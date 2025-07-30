@@ -216,6 +216,28 @@ input, textarea, select {
     height: 100vh;
     overflow: hidden;
   }
+  
+  /* iOS에서 약관동의 페이지 강제 표시 */
+  .register-content-area {
+    visibility: visible !important;
+    opacity: 1 !important;
+    display: block !important;
+  }
+  
+  /* iOS에서 약관동의 콘텐츠 강제 표시 */
+  [data-step="terms"] {
+    visibility: visible !important;
+    opacity: 1 !important;
+    display: block !important;
+    position: relative !important;
+    z-index: 1 !important;
+  }
+  
+  /* iOS에서 스크롤 영역 강제 초기화 */
+  .register-scroll-area {
+    scroll-top: 0 !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
 }
 
 /* Glass Effect 스타일 */

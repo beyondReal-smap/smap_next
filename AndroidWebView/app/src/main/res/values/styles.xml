@@ -2,10 +2,4 @@
     <style name="Theme.SmapWebView" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <!-- 필요에 따라 커스텀 속성 추가 -->
     </style>
-    
-    <style name="Theme.SmapWebView.NoActionBar" parent="Theme.SmapWebView">
-        <item name="android:windowFullscreen">true</item>
-        <item name="android:windowContentOverlay">@null</item>
-        <item name="android:windowBackground">@android:color/white</item>
-    </style>
 </resources> 

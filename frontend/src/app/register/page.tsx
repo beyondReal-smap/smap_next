@@ -632,37 +632,124 @@ export default function RegisterPage() {
       
       // iOS 전용 강력한 위치 고정
       const forceFixPosition = () => {
-        const registerForm = document.querySelector('.register-form') as HTMLElement;
+        // 올바른 스크롤 영역 선택자 사용
+        const scrollArea = document.querySelector('.register-scroll-area') as HTMLElement;
+        const contentArea = document.querySelector('.register-content-area') as HTMLElement;
         
-        if (registerForm) {
-          // 스크롤만 초기화
-          registerForm.scrollTop = 0;
-          registerForm.scrollTo({ top: 0, behavior: 'auto' });
+        if (scrollArea) {
+          // 스크롤 초기화
+          scrollArea.scrollTop = 0;
+          scrollArea.scrollTo({ top: 0, behavior: 'auto' });
+          console.log('🔧 [iOS FIX] register-scroll-area 스크롤 위치 초기화 완료');
         }
         
-        console.log('🔧 [iOS FIX] 스크롤 위치 초기화 완료');
+        if (contentArea) {
+          // 전체 컨텐츠 영역도 초기화
+          contentArea.scrollTop = 0;
+          contentArea.scrollTo({ top: 0, behavior: 'auto' });
+          console.log('🔧 [iOS FIX] register-content-area 스크롤 위치 초기화 완료');
+        }
+        
+        // 추가로 window 스크롤도 초기화
+        window.scrollTo({ top: 0, behavior: 'auto' });
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+        
+        console.log('🔧 [iOS FIX] 모든 스크롤 위치 초기화 완료');
       };
       
       if (isIOS) {
-        console.log('📱 [iOS] 약관 단계 진입 - 스크롤 위치 초기화');
+        console.log('📱 [iOS] 약관 단계 진입 - 강화된 스크롤 위치 초기화');
         
-        const registerForm = document.querySelector('.register-form') as HTMLElement;
-        if (registerForm) {
-          registerForm.scrollTop = 0;
-          registerForm.scrollTo(0, 0);
-        }
+        // 즉시 실행
+        forceFixPosition();
+        
+        // 추가로 약간의 지연 후 다시 실행 (iOS 렌더링 지연 대응)
+        setTimeout(() => {
+          forceFixPosition();
+        }, 100);
+        
+        // 더 긴 지연 후 한 번 더 실행
+        setTimeout(() => {
+          forceFixPosition();
+        }, 500);
       } else {
         // 안드로이드에서는 기본 스크롤 초기화만
-        const registerForm = document.querySelector('.register-form') as HTMLElement;
-        if (registerForm) {
-          registerForm.scrollTop = 0;
-          registerForm.scrollTo(0, 0);
+        const scrollArea = document.querySelector('.register-scroll-area') as HTMLElement;
+        if (scrollArea) {
+          scrollArea.scrollTop = 0;
+          scrollArea.scrollTo(0, 0);
         }
       }
     }
   }, [currentStep]);
 
-
+  // iOS에서 약관동의 페이지 강제 표시 (추가 보장)
+  useEffect(() => {
+    if (currentStep === REGISTER_STEPS.TERMS) {
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      
+      if (isIOS) {
+        console.log('📱 [iOS] 약관동의 페이지 강제 표시 보장');
+        
+        // 즉시 실행
+        const forceShowTerms = () => {
+          // 모든 스크롤 영역 초기화
+          const scrollArea = document.querySelector('.register-scroll-area') as HTMLElement;
+          const contentArea = document.querySelector('.register-content-area') as HTMLElement;
+          
+          if (scrollArea) {
+            scrollArea.scrollTop = 0;
+            scrollArea.scrollTo({ top: 0, behavior: 'auto' });
+          }
+          
+          if (contentArea) {
+            contentArea.scrollTop = 0;
+            contentArea.scrollTo({ top: 0, behavior: 'auto' });
+          }
+          
+          // window 스크롤도 초기화
+          window.scrollTo({ top: 0, behavior: 'auto' });
+          document.documentElement.scrollTop = 0;
+          document.body.scrollTop = 0;
+          
+          // 약관동의 콘텐츠 강제 표시
+          const termsContent = document.querySelector('[data-step="terms"]');
+          if (termsContent) {
+            (termsContent as HTMLElement).style.visibility = 'visible';
+            (termsContent as HTMLElement).style.opacity = '1';
+            (termsContent as HTMLElement).style.display = 'block';
+            (termsContent as HTMLElement).style.position = 'relative';
+            (termsContent as HTMLElement).style.zIndex = '1';
+          }
+          
+          // 추가로 모든 약관 관련 요소 강제 표시
+          const allTermsElements = document.querySelectorAll('.space-y-3, .terms-agreement-section, .terms-card');
+          allTermsElements.forEach((element) => {
+            (element as HTMLElement).style.visibility = 'visible';
+            (element as HTMLElement).style.opacity = '1';
+            (element as HTMLElement).style.display = 'block';
+          });
+          
+          console.log('📱 [iOS] 약관동의 페이지 강제 표시 완료');
+        };
+        
+        // 즉시 실행
+        forceShowTerms();
+        
+        // 약간의 지연 후 다시 실행
+        setTimeout(forceShowTerms, 100);
+        
+        // 더 긴 지연 후 한 번 더 실행
+        setTimeout(forceShowTerms, 500);
+        
+        // 최종 보장을 위한 실행
+        const timer = setTimeout(forceShowTerms, 1000);
+        
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [currentStep]);
 
   // 뒤로가기
   const handleBack = () => {
@@ -1262,6 +1349,15 @@ export default function RegisterPage() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -50 }}
               className="space-y-3"
+              data-step="terms"
+              style={{
+                // iOS에서 강제로 가시성 보장
+                visibility: 'visible',
+                opacity: 1,
+                display: 'block',
+                position: 'relative',
+                zIndex: 1
+              }}
             >
               <div className="text-center mb-4">
                 <div className="w-10 h-10 rounded-lg flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0113A3'}}>

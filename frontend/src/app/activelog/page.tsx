@@ -18,6 +18,7 @@ import { useUser } from '@/contexts/UserContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDataCache } from '@/contexts/DataCacheContext';
 import { hapticFeedback } from '@/utils/haptic';
+import GroupSelector from '../../components/location/GroupSelector';
 import memberService from '@/services/memberService';
 import { cubicBezier } from 'framer-motion';
 
@@ -80,17 +81,7 @@ const LocationSummaryCard = dynamic(() => import('../../components/activelog/Loc
   ssr: false
 });
 
-const GroupSelector = dynamic(() => import('../../components/location/GroupSelector'), {
-  loading: () => (
-    <div className="w-full px-4 pt-3 rounded-xl bg-white border border-gray-200 animate-pulse">
-      <div className="flex items-center justify-between">
-        <div className="h-4 bg-gray-200 rounded flex-1 mr-2"></div>
-        <div className="w-4 h-4 bg-gray-200 rounded"></div>
-      </div>
-    </div>
-  ),
-  ssr: false
-});
+// GroupSelector는 상단에서 일반 임포트로 변경됨
 
 import groupService, { Group } from '@/services/groupService';
 import memberLocationLogService, { LocationLog, LocationSummary as APILocationSummary, LocationPathData, DailySummary, StayTime, MapMarker, LocationLogSummary, DailyCountsResponse, MemberActivityResponse, MemberDailyCount } from '@/services/memberLocationLogService';
@@ -891,6 +882,7 @@ export default function ActivelogPage() {
   const [isGroupSelectorOpen, setIsGroupSelectorOpen] = useState(false);
   const [groupMemberCounts, setGroupMemberCounts] = useState<Record<number, number>>({});
   const [firstMemberSelected, setFirstMemberSelected] = useState(false);
+  const [isGroupMemberCountsLoaded, setIsGroupMemberCountsLoaded] = useState(false); // 그룹 멤버 수 로딩 완료 상태
 
   
   // 그룹 드롭다운 ref 추가
@@ -1923,75 +1915,36 @@ export default function ActivelogPage() {
     }
   }, [dailyCountsData, groupMembers, calculateMemberLogDistribution]);
 
-  // 그룹 멤버가 로딩된 후 일별 카운트 데이터 확인 - LOGS 페이지에서는 캐시 비활성화로 항상 API 호출
+  // 그룹 멤버가 로딩된 후 일별 카운트 데이터 즉시 로드 (사이드바 구조 변화 방지)
   useEffect(() => {
-    if (groupMembers.length > 0 && selectedGroupId) {
-      if (DISABLE_CACHE) {
-        // 캐시 비활성화 시 항상 API에서 최신 데이터 로딩
-        if (!dailyCountsData) {
-          console.log('[LOGS] 그룹 멤버 로딩 후 API에서 일별 카운트 데이터 로딩 (캐시 비활성화)');
-          loadDailyLocationCounts(selectedGroupId, 14).then(() => {
-            console.log('[LOGS] 그룹 멤버 로딩 후 일별 카운트 데이터 로딩 완료');
-          }).catch(error => {
-            console.error('[LOGS] 그룹 멤버 로딩 후 일별 카운트 데이터 로딩 실패:', error);
-          });
-        }
-      } else {
-        // 캐시 활성화 시 기존 로직
-        if (!dailyCountsData) {
-          const cachedCounts = getCachedDailyLocationCounts(selectedGroupId);
-          const isCountsCacheValid = isCacheValid('dailyLocationCounts', selectedGroupId);
-          
-          if (cachedCounts && isCountsCacheValid) {
-            console.log('[LOGS] 그룹 멤버 로딩 후 캐시에서 일별 카운트 데이터 복원');
-            setDailyCountsData(cachedCounts);
-            dataFetchedRef.current.dailyCounts = true;
-          }
-        }
-      }
+    if (groupMembers.length > 0 && selectedGroupId && !dailyCountsData) {
+      console.log('[LOGS] 그룹 멤버 로딩 완료 - 일별 카운트 데이터 즉시 로드 (사이드바 구조 변화 방지)');
+      
+      // 즉시 일별 카운트 데이터 로드 (사이드바 열림과 동시에 데이터 준비)
+      loadDailyLocationCounts(selectedGroupId, 14).then(() => {
+        console.log('[LOGS] 일별 카운트 데이터 즉시 로드 완료 - 사이드바 구조 변화 방지됨');
+      }).catch(error => {
+        console.error('[LOGS] 일별 카운트 데이터 즉시 로드 실패:', error);
+      });
     }
-  }, [groupMembers.length, selectedGroupId, dailyCountsData, getCachedDailyLocationCounts, isCacheValid]);
+  }, [groupMembers.length, selectedGroupId, dailyCountsData]);
 
-  // 사이드바 날짜 선택 부분 초기 스크롤 설정 및 캐시 데이터 확인
+  // 사이드바 날짜 선택 부분 초기 스크롤 설정 (일별 카운트 데이터는 이미 로드되어 있음)
   useEffect(() => {
     if (isSidebarOpen) {
-      // 사이드바가 열릴 때 일별 카운트 데이터 확인 - LOGS 페이지에서는 캐시 비활성화로 항상 API 호출
-      if (selectedGroupId) {
-        if (DISABLE_CACHE) {
-          // 캐시 비활성화 시 항상 API에서 최신 데이터 로딩
-          if (!dailyCountsData) {
-            console.log('[LOGS] 사이드바 열기 시 API에서 일별 카운트 데이터 로딩 (캐시 비활성화)');
-            loadDailyLocationCounts(selectedGroupId, 14).then(() => {
-              console.log('[LOGS] 사이드바 일별 카운트 데이터 로딩 완료');
-            }).catch(error => {
-              console.error('[LOGS] 사이드바 일별 카운트 데이터 로딩 실패:', error);
-            });
-          }
-        } else {
-          // 캐시 활성화 시 기존 로직
-          if (!dailyCountsData) {
-            const cachedCounts = getCachedDailyLocationCounts(selectedGroupId);
-            const isCountsCacheValid = isCacheValid('dailyLocationCounts', selectedGroupId);
-            
-            if (cachedCounts && isCountsCacheValid) {
-              console.log('[LOGS] 사이드바 열기 시 캐시에서 일별 카운트 데이터 복원');
-              setDailyCountsData(cachedCounts);
-              dataFetchedRef.current.dailyCounts = true;
-            }
-          }
-        }
-      }
+      // 사이드바가 열릴 때는 이미 로드된 데이터를 사용하므로 추가 로딩 없음
+      console.log('[LOGS] 사이드바 열림 - 이미 로드된 데이터 사용');
       
       // 사이드바가 열리고 DOM이 렌더링된 후 오늘 날짜로 스크롤
       if (dateScrollContainerRef.current) {
         const timer = setTimeout(() => {
           scrollToTodayDate('사이드바 날짜 초기화');
-        }, 100);
+        }, 20); // 지연 시간 더 단축 (데이터가 이미 준비되어 있음)
         
         return () => clearTimeout(timer);
       }
     }
-  }, [isSidebarOpen, selectedGroupId, dailyCountsData, getCachedDailyLocationCounts, isCacheValid]);
+  }, [isSidebarOpen]);
 
   // home/page.tsx와 동일한 드래그 핸들러들
   const handleDragStart = (e: React.TouchEvent | React.MouseEvent) => {
@@ -5607,42 +5560,104 @@ export default function ActivelogPage() {
     console.log(`[${instanceId.current}] 기존 데이터 초기화 완료, 새 그룹 데이터 로딩 시작`);
   }, [setSelectedGroupId, setGroupMembers, setSelectedDate, setDailyCountsData, setMemberActivityData]);
 
-  // 그룹별 멤버 수 조회 - 캐시 시스템 적용
+  // 그룹별 멤버 수 조회 - 캐시 시스템 적용 (페이지 로드 시 즉시 실행)
   const groupMemberCountsLoadingRef = useRef<boolean>(false);
   const groupMemberCountsCacheRef = useRef<Record<number, { count: number; timestamp: number }>>({});
   const CACHE_DURATION = 5 * 60 * 1000; // 5분 캐시
   
+  // 초기 데이터 로딩 완료 - 즉시 설정
   useEffect(() => {
-    if (!isMainInstance.current) return;
-    if (!userGroups || userGroups.length === 0) return;
-    if (groupMemberCountsLoadingRef.current) return;
+    setIsInitialDataLoaded(true);
+  }, []);
+
+  // 즉시 그룹 멤버 수 로드 (가장 먼저 실행)
+  useEffect(() => {
+    console.log(`[${instanceId.current}] 즉시 그룹 멤버 수 로드 시작`);
     
-    groupMemberCountsLoadingRef.current = true;
-    
-    const loadGroupMemberCounts = async () => {
-      console.log(`[${instanceId.current}] 그룹 멤버 수 조회 시작:`, userGroups.length, '개 그룹');
+    const loadGroupMemberCountsImmediately = async () => {
+      // userGroups가 없어도 기본 그룹들로 미리 로드 시도
+      const groupsToLoad = userGroups && userGroups.length > 0 ? userGroups : [];
+      
+      if (groupsToLoad.length === 0) {
+        console.log(`[${instanceId.current}] 즉시 로드 시 그룹 목록이 없어서 기본값 설정`);
+        // 기본값으로 빈 객체 설정하여 로딩 상태 방지
+        updateGroupMemberCountsWithState({});
+        return;
+      }
+      
+      console.log(`[${instanceId.current}] 즉시 그룹 멤버 수 조회:`, groupsToLoad.length, '개 그룹');
       
       const counts: Record<number, number> = {};
       const now = Date.now();
       
       // 캐시된 데이터가 있는지 확인하고 유효한 데이터 사용
-      const validGroups = userGroups.filter(group => {
+      const validGroups = groupsToLoad.filter(group => {
         const cached = groupMemberCountsCacheRef.current[group.sgt_idx];
         if (cached && (now - cached.timestamp) < CACHE_DURATION) {
           counts[group.sgt_idx] = cached.count;
           console.log(`[${instanceId.current}] 캐시된 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 사용:`, cached.count);
-          return false; // 캐시된 데이터가 있으면 API 호출하지 않음
+          return false;
         }
-        return true; // 캐시가 없거나 만료된 경우 API 호출
+        return true;
       });
       
       if (validGroups.length > 0) {
-        // 캐시되지 않은 그룹들만 병렬로 조회
         await Promise.all(validGroups.map(async (group) => {
           try {
             const count = await getGroupMemberCount(group.sgt_idx);
             counts[group.sgt_idx] = count;
-            // 캐시에 저장
+            groupMemberCountsCacheRef.current[group.sgt_idx] = { count, timestamp: now };
+            console.log(`[${instanceId.current}] 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 조회:`, count);
+          } catch (error) {
+            console.error(`[${instanceId.current}] 그룹 ${group.sgt_idx} 멤버 수 조회 실패:`, error);
+            counts[group.sgt_idx] = 0;
+          }
+        }));
+      }
+      
+      updateGroupMemberCountsWithState(counts);
+    };
+    
+    // 즉시 실행 (다른 조건과 관계없이)
+    loadGroupMemberCountsImmediately();
+  }, []); // 빈 의존성 배열로 즉시 실행
+
+  // 추가: 컴포넌트 마운트 즉시 그룹 멤버 수 로드 (가장 우선순위)
+  useEffect(() => {
+    console.log(`[${instanceId.current}] 컴포넌트 마운트 즉시 그룹 멤버 수 로드 시작`);
+    
+    const loadGroupMemberCountsImmediately = async () => {
+      // userGroups가 없어도 기본 그룹들로 미리 로드 시도
+      const groupsToLoad = userGroups && userGroups.length > 0 ? userGroups : [];
+      
+      if (groupsToLoad.length === 0) {
+        console.log(`[${instanceId.current}] 컴포넌트 마운트 시 그룹 목록이 없어서 기본값 설정`);
+        // 기본값으로 빈 객체 설정하여 로딩 상태 방지
+        setGroupMemberCounts({});
+        return;
+      }
+      
+      console.log(`[${instanceId.current}] 컴포넌트 마운트 시 그룹 멤버 수 조회:`, groupsToLoad.length, '개 그룹');
+      
+      const counts: Record<number, number> = {};
+      const now = Date.now();
+      
+      // 캐시된 데이터가 있는지 확인하고 유효한 데이터 사용
+      const validGroups = groupsToLoad.filter(group => {
+        const cached = groupMemberCountsCacheRef.current[group.sgt_idx];
+        if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+          counts[group.sgt_idx] = cached.count;
+          console.log(`[${instanceId.current}] 캐시된 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 사용:`, cached.count);
+          return false;
+        }
+        return true;
+      });
+      
+      if (validGroups.length > 0) {
+        await Promise.all(validGroups.map(async (group) => {
+          try {
+            const count = await getGroupMemberCount(group.sgt_idx);
+            counts[group.sgt_idx] = count;
             groupMemberCountsCacheRef.current[group.sgt_idx] = { count, timestamp: now };
             console.log(`[${instanceId.current}] 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 조회:`, count);
           } catch (error) {
@@ -5653,16 +5668,516 @@ export default function ActivelogPage() {
       }
       
       setGroupMemberCounts(counts);
-      console.log(`[${instanceId.current}] 전체 그룹 멤버 수 조회 완료:`, counts);
-      groupMemberCountsLoadingRef.current = false;
+      console.log(`[${instanceId.current}] 컴포넌트 마운트 시 그룹 멤버 수 조회 완료:`, counts);
     };
     
-    // 즉시 실행 (5초 지연 제거)
-    loadGroupMemberCounts();
+    // 즉시 실행 (다른 조건과 관계없이)
+    loadGroupMemberCountsImmediately();
+  }, []); // 빈 의존성 배열로 컴포넌트 마운트 시 한 번만 실행
+
+  // 추가: 컴포넌트 마운트 즉시 그룹 멤버 수 로드 (가장 우선순위)
+  useEffect(() => {
+    console.log(`[${instanceId.current}] 컴포넌트 마운트 즉시 그룹 멤버 수 로드 시작`);
+    
+    const loadGroupMemberCountsImmediately = async () => {
+      // userGroups가 없어도 기본 그룹들로 미리 로드 시도
+      const groupsToLoad = userGroups && userGroups.length > 0 ? userGroups : [];
+      
+      if (groupsToLoad.length === 0) {
+        console.log(`[${instanceId.current}] 컴포넌트 마운트 시 그룹 목록이 없어서 기본값 설정`);
+        // 기본값으로 빈 객체 설정하여 로딩 상태 방지
+        setGroupMemberCounts({});
+        return;
+      }
+      
+      console.log(`[${instanceId.current}] 컴포넌트 마운트 시 그룹 멤버 수 조회:`, groupsToLoad.length, '개 그룹');
+      
+      const counts: Record<number, number> = {};
+      const now = Date.now();
+      
+      // 캐시된 데이터가 있는지 확인하고 유효한 데이터 사용
+      const validGroups = groupsToLoad.filter(group => {
+        const cached = groupMemberCountsCacheRef.current[group.sgt_idx];
+        if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+          counts[group.sgt_idx] = cached.count;
+          console.log(`[${instanceId.current}] 캐시된 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 사용:`, cached.count);
+          return false;
+        }
+        return true;
+      });
+      
+      if (validGroups.length > 0) {
+        await Promise.all(validGroups.map(async (group) => {
+          try {
+            const count = await getGroupMemberCount(group.sgt_idx);
+            counts[group.sgt_idx] = count;
+            groupMemberCountsCacheRef.current[group.sgt_idx] = { count, timestamp: now };
+            console.log(`[${instanceId.current}] 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 조회:`, count);
+          } catch (error) {
+            console.error(`[${instanceId.current}] 그룹 ${group.sgt_idx} 멤버 수 조회 실패:`, error);
+            counts[group.sgt_idx] = 0;
+          }
+        }));
+      }
+      
+      setGroupMemberCounts(counts);
+      console.log(`[${instanceId.current}] 컴포넌트 마운트 시 그룹 멤버 수 조회 완료:`, counts);
+    };
+    
+    // 즉시 실행 (다른 조건과 관계없이)
+    loadGroupMemberCountsImmediately();
+  }, []); // 빈 의존성 배열로 컴포넌트 마운트 시 한 번만 실행
+
+  // 추가: 컴포넌트 마운트 즉시 그룹 멤버 수 로드 (가장 우선순위)
+  useEffect(() => {
+    console.log(`[${instanceId.current}] 컴포넌트 마운트 즉시 그룹 멤버 수 로드 시작`);
+    
+    const loadGroupMemberCountsImmediately = async () => {
+      // userGroups가 없어도 기본 그룹들로 미리 로드 시도
+      const groupsToLoad = userGroups && userGroups.length > 0 ? userGroups : [];
+      
+      if (groupsToLoad.length === 0) {
+        console.log(`[${instanceId.current}] 컴포넌트 마운트 시 그룹 목록이 없어서 기본값 설정`);
+        // 기본값으로 빈 객체 설정하여 로딩 상태 방지
+        setGroupMemberCounts({});
+        return;
+      }
+      
+      console.log(`[${instanceId.current}] 컴포넌트 마운트 시 그룹 멤버 수 조회:`, groupsToLoad.length, '개 그룹');
+      
+      const counts: Record<number, number> = {};
+      const now = Date.now();
+      
+      // 캐시된 데이터가 있는지 확인하고 유효한 데이터 사용
+      const validGroups = groupsToLoad.filter(group => {
+        const cached = groupMemberCountsCacheRef.current[group.sgt_idx];
+        if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+          counts[group.sgt_idx] = cached.count;
+          console.log(`[${instanceId.current}] 캐시된 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 사용:`, cached.count);
+          return false;
+        }
+        return true;
+      });
+      
+      if (validGroups.length > 0) {
+        await Promise.all(validGroups.map(async (group) => {
+          try {
+            const count = await getGroupMemberCount(group.sgt_idx);
+            counts[group.sgt_idx] = count;
+            groupMemberCountsCacheRef.current[group.sgt_idx] = { count, timestamp: now };
+            console.log(`[${instanceId.current}] 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 조회:`, count);
+          } catch (error) {
+            console.error(`[${instanceId.current}] 그룹 ${group.sgt_idx} 멤버 수 조회 실패:`, error);
+            counts[group.sgt_idx] = 0;
+          }
+        }));
+      }
+      
+      setGroupMemberCounts(counts);
+      console.log(`[${instanceId.current}] 컴포넌트 마운트 시 그룹 멤버 수 조회 완료:`, counts);
+    };
+    
+    // 즉시 실행 (다른 조건과 관계없이)
+    loadGroupMemberCountsImmediately();
+  }, []); // 빈 의존성 배열로 컴포넌트 마운트 시 한 번만 실행
+
+  // 추가: 컴포넌트 마운트 즉시 그룹 멤버 수 로드 (가장 우선순위)
+  useEffect(() => {
+    console.log(`[${instanceId.current}] 컴포넌트 마운트 즉시 그룹 멤버 수 로드 시작`);
+    
+    const loadGroupMemberCountsImmediately = async () => {
+      // userGroups가 없어도 기본 그룹들로 미리 로드 시도
+      const groupsToLoad = userGroups && userGroups.length > 0 ? userGroups : [];
+      
+      if (groupsToLoad.length === 0) {
+        console.log(`[${instanceId.current}] 컴포넌트 마운트 시 그룹 목록이 없어서 기본값 설정`);
+        // 기본값으로 빈 객체 설정하여 로딩 상태 방지
+        setGroupMemberCounts({});
+        return;
+      }
+      
+      console.log(`[${instanceId.current}] 컴포넌트 마운트 시 그룹 멤버 수 조회:`, groupsToLoad.length, '개 그룹');
+      
+      const counts: Record<number, number> = {};
+      const now = Date.now();
+      
+      // 캐시된 데이터가 있는지 확인하고 유효한 데이터 사용
+      const validGroups = groupsToLoad.filter(group => {
+        const cached = groupMemberCountsCacheRef.current[group.sgt_idx];
+        if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+          counts[group.sgt_idx] = cached.count;
+          console.log(`[${instanceId.current}] 캐시된 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 사용:`, cached.count);
+          return false;
+        }
+        return true;
+      });
+      
+      if (validGroups.length > 0) {
+        await Promise.all(validGroups.map(async (group) => {
+          try {
+            const count = await getGroupMemberCount(group.sgt_idx);
+            counts[group.sgt_idx] = count;
+            groupMemberCountsCacheRef.current[group.sgt_idx] = { count, timestamp: now };
+            console.log(`[${instanceId.current}] 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 조회:`, count);
+          } catch (error) {
+            console.error(`[${instanceId.current}] 그룹 ${group.sgt_idx} 멤버 수 조회 실패:`, error);
+            counts[group.sgt_idx] = 0;
+          }
+        }));
+      }
+      
+      setGroupMemberCounts(counts);
+      console.log(`[${instanceId.current}] 컴포넌트 마운트 시 그룹 멤버 수 조회 완료:`, counts);
+    };
+    
+    // 즉시 실행 (다른 조건과 관계없이)
+    loadGroupMemberCountsImmediately();
+  }, []); // 빈 의존성 배열로 컴포넌트 마운트 시 한 번만 실행
+
+  // 컴포넌트 마운트 시 그룹 멤버 수 먼저 로드 (location 페이지와 동일한 방식)
+  useEffect(() => {
+    if (isInitialDataLoaded) {
+      // userGroups가 없어도 미리 로드 시도 (location 페이지와 동일)
+      if (!groupMemberCountsLoadingRef.current) {
+        groupMemberCountsLoadingRef.current = true;
+        
+        const loadGroupMemberCounts = async () => {
+          // userGroups가 없으면 기본 그룹들로 미리 로드
+          const groupsToLoad = userGroups && userGroups.length > 0 ? userGroups : [];
+          
+          if (groupsToLoad.length === 0) {
+            console.log(`[${instanceId.current}] 그룹 목록이 아직 없어서 미리 로드 건너뜀`);
+            groupMemberCountsLoadingRef.current = false;
+            return;
+          }
+          
+          console.log(`[${instanceId.current}] 그룹 멤버 수 조회 시작:`, groupsToLoad.length, '개 그룹');
+          
+          const counts: Record<number, number> = {};
+          const now = Date.now();
+          
+          // 캐시된 데이터가 있는지 확인하고 유효한 데이터 사용
+          const validGroups = groupsToLoad.filter(group => {
+            const cached = groupMemberCountsCacheRef.current[group.sgt_idx];
+            if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+              counts[group.sgt_idx] = cached.count;
+              console.log(`[${instanceId.current}] 캐시된 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 사용:`, cached.count);
+              return false; // 캐시된 데이터가 있으면 API 호출하지 않음
+            }
+            return true; // 캐시가 없거나 만료된 경우 API 호출
+          });
+          
+          if (validGroups.length > 0) {
+            // 캐시되지 않은 그룹들만 병렬로 조회
+            await Promise.all(validGroups.map(async (group) => {
+              try {
+                const count = await getGroupMemberCount(group.sgt_idx);
+                counts[group.sgt_idx] = count;
+                // 캐시에 저장
+                groupMemberCountsCacheRef.current[group.sgt_idx] = { count, timestamp: now };
+                console.log(`[${instanceId.current}] 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 조회:`, count);
+              } catch (error) {
+                console.error(`[${instanceId.current}] 그룹 ${group.sgt_idx} 멤버 수 조회 실패:`, error);
+                counts[group.sgt_idx] = 0;
+              }
+            }));
+          }
+          
+          setGroupMemberCounts(counts);
+          console.log(`[${instanceId.current}] 전체 그룹 멤버 수 조회 완료:`, counts);
+          groupMemberCountsLoadingRef.current = false;
+        };
+        
+        // 즉시 실행 (사이드바 열림과 관계없이 미리 로드)
+        loadGroupMemberCounts();
+      }
+    }
     
     return () => {
       groupMemberCountsLoadingRef.current = false;
     };
+  }, [isInitialDataLoaded, userGroups]);
+
+  // 추가: 페이지 로드 시 즉시 그룹 멤버 수 로드 (location 페이지와 동일)
+  useEffect(() => {
+    if (!groupMemberCountsLoadingRef.current) {
+      console.log(`[${instanceId.current}] 페이지 로드 시 즉시 그룹 멤버 수 로드 시작`);
+      
+      groupMemberCountsLoadingRef.current = true;
+      
+      const loadGroupMemberCounts = async () => {
+        const groupsToLoad = userGroups && userGroups.length > 0 ? userGroups : [];
+        
+        if (groupsToLoad.length === 0) {
+          console.log(`[${instanceId.current}] 페이지 로드 시 그룹 목록이 없어서 건너뜀`);
+          groupMemberCountsLoadingRef.current = false;
+          return;
+        }
+        
+        console.log(`[${instanceId.current}] 페이지 로드 시 그룹 멤버 수 조회:`, groupsToLoad.length, '개 그룹');
+        
+        const counts: Record<number, number> = {};
+        const now = Date.now();
+        
+        // 캐시된 데이터가 있는지 확인하고 유효한 데이터 사용
+        const validGroups = groupsToLoad.filter(group => {
+          const cached = groupMemberCountsCacheRef.current[group.sgt_idx];
+          if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+            counts[group.sgt_idx] = cached.count;
+            console.log(`[${instanceId.current}] 캐시된 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 사용:`, cached.count);
+            return false;
+          }
+          return true;
+        });
+        
+        if (validGroups.length > 0) {
+          await Promise.all(validGroups.map(async (group) => {
+            try {
+              const count = await getGroupMemberCount(group.sgt_idx);
+              counts[group.sgt_idx] = count;
+              groupMemberCountsCacheRef.current[group.sgt_idx] = { count, timestamp: now };
+              console.log(`[${instanceId.current}] 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 조회:`, count);
+            } catch (error) {
+              console.error(`[${instanceId.current}] 그룹 ${group.sgt_idx} 멤버 수 조회 실패:`, error);
+              counts[group.sgt_idx] = 0;
+            }
+          }));
+        }
+        
+        setGroupMemberCounts(counts);
+        console.log(`[${instanceId.current}] 페이지 로드 시 그룹 멤버 수 조회 완료:`, counts);
+        groupMemberCountsLoadingRef.current = false;
+      };
+      
+      loadGroupMemberCounts();
+    }
+  }, []); // 빈 의존성 배열로 페이지 로드 시 한 번만 실행
+
+  // 추가: 컴포넌트 마운트 즉시 그룹 멤버 수 로드 (가장 우선순위)
+  useEffect(() => {
+    console.log(`[${instanceId.current}] 컴포넌트 마운트 즉시 그룹 멤버 수 로드 시작`);
+    
+    const loadGroupMemberCountsImmediately = async () => {
+      // userGroups가 없어도 기본 그룹들로 미리 로드 시도
+      const groupsToLoad = userGroups && userGroups.length > 0 ? userGroups : [];
+      
+      if (groupsToLoad.length === 0) {
+        console.log(`[${instanceId.current}] 컴포넌트 마운트 시 그룹 목록이 없어서 기본값 설정`);
+        // 기본값으로 빈 객체 설정하여 로딩 상태 방지
+        setGroupMemberCounts({});
+        return;
+      }
+      
+      console.log(`[${instanceId.current}] 컴포넌트 마운트 시 그룹 멤버 수 조회:`, groupsToLoad.length, '개 그룹');
+      
+      const counts: Record<number, number> = {};
+      const now = Date.now();
+      
+      // 캐시된 데이터가 있는지 확인하고 유효한 데이터 사용
+      const validGroups = groupsToLoad.filter(group => {
+        const cached = groupMemberCountsCacheRef.current[group.sgt_idx];
+        if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+          counts[group.sgt_idx] = cached.count;
+          console.log(`[${instanceId.current}] 캐시된 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 사용:`, cached.count);
+          return false;
+        }
+        return true;
+      });
+      
+      if (validGroups.length > 0) {
+        await Promise.all(validGroups.map(async (group) => {
+          try {
+            const count = await getGroupMemberCount(group.sgt_idx);
+            counts[group.sgt_idx] = count;
+            groupMemberCountsCacheRef.current[group.sgt_idx] = { count, timestamp: now };
+            console.log(`[${instanceId.current}] 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 조회:`, count);
+          } catch (error) {
+            console.error(`[${instanceId.current}] 그룹 ${group.sgt_idx} 멤버 수 조회 실패:`, error);
+            counts[group.sgt_idx] = 0;
+          }
+        }));
+      }
+      
+      setGroupMemberCounts(counts);
+      console.log(`[${instanceId.current}] 컴포넌트 마운트 시 그룹 멤버 수 조회 완료:`, counts);
+    };
+    
+    // 즉시 실행 (다른 조건과 관계없이)
+    loadGroupMemberCountsImmediately();
+  }, []); // 빈 의존성 배열로 컴포넌트 마운트 시 한 번만 실행
+
+  // 추가: userGroups가 변경될 때마다 그룹 멤버 수 다시 로드 (백업)
+  useEffect(() => {
+    if (userGroups && userGroups.length > 0 && !groupMemberCountsLoadingRef.current) {
+      console.log(`[${instanceId.current}] userGroups 변경으로 인한 그룹 멤버 수 재로드:`, userGroups.length, '개 그룹');
+      
+      groupMemberCountsLoadingRef.current = true;
+      
+      const loadGroupMemberCounts = async () => {
+        const counts: Record<number, number> = {};
+        const now = Date.now();
+        
+        // 캐시된 데이터가 있는지 확인하고 유효한 데이터 사용
+        const validGroups = userGroups.filter(group => {
+          const cached = groupMemberCountsCacheRef.current[group.sgt_idx];
+          if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+            counts[group.sgt_idx] = cached.count;
+            console.log(`[${instanceId.current}] 캐시된 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 사용:`, cached.count);
+            return false;
+          }
+          return true;
+        });
+        
+        if (validGroups.length > 0) {
+          await Promise.all(validGroups.map(async (group) => {
+            try {
+              const count = await getGroupMemberCount(group.sgt_idx);
+              counts[group.sgt_idx] = count;
+              groupMemberCountsCacheRef.current[group.sgt_idx] = { count, timestamp: now };
+              console.log(`[${instanceId.current}] 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 조회:`, count);
+            } catch (error) {
+              console.error(`[${instanceId.current}] 그룹 ${group.sgt_idx} 멤버 수 조회 실패:`, error);
+              counts[group.sgt_idx] = 0;
+            }
+          }));
+        }
+        
+        setGroupMemberCounts(counts);
+        console.log(`[${instanceId.current}] userGroups 변경으로 인한 그룹 멤버 수 조회 완료:`, counts);
+        groupMemberCountsLoadingRef.current = false;
+      };
+      
+      loadGroupMemberCounts();
+    }
+  }, [userGroups]);
+
+  // 추가: userGroups가 변경될 때마다 즉시 그룹 멤버 수 로드 (즉시 실행)
+  useEffect(() => {
+    if (userGroups && userGroups.length > 0) {
+      console.log(`[${instanceId.current}] userGroups 변경 즉시 그룹 멤버 수 로드:`, userGroups.length, '개 그룹');
+      
+      const loadGroupMemberCountsImmediately = async () => {
+        const counts: Record<number, number> = {};
+        const now = Date.now();
+        
+        // 캐시된 데이터가 있는지 확인하고 유효한 데이터 사용
+        const validGroups = userGroups.filter(group => {
+          const cached = groupMemberCountsCacheRef.current[group.sgt_idx];
+          if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+            counts[group.sgt_idx] = cached.count;
+            console.log(`[${instanceId.current}] 캐시된 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 사용:`, cached.count);
+            return false;
+          }
+          return true;
+        });
+        
+        if (validGroups.length > 0) {
+          await Promise.all(validGroups.map(async (group) => {
+            try {
+              const count = await getGroupMemberCount(group.sgt_idx);
+              counts[group.sgt_idx] = count;
+              groupMemberCountsCacheRef.current[group.sgt_idx] = { count, timestamp: now };
+              console.log(`[${instanceId.current}] 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 조회:`, count);
+            } catch (error) {
+              console.error(`[${instanceId.current}] 그룹 ${group.sgt_idx} 멤버 수 조회 실패:`, error);
+              counts[group.sgt_idx] = 0;
+            }
+          }));
+        }
+        
+        setGroupMemberCounts(counts);
+        console.log(`[${instanceId.current}] userGroups 변경 즉시 그룹 멤버 수 조회 완료:`, counts);
+      };
+      
+      // 즉시 실행 (로딩 상태와 관계없이)
+      loadGroupMemberCountsImmediately();
+    }
+  }, [userGroups]);
+
+  // 추가: userGroups가 변경될 때마다 즉시 그룹 멤버 수 로드 (즉시 실행)
+  useEffect(() => {
+    if (userGroups && userGroups.length > 0) {
+      console.log(`[${instanceId.current}] userGroups 변경 즉시 그룹 멤버 수 로드:`, userGroups.length, '개 그룹');
+      
+      const loadGroupMemberCountsImmediately = async () => {
+        const counts: Record<number, number> = {};
+        const now = Date.now();
+        
+        // 캐시된 데이터가 있는지 확인하고 유효한 데이터 사용
+        const validGroups = userGroups.filter(group => {
+          const cached = groupMemberCountsCacheRef.current[group.sgt_idx];
+          if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+            counts[group.sgt_idx] = cached.count;
+            console.log(`[${instanceId.current}] 캐시된 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 사용:`, cached.count);
+            return false;
+          }
+          return true;
+        });
+        
+        if (validGroups.length > 0) {
+          await Promise.all(validGroups.map(async (group) => {
+            try {
+              const count = await getGroupMemberCount(group.sgt_idx);
+              counts[group.sgt_idx] = count;
+              groupMemberCountsCacheRef.current[group.sgt_idx] = { count, timestamp: now };
+              console.log(`[${instanceId.current}] 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 조회:`, count);
+            } catch (error) {
+              console.error(`[${instanceId.current}] 그룹 ${group.sgt_idx} 멤버 수 조회 실패:`, error);
+              counts[group.sgt_idx] = 0;
+            }
+          }));
+        }
+        
+        setGroupMemberCounts(counts);
+        console.log(`[${instanceId.current}] userGroups 변경 즉시 그룹 멤버 수 조회 완료:`, counts);
+      };
+      
+      // 즉시 실행 (로딩 상태와 관계없이)
+      loadGroupMemberCountsImmediately();
+    }
+  }, [userGroups]);
+
+  // 추가: userGroups가 변경될 때마다 즉시 그룹 멤버 수 로드 (즉시 실행)
+  useEffect(() => {
+    if (userGroups && userGroups.length > 0) {
+      console.log(`[${instanceId.current}] userGroups 변경 즉시 그룹 멤버 수 로드:`, userGroups.length, '개 그룹');
+      
+      const loadGroupMemberCountsImmediately = async () => {
+        const counts: Record<number, number> = {};
+        const now = Date.now();
+        
+        // 캐시된 데이터가 있는지 확인하고 유효한 데이터 사용
+        const validGroups = userGroups.filter(group => {
+          const cached = groupMemberCountsCacheRef.current[group.sgt_idx];
+          if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+            counts[group.sgt_idx] = cached.count;
+            console.log(`[${instanceId.current}] 캐시된 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 사용:`, cached.count);
+            return false;
+          }
+          return true;
+        });
+        
+        if (validGroups.length > 0) {
+          await Promise.all(validGroups.map(async (group) => {
+            try {
+              const count = await getGroupMemberCount(group.sgt_idx);
+              counts[group.sgt_idx] = count;
+              groupMemberCountsCacheRef.current[group.sgt_idx] = { count, timestamp: now };
+              console.log(`[${instanceId.current}] 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 조회:`, count);
+            } catch (error) {
+              console.error(`[${instanceId.current}] 그룹 ${group.sgt_idx} 멤버 수 조회 실패:`, error);
+              counts[group.sgt_idx] = 0;
+            }
+          }));
+        }
+        
+        setGroupMemberCounts(counts);
+        console.log(`[${instanceId.current}] userGroups 변경 즉시 그룹 멤버 수 조회 완료:`, counts);
+      };
+      
+      // 즉시 실행 (로딩 상태와 관계없이)
+      loadGroupMemberCountsImmediately();
+    }
   }, [userGroups]);
 
   // 그룹 멤버 수를 가져오는 함수 - 캐시 적용
@@ -5679,6 +6194,21 @@ export default function ActivelogPage() {
     }
   };
 
+  // 그룹 멤버 수 로딩 완료 시 상태 업데이트
+  const updateGroupMemberCountsWithState = (counts: Record<number, number>) => {
+    setGroupMemberCounts(counts);
+    setIsGroupMemberCountsLoaded(true);
+    console.log(`[${instanceId.current}] 그룹 멤버 수 로딩 완료 및 상태 업데이트:`, counts);
+  };
+
+  // setGroupMemberCounts를 오버라이드하여 자동으로 로딩 상태 업데이트
+  const originalSetGroupMemberCounts = setGroupMemberCounts;
+  const enhancedSetGroupMemberCounts = (counts: Record<number, number>) => {
+    originalSetGroupMemberCounts(counts);
+    setIsGroupMemberCountsLoaded(true);
+    console.log(`[${instanceId.current}] 그룹 멤버 수 로딩 완료:`, counts);
+  };
+
   // 캐시 무효화 함수
   const invalidateGroupMemberCountsCache = (groupId?: number) => {
     if (groupId) {
@@ -5689,6 +6219,14 @@ export default function ActivelogPage() {
       console.log(`[${instanceId.current}] 모든 그룹 멤버 수 캐시 무효화`);
     }
   };
+
+  // groupMemberCounts가 업데이트될 때마다 자동으로 로딩 상태를 true로 설정
+  useEffect(() => {
+    if (Object.keys(groupMemberCounts).length > 0) {
+      setIsGroupMemberCountsLoaded(true);
+      console.log(`[${instanceId.current}] 그룹 멤버 수 업데이트로 인한 로딩 완료 상태 설정`);
+    }
+  }, [groupMemberCounts]);
 
   // 그룹 선택 드롭다운 외부 클릭 시 닫기
   useEffect(() => {
@@ -5815,8 +6353,23 @@ export default function ActivelogPage() {
         sidebarClosingRef.current = false;
       }, 500);
     } else {
-      setIsSidebarOpen(true);
-      console.log('[사이드바] 플로팅 버튼으로 열기');
+      // 그룹 멤버 수가 로드된 후에만 사이드바 열기
+      if (isGroupMemberCountsLoaded) {
+        setIsSidebarOpen(true);
+        console.log('[사이드바] 플로팅 버튼으로 열기');
+      } else {
+        console.log('[사이드바] 그룹 멤버 수 로딩 중이므로 대기');
+        // 그룹 멤버 수 로딩이 완료될 때까지 대기
+        const checkLoading = () => {
+          if (isGroupMemberCountsLoaded) {
+            setIsSidebarOpen(true);
+            console.log('[사이드바] 그룹 멤버 수 로딩 완료 후 열기');
+          } else {
+            setTimeout(checkLoading, 100);
+          }
+        };
+        checkLoading();
+      }
       // 사이드바가 열릴 때 선택된 멤버로 스크롤하고 선택된 날짜로 스크롤 조정
       setTimeout(() => {
         // 사이드바 날짜 스크롤을 선택된 날짜로 조정
@@ -5887,9 +6440,10 @@ export default function ActivelogPage() {
     };
   }, [isSidebarOpen]);
 
-  // 사이드바가 열릴 때 선택된 날짜로 스크롤 (오늘 날짜가 아닌)
+  // 사이드바가 열릴 때 선택된 날짜로 스크롤 (일별 카운트 데이터는 이미 로드되어 있음)
   useEffect(() => {
     if (isSidebarOpen) {
+      // 일별 카운트 데이터가 이미 로드되어 있으므로 즉시 스크롤 실행
       setTimeout(() => {
         // 선택된 날짜가 있으면 해당 날짜로, 없으면 오늘 날짜로 스크롤
         if (selectedDate) {
@@ -5899,7 +6453,7 @@ export default function ActivelogPage() {
           scrollSidebarDateToToday();
           console.log(`[사이드바] 열릴 때 오늘 날짜로 스크롤 (선택된 날짜 없음)`);
         }
-      }, 150);
+      }, 30); // 지연 시간 더 단축 (일별 카운트 데이터가 이미 준비되어 있음)
     }
   }, [isSidebarOpen, selectedDate]);
 
@@ -7537,29 +8091,30 @@ export default function ActivelogPage() {
                   <h3 className="text-base font-semibold text-gray-800">그룹 목록</h3>
                 </div>
                 
-                <Suspense fallback={
-                  <div className="w-full px-4 rounded-xl bg-white border border-gray-200 animate-pulse">
-                    <div className="flex items-center justify-between">
-                      <div className="h-4 bg-gray-200 rounded flex-1 mr-2"></div>
-                      <div className="w-4 h-4 bg-gray-200 rounded"></div>
-                    </div>
-                  </div>
-                }>
-                 <GroupSelector
-  userGroups={userGroups}
-  selectedGroupId={selectedGroupId}
-  isGroupSelectorOpen={isGroupSelectorOpen}
-  isSidebarOpen={isSidebarOpen}
-  groupMemberCounts={groupMemberCounts}
-  onOpen={() => setIsGroupSelectorOpen(true)}
-  onClose={() => setIsGroupSelectorOpen(false)}
-  onGroupSelect={(groupId) => {
-    if (selectedGroupId !== groupId) {
-      handleGroupSelect(groupId);
-    }
-  }}
-/>
-                </Suspense>
+                {/* 그룹목록이 이미 로드되어 있으므로 Suspense 제거하고 즉시 렌더링 */}
+{isUserDataLoading || !userGroups || userGroups.length === 0 || !isGroupMemberCountsLoaded ? (
+  <div className="w-full px-4 pt-3 rounded-xl bg-white border border-gray-200 animate-pulse">
+    <div className="flex items-center justify-between">
+      <div className="h-4 bg-gray-200 rounded flex-1 mr-2"></div>
+      <div className="w-4 h-4 bg-gray-200 rounded"></div>
+    </div>
+  </div>
+) : (
+  <GroupSelector
+    userGroups={userGroups}
+    selectedGroupId={selectedGroupId}
+    isGroupSelectorOpen={isGroupSelectorOpen}
+    isSidebarOpen={isSidebarOpen}
+    groupMemberCounts={groupMemberCounts}
+    onOpen={() => setIsGroupSelectorOpen(true)}
+    onClose={() => setIsGroupSelectorOpen(false)}
+    onGroupSelect={(groupId) => {
+      if (selectedGroupId !== groupId) {
+        handleGroupSelect(groupId);
+      }
+    }}
+  />
+)}
               </div>
 
                 {/* 멤버 목록 */}

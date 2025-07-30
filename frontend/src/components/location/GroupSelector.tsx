@@ -208,8 +208,8 @@ const GroupSelector = memo(({
         </motion.div>
       </motion.button>
 
-      {/* 애니메이션 없이 조건부 렌더링만 사용 */}
-      {isGroupSelectorOpen && (
+      {/* 그룹목록이 이미 로드되어 있으므로 즉시 렌더링 */}
+      {isGroupSelectorOpen && userGroups.length > 0 && (
         <DropdownPortal target={buttonRef} onClose={onClose}>
           {userGroups.map((group) => (
             <motion.button
