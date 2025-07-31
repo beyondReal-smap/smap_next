@@ -19,89 +19,6 @@ export default function LoginPage() {
   const [apiError, setApiError] = useState('');
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  // 이미 로그인된 경우 리다이렉트
-  useEffect(() => {
-    if (isLoggedIn && !authLoading) {
-      router.push('/home');
-    }
-  }, [isLoggedIn, authLoading, router]);
-
-  // 네이티브 앱에서 호출할 수 있도록 전역 함수 등록
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      (window as any).handleGoogleLoginResult = handleGoogleLoginResult;
-      (window as any).handleGoogleLogin = handleGoogleLogin;
-      console.log('🔥 [LOGIN] 전역 함수 등록 완료: handleGoogleLoginResult, handleGoogleLogin');
-    }
-  }, [handleGoogleLoginResult, handleGoogleLogin]);
-
-  // 전화번호 포맷팅 함수
-  const formatPhoneNumber = (value: string) => {
-    if (!value) return value;
-    const numericValue = value.replace(/[^0-9]/g, '');
-    const length = numericValue.length;
-
-    if (length < 4) return numericValue;
-    if (length < 7) {
-      return `${numericValue.slice(0, 3)}-${numericValue.slice(3)}`;
-    }
-    if (length < 11) {
-      return `${numericValue.slice(0, 3)}-${numericValue.slice(3, 6)}-${numericValue.slice(6)}`;
-    }
-    return `${numericValue.slice(0, 3)}-${numericValue.slice(3, 7)}-${numericValue.slice(7, 11)}`;
-  };
-
-  const handlePhoneNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const rawValue = e.target.value;
-    const formatted = formatPhoneNumber(rawValue);
-    setPhoneNumber(formatted);
-
-    const numericOnlyRaw = rawValue.replace(/-/g, '');
-    if (/[^0-9]/.test(numericOnlyRaw) && numericOnlyRaw !== '') {
-      setFormErrors(prevErrors => ({ ...prevErrors, phoneNumber: '숫자만 입력 가능합니다.'}));
-    } else {
-      setFormErrors(prevErrors => ({ ...prevErrors, phoneNumber: '' }));
-    }
-  };
-
-  // 전화번호 로그인 핸들러 (AuthContext 사용)
-  const handlePhoneNumberLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setApiError('');
-    setFormErrors({});
-
-    let currentFormErrors: Record<string, string> = {};
-    if (!phoneNumber.trim()) {
-      currentFormErrors.phoneNumber = '전화번호를 입력해주세요.';
-    }
-    if (!password.trim()) {
-      currentFormErrors.password = '비밀번호를 입력해주세요.';
-    }
-
-    if (Object.keys(currentFormErrors).length > 0) {
-      setFormErrors(currentFormErrors);
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      // AuthContext의 login 함수 사용
-      await login({
-        mt_id: phoneNumber.replace(/-/g, ''), // 전화번호에서 하이픈 제거
-        mt_pwd: password
-      });
-      
-      console.log('전화번호 로그인 성공');
-      router.push('/home');
-    } catch (error: any) {
-      console.error('전화번호 로그인 오류:', error);
-      setApiError(error.message || '로그인에 실패했습니다.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   // Google 로그인 핸들러 - 네이티브 앱 연동
   const handleGoogleLogin = async () => {
     console.log('🔥 [LOGIN] 네이티브 구글 로그인 요청');
@@ -192,7 +109,88 @@ export default function LoginPage() {
     }
   };
 
+  // 이미 로그인된 경우 리다이렉트
+  useEffect(() => {
+    if (isLoggedIn && !authLoading) {
+      router.push('/home');
+    }
+  }, [isLoggedIn, authLoading, router]);
 
+  // 네이티브 앱에서 호출할 수 있도록 전역 함수 등록
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).handleGoogleLoginResult = handleGoogleLoginResult;
+      (window as any).handleGoogleLogin = handleGoogleLogin;
+      console.log('🔥 [LOGIN] 전역 함수 등록 완료: handleGoogleLoginResult, handleGoogleLogin');
+    }
+  }, [handleGoogleLoginResult, handleGoogleLogin]);
+
+  // 전화번호 포맷팅 함수
+  const formatPhoneNumber = (value: string) => {
+    if (!value) return value;
+    const numericValue = value.replace(/[^0-9]/g, '');
+    const length = numericValue.length;
+
+    if (length < 4) return numericValue;
+    if (length < 7) {
+      return `${numericValue.slice(0, 3)}-${numericValue.slice(3)}`;
+    }
+    if (length < 11) {
+      return `${numericValue.slice(0, 3)}-${numericValue.slice(3, 6)}-${numericValue.slice(6)}`;
+    }
+    return `${numericValue.slice(0, 3)}-${numericValue.slice(3, 7)}-${numericValue.slice(7, 11)}`;
+  };
+
+  const handlePhoneNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawValue = e.target.value;
+    const formatted = formatPhoneNumber(rawValue);
+    setPhoneNumber(formatted);
+
+    const numericOnlyRaw = rawValue.replace(/-/g, '');
+    if (/[^0-9]/.test(numericOnlyRaw) && numericOnlyRaw !== '') {
+      setFormErrors(prevErrors => ({ ...prevErrors, phoneNumber: '숫자만 입력 가능합니다.'}));
+    } else {
+      setFormErrors(prevErrors => ({ ...prevErrors, phoneNumber: '' }));
+    }
+  };
+
+  // 전화번호 로그인 핸들러 (AuthContext 사용)
+  const handlePhoneNumberLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setApiError('');
+    setFormErrors({});
+
+    let currentFormErrors: Record<string, string> = {};
+    if (!phoneNumber.trim()) {
+      currentFormErrors.phoneNumber = '전화번호를 입력해주세요.';
+    }
+    if (!password.trim()) {
+      currentFormErrors.password = '비밀번호를 입력해주세요.';
+    }
+
+    if (Object.keys(currentFormErrors).length > 0) {
+      setFormErrors(currentFormErrors);
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      // AuthContext의 login 함수 사용
+      await login({
+        mt_id: phoneNumber.replace(/-/g, ''), // 전화번호에서 하이픈 제거
+        mt_pwd: password
+      });
+      
+      console.log('전화번호 로그인 성공');
+      router.push('/home');
+    } catch (error: any) {
+      console.error('전화번호 로그인 오류:', error);
+      setApiError(error.message || '로그인에 실패했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Kakao 로그인 핸들러
   const handleKakaoLogin = async () => {
