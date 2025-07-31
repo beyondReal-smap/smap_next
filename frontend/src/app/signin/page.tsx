@@ -807,7 +807,10 @@ const SignInPage = () => {
     
     // 🚨 네이티브 구글 로그인 데이터 처리 함수
     const handleNativeGoogleLoginData = async (data: any) => {
-      console.log('🔄 [NATIVE DATA] 네이티브 구글 로그인 데이터 처리 시작', data);
+      console.log('🔄 [NATIVE DATA] 네이티브 구글 로그인 데이터 처리 시작');
+      console.log('🔄 [NATIVE DATA] 받은 데이터 타입:', typeof data);
+      console.log('🔄 [NATIVE DATA] 받은 데이터:', data);
+      console.log('🔄 [NATIVE DATA] 데이터 키들:', data ? Object.keys(data) : '데이터 없음');
       
       // 진행 중 플래그 해제 (로그인 완료)
       delete (window as any).__GOOGLE_LOGIN_IN_PROGRESS__;
@@ -834,10 +837,36 @@ const SignInPage = () => {
 
         const result = await response.json();
         console.log('📥 [NATIVE DATA] 백엔드 응답:', result);
+        console.log('📥 [NATIVE DATA] 백엔드 응답 타입:', typeof result);
+        console.log('📥 [NATIVE DATA] 백엔드 응답 키들:', Object.keys(result));
+        console.log('📥 [NATIVE DATA] isNewUser 값:', result.isNewUser);
+        console.log('📥 [NATIVE DATA] success 값:', result.success);
 
         if (result.success) {
           if (result.isNewUser) {
             console.log('🆕 [NATIVE DATA] 신규 사용자 - 회원가입 페이지로 이동');
+            console.log('🆕 [NATIVE DATA] 백엔드 응답 데이터:', result);
+            console.log('🆕 [NATIVE DATA] 네이티브 데이터:', data);
+            
+            // 구글 소셜 로그인 데이터를 localStorage에 저장
+            const socialData = {
+              provider: 'google',
+              email: result.user?.email || data.userInfo?.email || data.email,
+              name: result.user?.name || data.userInfo?.name || data.name,
+              nickname: result.user?.nickname || data.userInfo?.nickname || data.nickname,
+              profile_image: result.user?.profile_image || data.userInfo?.profile_image || data.profile_image,
+              google_id: result.user?.google_id || data.userInfo?.google_id || data.google_id
+            };
+            
+            console.log('🆕 [NATIVE DATA] 소셜 로그인 데이터 저장:', socialData);
+            localStorage.setItem('socialLoginData', JSON.stringify(socialData));
+            
+            // localStorage 저장 확인
+            const savedData = localStorage.getItem('socialLoginData');
+            console.log('🆕 [NATIVE DATA] localStorage 저장 확인:', savedData);
+            
+            // router.push 사용 (window.location.href 대신)
+            console.log('🆕 [NATIVE DATA] register 페이지로 이동 시작');
             window.location.href = '/register?social=google';
           } else {
             console.log('✅ [NATIVE DATA] 기존 사용자 - 홈으로 이동');
@@ -903,8 +932,15 @@ const SignInPage = () => {
       }
     };
     
-    // 🚨 전역 변수 모니터링 (iOS 앱에서 직접 저장한 데이터 확인)
+        // 🚨 전역 변수 모니터링 (iOS 앱에서 직접 저장한 데이터 확인)
     const checkNativeData = () => {
+      // 디버깅을 위한 수동 확인
+      const savedData = localStorage.getItem('socialLoginData');
+      if (savedData) {
+        console.log('🎉 [NATIVE DATA] localStorage에서 데이터 발견:', savedData);
+      }
+      
+      // 전역 변수 확인
       if ((window as any).__NATIVE_GOOGLE_LOGIN_DATA__) {
         const data = (window as any).__NATIVE_GOOGLE_LOGIN_DATA__;
         console.log('🎉 [NATIVE DATA] 전역 변수에서 구글 로그인 데이터 발견!', data);
@@ -943,11 +979,16 @@ const SignInPage = () => {
     let checkCount = 0;
     const checkInterval = setInterval(() => {
       checkCount++;
+      console.log(`🔍 [NATIVE DATA] 모니터링 ${checkCount}/10`);
       checkNativeData();
       
       if (checkCount >= 10) {
         clearInterval(checkInterval);
         console.log('🔍 [NATIVE DATA] 전역 변수 모니터링 종료');
+        
+        // 모니터링 종료 후에도 localStorage 확인
+        const savedData = localStorage.getItem('socialLoginData');
+        console.log('🔍 [NATIVE DATA] 최종 localStorage 확인:', savedData);
       }
     }, 1000);
     

@@ -492,12 +492,18 @@ export default function RegisterPage() {
 
   // 소셜 로그인 데이터 초기화
   useEffect(() => {
+    console.log('🔥 [REGISTER] 소셜 로그인 데이터 초기화 시작');
     const urlParams = new URLSearchParams(window.location.search);
     const socialProvider = urlParams.get('social');
+    
+    console.log('🔥 [REGISTER] URL 파라미터 social:', socialProvider);
+    console.log('🔥 [REGISTER] 현재 URL:', window.location.href);
     
     if (socialProvider) {
       // localStorage에서 소셜 로그인 데이터 확인 (login 페이지에서 localStorage에 저장함)
       const socialData = localStorage.getItem('socialLoginData');
+      console.log('🔥 [REGISTER] localStorage에서 가져온 socialLoginData:', socialData);
+      
       if (socialData) {
         try {
           const parsedData: SocialLoginData = JSON.parse(socialData);
@@ -530,7 +536,10 @@ export default function RegisterPage() {
         }
       } else {
         console.warn('🔥 [REGISTER] URL에 social 파라미터가 있지만 socialLoginData가 없음');
+        console.warn('🔥 [REGISTER] localStorage 전체 내용:', Object.keys(localStorage));
       }
+    } else {
+      console.log('🔥 [REGISTER] social 파라미터가 없음 - 일반 회원가입');
     }
   }, []);
 
