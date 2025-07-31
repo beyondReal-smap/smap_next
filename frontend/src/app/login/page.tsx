@@ -26,6 +26,14 @@ export default function LoginPage() {
     }
   }, [isLoggedIn, authLoading, router]);
 
+  // 네이티브 앱에서 호출할 수 있도록 전역 함수 등록
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).handleGoogleLoginResult = handleGoogleLoginResult;
+      console.log('🔥 [LOGIN] 전역 함수 등록 완료: handleGoogleLoginResult');
+    }
+  }, []);
+
   // 전화번호 포맷팅 함수
   const formatPhoneNumber = (value: string) => {
     if (!value) return value;
@@ -93,23 +101,51 @@ export default function LoginPage() {
     }
   };
 
-  // Google 로그인 핸들러
+  // Google 로그인 핸들러 - 네이티브 앱 연동
   const handleGoogleLogin = async () => {
-    console.log('🔥 [LOGIN] 구글 로그인 버튼 클릭됨');
+    console.log('🔥 [LOGIN] 네이티브 구글 로그인 요청');
     setIsLoading(true);
     setApiError('');
     setFormErrors({});
     
     try {
-      console.log('🔥 [LOGIN] Google 로그인 시도 중...');
-      
+      // 네이티브 앱에 구글 로그인 요청
+      if (typeof window !== 'undefined' && (window as any).webkit?.messageHandlers?.smapIos) {
+        console.log('🔥 [LOGIN] iOS 네이티브 구글 로그인 호출');
+        (window as any).webkit.messageHandlers.smapIos.postMessage({
+          action: 'googleLogin',
+          callback: 'handleGoogleLoginResult'
+        });
+      } else if (typeof window !== 'undefined' && (window as any).Android) {
+        console.log('🔥 [LOGIN] Android 네이티브 구글 로그인 호출');
+        (window as any).Android.googleLogin();
+      } else {
+        console.log('🔥 [LOGIN] 네이티브 브릿지 없음 - 데모 모드로 진행');
+        // 네이티브 브릿지가 없는 경우 데모 데이터로 진행
+        await handleGoogleLoginDemo();
+      }
+    } catch (err: any) {
+      console.error('Google 로그인 오류:', err);
+      setApiError('네이티브 구글 로그인에 실패했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 네이티브에서 받은 구글 로그인 결과 처리
+  const handleGoogleLoginResult = async (googleData: any) => {
+    console.log('🔥 [LOGIN] 네이티브에서 구글 로그인 결과 수신:', googleData);
+    
+    try {
+      // 구글 데이터를 서버로 전송하여 사용자 확인
       const response = await fetch('/api/google-auth', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          credential: `demo-google-credential-${Date.now()}`
+          credential: googleData.credential || googleData.idToken,
+          user: googleData.user
         }),
       });
 
@@ -122,10 +158,7 @@ export default function LoginPage() {
       if (data.success) {
         console.log('🔥 [LOGIN] Google 로그인 응답:', data);
         
-        // 🚨 임시: 모든 구글 로그인을 신규 사용자로 처리 (테스트용)
-        const isNewUser = true;
-        
-        if (isNewUser) {
+        if (data.isNewUser) {
           // 신규 회원 - register 페이지로 이동하면서 구글 정보 전달
           const socialData = {
             provider: 'google',
@@ -154,11 +187,31 @@ export default function LoginPage() {
         throw new Error(data.message || 'Google 로그인에 실패했습니다.');
       }
     } catch (err: any) {
-      console.error('Google 로그인 오류:', err);
-      setApiError('구글 로그인은 실제 구글 SDK 구현이 필요합니다. /signin/page_new.tsx의 구현을 참고해주세요.');
-    } finally {
-      setIsLoading(false);
+      console.error('Google 로그인 결과 처리 오류:', err);
+      setApiError('구글 로그인 결과 처리에 실패했습니다.');
     }
+  };
+
+  // 데모용 구글 로그인 (네이티브 브릿지가 없는 경우)
+  const handleGoogleLoginDemo = async () => {
+    console.log('🔥 [LOGIN] 데모 구글 로그인 실행');
+    
+    // 데모 구글 사용자 데이터
+    const demoGoogleData = {
+      credential: `demo-google-credential-${Date.now()}`,
+      user: {
+        email: 'demo@gmail.com',
+        name: '데모 사용자',
+        nickname: 'demo_user',
+        profile_image: 'https://via.placeholder.com/150',
+        google_id: `demo_google_id_${Date.now()}`
+      }
+    };
+    
+    // 1초 후 결과 처리 (네이티브 로그인 시뮬레이션)
+    setTimeout(() => {
+      handleGoogleLoginResult(demoGoogleData);
+    }, 1000);
   };
 
   // Kakao 로그인 핸들러
@@ -331,44 +384,9 @@ export default function LoginPage() {
             {/* Google 로그인 버튼 */}
             <button
               type="button"
-              data-google-login="react-handler"
-              onClick={(e) => {
-                alert('구글 로그인 버튼 클릭됨!');
-                console.log('🔥 [LOGIN] 구글 로그인 버튼 onClick 이벤트 발생!');
-                console.log('🔥 [LOGIN] 이벤트 객체:', e);
-                console.log('🔥 [LOGIN] isLoading 상태:', isLoading);
-                console.log('🔥 [LOGIN] 버튼 disabled 상태:', e.currentTarget.disabled);
-                
-                // 이벤트 전파 중단
-                e.preventDefault();
-                e.stopPropagation();
-                
-                // 실제 핸들러 호출
-                console.log('🚀 [LOGIN] handleGoogleLogin 함수 호출 시작');
-                handleGoogleLogin();
-              }}
-              onMouseDown={(e) => {
-                console.log('🔥 [LOGIN] 구글 로그인 버튼 onMouseDown 이벤트 발생!');
-              }}
-              onMouseUp={(e) => {
-                console.log('🔥 [LOGIN] 구글 로그인 버튼 onMouseUp 이벤트 발생!');
-              }}
-              onTouchStart={(e) => {
-                console.log('🔥 [LOGIN] 구글 로그인 버튼 onTouchStart 이벤트 발생!');
-              }}
-              onTouchEnd={(e) => {
-                console.log('🔥 [LOGIN] 구글 로그인 버튼 onTouchEnd 이벤트 발생!');
-              }}
+              onClick={handleGoogleLogin}
               disabled={isLoading}
               className="w-full inline-flex items-center justify-center py-3 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-70 transition-all transform hover:scale-105 active:scale-95"
-              style={{ 
-                zIndex: 9999, 
-                position: 'relative',
-                pointerEvents: 'auto',
-                backgroundColor: 'red',
-                border: '3px solid blue',
-                minHeight: '60px'
-              }}
             >
               <FcGoogle className="w-5 h-5 mr-3" aria-hidden="true" />
               Google 계정으로 로그인
