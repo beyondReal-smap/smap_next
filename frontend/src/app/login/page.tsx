@@ -30,9 +30,10 @@ export default function LoginPage() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       (window as any).handleGoogleLoginResult = handleGoogleLoginResult;
-      console.log('🔥 [LOGIN] 전역 함수 등록 완료: handleGoogleLoginResult');
+      (window as any).handleGoogleLogin = handleGoogleLogin;
+      console.log('🔥 [LOGIN] 전역 함수 등록 완료: handleGoogleLoginResult, handleGoogleLogin');
     }
-  }, []);
+  }, [handleGoogleLoginResult, handleGoogleLogin]);
 
   // 전화번호 포맷팅 함수
   const formatPhoneNumber = (value: string) => {
