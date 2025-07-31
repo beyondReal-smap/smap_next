@@ -331,7 +331,12 @@ export default function LoginPage() {
             {/* Google 로그인 버튼 */}
             <button
               type="button"
-              onClick={handleGoogleLogin}
+              onClick={() => {
+                console.log('🔥 [LOGIN] 구글 로그인 버튼 클릭 이벤트 발생');
+                console.log('🔥 [LOGIN] isLoading 상태:', isLoading);
+                console.log('🔥 [LOGIN] handleGoogleLogin 함수 존재:', typeof handleGoogleLogin);
+                handleGoogleLogin();
+              }}
               disabled={isLoading}
               className="w-full inline-flex items-center justify-center py-3 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-70 transition-all transform hover:scale-105 active:scale-95"
             >
