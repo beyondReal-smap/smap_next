@@ -365,8 +365,16 @@ export async function POST(request: NextRequest) {
       let user = backendData.data.user || backendData.data.member;
       isNewUser = backendData.data.isNewUser || backendData.data.is_new_user || false;
       
+      // 🚨 임시: 모든 구글 로그인을 신규 사용자로 처리 (테스트용)
+      isNewUser = true;
+      sendLogToConsole('warning', '🚨 임시 설정: 모든 구글 로그인을 신규 사용자로 처리', {
+        originalIsNewUser: backendData.data?.isNewUser,
+        originalIsNewUserAlt: backendData.data?.is_new_user,
+        forcedIsNewUser: true
+      });
+      
       // 🔧 신규 사용자 판별 로직 강화
-      if (!isNewUser && user && user.mt_idx) {
+      if (!isNewUser && user && user.mt_idx && user.mt_idx > 0) {
         // 기존 사용자가 있는 경우
         sendLogToConsole('info', '🔧 기존 사용자 확인됨', {
           mt_idx: user.mt_idx,
@@ -379,7 +387,11 @@ export async function POST(request: NextRequest) {
         sendLogToConsole('info', '🔧 신규 사용자로 판별됨', {
           email: googleUser.email,
           googleId: googleUser.googleId,
-          reason: 'no_existing_user_found_or_invalid_user_data'
+          reason: 'no_existing_user_found_or_invalid_user_data',
+          originalIsNewUser: backendData.data?.isNewUser,
+          originalIsNewUserAlt: backendData.data?.is_new_user,
+          userMtIdx: user?.mt_idx,
+          hasUser: !!user
         });
         
         // 신규 사용자용 임시 데이터 생성
@@ -525,6 +537,15 @@ export async function POST(request: NextRequest) {
           { expiresIn: '7d' }
         );
       }
+      
+      // 신규 사용자일 때 토큰을 명시적으로 null로 설정
+      if (isNewUser) {
+        token = null;
+        sendLogToConsole('info', '🆕 신규 사용자 - 토큰을 null로 설정', {
+          isNewUser: true,
+          token: null
+        });
+      }
 
       sendLogToConsole('info', isNewUser ? '🆕 신규 사용자 - 회원가입 페이지로 이동' : '✅ 기존 사용자 로그인 성공', {
         mt_idx: user.mt_idx,
@@ -554,7 +575,7 @@ export async function POST(request: NextRequest) {
           mt_level: user.mt_level,
           mt_google_id: user.mt_google_id || googleUser.googleId
         },
-        token, // 🔥 토큰을 별도로 제공하여 localStorage에 저장 가능 (신규 사용자는 null)
+        token: isNewUser ? null : token, // 🔥 신규 사용자는 토큰을 null로 설정
         isNewUser,
         message: isNewUser ? 'Google 계정으로 회원가입을 진행합니다.' : 'Google 로그인 성공',
         // 🔥 백엔드에서 조회한 추가 데이터 포함 (강화된 처리)
@@ -585,25 +606,30 @@ export async function POST(request: NextRequest) {
         timestamp: Date.now()
       };
       
-      // 🔥 HttpOnly 쿠키와 일반 쿠키 모두 설정 (기존 사용자만)
-      if (token) {
-        response.cookies.set('auth-token', token, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 60 * 60 * 24 * 7,
-          path: '/',
-        });
-        
-        // 🔥 클라이언트에서 접근 가능한 그룹 데이터 설정
-        response.cookies.set('client-token', encodeURIComponent(JSON.stringify(clientData)), {
-          httpOnly: false, // 클라이언트에서 접근 가능
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 60 * 60 * 24 * 7,
-          path: '/',
-        });
-      }
+              // 🔥 HttpOnly 쿠키와 일반 쿠키 모두 설정 (기존 사용자만)
+        if (token && !isNewUser) {
+          response.cookies.set('auth-token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 60 * 60 * 24 * 7,
+            path: '/',
+          });
+          
+          // 🔥 클라이언트에서 접근 가능한 그룹 데이터 설정
+          response.cookies.set('client-token', encodeURIComponent(JSON.stringify(clientData)), {
+            httpOnly: false, // 클라이언트에서 접근 가능
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 60 * 60 * 24 * 7,
+            path: '/',
+          });
+        } else if (isNewUser) {
+          sendLogToConsole('info', '🆕 신규 사용자 - 쿠키 설정 건너뜀', {
+            isNewUser: true,
+            hasToken: !!token
+          });
+        }
 
       sendLogToConsole('info', '🔥 토큰 저장 지시 완료', {
         token: token ? 'Generated' : 'None',
