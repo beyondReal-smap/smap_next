@@ -816,7 +816,10 @@ const SignInPage = () => {
       delete (window as any).__GOOGLE_LOGIN_IN_PROGRESS__;
       
       try {
-        if (!data.idToken) {
+        // 네이티브 앱에서 전달하는 데이터 구조 확인
+        const idToken = data.idToken || data.credential || (data.user && data.user.idToken);
+        if (!idToken) {
+          console.error('❌ [NATIVE DATA] ID 토큰을 찾을 수 없습니다. 데이터 구조:', data);
           throw new Error('ID 토큰이 없습니다');
         }
         
@@ -829,8 +832,8 @@ const SignInPage = () => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            idToken: data.idToken,  // ✅ 백엔드가 기대하는 파라미터 이름으로 수정
-            userInfo: data.userInfo,
+            idToken: idToken,  // ✅ 유연한 토큰 추출 방식 사용
+            userInfo: data.userInfo || data.user,
             source: 'native_direct'
           }),
         });
@@ -931,6 +934,32 @@ const SignInPage = () => {
         showError(`네이티브 로그인 처리 중 오류가 발생했습니다: ${error}`);
       }
     };
+
+    // 🔥 전역 함수 등록 (네이티브 앱에서 호출할 수 있도록)
+    useEffect(() => {
+      if (typeof window !== 'undefined') {
+        (window as any).handleGoogleLoginResult = handleNativeGoogleLoginData;
+        console.log('🔥 [SIGNIN] 전역 함수 등록 완료: handleGoogleLoginResult');
+        console.log('🔥 [SIGNIN] 네이티브 앱에서 이제 이 함수를 호출할 수 있습니다');
+        
+        // 테스트용 전역 함수도 등록
+        (window as any).TEST_GOOGLE_LOGIN_SIGNIN = () => {
+          console.log('🧪 [TEST] 테스트 구글 로그인 데이터 생성');
+          const testData = {
+            credential: 'test_id_token_123',
+            user: {
+              email: 'test@example.com',
+              name: 'Test User',
+              nickname: 'TestUser',
+              profile_image: 'https://example.com/avatar.jpg',
+              google_id: '123456789'
+            }
+          };
+          handleNativeGoogleLoginData(testData);
+        };
+        console.log('🔥 [SIGNIN] 테스트 함수도 등록 완료: TEST_GOOGLE_LOGIN_SIGNIN');
+      }
+    }, []);
     
         // 🚨 전역 변수 모니터링 (iOS 앱에서 직접 저장한 데이터 확인)
     const checkNativeData = () => {
@@ -989,6 +1018,10 @@ const SignInPage = () => {
         // 모니터링 종료 후에도 localStorage 확인
         const savedData = localStorage.getItem('socialLoginData');
         console.log('🔍 [NATIVE DATA] 최종 localStorage 확인:', savedData);
+        
+        // 전역 함수 등록 상태 확인
+        console.log('🔍 [NATIVE DATA] handleGoogleLoginResult 함수 상태:', typeof (window as any).handleGoogleLoginResult);
+        console.log('🔍 [NATIVE DATA] __NATIVE_GOOGLE_LOGIN_DATA__ 확인:', (window as any).__NATIVE_GOOGLE_LOGIN_DATA__);
       }
     }, 1000);
     
