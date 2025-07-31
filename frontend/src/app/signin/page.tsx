@@ -931,14 +931,6 @@ const SignInPage = () => {
         showError(`네이티브 로그인 처리 중 오류가 발생했습니다: ${error}`);
       }
     };
-
-    // 전역 함수 등록
-    useEffect(() => {
-      if (typeof window !== 'undefined') {
-        (window as any).handleGoogleLoginResult = handleNativeGoogleLoginData;
-        console.log('🔥 [SIGNIN] 전역 함수 등록 완료: handleGoogleLoginResult');
-      }
-    }, []);
     
         // 🚨 전역 변수 모니터링 (iOS 앱에서 직접 저장한 데이터 확인)
     const checkNativeData = () => {
@@ -2955,8 +2947,9 @@ const SignInPage = () => {
     if ((window as any).webkit?.messageHandlers?.smapIos) {
       console.log('[GOOGLE LOGIN] iOS 네이티브 구글 로그인 호출');
       (window as any).webkit.messageHandlers.smapIos.postMessage({
-        action: 'googleLogin',
-        callback: 'handleGoogleLoginResult'
+        type: 'googleSignIn',
+        param: '',
+        timestamp: Date.now()
       });
     } else if (!isAndroidWebView) {
       // 안드로이드가 아닌 경우에만 웹 SDK 사용
