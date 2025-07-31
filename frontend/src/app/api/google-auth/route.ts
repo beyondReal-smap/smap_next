@@ -365,29 +365,32 @@ export async function POST(request: NextRequest) {
       let user = backendData.data.user || backendData.data.member;
       isNewUser = backendData.data.isNewUser || backendData.data.is_new_user || false;
       
-      // 🚨 임시: 모든 구글 로그인을 신규 사용자로 처리 (테스트용)
-      isNewUser = true;
-      sendLogToConsole('warning', '🚨 임시 설정: 모든 구글 로그인을 신규 사용자로 처리', {
+      // 백엔드 응답에 따른 정확한 신규/기존 사용자 판별
+      sendLogToConsole('info', '백엔드 응답에 따른 사용자 구분', {
         originalIsNewUser: backendData.data?.isNewUser,
         originalIsNewUserAlt: backendData.data?.is_new_user,
-        forcedIsNewUser: true
+        finalIsNewUser: isNewUser,
+        hasUserData: !!user,
+        userMtIdx: user?.mt_idx
       });
       
       // 🔧 신규 사용자 판별 로직 강화
-      if (!isNewUser && user && user.mt_idx && user.mt_idx > 0) {
-        // 기존 사용자가 있는 경우
+      if (user && user.mt_idx && user.mt_idx > 0) {
+        // 백엔드에서 유효한 사용자 데이터를 반환한 경우 = 기존 사용자
+        isNewUser = false;
         sendLogToConsole('info', '🔧 기존 사용자 확인됨', {
           mt_idx: user.mt_idx,
           mt_email: user.mt_email,
-          mt_google_id: user.mt_google_id
+          mt_google_id: user.mt_google_id,
+          reason: 'valid_user_data_with_mt_idx'
         });
       } else {
-        // 신규 사용자인 경우
+        // 백엔드에서 유효한 사용자 데이터를 반환하지 않은 경우 = 신규 사용자
         isNewUser = true;
         sendLogToConsole('info', '🔧 신규 사용자로 판별됨', {
           email: googleUser.email,
           googleId: googleUser.googleId,
-          reason: 'no_existing_user_found_or_invalid_user_data',
+          reason: user ? 'no_valid_mt_idx' : 'no_user_data',
           originalIsNewUser: backendData.data?.isNewUser,
           originalIsNewUserAlt: backendData.data?.is_new_user,
           userMtIdx: user?.mt_idx,

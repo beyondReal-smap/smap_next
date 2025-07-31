@@ -696,13 +696,27 @@ const SignInPage = () => {
           if (data.isNewUser) {
             console.log('[NATIVE CALLBACK] 신규회원 - 회원가입 페이지로 이동');
             
-            // 소셜 로그인 데이터를 sessionStorage에 저장
-            if (data.socialLoginData) {
-              sessionStorage.setItem('socialLoginData', JSON.stringify(data.socialLoginData));
-              console.log('[NATIVE CALLBACK] 소셜 로그인 데이터 저장 완료');
-            }
+            // 구글 소셜 로그인 데이터를 localStorage에 저장 (register 페이지에서 읽을 수 있도록)
+            const socialData = {
+              provider: 'google',
+              email: data.user?.email || userInfo.email,
+              name: data.user?.name || userInfo.name,
+              nickname: data.user?.nickname || userInfo.name,
+              given_name: userInfo.givenName,
+              family_name: userInfo.familyName,
+              profile_image: data.user?.profile_image || userInfo.picture,
+              google_id: data.user?.google_id || userInfo.sub
+            };
+            
+            console.log('[NATIVE CALLBACK] 구글 소셜 로그인 데이터 저장:', socialData);
+            localStorage.setItem('socialLoginData', JSON.stringify(socialData));
+            
+            // localStorage 저장 확인
+            const savedData = localStorage.getItem('socialLoginData');
+            console.log('[NATIVE CALLBACK] localStorage 저장 확인:', savedData);
             
             // 회원가입 페이지로 이동
+            console.log('[NATIVE CALLBACK] register 페이지로 이동');
             window.location.href = '/register?social=google';
             return;
             
@@ -843,31 +857,33 @@ const SignInPage = () => {
         console.log('📥 [NATIVE DATA] success 값:', result.success);
 
         if (result.success) {
-          if (result.isNewUser) {
-            console.log('🆕 [NATIVE DATA] 신규 사용자 - 회원가입 페이지로 이동');
-            console.log('🆕 [NATIVE DATA] 백엔드 응답 데이터:', result);
-            console.log('🆕 [NATIVE DATA] 네이티브 데이터:', data);
-            
-            // 구글 소셜 로그인 데이터를 localStorage에 저장
-            const socialData = {
-              provider: 'google',
-              email: result.user?.email || data.userInfo?.email || data.email,
-              name: result.user?.name || data.userInfo?.name || data.name,
-              nickname: result.user?.nickname || data.userInfo?.nickname || data.nickname,
-              profile_image: result.user?.profile_image || data.userInfo?.profile_image || data.profile_image,
-              google_id: result.user?.google_id || data.userInfo?.google_id || data.google_id
-            };
-            
-            console.log('🆕 [NATIVE DATA] 소셜 로그인 데이터 저장:', socialData);
-            localStorage.setItem('socialLoginData', JSON.stringify(socialData));
-            
-            // localStorage 저장 확인
-            const savedData = localStorage.getItem('socialLoginData');
-            console.log('🆕 [NATIVE DATA] localStorage 저장 확인:', savedData);
-            
-            // router.push 사용 (window.location.href 대신)
-            console.log('🆕 [NATIVE DATA] register 페이지로 이동 시작');
-            window.location.href = '/register?social=google';
+                  if (result.isNewUser) {
+          console.log('🆕 [NATIVE DATA] 신규 사용자 - 회원가입 페이지로 이동');
+          console.log('🆕 [NATIVE DATA] 백엔드 응답 데이터:', result);
+          console.log('🆕 [NATIVE DATA] 네이티브 데이터:', data);
+          
+          // 구글 소셜 로그인 데이터를 localStorage에 저장 (표준화된 구조로)
+          const socialData = {
+            provider: 'google',
+            email: result.user?.email || data.userInfo?.email || data.email,
+            name: result.user?.name || data.userInfo?.name || data.name,
+            nickname: result.user?.nickname || data.userInfo?.nickname || data.nickname || data.userInfo?.name || data.name,
+            given_name: data.userInfo?.givenName || data.userInfo?.given_name,
+            family_name: data.userInfo?.familyName || data.userInfo?.family_name,
+            profile_image: result.user?.profile_image || data.userInfo?.profile_image || data.profile_image || data.userInfo?.picture,
+            google_id: result.user?.google_id || data.userInfo?.google_id || data.google_id || data.userInfo?.sub
+          };
+          
+          console.log('🆕 [NATIVE DATA] 소셜 로그인 데이터 저장:', socialData);
+          localStorage.setItem('socialLoginData', JSON.stringify(socialData));
+          
+          // localStorage 저장 확인
+          const savedData = localStorage.getItem('socialLoginData');
+          console.log('🆕 [NATIVE DATA] localStorage 저장 확인:', savedData);
+          
+          // 강제로 페이지 이동
+          console.log('🆕 [NATIVE DATA] register 페이지로 강제 이동');
+          window.location.replace('/register?social=google');
           } else {
             console.log('✅ [NATIVE DATA] 기존 사용자 - 홈으로 이동');
             
@@ -2197,20 +2213,28 @@ const SignInPage = () => {
                 console.log('[GOOGLE LOGIN] 🆕 신규 사용자 - 회원가입 페이지로 이동');
                 console.log('[GOOGLE LOGIN] 이메일 정보:', data.user.email);
                 
-                // 구글에서 받은 이메일을 회원가입 페이지로 전달
-                const registerData = {
+                // 구글 소셜 로그인 데이터를 localStorage에 저장 (표준화된 구조로)
+                const socialData = {
+                  provider: 'google',
                   email: data.user.email,
                   name: data.user.name,
-                  provider: 'google',
-                  googleId: data.user.google_id,
-                  profileImage: data.user.profile_image
+                  nickname: data.user.name,
+                  given_name: data.user.given_name,
+                  family_name: data.user.family_name,
+                  profile_image: data.user.profile_image,
+                  google_id: data.user.google_id
                 };
                 
-                // 회원가입 데이터를 localStorage에 저장
-                localStorage.setItem('google_register_data', JSON.stringify(registerData));
+                console.log('[GOOGLE LOGIN] 구글 소셜 로그인 데이터 저장:', socialData);
+                localStorage.setItem('socialLoginData', JSON.stringify(socialData));
+                
+                // localStorage 저장 확인
+                const savedData = localStorage.getItem('socialLoginData');
+                console.log('[GOOGLE LOGIN] localStorage 저장 확인:', savedData);
                 
                 // 회원가입 페이지로 이동
-                router.replace('/register-new');
+                console.log('[GOOGLE LOGIN] register 페이지로 이동');
+                window.location.replace('/register?social=google');
               } else {
                 console.log('[GOOGLE LOGIN] 🏠 기존 사용자 - 홈 페이지로 이동');
                 router.replace('/home');

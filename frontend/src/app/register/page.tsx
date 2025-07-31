@@ -492,12 +492,18 @@ export default function RegisterPage() {
 
   // 소셜 로그인 데이터 초기화
   useEffect(() => {
+    console.log('🔥 [REGISTER] 소셜 로그인 데이터 초기화 시작');
+    
     const urlParams = new URLSearchParams(window.location.search);
     const socialProvider = urlParams.get('social');
     
+    console.log('🔥 [REGISTER] URL 파라미터 social:', socialProvider);
+    
     if (socialProvider) {
-      // localStorage에서 소셜 로그인 데이터 확인 (login 페이지에서 localStorage에 저장함)
+      // localStorage에서 소셜 로그인 데이터 확인 (signin 페이지에서 localStorage에 저장함)
       const socialData = localStorage.getItem('socialLoginData');
+      console.log('🔥 [REGISTER] localStorage에서 가져온 socialData:', socialData);
+      
       if (socialData) {
         try {
           const parsedData: SocialLoginData = JSON.parse(socialData);
@@ -521,16 +527,22 @@ export default function RegisterPage() {
           setCurrentStep(REGISTER_STEPS.TERMS);
           
           console.log(`🔥 [REGISTER] ${parsedData.provider} 소셜 로그인 데이터 로드 완료`);
+          console.log('🔥 [REGISTER] 현재 스텝을 TERMS로 설정');
           
-          // 사용 완료 후 localStorage에서 제거
-          localStorage.removeItem('socialLoginData');
+          // 소셜 로그인 데이터는 회원가입 완료 후에 제거하도록 변경
+          // localStorage.removeItem('socialLoginData'); // 여기서 제거하지 않음
           
         } catch (error) {
           console.error('🔥 [REGISTER] 소셜 로그인 데이터 파싱 오류:', error);
+          // 파싱 오류 시에는 데이터 제거
+          localStorage.removeItem('socialLoginData');
         }
       } else {
         console.warn('🔥 [REGISTER] URL에 social 파라미터가 있지만 socialLoginData가 없음');
+        console.warn('🔥 [REGISTER] 일반 회원가입으로 진행');
       }
+    } else {
+      console.log('🔥 [REGISTER] social 파라미터가 없으므로 일반 회원가입');
     }
   }, []);
 
@@ -856,8 +868,15 @@ export default function RegisterPage() {
   // 뒤로가기
   const handleBack = () => {
     if (currentStep === REGISTER_STEPS.TERMS) {
-      // 첫 번째 단계에서는 로그인 페이지로 이동
-      router.push('/login');
+      // 첫 번째 단계에서는 signin 페이지로 이동 (소셜 로그인 시)
+      if (registerData.isSocialLogin) {
+        // 소셜 로그인 데이터 정리 후 signin으로 이동
+        localStorage.removeItem('socialLoginData');
+        console.log('🔥 [REGISTER] 뒤로가기 - socialLoginData 제거 후 signin으로 이동');
+        router.push('/signin');
+      } else {
+        router.push('/signin');
+      }
     } else {
       const steps = Object.values(REGISTER_STEPS);
       const currentIndex = steps.indexOf(currentStep);
@@ -1224,8 +1243,9 @@ export default function RegisterPage() {
           console.log('새 회원 mt_idx 저장:', data.data.mt_idx);
         }
         
-        // 소셜 로그인 데이터 정리
+        // 소셜 로그인 데이터 정리 (회원가입 성공 시에만)
         localStorage.removeItem('socialLoginData');
+        console.log('🔥 [REGISTER] 회원가입 성공 후 socialLoginData 제거');
         
         setCurrentStep(REGISTER_STEPS.COMPLETE);
       } else {
@@ -1563,11 +1583,19 @@ export default function RegisterPage() {
                   }
                 </p>
                 {registerData.isSocialLogin && (
-                                  <div className="mt-3 p-3 bg-[#0114a2]/10 rounded-lg border border-[#0114a2]/20">
-                  <p className="text-xs text-[#0114a2]">
+                  <div className="mt-3 p-3 bg-[#0114a2]/10 rounded-lg border border-[#0114a2]/20">
+                    <p className="text-xs text-[#0114a2]">
                       📧 <strong>{registerData.mt_email}</strong><br/>
                       전화번호 인증 없이 간편하게 가입할 수 있습니다
                     </p>
+                  </div>
+                )}
+                {/* 디버깅용 - 개발 환경에서만 표시 */}
+                {process.env.NODE_ENV === 'development' && registerData.isSocialLogin && (
+                  <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
+                    <strong>DEBUG:</strong> Provider: {registerData.socialProvider}, 
+                    Email: {registerData.mt_email}, 
+                    Name: {registerData.mt_name}
                   </div>
                 )}
               </div>
