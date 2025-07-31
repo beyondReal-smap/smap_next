@@ -114,29 +114,71 @@ interface RegisterData {
 
 export default function RegisterPage() {
   const [isIOSReady, setIsIOSReady] = useState(false);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [initError, setInitError] = useState<string | null>(null);
   
-  // iOS 초기 렌더링 제어
+  // iOS 초기 렌더링 제어 및 데이터 로딩 상태 관리
   React.useEffect(() => {
+    console.log('🔥 [REGISTER] 페이지 초기화 시작');
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     
-    if (isIOS) {
-      // iOS에서는 더 긴 대기 시간과 DOMContentLoaded 이벤트 대기
-      const handleIOSReady = () => {
-        // DOM이 완전히 로드된 후 추가 대기
-        setTimeout(() => {
-          setIsIOSReady(true);
-        }, 300);
-      };
+    const handlePageReady = () => {
+      console.log('🔥 [REGISTER] 페이지 준비 완료');
+      setIsIOSReady(true);
       
+      // 데이터 로딩 대기 (소셜 로그인 데이터 확인)
+      setTimeout(() => {
+        console.log('🔥 [REGISTER] 데이터 로딩 체크 시작');
+        const urlParams = new URLSearchParams(window.location.search);
+        const socialProvider = urlParams.get('social');
+        
+        if (socialProvider) {
+          // 소셜 로그인인 경우 localStorage 데이터 대기
+          let attempts = 0;
+          const maxAttempts = 10; // 최대 2초 대기
+          
+          const checkData = () => {
+            const socialData = localStorage.getItem('socialLoginData');
+            console.log(`🔥 [REGISTER] 데이터 체크 시도 ${attempts + 1}/${maxAttempts}:`, socialData ? '데이터 있음' : '데이터 없음');
+            
+            if (socialData) {
+              console.log('🔥 [REGISTER] 소셜 로그인 데이터 확인됨');
+              setIsDataLoaded(true);
+              setIsInitializing(false);
+            } else if (attempts < maxAttempts) {
+              attempts++;
+              setTimeout(checkData, 200);
+            } else {
+              console.warn('🔥 [REGISTER] 소셜 로그인 데이터 로딩 타임아웃');
+              setInitError('소셜 로그인 데이터를 불러오는데 실패했습니다.');
+              setIsDataLoaded(false);
+              setIsInitializing(false);
+            }
+          };
+          
+          checkData();
+        } else {
+          // 일반 회원가입인 경우 바로 로딩 완료
+          console.log('🔥 [REGISTER] 일반 회원가입 - 즉시 로딩 완료');
+          setIsDataLoaded(true);
+          setIsInitializing(false);
+        }
+      }, isIOS ? 500 : 100); // iOS에서는 더 긴 대기 시간
+    };
+    
+    if (isIOS) {
+      console.log('📱 [REGISTER] iOS 환경 감지 - DOM 로딩 대기');
       if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', handleIOSReady);
-        return () => document.removeEventListener('DOMContentLoaded', handleIOSReady);
+        document.addEventListener('DOMContentLoaded', handlePageReady);
+        return () => document.removeEventListener('DOMContentLoaded', handlePageReady);
       } else {
-        handleIOSReady();
+        // DOM이 이미 로드된 경우 약간의 지연 후 실행
+        setTimeout(handlePageReady, 100);
       }
     } else {
-      // 안드로이드/데스크탑에서는 즉시 표시
-      setIsIOSReady(true);
+      console.log('💻 [REGISTER] 데스크탑/안드로이드 환경 - 즉시 준비');
+      handlePageReady();
     }
   }, []);
   
@@ -490,8 +532,13 @@ export default function RegisterPage() {
     };
   }, [requestLocationWithWebAPI, setRegisterData, setLocationLoading, setLocationError]);
 
-  // 소셜 로그인 데이터 초기화
+  // 소셜 로그인 데이터 초기화 (데이터 로딩 완료 후)
   useEffect(() => {
+    if (!isDataLoaded || isInitializing) {
+      console.log('🔥 [REGISTER] 데이터 로딩 대기 중... 소셜 로그인 데이터 초기화 건너뛰기');
+      return;
+    }
+    
     console.log('🔥 [REGISTER] 소셜 로그인 데이터 초기화 시작');
     
     const urlParams = new URLSearchParams(window.location.search);
@@ -536,15 +583,17 @@ export default function RegisterPage() {
           console.error('🔥 [REGISTER] 소셜 로그인 데이터 파싱 오류:', error);
           // 파싱 오류 시에는 데이터 제거
           localStorage.removeItem('socialLoginData');
+          setInitError('소셜 로그인 데이터를 처리하는데 실패했습니다.');
         }
       } else {
         console.warn('🔥 [REGISTER] URL에 social 파라미터가 있지만 socialLoginData가 없음');
         console.warn('🔥 [REGISTER] 일반 회원가입으로 진행');
+        setInitError('소셜 로그인 데이터가 없습니다. 다시 로그인해주세요.');
       }
     } else {
       console.log('🔥 [REGISTER] social 파라미터가 없으므로 일반 회원가입');
     }
-  }, []);
+  }, [isDataLoaded, isInitializing]);
 
   // 진행률 계산
   const getProgress = () => {
@@ -739,10 +788,12 @@ export default function RegisterPage() {
     return () => clearInterval(interval);
   }, [countdownTime, errorModal.isOpen, errorModal.isCountdown]);
 
-    // 약관 단계에서 스크롤 위치 초기화
+    // 약관 단계에서 스크롤 위치 초기화 (데이터 로딩 완료 후에만)
   useEffect(() => {
-    if (currentStep === REGISTER_STEPS.TERMS) {
+    if (currentStep === REGISTER_STEPS.TERMS && isDataLoaded && !isInitializing) {
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      
+      console.log('🔧 [REGISTER] 약관 단계 스크롤 초기화 - 데이터 로딩 완료');
       
       // iOS 전용 강력한 위치 고정
       const forceFixPosition = () => {
@@ -796,11 +847,11 @@ export default function RegisterPage() {
         }
       }
     }
-  }, [currentStep]);
+  }, [currentStep, isDataLoaded, isInitializing]);
 
-  // iOS에서 약관동의 페이지 강제 표시 (추가 보장)
+  // iOS에서 약관동의 페이지 강제 표시 (추가 보장, 데이터 로딩 완료 후에만)
   useEffect(() => {
-    if (currentStep === REGISTER_STEPS.TERMS) {
+    if (currentStep === REGISTER_STEPS.TERMS && isDataLoaded && !isInitializing) {
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
       
       if (isIOS) {
@@ -863,7 +914,7 @@ export default function RegisterPage() {
         return () => clearTimeout(timer);
       }
     }
-  }, [currentStep]);
+  }, [currentStep, isDataLoaded, isInitializing]);
 
   // 뒤로가기
   const handleBack = () => {
@@ -1461,13 +1512,53 @@ export default function RegisterPage() {
     }
   };
 
-  // iOS에서 로딩 중일 때 로딩 화면 표시
-  if (!isIOSReady && /iPad|iPhone|iPod/.test(navigator.userAgent)) {
+  // 페이지 초기화 중이거나 에러가 있을 때 표시
+  if (isInitializing || !isIOSReady || (!isDataLoaded && !initError)) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-white">
-        <div className="text-center">
-                          <div className="w-8 h-8 border-4 border-gray-200 border-t-[#0114a2] rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600 text-sm">로딩 중...</p>
+        <div className="text-center p-4">
+          <div className="w-8 h-8 border-4 border-gray-200 border-t-[#0114a2] rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 text-sm">페이지를 준비하고 있습니다...</p>
+          <p className="text-gray-400 text-xs mt-2">잠시만 기다려주세요</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // 에러가 발생한 경우 에러 화면 표시
+  if (initError) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-white p-4">
+        <div className="text-center max-w-md">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <h2 className="text-lg font-bold text-gray-900 mb-2">페이지 로드 오류</h2>
+          <p className="text-gray-600 text-sm mb-4" style={{ wordBreak: 'keep-all' }}>
+            {initError}
+          </p>
+          <div className="space-y-2">
+            <button
+              onClick={() => {
+                console.log('🔥 [REGISTER] 페이지 새로고침 시도');
+                window.location.reload();
+              }}
+              className="w-full py-3 bg-[#0114a2] text-white rounded-xl font-medium hover:bg-[#0114a2]/90 transition-colors"
+            >
+              페이지 새로고침
+            </button>
+            <button
+              onClick={() => {
+                console.log('🔥 [REGISTER] 로그인 페이지로 이동');
+                window.location.href = '/signin';
+              }}
+              className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+            >
+              로그인 페이지로 이동
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -2606,19 +2697,21 @@ export default function RegisterPage() {
                   handleNext();
                 }
               }}
-              disabled={!isStepValid() || isLoading || locationLoading}
-              whileHover={{ scale: (isStepValid() && !locationLoading) ? 1.02 : 1 }}
-              whileTap={{ scale: (isStepValid() && !locationLoading) ? 0.98 : 1 }}
+              disabled={!isStepValid() || isLoading || locationLoading || isInitializing || !isDataLoaded}
+              whileHover={{ scale: (isStepValid() && !locationLoading && !isInitializing && isDataLoaded) ? 1.02 : 1 }}
+              whileTap={{ scale: (isStepValid() && !locationLoading && !isInitializing && isDataLoaded) ? 0.98 : 1 }}
               className={`w-full py-4 rounded-xl font-semibold text-lg transition-all register-button ${
-                (isStepValid() && !locationLoading)
+                (isStepValid() && !locationLoading && !isInitializing && isDataLoaded)
                   ? 'text-white shadow-lg'
                   : 'bg-gray-200 text-gray-400 cursor-not-allowed'
               }`}
-              style={(isStepValid() && !locationLoading) 
+              style={(isStepValid() && !locationLoading && !isInitializing && isDataLoaded) 
                 ? {backgroundColor: '#0114a2'} 
                 : {}}
             >
-              {isLoading ? '처리 중...' : 
+              {isInitializing ? '초기화 중...' :
+               !isDataLoaded ? '데이터 로딩 중...' :
+               isLoading ? '처리 중...' : 
                locationLoading ? '위치 정보 가져오는 중...' :
                currentStep === REGISTER_STEPS.PHONE ? '인증번호 발송' :
                currentStep === REGISTER_STEPS.VERIFICATION ? '인증번호 확인' :

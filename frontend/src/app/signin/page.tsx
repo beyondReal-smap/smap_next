@@ -715,9 +715,23 @@ const SignInPage = () => {
             const savedData = localStorage.getItem('socialLoginData');
             console.log('[NATIVE CALLBACK] localStorage 저장 확인:', savedData);
             
-            // 회원가입 페이지로 이동
-            console.log('[NATIVE CALLBACK] register 페이지로 이동');
-            window.location.href = '/register?social=google';
+            // 회원가입 페이지로 이동 (데이터 저장 후 약간의 지연)
+            console.log('[NATIVE CALLBACK] register 페이지로 이동 준비');
+            
+            // localStorage 저장이 완료되었는지 재확인
+            setTimeout(() => {
+              const verifyData = localStorage.getItem('socialLoginData');
+              if (verifyData) {
+                console.log('[NATIVE CALLBACK] 데이터 저장 확인 완료, register 페이지로 이동');
+                window.location.replace('/register?social=google');
+              } else {
+                console.error('[NATIVE CALLBACK] 데이터 저장 실패, 다시 시도');
+                localStorage.setItem('socialLoginData', JSON.stringify(socialData));
+                setTimeout(() => {
+                  window.location.replace('/register?social=google');
+                }, 200);
+              }
+            }, 200);
             return;
             
           } else {
@@ -881,9 +895,22 @@ const SignInPage = () => {
           const savedData = localStorage.getItem('socialLoginData');
           console.log('🆕 [NATIVE DATA] localStorage 저장 확인:', savedData);
           
-          // 강제로 페이지 이동
-          console.log('🆕 [NATIVE DATA] register 페이지로 강제 이동');
-          window.location.replace('/register?social=google');
+          // 강제로 페이지 이동 (데이터 저장 확인 후)
+          console.log('🆕 [NATIVE DATA] register 페이지로 이동 준비');
+          
+          setTimeout(() => {
+            const verifyData = localStorage.getItem('socialLoginData');
+            if (verifyData) {
+              console.log('🆕 [NATIVE DATA] 데이터 저장 확인 완료, register 페이지로 이동');
+              window.location.replace('/register?social=google');
+            } else {
+              console.error('🆕 [NATIVE DATA] 데이터 저장 실패, 다시 시도');
+              localStorage.setItem('socialLoginData', JSON.stringify(socialData));
+              setTimeout(() => {
+                window.location.replace('/register?social=google');
+              }, 200);
+            }
+          }, 200);
           } else {
             console.log('✅ [NATIVE DATA] 기존 사용자 - 홈으로 이동');
             
@@ -2232,9 +2259,22 @@ const SignInPage = () => {
                 const savedData = localStorage.getItem('socialLoginData');
                 console.log('[GOOGLE LOGIN] localStorage 저장 확인:', savedData);
                 
-                // 회원가입 페이지로 이동
-                console.log('[GOOGLE LOGIN] register 페이지로 이동');
-                window.location.replace('/register?social=google');
+                // 회원가입 페이지로 이동 (데이터 저장 확인 후)
+                console.log('[GOOGLE LOGIN] register 페이지로 이동 준비');
+                
+                setTimeout(() => {
+                  const verifyData = localStorage.getItem('socialLoginData');
+                  if (verifyData) {
+                    console.log('[GOOGLE LOGIN] 데이터 저장 확인 완료, register 페이지로 이동');
+                    window.location.replace('/register?social=google');
+                  } else {
+                    console.error('[GOOGLE LOGIN] 데이터 저장 실패, 다시 시도');
+                    localStorage.setItem('socialLoginData', JSON.stringify(socialData));
+                    setTimeout(() => {
+                      window.location.replace('/register?social=google');
+                    }, 200);
+                  }
+                }, 200);
               } else {
                 console.log('[GOOGLE LOGIN] 🏠 기존 사용자 - 홈 페이지로 이동');
                 router.replace('/home');
@@ -3745,6 +3785,16 @@ const SignInPage = () => {
             {formErrors.password && (
               <p className="text-red-500 text-sm mt-1" style={{ wordBreak: 'keep-all' }}>{formErrors.password}</p>
             )}
+            
+            {/* 비밀번호 찾기 링크 */}
+            <div className="text-right mt-2">
+              <Link 
+                href="/forgot-password" 
+                className="text-sm text-[#0114a2] hover:text-[#001f87] hover:underline transition-colors"
+              >
+                비밀번호를 잊어버리셨나요?
+              </Link>
+            </div>
           </div>
         </div>
 

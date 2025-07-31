@@ -317,4 +317,31 @@ def check_nickname_duplicate(db: Session, mt_idx: int, nickname: str) -> bool:
         Member.mt_status == '1',
         Member.mt_show == 'Y'
     ).first()
-    return existing_user is not None 
+    return existing_user is not None
+
+def update_user_password(db: Session, mt_idx: int, new_password: str) -> bool:
+    """사용자 비밀번호 업데이트"""
+    try:
+        # 새 비밀번호 해시화
+        hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        
+        # 사용자 조회
+        user = db.query(Member).filter(Member.mt_idx == mt_idx).first()
+        if not user:
+            return False
+        
+        # 비밀번호 업데이트
+        user.mt_pass = hashed_password
+        user.mt_udate = datetime.utcnow()  # 수정일시 업데이트
+        
+        db.commit()
+        db.refresh(user)
+        
+        return True
+        
+    except Exception as e:
+        db.rollback()
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"비밀번호 업데이트 실패: {str(e)}")
+        return False 

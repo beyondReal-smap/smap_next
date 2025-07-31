@@ -17,6 +17,9 @@ class Settings(BaseSettings):
         "https://nextstep.smap.site", # Vercel 배포 주소 추가
     ]
     
+    # 프론트엔드 URL (비밀번호 재설정 링크용)
+    FRONTEND_URL: str = "https://nextstep.smap.site"
+    
     # MySQL 데이터베이스 설정
     MYSQL_HOST: str = "118.67.130.71"
     MYSQL_USER: str = "smap2"

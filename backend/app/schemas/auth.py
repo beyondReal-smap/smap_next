@@ -32,4 +32,36 @@ class RegisterRequest(BaseModel):
 # class UserResponse(UserIdentity):
 #     mt_email: Optional[EmailStr] = None
 #     mt_hp: Optional[str] = None
-#     # ... 기타 반환할 사용자 정보 ... 
+#     # ... 기타 반환할 사용자 정보 ...
+
+# 비밀번호 찾기 요청 스키마
+class ForgotPasswordRequest(BaseModel):
+    type: str  # 'phone' 또는 'email'
+    contact: str  # 전화번호 또는 이메일
+
+# 비밀번호 찾기 응답 스키마
+class ForgotPasswordResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[dict] = None
+
+# 토큰 검증 요청 스키마
+class VerifyResetTokenRequest(BaseModel):
+    token: str
+
+# 토큰 검증 응답 스키마
+class VerifyResetTokenResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[dict] = None
+
+# 비밀번호 재설정 요청 스키마
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+# 비밀번호 재설정 응답 스키마
+class ResetPasswordResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[dict] = None 
