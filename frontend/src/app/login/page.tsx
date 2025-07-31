@@ -120,9 +120,8 @@ export default function LoginPage() {
         console.log('🔥 [LOGIN] Android 네이티브 구글 로그인 호출');
         (window as any).Android.googleLogin();
       } else {
-        console.log('🔥 [LOGIN] 네이티브 브릿지 없음 - 데모 모드로 진행');
-        // 네이티브 브릿지가 없는 경우 데모 데이터로 진행
-        await handleGoogleLoginDemo();
+        console.log('🔥 [LOGIN] 네이티브 브릿지가 없습니다. 네이티브 앱에서만 구글 로그인이 가능합니다.');
+        setApiError('네이티브 앱에서만 구글 로그인이 가능합니다.');
       }
     } catch (err: any) {
       console.error('Google 로그인 오류:', err);
@@ -192,27 +191,7 @@ export default function LoginPage() {
     }
   };
 
-  // 데모용 구글 로그인 (네이티브 브릿지가 없는 경우)
-  const handleGoogleLoginDemo = async () => {
-    console.log('🔥 [LOGIN] 데모 구글 로그인 실행');
-    
-    // 데모 구글 사용자 데이터
-    const demoGoogleData = {
-      credential: `demo-google-credential-${Date.now()}`,
-      user: {
-        email: 'demo@gmail.com',
-        name: '데모 사용자',
-        nickname: 'demo_user',
-        profile_image: 'https://via.placeholder.com/150',
-        google_id: `demo_google_id_${Date.now()}`
-      }
-    };
-    
-    // 1초 후 결과 처리 (네이티브 로그인 시뮬레이션)
-    setTimeout(() => {
-      handleGoogleLoginResult(demoGoogleData);
-    }, 1000);
-  };
+
 
   // Kakao 로그인 핸들러
   const handleKakaoLogin = async () => {
