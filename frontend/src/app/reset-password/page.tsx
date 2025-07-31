@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiLock, FiEye, FiEyeOff, FiCheckCircle, FiAlertCircle } from 'react-icons/fi';
+import { FiLock, FiEye, FiEyeOff, FiCheckCircle, FiAlertCircle, FiKey } from 'react-icons/fi';
 import { HiOutlineChevronLeft } from 'react-icons/hi2';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -439,41 +439,19 @@ const ResetPasswordPage = () => {
   useEffect(() => {
     if (!isPageReady) return;
     
-    // 모든 setTimeout/setInterval을 추적하여 예상치 못한 타이머 차단
-    const originalSetTimeout = window.setTimeout;
-    const originalSetInterval = window.setInterval;
-    const trackedTimers = new Set<number>();
-    
-    window.setTimeout = function(callback: Function, delay?: number, ...args: any[]) {
-      // 5초 이상의 타이머는 로깅
-      if (delay && delay >= 5000) {
-        console.warn('[RESET_PASSWORD] 장시간 타이머 감지:', delay, 'ms');
+    // 페이지 안정성을 위한 기본 모니터링
+    const checkPageStability = () => {
+      if (mountedRef.current && componentRef.current) {
+        if (!document.contains(componentRef.current)) {
+          console.warn('[RESET_PASSWORD] 컴포넌트 안정성 문제 감지');
+        }
       }
-      
-      const timerId = originalSetTimeout.call(this, callback, delay, ...args);
-      trackedTimers.add(timerId);
-      return timerId;
-    } as any;
+    };
     
-    window.setInterval = function(callback: Function, delay?: number, ...args: any[]) {
-      console.warn('[RESET_PASSWORD] setInterval 사용 감지:', delay, 'ms');
-      
-      const intervalId = originalSetInterval.call(this, callback, delay, ...args);
-      trackedTimers.add(intervalId);
-      return intervalId;
-    } as any;
+    const stabilityCheck = setInterval(checkPageStability, 5000);
     
     return () => {
-      // 타이머 복원
-      window.setTimeout = originalSetTimeout;
-      window.setInterval = originalSetInterval;
-      
-      // 추적된 타이머 정리
-      trackedTimers.forEach(timerId => {
-        clearTimeout(timerId);
-        clearInterval(timerId);
-      });
-      trackedTimers.clear();
+      clearInterval(stabilityCheck);
     };
   }, [isPageReady]);
   
@@ -794,7 +772,7 @@ const ResetPasswordPage = () => {
     return (
       <div className="flex items-center justify-center min-h-screen bg-white">
         <div className="text-center">
-          <IOSCompatibleSpinner size="large" />
+          <IOSCompatibleSpinner size="lg" />
           <p className="text-gray-600 text-sm mt-4">페이지를 준비하고 있습니다...</p>
         </div>
       </div>
@@ -806,7 +784,7 @@ const ResetPasswordPage = () => {
     return (
       <div className="flex items-center justify-center min-h-screen bg-white">
         <div className="text-center">
-          <IOSCompatibleSpinner size="large" />
+          <IOSCompatibleSpinner size="lg" />
           <p className="text-gray-600 text-sm mt-4">토큰을 확인하고 있습니다...</p>
         </div>
       </div>
@@ -1104,7 +1082,7 @@ const ResetPasswordPage = () => {
             >
               {isLoading ? (
                 <>
-                  <IOSCompatibleSpinner size="small" color="white" />
+                  <IOSCompatibleSpinner size="sm" />
                   <span>변경 중...</span>
                 </>
               ) : (

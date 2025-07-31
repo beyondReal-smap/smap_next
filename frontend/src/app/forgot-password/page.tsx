@@ -420,41 +420,19 @@ const ForgotPasswordPage = () => {
   useEffect(() => {
     if (!isPageReady) return;
     
-    // 모든 setTimeout/setInterval을 추적하여 예상치 못한 타이머 차단
-    const originalSetTimeout = window.setTimeout;
-    const originalSetInterval = window.setInterval;
-    const trackedTimers = new Set<number>();
-    
-    window.setTimeout = function(callback: Function, delay?: number, ...args: any[]) {
-      // 5초 이상의 타이머는 로깅
-      if (delay && delay >= 5000) {
-        console.warn('[FORGOT_PASSWORD] 장시간 타이머 감지:', delay, 'ms');
+    // 페이지 안정성을 위한 기본 모니터링
+    const checkPageStability = () => {
+      if (mountedRef.current && componentRef.current) {
+        if (!document.contains(componentRef.current)) {
+          console.warn('[FORGOT_PASSWORD] 컴포넌트 안정성 문제 감지');
+        }
       }
-      
-      const timerId = originalSetTimeout.call(this, callback, delay, ...args);
-      trackedTimers.add(timerId);
-      return timerId;
-    } as any;
+    };
     
-    window.setInterval = function(callback: Function, delay?: number, ...args: any[]) {
-      console.warn('[FORGOT_PASSWORD] setInterval 사용 감지:', delay, 'ms');
-      
-      const intervalId = originalSetInterval.call(this, callback, delay, ...args);
-      trackedTimers.add(intervalId);
-      return intervalId;
-    } as any;
+    const stabilityCheck = setInterval(checkPageStability, 5000);
     
     return () => {
-      // 타이머 복원
-      window.setTimeout = originalSetTimeout;
-      window.setInterval = originalSetInterval;
-      
-      // 추적된 타이머 정리
-      trackedTimers.forEach(timerId => {
-        clearTimeout(timerId);
-        clearInterval(timerId);
-      });
-      trackedTimers.clear();
+      clearInterval(stabilityCheck);
     };
   }, [isPageReady]);
   
@@ -730,7 +708,7 @@ const ForgotPasswordPage = () => {
     return (
       <div className="flex items-center justify-center min-h-screen bg-white">
         <div className="text-center">
-          <IOSCompatibleSpinner size="large" />
+          <IOSCompatibleSpinner size="lg" />
           <p className="text-gray-600 text-sm mt-4">페이지를 준비하고 있습니다...</p>
         </div>
       </div>
@@ -774,7 +752,7 @@ const ForgotPasswordPage = () => {
                 if (isIOS()) {
                   hapticFeedback.backButton({ component: 'forgot-password' });
                 }
-                router.back();
+                router.push('/signin');
               }}
               className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
               whileHover={{ scale: 1.05 }}
@@ -796,9 +774,9 @@ const ForgotPasswordPage = () => {
         </div>
       </AnimatedHeader>
 
-              {/* 메인 컨텐츠 - 헤더 높이만큼 상단 패딩 추가 */}
-        <div className="max-w-md mx-auto px-4 py-8" style={{ 
-          paddingTop: 'calc(62px + 2rem)', // 헤더 높이 + 기본 패딩
+              {/* 메인 컨텐츠 - 헤더와 설명영역 간격 줄임 */}
+        <div className="max-w-md mx-auto px-4 py-4" style={{ 
+          paddingTop: 'calc(62px + 1rem)', // 헤더 높이 + 줄어든 패딩
           minHeight: 'calc(100vh - 62px)' // 헤더 높이 제외한 전체 높이
         }}>
         
@@ -920,7 +898,7 @@ const ForgotPasswordPage = () => {
               >
                 {isLoading ? (
                   <>
-                    <IOSCompatibleSpinner size="small" color="white" />
+                    <IOSCompatibleSpinner size="sm" />
                     <span>전송 중...</span>
                   </>
                 ) : (
