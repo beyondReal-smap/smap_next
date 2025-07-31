@@ -95,12 +95,13 @@ export default function LoginPage() {
 
   // Google 로그인 핸들러
   const handleGoogleLogin = async () => {
+    console.log('🔥 [LOGIN] 구글 로그인 버튼 클릭됨');
     setIsLoading(true);
     setApiError('');
     setFormErrors({});
     
     try {
-      console.log('Google 로그인 시도 중...');
+      console.log('🔥 [LOGIN] Google 로그인 시도 중...');
       
       const response = await fetch('/api/google-auth', {
         method: 'POST',
