@@ -70,7 +70,12 @@ export default function SocialLogin() {
           }
 
           if (data.success) {
-            if (data.isNewUser) {
+            console.log('🔥 [SOCIAL_LOGIN] Google 로그인 응답:', data);
+            
+            // 🚨 임시: 모든 구글 로그인을 신규 사용자로 처리 (테스트용)
+            const isNewUser = true;
+            
+            if (isNewUser) {
               // 신규 회원 - register 페이지로 이동하면서 구글 정보 전달
               const socialData = {
                 provider: 'google',
@@ -81,6 +86,7 @@ export default function SocialLogin() {
                 google_id: data.user.google_id
               };
               
+              console.log('🔥 [SOCIAL_LOGIN] 신규 사용자 - localStorage에 저장:', socialData);
               localStorage.setItem('socialLoginData', JSON.stringify(socialData));
               router.push('/register?social=google');
             } else {
