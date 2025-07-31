@@ -331,14 +331,46 @@ export default function LoginPage() {
             {/* Google 로그인 버튼 */}
             <button
               type="button"
-              onClick={() => {
-                console.log('🔥 [LOGIN] 구글 로그인 버튼 클릭 이벤트 발생');
-                console.log('🔥 [LOGIN] isLoading 상태:', isLoading);
-                console.log('🔥 [LOGIN] handleGoogleLogin 함수 존재:', typeof handleGoogleLogin);
+              data-google-login="react-handler"
+              onClickCapture={(e) => {
+                // 캡처링 단계에서 먼저 처리
+                console.log('🔥 [LOGIN] 구글 로그인 버튼 클릭 캡처됨!');
+                
+                // 이벤트 전파 중단
+                e.preventDefault();
+                e.stopPropagation();
+                
+                console.log('🔥 [LOGIN] 구글 로그인 버튼 클릭됨!');
+                console.log('🔍 [LOGIN] 클릭 이벤트 상세:', {
+                  target: e.target,
+                  currentTarget: e.currentTarget,
+                  isLoading,
+                  disabled: e.currentTarget.disabled,
+                  timestamp: Date.now()
+                });
+                
+                // 버튼이 비활성화되어 있으면 함수 종료
+                if (isLoading || e.currentTarget.disabled) {
+                  console.log('🚫 [LOGIN] 버튼이 비활성화되어 있어 클릭 무시');
+                  return;
+                }
+                
+                // 햅틱 피드백 (버튼 클릭 시)
+                if (typeof window !== 'undefined' && (window as any).hapticLight) {
+                  (window as any).hapticLight();
+                }
+                
+                // 실제 핸들러 호출
+                console.log('🚀 [LOGIN] handleGoogleLogin 함수 호출 시작');
                 handleGoogleLogin();
               }}
               disabled={isLoading}
               className="w-full inline-flex items-center justify-center py-3 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-70 transition-all transform hover:scale-105 active:scale-95"
+              style={{ 
+                zIndex: 100, 
+                position: 'relative',
+                pointerEvents: isLoading ? 'none' : 'auto'
+              }}
             >
               <FcGoogle className="w-5 h-5 mr-3" aria-hidden="true" />
               Google 계정으로 로그인
