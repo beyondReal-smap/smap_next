@@ -806,7 +806,7 @@ const SignInPage = () => {
     console.log('✅ [NATIVE CALLBACK] 네이티브 구글 로그인 콜백 함수 등록 완료');
     
     // 🚨 네이티브 구글 로그인 데이터 처리 함수
-    const handleNativeGoogleLoginData = useCallback(async (data: any) => {
+    const handleNativeGoogleLoginData = async (data: any) => {
       console.log('🔄 [NATIVE DATA] 네이티브 구글 로그인 데이터 처리 시작');
       console.log('🔄 [NATIVE DATA] 받은 데이터 타입:', typeof data);
       console.log('🔄 [NATIVE DATA] 받은 데이터:', data);
@@ -816,10 +816,7 @@ const SignInPage = () => {
       delete (window as any).__GOOGLE_LOGIN_IN_PROGRESS__;
       
       try {
-        // 네이티브 앱에서 전달하는 데이터 구조 확인
-        const idToken = data.idToken || data.credential || (data.user && data.user.idToken);
-        if (!idToken) {
-          console.error('❌ [NATIVE DATA] ID 토큰을 찾을 수 없습니다. 데이터 구조:', data);
+        if (!data.idToken) {
           throw new Error('ID 토큰이 없습니다');
         }
         
@@ -832,8 +829,8 @@ const SignInPage = () => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            idToken: idToken,  // ✅ 유연한 토큰 추출 방식 사용
-            userInfo: data.userInfo || data.user,
+            idToken: data.idToken,  // ✅ 백엔드가 기대하는 파라미터 이름으로 수정
+            userInfo: data.userInfo,
             source: 'native_direct'
           }),
         });
@@ -933,33 +930,7 @@ const SignInPage = () => {
         console.error('❌ [NATIVE DATA] 처리 중 오류:', error);
         showError(`네이티브 로그인 처리 중 오류가 발생했습니다: ${error}`);
       }
-    }, [showError]);
-
-    // 🔥 전역 함수 등록 (네이티브 앱에서 호출할 수 있도록)
-    useEffect(() => {
-      if (typeof window !== 'undefined') {
-        (window as any).handleGoogleLoginResult = handleNativeGoogleLoginData;
-        console.log('🔥 [SIGNIN] 전역 함수 등록 완료: handleGoogleLoginResult');
-        console.log('🔥 [SIGNIN] 네이티브 앱에서 이제 이 함수를 호출할 수 있습니다');
-        
-        // 테스트용 전역 함수도 등록
-        (window as any).TEST_GOOGLE_LOGIN_SIGNIN = () => {
-          console.log('🧪 [TEST] 테스트 구글 로그인 데이터 생성');
-          const testData = {
-            credential: 'test_id_token_123',
-            user: {
-              email: 'test@example.com',
-              name: 'Test User',
-              nickname: 'TestUser',
-              profile_image: 'https://example.com/avatar.jpg',
-              google_id: '123456789'
-            }
-          };
-          handleNativeGoogleLoginData(testData);
-        };
-        console.log('🔥 [SIGNIN] 테스트 함수도 등록 완료: TEST_GOOGLE_LOGIN_SIGNIN');
-      }
-    }, [handleNativeGoogleLoginData]);
+    };
     
         // 🚨 전역 변수 모니터링 (iOS 앱에서 직접 저장한 데이터 확인)
     const checkNativeData = () => {
@@ -969,25 +940,22 @@ const SignInPage = () => {
         console.log('🎉 [NATIVE DATA] localStorage에서 데이터 발견:', savedData);
       }
       
-      // 전역 변수 확인 (안전장치 추가)
-      if ((window as any).__NATIVE_GOOGLE_LOGIN_DATA__ && !isLoading) {
+      // 전역 변수 확인
+      if ((window as any).__NATIVE_GOOGLE_LOGIN_DATA__) {
         const data = (window as any).__NATIVE_GOOGLE_LOGIN_DATA__;
         console.log('🎉 [NATIVE DATA] 전역 변수에서 구글 로그인 데이터 발견!', data);
         
-        // 데이터 사용 후 즉시 삭제 (중복 처리 방지)
-        delete (window as any).__NATIVE_GOOGLE_LOGIN_DATA__;
-        
-        // 이후 처리
+        // 즉시 처리
         handleNativeGoogleLoginData(data);
+        
+        // 데이터 사용 후 삭제
+        delete (window as any).__NATIVE_GOOGLE_LOGIN_DATA__;
       }
       
-      // iOS 네이티브 콜백 데이터도 확인 (안전장치 추가)
-      if ((window as any).__IOS_GOOGLE_LOGIN_CALLBACK__ && !isLoading) {
+      // iOS 네이티브 콜백 데이터도 확인
+      if ((window as any).__IOS_GOOGLE_LOGIN_CALLBACK__) {
         const callbackData = (window as any).__IOS_GOOGLE_LOGIN_CALLBACK__;
         console.log('🎉 [NATIVE DATA] iOS 콜백 데이터 발견!', callbackData);
-        
-        // 콜백 데이터 즉시 삭제 (중복 처리 방지)
-        delete (window as any).__IOS_GOOGLE_LOGIN_CALLBACK__;
         
         // 진행 중 플래그 해제
         delete (window as any).__GOOGLE_LOGIN_IN_PROGRESS__;
@@ -1001,40 +969,31 @@ const SignInPage = () => {
           setError('로그인이 취소되었습니다. 다시 시도해주세요.');
           setIsLoading(false);
         }
+        
+        // 콜백 데이터 삭제
+        delete (window as any).__IOS_GOOGLE_LOGIN_CALLBACK__;
       }
     };
     
-    // 안전한 모니터링 (로딩 중이 아닐 때만)
-    if (!isLoading) {
-      // 주기적으로 확인 (1초마다, 최대 5회로 단축)
-      let checkCount = 0;
-      const checkInterval = setInterval(() => {
-        if (isLoading) {
-          clearInterval(checkInterval);
-          return;
-        }
-        
-        checkCount++;
-        console.log(`🔍 [NATIVE DATA] 모니터링 ${checkCount}/5`);
-        checkNativeData();
-        
-        if (checkCount >= 5) {
-          clearInterval(checkInterval);
-          console.log('🔍 [NATIVE DATA] 전역 변수 모니터링 종료');
-          
-          // 모니터링 종료 후에도 localStorage 확인
-          const savedData = localStorage.getItem('socialLoginData');
-          console.log('🔍 [NATIVE DATA] 최종 localStorage 확인:', savedData);
-          
-          // 전역 함수 등록 상태 확인
-          console.log('🔍 [NATIVE DATA] handleGoogleLoginResult 함수 상태:', typeof (window as any).handleGoogleLoginResult);
-          console.log('🔍 [NATIVE DATA] __NATIVE_GOOGLE_LOGIN_DATA__ 확인:', (window as any).__NATIVE_GOOGLE_LOGIN_DATA__);
-        }
-      }, 1000);
-      
-      // 즉시 한 번 확인
+    // 주기적으로 확인 (1초마다, 최대 10회)
+    let checkCount = 0;
+    const checkInterval = setInterval(() => {
+      checkCount++;
+      console.log(`🔍 [NATIVE DATA] 모니터링 ${checkCount}/10`);
       checkNativeData();
-    }
+      
+      if (checkCount >= 10) {
+        clearInterval(checkInterval);
+        console.log('🔍 [NATIVE DATA] 전역 변수 모니터링 종료');
+        
+        // 모니터링 종료 후에도 localStorage 확인
+        const savedData = localStorage.getItem('socialLoginData');
+        console.log('🔍 [NATIVE DATA] 최종 localStorage 확인:', savedData);
+      }
+    }, 1000);
+    
+    // 즉시 한 번 확인
+    checkNativeData();
     
     // 🔍 즉시 강제 핸들러 확인 (iOS 환경에서만)
     if (isIOSWebView) {
@@ -1687,10 +1646,10 @@ const SignInPage = () => {
           userAgent: navigator.userAgent
         });
         
-        // 네이티브 환경에서는 웹 Google SDK를 사용하지 않음
-        if (isAndroidWebView || isIOSWebView) {
-          console.log('[GOOGLE SDK] 네이티브 환경 - 웹 Google SDK 사용하지 않음');
-          throw new Error('네이티브 환경에서는 네이티브 Google 로그인을 사용합니다.');
+        // 안드로이드에서는 웹 Google SDK를 사용하지 않음
+        if (isAndroidWebView) {
+          console.log('[GOOGLE SDK] 안드로이드 환경 - 웹 Google SDK 사용하지 않음');
+          throw new Error('안드로이드에서는 네이티브 Google 로그인을 사용합니다.');
         }
         
         // Google SDK를 동적으로 로드해보기 (iOS 및 웹 환경에서만)
