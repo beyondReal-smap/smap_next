@@ -365,6 +365,34 @@ export async function POST(request: NextRequest) {
       let user = backendData.data.user || backendData.data.member;
       isNewUser = backendData.data.isNewUser || backendData.data.is_new_user || false;
       
+      // 🔧 신규 사용자 판별 로직 강화
+      if (!isNewUser && user && user.mt_idx) {
+        // 기존 사용자가 있는 경우
+        sendLogToConsole('info', '🔧 기존 사용자 확인됨', {
+          mt_idx: user.mt_idx,
+          mt_email: user.mt_email,
+          mt_google_id: user.mt_google_id
+        });
+      } else {
+        // 신규 사용자인 경우
+        isNewUser = true;
+        sendLogToConsole('info', '🔧 신규 사용자로 판별됨', {
+          email: googleUser.email,
+          googleId: googleUser.googleId,
+          reason: 'no_existing_user_found_or_invalid_user_data'
+        });
+        
+        // 신규 사용자용 임시 데이터 생성
+        user = {
+          mt_idx: null, // 신규 사용자는 mt_idx가 없음
+          mt_email: googleUser.email,
+          mt_name: googleUser.name,
+          mt_nickname: googleUser.givenName || googleUser.name,
+          mt_google_id: googleUser.googleId,
+          profile_image: googleUser.picture
+        };
+      }
+      
       // 🔧 백엔드 응답 검증 및 로깅
       sendLogToConsole('info', '🔧 백엔드 응답 사용자 정보 확인', {
         email: googleUser.email,
@@ -474,28 +502,31 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // JWT 토큰 생성 (백엔드 응답의 실제 사용자 정보 사용)
-      const token = jwt.sign(
-        { 
-          mt_idx: user.mt_idx,
-          userId: user.mt_idx, 
-          mt_id: user.mt_id,
-          mt_name: user.mt_name,
-          mt_nickname: user.mt_nickname,
-          mt_hp: user.mt_hp,
-          mt_email: user.mt_email,
-          mt_birth: user.mt_birth,
-          mt_gender: user.mt_gender,
-          mt_type: user.mt_type,
-          mt_level: user.mt_level,
-          googleId: user.mt_google_id,
-          provider: 'google'
-        },
-        process.env.NEXTAUTH_SECRET || 'default-secret',
-        { expiresIn: '7d' }
-      );
+      // JWT 토큰 생성 (기존 사용자만)
+      let token = null;
+      if (!isNewUser && user.mt_idx) {
+        token = jwt.sign(
+          { 
+            mt_idx: user.mt_idx,
+            userId: user.mt_idx, 
+            mt_id: user.mt_id,
+            mt_name: user.mt_name,
+            mt_nickname: user.mt_nickname,
+            mt_hp: user.mt_hp,
+            mt_email: user.mt_email,
+            mt_birth: user.mt_birth,
+            mt_gender: user.mt_gender,
+            mt_type: user.mt_type,
+            mt_level: user.mt_level,
+            googleId: user.mt_google_id,
+            provider: 'google'
+          },
+          process.env.NEXTAUTH_SECRET || 'default-secret',
+          { expiresIn: '7d' }
+        );
+      }
 
-      sendLogToConsole('info', '✅ 실제 고객으로 로그인 성공', {
+      sendLogToConsole('info', isNewUser ? '🆕 신규 사용자 - 회원가입 페이지로 이동' : '✅ 기존 사용자 로그인 성공', {
         mt_idx: user.mt_idx,
         email: user.mt_email,
         name: user.mt_name,
@@ -523,9 +554,9 @@ export async function POST(request: NextRequest) {
           mt_level: user.mt_level,
           mt_google_id: user.mt_google_id || googleUser.googleId
         },
-        token, // 🔥 토큰을 별도로 제공하여 localStorage에 저장 가능
+        token, // 🔥 토큰을 별도로 제공하여 localStorage에 저장 가능 (신규 사용자는 null)
         isNewUser,
-        message: isNewUser ? 'Google 계정으로 회원가입되었습니다.' : 'Google 로그인 성공',
+        message: isNewUser ? 'Google 계정으로 회원가입을 진행합니다.' : 'Google 로그인 성공',
         // 🔥 백엔드에서 조회한 추가 데이터 포함 (강화된 처리)
         additionalData: {
           groups: backendData.data?.groups || backendData.data?.additional_data?.groups || [],
@@ -554,23 +585,25 @@ export async function POST(request: NextRequest) {
         timestamp: Date.now()
       };
       
-      // 🔥 HttpOnly 쿠키와 일반 쿠키 모두 설정 (보안과 호환성)
-      response.cookies.set('auth-token', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 7,
-        path: '/',
-      });
-      
-      // 🔥 클라이언트에서 접근 가능한 그룹 데이터 설정
-      response.cookies.set('client-token', encodeURIComponent(JSON.stringify(clientData)), {
-        httpOnly: false, // 클라이언트에서 접근 가능
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 7,
-        path: '/',
-      });
+      // 🔥 HttpOnly 쿠키와 일반 쿠키 모두 설정 (기존 사용자만)
+      if (token) {
+        response.cookies.set('auth-token', token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 7,
+          path: '/',
+        });
+        
+        // 🔥 클라이언트에서 접근 가능한 그룹 데이터 설정
+        response.cookies.set('client-token', encodeURIComponent(JSON.stringify(clientData)), {
+          httpOnly: false, // 클라이언트에서 접근 가능
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 7,
+          path: '/',
+        });
+      }
 
       sendLogToConsole('info', '🔥 토큰 저장 지시 완료', {
         token: token ? 'Generated' : 'None',

@@ -495,9 +495,20 @@ export default function RegisterPage() {
     const urlParams = new URLSearchParams(window.location.search);
     const socialProvider = urlParams.get('social');
     
+    console.log('🔥 [REGISTER] 소셜 로그인 초기화 시작', {
+      socialProvider,
+      hasSocialProvider: !!socialProvider,
+      currentUrl: window.location.href
+    });
+    
     if (socialProvider) {
       // localStorage에서 소셜 로그인 데이터 확인 (login 페이지에서 localStorage에 저장함)
       const socialData = localStorage.getItem('socialLoginData');
+      console.log('🔥 [REGISTER] localStorage 확인', {
+        hasSocialData: !!socialData,
+        socialDataLength: socialData?.length || 0
+      });
+      
       if (socialData) {
         try {
           const parsedData: SocialLoginData = JSON.parse(socialData);
@@ -521,6 +532,13 @@ export default function RegisterPage() {
           setCurrentStep(REGISTER_STEPS.TERMS);
           
           console.log(`🔥 [REGISTER] ${parsedData.provider} 소셜 로그인 데이터 로드 완료`);
+          console.log('🔥 [REGISTER] 현재 registerData 상태:', {
+            isSocialLogin: true,
+            socialProvider: parsedData.provider,
+            mt_name: parsedData.name || parsedData.given_name || 'Google User',
+            mt_nickname: parsedData.nickname || parsedData.given_name || parsedData.name || 'Google User',
+            mt_email: parsedData.email || ''
+          });
           
           // 사용 완료 후 localStorage에서 제거
           localStorage.removeItem('socialLoginData');
@@ -530,7 +548,13 @@ export default function RegisterPage() {
         }
       } else {
         console.warn('🔥 [REGISTER] URL에 social 파라미터가 있지만 socialLoginData가 없음');
+        console.log('🔥 [REGISTER] localStorage 전체 내용:', {
+          keys: Object.keys(localStorage),
+          socialLoginData: localStorage.getItem('socialLoginData')
+        });
       }
+    } else {
+      console.log('🔥 [REGISTER] 일반 회원가입 모드');
     }
   }, []);
 

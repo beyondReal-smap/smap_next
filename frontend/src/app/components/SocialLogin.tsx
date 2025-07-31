@@ -69,16 +69,16 @@ export default function SocialLogin() {
             throw new Error(data.message || '구글 로그인에 실패했습니다.');
           }
 
-          if (data.success && data.data) {
-            if (data.data.isNewUser) {
+          if (data.success) {
+            if (data.isNewUser) {
               // 신규 회원 - register 페이지로 이동하면서 구글 정보 전달
               const socialData = {
                 provider: 'google',
-                email: data.data.user.email,
-                name: data.data.user.name,
-                nickname: data.data.user.nickname,
-                profile_image: data.data.user.profile_image,
-                google_id: data.data.user.google_id
+                email: data.user.email,
+                name: data.user.name,
+                nickname: data.user.nickname,
+                profile_image: data.user.profile_image,
+                google_id: data.user.google_id
               };
               
               localStorage.setItem('socialLoginData', JSON.stringify(socialData));
@@ -86,12 +86,12 @@ export default function SocialLogin() {
             } else {
               // 기존 회원 - 로그인 처리
               const authService = await import('@/services/authService');
-              if (data.data.token) {
-                authService.default.setToken(data.data.token);
+              if (data.token) {
+                authService.default.setToken(data.token);
               }
-              authService.default.setUserData(data.data.user);
+              authService.default.setUserData(data.user);
               
-              console.log('구글 로그인 성공:', data.data.user);
+              console.log('구글 로그인 성공:', data.user);
               router.push('/home');
             }
           } else {
