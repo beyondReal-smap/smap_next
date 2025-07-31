@@ -933,7 +933,7 @@ const SignInPage = () => {
         console.error('❌ [NATIVE DATA] 처리 중 오류:', error);
         showError(`네이티브 로그인 처리 중 오류가 발생했습니다: ${error}`);
       }
-    }, [showError]);
+    }, []); // 의존성 제거하여 무한 루프 방지
 
     // 🔥 전역 함수 등록 (네이티브 앱에서 호출할 수 있도록)
     useEffect(() => {
@@ -959,82 +959,54 @@ const SignInPage = () => {
         };
         console.log('🔥 [SIGNIN] 테스트 함수도 등록 완료: TEST_GOOGLE_LOGIN_SIGNIN');
       }
-    }, [handleNativeGoogleLoginData]);
+    }, []); // 의존성 제거하여 무한 루프 방지
     
-        // 🚨 전역 변수 모니터링 (iOS 앱에서 직접 저장한 데이터 확인)
-    const checkNativeData = () => {
-      // 디버깅을 위한 수동 확인
-      const savedData = localStorage.getItem('socialLoginData');
-      if (savedData) {
-        console.log('🎉 [NATIVE DATA] localStorage에서 데이터 발견:', savedData);
-      }
-      
-      // 전역 변수 확인 (안전장치 추가)
-      if ((window as any).__NATIVE_GOOGLE_LOGIN_DATA__ && !isLoading) {
-        const data = (window as any).__NATIVE_GOOGLE_LOGIN_DATA__;
-        console.log('🎉 [NATIVE DATA] 전역 변수에서 구글 로그인 데이터 발견!', data);
+    // 🚨 전역 변수 단발성 확인 (무한루프 방지)
+    useEffect(() => {
+      const checkOnceAndCleanup = () => {
+        console.log('🔍 [NATIVE DATA] 단발성 전역 변수 확인');
         
-        // 데이터 사용 후 즉시 삭제 (중복 처리 방지)
-        delete (window as any).__NATIVE_GOOGLE_LOGIN_DATA__;
-        
-        // 이후 처리
-        handleNativeGoogleLoginData(data);
-      }
-      
-      // iOS 네이티브 콜백 데이터도 확인 (안전장치 추가)
-      if ((window as any).__IOS_GOOGLE_LOGIN_CALLBACK__ && !isLoading) {
-        const callbackData = (window as any).__IOS_GOOGLE_LOGIN_CALLBACK__;
-        console.log('🎉 [NATIVE DATA] iOS 콜백 데이터 발견!', callbackData);
-        
-        // 콜백 데이터 즉시 삭제 (중복 처리 방지)
-        delete (window as any).__IOS_GOOGLE_LOGIN_CALLBACK__;
-        
-        // 진행 중 플래그 해제
-        delete (window as any).__GOOGLE_LOGIN_IN_PROGRESS__;
-        
-        if (callbackData.success && callbackData.data) {
-          // 성공한 경우
-          handleNativeGoogleLoginData(callbackData.data);
-        } else if (callbackData.error) {
-          // 실패한 경우
-          console.log('ℹ️ [NATIVE DATA] iOS 로그인 취소 또는 실패:', callbackData.error);
-          setError('로그인이 취소되었습니다. 다시 시도해주세요.');
-          setIsLoading(false);
-        }
-      }
-    };
-    
-    // 안전한 모니터링 (로딩 중이 아닐 때만)
-    if (!isLoading) {
-      // 주기적으로 확인 (1초마다, 최대 5회로 단축)
-      let checkCount = 0;
-      const checkInterval = setInterval(() => {
-        if (isLoading) {
-          clearInterval(checkInterval);
-          return;
+        // localStorage 확인
+        const savedData = localStorage.getItem('socialLoginData');
+        if (savedData) {
+          console.log('🎉 [NATIVE DATA] localStorage에서 데이터 발견:', savedData);
         }
         
-        checkCount++;
-        console.log(`🔍 [NATIVE DATA] 모니터링 ${checkCount}/5`);
-        checkNativeData();
-        
-        if (checkCount >= 5) {
-          clearInterval(checkInterval);
-          console.log('🔍 [NATIVE DATA] 전역 변수 모니터링 종료');
+        // 전역 변수 확인 (한 번만)
+        if ((window as any).__NATIVE_GOOGLE_LOGIN_DATA__) {
+          const data = (window as any).__NATIVE_GOOGLE_LOGIN_DATA__;
+          console.log('🎉 [NATIVE DATA] 전역 변수에서 구글 로그인 데이터 발견!', data);
           
-          // 모니터링 종료 후에도 localStorage 확인
-          const savedData = localStorage.getItem('socialLoginData');
-          console.log('🔍 [NATIVE DATA] 최종 localStorage 확인:', savedData);
+          // 데이터 사용 후 즉시 삭제
+          delete (window as any).__NATIVE_GOOGLE_LOGIN_DATA__;
           
-          // 전역 함수 등록 상태 확인
-          console.log('🔍 [NATIVE DATA] handleGoogleLoginResult 함수 상태:', typeof (window as any).handleGoogleLoginResult);
-          console.log('🔍 [NATIVE DATA] __NATIVE_GOOGLE_LOGIN_DATA__ 확인:', (window as any).__NATIVE_GOOGLE_LOGIN_DATA__);
+          // 처리
+          handleNativeGoogleLoginData(data);
+          return; // 처리 후 종료
         }
-      }, 1000);
-      
-      // 즉시 한 번 확인
-      checkNativeData();
-    }
+        
+        // iOS 네이티브 콜백 데이터 확인 (한 번만)
+        if ((window as any).__IOS_GOOGLE_LOGIN_CALLBACK__) {
+          const callbackData = (window as any).__IOS_GOOGLE_LOGIN_CALLBACK__;
+          console.log('🎉 [NATIVE DATA] iOS 콜백 데이터 발견!', callbackData);
+          
+          // 콜백 데이터 즉시 삭제
+          delete (window as any).__IOS_GOOGLE_LOGIN_CALLBACK__;
+          delete (window as any).__GOOGLE_LOGIN_IN_PROGRESS__;
+          
+          if (callbackData.success && callbackData.data) {
+            handleNativeGoogleLoginData(callbackData.data);
+          } else if (callbackData.error) {
+            console.log('ℹ️ [NATIVE DATA] iOS 로그인 취소 또는 실패:', callbackData.error);
+            setError('로그인이 취소되었습니다. 다시 시도해주세요.');
+            setIsLoading(false);
+          }
+        }
+      };
+
+      // 컴포넌트 마운트 시 한 번만 실행
+      checkOnceAndCleanup();
+    }, []); // 빈 의존성 배열로 한 번만 실행
     
     // 🔍 즉시 강제 핸들러 확인 (iOS 환경에서만)
     if (isIOSWebView) {
@@ -1687,11 +1659,7 @@ const SignInPage = () => {
           userAgent: navigator.userAgent
         });
         
-        // 네이티브 환경에서는 웹 Google SDK를 사용하지 않음
-        if (isAndroidWebView || isIOSWebView) {
-          console.log('[GOOGLE SDK] 네이티브 환경 - 웹 Google SDK 사용하지 않음');
-          throw new Error('네이티브 환경에서는 네이티브 Google 로그인을 사용합니다.');
-        }
+        // 이 부분은 이미 위에서 네이티브 환경을 처리했으므로 실행되지 않음
         
         // Google SDK를 동적으로 로드해보기 (iOS 및 웹 환경에서만)
         console.log('[GOOGLE SDK] Google Identity Services SDK 동적 로드 시도...');
@@ -1929,8 +1897,8 @@ const SignInPage = () => {
   //   }
   // }, []);
 
-  // URL 파라미터에서 에러 메시지 확인 (처음 방문 시 에러 모달 방지)
-  useEffect(() => {
+  // URL 파라미터에서 에러 메시지 확인 (처음 방문 시 에러 모달 방지) - 임시 비활성화
+  /*useEffect(() => {
     const error = searchParams.get('error');
     if (error) {
       // 🔥 처음 방문 시 에러 모달 방지
@@ -1999,7 +1967,7 @@ const SignInPage = () => {
       newUrl.searchParams.delete('error');
       window.history.replaceState({}, '', newUrl.toString());
     }
-  }, [searchParams]);
+  }, [searchParams]);*/
 
   // iOS 네이티브 Google Sign-In 콜백 함수 등록
   useEffect(() => {
@@ -2855,6 +2823,35 @@ const SignInPage = () => {
     // Google 로그인 핸들러 (안전한 버전)
   const handleGoogleLogin = async () => {
     console.log('🎯 [GOOGLE LOGIN] 구글 로그인 시작');
+    
+    // 🚨 네이티브 환경 확인 (가장 먼저 체크)
+    const isIOSWebView = !!(window as any).webkit && !!(window as any).webkit.messageHandlers;
+    const isAndroidWebView = /Android/.test(navigator.userAgent);
+    
+    if (isAndroidWebView || isIOSWebView) {
+      console.log('📱 [GOOGLE LOGIN] 네이티브 환경 감지 - 네이티브 Google 로그인 사용');
+      
+      try {
+        if (isIOSWebView && (window as any).webkit.messageHandlers.smapIos) {
+          console.log('📱 [GOOGLE LOGIN] iOS 네이티브 호출');
+          (window as any).webkit.messageHandlers.smapIos.postMessage({
+            action: 'googleLogin',
+            callback: 'handleGoogleLoginResult'
+          });
+        } else if (isAndroidWebView && (window as any).Android?.googleLogin) {
+          console.log('📱 [GOOGLE LOGIN] Android 네이티브 호출');
+          (window as any).Android.googleLogin();
+        } else {
+          console.error('❌ [GOOGLE LOGIN] 네이티브 인터페이스를 찾을 수 없음');
+          showError('네이티브 Google 로그인을 사용할 수 없습니다.');
+        }
+      } catch (error) {
+        console.error('❌ [GOOGLE LOGIN] 네이티브 호출 실패:', error);
+        showError('Google 로그인에 실패했습니다. 다시 시도해주세요.');
+      }
+      
+      return; // 네이티브 환경에서는 여기서 종료
+    }
     
     // 상태 체크
     if (isLoading) {
