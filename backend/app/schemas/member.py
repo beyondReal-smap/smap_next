@@ -106,21 +106,15 @@ class RegisterResponse(BaseModel):
     message: str
     data: Optional[dict] = None
 
-# Google 로그인 관련 스키마
+# Google 로그인 요청 스키마
 class GoogleLoginRequest(BaseModel):
     google_id: str
-    email: Optional[str] = None
-    name: Optional[str] = None
-    given_name: Optional[str] = None
-    family_name: Optional[str] = None
+    email: str
+    name: str
     image: Optional[str] = None
-    id_token: str
-    lookup_strategy: Optional[str] = "email_first"
-    search_by_email: Optional[bool] = True
-    verify_email_match: Optional[bool] = True
-    email_first_lookup: Optional[bool] = True
-    lookup_priority: Optional[str] = "email"
+    access_token: Optional[str] = None
 
+# Google 로그인 응답 스키마
 class GoogleLoginResponse(BaseModel):
     success: bool
     message: str

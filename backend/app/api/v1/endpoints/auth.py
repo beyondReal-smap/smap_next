@@ -1,15 +1,17 @@
+import os
+import uuid
+import jwt
+import logging
 from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Body
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
-from jose import JWTError, jwt
-from pydantic import BaseModel
-from app.core.config import settings
 from app.db.session import get_db
-from app.schemas.auth import LoginRequest, LoginResponse, UserIdentity, RegisterRequest, ForgotPasswordRequest, ForgotPasswordResponse, VerifyResetTokenRequest, VerifyResetTokenResponse, ResetPasswordRequest, ResetPasswordResponse
 from app.crud import crud_auth
-import logging
+from app.schemas.auth import *
+from app.core.config import settings
+from app.models.member import Member
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -871,83 +873,41 @@ async def forgot_password(
     db: Session = Depends(get_db)
 ):
     """
-    비밀번호 찾기 처리
-    전화번호 또는 이메일로 비밀번호 재설정 링크 전송
+    비밀번호 찾기 (SMS/이메일 발송)
     """
     try:
-        import re
-        
         logger.info(f"🔍 비밀번호 찾기 요청: {forgot_data.type}, {forgot_data.contact[:3]}***")
         
-        # 입력값 검증
-        if forgot_data.type not in ['phone', 'email']:
-            return ForgotPasswordResponse(
-                success=False,
-                message="잘못된 타입입니다."
-            )
-        
-        # 전화번호 형식 검증
-        if forgot_data.type == 'phone':
-            phone_pattern = r'^010-\d{4}-\d{4}$'
-            if not re.match(phone_pattern, forgot_data.contact):
-                return ForgotPasswordResponse(
-                    success=False,
-                    message="올바른 전화번호 형식이 아닙니다."
-                )
-        
-        # 이메일 형식 검증
-        elif forgot_data.type == 'email':
-            email_pattern = r'^[^\s@]+@[^\s@]+\.[^\s@]+$'
-            if not re.match(email_pattern, forgot_data.contact):
-                return ForgotPasswordResponse(
-                    success=False,
-                    message="올바른 이메일 형식이 아닙니다."
-                )
-        
         # 사용자 조회
-        user = None
         if forgot_data.type == 'phone':
-            # 전화번호로 사용자 조회 (mt_id와 mt_hp 모두 확인)
-            from app.crud.crud_member import crud_member
-            user = crud_member.get_by_phone(db, forgot_data.contact)
+            clean_phone = forgot_data.contact.replace('-', '').replace(' ', '')
+            user = crud_auth.get_user_by_phone(db, clean_phone)
         else:
-            # 이메일로 사용자 조회
             user = crud_auth.get_user_by_email(db, forgot_data.contact)
         
-        # 보안상 사용자가 존재하지 않아도 성공 응답 (실제로는 전송하지 않음)
         if not user:
-            logger.warning(f"비밀번호 찾기: 존재하지 않는 사용자 - {forgot_data.type}: {forgot_data.contact}")
+            logger.warning(f"비밀번호 찾기: 존재하지 않는 사용자 {forgot_data.contact[:3]}***")
             return ForgotPasswordResponse(
-                success=True,
-                message=f"{'SMS' if forgot_data.type == 'phone' else '이메일'}로 비밀번호 재설정 링크를 발송했습니다.",
-                data={
-                    "sent": False,  # 실제로는 전송하지 않았음을 로그용으로 기록
-                    "reason": "user_not_found"
-                }
+                success=False,
+                message="등록되지 않은 연락처입니다."
             )
         
-        # 비밀번호 재설정 토큰 생성 (JWT 사용)
-        reset_token_data = {
-            "user_id": user.mt_idx,
-            "email": user.mt_email,
-            "phone": user.mt_hp,
-            "type": forgot_data.type,
-            "exp": datetime.utcnow() + timedelta(hours=24)  # 24시간 유효
-        }
+        # 짧은 토큰 생성 (UUID 기반)
+        short_token = str(uuid.uuid4())[:8]  # 8자리 짧은 토큰
+        token_expires = datetime.utcnow() + timedelta(hours=1)
         
-        reset_token = jwt.encode(reset_token_data, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+        # 토큰을 데이터베이스에 저장 (보안 강화)
+        user.mt_reset_token = short_token
+        user.mt_token_edate = token_expires
+        db.commit()
         
-        # 재설정 링크 생성 (짧은 URL 형태)
-        from app.config import Config
-        reset_url = f"{Config.FRONTEND_URL}/r?t={reset_token}"
+        logger.info(f"💾 토큰 데이터베이스 저장 완료: 사용자 {user.mt_idx}, 토큰: {short_token}")
         
-        logger.info(f"✅ 비밀번호 재설정 토큰 생성 완료: 사용자 {user.mt_idx}")
+        # 비밀번호 재설정 링크 생성 (운영환경 도메인 적용, URL 단축)
+        reset_url = f"https://nextstep.smap.site/r?t={short_token}"
         
-        # 테스트 환경에서는 링크를 로그로 출력
-        import os
-        if os.getenv('ENVIRONMENT', 'development') == 'development':
-            logger.info(f"🔗 [테스트] 비밀번호 재설정 링크: {reset_url}")
-            logger.info(f"🔗 [테스트] 토큰: {reset_token}")
+        logger.info(f"🔗 [테스트] 비밀번호 재설정 링크: {reset_url}")
+        logger.info(f"🔗 [테스트] 토큰: {short_token}")
         
         # 실제 SMS/이메일 전송 구현
         if forgot_data.type == 'phone':
@@ -975,7 +935,7 @@ async def forgot_password(
             data={
                 "type": forgot_data.type,
                 "contact": forgot_data.contact,
-                "token_expires": "24시간",
+                "token_expires": "1시간",
                 "sent": True
             }
         )
@@ -998,33 +958,25 @@ async def verify_reset_token(
     try:
         logger.info(f"🔍 토큰 검증 요청: {len(token_data.token)}자 토큰")
         
-        # JWT 토큰 검증
-        try:
-            payload = jwt.decode(token_data.token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-            user_id = payload.get("user_id")
-            token_type = payload.get("type")
-            
-            if not user_id:
-                logger.warning("토큰에 user_id가 없음")
-                return VerifyResetTokenResponse(
-                    success=False,
-                    message="유효하지 않은 토큰입니다."
-                )
-            
-        except JWTError as e:
-            logger.warning(f"JWT 토큰 검증 실패: {str(e)}")
+        # 짧은 토큰 검증 (UUID 기반)
+        if len(token_data.token) != 8:
+            logger.warning("토큰 길이가 올바르지 않음")
+            return VerifyResetTokenResponse(
+                success=False,
+                message="유효하지 않은 토큰입니다."
+            )
+        
+        # 데이터베이스에서 토큰으로 사용자 조회
+        user = db.query(Member).filter(
+            Member.mt_reset_token == token_data.token,
+            Member.mt_token_edate > datetime.utcnow()
+        ).first()
+        
+        if not user:
+            logger.warning(f"토큰 검증 실패: 유효하지 않은 토큰 {token_data.token}")
             return VerifyResetTokenResponse(
                 success=False,
                 message="토큰이 만료되었거나 유효하지 않습니다."
-            )
-        
-        # 사용자 존재 확인
-        user = crud_auth.get_user_by_idx(db, user_id)
-        if not user:
-            logger.warning(f"토큰 검증: 존재하지 않는 사용자 ID {user_id}")
-            return VerifyResetTokenResponse(
-                success=False,
-                message="사용자를 찾을 수 없습니다."
             )
         
         logger.info(f"✅ 토큰 검증 성공: 사용자 {user.mt_idx}")
@@ -1034,7 +986,7 @@ async def verify_reset_token(
             message="토큰이 유효합니다.",
             data={
                 "user_id": user.mt_idx,
-                "type": token_type,
+                "type": "phone",  # 기본값
                 "email": user.mt_email,
                 "phone": user.mt_hp
             }
@@ -1060,32 +1012,25 @@ async def reset_password(
         
         logger.info(f"🔄 비밀번호 재설정 요청: {len(reset_data.token)}자 토큰")
         
-        # JWT 토큰 검증
-        try:
-            payload = jwt.decode(reset_data.token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-            user_id = payload.get("user_id")
-            
-            if not user_id:
-                logger.warning("재설정 토큰에 user_id가 없음")
-                return ResetPasswordResponse(
-                    success=False,
-                    message="유효하지 않은 토큰입니다."
-                )
-            
-        except JWTError as e:
-            logger.warning(f"재설정 JWT 토큰 검증 실패: {str(e)}")
+        # 짧은 토큰 검증 (UUID 기반)
+        if len(reset_data.token) != 8:
+            logger.warning("토큰 길이가 올바르지 않음")
+            return ResetPasswordResponse(
+                success=False,
+                message="유효하지 않은 토큰입니다."
+            )
+        
+        # 데이터베이스에서 토큰으로 사용자 조회
+        user = db.query(Member).filter(
+            Member.mt_reset_token == reset_data.token,
+            Member.mt_token_edate > datetime.utcnow()
+        ).first()
+        
+        if not user:
+            logger.warning(f"비밀번호 재설정: 유효하지 않은 토큰 {reset_data.token}")
             return ResetPasswordResponse(
                 success=False,
                 message="토큰이 만료되었거나 유효하지 않습니다."
-            )
-        
-        # 사용자 존재 확인
-        user = crud_auth.get_user_by_idx(db, user_id)
-        if not user:
-            logger.warning(f"비밀번호 재설정: 존재하지 않는 사용자 ID {user_id}")
-            return ResetPasswordResponse(
-                success=False,
-                message="사용자를 찾을 수 없습니다."
             )
         
         # 새 비밀번호 검증
@@ -1115,6 +1060,11 @@ async def reset_password(
                 success=False,
                 message="비밀번호 변경에 실패했습니다."
             )
+        
+        # 토큰 사용 후 무효화 (보안 강화)
+        user.mt_reset_token = None
+        user.mt_token_edate = None
+        db.commit()
         
         logger.info(f"✅ 비밀번호 재설정 완료: 사용자 {user.mt_idx}")
         

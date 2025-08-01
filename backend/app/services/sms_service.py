@@ -1,5 +1,6 @@
 import os
 import aiohttp
+import json
 import logging
 from typing import Optional
 
@@ -36,10 +37,28 @@ class SMSService:
             }
 
             logger.info(f"📱 SMS 발송 시도: {clean_phone[:3]}***")
+            logger.info(f"📱 SMS API URL: {self.aligo_url}")
 
             async with aiohttp.ClientSession() as session:
                 async with session.post(self.aligo_url, data=data) as response:
-                    result = await response.json()
+                    # 응답 상태 코드 확인
+                    logger.info(f"📱 SMS API 응답 상태: {response.status}")
+                    
+                    # 응답 텍스트 먼저 확인
+                    response_text = await response.text()
+                    logger.info(f"📱 SMS API 응답 내용: {response_text}")
+                    
+                    # JSON 파싱 시도 (Content-Type에 관계없이)
+                    try:
+                        result = json.loads(response_text)
+                        logger.info(f"📱 SMS API JSON 응답: {result}")
+                    except Exception as json_error:
+                        logger.warning(f"📱 SMS API JSON 파싱 실패: {json_error}")
+                        # HTML 응답인 경우 기본 실패 응답 생성
+                        result = {
+                            'result_code': '0',
+                            'message': f'API 응답 파싱 실패: {response_text[:100]}'
+                        }
                     
                     if result.get('result_code') == '1':
                         logger.info(f"✅ SMS 발송 성공: {clean_phone[:3]}***")
@@ -49,10 +68,11 @@ class SMSService:
                             'msg_id': result.get('msg_id')
                         }
                     else:
-                        logger.error(f"❌ SMS 발송 실패: {result.get('message', '알 수 없는 오류')}")
+                        error_msg = result.get('message', '알 수 없는 오류')
+                        logger.error(f"❌ SMS 발송 실패: {error_msg}")
                         return {
                             'success': False,
-                            'message': result.get('message', 'SMS 발송에 실패했습니다.')
+                            'message': error_msg
                         }
 
         except Exception as e:
@@ -66,7 +86,7 @@ class SMSService:
         """
         비밀번호 재설정 SMS 발송
         """
-        message = f"[SMAP] 비밀번호 재설정 링크입니다.{reset_url}"
+        message = f"[SMAP] 비밀번호 재설정 링크입니다.\n\n{reset_url}\n\n24시간 내에 접속하여 비밀번호를 변경해주세요."
         
         return await self.send_sms(
             phone_number=phone_number,

@@ -325,7 +325,7 @@ def update_user_password(db: Session, mt_idx: int, new_password: str) -> bool:
             return False
         
         # 비밀번호 업데이트
-        user.mt_pass = hashed_password
+        user.mt_pwd = hashed_password
         user.mt_udate = datetime.utcnow()  # 수정일시 업데이트
         
         db.commit()

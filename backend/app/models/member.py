@@ -58,7 +58,7 @@ class Member(BaseModel):
     mt_adate = Column(DateTime, nullable=True, comment='회원최근접속일시')
     mt_udate = Column(DateTime, nullable=True, comment='수정일시')
     mt_update_dt = Column(DateTime, nullable=True, comment='Cache Data관리를 위한 필드')
-    mt_reset_token = Column(String(100), nullable=True, comment='비밀번호 인증토큰')
+    mt_reset_token = Column(String(500), nullable=True, comment='비밀번호 인증토큰')
     mt_token_edate = Column(DateTime, nullable=True, comment='토큰만료일시')
     mt_lang = Column(String(2), default='ko', comment='사용자언어')
     mt_map = Column(Enum('Y', 'N'), default='N', comment='지도 선택 - 네이버 : N / 구글 : Y')
