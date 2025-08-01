@@ -93,7 +93,7 @@ export async function sendSMS(phoneNumber: string, message: string, subject?: st
 // 비밀번호 재설정 링크 발송 함수
 export async function sendPasswordResetLink(phoneNumber: string, resetUrl: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const message = `[SMAP] 비밀번호 재설정 링크입니다.\n\n${resetUrl}\n\n24시간 내에 접속하여 비밀번호를 변경해주세요.`;
+    const message = `[SMAP] 비밀번호 재설정 링크입니다.${resetUrl}`;
 
     const formData = new FormData();
     formData.append('user_id', ALIGO_USER_ID);

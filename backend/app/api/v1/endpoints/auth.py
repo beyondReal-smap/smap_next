@@ -937,9 +937,9 @@ async def forgot_password(
         
         reset_token = jwt.encode(reset_token_data, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
         
-        # 재설정 링크 생성 (프론트엔드 URL 기반)
+        # 재설정 링크 생성 (짧은 URL 형태)
         from app.config import Config
-        reset_url = f"{Config.FRONTEND_URL}/reset-password?token={reset_token}"
+        reset_url = f"{Config.FRONTEND_URL}/r?t={reset_token}"
         
         logger.info(f"✅ 비밀번호 재설정 토큰 생성 완료: 사용자 {user.mt_idx}")
         
@@ -953,23 +953,13 @@ async def forgot_password(
         if forgot_data.type == 'phone':
             # SMS 전송 로직
             try:
-                # 프론트엔드 SMS API 호출
-                sms_response = await fetch(f"{Config.FRONTEND_URL}/api/sms/send", {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        phone: forgot_data.contact,
-                        message: f"[SMAP] 비밀번호 재설정 링크입니다.\n\n{reset_url}\n\n24시간 내에 접속하여 비밀번호를 변경해주세요.",
-                        subject: "SMAP 비밀번호 재설정"
-                    }),
-                })
+                from app.services.sms_service import sms_service
+                sms_result = await sms_service.send_password_reset_sms(forgot_data.contact, reset_url)
                 
-                if sms_response.ok:
+                if sms_result['success']:
                     logger.info(f"✅ SMS 발송 성공: {forgot_data.contact[:3]}***")
                 else:
-                    logger.warning(f"⚠️ SMS 발송 실패: {forgot_data.contact[:3]}***")
+                    logger.warning(f"⚠️ SMS 발송 실패: {sms_result['message']}")
                     
             except Exception as e:
                 logger.error(f"❌ SMS 발송 중 오류: {str(e)}")
