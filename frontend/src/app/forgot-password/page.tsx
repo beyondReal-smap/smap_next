@@ -19,26 +19,6 @@ declare global {
 
 // iOS 최적화를 위한 스타일
 const pageStyles = `
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.forgot-password-content {
-  opacity: 0;
-  animation: fadeIn 0.5s ease-out forwards;
-}
-
-.forgot-password-content:nth-child(1) { animation-delay: 0.1s; }
-.forgot-password-content:nth-child(2) { animation-delay: 0.2s; }
-.forgot-password-content:nth-child(3) { animation-delay: 0.3s; }
-
 /* iOS 스크롤 최적화 */
 .forgot-password-container {
   -webkit-overflow-scrolling: touch;
@@ -101,6 +81,7 @@ const ForgotPasswordPage = () => {
   const router = useRouter();
   const mountedRef = useRef(true);
   const componentRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const isInitializedRef = useRef(false);
   const stabilityTimersRef = useRef<NodeJS.Timeout[]>([]);
   const [criticalError, setCriticalError] = useState<string | null>(null);
@@ -556,6 +537,68 @@ const ForgotPasswordPage = () => {
     return Object.keys(newErrors).length === 0;
   }, [contact, contactType]);
 
+  // 사용자 존재 여부 확인
+  const checkUserExists = useCallback(async (type: 'phone' | 'email', value: string) => {
+    try {
+      if (type === 'phone') {
+        // 전화번호인 경우 find-user-by-phone API 사용
+        console.log('[FORGOT_PASSWORD] 전화번호 기반 사용자 확인 시작:', value.substring(0, 3) + '***');
+        
+        const response = await fetch('/api/auth/find-user-by-phone', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            phone: value,
+          }),
+        });
+
+        const data = await response.json();
+        console.log('[FORGOT_PASSWORD] 전화번호 기반 사용자 확인 응답:', {
+          status: response.status,
+          success: data.success,
+          message: data.message,
+          found: data.data?.found,
+          data: data.data
+        });
+        
+        if (response.ok) {
+          // 백엔드에서 success가 false여도 found 필드를 확인
+          const userExists = data.data?.found === true;
+          console.log('[FORGOT_PASSWORD] 전화번호 기반 사용자 존재 여부:', userExists);
+          return userExists;
+        }
+        
+        return false;
+      } else {
+        // 이메일인 경우 기존 방식 사용
+        const response = await fetch(`/api/auth/check?type=${type}&value=${encodeURIComponent(value)}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        const data = await response.json();
+        
+        console.log('[FORGOT_PASSWORD] 이메일 기반 사용자 확인 응답:', data);
+        
+        if (response.ok) {
+          // available이 false면 사용자가 존재함 (이미 가입된 상태)
+          const userExists = data.available === false;
+          console.log('[FORGOT_PASSWORD] 이메일 기반 사용자 존재 여부:', userExists);
+          return userExists;
+        }
+        
+        return false;
+      }
+    } catch (error) {
+      console.error('[FORGOT_PASSWORD] 사용자 확인 오류:', error);
+      return false;
+    }
+  }, []);
+
   // 비밀번호 재설정 요청 - useCallback으로 최적화
   const handleResetRequest = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -568,9 +611,20 @@ const ForgotPasswordPage = () => {
     }
 
     setIsLoading(true);
-    setErrors({});
+    // 에러는 유지하되 입력 필드는 계속 활성화
 
     try {
+      console.log('[FORGOT_PASSWORD] 사용자 존재 확인 시작:', { type: contactType, contact: contact.substring(0, 3) + '***' });
+      
+      // 사용자 존재 여부 확인
+      const userExists = await checkUserExists(contactType, contact);
+      
+      if (!userExists) {
+        throw new Error(`가입되지 않은 ${contactType === 'phone' ? '전화번호' : '이메일'}입니다.`);
+      }
+      
+      console.log('[FORGOT_PASSWORD] 사용자 확인 완료, 가입된 사용자입니다.');
+
       console.log('[FORGOT_PASSWORD] 재설정 요청 시작:', { type: contactType, contact: contact.substring(0, 3) + '***' });
       
       const response = await fetch('/api/auth/forgot-password', {
@@ -614,9 +668,15 @@ const ForgotPasswordPage = () => {
     } finally {
       if (mountedRef.current) {
         setIsLoading(false);
+        // 로딩 완료 후 입력 필드에 포커스 유지
+        setTimeout(() => {
+          if (inputRef.current && mountedRef.current) {
+            inputRef.current.focus();
+          }
+        }, 100);
       }
     }
-  }, [contactType, contact, validateInput, isIOS]);
+  }, [contactType, contact, validateInput, isIOS, checkUserExists]);
 
   // 연락처 입력 처리 - useCallback으로 최적화
   const handleContactChange = useCallback((value: string) => {
@@ -628,11 +688,11 @@ const ForgotPasswordPage = () => {
       setContact(value);
     }
     
-    // 에러 초기화
-    if (errors.contact) {
-      setErrors(prev => ({ ...prev, contact: undefined }));
+    // 에러 초기화 - 입력 시 모든 에러 메시지 제거
+    if (errors.contact || errors.general) {
+      setErrors({});
     }
-  }, [contactType, formatPhoneNumber, errors.contact]);
+  }, [contactType, formatPhoneNumber, errors.contact, errors.general]);
   
   // 연락처 타입 변경 핸들러
   const handleContactTypeChange = useCallback((newType: 'phone' | 'email') => {
@@ -742,9 +802,9 @@ const ForgotPasswordPage = () => {
       >
         <div className="flex items-center justify-between h-14 px-4">
           <motion.div 
-            initial={{ opacity: 0, x: -40 }}
+            initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
             className="flex items-center space-x-3 motion-div"
           >
             <motion.button 
@@ -782,9 +842,9 @@ const ForgotPasswordPage = () => {
         
         {/* 비밀번호 찾기 정보 카드 - 버튼 색상과 맞춤 */}
         <motion.div 
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.6 }}
+          transition={{ delay: 0.1, duration: 0.4, ease: "easeOut" }}
           className="mb-4"
         >
           <div className="bg-[#0114a2] rounded-3xl p-6 text-white shadow-xl">
@@ -809,9 +869,9 @@ const ForgotPasswordPage = () => {
 
         {step === 'input' ? (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
             className="forgot-password-content"
           >
 
@@ -858,6 +918,7 @@ const ForgotPasswordPage = () => {
                     )}
                   </div>
                   <input
+                    ref={inputRef}
                     type={contactType === 'phone' ? 'tel' : 'email'}
                     value={contact}
                     onChange={(e) => handleContactChange(e.target.value)}
@@ -867,22 +928,23 @@ const ForgotPasswordPage = () => {
                         : 'example@email.com'
                     }
                     maxLength={contactType === 'phone' ? 13 : undefined}
+                    disabled={isLoading}
                     className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-[#0114a2] focus:border-transparent transition-all ${
                       errors.contact 
                         ? 'border-red-300 focus:ring-red-500' 
                         : 'border-gray-200'
-                    }`}
+                    } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                   />
                 </div>
                 {errors.contact && (
-                  <p className="text-red-500 text-sm mt-1">{errors.contact}</p>
+                  <p className="text-red-500 text-sm mt-1 text-center">{errors.contact}</p>
                 )}
               </div>
 
               {/* 일반 에러 */}
               {errors.general && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-red-600 text-sm">{errors.general}</p>
+                  <p className="text-red-600 text-sm text-center">{errors.general}</p>
                 </div>
               )}
 
@@ -890,23 +952,16 @@ const ForgotPasswordPage = () => {
               <button
                 type="submit"
                 disabled={isLoading || !contact.trim()}
-                className={`w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl font-medium transition-all ${
+                className={`w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl font-medium transition-all min-h-[48px] ${
                   isLoading || !contact.trim()
                     ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                     : 'bg-[#0114a2] text-white hover:bg-[#001f87] transform hover:scale-105 active:scale-95'
                 }`}
               >
-                {isLoading ? (
-                  <>
-                    <IOSCompatibleSpinner size="sm" />
-                    <span>전송 중...</span>
-                  </>
-                ) : (
-                  <>
-                    <FiSend size={16} />
-                    <span>재설정 링크 전송</span>
-                  </>
-                )}
+                <div className="flex items-center justify-center space-x-2">
+                  <FiSend size={16} />
+                  <span>재설정 링크 전송</span>
+                </div>
               </button>
             </form>
 
@@ -922,9 +977,9 @@ const ForgotPasswordPage = () => {
           </motion.div>
         ) : (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
             className="text-center forgot-password-content"
           >
             {/* 성공 아이콘 */}

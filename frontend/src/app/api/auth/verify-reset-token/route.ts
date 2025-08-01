@@ -23,7 +23,8 @@ export async function POST(request: NextRequest) {
 
     // 백엔드 API 호출
     try {
-      const backendResponse = await fetch(`${process.env.BACKEND_URL}/api/v1/auth/verify-reset-token`, {
+      const backendUrl = process.env.BACKEND_URL || 'https://118.67.130.71:8000';
+      const backendResponse = await fetch(`${backendUrl}/api/v1/auth/verify-reset-token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

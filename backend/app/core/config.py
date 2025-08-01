@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
     
+    # Firebase 설정
+    FIREBASE_CREDENTIALS_PATH: str = "backend/com-dmonster-smap-firebase-adminsdk-2zx5p-2610556cf5.json"
+    FIREBASE_PROJECT_ID: str = "com-dmonster-smap"
+    
     # 하위 호환성을 위한 별칭
     @property
     def SECRET_KEY(self) -> str:

@@ -45,7 +45,8 @@ export async function POST(request: NextRequest) {
 
     // 백엔드 API 호출
     try {
-      const backendResponse = await fetch(`${process.env.BACKEND_URL}/api/v1/auth/forgot-password`, {
+      const backendUrl = process.env.BACKEND_URL || 'https://118.67.130.71:8000';
+      const backendResponse = await fetch(`${backendUrl}/api/v1/auth/forgot-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -54,6 +55,7 @@ export async function POST(request: NextRequest) {
           type,
           contact,
         }),
+        signal: AbortSignal.timeout(10000), // 10초 타임아웃
       });
 
       const backendData = await backendResponse.json();
@@ -80,6 +82,11 @@ export async function POST(request: NextRequest) {
         type,
         timestamp: new Date().toISOString()
       });
+
+      // 개발 환경에서는 백엔드 응답 데이터도 로그로 출력
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[FORGOT PASSWORD] 백엔드 응답 데이터:', backendData);
+      }
 
       return NextResponse.json({
         success: true,

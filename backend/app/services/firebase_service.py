@@ -97,7 +97,8 @@ class FirebaseService:
     def send_push_notification(self, token: str, title: str, content: str) -> str:
         """FCM 푸시 알림 전송"""
         if not self._firebase_available:
-            raise Exception("Firebase가 초기화되지 않았습니다. Firebase 인증 정보를 확인해주세요.")
+            logger.warning("Firebase가 초기화되지 않아 푸시 알림을 건너뜁니다.")
+            return "firebase_disabled"
             
         try:
             message = messaging.Message(

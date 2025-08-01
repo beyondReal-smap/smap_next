@@ -88,4 +88,41 @@ export async function sendSMS(phoneNumber: string, message: string, subject?: st
     console.error('SMS 발송 오류:', error);
     return { success: false, error: '서버 오류가 발생했습니다.' };
   }
+}
+
+// 비밀번호 재설정 링크 발송 함수
+export async function sendPasswordResetLink(phoneNumber: string, resetUrl: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const message = `[SMAP] 비밀번호 재설정 링크입니다.\n\n${resetUrl}\n\n24시간 내에 접속하여 비밀번호를 변경해주세요.`;
+
+    const formData = new FormData();
+    formData.append('user_id', ALIGO_USER_ID);
+    formData.append('key', ALIGO_KEY);
+    formData.append('msg', message);
+    formData.append('receiver', phoneNumber.replace(/[^0-9]/g, ''));
+    formData.append('destination', '');
+    formData.append('sender', ALIGO_SENDER);
+    formData.append('rdate', '');
+    formData.append('rtime', '');
+    formData.append('testmode_yn', 'N');
+    formData.append('title', 'SMAP 비밀번호 재설정');
+    formData.append('msg_type', 'SMS');
+
+    const response = await fetch('https://apis.aligo.in/send/', {
+      method: 'POST',
+      body: formData,
+    });
+
+    const result: AligoResponse = await response.json();
+
+    if (result.result_code === '1') {
+      return { success: true };
+    } else {
+      return { success: false, error: result.message };
+    }
+
+  } catch (error) {
+    console.error('비밀번호 재설정 SMS 발송 오류:', error);
+    return { success: false, error: '서버 오류가 발생했습니다.' };
+  }
 } 

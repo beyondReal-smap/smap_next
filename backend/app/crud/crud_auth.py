@@ -9,13 +9,7 @@ import re
 
 def get_user_by_phone(db: Session, phone_number: str) -> Optional[Member]:
     """전화번호(mt_id)로 사용자를 조회합니다."""
-    return db.query(Member).filter(
-        Member.mt_id == phone_number,
-        Member.mt_type == '1', # 일반회원
-        Member.mt_level >= 2, # 정상회원 레벨 이상 (탈퇴회원 mt_level=1 제외)
-        Member.mt_status == '1', # 정상상태
-        Member.mt_show == 'Y' # 노출여부
-    ).first()
+    return db.query(Member).filter(Member.mt_id == phone_number).first()
 
 def get_user_by_email(db: Session, email: str) -> Optional[Member]:
     """이메일로 사용자를 조회합니다 (중복 체크용)."""

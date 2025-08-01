@@ -47,6 +47,10 @@ class GoogleUserDataRequest(BaseModel):
     email: str
     google_id: Optional[str] = None
 
+class PhoneUserDataRequest(BaseModel):
+    phone: str
+    google_id: Optional[str] = None
+
 class GoogleUserDataResponse(BaseModel):
     success: bool
     message: str
@@ -625,7 +629,216 @@ async def find_user_by_email(
         return GoogleUserDataResponse(
             success=False,
             message="서버 오류가 발생했습니다."
-        ) 
+                )
+
+@router.post("/find-user-by-phone", response_model=GoogleUserDataResponse)
+async def find_user_by_phone(
+    request: PhoneUserDataRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    전화번호로 사용자를 조회하고 관련 데이터를 함께 반환합니다.
+    Google 로그인 후 기존 사용자 확인 및 데이터 조회용
+    """
+    try:
+        from sqlalchemy import text
+        from datetime import datetime, timedelta
+        
+        logger.info(f"🔍 전화번호 기반 사용자 조회 시작: {request.phone}")
+        
+        # 1. 전화번호로 사용자 조회 (mt_id와 mt_hp 모두 확인)
+        from app.crud.crud_member import crud_member
+        from app.models.member import Member
+        
+        # 전화번호 정리 (하이픈 제거)
+        clean_phone = request.phone.replace('-', '')
+        logger.info(f"🔍 정리된 전화번호: {clean_phone}")
+        
+        user = crud_member.get_by_phone(db, request.phone)
+        
+        if not user:
+            logger.info(f"❌ 전화번호로 사용자를 찾을 수 없음: {request.phone} (정리된 번호: {clean_phone})")
+            # 디버깅을 위해 직접 쿼리 실행
+            mt_id_user = db.query(Member).filter(Member.mt_id == clean_phone).first()
+            mt_hp_user = db.query(Member).filter(Member.mt_hp == clean_phone).first()
+            logger.info(f"🔍 디버깅 - mt_id로 조회: {'찾음' if mt_id_user else '없음'}")
+            logger.info(f"🔍 디버깅 - mt_hp로 조회: {'찾음' if mt_hp_user else '없음'}")
+            return GoogleUserDataResponse(
+                success=False,
+                message="사용자를 찾을 수 없습니다.",
+                data={
+                    "found": False,
+                    "is_new_user": True
+                }
+            )
+        
+        # 2. 계정 상태 확인
+        if user.mt_level == 1:  # 탈퇴한 사용자
+            logger.warning(f"⚠️ 탈퇴한 사용자 조회: {user.mt_idx}")
+            return GoogleUserDataResponse(
+                success=False,
+                message="탈퇴한 계정입니다.",
+                data={
+                    "found": True,
+                    "is_withdrawn": True,
+                    "user": {
+                        "mt_idx": user.mt_idx,
+                        "mt_hp": user.mt_hp,
+                        "mt_level": user.mt_level
+                    }
+                }
+            )
+        
+        # 3. Google ID 연결 확인 및 업데이트
+        if request.google_id and not user.mt_google_id:
+            user.mt_google_id = request.google_id
+            user.mt_type = 4  # Google 로그인 타입으로 변경
+            user.mt_ldate = datetime.utcnow()
+            db.commit()
+            logger.info(f"🔗 Google ID 연결 완료: {user.mt_idx}")
+        
+        # 4. 사용자의 그룹 정보 조회
+        groups_query = text("""
+            SELECT 
+                sg.sgt_idx,
+                sg.sgt_title,
+                sgd.sgdt_owner_chk,
+                sgd.sgdt_leader_chk,
+                COUNT(DISTINCT sgd2.mt_idx) as member_count
+            FROM smap_group_detail_t sgd
+            JOIN smap_group_t sg ON sgd.sgt_idx = sg.sgt_idx
+            LEFT JOIN smap_group_detail_t sgd2 ON sg.sgt_idx = sgd2.sgt_idx 
+                AND sgd2.sgdt_discharge = 'N' 
+                AND sgd2.sgdt_exit = 'N'
+                AND sgd2.sgdt_show = 'Y'
+            WHERE sgd.mt_idx = :mt_idx
+                AND sgd.sgdt_discharge = 'N'
+                AND sgd.sgdt_exit = 'N'
+                AND sgd.sgdt_show = 'Y'
+                AND sg.sgt_show = 'Y'
+            GROUP BY sg.sgt_idx, sg.sgt_title, sgd.sgdt_owner_chk, sgd.sgdt_leader_chk
+            ORDER BY sgd.sgdt_owner_chk DESC, sgd.sgdt_leader_chk DESC
+            LIMIT 10
+        """)
+        
+        groups_result = db.execute(groups_query, {"mt_idx": user.mt_idx}).fetchall()
+        groups = []
+        for row in groups_result:
+            groups.append({
+                "sgt_idx": row.sgt_idx,
+                "sgt_title": row.sgt_title,
+                "sgt_file1": None,  # 컬럼이 없으므로 기본값
+                "sgdt_owner_chk": row.sgdt_owner_chk,
+                "sgdt_leader_chk": row.sgdt_leader_chk,
+                "member_count": row.member_count,
+                "is_owner": row.sgdt_owner_chk == 'Y',
+                "is_leader": row.sgdt_leader_chk == 'Y'
+            })
+        
+        # 5. 최근 스케줄 조회 (7일 전후)
+        seven_days_ago = datetime.now() - timedelta(days=7)
+        seven_days_later = datetime.now() + timedelta(days=7)
+        
+        schedules_query = text("""
+            SELECT 
+                sst.sst_idx,
+                sst.sst_title,
+                sst.sst_sdate,
+                sst.sst_edate,
+                sst.sst_memo,
+                sst.sgt_idx,
+                sst.sst_location_title,
+                sst.sst_location_add,
+                sst.sst_location_lat,
+                sst.sst_location_long,
+                sg.sgt_title as group_title
+            FROM smap_schedule_t sst
+            LEFT JOIN smap_group_t sg ON sst.sgt_idx = sg.sgt_idx
+            WHERE sst.sst_show = 'Y'
+                AND sst.sst_sdate BETWEEN :start_date AND :end_date
+                AND EXISTS (
+                    SELECT 1 FROM smap_group_detail_t sgd 
+                    WHERE sgd.sgt_idx = sst.sgt_idx 
+                        AND sgd.mt_idx = :mt_idx
+                        AND sgd.sgdt_discharge = 'N'
+                        AND sgd.sgdt_exit = 'N'
+                        AND sgd.sgdt_show = 'Y'
+                )
+            ORDER BY sst.sst_sdate ASC
+            LIMIT 20
+        """)
+        
+        schedules_result = db.execute(schedules_query, {
+            "mt_idx": user.mt_idx,
+            "start_date": seven_days_ago,
+            "end_date": seven_days_later
+        }).fetchall()
+        
+        recent_schedules = []
+        for row in schedules_result:
+            recent_schedules.append({
+                "sst_idx": row.sst_idx,
+                "sst_title": row.sst_title,
+                "sst_sdate": row.sst_sdate,
+                "sst_edate": row.sst_edate,
+                "sst_location_title": row.sst_location_title,
+                "sst_location_add": row.sst_location_add,
+                "sst_location_lat": row.sst_location_lat,
+                "sst_location_long": row.sst_location_long,
+                "sst_memo": row.sst_memo,
+                "sgt_idx": row.sgt_idx,
+                "group_title": row.group_title
+            })
+        
+        # 6. 사용자 데이터 구성
+        user_data = {
+            "mt_idx": user.mt_idx,
+            "mt_id": user.mt_id,
+            "mt_name": user.mt_name,
+            "mt_nickname": user.mt_nickname,
+            "mt_hp": user.mt_hp,
+            "mt_email": user.mt_email,
+            "mt_birth": user.mt_birth,
+            "mt_gender": user.mt_gender,
+            "mt_type": user.mt_type,
+            "mt_level": user.mt_level,
+            "mt_file1": user.mt_file1,
+            "mt_lat": user.mt_lat,
+            "mt_long": user.mt_long,
+            "mt_onboarding": user.mt_onboarding,
+            "mt_ldate": user.mt_ldate,
+            "mt_wdate": user.mt_wdate
+        }
+        
+        group_count = len(groups)
+        schedule_count = len(recent_schedules)
+        has_data = group_count > 0 or schedule_count > 0
+        
+        logger.info(f"✅ 사용자 데이터 조회 완료: {user.mt_idx}, 그룹: {group_count}개, 스케줄: {schedule_count}개")
+        
+        return GoogleUserDataResponse(
+            success=True,
+            message="사용자 데이터 조회 성공",
+            data={
+                "found": True,
+                "is_new_user": False,
+                "user": user_data,
+                "groups": groups,
+                "recent_schedules": recent_schedules,
+                "group_count": group_count,
+                "schedule_count": schedule_count,
+                "has_data": has_data,
+                "lookup_method": "phone",
+                "needs_onboarding": user.mt_onboarding == 'N'
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"전화번호 기반 사용자 조회 실패: {str(e)}")
+        return GoogleUserDataResponse(
+            success=False,
+            message="서버 오류가 발생했습니다."
+        )
 
 @router.post("/google-login", response_model=GoogleLoginResponse)
 async def google_login(
@@ -694,10 +907,9 @@ async def forgot_password(
         # 사용자 조회
         user = None
         if forgot_data.type == 'phone':
-            # 전화번호로 사용자 조회 (하이픈 제거한 형태도 확인)
-            phone_no_dash = forgot_data.contact.replace('-', '')
-            user = crud_auth.get_user_by_phone(db, forgot_data.contact) or \
-                   crud_auth.get_user_by_phone(db, phone_no_dash)
+            # 전화번호로 사용자 조회 (mt_id와 mt_hp 모두 확인)
+            from app.crud.crud_member import crud_member
+            user = crud_member.get_by_phone(db, forgot_data.contact)
         else:
             # 이메일로 사용자 조회
             user = crud_auth.get_user_by_email(db, forgot_data.contact)
@@ -726,17 +938,44 @@ async def forgot_password(
         reset_token = jwt.encode(reset_token_data, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
         
         # 재설정 링크 생성 (프론트엔드 URL 기반)
-        reset_url = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
+        from app.config import Config
+        reset_url = f"{Config.FRONTEND_URL}/reset-password?token={reset_token}"
         
         logger.info(f"✅ 비밀번호 재설정 토큰 생성 완료: 사용자 {user.mt_idx}")
         
-        # TODO: 실제 SMS/이메일 전송 구현
-        # if forgot_data.type == 'phone':
-        #     # SMS 전송 로직
-        #     sms_service.send_password_reset(forgot_data.contact, reset_url)
-        # else:
-        #     # 이메일 전송 로직
-        #     email_service.send_password_reset(forgot_data.contact, reset_url)
+        # 테스트 환경에서는 링크를 로그로 출력
+        import os
+        if os.getenv('ENVIRONMENT', 'development') == 'development':
+            logger.info(f"🔗 [테스트] 비밀번호 재설정 링크: {reset_url}")
+            logger.info(f"🔗 [테스트] 토큰: {reset_token}")
+        
+        # 실제 SMS/이메일 전송 구현
+        if forgot_data.type == 'phone':
+            # SMS 전송 로직
+            try:
+                # 프론트엔드 SMS API 호출
+                sms_response = await fetch(f"{Config.FRONTEND_URL}/api/sms/send", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        phone: forgot_data.contact,
+                        message: f"[SMAP] 비밀번호 재설정 링크입니다.\n\n{reset_url}\n\n24시간 내에 접속하여 비밀번호를 변경해주세요.",
+                        subject: "SMAP 비밀번호 재설정"
+                    }),
+                })
+                
+                if sms_response.ok:
+                    logger.info(f"✅ SMS 발송 성공: {forgot_data.contact[:3]}***")
+                else:
+                    logger.warning(f"⚠️ SMS 발송 실패: {forgot_data.contact[:3]}***")
+                    
+            except Exception as e:
+                logger.error(f"❌ SMS 발송 중 오류: {str(e)}")
+        else:
+            # 이메일 전송 로직 (향후 구현)
+            logger.info(f"📧 이메일 전송 준비: {forgot_data.contact}")
         
         logger.info(f"📱 비밀번호 재설정 링크 준비 완료: {forgot_data.type} -> {forgot_data.contact[:3]}***")
         

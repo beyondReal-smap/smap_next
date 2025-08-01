@@ -17,7 +17,10 @@ class CRUDMember:
     def get_by_phone(self, db: Session, phone: str) -> Optional[Member]:
         """전화번호로 회원 조회"""
         clean_phone = phone.replace('-', '')
-        return db.query(self.model).filter(self.model.mt_id == clean_phone).first()
+        # mt_id와 mt_hp 두 필드 모두 확인
+        return db.query(self.model).filter(
+            (self.model.mt_id == clean_phone) | (self.model.mt_hp == clean_phone)
+        ).first()
 
     def get_by_email(self, db: Session, email: str) -> Optional[Member]:
         """이메일로 회원 조회"""

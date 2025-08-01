@@ -3787,7 +3787,7 @@ const SignInPage = () => {
             )}
             
             {/* 비밀번호 찾기 링크 */}
-            <div className="text-right mt-2">
+            <div className="text-center mt-2">
               <Link 
                 href="/forgot-password" 
                 className="text-sm text-[#0114a2] hover:text-[#001f87] hover:underline transition-colors"
