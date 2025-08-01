@@ -21,6 +21,15 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString()
     });
 
+    // 토큰 길이 검증 (8자리가 아니면 실패)
+    if (token.length !== 8) {
+      console.log('[VERIFY RESET TOKEN] 토큰 길이 검증 실패:', token.length);
+      return NextResponse.json(
+        { message: '유효하지 않은 토큰입니다.' },
+        { status: 400 }
+      );
+    }
+
     // 백엔드 API 호출
     try {
       const backendUrl = process.env.BACKEND_URL || 'https://118.67.130.71:8000';
@@ -36,11 +45,12 @@ export async function POST(request: NextRequest) {
 
       const backendData = await backendResponse.json();
 
-      if (!backendResponse.ok) {
-        console.error('[VERIFY RESET TOKEN] 백엔드 에러:', backendData);
+      // 백엔드 응답의 success 필드를 확인
+      if (!backendData.success) {
+        console.error('[VERIFY RESET TOKEN] 백엔드 토큰 검증 실패:', backendData);
         return NextResponse.json(
           { message: backendData.message || '토큰이 유효하지 않습니다.' },
-          { status: backendResponse.status }
+          { status: 400 }
         );
       }
 

@@ -913,43 +913,50 @@ const ResetPasswordPage = () => {
 
               {/* 메인 컨텐츠 - 헤더 높이만큼 상단 패딩 추가 */}
         <div className="max-w-md mx-auto px-4 py-8" style={{ 
-          paddingTop: 'calc(62px + 2rem)', // 헤더 높이 + 기본 패딩
+          paddingTop: 'calc(62px + 1rem)', // 헤더 높이 + 줄어든 패딩
           minHeight: 'calc(100vh - 62px)' // 헤더 높이 제외한 전체 높이
         }}>
         
-        {/* 비밀번호 재설정 정보 카드 - 버튼 색상과 맞춤 */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.6 }}
-          className="mb-4"
-        >
-          <div className="bg-[#0114a2] rounded-3xl p-6 text-white shadow-xl">
-            <div className="flex items-center space-x-4">
-              <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
-                <FiKey className="w-8 h-8" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center space-x-2 mb-1">
-                  <h2 className="text-xl font-bold">비밀번호 재설정</h2>
-                  <div className="flex items-center space-x-1 bg-white/20 px-2 py-1 rounded-full">
-                    <FiLock className="w-3 h-3 text-blue-100" />
-                    <span className="text-xs font-medium text-blue-100">보안 설정</span>
-                  </div>
-                </div>
-                <p className="text-blue-100 text-sm mb-1">새로운 비밀번호를 설정하세요</p>
-                <p className="text-blue-200 text-xs">안전한 비밀번호로 계정을 보호하세요</p>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-
+        {/* 통합된 컨테이너 - 순차적 애니메이션 */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
           className="reset-password-content"
         >
+          {/* 비밀번호 재설정 정보 카드 - 버튼 색상과 맞춤 */}
+          <motion.div 
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.4 }}
+            className="mb-4"
+          >
+            <div className="bg-[#0114a2] rounded-3xl p-6 text-white shadow-xl">
+              <div className="flex items-center space-x-4">
+                <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+                  <FiKey className="w-8 h-8" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center space-x-2 mb-1">
+                    <h2 className="text-xl font-bold">비밀번호 재설정</h2>
+                    <div className="flex items-center space-x-1 bg-white/20 px-2 py-1 rounded-full">
+                      <FiLock className="w-3 h-3 text-blue-100" />
+                      <span className="text-xs font-medium text-blue-100">보안 설정</span>
+                    </div>
+                  </div>
+                  <p className="text-blue-100 text-sm mb-1">새로운 비밀번호를 설정하세요</p>
+                  <p className="text-blue-200 text-xs">안전한 비밀번호로 계정을 보호하세요</p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* 비밀번호 재설정 폼 */}
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.4 }}
+          >
 
           {/* 비밀번호 재설정 폼 */}
           <form onSubmit={handleResetPassword} className="space-y-6">
@@ -1094,6 +1101,7 @@ const ResetPasswordPage = () => {
               로그인으로 돌아가기
             </Link>
           </div>
+        </motion.div>
         </motion.div>
       </div>
     </div>
