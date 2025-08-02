@@ -572,7 +572,7 @@ const ForgotPasswordPage = () => {
         
         return false;
       } else {
-        // 이메일인 경우 기존 방식 사용
+        // 이메일인 경우 새로운 check API 사용
         const response = await fetch(`/api/auth/check?type=${type}&value=${encodeURIComponent(value)}`, {
           method: 'GET',
           headers: {
@@ -585,8 +585,8 @@ const ForgotPasswordPage = () => {
         console.log('[FORGOT_PASSWORD] 이메일 기반 사용자 확인 응답:', data);
         
         if (response.ok) {
-          // available이 false면 사용자가 존재함 (이미 가입된 상태)
-          const userExists = data.available === false;
+          // 새로운 API 응답 형식: data.found === true면 사용자가 존재함
+          const userExists = data.data?.found === true;
           console.log('[FORGOT_PASSWORD] 이메일 기반 사용자 존재 여부:', userExists);
           return userExists;
         }

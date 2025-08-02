@@ -32,4 +32,8 @@ class Config:
     PASSWORD_REQUIRE_SPECIAL = os.getenv('PASSWORD_REQUIRE_SPECIAL', 'true').lower() == 'true'
     
     # 프론트엔드 URL 설정
-    FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000') 
+    FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+    
+    # 이메일 설정
+    EMAIL_SENDER = os.getenv('EMAIL_SENDER', 'your-email@gmail.com')
+    EMAIL_PASSWORD = os.getenv('EMAIL_PASSWORD', 'your-app-password') 

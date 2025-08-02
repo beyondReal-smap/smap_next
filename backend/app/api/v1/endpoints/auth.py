@@ -883,7 +883,8 @@ async def forgot_password(
             clean_phone = forgot_data.contact.replace('-', '').replace(' ', '')
             user = crud_auth.get_user_by_phone(db, clean_phone)
         else:
-            user = crud_auth.get_user_by_email(db, forgot_data.contact)
+            # 이메일로 사용자 조회 (탈퇴한 계정도 포함)
+            user = db.query(Member).filter(Member.mt_email == forgot_data.contact).first()
         
         if not user:
             logger.warning(f"비밀번호 찾기: 존재하지 않는 사용자 {forgot_data.contact[:3]}***")
@@ -924,8 +925,18 @@ async def forgot_password(
             except Exception as e:
                 logger.error(f"❌ SMS 발송 중 오류: {str(e)}")
         else:
-            # 이메일 전송 로직 (향후 구현)
-            logger.info(f"📧 이메일 전송 준비: {forgot_data.contact}")
+            # 이메일 전송 로직
+            try:
+                from app.services.email_service import email_service
+                email_result = await email_service.send_password_reset_email(forgot_data.contact, reset_url)
+                
+                if email_result['success']:
+                    logger.info(f"✅ 이메일 발송 성공: {forgot_data.contact}")
+                else:
+                    logger.warning(f"⚠️ 이메일 발송 실패: {email_result['message']}")
+                    
+            except Exception as e:
+                logger.error(f"❌ 이메일 발송 중 오류: {str(e)}")
         
         logger.info(f"📱 비밀번호 재설정 링크 준비 완료: {forgot_data.type} -> {forgot_data.contact[:3]}***")
         
