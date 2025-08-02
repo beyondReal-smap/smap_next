@@ -435,22 +435,22 @@ export default function GroupJoinPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.6, duration: 0.5 }}
               >
-                <motion.div
+                {/* <motion.div
                   className="w-16 h-16 mx-auto mb-4 relative"
                   initial={{ scale: 0, rotate: -180 }}
                   animate={{ scale: 1, rotate: 0 }}
                   transition={{ delay: 0.7, duration: 0.6, type: "spring", stiffness: 200 }}
                 >
-                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-400 to-purple-600 rounded-full opacity-20 blur-md"></div>
+                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-400 to-purple-600 rounded-xl opacity-20 blur-md"></div>
                   <Image
                     src="/images/smap_logo.webp"
                     alt="SMAP 로고"
                     width={64}
                     height={64}
-                    className="rounded-full object-cover relative z-10 border-3 border-white shadow-lg"
+                    className="rounded-xl object-cover relative z-10 border-2 border-white shadow-lg"
                     priority
                   />
-                </motion.div>
+                </motion.div> */}
                 
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
@@ -458,11 +458,17 @@ export default function GroupJoinPage() {
                   transition={{ delay: 0.8, duration: 0.4 }}
                 >
                   <div className="flex items-center justify-center mb-2">
-                    <IoSparklesSharp className="text-yellow-500 text-lg mr-1" />
+                    <Image
+                      src="/images/smap_logo.webp"
+                      alt="SMAP 로고"
+                      width={44}
+                      height={40}
+                      className="rounded-md object-cover"
+                    />
                     <h1 className="text-lg font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
                       그룹 초대
                     </h1>
-                    <IoSparklesSharp className="text-yellow-500 text-lg ml-1" />
+                    {/* <IoSparklesSharp className="text-yellow-500 text-lg ml-1" /> */}
                   </div>
                   <p className="text-gray-600 text-sm">SMAP에서 함께해요!</p>
                 </motion.div>
