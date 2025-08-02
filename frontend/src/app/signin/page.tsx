@@ -2830,6 +2830,8 @@ const SignInPage = () => {
   // 그룹 가입 처리 함수
   const handlePendingGroupJoin = async () => {
     try {
+      console.log('[SIGNIN] 그룹 가입 처리 함수 시작');
+      
       const pendingGroupJoin = localStorage.getItem('pendingGroupJoin');
       if (!pendingGroupJoin) {
         console.log('[SIGNIN] 대기 중인 그룹 가입 없음');
@@ -2838,24 +2840,42 @@ const SignInPage = () => {
 
       const groupData = JSON.parse(pendingGroupJoin);
       const { groupId, groupTitle, timestamp } = groupData;
+      
+      console.log('[SIGNIN] localStorage에서 그룹 데이터 확인:', {
+        groupId,
+        groupTitle,
+        timestamp: new Date(timestamp).toISOString(),
+        age: Date.now() - timestamp
+      });
 
       // 24시간 이내의 요청만 처리 (만료된 요청 방지)
       const isExpired = Date.now() - timestamp > 24 * 60 * 60 * 1000;
       if (isExpired) {
-        console.log('[SIGNIN] 만료된 그룹 가입 요청, 삭제');
+        console.log('[SIGNIN] 만료된 그룹 가입 요청, 삭제 (24시간 초과)');
         localStorage.removeItem('pendingGroupJoin');
         return false;
       }
 
-      console.log('[SIGNIN] 대기 중인 그룹 가입 처리 시작:', { groupId, groupTitle });
+      console.log('[SIGNIN] 대기 중인 그룹 가입 처리 시작:', { 
+        groupId, 
+        groupTitle,
+        groupIdType: typeof groupId,
+        parsedGroupId: parseInt(groupId)
+      });
 
+      // 백엔드 로그를 위한 API 호출 전 로깅
+      console.log('[SIGNIN] 그룹 가입 API 호출 시작 - groupId:', parseInt(groupId));
+      
       // 그룹 가입 API 호출
-      await groupService.joinGroup(parseInt(groupId));
+      const result = await groupService.joinGroup(parseInt(groupId));
+      
+      console.log('[SIGNIN] 그룹 가입 API 호출 완료:', result);
 
       // 성공 시 localStorage에서 제거
       localStorage.removeItem('pendingGroupJoin');
+      console.log('[SIGNIN] localStorage에서 그룹 데이터 제거 완료');
 
-      console.log(`[SIGNIN] 그룹 "${groupTitle}" 가입 완료!`);
+      console.log(`[SIGNIN] 그룹 "${groupTitle}" (ID: ${groupId}) 가입 완료!`);
       
       // 성공 알림 (선택사항)
       showError(`그룹 "${groupTitle}"에 성공적으로 가입되었습니다!`);
@@ -2864,9 +2884,15 @@ const SignInPage = () => {
 
     } catch (error) {
       console.error('[SIGNIN] 자동 그룹 가입 실패:', error);
+      console.error('[SIGNIN] 에러 상세 정보:', {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        name: error instanceof Error ? error.name : 'Unknown'
+      });
       
       // 실패해도 localStorage는 정리
       localStorage.removeItem('pendingGroupJoin');
+      console.log('[SIGNIN] 에러 발생으로 localStorage에서 그룹 데이터 제거');
       
       // 에러 메시지 표시
       showError('그룹 가입 중 오류가 발생했습니다. 나중에 다시 시도해주세요.');

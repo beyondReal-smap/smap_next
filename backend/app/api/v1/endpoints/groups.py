@@ -555,19 +555,27 @@ def join_group(
     그룹에 가입합니다.
     """
     logger.info(f"[JOIN_GROUP] 그룹 가입 요청 시작 - group_id: {group_id}, mt_idx: {join_request.mt_idx}")
+    logger.info(f"[JOIN_GROUP] 요청 상세 정보: {join_request.dict()}")
     
     # 그룹 존재 확인
     group = db.query(Group).filter(Group.sgt_idx == group_id).first()
     if not group:
+        logger.error(f"[JOIN_GROUP] 그룹을 찾을 수 없음 - group_id: {group_id}")
         raise HTTPException(status_code=404, detail="그룹을 찾을 수 없습니다.")
     
+    logger.info(f"[JOIN_GROUP] 그룹 확인 완료 - group_title: {group.sgt_title}, sgt_show: {group.sgt_show}")
+    
     if group.sgt_show != 'Y':
+        logger.error(f"[JOIN_GROUP] 숨겨진 그룹 - group_id: {group_id}, sgt_show: {group.sgt_show}")
         raise HTTPException(status_code=404, detail="존재하지 않는 그룹입니다.")
     
     # 사용자 존재 확인
     member = db.query(Member).filter(Member.mt_idx == join_request.mt_idx).first()
     if not member:
+        logger.error(f"[JOIN_GROUP] 사용자를 찾을 수 없음 - mt_idx: {join_request.mt_idx}")
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+    
+    logger.info(f"[JOIN_GROUP] 사용자 확인 완료 - mt_name: {member.mt_name}, mt_id: {member.mt_id}")
     
     # 이미 그룹에 가입되어 있는지 확인
     existing_membership = db.query(GroupDetail).filter(
@@ -579,16 +587,21 @@ def join_group(
     ).first()
     
     if existing_membership:
+        logger.info(f"[JOIN_GROUP] 기존 멤버십 발견 - sgdt_idx: {existing_membership.sgdt_idx}, sgdt_show: {existing_membership.sgdt_show}")
+        
         if existing_membership.sgdt_show == 'Y':
+            logger.warning(f"[JOIN_GROUP] 이미 가입된 사용자 - mt_idx: {join_request.mt_idx}, group_id: {group_id}")
             raise HTTPException(status_code=400, detail="이미 그룹에 가입되어 있습니다.")
         else:
             # 이전에 탈퇴했던 경우 재가입 처리
-            logger.info(f"[JOIN_GROUP] 재가입 처리 - sgdt_idx: {existing_membership.sgdt_idx}")
+            logger.info(f"[JOIN_GROUP] 재가입 처리 시작 - sgdt_idx: {existing_membership.sgdt_idx}")
             existing_membership.sgdt_show = 'Y'
             existing_membership.sgdt_exit = 'N'
             existing_membership.sgdt_udate = datetime.utcnow()
             db.add(existing_membership)
             db.commit()
+            
+            logger.info(f"[JOIN_GROUP] 재가입 완료 - sgdt_idx: {existing_membership.sgdt_idx}")
             
             return {
                 "success": True,
@@ -604,6 +617,8 @@ def join_group(
             }
     
     # 새로운 그룹 멤버십 생성
+    logger.info(f"[JOIN_GROUP] 새로운 멤버십 생성 시작 - group_id: {group_id}, mt_idx: {join_request.mt_idx}")
+    
     try:
         new_membership = GroupDetail(
             sgt_idx=group_id,
@@ -623,7 +638,7 @@ def join_group(
         db.commit()
         db.refresh(new_membership)
         
-        logger.info(f"[JOIN_GROUP] 그룹 가입 성공 - sgdt_idx: {new_membership.sgdt_idx}")
+        logger.info(f"[JOIN_GROUP] 그룹 가입 성공 - sgdt_idx: {new_membership.sgdt_idx}, group_id: {group_id}, mt_idx: {join_request.mt_idx}")
         
         return {
             "success": True,
@@ -640,6 +655,7 @@ def join_group(
         
     except Exception as e:
         logger.error(f"[JOIN_GROUP] 그룹 가입 실패: {str(e)}")
+        logger.error(f"[JOIN_GROUP] 에러 상세 정보: {traceback.format_exc()}")
         db.rollback()
         raise HTTPException(status_code=500, detail="그룹 가입 중 오류가 발생했습니다.")
 

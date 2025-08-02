@@ -160,6 +160,8 @@ export default function GroupJoinPage() {
   const handleOpenApp = () => {
     if (typeof window === 'undefined') return;
     
+    console.log(`[GROUP_JOIN] 앱 열기 시작 - 그룹 ID: ${groupId}`);
+    
     // 그룹 정보 저장
     const groupJoinData = {
       groupId: parseInt(groupId),
@@ -168,26 +170,31 @@ export default function GroupJoinPage() {
     };
     
     localStorage.setItem('pendingGroupJoin', JSON.stringify(groupJoinData));
+    console.log('[GROUP_JOIN] localStorage에 그룹 정보 저장:', groupJoinData);
     
     // 딥링크 시도
     try {
       if (isIOS()) {
         const deepLink = `smap://group/${groupId}/join`;
+        console.log(`[GROUP_JOIN] iOS 딥링크 시도: ${deepLink}`);
         window.location.href = deepLink;
         
         // 3초 후 앱스토어로 이동
         setTimeout(() => {
+          console.log('[GROUP_JOIN] iOS 앱스토어로 이동');
           window.open(APP_STORE_URL, '_blank');
         }, 3000);
       } else if (isAndroid()) {
         // 안드로이드에서 더 안정적인 방법 사용
         const deepLink = `smap://group/${groupId}/join`;
+        console.log(`[GROUP_JOIN] Android 딥링크 시도: ${deepLink}`);
         let appOpened = false;
         
         // 페이지 가시성 변화를 감지하여 앱이 열렸는지 확인
         const handleVisibilityChange = () => {
           if (document.hidden) {
             appOpened = true;
+            console.log('[GROUP_JOIN] 앱이 열림 감지됨');
           }
         };
         
@@ -198,6 +205,7 @@ export default function GroupJoinPage() {
           // 방법 1: window.location 사용
           window.location.href = deepLink;
         } catch (e) {
+          console.log('[GROUP_JOIN] 방법 1 실패, 방법 2 시도');
           // 방법 2: iframe 사용
           const iframe = document.createElement('iframe');
           iframe.style.display = 'none';
@@ -215,15 +223,17 @@ export default function GroupJoinPage() {
         setTimeout(() => {
           document.removeEventListener('visibilitychange', handleVisibilityChange);
           if (!appOpened) {
+            console.log('[GROUP_JOIN] 앱이 열리지 않음, 플레이스토어로 이동');
             window.open(PLAY_STORE_URL, '_blank');
           }
         }, 2000);
       } else {
         // 데스크톱에서는 바로 스토어로
+        console.log('[GROUP_JOIN] 데스크톱에서 앱스토어로 이동');
         window.open(APP_STORE_URL, '_blank');
       }
     } catch (error) {
-      console.error('앱 열기 오류:', error);
+      console.error('[GROUP_JOIN] 앱 열기 오류:', error);
       // 오류 시 스토어로 이동
       if (isIOS()) {
         window.open(APP_STORE_URL, '_blank');
