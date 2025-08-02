@@ -108,6 +108,36 @@ export default function GroupJoinPage() {
   };
   
   const isMobile = () => isIOS() || isAndroid();
+  
+  // 앱 설치 여부 확인 (iOS)
+  const checkAppInstalled = () => {
+    if (typeof window === 'undefined') return false;
+    
+    try {
+      // iOS에서 앱 설치 여부 확인
+      if (isIOS()) {
+        // Safari에서 앱 설치 여부를 확인하는 방법
+        const testLink = 'smap://test';
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        iframe.src = testLink;
+        document.body.appendChild(iframe);
+        
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, 100);
+        
+        // 실제로는 정확한 확인이 어려우므로 false 반환 (안전하게)
+        return false;
+      }
+      return false;
+    } catch (e) {
+      console.log('[GROUP_JOIN] 앱 설치 확인 실패:', e);
+      return false;
+    }
+  };
 
   // 앱 스토어 링크
   const APP_STORE_URL = 'https://apps.apple.com/kr/app/smap-%EC%9C%84%EC%B9%98%EC%B6%94%EC%A0%81-%EC%9D%B4%EB%8F%99%EA%B2%BD%EB%A1%9C-%EC%9D%BC%EC%A0%95/id6480279658?platform=iphone';
@@ -175,15 +205,81 @@ export default function GroupJoinPage() {
     // 딥링크 시도
     try {
       if (isIOS()) {
+        // iOS Safari에서 안전한 딥링크 처리
         const deepLink = `smap://group/${groupId}/join`;
-        console.log(`[GROUP_JOIN] iOS 딥링크 시도: ${deepLink}`);
-        window.location.href = deepLink;
+        const fallbackUrl = APP_STORE_URL;
         
-        // 3초 후 앱스토어로 이동
-        setTimeout(() => {
-          console.log('[GROUP_JOIN] iOS 앱스토어로 이동');
-          window.open(APP_STORE_URL, '_blank');
-        }, 3000);
+        console.log(`[GROUP_JOIN] iOS 딥링크 시도: ${deepLink}`);
+        
+        // iOS에서 더 안전한 딥링크 처리 방법
+        let appOpened = false;
+        let fallbackTimeout: NodeJS.Timeout;
+        
+        // 페이지 가시성 변화를 감지하여 앱이 열렸는지 확인
+        const handleVisibilityChange = () => {
+          if (document.hidden) {
+            appOpened = true;
+            console.log('[GROUP_JOIN] iOS 앱이 열림 감지됨');
+            if (fallbackTimeout) {
+              clearTimeout(fallbackTimeout);
+            }
+          }
+        };
+        
+        // 페이지 포커스 변화를 감지
+        const handleFocus = () => {
+          if (appOpened) {
+            console.log('[GROUP_JOIN] iOS 앱이 열린 후 포커스 복귀');
+          }
+        };
+        
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('focus', handleFocus);
+        
+        // 딥링크 시도 (Safari 오류 방지를 위한 안전한 방법)
+        try {
+          // 방법 1: iframe 사용 (가장 안전한 방법)
+          const iframe = document.createElement('iframe');
+          iframe.style.display = 'none';
+          iframe.style.position = 'absolute';
+          iframe.style.left = '-9999px';
+          iframe.style.top = '-9999px';
+          iframe.src = deepLink;
+          document.body.appendChild(iframe);
+          
+          // 100ms 후 iframe 제거
+          setTimeout(() => {
+            if (document.body.contains(iframe)) {
+              document.body.removeChild(iframe);
+            }
+          }, 100);
+        } catch (e) {
+          console.log('[GROUP_JOIN] iOS iframe 방법 실패:', e);
+          
+          // 방법 2: window.open 사용 (대안)
+          try {
+            const newWindow = window.open(deepLink, '_blank');
+            if (newWindow) {
+              setTimeout(() => {
+                newWindow.close();
+              }, 100);
+            }
+          } catch (e2) {
+            console.log('[GROUP_JOIN] iOS window.open 방법도 실패:', e2);
+          }
+        }
+        
+        // 2초 후 앱이 열리지 않았으면 앱스토어로 이동
+        fallbackTimeout = setTimeout(() => {
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+          window.removeEventListener('focus', handleFocus);
+          
+          if (!appOpened) {
+            console.log('[GROUP_JOIN] iOS 앱이 열리지 않음, 앱스토어로 이동');
+            window.open(fallbackUrl, '_blank');
+          }
+        }, 2000);
+        
       } else if (isAndroid()) {
         // 안드로이드에서 더 안정적인 방법 사용
         const deepLink = `smap://group/${groupId}/join`;
@@ -194,19 +290,14 @@ export default function GroupJoinPage() {
         const handleVisibilityChange = () => {
           if (document.hidden) {
             appOpened = true;
-            console.log('[GROUP_JOIN] 앱이 열림 감지됨');
+            console.log('[GROUP_JOIN] Android 앱이 열림 감지됨');
           }
         };
         
         document.addEventListener('visibilitychange', handleVisibilityChange);
         
-        // 1. 딥링크 시도 (여러 방법)
+        // 1. 딥링크 시도 (iframe 사용으로 안전하게)
         try {
-          // 방법 1: window.location 사용
-          window.location.href = deepLink;
-        } catch (e) {
-          console.log('[GROUP_JOIN] 방법 1 실패, 방법 2 시도');
-          // 방법 2: iframe 사용
           const iframe = document.createElement('iframe');
           iframe.style.display = 'none';
           iframe.src = deepLink;
@@ -217,13 +308,15 @@ export default function GroupJoinPage() {
               document.body.removeChild(iframe);
             }
           }, 100);
+        } catch (e) {
+          console.log('[GROUP_JOIN] Android iframe 방법 실패:', e);
         }
         
         // 2초 후 앱이 열리지 않았으면 플레이스토어로 이동
         setTimeout(() => {
           document.removeEventListener('visibilitychange', handleVisibilityChange);
           if (!appOpened) {
-            console.log('[GROUP_JOIN] 앱이 열리지 않음, 플레이스토어로 이동');
+            console.log('[GROUP_JOIN] Android 앱이 열리지 않음, 플레이스토어로 이동');
             window.open(PLAY_STORE_URL, '_blank');
           }
         }, 2000);
@@ -557,7 +650,7 @@ export default function GroupJoinPage() {
                     >
                       <HiDevicePhoneMobile className="text-xl relative z-10" />
                     </motion.div>
-                    <span className="relative z-10">SMAP 앱에서 열기</span>
+                    <span className="relative z-10">{isMobile() ? 'SMAP 앱에서 열기' : '앱 다운로드'}</span>
                   </motion.button>
                   
                   <motion.p 
