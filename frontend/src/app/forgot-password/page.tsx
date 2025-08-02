@@ -959,8 +959,17 @@ const ForgotPasswordPage = () => {
                 }`}
               >
                 <div className="flex items-center justify-center space-x-2">
-                  <FiSend size={16} />
-                  <span>재설정 링크 전송</span>
+                  {isLoading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>전송 중...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FiSend size={16} />
+                      <span>재설정 링크 전송</span>
+                    </>
+                  )}
                 </div>
               </button>
             </form>

@@ -1087,15 +1087,26 @@ const ResetPasswordPage = () => {
             {/* 재설정 버튼 */}
             <button
               type="submit"
-              disabled={!password || !confirmPassword || password !== confirmPassword || !Object.values(passwordStrength).every(Boolean)}
+              disabled={isLoading || !password || !confirmPassword || password !== confirmPassword || !Object.values(passwordStrength).every(Boolean)}
               className={`w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl font-medium transition-all ${
-                !password || !confirmPassword || password !== confirmPassword || !Object.values(passwordStrength).every(Boolean)
+                isLoading || !password || !confirmPassword || password !== confirmPassword || !Object.values(passwordStrength).every(Boolean)
                   ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                   : 'bg-[#0114a2] text-white hover:bg-[#001f87] transform hover:scale-105 active:scale-95'
               }`}
             >
-              <FiLock size={16} />
-              <span>비밀번호 변경</span>
+              <div className="flex items-center justify-center space-x-2">
+                {isLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>변경 중...</span>
+                  </>
+                ) : (
+                  <>
+                    <FiLock size={16} />
+                    <span>비밀번호 변경</span>
+                  </>
+                )}
+              </div>
             </button>
           </form>
 

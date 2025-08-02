@@ -48,7 +48,7 @@ class EmailService:
                 <p>{reset_url}</p>
                 <p><strong>주의사항:</strong></p>
                 <ul>
-                    <li>이 링크는 1분 후에 만료됩니다.</li>
+                    <li>이 링크는 10분 후에 만료됩니다.</li>
                     <li>본인이 요청하지 않았다면 이 이메일을 무시하세요.</li>
                     <li>보안을 위해 링크를 다른 사람과 공유하지 마세요.</li>
                 </ul>
