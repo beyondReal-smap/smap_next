@@ -86,7 +86,7 @@ class SMSService:
         """
         비밀번호 재설정 SMS 발송
         """
-        message = f"[SMAP] 비밀번호 재설정 링크입니다.{reset_url}"
+        message = f"[SMAP] 비밀번호 재설정 링크입니다.\n{reset_url}\n1분 내에 사용해주세요."
         
         return await self.send_sms(
             phone_number=phone_number,

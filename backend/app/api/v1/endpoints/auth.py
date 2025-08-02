@@ -894,14 +894,14 @@ async def forgot_password(
         
         # 짧은 토큰 생성 (UUID 기반)
         short_token = str(uuid.uuid4())[:8]  # 8자리 짧은 토큰
-        token_expires = datetime.utcnow() + timedelta(hours=1)
+        token_expires = datetime.utcnow() + timedelta(minutes=1)  # 1분으로 단축 (테스트용)
         
         # 토큰을 데이터베이스에 저장 (보안 강화)
         user.mt_reset_token = short_token
         user.mt_token_edate = token_expires
         db.commit()
         
-        logger.info(f"💾 토큰 데이터베이스 저장 완료: 사용자 {user.mt_idx}, 토큰: {short_token}")
+        logger.info(f"💾 토큰 데이터베이스 저장 완료: 사용자 {user.mt_idx}, 토큰: {short_token}, 만료시간: {token_expires}")
         
         # 비밀번호 재설정 링크 생성 (운영환경 도메인 적용, URL 단축)
         reset_url = f"https://nextstep.smap.site/r?t={short_token}"
@@ -935,7 +935,7 @@ async def forgot_password(
             data={
                 "type": forgot_data.type,
                 "contact": forgot_data.contact,
-                "token_expires": "1시간",
+                "token_expires": "1분",  # 하드코딩으로 1분 설정
                 "sent": True
             }
         )

@@ -18,6 +18,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 토큰 길이 검증 (8자리가 아니면 실패)
+    if (token.length !== 8) {
+      console.log('[RESET PASSWORD] 토큰 길이 검증 실패:', token.length);
+      return NextResponse.json(
+        { message: '유효하지 않은 토큰입니다.' },
+        { status: 400 }
+      );
+    }
+
     // 비밀번호 강도 검증
     if (newPassword.length < 8) {
       return NextResponse.json(
@@ -59,11 +68,12 @@ export async function POST(request: NextRequest) {
 
       const backendData = await backendResponse.json();
 
-      if (!backendResponse.ok) {
-        console.error('[RESET PASSWORD] 백엔드 에러:', backendData);
+      // 백엔드 응답의 success 필드를 확인
+      if (!backendData.success) {
+        console.error('[RESET PASSWORD] 백엔드 비밀번호 재설정 실패:', backendData);
         
         // 토큰 만료/무효 에러 처리
-        if (backendResponse.status === 400 || backendResponse.status === 401) {
+        if (backendData.message && backendData.message.includes('토큰')) {
           return NextResponse.json(
             { message: '토큰이 만료되었거나 유효하지 않습니다.' },
             { status: 400 }
@@ -72,7 +82,7 @@ export async function POST(request: NextRequest) {
         
         return NextResponse.json(
           { message: backendData.message || '비밀번호 재설정에 실패했습니다.' },
-          { status: backendResponse.status }
+          { status: 400 }
         );
       }
 
@@ -87,18 +97,20 @@ export async function POST(request: NextRequest) {
     } catch (backendError) {
       console.error('[RESET PASSWORD] 백엔드 연결 실패:', backendError);
       
-      // 개발 환경에서는 임시로 성공 처리 (테스트용)
+      // 개발 환경에서만 임시 성공 처리 (실제 비밀번호 변경 시뮬레이션)
       if (process.env.NODE_ENV === 'development') {
-        console.log('[RESET PASSWORD] 개발 환경 - 임시 성공 처리');
+        console.log('[RESET PASSWORD] 개발 환경 - 백엔드 연결 실패로 인한 임시 성공 처리');
         return NextResponse.json({
           success: true,
           message: '비밀번호가 성공적으로 변경되었습니다.',
-          dev: true
+          dev: true,
+          note: '백엔드 연결 실패로 인한 임시 처리입니다.'
         });
       }
       
+      // 백엔드 연결 실패 시 에러 메시지 반환
       return NextResponse.json(
-        { message: '서버 연결에 실패했습니다.' },
+        { message: '서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.' },
         { status: 503 }
       );
     }
