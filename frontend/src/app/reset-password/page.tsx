@@ -667,7 +667,7 @@ const ResetPasswordPage = () => {
       const data = await response.json();
 
       if (mountedRef.current) {
-        if (response.ok) {
+        if (response.ok && data.success) {
           setStep('success');
           console.log('[RESET_PASSWORD] 비밀번호 재설정 성공');
           
@@ -676,9 +676,16 @@ const ResetPasswordPage = () => {
             hapticFeedback.success();
           }
         } else {
-          setErrors({ 
-            general: data.message || '비밀번호 재설정에 실패했습니다.' 
-          });
+          // 백엔드 응답에서 에러 메시지 확인
+          let errorMessage = data.message || '비밀번호 재설정에 실패했습니다.';
+          
+          // 토큰 관련 에러인 경우 특별 처리
+          if (errorMessage.includes('토큰') || errorMessage.includes('만료') || errorMessage.includes('유효하지 않은')) {
+            setStep('error');
+            console.log('[RESET_PASSWORD] 토큰 에러로 인한 실패:', errorMessage);
+          } else {
+            setErrors({ general: errorMessage });
+          }
           
           // 에러 햅틱 피드백
           if (isIOS()) {
