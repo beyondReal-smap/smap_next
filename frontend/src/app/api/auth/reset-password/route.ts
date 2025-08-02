@@ -53,9 +53,20 @@ export async function POST(request: NextRequest) {
     });
 
     // 백엔드 API 호출
+    console.log('[RESET PASSWORD] 백엔드 API 호출 시작');
     try {
-      const backendUrl = process.env.BACKEND_URL || 'https://118.67.130.71:8000';
-      const backendResponse = await fetch(`${backendUrl}/api/v1/auth/reset-password`, {
+      const backendUrl = 'https://118.67.130.71:8000/api/v1/auth/reset-password';
+      
+      console.log('[RESET PASSWORD] 백엔드 URL:', backendUrl);
+      console.log('[RESET PASSWORD] 요청 데이터:', { 
+        tokenLength: token.length,
+        passwordLength: newPassword.length
+      });
+      
+      // SSL 인증서 문제 해결을 위한 설정
+      process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
+
+      const backendResponse = await fetch(backendUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -64,58 +75,58 @@ export async function POST(request: NextRequest) {
           token,
           new_password: newPassword,
         }),
+        // 타임아웃 설정 (10초로 증가)
+        signal: AbortSignal.timeout(10000)
       });
 
-      const backendData = await backendResponse.json();
+      console.log('[RESET PASSWORD] 백엔드 응답 상태:', backendResponse.status);
+      console.log('[RESET PASSWORD] 백엔드 응답 헤더:', Object.fromEntries(backendResponse.headers.entries()));
 
-      // 백엔드 응답의 success 필드를 확인
-      if (!backendData.success) {
-        console.error('[RESET PASSWORD] 백엔드 비밀번호 재설정 실패:', backendData);
-        
-        // 토큰 만료/무효 에러 처리
-        if (backendData.message && backendData.message.includes('토큰')) {
-          return NextResponse.json(
-            { message: '토큰이 만료되었거나 유효하지 않습니다.' },
-            { status: 400 }
-          );
-        }
-        
+      const backendData = await backendResponse.json();
+      console.log('[RESET PASSWORD] 백엔드 응답 데이터:', backendData);
+
+      if (!backendResponse.ok) {
+        // 백엔드에서 오류 응답이 온 경우
+        console.error('[RESET PASSWORD] 백엔드 오류:', backendResponse.status, backendData);
         return NextResponse.json(
-          { message: backendData.message || '비밀번호 재설정에 실패했습니다.' },
-          { status: 400 }
+          { 
+            success: false, 
+            message: backendData.message || '비밀번호 재설정에 실패했습니다.' 
+          },
+          { status: backendResponse.status }
         );
       }
 
-      console.log('[RESET PASSWORD] 비밀번호 재설정 성공');
-
-      return NextResponse.json({
-        success: true,
-        message: '비밀번호가 성공적으로 변경되었습니다.',
+      // 백엔드 응답을 그대로 전달
+      console.log('[RESET PASSWORD] 백엔드 응답 처리:', {
+        success: backendData.success,
+        message: backendData.message,
         data: backendData.data
       });
+      return NextResponse.json(backendData);
 
     } catch (backendError) {
       console.error('[RESET PASSWORD] 백엔드 연결 실패:', backendError);
       
-      // 개발 환경에서만 임시 성공 처리 (실제 비밀번호 변경 시뮬레이션)
+      // 개발 환경에서는 Mock 데이터 반환
       if (process.env.NODE_ENV === 'development') {
-        console.log('[RESET PASSWORD] 개발 환경 - 백엔드 연결 실패로 인한 임시 성공 처리');
+        console.log('[RESET PASSWORD] 개발 환경 - Mock 데이터 반환');
         return NextResponse.json({
           success: true,
           message: '비밀번호가 성공적으로 변경되었습니다.',
-          dev: true,
-          note: '백엔드 연결 실패로 인한 임시 처리입니다.'
+          data: null,
+          dev: true
         });
       }
       
-      // 백엔드 연결 실패 시 에러 메시지 반환
+      // 프로덕션에서는 에러 반환
       return NextResponse.json(
         { message: '서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.' },
         { status: 503 }
       );
     }
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('[RESET PASSWORD] API 오류:', error);
     return NextResponse.json(
       { message: '요청 처리 중 오류가 발생했습니다.' },

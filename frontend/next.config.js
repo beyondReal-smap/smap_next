@@ -1,3 +1,8 @@
+// 개발환경에서만 SSL 검증 비활성화
+if (process.env.NODE_ENV === 'development') {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // React 최적화 - Strict Mode 비활성화 (컴포넌트 이중 마운트 방지)

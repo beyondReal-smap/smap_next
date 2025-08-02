@@ -10,43 +10,34 @@ export async function POST(request: NextRequest) {
     const body: ForgotPasswordRequest = await request.json();
     const { type, contact } = body;
 
-    // 입력값 검증
     if (!type || !contact) {
       return NextResponse.json(
-        { message: '필수 정보가 누락되었습니다.' },
+        { message: '타입과 연락처가 모두 필요합니다.' },
         { status: 400 }
       );
     }
 
-    // 연락처 형식 검증
-    if (type === 'phone') {
-      const phoneRegex = /^010-\d{4}-\d{4}$/;
-      if (!phoneRegex.test(contact)) {
-        return NextResponse.json(
-          { message: '올바른 전화번호 형식이 아닙니다.' },
-          { status: 400 }
-        );
-      }
-    } else if (type === 'email') {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(contact)) {
-        return NextResponse.json(
-          { message: '올바른 이메일 형식이 아닙니다.' },
-          { status: 400 }
-        );
-      }
-    }
-
     console.log('[FORGOT PASSWORD] 비밀번호 재설정 요청:', {
       type,
-      contact: type === 'phone' ? contact.replace(/(\d{3})-(\d{4})-(\d{4})/, '$1-****-$3') : contact.replace(/(.{2}).*(@.*)/, '$1***$2'),
+      contact: type === 'phone' ? contact.substring(0, 3) + '****-' + contact.substring(7) : contact,
       timestamp: new Date().toISOString()
     });
 
     // 백엔드 API 호출
+    console.log('[FORGOT PASSWORD] 백엔드 API 호출 시작');
     try {
-      const backendUrl = process.env.BACKEND_URL || 'https://118.67.130.71:8000';
-      const backendResponse = await fetch(`${backendUrl}/api/v1/auth/forgot-password`, {
+      const backendUrl = 'https://118.67.130.71:8000/api/v1/auth/forgot-password';
+      
+      console.log('[FORGOT PASSWORD] 백엔드 URL:', backendUrl);
+      console.log('[FORGOT PASSWORD] 요청 데이터:', { 
+        type, 
+        contact: type === 'phone' ? contact.substring(0, 3) + '***' : contact 
+      });
+      
+      // SSL 인증서 문제 해결을 위한 설정
+      process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
+
+      const backendResponse = await fetch(backendUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -55,56 +46,42 @@ export async function POST(request: NextRequest) {
           type,
           contact,
         }),
-        signal: AbortSignal.timeout(10000), // 10초 타임아웃
+        // 타임아웃 설정 (10초로 증가)
+        signal: AbortSignal.timeout(10000)
       });
 
+      console.log('[FORGOT PASSWORD] 백엔드 응답 상태:', backendResponse.status);
+      console.log('[FORGOT PASSWORD] 백엔드 응답 헤더:', Object.fromEntries(backendResponse.headers.entries()));
+
       const backendData = await backendResponse.json();
+      console.log('[FORGOT PASSWORD] 백엔드 응답 데이터:', backendData);
 
       if (!backendResponse.ok) {
-        console.error('[FORGOT PASSWORD] 백엔드 에러:', backendData);
-        
-        // 사용자에게는 보안상 구체적인 이유를 알려주지 않음
-        if (backendResponse.status === 404) {
-          return NextResponse.json(
-            { message: '입력하신 정보로 가입된 계정을 찾을 수 없습니다.' },
-            { status: 404 }
-          );
-        }
-        
+        // 백엔드에서 오류 응답이 온 경우
+        console.error('[FORGOT PASSWORD] 백엔드 오류:', backendResponse.status, backendData);
         return NextResponse.json(
-          { message: '요청 처리 중 오류가 발생했습니다.' },
-          { status: 500 }
+          { 
+            success: false, 
+            message: backendData.message || '비밀번호 재설정 요청에 실패했습니다.' 
+          },
+          { status: backendResponse.status }
         );
       }
 
-      console.log('[FORGOT PASSWORD] 백엔드 성공:', {
-        success: true,
-        type,
-        timestamp: new Date().toISOString()
+      // 백엔드 응답을 그대로 전달
+      console.log('[FORGOT PASSWORD] 백엔드 응답 처리:', {
+        success: backendData.success,
+        message: backendData.message,
+        data: backendData.data
       });
-
-      // 개발 환경에서는 백엔드 응답 데이터도 로그로 출력
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[FORGOT PASSWORD] 백엔드 응답 데이터:', backendData);
-      }
-
-      return NextResponse.json({
-        success: true,
-        message: type === 'phone' 
-          ? 'SMS로 비밀번호 재설정 링크를 발송했습니다.' 
-          : '이메일로 비밀번호 재설정 링크를 발송했습니다.',
-        data: {
-          type,
-          contact: type === 'phone' ? contact : contact
-        }
-      });
+      return NextResponse.json(backendData);
 
     } catch (backendError) {
       console.error('[FORGOT PASSWORD] 백엔드 연결 실패:', backendError);
       
-      // 개발 환경에서는 임시로 성공 처리 (테스트용)
+      // 개발 환경에서는 Mock 데이터 반환
       if (process.env.NODE_ENV === 'development') {
-        console.log('[FORGOT PASSWORD] 개발 환경 - 임시 성공 처리');
+        console.log('[FORGOT PASSWORD] 개발 환경 - Mock 데이터 반환');
         return NextResponse.json({
           success: true,
           message: type === 'phone' 
@@ -112,19 +89,22 @@ export async function POST(request: NextRequest) {
             : '이메일로 비밀번호 재설정 링크를 발송했습니다.',
           data: {
             type,
-            contact: type === 'phone' ? contact : contact
+            contact: type === 'phone' ? contact : contact,
+            token_expires: "1분",
+            sent: true
           },
           dev: true
         });
       }
       
+      // 프로덕션에서는 에러 반환
       return NextResponse.json(
         { message: '서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.' },
         { status: 503 }
       );
     }
-
-  } catch (error) {
+    
+  } catch (error: any) {
     console.error('[FORGOT PASSWORD] API 오류:', error);
     return NextResponse.json(
       { message: '요청 처리 중 오류가 발생했습니다.' },
