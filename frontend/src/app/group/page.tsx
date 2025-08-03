@@ -106,12 +106,7 @@ const pageStyles = `
   100% { transform: translateX(100%); }
 }
 
-/* 로딩 중일 때는 애니메이션 비활성화 */
-.loading .group-content,
-.loading .group-card {
-  opacity: 1;
-  animation: none;
-}
+
 
 .glass-effect {
   backdrop-filter: blur(20px);
@@ -182,33 +177,51 @@ const getDefaultImage = (gender: number | null | undefined, index: number): stri
   return `/images/avatar${(index % 3) + 1}.png`;
 };
 
-// 검색 컴포넌트 메모이제이션
-const SearchSection = memo<{
-  searchQuery: string;
-  onSearchChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onFocus: () => void;
-  onBlur: () => void;
-}>(({ searchQuery, onSearchChange, onFocus, onBlur }) => (
+// 초대 코드 입력 컴포넌트 메모이제이션
+const InviteCodeSection = memo<{
+  inviteCode: string;
+  onInviteCodeChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onJoinGroup: () => void;
+  isJoiningGroup: boolean;
+}>(({ inviteCode, onInviteCodeChange, onJoinGroup, isJoiningGroup }) => (
   <div className="px-4 pb-4 mt-5">
     <motion.div 
       className="relative"
       whileFocus={{ scale: 1.02 }}
       transition={{ duration: 0.2 }}
     >
-      <FaSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-      <input
-        type="text"
-        placeholder="그룹 검색..."
-        value={searchQuery}
-        onChange={onSearchChange}
-        onFocus={onFocus}
-        onBlur={onBlur}
-        className="w-full pl-4 pr-4 py-4 bg-white border rounded-2xl focus:outline-none focus:ring-2 focus:border-gray-500 placeholder-gray-400 text-base shadow-sm"
-        style={{ 
-          borderColor: 'rgba(1, 19, 163, 0.2)',
-          '--tw-ring-color': '#0113A3'
-        } as React.CSSProperties}
-      />
+      <div className="flex items-center space-x-2">
+        <div className="flex-1 relative">
+          <FaUserPlus className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <input
+            type="text"
+            placeholder="초대 코드 입력..."
+            value={inviteCode}
+            onChange={onInviteCodeChange}
+            className="w-full pl-4 pr-4 py-4 bg-white border rounded-2xl focus:outline-none focus:ring-2 focus:border-yellow-500 placeholder-gray-400 text-base shadow-sm"
+            style={{ 
+              borderColor: 'rgba(245, 158, 11, 0.2)',
+              '--tw-ring-color': '#f59e0b'
+            } as React.CSSProperties}
+          />
+        </div>
+        <motion.button
+          onClick={onJoinGroup}
+          disabled={isJoiningGroup || !inviteCode.trim()}
+          className="px-6 py-4 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-2xl font-medium shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          {isJoiningGroup ? (
+            <div className="flex items-center">
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+              가입 중...
+            </div>
+          ) : (
+            '가입'
+          )}
+        </motion.button>
+      </div>
     </motion.div>
   </div>
 ));
@@ -500,7 +513,7 @@ const modalVariants = {
 // 메인 컴포넌트
 function GroupPageContent() {
   const router = useRouter();
-  const { user, isLoggedIn, loading: authLoading } = useAuth();
+  const { user, isLoggedIn } = useAuth();
   const { 
     getUserProfile, 
     getUserGroups, 
@@ -535,9 +548,11 @@ function GroupPageContent() {
   
   // UI 상태
   const [currentView, setCurrentView] = useState<'list' | 'detail'>('list');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [showGroupActions, setShowGroupActions] = useState(false);
+  
+  // 초대 코드 관련 상태
+  const [inviteCode, setInviteCode] = useState('');
+  const [isJoiningGroup, setIsJoiningGroup] = useState(false);
   
   // 로딩 상태
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
@@ -555,6 +570,7 @@ function GroupPageContent() {
 
   // 그룹 목록 조회
   const fetchGroups = async () => {
+    setLoading(true);
     try {
       const data = await groupService.getCurrentUserGroups();
       setGroups(data);
@@ -573,6 +589,8 @@ function GroupPageContent() {
     } catch (error) {
       console.error('그룹 목록 조회 오류:', error);
       setGroups([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -833,12 +851,7 @@ function GroupPageContent() {
   // 인증 상태 확인 및 초기 데이터 로드 - 간소화
   useEffect(() => {
     const initializeAuth = async () => {
-      console.log('[GROUP] 인증 상태 확인:', { isLoggedIn, user: user?.mt_idx, authLoading });
-
-      // 인증 로딩 중이면 잠시 대기
-      if (authLoading) {
-        return;
-      }
+      console.log('[GROUP] 인증 상태 확인:', { isLoggedIn, user: user?.mt_idx });
 
       // 로그인되지 않은 경우 리다이렉트
       if (!isLoggedIn && !authService.getToken()) {
@@ -854,8 +867,9 @@ function GroupPageContent() {
       }
     };
 
+    // 바로 실행
     initializeAuth();
-  }, [authLoading, isLoggedIn, user, router]);
+  }, [isLoggedIn, user, router]);
 
   // 선택된 그룹의 멤버 및 통계 조회
   useEffect(() => {
@@ -885,9 +899,7 @@ function GroupPageContent() {
     router.back();
   };
 
-  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
-  }, []);
+
 
   // 새 그룹 생성
   const handleSaveGroup = async () => {
@@ -1273,19 +1285,7 @@ function GroupPageContent() {
     }
   };
 
-  // 검색 필터링 (useMemo로 최적화)
-  const filteredGroups = useMemo(() => {
-    if (!groups || !Array.isArray(groups)) return [];
-    
-    if (!searchQuery.trim()) return groups;
-    
-    const query = searchQuery.toLowerCase();
-    return groups.filter(group => 
-      group.sgt_title.toLowerCase().includes(query) || 
-      (group.sgt_content && group.sgt_content.toLowerCase().includes(query)) ||
-      (group.sgt_memo && group.sgt_memo.toLowerCase().includes(query))
-    );
-  }, [groups, searchQuery]);
+
 
   // 토스트 모달 상태
   const [toastModal, setToastModal] = useState<{
@@ -1372,6 +1372,56 @@ function GroupPageContent() {
       
       // 그룹 선택 시 사이드바 닫기
       setIsSidebarOpen(false);
+    }
+  };
+
+  // 초대 코드로 그룹 가입
+  const handleJoinGroupByCode = async () => {
+    if (!inviteCode.trim()) {
+      showToastModal('error', '입력 오류', '초대 코드를 입력해주세요.');
+      return;
+    }
+
+    setIsJoiningGroup(true);
+    try {
+      // 백엔드 API 호출하여 초대 코드로 그룹 정보 조회
+      const response = await fetch(`/api/groups/code/${inviteCode.trim()}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || '유효하지 않은 초대 코드입니다.');
+      }
+
+      // 그룹 가입 API 호출
+      const joinResponse = await fetch(`/api/groups/${data.sgt_idx}/join`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          mt_idx: user?.mt_idx,
+          sgt_idx: data.sgt_idx
+        }),
+      });
+
+      const joinData = await joinResponse.json();
+
+      if (!joinResponse.ok) {
+        throw new Error(joinData.error || '그룹 가입에 실패했습니다.');
+      }
+
+      showToastModal('success', '가입 완료', `${data.sgt_title} 그룹에 성공적으로 가입되었습니다!`);
+      setInviteCode('');
+      
+      // 그룹 목록 새로고침
+      await fetchGroups();
+      
+    } catch (error) {
+      console.error('그룹 가입 오류:', error);
+      const errorMessage = error instanceof Error ? error.message : '그룹 가입 중 오류가 발생했습니다.';
+      showToastModal('error', '가입 실패', errorMessage);
+    } finally {
+      setIsJoiningGroup(false);
     }
   };
 
@@ -1589,24 +1639,63 @@ function GroupPageContent() {
                   transition={{ 
                     duration: 0.3
                   }}
-                  className={loading ? 'loading' : ''}
+
                 >
                   {/* 검색 섹션 */}
                   <div className="group-content">
-                  <SearchSection
-                    searchQuery={searchQuery}
-                    onSearchChange={handleSearchChange}
-                    onFocus={() => setIsSearchFocused(true)}
-                    onBlur={() => setIsSearchFocused(false)}
+                  <InviteCodeSection
+                    inviteCode={inviteCode}
+                    onInviteCodeChange={(e) => setInviteCode(e.target.value)}
+                    onJoinGroup={handleJoinGroupByCode}
+                    isJoiningGroup={isJoiningGroup}
                   />
                   </div>
 
                   {/* 통계 카드 */}
                   <div className="group-content">
-                  <StatsCards
-                    groupsCount={groups.length}
-                    totalMembers={Object.values(groupMemberCounts).reduce((a, b) => a + b, 0)}
-                  />
+                  {loading ? (
+                    <div className="px-4 mb-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        {/* 총 그룹 스켈레톤 */}
+                        <motion.div 
+                          className="rounded-2xl p-4 text-white shadow-lg relative overflow-hidden"
+                          style={{ background: 'linear-gradient(to right, #0113A3, #001a8a)' }}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.1, duration: 0.5 }}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="h-4 bg-blue-200 rounded mb-2 animate-pulse" style={{ width: '60%' }}></div>
+                              <div className="h-8 bg-blue-200 rounded animate-pulse" style={{ width: '40%' }}></div>
+                            </div>
+                            <div className="w-8 h-8 bg-blue-200 rounded animate-pulse"></div>
+                          </div>
+                        </motion.div>
+                        
+                        {/* 총 멤버 스켈레톤 */}
+                        <motion.div 
+                          className="bg-gradient-to-r from-pink-600 to-pink-700 rounded-2xl p-4 text-white shadow-lg relative overflow-hidden"
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.2, duration: 0.5 }}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="h-4 bg-pink-200 rounded mb-2 animate-pulse" style={{ width: '60%' }}></div>
+                              <div className="h-8 bg-pink-200 rounded animate-pulse" style={{ width: '40%' }}></div>
+                            </div>
+                            <div className="w-8 h-8 bg-pink-200 rounded animate-pulse"></div>
+                          </div>
+                        </motion.div>
+                      </div>
+                    </div>
+                  ) : (
+                    <StatsCards
+                      groupsCount={groups.length}
+                      totalMembers={Object.values(groupMemberCounts).reduce((a, b) => a + b, 0)}
+                    />
+                  )}
                   </div>
 
                   {/* 그룹 목록 */}
@@ -1619,7 +1708,7 @@ function GroupPageContent() {
                           {loading ? (
                             <div className="space-y-3">
                               {/* 향상된 스켈레톤 그룹 카드들 */}
-                              {[1, 2, 3, 4].map((index) => (
+                              {[1, 2].map((index) => (
                                 <div 
                                   key={index} 
                                   className="rounded-xl p-4 cursor-pointer relative overflow-hidden"
@@ -1671,7 +1760,7 @@ function GroupPageContent() {
                                 </div>
                               ))}
                             </div>
-                          ) : (filteredGroups && Array.isArray(filteredGroups)) && filteredGroups.map((group, index) => {
+                          ) : (groups && Array.isArray(groups)) && groups.map((group, index) => {
                             const memberCount = groupMemberCounts[group.sgt_idx] || 0;
                             
                             return (

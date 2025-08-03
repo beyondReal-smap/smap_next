@@ -295,10 +295,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     };
 
+    // 즉시 실행하고 3초 후에도 강제로 로딩 상태 해제
     initializeAuth();
+    
+    const timeout = setTimeout(() => {
+      if (isMounted) {
+        console.log('[AUTH CONTEXT] 로딩 타임아웃 - 강제로 로딩 상태 해제');
+        dispatch({ type: 'SET_LOADING', payload: false });
+      }
+    }, 3000);
 
     return () => {
       isMounted = false;
+      clearTimeout(timeout);
     };
   }, [preloadUserData]); // preloadUserData를 의존성 배열에 추가
 

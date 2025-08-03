@@ -570,7 +570,7 @@ export default function GroupJoinPage() {
                       height={40}
                       className="rounded-md object-cover"
                     />
-                    <h1 className="text-lg font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                    <h1 className="text-lg font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
                       그룹 초대
                     </h1>
                     {/* <IoSparklesSharp className="text-yellow-500 text-lg ml-1" /> */}

@@ -81,9 +81,9 @@ export default function IOSCompatibleSpinner({
   const getSizeClasses = () => {
     switch (size) {
       case 'sm': return { spinner: 'w-6 h-6 border-2', text: 'text-sm' };
-      case 'md': return { spinner: 'w-12 h-12 border-4', text: 'text-base' };
-      case 'lg': return { spinner: 'w-16 h-16 border-4', text: 'text-lg' };
-      default: return { spinner: 'w-12 h-12 border-4', text: 'text-base' };
+      case 'md': return { spinner: 'w-8 h-8 border-4', text: 'text-base' };
+      case 'lg': return { spinner: 'w-10 h-10 border-4', text: 'text-lg' };
+      default: return { spinner: 'w-8 h-8 border-4', text: 'text-base' };
     }
   };
 
