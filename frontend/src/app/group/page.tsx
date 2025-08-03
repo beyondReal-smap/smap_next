@@ -208,7 +208,7 @@ const InviteCodeSection = memo<{
         <motion.button
           onClick={onJoinGroup}
           disabled={isJoiningGroup || !inviteCode.trim()}
-          className="px-6 py-4 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-2xl font-medium shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-6 py-4 bg-gradient-to-r from-yellow-500 to-yellow-400 text-white rounded-2xl font-medium shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
         >
