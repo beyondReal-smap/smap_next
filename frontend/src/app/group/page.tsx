@@ -930,6 +930,13 @@ function GroupPageContent() {
       setNewGroup({ name: '', description: '' });
       
       showToastModal('success', '그룹 생성 완료', '새 그룹이 성공적으로 생성되었습니다.');
+      
+      // 초대 코드가 있는 경우 별도로 표시
+      if ((freshGroup as any)?.sgt_code) {
+        setTimeout(() => {
+          showToastModal('success', '초대 코드', `초대 코드: ${(freshGroup as any).sgt_code}`);
+        }, 1000);
+      }
     } catch (error) {
       console.error('그룹 생성 오류:', error);
       alert('그룹 생성 중 오류가 발생했습니다. 다시 시도해주세요.');
@@ -1026,7 +1033,12 @@ function GroupPageContent() {
     if (!selectedGroup) return;
     
     const inviteLink = `${window.location.origin}/group/${selectedGroup.sgt_idx}/join`;
-    const message = `[SMAP] ${selectedGroup.sgt_title} 그룹에 초대되었습니다!\n\n아래 링크를 클릭하여 참여해보세요:\n${inviteLink}`;
+    
+    // 초대 코드가 있는 경우 메시지에 포함
+    const inviteCode = (selectedGroup as any).sgt_code;
+    const message = inviteCode 
+      ? `[SMAP] ${selectedGroup.sgt_title} 그룹에 초대되었습니다!\n\n초대 코드: ${inviteCode}\n\n아래 링크를 클릭하여 참여해보세요:\n${inviteLink}`
+      : `[SMAP] ${selectedGroup.sgt_title} 그룹에 초대되었습니다!\n\n아래 링크를 클릭하여 참여해보세요:\n${inviteLink}`;
     
     if (isMobile()) {
       if (isIOS()) {
@@ -1127,7 +1139,12 @@ function GroupPageContent() {
     if (!selectedGroup) return;
     
     const inviteLink = `${window.location.origin}/group/${selectedGroup.sgt_idx}/join`;
-    const message = `[SMAP] ${selectedGroup.sgt_title} 그룹에 초대되었습니다! 링크: ${inviteLink}`;
+    
+    // 초대 코드가 있는 경우 메시지에 포함
+    const inviteCode = (selectedGroup as any).sgt_code;
+    const message = inviteCode 
+      ? `[SMAP] ${selectedGroup.sgt_title} 그룹에 초대되었습니다!\n\n초대 코드: ${inviteCode}\n\n링크: ${inviteLink}`
+      : `[SMAP] ${selectedGroup.sgt_title} 그룹에 초대되었습니다! 링크: ${inviteLink}`;
     
     if (isMobile()) {
       if (isIOS()) {
@@ -1161,9 +1178,15 @@ function GroupPageContent() {
     const inviteLink = `${window.location.origin}/group/${selectedGroup.sgt_idx}/join`;
     
     try {
+      // 초대 코드가 있는 경우 메시지에 포함
+      const inviteCode = (selectedGroup as any).sgt_code;
+      const shareText = inviteCode 
+        ? `[SMAP] ${selectedGroup.sgt_title} 그룹에 초대되었습니다!\n\n초대 코드: ${inviteCode}\n\n함께 참여해보세요.`
+        : `[SMAP] ${selectedGroup.sgt_title} 그룹에 초대되었습니다! 함께 참여해보세요.`;
+      
       await navigator.share({
         title: `${selectedGroup.sgt_title} 그룹 초대`,
-        text: `[SMAP] ${selectedGroup.sgt_title} 그룹에 초대되었습니다! 함께 참여해보세요.`,
+        text: shareText,
         url: inviteLink
       });
       
@@ -1764,7 +1787,24 @@ function GroupPageContent() {
                         </div>
                       </div>
                       <div className="flex items-center justify-between text-sm text-blue-200">
-                        <span>코드: {selectedGroup.sgt_code || 'N/A'}</span>
+                        <div className="flex items-center">
+                          <span className="mr-2">초대 코드:</span>
+                          <code className="bg-white/20 px-2 py-1 rounded text-blue-100 font-mono font-bold">
+                            {selectedGroup.sgt_code || 'N/A'}
+                          </code>
+                          {selectedGroup.sgt_code && (
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(selectedGroup.sgt_code!);
+                                showToastModal('success', '복사 완료', '초대 코드가 복사되었습니다.');
+                              }}
+                              className="ml-1 p-1 text-blue-200 hover:text-white transition-colors"
+                              title="초대 코드 복사"
+                            >
+                              <FiCopy className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
                         <span>생성일: {new Date(selectedGroup.sgt_wdate).toLocaleDateString()}</span>
                       </div>
                     </motion.div>
@@ -2299,6 +2339,18 @@ function GroupPageContent() {
               <div className="text-center mb-4">
                 <FaShare className="w-8 h-8 text-gray-700 mx-auto mb-2" />
                 <p className="text-gray-600 text-sm">{selectedGroup?.sgt_title}</p>
+                
+                {/* 초대 코드 표시 */}
+                {selectedGroup?.sgt_code && (
+                  <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <p className="text-xs text-gray-500 mb-1 text-center">초대 코드</p>
+                    <div className="flex items-center justify-center">
+                      <code className="text-lg font-mono font-bold text-blue-600 bg-white px-3 py-2 rounded border text-center">
+                        {selectedGroup.sgt_code}
+                      </code>
+                    </div>
+                  </div>
+                )}
               </div>
               
               <div className="space-y-2">

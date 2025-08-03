@@ -3853,7 +3853,7 @@ const SignInPage = () => {
               <div className="w-full border-t border-gray-300" />
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-3 bg-white text-gray-500">
+              <span className="px-3 bg-[#fef8f9] text-gray-500">
                 또는 다음으로 계속
               </span>
             </div>

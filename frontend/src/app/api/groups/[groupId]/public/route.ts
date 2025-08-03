@@ -64,54 +64,26 @@ export async function GET(
     let data = null;
     let backendUrl = '';
     
+    // 공개 API가 계속 실패하므로 바로 일반 그룹 API 사용
     try {
-      // 방법 1: 백엔드 공개 그룹 조회 API 호출 시도
-      backendUrl = `https://118.67.130.71:8000/api/v1/groups/${groupId}/public`;
-      console.log('[Group Public API] 방법 1 - 공개 API 호출:', backendUrl);
+      backendUrl = `https://118.67.130.71:8000/api/v1/groups/${groupId}`;
+      console.log('[Group Public API] 일반 그룹 API 호출:', backendUrl);
       
       const fetchOptions: RequestInit = {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
           'User-Agent': 'Next.js API Proxy',
-          'Content-Type': 'application/json',
         },
         // @ts-ignore - Next.js 환경에서 SSL 인증서 검증 우회
         rejectUnauthorized: false,
       };
       
-      const publicData = await fetchWithFallback(backendUrl, fetchOptions);
-      
-      if (publicData && publicData.success && publicData.data) {
-        data = publicData.data;
-        console.log('[Group Public API] 방법 1 성공:', data);
-      }
-    } catch (publicError) {
-      console.log('[Group Public API] 방법 1 실패:', publicError);
-    }
-    
-    if (!data) {
-      try {
-        // 방법 2: 일반 그룹 조회 API 호출 시도
-        backendUrl = `https://118.67.130.71:8000/api/v1/groups/${groupId}`;
-        console.log('[Group Public API] 방법 2 - 일반 그룹 API 호출:', backendUrl);
-        
-        const fetchOptions: RequestInit = {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'User-Agent': 'Next.js API Proxy',
-            'Content-Type': 'application/json',
-          },
-          // @ts-ignore
-          rejectUnauthorized: false,
-        };
-        
-        data = await fetchWithFallback(backendUrl, fetchOptions);
-        console.log('[Group Public API] 방법 2 성공:', data);
-      } catch (generalError) {
-        console.log('[Group Public API] 방법 2 실패:', generalError);
-      }
+      data = await fetchWithFallback(backendUrl, fetchOptions);
+      console.log('[Group Public API] 일반 그룹 API 성공:', data);
+    } catch (error) {
+      console.log('[Group Public API] 일반 그룹 API 실패:', error);
+      throw error;
     }
     
     if (!data) {
@@ -129,7 +101,6 @@ export async function GET(
         headers: {
           'Accept': 'application/json',
           'User-Agent': 'Next.js API Proxy',
-          'Content-Type': 'application/json',
         },
         // @ts-ignore
         rejectUnauthorized: false,
@@ -156,6 +127,7 @@ export async function GET(
       sgt_title: data.sgt_title,
       sgt_content: data.sgt_content || data.sgt_memo,
       sgt_memo: data.sgt_memo,
+      sgt_code: data.sgt_code,
       sgt_show: data.sgt_show,
       sgt_wdate: data.sgt_wdate,
       memberCount: memberCount

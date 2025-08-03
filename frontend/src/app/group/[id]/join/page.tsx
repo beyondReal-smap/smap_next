@@ -15,6 +15,7 @@ interface GroupInfo {
   sgt_title: string;
   sgt_content?: string;
   sgt_memo?: string;
+  sgt_code?: string;
   memberCount: number;
 }
 
@@ -172,6 +173,7 @@ export default function GroupJoinPage() {
           sgt_title: group.sgt_title,
           sgt_content: group.sgt_content,
           sgt_memo: group.sgt_memo,
+          sgt_code: group.sgt_code,
           memberCount: group.memberCount || 0
         });
         
@@ -612,7 +614,7 @@ export default function GroupJoinPage() {
                   )}
                   
                   <motion.div 
-                    className="flex items-center justify-center bg-white rounded-xl py-2 px-3 shadow-sm"
+                    className="flex items-center justify-center bg-white rounded-xl py-2 px-3 shadow-sm mb-3"
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 1.3, duration: 0.4 }}
@@ -620,6 +622,23 @@ export default function GroupJoinPage() {
                     <FaUsers className="mr-2 text-indigo-500 text-sm" />
                     <span className="text-gray-700 font-medium text-sm">멤버 {groupInfo.memberCount}명</span>
                   </motion.div>
+                  
+                  {/* 초대 코드 표시 */}
+                  {groupInfo.sgt_code && (
+                    <motion.div 
+                      className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-3 border border-blue-200"
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 1.4, duration: 0.4 }}
+                    >
+                      <p className="text-xs text-blue-600 font-medium mb-1 text-center">초대 코드</p>
+                      <div className="flex items-center justify-center">
+                        <code className="text-lg font-mono font-bold text-blue-700 bg-white px-3 py-2 rounded-lg border border-blue-300 text-center shadow-sm">
+                          {groupInfo.sgt_code}
+                        </code>
+                      </div>
+                    </motion.div>
+                  )}
                 </motion.div>
               </motion.div>
 
