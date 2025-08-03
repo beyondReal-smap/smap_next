@@ -159,7 +159,7 @@ const GroupDropdownPortal = ({
       onClick={(e) => {
         e.stopPropagation();
       }}
-      className="absolute rounded-xl z-[99999] overflow-hidden bg-white shadow-2xl border border-gray-200/80"
+      className="absolute rounded-xl z-[1000] overflow-hidden bg-white shadow-2xl border border-gray-200/80"
       style={{
         top: position.top,
         left: position.left,
@@ -721,7 +721,7 @@ const MobileCalendar = memo(({
   };
 
   return (
-    <div className="bg-white rounded-3xl p-4 shadow-sm border border-gray-100">
+    <div className="bg-white rounded-3xl p-4 shadow-sm border border-gray-100" style={{ zIndex: 0 }}>
       {/* 캘린더 헤더 */}
       <div className="flex items-center justify-between mb-4">
         <motion.button
@@ -793,6 +793,7 @@ const MobileCalendar = memo(({
             ease: [0.25, 0.46, 0.45, 0.94]
           }}
           className="grid grid-cols-7 gap-1"
+          style={{ zIndex: 0 }}
         >
           {renderCalendarDays()}
         </motion.div>
@@ -4208,12 +4209,18 @@ export default function SchedulePage() {
         {/* 통일된 헤더 애니메이션 */}
         <AnimatedHeader 
             variant="simple"
-            className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed schedule-header"
+            className="fixed top-0 left-0 right-0 z-[2147483647] glass-effect header-fixed schedule-header"
             style={{ 
               paddingTop: '0px',
               marginTop: '0px',
               top: '0px',
-              position: 'fixed'
+              position: 'fixed',
+              zIndex: 2147483647,
+              pointerEvents: 'auto',
+              width: '100vw',
+              height: '56px',
+              minHeight: '56px',
+              maxHeight: '56px'
             }}
           >
             <div className="flex items-center justify-between h-14 px-4">
@@ -4261,6 +4268,7 @@ export default function SchedulePage() {
               initial="hidden"
               animate="visible"
               custom={0}
+              style={{ zIndex: 0 }}
             >
               {/* 캘린더 컴포넌트 */}
               <motion.div
@@ -4268,6 +4276,7 @@ export default function SchedulePage() {
                 initial="hidden"
                 animate="visible"
                 custom={0}
+                style={{ zIndex: 0 }}
               >
                 <MobileCalendar 
                   selectedDay={selectedDay} 
@@ -5327,8 +5336,8 @@ export default function SchedulePage() {
                     <div className="modal-scroll-area flex-1 overflow-y-auto scroll-container">
                       {isSearchingLocation ? (
                         <div className="text-center py-8 px-6">
-                          <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <svg className="unified-animate-spin h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg className="unified-animate-spin h-6 w-6 text-orange-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
@@ -6081,7 +6090,7 @@ export default function SchedulePage() {
                         {/* 그룹 선택 */}
                     <div className="mb-4">
                           <label className="block text-sm font-medium text-gray-700 mb-2">그룹 선택</label>
-                          <div className="relative group-selector-container" style={{ zIndex: 2147483647, position: 'relative' }}>
+                          <div className="relative group-selector-container" style={{ zIndex: 1000, position: 'relative' }}>
                           <button
                             ref={groupButtonRef}
                             type="button"
