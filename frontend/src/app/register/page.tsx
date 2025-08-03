@@ -1516,10 +1516,10 @@ export default function RegisterPage() {
   if (isInitializing || !isIOSReady || (!isDataLoaded && !initError)) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-white">
-        <div className="text-center p-4">
-          <div className="w-8 h-8 border-4 border-gray-200 border-t-[#0114a2] rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600 text-sm">페이지를 준비하고 있습니다...</p>
-          <p className="text-gray-400 text-xs mt-2">잠시만 기다려주세요</p>
+        <div className="flex flex-col items-center justify-center p-4">
+          <div className="w-8 h-8 border-4 border-gray-200 border-t-[#0114a2] rounded-full animate-spin mb-4"></div>
+          <span className="text-gray-600 text-sm">페이지를 준비하고 있습니다...</span>
+          <span className="text-gray-400 text-xs mt-2">잠시만 기다려주세요</span>
         </div>
       </div>
     );

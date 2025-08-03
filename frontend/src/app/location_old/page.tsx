@@ -2385,9 +2385,9 @@ export default function LocationPage() {
                        </div>
                    </h2>
                    {isLoading ? (
-                    <div className="text-center py-3 text-gray-500">
-                      <FiLoader className="animate-spin mx-auto mb-1" />
-                      <p>멤버 정보를 불러오는 중...</p>
+                    <div className="flex flex-col items-center justify-center py-3 text-gray-500">
+                      <FiLoader className="animate-spin mb-2" />
+                      <span className="text-sm">멤버 정보를 불러오는 중...</span>
                     </div>
                    ) : groupMembers.length > 0 ? (
                      <div className="flex flex-row flex-nowrap justify-start items-center gap-x-4 mb-2 overflow-x-auto hide-scrollbar px-2 py-2">
@@ -2438,9 +2438,9 @@ export default function LocationPage() {
                     {isLoadingOtherLocations && <FiLoader className="animate-spin ml-2 text-indigo-500" size={18}/>}
                   </h2>
                   {isLoadingOtherLocations ? (
-                    <div className="text-center py-3 text-gray-500">
-                      <FiLoader className="animate-spin mx-auto mb-1" />
-                      <p>다른 멤버 장소 로딩 중...</p>
+                    <div className="flex flex-col items-center justify-center py-3 text-gray-500">
+                      <FiLoader className="animate-spin mb-2" />
+                      <span className="text-sm">다른 멤버 장소 로딩 중...</span>
                     </div>
                   ) : otherMembersSavedLocations.length > 0 ? (
                     <div className="flex overflow-x-auto space-x-3 pb-2 hide-scrollbar -mx-1 px-1">

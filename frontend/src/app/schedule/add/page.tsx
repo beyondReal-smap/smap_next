@@ -2,8 +2,9 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 import { PageContainer, Card, Button } from '../../components/layout';
 import { FaPencil, FaClock, FaArrowsRotate, FaBell, FaMapPin, FaBriefcase, FaFileLines, FaCalendarDays, FaUsers } from 'react-icons/fa6';
 import { FaSearch, FaExclamationTriangle } from 'react-icons/fa';
@@ -58,6 +59,10 @@ interface GroupMember {
   isSelected: boolean;
   location: Location;
   schedules: Schedule[];
+  mt_idx?: number;
+  sgdt_owner_chk?: string;
+  sgdt_leader_chk?: string;
+  mt_file1?: string;
 }
 
 // 목업 데이터 추가
@@ -107,6 +112,7 @@ interface ScheduleForm {
 
 export default function AddSchedulePage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [scheduleForm, setScheduleForm] = useState<ScheduleForm>({
     title: '',
     startDate: dayjs().format('YYYY-MM-DD'),
@@ -151,37 +157,124 @@ export default function AddSchedulePage() {
   const [isFromHome, setIsFromHome] = useState(false);
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>(MOCK_GROUP_MEMBERS_HOME);
   const [selectedMemberName, setSelectedMemberName] = useState<string | null>(null);
+  const [currentUserRole, setCurrentUserRole] = useState<'owner' | 'leader' | 'member'>('member');
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
+
+  // 멤버 리스트 정렬 고정 (선택 상태 변경 시에도 순서 유지)
+  const sortedGroupMembers = useMemo(() => {
+    return [...groupMembers].sort((a, b) => {
+      // 관리자 우선
+      if (a.sgdt_owner_chk === 'Y' && b.sgdt_owner_chk !== 'Y') return -1;
+      if (a.sgdt_owner_chk !== 'Y' && b.sgdt_owner_chk === 'Y') return 1;
+      
+      // 리더 우선
+      if (a.sgdt_leader_chk === 'Y' && b.sgdt_leader_chk !== 'Y') return -1;
+      if (a.sgdt_leader_chk !== 'Y' && b.sgdt_leader_chk === 'Y') return 1;
+      
+      // 이름 순
+      return a.name.localeCompare(b.name);
+    });
+  }, [groupMembers]);
+
+  // 그룹 멤버 데이터 가져오기
+  const fetchGroupMembers = async (groupId: string) => {
+    try {
+      setIsLoadingMembers(true);
+      console.log('[SCHEDULE ADD] 그룹 멤버 데이터 가져오기 시작:', groupId);
+      
+      const response = await fetch(`/api/groups/${groupId}/members`);
+      if (!response.ok) {
+        throw new Error('그룹 멤버 데이터를 가져올 수 없습니다.');
+      }
+      
+      const membersData = await response.json();
+      console.log('[SCHEDULE ADD] 그룹 멤버 데이터:', membersData);
+      
+      // 멤버 데이터를 GroupMember 형식으로 변환
+      const transformedMembers: GroupMember[] = membersData.map((member: any) => ({
+        id: member.mt_idx?.toString() || member.id || '',
+        name: member.mt_name || member.name || '',
+        photo: member.mt_file1 ? `/images/avatars/${member.mt_file1}` : member.photo || '/images/avatar1.png',
+        isSelected: false,
+        location: {
+          lat: member.mt_lat || 37.5642,
+          lng: member.mt_long || 127.0016
+        },
+        schedules: [],
+        mt_idx: member.mt_idx,
+        sgdt_owner_chk: member.sgdt_owner_chk,
+        sgdt_leader_chk: member.sgdt_leader_chk,
+        mt_file1: member.mt_file1
+      }));
+      
+      // 현재 사용자의 역할 확인 (로그인된 사용자 정보 사용)
+      const currentUserId = user?.mt_idx?.toString();
+      const currentUser = transformedMembers.find(m => m.id === currentUserId);
+      if (currentUser) {
+        if (currentUser.sgdt_owner_chk === 'Y') {
+          setCurrentUserRole('owner');
+        } else if (currentUser.sgdt_leader_chk === 'Y') {
+          setCurrentUserRole('leader');
+        } else {
+          setCurrentUserRole('member');
+        }
+        console.log('[SCHEDULE ADD] 현재 사용자 역할 확인:', {
+          userId: currentUserId,
+          userName: currentUser.name,
+          role: currentUser.sgdt_owner_chk === 'Y' ? 'owner' : currentUser.sgdt_leader_chk === 'Y' ? 'leader' : 'member'
+        });
+      } else {
+        console.warn('[SCHEDULE ADD] 현재 사용자를 찾을 수 없음:', currentUserId);
+      }
+      
+      setGroupMembers(transformedMembers);
+      console.log('[SCHEDULE ADD] 그룹 멤버 데이터 변환 완료:', transformedMembers.length, '명');
+      
+    } catch (error) {
+      console.error('[SCHEDULE ADD] 그룹 멤버 데이터 가져오기 실패:', error);
+      // 에러 시 목업 데이터 사용
+      setGroupMembers(MOCK_GROUP_MEMBERS_HOME);
+    } finally {
+      setIsLoadingMembers(false);
+    }
+  };
 
   // URL 파라미터 처리를 위한 useEffect
   useEffect(() => {
     // Next.js 13 App Router에서 URL 파라미터 가져오기
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && user) {
       const url = new URL(window.location.href);
-      const memberId = url.searchParams.get('memberId');
       const fromHome = url.searchParams.get('from') === 'home';
+      const groupId = url.searchParams.get('groupId');
 
-      console.log('URL Params:', { memberId, fromHome, url: window.location.href }); // 디버깅용
+      console.log('URL Params:', { fromHome, groupId, url: window.location.href }); // 디버깅용
 
-      if (memberId && fromHome) {
-        setSelectedMemberId(memberId);
+      if (fromHome) {
         setIsFromHome(true);
 
-        // 해당 멤버 찾기 및 상태 업데이트
-        const member = MOCK_GROUP_MEMBERS_HOME.find(m => m.id === memberId);
-        console.log('Looking for member with ID:', memberId); // 디버깅용
-        console.log('Available members:', MOCK_GROUP_MEMBERS_HOME); // 디버깅용
-        console.log('Found member:', member); // 디버깅용
+        // 그룹 ID가 있으면 실제 데이터 가져오기
+        if (groupId) {
+          fetchGroupMembers(groupId);
+        } else {
+          // 그룹 ID가 없으면 목업 데이터 사용
+          const currentUserId = user.mt_idx?.toString();
+          const member = MOCK_GROUP_MEMBERS_HOME.find(m => m.id === currentUserId);
+          console.log('Looking for member with ID:', currentUserId); // 디버깅용
+          console.log('Available members:', MOCK_GROUP_MEMBERS_HOME); // 디버깅용
+          console.log('Found member:', member); // 디버깅용
 
-        if (member) {
-          setSelectedMemberName(member.name);
-          setGroupMembers(prev => prev.map(m => ({
-            ...m,
-            isSelected: m.id === memberId
-          })));
+          if (member) {
+            setSelectedMemberId(currentUserId);
+            setSelectedMemberName(member.name);
+            setGroupMembers(prev => prev.map(m => ({
+              ...m,
+              isSelected: m.id === currentUserId
+            })));
+          }
         }
       }
     }
-  }, []);
+  }, [user]);
 
   // 디버깅용 useEffect 추가
   useEffect(() => {
@@ -189,17 +282,46 @@ export default function AddSchedulePage() {
       selectedMemberId,
       isFromHome,
       selectedMemberName,
-      groupMembers: groupMembers.map(m => ({ id: m.id, name: m.name, isSelected: m.isSelected }))
+      currentUserRole,
+      currentUserId: user?.mt_idx,
+      groupMembers: groupMembers.map(m => ({ 
+        id: m.id, 
+        name: m.name, 
+        isSelected: m.isSelected,
+        owner: m.sgdt_owner_chk,
+        leader: m.sgdt_leader_chk
+      }))
     });
-  }, [selectedMemberId, isFromHome, selectedMemberName, groupMembers]);
+  }, [selectedMemberId, isFromHome, selectedMemberName, currentUserRole, user?.mt_idx, groupMembers]);
 
-  // 멤버 선택 핸들러
+  // 멤버 선택 핸들러 - 역할에 따른 권한 적용
   const handleMemberSelect = (memberId: string) => {
-    const member = groupMembers.find(m => m.id === memberId);
+    const member = sortedGroupMembers.find(m => m.id === memberId);
+    const currentUserId = user?.mt_idx?.toString();
+    
+    console.log('[SCHEDULE ADD] 멤버 선택 시도:', {
+      selectedMemberId: memberId,
+      currentUserId: currentUserId,
+      currentUserRole: currentUserRole,
+      memberName: member?.name
+    });
+    
+    // 역할에 따른 권한 확인
+    if (currentUserRole === 'member') {
+      // 일반 멤버는 자신만 선택 가능
+      if (memberId !== currentUserId) {
+        console.log('[SCHEDULE ADD] 일반 멤버는 자신의 스케줄만 등록 가능합니다.');
+        alert('일반 멤버는 자신의 스케줄만 등록할 수 있습니다.');
+        return;
+      }
+    }
+    
     setSelectedMemberId(memberId);
     if (member) {
       setSelectedMemberName(member.name);
     }
+    
+    // 멤버 리스트 정렬 유지하면서 선택 상태만 업데이트
     setGroupMembers(prev => prev.map(m => ({
       ...m,
       isSelected: m.id === memberId
@@ -674,33 +796,67 @@ export default function AddSchedulePage() {
                 <h3 className="text-lg font-semibold text-gray-800">그룹 멤버 선택</h3>
               </div>
               <div className="border-t border-gray-100 pt-5">
-                <div className="flex flex-row flex-nowrap justify-start items-center gap-x-4 mb-2 overflow-x-auto hide-scrollbar px-2 py-3">
-                  {groupMembers.map((member) => (
-                    <div key={member.id} className="flex flex-col items-center p-0 flex-shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => handleMemberSelect(member.id)}
-                        className="flex flex-col items-center focus:outline-none"
-                      >
-                        <div className={`w-12 h-12 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden border-2 transition-all duration-200 transform hover:scale-105 ${
-                          member.isSelected ? 'border-indigo-500 ring-2 ring-indigo-300 scale-110' : 'border-transparent'
-                        }`}>
-                          <img 
-                            src={member.photo} 
-                            alt={member.name} 
-                            className="w-full h-full object-cover"
-                            draggable="false"
-                          />
-                        </div>
-                        <span className={`block text-xs font-medium mt-1.5 ${
-                          member.isSelected ? 'text-indigo-700' : 'text-gray-700'
-                        }`}>
-                          {member.name}
-                        </span>
-                      </button>
-                    </div>
-                  ))}
+                {/* 역할 정보 표시 */}
+                <div className="mb-3 p-2 bg-blue-50 rounded-lg">
+                  <p className="text-xs text-blue-700">
+                    {currentUserRole === 'owner' && '그룹 관리자: 모든 멤버의 스케줄을 등록할 수 있습니다.'}
+                    {currentUserRole === 'leader' && '그룹 리더: 모든 멤버의 스케줄을 등록할 수 있습니다.'}
+                    {currentUserRole === 'member' && '일반 멤버: 자신의 스케줄만 등록할 수 있습니다.'}
+                  </p>
                 </div>
+                
+                {isLoadingMembers ? (
+                  <div className="flex flex-col items-center justify-center py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-500 mb-2"></div>
+                    <span className="text-sm text-gray-500">멤버 정보를 불러오는 중...</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-row flex-nowrap justify-start items-center gap-x-4 mb-2 overflow-x-auto hide-scrollbar px-2 py-3">
+                    {sortedGroupMembers.map((member) => {
+                      // 역할에 따른 선택 가능 여부 확인
+                      const currentUserId = user?.mt_idx?.toString();
+                      const canSelect = currentUserRole === 'owner' || 
+                                      currentUserRole === 'leader' || 
+                                      member.id === currentUserId;
+                      
+                      return (
+                        <div key={member.id} className="flex flex-col items-center p-0 flex-shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleMemberSelect(member.id)}
+                            disabled={!canSelect}
+                            className={`flex flex-col items-center focus:outline-none ${
+                              !canSelect ? 'opacity-50 cursor-not-allowed' : ''
+                            }`}
+                          >
+                            <div className={`w-12 h-12 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden border-2 transition-all duration-200 transform hover:scale-105 ${
+                              member.isSelected ? 'border-indigo-500 ring-2 ring-indigo-300 scale-110' : 'border-transparent'
+                            } ${!canSelect ? 'grayscale' : ''}`}>
+                              <img 
+                                src={member.photo} 
+                                alt={member.name} 
+                                className="w-full h-full object-cover"
+                                draggable="false"
+                              />
+                            </div>
+                            <span className={`block text-xs font-medium mt-1.5 ${
+                              member.isSelected ? 'text-indigo-700' : 'text-gray-700'
+                            } ${!canSelect ? 'text-gray-400' : ''}`}>
+                              {member.name}
+                            </span>
+                            {/* 역할 표시 */}
+                            {member.sgdt_owner_chk === 'Y' && (
+                              <span className="text-xs text-red-500 font-medium">관리자</span>
+                            )}
+                            {member.sgdt_leader_chk === 'Y' && member.sgdt_owner_chk !== 'Y' && (
+                              <span className="text-xs text-blue-500 font-medium">리더</span>
+                            )}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
                 {!selectedMemberId && (
                   <p className="text-sm text-red-500 mt-2">
                     일정을 등록할 그룹 멤버를 선택해주세요.

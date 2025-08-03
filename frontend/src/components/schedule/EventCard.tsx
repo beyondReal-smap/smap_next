@@ -111,7 +111,6 @@ const EventCard = memo(({ event, onEventClick, getSafeImageUrl, getDefaultImage 
       exit={{ opacity: 0, y: -20 }}
       transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
       whileHover={{ y: -2, boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)' }}
-      whileTap={{ scale: 0.98 }}
     >
       <div className="flex justify-between items-start mb-3">
         {/* 왼쪽: 일정 정보 */}

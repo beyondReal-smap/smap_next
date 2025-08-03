@@ -40,6 +40,7 @@ import groupService, { Group } from '../../services/groupService';
 import scheduleService, { Schedule, UserPermission } from '../../services/scheduleService';
 import pushNotificationService, { ScheduleNotificationContext, GroupMemberInfo } from '../../services/pushNotificationService';
 import { useDataCache } from '../../contexts/DataCacheContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { hapticFeedback } from '../../utils/haptic';
 import FloatingButton from '../../components/common/FloatingButton';
 
@@ -726,8 +727,6 @@ const MobileCalendar = memo(({
         <motion.button
           onClick={handlePrevMonth}
           className="p-2 hover:bg-gray-100 rounded-full mobile-button"
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
           disabled={isAnimating}
         >
           <FiChevronLeft className="w-5 h-5 text-gray-600" />
@@ -747,8 +746,6 @@ const MobileCalendar = memo(({
             onClick={handleToday}
             className="text-sm mobile-button"
             style={{ color: '#0113A3' }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
             disabled={isAnimating}
           >
             오늘로 이동
@@ -758,8 +755,6 @@ const MobileCalendar = memo(({
         <motion.button
           onClick={handleNextMonth}
           className="p-2 hover:bg-gray-100 rounded-full mobile-button"
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
           disabled={isAnimating}
         >
           <FiChevronRight className="w-5 h-5 text-gray-600" />
@@ -808,6 +803,7 @@ const MobileCalendar = memo(({
 
 export default function SchedulePage() {
   const router = useRouter();
+  const { user } = useAuth();
   
   // DataCache 컨텍스트 사용
   const { invalidateCache } = useDataCache();
@@ -881,6 +877,7 @@ export default function SchedulePage() {
   const [scheduleGroupMembers, setScheduleGroupMembers] = useState<ScheduleGroupMember[]>([]);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [isFetchingMembers, setIsFetchingMembers] = useState(false);
+  const [currentUserRole, setCurrentUserRole] = useState<'owner' | 'leader' | 'member'>('member');
 
   // 반복 및 알림 모달 상태
   const [isRepeatModalOpen, setIsRepeatModalOpen] = useState(false);
@@ -2550,9 +2547,37 @@ export default function SchedulePage() {
           };
         });
 
+        // 현재 사용자의 역할 확인
+        const currentUserId = user?.mt_idx?.toString();
+        const currentUser = convertedMembers.find(m => m.id === currentUserId);
+        if (currentUser) {
+          if (currentUser.sgdt_owner_chk === 'Y') {
+            setCurrentUserRole('owner');
+          } else if (currentUser.sgdt_leader_chk === 'Y') {
+            setCurrentUserRole('leader');
+          } else {
+            setCurrentUserRole('member');
+          }
+          console.log('[SCHEDULE PAGE] 현재 사용자 역할 확인:', {
+            userId: currentUserId,
+            userName: currentUser.name,
+            role: currentUser.sgdt_owner_chk === 'Y' ? 'owner' : currentUser.sgdt_leader_chk === 'Y' ? 'leader' : 'member'
+          });
+        } else {
+          console.warn('[SCHEDULE PAGE] 현재 사용자를 찾을 수 없음:', currentUserId);
+        }
+
         setScheduleGroupMembers(convertedMembers);
         
-        if (convertedMembers.length > 0 && !selectedMemberId) {
+        // 현재 사용자가 선택되도록 초기 설정
+        if (currentUser) {
+          setSelectedMemberId(currentUser.id);
+          setScheduleGroupMembers(prev => prev.map(member => ({
+            ...member,
+            isSelected: member.id === currentUser.id
+          })));
+        } else if (convertedMembers.length > 0 && !selectedMemberId) {
+          // 현재 사용자를 찾을 수 없는 경우 첫 번째 멤버 선택 (fallback)
           setSelectedMemberId(convertedMembers[0].id);
           setScheduleGroupMembers(prev => prev.map(member => ({
             ...member,
@@ -2600,10 +2625,24 @@ export default function SchedulePage() {
       return;
     }
     
-    console.log('[handleScheduleMemberSelect] 멤버 선택:', {
+    const currentUserId = user?.mt_idx?.toString();
+    
+    console.log('[handleScheduleMemberSelect] 멤버 선택 시도:', {
       selectedMemberId: memberId,
+      currentUserId: currentUserId,
+      currentUserRole: currentUserRole,
       previousSelectedMemberId: selectedMemberId
     });
+    
+    // 역할에 따른 권한 확인
+    if (currentUserRole === 'member') {
+      // 일반 멤버는 자신만 선택 가능
+      if (memberId !== currentUserId) {
+        console.log('[handleScheduleMemberSelect] 일반 멤버는 자신의 스케줄만 등록 가능합니다.');
+        alert('일반 멤버는 자신의 스케줄만 등록할 수 있습니다.');
+        return;
+      }
+    }
     
     setSelectedMemberId(memberId);
     
@@ -4468,7 +4507,7 @@ export default function SchedulePage() {
                                   y: -4,
                                   transition: { duration: 0.2 }
                                 }}
-                                whileTap={{ scale: 0.98 }}
+
                               >
                                 {/* 메인 카드 - 컴팩트 버전 */}
                                 <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-300 group-hover:shadow-md group-hover:border-gray-200 transition-all duration-200">
@@ -4667,9 +4706,9 @@ export default function SchedulePage() {
                     onClick={e => e.stopPropagation()}
                     onWheel={e => e.stopPropagation()}
                     onTouchMove={e => e.stopPropagation()}
-                    initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
                     transition={{ duration: 0.3 }}
                   >
                     <div className="p-6">
@@ -5143,8 +5182,7 @@ export default function SchedulePage() {
                                     ? 'bg-green-600 text-white font-semibold'
                                     : 'hover:bg-gray-100 text-gray-700'
                                 }`}
-                                whileHover={{ scale: 1.02 }}
-                                whileTap={{ scale: 0.98 }}
+
                               >
                                 {minute.toString().padStart(2, '0')}분
                               </motion.button>
@@ -5174,8 +5212,7 @@ export default function SchedulePage() {
                                 setSelectedMinute(preset.minute);
                               }}
                               className="px-2 py-2 text-xs bg-gray-100 hover:bg-green-100 text-gray-700 hover:text-green-700 rounded-lg font-medium mobile-button transition-colors"
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
+
                             >
                               {preset.label}
                             </motion.button>
@@ -5219,9 +5256,9 @@ export default function SchedulePage() {
                     onTouchStart={e => e.stopPropagation()}
                     onTouchMove={e => e.stopPropagation()}
                     onTouchEnd={e => e.stopPropagation()}
-                    initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
                     transition={{ duration: 0.3 }}
                   >
                     <div className="p-6 flex-shrink-0">
@@ -5621,8 +5658,7 @@ export default function SchedulePage() {
                                   ? 'bg-red-500 hover:bg-red-600 text-white' 
                                   : 'bg-green-500 hover:bg-green-600 text-white'
                               }`}
-                              whileHover={{ scale: 1.02 }}
-                              whileTap={{ scale: 0.98 }}
+
                             >
                               {successModalContent.type === 'info' ? '삭제하기' : '확인'}
                             </motion.button>
@@ -5635,8 +5671,7 @@ export default function SchedulePage() {
                               successModalContent.type === 'error' ? 'bg-red-500 hover:bg-red-600 text-white' :
                               'bg-blue-500 hover:bg-blue-600 text-white'
                             }`}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
+
                           >
                             확인
                           </motion.button>
@@ -5666,13 +5701,11 @@ export default function SchedulePage() {
                       variants={{
                         hidden: { 
                           opacity: 0, 
-                          y: 50,
-                          scale: 0.9
+                          y: 50
                         },
                         visible: { 
                           opacity: 1, 
                           y: 0,
-                          scale: 1,
                           transition: {
                             duration: 0.25,
                             ease: [0.25, 0.46, 0.45, 0.94]
@@ -5681,7 +5714,6 @@ export default function SchedulePage() {
                         exit: { 
                           opacity: 0, 
                           y: 50,
-                          scale: 0.9,
                           transition: {
                             duration: 0.2,
                             ease: [0.55, 0.06, 0.68, 0.19]
@@ -5748,8 +5780,7 @@ export default function SchedulePage() {
                             }
                           }}
                           className="flex-1 flex items-center justify-center space-x-2 py-3 bg-red-50 text-red-700 rounded-xl font-medium mobile-button hover:bg-red-100 transition-colors"
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
+
                         >
                           <FaTrash className="w-4 h-4" />
                           <span>삭제</span>
@@ -5793,9 +5824,9 @@ export default function SchedulePage() {
                       onClick={e => e.stopPropagation()}
                       onWheel={e => e.stopPropagation()}
                       onTouchMove={e => e.stopPropagation()}
-                      initial={{ opacity: 0, scale: 0.9, y: 30 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.9, y: 30 }}
+                      initial={{ opacity: 0, y: 30 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 30 }}
                       transition={{ duration: 0.25 }}
                     >
                       <div className="p-5">
@@ -6084,9 +6115,9 @@ export default function SchedulePage() {
                                   onClose={() => setIsGroupSelectorOpen(false)}
                                 >
                                   {isLoadingGroups ? (
-                                    <div className="p-4 text-center text-gray-500">
-                                      <div className="w-5 h-5 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin mx-auto mb-2"></div>
-                                      그룹 목록을 불러오는 중...
+                                    <div className="flex flex-col items-center justify-center p-4 text-gray-500">
+                                      <div className="w-5 h-5 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin mb-2"></div>
+                                      <span className="text-sm">그룹 목록을 불러오는 중...</span>
                                     </div>
                                   ) : userGroups.length > 0 ? (
                                     <>
@@ -6131,36 +6162,48 @@ export default function SchedulePage() {
                       <div style={{ zIndex: -2147483647, position: 'relative' }}>
                         <label className="block text-sm font-medium text-gray-700 mb-3">멤버 선택</label>
                         {isFetchingMembers ? (
-                          <div className="text-center py-6 text-gray-500">
-                            <div className="w-6 h-6 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin mx-auto mb-2"></div>
-                            멤버 목록을 불러오는 중...
+                          <div className="flex flex-col items-center justify-center py-6 text-gray-500">
+                            <div className="w-6 h-6 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin mb-2"></div>
+                            <span className="text-sm">멤버 목록을 불러오는 중...</span>
                           </div>
                         ) : scheduleGroupMembers.length > 0 ? (
                           <div className="flex overflow-x-auto space-x-4 pt-2 pb-2 px-3 -mx-1" style={{ zIndex: -2147483647, position: 'relative' }}>
                             {scheduleGroupMembers
                               .sort((a, b) => {
-                                // 먼저 선택된 멤버를 맨 앞으로
-                                if (a.isSelected && !b.isSelected) return -1;
-                                if (!a.isSelected && b.isSelected) return 1;
-                                // 그 다음 이름순 정렬
+                                // 관리자 우선
+                                if (a.sgdt_owner_chk === 'Y' && b.sgdt_owner_chk !== 'Y') return -1;
+                                if (a.sgdt_owner_chk !== 'Y' && b.sgdt_owner_chk === 'Y') return 1;
+                                
+                                // 리더 우선
+                                if (a.sgdt_leader_chk === 'Y' && b.sgdt_leader_chk !== 'Y') return -1;
+                                if (a.sgdt_leader_chk !== 'Y' && b.sgdt_leader_chk === 'Y') return 1;
+                                
+                                // 이름순 정렬 (고정된 순서)
                                 return a.name.localeCompare(b.name, 'ko', { numeric: true });
                               })
-                              .map((member, index) => (
-                              <motion.div 
-                              key={member.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: index * 0.1 }}
-                                className="flex flex-col items-center flex-shrink-0"
-                              >
-                              <button
-                                  type="button"
-                                  onClick={() => !newEvent.id && handleScheduleMemberSelect(member.id)} // newEvent.id가 있으면 클릭 비활성화
-                                  disabled={!!newEvent.id} // 수정 모드일 때 비활성화
-                                  className={`flex flex-col items-center focus:outline-none mobile-button ${
-                                    newEvent.id ? 'cursor-not-allowed opacity-50' : '' // 수정 모드 스타일
-                                  }`}
+                              .map((member, index) => {
+                                // 역할에 따른 선택 가능 여부 확인
+                                const currentUserId = user?.mt_idx?.toString();
+                                const canSelect = currentUserRole === 'owner' || 
+                                                currentUserRole === 'leader' || 
+                                                member.id === currentUserId;
+                                
+                                return (
+                                <motion.div 
+                                key={member.id}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                                  transition={{ delay: index * 0.1 }}
+                                  className="flex flex-col items-center flex-shrink-0"
                                 >
+                                <button
+                                    type="button"
+                                    onClick={() => !newEvent.id && handleScheduleMemberSelect(member.id)} // newEvent.id가 있으면 클릭 비활성화
+                                    disabled={!!newEvent.id || !canSelect} // 수정 모드이거나 선택 불가능한 경우 비활성화
+                                    className={`flex flex-col items-center focus:outline-none mobile-button ${
+                                      newEvent.id || !canSelect ? 'cursor-not-allowed opacity-50' : '' // 수정 모드이거나 선택 불가능한 경우 스타일
+                                    }`}
+                                  >
                                   <div className={`w-10 h-10 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden transition-all duration-300 ${
                                     member.isSelected ? 'ring-4 ring-indigo-500 ring-offset-2' : ''
                                   }`}>
@@ -6191,15 +6234,16 @@ export default function SchedulePage() {
                                   </span>
                             </button>
                               </motion.div>
-                              ))}
+                              );
+                              })}
                             </div>
                         ) : (
-                          <div className="text-center py-6 text-gray-500">
-                            <div className="w-12 h-12 mx-auto mb-3 bg-gray-100 rounded-full flex items-center justify-center">
+                          <div className="flex flex-col items-center justify-center py-6 text-gray-500">
+                            <div className="w-12 h-12 mb-3 bg-gray-100 rounded-full flex items-center justify-center">
                               <FiUsers className="w-6 h-6 text-gray-300" />
                             </div>
-                            <p className="text-sm">그룹에 참여한 멤버가 없습니다</p>
-                      </div>
+                            <span className="text-sm">그룹에 참여한 멤버가 없습니다</span>
+                          </div>
                             )}
                           </div>
                         )}

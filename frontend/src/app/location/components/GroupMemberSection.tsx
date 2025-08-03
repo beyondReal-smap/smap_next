@@ -131,9 +131,9 @@ export default function GroupMemberSection({
       </div>
 
       {isLoading ? (
-        <div className="text-center py-6">
+        <div className="flex flex-col items-center justify-center py-6">
           <div className="shimmer w-full h-16 rounded-lg mb-4"></div>
-          <p className="text-gray-500">멤버 정보를 불러오는 중...</p>
+          <span className="text-sm text-gray-500">멤버 정보를 불러오는 중...</span>
         </div>
       ) : groupMembers.length > 0 ? (
         <div className="flex flex-row flex-nowrap justify-start items-center gap-x-4 overflow-x-auto hide-scrollbar px-2 py-3">
@@ -175,11 +175,11 @@ export default function GroupMemberSection({
           ))}
         </div>
       ) : (
-        <div className="text-center py-6">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+        <div className="flex flex-col items-center justify-center py-6">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3">
             <FiUsers className="text-gray-400" size={24} />
           </div>
-          <p className="text-gray-500">그룹에 참여한 멤버가 없습니다</p>
+          <span className="text-sm text-gray-500">그룹에 참여한 멤버가 없습니다</span>
         </div>
       )}
     </motion.div>

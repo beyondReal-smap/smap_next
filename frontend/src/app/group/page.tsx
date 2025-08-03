@@ -1924,8 +1924,8 @@ function GroupPageContent() {
                         <FaUsers className="w-6 h-6 text-red-800 mx-auto mb-1" />
                         <div className="flex items-center justify-center flex-1">
                         {membersLoading ? (
-                            <div className="text-center">
-                              <div className="w-4 h-4 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin mx-auto mb-1"></div>
+                            <div className="flex flex-col items-center justify-center">
+                              <div className="w-4 h-4 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin mb-1"></div>
                           </div>
                         ) : (
                           <div className="text-lg font-bold">
@@ -1945,8 +1945,8 @@ function GroupPageContent() {
                         <FaCalendarAlt className="w-6 h-6 text-yellow-800 mx-auto mb-1" />
                         <div className="flex items-center justify-center flex-1">
                         {statsLoading ? (
-                            <div className="text-center">
-                              <div className="w-4 h-4 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin mx-auto mb-1"></div>
+                            <div className="flex flex-col items-center justify-center">
+                              <div className="w-4 h-4 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin mb-1"></div>
                               {/* <div className="text-xs text-yellow-800">로딩중...</div> */}
                           </div>
                         ) : (
@@ -1967,8 +1967,8 @@ function GroupPageContent() {
                         <FaMapMarkerAlt className="w-6 h-6 text-blue-600 mx-auto mb-1" />
                         <div className="flex items-center justify-center flex-1">
                         {statsLoading ? (
-                            <div className="text-center">
-                              <div className="w-4 h-4 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin mx-auto mb-1"></div>
+                            <div className="flex flex-col items-center justify-center">
+                              <div className="w-4 h-4 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin mb-1"></div>
                               {/* <div className="text-xs text-blue-800">로딩중...</div> */}
                           </div>
                         ) : (
@@ -2040,9 +2040,9 @@ function GroupPageContent() {
                       <div className="p-4">
                         {membersLoading ? (
                           <div className="flex items-center justify-center py-8">
-                            <div className="text-center">
-                              <div className="w-6 h-6 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin mx-auto mb-2"></div>
-                              <p className="text-sm text-gray-600">그룹원을 불러오는 중...</p>
+                            <div className="flex flex-col items-center justify-center">
+                              <div className="w-6 h-6 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin mb-2"></div>
+                              <span className="text-sm text-gray-600">그룹원을 불러오는 중...</span>
                             </div>
                           </div>
                         ) : (
