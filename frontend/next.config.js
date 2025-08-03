@@ -187,7 +187,7 @@ const nextConfig = {
               "img-src 'self' data: blob: *.map.naver.com *.googleapis.com *.gstatic.com *.google.com *.navercorp.com *.naver.net *.pstatic.net *.vercel-scripts.com *.vercel.com",
               "style-src 'self' 'unsafe-inline' *.googleapis.com *.gstatic.com *.google.com accounts.google.com *.navercorp.com *.naver.net *.pstatic.net *.vercel-scripts.com *.vercel.com",
               "font-src 'self' *.gstatic.com *.googleapis.com *.navercorp.com *.naver.net *.pstatic.net *.vercel-scripts.com *.vercel.com",
-              "frame-src 'self' *.google.com *.navercorp.com *.naver.net *.pstatic.net *.vercel-scripts.com *.vercel.com",
+              "frame-src 'self' *.google.com *.navercorp.com *.naver.net *.pstatic.net *.vercel-scripts.com *.vercel.com smap:",
               "worker-src 'self' blob:",
               "object-src 'none'",
               "base-uri 'self'"

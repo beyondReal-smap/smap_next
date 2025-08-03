@@ -42,7 +42,7 @@ const nextConfig = {
               "img-src 'self' data: blob: *.map.naver.com *.googleapis.com *.gstatic.com *.google.com",
               "style-src 'self' 'unsafe-inline' *.googleapis.com *.gstatic.com",
               "font-src 'self' *.gstatic.com *.googleapis.com",
-              "frame-src 'self' *.google.com",
+              "frame-src 'self' *.google.com smap:",
               "worker-src 'self' blob:",
               "object-src 'none'",
               "base-uri 'self'"
