@@ -232,13 +232,25 @@ const StatsCards = memo<{
   totalMembers: number;
 }>(({ groupsCount, totalMembers }) => (
   <div className="px-4 mb-4">
-    <div className="grid grid-cols-2 gap-3">
+    <motion.div 
+      className="grid grid-cols-2 gap-3"
+      initial="hidden"
+      animate="visible"
+      variants={{
+        hidden: { opacity: 0 },
+        visible: {
+          opacity: 1,
+          transition: {
+            staggerChildren: 0.05,
+            delayChildren: 0
+          }
+        }
+      }}
+    >
       <motion.div 
         className="rounded-2xl p-4 text-white shadow-lg"
         style={{ background: 'linear-gradient(to right, #0113A3, #001a8a)' }}
         variants={cardVariants}
-        initial="hidden"
-        animate="visible"
       >
         <div className="flex items-center justify-between">
           <div>
@@ -251,8 +263,6 @@ const StatsCards = memo<{
       <motion.div 
         className="bg-gradient-to-r from-pink-600 to-pink-700 rounded-2xl p-4 text-white shadow-lg"
         variants={cardVariants}
-        initial="hidden"
-        animate="visible"
       >
         <div className="flex items-center justify-between">
           <div>
@@ -262,7 +272,7 @@ const StatsCards = memo<{
           <FaUsers className="w-8 h-8 text-pink-200" />
         </div>
       </motion.div>
-    </div>
+    </motion.div>
   </div>
 ));
 
@@ -350,11 +360,13 @@ const pageVariants = {
 
 
 const cardVariants = {
-  hidden: { opacity: 0 },
+  hidden: { 
+    opacity: 0
+  },
   visible: {
     opacity: 1,
     transition: {
-      duration: 0.5
+      duration: 0.3
     }
   }
 };
@@ -1669,12 +1681,9 @@ function GroupPageContent() {
                     <div className="px-4 mb-4">
                       <div className="grid grid-cols-2 gap-3">
                         {/* 총 그룹 스켈레톤 */}
-                        <motion.div 
+                        <div 
                           className="rounded-2xl p-4 text-white shadow-lg relative overflow-hidden"
                           style={{ background: 'linear-gradient(to right, #0113A3, #001a8a)' }}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.1, duration: 0.5 }}
                         >
                           <div className="flex items-center justify-between">
                             <div>
@@ -1683,14 +1692,11 @@ function GroupPageContent() {
                             </div>
                             <div className="w-8 h-8 bg-blue-200 rounded animate-pulse"></div>
                           </div>
-                        </motion.div>
+                        </div>
                         
                         {/* 총 멤버 스켈레톤 */}
-                        <motion.div 
+                        <div 
                           className="bg-gradient-to-r from-pink-600 to-pink-700 rounded-2xl p-4 text-white shadow-lg relative overflow-hidden"
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.2, duration: 0.5 }}
                         >
                           <div className="flex items-center justify-between">
                             <div>
@@ -1699,7 +1705,7 @@ function GroupPageContent() {
                             </div>
                             <div className="w-8 h-8 bg-pink-200 rounded animate-pulse"></div>
                           </div>
-                        </motion.div>
+                        </div>
                       </div>
                     </div>
                   ) : (
