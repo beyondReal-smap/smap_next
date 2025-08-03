@@ -35,9 +35,22 @@ def get_user_by_idx(db: Session, mt_idx: int) -> Optional[Member]:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """입력된 비밀번호와 해시된 비밀번호를 비교합니다."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"[VERIFY_PASSWORD] 비밀번호 검증 시작 - plain_password_length: {len(plain_password)}, hashed_password_exists: {bool(hashed_password)}")
+    
     if not hashed_password: # DB에 비밀번호가 없는 경우 (예: 소셜 로그인 사용자)
+        logger.warning("[VERIFY_PASSWORD] 해시된 비밀번호가 없음")
         return False
-    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+    
+    try:
+        result = bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+        logger.info(f"[VERIFY_PASSWORD] 비밀번호 검증 결과: {result}")
+        return result
+    except Exception as e:
+        logger.error(f"[VERIFY_PASSWORD] 비밀번호 검증 중 오류: {str(e)}")
+        return False
 
 def verify_user_password(db: Session, mt_idx: int, current_password: str) -> bool:
     """사용자의 현재 비밀번호를 확인합니다."""

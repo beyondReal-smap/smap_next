@@ -1384,13 +1384,18 @@ function GroupPageContent() {
 
     setIsJoiningGroup(true);
     try {
+      console.log('[GROUP] 초대 코드로 그룹 가입 시도:', inviteCode.trim());
+      
       // 백엔드 API 호출하여 초대 코드로 그룹 정보 조회
       const response = await fetch(`/api/groups/code/${inviteCode.trim()}`);
-      const data = await response.json();
-
+      
       if (!response.ok) {
-        throw new Error(data.error || '유효하지 않은 초대 코드입니다.');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || '유효하지 않은 초대 코드입니다.');
       }
+      
+      const data = await response.json();
+      console.log('[GROUP] 그룹 정보 조회 성공:', data);
 
       // 그룹 가입 API 호출
       const joinResponse = await fetch(`/api/groups/${data.sgt_idx}/join`, {
@@ -1404,11 +1409,18 @@ function GroupPageContent() {
         }),
       });
 
-      const joinData = await joinResponse.json();
-
       if (!joinResponse.ok) {
-        throw new Error(joinData.error || '그룹 가입에 실패했습니다.');
+        const joinErrorData = await joinResponse.json().catch(() => ({}));
+        
+        if (joinResponse.status === 409) {
+          throw new Error('이미 가입된 그룹입니다.');
+        }
+        
+        throw new Error(joinErrorData.error || '그룹 가입에 실패했습니다.');
       }
+
+      const joinData = await joinResponse.json();
+      console.log('[GROUP] 그룹 가입 성공:', joinData);
 
       showToastModal('success', '가입 완료', `${data.sgt_title} 그룹에 성공적으로 가입되었습니다!`);
       setInviteCode('');

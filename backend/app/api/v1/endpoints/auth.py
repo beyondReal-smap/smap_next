@@ -107,14 +107,23 @@ async def login_for_home_page(
             # 전화번호로 조회 (하이픈 제거)
             user = crud_auth.get_user_by_phone(db, login_request.mt_id.replace("-", ""))
         
+        logger.info(f"[LOGIN] 사용자 조회 결과: {user.mt_idx if user else 'None'}, mt_id: {login_request.mt_id}")
+        
         if not user:
+            logger.warning(f"[LOGIN] 사용자를 찾을 수 없음: {login_request.mt_id}")
             return LoginResponseHome(
                 success=False,
                 message="아이디 또는 비밀번호가 올바르지 않습니다."
             )
         
+        logger.info(f"[LOGIN] 사용자 확인됨: mt_idx={user.mt_idx}, mt_name={user.mt_name}, mt_pwd_exists={bool(user.mt_pwd)}")
+        
         # 비밀번호 검증
-        if not user.mt_pwd or not crud_auth.verify_password(login_request.mt_pwd, user.mt_pwd):
+        password_verified = crud_auth.verify_password(login_request.mt_pwd, user.mt_pwd) if user.mt_pwd else False
+        logger.info(f"[LOGIN] 비밀번호 검증 결과: {password_verified}")
+        
+        if not user.mt_pwd or not password_verified:
+            logger.warning(f"[LOGIN] 비밀번호 검증 실패: mt_idx={user.mt_idx}, mt_pwd_exists={bool(user.mt_pwd)}")
             return LoginResponseHome(
                 success=False,
                 message="아이디 또는 비밀번호가 올바르지 않습니다."

@@ -1544,6 +1544,14 @@ export default function HomePage() {
             }));
             console.log('[fetchAllGroupData] 그룹 멤버 수 업데이트:', parseInt(groupIdToUse), '→', currentMembers.length, '명');
             
+            // 멤버 데이터 로드 후 마커 업데이트
+            setTimeout(() => {
+              if (isMounted && currentMembers.length > 0) {
+                console.log('[fetchAllGroupData] 멤버 데이터 로드 후 마커 업데이트');
+                updateMemberMarkers(currentMembers);
+              }
+            }, 500);
+            
             dataFetchedRef.current.members = true;
           }
         }
@@ -1762,6 +1770,12 @@ export default function HomePage() {
                 }
               }
             }, 1000); // 지도 초기화와 마커 생성을 위한 충분한 지연
+          }
+          
+          // 마커 업데이트
+          if (groupMembers.length > 0) {
+            console.log('[fetchAllGroupData] 마커 업데이트 시작');
+            updateMemberMarkers(groupMembers);
           }
           
           // 데이터 로딩 완료 햅틱 피드백
