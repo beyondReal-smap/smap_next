@@ -1992,7 +1992,10 @@ export default function SchedulePage() {
           sst_pick_result: alarmPickResult,
           // 반복 일정 처리 옵션
           editOption: newEvent.editOption,
-          // 선택된 멤버 정보
+          // 실제 수정한 사람 (현재 로그인한 사용자)
+          editorId: user?.mt_idx || undefined,
+          editorName: user?.mt_name || undefined,
+          // 선택된 멤버 정보 (일정의 대상자)
           targetMemberId: selectedMember?.mt_idx || undefined,
           sgdt_idx: selectedMember?.sgdt_idx || undefined,
         };
@@ -2136,6 +2139,10 @@ export default function SchedulePage() {
         // 추가
         const createData = {
           groupId: selectedGroupId,
+          // 실제 생성한 사람 (현재 로그인한 사용자)
+          editorId: user?.mt_idx || undefined,
+          editorName: user?.mt_name || undefined,
+          // 일정의 대상자
           targetMemberId: selectedMember?.mt_idx || undefined,
           sgdt_idx: selectedMember?.sgdt_idx || undefined, // 타겟 멤버의 그룹 상세 인덱스
           sst_title: newEvent.title,
@@ -2304,7 +2311,11 @@ export default function SchedulePage() {
 
       const response = await scheduleService.deleteSchedule(
         selectedEventDetails.sst_idx,
-        selectedGroupId
+        selectedGroupId,
+        {
+          editorId: user?.mt_idx || undefined,
+          editorName: user?.mt_name || undefined
+        }
       );
 
       if (response.success) {
@@ -3645,7 +3656,11 @@ export default function SchedulePage() {
         // 일반 삭제 또는 이것만 삭제
         response = await scheduleService.deleteSchedule(
           event.sst_idx!,
-          selectedGroupId
+          selectedGroupId,
+          {
+            editorId: user?.mt_idx || undefined,
+            editorName: user?.mt_name || undefined
+          }
         );
       } else {
         // 반복 일정 처리 옵션이 있는 삭제
@@ -3654,7 +3669,10 @@ export default function SchedulePage() {
           sst_pidx: event.sst_pidx || null, // undefined인 경우 null로 설정
           sgdt_idx: event.tgtSgdtIdx || null, // undefined인 경우 null로 설정
           groupId: selectedGroupId,
-          deleteOption: option as 'this' | 'future' | 'all'
+          deleteOption: option as 'this' | 'future' | 'all',
+          // 실제 삭제한 사람 (현재 로그인한 사용자)
+          editorId: user?.mt_idx || undefined,
+          editorName: user?.mt_name || undefined
         });
       }
 

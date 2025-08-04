@@ -920,6 +920,14 @@ def create_group_schedule(
         logger.info(f"🔥 [CREATE_SCHEDULE] 스케줄 생성 시작 - group_id: {group_id}, user_id: {current_user_id}")
         logger.info(f"📝 [CREATE_SCHEDULE] 원본 요청 데이터: {schedule_data}")
         
+        # 실제 작업자 정보 추출 (푸시 알림용)
+        editor_id = schedule_data.get('editorId')
+        editor_name = schedule_data.get('editorName')
+        if editor_id and editor_name:
+            logger.info(f"👤 [CREATE_SCHEDULE] 실제 작업자 정보 - editorId: {editor_id}, editorName: {editor_name}")
+        else:
+            logger.info(f"👤 [CREATE_SCHEDULE] 실제 작업자 정보 없음 - current_user_id: {current_user_id} 사용")
+        
         # 그룹 권한 확인
         member_auth = GroupScheduleManager.check_group_permission(db, current_user_id, group_id)
         if not member_auth:
@@ -1128,7 +1136,9 @@ def create_group_schedule(
             "data": {
                 "sst_idx": new_schedule_id,
                 "message": "Schedule created successfully",
-                "target_member_id": target_member_id
+                "target_member_id": target_member_id,
+                "editor_id": editor_id,
+                "editor_name": editor_name
             }
         }
         
@@ -1157,6 +1167,14 @@ def update_group_schedule_with_repeat_option(
     try:
         logger.info(f"🔥 [UPDATE_REPEAT_SCHEDULE] 반복 일정 수정 시작 - group_id: {group_id}, schedule_id: {schedule_id}, user_id: {current_user_id}")
         logger.info(f"📝 [UPDATE_REPEAT_SCHEDULE] 요청 데이터: {schedule_data}")
+        
+        # 실제 작업자 정보 추출 (푸시 알림용)
+        editor_id = schedule_data.get('editorId')
+        editor_name = schedule_data.get('editorName')
+        if editor_id and editor_name:
+            logger.info(f"👤 [UPDATE_REPEAT_SCHEDULE] 실제 작업자 정보 - editorId: {editor_id}, editorName: {editor_name}")
+        else:
+            logger.info(f"👤 [UPDATE_REPEAT_SCHEDULE] 실제 작업자 정보 없음 - current_user_id: {current_user_id} 사용")
         
         # 그룹 권한 확인
         member_auth = GroupScheduleManager.check_group_permission(db, current_user_id, group_id)
@@ -1428,7 +1446,9 @@ def update_group_schedule_with_repeat_option(
             "data": {
                 "message": f"Successfully updated {updated_count} schedule(s)",
                 "updated_count": updated_count,
-                "edit_option": edit_option
+                "edit_option": edit_option,
+                "editor_id": editor_id,
+                "editor_name": editor_name
             }
         }
         
@@ -1597,6 +1617,17 @@ def delete_group_schedule_with_repeat_option(
     try:
         logger.info(f"🗑️ [DELETE_REPEAT_SCHEDULE] 반복 일정 삭제 시작 - group_id: {group_id}, schedule_id: {schedule_id}, user_id: {current_user_id}")
         
+        # 실제 작업자 정보 추출 (푸시 알림용)
+        editor_id = None
+        editor_name = None
+        if delete_data:
+            editor_id = delete_data.get('editorId')
+            editor_name = delete_data.get('editorName')
+            if editor_id and editor_name:
+                logger.info(f"👤 [DELETE_REPEAT_SCHEDULE] 실제 작업자 정보 - editorId: {editor_id}, editorName: {editor_name}")
+            else:
+                logger.info(f"👤 [DELETE_REPEAT_SCHEDULE] 실제 작업자 정보 없음 - current_user_id: {current_user_id} 사용")
+        
         # 그룹 권한 확인
         member_auth = GroupScheduleManager.check_group_permission(db, current_user_id, group_id)
         if not member_auth:
@@ -1725,7 +1756,9 @@ def delete_group_schedule_with_repeat_option(
             "data": {
                 "message": f"Successfully deleted {deleted_count} schedule(s)",
                 "deleted_count": deleted_count,
-                "delete_option": delete_option
+                "delete_option": delete_option,
+                "editor_id": editor_id,
+                "editor_name": editor_name
             }
         }
         

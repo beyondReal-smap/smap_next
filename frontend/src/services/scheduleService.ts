@@ -106,6 +106,9 @@ export interface CreateScheduleRequest {
   sst_alram_t?: string; // 알림 시간
   sst_pick_type?: string; // 알림 타입 (minute, hour, day)
   sst_pick_result?: string; // 알림 값
+  // 실제 생성한 사람 (현재 로그인한 사용자)
+  editorId?: number;
+  editorName?: string;
 }
 
 // 스케줄 수정 요청 (반복 옵션 추가)
@@ -134,6 +137,9 @@ export interface UpdateScheduleRequest {
   sst_pick_result?: string; // 알림 값
   // 반복 일정 처리 옵션 추가
   editOption?: 'this' | 'future' | 'all';
+  // 실제 수정한 사람 (현재 로그인한 사용자)
+  editorId?: number;
+  editorName?: string;
 }
 
 // 스케줄 삭제 요청 (반복 옵션 추가)
@@ -144,6 +150,9 @@ export interface DeleteScheduleRequest {
   groupId: number;
   // 반복 일정 처리 옵션
   deleteOption?: 'this' | 'future' | 'all';
+  // 실제 삭제한 사람 (현재 로그인한 사용자)
+  editorId?: number;
+  editorName?: string;
 }
 
 class ScheduleService {
@@ -260,6 +269,8 @@ class ScheduleService {
         sst_pick_result: scheduleData.sst_pick_result,
         targetMemberId: scheduleData.targetMemberId,
         sgdt_idx: scheduleData.sgdt_idx, // 타겟 멤버의 그룹 상세 인덱스
+        editorId: scheduleData.editorId, // 실제 생성한 사람 ID
+        editorName: scheduleData.editorName, // 실제 생성한 사람 이름
       };
 
       console.log('[SCHEDULE SERVICE] 📦 백엔드 전송 데이터:', requestData);
@@ -330,6 +341,9 @@ class ScheduleService {
         // 타겟 멤버 정보
         targetMemberId: scheduleData.targetMemberId,
         sgdt_idx: scheduleData.sgdt_idx,
+        // 실제 수정한 사람 정보
+        editorId: scheduleData.editorId,
+        editorName: scheduleData.editorName,
       };
       
       console.log('[SCHEDULE SERVICE] 📦 백엔드 전송 데이터:', requestData);
@@ -357,16 +371,24 @@ class ScheduleService {
    * 스케줄 삭제
    * @param sst_idx 스케줄 ID
    * @param groupId 그룹 ID
+   * @param editorInfo 삭제자 정보
    */
-  async deleteSchedule(sst_idx: number, groupId: number): Promise<{
+  async deleteSchedule(sst_idx: number, groupId: number, editorInfo?: { editorId?: number; editorName?: string }): Promise<{
     success: boolean;
     data?: { message: string };
     error?: string;
   }> {
     try {
-      console.log('[SCHEDULE SERVICE] 스케줄 삭제 시작:', { sst_idx, groupId });
+      console.log('[SCHEDULE SERVICE] 스케줄 삭제 시작:', { sst_idx, groupId, editorInfo });
       
-      const response = await apiClient.delete(`/schedule/group/${groupId}/schedules/${sst_idx}`);
+      const requestData = editorInfo ? {
+        editorId: editorInfo.editorId,
+        editorName: editorInfo.editorName
+      } : {};
+      
+      const response = await apiClient.delete(`/schedule/group/${groupId}/schedules/${sst_idx}`, {
+        data: requestData
+      });
       
       console.log('[SCHEDULE SERVICE] 스케줄 삭제 응답:', {
         status: response.status,
@@ -419,6 +441,9 @@ class ScheduleService {
         // 타겟 멤버 정보 추가
         targetMemberId: updateData.targetMemberId,
         sgdt_idx: updateData.sgdt_idx,
+        // 실제 수정한 사람 정보 추가
+        editorId: updateData.editorId,
+        editorName: updateData.editorName,
         // 반복 일정 처리 옵션 추가
         editOption: editOption
       };
@@ -460,6 +485,8 @@ class ScheduleService {
         deleteOption: deleteData.deleteOption,
         sst_pidx: deleteData.sst_pidx, // 반복 일정의 부모 ID 추가
         sgdt_idx: deleteData.sgdt_idx, // 그룹 상세 ID 추가
+        editorId: deleteData.editorId, // 실제 삭제한 사람 ID 추가
+        editorName: deleteData.editorName, // 실제 삭제한 사람 이름 추가
       };
       
       console.log('[SCHEDULE SERVICE] 📦 반복 일정 삭제 요청 데이터:', requestData);
