@@ -2084,33 +2084,76 @@ export default function HomePage() {
     console.log('[HOME] 🗺️ 지도 초기화 시작 - 재방문 시에도 안전하게 처리');
     
     // 페이지 재방문 시에도 지도가 제대로 표시되도록 강제 초기화
-    const forceMapInitialization = () => {
-      // API 로드 상태 재검증
-      const isNaverReady = window.naver?.maps && naverMapsLoaded;
-      const isGoogleReady = window.google?.maps && googleMapsLoaded;
-      
-      if (mapType === 'naver') {
-        if (isNaverReady) {
-          console.log('[HOME] 네이버맵 API 이미 준비됨 - 즉시 초기화');
-          setNaverMapsLoaded(true);
-          apiLoadStatus.naver = true;
-          setIsMapLoading(false);
-        } else if (!apiLoadStatus.naver) {
-          console.log('[HOME] 🗺️ 네이버맵 우선 로딩 시작');
+      const forceMapInitialization = () => {
+    console.log('[HOME] 🗺️ 지도 초기화 강제 실행');
+    
+    // 컨테이너 요소 확인
+    const googleContainer = googleMapContainer.current;
+    const naverContainer = naverMapContainer.current;
+    
+    console.log('[HOME] 컨테이너 상태:', {
+      googleContainer: !!googleContainer,
+      naverContainer: !!naverContainer,
+      mapType
+    });
+    
+    // API 로드 상태 재검증
+    const isNaverReady = window.naver?.maps && naverMapsLoaded;
+    const isGoogleReady = window.google?.maps && googleMapsLoaded;
+    
+    console.log('[HOME] API 상태:', {
+      isNaverReady,
+      isGoogleReady,
+      naverMapsLoaded,
+      googleMapsLoaded
+    });
+    
+    if (mapType === 'naver') {
+      if (isNaverReady && naverContainer) {
+        console.log('[HOME] 네이버맵 API 이미 준비됨 - 즉시 초기화');
+        setNaverMapsLoaded(true);
+        apiLoadStatus.naver = true;
+        setIsMapLoading(false);
+        
+        // 즉시 초기화 시도
+        setTimeout(() => {
+          if (window.naver?.maps) {
+            initNaverMap();
+          }
+        }, 100);
+      } else if (!apiLoadStatus.naver) {
+        console.log('[HOME] 🗺️ 네이버맵 우선 로딩 시작');
+        loadNaverMapsAPI();
+      } else {
+        console.log('[HOME] 네이버맵 API 로딩 중 - 재시도');
+        setTimeout(() => {
           loadNaverMapsAPI();
-        }
-      } else if (mapType === 'google') {
-        if (isGoogleReady) {
-          console.log('[HOME] 구글맵 API 이미 준비됨 - 즉시 초기화');
-          setGoogleMapsLoaded(true);
-          apiLoadStatus.google = true;
-          setIsMapLoading(false);
-        } else if (!apiLoadStatus.google) {
-          console.log('[HOME] 🗺️ 구글맵 로딩 시작');
-          loadGoogleMapsAPI();
-        }
+        }, 1000);
       }
-    };
+    } else if (mapType === 'google') {
+      if (isGoogleReady && googleContainer) {
+        console.log('[HOME] 구글맵 API 이미 준비됨 - 즉시 초기화');
+        setGoogleMapsLoaded(true);
+        apiLoadStatus.google = true;
+        setIsMapLoading(false);
+        
+        // 즉시 초기화 시도
+        setTimeout(() => {
+          if (window.google?.maps) {
+            initGoogleMap();
+          }
+        }, 100);
+      } else if (!apiLoadStatus.google) {
+        console.log('[HOME] 🗺️ 구글맵 로딩 시작');
+        loadGoogleMapsAPI();
+      } else {
+        console.log('[HOME] 구글맵 API 로딩 중 - 재시도');
+        setTimeout(() => {
+          loadGoogleMapsAPI();
+        }, 1000);
+      }
+    }
+  };
 
     // 로그인 후 홈 초기화 지연 플래그 확인
     const shouldDelayInit = typeof window !== 'undefined' && (window as any).__DELAY_HOME_INIT__;
@@ -2124,7 +2167,32 @@ export default function HomePage() {
     forceMapInitialization();
     const initTimeout = setTimeout(forceMapInitialization, 500);
     
-    return () => clearTimeout(initTimeout);
+    // DOM 마운트 확인 후 추가 초기화
+    const domCheckTimeout = setTimeout(() => {
+      const googleContainer = googleMapContainer.current;
+      const naverContainer = naverMapContainer.current;
+      
+      console.log('[HOME] DOM 마운트 상태 확인:', {
+        googleContainer: !!googleContainer,
+        naverContainer: !!naverContainer,
+        mapType
+      });
+      
+      if (mapType === 'google' && googleContainer && !map.current) {
+        console.log('[HOME] 구글맵 DOM 마운트 확인 - 초기화 재시도');
+        setTimeout(() => initGoogleMap(), 200);
+      }
+      
+      if (mapType === 'naver' && naverContainer && !naverMap.current) {
+        console.log('[HOME] 네이버맵 DOM 마운트 확인 - 초기화 재시도');
+        setTimeout(() => initNaverMap(), 200);
+      }
+    }, 1000);
+    
+    return () => {
+      clearTimeout(initTimeout);
+      clearTimeout(domCheckTimeout);
+    };
   }, [mapType]); // mapType 변경 시에도 재실행
 
   // 🗺️ 지도 API 로드 완료 시 자동 초기화
@@ -2141,6 +2209,35 @@ export default function HomePage() {
       setTimeout(() => initGoogleMap(), 100); // DOM 안정화 대기
     }
   }, [googleMapsLoaded, mapType]);
+
+  // 🗺️ 지도 초기화 보장을 위한 추가 안전장치
+  useEffect(() => {
+    const ensureMapInitialization = () => {
+      console.log('[HOME] 지도 초기화 보장 체크');
+      
+      // 지도가 초기화되지 않은 경우 재시도
+      if (mapType === 'naver' && naverMapsLoaded && window.naver?.maps && !naverMap.current) {
+        console.log('[HOME] 네이버맵 초기화 누락 감지 - 재시도');
+        setTimeout(() => initNaverMap(), 500);
+      }
+      
+      if (mapType === 'google' && googleMapsLoaded && window.google?.maps && !map.current) {
+        console.log('[HOME] 구글맵 초기화 누락 감지 - 재시도');
+        setTimeout(() => initGoogleMap(), 500);
+      }
+    };
+
+    // 페이지 로드 후 2초, 5초, 10초에 지도 초기화 상태 확인
+    const timers = [
+      setTimeout(ensureMapInitialization, 2000),
+      setTimeout(ensureMapInitialization, 5000),
+      setTimeout(ensureMapInitialization, 10000)
+    ];
+
+    return () => {
+      timers.forEach(timer => clearTimeout(timer));
+    };
+  }, [mapType, naverMapsLoaded, googleMapsLoaded]);
 
   // 🗺️ 그룹멤버 데이터 변경 시 지도 업데이트
   useEffect(() => {
@@ -2467,10 +2564,25 @@ export default function HomePage() {
 
   // Google 지도 초기화 (로고 제거 옵션 추가)
   const initGoogleMap = () => {
-    if (!googleMapContainer.current || !googleMapsLoaded || !window.google || !window.google.maps) {
-      console.log('Google Maps 초기화를 위한 조건이 충족되지 않음');
+    console.log('[HOME] Google Maps 초기화 시작');
+    
+    // 조건 검증
+    if (!googleMapContainer.current) {
+      console.error('[HOME] Google Maps 컨테이너가 없음');
       return;
     }
+    
+    if (!googleMapsLoaded) {
+      console.error('[HOME] Google Maps API가 로드되지 않음');
+      return;
+    }
+    
+    if (!window.google || !window.google.maps) {
+      console.error('[HOME] Google Maps 객체가 없음');
+      return;
+    }
+    
+    console.log('[HOME] Google Maps 초기화 조건 충족');
 
     // 그룹멤버가 있으면 첫 번째 멤버 위치, 없으면 현재 위치로 초기화
     let centerLocation = { lat: userLocation.lat, lng: userLocation.lng };
@@ -2538,25 +2650,49 @@ export default function HomePage() {
       
       console.log('Google Maps 초기화 완료');
     } catch (error) {
-      console.error('Google Maps 초기화 오류:', error);
+      console.error('[HOME] Google Maps 초기화 오류:', error);
       setIsMapLoading(false);
+      
+      // 초기화 실패 시 재시도
+      console.log('[HOME] Google Maps 초기화 재시도 예약 (3초 후)');
+      setTimeout(() => {
+        if (mapType === 'google' && !map.current) {
+          console.log('[HOME] Google Maps 초기화 재시도');
+          initGoogleMap();
+        }
+      }, 3000);
     }
   };
 
   // Naver 지도 초기화
   const initNaverMap = () => {
-    if (!naverMapContainer.current || !naverMapsLoaded || !window.naver || !window.naver.maps) {
-      console.log('Naver Maps 초기화를 위한 조건이 충족되지 않음');
+    console.log('[HOME] Naver Maps 초기화 시작');
+    
+    // 조건 검증
+    if (!naverMapContainer.current) {
+      console.error('[HOME] Naver Maps 컨테이너가 없음');
+      return;
+    }
+    
+    if (!naverMapsLoaded) {
+      console.error('[HOME] Naver Maps API가 로드되지 않음');
+      return;
+    }
+    
+    if (!window.naver || !window.naver.maps) {
+      console.error('[HOME] Naver Maps 객체가 없음');
       
       // iOS WebView에서 네이버맵 로딩 재시도
       if ((window as any).webkit && (window as any).webkit.messageHandlers) {
-        console.log('iOS WebView에서 Naver Maps 로딩 재시도');
+        console.log('[HOME] iOS WebView에서 Naver Maps 로딩 재시도');
         setTimeout(() => {
           loadNaverMapsAPI();
         }, 2000);
       }
       return;
     }
+    
+    console.log('[HOME] Naver Maps 초기화 조건 충족');
 
     // 그룹멤버가 있으면 첫 번째 멤버 위치, 없으면 현재 위치로 초기화
     let centerLat = userLocation.lat;
@@ -2674,8 +2810,17 @@ export default function HomePage() {
       }
       
     } catch (error) {
-      console.error('Naver Maps 초기화 오류:', error);
+      console.error('[HOME] Naver Maps 초기화 오류:', error);
       setIsMapLoading(false);
+      
+      // 초기화 실패 시 재시도
+      console.log('[HOME] Naver Maps 초기화 재시도 예약 (3초 후)');
+      setTimeout(() => {
+        if (mapType === 'naver' && !naverMap.current) {
+          console.log('[HOME] Naver Maps 초기화 재시도');
+          initNaverMap();
+        }
+      }, 3000);
     }
   };
 

@@ -69,6 +69,43 @@ header, [role="banner"], .glass-effect, .home-header, .group-header, .schedule-h
   margin-top: 0 !important;
 }
 
+/* schedule 페이지 헤더 최강 고정 */
+.schedule-header,
+body[data-page="/schedule"] .schedule-header,
+html[data-page="/schedule"] .schedule-header,
+.schedule-header[class*="fixed"],
+.schedule-header[class*="z-"],
+.schedule-header[style*="z-index"],
+.schedule-header[style*="zIndex"] {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 2147483647 !important;
+  width: 100vw !important;
+  height: 56px !important;
+  min-height: 56px !important;
+  max-height: 56px !important;
+  background: rgba(255, 255, 255, 0.98) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.8) !important;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08) !important;
+  display: flex !important;
+  align-items: center !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
+  will-change: transform !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  touch-action: manipulation !important;
+  pointer-events: auto !important;
+}
+
 /* 헤더 고정 스타일 강화 - 통일된 높이 56px */
 .header-fixed {
   position: fixed !important;
@@ -718,6 +755,33 @@ html body[data-page="/home"] #bottom-navigation-bar {
   overflow: visible !important;
   height: 100vh !important;
   max-height: 100vh !important;
+}
+
+/* schedule 페이지 캘린더 요소들 z-index 강제 낮춤 */
+body[data-page="/schedule"] .absolute:not(button):not([data-floating-button]):not([style*="position: fixed"]),
+body[data-page="/schedule"] .relative:not(button):not([data-floating-button]):not([style*="position: fixed"]),
+body[data-page="/schedule"] .motion-div:not(button):not([data-floating-button]):not([style*="position: fixed"]),
+body[data-page="/schedule"] .grid:not(button):not([data-floating-button]):not([style*="position: fixed"]),
+body[data-page="/schedule"] .flex:not(button):not([data-floating-button]):not([style*="position: fixed"]),
+body[data-page="/schedule"] .bg-white:not(button):not([data-floating-button]):not([style*="position: fixed"]),
+body[data-page="/schedule"] .rounded-3xl:not(button):not([data-floating-button]):not([style*="position: fixed"]),
+body[data-page="/schedule"] .shadow-sm:not(button):not([data-floating-button]):not([style*="position: fixed"]),
+body[data-page="/schedule"] .border:not(button):not([data-floating-button]):not([style*="position: fixed"]),
+body[data-page="/schedule"] .border-gray-100:not(button):not([data-floating-button]):not([style*="position: fixed"]) {
+  z-index: 0 !important;
+  position: relative !important;
+}
+
+/* schedule 페이지 캘린더 컨테이너 강제 z-index 낮춤 */
+body[data-page="/schedule"] div[style*="zIndex: 0"],
+body[data-page="/schedule"] div[style*="z-index: 0"] {
+  z-index: 0 !important;
+  position: relative !important;
+}
+
+/* schedule 페이지 모든 캘린더 관련 요소 z-index 낮춤 */
+body[data-page="/schedule"] *:not(.schedule-header):not(.header-fixed):not(.glass-effect):not(button):not([data-floating-button]):not([style*="position: fixed"]) {
+  z-index: auto !important;
 }
 
 .schedule-page-content {
@@ -3774,6 +3838,41 @@ body[data-page="/setting/terms"] [data-framer-motion] {
   contain: layout;
 }
 
+/* schedule 페이지 콘텐츠 영역 스크롤 활성화 */
+body[data-page="/schedule"] .content-area {
+  min-height: auto !important;
+  contain: none !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* schedule 페이지 모달을 화면 하단에 완전히 붙이기 */
+body[data-page="/schedule"] .add-event-modal {
+  padding: 0 !important;
+  margin: 0 !important;
+  align-items: flex-end !important;
+  z-index: 999999 !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+}
+
+body[data-page="/schedule"] .add-event-modal > div {
+  margin-bottom: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+  z-index: 999999 !important;
+}
+
+/* 모달이 열렸을 때 플로팅 버튼과 네비게이션 바를 확실히 가리기 */
+body[data-page="/schedule"] .add-event-modal * {
+  z-index: inherit !important;
+}
+
 /* 리스트 아이템 고정 높이 */
 .list-item {
   min-height: 72px;
@@ -4446,4 +4545,15 @@ body[data-page="/schedule"] div[style*="zIndex: -2147483647"] {
 .group-selector-container .absolute {
   z-index: 2147483647 !important;
   position: absolute !important;
+}
+
+/* 플로팅 버튼 초기 위치 고정 - 네비게이션 바 위쪽 */
+[data-floating-button="true"] {
+  position: fixed !important;
+  bottom: 70px !important;
+  right: 16px !important;
+  z-index: 9990 !important;
+  background: #0113A3 !important;
+  box-shadow: 0 8px 25px rgba(1, 19, 163, 0.3) !important;
+  pointer-events: auto !important;
 }

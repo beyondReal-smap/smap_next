@@ -48,6 +48,7 @@ const FloatingButton: React.FC<FloatingButtonProps> = ({
   className = '',
   style = {}
 }) => {
+
   // hooks는 항상 같은 순서로 호출되어야 함
   const pathname = usePathname();
 
@@ -74,7 +75,7 @@ const FloatingButton: React.FC<FloatingButtonProps> = ({
       
       case 'schedule':
         return {
-          icon: <FiPlus className="w-6 h-6" />,
+          icon: <FiPlus className="w-6 h-6" style={{ display: 'block', margin: 'auto' }} />,
           position: { bottom: '90px', right: '16px' },
           backgroundColor: '#0113A3'
         };
@@ -154,17 +155,32 @@ const FloatingButton: React.FC<FloatingButtonProps> = ({
       style={{
         background: config.backgroundColor,
         boxShadow: '0 8px 25px rgba(1, 19, 163, 0.3)',
-        zIndex: 999999,
+        zIndex: 1000,
         position: 'fixed',
         bottom: config.position.bottom,
         right: config.position.right,
         pointerEvents: disabled ? 'none' : 'auto',
         opacity: disabled ? 0.5 : 1,
+        // 아이콘 중앙 정렬을 위한 flex 스타일
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        visibility: 'visible',
         ...style
       }}
       data-floating-button="true"
     >
-      {config.icon}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '100%',
+        height: '100%',
+        position: 'relative',
+        zIndex: 1
+      }}>
+        {config.icon}
+      </div>
       
       {/* 배지 표시 (home 페이지용) */}
       {badgeCount !== undefined && badgeCount > 0 && !isOpen && (

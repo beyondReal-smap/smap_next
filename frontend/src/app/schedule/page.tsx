@@ -250,7 +250,7 @@ html, body {
 /* 플로팅 버튼 스타일 제거됨 - 통합 컴포넌트 사용 */
 
 /* 앱 고정 레이아웃 - 전체 스크롤 비활성화 */
-html, body {
+html {
   overflow: hidden !important;
   position: fixed !important;
   width: 100% !important;
@@ -262,6 +262,11 @@ html, body {
 /* floating-button이 보이도록 body에서 overflow 예외 처리 */
 body {
   overflow: visible !important; /* floating-button을 위해 visible로 변경 */
+  position: relative !important; /* fixed에서 relative로 변경 */
+  width: 100% !important;
+  height: 100% !important;
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: manipulation !important;
 }
 
 /* 모바일 사파리 bounce 효과 비활성화 */
@@ -357,7 +362,7 @@ const modalVariants = {
   hidden: {
     opacity: 0,
     scale: 0.9,
-    y: 50
+    y: 20
   },
   visible: {
     opacity: 1,
@@ -370,7 +375,7 @@ const modalVariants = {
   exit: {
     opacity: 0,
     scale: 0.9,
-    y: 50,
+    y: 20,
     transition: {
       duration: 0.2
     }
@@ -2428,6 +2433,9 @@ export default function SchedulePage() {
     setIsLocationSearchModalOpen(false);
     setIsDateTimeModalOpen(false);
     
+    // body 스크롤 복원
+    document.body.style.overflow = 'auto';
+    
     // 검색 관련 상태도 초기화
     setLocationSearchQuery('');
     setLocationSearchResults([]);
@@ -3334,13 +3342,13 @@ export default function SchedulePage() {
                 targetMemberGender = targetMember.mt_gender || null;
                 targetMemberIdx = targetMember.mt_idx;
                 
-                console.log(`[DEBUG] 타겟 멤버 찾음 - ID: ${targetMtIdx}, 이름: ${targetMemberName}`);
+                // console.log(`[DEBUG] 타겟 멤버 찾음 - ID: ${targetMtIdx}, 이름: ${targetMemberName}`);
               } else {
-                console.log(`[DEBUG] 타겟 멤버 못 찾음 - ID: ${targetMtIdx}, 그룹: ${schedule.sgt_idx}`);
+                // console.log(`[DEBUG] 타겟 멤버 못 찾음 - ID: ${targetMtIdx}, 그룹: ${schedule.sgt_idx}`);
               }
             } else if (!targetMtIdx) {
               // tgt_mt_idx가 없으면 기본 멤버 정보 사용 (생성자 정보)
-              console.log(`[DEBUG] 타겟 멤버 ID 없음, 생성자 정보 사용 - 생성자: ${schedule.mt_idx}, 이름: ${targetMemberName}`);
+              // console.log(`[DEBUG] 타겟 멤버 ID 없음, 생성자 정보 사용 - 생성자: ${schedule.mt_idx}, 이름: ${targetMemberName}`);
             }
 
             const event: ScheduleEvent = {
@@ -3885,7 +3893,8 @@ export default function SchedulePage() {
     groupMembers: any[] // 실제 백엔드 그룹 멤버 데이터
   ): ScheduleEvent => {
     // tgtSgdtIdx와 일치하는 멤버 찾기
-    console.log(`[mapMemberLocationToSchedule] 스케줄 "${schedule.title}" 처리 시작, tgtSgdtIdx: ${schedule.tgtSgdtIdx}, tgtMtIdx: ${schedule.tgtMtIdx}`); const targetMember = groupMembers.find(member => 
+    // console.log(`[mapMemberLocationToSchedule] 스케줄 "${schedule.title}" 처리 시작, tgtSgdtIdx: ${schedule.tgtSgdtIdx}, tgtMtIdx: ${schedule.tgtMtIdx}`); 
+    const targetMember = groupMembers.find(member => 
       member.sgdt_idx === schedule.tgtSgdtIdx || member.mt_idx === schedule.tgtMtIdx
     );
     
@@ -3916,7 +3925,8 @@ export default function SchedulePage() {
       updatedSchedule.distance = distance;
       updatedSchedule.distanceText = formatDistance(distance);
       
-      console.log(`[DISTANCE] 스케줄 "${schedule.title}" - 멤버 "${targetMember.mt_name}": ${formatDistance(distance)}`); console.log(`[DISTANCE] 스케줄 위치: (${schedule.locationLat}, ${schedule.locationLng}), 멤버 위치: (${targetMember.mlt_lat}, ${targetMember.mlt_long})`);
+      // console.log(`[DISTANCE] 스케줄 "${schedule.title}" - 멤버 "${targetMember.mt_name}": ${formatDistance(distance)}`); 
+      // console.log(`[DISTANCE] 스케줄 위치: (${schedule.locationLat}, ${schedule.locationLng}), 멤버 위치: (${targetMember.mlt_lat}, ${targetMember.mlt_long})`);
     }
     
     return updatedSchedule;
@@ -4197,8 +4207,16 @@ export default function SchedulePage() {
   return (
     <>
       <style jsx global>{pageStyles}</style>
+      
+      {/* 플로팅 버튼 - 일정 추가 */}
+      <FloatingButton
+        variant="schedule"
+        onClick={handleOpenAddEventModal}
+      />
+      
+
       <div 
-        className="fixed inset-0 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 main-container"
+        className="fixed inset-0 overflow-visible bg-gradient-to-br from-indigo-50 via-white to-purple-50 main-container"
         id="schedule-page-container"
         style={{
           paddingTop: '0px',
@@ -4254,12 +4272,15 @@ export default function SchedulePage() {
             animate="in"
             exit="out"
             variants={pageVariants}
-            className="absolute inset-0 px-4 space-y-5 pb-16 overflow-y-auto content-area pt-20"
+            className="absolute inset-0 px-4 space-y-5 pb-24 overflow-y-auto content-area pt-4"
             style={{ 
-              top: '0px', // 헤더 패딩 제거
-                             bottom: '48px', // 네비게이션 바 높이만큼 위로
+              top: '56px', // 헤더 높이만큼 아래로
+              bottom: '0', // 화면 끝까지 확장
               left: '0',
-              right: '0'
+              right: '0',
+              height: 'calc(100vh - 56px)', // 전체 높이에서 헤더만 제외
+              overflowY: 'auto',
+              WebkitOverflowScrolling: 'touch'
             }}
           >
             {/* 캘린더 섹션 */}
@@ -5904,11 +5925,7 @@ export default function SchedulePage() {
           </motion.div>
       </div>
 
-      {/* 플로팅 버튼 - 일정 추가 */}
-      <FloatingButton
-        variant="schedule"
-        onClick={handleOpenAddEventModal}
-      />
+
 
       {/* 일정 추가/수정 모달 */}
       <AnimatePresence>
@@ -5916,14 +5933,30 @@ export default function SchedulePage() {
                       <motion.div 
             className="add-event-modal fixed inset-0 flex items-end justify-center bg-black/50 backdrop-blur-sm" 
             onClick={closeAddModal}
-            style={{ zIndex: 9999 }}
+            style={{ 
+              zIndex: 999999, 
+              padding: 0, 
+              margin: 0,
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              width: '100vw',
+              height: '100vh'
+            }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
           >
             <motion.div 
-              className="w-full max-w-md bg-white rounded-t-3xl shadow-2xl max-h-[90vh] flex flex-col"
+              className="w-full max-w-md bg-white rounded-t-2xl shadow-2xl max-h-[95vh] flex flex-col"
+              style={{ 
+                marginBottom: 0,
+                marginTop: 'auto',
+                alignSelf: 'flex-end'
+              }}
               onClick={e => e.stopPropagation()}
               onWheel={e => e.stopPropagation()}
               variants={modalVariants}
