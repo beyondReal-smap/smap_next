@@ -3319,6 +3319,7 @@ export default function SchedulePage() {
 
             // 타겟 멤버 정보 설정 (실제 스케줄 대상자 기준)
             let targetMemberName = schedule.member_name || '';
+            let targetMemberNickname = '';
             let targetMemberPhoto = schedule.member_photo || '';
             let targetMemberGender = schedule.mt_gender || null;
             let targetMemberIdx = schedule.tgt_mt_idx || schedule.mt_idx || 0; // 타겟 멤버 ID 우선, 없으면 생성자 ID
@@ -3338,13 +3339,14 @@ export default function SchedulePage() {
               
               if (targetMember) {
                 targetMemberName = targetMember.mt_name || targetMember.name || targetMemberName;
+                targetMemberNickname = targetMember.mt_nickname || targetMember.mt_name || targetMember.name || '';
                 targetMemberPhoto = targetMember.mt_file1 || targetMemberPhoto;
                 targetMemberGender = targetMember.mt_gender || null;
                 targetMemberIdx = targetMember.mt_idx;
                 
-                // console.log(`[DEBUG] 타겟 멤버 찾음 - ID: ${targetMtIdx}, 이름: ${targetMemberName}`);
+                console.log(`[DEBUG] 타겟 멤버 찾음 - ID: ${targetMtIdx}, 이름: ${targetMemberName}, 닉네임: ${targetMemberNickname}`);
               } else {
-                // console.log(`[DEBUG] 타겟 멤버 못 찾음 - ID: ${targetMtIdx}, 그룹: ${schedule.sgt_idx}`);
+                console.log(`[DEBUG] 타겟 멤버 못 찾음 - ID: ${targetMtIdx}, 그룹: ${schedule.sgt_idx}`);
               }
             } else if (!targetMtIdx) {
               // tgt_mt_idx가 없으면 기본 멤버 정보 사용 (생성자 정보)
@@ -3363,6 +3365,7 @@ export default function SchedulePage() {
               groupName: schedule.group_title || '',
               groupColor: getGroupColor(schedule.sgt_idx || 0),
               memberName: targetMemberName,
+              memberNickname: targetMemberNickname,
               memberPhoto: targetMemberPhoto,
               memberGender: targetMemberGender,
               memberIdx: targetMemberIdx,
@@ -3893,7 +3896,7 @@ export default function SchedulePage() {
     groupMembers: any[] // 실제 백엔드 그룹 멤버 데이터
   ): ScheduleEvent => {
     // tgtSgdtIdx와 일치하는 멤버 찾기
-    // console.log(`[mapMemberLocationToSchedule] 스케줄 "${schedule.title}" 처리 시작, tgtSgdtIdx: ${schedule.tgtSgdtIdx}, tgtMtIdx: ${schedule.tgtMtIdx}`); 
+    console.log(`[mapMemberLocationToSchedule] 스케줄 "${schedule.title}" 처리 시작, tgtSgdtIdx: ${schedule.tgtSgdtIdx}, tgtMtIdx: ${schedule.tgtMtIdx}`); 
     const targetMember = groupMembers.find(member => 
       member.sgdt_idx === schedule.tgtSgdtIdx || member.mt_idx === schedule.tgtMtIdx
     );
@@ -3905,12 +3908,15 @@ export default function SchedulePage() {
     // 스케줄에 멤버 정보 추가
     const updatedSchedule = {
       ...schedule,
+      memberName: targetMember.mt_name || targetMember.name, // 실제 이름
       memberNickname: targetMember.mt_nickname || targetMember.mt_name, // nickname 우선, 없으면 name
       memberCurrentLat: targetMember.mlt_lat,
       memberCurrentLng: targetMember.mlt_long,
       memberBattery: targetMember.mlt_battery,
       memberGpsTime: targetMember.mlt_gps_time,
     };
+    
+    console.log(`[mapMemberLocationToSchedule] 멤버 정보 업데이트 - 이름: ${updatedSchedule.memberName}, 닉네임: ${updatedSchedule.memberNickname}`);
     
     // 거리 계산 (스케줄 위치와 멤버 현재 위치)
     if (schedule.locationLat && schedule.locationLng && 
