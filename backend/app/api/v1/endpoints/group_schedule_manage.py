@@ -8,6 +8,9 @@ from app.models.member import Member
 from app.models.group import Group
 from app.models.group_detail import GroupDetail
 from app.schemas.schedule import ScheduleCreate, ScheduleUpdate, ScheduleResponse
+from app.schemas.fcm_notification import FCMSendRequest
+from app.services.firebase_service import firebase_service
+from app.models.push_log import PushLog
 from datetime import datetime
 import logging
 
@@ -109,6 +112,123 @@ class GroupScheduleManager:
         except Exception as e:
             logger.error(f"그룹 멤버 조회 오류: {e}")
             return []
+    
+    @staticmethod
+    def send_schedule_notification(
+        db: Session, 
+        action: str,  # 'create', 'update', 'delete'
+        schedule_id: int,
+        schedule_title: str,
+        target_member_id: int,
+        editor_id: Optional[int] = None,
+        editor_name: Optional[str] = None
+    ) -> bool:
+        """
+        일정 생성/수정/삭제 시 푸시 알림 전송
+        
+        Args:
+            db: 데이터베이스 세션
+            action: 액션 유형 ('create', 'update', 'delete')
+            schedule_id: 일정 ID
+            schedule_title: 일정 제목
+            target_member_id: 일정 대상자 ID
+            editor_id: 실제 작업자 ID
+            editor_name: 실제 작업자 이름
+        
+        Returns:
+            푸시 알림 전송 성공 여부
+        """
+        try:
+            # 실제 작업자가 없으면 대상자와 동일하다고 가정
+            if not editor_id:
+                editor_id = target_member_id
+            if not editor_name:
+                # 에디터 이름 조회
+                editor_member = Member.find_by_idx(db, str(editor_id))
+                editor_name = editor_member.mt_name if editor_member else "알 수 없음"
+            
+            # 본인이 본인 일정을 수정하는 경우에는 알림을 보내지 않음
+            if editor_id == target_member_id:
+                logger.info(f"🔔 [PUSH_NOTIFICATION] 본인 일정 {action} - 알림 전송 생략")
+                return True
+            
+            # 대상 멤버 정보 조회
+            target_member = Member.find_by_idx(db, str(target_member_id))
+            if not target_member:
+                logger.error(f"❌ [PUSH_NOTIFICATION] 대상 멤버를 찾을 수 없음: {target_member_id}")
+                return False
+            
+            if not target_member.mt_token_id:
+                logger.warning(f"⚠️ [PUSH_NOTIFICATION] 대상 멤버의 FCM 토큰이 없음: {target_member_id}")
+                return False
+            
+            # Firebase 사용 가능 여부 확인
+            if not firebase_service.is_available():
+                logger.warning("⚠️ [PUSH_NOTIFICATION] Firebase가 사용 불가능하여 푸시 알림 전송 생략")
+                return False
+            
+            # 액션에 따른 메시지 설정
+            action_messages = {
+                'create': {
+                    'title': '🆕 새 일정이 생성되었습니다',
+                    'content': f'{editor_name}님이 회원님의 일정 "{schedule_title}"을(를) 생성했습니다.',
+                    'condition': '일정 생성 알림',
+                    'memo': '다른 멤버가 회원의 일정을 생성했을 때 전송'
+                },
+                'update': {
+                    'title': '✏️ 일정이 수정되었습니다',
+                    'content': f'{editor_name}님이 회원님의 일정 "{schedule_title}"을(를) 수정했습니다.',
+                    'condition': '일정 수정 알림',
+                    'memo': '다른 멤버가 회원의 일정을 수정했을 때 전송'
+                },
+                'delete': {
+                    'title': '🗑️ 일정이 삭제되었습니다',
+                    'content': f'{editor_name}님이 회원님의 일정 "{schedule_title}"을(를) 삭제했습니다.',
+                    'condition': '일정 삭제 알림',
+                    'memo': '다른 멤버가 회원의 일정을 삭제했을 때 전송'
+                }
+            }
+            
+            if action not in action_messages:
+                logger.error(f"❌ [PUSH_NOTIFICATION] 지원하지 않는 액션: {action}")
+                return False
+            
+            message_info = action_messages[action]
+            
+            logger.info(f"🔔 [PUSH_NOTIFICATION] {action} 알림 전송 시작 - target: {target_member.mt_name}, editor: {editor_name}")
+            
+            # FCM 푸시 알림 전송
+            response = firebase_service.send_push_notification(
+                target_member.mt_token_id,
+                message_info['title'],
+                message_info['content']
+            )
+            
+            # 푸시 로그 저장
+            push_log = PushLog(
+                plt_type="2",  # 일정 관련 타입
+                mt_idx=target_member_id,
+                sst_idx=schedule_id,
+                plt_condition=message_info['condition'],
+                plt_memo=message_info['memo'],
+                plt_title=message_info['title'],
+                plt_content=message_info['content'],
+                plt_sdate=datetime.now(),
+                plt_status=2 if response else 3,  # 2: 성공, 3: 실패
+                plt_read_chk='N',
+                plt_show='Y',
+                plt_wdate=datetime.now()
+            )
+            
+            db.add(push_log)
+            db.commit()
+            
+            logger.info(f"✅ [PUSH_NOTIFICATION] {action} 알림 전송 성공 - target: {target_member.mt_name}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"💥 [PUSH_NOTIFICATION] {action} 알림 전송 실패: {e}")
+            return False
 
 def create_recurring_schedules(db: Session, parent_schedule_id: int, base_params: Dict[str, Any], 
                              repeat_json: str, repeat_json_v: str) -> int:
@@ -1131,6 +1251,21 @@ def create_group_schedule(
                 logger.warning(f"⚠️ [CREATE_SCHEDULE] 반복 일정 생성 실패: {e}")
                 # 반복 일정 생성 실패해도 메인 일정은 유지
         
+        # 푸시 알림 전송 (생성자와 대상자가 다른 경우에만)
+        try:
+            GroupScheduleManager.send_schedule_notification(
+                db=db,
+                action='create',
+                schedule_id=new_schedule_id,
+                schedule_title=schedule_data.get('sst_title', ''),
+                target_member_id=target_member_id,
+                editor_id=editor_id,
+                editor_name=editor_name
+            )
+        except Exception as push_error:
+            logger.warning(f"⚠️ [CREATE_SCHEDULE] 푸시 알림 전송 실패: {push_error}")
+            # 푸시 알림 실패해도 일정 생성은 유지
+        
         return {
             "success": True,
             "data": {
@@ -1441,6 +1576,24 @@ def update_group_schedule_with_repeat_option(
         
         logger.info(f"✅ [UPDATE_REPEAT_SCHEDULE] 스케줄 수정 완료 - 수정된 개수: {updated_count}")
         
+        # 푸시 알림 전송 (수정자와 대상자가 다른 경우에만)
+        try:
+            # 수정된 스케줄의 대상자 ID 조회
+            target_member_id = schedule_result.mt_idx
+            
+            GroupScheduleManager.send_schedule_notification(
+                db=db,
+                action='update',
+                schedule_id=schedule_id,
+                schedule_title=schedule_data.get('sst_title', schedule_result.sst_title),
+                target_member_id=target_member_id,
+                editor_id=editor_id,
+                editor_name=editor_name
+            )
+        except Exception as push_error:
+            logger.warning(f"⚠️ [UPDATE_REPEAT_SCHEDULE] 푸시 알림 전송 실패: {push_error}")
+            # 푸시 알림 실패해도 일정 수정은 유지
+        
         return {
             "success": True,
             "data": {
@@ -1750,6 +1903,24 @@ def delete_group_schedule_with_repeat_option(
         db.commit()
         
         logger.info(f"✅ [DELETE_REPEAT_SCHEDULE] 스케줄 삭제 완료 - 삭제된 개수: {deleted_count}")
+        
+        # 푸시 알림 전송 (삭제자와 대상자가 다른 경우에만)
+        try:
+            # 삭제된 스케줄의 대상자 ID 조회
+            target_member_id = schedule_result.mt_idx
+            
+            GroupScheduleManager.send_schedule_notification(
+                db=db,
+                action='delete',
+                schedule_id=schedule_id,
+                schedule_title=schedule_result.sst_title,
+                target_member_id=target_member_id,
+                editor_id=editor_id,
+                editor_name=editor_name
+            )
+        except Exception as push_error:
+            logger.warning(f"⚠️ [DELETE_REPEAT_SCHEDULE] 푸시 알림 전송 실패: {push_error}")
+            # 푸시 알림 실패해도 일정 삭제는 유지
         
         return {
             "success": True,
