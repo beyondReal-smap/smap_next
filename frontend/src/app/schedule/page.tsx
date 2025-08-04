@@ -4731,7 +4731,8 @@ export default function SchedulePage() {
                   <motion.div 
                   className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
                   onClick={() => handleCancelRepeatModal()}
-                  style={{ zIndex: 10000 }}
+                  style={{ zIndex: 9999999 }}
+                  data-portal="repeat-modal"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -4921,7 +4922,8 @@ export default function SchedulePage() {
                     <motion.div 
                     className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
                     onClick={() => setIsAlarmModalOpen(false)}
-                    style={{ zIndex: 10000 }}
+                    style={{ zIndex: 9999999 }}
+                    data-portal="alarm-modal"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
@@ -4984,7 +4986,8 @@ export default function SchedulePage() {
                     <motion.div 
                       className="modal-overlay-top modal-backdrop flex items-center justify-center bg-black/50 backdrop-blur-sm" 
                       onClick={() => setIsDateTimeModalOpen(false)}
-                      style={{ zIndex: 10000 }}
+                      style={{ zIndex: 9999999 }}
+                      data-portal="datetime-modal"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -5142,7 +5145,8 @@ export default function SchedulePage() {
                   <motion.div 
                   className="modal-overlay-top modal-backdrop flex items-center justify-center bg-black/50 backdrop-blur-sm" 
                   onClick={handleCloseTimeModal}
-                  style={{ zIndex: 10000 }}
+                  style={{ zIndex: 9999999 }}
+                  data-portal="time-modal"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -5279,7 +5283,8 @@ export default function SchedulePage() {
                   <motion.div 
                   className="modal-overlay-top modal-backdrop flex items-center justify-center bg-black/50 backdrop-blur-sm" 
                   onClick={() => setIsLocationSearchModalOpen(false)}
-                  style={{ zIndex: 10000 }}
+                  style={{ zIndex: 9999999 }}
+                  data-portal="location-modal"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -5436,7 +5441,8 @@ export default function SchedulePage() {
                   <motion.div 
                   className="modal-overlay-top modal-backdrop flex items-center justify-center bg-black/50 backdrop-blur-sm" 
                   onClick={handleCloseCalendarModal}
-                  style={{ zIndex: 10000 }}
+                  style={{ zIndex: 9999999 }}
+                  data-portal="calendar-modal"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}

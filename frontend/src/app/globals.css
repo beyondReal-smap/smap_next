@@ -758,16 +758,16 @@ html body[data-page="/home"] #bottom-navigation-bar {
 }
 
 /* schedule 페이지 캘린더 요소들 z-index 강제 낮춤 */
-body[data-page="/schedule"] .absolute:not(button):not([data-floating-button]):not([style*="position: fixed"]),
-body[data-page="/schedule"] .relative:not(button):not([data-floating-button]):not([style*="position: fixed"]),
-body[data-page="/schedule"] .motion-div:not(button):not([data-floating-button]):not([style*="position: fixed"]),
-body[data-page="/schedule"] .grid:not(button):not([data-floating-button]):not([style*="position: fixed"]),
-body[data-page="/schedule"] .flex:not(button):not([data-floating-button]):not([style*="position: fixed"]),
-body[data-page="/schedule"] .bg-white:not(button):not([data-floating-button]):not([style*="position: fixed"]),
-body[data-page="/schedule"] .rounded-3xl:not(button):not([data-floating-button]):not([style*="position: fixed"]),
-body[data-page="/schedule"] .shadow-sm:not(button):not([data-floating-button]):not([style*="position: fixed"]),
-body[data-page="/schedule"] .border:not(button):not([data-floating-button]):not([style*="position: fixed"]),
-body[data-page="/schedule"] .border-gray-100:not(button):not([data-floating-button]):not([style*="position: fixed"]) {
+body[data-page="/schedule"] .absolute:not(button):not([data-floating-button]):not([style*="position: fixed"]):not([data-portal]):not([class*="modal"]),
+body[data-page="/schedule"] .relative:not(button):not([data-floating-button]):not([style*="position: fixed"]):not([data-portal]):not([class*="modal"]),
+body[data-page="/schedule"] .motion-div:not(button):not([data-floating-button]):not([style*="position: fixed"]):not([data-portal]):not([class*="modal"]),
+body[data-page="/schedule"] .grid:not(button):not([data-floating-button]):not([style*="position: fixed"]):not([data-portal]):not([class*="modal"]),
+body[data-page="/schedule"] .flex:not(button):not([data-floating-button]):not([style*="position: fixed"]):not([data-portal]):not([class*="modal"]),
+body[data-page="/schedule"] .bg-white:not(button):not([data-floating-button]):not([style*="position: fixed"]):not([data-portal]):not([class*="modal"]),
+body[data-page="/schedule"] .rounded-3xl:not(button):not([data-floating-button]):not([style*="position: fixed"]):not([data-portal]):not([class*="modal"]),
+body[data-page="/schedule"] .shadow-sm:not(button):not([data-floating-button]):not([style*="position: fixed"]):not([data-portal]):not([class*="modal"]),
+body[data-page="/schedule"] .border:not(button):not([data-floating-button]):not([style*="position: fixed"]):not([data-portal]):not([class*="modal"]),
+body[data-page="/schedule"] .border-gray-100:not(button):not([data-floating-button]):not([style*="position: fixed"]):not([data-portal]):not([class*="modal"]) {
   z-index: 0 !important;
   position: relative !important;
 }
@@ -780,8 +780,24 @@ body[data-page="/schedule"] div[style*="z-index: 0"] {
 }
 
 /* schedule 페이지 모든 캘린더 관련 요소 z-index 낮춤 */
-body[data-page="/schedule"] *:not(.schedule-header):not(.header-fixed):not(.glass-effect):not(button):not([data-floating-button]):not([style*="position: fixed"]) {
+body[data-page="/schedule"] *:not(.schedule-header):not(.header-fixed):not(.glass-effect):not(button):not([data-floating-button]):not([style*="position: fixed"]):not([data-portal]):not([class*="modal"]):not([class*="Portal"]):not([id*="modal"]) {
   z-index: auto !important;
+}
+
+/* Portal 모달들을 위한 강제 z-index 보호 */
+#__next [data-portal] *,
+#__next [class*="Portal"] *,
+#__next [class*="modal"] *,
+#__next [id*="modal"] * {
+  z-index: inherit !important;
+}
+
+/* Portal 자체에 대한 z-index 보호 */
+[data-portal],
+[class*="Portal"],
+[class*="modal"],
+[id*="modal"] {
+  z-index: 9999999 !important;
 }
 
 .schedule-page-content {
