@@ -20,7 +20,8 @@ import {
   FaShare,
   FaArrowLeft,
   FaBars,
-  FaCheckCircle
+  FaCheckCircle,
+  FaQrcode
 } from 'react-icons/fa';
 import { 
   HiSparkles, 
@@ -45,6 +46,7 @@ import authService from '@/services/authService';
 import { hapticFeedback } from '@/utils/haptic';
 import IOSCompatibleSpinner from '@/components/common/IOSCompatibleSpinner';
 import GroupSelector from '@/components/location/GroupSelector';
+import QRCode from 'react-qr-code';
 
 // Dynamic imports for performance optimization - 로딩 컴포넌트 제거
 const Modal = dynamicImport(() => import('@/components/ui/Modal'), {
@@ -567,6 +569,10 @@ function GroupPageContent() {
   // 초대 코드 관련 상태
   const [inviteCode, setInviteCode] = useState('');
   const [isJoiningGroup, setIsJoiningGroup] = useState(false);
+  
+  // QR코드 관련 상태
+  const [showQRCode, setShowQRCode] = useState(false);
+  const [qrCodeData, setQrCodeData] = useState('');
   
   // 로딩 상태
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
@@ -1410,6 +1416,19 @@ function GroupPageContent() {
   };
 
   // 초대 코드로 그룹 가입
+  // QR코드 생성 함수
+  const generateQRCode = (group: ExtendedGroup) => {
+    const inviteData = {
+      groupId: group.sgt_idx,
+      groupName: group.sgt_title,
+      inviteCode: group.sgt_code || '',
+      inviteLink: `${window.location.origin}/group/${group.sgt_idx}/join`
+    };
+    setQrCodeData(JSON.stringify(inviteData));
+    setShowQRCode(true);
+    setIsShareModalOpen(false); // 공유 모달 닫기
+  };
+
   const handleJoinGroupByCode = async () => {
     if (!inviteCode.trim()) {
       showToastModal('error', '입력 오류', '초대 코드를 입력해주세요.');
@@ -2530,6 +2549,16 @@ function GroupPageContent() {
                   </span>
                 </motion.button>
                 
+                <motion.button 
+                  onClick={() => generateQRCode(selectedGroup!)}
+                  className="w-full flex items-center justify-center p-3 rounded-lg bg-purple-200 text-purple-800 shadow-sm hover:bg-purple-300 hover:text-purple-900 transition-all"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <FaQrcode className="w-4 h-4 mr-2" />
+                  <span className="font-medium text-sm">QR코드 보기</span>
+                </motion.button>
+                
                 <motion.button
                   onClick={() => setIsShareModalOpen(false)}
                   className="w-full py-2 mt-3 text-gray-600 font-medium text-sm"
@@ -2829,6 +2858,103 @@ function GroupPageContent() {
                 )}
               </div>
             </motion.div>
+          )}
+
+          {/* QR코드 모달 */}
+          {showQRCode && (
+            <Modal
+              key="qr-code-modal"
+              isOpen={showQRCode}
+              onClose={() => setShowQRCode(false)}
+              title="QR코드 초대"
+              size="sm"
+              className="rounded-2xl max-w-xs"
+            >
+              <div className="p-4">
+                <div className="text-center mb-4">
+                  <FaQrcode className="w-8 h-8 text-gray-700 mx-auto mb-2" />
+                  <p className="text-gray-600 text-sm">{selectedGroup?.sgt_title}</p>
+                  
+                  {/* QR코드 표시 */}
+                  <div className="mt-4 p-4 bg-white rounded-lg border border-gray-200">
+                    <div className="flex justify-center">
+                      <div className="bg-white p-2 rounded">
+                        {/* QR코드 이미지 */}
+                        <div className="w-48 h-48 bg-white rounded flex items-center justify-center">
+                          {qrCodeData ? (
+                            <QRCode
+                              value={qrCodeData}
+                              size={180}
+                              level="M"
+                              bgColor="white"
+                              fgColor="black"
+                            />
+                          ) : (
+                            <div className="text-center">
+                              <FaQrcode className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                              <p className="text-xs text-gray-500">QR코드 생성 중...</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* 초대 코드 표시 */}
+                    {selectedGroup?.sgt_code && (
+                      <div className="mt-3 p-2 bg-gray-50 rounded border">
+                        <p className="text-xs text-gray-500 mb-1 text-center">초대 코드</p>
+                        <div className="flex items-center justify-center">
+                          <code className="text-sm font-mono font-bold text-blue-600 bg-white px-2 py-1 rounded border text-center">
+                            {selectedGroup.sgt_code}
+                          </code>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <motion.button 
+                    onClick={() => {
+                      if (selectedGroup?.sgt_code) {
+                        fallbackCopyText(selectedGroup.sgt_code);
+                        showToastModal('success', '복사 완료', '초대 코드가 클립보드에 복사되었습니다.');
+                      }
+                    }}
+                    className="w-full flex items-center justify-center p-3 rounded-lg bg-blue-200 text-blue-800 shadow-sm hover:bg-blue-300 hover:text-blue-900 transition-all"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <FiCopy className="w-4 h-4 mr-2" />
+                    <span className="font-medium text-sm">초대 코드 복사</span>
+                  </motion.button>
+                  
+                  <motion.button 
+                    onClick={() => {
+                      if (qrCodeData) {
+                        fallbackCopyText(qrCodeData);
+                        showToastModal('success', '복사 완료', 'QR코드 데이터가 클립보드에 복사되었습니다.');
+                      }
+                    }}
+                    className="w-full flex items-center justify-center p-3 rounded-lg bg-green-200 text-green-800 shadow-sm hover:bg-green-300 hover:text-green-900 transition-all"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <FaQrcode className="w-4 h-4 mr-2" />
+                    <span className="font-medium text-sm">QR코드 데이터 복사</span>
+                  </motion.button>
+                  
+                  <motion.button
+                    onClick={() => setShowQRCode(false)}
+                    className="w-full py-2 mt-3 text-gray-600 font-medium text-sm"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    닫기
+                  </motion.button>
+                </div>
+              </div>
+            </Modal>
           )}
         </AnimatePresence>
       </div>
