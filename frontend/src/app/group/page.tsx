@@ -233,35 +233,105 @@ const InviteCodeSection = memo<{
 const StatsCards = memo<{
   groupsCount: number;
   totalMembers: number;
-}>(({ groupsCount, totalMembers }) => (
-  <div className="px-4 mb-4">
-    <div className="grid grid-cols-2 gap-3">
-      <div 
-        className="rounded-2xl p-4 text-white shadow-lg"
-        style={{ background: 'linear-gradient(to right, #0113A3, #001a8a)' }}
-      >
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-blue-100 text-sm">총 그룹</p>
-            <p className="text-2xl font-bold">{groupsCount}개</p>
-          </div>
-          <FaLayerGroup className="w-8 h-8 text-blue-200" />
-        </div>
-      </div>
-      <div 
-        className="bg-gradient-to-r from-pink-600 to-pink-700 rounded-2xl p-4 text-white shadow-lg"
-      >
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-pink-100 text-sm">총 멤버</p>
-            <p className="text-2xl font-bold">{totalMembers}명</p>
-          </div>
-          <FaUsers className="w-8 h-8 text-pink-200" />
-        </div>
+}>(({ groupsCount, totalMembers }) => {
+
+  return (
+    <div className="px-4 mb-4">
+      <div className="grid grid-cols-2 gap-3">
+                          <motion.div 
+           className="rounded-2xl p-4 text-white shadow-lg"
+           style={{ background: 'linear-gradient(to right, #0113A3, #001a8a)' }}
+           initial={{ opacity: 0, y: 20, scale: 0.9 }}
+           animate={{ opacity: 1, y: 0, scale: 1 }}
+           transition={{ 
+             duration: 0.6, 
+             ease: [0.25, 0.46, 0.45, 0.94],
+             delay: 0.1
+           }}
+           whileHover={{ 
+             scale: 1.02,
+             transition: { duration: 0.2 }
+           }}
+         >
+           <div className="flex items-center justify-between">
+             <div>
+               <motion.p 
+                 className="text-blue-100 text-sm"
+                 initial={{ opacity: 0, x: -10 }}
+                 animate={{ opacity: 1, x: 0 }}
+                 transition={{ delay: 0.3, duration: 0.4 }}
+               >
+                 총 그룹
+               </motion.p>
+               <motion.p 
+                 className="text-2xl font-bold"
+                 initial={{ opacity: 0, scale: 0.8 }}
+                 animate={{ 
+                   opacity: 1, 
+                   scale: 1,
+                   color: "#ffffff"
+                 }}
+                 transition={{ delay: 0.4, duration: 0.5 }}
+                 key={`groups-${groupsCount}`}
+                 whileHover={{ scale: 1.05 }}
+               >
+                 {groupsCount}개
+               </motion.p>
+             </div>
+             <div>
+               <FaLayerGroup className="w-8 h-8 text-blue-200" />
+             </div>
+           </div>
+         </motion.div>
+        
+                          <motion.div 
+           className="bg-gradient-to-r from-pink-600 to-pink-700 rounded-2xl p-4 text-white shadow-lg"
+           initial={{ opacity: 0, y: 20, scale: 0.9 }}
+           animate={{ opacity: 1, y: 0, scale: 1 }}
+           transition={{ 
+             duration: 0.6, 
+             ease: [0.25, 0.46, 0.45, 0.94],
+             delay: 0.1
+           }}
+           whileHover={{ 
+             scale: 1.02,
+             transition: { duration: 0.2 }
+           }}
+         >
+           <div className="flex items-center justify-between">
+             <div>
+               <motion.p 
+                 className="text-pink-100 text-sm"
+                 initial={{ opacity: 0, x: -10 }}
+                 animate={{ opacity: 1, x: 0 }}
+                 transition={{ delay: 0.3, duration: 0.4 }}
+               >
+                 총 멤버
+               </motion.p>
+               <motion.p 
+                 className="text-2xl font-bold"
+                 initial={{ opacity: 0, scale: 0.8 }}
+                 animate={{ 
+                   opacity: 1, 
+                   scale: 1,
+                   color: "#ffffff"
+                 }}
+                 transition={{ delay: 0.4, duration: 0.5 }}
+                 key={`members-${totalMembers}`}
+                 whileHover={{ scale: 1.05 }}
+               >
+                 {totalMembers}명
+               </motion.p>
+             </div>
+             <div>
+               <FaUsers className="w-8 h-8 text-pink-200" />
+             </div>
+           </div>
+         </motion.div>
       </div>
     </div>
-  </div>
-));
+  );
+});
 
 // 그룹 카드 컴포넌트 메모이제이션
 const GroupCard = memo<{
@@ -580,6 +650,7 @@ function GroupPageContent() {
       setGroups(data);
 
       const memberCounts: {[key: number]: number} = {};
+      
       for (const group of data) {
         try {
           const members = await memberService.getGroupMembers(group.sgt_idx.toString());
@@ -589,6 +660,7 @@ function GroupPageContent() {
           memberCounts[group.sgt_idx] = 0;
         }
       }
+      
       setGroupMemberCounts(memberCounts);
     } catch (error) {
       console.error('그룹 목록 조회 오류:', error);

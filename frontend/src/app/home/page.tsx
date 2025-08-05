@@ -1322,20 +1322,7 @@ export default function HomePage() {
     }
   }, [authLoading, isUserDataLoading, userGroups.length]); // 조건을 더 민감하게 변경
 
-  // selectedGroupId 상태 변화 추적 및 데이터 초기화
-  useEffect(() => {
-    console.log('[HOME] selectedGroupId 상태 변화:', selectedGroupId);
-    
-    // selectedGroupId가 변경되면 데이터 로딩 상태 초기화
-    if (selectedGroupId) {
-      console.log('[HOME] 새로운 그룹 선택으로 데이터 로딩 상태 초기화');
-      dataFetchedRef.current.members = false;
-      dataFetchedRef.current.schedules = false;
-      dataFetchedRef.current.loading = false;
-      setIsFirstMemberSelectionComplete(false);
-      setFirstMemberSelected(false); // 첫 번째 멤버 선택 상태도 초기화
-    }
-  }, [selectedGroupId]);
+  // selectedGroupId 상태 변화 추적 및 데이터 초기화 - 통합된 useEffect로 대체됨
 
   // 바텀시트 제거됨
 
@@ -1387,7 +1374,7 @@ export default function HomePage() {
     }
   }, []);
 
-  // 그룹 멤버 및 스케줄 데이터 가져오기
+    // 그룹 멤버 및 스케줄 데이터 가져오기 - 중복 실행 방지 개선
   useEffect(() => {
     let isMounted = true;
     
@@ -1433,9 +1420,7 @@ export default function HomePage() {
       
       // 로딩 시작 플래그 설정
       dataFetchedRef.current.loading = true;
-
       dataFetchedRef.current.currentGroupId = parseInt(groupIdToUse);
-
       try {
         let currentMembers: GroupMember[] = groupMembers.length > 0 ? [...groupMembers] : [];
 
@@ -1921,9 +1906,9 @@ export default function HomePage() {
     };
 
     // 로그인 후 홈 초기화 지연 플래그 확인
-    const shouldDelayInit = typeof window !== 'undefined' && (window as any).__DELAY_HOME_INIT__;
+    const shouldDelayInitData = typeof window !== 'undefined' && (window as any).__DELAY_HOME_INIT__;
     
-    if (shouldDelayInit) {
+    if (shouldDelayInitData) {
       console.log('[HOME] 🚀 로그인 후 초기화 지연 중... (2초 후 데이터 로딩 시작)');
       return;
     }
@@ -1950,6 +1935,16 @@ export default function HomePage() {
         schedules: dataFetchedRef.current.schedules,
         loading: dataFetchedRef.current.loading
       });
+    }
+
+    // selectedGroupId가 변경되면 데이터 로딩 상태 초기화 (중복 실행 방지)
+    if (selectedGroupId && dataFetchedRef.current.currentGroupId !== selectedGroupId) {
+      console.log('[HOME] 새로운 그룹 선택으로 데이터 로딩 상태 초기화');
+      dataFetchedRef.current.members = false;
+      dataFetchedRef.current.schedules = false;
+      dataFetchedRef.current.loading = false;
+      setIsFirstMemberSelectionComplete(false);
+      setFirstMemberSelected(false); // 첫 번째 멤버 선택 상태도 초기화
     }
 
     return () => { isMounted = false; };
@@ -2212,81 +2207,87 @@ export default function HomePage() {
     runAuthSequence();
   }, [authLoading, isLoggedIn, user, router]);
 
-  // 🗺️ 지도 API 로딩 및 초기화 - 컴포넌트 마운트 시 시작
+  // 🗺️ 지도 API 로딩 및 초기화 - 컴포넌트 마운트 시 시작 (중복 실행 방지)
   useEffect(() => {
     console.log('[HOME] 🗺️ 지도 초기화 시작 - 재방문 시에도 안전하게 처리');
     
-    // 페이지 재방문 시에도 지도가 제대로 표시되도록 강제 초기화
-      const forceMapInitialization = () => {
-    console.log('[HOME] 🗺️ 지도 초기화 강제 실행');
-    
-    // 컨테이너 요소 확인
-    const googleContainer = googleMapContainer.current;
-    const naverContainer = naverMapContainer.current;
-    
-    console.log('[HOME] 컨테이너 상태:', {
-      googleContainer: !!googleContainer,
-      naverContainer: !!naverContainer,
-      mapType
-    });
-    
-    // API 로드 상태 재검증
-    const isNaverReady = window.naver?.maps && naverMapsLoaded;
-    const isGoogleReady = window.google?.maps && googleMapsLoaded;
-    
-    console.log('[HOME] API 상태:', {
-      isNaverReady,
-      isGoogleReady,
-      naverMapsLoaded,
-      googleMapsLoaded
-    });
-    
-    if (mapType === 'naver') {
-      if (isNaverReady && naverContainer) {
-        console.log('[HOME] 네이버맵 API 이미 준비됨 - 즉시 초기화');
-        setNaverMapsLoaded(true);
-        apiLoadStatus.naver = true;
-        setIsMapLoading(false);
-        
-        // 즉시 초기화 시도
-        setTimeout(() => {
-          if (window.naver?.maps) {
-            initNaverMap();
-          }
-        }, 100);
-      } else if (!apiLoadStatus.naver) {
-        console.log('[HOME] 🗺️ 네이버맵 우선 로딩 시작');
-        loadNaverMapsAPI();
-      } else {
-        console.log('[HOME] 네이버맵 API 로딩 중 - 재시도');
-        setTimeout(() => {
-          loadNaverMapsAPI();
-        }, 1000);
-      }
-    } else if (mapType === 'google') {
-      if (isGoogleReady && googleContainer) {
-        console.log('[HOME] 구글맵 API 이미 준비됨 - 즉시 초기화');
-        setGoogleMapsLoaded(true);
-        apiLoadStatus.google = true;
-        setIsMapLoading(false);
-        
-        // 즉시 초기화 시도
-        setTimeout(() => {
-          if (window.google?.maps) {
-            initGoogleMap();
-          }
-        }, 100);
-      } else if (!apiLoadStatus.google) {
-        console.log('[HOME] 🗺️ 구글맵 로딩 시작');
-        loadGoogleMapsAPI();
-      } else {
-        console.log('[HOME] 구글맵 API 로딩 중 - 재시도');
-        setTimeout(() => {
-          loadGoogleMapsAPI();
-        }, 1000);
-      }
+    // 중복 실행 방지 - 이미 초기화 중이거나 완료된 경우
+    if (isMapLoading && (naverMap.current || map.current)) {
+      console.log('[HOME] 🗺️ 지도 이미 초기화됨 - 중복 실행 방지');
+      return;
     }
-  };
+    
+    // 페이지 재방문 시에도 지도가 제대로 표시되도록 강제 초기화
+    const forceMapInitialization = () => {
+      console.log('[HOME] 🗺️ 지도 초기화 강제 실행');
+      
+      // 컨테이너 요소 확인
+      const googleContainer = googleMapContainer.current;
+      const naverContainer = naverMapContainer.current;
+      
+      console.log('[HOME] 컨테이너 상태:', {
+        googleContainer: !!googleContainer,
+        naverContainer: !!naverContainer,
+        mapType
+      });
+      
+      // API 로드 상태 재검증
+      const isNaverReady = window.naver?.maps && naverMapsLoaded;
+      const isGoogleReady = window.google?.maps && googleMapsLoaded;
+      
+      console.log('[HOME] API 상태:', {
+        isNaverReady,
+        isGoogleReady,
+        naverMapsLoaded,
+        googleMapsLoaded
+      });
+      
+      if (mapType === 'naver') {
+        if (isNaverReady && naverContainer) {
+          console.log('[HOME] 네이버맵 API 이미 준비됨 - 즉시 초기화');
+          setNaverMapsLoaded(true);
+          apiLoadStatus.naver = true;
+          setIsMapLoading(false);
+          
+          // 즉시 초기화 시도
+          setTimeout(() => {
+            if (window.naver?.maps) {
+              initNaverMap();
+            }
+          }, 100);
+        } else if (!apiLoadStatus.naver) {
+          console.log('[HOME] 🗺️ 네이버맵 우선 로딩 시작');
+          loadNaverMapsAPI();
+        } else {
+          console.log('[HOME] 네이버맵 API 로딩 중 - 재시도');
+          setTimeout(() => {
+            loadNaverMapsAPI();
+          }, 1000);
+        }
+      } else if (mapType === 'google') {
+        if (isGoogleReady && googleContainer) {
+          console.log('[HOME] 구글맵 API 이미 준비됨 - 즉시 초기화');
+          setGoogleMapsLoaded(true);
+          apiLoadStatus.google = true;
+          setIsMapLoading(false);
+          
+          // 즉시 초기화 시도
+          setTimeout(() => {
+            if (window.google?.maps) {
+              initGoogleMap();
+            }
+          }, 100);
+        } else if (!apiLoadStatus.google) {
+          console.log('[HOME] 🗺️ 구글맵 로딩 시작');
+          loadGoogleMapsAPI();
+        } else {
+          console.log('[HOME] 구글맵 API 로딩 중 - 재시도');
+          setTimeout(() => {
+            loadGoogleMapsAPI();
+          }, 1000);
+        }
+      }
+    };
 
     // 로그인 후 홈 초기화 지연 플래그 확인
     const shouldDelayInit = typeof window !== 'undefined' && (window as any).__DELAY_HOME_INIT__;
@@ -2343,10 +2344,16 @@ export default function HomePage() {
     }
   }, [googleMapsLoaded, mapType]);
 
-  // 🗺️ 지도 초기화 보장을 위한 추가 안전장치
+  // 🗺️ 지도 초기화 보장을 위한 추가 안전장치 (중복 실행 방지)
   useEffect(() => {
     const ensureMapInitialization = () => {
       console.log('[HOME] 지도 초기화 보장 체크');
+      
+      // 중복 실행 방지 - 이미 초기화된 경우 스킵
+      if ((mapType === 'naver' && naverMap.current) || (mapType === 'google' && map.current)) {
+        console.log('[HOME] 지도 이미 초기화됨 - 보장 체크 스킵');
+        return;
+      }
       
       // 지도가 초기화되지 않은 경우 재시도
       if (mapType === 'naver' && naverMapsLoaded && window.naver?.maps && !naverMap.current) {
@@ -2360,7 +2367,7 @@ export default function HomePage() {
       }
     };
 
-    // 페이지 로드 후 2초, 5초, 10초에 지도 초기화 상태 확인
+    // 페이지 로드 후 2초, 5초, 10초에 지도 초기화 상태 확인 (중복 방지)
     const timers = [
       setTimeout(ensureMapInitialization, 2000),
       setTimeout(ensureMapInitialization, 5000),
