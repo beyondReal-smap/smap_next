@@ -3,7 +3,6 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import Image from 'next/image';
 
 export default function RootPage() {
   const router = useRouter();
@@ -47,34 +46,6 @@ export default function RootPage() {
   }, []);
 
   // 로딩 화면 표시
-  return (
-    <div 
-      className="min-h-screen flex items-center justify-center"
-      style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)' }}
-    >
-      <div className="text-center">
-        <div className="relative w-32 h-32 mx-auto mb-6">
-          <Image 
-            src="/images/smap_logo.webp"
-            alt="SMAP Logo"
-            width={128}
-            height={128}
-            className="w-full h-full object-contain"
-            priority
-          />
-        </div>
-        
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">SMAP</h2>
-        
-        <div className="flex items-center justify-center space-x-2">
-          <div 
-            className="animate-spin rounded-full h-6 w-6 border-4 border-gray-200 border-t-blue-500"
-          ></div>
-          <p className="text-gray-600">
-            {loading ? '로딩 중...' : '페이지 이동 중...'}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
+  // 빈 화면 - 리다이렉트만 수행
+  return null;
 } 
