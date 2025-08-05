@@ -292,13 +292,13 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
           </div>
 
           {/* 탭 버튼 */}
-          <div className="flex bg-gray-50">
+          <div className="flex bg-gray-100 border-b border-gray-200">
             <button
               onClick={() => setActiveTab('create')}
-              className={`flex-1 py-4 px-6 font-medium transition-colors ${
+              className={`flex-1 py-4 px-6 font-medium transition-colors relative ${
                 activeTab === 'create'
-                  ? 'bg-white text-[#0113A3] border-b-2 border-[#0113A3]'
-                  : 'text-gray-600 hover:text-gray-800'
+                  ? 'bg-white text-[#0113A3] border-b-2 border-[#0113A3] shadow-sm'
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
               }`}
             >
               <FiPlus className="w-5 h-5 inline mr-2" />
@@ -306,10 +306,10 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
             </button>
             <button
               onClick={() => setActiveTab('join')}
-              className={`flex-1 py-4 px-6 font-medium transition-colors ${
+              className={`flex-1 py-4 px-6 font-medium transition-colors relative ${
                 activeTab === 'join'
-                  ? 'bg-white text-[#0113A3] border-b-2 border-[#0113A3]'
-                  : 'text-gray-600 hover:text-gray-800'
+                  ? 'bg-white text-[#0113A3] border-b-2 border-[#0113A3] shadow-sm'
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
               }`}
             >
               <FiUserPlus className="w-5 h-5 inline mr-2" />
@@ -328,7 +328,7 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
                   exit={{ opacity: 0, x: 20 }}
                   className="space-y-4 h-full flex flex-col"
                 >
-                  <div className="flex-1">
+                  <div className="flex-1 bg-gray-50 p-4 rounded-lg border border-gray-200">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       그룹명
                     </label>
@@ -339,7 +339,7 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
                         value={groupName}
                         onChange={(e) => setGroupName(e.target.value)}
                         placeholder="예: 우리 가족, 직장 동료들"
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0113A3] focus:border-[#0113A3] outline-none transition-colors"
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0113A3] focus:border-[#0113A3] outline-none transition-colors bg-white"
                         maxLength={20}
                       />
                     </div>
@@ -371,7 +371,7 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
                   exit={{ opacity: 0, x: -20 }}
                   className="space-y-4 h-full flex flex-col"
                 >
-                  <div className="flex-1">
+                  <div className="flex-1 bg-gray-50 p-4 rounded-lg border border-gray-200">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       초대 코드
                     </label>
@@ -387,7 +387,7 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
                           }
                         }}
                         placeholder="6자리 초대 코드 입력"
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0113A3] focus:border-[#0113A3] outline-none transition-colors"
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0113A3] focus:border-[#0113A3] outline-none transition-colors bg-white"
                         maxLength={6}
                       />
                     </div>
