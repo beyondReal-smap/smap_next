@@ -37,6 +37,10 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
     closePermissionModal
   } = useLocationPermission();
 
+  // 디버깅을 위한 로그
+  console.log('[GroupInitModal] 권한 상태:', permissionState);
+  console.log('[GroupInitModal] 모달 표시 상태:', showPermissionModal);
+
   // 네비게이션 바 숨김/표시 관리
   useEffect(() => {
     const bottomNavBar = document.getElementById('bottom-navigation-bar');
@@ -183,7 +187,15 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
       onSuccess();
       
       // 위치 권한 요청 (iOS에서 권한이 없거나 제한된 경우)
+      console.log('[GroupInitModal] 그룹 생성 후 권한 상태:', permissionState);
       if (permissionState.status === 'denied' || permissionState.status === 'prompt') {
+        console.log('[GroupInitModal] 위치 권한 요청 시작');
+        setTimeout(() => {
+          requestPermission();
+        }, 500);
+      } else {
+        console.log('[GroupInitModal] 권한 상태가 허용됨 또는 확인 불가:', permissionState.status);
+        // 권한 상태가 unknown인 경우에도 요청해보기
         setTimeout(() => {
           requestPermission();
         }, 500);
@@ -244,7 +256,15 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
       onSuccess();
       
       // 위치 권한 요청 (iOS에서 권한이 없거나 제한된 경우)
+      console.log('[GroupInitModal] 그룹 가입 후 권한 상태:', permissionState);
       if (permissionState.status === 'denied' || permissionState.status === 'prompt') {
+        console.log('[GroupInitModal] 위치 권한 요청 시작');
+        setTimeout(() => {
+          requestPermission();
+        }, 500);
+      } else {
+        console.log('[GroupInitModal] 권한 상태가 허용됨 또는 확인 불가:', permissionState.status);
+        // 권한 상태가 unknown인 경우에도 요청해보기
         setTimeout(() => {
           requestPermission();
         }, 500);

@@ -62,7 +62,10 @@ export const useLocationPermission = () => {
 
   // 위치 권한 요청
   const requestPermission = useCallback(async (): Promise<boolean> => {
+    console.log('[useLocationPermission] 위치 권한 요청 시작');
+    
     if (!navigator.geolocation) {
+      console.log('[useLocationPermission] geolocation API 지원 안됨');
       setPermissionState({
         status: 'denied',
         isLoading: false,
@@ -71,6 +74,7 @@ export const useLocationPermission = () => {
       return false;
     }
 
+    console.log('[useLocationPermission] geolocation API 사용 가능');
     setPermissionState(prev => ({ ...prev, isLoading: true, error: null }));
 
     return new Promise((resolve) => {
@@ -117,7 +121,9 @@ export const useLocationPermission = () => {
           });
           
           // 권한이 거부된 경우 모달 표시
+          console.log('[useLocationPermission] 권한 상태:', status, '모달 표시:', status === 'denied');
           if (status === 'denied') {
+            console.log('[useLocationPermission] 권한 거부됨 - 모달 표시');
             setShowPermissionModal(true);
           }
           
