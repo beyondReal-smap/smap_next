@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiUsers, FiUserPlus, FiX, FiPlus } from 'react-icons/fi';
-import { HiSparkles } from 'react-icons/hi';
+import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUser } from '@/contexts/UserContext';
 import groupService from '@/services/groupService';
@@ -281,7 +281,13 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
                 animate={{ scale: 1 }}
                 transition={{ delay: 0.2, type: "spring" }}
               >
-                <HiSparkles className="w-7 h-7 text-yellow-300" />
+                <Image
+                  src="/images/smap_logo_nobackground.png"
+                  alt="SMAP Logo"
+                  width={32}
+                  height={32}
+                  className="w-12 h-12"
+                />
               </motion.div>
               
               <h2 className="text-2xl font-bold mb-1">SMAP 시작하기</h2>
