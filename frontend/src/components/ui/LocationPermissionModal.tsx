@@ -19,6 +19,13 @@ export default function LocationPermissionModal({
   onSettings
 }: LocationPermissionModalProps) {
   
+  console.log('[LocationPermissionModal] 렌더링:', { isOpen });
+  
+  // 🚨 강제 로그 (모달이 열려있을 때)
+  if (isOpen) {
+    console.log('🚨 [LocationPermissionModal] 강제 로그 - 위치 권한 모달이 열려있습니다!');
+  }
+  
   const handleConfirm = () => {
     triggerHapticFeedback(HapticFeedbackType.SUCCESS, '권한 요청', { action: 'location-permission' });
     onConfirm();

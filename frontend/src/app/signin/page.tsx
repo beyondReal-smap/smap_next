@@ -2986,6 +2986,16 @@ const SignInPage = () => {
           console.error('[GOOGLE LOGIN] 오류 상세:', error?.message);
           console.error('[GOOGLE LOGIN] 오류 스택:', error?.stack);
           
+          // 🚨 안드로이드 Google Sign-In 실패 상세 분석
+          console.log('🚨 [ANDROID GOOGLE SIGN-IN] 실패 분석:');
+          console.log('  - 에러 타입:', typeof error);
+          console.log('  - 에러 이름:', error?.name);
+          console.log('  - 에러 메시지:', error?.message);
+          console.log('  - 에러 코드:', error?.code);
+          console.log('  - User Agent:', navigator.userAgent);
+          console.log('  - AndroidGoogleSignIn 객체:', (window as any).AndroidGoogleSignIn);
+          console.log('  - 인터페이스 준비 상태:', (window as any).__ANDROID_GOOGLE_SIGNIN_READY__);
+          
           // 안드로이드에서 네이티브 로그인 실패 시 에러 표시
           setError('Google 로그인 설정 오류입니다. 앱을 다시 시작해주세요.');
           setIsLoading(false);

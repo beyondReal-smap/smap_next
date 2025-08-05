@@ -64,6 +64,10 @@ export const useLocationPermission = () => {
   const requestPermission = useCallback(async (): Promise<boolean> => {
     console.log('[useLocationPermission] 위치 권한 요청 시작');
     
+    // 안드로이드 환경 감지
+    const isAndroid = /Android/.test(navigator.userAgent);
+    console.log('[useLocationPermission] 안드로이드 환경:', isAndroid);
+    
     if (!navigator.geolocation) {
       console.log('[useLocationPermission] geolocation API 지원 안됨');
       setPermissionState({
@@ -91,6 +95,15 @@ export const useLocationPermission = () => {
         },
         (error) => {
           console.error('위치 권한 요청 실패:', error);
+          console.log('[useLocationPermission] 에러 상세 정보:', {
+            code: error.code,
+            message: error.message,
+            PERMISSION_DENIED: error.PERMISSION_DENIED,
+            POSITION_UNAVAILABLE: error.POSITION_UNAVAILABLE,
+            TIMEOUT: error.TIMEOUT,
+            userAgent: navigator.userAgent,
+            isAndroid: /Android/.test(navigator.userAgent)
+          });
           
           let errorMessage = '';
           let status: 'granted' | 'denied' | 'prompt' = 'denied';
@@ -99,18 +112,22 @@ export const useLocationPermission = () => {
             case error.PERMISSION_DENIED:
               errorMessage = '위치 권한이 거부되었습니다.';
               status = 'denied';
+              console.log('[useLocationPermission] 권한 거부됨 (PERMISSION_DENIED)');
               break;
             case error.POSITION_UNAVAILABLE:
               errorMessage = '위치 정보를 사용할 수 없습니다.';
               status = 'denied';
+              console.log('[useLocationPermission] 위치 정보 사용 불가 (POSITION_UNAVAILABLE)');
               break;
             case error.TIMEOUT:
               errorMessage = '위치 정보 요청이 시간 초과되었습니다.';
               status = 'prompt';
+              console.log('[useLocationPermission] 시간 초과 (TIMEOUT)');
               break;
             default:
               errorMessage = '위치 정보를 가져오는 중 오류가 발생했습니다.';
               status = 'denied';
+              console.log('[useLocationPermission] 기타 오류 (code:', error.code, ')');
               break;
           }
           
@@ -124,7 +141,14 @@ export const useLocationPermission = () => {
           console.log('[useLocationPermission] 권한 상태:', status, '모달 표시:', status === 'denied');
           if (status === 'denied') {
             console.log('[useLocationPermission] 권한 거부됨 - 모달 표시');
+            console.log('[useLocationPermission] 🚨 모달 상태 변경: false -> true');
             setShowPermissionModal(true);
+            
+            // 🚨 강제 로그 (항상 표시)
+            setTimeout(() => {
+              console.log('🚨 [useLocationPermission] 강제 로그 - 권한 모달이 표시되어야 합니다!');
+              console.log('🚨 [useLocationPermission] showPermissionModal 상태:', showPermissionModal);
+            }, 100);
           }
           
           resolve(false);
@@ -138,10 +162,13 @@ export const useLocationPermission = () => {
     });
   }, []);
 
-  // 설정으로 이동 (iOS WebView)
+  // 설정으로 이동 (iOS/Android WebView)
   const openSettings = useCallback(() => {
+    console.log('[useLocationPermission] 설정으로 이동 시도');
+    
     // iOS WebView
     if (typeof window !== 'undefined' && window.webkit?.messageHandlers?.smapIos) {
+      console.log('[useLocationPermission] iOS 네이티브 설정 열기');
       window.webkit.messageHandlers.smapIos.postMessage({
         type: 'openSettings',
         param: ''
@@ -151,7 +178,15 @@ export const useLocationPermission = () => {
     }
     // Android WebView
     if (typeof window !== 'undefined' && (window as any).SmapApp?.openAppSettings) {
+      console.log('[useLocationPermission] Android 네이티브 설정 열기');
       (window as any).SmapApp.openAppSettings();
+      setShowPermissionModal(false);
+      return;
+    }
+    // Android Google Sign-In 인터페이스
+    if (typeof window !== 'undefined' && (window as any).AndroidGoogleSignIn?.openSettings) {
+      console.log('[useLocationPermission] Android Google Sign-In 설정 열기');
+      (window as any).AndroidGoogleSignIn.openSettings();
       setShowPermissionModal(false);
       return;
     }

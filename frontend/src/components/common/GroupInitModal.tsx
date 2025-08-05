@@ -196,10 +196,21 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
 
       onSuccess();
       
-      // 위치 권한 요청 (iOS에서 권한이 없거나 제한된 경우)
+      // 위치 권한 요청 (iOS/Android에서 권한이 없거나 제한된 경우)
       console.log('[GroupInitModal] 그룹 생성 후 권한 상태:', permissionState);
-      if (permissionState.status === 'denied' || permissionState.status === 'prompt') {
-        console.log('[GroupInitModal] 위치 권한 요청 시작');
+      
+      // 안드로이드 환경 감지
+      const isAndroid = /Android/.test(navigator.userAgent);
+      console.log('[GroupInitModal] 안드로이드 환경:', isAndroid);
+      
+      // 안드로이드에서는 무조건 권한 요청 시도
+      if (isAndroid) {
+        console.log('[GroupInitModal] 안드로이드 - 위치 권한 요청 강제 실행');
+        setTimeout(() => {
+          requestPermission();
+        }, 1000); // 안드로이드에서는 더 긴 지연
+      } else if (permissionState.status === 'denied' || permissionState.status === 'prompt') {
+        console.log('[GroupInitModal] iOS - 위치 권한 요청 시작');
         setTimeout(() => {
           requestPermission();
         }, 500);
@@ -268,10 +279,21 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
 
       onSuccess();
       
-      // 위치 권한 요청 (iOS에서 권한이 없거나 제한된 경우)
+      // 위치 권한 요청 (iOS/Android에서 권한이 없거나 제한된 경우)
       console.log('[GroupInitModal] 그룹 가입 후 권한 상태:', permissionState);
-      if (permissionState.status === 'denied' || permissionState.status === 'prompt') {
-        console.log('[GroupInitModal] 위치 권한 요청 시작');
+      
+      // 안드로이드 환경 감지
+      const isAndroid = /Android/.test(navigator.userAgent);
+      console.log('[GroupInitModal] 안드로이드 환경:', isAndroid);
+      
+      // 안드로이드에서는 무조건 권한 요청 시도
+      if (isAndroid) {
+        console.log('[GroupInitModal] 안드로이드 - 위치 권한 요청 강제 실행');
+        setTimeout(() => {
+          requestPermission();
+        }, 1000); // 안드로이드에서는 더 긴 지연
+      } else if (permissionState.status === 'denied' || permissionState.status === 'prompt') {
+        console.log('[GroupInitModal] iOS - 위치 권한 요청 시작');
         setTimeout(() => {
           requestPermission();
         }, 500);
@@ -324,6 +346,26 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
     return (
     <>
       {console.log('[GroupInitModal] JSX 렌더링 시작')}
+      {/* 🚨 DOM에 직접 로그 표시 */}
+      <div style={{
+        position: 'fixed',
+        top: '10px',
+        left: '10px',
+        background: 'red',
+        color: 'white',
+        padding: '10px',
+        zIndex: 10000,
+        fontSize: '12px',
+        fontFamily: 'monospace'
+      }}>
+        GroupInitModal 렌더링됨
+        <br />
+        isOpen: {String(isOpen)}
+        <br />
+        user: {user?.mt_idx || '없음'}
+        <br />
+        activeTab: {activeTab}
+      </div>
       <AnimatePresence>
         <motion.div
           className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
