@@ -7,6 +7,8 @@ import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUser } from '@/contexts/UserContext';
 import groupService from '@/services/groupService';
+import { useLocationPermission } from '@/hooks/useLocationPermission';
+import LocationPermissionModal from '@/components/ui/LocationPermissionModal';
 
 interface GroupInitModalProps {
   isOpen: boolean;
@@ -27,6 +29,13 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
   
   const { user } = useAuth();
   const { forceRefreshGroups } = useUser();
+  const {
+    permissionState,
+    showPermissionModal,
+    requestPermission,
+    openSettings,
+    closePermissionModal
+  } = useLocationPermission();
 
   // 네비게이션 바 숨김/표시 관리
   useEffect(() => {
@@ -172,13 +181,20 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
       }, 300);
 
       onSuccess();
+      
+      // 위치 권한 요청 (iOS에서 권한이 없거나 제한된 경우)
+      if (permissionState.status === 'denied' || permissionState.status === 'prompt') {
+        setTimeout(() => {
+          requestPermission();
+        }, 500);
+      }
     } catch (error) {
       console.error('[GroupInitModal] 그룹 생성 실패:', error);
       setError(error instanceof Error ? error.message : '그룹 생성에 실패했습니다.');
     } finally {
       setIsLoading(false);
     }
-  }, [groupName, user?.mt_idx, forceRefreshGroups, onSuccess]);
+  }, [groupName, user?.mt_idx, forceRefreshGroups, onSuccess, permissionState.status, requestPermission]);
 
   // 그룹 가입 핸들러
   const handleJoinGroup = useCallback(async () => {
@@ -226,13 +242,20 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
       }, 300);
 
       onSuccess();
+      
+      // 위치 권한 요청 (iOS에서 권한이 없거나 제한된 경우)
+      if (permissionState.status === 'denied' || permissionState.status === 'prompt') {
+        setTimeout(() => {
+          requestPermission();
+        }, 500);
+      }
     } catch (error) {
       console.error('[GroupInitModal] 그룹 가입 실패:', error);
       setError(error instanceof Error ? error.message : '그룹 가입에 실패했습니다.');
     } finally {
       setIsLoading(false);
     }
-  }, [inviteCode, user?.mt_idx, forceRefreshGroups, onSuccess]);
+  }, [inviteCode, user?.mt_idx, forceRefreshGroups, onSuccess, permissionState.status, requestPermission]);
 
   const resetForm = () => {
     setGroupName('');
@@ -249,198 +272,208 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <AnimatePresence>
-      <motion.div
-        className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-      >
-        {/* 배경 오버레이 */}
+    <>
+      <AnimatePresence>
         <motion.div
-          className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-        />
-
-        {/* 모달 콘텐츠 */}
-        <motion.div
-          className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden"
-          initial={{ scale: 0.9, opacity: 0, y: 20 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={{ scale: 0.9, opacity: 0, y: 20 }}
-          transition={{ type: "spring", damping: 20, stiffness: 300 }}
         >
-          {/* 헤더 */}
-          <div className="bg-gradient-to-r from-[#0113A3] to-[#001a8a] px-6 py-2 text-white relative">
-            <div className="text-center">
-              <motion.div
-                className="inline-flex items-center justify-center w-16 h-16 bg-[#0113A3]/20 rounded-full"
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.2, type: "spring" }}
-              >
-                <Image
-                  src="/images/smap_logo_nobackground.png"
-                  alt="SMAP Logo"
-                  width={32}
-                  height={32}
-                  className="w-12 h-12"
-                />
-              </motion.div>
-              
-              <h2 className="text-2xl font-bold mb-1">SMAP 시작하기</h2>
-              <p className="text-white opacity-90">
-                그룹을 만들거나 초대받은 그룹에 참여해보세요!
-              </p>
-            </div>
-          </div>
+          {/* 배경 오버레이 */}
+          <motion.div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          />
 
-          {/* 탭 버튼 */}
-          <div className="flex bg-gray-100 border-b border-gray-200">
-            <button
-              onClick={() => setActiveTab('create')}
-              className={`flex-1 py-4 px-6 font-medium transition-colors relative ${
-                activeTab === 'create'
-                  ? 'bg-white text-[#0113A3] border-b-2 border-[#0113A3] shadow-sm'
-                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
-              }`}
-            >
-              <FiPlus className="w-5 h-5 inline mr-2" />
-              그룹 만들기
-            </button>
-            <button
-              onClick={() => setActiveTab('join')}
-              className={`flex-1 py-4 px-6 font-medium transition-colors relative ${
-                activeTab === 'join'
-                  ? 'bg-white text-[#0113A3] border-b-2 border-[#0113A3] shadow-sm'
-                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
-              }`}
-            >
-              <FiUserPlus className="w-5 h-5 inline mr-2" />
-              그룹 참여하기
-            </button>
-          </div>
-
-          {/* 콘텐츠 */}
-          <div className="px-6 pt-4 pb-0 min-h-[180px]">
-            <AnimatePresence mode="wait">
-              {activeTab === 'create' ? (
+          {/* 모달 콘텐츠 */}
+          <motion.div
+            className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden"
+            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+            transition={{ type: "spring", damping: 20, stiffness: 300 }}
+          >
+            {/* 헤더 */}
+            <div className="bg-gradient-to-r from-[#0113A3] to-[#001a8a] px-6 py-2 text-white relative">
+              <div className="text-center">
                 <motion.div
-                  key="create"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  className="space-y-4 h-full flex flex-col"
+                  className="inline-flex items-center justify-center w-16 h-16 bg-[#0113A3]/20 rounded-full"
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.2, type: "spring" }}
                 >
-                  <div className="flex-1 bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      그룹명
-                    </label>
-                    <div className="relative">
-                      <FiUsers className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                      <input
-                        type="text"
-                        value={groupName}
-                        onChange={(e) => setGroupName(e.target.value)}
-                        placeholder="예: 우리 가족, 직장 동료들"
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0113A3] focus:border-[#0113A3] outline-none transition-colors bg-white"
-                        maxLength={20}
-                      />
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      최대 20자까지 입력 가능합니다.
-                    </p>
-                  </div>
-
-                  <button
-                    onClick={handleCreateGroup}
-                    disabled={isLoading || !groupName.trim()}
-                    className="w-full bg-gradient-to-r from-[#0113A3] to-[#001a8a] text-white py-3 rounded-xl font-medium hover:from-[#001a8a] hover:to-[#0113A3] disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-auto"
-                  >
-                    {isLoading ? (
-                      <div className="flex items-center justify-center">
-                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                        그룹 생성 중...
-                      </div>
-                    ) : (
-                      '그룹 만들기'
-                    )}
-                  </button>
+                  <Image
+                    src="/images/smap_logo_nobackground.png"
+                    alt="SMAP Logo"
+                    width={32}
+                    height={32}
+                    className="w-12 h-12"
+                  />
                 </motion.div>
-              ) : (
-                <motion.div
-                  key="join"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="space-y-4 h-full flex flex-col"
-                >
-                  <div className="flex-1 bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      초대 코드
-                    </label>
-                    <div className="relative">
-                      <FiUserPlus className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                      <input
-                        type="text"
-                        value={inviteCode}
-                        onChange={(e) => {
-                          const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-                          if (value.length <= 6) {
-                            setInviteCode(value);
-                          }
-                        }}
-                        placeholder="6자리 초대 코드 입력"
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0113A3] focus:border-[#0113A3] outline-none transition-colors bg-white"
-                        maxLength={6}
-                      />
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      그룹 관리자로부터 받은 6자리 코드를 입력하세요.
-                    </p>
-                  </div>
+                
+                <h2 className="text-2xl font-bold mb-1">SMAP 시작하기</h2>
+                <p className="text-white opacity-90">
+                  그룹을 만들거나 초대받은 그룹에 참여해보세요!
+                </p>
+              </div>
+            </div>
 
-                  <button
-                    onClick={handleJoinGroup}
-                    disabled={isLoading || inviteCode.length !== 6}
-                    className="w-full bg-gradient-to-r from-[#0113A3] to-[#001a8a] text-white py-3 rounded-xl font-medium hover:from-[#001a8a] hover:to-[#0113A3] disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-auto"
+            {/* 탭 버튼 */}
+            <div className="flex bg-gray-100 border-b border-gray-200">
+              <button
+                onClick={() => setActiveTab('create')}
+                className={`flex-1 py-4 px-6 font-medium transition-colors relative ${
+                  activeTab === 'create'
+                    ? 'bg-white text-[#0113A3] border-b-2 border-[#0113A3] shadow-sm'
+                    : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+                }`}
+              >
+                <FiPlus className="w-5 h-5 inline mr-2" />
+                그룹 만들기
+              </button>
+              <button
+                onClick={() => setActiveTab('join')}
+                className={`flex-1 py-4 px-6 font-medium transition-colors relative ${
+                  activeTab === 'join'
+                    ? 'bg-white text-[#0113A3] border-b-2 border-[#0113A3] shadow-sm'
+                    : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+                }`}
+              >
+                <FiUserPlus className="w-5 h-5 inline mr-2" />
+                그룹 참여하기
+              </button>
+            </div>
+
+            {/* 콘텐츠 */}
+            <div className="px-6 pt-4 pb-0 min-h-[180px]">
+              <AnimatePresence mode="wait">
+                {activeTab === 'create' ? (
+                  <motion.div
+                    key="create"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    className="space-y-4 h-full flex flex-col"
                   >
-                    {isLoading ? (
-                      <div className="flex items-center justify-center">
-                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                        그룹 가입 중...
+                    <div className="flex-1 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        그룹명
+                      </label>
+                      <div className="relative">
+                        <FiUsers className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                        <input
+                          type="text"
+                          value={groupName}
+                          onChange={(e) => setGroupName(e.target.value)}
+                          placeholder="예: 우리 가족, 직장 동료들"
+                          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0113A3] focus:border-[#0113A3] outline-none transition-colors bg-white"
+                          maxLength={20}
+                        />
                       </div>
-                    ) : (
-                      '그룹 참여하기'
-                    )}
-                  </button>
+                      <p className="text-xs text-gray-500 mt-1">
+                        최대 20자까지 입력 가능합니다.
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={handleCreateGroup}
+                      disabled={isLoading || !groupName.trim()}
+                      className="w-full bg-gradient-to-r from-[#0113A3] to-[#001a8a] text-white py-3 rounded-xl font-medium hover:from-[#001a8a] hover:to-[#0113A3] disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-auto"
+                    >
+                      {isLoading ? (
+                        <div className="flex items-center justify-center">
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                          그룹 생성 중...
+                        </div>
+                      ) : (
+                        '그룹 만들기'
+                      )}
+                    </button>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="join"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="space-y-4 h-full flex flex-col"
+                  >
+                    <div className="flex-1 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        초대 코드
+                      </label>
+                      <div className="relative">
+                        <FiUserPlus className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                        <input
+                          type="text"
+                          value={inviteCode}
+                          onChange={(e) => {
+                            const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                            if (value.length <= 6) {
+                              setInviteCode(value);
+                            }
+                          }}
+                          placeholder="6자리 초대 코드 입력"
+                          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0113A3] focus:border-[#0113A3] outline-none transition-colors bg-white"
+                          maxLength={6}
+                        />
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        그룹 관리자로부터 받은 6자리 코드를 입력하세요.
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={handleJoinGroup}
+                      disabled={isLoading || inviteCode.length !== 6}
+                      className="w-full bg-gradient-to-r from-[#0113A3] to-[#001a8a] text-white py-3 rounded-xl font-medium hover:from-[#001a8a] hover:to-[#0113A3] disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-auto"
+                    >
+                      {isLoading ? (
+                        <div className="flex items-center justify-center">
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                          그룹 가입 중...
+                        </div>
+                      ) : (
+                        '그룹 참여하기'
+                      )}
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* 에러 메시지 */}
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg"
+                >
+                  <p className="text-sm text-red-600">{error}</p>
                 </motion.div>
               )}
-            </AnimatePresence>
+            </div>
 
-            {/* 에러 메시지 */}
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg"
-              >
-                <p className="text-sm text-red-600">{error}</p>
-              </motion.div>
-            )}
-          </div>
-
-          {/* 푸터 */}
-          <div className="px-6 pb-6">
-            <p className="text-xs text-gray-500 text-center">
-              나중에 그룹을 추가하거나 변경할 수 있습니다.
-            </p>
-          </div>
+            {/* 푸터 */}
+            <div className="px-6 pb-6">
+              <p className="text-xs text-gray-500 text-center">
+                나중에 그룹을 추가하거나 변경할 수 있습니다.
+              </p>
+            </div>
+          </motion.div>
         </motion.div>
-      </motion.div>
-    </AnimatePresence>
+      </AnimatePresence>
+      
+      {/* 위치 권한 모달 */}
+      <LocationPermissionModal
+        isOpen={showPermissionModal}
+        onClose={closePermissionModal}
+        onConfirm={requestPermission}
+        onSettings={openSettings}
+      />
+    </>
   );
 };
 
