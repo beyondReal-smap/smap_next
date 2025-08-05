@@ -229,31 +229,16 @@ const InviteCodeSection = memo<{
   </div>
 ));
 
-// 통계 카드 컴포넌트 메모이제이션
+// 통계 카드 컴포넌트 메모이제이션 - 애니메이션 제거
 const StatsCards = memo<{
   groupsCount: number;
   totalMembers: number;
 }>(({ groupsCount, totalMembers }) => (
   <div className="px-4 mb-4">
-    <motion.div 
-      className="grid grid-cols-2 gap-3"
-      initial="hidden"
-      animate="visible"
-      variants={{
-        hidden: { opacity: 0 },
-        visible: {
-          opacity: 1,
-          transition: {
-            staggerChildren: 0.05,
-            delayChildren: 0
-          }
-        }
-      }}
-    >
-      <motion.div 
+    <div className="grid grid-cols-2 gap-3">
+      <div 
         className="rounded-2xl p-4 text-white shadow-lg"
         style={{ background: 'linear-gradient(to right, #0113A3, #001a8a)' }}
-        variants={cardVariants}
       >
         <div className="flex items-center justify-between">
           <div>
@@ -262,10 +247,9 @@ const StatsCards = memo<{
           </div>
           <FaLayerGroup className="w-8 h-8 text-blue-200" />
         </div>
-      </motion.div>
-      <motion.div 
+      </div>
+      <div 
         className="bg-gradient-to-r from-pink-600 to-pink-700 rounded-2xl p-4 text-white shadow-lg"
-        variants={cardVariants}
       >
         <div className="flex items-center justify-between">
           <div>
@@ -274,8 +258,8 @@ const StatsCards = memo<{
           </div>
           <FaUsers className="w-8 h-8 text-pink-200" />
         </div>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   </div>
 ));
 
@@ -1694,18 +1678,9 @@ function GroupPageContent() {
             left: '0',
             right: '0'
           }}>
-            <AnimatePresence mode="wait">
+            <div>
               {currentView === 'list' ? (
-                <motion.div
-                  key="list"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ 
-                    duration: 0.3
-                  }}
-
-                >
+                <div>
                   {/* 검색 섹션 */}
                   <div className="group-content">
                   <InviteCodeSection
@@ -1836,18 +1811,9 @@ function GroupPageContent() {
                       </div>
                   </div>
 
-                </motion.div>
+                </div>
               ) : selectedGroup ? (
-                <motion.div
-                  key="detail"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ 
-                    duration: 0.3
-                  }}
-                  className="flex flex-col flex-1 min-h-0"
-                >
+                <div className="flex flex-col flex-1 min-h-0">
                   {/* 고정 영역: 그룹 헤더 카드 + 통계 카드들 */}
                   <div className="flex-shrink-0">
                     {/* 그룹 헤더 카드 */}
@@ -2232,9 +2198,9 @@ function GroupPageContent() {
                     </motion.div>
                     </div>
                   </div>
-                </motion.div>
+                </div>
               ) : null}
-            </AnimatePresence>
+            </div>
           </div>
 
         {/* 플로팅 추가 버튼 - 전체 페이지 기준 */}
