@@ -39,6 +39,7 @@ import memberService from '@/services/memberService';
 import scheduleService from '@/services/scheduleService';
 import locationService from '@/services/locationService';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUser } from '@/contexts/UserContext';
 import { useDataCache } from '@/contexts/DataCacheContext';
 import authService from '@/services/authService';
 import { hapticFeedback } from '@/utils/haptic';
@@ -526,6 +527,7 @@ const modalVariants = {
 function GroupPageContent() {
   const router = useRouter();
   const { user, isLoggedIn } = useAuth();
+  const { forceRefreshGroups } = useUser();
   const { 
     getUserProfile, 
     getUserGroups, 
@@ -1016,14 +1018,34 @@ function GroupPageContent() {
     
     setIsDeleting(true);
     try {
-      await groupService.deleteGroup(selectedGroup.sgt_idx);
-      await fetchGroups();
+      console.log('[GROUP PAGE] 그룹 삭제 시작:', selectedGroup.sgt_idx);
       
+      // 그룹 삭제 실행
+      await groupService.deleteGroup(selectedGroup.sgt_idx);
+      
+      // UserContext 그룹 데이터 강제 새로고침 (실시간 데이터)
+      console.log('[GROUP PAGE] UserContext 그룹 데이터 강제 새로고침 시작');
+      await forceRefreshGroups();
+      
+      // 추가적인 데이터 새로고침을 위한 지연 실행
+      setTimeout(async () => {
+        console.log('[GROUP PAGE] 그룹 삭제 후 추가 데이터 새로고침');
+        await forceRefreshGroups();
+      }, 300);
+      
+      // 로컬 상태 업데이트
       setSelectedGroup(null);
       setGroupMembers([]);
       setShowGroupActions(false);
       setIsDeleteModalOpen(false);
       setCurrentView('list');
+      
+      // 그룹이 0개가 되면 홈으로 이동
+      const updatedGroups = await forceRefreshGroups();
+      if (!updatedGroups || updatedGroups.length === 0) {
+        console.log('[GROUP PAGE] 그룹이 0개 - 홈으로 이동');
+        router.push('/home');
+      }
       
       showToastModal('success', '그룹 삭제 완료', '그룹이 삭제되었습니다.');
     } catch (error) {

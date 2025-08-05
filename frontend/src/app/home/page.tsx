@@ -98,6 +98,7 @@ import {
 } from '../../utils/domainDetection';
 
 import memberService from '@/services/memberService';
+import GroupInitModal from '@/components/common/GroupInitModal';
 import scheduleService from '../../services/scheduleService';
 import groupService from '@/services/groupService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -824,6 +825,9 @@ export default function HomePage() {
   const [criticalError, setCriticalError] = useState<string | null>(null);
   const [renderAttempts, setRenderAttempts] = useState(0);
   
+  // 🆕 그룹 초기화 모달 관련 상태
+  const [showGroupInitModal, setShowGroupInitModal] = useState(false);
+  
   // 🚨 iOS 시뮬레이터 디버깅 - 즉시 실행 로그
   console.log('🏠 [HOME] HomePage 컴포넌트 시작');
   
@@ -880,6 +884,18 @@ export default function HomePage() {
   // 인증 관련 상태 추가
   const { user, isLoggedIn, loading: authLoading, isPreloadingComplete } = useAuth();
   
+  // UserContext 사용 (최상단으로 이동)
+  const { 
+    userInfo, 
+    userGroups, 
+    isUserDataLoading, 
+    userDataError, 
+    refreshUserData,
+    selectedGroupId: userContextSelectedGroupId,
+    setSelectedGroupId: setUserContextSelectedGroupId,
+    forceRefreshGroups
+  } = useUser();
+  
   // NavigationManager 플래그 처리
   useEffect(() => {
     // 리다이렉트 플래그 처리 (NavigationManager에서 설정된 경우)
@@ -911,6 +927,92 @@ export default function HomePage() {
       });
     }
   }, [user, isLoggedIn, authLoading, isPreloadingComplete]);
+  
+  // 🆕 그룹 체크 및 초기화 모달 표시 로직
+  useEffect(() => {
+    if (isLoggedIn && user && !isUserDataLoading && userGroups !== undefined) {
+      console.log('[HOME] 그룹 데이터 체크:', { 
+        userGroups: userGroups?.length || 0,
+        user: user.mt_idx 
+      });
+      
+      // 그룹이 없는 경우 모달 표시
+      if (!userGroups || userGroups.length === 0) {
+        console.log('[HOME] 그룹이 없어 초기화 모달 표시');
+        setShowGroupInitModal(true);
+      } else {
+        // 그룹이 있으면 모달 닫기
+        setShowGroupInitModal(false);
+      }
+    }
+  }, [isLoggedIn, user, isUserDataLoading, userGroups]);
+
+  // 🆕 페이지 포커스 시 실시간 데이터 새로고침
+  useEffect(() => {
+    const handleFocus = async () => {
+      if (isLoggedIn && user) {
+        console.log('[HOME] 페이지 포커스 감지 - 실시간 데이터 새로고침');
+        await forceRefreshGroups();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [isLoggedIn, user, forceRefreshGroups]);
+  
+  // 🆕 그룹 초기화 모달 핸들러
+  const handleGroupInitSuccess = useCallback(async () => {
+    console.log('[HOME] 그룹 초기화 성공');
+    setShowGroupInitModal(false);
+    
+    // 즉시 UserContext 그룹 데이터 강제 새로고침 (실시간 데이터)
+    console.log('[HOME] 즉시 그룹 데이터 새로고침 시작');
+    await forceRefreshGroups();
+    
+    // 추가적인 데이터 새로고침을 위한 지연 실행
+    setTimeout(async () => {
+      console.log('[HOME] 그룹 생성 후 추가 데이터 새로고침');
+      
+      // UserContext 데이터 다시 새로고침 (캐시 무시)
+      await forceRefreshGroups();
+      
+      // DataCache도 새로고침
+      if (typeof window !== 'undefined') {
+        // localStorage에서 그룹 관련 캐시 제거
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && (
+            key.startsWith('user_groups_') || 
+            key.startsWith('user_group_count_') ||
+            key === 'user_groups' ||
+            key === 'user_group_count' ||
+            key.startsWith('group_members_') ||
+            key.startsWith('schedule_data_') ||
+            key.startsWith('location_data_')
+          )) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+        console.log('[HOME] 그룹 관련 캐시 제거 완료');
+      }
+      
+      // 페이지 새로고침 없이 데이터만 업데이트
+      console.log('[HOME] 그룹 데이터 업데이트 완료');
+    }, 300);
+    
+    // 추가 지연 실행으로 데이터 완전 새로고침
+    setTimeout(async () => {
+      console.log('[HOME] 최종 데이터 새로고침');
+      await forceRefreshGroups();
+    }, 1000);
+  }, [forceRefreshGroups]);
+  
+  const handleGroupInitClose = useCallback(() => {
+    console.log('[HOME] 그룹 초기화 모달 닫기');
+    setShowGroupInitModal(false);
+  }, []);
 
   // InfoWindow 닫기를 위한 전역 함수 설정
   useEffect(() => {
@@ -934,16 +1036,6 @@ export default function HomePage() {
       delete (window as any).closeCurrentInfoWindow;
     };
   }, []);
-      // UserContext 사용
-    const { 
-      userInfo, 
-      userGroups, 
-      isUserDataLoading, 
-      userDataError, 
-      refreshUserData,
-      selectedGroupId: userContextSelectedGroupId,
-      setSelectedGroupId: setUserContextSelectedGroupId
-    } = useUser();
    
     // 데이터 캐시 컨텍스트
     const { 
@@ -6322,6 +6414,13 @@ export default function HomePage() {
            )}
          </AnimatePresence>
               </motion.div>
+              
+              {/* 🆕 그룹 초기화 모달 */}
+              <GroupInitModal
+                isOpen={showGroupInitModal}
+                onClose={handleGroupInitClose}
+                onSuccess={handleGroupInitSuccess}
+              />
       </>
     );
   } catch (renderError) {

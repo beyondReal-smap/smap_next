@@ -232,13 +232,17 @@ class GroupService {
   }
 
   // 현재 로그인한 사용자의 그룹 목록 조회
-  async getCurrentUserGroups(): Promise<Group[]> {
+  async getCurrentUserGroups(ignoreCache: boolean = false): Promise<Group[]> {
     try {
-      console.log('[GroupService] 현재 사용자 그룹 목록 조회 시작');
+      console.log('[GroupService] 현재 사용자 그룹 목록 조회 시작', ignoreCache ? '(캐시 무시)' : '');
       
       // 백엔드 API 문서에 따라 현재 사용자가 속한 그룹 목록 조회
       // Authorization 헤더를 통해 현재 사용자 식별
-      const response = await apiClient.get('/groups/current-user');
+      const response = await apiClient.get('/groups/current-user', {
+        headers: {
+          ...(ignoreCache && { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' })
+        }
+      });
       
       console.log('[GroupService] 현재 사용자 그룹 목록 응답:', response.data);
       

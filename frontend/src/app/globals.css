@@ -4573,3 +4573,34 @@ body[data-page="/schedule"] div[style*="zIndex: -2147483647"] {
   box-shadow: 0 8px 25px rgba(1, 19, 163, 0.3) !important;
   pointer-events: auto !important;
 }
+
+/* 모달이 열렸을 때 네비게이션 바 숨김 */
+.modal-open-hidden,
+#bottom-navigation-bar.modal-open-hidden {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translateY(100%) !important;
+  z-index: 0 !important;
+  position: fixed !important;
+  bottom: 0px !important;
+  left: 0px !important;
+  right: 0px !important;
+  width: 100% !important;
+  min-height: 72px !important;
+  background: transparent !important;
+  border-top: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  overflow: hidden !important;
+}
+
+/* 모달이 열렸을 때 네비게이션 바 내부 요소들도 숨김 */
+.modal-open-hidden *,
+#bottom-navigation-bar.modal-open-hidden * {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}

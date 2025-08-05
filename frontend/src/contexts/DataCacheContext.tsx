@@ -88,7 +88,7 @@ interface DataCacheContextType {
   setUserProfile: (profile: UserProfile) => void;
   
   // 사용자 그룹
-  getUserGroups: () => GroupInfo[];
+  getUserGroups: (ignoreCache?: boolean) => GroupInfo[];
   setUserGroups: (groups: GroupInfo[]) => void;
   
   // 그룹 멤버
@@ -689,7 +689,13 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
     saveToLocalStorage('userGroups', groups);
   }, [saveToLocalStorage]);
 
-  const getUserGroups = useCallback(() => {
+  const getUserGroups = useCallback((ignoreCache: boolean = false) => {
+    // 실시간 데이터 요청인 경우 캐시 무시
+    if (ignoreCache) {
+      console.log('[DATA CACHE] 실시간 그룹 데이터 요청 - 캐시 무시');
+      return [];
+    }
+    
     const isValid = isCacheValid('userGroups');
     if (isValid && cache.userGroups.length > 0) {
       // 로깅 제거 - 과도한 로그 방지

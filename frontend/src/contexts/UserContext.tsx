@@ -35,6 +35,9 @@ interface UserContextType {
   // 데이터 새로고침 함수
   refreshUserData: () => Promise<void>;
   
+  // 그룹 데이터 강제 새로고침 함수
+  forceRefreshGroups: () => Promise<Group[]>;
+  
   // 선택된 그룹
   selectedGroupId: number | null;
   setSelectedGroupId: (groupId: number | null) => void;
@@ -58,7 +61,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const { user, isLoggedIn, loading: authLoading, isPreloadingComplete } = useAuth();
   const { getUserProfile, getUserGroups } = useDataCache();
 
-  // 사용자 데이터 새로고침 함수 (캐시된 데이터만 사용)
+  // 사용자 데이터 새로고침 함수 (실시간 데이터 조회)
   const refreshUserData = useCallback(async () => {
     try {
       setIsUserDataLoading(true);
@@ -72,7 +75,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return;
       }
 
-      console.log('[UserContext] 캐시된 데이터로 사용자 정보 로딩:', user.mt_idx, user.mt_name);
+      console.log('[UserContext] 실시간 데이터 조회 시작:', user.mt_idx, user.mt_name);
       
       // 🔧 사용자 정보 로깅 (모든 사용자)
       console.log('🔧 [UserContext] 사용자 정보 확인:', {
@@ -105,148 +108,31 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       setUserInfo(userInfoData);
 
-      // 🔥 1. localStorage에서 그룹 데이터 최우선 확인
-      let groupsAcquired = false;
+      // 🔥 실시간 그룹 데이터 조회 (캐시 사용하지 않음)
+      console.log('[UserContext] 실시간 그룹 데이터 조회 시작');
       
-      if (typeof window !== 'undefined') {
-        try {
-          const storedGroups = localStorage.getItem('user_groups');
-          if (storedGroups) {
-            const groups = JSON.parse(storedGroups);
-            if (Array.isArray(groups) && groups.length > 0) {
-              console.log('[UserContext] 🔥 localStorage에서 그룹 데이터 발견:', groups.length, '개 (최우선 사용)');
-              // localStorage 그룹을 Group 타입으로 변환
-              const convertedGroups: Group[] = groups.map((group: any) => ({
-                sgt_idx: group.sgt_idx,
-                sgt_title: group.sgt_title || `그룹 ${group.sgt_idx}`,
-                sgt_content: group.sgt_intro || '',
-                sgt_memo: '',
-                mt_idx: user.mt_idx,
-                sgt_show: 'Y',
-                sgt_wdate: new Date().toISOString(),
-                member_count: group.member_count || group.memberCount || 0
-              }));
-              setUserGroups(convertedGroups);
-              groupsAcquired = true;
-              console.log('[UserContext] localStorage 그룹 데이터 설정 완료:', convertedGroups.map(g => ({
-                sgt_idx: g.sgt_idx,
-                sgt_title: g.sgt_title,
-                member_count: g.member_count
-              })));
-            }
+      try {
+        // groupService를 통해 최신 그룹 데이터 조회
+        const groupService = await import('@/services/groupService');
+        const groupsData = await groupService.default.getCurrentUserGroups(true); // 캐시 무시
+        
+        if (groupsData && groupsData.length > 0) {
+          console.log('[UserContext] ⚡ 실시간 그룹 데이터 획득:', groupsData.length, '개');
+          setUserGroups(groupsData);
+          
+          // 첫 번째 그룹을 기본 선택으로 설정
+          if (!selectedGroupId && groupsData.length > 0) {
+            setSelectedGroupId(groupsData[0].sgt_idx);
           }
-        } catch (error) {
-          console.warn('[UserContext] localStorage 그룹 데이터 파싱 실패:', error);
+        } else {
+          console.log('[UserContext] 사용자의 그룹이 없음');
+          setUserGroups([]);
+          setSelectedGroupId(null);
         }
-      }
-      
-      // 🔥 2. localStorage에 없으면 캐시된 그룹 데이터 사용
-      if (!groupsAcquired) {
-        const cachedGroups = getUserGroups();
-        if (cachedGroups && cachedGroups.length > 0) {
-          console.log('[UserContext] 캐시된 그룹 데이터 사용:', cachedGroups.length, '개');
-          // GroupInfo를 Group 타입으로 변환
-          const convertedGroups: Group[] = cachedGroups.map(group => ({
-            sgt_idx: group.sgt_idx,
-            sgt_title: group.sgt_title,
-            sgt_content: group.sgt_intro || '',
-            sgt_memo: '',
-            mt_idx: user.mt_idx, // 현재 사용자 ID
-            sgt_show: 'Y',
-            sgt_wdate: new Date().toISOString(),
-            member_count: group.member_count
-          }));
-          setUserGroups(convertedGroups);
-          groupsAcquired = true;
-        }
-      }
-      
-      // 🔥 3. 모든 방법이 실패한 경우에만 추가 시도
-      if (!groupsAcquired) {
-        console.log('[UserContext] 캐시된 그룹 데이터 없음, 다중 방법으로 데이터 확보 시도');
-        
-        let groupsAcquired = false;
-        
-                 // 방법 1: AuthContext 그룹 데이터 재확인
-         try {
-           console.log('[UserContext] 시도 1: AuthContext 그룹 데이터 재확인');
-           if (user?.groups && user.groups.length > 0) {
-             console.log('[UserContext] AuthContext에서 그룹 데이터 발견:', user.groups.length, '개');
-             // AuthContext 그룹을 Group 타입으로 변환
-             const authGroups: Group[] = user.groups.map(group => ({
-               sgt_idx: group.sgt_idx,
-               sgt_title: group.sgt_title || '그룹',
-               sgt_content: '',
-               sgt_memo: '',
-               mt_idx: user.mt_idx,
-               sgt_show: 'Y',
-               sgt_wdate: new Date().toISOString(),
-               member_count: group.memberCount || 1
-             }));
-             setUserGroups(authGroups);
-             groupsAcquired = true;
-           }
-         } catch (error) {
-           console.log('[UserContext] AuthContext 그룹 데이터 변환 실패:', error);
-         }
-        
-        // 방법 2: groupService 직접 사용
-        if (!groupsAcquired) {
-          try {
-            console.log('[UserContext] 시도 2: groupService 직접 호출');
-            const groupService = await import('@/services/groupService');
-            const groupsData = await groupService.default.getCurrentUserGroups();
-            
-            if (groupsData && groupsData.length > 0) {
-              console.log('[UserContext] ⚡ groupService로 그룹 데이터 획득:', groupsData.length, '개');
-              setUserGroups(groupsData);
-              groupsAcquired = true;
-            }
-          } catch (error) {
-            console.warn('[UserContext] groupService 직접 호출 실패:', error);
-          }
-        }
-        
-        // 방법 3: API 직접 호출 (기존 방법)
-        if (!groupsAcquired) {
-          try {
-            console.log('[UserContext] 시도 3: API 직접 호출');
-            const response = await fetch('/api/groups', {
-              headers: {
-                'Authorization': `Bearer ${localStorage.getItem('auth-token')}`,
-                'Content-Type': 'application/json'
-              }
-            });
-            
-            if (response.ok) {
-              const data = await response.json();
-              if (data.success && data.data) {
-                console.log('[UserContext] ⚡ API 직접 호출로 그룹 데이터 획득:', data.data.length, '개');
-                setUserGroups(data.data);
-                groupsAcquired = true;
-              }
-            }
-          } catch (apiError) {
-            console.warn('[UserContext] API 직접 호출 실패:', apiError);
-          }
-        }
-        
-        // 방법 4: 기본 그룹 생성 (모든 방법 실패 시)
-        if (!groupsAcquired) {
-          console.log('[UserContext] 모든 방법 실패, 기본 그룹 데이터 생성');
-          const defaultGroup: Group = {
-            sgt_idx: 641, // family 그룹 ID (하드코딩)
-            sgt_title: 'Family',
-            sgt_content: '기본 그룹',
-            sgt_memo: '',
-            mt_idx: user.mt_idx,
-            sgt_show: 'Y',
-            sgt_wdate: new Date().toISOString(),
-            member_count: 1
-          };
-          setUserGroups([defaultGroup]);
-          console.log('[UserContext] 기본 그룹 생성 완료:', defaultGroup.sgt_title);
-        }
+      } catch (error) {
+        console.error('[UserContext] 실시간 그룹 데이터 조회 실패:', error);
+        setUserGroups([]);
+        setSelectedGroupId(null);
       }
 
       console.log('[UserContext] 사용자 데이터 로딩 완료:', {
@@ -263,11 +149,64 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [isLoggedIn, user, getUserProfile, getUserGroups]);
 
+  // 🆕 그룹 데이터 강제 새로고침 함수 (실시간 조회)
+  const forceRefreshGroups = useCallback(async () => {
+    if (!isLoggedIn || !user) {
+      console.log('[UserContext] 그룹 강제 새로고침 - 로그인되지 않음');
+      return [];
+    }
+
+    console.log('[UserContext] 실시간 그룹 데이터 강제 새로고침 시작');
+    
+    try {
+      // groupService를 통해 최신 그룹 데이터 조회 (캐시 무시)
+      const groupService = await import('@/services/groupService');
+      const latestGroups = await groupService.default.getCurrentUserGroups(true); // true = 캐시 무시
+      
+      if (latestGroups && latestGroups.length > 0) {
+        console.log('[UserContext] ⚡ 실시간 그룹 데이터 조회 성공:', latestGroups.length, '개');
+        
+        setUserGroups(latestGroups);
+        
+        // 첫 번째 그룹을 기본 선택으로 설정 (선택된 그룹이 없는 경우)
+        if (!selectedGroupId && latestGroups.length > 0) {
+          setSelectedGroupId(latestGroups[0].sgt_idx);
+        }
+        
+        console.log('[UserContext] 실시간 그룹 데이터 새로고침 완료:', latestGroups.map(g => ({
+          sgt_idx: g.sgt_idx,
+          sgt_title: g.sgt_title,
+          member_count: g.member_count
+        })));
+        
+        return latestGroups;
+      } else {
+        console.log('[UserContext] 실시간 조회 결과: 그룹이 없음');
+        setUserGroups([]);
+        setSelectedGroupId(null);
+        return [];
+      }
+    } catch (error) {
+      console.error('[UserContext] 실시간 그룹 데이터 조회 실패:', error);
+      setUserGroups([]);
+      setSelectedGroupId(null);
+      return [];
+    }
+  }, [isLoggedIn, user, selectedGroupId]);
+
   // AuthContext 프리로딩 완료 후 데이터 새로고침
   useEffect(() => {
     // AuthContext 로딩이 완료되고 사용자 정보가 있으면 즉시 실행
     if (!authLoading && isLoggedIn && user) {
       console.log('[UserContext] 🚀 AuthContext 사용자 정보 확인, 즉시 데이터 로딩 시작:', user.mt_idx);
+      
+      // 개발 모드에서 앱 시작 시 강제로 그룹 데이터 초기화
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[UserContext] 개발 모드 - 그룹 데이터 강제 초기화');
+        setUserGroups([]);
+        setSelectedGroupId(null);
+      }
+      
       refreshUserData();
       return;
     }
@@ -297,14 +236,25 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [isPreloadingComplete, isLoggedIn, user, userInfo, refreshUserData]);
 
-  // 사용자 변경 시 초기화 상태 리셋
+  // 사용자 변경 시 완전한 데이터 초기화
   useEffect(() => {
     if (user?.mt_idx) {
-      console.log('[UserContext] 사용자 변경 감지, 초기화 상태 리셋:', user.mt_idx);
+      console.log('[UserContext] 사용자 변경 감지, 실시간 데이터 초기화:', user.mt_idx);
+      
+      // 모든 상태 초기화
       setIsInitialized(false);
       setSelectedGroupId(null);
+      setUserGroups([]);
+      setUserInfo(null);
+      setUserDataError(null);
+      setIsUserDataLoading(true);
+      
+      // 새로운 사용자 데이터 로딩 시작
+      setTimeout(() => {
+        refreshUserData();
+      }, 100);
     }
-  }, [user?.mt_idx]);
+  }, [user?.mt_idx, refreshUserData]);
 
   // 그룹 데이터 로딩 완료 후 첫 번째 그룹 자동 선택 (한 번만)
   useEffect(() => {
@@ -331,7 +281,8 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsUserDataLoading,
     userDataError,
     setUserDataError,
-    refreshUserData
+    refreshUserData,
+    forceRefreshGroups
   };
 
   return (
