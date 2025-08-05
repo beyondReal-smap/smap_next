@@ -3831,7 +3831,7 @@ const SignInPage = () => {
           <button
             type="submit"
             disabled={isLoading}
-            className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-base font-medium rounded-lg text-white disabled:opacity-70 transition-all transform hover:scale-105 active:scale-95 shadow-md"
+            className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-base font-medium rounded-lg text-white disabled:opacity-70 transition-all shadow-md"
             style={{backgroundColor: '#0113A3'}}
             onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#001f87'}
             onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#0113A3'}
@@ -3915,7 +3915,7 @@ const SignInPage = () => {
                     });
                 }}
                 disabled={isLoading}
-                className="w-full inline-flex items-center justify-center py-2.5 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none disabled:opacity-70 transition-all transform hover:scale-105 active:scale-95"
+                className="w-full inline-flex items-center justify-center py-2.5 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none disabled:opacity-70 transition-all"
                 style={{ 
                   zIndex: 100, 
                   position: 'relative',
