@@ -229,7 +229,7 @@ const InviteCodeSection = memo<{
   </div>
 ));
 
-// 통계 카드 컴포넌트 메모이제이션 - 애니메이션 제거
+// 통계 카드 컴포넌트 메모이제이션
 const StatsCards = memo<{
   groupsCount: number;
   totalMembers: number;
@@ -1693,43 +1693,12 @@ function GroupPageContent() {
 
                   {/* 통계 카드 */}
                   <div className="group-content">
-                  {loading ? (
-                    <div className="px-4 mb-4">
-                      <div className="grid grid-cols-2 gap-3">
-                        {/* 총 그룹 스켈레톤 */}
-                        <div 
-                          className="rounded-2xl p-4 text-white shadow-lg relative overflow-hidden"
-                          style={{ background: 'linear-gradient(to right, #0113A3, #001a8a)' }}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="h-4 bg-blue-200 rounded mb-2 animate-pulse" style={{ width: '60%' }}></div>
-                              <div className="h-8 bg-blue-200 rounded animate-pulse" style={{ width: '40%' }}></div>
-                            </div>
-                            <div className="w-8 h-8 bg-blue-200 rounded animate-pulse"></div>
-                          </div>
-                        </div>
-                        
-                        {/* 총 멤버 스켈레톤 */}
-                        <div 
-                          className="bg-gradient-to-r from-pink-600 to-pink-700 rounded-2xl p-4 text-white shadow-lg relative overflow-hidden"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="h-4 bg-pink-200 rounded mb-2 animate-pulse" style={{ width: '60%' }}></div>
-                              <div className="h-8 bg-pink-200 rounded animate-pulse" style={{ width: '40%' }}></div>
-                            </div>
-                            <div className="w-8 h-8 bg-pink-200 rounded animate-pulse"></div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <StatsCards
-                      groupsCount={groups.length}
-                      totalMembers={Object.values(groupMemberCounts).reduce((a, b) => a + b, 0)}
-                    />
-                  )}
+                    {!loading && (
+                      <StatsCards
+                        groupsCount={groups.length}
+                        totalMembers={Object.values(groupMemberCounts).reduce((a, b) => a + b, 0)}
+                      />
+                    )}
                   </div>
 
                   {/* 그룹 목록 */}
