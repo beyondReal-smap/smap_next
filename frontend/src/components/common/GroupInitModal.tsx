@@ -273,19 +273,19 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
           transition={{ type: "spring", damping: 20, stiffness: 300 }}
         >
           {/* 헤더 */}
-          <div className="bg-gradient-to-r from-indigo-600 to-blue-600 px-6 py-8 text-white relative">
+          <div className="bg-gradient-to-r from-[#0113A3] to-[#001a8a] px-6 py-2 text-white relative">
             <div className="text-center">
               <motion.div
-                className="inline-flex items-center justify-center w-16 h-16 bg-white/20 rounded-full mb-4"
+                className="inline-flex items-center justify-center w-16 h-16 bg-[#0113A3]/20 rounded-full"
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ delay: 0.2, type: "spring" }}
               >
-                <HiSparkles className="w-8 h-8" />
+                <HiSparkles className="w-7 h-7 text-yellow-300" />
               </motion.div>
               
-              <h2 className="text-2xl font-bold mb-2">SMAP 시작하기</h2>
-              <p className="text-indigo-100">
+              <h2 className="text-2xl font-bold mb-1">SMAP 시작하기</h2>
+              <p className="text-white opacity-90">
                 그룹을 만들거나 초대받은 그룹에 참여해보세요!
               </p>
             </div>
@@ -297,7 +297,7 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
               onClick={() => setActiveTab('create')}
               className={`flex-1 py-4 px-6 font-medium transition-colors ${
                 activeTab === 'create'
-                  ? 'bg-white text-indigo-600 border-b-2 border-indigo-600'
+                  ? 'bg-white text-[#0113A3] border-b-2 border-[#0113A3]'
                   : 'text-gray-600 hover:text-gray-800'
               }`}
             >
@@ -308,7 +308,7 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
               onClick={() => setActiveTab('join')}
               className={`flex-1 py-4 px-6 font-medium transition-colors ${
                 activeTab === 'join'
-                  ? 'bg-white text-indigo-600 border-b-2 border-indigo-600'
+                  ? 'bg-white text-[#0113A3] border-b-2 border-[#0113A3]'
                   : 'text-gray-600 hover:text-gray-800'
               }`}
             >
@@ -318,7 +318,7 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
           </div>
 
           {/* 콘텐츠 */}
-          <div className="px-6 pt-4 pb-1 min-h-[200px]">
+          <div className="px-6 pt-4 pb-0 min-h-[200px]">
             <AnimatePresence mode="wait">
               {activeTab === 'create' ? (
                 <motion.div
@@ -339,7 +339,7 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
                         value={groupName}
                         onChange={(e) => setGroupName(e.target.value)}
                         placeholder="예: 우리 가족, 직장 동료들"
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0113A3] focus:border-[#0113A3] outline-none transition-colors"
                         maxLength={20}
                       />
                     </div>
@@ -351,7 +351,7 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
                   <button
                     onClick={handleCreateGroup}
                     disabled={isLoading || !groupName.trim()}
-                    className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 text-white py-3 rounded-xl font-medium hover:from-indigo-700 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-auto"
+                    className="w-full bg-gradient-to-r from-[#0113A3] to-[#001a8a] text-white py-3 rounded-xl font-medium hover:from-[#001a8a] hover:to-[#0113A3] disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-auto"
                   >
                     {isLoading ? (
                       <div className="flex items-center justify-center">
@@ -387,7 +387,7 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
                           }
                         }}
                         placeholder="6자리 초대 코드 입력"
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors"
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0113A3] focus:border-[#0113A3] outline-none transition-colors"
                         maxLength={6}
                       />
                     </div>
@@ -399,7 +399,7 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
                   <button
                     onClick={handleJoinGroup}
                     disabled={isLoading || inviteCode.length !== 6}
-                    className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 text-white py-3 rounded-xl font-medium hover:from-indigo-700 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-auto"
+                    className="w-full bg-gradient-to-r from-[#0113A3] to-[#001a8a] text-white py-3 rounded-xl font-medium hover:from-[#001a8a] hover:to-[#0113A3] disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-auto"
                   >
                     {isLoading ? (
                       <div className="flex items-center justify-center">
