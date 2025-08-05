@@ -23,7 +23,7 @@ const isGroupJoinPage = (pathname: string) => {
   return isJoinPage;
 };
 
-import IOSCompatibleSpinner from '@/components/common/IOSCompatibleSpinner';
+
 
 // 인증 가드 컴포넌트 (리디렉션 로직 제거)
 function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -74,11 +74,8 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     handlePendingGroupJoin();
   }, [isLoggedIn, loading, router]);
 
-  // 로딩 중일 때만 스피너를 보여주고, 그 외에는 항상 children을 렌더링
+  // 로딩 중일 때도 children을 렌더링 (스피너 제거)
   // 리디렉션 책임은 하위의 (authenticated)/layout.tsx 로 위임
-  if (loading) {
-    return <IOSCompatibleSpinner message="로딩 중..." fullScreen />;
-  }
 
   return <>{children}</>;
 }
