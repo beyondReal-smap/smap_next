@@ -937,11 +937,19 @@ export default function HomePage() {
       });
       
       // 그룹이 없는 경우 모달 표시
+      console.log('[HOME] 그룹 상태 확인:', {
+        userGroups: userGroups,
+        userGroupsLength: userGroups?.length,
+        isLoggedIn,
+        user: user?.mt_idx
+      });
+      
       if (!userGroups || userGroups.length === 0) {
         console.log('[HOME] 그룹이 없어 초기화 모달 표시');
         setShowGroupInitModal(true);
       } else {
         // 그룹이 있으면 모달 닫기
+        console.log('[HOME] 그룹이 있어 모달 닫기');
         setShowGroupInitModal(false);
       }
     }

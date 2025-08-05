@@ -28,6 +28,8 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
   const [error, setError] = useState('');
   
   const { user } = useAuth();
+  
+  console.log('[GroupInitModal] 컴포넌트 렌더링:', { isOpen, user: user?.mt_idx });
   const { forceRefreshGroups } = useUser();
   const {
     permissionState,
@@ -289,7 +291,12 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
     onClose();
   };
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    console.log('[GroupInitModal] 모달이 닫혀있음 - 렌더링하지 않음');
+    return null;
+  }
+  
+  console.log('[GroupInitModal] 모달이 열려있음 - 렌더링 시작');
 
   return (
     <>
