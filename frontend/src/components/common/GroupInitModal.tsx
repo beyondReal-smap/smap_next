@@ -318,7 +318,7 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
           </div>
 
           {/* 콘텐츠 */}
-          <div className="px-6 pt-4 pb-0 min-h-[200px]">
+          <div className="px-6 pt-4 pb-0 min-h-[180px]">
             <AnimatePresence mode="wait">
               {activeTab === 'create' ? (
                 <motion.div
