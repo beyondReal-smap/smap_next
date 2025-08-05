@@ -3839,7 +3839,7 @@ const SignInPage = () => {
             onBlur={(e) => (e.target as HTMLButtonElement).style.boxShadow = ''}
           >
             {isLoading ? (
-              <LoadingSpinner message="로그인 중..." fullScreen={false} />
+              <LoadingSpinner message="로그인 중..." fullScreen={false} size="sm" type="spinner" />
             ) : (
               '전화번호로 로그인'
             )}
@@ -3924,8 +3924,14 @@ const SignInPage = () => {
                 onFocus={(e) => (e.target as HTMLButtonElement).style.boxShadow = '0 0 0 2px #0113A3'}
                 onBlur={(e) => (e.target as HTMLButtonElement).style.boxShadow = ''}
               >
-                <FcGoogle className="w-5 h-5 mr-3" aria-hidden="true" />
-                Google 계정으로 로그인
+                {isLoading ? (
+                  <LoadingSpinner message="로그인 중..." fullScreen={false} size="sm" type="spinner" />
+                ) : (
+                  <>
+                    <FcGoogle className="w-5 h-5 mr-3" aria-hidden="true" />
+                    Google 계정으로 로그인
+                  </>
+                )}
               </button>
               
               {/* iOS WebView 안내 메시지 */}
