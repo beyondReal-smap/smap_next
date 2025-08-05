@@ -281,7 +281,7 @@ const sidebarVariants = {
     filter: 'blur(1px)',
     boxShadow: '0 0 0 rgba(0,0,0,0)',
     transition: {
-      duration: 0.4
+      duration: 0.6
     }
   },
   open: {
@@ -291,7 +291,7 @@ const sidebarVariants = {
     filter: 'blur(0px)',
     boxShadow: '0 8px 32px rgba(31,41,55,0.18), 0 1.5px 6px rgba(0,0,0,0.08)',
     transition: {
-      duration: 0.5
+      duration: 0.7
     }
   }
 };
@@ -312,7 +312,8 @@ const sidebarOverlayVariants = {
 const sidebarContentVariants = {
   closed: {
     opacity: 0,
-    x: -20,
+    x: -30,
+    scale: 0.98,
     transition: {
       duration: 0.2
     }
@@ -320,8 +321,10 @@ const sidebarContentVariants = {
   open: {
     opacity: 1,
     x: 0,
+    scale: 1,
     transition: {
-      duration: 0.3
+      duration: 0.25,
+      delay: 0.05
     }
   }
 };
@@ -329,16 +332,10 @@ const sidebarContentVariants = {
 // 멤버 아이템 애니메이션 - 간단한 슬라이딩 애니메이션
 const memberItemVariants = {
   closed: { 
-    opacity: 0,
-    x: -30
+    opacity: 1
   },
   open: { 
-    opacity: 1,
-    x: 0,
-    transition: {
-      duration: 0.3,
-      ease: "easeOut" as const
-    }
+    opacity: 1
   }
 };
 

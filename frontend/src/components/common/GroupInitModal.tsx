@@ -262,7 +262,6 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          onClick={handleClose}
         />
 
         {/* 모달 콘텐츠 */}
@@ -275,13 +274,6 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
         >
           {/* 헤더 */}
           <div className="bg-gradient-to-r from-indigo-600 to-blue-600 px-6 py-8 text-white relative">
-            <button
-              onClick={handleClose}
-              className="absolute top-4 right-4 p-2 rounded-full hover:bg-white/20 transition-colors"
-            >
-              <FiX className="w-6 h-6" />
-            </button>
-            
             <div className="text-center">
               <motion.div
                 className="inline-flex items-center justify-center w-16 h-16 bg-white/20 rounded-full mb-4"
