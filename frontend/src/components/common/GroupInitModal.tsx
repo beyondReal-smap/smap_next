@@ -29,7 +29,12 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
   
   const { user } = useAuth();
   
-  console.log('[GroupInitModal] 컴포넌트 렌더링:', { isOpen, user: user?.mt_idx });
+  console.log('[GroupInitModal] 컴포넌트 렌더링:', { 
+    isOpen, 
+    user: user?.mt_idx,
+    timestamp: new Date().toISOString(),
+    componentMounted: true
+  });
   const { forceRefreshGroups } = useUser();
   const {
     permissionState,
@@ -153,7 +158,10 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
 
   // 그룹 생성 핸들러
   const handleCreateGroup = useCallback(async () => {
+    console.log('[GroupInitModal] 그룹 생성 버튼 클릭됨');
+    
     if (!groupName.trim()) {
+      console.log('[GroupInitModal] 그룹명이 비어있음');
       setError('그룹명을 입력해주세요.');
       return;
     }
@@ -212,7 +220,10 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
 
   // 그룹 가입 핸들러
   const handleJoinGroup = useCallback(async () => {
+    console.log('[GroupInitModal] 그룹 가입 버튼 클릭됨');
+    
     if (!inviteCode.trim()) {
+      console.log('[GroupInitModal] 초대 코드가 비어있음');
       setError('초대 코드를 입력해주세요.');
       return;
     }
@@ -297,9 +308,22 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
   }
   
   console.log('[GroupInitModal] 모달이 열려있음 - 렌더링 시작');
+  
+  // 🚨 강제 로그 (항상 표시)
+  console.log('🚨 [GroupInitModal] 강제 로그 - 모달이 열려있습니다!');
+  console.log('🚨 [GroupInitModal] 현재 상태:', {
+    isOpen,
+    user: user?.mt_idx,
+    activeTab,
+    groupName,
+    inviteCode,
+    isLoading,
+    error
+  });
 
-  return (
+    return (
     <>
+      {console.log('[GroupInitModal] JSX 렌더링 시작')}
       <AnimatePresence>
         <motion.div
           className="fixed inset-0 z-[9999] flex items-center justify-center p-4"

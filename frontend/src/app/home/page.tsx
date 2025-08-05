@@ -941,7 +941,8 @@ export default function HomePage() {
         userGroups: userGroups,
         userGroupsLength: userGroups?.length,
         isLoggedIn,
-        user: user?.mt_idx
+        user: user?.mt_idx,
+        showGroupInitModal: showGroupInitModal
       });
       
       if (!userGroups || userGroups.length === 0) {
@@ -970,6 +971,7 @@ export default function HomePage() {
   
   // 🆕 그룹 초기화 모달 핸들러
   const handleGroupInitSuccess = useCallback(async () => {
+    console.log('[HOME] 그룹 초기화 성공 - 모달 닫기');
     console.log('[HOME] 그룹 초기화 성공');
     setShowGroupInitModal(false);
     
@@ -1044,6 +1046,37 @@ export default function HomePage() {
       delete (window as any).closeCurrentInfoWindow;
     };
   }, []);
+
+  // 🧪 개발자 도구에서 테스트용 전역 함수
+  useEffect(() => {
+    (window as any).__TEST_GROUP_INIT_MODAL__ = {
+      showModal: () => {
+        console.log('[TEST] GroupInitModal 강제 표시');
+        setShowGroupInitModal(true);
+      },
+      hideModal: () => {
+        console.log('[TEST] GroupInitModal 강제 숨김');
+        setShowGroupInitModal(false);
+      },
+      checkStatus: () => {
+        console.log('[TEST] 현재 상태:', {
+          showGroupInitModal,
+          userGroups: userGroups?.length,
+          isLoggedIn,
+          user: user?.mt_idx
+        });
+      }
+    };
+    
+    console.log('[TEST] 전역 테스트 함수 등록 완료:');
+    console.log('  - window.__TEST_GROUP_INIT_MODAL__.showModal()');
+    console.log('  - window.__TEST_GROUP_INIT_MODAL__.hideModal()');
+    console.log('  - window.__TEST_GROUP_INIT_MODAL__.checkStatus()');
+    
+    return () => {
+      delete (window as any).__TEST_GROUP_INIT_MODAL__;
+    };
+  }, [showGroupInitModal, userGroups, isLoggedIn, user]);
    
     // 데이터 캐시 컨텍스트
     const { 
