@@ -109,14 +109,24 @@ async def handle_location_log_request(
         elif act == "create_location_log":
             # 위치 로그 생성
             try:
+                print(f"📍 [BACKEND] 위치 로그 생성 요청 수신:")
+                print(f"   📍 mt_idx: {body.get('mt_idx')}")
+                print(f"   📍 위도: {body.get('mlt_lat')}")
+                print(f"   📍 경도: {body.get('mlt_long')}")
+                print(f"   📍 정확도: {body.get('mlt_accuracy')}")
+                print(f"   📍 속도: {body.get('mlt_speed')}")
+                print(f"   📍 소스: {body.get('source')}")
+                
                 log_data = MemberLocationLogCreate(**body)
                 result = location_log_crud.create_location_log(db, log_data)
                 logger.info(f"Location log created successfully: {result.mlt_idx}")
+                print(f"✅ [BACKEND] 위치 로그 생성 성공: {result.mlt_idx}")
                 return {"result": "Y", "data": result.to_dict()}
                 
             except Exception as e:
                 logger.error(f"Error creating location log: {str(e)}")
                 logger.error(traceback.format_exc())
+                print(f"❌ [BACKEND] 위치 로그 생성 실패: {str(e)}")
                 raise HTTPException(status_code=500, detail=str(e))
         
         elif act == "update_location_log":

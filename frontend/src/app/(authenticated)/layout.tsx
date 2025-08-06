@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import AppLayout from '../components/layout/AppLayout';
+import locationTrackingService from '@/services/locationTrackingService';
 
 // 범용 로딩 스피너 컴포넌트
 function FullPageSpinner() {
@@ -29,6 +30,41 @@ export default function AuthenticatedLayout({
       router.push('/signin');
     }
   }, [isLoggedIn, loading, router]);
+
+  // 로그인 후 위치 추적 시작
+  useEffect(() => {
+    if (isLoggedIn && !loading) {
+      console.log('📍 [AUTH_LAYOUT] 로그인 확인됨, 위치 추적 시작');
+      
+      // 위치 추적 시작
+      locationTrackingService.startTracking({
+        enableHighAccuracy: true,
+        distanceFilter: 10, // 10미터마다 업데이트
+        updateInterval: 30000 // 30초마다 업데이트
+      });
+
+      // 위치 업데이트 콜백 등록
+      locationTrackingService.onLocationUpdate((location) => {
+        console.log('📍 [AUTH_LAYOUT] 위치 업데이트 수신:', {
+          lat: location.latitude,
+          lng: location.longitude,
+          accuracy: location.accuracy,
+          source: location.source
+        });
+      });
+
+      // 에러 콜백 등록
+      locationTrackingService.onError((error) => {
+        console.error('📍 [AUTH_LAYOUT] 위치 추적 오류:', error);
+      });
+
+      // 컴포넌트 언마운트 시 위치 추적 중지
+      return () => {
+        console.log('📍 [AUTH_LAYOUT] 레이아웃 언마운트, 위치 추적 중지');
+        locationTrackingService.stopTracking();
+      };
+    }
+  }, [isLoggedIn, loading]);
 
   // 로딩 중일 때는 로딩 화면을 보여줌
   if (loading) {

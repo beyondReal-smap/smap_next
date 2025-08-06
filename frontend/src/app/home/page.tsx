@@ -98,6 +98,7 @@ import {
 } from '../../utils/domainDetection';
 
 import memberService from '@/services/memberService';
+import LocationTrackingStatus from '@/components/common/LocationTrackingStatus';
 import GroupInitModal from '@/components/common/GroupInitModal';
 import scheduleService from '../../services/scheduleService';
 import groupService from '@/services/groupService';
@@ -6469,6 +6470,9 @@ export default function HomePage() {
                 onClose={handleGroupInitClose}
                 onSuccess={handleGroupInitSuccess}
               />
+              
+              {/* 📍 위치 추적 상태 표시 */}
+              <LocationTrackingStatus />
       </>
     );
   } catch (renderError) {

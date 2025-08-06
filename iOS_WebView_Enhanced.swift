@@ -1222,6 +1222,12 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
         case "requestLocationPermission":
             print("📍 [LOCATION] 위치 권한 요청 수신!")
             handleLocationPermissionRequest(param: param)
+        case "startLocationTracking":
+            print("📍 [LOCATION] 지속적 위치 추적 시작 요청!")
+            handleStartLocationTracking(param: param)
+        case "stopLocationTracking":
+            print("📍 [LOCATION] 지속적 위치 추적 중지 요청!")
+            handleStopLocationTracking(param: param)
         case "openSettings":
             print("⚙️ [SETTINGS] 설정 열기 요청!")
             handleOpenSettings()
@@ -1550,6 +1556,39 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
         }
     }
     
+    private func handleStartLocationTracking(param: Any?) {
+        print("📍 [LOCATION] 지속적 위치 추적 시작 요청")
+        
+        // 위치 서비스 활성화 상태 확인
+        guard CLLocationManager.locationServicesEnabled() else {
+            print("❌ [LOCATION] 위치 서비스가 비활성화됨")
+            return
+        }
+        
+        // 위치 권한 상태 확인
+        let locationManager = CLLocationManager()
+        let authorizationStatus = locationManager.authorizationStatus
+        
+        switch authorizationStatus {
+        case .authorizedWhenInUse, .authorizedAlways:
+            print("✅ [LOCATION] 권한 있음 - 지속적 위치 추적 시작")
+            startContinuousLocationTracking()
+        case .denied, .restricted:
+            print("❌ [LOCATION] 권한 거부됨 - 지속적 위치 추적 불가")
+        case .notDetermined:
+            print("⏳ [LOCATION] 권한 미결정 - 권한 요청 후 추적 시작")
+            requestLocationPermission()
+        @unknown default:
+            print("❓ [LOCATION] 알 수 없는 권한 상태")
+        }
+    }
+    
+    private func handleStopLocationTracking(param: Any?) {
+        print("📍 [LOCATION] 지속적 위치 추적 중지 요청")
+        stopContinuousLocationTracking()
+    }
+    }
+    
     private func requestLocationPermission() {
         print("📍 [LOCATION] 위치 권한 요청 시작")
         
@@ -1572,6 +1611,30 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
         
         // 위치 매니저를 유지하기 위해 프로퍼티로 저장
         self.locationManager = locationManager
+    }
+    
+    private func startContinuousLocationTracking() {
+        print("📍 [LOCATION] 지속적 위치 추적 시작")
+        
+        let locationManager = CLLocationManager()
+        locationManager.delegate = self
+        locationManager.desiredAccuracy = kCLLocationAccuracyBest
+        locationManager.distanceFilter = 10 // 10미터마다 업데이트
+        locationManager.startUpdatingLocation()
+        
+        // 위치 매니저를 유지하기 위해 프로퍼티로 저장
+        self.locationManager = locationManager
+        
+        print("✅ [LOCATION] 지속적 위치 추적 활성화됨")
+    }
+    
+    private func stopContinuousLocationTracking() {
+        print("📍 [LOCATION] 지속적 위치 추적 중지")
+        
+        locationManager?.stopUpdatingLocation()
+        locationManager = nil
+        
+        print("✅ [LOCATION] 지속적 위치 추적 중지됨")
     }
     
     private func showLocationPermissionAlert() {
@@ -1667,6 +1730,38 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
             }
         }
     }
+    
+    private func sendLocationUpdateToWeb(latitude: Double, longitude: Double, accuracy: Double, speed: Double, altitude: Double, timestamp: Date) {
+        print("📍 [LOCATION] 지속적 위치 업데이트 웹으로 전송")
+        
+        let timestampMs = Int(timestamp.timeIntervalSince1970 * 1000)
+        let resultScript = """
+            if (window.onLocationUpdate) {
+                console.log('📍 [iOS-NATIVE] 지속적 위치 업데이트 콜백 실행');
+                window.onLocationUpdate({
+                    latitude: \(latitude),
+                    longitude: \(longitude),
+                    accuracy: \(accuracy),
+                    speed: \(speed),
+                    altitude: \(altitude),
+                    timestamp: \(timestampMs),
+                    source: 'ios-native-continuous'
+                });
+            } else {
+                console.log('⚠️ [iOS-NATIVE] onLocationUpdate 함수를 찾을 수 없습니다');
+            }
+        """
+        
+        DispatchQueue.main.async {
+            self.webView?.evaluateJavaScript(resultScript) { result, error in
+                if let error = error {
+                    print("❌ [LOCATION] 지속적 위치 업데이트 웹 콜백 실행 실패: \(error)")
+                } else {
+                    print("✅ [LOCATION] 지속적 위치 업데이트 웹 콜백 실행 완료")
+                }
+            }
+        }
+    }
 }
 
 // MARK: - 📍 CLLocationManagerDelegate
@@ -1678,8 +1773,8 @@ extension EnhancedWebViewController: CLLocationManagerDelegate {
         switch status {
         case .authorizedWhenInUse, .authorizedAlways:
             print("✅ [LOCATION] 위치 권한 허용됨")
-            // 권한이 허용되면 위치 정보 가져오기
-            getCurrentLocation()
+            // 권한이 허용되면 지속적인 위치 추적 시작
+            startContinuousLocationTracking()
         case .denied, .restricted:
             print("❌ [LOCATION] 위치 권한 거부됨")
             sendLocationPermissionResult(success: false, error: "위치 권한이 거부되었습니다")
@@ -1710,16 +1805,19 @@ extension EnhancedWebViewController: CLLocationManagerDelegate {
         print("   📍 시간: \(location.timestamp)")
         print("   📍 신호 품질: \(location.horizontalAccuracy < 10 ? "우수" : location.horizontalAccuracy < 50 ? "양호" : "보통")")
         
-        // 위치 매니저 정리
-        locationManager?.stopUpdatingLocation()
-        locationManager = nil
+        // 지속적인 위치 추적을 위해 위치 매니저를 정리하지 않음
+        // locationManager?.stopUpdatingLocation()
+        // locationManager = nil
         
-        // 웹으로 결과 전송
+        // 웹으로 결과 전송 (지속적 업데이트)
         print("🌐 [LOCATION] 웹뷰로 GPS 데이터 전송 시작")
-        sendLocationPermissionResult(
-            success: true,
+        sendLocationUpdateToWeb(
             latitude: location.coordinate.latitude,
-            longitude: location.coordinate.longitude
+            longitude: location.coordinate.longitude,
+            accuracy: location.horizontalAccuracy,
+            speed: location.speed,
+            altitude: location.altitude,
+            timestamp: location.timestamp
         )
     }
     
