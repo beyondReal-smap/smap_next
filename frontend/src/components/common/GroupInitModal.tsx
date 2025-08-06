@@ -347,7 +347,7 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
     <>
       {console.log('[GroupInitModal] JSX 렌더링 시작')}
       {/* 🚨 DOM에 직접 로그 표시 */}
-      <div style={{
+      {/* <div style={{
         position: 'fixed',
         top: '10px',
         left: '10px',
@@ -365,7 +365,7 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
         user: {user?.mt_idx || '없음'}
         <br />
         activeTab: {activeTab}
-      </div>
+      </div> */}
       <AnimatePresence>
         <motion.div
           className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
