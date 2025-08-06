@@ -107,6 +107,12 @@ class CRUDMember:
             except ValueError:
                 pass
         
+        # 위치 정보 로깅
+        print(f"📍 [BACKEND] 회원가입 위치 정보 처리:")
+        print(f"   📍 위도: {obj_in.mt_lat}")
+        print(f"   📍 경도: {obj_in.mt_long}")
+        print(f"   📍 위치 정보 타입: {type(obj_in.mt_lat)}, {type(obj_in.mt_long)}")
+        
         db_obj = self.model(
             mt_type=obj_in.mt_type,
             mt_level=obj_in.mt_level,
@@ -214,6 +220,11 @@ class CRUDMember:
 
     def update_location(self, db: Session, *, user: Member, lat: float, lng: float) -> Member:
         """위치 정보 업데이트"""
+        print(f"📍 [BACKEND] 위치 정보 업데이트:")
+        print(f"   📍 사용자 ID: {user.mt_idx}")
+        print(f"   📍 기존 위치: {user.mt_lat}, {user.mt_long}")
+        print(f"   📍 새 위치: {lat}, {lng}")
+        
         user.mt_lat = lat
         user.mt_long = lng
         user.mt_udate = datetime.utcnow()

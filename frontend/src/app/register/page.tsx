@@ -471,8 +471,15 @@ export default function RegisterPage() {
     // iOS 위치 권한 요청 성공 콜백
     (window as any).onLocationPermissionGranted = (locationData: any) => {
       console.log('🎯 [LOCATION CALLBACK] iOS 위치 권한 허용 및 위치 정보 수신:', locationData);
+      console.log('📊 [LOCATION CALLBACK] GPS 데이터 상세 정보:');
+      console.log('   📍 위도:', locationData?.latitude);
+      console.log('   📍 경도:', locationData?.longitude);
+      console.log('   📍 정확도:', locationData?.accuracy);
+      console.log('   📍 타임스탬프:', locationData?.timestamp);
+      console.log('   📍 소스:', locationData?.source);
       
       if (locationData && locationData.latitude && locationData.longitude) {
+        console.log('✅ [LOCATION CALLBACK] 유효한 GPS 데이터 확인됨');
         setRegisterData(prev => ({
           ...prev,
           mt_lat: locationData.latitude,
@@ -481,8 +488,15 @@ export default function RegisterPage() {
         setLocationLoading(false);
         setLocationError('');
         console.log('✅ [LOCATION CALLBACK] 위치 정보 저장 완료');
+        console.log('📝 [LOCATION CALLBACK] 저장된 위치:', { lat: locationData.latitude, lng: locationData.longitude });
       } else {
         console.log('⚠️ [LOCATION CALLBACK] 위치 데이터가 불완전함, 웹 API로 폴백');
+        console.log('❌ [LOCATION CALLBACK] 누락된 데이터:', {
+          hasLatitude: !!locationData?.latitude,
+          hasLongitude: !!locationData?.longitude,
+          latitude: locationData?.latitude,
+          longitude: locationData?.longitude
+        });
         requestLocationWithWebAPI();
       }
     };

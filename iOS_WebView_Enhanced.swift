@@ -1692,19 +1692,30 @@ extension EnhancedWebViewController: CLLocationManagerDelegate {
     }
     
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        print("📍 [LOCATION] GPS 데이터 수신 시작 - 위치 개수: \(locations.count)")
+        
         guard let location = locations.last else {
             print("❌ [LOCATION] 위치 정보 없음")
             sendLocationPermissionResult(success: false, error: "위치 정보를 가져올 수 없습니다")
             return
         }
         
-        print("✅ [LOCATION] 위치 정보 수신: \(location.coordinate.latitude), \(location.coordinate.longitude)")
+        // GPS 데이터 상세 정보 로깅
+        print("✅ [LOCATION] GPS 데이터 수신 성공:")
+        print("   📍 위도: \(location.coordinate.latitude)")
+        print("   📍 경도: \(location.coordinate.longitude)")
+        print("   📍 정확도: \(location.horizontalAccuracy)m")
+        print("   📍 고도: \(location.altitude)m")
+        print("   📍 속도: \(location.speed)m/s")
+        print("   📍 시간: \(location.timestamp)")
+        print("   📍 신호 품질: \(location.horizontalAccuracy < 10 ? "우수" : location.horizontalAccuracy < 50 ? "양호" : "보통")")
         
         // 위치 매니저 정리
         locationManager?.stopUpdatingLocation()
         locationManager = nil
         
         // 웹으로 결과 전송
+        print("🌐 [LOCATION] 웹뷰로 GPS 데이터 전송 시작")
         sendLocationPermissionResult(
             success: true,
             latitude: location.coordinate.latitude,
