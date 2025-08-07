@@ -32,6 +32,12 @@ class LocationTrackingService {
   }
 
   private setupNativeCallbacks() {
+    // 서버 사이드 렌더링 체크
+    if (typeof window === 'undefined') {
+      console.log('📍 [LOCATION TRACKING] 서버 사이드 렌더링 환경 - 네이티브 콜백 설정 건너뜀');
+      return;
+    }
+    
     console.log('📍 [LOCATION TRACKING] 네이티브 콜백 설정 시작');
     
     // iOS 네이티브 지속적 위치 업데이트 콜백
@@ -132,6 +138,12 @@ class LocationTrackingService {
   }
 
   private getCurrentUser() {
+    // 서버 사이드 렌더링 체크
+    if (typeof window === 'undefined') {
+      console.log('📍 [LOCATION TRACKING] 서버 사이드 렌더링 환경 - 사용자 정보 조회 건너뜀');
+      return null;
+    }
+    
     try {
       // 여러 가능한 키에서 사용자 정보 찾기
       const possibleKeys = ['user', 'smap_user_data', 'auth_user'];
@@ -203,6 +215,11 @@ class LocationTrackingService {
 
   // 사용자 정보가 로드되면 이전 위치 데이터도 전송
   private checkAndSendPendingLocations() {
+    // 서버 사이드 렌더링 체크
+    if (typeof window === 'undefined') {
+      return;
+    }
+    
     const user = this.getCurrentUser();
     if (user?.mt_idx && this.lastLocation && !this.lastLocation.mt_idx) {
       console.log('📍 [LOCATION TRACKING] 사용자 정보 로드됨 - 이전 위치 데이터 전송');
@@ -212,12 +229,23 @@ class LocationTrackingService {
   }
 
   private isNativeApp(): boolean {
+    // 서버 사이드 렌더링 체크
+    if (typeof window === 'undefined') {
+      return false;
+    }
+    
     return !!(window as any).webkit?.messageHandlers?.smapIos || 
            !!(window as any).SmapApp ||
            /SMAP/i.test(navigator.userAgent);
   }
 
   private startNativeLocationTracking() {
+    // 서버 사이드 렌더링 체크
+    if (typeof window === 'undefined') {
+      console.log('📍 [LOCATION TRACKING] 서버 사이드 렌더링 환경 - 네이티브 위치 추적 건너뜀');
+      return;
+    }
+    
     console.log('📍 [LOCATION TRACKING] 네이티브 위치 추적 시작');
     
     // iOS 네이티브 위치 추적 시작
@@ -241,6 +269,12 @@ class LocationTrackingService {
   }
 
   private startWebLocationTracking(options: any) {
+    // 서버 사이드 렌더링 체크
+    if (typeof window === 'undefined') {
+      console.log('📍 [LOCATION TRACKING] 서버 사이드 렌더링 환경 - 웹 위치 추적 건너뜀');
+      return;
+    }
+    
     console.log('🌐 [LOCATION TRACKING] 웹 브라우저 위치 추적 시작');
     
     if (!navigator.geolocation) {
@@ -271,6 +305,12 @@ class LocationTrackingService {
   }
 
   public stopTracking() {
+    // 서버 사이드 렌더링 체크
+    if (typeof window === 'undefined') {
+      console.log('📍 [LOCATION TRACKING] 서버 사이드 렌더링 환경 - 위치 추적 중지 건너뜀');
+      return;
+    }
+    
     if (!this.isTracking) {
       console.log('📍 [LOCATION TRACKING] 추적 중이 아닙니다');
       return;
@@ -317,6 +357,11 @@ class LocationTrackingService {
 
   // 사용자 정보가 로드되었을 때 호출 (외부에서 사용)
   public onUserLogin() {
+    // 서버 사이드 렌더링 체크
+    if (typeof window === 'undefined') {
+      return;
+    }
+    
     console.log('📍 [LOCATION TRACKING] 사용자 로그인 감지 - 위치 데이터 확인');
     this.checkAndSendPendingLocations();
   }
