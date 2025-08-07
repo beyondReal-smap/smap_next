@@ -38,11 +38,23 @@ class EnhancedWebViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         
+        print("🚀 [INIT] viewDidLoad 시작")
         logSystemInfo()
+        print("🚀 [INIT] 시스템 정보 로깅 완료")
+        
         setupNetworkMonitoring()
+        print("🚀 [INIT] 네트워크 모니터링 설정 완료")
+        
         setupWebView()
+        print("🚀 [INIT] 웹뷰 설정 완료")
+        
         setupUI()
+        print("🚀 [INIT] UI 설정 완료")
+        
         loadWebsite()
+        print("🚀 [INIT] 웹사이트 로드 요청 완료")
+        
+        print("🚀 [INIT] viewDidLoad 완료")
     }
     
     // MARK: - 📱 시스템 정보 로깅
@@ -505,12 +517,18 @@ class EnhancedWebViewController: UIViewController {
     
     // MARK: - 🛠️ WebView 설정 (최적화된)
     private func setupWebView() {
+        print("🛠️ [WebView] 웹뷰 설정 시작")
+        
         let config = createOptimizedWebViewConfiguration()
+        print("🛠️ [WebView] 설정 객체 생성 완료")
+        
         webView = WKWebView(frame: view.bounds, configuration: config)
+        print("🛠️ [WebView] 웹뷰 인스턴스 생성 완료")
         
         // Delegates 설정
         webView.navigationDelegate = self
         webView.uiDelegate = self
+        print("🛠️ [WebView] 델리게이트 설정 완료")
         
         // 🔍 웹 인스펙터 활성화 (Safari 개발자 도구 연결용)
         if #available(iOS 16.4, *) {
@@ -1921,6 +1939,10 @@ extension EnhancedWebViewController: CLLocationManagerDelegate {
         print("   📍 속도: \(location.speed)m/s")
         print("   📍 시간: \(location.timestamp)")
         print("   📍 신호 품질: \(location.horizontalAccuracy < 10 ? "우수" : location.horizontalAccuracy < 50 ? "양호" : "보통")")
+        
+        // 📊 사용자 ID 강제 설정 테스트
+        print("mt_idx - 1")  // 임시로 사용자 ID 1로 설정
+        print("📍 [LOCATION] 임시 사용자 ID 설정: 1")
         
         // 지속적인 위치 추적을 위해 위치 매니저를 정리하지 않음
         // locationManager?.stopUpdatingLocation()
