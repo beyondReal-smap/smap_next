@@ -1732,7 +1732,14 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
     }
     
     private func sendLocationUpdateToWeb(latitude: Double, longitude: Double, accuracy: Double, speed: Double, altitude: Double, timestamp: Date) {
-        print("📍 [LOCATION] 지속적 위치 업데이트 웹으로 전송")
+        print("📍 [LOCATION] 지속적 위치 업데이트 웹으로 전송 시작")
+        print("📍 [LOCATION] 전송할 데이터:")
+        print("   📍 위도: \(latitude)")
+        print("   📍 경도: \(longitude)")
+        print("   📍 정확도: \(accuracy)")
+        print("   📍 속도: \(speed)")
+        print("   📍 고도: \(altitude)")
+        print("   📍 타임스탬프: \(timestamp)")
         
         let timestampMs = Int(timestamp.timeIntervalSince1970 * 1000)
         let resultScript = """
@@ -1753,12 +1760,17 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
             }
         """
         
+        print("📍 [LOCATION] JavaScript 스크립트 생성 완료")
+        print("📍 [LOCATION] webView 존재 여부: \(self.webView != nil)")
+        
         DispatchQueue.main.async {
+            print("📍 [LOCATION] 메인 큐에서 JavaScript 실행 시작")
             self.webView?.evaluateJavaScript(resultScript) { result, error in
                 if let error = error {
                     print("❌ [LOCATION] 지속적 위치 업데이트 웹 콜백 실행 실패: \(error)")
                 } else {
                     print("✅ [LOCATION] 지속적 위치 업데이트 웹 콜백 실행 완료")
+                    print("📍 [LOCATION] JavaScript 실행 결과: \(result ?? "null")")
                 }
             }
         }
@@ -1812,6 +1824,7 @@ extension EnhancedWebViewController: CLLocationManagerDelegate {
         
         // 웹으로 결과 전송 (지속적 업데이트)
         print("🌐 [LOCATION] 웹뷰로 GPS 데이터 전송 시작")
+        print("🌐 [LOCATION] sendLocationUpdateToWeb 함수 호출 시작")
         sendLocationUpdateToWeb(
             latitude: location.coordinate.latitude,
             longitude: location.coordinate.longitude,
@@ -1820,6 +1833,7 @@ extension EnhancedWebViewController: CLLocationManagerDelegate {
             altitude: location.altitude,
             timestamp: location.timestamp
         )
+        print("🌐 [LOCATION] sendLocationUpdateToWeb 함수 호출 완료")
     }
     
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {

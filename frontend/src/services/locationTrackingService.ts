@@ -27,6 +27,7 @@ class LocationTrackingService {
   private errorCallbacks: ((error: any) => void)[] = [];
 
   constructor() {
+    console.log('📍 [LOCATION TRACKING] LocationTrackingService 인스턴스 생성');
     this.setupNativeCallbacks();
   }
 
