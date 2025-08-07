@@ -1781,6 +1781,72 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
             }
         }
     }
+    
+    // MARK: - 🔍 JavaScript 환경 확인
+    
+    private func checkJavaScriptEnvironment() {
+        print("🔍 [DEBUG] JavaScript 환경 확인 시작")
+        
+        let checkScript = """
+            console.log('🔍 [iOS-NATIVE] JavaScript 환경 확인 시작');
+            console.log('🔍 [iOS-NATIVE] locationTrackingService 존재 여부:', typeof window.locationTrackingService);
+            console.log('🔍 [iOS-NATIVE] onLocationUpdate 존재 여부:', typeof window.onLocationUpdate);
+            console.log('🔍 [iOS-NATIVE] window.webkit:', typeof window.webkit);
+            console.log('🔍 [iOS-NATIVE] messageHandlers:', typeof window.webkit?.messageHandlers);
+            console.log('🔍 [iOS-NATIVE] smapIos:', typeof window.webkit?.messageHandlers?.smapIos);
+            
+            // 강제로 onLocationUpdate 함수 등록
+            if (typeof window.onLocationUpdate !== 'function') {
+                console.log('⚠️ [iOS-NATIVE] onLocationUpdate 함수가 없음 - 임시 함수 등록');
+                window.onLocationUpdate = function(data) {
+                    console.log('📍 [TEMP] 임시 onLocationUpdate 함수 호출:', data);
+                };
+            }
+            
+            'JavaScript 환경 확인 완료';
+        """
+        
+        webView?.evaluateJavaScript(checkScript) { result, error in
+            if let error = error {
+                print("❌ [DEBUG] JavaScript 환경 확인 실패: \(error)")
+            } else {
+                print("✅ [DEBUG] JavaScript 환경 확인 성공: \(result ?? "nil")")
+            }
+        }
+    }
+    
+    private func forceConsoleOutput() {
+        print("🔊 [DEBUG] 강제 콘솔 출력 시작")
+        
+        let forceScript = """
+            console.log('🔊 [FORCE-CONSOLE] ===========================================');
+            console.log('🔊 [FORCE-CONSOLE] 강제 콘솔 출력 테스트');
+            console.log('🔊 [FORCE-CONSOLE] 현재 URL:', window.location.href);
+            console.log('🔊 [FORCE-CONSOLE] 페이지 로드 시간:', new Date().toISOString());
+            console.log('🔊 [FORCE-CONSOLE] ===========================================');
+            
+            // 1초마다 10번 반복 출력
+            let count = 0;
+            const interval = setInterval(() => {
+                count++;
+                console.log(`🔊 [FORCE-CONSOLE] 반복 출력 ${count}/10 - Safari 웹 인스펙터 확인하세요!`);
+                if (count >= 10) {
+                    clearInterval(interval);
+                    console.log('🔊 [FORCE-CONSOLE] 반복 출력 완료');
+                }
+            }, 1000);
+            
+            '강제 콘솔 출력 시작';
+        """
+        
+        webView?.evaluateJavaScript(forceScript) { result, error in
+            if let error = error {
+                print("❌ [DEBUG] 강제 콘솔 출력 실패: \(error)")
+            } else {
+                print("✅ [DEBUG] 강제 콘솔 출력 시작: \(result ?? "nil")")
+            }
+        }
+    }
 }
 
 // MARK: - 📍 CLLocationManagerDelegate
@@ -1831,6 +1897,10 @@ extension EnhancedWebViewController: CLLocationManagerDelegate {
         // 웹으로 결과 전송 (지속적 업데이트)
         print("🌐 [LOCATION] 웹뷰로 GPS 데이터 전송 시작")
         print("🌐 [LOCATION] sendLocationUpdateToWeb 함수 호출 시작")
+        print("🌐 [LOCATION] 전송할 좌표: \(location.coordinate.latitude), \(location.coordinate.longitude)")
+        print("🌐 [LOCATION] 웹뷰 상태: \(webView != nil ? "존재함" : "없음")")
+        print("🌐 [LOCATION] 웹뷰 URL: \(webView?.url?.absoluteString ?? "nil")")
+        
         sendLocationUpdateToWeb(
             latitude: location.coordinate.latitude,
             longitude: location.coordinate.longitude,
@@ -1894,6 +1964,16 @@ extension EnhancedWebViewController: WKNavigationDelegate {
         }
         
         retryCount = 0 // 성공 시 재시도 카운트 리셋
+        
+        // 페이지 로드 완료 후 JavaScript 환경 확인
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            self.checkJavaScriptEnvironment()
+        }
+        
+        // 웹 콘솔에 강제로 메시지 출력
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            self.forceConsoleOutput()
+        }
         
         // 페이지 로드 완료 후 App-Bound Domain 상태 확인
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
