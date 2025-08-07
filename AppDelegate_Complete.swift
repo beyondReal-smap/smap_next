@@ -27,9 +27,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         window = UIWindow(frame: UIScreen.main.bounds)
         
         // 최적화된 WebView 컨트롤러 사용
+        print("🔥🔥🔥 [CRITICAL] AppDelegate에서 EnhancedWebViewController 생성 시작! 🔥🔥🔥")
         let webViewController = EnhancedWebViewController()
+        print("🔥🔥🔥 [CRITICAL] EnhancedWebViewController 생성 완료! 🔥🔥🔥")
         window?.rootViewController = webViewController
+        print("🔥🔥🔥 [CRITICAL] rootViewController 설정 완료! 🔥🔥🔥")
         window?.makeKeyAndVisible()
+        print("🔥🔥🔥 [CRITICAL] window 표시 완료! 🔥🔥🔥")
         
         // 앱 설정 최적화
         setupAppOptimizations()

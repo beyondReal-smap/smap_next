@@ -38,6 +38,12 @@ class EnhancedWebViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         
+        // ⚠️ 매우 명확한 로그로 이 코드가 실행되는지 확인
+        print("=" * 80)
+        print("🔥🔥🔥 [CRITICAL] EnhancedWebViewController.viewDidLoad 실행됨! 🔥🔥🔥")
+        print("🔥🔥🔥 [CRITICAL] 이 로그가 보이면 코드가 실행되고 있습니다! 🔥🔥🔥")
+        print("=" * 80)
+        
         print("🚀 [INIT] viewDidLoad 시작")
         logSystemInfo()
         print("🚀 [INIT] 시스템 정보 로깅 완료")
@@ -1922,6 +1928,7 @@ extension EnhancedWebViewController: CLLocationManagerDelegate {
     }
     
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        print("🔥🔥🔥 [CRITICAL] didUpdateLocations 호출됨! EnhancedWebViewController 사용 중! 🔥🔥🔥")
         print("📍 [LOCATION] GPS 데이터 수신 시작 - 위치 개수: \(locations.count)")
         
         guard let location = locations.last else {
