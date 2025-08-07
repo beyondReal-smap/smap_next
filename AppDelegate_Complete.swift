@@ -170,6 +170,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                 case .denied:
                     print("❌ [Firebase] 푸시 알림 권한이 거부되어 있음")
                     print("❌ [Firebase] 사용자가 설정에서 직접 권한을 허용해야 합니다")
+                    print("❌ [Firebase] 권한 거부로 인해 APNS 등록을 건너뜁니다")
                     
                 case .notDetermined:
                     print("🔄 [Firebase] 푸시 알림 권한이 아직 결정되지 않음 - 권한 요청 시작")
@@ -251,6 +252,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                     
                 case .denied:
                     print("❌ [Firebase] 푸시 알림 권한이 거부되어 있음")
+                    print("❌ [Firebase] APNS 토큰 없이 FCM 토큰 가져오기 건너뜁니다")
                     
                 case .notDetermined:
                     print("🔄 [Firebase] 푸시 알림 권한이 아직 결정되지 않음")
@@ -268,6 +270,21 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     private func checkFirebaseTokenStatus() {
         print("🔍 [Firebase] FCM 토큰 상태 확인")
         
+        // 푸시 알림 권한 상태를 먼저 확인
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            DispatchQueue.main.async {
+                if settings.authorizationStatus == .denied {
+                    print("❌ [Firebase] 푸시 권한 거부됨 - FCM 토큰 확인 건너뜀")
+                    return
+                }
+                
+                print("🔍 [Firebase] 권한 허용됨 - FCM 토큰 가져오기 시도")
+                self.performTokenCheck()
+            }
+        }
+    }
+    
+    private func performTokenCheck() {
         Messaging.messaging().token { token, error in
             DispatchQueue.main.async {
                 if let error = error {
@@ -337,39 +354,48 @@ extension AppDelegate: MessagingDelegate {
         print("🔥 [Firebase] FCM 토큰 업데이트 델리게이트 호출됨")
         print("🔥 [Firebase] 새로운 FCM 토큰: \(fcmToken ?? "nil")")
         
-        if let token = fcmToken {
-            print("✅ [Firebase] 유효한 FCM 토큰 수신됨")
-            print("🔔 [Firebase] FCM 토큰 전체: \(token)")
-            
-            // 사용자가 제공한 토큰과 비교
-            let userProvidedToken = "fz6CAxDq4UVBmoaEdMtIHZ:APA91bG3i8_fwzaYnHOn9zQVLQdtZ0ZsmFY9EY0U1VGO1CPePWMTjsY1ls6Gpu6Dj44jDIq35AW-uZMWj6NjwO0lWV0O8RqWcvhuCez4Pv_jvncLg98zzFI"
-            if token == userProvidedToken {
-                print("✅ [Firebase] 새 토큰이 사용자 제공 토큰과 일치함")
-            } else {
-                print("⚠️ [Firebase] 새 토큰이 사용자 제공 토큰과 다름")
-                print("⚠️ [Firebase] 델리게이트 토큰: \(token)")
-                print("⚠️ [Firebase] 제공된 토큰: \(userProvidedToken)")
-            }
-            
-            // 현재 푸시 알림 권한 상태도 함께 확인
-            UNUserNotificationCenter.current().getNotificationSettings { settings in
-                DispatchQueue.main.async {
-                    print("🔥 [Firebase] 토큰 업데이트 시 권한 상태: \(self.authorizationStatusString(settings.authorizationStatus))")
-                    
-                    if settings.authorizationStatus == .denied {
-                        print("❌ [Firebase] 경고: FCM 토큰은 있지만 푸시 알림 권한이 거부됨!")
-                    } else if settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional {
-                        print("✅ [Firebase] FCM 토큰과 푸시 알림 권한 모두 정상!")
-                    }
+        // 권한 상태 확인 먼저
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            DispatchQueue.main.async {
+                print("🔥 [Firebase] 토큰 업데이트 시 권한 상태: \(self.authorizationStatusString(settings.authorizationStatus))")
+                
+                if settings.authorizationStatus == .denied {
+                    print("❌ [Firebase] 경고: FCM 토큰은 있지만 푸시 알림 권한이 거부됨!")
+                    print("❌ [Firebase] 토큰: \(fcmToken ?? "nil")")
+                    return
+                }
+                
+                if let token = fcmToken {
+                    self.handleValidFCMToken(token, settings: settings)
+                } else {
+                    print("❌ [Firebase] FCM 토큰이 nil입니다 - Firebase 설정을 확인해주세요")
                 }
             }
-            
-            // FCM 토큰을 서버에 전송하는 로직을 여기에 추가할 수 있습니다
-            // 예: sendTokenToServer(token)
-            
-        } else {
-            print("❌ [Firebase] FCM 토큰이 nil입니다 - Firebase 설정을 확인해주세요")
         }
+    }
+    
+    private func handleValidFCMToken(_ token: String, settings: UNNotificationSettings) {
+        print("✅ [Firebase] 유효한 FCM 토큰 수신됨")
+        print("🔔 [Firebase] FCM 토큰 전체: \(token)")
+        
+        // 사용자가 제공한 토큰과 비교
+        let userProvidedToken = "fz6CAxDq4UVBmoaEdMtIHZ:APA91bG3i8_fwzaYnHOn9zQVLQdtZ0ZsmFY9EY0U1VGO1CPePWMTjsY1ls6Gpu6Dj44jDIq35AW-uZMWj6NjwO0lWV0O8RqWcvhuCez4Pv_jvncLg98zzFI"
+        if token == userProvidedToken {
+            print("✅ [Firebase] 새 토큰이 사용자 제공 토큰과 일치함")
+        } else {
+            print("⚠️ [Firebase] 새 토큰이 사용자 제공 토큰과 다름")
+            print("⚠️ [Firebase] 델리게이트 토큰: \(token)")
+            print("⚠️ [Firebase] 제공된 토큰: \(userProvidedToken)")
+        }
+        
+        if settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional {
+            print("✅ [Firebase] FCM 토큰과 푸시 알림 권한 모두 정상!")
+        } else {
+            print("⚠️ [Firebase] FCM 토큰은 있지만 권한 상태: \(authorizationStatusString(settings.authorizationStatus))")
+        }
+        
+        // FCM 토큰을 서버에 전송하는 로직을 여기에 추가할 수 있습니다
+        // 예: sendTokenToServer(token)
     }
 }
 
