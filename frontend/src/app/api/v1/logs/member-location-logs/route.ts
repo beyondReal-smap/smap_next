@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// SMAP iOS 위치 로그 API 라우터 - 405 에러 해결용
 const BACKEND_URL = process.env.BACKEND_URL || 'https://118.67.130.71:8000';
 
 async function fetchWithFallback(url: string, options: any = {}): Promise<any> {
