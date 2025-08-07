@@ -282,6 +282,141 @@ window.SmapApp = {
         showToast: function(message) {
             window.SmapApp.sendMessage('showToast', { message: message });
         }
+    },
+
+    // 🆕 사용자 정보 전송 (프론트엔드 → iOS)
+    user: {
+        // 로그인된 사용자 정보를 iOS로 전송
+        sendUserInfo: function(userInfo) {
+            console.log('👤 [iOS Bridge] 사용자 정보 iOS로 전송:', userInfo);
+            
+            const userData = {
+                mt_idx: userInfo.mt_idx,
+                mt_id: userInfo.mt_id,
+                mt_name: userInfo.mt_name,
+                mt_email: userInfo.mt_email,
+                isLoggedIn: true,
+                timestamp: Date.now()
+            };
+            
+            window.SmapApp.sendMessage('userInfo', userData);
+            
+            // 💾 로컬스토리지에도 저장 (iOS에서 필요시 접근)
+            try {
+                localStorage.setItem('smap_user_info', JSON.stringify(userData));
+                console.log('👤 [iOS Bridge] 사용자 정보 로컬스토리지 저장 완료');
+            } catch (error) {
+                console.error('👤 [iOS Bridge] 로컬스토리지 저장 실패:', error);
+            }
+        },
+
+        // 로그아웃 시 사용자 정보 제거
+        clearUserInfo: function() {
+            console.log('👤 [iOS Bridge] 사용자 정보 제거');
+            
+            window.SmapApp.sendMessage('userLogout', {
+                isLoggedIn: false,
+                timestamp: Date.now()
+            });
+            
+            try {
+                localStorage.removeItem('smap_user_info');
+                console.log('👤 [iOS Bridge] 로컬스토리지 사용자 정보 제거 완료');
+            } catch (error) {
+                console.error('👤 [iOS Bridge] 로컬스토리지 제거 실패:', error);
+            }
+        },
+
+        // iOS에서 사용자 정보 요청 시 응답
+        getUserInfo: function() {
+            try {
+                const userInfo = localStorage.getItem('smap_user_info');
+                if (userInfo) {
+                    const parsedInfo = JSON.parse(userInfo);
+                    console.log('👤 [iOS Bridge] 저장된 사용자 정보 반환:', parsedInfo);
+                    return parsedInfo;
+                }
+            } catch (error) {
+                console.error('👤 [iOS Bridge] 사용자 정보 조회 실패:', error);
+            }
+            
+            console.log('👤 [iOS Bridge] 저장된 사용자 정보 없음');
+            return null;
+        },
+
+        // 🆕 자동으로 사용자 정보 확인 및 전송
+        checkAndSendUserInfo: function() {
+            console.log('👤 [iOS Bridge] 자동 사용자 정보 확인 시작');
+            
+            try {
+                // 1. 로컬스토리지에서 사용자 정보 확인
+                const storedUserInfo = localStorage.getItem('smap_user_info');
+                if (storedUserInfo) {
+                    const userInfo = JSON.parse(storedUserInfo);
+                    console.log('👤 [iOS Bridge] 로컬스토리지에서 사용자 정보 발견:', userInfo);
+                    this.sendUserInfo(userInfo);
+                    return;
+                }
+                
+                // 2. 전역 변수에서 사용자 정보 확인
+                if (window.currentUser) {
+                    console.log('👤 [iOS Bridge] 전역 변수에서 사용자 정보 발견:', window.currentUser);
+                    this.sendUserInfo(window.currentUser);
+                    return;
+                }
+                
+                // 3. Auth 컨텍스트에서 사용자 정보 확인 (Next.js)
+                if (window.authContext && window.authContext.user) {
+                    console.log('👤 [iOS Bridge] Auth 컨텍스트에서 사용자 정보 발견:', window.authContext.user);
+                    this.sendUserInfo(window.authContext.user);
+                    return;
+                }
+                
+                // 4. 쿠키에서 사용자 정보 확인
+                const userCookie = this.getCookie('user_info');
+                if (userCookie) {
+                    try {
+                        const userInfo = JSON.parse(decodeURIComponent(userCookie));
+                        console.log('👤 [iOS Bridge] 쿠키에서 사용자 정보 발견:', userInfo);
+                        this.sendUserInfo(userInfo);
+                        return;
+                    } catch (e) {
+                        console.error('👤 [iOS Bridge] 쿠키 파싱 실패:', e);
+                    }
+                }
+                
+                // 5. 세션스토리지에서 사용자 정보 확인
+                const sessionUserInfo = sessionStorage.getItem('user_info') || sessionStorage.getItem('smap_user');
+                if (sessionUserInfo) {
+                    try {
+                        const userInfo = JSON.parse(sessionUserInfo);
+                        console.log('👤 [iOS Bridge] 세션스토리지에서 사용자 정보 발견:', userInfo);
+                        this.sendUserInfo(userInfo);
+                        return;
+                    } catch (e) {
+                        console.error('👤 [iOS Bridge] 세션스토리지 파싱 실패:', e);
+                    }
+                }
+                
+                console.log('⚠️ [iOS Bridge] 사용자 정보를 찾을 수 없음 - 나중에 다시 시도');
+                
+                // 5초 후 다시 시도
+                setTimeout(() => {
+                    this.checkAndSendUserInfo();
+                }, 5000);
+                
+            } catch (error) {
+                console.error('❌ [iOS Bridge] 자동 사용자 정보 확인 중 오류:', error);
+            }
+        },
+
+        // 쿠키 헬퍼 함수
+        getCookie: function(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return null;
+        }
     }
 };
 
@@ -406,6 +541,11 @@ document.addEventListener('DOMContentLoaded', function() {
         setTimeout(() => {
             window.SmapApp.device.getInfo();
         }, 500);
+        
+        // 🆕 사용자 정보 자동 전송 (1초 후)
+        setTimeout(() => {
+            window.SmapApp.user.checkAndSendUserInfo();
+        }, 1000);
     } else {
         console.log('[iOS Bridge] 웹 브라우저 환경에서 실행 중');
     }

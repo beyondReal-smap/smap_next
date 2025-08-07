@@ -1288,6 +1288,12 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
         case "requestNotificationPermission":
             print("🔔 [PUSH] 푸시 알림 권한 요청 수신!")
             handleNotificationPermissionRequest(param: param)
+        case "userInfo":
+            print("👤 [USER] 사용자 정보 수신!")
+            handleUserInfo(param: param)
+        case "userLogout":
+            print("👤 [USER] 사용자 로그아웃 수신!")
+            handleUserLogout(param: param)
         case "openSettings":
             print("⚙️ [SETTINGS] 설정 열기 요청!")
             handleOpenSettings()
@@ -2237,6 +2243,96 @@ extension EnhancedWebViewController: WKUIDelegate {
             completionHandler(false)
         })
         present(alert, animated: true)
+    }
+    
+    // MARK: - 👤 사용자 정보 처리
+    
+    private func handleUserInfo(param: Any?) {
+        print("👤 [USER] 사용자 정보 처리 시작")
+        
+        guard let paramDict = param as? [String: Any] else {
+            print("❌ [USER] 유효하지 않은 사용자 정보 형식")
+            return
+        }
+        
+        guard let mtIdx = paramDict["mt_idx"] as? String, !mtIdx.isEmpty else {
+            print("❌ [USER] mt_idx가 없거나 비어있음")
+            return
+        }
+        
+        let mtId = paramDict["mt_id"] as? String ?? ""
+        let mtName = paramDict["mt_name"] as? String ?? ""
+        let mtEmail = paramDict["mt_email"] as? String ?? ""
+        
+        print("✅ [USER] 사용자 정보 수신 성공:")
+        print("   👤 mt_idx: \(mtIdx)")
+        print("   👤 mt_id: \(mtId)")
+        print("   👤 mt_name: \(mtName)")
+        print("   👤 mt_email: \(mtEmail)")
+        
+        // 💾 UserDefaults에 저장
+        UserDefaults.standard.set(mtIdx, forKey: "mt_idx")
+        UserDefaults.standard.set(mtId, forKey: "mt_id")
+        UserDefaults.standard.set(mtName, forKey: "mt_name")
+        UserDefaults.standard.set(mtEmail, forKey: "mt_email")
+        UserDefaults.standard.set(true, forKey: "is_logged_in")
+        
+        print("💾 [USER] 사용자 정보 로컬 저장 완료")
+        
+        // 📍 LocationService에 사용자 정보 전달
+        LocationService.sharedInstance.updateUserInfo(mtIdx: mtIdx, mtId: mtId, mtName: mtName)
+        
+        // 🌐 웹뷰로 확인 응답 전송
+        let confirmationScript = """
+            console.log('✅ [iOS-USER] 사용자 정보 저장 완료:', {
+                mt_idx: '\(mtIdx)',
+                mt_name: '\(mtName)',
+                timestamp: new Date().toISOString()
+            });
+        """
+        
+        DispatchQueue.main.async {
+            self.webView.evaluateJavaScript(confirmationScript) { result, error in
+                if let error = error {
+                    print("❌ [USER] 웹뷰 확인 스크립트 실행 실패: \(error)")
+                } else {
+                    print("✅ [USER] 웹뷰에 사용자 정보 저장 완료 알림")
+                }
+            }
+        }
+    }
+    
+    private func handleUserLogout(param: Any?) {
+        print("👤 [USER] 사용자 로그아웃 처리 시작")
+        
+        // 💾 UserDefaults에서 사용자 정보 제거
+        UserDefaults.standard.removeObject(forKey: "mt_idx")
+        UserDefaults.standard.removeObject(forKey: "mt_id")
+        UserDefaults.standard.removeObject(forKey: "mt_name")
+        UserDefaults.standard.removeObject(forKey: "mt_email")
+        UserDefaults.standard.set(false, forKey: "is_logged_in")
+        
+        print("💾 [USER] 로컬 사용자 정보 제거 완료")
+        
+        // 📍 LocationService에 로그아웃 알림
+        LocationService.sharedInstance.clearUserInfo()
+        
+        // 🌐 웹뷰로 확인 응답 전송
+        let confirmationScript = """
+            console.log('✅ [iOS-USER] 사용자 로그아웃 처리 완료:', {
+                timestamp: new Date().toISOString()
+            });
+        """
+        
+        DispatchQueue.main.async {
+            self.webView.evaluateJavaScript(confirmationScript) { result, error in
+                if let error = error {
+                    print("❌ [USER] 웹뷰 로그아웃 확인 스크립트 실행 실패: \(error)")
+                } else {
+                    print("✅ [USER] 웹뷰에 로그아웃 완료 알림")
+                }
+            }
+        }
     }
 }
 
