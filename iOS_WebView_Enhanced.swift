@@ -1743,6 +1743,9 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
         
         let timestampMs = Int(timestamp.timeIntervalSince1970 * 1000)
         let resultScript = """
+            console.log('📍 [iOS-NATIVE] 위치 업데이트 스크립트 실행 시작');
+            console.log('📍 [iOS-NATIVE] window.onLocationUpdate 존재 여부:', typeof window.onLocationUpdate);
+            
             if (window.onLocationUpdate) {
                 console.log('📍 [iOS-NATIVE] 지속적 위치 업데이트 콜백 실행');
                 window.onLocationUpdate({
@@ -1754,13 +1757,17 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
                     timestamp: \(timestampMs),
                     source: 'ios-native-continuous'
                 });
+                console.log('📍 [iOS-NATIVE] 위치 업데이트 콜백 실행 완료');
             } else {
                 console.log('⚠️ [iOS-NATIVE] onLocationUpdate 함수를 찾을 수 없습니다');
+                console.log('⚠️ [iOS-NATIVE] window 객체 확인:', typeof window);
+                console.log('⚠️ [iOS-NATIVE] window 속성들:', Object.keys(window).filter(key => key.includes('Location') || key.includes('location')));
             }
         """
         
         print("📍 [LOCATION] JavaScript 스크립트 생성 완료")
         print("📍 [LOCATION] webView 존재 여부: \(self.webView != nil)")
+        print("📍 [LOCATION] webView URL: \(self.webView?.url?.absoluteString ?? "nil")")
         
         DispatchQueue.main.async {
             print("📍 [LOCATION] 메인 큐에서 JavaScript 실행 시작")

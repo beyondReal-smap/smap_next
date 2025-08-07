@@ -35,6 +35,10 @@ export default function AuthenticatedLayout({
   useEffect(() => {
     if (isLoggedIn && !loading) {
       console.log('📍 [AUTH_LAYOUT] 로그인 확인됨, 위치 추적 시작');
+      console.log('📍 [AUTH_LAYOUT] locationTrackingService 상태:', {
+        isTracking: locationTrackingService.isCurrentlyTracking(),
+        lastLocation: locationTrackingService.getLastLocation()
+      });
       
       // 위치 추적 시작
       locationTrackingService.startTracking({

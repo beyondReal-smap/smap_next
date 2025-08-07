@@ -32,6 +32,8 @@ class LocationTrackingService {
   }
 
   private setupNativeCallbacks() {
+    console.log('📍 [LOCATION TRACKING] 네이티브 콜백 설정 시작');
+    
     // iOS 네이티브 지속적 위치 업데이트 콜백
     (window as any).onLocationUpdate = (locationData: LocationData) => {
       console.log('📍 [LOCATION TRACKING] iOS 네이티브 지속적 위치 업데이트:', locationData);
@@ -43,6 +45,9 @@ class LocationTrackingService {
       console.log('📍 [LOCATION TRACKING] Android 네이티브 지속적 위치 업데이트:', locationData);
       this.handleLocationUpdate(locationData);
     };
+    
+    console.log('📍 [LOCATION TRACKING] 네이티브 콜백 설정 완료');
+    console.log('📍 [LOCATION TRACKING] window.onLocationUpdate 등록됨:', typeof (window as any).onLocationUpdate);
   }
 
   private handleLocationUpdate(locationData: LocationData) {
