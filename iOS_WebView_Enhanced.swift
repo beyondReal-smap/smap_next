@@ -1100,9 +1100,41 @@ class EnhancedWebViewController: UIViewController {
         request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
         
         print("🌐 [WebView] 웹사이트 로드 시작: \(targetURL)")
+        print("🌐 [WebView] 요청 타임아웃: \(requestTimeout)초")
+        print("🌐 [WebView] 캐시 정책: \(cachePolicy.rawValue)")
+        print("🌐 [WebView] 웹뷰 상태: \(webView != nil ? "생성됨" : "없음")")
         os_log("🌐 [Navigation] 로드 시작: %{public}@", log: Self.navigationLog, type: .info, targetURL)
         
         webView.load(request)
+        
+        // 5초 후 로드 상태 강제 확인
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+            self.checkLoadStatus()
+        }
+    }
+    
+    private func checkLoadStatus() {
+        print("🔍 [WebView] 로드 상태 확인:")
+        print("   - 현재 URL: \(webView?.url?.absoluteString ?? "nil")")
+        print("   - 로딩 중: \(webView?.isLoading ?? false)")
+        print("   - 제목: \(webView?.title ?? "nil")")
+        print("   - 진행률: \(webView?.estimatedProgress ?? 0)")
+        
+        // 강제로 JavaScript 실행 테스트
+        webView?.evaluateJavaScript("document.readyState") { result, error in
+            print("🔍 [WebView] document.readyState: \(result ?? "error")")
+            if let error = error {
+                print("❌ [WebView] JavaScript 실행 오류: \(error)")
+            }
+        }
+        
+        // 현재 페이지 HTML 확인
+        webView?.evaluateJavaScript("document.documentElement.outerHTML.length") { result, error in
+            print("🔍 [WebView] HTML 길이: \(result ?? "error")")
+            if let error = error {
+                print("❌ [WebView] HTML 조회 오류: \(error)")
+            }
+        }
     }
     
     // MARK: - 📊 성능 모니터링
@@ -1951,7 +1983,7 @@ extension EnhancedWebViewController: CLLocationManagerDelegate {
 extension EnhancedWebViewController: WKNavigationDelegate {
     
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
-        print("🧭 [Navigation] 로딩 시작")
+        print("🧭 [Navigation] 로딩 시작: \(webView.url?.absoluteString ?? "unknown")")
         pageLoadStartTime = Date()
     }
     
@@ -1988,6 +2020,9 @@ extension EnhancedWebViewController: WKNavigationDelegate {
     
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         print("❌ [Navigation] 로딩 실패: \(error.localizedDescription)")
+        print("❌ [Navigation] 에러 코드: \((error as NSError).code)")
+        print("❌ [Navigation] 에러 도메인: \((error as NSError).domain)")
+        print("❌ [Navigation] 시도한 URL: \(webView.url?.absoluteString ?? "unknown")")
         os_log("❌ [Navigation] 로딩 실패: %{public}@", log: Self.navigationLog, type: .error, error.localizedDescription)
         
         // 네트워크 에러인 경우 자동 재시도
