@@ -20,8 +20,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Firebase Messaging 델리게이트 설정
         Messaging.messaging().delegate = self
         
-        // 푸시 알림 권한 요청
-        requestNotificationPermission()
+        // Firebase 초기화 완료 후 푸시 알림 권한 요청 (약간의 지연)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            self.requestNotificationPermission()
+        }
         
         // 윈도우 생성
         window = UIWindow(frame: UIScreen.main.bounds)
@@ -128,6 +130,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         
         // 앱 활성화 시 성능 최적화
         WebViewCacheManager.shared.optimizeForPerformance()
+        
+        // 앱이 활성화될 때마다 푸시 알림 권한 상태 확인
+        checkCurrentNotificationStatus()
     }
     
     func applicationWillTerminate(_ application: UIApplication) {
@@ -140,19 +145,148 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     // MARK: - 🔔 푸시 알림 설정
     
     private func requestNotificationPermission() {
-        print("🔔 [Firebase] 푸시 알림 권한 요청 시작")
+        print("🔔 [Firebase] 푸시 알림 권한 처리 시작")
+        
+        let center = UNUserNotificationCenter.current()
+        
+        // 먼저 현재 권한 상태를 확인
+        center.getNotificationSettings { settings in
+            DispatchQueue.main.async {
+                print("🔔 [Firebase] 현재 알림 권한 상태: \(settings.authorizationStatus.rawValue)")
+                print("🔔 [Firebase] 알림 권한 상태 상세:")
+                print("   - authorizationStatus: \(self.authorizationStatusString(settings.authorizationStatus))")
+                print("   - notificationCenterSetting: \(settings.notificationCenterSetting.rawValue)")
+                print("   - lockScreenSetting: \(settings.lockScreenSetting.rawValue)")
+                print("   - carPlaySetting: \(settings.carPlaySetting.rawValue)")
+                print("   - alertSetting: \(settings.alertSetting.rawValue)")
+                print("   - badgeSetting: \(settings.badgeSetting.rawValue)")
+                print("   - soundSetting: \(settings.soundSetting.rawValue)")
+                
+                switch settings.authorizationStatus {
+                case .authorized, .provisional:
+                    print("✅ [Firebase] 푸시 알림 권한이 이미 허용되어 있음")
+                    self.registerForRemoteNotifications()
+                    
+                case .denied:
+                    print("❌ [Firebase] 푸시 알림 권한이 거부되어 있음")
+                    print("❌ [Firebase] 사용자가 설정에서 직접 권한을 허용해야 합니다")
+                    
+                case .notDetermined:
+                    print("🔄 [Firebase] 푸시 알림 권한이 아직 결정되지 않음 - 권한 요청 시작")
+                    self.performActualPermissionRequest()
+                    
+                case .ephemeral:
+                    print("⏱️ [Firebase] 임시 푸시 알림 권한")
+                    self.registerForRemoteNotifications()
+                    
+                @unknown default:
+                    print("❓ [Firebase] 알 수 없는 푸시 알림 권한 상태")
+                    self.performActualPermissionRequest()
+                }
+            }
+        }
+    }
+    
+    private func performActualPermissionRequest() {
+        print("🔔 [Firebase] 실제 푸시 알림 권한 요청 시작")
         
         let center = UNUserNotificationCenter.current()
         center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
             DispatchQueue.main.async {
+                print("🔔 [Firebase] 푸시 알림 권한 요청 결과 수신")
+                print("🔔 [Firebase] 권한 허용 여부: \(granted)")
+                
+                if let error = error {
+                    print("❌ [Firebase] 권한 요청 중 오류 발생: \(error.localizedDescription)")
+                    print("❌ [Firebase] 오류 상세: \(error)")
+                }
+                
                 if granted {
-                    print("✅ [Firebase] 푸시 알림 권한 허용됨")
+                    print("✅ [Firebase] 사용자가 푸시 알림 권한을 허용함")
                     self.registerForRemoteNotifications()
                 } else {
-                    print("❌ [Firebase] 푸시 알림 권한 거부됨")
-                    if let error = error {
-                        print("❌ [Firebase] 권한 요청 오류: \(error)")
+                    print("❌ [Firebase] 사용자가 푸시 알림 권한을 거부함")
+                    
+                    // 권한 거부 후 현재 상태를 다시 확인
+                    center.getNotificationSettings { newSettings in
+                        DispatchQueue.main.async {
+                            print("❌ [Firebase] 권한 거부 후 현재 상태: \(self.authorizationStatusString(newSettings.authorizationStatus))")
+                        }
                     }
+                }
+            }
+        }
+    }
+    
+    private func authorizationStatusString(_ status: UNAuthorizationStatus) -> String {
+        switch status {
+        case .notDetermined:
+            return "notDetermined (결정되지 않음)"
+        case .denied:
+            return "denied (거부됨)"
+        case .authorized:
+            return "authorized (허용됨)"
+        case .provisional:
+            return "provisional (임시 허용)"
+        case .ephemeral:
+            return "ephemeral (임시)"
+        @unknown default:
+            return "unknown (알 수 없음)"
+        }
+    }
+    
+    private func checkCurrentNotificationStatus() {
+        print("🔍 [Firebase] 현재 푸시 알림 권한 상태 확인 시작")
+        
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationSettings { settings in
+            DispatchQueue.main.async {
+                print("🔍 [Firebase] 앱 활성화 시 권한 상태: \(self.authorizationStatusString(settings.authorizationStatus))")
+                
+                switch settings.authorizationStatus {
+                case .authorized, .provisional:
+                    print("✅ [Firebase] 푸시 알림 권한이 허용되어 있음 - 토큰 갱신 확인")
+                    // 권한이 허용되어 있으면 토큰이 제대로 등록되어 있는지 확인
+                    self.checkFirebaseTokenStatus()
+                    
+                case .denied:
+                    print("❌ [Firebase] 푸시 알림 권한이 거부되어 있음")
+                    
+                case .notDetermined:
+                    print("🔄 [Firebase] 푸시 알림 권한이 아직 결정되지 않음")
+                    
+                case .ephemeral:
+                    print("⏱️ [Firebase] 임시 푸시 알림 권한")
+                    
+                @unknown default:
+                    print("❓ [Firebase] 알 수 없는 푸시 알림 권한 상태")
+                }
+            }
+        }
+    }
+    
+    private func checkFirebaseTokenStatus() {
+        print("🔍 [Firebase] FCM 토큰 상태 확인")
+        
+        Messaging.messaging().token { token, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("❌ [Firebase] FCM 토큰 가져오기 실패: \(error.localizedDescription)")
+                } else if let token = token {
+                    print("✅ [Firebase] 현재 FCM 토큰 확인됨")
+                    print("🔔 [Firebase] FCM 토큰: \(token)")
+                    
+                    // 사용자가 제공한 토큰과 비교
+                    let userProvidedToken = "fz6CAxDq4UVBmoaEdMtIHZ:APA91bG3i8_fwzaYnHOn9zQVLQdtZ0ZsmFY9EY0U1VGO1CPePWMTjsY1ls6Gpu6Dj44jDIq35AW-uZMWj6NjwO0lWV0O8RqWcvhuCez4Pv_jvncLg98zzFI"
+                    if token == userProvidedToken {
+                        print("✅ [Firebase] 토큰이 사용자 제공 토큰과 일치함")
+                    } else {
+                        print("⚠️ [Firebase] 토큰이 사용자 제공 토큰과 다름")
+                        print("⚠️ [Firebase] 현재 토큰: \(token)")
+                        print("⚠️ [Firebase] 제공된 토큰: \(userProvidedToken)")
+                    }
+                } else {
+                    print("❌ [Firebase] FCM 토큰이 nil입니다")
                 }
             }
         }
@@ -177,7 +311,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // 토큰을 문자열로 변환하여 로그 출력
         let tokenParts = deviceToken.map { data in String(format: "%02.2hhx", data) }
         let token = tokenParts.joined()
-        print("🔔 [Firebase] 디바이스 토큰: \(token)")
+        print("🔔 [Firebase] APNS 디바이스 토큰: \(token)")
+        
+        // 권한 상태를 다시 한 번 확인
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            DispatchQueue.main.async {
+                print("🔔 [Firebase] 토큰 등록 후 권한 상태: \(self.authorizationStatusString(settings.authorizationStatus))")
+            }
+        }
     }
     
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
@@ -193,11 +334,41 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 // MARK: - 🔔 Firebase Messaging 델리게이트
 extension AppDelegate: MessagingDelegate {
     func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
-        print("🔥 [Firebase] FCM 토큰 업데이트: \(fcmToken ?? "nil")")
+        print("🔥 [Firebase] FCM 토큰 업데이트 델리게이트 호출됨")
+        print("🔥 [Firebase] 새로운 FCM 토큰: \(fcmToken ?? "nil")")
         
-        // FCM 토큰을 서버에 전송하는 로직을 여기에 추가할 수 있습니다
         if let token = fcmToken {
-            print("🔥 [Firebase] FCM 토큰: \(token)")
+            print("✅ [Firebase] 유효한 FCM 토큰 수신됨")
+            print("🔔 [Firebase] FCM 토큰 전체: \(token)")
+            
+            // 사용자가 제공한 토큰과 비교
+            let userProvidedToken = "fz6CAxDq4UVBmoaEdMtIHZ:APA91bG3i8_fwzaYnHOn9zQVLQdtZ0ZsmFY9EY0U1VGO1CPePWMTjsY1ls6Gpu6Dj44jDIq35AW-uZMWj6NjwO0lWV0O8RqWcvhuCez4Pv_jvncLg98zzFI"
+            if token == userProvidedToken {
+                print("✅ [Firebase] 새 토큰이 사용자 제공 토큰과 일치함")
+            } else {
+                print("⚠️ [Firebase] 새 토큰이 사용자 제공 토큰과 다름")
+                print("⚠️ [Firebase] 델리게이트 토큰: \(token)")
+                print("⚠️ [Firebase] 제공된 토큰: \(userProvidedToken)")
+            }
+            
+            // 현재 푸시 알림 권한 상태도 함께 확인
+            UNUserNotificationCenter.current().getNotificationSettings { settings in
+                DispatchQueue.main.async {
+                    print("🔥 [Firebase] 토큰 업데이트 시 권한 상태: \(self.authorizationStatusString(settings.authorizationStatus))")
+                    
+                    if settings.authorizationStatus == .denied {
+                        print("❌ [Firebase] 경고: FCM 토큰은 있지만 푸시 알림 권한이 거부됨!")
+                    } else if settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional {
+                        print("✅ [Firebase] FCM 토큰과 푸시 알림 권한 모두 정상!")
+                    }
+                }
+            }
+            
+            // FCM 토큰을 서버에 전송하는 로직을 여기에 추가할 수 있습니다
+            // 예: sendTokenToServer(token)
+            
+        } else {
+            print("❌ [Firebase] FCM 토큰이 nil입니다 - Firebase 설정을 확인해주세요")
         }
     }
 }
