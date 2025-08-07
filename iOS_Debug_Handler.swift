@@ -4,6 +4,7 @@
 import WebKit
 import UIKit
 import os.log
+import UserNotifications
 
 // 🚨 IPC 과부하 방지를 위한 메시지 쓰로틀링 클래스
 class MessageThrottle {
@@ -490,7 +491,32 @@ extension YourWebViewClass: WKScriptMessageHandler {
     
     private func handleNotificationPermissionRequest() {
         infoLog("알림 권한 요청 처리", category: "iOS")
-        // 알림 권한 요청 로직
+        
+        let center = UNUserNotificationCenter.current()
+        
+        // 현재 권한 상태 먼저 확인
+        center.getNotificationSettings { settings in
+            DispatchQueue.main.async {
+                self.infoLog("현재 푸시 권한 상태: \(settings.authorizationStatus.rawValue)", category: "iOS")
+                
+                switch settings.authorizationStatus {
+                case .authorized, .provisional:
+                    self.infoLog("푸시 알림 권한이 이미 허용되어 있음", category: "iOS")
+                    
+                case .denied:
+                    self.errorLog("푸시 알림 권한이 거부되어 있음", category: "iOS")
+                    
+                case .notDetermined:
+                    self.infoLog("푸시 알림 권한 미설정 - 권한 요청 필요", category: "iOS")
+                    
+                case .ephemeral:
+                    self.infoLog("임시 푸시 알림 권한", category: "iOS")
+                    
+                @unknown default:
+                    self.debugLog("알 수 없는 푸시 알림 권한 상태", category: "iOS")
+                }
+            }
+        }
     }
 }
 

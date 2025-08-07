@@ -96,16 +96,36 @@ class LocationTrackingService {
   private async sendLocationToServer(locationData: LocationData) {
     try {
       console.log('📍 [LOCATION TRACKING] 서버로 위치 정보 전송 시작');
+      console.log('📍 [LOCATION TRACKING] 수신된 위치 데이터:', locationData);
       
       // 현재 로그인된 사용자 정보 가져오기
       const user = this.getCurrentUser();
-      if (!user?.mt_idx) {
-        console.warn('📍 [LOCATION TRACKING] 사용자 정보 없음, 위치 전송 건너뜀');
-        return;
+      console.log('📍 [LOCATION TRACKING] 현재 사용자 정보:', user);
+      
+      // iOS에서 전송된 mt_idx 우선 사용
+      let mtIdx = locationData.mt_idx || user?.mt_idx;
+      
+      if (!mtIdx) {
+        console.warn('📍 [LOCATION TRACKING] mt_idx 없음 - 상세 디버깅:');
+        console.warn('  - locationData.mt_idx:', locationData.mt_idx);
+        console.warn('  - user:', user);
+        console.warn('  - user?.mt_idx:', user?.mt_idx);
+        console.warn('  - localStorage 전체:', Object.keys(localStorage || {}));
+        
+        // iOS WebView 환경에서는 mt_idx가 없어도 일단 전송 시도 (테스트용)
+        if (locationData.source === 'ios-location-service') {
+          console.warn('📍 [LOCATION TRACKING] iOS 환경에서 mt_idx 없이 전송 시도 (테스트용)');
+          mtIdx = 0; // 임시값
+        } else {
+          console.warn('📍 [LOCATION TRACKING] 사용자 정보 없음, 위치 전송 건너뜀');
+          return;
+        }
       }
+      
+      console.log('📍 [LOCATION TRACKING] 최종 사용할 mt_idx:', mtIdx);
 
       const locationPayload = {
-        mt_idx: user.mt_idx,
+        mt_idx: mtIdx,
         mlt_lat: locationData.latitude,
         mlt_long: locationData.longitude,
         mlt_accuracy: locationData.accuracy || 0,

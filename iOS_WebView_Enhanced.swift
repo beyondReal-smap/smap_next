@@ -6,6 +6,7 @@ import UIKit
 import Network
 import os.log
 import CoreLocation
+import UserNotifications
 
 class EnhancedWebViewController: UIViewController {
     
@@ -1284,6 +1285,9 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
         case "stopLocationTracking":
             print("📍 [LOCATION] 지속적 위치 추적 중지 요청!")
             handleStopLocationTracking(param: param)
+        case "requestNotificationPermission":
+            print("🔔 [PUSH] 푸시 알림 권한 요청 수신!")
+            handleNotificationPermissionRequest(param: param)
         case "openSettings":
             print("⚙️ [SETTINGS] 설정 열기 요청!")
             handleOpenSettings()
@@ -1743,6 +1747,118 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
         }
     }
     
+    // MARK: - 🔔 푸시 알림 권한 처리
+    
+    private func handleNotificationPermissionRequest(param: Any?) {
+        print("🔔 [PUSH] 푸시 알림 권한 요청 처리 시작")
+        
+        let center = UNUserNotificationCenter.current()
+        
+        // 현재 권한 상태 먼저 확인
+        center.getNotificationSettings { settings in
+            DispatchQueue.main.async {
+                print("🔔 [PUSH] 현재 권한 상태: \(self.authorizationStatusString(settings.authorizationStatus))")
+                
+                switch settings.authorizationStatus {
+                case .authorized, .provisional:
+                    print("✅ [PUSH] 푸시 알림 권한이 이미 허용되어 있음")
+                    self.sendNotificationPermissionResult(granted: true)
+                    
+                case .denied:
+                    print("❌ [PUSH] 푸시 알림 권한이 거부되어 있음")
+                    print("Push: 권한 거부") // 사용자가 말한 첫 번째 로그
+                    self.sendNotificationPermissionResult(granted: false)
+                    
+                case .notDetermined:
+                    print("🔄 [PUSH] 푸시 알림 권한 미설정 - 권한 요청 시작")
+                    self.requestNotificationPermission()
+                    
+                case .ephemeral:
+                    print("⏱️ [PUSH] 임시 푸시 알림 권한")
+                    self.sendNotificationPermissionResult(granted: true)
+                    
+                @unknown default:
+                    print("❓ [PUSH] 알 수 없는 푸시 알림 권한 상태")
+                    self.requestNotificationPermission()
+                }
+            }
+        }
+    }
+    
+    private func requestNotificationPermission() {
+        print("🔔 [PUSH] 실제 푸시 알림 권한 요청 시작")
+        
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+            DispatchQueue.main.async {
+                print("Push: 권한 \(granted ? "허용" : "거부")") // 사용자가 말한 첫 번째 로그
+                
+                if let error = error {
+                    print("❌ [PUSH] 권한 요청 중 오류: \(error.localizedDescription)")
+                }
+                
+                // 권한 요청 직후 실제 상태를 다시 확인
+                center.getNotificationSettings { newSettings in
+                    DispatchQueue.main.async {
+                        let actualStatus = newSettings.authorizationStatus
+                        let actualGranted = (actualStatus == .authorized || actualStatus == .provisional)
+                        
+                        print("🔔 [PUSH] 권한 요청 결과: \(actualGranted ? "허용" : "거부")") // 사용자가 말한 두 번째 로그
+                        print("🔔 [PUSH] 실제 상태: \(self.authorizationStatusString(actualStatus))")
+                        
+                        // 두 결과가 다른 경우 경고 로그
+                        if granted != actualGranted {
+                            print("⚠️ [PUSH] 권한 요청 결과 불일치!")
+                            print("   - requestAuthorization 결과: \(granted)")
+                            print("   - getNotificationSettings 결과: \(actualGranted)")
+                            print("   - 실제 authorizationStatus: \(actualStatus.rawValue)")
+                        }
+                        
+                        self.sendNotificationPermissionResult(granted: actualGranted)
+                    }
+                }
+            }
+        }
+    }
+    
+    private func authorizationStatusString(_ status: UNAuthorizationStatus) -> String {
+        switch status {
+        case .notDetermined:
+            return "notDetermined (결정되지 않음)"
+        case .denied:
+            return "denied (거부됨)"
+        case .authorized:
+            return "authorized (허용됨)"
+        case .provisional:
+            return "provisional (임시 허용)"
+        case .ephemeral:
+            return "ephemeral (임시)"
+        @unknown default:
+            return "unknown (알 수 없음)"
+        }
+    }
+    
+    private func sendNotificationPermissionResult(granted: Bool) {
+        print("🔔 [PUSH] 웹뷰로 권한 결과 전송: \(granted ? "허용" : "거부")")
+        
+        let resultScript = """
+            console.log('🔔 [iOS Bridge] 푸시 알림 권한 결과:', \(granted));
+            if (window.handleNotificationPermissionResult) {
+                window.handleNotificationPermissionResult(\(granted));
+            } else {
+                console.log('⚠️ [iOS Bridge] handleNotificationPermissionResult 함수가 없음');
+            }
+        """
+        
+        webView.evaluateJavaScript(resultScript) { result, error in
+            if let error = error {
+                print("❌ [PUSH] 권한 결과 전송 실패: \(error)")
+            } else {
+                print("✅ [PUSH] 권한 결과 전송 완료")
+            }
+        }
+    }
+
     private func sendLocationPermissionResult(success: Bool, latitude: Double? = nil, longitude: Double? = nil, error: String? = nil) {
         print("📍 [LOCATION] 웹으로 결과 전송: success=\(success)")
         

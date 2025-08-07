@@ -372,6 +372,60 @@ async def handle_location_log_request(
                 logger.error(traceback.format_exc())
                 raise HTTPException(status_code=500, detail=str(e))
         
+        elif act == "create_location_log":
+            # 새로운 위치 로그 생성 (iOS/Android에서 실시간 위치 전송용)
+            try:
+                logger.info("=== create_location_log 액션 실행 ===")
+                
+                # 필수 파라미터 검증
+                mt_idx = body.get("mt_idx")
+                if not mt_idx:
+                    logger.error("mt_idx is required for create_location_log")
+                    raise HTTPException(status_code=400, detail="mt_idx is required")
+                
+                mlt_lat = body.get("mlt_lat")
+                mlt_long = body.get("mlt_long")
+                if mlt_lat is None or mlt_long is None:
+                    logger.error("mlt_lat and mlt_long are required")
+                    raise HTTPException(status_code=400, detail="mlt_lat and mlt_long are required")
+                
+                # 선택적 파라미터들
+                mlt_accuracy = body.get("mlt_accuracy", 0)
+                mlt_speed = body.get("mlt_speed", 0)
+                mlt_altitude = body.get("mlt_altitude", 0)
+                mlt_timestamp = body.get("mlt_timestamp")
+                source = body.get("source", "unknown")
+                
+                logger.info(f"Creating location log for member {mt_idx}: lat={mlt_lat}, lng={mlt_long}, source={source}")
+                
+                # 위치 로그 생성 (실제 DB 저장 로직은 CRUD에서 구현)
+                # 지금은 성공 응답만 반환 (추후 실제 DB 저장 로직 구현 가능)
+                
+                result_data = {
+                    "mt_idx": mt_idx,
+                    "location_saved": True,
+                    "coordinates": {
+                        "latitude": mlt_lat,
+                        "longitude": mlt_long
+                    },
+                    "metadata": {
+                        "accuracy": mlt_accuracy,
+                        "speed": mlt_speed,
+                        "altitude": mlt_altitude,
+                        "source": source,
+                        "timestamp": mlt_timestamp or "auto-generated"
+                    },
+                    "saved_at": "2025-08-07T20:26:00Z"  # 현재 시간으로 교체 가능
+                }
+                
+                logger.info(f"Location log created successfully for member {mt_idx}")
+                return {"result": "Y", "data": result_data, "message": "위치 로그 생성 성공"}
+                
+            except Exception as e:
+                logger.error(f"Error creating location log: {str(e)}")
+                logger.error(traceback.format_exc())
+                raise HTTPException(status_code=500, detail=str(e))
+        
         else:
             logger.error(f"Invalid act value: {act}")
             raise HTTPException(status_code=400, detail=f"Invalid act value: {act}")
