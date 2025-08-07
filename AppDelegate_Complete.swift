@@ -1,4 +1,6 @@
 import UIKit
+import UserNotifications
+import Firebase
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -10,6 +12,16 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         print("╔═══════════════════════════════════════════════════════════════════════════════╗")
         print("║ 🚀 [SMAP-iOS] 앱 시작 - 완전 최적화 버전                                       ║")
         print("╚═══════════════════════════════════════════════════════════════════════════════╝")
+        
+        // Firebase 설정
+        FirebaseApp.configure()
+        print("🔥 [Firebase] Firebase 초기화 완료")
+        
+        // Firebase Messaging 델리게이트 설정
+        Messaging.messaging().delegate = self
+        
+        // 푸시 알림 권한 요청
+        requestNotificationPermission()
         
         // 윈도우 생성
         window = UIWindow(frame: UIScreen.main.bounds)
@@ -119,6 +131,70 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         
         // 정리 작업
         NotificationCenter.default.removeObserver(self)
+    }
+    
+    // MARK: - 🔔 푸시 알림 설정
+    
+    private func requestNotificationPermission() {
+        print("🔔 [Firebase] 푸시 알림 권한 요청 시작")
+        
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+            DispatchQueue.main.async {
+                if granted {
+                    print("✅ [Firebase] 푸시 알림 권한 허용됨")
+                    self.registerForRemoteNotifications()
+                } else {
+                    print("❌ [Firebase] 푸시 알림 권한 거부됨")
+                    if let error = error {
+                        print("❌ [Firebase] 권한 요청 오류: \(error)")
+                    }
+                }
+            }
+        }
+    }
+    
+    private func registerForRemoteNotifications() {
+        print("🔔 [Firebase] 원격 알림 등록 시작")
+        
+        DispatchQueue.main.async {
+            UIApplication.shared.registerForRemoteNotifications()
+        }
+    }
+    
+    // MARK: - 🔔 푸시 알림 델리게이트
+    
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        print("✅ [Firebase] 디바이스 토큰 등록 성공")
+        
+        // Firebase에 토큰 등록
+        Messaging.messaging().apnsToken = deviceToken
+        
+        // 토큰을 문자열로 변환하여 로그 출력
+        let tokenParts = deviceToken.map { data in String(format: "%02.2hhx", data) }
+        let token = tokenParts.joined()
+        print("🔔 [Firebase] 디바이스 토큰: \(token)")
+    }
+    
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        print("❌ [Firebase] 원격 알림 등록 실패: \(error)")
+    }
+    
+    func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any], fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
+        print("🔔 [Firebase] 푸시 알림 수신: \(userInfo)")
+        completionHandler(.newData)
+    }
+}
+
+// MARK: - 🔔 Firebase Messaging 델리게이트
+extension AppDelegate: MessagingDelegate {
+    func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
+        print("🔥 [Firebase] FCM 토큰 업데이트: \(fcmToken ?? "nil")")
+        
+        // FCM 토큰을 서버에 전송하는 로직을 여기에 추가할 수 있습니다
+        if let token = fcmToken {
+            print("🔥 [Firebase] FCM 토큰: \(token)")
+        }
     }
 }
 

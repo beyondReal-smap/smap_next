@@ -1752,8 +1752,7 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
                     speed: \(speed),
                     altitude: \(altitude),
                     timestamp: \(timestampMs),
-                    source: 'ios-native-continuous',
-                    mt_idx: null // 웹에서 사용자 정보를 찾아서 설정
+                    source: 'ios-native-continuous'
                 });
             } else {
                 console.log('⚠️ [iOS-NATIVE] onLocationUpdate 함수를 찾을 수 없습니다');

@@ -53,14 +53,14 @@ class LocationTrackingService {
       source: locationData.source
     });
 
-    // 사용자 정보 자동 추가
+    // 사용자 정보 자동 추가 (있으면 추가, 없어도 계속 진행)
     const user = this.getCurrentUser();
     if (user?.mt_idx) {
       locationData.mt_idx = user.mt_idx;
       console.log('📍 [LOCATION TRACKING] 사용자 정보 추가됨:', user.mt_idx);
     } else {
-      console.warn('📍 [LOCATION TRACKING] 사용자 정보 없음 - 서버 전송 건너뜀');
-      return; // 사용자 정보가 없으면 서버 전송하지 않음
+      console.warn('📍 [LOCATION TRACKING] 사용자 정보 없음 - 위치 데이터만 저장');
+      // 사용자 정보가 없어도 위치 데이터는 저장하고 콜백은 실행
     }
 
     this.lastLocation = locationData;
@@ -74,8 +74,12 @@ class LocationTrackingService {
       }
     });
 
-    // 서버로 위치 정보 전송
-    this.sendLocationToServer(locationData);
+    // 서버로 위치 정보 전송 (사용자 정보가 있어야만 전송)
+    if (user?.mt_idx) {
+      this.sendLocationToServer(locationData);
+    } else {
+      console.log('📍 [LOCATION TRACKING] 사용자 정보 없음 - 서버 전송 건너뜀 (위치 데이터는 저장됨)');
+    }
   }
 
   private async sendLocationToServer(locationData: LocationData) {
@@ -187,6 +191,19 @@ class LocationTrackingService {
 
     this.isTracking = true;
     console.log('✅ [LOCATION TRACKING] 위치 추적 시작됨');
+
+    // 사용자 정보가 나중에 로드될 때를 대비해 주기적으로 확인
+    this.checkAndSendPendingLocations();
+  }
+
+  // 사용자 정보가 로드되면 이전 위치 데이터도 전송
+  private checkAndSendPendingLocations() {
+    const user = this.getCurrentUser();
+    if (user?.mt_idx && this.lastLocation && !this.lastLocation.mt_idx) {
+      console.log('📍 [LOCATION TRACKING] 사용자 정보 로드됨 - 이전 위치 데이터 전송');
+      this.lastLocation.mt_idx = user.mt_idx;
+      this.sendLocationToServer(this.lastLocation);
+    }
   }
 
   private isNativeApp(): boolean {
@@ -291,6 +308,12 @@ class LocationTrackingService {
 
   public isCurrentlyTracking(): boolean {
     return this.isTracking;
+  }
+
+  // 사용자 정보가 로드되었을 때 호출 (외부에서 사용)
+  public onUserLogin() {
+    console.log('📍 [LOCATION TRACKING] 사용자 로그인 감지 - 위치 데이터 확인');
+    this.checkAndSendPendingLocations();
   }
 }
 

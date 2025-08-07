@@ -9,6 +9,7 @@ import dataPreloadService from '@/services/dataPreloadService';
 import { comprehensivePreloadData } from '@/services/dataPreloadService';
 import groupService from '@/services/groupService';
 import navigationManager from '@/utils/navigationManager';
+import locationTrackingService from '@/services/locationTrackingService';
 
 // 전역 상태로 중복 실행 방지
 let globalPreloadingState = {
@@ -271,6 +272,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           console.log('[AUTH CONTEXT] 유효한 토큰과 사용자 데이터 발견:', userData.mt_name);
           if (isMounted) {
             dispatch({ type: 'LOGIN_SUCCESS', payload: userData });
+            // 위치 추적 서비스에 사용자 로그인 알림
+            locationTrackingService.onUserLogin();
             // 프리로딩은 백그라운드에서 비동기적으로 실행 (결과를 기다리지 않음)
             preloadUserData(userData.mt_idx, 'initial-load').catch(error => {
               console.warn('[AUTH] 초기 프리로딩 실패 (무시):', error);
@@ -324,6 +327,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // 로그인 성공 시 사용자 데이터 저장
       if (response.data?.member) {
         dispatch({ type: 'LOGIN_SUCCESS', payload: response.data.member });
+        
+        // 위치 추적 서비스에 사용자 로그인 알림
+        locationTrackingService.onUserLogin();
 
         // 즉시 로딩 완료 처리 (사용자가 홈으로 빠르게 이동할 수 있도록)
         dispatch({ type: 'SET_LOADING', payload: false });
@@ -520,6 +526,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const userProfile = await authService.getUserBasicProfile(state.user.mt_idx);
       authService.setUserData(userProfile);
       dispatch({ type: 'LOGIN_SUCCESS', payload: userProfile });
+      
+      // 위치 추적 서비스에 사용자 로그인 알림
+      locationTrackingService.onUserLogin();
     } catch (error: any) {
       console.error('[AUTH CONTEXT] 사용자 데이터 새로고침 실패:', error);
       dispatch({ type: 'SET_ERROR', payload: '사용자 정보를 새로고침할 수 없습니다.' });
@@ -587,6 +596,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           }
           
           dispatch({ type: 'LOGIN_SUCCESS', payload: enhancedUserData });
+          
+          // 위치 추적 서비스에 사용자 로그인 알림
+          locationTrackingService.onUserLogin();
+          
           return;
         }
       }
