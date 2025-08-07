@@ -355,7 +355,16 @@ window.SmapApp = {
                 this.debugAllStorages();
                 
                 // 1. 로컬스토리지에서 사용자 정보 확인 (다양한 키)
-                const localKeys = ['smap_user_info', 'user_info', 'userData', 'currentUser', 'authUser', 'loginUser'];
+                const localKeys = [
+                    'smap_user_data',      // ✅ 실제 발견된 키!
+                    'user',                // ✅ 실제 발견된 키!
+                    'smap_user_info', 
+                    'user_info', 
+                    'userData', 
+                    'currentUser', 
+                    'authUser', 
+                    'loginUser'
+                ];
                 for (const key of localKeys) {
                     const storedData = localStorage.getItem(key);
                     if (storedData) {
@@ -411,13 +420,27 @@ window.SmapApp = {
                 }
                 
                 // 5. 쿠키에서 사용자 정보 확인
-                const cookieKeys = ['user_info', 'auth_user', 'login_data', 'smap_user'];
+                const cookieKeys = ['user_info', 'auth_user', 'login_data', 'smap_user', 'client-token'];
                 for (const key of cookieKeys) {
                     const userCookie = this.getCookie(key);
                     if (userCookie) {
                         try {
-                            const userInfo = JSON.parse(decodeURIComponent(userCookie));
-                            if (userInfo && (userInfo.mt_idx || userInfo.id || userInfo.user_id)) {
+                            const decodedCookie = decodeURIComponent(userCookie);
+                            console.log(`🍪 [iOS Bridge] 쿠키(${key}) 원본:`, decodedCookie.substring(0, 200));
+                            
+                            let userInfo;
+                            if (key === 'client-token') {
+                                // client-token은 특별한 형식으로 파싱
+                                userInfo = JSON.parse(decodedCookie);
+                                if (userInfo.userId) {
+                                    userInfo.mt_idx = userInfo.userId;
+                                    userInfo.id = userInfo.userId;
+                                }
+                            } else {
+                                userInfo = JSON.parse(decodedCookie);
+                            }
+                            
+                            if (userInfo && (userInfo.mt_idx || userInfo.id || userInfo.user_id || userInfo.userId)) {
                                 console.log(`👤 [iOS Bridge] 쿠키(${key})에서 사용자 정보 발견:`, userInfo);
                                 this.sendUserInfo(this.normalizeUserInfo(userInfo));
                                 return;
