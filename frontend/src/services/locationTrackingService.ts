@@ -8,6 +8,7 @@ interface LocationData {
   altitude?: number;
   timestamp: number;
   source: string;
+  mt_idx?: number; // 사용자 ID 추가
 }
 
 interface LocationTrackingConfig {
@@ -50,6 +51,16 @@ class LocationTrackingService {
       accuracy: locationData.accuracy,
       source: locationData.source
     });
+
+    // 사용자 정보 자동 추가
+    const user = this.getCurrentUser();
+    if (user?.mt_idx) {
+      locationData.mt_idx = user.mt_idx;
+      console.log('📍 [LOCATION TRACKING] 사용자 정보 추가됨:', user.mt_idx);
+    } else {
+      console.warn('📍 [LOCATION TRACKING] 사용자 정보 없음 - 서버 전송 건너뜀');
+      return; // 사용자 정보가 없으면 서버 전송하지 않음
+    }
 
     this.lastLocation = locationData;
     
@@ -112,8 +123,32 @@ class LocationTrackingService {
 
   private getCurrentUser() {
     try {
-      const userStr = localStorage.getItem('user');
-      return userStr ? JSON.parse(userStr) : null;
+      // 여러 가능한 키에서 사용자 정보 찾기
+      const possibleKeys = ['user', 'smap_user_data', 'auth_user'];
+      let userData = null;
+      
+      for (const key of possibleKeys) {
+        const userStr = localStorage.getItem(key);
+        if (userStr) {
+          try {
+            userData = JSON.parse(userStr);
+            console.log(`📍 [LOCATION TRACKING] 사용자 정보 발견 (키: ${key}):`, {
+              mt_idx: userData.mt_idx,
+              mt_name: userData.mt_name
+            });
+            break;
+          } catch (parseError) {
+            console.warn(`📍 [LOCATION TRACKING] 키 ${key} 파싱 실패:`, parseError);
+          }
+        }
+      }
+      
+      if (!userData) {
+        console.warn('📍 [LOCATION TRACKING] 사용자 정보를 찾을 수 없음. 가능한 키들:', possibleKeys);
+        console.log('📍 [LOCATION TRACKING] localStorage 전체 내용:', Object.keys(localStorage));
+      }
+      
+      return userData;
     } catch (error) {
       console.error('📍 [LOCATION TRACKING] 사용자 정보 파싱 오류:', error);
       return null;
