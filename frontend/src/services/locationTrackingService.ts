@@ -137,7 +137,7 @@ class LocationTrackingService {
 
       console.log('📍 [LOCATION TRACKING] 위치 페이로드:', locationPayload);
 
-      // 백엔드 API로 위치 정보 전송
+      // 백엔드 API로 위치 정보 전송 (Next API 프록시 경유: 인증서 문제 회피)
       const response = await apiClient.post('/api/v1/logs/member-location-logs', {
         act: 'create_location_log',
         ...locationPayload

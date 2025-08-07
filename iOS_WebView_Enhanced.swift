@@ -1266,6 +1266,11 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
         let type = body["type"] as? String ?? ""
         let param = body["param"]
         
+        print("🔍 [DEBUG] 추출된 type: '\(type)'")
+        print("🔍 [DEBUG] type 길이: \(type.count)")
+        print("🔍 [DEBUG] type == 'userInfo': \(type == "userInfo")")
+        print("🔍 [DEBUG] type.trimmingCharacters: '\(type.trimmingCharacters(in: .whitespacesAndNewlines))'")
+        
         switch type {
         case "hapticFeedback", "haptic":
             handleHapticFeedback(param: param)
@@ -1298,7 +1303,11 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
             print("⚙️ [SETTINGS] 설정 열기 요청!")
             handleOpenSettings()
         default:
-            print("⚠️ [SMAP-iOS] 알 수 없는 타입: \(type)")
+            print("⚠️ [SMAP-iOS] 알 수 없는 타입: '\(type)'")
+            print("⚠️ [SMAP-iOS] 타입 길이: \(type.count)")
+            print("⚠️ [SMAP-iOS] 타입 문자 코드: \(type.unicodeScalars.map { $0.value })")
+            print("⚠️ [SMAP-iOS] 전체 메시지: \(body)")
+            print("⚠️ [SMAP-iOS] 가능한 매칭: userInfo, haptic, jsLog 등")
         }
     }
     
@@ -2248,19 +2257,46 @@ extension EnhancedWebViewController: WKUIDelegate {
     // MARK: - 👤 사용자 정보 처리
     
     private func handleUserInfo(param: Any?) {
+        print("🔥🔥🔥 [USER INFO] handleUserInfo 메서드 호출됨!! 🔥🔥🔥")
         print("👤 [USER] 사용자 정보 처리 시작")
+        print("📨 [USER] 받은 파라미터: \(param ?? "nil")")
+        print("📨 [USER] 파라미터 타입: \(type(of: param))")
         
         guard let paramDict = param as? [String: Any] else {
             print("❌ [USER] 유효하지 않은 사용자 정보 형식")
+            print("❌ [USER] 전달받은 데이터: \(param ?? "nil")")
             return
         }
         
-        guard let mtIdx = paramDict["mt_idx"] as? String, !mtIdx.isEmpty else {
+        print("✅ [USER] 파라미터 딕셔너리 변환 성공: \(paramDict)")
+        
+        // mt_idx를 숫자와 문자열 모두 지원
+        var mtIdx: String = ""
+        if let mtIdxString = paramDict["mt_idx"] as? String {
+            mtIdx = mtIdxString
+        } else if let mtIdxNumber = paramDict["mt_idx"] as? Int {
+            mtIdx = String(mtIdxNumber)
+        } else if let mtIdxNumber = paramDict["mt_idx"] as? NSNumber {
+            mtIdx = mtIdxNumber.stringValue
+        }
+        
+        guard !mtIdx.isEmpty else {
             print("❌ [USER] mt_idx가 없거나 비어있음")
+            print("❌ [USER] mt_idx 원본 값: \(paramDict["mt_idx"] ?? "nil")")
+            print("❌ [USER] mt_idx 원본 타입: \(type(of: paramDict["mt_idx"]))")
             return
         }
         
-        let mtId = paramDict["mt_id"] as? String ?? ""
+        // mt_id도 숫자와 문자열 모두 지원
+        var mtId: String = ""
+        if let mtIdString = paramDict["mt_id"] as? String {
+            mtId = mtIdString
+        } else if let mtIdNumber = paramDict["mt_id"] as? Int {
+            mtId = String(mtIdNumber)
+        } else if let mtIdNumber = paramDict["mt_id"] as? NSNumber {
+            mtId = mtIdNumber.stringValue
+        }
+        
         let mtName = paramDict["mt_name"] as? String ?? ""
         let mtEmail = paramDict["mt_email"] as? String ?? ""
         

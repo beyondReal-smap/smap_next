@@ -208,7 +208,6 @@ export default function LocationLayout({
       }} />
       {/* Preload critical resources */}
       <link rel="preconnect" href="https://openapi.map.naver.com" />
-      <link rel="preconnect" href="https://118.67.130.71:8000" />
       <link rel="dns-prefetch" href="https://oapi.map.naver.com" />
       {/* Preload fonts */}
       <link

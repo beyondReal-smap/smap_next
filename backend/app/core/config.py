@@ -11,10 +11,11 @@ class Settings(BaseSettings):
     BACKEND_CORS_ORIGINS: List[str] = [
         "http://localhost:3000",  # Next.js 개발 서버
         "http://localhost:8000",  # FastAPI 개발 서버
-        "https://118.67.130.71:3000",  # 프론트엔드 서버
-        "https://118.67.130.71:8000",  # 백엔드 서버
+        # 배포 도메인들
+        "https://nextstep.smap.site",
+        "https://smap.co.kr",
+        # 레거시 IP는 제거 (iOS에서 인증서 경고 유발)
         "http://127.0.0.1:3000",  # 로컬 IP
-        "https://nextstep.smap.site", # Vercel 배포 주소 추가
     ]
     
     # 프론트엔드 URL (비밀번호 재설정 링크용)

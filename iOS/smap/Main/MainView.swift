@@ -37,14 +37,15 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
         super.viewDidLoad()
         
         // 🚨 강제 빌드 트리거 변수 (Xcode가 파일 변경을 감지하도록)
-        let forceBuildTrigger = "FORCE_BUILD_2025_06_20_V4"
+        let forceBuildTrigger = "FORCE_BUILD_2025_08_07_USER_INFO_MAINVIEW_V1"
         
         // 🚨🚨🚨 빌드 확인용 로그 - 이 로그가 보이면 새로운 코드가 빌드된 것 🚨🚨🚨
-        print("🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥")
-        print("🔥 [SMAP-BUILD-CHECK - MainView] 새로운 코드가 빌드되었습니다! - 2025.06.20 v4-FORCE")
-        print("🔥 [SMAP-BUILD-CHECK - MainView] 네이티브 구글 로그인 강제 모드 지원")
-        print("🔥 [SMAP-BUILD-CHECK - MainView] onNativeGoogleLoginSuccess/Error 콜백 지원")
-        print("🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥")
+        print("🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨")
+        print("🚨 [MAINVIEW-BUILD-CHECK] *** 2025.08.07 MainView 사용자 정보 처리 추가 *** 🚨")
+        print("🚨 [MAINVIEW-BUILD-CHECK] 새로운 빌드가 적용되었습니다!")
+        print("🚨 [MAINVIEW-BUILD-CHECK] userInfo 메시지 처리 추가됨")
+        print("🚨 [MAINVIEW-BUILD-CHECK] LocationService 사용자 정보 전달 구현")
+        print("🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨")
         
         // 초기 로딩 상태 설정
         self.loadingView.alpha = 1 // 초기에는 로딩 화면 표시
@@ -1296,6 +1297,157 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
         return false
         #endif
     }
+    
+    // MARK: - 👤 사용자 정보 처리 메서드 (MainView)
+    
+    /// 사용자 정보 처리
+    private func handleUserInfo(body: [String: Any]) {
+        print("🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨")
+        print("🚨 [USER INFO MAINVIEW] handleUserInfo 메서드 호출됨!! 🚨")
+        print("🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨")
+        print("👤 [USER INFO MAINVIEW] 사용자 정보 처리 시작")
+        print("📨 [USER INFO MAINVIEW] 받은 body: \(body)")
+        
+        guard let param = body["param"] as? [String: Any] else {
+            print("❌ [USER INFO MAINVIEW] param 파싱 실패")
+            print("❌ [USER INFO MAINVIEW] body: \(body)")
+            return
+        }
+        
+        print("✅ [USER INFO MAINVIEW] param 파싱 성공: \(param)")
+        
+        // mt_idx를 숫자와 문자열 모두 지원
+        var mtIdx: String = ""
+        if let mtIdxString = param["mt_idx"] as? String {
+            mtIdx = mtIdxString
+        } else if let mtIdxNumber = param["mt_idx"] as? Int {
+            mtIdx = String(mtIdxNumber)
+        } else if let mtIdxNumber = param["mt_idx"] as? NSNumber {
+            mtIdx = mtIdxNumber.stringValue
+        }
+        
+        guard !mtIdx.isEmpty else {
+            print("❌ [USER INFO MAINVIEW] mt_idx가 없거나 비어있음")
+            print("❌ [USER INFO MAINVIEW] mt_idx 원본 값: \(param["mt_idx"] ?? "nil")")
+            print("❌ [USER INFO MAINVIEW] mt_idx 원본 타입: \(type(of: param["mt_idx"]))")
+            return
+        }
+        
+        // mt_id도 숫자와 문자열 모두 지원
+        var mtId: String = ""
+        if let mtIdString = param["mt_id"] as? String {
+            mtId = mtIdString
+        } else if let mtIdNumber = param["mt_id"] as? Int {
+            mtId = String(mtIdNumber)
+        } else if let mtIdNumber = param["mt_id"] as? NSNumber {
+            mtId = mtIdNumber.stringValue
+        }
+        
+        let mtName = param["mt_name"] as? String ?? ""
+        let mtEmail = param["mt_email"] as? String ?? ""
+        
+        print("✅ [USER INFO MAINVIEW] 사용자 정보 파싱 성공:")
+        print("   👤 mt_idx: \(mtIdx)")
+        print("   👤 mt_id: \(mtId)")
+        print("   👤 mt_name: \(mtName)")
+        print("   👤 mt_email: \(mtEmail)")
+        
+        // 💾 UserDefaults에 저장
+        UserDefaults.standard.set(mtIdx, forKey: "mt_idx")
+        UserDefaults.standard.set(mtId, forKey: "mt_id")
+        UserDefaults.standard.set(mtName, forKey: "mt_name")
+        UserDefaults.standard.set(mtEmail, forKey: "mt_email")
+        UserDefaults.standard.set(true, forKey: "is_logged_in")
+        UserDefaults.standard.synchronize()
+        
+        print("💾 [USER INFO MAINVIEW] 사용자 정보 로컬 저장 완료")
+        
+        // 📍 LocationService에 사용자 정보 전달
+        LocationService.sharedInstance.updateUserInfo(mtIdx: mtIdx, mtId: mtId, mtName: mtName)
+        print("🔗 [USER INFO MAINVIEW] LocationService에 사용자 정보 전달 완료")
+        
+        // 🌐 웹뷰로 확인 응답 전송
+        let confirmationScript = """
+            console.log('✅ [iOS-USER-MAINVIEW] 사용자 정보 저장 완료:', {
+                mt_idx: '\(mtIdx)',
+                mt_name: '\(mtName)',
+                source: 'mainview',
+                timestamp: new Date().toISOString()
+            });
+            
+            // 전역 이벤트 발생
+            if (window.dispatchEvent) {
+                window.dispatchEvent(new CustomEvent('ios-user-info-saved', {
+                    detail: {
+                        mt_idx: '\(mtIdx)',
+                        mt_name: '\(mtName)',
+                        source: 'mainview',
+                        success: true
+                    }
+                }));
+            }
+        """
+        
+        DispatchQueue.main.async {
+            self.web_view?.evaluateJavaScript(confirmationScript) { result, error in
+                if let error = error {
+                    print("❌ [USER INFO MAINVIEW] 웹뷰 확인 스크립트 실행 실패: \(error)")
+                } else {
+                    print("✅ [USER INFO MAINVIEW] 웹뷰에 사용자 정보 저장 완료 알림")
+                }
+            }
+        }
+        
+        print("🎉 [USER INFO MAINVIEW] 사용자 정보 처리 완료!")
+    }
+    
+    /// 사용자 로그아웃 처리
+    private func handleUserLogout() {
+        print("👤 [USER LOGOUT MAINVIEW] 사용자 로그아웃 처리 시작")
+        
+        // 💾 UserDefaults에서 사용자 정보 제거
+        UserDefaults.standard.removeObject(forKey: "mt_idx")
+        UserDefaults.standard.removeObject(forKey: "mt_id")
+        UserDefaults.standard.removeObject(forKey: "mt_name")
+        UserDefaults.standard.removeObject(forKey: "mt_email")
+        UserDefaults.standard.set(false, forKey: "is_logged_in")
+        UserDefaults.standard.synchronize()
+        
+        print("💾 [USER LOGOUT MAINVIEW] 로컬 사용자 정보 제거 완료")
+        
+        // 📍 LocationService에 로그아웃 알림
+        LocationService.sharedInstance.clearUserInfo()
+        
+        // 🌐 웹뷰로 확인 응답 전송
+        let confirmationScript = """
+            console.log('✅ [iOS-USER-MAINVIEW] 사용자 로그아웃 처리 완료:', {
+                source: 'mainview',
+                timestamp: new Date().toISOString()
+            });
+            
+            // 전역 이벤트 발생
+            if (window.dispatchEvent) {
+                window.dispatchEvent(new CustomEvent('ios-user-logout', {
+                    detail: { 
+                        source: 'mainview',
+                        success: true 
+                    }
+                }));
+            }
+        """
+        
+        DispatchQueue.main.async {
+            self.web_view?.evaluateJavaScript(confirmationScript) { result, error in
+                if let error = error {
+                    print("❌ [USER LOGOUT MAINVIEW] 웹뷰 로그아웃 확인 스크립트 실행 실패: \(error)")
+                } else {
+                    print("✅ [USER LOGOUT MAINVIEW] 웹뷰에 로그아웃 완료 알림")
+                }
+            }
+        }
+        
+        print("✅ [USER LOGOUT MAINVIEW] 사용자 로그아웃 처리 완료")
+    }
 }
 
 
@@ -1919,6 +2071,17 @@ extension MainView {
                     self.web_view.load(request)
                 }
                 break
+            case "userInfo":
+                print("🚨🚨🚨 [USER INFO MAINVIEW] 사용자 정보 메시지 수신!! 🚨🚨🚨")
+                print("🚨🚨🚨 [USER INFO MAINVIEW] MainView에서 처리 시작!! 🚨🚨🚨")
+                self.handleUserInfo(body: body)
+                break
+                
+            case "userLogout":
+                print("👤 [USER LOGOUT MAINVIEW] 사용자 로그아웃 메시지 수신")
+                self.handleUserLogout()
+                break
+                
             case "showAd":
                 // 광고 기능 비활성화됨 (웹뷰 앱에서는 사용하지 않음)
                 print("광고 기능이 비활성화되었습니다.")
