@@ -298,10 +298,7 @@ const sidebarVariants = {
     scale: 0.99,
     filter: 'blur(1px)',
     boxShadow: '0 0 0 rgba(0,0,0,0)',
-    transition: {
-      duration: 0.6,
-      ease: cubicBezier(0.25, 0.46, 0.45, 0.94)
-    }
+    transition: { duration: 0.7, ease: cubicBezier(0.22, 0.61, 0.36, 1) }
   },
   open: {
     x: 0,
@@ -309,10 +306,7 @@ const sidebarVariants = {
     scale: 1,
     filter: 'blur(0px)',
     boxShadow: '0 8px 32px rgba(31,41,55,0.18), 0 1.5px 6px rgba(0,0,0,0.08)',
-    transition: {
-      duration: 0.7,
-      ease: cubicBezier(0.25, 0.46, 0.45, 0.94)
-    }
+    transition: { duration: 0.8, ease: cubicBezier(0.22, 0.61, 0.36, 1) }
   }
 };
 
@@ -320,12 +314,12 @@ const sidebarOverlayVariants = {
   closed: {
     opacity: 0,
     filter: 'blur(0px)',
-    transition: { duration: 0.2 }
+    transition: { duration: 0.3 }
   },
   open: {
     opacity: 1,
     filter: 'blur(2.5px)',
-    transition: { duration: 0.35 }
+    transition: { duration: 0.45 }
   }
 };
 
@@ -334,18 +328,13 @@ const sidebarContentVariants = {
     opacity: 0,
     x: -30,
     scale: 0.98,
-    transition: {
-      duration: 0.2
-    }
+    transition: { duration: 0.3 }
   },
   open: {
     opacity: 1,
     x: 0,
     scale: 1,
-    transition: {
-      duration: 0.25,
-      delay: 0.05
-    }
+    transition: { duration: 0.4, delay: 0.05 }
   }
 };
 
@@ -788,6 +777,8 @@ export default function LocationPage() {
   const [map, setMap] = useState<NaverMap | null>(null);
   const [markers, setMarkers] = useState<NaverMarker[]>([]);
   const [memberMarkers, setMemberMarkers] = useState<NaverMarker[]>([]); // Add state for member markers
+  // 중복 마커 생성으로 인한 깜빡임 방지용 시그니처
+  const lastMarkersSignatureRef = useRef<string>('');
   const [infoWindow, setInfoWindow] = useState<NaverInfoWindow | null>(null);
   const mapContainer = useRef<HTMLDivElement>(null);
   const tempMarker = useRef<NaverMarker | null>(null);
@@ -3469,48 +3460,33 @@ export default function LocationPage() {
     // 선택된 멤버 확인
     const selectedMember = members.find(member => member.isSelected);
     console.log('[updateAllMarkers] 🚀 시작 - 멤버:', members.length, '명, 선택된 멤버:', selectedMember?.name || '없음', '장소:', locations?.length || 0, '개');
+
+    // 현재 상태의 시그니처 생성 (멤버 좌표 + 선택된 멤버 + 장소 좌표)
+    const markerSignature = JSON.stringify({
+      members: (members || []).map(m => ({
+        id: m.id,
+        lat: parseCoordinate(m.mlt_lat) || parseCoordinate(m.location?.lat),
+        lng: parseCoordinate(m.mlt_long) || parseCoordinate(m.location?.lng),
+        isSelected: !!m.isSelected,
+      })),
+      selectedMemberId: selectedMember?.id || null,
+      locations: (locations || []).map(l => ({ id: l.id, coords: l.coordinates }))
+    });
+
+    if (lastMarkersSignatureRef.current === markerSignature) {
+      console.log('[updateAllMarkers] ⏭️ 시그니처 동일 - 마커 재생성/InfoWindow 중복 방지');
+      return;
+    }
+    lastMarkersSignatureRef.current = markerSignature;
     console.log('[updateAllMarkers] 📊 현재 마커 상태:', {
       기존멤버마커수: memberMarkers.length,
       기존장소마커수: markers.length,
       호출시간: new Date().toLocaleTimeString()
     });
 
-    // *** 중요: 기존 모든 마커들을 완전히 제거하여 다른 멤버의 장소 마커가 남지 않도록 함 ***
-    console.log('[updateAllMarkers] 기존 마커 제거 - 멤버 마커:', memberMarkers.length, '개, 장소 마커:', markers.length, '개');
-    
-    // *** 강화된 마커 제거 로직 - 지도에서 모든 마커를 완전히 제거 ***
-    try {
-      // 1. 상태 배열의 멤버 마커들 제거
-      memberMarkers.forEach((marker, index) => {
-        if (marker && typeof marker.setMap === 'function') {
-          console.log('[updateAllMarkers] 멤버 마커 제거:', index, marker.getTitle?.() || '제목없음');
-          marker.setMap(null);
-        }
-      });
-      
-      // 2. 상태 배열의 장소 마커들 제거 (이전 멤버 장소 마커 완전 제거)
-      markers.forEach((marker, index) => {
-        if (marker && typeof marker.setMap === 'function') {
-          console.log('[updateAllMarkers] 장소 마커 제거:', index, marker.getTitle?.() || '제목없음');
-          marker.setMap(null);
-        }
-      });
-      
-      // 3. 임시 마커도 제거
-      if (tempMarker.current) {
-        console.log('[updateAllMarkers] 임시 마커 제거');
-        tempMarker.current.setMap(null);
-        tempMarker.current = null;
-      }
-      
-    } catch (error) {
-      console.error('[updateAllMarkers] 마커 제거 중 오류:', error);
-    }
-    
-    // 4. 상태 배열 완전 초기화 (즉시 실행하여 이전 마커 완전 제거)
-    console.log('[updateAllMarkers] 🧹 상태 배열 초기화 - 이전 마커 완전 제거');
-    setMemberMarkers([]);
-    setMarkers([]);
+    // 기존 마커 일괄 제거 대신 재사용 전략(깜빡임 방지)
+    const nextMemberMarkers: Record<string, NaverMarker> = {};
+    const nextLocationMarkers: Record<string, NaverMarker> = {};
     
     // 5. 마커 제거 완료 후 잠시 대기하여 상태 업데이트 완료 보장
     console.log('[updateAllMarkers] 기존 마커 제거 및 상태 초기화 완료');
@@ -3566,7 +3542,14 @@ export default function LocationPage() {
           console.log(`[updateAllMarkers] 멤버 마커 생성: ${member.name} (선택됨: ${member.isSelected}, 색상: ${borderColor})`);
       
       
-          const marker = new window.naver.maps.Marker({
+          const key = String(member.id || member.name || index);
+          let marker = (memberMarkers.find(m => (m as any).__key === key) || null) as any;
+          if (marker && marker.setPosition) {
+            const pos = createSafeLatLng(lat, lng);
+            pos && marker.setPosition(pos);
+            marker.setZIndex && marker.setZIndex(member.isSelected ? 200 : 150);
+          } else {
+            marker = new window.naver.maps.Marker({
             position: position,
             map: map,
             title: member.name,
@@ -3591,6 +3574,8 @@ export default function LocationPage() {
             },
             zIndex: member.isSelected ? 200 : 150
           });
+          (marker as any).__key = key;
+          }
 
           // 멤버 마커 클릭 이벤트 - 멤버 InfoWindow 생성 및 표시
           window.naver.maps.Event.addListener(marker, 'click', () => {
@@ -3676,7 +3661,14 @@ export default function LocationPage() {
         
         const memberCount = members.length;
         
-        const marker = new window.naver.maps.Marker({
+        const key = String(location.id || `${lng},${lat}`);
+        let marker = (markers.find(m => (m as any).__key === key) || null) as any;
+        if (marker && marker.setPosition) {
+          const pos = createSafeLatLng(lat, lng);
+          pos && marker.setPosition(pos);
+          marker.setZIndex && marker.setZIndex(isMarkerSelected ? 220 : 120);
+        } else {
+        marker = new window.naver.maps.Marker({
           position,
           map,
           title: location.name,
@@ -3750,6 +3742,8 @@ export default function LocationPage() {
           },
           zIndex: isMarkerSelected ? 200 : 150
         });
+        (marker as any).__key = key;
+        }
 
         // 장소 마커 클릭 이벤트
         window.naver.maps.Event.addListener(marker, 'click', () => {

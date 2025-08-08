@@ -280,9 +280,7 @@ const sidebarVariants = {
     scale: 0.99,
     filter: 'blur(1px)',
     boxShadow: '0 0 0 rgba(0,0,0,0)',
-    transition: {
-      duration: 0.6
-    }
+    transition: { duration: 0.7 }
   },
   open: {
     x: 0,
@@ -290,9 +288,7 @@ const sidebarVariants = {
     scale: 1,
     filter: 'blur(0px)',
     boxShadow: '0 8px 32px rgba(31,41,55,0.18), 0 1.5px 6px rgba(0,0,0,0.08)',
-    transition: {
-      duration: 0.7
-    }
+    transition: { duration: 0.8 }
   }
 };
 
@@ -300,12 +296,12 @@ const sidebarOverlayVariants = {
   closed: {
     opacity: 0,
     filter: 'blur(0px)',
-    transition: { duration: 0.2 }
+    transition: { duration: 0.3 }
   },
   open: {
     opacity: 1,
     filter: 'blur(2.5px)',
-    transition: { duration: 0.35 }
+    transition: { duration: 0.45 }
   }
 };
 
@@ -314,18 +310,13 @@ const sidebarContentVariants = {
     opacity: 0,
     x: -30,
     scale: 0.98,
-    transition: {
-      duration: 0.2
-    }
+    transition: { duration: 0.3 }
   },
   open: {
     opacity: 1,
     x: 0,
     scale: 1,
-    transition: {
-      duration: 0.25,
-      delay: 0.05
-    }
+    transition: { duration: 0.4, delay: 0.05 }
   }
 };
 
@@ -954,6 +945,21 @@ export default function ActivelogPage() {
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [hasInitialLoadFailed, setHasInitialLoadFailed] = useState(false);
 
+  // 로딩 단계/진행률 단조 증가 보장 유틸리티
+  const loadingStepOrder: Record<typeof loadingStep, number> = {
+    maps: 1,
+    groups: 2,
+    members: 3,
+    data: 4,
+    complete: 5,
+  } as const;
+  const updateLoadingStepSafe = (nextStep: typeof loadingStep) => {
+    setLoadingStep((prev) => (loadingStepOrder[nextStep] > loadingStepOrder[prev] ? nextStep : prev));
+  };
+  const updateLoadingProgressSafe = (next: number) => {
+    setLoadingProgress((prev) => (next > prev ? next : prev));
+  };
+
   // 첫 진입 애니메이션 상태 관리
 
   const [showDateSelection, setShowDateSelection] = useState(false);
@@ -1411,8 +1417,8 @@ export default function ActivelogPage() {
       loadingStep !== 'complete'
     ) {
       console.log('[LOGS] 모든 초기 로딩 완료');
-      setLoadingStep('complete');
-      setLoadingProgress(100);
+      updateLoadingStepSafe('complete');
+      updateLoadingProgressSafe(100);
       
       // 완료 후 조금의 딜레이를 두고 초기 로딩 상태 해제
       setTimeout(() => {
@@ -1439,8 +1445,8 @@ export default function ActivelogPage() {
         setIsMapLoading(false);
         setIsInitialDataLoaded(true);
         setShowDateSelection(true);
-        setLoadingStep('complete');
-        setLoadingProgress(100);
+        updateLoadingStepSafe('complete');
+        updateLoadingProgressSafe(100);
       }
     }, backupTimeout);
 
@@ -1452,8 +1458,8 @@ export default function ActivelogPage() {
     console.log('[LOGS] 초기 로딩 재시도');
     setHasInitialLoadFailed(false);
     setIsInitialLoading(true);
-    setLoadingStep('maps');
-    setLoadingProgress(10);
+    updateLoadingStepSafe('maps');
+    updateLoadingProgressSafe(10);
     
     // 네이버 지도 API 다시 로드
     loadNaverMapsAPI();
@@ -1466,22 +1472,22 @@ export default function ActivelogPage() {
     setIsMapLoading(false);
     setIsInitialDataLoaded(true);
     setShowDateSelection(true);
-    setLoadingStep('complete');
-    setLoadingProgress(100);
+    updateLoadingStepSafe('complete');
+    updateLoadingProgressSafe(100);
   };
 
   const loadNaverMapsAPI = () => {
     if (window.naver?.maps) {
       console.log('[LOGS] Naver Maps API 이미 로드됨');
       setNaverMapsLoaded(true);
-      setLoadingStep('groups');
-      setLoadingProgress(25);
+      updateLoadingStepSafe('groups');
+      updateLoadingProgressSafe(25);
       return;
     }
     
     console.log('[LOGS] Naver Maps API 로딩 시작');
-    setLoadingStep('maps');
-    setLoadingProgress(10);
+    updateLoadingStepSafe('maps');
+    updateLoadingProgressSafe(10);
     
     // 동적 Client ID 가져오기 (도메인별 자동 선택) - Home/Location 페이지와 동일
     const dynamicClientId = API_KEYS.NAVER_MAPS_CLIENT_ID;
@@ -1575,8 +1581,8 @@ export default function ActivelogPage() {
           console.log(`[${instanceId.current}] 첫 번째 그룹 자동 선택:`, firstGroupId);
           setSelectedGroupId(firstGroupId);
           // 그룹 선택 시 로딩 상태 업데이트
-          setLoadingStep('groups');
-          setLoadingProgress(40);
+          updateLoadingStepSafe('groups');
+          updateLoadingProgressSafe(40);
         }
     } else {
       console.log(`[${instanceId.current}] 서브 인스턴스 - 실행하지 않음`);
@@ -3687,15 +3693,15 @@ export default function ActivelogPage() {
 
   // 마커 데이터로부터 이동거리, 이동시간, 걸음수 계산 (걸음수는 마지막 마커의 mt_health_work 사용)
   const calculateLocationStats = (locationData: any[]): { distance: string; time: string; steps: string } => {
-    console.log('[calculateLocationStats] 입력 데이터 확인:', {
-      hasData: !!locationData,
-      dataLength: locationData?.length || 0,
-      firstItem: locationData?.[0],
-      lastItem: locationData?.[locationData?.length - 1]
-    });
+    // console.log('[calculateLocationStats] 입력 데이터 확인:', {
+    //   hasData: !!locationData,
+    //   dataLength: locationData?.length || 0,
+    //   firstItem: locationData?.[0],
+    //   lastItem: locationData?.[locationData?.length - 1]
+    // });
     
     if (!locationData || locationData.length === 0) {
-      console.log('[calculateLocationStats] 데이터 없음 - 기본값 반환');
+      // console.log('[calculateLocationStats] 데이터 없음 - 기본값 반환');
       return { distance: '0 km', time: '0분', steps: '0 걸음' };
     }
 
@@ -3710,14 +3716,14 @@ export default function ActivelogPage() {
     let movingTimeSeconds = 0;
     let validSegments = 0;
     
-    console.log('[calculateLocationStats] 거리/시간 계산 시작:', {
-      totalMarkers: sortedData.length,
-      firstMarker: {
-        timestamp: sortedData[0].timestamp || sortedData[0].mlt_gps_time,
-        lat: sortedData[0].latitude || sortedData[0].mlt_lat,
-        lng: sortedData[0].longitude || sortedData[0].mlt_long
-      }
-    });
+    // console.log('[calculateLocationStats] 거리/시간 계산 시작:', {
+    //   totalMarkers: sortedData.length,
+    //   firstMarker: {
+    //     timestamp: sortedData[0].timestamp || sortedData[0].mlt_gps_time,
+    //     lat: sortedData[0].latitude || sortedData[0].mlt_lat,
+    //     lng: sortedData[0].longitude || sortedData[0].mlt_long
+    //   }
+    // });
     
     // 이동거리와 실제 이동시간 계산 (체류시간 제외)
     for (let i = 1; i < sortedData.length; i++) {
@@ -3754,13 +3760,13 @@ export default function ActivelogPage() {
             
             // 5분(300초) 이상 차이나는 구간은 이동시간에서 제외
             if (segmentTimeSeconds >= 300) {
-              console.log('[calculateLocationStats] 1시간 이상 구간 제외:', {
-                prevTime: new Date(prev.timestamp || prev.mlt_gps_time || '').toISOString(),
-                currTime: new Date(curr.timestamp || curr.mlt_gps_time || '').toISOString(),
-                segmentTimeHours: segmentTimeHours.toFixed(2) + '시간',
-                distance: distance.toFixed(2) + 'm',
-                reason: '시간 간격이 1시간 이상'
-              });
+              // console.log('[calculateLocationStats] 1시간 이상 구간 제외:', {
+              //   prevTime: new Date(prev.timestamp || prev.mlt_gps_time || '').toISOString(),
+              //   currTime: new Date(curr.timestamp || curr.mlt_gps_time || '').toISOString(),
+              //   segmentTimeHours: segmentTimeHours.toFixed(2) + '시간',
+              //   distance: distance.toFixed(2) + 'm',
+              //   reason: '시간 간격이 1시간 이상'
+              // });
             } else if (isMoving && segmentTimeSeconds > 0) {
               movingTimeSeconds += segmentTimeSeconds;
               // console.log('[calculateLocationStats] 이동시간 추가:', {
@@ -3790,11 +3796,11 @@ export default function ActivelogPage() {
           const value = data[field];
           if (value && typeof value === 'number' && value > actualSteps) {
             actualSteps = value;
-            console.log('[calculateLocationStats] 더 큰 걸음수 발견:', {
-              field: field,
-              value: value,
-              timestamp: data.timestamp || data.mlt_gps_time
-            });
+            // console.log('[calculateLocationStats] 더 큰 걸음수 발견:', {
+            //   field: field,
+            //   value: value,
+            //   timestamp: data.timestamp || data.mlt_gps_time
+            // });
           }
         }
       }
@@ -3808,8 +3814,8 @@ export default function ActivelogPage() {
         console.log('[calculateLocationStats] 모든 마커에서 걸음수 데이터를 찾을 수 없음');
         
         // 디버깅을 위해 첫 번째와 마지막 마커의 모든 필드 출력
-        console.log('[calculateLocationStats] 디버깅 - 첫 번째 마커 데이터:', sortedData[0]);
-        console.log('[calculateLocationStats] 디버깅 - 마지막 마커 데이터:', sortedData[sortedData.length - 1]);
+        // console.log('[calculateLocationStats] 디버깅 - 첫 번째 마커 데이터:', sortedData[0]);
+        // console.log('[calculateLocationStats] 디버깅 - 마지막 마커 데이터:', sortedData[sortedData.length - 1]);
       }
     }
 
@@ -3818,26 +3824,26 @@ export default function ActivelogPage() {
     const timeFormatted = formatTime(movingTimeSeconds);
     const stepsFormatted = actualSteps.toLocaleString();
 
-    console.log('[calculateLocationStats] 계산 결과:', {
-      totalDistance: totalDistance,
-      distanceKm: distanceKm,
-      movingTimeSeconds: movingTimeSeconds,
-      timeFormatted: timeFormatted,
-      actualSteps: actualSteps,
-      dataPoints: sortedData.length,
-      validSegments: validSegments,
-      note: '마커 데이터 기반 이동거리/시간 계산, 모든 마커에서 최대 걸음수 사용'
-    });
+    // console.log('[calculateLocationStats] 계산 결과:', {
+    //   totalDistance: totalDistance,
+    //   distanceKm: distanceKm,
+    //   movingTimeSeconds: movingTimeSeconds,
+    //   timeFormatted: timeFormatted,
+    //   actualSteps: actualSteps,
+    //   dataPoints: sortedData.length,
+    //   validSegments: validSegments,
+    //   note: '마커 데이터 기반 이동거리/시간 계산, 모든 마커에서 최대 걸음수 사용'
+    // });
     
     // 데이터가 전부 0인 경우 추가 진단
-    if (totalDistance === 0 && movingTimeSeconds === 0 && actualSteps === 0) {
-      console.warn('[calculateLocationStats] ⚠️ 모든 값이 0 - 추가 진단 필요');
-      console.log('[calculateLocationStats] 상세 진단:', {
-        hasValidCoordinates: sortedData.some(d => (d.latitude || d.mlt_lat) && (d.longitude || d.mlt_long)),
-        hasValidTimestamps: sortedData.some(d => d.timestamp || d.mlt_gps_time),
-        sampleMarkers: sortedData.slice(0, 3)
-      });
-    }
+    // if (totalDistance === 0 && movingTimeSeconds === 0 && actualSteps === 0) {
+    //   console.warn('[calculateLocationStats] ⚠️ 모든 값이 0 - 추가 진단 필요');
+    //   console.log('[calculateLocationStats] 상세 진단:', {
+    //     hasValidCoordinates: sortedData.some(d => (d.latitude || d.mlt_lat) && (d.longitude || d.mlt_long)),
+    //     hasValidTimestamps: sortedData.some(d => d.timestamp || d.mlt_gps_time),
+    //     sampleMarkers: sortedData.slice(0, 3)
+    //   });
+    // }
 
     return {
       distance: `${distanceKm} km`,
@@ -5251,8 +5257,8 @@ export default function ActivelogPage() {
       console.log(`[${instanceId.current}-fetchAllGroupData-${fetchId}] 데이터 페칭 시작:`, selectedGroupId);
       
       // 로딩 단계 업데이트 - 멤버 데이터 조회 시작
-      setLoadingStep('members');
-      setLoadingProgress(60);
+        updateLoadingStepSafe('members');
+      updateLoadingProgressSafe(60);
 
       try {
         const groupIdToUse = selectedGroupId.toString();
@@ -5377,8 +5383,8 @@ export default function ActivelogPage() {
                 setGroupMembers(currentMembers);
 
                 // 로딩 단계 업데이트 - 멤버 데이터 로딩 완료
-                setLoadingStep('data');
-                setLoadingProgress(85);
+                updateLoadingStepSafe('data');
+                updateLoadingProgressSafe(85);
 
                 // 첫 번째 멤버의 데이터 기반 통합 지도 설정 - 자동 날짜 선택 후 처리됨
                 if (currentMembers.length > 0 && map.current) {
@@ -5392,13 +5398,13 @@ export default function ActivelogPage() {
                 
                 console.log('[LOGS] 멤버 데이터 없음 - 초기 로딩 실패 처리');
                 setHasInitialLoadFailed(true);
-                setLoadingStep('members');
+                updateLoadingStepSafe('members');
                 handleDataError(new Error('그룹 멤버 데이터가 없습니다.'), 'fetchAllGroupData');
               }
             } catch (memberError) {
               console.error('[LOGS] 그룹 멤버 조회 API 오류:', memberError);
               setHasInitialLoadFailed(true);
-              setLoadingStep('members');
+              updateLoadingStepSafe('members');
               handleDataError(memberError, 'fetchAllGroupData');
               setGroupMembers([]);
             } 

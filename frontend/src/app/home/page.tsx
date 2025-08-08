@@ -1119,6 +1119,8 @@ export default function HomePage() {
   const naverMap = useRef<any>(null);
   const naverMarker = useRef<any>(null);
   const memberMarkers = useRef<any[]>([]);
+  // 멤버별 마커를 재사용하여 불필요한 재생성으로 인한 깜빡임 방지
+  const memberMarkerMapRef = useRef<Map<string, any>>(new Map());
   const scheduleMarkersRef = useRef<any[]>([]); // 스케줄 마커를 위한 ref 추가
   
   // InfoWindow 참조 관리를 위한 ref 추가
@@ -4378,15 +4380,8 @@ export default function HomePage() {
     // 마지막 선택된 멤버 업데이트
     lastSelectedMemberRef.current = selectedMemberName;
     
-    // 기존 마커 삭제
-    if (memberMarkers.current.length > 0) {
-      memberMarkers.current.forEach(marker => {
-        if (marker && marker.setMap) {
-          marker.setMap(null);
-        }
-      });
-      memberMarkers.current = [];
-    }
+    // 기존 마커 삭제 로직을 재사용/갱신 로직으로 변경
+    const nextMarkerMap = new Map<string, any>();
     
     // 모든 그룹멤버에 대해 마커 생성
     if (members.length > 0) {
@@ -4401,27 +4396,39 @@ export default function HomePage() {
         const lng = (realTimeLng !== null && realTimeLng !== 0) ? realTimeLng : defaultLng;
 
         if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
-          console.log('[updateMemberMarkers] 멤버 마커 생성:', member.name, { lat, lng });
-          
-          // createMarker 함수를 사용하여 InfoWindow가 포함된 마커 생성
-          const newMarker = createMarker(
-            { lat, lng },
-            index,
-            'member',
-            member.isSelected,
-            member,
-            undefined
-          );
-          
-          if (newMarker) {
-            // 추가 설정: 선택된 멤버는 z-index를 높게 설정
-            if (mapType === 'naver' && newMarker.setZIndex) {
-              newMarker.setZIndex(member.isSelected ? 200 : 150);
-            } else if (mapType === 'google' && newMarker.setZIndex) {
-              newMarker.setZIndex(member.isSelected ? 200 : 150);
+          const key = String(member.id || member.name || index);
+          const existingMarker = memberMarkerMapRef.current.get(key);
+
+          if (existingMarker && existingMarker.setPosition) {
+            // 위치만 업데이트하여 깜빡임 최소화
+            if (mapType === 'naver') {
+              const pos = createSafeLatLng(lat, lng);
+              pos && existingMarker.setPosition(pos);
+            } else if (mapType === 'google') {
+              existingMarker.setPosition({ lat, lng });
             }
-            
-            memberMarkers.current.push(newMarker);
+            // 선택 상태에 따른 z-index 갱신
+            if (existingMarker.setZIndex) {
+              existingMarker.setZIndex(member.isSelected ? 200 : 150);
+            }
+            nextMarkerMap.set(key, existingMarker);
+          } else {
+            console.log('[updateMemberMarkers] 멤버 마커 생성:', member.name, { lat, lng });
+            // 새로 생성
+            const newMarker = createMarker(
+              { lat, lng },
+              index,
+              'member',
+              member.isSelected,
+              member,
+              undefined
+            );
+            if (newMarker) {
+              if (newMarker.setZIndex) {
+                newMarker.setZIndex(member.isSelected ? 200 : 150);
+              }
+              nextMarkerMap.set(key, newMarker);
+            }
           }
         } else {
           console.warn('유효하지 않은 멤버 좌표:', member.name, member.location);
@@ -4469,7 +4476,8 @@ export default function HomePage() {
           // 선택된 멤버의 InfoWindow 자동 표시 (중복 방지) - 짧은 지연
           setTimeout(() => {
             const selectedMarkerIndex = (members && safeArrayCheck(members)) ? members.findIndex(member => member.isSelected) : -1;
-            const selectedMarker = memberMarkers.current[selectedMarkerIndex];
+            const selectedKey = String(selectedMember.id || selectedMember.name || selectedMarkerIndex);
+            const selectedMarker = nextMarkerMap.get(selectedKey);
             
             if (selectedMarker && window.naver?.maps?.InfoWindow) {
               // InfoWindow가 이미 열려있고 같은 멤버인 경우 중복 생성 방지
@@ -4757,6 +4765,16 @@ export default function HomePage() {
         console.warn('유효하지 않은 멤버 좌표:', selectedMember.name, selectedMember.location);
       }
     }
+
+    // 맵 상에서 사라진 마커 정리 및 참조 업데이트
+    // 이전 맵에 있던 마커 중 이번에 사용하지 않은 것만 제거
+    memberMarkerMapRef.current.forEach((marker, key) => {
+      if (!nextMarkerMap.has(key) && marker && marker.setMap) {
+        marker.setMap(null);
+      }
+    });
+    memberMarkerMapRef.current = nextMarkerMap;
+    memberMarkers.current = Array.from(nextMarkerMap.values());
   };
 
   // 지도 타입 변경 시 멤버 마커 업데이트
@@ -5604,10 +5622,7 @@ export default function HomePage() {
       scale: 0.99,
       filter: 'blur(1px)',
       boxShadow: '0 0 0 rgba(0,0,0,0)',
-      transition: {
-        duration: 0.6,
-        ease: cubicBezier(0.25, 0.46, 0.45, 0.94)
-      }
+      transition: { duration: 0.7, ease: cubicBezier(0.22, 0.61, 0.36, 1) }
     },
     open: {
       x: 0,
@@ -5615,10 +5630,7 @@ export default function HomePage() {
       scale: 1,
       filter: 'blur(0px)',
       boxShadow: '0 8px 32px rgba(31,41,55,0.18), 0 1.5px 6px rgba(0,0,0,0.08)',
-      transition: {
-        duration: 0.7,
-        ease: cubicBezier(0.25, 0.46, 0.45, 0.94)
-      }
+      transition: { duration: 0.8, ease: cubicBezier(0.22, 0.61, 0.36, 1) }
     }
   };
 
@@ -5626,12 +5638,12 @@ export default function HomePage() {
     closed: {
       opacity: 0,
       filter: 'blur(0px)',
-      transition: { duration: 0.2 }
+      transition: { duration: 0.3 }
     },
     open: {
       opacity: 1,
       filter: 'blur(2.5px)',
-      transition: { duration: 0.35 }
+      transition: { duration: 0.45 }
     }
   };
 
@@ -5640,18 +5652,13 @@ export default function HomePage() {
       opacity: 0,
       x: -30,
       scale: 0.98,
-      transition: {
-        duration: 0.2
-      }
+      transition: { duration: 0.3 }
     },
     open: {
       opacity: 1,
       x: 0,
       scale: 1,
-      transition: {
-        duration: 0.25,
-        delay: 0.05
-      }
+      transition: { duration: 0.4, delay: 0.05 }
     }
   };
 

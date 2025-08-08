@@ -128,12 +128,10 @@ export default function InitialLoadingOverlay({
             transition={{ delay: 0.4 }}
             className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100"
           >
-            {/* 현재 단계 아이콘 */}
+            {/* 현재 단계 아이콘 (리마운트 방지: key 제거, 래퍼 지속 회전) */}
             <motion.div
-              key={loadingStep}
-              initial={{ scale: 0, rotate: -90 }}
+              initial={false}
               animate={{ scale: 1, rotate: 0 }}
-              transition={{ type: "spring", stiffness: 260, damping: 20 }}
               className="w-16 h-16 mx-auto mb-6 bg-blue-100 rounded-full flex items-center justify-center"
             >
               {loadingStep === 'complete' ? (
@@ -150,39 +148,38 @@ export default function InitialLoadingOverlay({
               ) : (
                 <motion.div
                   animate={{ rotate: 360 }}
-                  transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                  transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
+                  style={{ willChange: 'transform' }}
                 >
                   <StepIcon className="w-8 h-8 text-blue-600" />
                 </motion.div>
               )}
             </motion.div>
 
-            {/* 단계 제목 및 설명 */}
+            {/* 단계 제목 및 설명 (리마운트 없이 텍스트만 변경) */}
             <motion.h3
-              key={`title-${loadingStep}`}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               className="text-lg font-semibold text-gray-900 mb-2"
+              transition={{ duration: 0.2 }}
             >
               {currentStep.title}
             </motion.h3>
 
             <motion.p
-              key={`desc-${loadingStep}`}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               className="text-gray-500 mb-6"
+              transition={{ duration: 0.2 }}
             >
               {currentStep.description}
             </motion.p>
 
-            {/* 진행률 바 */}
+            {/* 진행률 바 (리마운트 시 0%로 초기화되는 현상 방지를 위해 CSS 전환 사용) */}
             <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
-              <motion.div
-                className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full"
-                initial={{ width: 0 }}
-                animate={{ width: `${progress}%` }}
-                transition={{ duration: 0.5, ease: "easeOut" }}
+              <div
+                className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-[width] duration-500 ease-out"
+                style={{ width: `${progress}%` }}
               />
             </div>
 
