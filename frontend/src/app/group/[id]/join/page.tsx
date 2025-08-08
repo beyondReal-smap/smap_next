@@ -1,6 +1,8 @@
+import type { Metadata } from 'next'
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { headers } from 'next/headers'
 import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import IOSCompatibleSpinner from '../../../../components/common/IOSCompatibleSpinner';
@@ -17,6 +19,29 @@ interface GroupInfo {
   sgt_memo?: string;
   sgt_code?: string;
   memberCount: number;
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  try {
+    const h = await headers()
+    const url = h.get('x-next-url') || ''
+    const match = url.match(/group\/(\d+)\/join/)
+    const groupId = match?.[1]
+    return {
+      title: groupId ? `그룹 초대 - ${groupId} | SMAP` : '그룹 초대 | SMAP',
+      description: 'SMAP 그룹 초대 페이지',
+      openGraph: {
+        title: 'SMAP 그룹 초대',
+        description: 'SMAP 그룹 초대 페이지',
+        type: 'website',
+      },
+    }
+  } catch {
+    return {
+      title: '그룹 초대 | SMAP',
+      description: 'SMAP 그룹 초대 페이지',
+    }
+  }
 }
 
 export default function GroupJoinPage() {

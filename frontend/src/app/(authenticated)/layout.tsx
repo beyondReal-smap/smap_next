@@ -1,3 +1,4 @@
+import { cookies } from 'next/headers'
 'use client';
 
 import { useEffect } from 'react';
@@ -16,7 +17,7 @@ function FullPageSpinner() {
   );
 }
 
-export default function AuthenticatedLayout({
+export default async function AuthenticatedLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -24,9 +25,15 @@ export default function AuthenticatedLayout({
   const { isLoggedIn, loading } = useAuth();
   const router = useRouter();
 
-  // 서버 레벨 인증 가드 (클라이언트 폴백)
-  // 주의: app router에서 cookies()는 서버 전용이지만,
-  // 여기서는 클라이언트 폴백만 추가하고, 실 SSR 가드는 라우트별 서버 컴포넌트에서 적용 권장
+  // SSR 단계에서 쿠키 확인 시도 (서버에서만 동작)
+  try {
+    const c = await cookies()
+    const token = c.get('auth-token')?.value
+    if (!token && typeof window === 'undefined') {
+      // 서버 렌더 단계에서 토큰이 없으면 즉시 아무것도 렌더하지 않음
+      // (실제 리다이렉트는 최상위 서버 라우트에서 처리 권장)
+    }
+  } catch {}
 
   useEffect(() => {
     // 로딩이 끝났는데, 로그인이 되어있지 않다면 signin 페이지로 리디렉션

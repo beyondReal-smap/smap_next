@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+export const runtime = 'edge';
+
 // node-fetch를 대안으로 사용
 let nodeFetch: any = null;
 try {
