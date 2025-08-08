@@ -18,7 +18,7 @@ async function fetchWithFallback(url: string, options: RequestInit): Promise<any
   try {
     try {
       // 기본 fetch 시도
-      response = await fetch(url, options);
+      response = await fetch(url, { ...options, next: { revalidate: 120 } });
     } catch (fetchError) {
       if (nodeFetch) {
         // node-fetch 시도

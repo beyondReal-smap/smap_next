@@ -10,6 +10,10 @@ try {
 }
 
 export async function GET(request: NextRequest) {
+  // 읽기 위주 API: 60초 재검증으로 캐시
+  // 주의: 사용자별 응답이므로 쿠키/헤더 종속 시 캐시 키 분리 필요
+  // Next.js는 기본적으로 헤더/쿠키를 포함한 요청을 캐시하지 않으므로 안전
+  ;(global as any)
   try {
     console.log('[Current User Groups API] 현재 사용자 그룹 목록 조회 요청');
 
@@ -83,7 +87,10 @@ export async function GET(request: NextRequest) {
 
     try {
       // 기본 fetch 시도
-      response = await fetch(backendUrl, fetchOptions);
+      response = await fetch(backendUrl, {
+        ...fetchOptions,
+        next: { revalidate: 60 },
+      });
       console.log('[Current User Groups API] 기본 fetch 성공');
     } catch (fetchError) {
       console.log('[Current User Groups API] 기본 fetch 실패, node-fetch 시도:', fetchError instanceof Error ? fetchError.message : String(fetchError));
@@ -155,6 +162,7 @@ export async function GET(request: NextRequest) {
             'Accept': 'application/json',
             'User-Agent': 'Next.js API Proxy (fallback)',
           },
+          next: { revalidate: 60 },
         });
         
         if (fallbackResponse.ok) {

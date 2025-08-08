@@ -1,6 +1,7 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiUsers, FiLoader, FiSettings, FiChevronDown } from 'react-icons/fi';
 import Link from 'next/link';
@@ -44,6 +45,23 @@ export default function GroupMemberSection({
   getDefaultImage,
   itemVariants
 }: GroupMemberSectionProps) {
+  const AvatarImage: React.FC<{ src: string; alt: string; fallbackSrc: string }> = ({ src, alt, fallbackSrc }) => {
+    const [hasError, setHasError] = useState(false);
+    const finalSrc = hasError ? fallbackSrc : src;
+
+    return (
+      <Image
+        src={finalSrc}
+        alt={alt}
+        width={56}
+        height={56}
+        className="w-full h-full object-cover"
+        onError={() => setHasError(true)}
+        loading="lazy"
+      />
+    );
+  };
+
   return (
     <motion.div
       variants={itemVariants}
@@ -154,15 +172,10 @@ export default function GroupMemberSection({
                     ? 'border-indigo-500 ring-4 ring-indigo-200 shadow-lg' 
                     : 'border-transparent hover:border-indigo-300'
                 }`}>
-                  <img 
-                    src={member.photo ?? getDefaultImage(member.mt_gender, member.original_index)} 
-                    alt={member.name} 
-                    className="w-full h-full object-cover" 
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.src = getDefaultImage(member.mt_gender, member.original_index);
-                      target.onerror = null; 
-                    }}
+                  <AvatarImage
+                    src={member.photo ?? getDefaultImage(member.mt_gender, member.original_index)}
+                    alt={member.name}
+                    fallbackSrc={getDefaultImage(member.mt_gender, member.original_index)}
                   />
                 </div>
                 <span className={`block text-sm font-medium mt-2 transition-colors ${

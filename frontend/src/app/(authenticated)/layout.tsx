@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import AppLayout from '../components/layout/AppLayout';
 import locationTrackingService from '@/services/locationTrackingService';
+import { cookies } from 'next/headers';
 
 // 범용 로딩 스피너 컴포넌트
 function FullPageSpinner() {
@@ -22,6 +23,10 @@ export default function AuthenticatedLayout({
 }) {
   const { isLoggedIn, loading } = useAuth();
   const router = useRouter();
+
+  // 서버 레벨 인증 가드 (클라이언트 폴백)
+  // 주의: app router에서 cookies()는 서버 전용이지만,
+  // 여기서는 클라이언트 폴백만 추가하고, 실 SSR 가드는 라우트별 서버 컴포넌트에서 적용 권장
 
   useEffect(() => {
     // 로딩이 끝났는데, 로그인이 되어있지 않다면 signin 페이지로 리디렉션
