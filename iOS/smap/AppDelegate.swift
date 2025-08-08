@@ -47,23 +47,18 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         
         print("✅ Google Client ID: \(clientId)")
         
-        do {
-            let config = GIDConfiguration(clientID: clientId)
-            GIDSignIn.sharedInstance.configuration = config
-            print("✅ Google Sign-In 설정 완료")
-            
-            // URL Scheme 디버깅
-            if let reversedClientId = plist["REVERSED_CLIENT_ID"] as? String {
-                print("✅ Reversed Client ID: \(reversedClientId)")
-            }
-            
-            // 번들 ID 확인
-            if let bundleId = Bundle.main.bundleIdentifier {
-                print("✅ Bundle ID: \(bundleId)")
-            }
-            
-        } catch {
-            print("❌ Google Sign-In 설정 실패: \(error)")
+        let config = GIDConfiguration(clientID: clientId)
+        GIDSignIn.sharedInstance.configuration = config
+        print("✅ Google Sign-In 설정 완료")
+        
+        // URL Scheme 디버깅
+        if let reversedClientId = plist["REVERSED_CLIENT_ID"] as? String {
+            print("✅ Reversed Client ID: \(reversedClientId)")
+        }
+        
+        // 번들 ID 확인
+        if let bundleId = Bundle.main.bundleIdentifier {
+            print("✅ Bundle ID: \(bundleId)")
         }
         
         // Google Mobile Ads SDK 초기화 제거됨 (웹뷰 앱에서는 사용하지 않음)

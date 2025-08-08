@@ -2,7 +2,10 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // 인증이 필요하지 않은 공개 경로들
+// 첫 진입( '/')과 인증 콜백('/auth')을 명시적으로 허용하여
+// 초기 로드 시 SSR 리다이렉트로 인한 인증 실패 UX를 방지
 const publicPaths = [
+  '/auth',
   '/signin',
   '/register',
   '/register-new',
@@ -44,6 +47,12 @@ const apiPaths = ['/api'];
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
+  // 루트 경로("/")는 항상 통과 (클라이언트에서 라우팅 처리)
+  if (pathname === '/') {
+    console.log('[MIDDLEWARE] 🟢 루트 경로 통과: /');
+    return NextResponse.next();
+  }
+
   // 공개 경로는 항상 통과
   if (publicPaths.some(path => pathname.startsWith(path)) || isGroupJoinPath(pathname)) {
     console.log('[MIDDLEWARE] 🟢 공개 경로 통과:', pathname);

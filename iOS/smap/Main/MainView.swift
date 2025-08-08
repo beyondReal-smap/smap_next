@@ -37,7 +37,7 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
         super.viewDidLoad()
         
         // 🚨 강제 빌드 트리거 변수 (Xcode가 파일 변경을 감지하도록)
-        let forceBuildTrigger = "FORCE_BUILD_2025_08_07_USER_INFO_MAINVIEW_V1"
+        _ = "FORCE_BUILD_2025_08_07_USER_INFO_MAINVIEW_V1"
         
         // 🚨🚨🚨 빌드 확인용 로그 - 이 로그가 보이면 새로운 코드가 빌드된 것 🚨🚨🚨
         print("🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨")
