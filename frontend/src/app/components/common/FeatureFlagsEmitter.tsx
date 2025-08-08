@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useMemo } from 'react'
-import { FlagValues } from '@vercel/flags/react'
+import { FlagValues } from 'flags/react'
 
 /**
  * FeatureFlagsEmitter
