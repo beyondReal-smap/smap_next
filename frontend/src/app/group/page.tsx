@@ -30,7 +30,7 @@ import {
   HiEllipsisVertical,
   HiOutlineChevronLeft
 } from 'react-icons/hi2';
-import { RiKakaoTalkFill } from 'react-icons/ri';
+// import { RiKakaoTalkFill } from 'react-icons/ri';
 import { FiLink, FiX, FiCopy, FiSettings, FiPlus, FiUser, FiChevronDown } from 'react-icons/fi';
 import FloatingButton from '../../components/common/FloatingButton';
 import { MdOutlineMessage, MdGroupAdd } from 'react-icons/md';
@@ -1136,67 +1136,7 @@ function GroupPageContent() {
     return 'share' in navigator;
   };
 
-  // 카카오톡 공유 함수
-  const handleKakaoShare = () => {
-    if (!selectedGroup) return;
-    
-    const inviteLink = `${window.location.origin}/group/${selectedGroup.sgt_idx}/join`;
-    
-    // 초대 코드가 있는 경우 메시지에 포함
-    const inviteCode = (selectedGroup as any).sgt_code;
-    const message = inviteCode 
-      ? `[SMAP] ${selectedGroup.sgt_title} 그룹에 초대되었습니다!\n\n초대 코드: ${inviteCode}\n\n아래 링크를 클릭하여 참여해보세요:\n${inviteLink}`
-      : `[SMAP] ${selectedGroup.sgt_title} 그룹에 초대되었습니다!\n\n아래 링크를 클릭하여 참여해보세요:\n${inviteLink}`;
-    
-    if (isMobile()) {
-      if (isIOS()) {
-        // iOS: 카카오톡 앱 스키마 사용
-        const kakaoUrl = `kakaolink://send?msg=${encodeURIComponent(message)}`;
-        window.location.href = kakaoUrl;
-        
-        // 카카오톡이 설치되어 있지 않은 경우 앱스토어로 이동
-        setTimeout(() => {
-          if (document.hidden) return; // 이미 앱이 열린 경우
-          const appStoreUrl = 'https://apps.apple.com/kr/app/kakaotalk/id362057947';
-          if (confirm('카카오톡이 설치되어 있지 않습니다. 앱스토어로 이동하시겠습니까?')) {
-            window.open(appStoreUrl, '_blank');
-          }
-        }, 1000);
-      } else if (isAndroid()) {
-        // Android: 인텐트 사용
-        const intentUrl = `intent://send?msg=${encodeURIComponent(message)}#Intent;package=com.kakao.talk;scheme=kakaolink;launchFlags=0x10000000;end`;
-        window.location.href = intentUrl;
-        
-        // 카카오톡이 설치되어 있지 않은 경우 플레이스토어로 이동
-        setTimeout(() => {
-          if (document.hidden) return; // 이미 앱이 열린 경우
-          const playStoreUrl = 'https://play.google.com/store/apps/details?id=com.kakao.talk';
-          if (confirm('카카오톡이 설치되어 있지 않습니다. 플레이스토어로 이동하시겠습니까?')) {
-            window.open(playStoreUrl, '_blank');
-          }
-        }, 1000);
-      }
-    } else {
-      // 데스크탑: 웹 카카오톡 또는 클립보드 복사
-      if (navigator.clipboard) {
-        navigator.clipboard.writeText(message).then(() => {
-          alert('카카오톡 공유 메시지가 클립보드에 복사되었습니다.\n카카오톡에서 붙여넣기하여 공유해주세요.');
-        });
-      } else {
-        // 클립보드 API를 지원하지 않는 경우
-        const textArea = document.createElement('textarea');
-        textArea.value = message;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        alert('카카오톡 공유 메시지가 클립보드에 복사되었습니다.\n카카오톡에서 붙여넣기하여 공유해주세요.');
-      }
-    }
-    
-    setIsShareModalOpen(false);
-    showToastModal('success', '카카오톡 공유', '카카오톡으로 초대 메시지를 전송합니다.');
-  };
+  // 카카오톡 공유 제거됨
 
   // 초대 링크 복사 함수
   const handleCopyLink = () => {
@@ -2521,19 +2461,6 @@ function GroupPageContent() {
                     <span className="font-medium text-sm">다른 앱으로 공유</span>
                   </motion.button>
                 )}
-                
-                <motion.button 
-                  onClick={handleKakaoShare} 
-                  className="w-full flex items-center justify-center p-3 rounded-lg bg-[#FEE500] text-[#3C1E1E] shadow-sm hover:shadow-md transition-shadow"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <RiKakaoTalkFill className="w-4 h-4 mr-2" />
-                  <span className="font-medium text-sm">
-                    {isMobile() ? '카카오톡으로 공유' : '카카오톡 메시지 복사'}
-                  </span>
-                </motion.button>
-                
                 <motion.button 
                   onClick={handleCopyLink} 
                   className="w-full flex items-center justify-center p-3 rounded-lg bg-blue-200 text-blue-800 shadow-sm hover:bg-blue-300 hover:text-blue-900 transition-all"
@@ -2875,23 +2802,23 @@ function GroupPageContent() {
               onClose={() => setShowQRCode(false)}
               title="QR코드 초대"
               size="sm"
-              className="rounded-2xl max-w-xs"
+              className="rounded-2xl max-w-xs max-h-[80vh] overflow-y-auto"
             >
-              <div className="p-4">
-                <div className="text-center mb-4">
+              <div className="p-3">
+                <div className="text-center mb-3">
                   <FaQrcode className="w-8 h-8 text-gray-700 mx-auto mb-2" />
                   <p className="text-gray-600 text-sm">{selectedGroup?.sgt_title}</p>
                   
                   {/* QR코드 표시 */}
-                  <div className="mt-4 p-4 bg-white rounded-lg border border-gray-200">
+                  <div className="mt-3 p-3 bg-white rounded-lg border border-gray-200">
                     <div className="flex justify-center">
                       <div className="bg-white p-2 rounded">
                         {/* QR코드 이미지 */}
-                        <div className="w-48 h-48 bg-white rounded flex items-center justify-center">
+                        <div className="w-40 h-40 bg-white rounded flex items-center justify-center">
                           {qrCodeData ? (
                             <QRCode
                               value={qrCodeData}
-                              size={180}
+                              size={150}
                               level="M"
                               bgColor="white"
                               fgColor="black"
@@ -2920,7 +2847,7 @@ function GroupPageContent() {
                   </div>
                 </div>
                 
-                <div className="space-y-2">
+                <div className="space-y-2 sticky bottom-0 bg-white/80 backdrop-blur-sm pt-2">
                   <motion.button 
                     onClick={() => {
                       if (selectedGroup?.sgt_code) {
