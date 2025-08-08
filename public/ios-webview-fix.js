@@ -584,7 +584,7 @@
       // 모든 animate-pulse 요소 찾기
       const pulseElements = document.querySelectorAll('.animate-pulse, [class*="animate-pulse"]');
       pulseElements.forEach((element, index) => {
-        console.log(`Fixing pulse animation for element ${index}:`, element.className);
+        // console.log(`Fixing pulse animation for element ${index}:`, element.className);
         
         element.classList.add('ios-animate-pulse');
         element.style.webkitAnimation = 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite';
