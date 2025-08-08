@@ -206,17 +206,9 @@ export default function LocationLayout({
           }
         `
       }} />
-      {/* Preload critical resources */}
+      {/* Preconnect / DNS-prefetch (필요 시 유지) */}
       <link rel="preconnect" href="https://openapi.map.naver.com" />
       <link rel="dns-prefetch" href="https://oapi.map.naver.com" />
-      {/* Preload fonts */}
-      <link
-        rel="preload"
-        href="/fonts/LINESeedKR-Rg.woff2"
-        as="font"
-        type="font/woff2"
-        crossOrigin="anonymous"
-      />
       <div className="location-page">
         {children}
       </div>

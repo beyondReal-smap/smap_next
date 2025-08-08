@@ -1249,7 +1249,7 @@
           });
         }
         
-        console.log(`🔍 [HANDLER-CHECK] 핸들러 상태:`, result);
+        // console.log(`🔍 [HANDLER-CHECK] 핸들러 상태:`, result);
         return result;
       };
       
