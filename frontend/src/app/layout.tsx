@@ -4,6 +4,7 @@ import type { Metadata, Viewport } from 'next'
 import { lineSeed } from './fonts'; // LINE SEED 폰트 임포트
 // import { BottomNavBar } from './components/layout' // 직접 사용하지 않음
 import ClientLayout from './ClientLayout'; // ClientLayout import
+import FeatureFlagsEmitter from './components/common/FeatureFlagsEmitter'
 import config, { APP_INFO, getLocalizedAppInfo } from '../config'
 import Script from 'next/script'
 import { Inter } from 'next/font/google'
@@ -131,8 +132,7 @@ export default function RootLayout({
         {/* 프리로드 최적화 */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link rel="preload" href="/fonts/LINESeedKR-Rg.woff2" as="font" type="font/woff2" crossOrigin="" />
-        <link rel="preload" href="/fonts/LINESeedKR-Bd.woff2" as="font" type="font/woff2" crossOrigin="" />
+        {/* NOTE: 로컬 폰트는 next/font(localFont)에서 자동 preload 처리 (해시 경로) */}
         
         {/* 성능 최적화 리소스 힌트 */}
         <link rel="dns-prefetch" href="//nextstep.smap.site" />
@@ -327,6 +327,8 @@ export default function RootLayout({
       </head>
       <body className={`${lineSeed.variable} font-sans antialiased ${inter.className}`} suppressHydrationWarning>
         <ClientLayout>
+          {/* Vercel Web Analytics - Feature Flags DOM 주입 */}
+          <FeatureFlagsEmitter />
           {children} 
         </ClientLayout>
         {/* DatePicker 캘린더 포털용 div 추가 */}
