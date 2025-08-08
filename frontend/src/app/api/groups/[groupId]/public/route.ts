@@ -26,12 +26,6 @@ async function fetchWithFallback(url: string, options: RequestInit): Promise<any
         // node-fetch 시도
         response = await nodeFetch(url, {
           ...options,
-          agent: function(_parsedURL: any) {
-            const https = require('https');
-            return new https.Agent({
-              rejectUnauthorized: false
-            });
-          }
         });
       } else {
         throw fetchError;

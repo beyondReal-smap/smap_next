@@ -2805,12 +2805,11 @@ function GroupPageContent() {
               className="rounded-2xl max-w-xs max-h-[80vh] overflow-y-auto"
             >
               <div className="p-3">
-                <div className="text-center mb-3">
-                  <FaQrcode className="w-8 h-8 text-gray-700 mx-auto mb-2" />
+                <div className="text-center mb-2">
                   <p className="text-gray-600 text-sm">{selectedGroup?.sgt_title}</p>
                   
                   {/* QR코드 표시 */}
-                  <div className="mt-3 p-3 bg-white rounded-lg border border-gray-200">
+                  <div className="mt-2 p-3 bg-white rounded-lg border border-gray-200">
                     <div className="flex justify-center">
                       <div className="bg-white p-2 rounded">
                         {/* QR코드 이미지 */}
@@ -2847,7 +2846,7 @@ function GroupPageContent() {
                   </div>
                 </div>
                 
-                <div className="space-y-2 sticky bottom-0 bg-white/80 backdrop-blur-sm pt-2">
+                <div className="space-y-2 mt-2">
                   <motion.button 
                     onClick={() => {
                       if (selectedGroup?.sgt_code) {
@@ -2880,7 +2879,7 @@ function GroupPageContent() {
                   
                   <motion.button
                     onClick={() => setShowQRCode(false)}
-                    className="w-full py-2 mt-3 text-gray-600 font-medium text-sm"
+                    className="w-full py-2 mt-2 text-gray-600 font-medium text-sm"
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >
