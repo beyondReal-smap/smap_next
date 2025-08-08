@@ -50,7 +50,7 @@ export async function GET(
     console.log(`[API PROXY] 멤버 ${memberId}의 장소 데이터 조회 시작`);
     
     // HTTPS 백엔드 URL
-    const backendUrl = `https://118.67.130.71:8000/api/v1/locations/member/${memberId}`;
+    const backendUrl = `https://api3.smap.site/api/v1/locations/member/${memberId}`;
     
     const response = await fetchWithRetry(backendUrl, {
       method: 'GET',

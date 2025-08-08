@@ -23,7 +23,7 @@ export async function POST(
     console.log(`[GROUP JOIN NEW MEMBER API] 사용자 정보 - mt_idx: ${mt_idx}, groupId: ${groupId}`);
 
     // 백엔드 API 호출
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'https://118.67.130.71:8000';
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api3.smap.site';
     const response = await fetch(`${backendUrl}/api/v1/groups/${groupId}/join-new-member`, {
       method: 'POST',
       headers: {

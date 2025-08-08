@@ -684,7 +684,7 @@ const loadingTextVariants = {
 // ... existing code ...
 
 // Helper 함수들 추가
-const BACKEND_STORAGE_BASE_URL = 'https://118.67.130.71:8000/storage/';
+const BACKEND_STORAGE_BASE_URL = 'https://api3.smap.site/storage/';
 
 // iOS WebView에서 안전한 배열 체크 유틸리티 함수
 const safeIsArray = (value: any): value is any[] => {

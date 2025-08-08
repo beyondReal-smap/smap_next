@@ -156,7 +156,7 @@ export async function GET(
 
     // 실제 백엔드 API 호출 시도
     try {
-      const backendUrl = `https://118.67.130.71:8000/api/v1/members/${id}`;
+      const backendUrl = `https://api3.smap.site/api/v1/members/${id}`;
       console.log('[Members API] 백엔드 API 호출:', backendUrl);
       
       const memberData = await fetchWithFallback(backendUrl);
@@ -246,7 +246,7 @@ export async function PUT(
 
     // 실제 백엔드 API 호출 시도
     try {
-      const backendUrl = `https://118.67.130.71:8000/api/v1/members/${id}`;
+      const backendUrl = `https://api3.smap.site/api/v1/members/${id}`;
       console.log('[Members API] 백엔드 업데이트 API 호출:', backendUrl);
       
       const response = await fetch(backendUrl, {

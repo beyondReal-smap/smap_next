@@ -117,7 +117,7 @@ export async function GET(
     
     // FastAPI POST 방식으로 호출
     try {
-      const backendUrl = `https://118.67.130.71:8000/api/v1/logs/member-location-logs`;
+      const backendUrl = `https://api3.smap.site/api/v1/logs/member-location-logs`;
       console.log('[Location Summary API] FastAPI 호출:', backendUrl);
       
       const requestBody = {

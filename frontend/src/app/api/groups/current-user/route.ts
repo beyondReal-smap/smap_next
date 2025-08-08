@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 백엔드 API 호출 - 현재 사용자의 그룹 목록 조회 (올바른 엔드포인트 사용)
-    const backendUrl = `https://118.67.130.71:8000/api/v1/groups/member/${currentUserId}`;
+    const backendUrl = `https://api3.smap.site/api/v1/groups/member/${currentUserId}`;
     console.log('[Current User Groups API] 백엔드 호출:', backendUrl);
     
     const fetchOptions: RequestInit = {
@@ -142,7 +142,7 @@ export async function GET(request: NextRequest) {
       console.log('[Current User Groups API] 사용할 사용자 ID:', userIdToUse);
       
       // 올바른 백엔드 엔드포인트 사용: /groups/member/{member_id}
-      const fallbackUrl = `https://118.67.130.71:8000/api/v1/groups/member/${userIdToUse}`;
+      const fallbackUrl = `https://api3.smap.site/api/v1/groups/member/${userIdToUse}`;
       console.log('[Current User Groups API] 대체 API 호출:', fallbackUrl);
       
       try {

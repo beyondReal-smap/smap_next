@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     // 백엔드 API 호출
     console.log('[CHECK_USER] 백엔드 API 호출 시작');
     try {
-      const backendUrl = 'https://118.67.130.71:8000';
+      const backendUrl = 'https://api3.smap.site';
       let apiEndpoint: string;
       let requestBody: any;
       

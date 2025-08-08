@@ -167,7 +167,7 @@ body {
 `;
 
 // 백엔드 이미지 저장 경로의 기본 URL
-const BACKEND_STORAGE_BASE_URL = 'https://118.67.130.71:8000/storage/';
+const BACKEND_STORAGE_BASE_URL = 'https://api3.smap.site/storage/';
 
 // 기본 이미지 생성 함수
 const getDefaultImage = (gender: number | null | undefined, index: number): string => {

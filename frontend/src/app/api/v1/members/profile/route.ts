@@ -10,7 +10,7 @@ try {
 
 export async function GET(request: NextRequest) {
   try {
-    const backendUrl = 'https://118.67.130.71:8000/api/v1/members/me';
+    const backendUrl = 'https://api3.smap.site/api/v1/members/me';
     
     console.log('[API PROXY /members/me] 백엔드 호출:', backendUrl);
     

@@ -27,7 +27,7 @@ export async function GET(
     
     console.log('[API PROXY] 그룹 멤버 조회 요청:', { originalId: id, userId });
     
-    const backendUrl = `https://118.67.130.71:8000/api/v1/groups/member/${userId}`;
+    const backendUrl = `https://api3.smap.site/api/v1/groups/member/${userId}`;
     
     console.log('[API PROXY] 백엔드 호출:', backendUrl);
     

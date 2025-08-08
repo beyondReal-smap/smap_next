@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
   const testUrls = [
-    'https://118.67.130.71:8000/api/v1/group-members/member/641',
-    'https://118.67.130.71:8000/api/v1/schedules/group/641',
-    'https://118.67.130.71:8000/api/v1/locations/member/282'
+    'https://api3.smap.site/api/v1/group-members/member/641',
+    'https://api3.smap.site/api/v1/schedules/group/641',
+    'https://api3.smap.site/api/v1/locations/member/282'
   ];
 
   const results = [];

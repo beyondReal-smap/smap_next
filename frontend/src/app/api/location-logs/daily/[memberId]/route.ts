@@ -94,7 +94,7 @@ export async function GET(
     }
 
     // 올바른 POST 방식으로 백엔드 API 호출
-    const backendUrl = `https://118.67.130.71:8000/api/v1/logs/member-location-logs`;
+    const backendUrl = `https://api3.smap.site/api/v1/logs/member-location-logs`;
     console.log('[Daily Location Logs API] 백엔드 API 호출:', backendUrl);
     
     const requestBody = {

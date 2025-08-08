@@ -20,7 +20,7 @@ export const authOptions: NextAuthOptions = {
         
         try {
           // 백엔드 API에 Google 사용자 정보 전송
-          const response = await fetch('https://118.67.130.71:8000/api/v1/members/google-login', {
+          const response = await fetch('https://api3.smap.site/api/v1/members/google-login', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

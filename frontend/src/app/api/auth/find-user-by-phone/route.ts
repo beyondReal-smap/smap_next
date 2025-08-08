@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     // 백엔드 API 호출
     console.log('[FIND_USER_BY_PHONE] 백엔드 API 호출 시작');
     try {
-      const backendUrl = 'https://118.67.130.71:8000/api/v1/auth/find-user-by-phone';
+      const backendUrl = 'https://api3.smap.site/api/v1/auth/find-user-by-phone';
       
       console.log('[FIND_USER_BY_PHONE] 백엔드 URL:', backendUrl);
       console.log('[FIND_USER_BY_PHONE] 요청 데이터:', { phone: phone.substring(0, 3) + '***' });

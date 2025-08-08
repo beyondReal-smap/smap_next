@@ -3,13 +3,13 @@
 SMAP 프로젝트의 백엔드 서버입니다. 외부 API 서버와의 연동 및 데이터베이스 백업 기능을 제공합니다.
 
 ## 개요
-SMAP 프로젝트의 백엔드 서버로, 외부 API 서버 (https://118.67.130.71:8000)와 연동하여 비밀번호 변경 및 사용자 관리 기능을 제공합니다.
+SMAP 프로젝트의 백엔드 서버로, 외부 API 서버 (https://api3.smap.site)와 연동하여 비밀번호 변경 및 사용자 관리 기능을 제공합니다.
 
 ## 주요 기능
 
 ### 🔐 인증 및 회원 관리
 - JWT 기반 인증 시스템
-- 외부 API 서버 연동 (https://118.67.130.71:8000)
+- 외부 API 서버 연동 (https://api3.smap.site)
 - 데이터베이스 백업 폴백 시스템
 - 비밀번호 변경 및 확인 기능
 
@@ -154,7 +154,7 @@ PORT=3001
 NODE_ENV=development
 
 # 외부 API 설정
-EXTERNAL_API_BASE_URL=https://118.67.130.71:8000
+EXTERNAL_API_BASE_URL=https://api3.smap.site
 EXTERNAL_API_TIMEOUT=10000
 
 # 데이터베이스 설정 (백업용)

@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
       console.log('[API PROXY] month 파라미터 추가:', month);
     }
     
-    const backendUrl = `https://118.67.130.71:8000/api/v1/schedule/owner-groups/all-schedules?${backendParams.toString()}`;
+    const backendUrl = `https://api3.smap.site/api/v1/schedule/owner-groups/all-schedules?${backendParams.toString()}`;
     
     console.log('[API PROXY] 🚀 백엔드 호출 준비');
     console.log('[API PROXY] ✨ 최종 백엔드 URL:', backendUrl);

@@ -157,7 +157,7 @@ export interface DeleteScheduleRequest {
 
 class ScheduleService {
   // apiClient를 사용하므로 baseURL 제거
-  // private readonly baseURL = 'http://118.67.130.71:8000/api/schedule/group-manage';
+  // private readonly baseURL = 'https://api3.smap.site/api/schedule/group-manage';
 
   // 인증 헤더 생성 메서드도 제거 (apiClient에서 자동 처리)
   // private getHeaders(): HeadersInit {

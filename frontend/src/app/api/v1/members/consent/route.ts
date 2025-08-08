@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     console.log('[CONSENT API] 동의 상태 변경:', { userId, field, value });
 
     // 백엔드 API 호출
-    const backendUrl = process.env.BACKEND_URL || 'https://118.67.130.71:8000';
+    const backendUrl = process.env.BACKEND_URL || 'https://api3.smap.site';
     const response = await fetch(`${backendUrl}/api/v1/members/consent`, {
       method: 'POST',
       headers: {

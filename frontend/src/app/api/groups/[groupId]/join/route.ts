@@ -19,7 +19,7 @@ export async function POST(
     console.log('[Group Join API] 그룹 가입 시도:', { mt_idx, sgt_idx });
 
     // 백엔드 API 호출
-    const backendUrl = `https://118.67.130.71:8000/api/v1/groups/${groupId}/join`;
+    const backendUrl = `https://api3.smap.site/api/v1/groups/${groupId}/join`;
     
     const response = await fetch(backendUrl, {
       method: 'POST',

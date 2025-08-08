@@ -78,7 +78,7 @@ export async function GET(
     console.log('[Member Locations API] 멤버 장소 조회 요청:', { groupId, memberId });
 
     // 백엔드 엔드포인트 직접 호출
-    const locationsUrl = `https://118.67.130.71:8000/api/v1/locations/member/${memberId}`;
+    const locationsUrl = `https://api3.smap.site/api/v1/locations/member/${memberId}`;
     console.log('[Member Locations API] 백엔드 API 호출:', locationsUrl);
     
     const locationsData = await fetchWithFallback(locationsUrl);

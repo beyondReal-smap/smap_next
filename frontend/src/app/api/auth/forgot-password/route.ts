@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     // 백엔드 API 호출
     console.log('[FORGOT PASSWORD] 백엔드 API 호출 시작');
     try {
-      const backendUrl = 'https://118.67.130.71:8000/api/v1/auth/forgot-password';
+      const backendUrl = 'https://api3.smap.site/api/v1/auth/forgot-password';
       
       console.log('[FORGOT PASSWORD] 백엔드 URL:', backendUrl);
       console.log('[FORGOT PASSWORD] 요청 데이터:', { 

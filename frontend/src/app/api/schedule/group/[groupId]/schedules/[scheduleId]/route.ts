@@ -135,7 +135,7 @@ export async function PUT(
     console.log('[SCHEDULE API] 현재 사용자 ID:', currentUserId);
     
     // 백엔드 API URL 구성
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://118.67.130.71:8000';
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api3.smap.site';
     let apiUrl = `${backendUrl}/api/v1/schedule/group/${groupId}/schedules/${scheduleId}?current_user_id=${currentUserId}`;
     
     // 반복 일정 처리 옵션에 따른 URL 및 데이터 구성
@@ -234,7 +234,7 @@ export async function DELETE(
     console.log('[SCHEDULE API] 현재 사용자 ID:', currentUserId);
     
     // 백엔드 API URL 구성
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://118.67.130.71:8000';
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api3.smap.site';
     let apiUrl = `${backendUrl}/api/v1/schedule/group/${groupId}/schedules/${scheduleId}?current_user_id=${currentUserId}`;
     
     // 요청 데이터 구성
@@ -331,7 +331,7 @@ export async function GET(
     console.log('[SCHEDULE API] 현재 사용자 ID:', currentUserId);
     
     // 백엔드 API URL 구성
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://118.67.130.71:8000';
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api3.smap.site';
     const apiUrl = `${backendUrl}/api/v1/schedule/group/${groupId}/schedules/${scheduleId}?current_user_id=${currentUserId}`;
     
     console.log('[SCHEDULE API] 백엔드 요청 URL:', apiUrl);

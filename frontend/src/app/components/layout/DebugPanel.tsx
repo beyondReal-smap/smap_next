@@ -127,7 +127,7 @@ const DebugPanel: React.FC = () => {
       try {
         const userId = auth.user?.mt_idx || user.userInfo?.mt_idx;
         if (userId) {
-          const directResponse = await fetch(`https://118.67.130.71:8000/api/v1/groups/member/${userId}`, {
+          const directResponse = await fetch(`https://api3.smap.site/api/v1/groups/member/${userId}`, {
             method: 'GET',
             headers: {
               'Content-Type': 'application/json',
@@ -143,7 +143,7 @@ const DebugPanel: React.FC = () => {
               status: directResponse.status,
               statusText: directResponse.statusText,
               userId,
-              url: `https://118.67.130.71:8000/api/v1/groups/member/${userId}`
+              url: `https://api3.smap.site/api/v1/groups/member/${userId}`
             }
           });
         }

@@ -17,7 +17,7 @@ export async function GET(
     console.log('[Group Code API] 초대 코드로 그룹 조회:', code);
 
     // 백엔드 API 호출
-    const backendUrl = `https://118.67.130.71:8000/api/v1/groups/code/${code}`;
+    const backendUrl = `https://api3.smap.site/api/v1/groups/code/${code}`;
     
     const response = await fetch(backendUrl, {
       method: 'GET',

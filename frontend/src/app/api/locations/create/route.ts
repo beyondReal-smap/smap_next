@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     const memberId = body.mt_idx || body.insert_mt_idx || 282;
     
     // 백엔드 API 호출 - 멤버별 장소 생성 엔드포인트 사용
-    const backendUrl = `https://118.67.130.71:8000/api/v1/locations/members/${memberId}/locations`;
+    const backendUrl = `https://api3.smap.site/api/v1/locations/members/${memberId}/locations`;
     console.log('[Location Create API] 멤버별 장소 생성 API 호출:', backendUrl, body);
     
     const backendResponse = await fetch(backendUrl, {

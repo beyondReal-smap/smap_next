@@ -836,7 +836,7 @@ def remove_member_from_group(
         logger.error(f"[REMOVE_MEMBER] 멤버를 그룹에서 찾을 수 없음 - group_id: {group_id}, member_id: {member_id}")
         raise HTTPException(status_code=404, detail="멤버를 그룹에서 찾을 수 없습니다.")
     
-    logger.info(f"[REMOVE_MEMBER] 멤버 조회 URL: https://118.67.130.71:8000/api/v1/group-members/member/{group_id}")
+    logger.info(f"[REMOVE_MEMBER] 멤버 조회 URL: https://api3.smap.site/api/v1/group-members/member/{group_id}")
     logger.info(f"[REMOVE_MEMBER] 조회된 멤버 수: {db.query(GroupDetail).filter(GroupDetail.sgt_idx == group_id).count()}")
     logger.info(f"[REMOVE_MEMBER] 찾은 멤버: {group_detail.__dict__}")
     
@@ -855,7 +855,7 @@ def remove_member_from_group(
     
     logger.info(f"[REMOVE_MEMBER] DB 커밋 후 상태 - sgdt_show: {group_detail.sgdt_show}, sgdt_exit: {group_detail.sgdt_exit}")
     
-    logger.info(f"[REMOVE_MEMBER] 업데이트 URL: https://118.67.130.71:8000/api/v1/group-details/{group_detail.sgdt_idx}")
+    logger.info(f"[REMOVE_MEMBER] 업데이트 URL: https://api3.smap.site/api/v1/group-details/{group_detail.sgdt_idx}")
     logger.info(f"[REMOVE_MEMBER] 업데이트 데이터: {{ sgdt_show: '{remove_data.sgdt_show}', sgdt_exit: '{remove_data.sgdt_exit}' }}")
     logger.info(f"[REMOVE_MEMBER] 멤버 탈퇴 처리 성공: {group_detail.__dict__}")
     

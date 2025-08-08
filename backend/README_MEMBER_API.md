@@ -292,7 +292,7 @@ if (result.success) {
 
 ### 회원가입 테스트
 ```bash
-curl -X POST "https://118.67.130.71:8000/api/v1/members/register" \
+curl -X POST "https://api3.smap.site/api/v1/members/register" \
   -H "Content-Type: application/json" \
   -d '{
     "mt_type": 1,
@@ -320,7 +320,7 @@ curl -X POST "https://118.67.130.71:8000/api/v1/members/register" \
 
 ### 로그인 테스트
 ```bash
-curl -X POST "https://118.67.130.71:8000/api/v1/members/login" \
+curl -X POST "https://api3.smap.site/api/v1/members/login" \
   -H "Content-Type: application/json" \
   -d '{
     "mt_id": "01012345678",

@@ -85,7 +85,7 @@ export async function PUT(
     });
 
     // 먼저 해당 그룹의 멤버 정보를 조회하여 sgdt_idx를 찾기
-    const membersUrl = `https://118.67.130.71:8000/api/v1/group-members/member/${groupId}`;
+    const membersUrl = `https://api3.smap.site/api/v1/group-members/member/${groupId}`;
     console.log('[Member Remove API] 멤버 조회 URL:', membersUrl);
     
     const members = await fetchWithFallback(membersUrl);
@@ -119,7 +119,7 @@ export async function PUT(
       sgdt_exit: 'Y'
     };
 
-    const updateUrl = `https://118.67.130.71:8000/api/v1/groups/${groupId}/members/${memberId}/remove`;
+    const updateUrl = `https://api3.smap.site/api/v1/groups/${groupId}/members/${memberId}/remove`;
     console.log('[Member Remove API] 업데이트 URL:', updateUrl);
     console.log('[Member Remove API] 업데이트 데이터:', updateData);
 

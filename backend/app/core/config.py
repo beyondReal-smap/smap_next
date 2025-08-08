@@ -14,6 +14,9 @@ class Settings(BaseSettings):
         # 배포 도메인들
         "https://nextstep.smap.site",
         "https://smap.co.kr",
+        # 추가 허용 도메인
+        "http://api3.smap.site:3000",
+        "https://api3.smap.site:3000",
         # 레거시 IP는 제거 (iOS에서 인증서 경고 유발)
         "http://127.0.0.1:3000",  # 로컬 IP
     ]

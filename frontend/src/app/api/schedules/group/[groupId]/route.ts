@@ -204,7 +204,7 @@ export async function GET(
     console.log('[API PROXY] 파라미터 추출 완료:', { groupId, days, startDate, endDate });
 
     // 올바른 백엔드 API 호출 경로 수정
-    let backendUrl = `https://118.67.130.71:8000/api/v1/schedule/group/${groupId}/schedules`;
+    let backendUrl = `https://api3.smap.site/api/v1/schedule/group/${groupId}/schedules`;
     const urlParams = new URLSearchParams();
     
     // current_user_id는 필수 파라미터 - 실제 로그인 사용자 ID 사용
@@ -298,7 +298,7 @@ export async function POST(
     }
     
     // 백엔드 API 호출
-    const backendUrl = `https://118.67.130.71:8000/api/v1/schedule/group/${groupId}/schedules?current_user_id=${currentUserId}`;
+    const backendUrl = `https://api3.smap.site/api/v1/schedule/group/${groupId}/schedules?current_user_id=${currentUserId}`;
     console.log('[API PROXY] 🎯 백엔드 호출 URL:', backendUrl);
     
     const backendRequestData = {
@@ -383,7 +383,7 @@ export async function PUT(
     }
     
     // 백엔드 API 호출
-    const backendUrl = `https://118.67.130.71:8000/api/v1/schedule/group/${groupId}/schedules/${body.sst_idx}?current_user_id=${currentUserId}`;
+    const backendUrl = `https://api3.smap.site/api/v1/schedule/group/${groupId}/schedules/${body.sst_idx}?current_user_id=${currentUserId}`;
     console.log('[API PROXY] 🎯 백엔드 호출 URL:', backendUrl);
     
     const backendRequestData = {
@@ -502,7 +502,7 @@ export async function DELETE(
     }
     
     // 백엔드 API 호출
-    const backendUrl = `https://118.67.130.71:8000/api/v1/schedule/group/${groupId}/schedules/${scheduleId}?current_user_id=${currentUserId}`;
+    const backendUrl = `https://api3.smap.site/api/v1/schedule/group/${groupId}/schedules/${scheduleId}?current_user_id=${currentUserId}`;
     console.log('[API PROXY] 스케줄 삭제 백엔드 호출:', backendUrl);
     
     const fetchOptions: RequestInit = {

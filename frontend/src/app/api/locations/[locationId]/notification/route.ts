@@ -56,7 +56,7 @@ export async function PATCH(
     const body = await request.json();
     
     // v1 locations API 사용 - 알림 전용 엔드포인트 사용
-    const backendUrl = `https://118.67.130.71:8000/api/v1/locations/${locationId}/notification`;
+    const backendUrl = `https://api3.smap.site/api/v1/locations/${locationId}/notification`;
     
     console.log('[API PROXY] 위치 알림 설정 업데이트 백엔드 호출:', backendUrl, body);
     

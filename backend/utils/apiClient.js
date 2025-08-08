@@ -8,7 +8,7 @@ const httpsAgent = new https.Agent({
 
 class ApiClient {
   constructor() {
-    this.baseURL = process.env.EXTERNAL_API_BASE_URL || 'https://118.67.130.71:8000';
+    this.baseURL = process.env.EXTERNAL_API_BASE_URL || 'https://api3.smap.site';
     this.timeout = parseInt(process.env.EXTERNAL_API_TIMEOUT) || 10000;
     this.maxRetries = 3;
     this.retryDelay = 1000; // 1초

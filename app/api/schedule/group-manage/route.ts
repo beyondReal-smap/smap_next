@@ -110,7 +110,7 @@ export async function GET(req: NextRequest) {
     }
 
     // 백엔드 API URL 구성
-    const backendUrl = new URL(`http://118.67.130.71:8000/api/v1/group-schedule-manage/group/${groupId}/schedules`);
+    const backendUrl = new URL(`https://api3.smap.site/api/v1/group-schedule-manage/group/${groupId}/schedules`);
     
     // 쿼리 파라미터 추가
     backendUrl.searchParams.set('current_user_id', user.mt_idx.toString());
@@ -226,7 +226,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 백엔드 API URL
-    const backendUrl = `http://118.67.130.71:8000/api/v1/group-schedule-manage/group/${groupId}/schedules`;
+    const backendUrl = `https://api3.smap.site/api/v1/group-schedule-manage/group/${groupId}/schedules`;
     
     // current_user_id를 쿼리 파라미터로 추가
     const urlWithParams = new URL(backendUrl);
@@ -274,7 +274,7 @@ export async function PUT(req: NextRequest) {
     }
 
     // 백엔드 API URL
-    const backendUrl = `http://118.67.130.71:8000/api/v1/group-schedule-manage/group/${groupId}/schedules/${sst_idx}`;
+    const backendUrl = `https://api3.smap.site/api/v1/group-schedule-manage/group/${groupId}/schedules/${sst_idx}`;
     
     // current_user_id를 쿼리 파라미터로 추가
     const urlWithParams = new URL(backendUrl);
@@ -324,7 +324,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     // 백엔드 API URL
-    const backendUrl = `http://118.67.130.71:8000/api/v1/group-schedule-manage/group/${groupId}/schedules/${sst_idx}`;
+    const backendUrl = `https://api3.smap.site/api/v1/group-schedule-manage/group/${groupId}/schedules/${sst_idx}`;
     
     // current_user_id를 쿼리 파라미터로 추가
     const urlWithParams = new URL(backendUrl);

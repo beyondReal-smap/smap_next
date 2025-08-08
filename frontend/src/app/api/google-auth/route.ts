@@ -209,7 +209,7 @@ export async function POST(request: NextRequest) {
     
     try {
       sendLogToConsole('info', '백엔드 연결 시도 시작', {
-        backendUrl: 'https://118.67.130.71:8000/api/v1/auth/google-login',
+        backendUrl: 'https://api3.smap.site/api/v1/auth/google-login',
         googleUserId: googleUser.googleId,
         googleUserEmail: googleUser.email
       });
@@ -250,7 +250,7 @@ export async function POST(request: NextRequest) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10초 타임아웃
       
-      const backendResponse = await fetch('https://118.67.130.71:8000/api/v1/auth/google-login', {
+      const backendResponse = await fetch('https://api3.smap.site/api/v1/auth/google-login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -331,7 +331,7 @@ export async function POST(request: NextRequest) {
         isFetchError: String(backendError).includes('fetch'),
         requestedEmail: googleUser.email,
         requestedGoogleId: googleUser.googleId,
-        backendUrl: 'https://118.67.130.71:8000/api/v1/auth/google-login'
+        backendUrl: 'https://api3.smap.site/api/v1/auth/google-login'
       });
       
       // 네트워크 오류인 경우 추가 정보
@@ -458,7 +458,7 @@ export async function POST(request: NextRequest) {
         try {
           sendLogToConsole('info', '🔍 이메일 기반 직접 사용자 조회 시도');
           
-          const emailLookupResponse = await fetch(`https://118.67.130.71:8000/api/v1/auth/find-user-by-email`, {
+          const emailLookupResponse = await fetch(`https://api3.smap.site/api/v1/auth/find-user-by-email`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

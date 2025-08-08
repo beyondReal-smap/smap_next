@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
           }
         };
 
-        const BACKEND_URL = process.env.BACKEND_URL || 'https://118.67.130.71:8000';
+const BACKEND_URL = process.env.BACKEND_URL || 'https://api3.smap.site';
         const backendData = await fetchWithFallback(`${BACKEND_URL}/api/v1/members/me`, {
           method: 'GET',
           headers: {

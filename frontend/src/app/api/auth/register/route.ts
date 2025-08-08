@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
 
     try {
       // 백엔드 API 호출 (직접 URL 설정)
-      const backendUrl = new URL('https://118.67.130.71:8000/api/v1/members/register');
+      const backendUrl = new URL('https://api3.smap.site/api/v1/members/register');
       console.log('=== 백엔드 API 호출 시작 ===');
       console.log('백엔드 URL:', backendUrl.toString());
       console.log('전송할 데이터:', JSON.stringify(memberData, null, 2));

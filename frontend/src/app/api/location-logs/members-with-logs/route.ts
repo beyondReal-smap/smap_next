@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 백엔드 API 호출
-    const backendUrl = `https://118.67.130.71:8000/api/v1/logs/members-with-logs?group_id=${groupId}&date=${date}`;
+    const backendUrl = `https://api3.smap.site/api/v1/logs/members-with-logs?group_id=${groupId}&date=${date}`;
     console.log('[Members With Logs API] 백엔드 API 호출:', backendUrl);
     
     const data = await fetchWithFallback(backendUrl);

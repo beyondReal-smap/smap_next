@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const BACKEND_URL = process.env.BACKEND_URL || 'https://118.67.130.71:8000';
+const ENV_BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'https://api3.smap.site';
+const BACKEND_URL = (
+  ENV_BACKEND.includes('118.67.130.71') || ENV_BACKEND.startsWith('http://')
+) ? 'https://api3.smap.site' : ENV_BACKEND;
 
 // node-fetch를 대안으로 사용
 let nodeFetch: any = null;

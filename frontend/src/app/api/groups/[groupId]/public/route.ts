@@ -66,7 +66,7 @@ export async function GET(
     
     // 공개 API가 계속 실패하므로 바로 일반 그룹 API 사용
     try {
-      backendUrl = `https://118.67.130.71:8000/api/v1/groups/${groupId}`;
+      backendUrl = `https://api3.smap.site/api/v1/groups/${groupId}`;
       console.log('[Group Public API] 일반 그룹 API 호출:', backendUrl);
       
       const fetchOptions: RequestInit = {
@@ -93,7 +93,7 @@ export async function GET(
     // 멤버 수 정확히 조회
     let memberCount = 0;
     try {
-      const memberUrl = `https://118.67.130.71:8000/api/v1/group-members/member/${groupId}`;
+      const memberUrl = `https://api3.smap.site/api/v1/group-members/member/${groupId}`;
       console.log('[Group Public API] 멤버 수 조회:', memberUrl);
       
       const memberResponse = await fetchWithFallback(memberUrl, {

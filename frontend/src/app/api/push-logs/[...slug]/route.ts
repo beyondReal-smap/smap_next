@@ -16,7 +16,7 @@ export async function GET(
     const params = await context.params;
     const { slug } = params;
     const path = Array.isArray(slug) ? slug.join('/') : slug || '';
-    const backendUrl = `https://118.67.130.71:8000/api/v1/push-logs/${path}`;
+    const backendUrl = `https://api3.smap.site/api/v1/push-logs/${path}`;
     
     // URL에서 쿼리 파라미터 추출
     const { searchParams } = new URL(request.url);
@@ -183,7 +183,7 @@ export async function POST(
     const params = await context.params;
     const { slug } = params;
     const path = Array.isArray(slug) ? slug.join('/') : slug || '';
-    const backendUrl = `https://118.67.130.71:8000/api/v1/push-logs/${path}`;
+    const backendUrl = `https://api3.smap.site/api/v1/push-logs/${path}`;
     
     // read-all의 경우 쿼리 파라미터에서 mt_idx 추출
     if (path === 'read-all') {
@@ -450,7 +450,7 @@ export async function DELETE(
     const params = await context.params;
     const { slug } = params;
     const path = Array.isArray(slug) ? slug.join('/') : slug || '';
-    const backendUrl = `https://118.67.130.71:8000/api/v1/push-logs/${path}`;
+    const backendUrl = `https://api3.smap.site/api/v1/push-logs/${path}`;
     
     console.log('[API PROXY /push-logs] DELETE 요청:', backendUrl);
     
@@ -539,7 +539,7 @@ export async function PATCH(
     const path = Array.isArray(slug) ? slug.join('/') : slug || '';
     
     // read-all의 경우 쿼리 파라미터 처리
-    let backendUrl = `https://118.67.130.71:8000/api/v1/push-logs/${path}`;
+    let backendUrl = `https://api3.smap.site/api/v1/push-logs/${path}`;
     if (path === 'read-all') {
       const url = new URL(request.url);
       const mt_idx = url.searchParams.get('mt_idx');

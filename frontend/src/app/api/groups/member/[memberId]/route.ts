@@ -81,11 +81,11 @@ export async function GET(
 
     // 성공하는 멤버 API와 유사한 패턴들 시도
     const possibleUrls = [
-      `https://118.67.130.71:8000/api/v1/group-members/group/${memberId}`,
-      `https://118.67.130.71:8000/api/v1/groups/member/${memberId}`,
-      `https://118.67.130.71:8000/api/v1/member-groups/${memberId}`,
-      `https://118.67.130.71:8000/api/v1/members/${memberId}/groups`,
-      `https://118.67.130.71:8000/api/v1/group-members/member/${memberId}` // 성공하는 패턴 역순
+      `https://api3.smap.site/api/v1/group-members/group/${memberId}`,
+      `https://api3.smap.site/api/v1/groups/member/${memberId}`,
+      `https://api3.smap.site/api/v1/member-groups/${memberId}`,
+      `https://api3.smap.site/api/v1/members/${memberId}/groups`,
+      `https://api3.smap.site/api/v1/group-members/member/${memberId}` // 성공하는 패턴 역순
     ];
 
     let groupsData = null;

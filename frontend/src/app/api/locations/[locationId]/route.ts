@@ -55,7 +55,7 @@ export async function PATCH(
   const { locationId } = await context.params; // Next.js 15에서 params는 Promise입니다
   try {
     // v1 locations API 사용하여 slt_show를 'N'으로 설정
-    const backendUrl = `https://118.67.130.71:8000/api/v1/locations/${locationId}`;
+    const backendUrl = `https://api3.smap.site/api/v1/locations/${locationId}`;
     const hidePayload = { slt_show: 'N' };
     
     console.log('[API PROXY] 위치 숨김 처리 백엔드 호출 (PUT):', backendUrl, hidePayload);
@@ -141,7 +141,7 @@ export async function DELETE(
     console.log('[API PROXY] 장소 삭제 요청:', locationId);
     
     // 백엔드 FastAPI DELETE 엔드포인트 호출
-    const backendUrl = `https://118.67.130.71:8000/api/v1/locations/${locationId}`;
+    const backendUrl = `https://api3.smap.site/api/v1/locations/${locationId}`;
     
     console.log('[API PROXY] 장소 삭제 백엔드 호출 (DELETE):', backendUrl);
     

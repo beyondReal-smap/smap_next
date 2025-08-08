@@ -11,7 +11,7 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const increment_hit = searchParams.get('increment_hit') || 'true';
     
-    const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL || 'https://118.67.130.71:8000'}/api/v1/notices/${resolvedParams.id}?increment_hit=${increment_hit}`;
+    const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api3.smap.site'}/api/v1/notices/${resolvedParams.id}?increment_hit=${increment_hit}`;
     console.log('[Notice Detail API] 백엔드 요청:', backendUrl);
 
     // SSL 인증서 문제 해결을 위한 설정

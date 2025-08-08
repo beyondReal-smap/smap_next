@@ -257,7 +257,7 @@ export async function GET(
     
     try {
       // 올바른 POST 방식으로 백엔드 API 호출
-      const backendUrl = `https://118.67.130.71:8000/api/v1/logs/member-location-logs`;
+      const backendUrl = `https://api3.smap.site/api/v1/logs/member-location-logs`;
       console.log('[Location Summary API] 백엔드 API 호출:', backendUrl);
       
       const requestBody = {
@@ -280,7 +280,7 @@ export async function GET(
       
              // Summary API 실패 시 원시 데이터를 가져와서 계산
        try {
-         const rawDataUrl = `https://118.67.130.71:8000/api/v1/logs/member-location-logs`;
+         const rawDataUrl = `https://api3.smap.site/api/v1/logs/member-location-logs`;
          console.log('[Location Summary API] 원시 데이터 API 호출:', rawDataUrl);
          
          const rawRequestBody = {

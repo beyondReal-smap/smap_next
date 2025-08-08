@@ -117,7 +117,7 @@ export async function POST(
     console.log('[SCHEDULE API] 현재 사용자 ID:', currentUserId);
     
     // 백엔드 API URL 구성
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://118.67.130.71:8000';
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api3.smap.site';
     const apiUrl = `${backendUrl}/api/v1/schedule/group/${groupId}/schedules?current_user_id=${currentUserId}`;
     
     console.log('[SCHEDULE API] 백엔드 요청 URL:', apiUrl);
@@ -210,7 +210,7 @@ export async function GET(
     console.log('[SCHEDULE API] 현재 사용자 ID:', currentUserId);
     
     // 백엔드 API URL 구성
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://118.67.130.71:8000';
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api3.smap.site';
     let apiUrl = `${backendUrl}/api/v1/schedule/group/${groupId}/schedules?current_user_id=${currentUserId}`;
     
     // 쿼리 파라미터 추가

@@ -203,7 +203,7 @@ export async function GET(
     if (startDate) queryParams.append('start_date', startDate);
     if (endDate) queryParams.append('end_date', endDate);
     
-    const backendUrl = `https://118.67.130.71:8000/api/v1/logs/member-location-logs`;
+    const backendUrl = `https://api3.smap.site/api/v1/logs/member-location-logs`;
     
     // act 값을 백엔드에서 실제 지원하는 값으로 설정
     const requestBody = {

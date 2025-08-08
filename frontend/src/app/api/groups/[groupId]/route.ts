@@ -69,7 +69,7 @@ export async function GET(
     console.log('[Group Get API] 그룹 정보 조회 요청:', { groupId });
 
     // 백엔드 그룹 조회 API 호출
-    const backendUrl = `https://118.67.130.71:8000/api/v1/groups/${groupId}`;
+    const backendUrl = `https://api3.smap.site/api/v1/groups/${groupId}`;
     console.log('[Group Get API] 백엔드 API 호출:', backendUrl);
     
     const fetchOptions: RequestInit = {
@@ -129,7 +129,7 @@ export async function PUT(
     console.log('[Group Update API] 그룹 업데이트 요청:', { groupId, body });
 
     // 백엔드 그룹 업데이트 API 호출
-    const backendUrl = `https://118.67.130.71:8000/api/v1/groups/${groupId}`;
+    const backendUrl = `https://api3.smap.site/api/v1/groups/${groupId}`;
     console.log('[Group Update API] 백엔드 API 호출:', backendUrl);
     
     const fetchOptions: RequestInit = {
@@ -199,7 +199,7 @@ export async function DELETE(
       sgt_show: 'N'
     };
 
-    const backendUrl = `https://118.67.130.71:8000/api/v1/groups/${groupId}`;
+    const backendUrl = `https://api3.smap.site/api/v1/groups/${groupId}`;
     console.log('[Group Delete API] 백엔드 PUT API 호출 (소프트 삭제):', backendUrl);
     console.log('[Group Delete API] 전송할 데이터:', updateData);
     

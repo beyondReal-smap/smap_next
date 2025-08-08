@@ -21,13 +21,13 @@ Vercel의 서버리스 함수에서 백엔드 서버로 연결할 때 환경변�
 
 | Key | Value | Environment |
 |-----|-------|-------------|
-| `BACKEND_URL` | `https://118.67.130.71:8000` | Production |
-| `NEXT_PUBLIC_BACKEND_URL` | `https://118.67.130.71:8000` | Production |
+| `BACKEND_URL` | `https://api3.smap.site` | Production |
+| `NEXT_PUBLIC_BACKEND_URL` | `https://api3.smap.site` | Production |
 
 ### 3. 환경변수 설정 단계
 
 1. **Key** 입력란에 `BACKEND_URL` 입력
-2. **Value** 입력란에 `https://118.67.130.71:8000` 입력
+2. **Value** 입력란에 `https://api3.smap.site` 입력
 3. **Environment**에서 **Production** 선택
 4. **Add** 버튼 클릭
 5. 같은 방법으로 `NEXT_PUBLIC_BACKEND_URL`도 추가
@@ -54,7 +54,7 @@ Vercel의 서버리스 함수에서 백엔드 서버로 연결할 때 환경변�
 ### 네트워크 연결 문제
 백엔드 서버가 외부에서 접근 가능한지 확인:
 ```bash
-curl -k https://118.67.130.71:8000/api/v1/health
+curl -k https://api3.smap.site/api/v1/health
 ```
 
 ### 방화벽 설정

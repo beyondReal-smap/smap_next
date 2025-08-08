@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       // SSL 인증서 검증 비활성화 (개발 환경)
       process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
       
-      const backendResponse = await fetch('https://118.67.130.71:8000/api/v1/auth/kakao-login', {
+      const backendResponse = await fetch('https://api3.smap.site/api/v1/auth/kakao-login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

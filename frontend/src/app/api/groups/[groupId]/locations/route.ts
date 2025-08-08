@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
 
 async function fetchWithFallback(url: string): Promise<any> {
-  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://118.67.130.71:8000';
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api3.smap.site';
   
   console.log('[Group Locations API] 🔗 백엔드 요청:', {
     url,
@@ -60,7 +60,7 @@ export async function GET(
     console.log('[Group Locations API] 그룹 장소 조회 요청:', { groupId });
 
     // 먼저 그룹 멤버들을 조회
-    const membersUrl = `https://118.67.130.71:8000/api/v1/group-members/member/${groupId}`;
+    const membersUrl = `https://api3.smap.site/api/v1/group-members/member/${groupId}`;
     console.log('[Group Locations API] 그룹 멤버 조회:', membersUrl);
     
     const membersData = await fetchWithFallback(membersUrl);
@@ -71,7 +71,7 @@ export async function GET(
     
     for (const member of membersData) {
       try {
-        const memberLocationsUrl = `https://118.67.130.71:8000/api/v1/locations/member/${member.mt_idx}`;
+        const memberLocationsUrl = `https://api3.smap.site/api/v1/locations/member/${member.mt_idx}`;
         console.log('[Group Locations API] 멤버 위치 조회:', { memberId: member.mt_idx, url: memberLocationsUrl });
         
         const memberLocations = await fetchWithFallback(memberLocationsUrl);
