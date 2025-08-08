@@ -1,8 +1,8 @@
 import traceback
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Request, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, Query, status
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from ....db.session import get_db
 from ....schemas.member_location_log import (
     MemberLocationLogCreate, 
@@ -17,9 +17,34 @@ from ....schemas.member_location_log import (
     LocationLogSummaryResponse
 )
 from ....crud import member_location_log as location_log_crud
+from ....core.config import settings
+import jwt
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+def _extract_token_from_header(request: Request) -> Optional[str]:
+    auth_header = request.headers.get("Authorization") or request.headers.get("authorization")
+    if not auth_header:
+        return None
+    parts = auth_header.split()
+    if len(parts) == 2 and parts[0].lower() == "bearer":
+        return parts[1]
+    return None
+
+def _get_mt_idx_from_token(request: Request) -> Tuple[Optional[int], Optional[str]]:
+    """Return (mt_idx, error_message). error_message is None when ok."""
+    token = _extract_token_from_header(request)
+    if not token:
+        return None, "Authorization 헤더가 필요합니다 (Bearer 토큰)."
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        mt_idx = payload.get("mt_idx")
+        if not mt_idx:
+            return None, "토큰에 mt_idx가 없습니다."
+        return int(mt_idx), None
+    except Exception as e:
+        return None, f"토큰 검증 실패: {str(e)}"
 
 @router.post("/member-location-logs")
 async def handle_location_log_request(
@@ -107,26 +132,63 @@ async def handle_location_log_request(
                 raise HTTPException(status_code=500, detail=str(e))
         
         elif act == "create_location_log":
-            # 위치 로그 생성
+            # 위치 로그 생성 (토큰 기반 사용자 식별 + 배치 전송 지원)
             try:
-                print(f"📍 [BACKEND] 위치 로그 생성 요청 수신:")
-                print(f"   📍 mt_idx: {body.get('mt_idx')}")
+                token_mt_idx, token_err = _get_mt_idx_from_token(request)
+                if token_err:
+                    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=token_err)
+
+                # 동의(옵션): body 또는 헤더로 넘어오는 동의 플래그가 명시적으로 'N'이면 차단
+                consent = (str(body.get("location_consent", "Y")).upper() != "N")
+                if not consent:
+                    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="위치 정보 수집 동의가 필요합니다.")
+
+                # 배치 전송 처리: mlt_gps_data 배열이 있으면 배치로 저장
+                if isinstance(body.get("mlt_gps_data"), list) and body.get("mlt_gps_data"):
+                    created = []
+                    errors = []
+                    for idx, item in enumerate(body["mlt_gps_data"]):
+                        try:
+                            single = {
+                                "act": "create_location_log",  # 내부 검증용
+                                "mt_idx": token_mt_idx,
+                                "mlt_lat": item.get("mlt_lat"),
+                                "mlt_long": item.get("mlt_long"),
+                                "mlt_accuracy": item.get("mlt_accuracy") or item.get("mlt_accuacy"),
+                                "mlt_speed": item.get("mlt_speed"),
+                                "mlt_altitude": item.get("mlt_altitude"),
+                                # iOS 배치 필드명 호환: mlt_gps_time → mlt_timestamp
+                                "mlt_timestamp": item.get("mlt_timestamp") or item.get("mlt_gps_time"),
+                                "source": body.get("source", "ios-app"),
+                                "mlt_location_chk": item.get("mlt_location_chk"),
+                                "mlt_fine_location": item.get("mlt_fine_location"),
+                                "mlt_battery": item.get("mlt_battery"),
+                                "mt_health_work": item.get("mt_health_work"),
+                            }
+                            log_data = MemberLocationLogCreate(**single)
+                            result = location_log_crud.create_location_log(db, log_data)
+                            created.append(result.to_dict())
+                        except Exception as e:
+                            logger.warning(f"Batch item {idx} failed: {str(e)}")
+                            errors.append({"index": idx, "error": str(e)})
+                    return {"result": "Y" if created else "N", "created_count": len(created), "errors": errors, "data": created[:10]}
+
+                # 단건 처리
+                print(f"📍 [BACKEND] 위치 로그 생성 요청 수신 (단건):")
+                print(f"   📍 token.mt_idx: {token_mt_idx}")
                 print(f"   📍 위도: {body.get('mlt_lat')}")
                 print(f"   📍 경도: {body.get('mlt_long')}")
-                print(f"   📍 정확도: {body.get('mlt_accuracy')}")
-                print(f"   📍 속도: {body.get('mlt_speed')}")
-                print(f"   📍 소스: {body.get('source')}")
                 
+                body["mt_idx"] = token_mt_idx  # 클라이언트 바디의 mt_idx 무시하고 토큰 우선
                 log_data = MemberLocationLogCreate(**body)
                 result = location_log_crud.create_location_log(db, log_data)
                 logger.info(f"Location log created successfully: {result.mlt_idx}")
-                print(f"✅ [BACKEND] 위치 로그 생성 성공: {result.mlt_idx}")
                 return {"result": "Y", "data": result.to_dict()}
-                
+            except HTTPException:
+                raise
             except Exception as e:
                 logger.error(f"Error creating location log: {str(e)}")
                 logger.error(traceback.format_exc())
-                print(f"❌ [BACKEND] 위치 로그 생성 실패: {str(e)}")
                 raise HTTPException(status_code=500, detail=str(e))
         
         elif act == "update_location_log":

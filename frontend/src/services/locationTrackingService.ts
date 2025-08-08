@@ -94,67 +94,10 @@ class LocationTrackingService {
   }
 
   private async sendLocationToServer(locationData: LocationData) {
-    try {
-      console.log('📍 [LOCATION TRACKING] 서버로 위치 정보 전송 시작');
-      console.log('📍 [LOCATION TRACKING] 수신된 위치 데이터:', locationData);
-      
-      // 현재 로그인된 사용자 정보 가져오기
-      const user = this.getCurrentUser();
-      console.log('📍 [LOCATION TRACKING] 현재 사용자 정보:', user);
-      
-      // iOS에서 전송된 mt_idx 우선 사용
-      let mtIdx = locationData.mt_idx || user?.mt_idx;
-      
-      if (!mtIdx) {
-        console.warn('📍 [LOCATION TRACKING] mt_idx 없음 - 상세 디버깅:');
-        console.warn('  - locationData.mt_idx:', locationData.mt_idx);
-        console.warn('  - user:', user);
-        console.warn('  - user?.mt_idx:', user?.mt_idx);
-        console.warn('  - localStorage 전체:', Object.keys(localStorage || {}));
-        
-        // iOS WebView 환경에서는 mt_idx가 없어도 일단 전송 시도 (테스트용)
-        if (locationData.source === 'ios-location-service') {
-          console.warn('📍 [LOCATION TRACKING] iOS 환경에서 mt_idx 없이 전송 시도 (테스트용)');
-          mtIdx = 0; // 임시값
-        } else {
-          console.warn('📍 [LOCATION TRACKING] 사용자 정보 없음, 위치 전송 건너뜀');
-          return;
-        }
-      }
-      
-      console.log('📍 [LOCATION TRACKING] 최종 사용할 mt_idx:', mtIdx);
-
-      const locationPayload = {
-        mt_idx: mtIdx,
-        mlt_lat: locationData.latitude,
-        mlt_long: locationData.longitude,
-        mlt_accuracy: locationData.accuracy || 0,
-        mlt_speed: locationData.speed || 0,
-        mlt_altitude: locationData.altitude || 0,
-        mlt_timestamp: new Date(locationData.timestamp).toISOString(),
-        source: locationData.source
-      };
-
-      console.log('📍 [LOCATION TRACKING] 위치 페이로드:', locationPayload);
-
-      // 백엔드 API로 위치 정보 전송 (Next API 프록시 경유: 인증서 문제 회피)
-      const response = await apiClient.post('/api/v1/logs/member-location-logs', {
-        act: 'create_location_log',
-        ...locationPayload
-      });
-
-      console.log('📍 [LOCATION TRACKING] 서버 응답:', response.data);
-      
-    } catch (error) {
-      console.error('📍 [LOCATION TRACKING] 서버 전송 실패:', error);
-      this.errorCallbacks.forEach(callback => {
-        try {
-          callback(error);
-        } catch (callbackError) {
-          console.error('📍 [LOCATION TRACKING] 에러 콜백 실행 오류:', callbackError);
-        }
-      });
-    }
+    // 프론트엔드에서의 위치 업로드는 보안상/중복 방지를 위해 비활성화합니다.
+    // iOS 네이티브 앱이 HTTPS로 백엔드를 직접 호출합니다.
+    console.log('📍 [LOCATION TRACKING] 프론트엔드 업로드 비활성화 - iOS 네이티브가 직접 전송합니다.');
+    return;
   }
 
   private getCurrentUser() {

@@ -8,6 +8,17 @@ import os.log
 import CoreLocation
 import UserNotifications
 
+// 배치 업로드용 모델
+fileprivate struct QueuedLocation: Codable {
+    let lat: Double
+    let lng: Double
+    let accuracy: Double
+    let speed: Double
+    let altitude: Double
+    let timestamp: String // ISO8601
+    let battery: Int
+}
+
 class EnhancedWebViewController: UIViewController {
     
     // MARK: - 🏷️ 로깅 시스템
@@ -35,6 +46,20 @@ class EnhancedWebViewController: UIViewController {
     
     // MARK: - 📍 위치 관련
     private var locationManager: CLLocationManager?
+    private var uploadQueue: [QueuedLocation] = []
+    private var isUploading = false
+    private var uploadTimer: Timer?
+    private var backoffSeconds: Double = 2
+    private let maxBackoffSeconds: Double = 60
+    private var recentTimestamps = Set<String>()
+    private var authToken: String? { // JWT 토큰 (웹에서 전달 받아 저장)
+        get { UserDefaults.standard.string(forKey: "auth_token") }
+        set { UserDefaults.standard.setValue(newValue, forKey: "auth_token") }
+    }
+    private var locationConsent: Bool {
+        get { UserDefaults.standard.object(forKey: "location_consent") as? Bool ?? true }
+        set { UserDefaults.standard.setValue(newValue, forKey: "location_consent") }
+    }
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -59,6 +84,10 @@ class EnhancedWebViewController: UIViewController {
         print("🚀 [INIT] UI 설정 완료")
         
         loadWebsite()
+        // 배터리 수집을 위한 설정
+        UIDevice.current.isBatteryMonitoringEnabled = true
+        // 업로드 타이머 시작 (주기적 배치 전송)
+        startUploadTimer()
         print("🚀 [INIT] 웹사이트 로드 요청 완료")
         
         print("🚀 [INIT] viewDidLoad 완료")
@@ -1272,6 +1301,26 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
         print("🔍 [DEBUG] type.trimmingCharacters: '\(type.trimmingCharacters(in: .whitespacesAndNewlines))'")
         
         switch type {
+        case "setAuthToken":
+            if let dict = param as? [String: Any], let token = dict["token"] as? String {
+                self.authToken = token
+                print("🔐 [AUTH] 토큰 저장 완료 (길이): \(token.count)")
+            } else if let token = param as? String {
+                self.authToken = token
+                print("🔐 [AUTH] 토큰 저장 완료 (길이): \(token.count)")
+            } else {
+                print("⚠️ [AUTH] setAuthToken 파라미터 형식 오류")
+            }
+        case "setLocationConsent":
+            if let dict = param as? [String: Any], let consent = dict["consent"] as? Bool {
+                self.locationConsent = consent
+                print("📍 [CONSENT] 위치 수집 동의 상태: \(consent)")
+            } else if let consent = param as? Bool {
+                self.locationConsent = consent
+                print("📍 [CONSENT] 위치 수집 동의 상태: \(consent)")
+            } else {
+                print("⚠️ [CONSENT] setLocationConsent 파라미터 형식 오류")
+            }
         case "hapticFeedback", "haptic":
             handleHapticFeedback(param: param)
         case "jsLog":
@@ -1702,6 +1751,113 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
         
         print("✅ [LOCATION] 지속적 위치 추적 활성화됨")
     }
+
+    // MARK: - 📨 업로드 큐 처리
+    private func enqueueLocation(_ location: CLLocation) {
+        guard locationConsent else {
+            print("🚫 [LOCATION] 동의 없음 - 업로드 생략")
+            return
+        }
+        let battery = Int(UIDevice.current.batteryLevel * 100)
+        let iso = ISO8601DateFormatter().string(from: location.timestamp)
+        // 중복 방지: 같은 타임스탬프는 스킵
+        if recentTimestamps.contains(iso) {
+            return
+        }
+        recentTimestamps.insert(iso)
+        uploadQueue.append(QueuedLocation(
+            lat: location.coordinate.latitude,
+            lng: location.coordinate.longitude,
+            accuracy: location.horizontalAccuracy,
+            speed: max(0, location.speed),
+            altitude: location.altitude,
+            timestamp: iso,
+            battery: battery
+        ))
+        // 큐가 일정 길이 넘으면 즉시 업로드 트리거
+        if uploadQueue.count >= 10 {
+            flushUploadQueue()
+        }
+    }
+
+    private func startUploadTimer() {
+        uploadTimer?.invalidate()
+        uploadTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in
+            self?.flushUploadQueue()
+        }
+        RunLoop.main.add(uploadTimer!, forMode: .common)
+    }
+
+    private func flushUploadQueue() {
+        guard !isUploading else { return }
+        guard !uploadQueue.isEmpty else { return }
+        guard let token = authToken, !token.isEmpty else {
+            print("⚠️ [UPLOAD] 토큰 없음 - 업로드 보류")
+            return
+        }
+
+        isUploading = true
+        let batch = Array(uploadQueue.prefix(50))
+        let remaining = Array(uploadQueue.dropFirst(min(50, uploadQueue.count)))
+
+        let payload: [String: Any] = [
+            "act": "create_location_log",
+            "source": "ios-app",
+            "location_consent": locationConsent ? "Y" : "N",
+            "mlt_gps_data": batch.map { item in
+                return [
+                    "mlt_lat": item.lat,
+                    "mlt_long": item.lng,
+                    "mlt_accuracy": item.accuracy,
+                    "mlt_speed": item.speed,
+                    "mlt_altitude": item.altitude,
+                    "mlt_timestamp": item.timestamp,
+                    "mlt_battery": String(item.battery),
+                    "mlt_location_chk": "N",
+                    "mlt_fine_location": "N"
+                ]
+            }
+        ]
+
+        var request = URLRequest(url: URL(string: "https://api3.smap.site/api/v1/logs/member-location-logs")!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 15
+        request.httpBody = try? JSONSerialization.data(withJSONObject: payload, options: [])
+
+        let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            defer { self?.isUploading = false }
+            if let error = error {
+                print("❌ [UPLOAD] 네트워크 오류: \(error.localizedDescription)")
+                self?.scheduleBackoffRetry()
+                return
+            }
+            guard let http = response as? HTTPURLResponse else {
+                print("❌ [UPLOAD] 잘못된 응답")
+                self?.scheduleBackoffRetry()
+                return
+            }
+            if (200...299).contains(http.statusCode) {
+                print("✅ [UPLOAD] 배치 업로드 성공: \(batch.count)건")
+                self?.uploadQueue = remaining
+                self?.backoffSeconds = 2
+            } else {
+                print("❌ [UPLOAD] 서버 오류: \(http.statusCode)")
+                self?.scheduleBackoffRetry()
+            }
+        }
+        task.resume()
+    }
+
+    private func scheduleBackoffRetry() {
+        backoffSeconds = min(maxBackoffSeconds, backoffSeconds * 2)
+        print("⏳ [UPLOAD] 백오프 재시도: \(backoffSeconds)s 후")
+        DispatchQueue.main.asyncAfter(deadline: .now() + backoffSeconds) { [weak self] in
+            self?.flushUploadQueue()
+        }
+    }
     
     private func stopContinuousLocationTracking() {
         print("📍 [LOCATION] 지속적 위치 추적 중지")
@@ -2086,7 +2242,10 @@ extension EnhancedWebViewController: CLLocationManagerDelegate {
         // locationManager?.stopUpdatingLocation()
         // locationManager = nil
         
-        // 웹으로 결과 전송 (지속적 업데이트)
+        // 업로드 큐에 추가 (배치 전송)
+        enqueueLocation(location)
+
+        // 웹으로 결과 전송 (지속적 업데이트 - UI용)
         print("🌐 [LOCATION] 웹뷰로 GPS 데이터 전송 시작")
         print("🌐 [LOCATION] sendLocationUpdateToWeb 함수 호출 시작")
         print("🌐 [LOCATION] 전송할 좌표: \(location.coordinate.latitude), \(location.coordinate.longitude)")
