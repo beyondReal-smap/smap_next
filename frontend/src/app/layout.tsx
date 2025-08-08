@@ -151,21 +151,12 @@ export default function RootLayout({
           `
         }} />
         
-        {/* 전역 에러 핸들러 (가장 먼저 로드) */}
-        <script src="/error-handler.js" async></script>
-        
-        {/* iOS 웹뷰 타임아웃 방지 및 최적화 스크립트 */}
-        <script src="/ios-webview-fix.js" async></script>
-        
-        {/* iOS 웹뷰 브릿지 */}
-        <script src="/ios-bridge.js" async></script>
-        
-        {/* Google Identity Services SDK - iOS WebView 호환성 개선 */}
-        <script 
-          src="https://accounts.google.com/gsi/client" 
-          async 
-          defer
-        ></script>
+        {/* 전역 스크립트는 Next.js Script로 주입하여 최적화 */}
+        <Script src="/ios-bridge.js" strategy="beforeInteractive" />
+        <Script 
+          src="https://accounts.google.com/gsi/client"
+          strategy="afterInteractive"
+        />
         
         {/* iOS WebView에서 스크립트 실행 개선 */}
         <script 
@@ -321,7 +312,6 @@ export default function RootLayout({
         
         {/* iOS WebView 환경 개선 스크립트 */}
         <Script src="/ios-webview-fix.js" strategy="beforeInteractive" />
-        
         {/* 에러 핸들러 스크립트 */}
         <Script src="/error-handler.js" strategy="beforeInteractive" />
       </head>
