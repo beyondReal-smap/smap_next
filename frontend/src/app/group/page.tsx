@@ -2802,22 +2802,22 @@ function GroupPageContent() {
               onClose={() => setShowQRCode(false)}
               title="QR코드 초대"
               size="sm"
-              className="rounded-2xl max-w-xs max-h-[80vh] overflow-y-auto"
+              className="rounded-2xl max-w-xs"
             >
-              <div className="p-3">
+              <div className="p-2">
                 <div className="text-center mb-2">
                   <p className="text-gray-600 text-sm">{selectedGroup?.sgt_title}</p>
                   
                   {/* QR코드 표시 */}
-                  <div className="mt-2 p-3 bg-white rounded-lg border border-gray-200">
+                  <div className="mt-2 p-2 bg-white rounded-lg border border-gray-200">
                     <div className="flex justify-center">
                       <div className="bg-white p-2 rounded">
                         {/* QR코드 이미지 */}
-                        <div className="w-40 h-40 bg-white rounded flex items-center justify-center">
+                        <div className="w-36 h-36 bg-white rounded flex items-center justify-center">
                           {qrCodeData ? (
                             <QRCode
                               value={qrCodeData}
-                              size={150}
+                              size={136}
                               level="M"
                               bgColor="white"
                               fgColor="black"
@@ -2846,7 +2846,7 @@ function GroupPageContent() {
                   </div>
                 </div>
                 
-                <div className="space-y-2 mt-2">
+                <div className="space-y-1 mt-2">
                   <motion.button 
                     onClick={() => {
                       if (selectedGroup?.sgt_code) {
@@ -2854,7 +2854,7 @@ function GroupPageContent() {
                         showToastModal('success', '복사 완료', '초대 코드가 클립보드에 복사되었습니다.');
                       }
                     }}
-                    className="w-full flex items-center justify-center p-3 rounded-lg bg-blue-200 text-blue-800 shadow-sm hover:bg-blue-300 hover:text-blue-900 transition-all"
+                    className="w-full flex items-center justify-center p-2 rounded-lg bg-blue-200 text-blue-800 shadow-sm hover:bg-blue-300 hover:text-blue-900 transition-all"
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >
@@ -2869,7 +2869,7 @@ function GroupPageContent() {
                         showToastModal('success', '복사 완료', 'QR코드 데이터가 클립보드에 복사되었습니다.');
                       }
                     }}
-                    className="w-full flex items-center justify-center p-3 rounded-lg bg-green-200 text-green-800 shadow-sm hover:bg-green-300 hover:text-green-900 transition-all"
+                    className="w-full flex items-center justify-center p-2 rounded-lg bg-green-200 text-green-800 shadow-sm hover:bg-green-300 hover:text-green-900 transition-all"
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >
@@ -2879,7 +2879,7 @@ function GroupPageContent() {
                   
                   <motion.button
                     onClick={() => setShowQRCode(false)}
-                    className="w-full py-2 mt-2 text-gray-600 font-medium text-sm"
+                    className="w-full py-1.5 mt-1 text-gray-600 font-medium text-sm"
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >

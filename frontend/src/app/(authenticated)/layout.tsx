@@ -1,4 +1,3 @@
-import { cookies } from 'next/headers'
 'use client';
 
 import { useEffect } from 'react';
@@ -6,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import AppLayout from '../components/layout/AppLayout';
 import locationTrackingService from '@/services/locationTrackingService';
-import { cookies } from 'next/headers';
+// 서버 전용 API는 클라이언트 컴포넌트에서 사용하지 않음
 
 // 범용 로딩 스피너 컴포넌트
 function FullPageSpinner() {
@@ -17,7 +16,7 @@ function FullPageSpinner() {
   );
 }
 
-export default async function AuthenticatedLayout({
+export default function AuthenticatedLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -25,15 +24,7 @@ export default async function AuthenticatedLayout({
   const { isLoggedIn, loading } = useAuth();
   const router = useRouter();
 
-  // SSR 단계에서 쿠키 확인 시도 (서버에서만 동작)
-  try {
-    const c = await cookies()
-    const token = c.get('auth-token')?.value
-    if (!token && typeof window === 'undefined') {
-      // 서버 렌더 단계에서 토큰이 없으면 즉시 아무것도 렌더하지 않음
-      // (실제 리다이렉트는 최상위 서버 라우트에서 처리 권장)
-    }
-  } catch {}
+  // SSR 쿠키 확인 로직은 서버 컴포넌트에서 처리 (여기는 클라이언트 전용)
 
   useEffect(() => {
     // 로딩이 끝났는데, 로그인이 되어있지 않다면 signin 페이지로 리디렉션
