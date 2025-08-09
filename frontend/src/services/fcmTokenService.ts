@@ -35,12 +35,25 @@ class FCMTokenService {
         this.isInitialized = true; // 에러 상태로 초기화 완료 처리
         return;
       }
+
+      // FCM 지원 환경인지 확인
+      if (!('serviceWorker' in navigator)) {
+        console.warn('[FCM Token Service] ⚠️ ServiceWorker를 지원하지 않는 환경');
+        this.isInitialized = true;
+        return;
+      }
+
+      if (!('Notification' in window)) {
+        console.warn('[FCM Token Service] ⚠️ 알림을 지원하지 않는 환경');
+        this.isInitialized = true;
+        return;
+      }
+      
+      // 서비스 워커를 먼저 등록
+      await this.ensureServiceWorker();
       
       // Firebase Messaging 초기화
       this.messaging = getMessaging(app);
-      
-      // 서비스 워커 등록 (없으면 생성)
-      await this.ensureServiceWorker();
       
       this.isInitialized = true;
       console.log('[FCM Token Service] ✅ 초기화 완료');
