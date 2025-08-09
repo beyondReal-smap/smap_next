@@ -61,7 +61,8 @@ export async function GET(
     console.log('[Group Locations API] 그룹 장소 조회 요청:', { groupId });
 
     // 먼저 그룹 멤버들을 조회
-    const membersUrl = `${backendUrl}/api/v1/group-members/member/${groupId}`;
+    const backendBase = resolveBackendBaseUrl();
+    const membersUrl = `${backendBase}/api/v1/group-members/member/${groupId}`;
     console.log('[Group Locations API] 그룹 멤버 조회:', membersUrl);
     
     const membersData = await fetchWithFallback(membersUrl);
@@ -72,7 +73,7 @@ export async function GET(
     
     for (const member of membersData) {
       try {
-        const memberLocationsUrl = `${backendUrl}/api/v1/locations/member/${member.mt_idx}`;
+        const memberLocationsUrl = `${backendBase}/api/v1/locations/member/${member.mt_idx}`;
         console.log('[Group Locations API] 멤버 위치 조회:', { memberId: member.mt_idx, url: memberLocationsUrl });
         
         const memberLocations = await fetchWithFallback(memberLocationsUrl);
