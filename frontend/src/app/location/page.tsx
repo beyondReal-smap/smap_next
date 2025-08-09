@@ -788,6 +788,11 @@ export default function LocationPage() {
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
   const [selectedMemberIdRef, setSelectedMemberIdRef] = useState<React.MutableRefObject<string | null>>({ current: null });
+  // 사이드바 멤버 선택 시에만 자동 InfoWindow 표시를 허용하는 플래그
+  const shouldAutoOpenInfoWindowRef = useRef<boolean>(false);
+  // 자동 InfoWindow 재생성 방지용 타이머와 시그니처
+  const autoInfoWindowTimeoutRef = useRef<number | null>(null);
+  const lastAutoInfoSignatureRef = useRef<string>("");
   const [isGroupSelectorOpen, setIsGroupSelectorOpen] = useState(false);
   const [groupMemberCounts, setGroupMemberCounts] = useState<Record<number, number>>({});
   
@@ -1964,6 +1969,10 @@ export default function LocationPage() {
     }
     
     selectedMemberIdRef.current = memberId;
+    // 사이드바 선택으로 진입했음을 표시하여 자동 InfoWindow 허용
+    if (!fromMarkerClick) {
+      shouldAutoOpenInfoWindowRef.current = true;
+    }
   
     const updatedMembers = (membersArray || groupMembers).map(member => ({
         ...member,
@@ -3952,15 +3961,38 @@ export default function LocationPage() {
       if (infoWindow && infoWindow.getMap()) return;
     } catch (_) {}
 
+    // 네비게이션/라우팅 결과로 리렌더링된 경우 자동 오픈 방지
+    if (!shouldAutoOpenInfoWindowRef.current) return;
+
     // 멤버 ID로 매칭되는 마커 찾기 (재렌더/인덱스 변화 대응)
     const key = String(sel.id);
     const markerForSelected = memberMarkers.find((mk: any) => mk && (mk as any).__key === key);
     if (markerForSelected) {
+      // 중복 스케줄링 방지: 멤버/마커 상태 기반 시그니처 확인
+      const signature = `${sel.id}:${memberMarkers.length}`;
+      if (signature === lastAutoInfoSignatureRef.current) {
+        return;
+      }
+      lastAutoInfoSignatureRef.current = signature;
+
       // 약간의 지연으로 DOM/마커 상태 안정화 후 표시
-      setTimeout(() => {
+      if (autoInfoWindowTimeoutRef.current) {
+        clearTimeout(autoInfoWindowTimeoutRef.current);
+      }
+      autoInfoWindowTimeoutRef.current = window.setTimeout(() => {
         createMemberInfoWindow(sel, markerForSelected);
-      }, 100);
+        // 한 번 자동 오픈 후에는 플래그 리셋하여 불필요한 재생성 방지
+        shouldAutoOpenInfoWindowRef.current = false;
+        autoInfoWindowTimeoutRef.current = null;
+      }, 120);
     }
+    // 클린업: 의존성 변경/언마운트 시 pending 타이머 정리
+    return () => {
+      if (autoInfoWindowTimeoutRef.current) {
+        clearTimeout(autoInfoWindowTimeoutRef.current);
+        autoInfoWindowTimeoutRef.current = null;
+      }
+    };
   }, [groupMembers, memberMarkers, map, isMapReady, infoWindow]);
 
 
