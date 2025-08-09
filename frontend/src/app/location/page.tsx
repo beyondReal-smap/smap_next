@@ -1940,6 +1940,8 @@ export default function LocationPage() {
         }
       });
       console.log('[handleMemberSelect] 기존 멤버 마커 지도에서 제거 완료');
+      // 상태 배열도 비워서 재사용 로직으로 인해 setMap이 누락되는 문제 방지
+      setMemberMarkers([]);
     }
 
     // 2. 선택된 장소 관련 상태 초기화 (이미 선택된 멤버가 아닌 경우에만)
@@ -3484,7 +3486,23 @@ export default function LocationPage() {
       호출시간: new Date().toLocaleTimeString()
     });
 
-    // 기존 마커 일괄 제거 대신 재사용 전략(깜빡임 방지)
+    // 기존 장소 마커는 모두 제거하여 "선택된 멤버의 장소만" 남도록 보장
+    // (재사용 전략은 다른 멤버 장소가 남는 문제를 유발할 수 있어 명시적으로 정리)
+    if (markers.length > 0) {
+      try {
+        markers.forEach(marker => {
+          if (marker && typeof marker.setMap === 'function' && marker.getMap && marker.getMap()) {
+            marker.setMap(null);
+          }
+        });
+        setMarkers([]);
+        console.log('[updateAllMarkers] 기존 장소 마커 전부 제거 완료:', markers.length);
+      } catch (e) {
+        console.warn('[updateAllMarkers] 기존 장소 마커 제거 중 경고:', e);
+      }
+    }
+
+    // 기존 마커 일괄 제거 후 새로 구성
     const nextMemberMarkers: Record<string, NaverMarker> = {};
     const nextLocationMarkers: Record<string, NaverMarker> = {};
     
@@ -3537,7 +3555,7 @@ export default function LocationPage() {
             return;
           }
           
-          const borderColor = member.isSelected ? '#EC4899' : '#0113A3';
+          const borderColor = member.isSelected ? '#ef4444' : '#0113A3';
           
           console.log(`[updateAllMarkers] 멤버 마커 생성: ${member.name} (선택됨: ${member.isSelected}, 색상: ${borderColor})`);
       
@@ -3620,7 +3638,7 @@ export default function LocationPage() {
     });
     
     // *** 핵심 로직: 선택된 멤버의 장소 마커만 생성 (다른 멤버 장소는 표시하지 않음) ***
-    if (selectedMember && locations && locations.length > 0) {
+    if (selectedMember && Array.isArray(locations)) {
       console.log('[updateAllMarkers] 🎯 선택된 멤버의 장소 마커 생성 시작:', {
         selectedMemberName: selectedMember.name,
         selectedMemberId: selectedMember.id,
@@ -3628,6 +3646,7 @@ export default function LocationPage() {
         locationsPreview: locations.slice(0, 3).map(loc => ({ name: loc.name, coordinates: loc.coordinates }))
       });
       
+      // 선택된 멤버의 장소만 반영: locations는 이미 선택 멤버의 장소로 전달됨
       locations.forEach((location, index) => {
         const [lng, lat] = location.coordinates;
         
@@ -3868,27 +3887,31 @@ export default function LocationPage() {
       });
       
       // *** 핵심: 이곳에서만 마커 업데이트 (handleMemberSelect에서는 호출하지 않음) ***
-      updateAllMarkers(groupMembers, selectedMemberSavedLocations);
+      // 멤버 마커는 항상 갱신, 장소 마커는 선택된 멤버의 장소가 준비된 경우에만 반영
+      // 선택된 멤버의 장소만 전달. 장소가 아직 준비되지 않았으면 빈 배열 전달해 잔여 마커를 정리
+      const selMember = groupMembers.find(m => m.isSelected);
+      const locationsForSelected = selMember ? (selectedMemberSavedLocations || []) : [];
+      updateAllMarkers(groupMembers, locationsForSelected);
       
       // 첫번째 멤버 선택 완료 후 InfoWindow 자동 생성
-      const selectedMember = groupMembers.find(m => m.isSelected);
-      if (selectedMember && isFirstMemberSelectionComplete && !infoWindow && !isLocationSelectingRef.current) {
+      const selectedMember2 = groupMembers.find(m => m.isSelected);
+      if (selectedMember2 && isFirstMemberSelectionComplete && !infoWindow && !isLocationSelectingRef.current) {
         // 마커 업데이트 완료 후 InfoWindow 생성
         // 단, 장소 선택 중이면 멤버 InfoWindow 생성을 방지
         setTimeout(() => {
-          const memberIndex = groupMembers.findIndex(m => m.id === selectedMember.id);
+          const memberIndex = groupMembers.findIndex(m => m.id === selectedMember2.id);
           if (memberIndex >= 0 && memberMarkers.length > memberIndex && memberMarkers[memberIndex]) {
-            console.log('[useEffect 통합 마커] 선택된 멤버 InfoWindow 자동 생성:', selectedMember.name);
-            createMemberInfoWindow(selectedMember, memberMarkers[memberIndex]);
+            console.log('[useEffect 통합 마커] 선택된 멤버 InfoWindow 자동 생성:', selectedMember2.name);
+            createMemberInfoWindow(selectedMember2, memberMarkers[memberIndex]);
           } else {
             console.log('[useEffect 통합 마커] InfoWindow 생성 실패 - 마커 없음:', {
               memberIndex,
               totalMarkers: memberMarkers.length,
-              selectedMember: selectedMember.name
+              selectedMember: selectedMember2.name
             });
           }
         }, 300); // 마커 생성 완료를 위한 지연
-      } else if (selectedMember && isFirstMemberSelectionComplete && isLocationSelectingRef.current) {
+      } else if (selectedMember2 && isFirstMemberSelectionComplete && isLocationSelectingRef.current) {
         console.log('[useEffect 통합 마커] 장소 선택 중 - 멤버 InfoWindow 생성 방지');
       }
     } else if (map && isMapReady) {
@@ -3914,6 +3937,31 @@ export default function LocationPage() {
       });
     }
   }, [groupMembers, selectedMemberSavedLocations, map, isMapReady, isFirstMemberSelectionComplete]);
+
+  // 선택된 멤버 변경 또는 멤버 마커 생성 후 InfoWindow 자동 표시 보강
+  useEffect(() => {
+    if (!map || !isMapReady) return;
+    // 장소 선택 중에는 자동 표시 방지
+    if (isLocationSelectingRef.current) return;
+
+    const sel = groupMembers.find(m => m.isSelected);
+    if (!sel) return;
+
+    // 이미 열려 있으면 재생성하지 않음
+    try {
+      if (infoWindow && infoWindow.getMap()) return;
+    } catch (_) {}
+
+    // 멤버 ID로 매칭되는 마커 찾기 (재렌더/인덱스 변화 대응)
+    const key = String(sel.id);
+    const markerForSelected = memberMarkers.find((mk: any) => mk && (mk as any).__key === key);
+    if (markerForSelected) {
+      // 약간의 지연으로 DOM/마커 상태 안정화 후 표시
+      setTimeout(() => {
+        createMemberInfoWindow(sel, markerForSelected);
+      }, 100);
+    }
+  }, [groupMembers, memberMarkers, map, isMapReady, infoWindow]);
 
 
 
