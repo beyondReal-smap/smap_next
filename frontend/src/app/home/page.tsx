@@ -3302,7 +3302,7 @@ export default function HomePage() {
           icon: {
             content: `
               <div style="position: relative; text-align: center;">
-                <div style="width: 32px; height: 32px; background-color: white; border: 2px solid ${borderColor}; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: ${isSelected ? '0 0 8px rgba(239, 68, 68, 0.5)' : '0 1px 3px rgba(0,0,0,0.2)'};">
+                <div style="width: 32px; height: 32px; background-color: white; border: 2px solid ${borderColor}; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: ${isSelected ? '0 0 8px rgba(236, 72, 153, 0.5)' : '0 1px 3px rgba(0,0,0,0.2)'};">
                   <img 
                     src="${photoForMarker}" 
                     alt="${memberData.name}" 
@@ -4165,6 +4165,20 @@ export default function HomePage() {
       member.id === id ? { ...member, isSelected: true } : { ...member, isSelected: false }
     ) : [];
     setGroupMembers(updatedMembers);
+    
+    // 즉시 마커 색상 갱신 (지연 없이)
+    if (
+      (mapType === 'naver' && naverMap.current && mapsInitialized.naver && window.naver?.maps) ||
+      (mapType === 'google' && map.current && mapsInitialized.google && window.google?.maps)
+    ) {
+      try {
+        console.log('[handleMemberSelect] 즉시 마커 색상 갱신 시작');
+        updateMemberMarkers(updatedMembers);
+        console.log('[handleMemberSelect] 즉시 마커 색상 갱신 완료');
+      } catch (e) {
+        console.warn('[handleMemberSelect] 즉시 마커 갱신 실패:', e);
+      }
+    }
     const selectedMember = (updatedMembers && safeArrayCheck(updatedMembers)) ? updatedMembers.find((member: GroupMember) => member.isSelected) : null;
     
     console.log('[handleMemberSelect] 멤버 선택:', {
@@ -4452,6 +4466,44 @@ export default function HomePage() {
             // 선택 상태에 따른 z-index 갱신
             if (existingMarker.setZIndex) {
               existingMarker.setZIndex(member.isSelected ? 200 : 150);
+            }
+            // 선택 상태에 따른 아이콘 갱신 (네이버 지도)
+            if (mapType === 'naver' && existingMarker.setIcon) {
+              const photoForMarker = getSafeImageUrl(member.photo, member.mt_gender, member.original_index);
+              const borderColor = member.isSelected ? '#EC4899' : '#4F46E5';
+              const boxShadow = member.isSelected ? '0 0 8px rgba(236, 72, 153, 0.5)' : '0 1px 3px rgba(0,0,0,0.2)';
+              existingMarker.setIcon({
+                content: `
+                  <div style="position: relative; text-align: center;">
+                    <div style="width: 32px; height: 32px; background-color: white; border: 2px solid ${borderColor}; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: ${boxShadow};">
+                      <img 
+                        src="${photoForMarker}" 
+                        alt="${member.name}" 
+                        style="width: 100%; height: 100%; object-fit: cover;" 
+                        data-gender="${member.mt_gender ?? ''}" 
+                        data-index="${member.original_index}"
+                        onerror="
+                          const genderStr = this.getAttribute('data-gender');
+                          const indexStr = this.getAttribute('data-index');
+                          const gender = genderStr ? parseInt(genderStr, 10) : null;
+                          const idx = indexStr ? parseInt(indexStr, 10) : 0;
+                          const imgNum = (idx % 4) + 1;
+                          let fallbackSrc = '/images/avatar' + ((idx % 3) + 1) + '.png';
+                          if (gender === 1) { fallbackSrc = '/images/male_' + imgNum + '.png'; }
+                          else if (gender === 2) { fallbackSrc = '/images/female_' + imgNum + '.png'; }
+                          this.src = fallbackSrc;
+                          this.onerror = null;
+                        "
+                      />
+                    </div>
+                    <div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.7); color: white; padding: 2px 5px; border-radius: 3px; white-space: nowrap; font-size: 10px;">
+                      ${member.name}
+                    </div>
+                  </div>
+                `,
+                size: new window.naver.maps.Size(36, 48),
+                anchor: new window.naver.maps.Point(18, 42)
+              });
             }
             nextMarkerMap.set(key, existingMarker);
           } else {
