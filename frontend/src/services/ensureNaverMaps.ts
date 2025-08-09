@@ -70,9 +70,7 @@ export async function ensureNaverMapsLoaded(options?: EnsureOptions): Promise<vo
     return window.__NAVER_MAPS_PROMISE__!;
   }
 
-  let rejectOnError: ((e: any) => void) | null = null;
   const p = new Promise<void>(async (resolve, reject) => {
-    rejectOnError = reject;
     let attempt = 0;
     let lastError: any = null;
 
@@ -128,7 +126,6 @@ export async function ensureNaverMapsLoaded(options?: EnsureOptions): Promise<vo
     await p;
   } catch (e) {
     window.__NAVER_MAPS_PROMISE__ = null;
-    if (rejectOnError) rejectOnError(e);
     throw e;
   }
 }
