@@ -28,6 +28,7 @@ export interface Member {
   mt_weather_date?: string;
   mt_ldate?: string;
   mt_adate?: string;
+  mt_token_id?: string; // FCM 토큰
   // 약관 동의 필드
   mt_agree1?: 'Y' | 'N';  // 서비스이용약관 동의여부
   mt_agree2?: 'Y' | 'N';  // 개인정보 처리방침 동의여부

@@ -394,8 +394,55 @@ extension AppDelegate: MessagingDelegate {
             print("⚠️ [Firebase] FCM 토큰은 있지만 권한 상태: \(authorizationStatusString(settings.authorizationStatus))")
         }
         
-        // FCM 토큰을 서버에 전송하는 로직을 여기에 추가할 수 있습니다
-        // 예: sendTokenToServer(token)
+        // FCM 토큰을 JavaScript로 전달
+        self.sendFCMTokenToWebView(token)
+    }
+    
+    // MARK: - FCM 토큰 JavaScript 전달
+    private func sendFCMTokenToWebView(_ token: String) {
+        DispatchQueue.main.async {
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               let window = windowScene.windows.first,
+               let webView = self.findWebView(in: window.rootViewController?.view) {
+                
+                print("🔔 [Firebase] FCM 토큰을 JavaScript로 전달: \(token.prefix(50))...")
+                
+                let script = """
+                    if (window.receiveFCMToken) {
+                        window.receiveFCMToken('\(token)');
+                    } else {
+                        window.nativeFCMToken = '\(token)';
+                        console.log('FCM 토큰이 임시 저장됨:', window.nativeFCMToken.substring(0, 50) + '...');
+                    }
+                """
+                
+                webView.evaluateJavaScript(script) { (result, error) in
+                    if let error = error {
+                        print("❌ [Firebase] FCM 토큰 JavaScript 전달 실패: \(error)")
+                    } else {
+                        print("✅ [Firebase] FCM 토큰 JavaScript 전달 성공")
+                    }
+                }
+            } else {
+                print("⚠️ [Firebase] WebView를 찾을 수 없음 - FCM 토큰 전달 실패")
+            }
+        }
+    }
+    
+    private func findWebView(in view: UIView?) -> WKWebView? {
+        guard let view = view else { return nil }
+        
+        if let webView = view as? WKWebView {
+            return webView
+        }
+        
+        for subview in view.subviews {
+            if let webView = findWebView(in: subview) {
+                return webView
+            }
+        }
+        
+        return nil
     }
 }
 

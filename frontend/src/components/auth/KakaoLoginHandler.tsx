@@ -101,6 +101,34 @@ const KakaoLoginHandler = forwardRef<KakaoLoginHandlerRef, KakaoLoginHandlerProp
           console.warn('🎯 [KAKAO] 데이터 프리로드 실패:', preloadError);
         }
 
+        // FCM 토큰 처리 (백그라운드에서 실행)
+        setTimeout(async () => {
+          try {
+            console.log('🔔 [KAKAO] 로그인 후 FCM 토큰 처리 시작');
+            const fcmTokenService = (await import('@/services/fcmTokenService')).default;
+            
+            if (data.isNewUser) {
+              // 신규 사용자 - FCM 토큰 등록
+              const fcmResult = await fcmTokenService.initializeAndRegisterToken(userProfile.mt_idx);
+              if (fcmResult.success) {
+                console.log('✅ [KAKAO] 신규 사용자 FCM 토큰 등록 완료');
+              } else {
+                console.warn('⚠️ [KAKAO] 신규 사용자 FCM 토큰 등록 실패:', fcmResult.error);
+              }
+            } else {
+              // 기존 사용자 - FCM 토큰 체크/업데이트
+              const fcmResult = await fcmTokenService.initializeAndCheckUpdateToken(userProfile.mt_idx);
+              if (fcmResult.success) {
+                console.log('✅ [KAKAO] 기존 사용자 FCM 토큰 체크/업데이트 완료:', fcmResult.message);
+              } else {
+                console.warn('⚠️ [KAKAO] 기존 사용자 FCM 토큰 체크/업데이트 실패:', fcmResult.error);
+              }
+            }
+          } catch (fcmError) {
+            console.error('❌ [KAKAO] FCM 토큰 처리 중 오류:', fcmError);
+          }
+        }, 1000); // 로그인/회원가입 완료 후 1초 지연
+
         onSuccess?.(userInfo);
         
         // 신규 사용자인 경우 회원가입 페이지로, 기존 사용자는 홈으로

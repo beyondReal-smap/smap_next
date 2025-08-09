@@ -1306,6 +1306,24 @@ export default function RegisterPage() {
         if (data.data && data.data.mt_idx) {
           localStorage.setItem('newMemberMtIdx', data.data.mt_idx.toString());
           console.log('새 회원 mt_idx 저장:', data.data.mt_idx);
+          
+          // FCM 토큰 등록 (백그라운드에서 실행)
+          setTimeout(async () => {
+            try {
+              console.log('🔔 [REGISTER] 회원가입 완료 후 FCM 토큰 등록 시작');
+              const fcmTokenService = (await import('@/services/fcmTokenService')).default;
+              
+              const fcmResult = await fcmTokenService.initializeAndRegisterToken(data.data.mt_idx);
+              
+              if (fcmResult.success) {
+                console.log('✅ [REGISTER] FCM 토큰 등록 완료');
+              } else {
+                console.warn('⚠️ [REGISTER] FCM 토큰 등록 실패:', fcmResult.error);
+              }
+            } catch (fcmError) {
+              console.error('❌ [REGISTER] FCM 토큰 등록 중 오류:', fcmError);
+            }
+          }, 1500); // 회원가입 완료 후 1.5초 지연
         }
         
         // 소셜 로그인 데이터 정리 (회원가입 성공 시에만)
