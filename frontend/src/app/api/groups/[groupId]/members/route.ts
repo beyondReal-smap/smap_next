@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import resolveBackendBaseUrl from '../../../_utils/backend';
 
 // node-fetch를 대안으로 사용
 let nodeFetch: any = null;
@@ -78,7 +79,8 @@ export async function GET(
     console.log('[Group Members API] 그룹 멤버 조회 요청:', { groupId });
 
     // 기존 백엔드 엔드포인트 직접 호출 (이미 조인된 데이터 반환)
-    const membersUrl = `https://api3.smap.site/api/v1/group-members/member/${groupId}`;
+    const backendBase = resolveBackendBaseUrl();
+    const membersUrl = `${backendBase}/api/v1/group-members/member/${groupId}`;
     console.log('[Group Members API] 백엔드 API 호출:', membersUrl);
     
     const membersData = await fetchWithFallback(membersUrl);

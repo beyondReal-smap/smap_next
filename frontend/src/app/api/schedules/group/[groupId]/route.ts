@@ -197,13 +197,13 @@ export async function GET(
   
   try {
     const { searchParams } = new URL(request.url);
-    const days = searchParams.get('days') || '7'; // 기본 7일
-    const startDate = searchParams.get('startDate');
-    const endDate = searchParams.get('endDate');
+    const daysParam = searchParams.get('days') || '7'; // 기본 7일
+    let startDate = searchParams.get('startDate');
+    let endDate = searchParams.get('endDate');
 
-    console.log('[API PROXY] 파라미터 추출 완료:', { groupId, days, startDate, endDate });
+    console.log('[API PROXY] 파라미터 추출 완료:', { groupId, days: daysParam, startDate, endDate });
 
-    // 올바른 백엔드 API 호출 경로 수정
+    // 올바른 백엔드 API 호출 경로
     let backendUrl = `https://api3.smap.site/api/v1/schedule/group/${groupId}/schedules`;
     const urlParams = new URLSearchParams();
     
@@ -217,11 +217,20 @@ export async function GET(
     }
     urlParams.append('current_user_id', currentUserId.toString());
     
-    // days 파라미터 추가
-    if (days) {
-      urlParams.append('days', days);
+    // 백엔드가 days를 직접 지원하지 않을 수 있으므로 서버에서 기간 계산
+    if (!startDate || !endDate) {
+      const days = Math.max(1, parseInt(daysParam, 10) || 7);
+      const now = new Date();
+      const end = new Date(now);
+      end.setHours(23, 59, 59, 999);
+      const start = new Date(now);
+      start.setDate(start.getDate() - (days - 1));
+      start.setHours(0, 0, 0, 0);
+      const toMysql = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
+      startDate = toMysql(start);
+      endDate = toMysql(end);
     }
-    
+
     if (startDate && endDate) {
       urlParams.append('start_date', startDate);
       urlParams.append('end_date', endDate);
@@ -246,8 +255,22 @@ export async function GET(
     
     console.log('[API PROXY] fetch 옵션 설정 완료');
     
-    const data = await fetchWithFallback(backendUrl, fetchOptions);
-    console.log('[API PROXY] ✅ 백엔드에서 실제 데이터 받음 ✅');
+    let data: any;
+    try {
+      data = await fetchWithFallback(backendUrl, fetchOptions);
+      console.log('[API PROXY] ✅ 백엔드에서 실제 데이터 받음 ✅');
+    } catch (backendError: any) {
+      console.error('[API PROXY] 백엔드  오류, 안전한 빈 데이터로 대체:', backendError?.message || backendError);
+      // 프론트는 500을 에러로 처리하므로, 빈 구조를 200으로 반환하여 UX 보호
+      return NextResponse.json({
+        success: false,
+        data: {
+          groupMembers: [],
+          schedules: [],
+          userPermission: { canManage: false, isOwner: false, isLeader: false }
+        }
+      });
+    }
     console.log('[API PROXY] 그룹 스케줄 백엔드 응답 데이터:', {
       dataType: Array.isArray(data) ? 'array' : typeof data,
       count: Array.isArray(data) ? data.length : 'N/A',

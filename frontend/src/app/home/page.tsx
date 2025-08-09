@@ -219,6 +219,36 @@ body.sidebar-open .header-fixed {
   z-index: 10 !important;
 }
 
+/* 사이드바가 열렸을 때 배경 스크롤 완전 차단 */
+body.sidebar-open {
+  overflow: hidden !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  touch-action: none !important;
+  -webkit-overflow-scrolling: auto !important;
+}
+
+/* 사이드바 내부 컨텐츠는 스크롤 허용 */
+body.sidebar-open .sidebar-content {
+  touch-action: auto !important;
+  pointer-events: auto !important;
+  overscroll-behavior: contain !important;
+  -webkit-overflow-scrolling: touch !important;
+  overflow-y: auto !important;
+}
+
+body.sidebar-open .sidebar-content * {
+  touch-action: auto !important;
+  pointer-events: auto !important;
+}
+
 /* iOS 웹뷰 하단 네비게이션 최적화 */
 .navigation-fixed {
   position: fixed !important;
@@ -5583,6 +5613,25 @@ export default function HomePage() {
       };
     }, [isSidebarOpen]);
 
+    // 사이드바 열림 시 배경 스크롤 차단 (wheel/touchmove 방지)
+    useEffect(() => {
+      const preventBackgroundScroll = (e: Event) => {
+        if (!sidebarRef.current) return;
+        const target = e.target as Node;
+        if (!sidebarRef.current.contains(target)) {
+          e.preventDefault();
+        }
+      };
+      if (isSidebarOpen) {
+        document.addEventListener('wheel', preventBackgroundScroll, { passive: false });
+        document.addEventListener('touchmove', preventBackgroundScroll, { passive: false });
+      }
+      return () => {
+        document.removeEventListener('wheel', preventBackgroundScroll as EventListener);
+        document.removeEventListener('touchmove', preventBackgroundScroll as EventListener);
+      };
+    }, [isSidebarOpen]);
+
     // 사이드바 외부 클릭 시 닫기 (강화된 햅틱 피드백)
     useEffect(() => {
       const handleSidebarClickOutside = (event: MouseEvent) => {
@@ -6172,7 +6221,7 @@ export default function HomePage() {
                      initial="closed"
                      animate="open"
                      exit="closed"
-                     className="p-6 h-full flex flex-col relative z-10"
+                    className="p-6 h-full flex flex-col relative z-10 sidebar-content overflow-y-auto"
                      onClick={(e) => e.stopPropagation()}
                      style={{
                        paddingTop: '1.5rem',

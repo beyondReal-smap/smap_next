@@ -30,6 +30,9 @@
         <!-- 외부 서비스 -->
         <domain includeSubdomains="true">map.naver.com</domain>
         <domain includeSubdomains="true">map.naver.net</domain>
+        <!-- 네이버 지도 JS SDK 및 오픈 API -->
+        <domain includeSubdomains="true">oapi.map.naver.com</domain>
+        <domain includeSubdomains="true">openapi.map.naver.com</domain>
         
         <!-- 🔥 IP 주소 직접 접근 (DNS 문제 우회) -->
         <domain includeSubdomains="true">216.198.79.65</domain>

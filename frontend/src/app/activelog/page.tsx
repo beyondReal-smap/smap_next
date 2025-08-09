@@ -1672,7 +1672,12 @@ export default function ActivelogPage() {
           memberName = firstMember.name;
         }
         
-        const initialCenter = new window.naver.maps.LatLng(initialLat, initialLng);
+        const LatLng = (window as any)?.naver?.maps?.LatLng;
+        if (!LatLng) {
+          console.warn('[Map Init] naver.maps.LatLng 미존재 - SDK 미로딩 또는 해제 상태');
+          return;
+        }
+        const initialCenter = new LatLng(initialLat, initialLng);
         
         console.log('[LOGS 지도 초기화] 위치 설정:', {
           memberName,
@@ -2744,7 +2749,8 @@ export default function ActivelogPage() {
       // 오류 시에도 멤버의 현재 위치로 지도 설정
       const currentLat = member.mlt_lat || member.location.lat || 37.5665;
       const currentLng = member.mlt_long || member.location.lng || 126.9780;
-      const adjustedPosition = new window.naver.maps.LatLng(currentLat, currentLng);
+      const LatLng1 = (window as any)?.naver?.maps?.LatLng; if (!LatLng1) return;
+      const adjustedPosition = new LatLng1(currentLat, currentLng);
       
       map.current.setCenter(adjustedPosition);
       map.current.setZoom(16);
@@ -2791,7 +2797,8 @@ export default function ActivelogPage() {
         const lngDiff = Math.abs(currentLng - startLng);
         
         if (latDiff > 0.001 || lngDiff > 0.001) {
-          const adjustedPosition = new window.naver.maps.LatLng(targetLat, startLng);
+          const LatLng2 = (window as any)?.naver?.maps?.LatLng; if (!LatLng2) return;
+          const adjustedPosition = new LatLng2(targetLat, startLng);
           map.current.setCenter(adjustedPosition);
           map.current.setZoom(16);
           
@@ -2941,7 +2948,8 @@ export default function ActivelogPage() {
       startInfoWindow.open(map.current, targetMarker);
       console.log('[showStartPointInfoWindow] 마커에 InfoWindow 표시 완료');
     } else {
-      const position = new window.naver.maps.LatLng(lat, lng);
+      const LatLng3 = (window as any)?.naver?.maps?.LatLng; if (!LatLng3) return;
+      const position = new LatLng3(lat, lng);
       startInfoWindow.open(map.current, position);
       console.log('[showStartPointInfoWindow] 위치에 InfoWindow 표시 완료');
     }
@@ -3618,7 +3626,8 @@ export default function ActivelogPage() {
                 try {
                     const lat = selectedMember.mlt_lat !== null && selectedMember.mlt_lat !== undefined && selectedMember.mlt_lat !== 0 ? parseFloat(selectedMember.mlt_lat.toString()) : parseFloat(selectedMember.location.lat.toString() || '37.5665');
                     const lng = selectedMember.mlt_long !== null && selectedMember.mlt_long !== undefined && selectedMember.mlt_long !== 0 ? parseFloat(selectedMember.mlt_long.toString()) : parseFloat(selectedMember.location.lng.toString() || '126.9780');
-                     const position = new window.naver.maps.LatLng(lat, lng);
+                    const LatLng4 = (window as any)?.naver?.maps?.LatLng; if (!LatLng4) return;
+                    const position = new LatLng4(lat, lng);
                      const safeImageUrl = getSafeImageUrl(selectedMember.photo, selectedMember.mt_gender, selectedMember.original_index);
                      const marker = new window.naver.maps.Marker({
                        position: position,
@@ -4112,7 +4121,8 @@ export default function ActivelogPage() {
   const createOrUpdateCurrentPositionMarker = (lat: number, lng: number, targetIndex: number, totalMarkers: number) => {
     if (!map.current || !window.naver?.maps) return;
 
-    const position = new window.naver.maps.LatLng(lat, lng);
+    const LatLng5 = (window as any)?.naver?.maps?.LatLng; if (!LatLng5) return;
+    const position = new LatLng5(lat, lng);
 
     // 기존 마커가 있다면 새로 생성 (InfoWindow 깜빡임 방지)
     if (currentPositionMarker.current) {
@@ -4242,7 +4252,8 @@ export default function ActivelogPage() {
           ) > mapUpdateThresholdM;
 
         if (shouldUpdateMapCenter) {
-          const center = new window.naver.maps.LatLng(Number(lat), Number(lng));
+          const LatLng6 = (window as any)?.naver?.maps?.LatLng; if (!LatLng6) return;
+          const center = new LatLng6(Number(lat), Number(lng));
           map.current.setCenter(center);
           // 좌표 계산 캐싱: 이전 중심 좌표 저장
           lastMapCenterRef.current = { lat: Number(lat), lng: Number(lng) };
@@ -4753,7 +4764,8 @@ export default function ActivelogPage() {
           if (map.current) {
             const memberLat = selectedMember.mlt_lat || selectedMember.location.lat || 37.5665;
             const memberLng = selectedMember.mlt_long || selectedMember.location.lng || 126.9780;
-            const adjustedPosition = new window.naver.maps.LatLng(memberLat, memberLng);
+            const LatLng7 = (window as any)?.naver?.maps?.LatLng; if (!LatLng7) return;
+            const adjustedPosition = new LatLng7(memberLat, memberLng);
             
             map.current.setCenter(adjustedPosition);
             map.current.setZoom(16);
@@ -4814,7 +4826,12 @@ export default function ActivelogPage() {
         const lng = firstMarker.longitude || firstMarker.mlt_long || 0;
         
         if (lat !== 0 && lng !== 0) {
-          const adjustedPosition = new window.naver.maps.LatLng(lat, lng);
+          const LatLngCtor = (window as any)?.naver?.maps?.LatLng;
+          if (!LatLngCtor) {
+            console.warn('[LOGS] naver.maps.LatLng 사용 불가 - SDK 로드 안됨 또는 초기화 해제됨');
+            return;
+          }
+          const adjustedPosition = new LatLngCtor(lat, lng);
           
           map.current.setCenter(adjustedPosition);
           map.current.setZoom(16); // 줌 레벨 16으로 설정
@@ -4838,7 +4855,12 @@ export default function ActivelogPage() {
           if(selectedMember) {
               const memberLat = selectedMember.mlt_lat || selectedMember.location.lat || 37.5665;
               const memberLng = selectedMember.mlt_long || selectedMember.location.lng || 126.9780;
-              const adjustedPosition = new window.naver.maps.LatLng(memberLat, memberLng);
+              const LatLngCtor = (window as any)?.naver?.maps?.LatLng;
+              if (!LatLngCtor) {
+                console.warn('[LOGS] naver.maps.LatLng 사용 불가 - SDK 로드 안됨 또는 초기화 해제됨');
+                return;
+              }
+              const adjustedPosition = new LatLngCtor(memberLat, memberLng);
               
               // 지도 중심 먼저 설정
               map.current.setCenter(adjustedPosition);
@@ -4876,7 +4898,8 @@ export default function ActivelogPage() {
         if (selectedMember && sortedLocationData.length === 0 && map.current) {
           const memberLat = selectedMember.mlt_lat || selectedMember.location.lat || 37.5665;
           const memberLng = selectedMember.mlt_long || selectedMember.location.lng || 126.9780;
-          const adjustedPosition = new window.naver.maps.LatLng(memberLat, memberLng);
+          const LatLng8 = (window as any)?.naver?.maps?.LatLng; if (!LatLng8) return;
+          const adjustedPosition = new LatLng8(memberLat, memberLng);
           
           map.current.setCenter(adjustedPosition);
           map.current.setZoom(16);
@@ -4995,8 +5018,9 @@ export default function ActivelogPage() {
           // 지도 중심 설정
           const firstMember = updatedMembers[0];
           if (map.current && firstMember) {
-            const adjustedPosition = new window.naver.maps.LatLng(
-              firstMember.location.lat, 
+            const LatLng = (window as any)?.naver?.maps?.LatLng; if (!LatLng) return;
+            const adjustedPosition = new LatLng(
+              firstMember.location.lat,
               firstMember.location.lng
             );
             map.current.setCenter(adjustedPosition);

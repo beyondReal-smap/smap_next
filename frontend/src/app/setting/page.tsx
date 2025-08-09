@@ -553,7 +553,7 @@ export default function SettingsPage() {
             className="bg-gray-50 rounded-2xl p-4 text-center setting-content"
           >
             <div className="text-sm text-gray-600 mb-1">SMAP</div>
-            <div className="text-xs text-gray-500">버전 1.0.0</div>
+            <div className="text-xs text-gray-500">버전 2.2.0</div>
           </motion.div>
         </motion.div>
       </div>

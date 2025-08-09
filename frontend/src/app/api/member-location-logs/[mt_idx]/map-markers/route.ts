@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api3.smap.site';
+import resolveBackendBaseUrl from '../../../_utils/backend';
 
 // HTTPS 인증서 검증 비활성화 (개발 환경)
 if (process.env.NODE_ENV === 'development') {
@@ -28,8 +27,9 @@ export async function GET(
 
     console.log('[API] map-markers 요청:', { mt_idx, date, minSpeed, maxAccuracy });
 
-    // 백엔드 API로 프록시
-    const backendUrl = `${BACKEND_URL}/api/v1/logs/member-location-logs/${mt_idx}/map-markers?date=${date}&min_speed=${minSpeed}&max_accuracy=${maxAccuracy}`;
+    // 백엔드 API로 프록시 (도메인 강제)
+    const backendBase = resolveBackendBaseUrl();
+    const backendUrl = `${backendBase}/api/v1/logs/member-location-logs/${mt_idx}/map-markers?date=${date}&min_speed=${minSpeed}&max_accuracy=${maxAccuracy}`;
     console.log('[API] 백엔드 URL:', backendUrl);
 
     const response = await fetch(backendUrl, {

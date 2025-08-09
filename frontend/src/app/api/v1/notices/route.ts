@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import resolveBackendBaseUrl from '../../_utils/backend';
 
 export const runtime = 'edge';
 
@@ -11,7 +12,8 @@ export async function GET(request: NextRequest) {
     const size = searchParams.get('size') || '20';
     const show_only = searchParams.get('show_only') || 'true';
     
-    const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api3.smap.site'}/api/v1/notices/?page=${page}&size=${size}&show_only=${show_only}`;
+    const backendBase = resolveBackendBaseUrl();
+    const backendUrl = `${backendBase}/api/v1/notices/?page=${page}&size=${size}&show_only=${show_only}`;
     console.log('[Notice API] 백엔드 요청:', backendUrl);
 
     // SSL 인증서 문제 해결을 위한 설정

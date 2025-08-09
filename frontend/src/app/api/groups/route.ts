@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import resolveBackendBaseUrl from '../_utils/backend';
 import { requireAuth, getCurrentUserId } from '@/lib/auth';
 
 // node-fetch를 대안으로 사용
@@ -32,7 +33,8 @@ export async function GET(request: NextRequest) {
     console.log('[Groups API] 그룹 목록 조회 요청:', { mt_idx });
 
     // 기존 작동하던 백엔드 API 호출
-    const backendUrl = `https://api3.smap.site/api/v1/groups/member/${mt_idx}`;
+    const backendBase = resolveBackendBaseUrl();
+    const backendUrl = `${backendBase}/api/v1/groups/member/${mt_idx}`;
     console.log('[Groups API] 백엔드 호출:', backendUrl);
     
     const fetchOptions: RequestInit = {
@@ -141,7 +143,8 @@ export async function POST(request: NextRequest) {
     console.log('[Groups API] 그룹 생성 요청:', body);
 
     // 백엔드 그룹 생성 API 호출
-    const backendUrl = 'https://api3.smap.site/api/v1/groups';
+    const backendBase = resolveBackendBaseUrl();
+    const backendUrl = `${backendBase}/api/v1/groups`;
     console.log('[Groups API] 백엔드 그룹 생성 호출:', backendUrl);
     
     const fetchOptions: RequestInit = {

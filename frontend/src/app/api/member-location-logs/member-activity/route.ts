@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api3.smap.site';
+import resolveBackendBaseUrl from '../../_utils/backend';
 
 // 응답 데이터 변환 함수
 function transformResponse(backendData: any) {
@@ -48,8 +47,9 @@ export async function GET(request: NextRequest) {
 
     console.log('[API] member-activity 요청:', { groupId, date });
 
-    // 백엔드 API로 프록시
-    const backendUrl = `${BACKEND_URL}/api/v1/logs/member-activity?group_id=${groupId}&date=${date}`;
+    // 백엔드 API로 프록시 (도메인 강제)
+    const backendBase = resolveBackendBaseUrl();
+    const backendUrl = `${backendBase}/api/v1/logs/member-activity?group_id=${groupId}&date=${date}`;
     console.log('[API] 백엔드 URL:', backendUrl);
 
     // Node.js 환경 변수로 SSL 검증 비활성화

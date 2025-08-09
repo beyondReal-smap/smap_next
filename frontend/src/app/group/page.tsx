@@ -1987,7 +1987,7 @@ function GroupPageContent() {
                       animate={{ y: 0, opacity: 1 }}
                                               transition={{ delay: 0.5, duration: 0.5 }}
                     >
-                      <div className="p-4 border-b" style={{ borderColor: 'rgba(1, 19, 163, 0.1)' }}>
+                      <div className="p-4 border-b sticky top-0 z-10 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80" style={{ borderColor: 'rgba(1, 19, 163, 0.1)' }}>
                         <div className="flex items-center justify-between">
                           <h3 className="text-lg font-normal text-gray-900">그룹 멤버</h3>
                           <motion.button
