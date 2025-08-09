@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import resolveBackendBaseUrl from '../../../../_utils/backend';
+import resolveBackendBaseUrl from '../../../../../_utils/backend';
 
 // node-fetch를 대안으로 사용
 let nodeFetch: any = null;
