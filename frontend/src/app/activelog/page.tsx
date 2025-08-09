@@ -1476,7 +1476,7 @@ export default function ActivelogPage() {
     updateLoadingProgressSafe(100);
   };
 
-  const loadNaverMapsAPI = () => {
+  const loadNaverMapsAPI = async () => {
     if (window.naver?.maps) {
       console.log('[LOGS] Naver Maps API 이미 로드됨');
       setNaverMapsLoaded(true);
@@ -1501,6 +1501,19 @@ export default function ActivelogPage() {
                         window.webkit && 
                         window.webkit.messageHandlers;
     
+    // 보장 로더 우선 시도 (실패/타임아웃시 폴백)
+    try {
+      const { ensureNaverMapsLoaded } = await import('../../services/ensureNaverMaps');
+      const submodules = (isVercel || isIOSWebView || isProduction) ? 'geocoder' : 'geocoder,drawing,visualization';
+      await ensureNaverMapsLoaded({ maxRetries: 6, initialDelayMs: 300, submodules });
+      setNaverMapsLoaded(true);
+      updateLoadingStepSafe('groups');
+      updateLoadingProgressSafe(25);
+      return;
+    } catch (e) {
+      console.warn('[LOGS] ensureNaverMapsLoaded 실패, 수동 로딩으로 폴백', e);
+    }
+
     // 네이버 지도 API 로드용 URL 생성
     const naverMapUrl = new URL(`https://oapi.map.naver.com/openapi/v3/maps.js`);
     naverMapUrl.searchParams.append('ncpKeyId', dynamicClientId);

@@ -777,6 +777,9 @@ export default function LocationPage() {
   const [map, setMap] = useState<NaverMap | null>(null);
   const [markers, setMarkers] = useState<NaverMarker[]>([]);
   const [memberMarkers, setMemberMarkers] = useState<NaverMarker[]>([]); // Add state for member markers
+  // 최신 마커 배열을 추적하기 위한 ref (setState 비동기 반영 지연으로 인한 누락 방지)
+  const locationMarkersRef = useRef<NaverMarker[]>([]);
+  const memberMarkersRef = useRef<NaverMarker[]>([]);
   // 중복 마커 생성으로 인한 깜빡임 방지용 시그니처
   const lastMarkersSignatureRef = useRef<string>('');
   const [infoWindow, setInfoWindow] = useState<NaverInfoWindow | null>(null);
@@ -793,6 +796,57 @@ export default function LocationPage() {
   // 자동 InfoWindow 재생성 방지용 타이머와 시그니처
   const autoInfoWindowTimeoutRef = useRef<number | null>(null);
   const lastAutoInfoSignatureRef = useRef<string>("");
+  // 멤버 선택 버전(레이스 컨디션 방지용)
+  const selectionVersionRef = useRef<number>(0);
+  // 멤버 선택 플로우 진행 중 가드
+  const selectionFlowInProgressRef = useRef<boolean>(false);
+
+  // 지도 오버레이 하드 리셋 함수 (멤버 변경 시 사용)
+  const hardResetMapOverlays = (reason: string) => {
+    try {
+      console.log('[hardResetMapOverlays] 시작:', reason);
+      // InfoWindow 정리
+      try {
+        if (infoWindow) {
+          infoWindow.close();
+          setInfoWindow(null);
+        }
+      } catch (e) {}
+      // 패널 임시 마커 정리
+      try {
+        if (tempMarker.current) {
+          tempMarker.current.setMap(null);
+          tempMarker.current = null;
+        }
+      } catch (_) {}
+      // 멤버 마커 제거 (ref 우선)
+      const allMemberMarkers = memberMarkersRef.current?.length ? memberMarkersRef.current : memberMarkers;
+      if (allMemberMarkers && allMemberMarkers.length) {
+        allMemberMarkers.forEach(mk => {
+          try { mk && (mk as any).setMap && (mk as any).setMap(null); } catch (_) {}
+        });
+        setMemberMarkers([]);
+        memberMarkersRef.current = [];
+      }
+      // 장소 마커 제거
+      const allLocationMarkers = locationMarkersRef.current?.length ? locationMarkersRef.current : markers;
+      if (allLocationMarkers && allLocationMarkers.length) {
+        allLocationMarkers.forEach(mk => { try { mk && mk.setMap && mk.setMap(null); } catch (_) {} });
+        setMarkers([]);
+        locationMarkersRef.current = [];
+      }
+      // 자동 오픈 스케줄 취소 및 시그니처 초기화
+      if (autoInfoWindowTimeoutRef.current) {
+        clearTimeout(autoInfoWindowTimeoutRef.current);
+        autoInfoWindowTimeoutRef.current = null;
+      }
+      lastAutoInfoSignatureRef.current = '';
+      selectionFlowInProgressRef.current = false;
+      console.log('[hardResetMapOverlays] 완료');
+    } catch (e) {
+      console.warn('[hardResetMapOverlays] 경고:', e);
+    }
+  };
   const [isGroupSelectorOpen, setIsGroupSelectorOpen] = useState(false);
   const [groupMemberCounts, setGroupMemberCounts] = useState<Record<number, number>>({});
   
@@ -1901,6 +1955,11 @@ export default function LocationPage() {
   // 멤버 선택 핸들러
   const handleMemberSelect = async (memberId: string, openLocationPanel = false, membersArray?: GroupMember[], fromMarkerClick = false, clickedMarker?: any, onlyShowInfoWindow = false) => { 
     console.log('[handleMemberSelect] 멤버 선택:', memberId, '패널 열기:', openLocationPanel, '마커 클릭:', fromMarkerClick);
+    // 동일 멤버 재선택 시 아무 동작도 하지 않음 (요구사항)
+    if (selectedMemberIdRef.current === memberId) {
+      console.log('[handleMemberSelect] 동일 멤버 재선택 - 동작 생략');
+      return;
+    }
     
     // 즉시 햅틱 피드백 (사용자 응답성 개선)
     try {
@@ -1921,33 +1980,14 @@ export default function LocationPage() {
        return;
     }
 
-    // 이미 선택된 멤버인 경우, InfoWindow가 열려있는지 확인
-    if (selectedMemberIdRef.current === memberId && isFirstMemberSelectionComplete) {
-      // InfoWindow가 열려있는지 확인
-      const isInfoWindowOpen = infoWindow && infoWindow.getMap();
-      
-      if (isInfoWindowOpen) {
-        console.log('[handleMemberSelect] 이미 선택된 멤버이고 InfoWindow가 열려있습니다. 중복 실행 방지:', memberId);
-        return;
-      } else {
-        console.log('[handleMemberSelect] 이미 선택된 멤버이지만 InfoWindow가 닫혀있습니다. InfoWindow 재표시:', memberId);
-        // InfoWindow가 닫혀있으면 계속 진행하여 InfoWindow 표시
-      }
-    }
+    // 위 가드에서 동일 멤버는 이미 반환되므로 이하 로직 진행
     
     // *** 마커 정리 로직 강화 ***
-    // 1. 현재 지도에 있는 모든 멤버 마커 즉시 제거
-    if (map && memberMarkers.length > 0) {
-      console.log('[handleMemberSelect] 기존 멤버 마커 제거 시작:', memberMarkers.length, '개');
-      memberMarkers.forEach(marker => {
-        if (marker && typeof marker.setMap === 'function') {
-          marker.setMap(null);
-        }
-      });
-      console.log('[handleMemberSelect] 기존 멤버 마커 지도에서 제거 완료');
-      // 상태 배열도 비워서 재사용 로직으로 인해 setMap이 누락되는 문제 방지
-      setMemberMarkers([]);
-    }
+    // 1. 하드 리셋: 모든 오버레이/타이머/시그니처 정리
+    hardResetMapOverlays('[handleMemberSelect] 멤버 변경');
+    // 선택 버전 증가 (이후 비동기 처리에서 최신 선택만 유효하도록)
+    selectionVersionRef.current += 1;
+    const currentSelectionVersion = selectionVersionRef.current;
 
     // 2. 선택된 장소 관련 상태 초기화 (이미 선택된 멤버가 아닌 경우에만)
     const currentlySelectedMember = groupMembers.find(m => m.isSelected);
@@ -1960,10 +2000,7 @@ export default function LocationPage() {
       setSelectedMemberSavedLocations(null);
       
       // 기존 장소 마커들 제거
-      if (markers.length > 0) {
-        markers.forEach(marker => marker.setMap(null));
-        setMarkers([]);
-      }
+      // 이미 hardResetMapOverlays에서 정리됨
     } else {
       console.log('[handleMemberSelect] 같은 멤버 재선택 - 장소 상태 유지');
     }
@@ -1989,6 +2026,10 @@ export default function LocationPage() {
         console.log('[handleMemberSelect] 선택된 멤버 장소 데이터 로드 시작:', newlySelectedMember.name);
         
         const memberLocationsRaw = await locationService.getOtherMembersLocations(memberId);
+        if (selectionVersionRef.current !== currentSelectionVersion) {
+          console.log('[handleMemberSelect] 선택 버전 불일치 - 오래된 요청 결과 폐기');
+          return;
+        }
         console.log('[handleMemberSelect] 멤버 장소 데이터 로드 완료:', {
           멤버ID: memberId,
           원본데이터수: memberLocationsRaw.length
@@ -2168,7 +2209,7 @@ export default function LocationPage() {
           });
           
           // 마커가 있고 지도와 네이버 맵스가 로드되었을 때만 InfoWindow 표시
-          if (selectedMarker && map && window.naver?.maps) {
+            if (selectedMarker && map && window.naver?.maps) {
             const photoForMarker = getSafeImageUrl(newlySelectedMember.photo, newlySelectedMember.mt_gender, newlySelectedMember.original_index);
             const borderColor = '#f59e0b'; // 선택된 멤버 색상
 
@@ -2620,7 +2661,7 @@ export default function LocationPage() {
 
   // 네이버 지도 로드 (최적화)
   useEffect(() => {
-    const loadNaverMaps = () => {
+    const loadNaverMaps = async () => {
       console.log('[네이버 지도 로드] 시작');
       
       if (window.naver && window.naver.maps) {
@@ -2639,6 +2680,17 @@ export default function LocationPage() {
                           window.webkit && 
                           window.webkit.messageHandlers;
       
+      // 보장 로더 우선 시도 (실패/타임아웃시 폴백)
+      try {
+        const { ensureNaverMapsLoaded } = await import('../../services/ensureNaverMaps');
+        const submodules = (isIOSWebView || isProduction) ? 'geocoder' : 'geocoder,drawing,visualization';
+        await ensureNaverMapsLoaded({ maxRetries: 6, initialDelayMs: 300, submodules });
+        setIsMapLoading(false);
+        return;
+      } catch (e) {
+        console.warn('[LOCATION] ensureNaverMapsLoaded 실패, 수동 로딩으로 폴백', e);
+      }
+
       // 네이버 지도 API 로드용 URL 생성
       const naverMapUrl = new URL(`https://oapi.map.naver.com/openapi/v3/maps.js`);
       naverMapUrl.searchParams.append('ncpKeyId', dynamicClientId);
@@ -3497,15 +3549,17 @@ export default function LocationPage() {
 
     // 기존 장소 마커는 모두 제거하여 "선택된 멤버의 장소만" 남도록 보장
     // (재사용 전략은 다른 멤버 장소가 남는 문제를 유발할 수 있어 명시적으로 정리)
-    if (markers.length > 0) {
+    const markersToRemove = locationMarkersRef.current?.length ? locationMarkersRef.current : markers;
+    if (markersToRemove.length > 0) {
       try {
-        markers.forEach(marker => {
+        markersToRemove.forEach(marker => {
           if (marker && typeof marker.setMap === 'function' && marker.getMap && marker.getMap()) {
             marker.setMap(null);
           }
         });
         setMarkers([]);
-        console.log('[updateAllMarkers] 기존 장소 마커 전부 제거 완료:', markers.length);
+        locationMarkersRef.current = [];
+        console.log('[updateAllMarkers] 기존 장소 마커 전부 제거 완료:', markersToRemove.length);
       } catch (e) {
         console.warn('[updateAllMarkers] 기존 장소 마커 제거 중 경고:', e);
       }
@@ -3837,7 +3891,9 @@ export default function LocationPage() {
     });
     
     setMemberMarkers(newMemberMarkers);
+    memberMarkersRef.current = newMemberMarkers;
     setMarkers(newLocationMarkers);
+    locationMarkersRef.current = newLocationMarkers;
     
     console.log('[updateAllMarkers] ✅ 완료 - 멤버 마커:', newMemberMarkers.length, '개, 선택된 멤버의 장소 마커:', newLocationMarkers.length, '개');
     console.log('[updateAllMarkers] ✅ 핵심 결과: 다른 멤버 장소 마커 완전 제거됨, 선택된 멤버', selectedMember?.name || '없음', '의 장소만 표시');

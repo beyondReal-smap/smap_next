@@ -2522,7 +2522,7 @@ export default function HomePage() {
   };
 
   // Naver Maps API 로드 함수 (프리로딩 최적화 + iOS WebView 지원)
-  const loadNaverMapsAPI = () => {
+  const loadNaverMapsAPI = async () => {
     // iOS WebView 감지
     const isIOSWebView = typeof window !== 'undefined' && 
                         window.webkit && 
@@ -2570,11 +2570,22 @@ export default function HomePage() {
       }, 50); // 50ms마다 체크
       
       // 최대 3초 대기 후 백업 로딩
-      setTimeout(() => {
+      setTimeout(async () => {
         if (!window.naver?.maps) {
           clearInterval(checkInterval);
           console.log('[HOME] 프리로드 대기 시간 초과 - 백업 로딩 실행');
-          performBackupLoading();
+          // 보강: 보장 로더로 강제 로딩 (지수 백오프 + 에러리스너)
+          const { ensureNaverMapsLoaded } = await import('../../services/ensureNaverMaps');
+          try {
+            const isProd = window.location.hostname.includes('.smap.site');
+            await ensureNaverMapsLoaded({ maxRetries: 6, initialDelayMs: 300, submodules: isProd ? 'geocoder' : 'geocoder,drawing,visualization' });
+            apiLoadStatus.naver = true;
+            setNaverMapsLoaded(true);
+            setIsMapLoading(false);
+          } catch (e) {
+            console.error('[HOME] ensureNaverMapsLoaded 실패, 최종 백업 로딩 시도', e);
+            performBackupLoading();
+          }
         }
       }, 3000);
       return;
@@ -2582,7 +2593,17 @@ export default function HomePage() {
 
     // 프리로드가 없을 경우 즉시 백업 로딩
     console.log('[HOME] 프리로드 스크립트 없음 - 백업 로딩 시작');
-    performBackupLoading();
+    try {
+      const { ensureNaverMapsLoaded } = await import('../../services/ensureNaverMaps');
+      const isProd = window.location.hostname.includes('.smap.site');
+      await ensureNaverMapsLoaded({ maxRetries: 6, initialDelayMs: 300, submodules: isProd ? 'geocoder' : 'geocoder,drawing,visualization' });
+      apiLoadStatus.naver = true;
+      setNaverMapsLoaded(true);
+      setIsMapLoading(false);
+    } catch (e) {
+      console.error('[HOME] 보장 로더 실패, 일반 백업 로딩으로 폴백', e);
+      performBackupLoading();
+    }
 
     function performBackupLoading() {
       // 동적 Client ID 가져오기 (도메인별 자동 선택)
