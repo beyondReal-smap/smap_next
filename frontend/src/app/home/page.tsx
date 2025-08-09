@@ -4166,15 +4166,89 @@ export default function HomePage() {
     ) : [];
     setGroupMembers(updatedMembers);
     
-    // 즉시 마커 색상 갱신 (지연 없이)
+    // 즉시 마커 색상 갱신 및 지도 중심 이동 (지연 없이)
     if (
       (mapType === 'naver' && naverMap.current && mapsInitialized.naver && window.naver?.maps) ||
       (mapType === 'google' && map.current && mapsInitialized.google && window.google?.maps)
     ) {
       try {
-        console.log('[handleMemberSelect] 즉시 마커 색상 갱신 시작');
+        console.log('[handleMemberSelect] 즉시 마커 색상 갱신 및 지도 중심 이동 시작');
+        
+        // 선택된 멤버의 좌표로 지도 중심 이동
+        const selectedMember = updatedMembers.find(member => member.isSelected);
+        if (selectedMember) {
+          const realTimeLat = parseCoordinate(selectedMember.mlt_lat);
+          const realTimeLng = parseCoordinate(selectedMember.mlt_long);
+          const defaultLat = parseCoordinate(selectedMember.location.lat);
+          const defaultLng = parseCoordinate(selectedMember.location.lng);
+          
+          const lat = (realTimeLat !== null && realTimeLat !== 0) ? realTimeLat : defaultLat;
+          const lng = (realTimeLng !== null && realTimeLng !== 0) ? realTimeLng : defaultLng;
+          
+          console.log('[handleMemberSelect] 선택된 멤버 위치 정보:', {
+            memberName: selectedMember.name,
+            realTime: { lat: realTimeLat, lng: realTimeLng },
+            default: { lat: defaultLat, lng: defaultLng },
+            selected: { lat, lng }
+          });
+          
+          // 좌표 유효성 검증
+          const isValidCoordinate = (lat !== null && lng !== null && 
+                                    lat !== 0 && lng !== 0 && 
+                                    lat >= 33 && lat <= 43 && 
+                                    lng >= 124 && lng <= 132);
+          
+          if (isValidCoordinate) {
+            // 네이버 지도 이동
+            if (mapType === 'naver' && naverMap.current) {
+              const targetLatLng = createSafeLatLng(lat, lng);
+              if (targetLatLng) {
+                try {
+                  naverMap.current.panTo(targetLatLng, {
+                    duration: 800,
+                    easing: 'easeOutCubic'
+                  });
+                  naverMap.current.setZoom(16);
+                  console.log('[handleMemberSelect] ✅ 네이버 지도 중심 이동 성공:', selectedMember.name, { lat, lng });
+                } catch (e) {
+                  console.error('[handleMemberSelect] ❌ 네이버 지도 이동 실패, 즉시 이동 시도:', e);
+                  try {
+                    naverMap.current.setCenter(targetLatLng);
+                    naverMap.current.setZoom(16);
+                    console.log('[handleMemberSelect] ✅ 네이버 지도 즉시 이동 성공:', selectedMember.name);
+                  } catch (e2) {
+                    console.error('[handleMemberSelect] ❌ 네이버 지도 즉시 이동도 실패:', e2);
+                  }
+                }
+              }
+            }
+            // 구글 지도 이동
+            else if (mapType === 'google' && map.current) {
+              try {
+                map.current.panTo({ lat, lng });
+                map.current.setZoom(16);
+                console.log('[handleMemberSelect] ✅ 구글 지도 중심 이동 성공:', selectedMember.name, { lat, lng });
+              } catch (e) {
+                console.error('[handleMemberSelect] ❌ 구글 지도 이동 실패, 즉시 이동 시도:', e);
+                try {
+                  map.current.setCenter({ lat, lng });
+                  map.current.setZoom(16);
+                  console.log('[handleMemberSelect] ✅ 구글 지도 즉시 이동 성공:', selectedMember.name);
+                } catch (e2) {
+                  console.error('[handleMemberSelect] ❌ 구글 지도 즉시 이동도 실패:', e2);
+                }
+              }
+            }
+          } else {
+            console.warn('[handleMemberSelect] ❌ 유효하지 않은 좌표로 지도 이동 불가:', {
+              memberName: selectedMember.name,
+              coordinates: { lat, lng }
+            });
+          }
+        }
+        
         updateMemberMarkers(updatedMembers);
-        console.log('[handleMemberSelect] 즉시 마커 색상 갱신 완료');
+        console.log('[handleMemberSelect] 즉시 마커 색상 갱신 및 지도 중심 이동 완료');
       } catch (e) {
         console.warn('[handleMemberSelect] 즉시 마커 갱신 실패:', e);
       }
@@ -4425,12 +4499,13 @@ export default function HomePage() {
     const currentSelectedMember = (members && safeArrayCheck(members)) ? members.find(member => member.isSelected) : null;
     const selectedMemberName = currentSelectedMember?.name || null;
     
-    // 같은 멤버가 이미 선택되어 있고 InfoWindow가 열려있으면 중복 실행 방지
-    if (selectedMemberName && 
-        lastSelectedMemberRef.current === selectedMemberName && 
-        currentInfoWindowRef.current) {
-      console.log('[updateMemberMarkers] 같은 멤버 중복 실행 방지:', selectedMemberName);
-      return;
+    // InfoWindow 중복 생성 방지만 체크 (마커 업데이트와 지도 이동은 허용)
+    const shouldSkipInfoWindow = selectedMemberName && 
+        currentInfoWindowRef.current && 
+        (currentInfoWindowRef.current as any)._memberName === selectedMemberName;
+    
+    if (shouldSkipInfoWindow) {
+      console.log('[updateMemberMarkers] InfoWindow 중복 생성 방지 (마커 업데이트는 계속):', selectedMemberName);
     }
     
     // 마지막 선택된 멤버 업데이트
@@ -4542,16 +4617,36 @@ export default function HomePage() {
       const lat = (realTimeLat !== null && realTimeLat !== 0) ? realTimeLat : defaultLat;
       const lng = (realTimeLng !== null && realTimeLng !== 0) ? realTimeLng : defaultLng;
 
-      if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
-        // 기존 InfoWindow 닫기 (새로운 멤버 선택 시)
+      // 좌표 유효성 추가 검증
+      const isValidCoordinate = (lat !== null && lng !== null && 
+                                lat !== 0 && lng !== 0 && 
+                                lat >= 33 && lat <= 43 && 
+                                lng >= 124 && lng <= 132);
+      
+      console.log('[updateMemberMarkers] 멤버 위치 정보 검증:', {
+        memberName: selectedMember.name,
+        realTime: { lat: realTimeLat, lng: realTimeLng },
+        default: { lat: defaultLat, lng: defaultLng },
+        selected: { lat, lng },
+        isValid: isValidCoordinate,
+        hasRealTime: realTimeLat !== null && realTimeLat !== 0
+      });
+
+      if (isValidCoordinate) {
+        // 기존 InfoWindow 닫기 (다른 멤버의 InfoWindow인 경우에만)
         if (currentInfoWindowRef.current) {
-          try {
-            currentInfoWindowRef.current.close();
-            currentInfoWindowRef.current = null;
-            console.log('[updateMemberMarkers] 기존 InfoWindow 닫기 완료');
-          } catch (e) {
-            console.warn('[updateMemberMarkers] 기존 InfoWindow 닫기 실패:', e);
-            currentInfoWindowRef.current = null;
+          const currentMemberName = (currentInfoWindowRef.current as any)._memberName;
+          if (currentMemberName && currentMemberName !== selectedMember.name) {
+            try {
+              currentInfoWindowRef.current.close();
+              currentInfoWindowRef.current = null;
+              console.log('[updateMemberMarkers] 다른 멤버의 InfoWindow 닫기 완료:', currentMemberName, '→', selectedMember.name);
+            } catch (e) {
+              console.warn('[updateMemberMarkers] 기존 InfoWindow 닫기 실패:', e);
+              currentInfoWindowRef.current = null;
+            }
+          } else if (currentMemberName === selectedMember.name) {
+            console.log('[updateMemberMarkers] 같은 멤버의 InfoWindow 유지:', selectedMember.name);
           }
         }
 
@@ -4559,15 +4654,30 @@ export default function HomePage() {
           // 네이버 지도 이동 및 줌 레벨 조정 (즉시 실행)
           const targetLatLng = createSafeLatLng(lat, lng);
           if (targetLatLng) {
-            naverMap.current.panTo(targetLatLng, {
-              duration: 300,
-              easing: 'easeOutCubic'
-            });
+            try {
+              naverMap.current.panTo(targetLatLng, {
+                duration: 500,
+                easing: 'easeOutCubic'
+              });
+              naverMap.current.setZoom(16);
+              console.log('[updateMemberMarkers] ✅ 네이버 지도 중심 이동 성공:', selectedMember.name, { lat, lng });
+            } catch (e) {
+              console.error('[updateMemberMarkers] ❌ 네이버 지도 이동 실패:', e);
+              // 대안: 즉시 이동
+              try {
+                naverMap.current.setCenter(targetLatLng);
+                naverMap.current.setZoom(16);
+                console.log('[updateMemberMarkers] ✅ 네이버 지도 즉시 이동 성공:', selectedMember.name);
+              } catch (e2) {
+                console.error('[updateMemberMarkers] ❌ 네이버 지도 즉시 이동도 실패:', e2);
+              }
+            }
+          } else {
+            console.error('[updateMemberMarkers] ❌ LatLng 객체 생성 실패:', { lat, lng });
           }
-            naverMap.current.setZoom(16);
-            console.log('네이버 지도 중심 이동:', selectedMember.name, { lat, lng });
 
           // 선택된 멤버의 InfoWindow 자동 표시 (중복 방지) - 짧은 지연
+          if (!shouldSkipInfoWindow) {
           setTimeout(() => {
             const selectedMarkerIndex = (members && safeArrayCheck(members)) ? members.findIndex(member => member.isSelected) : -1;
             const selectedKey = String(selectedMember.id || selectedMember.name || selectedMarkerIndex);
@@ -4710,13 +4820,27 @@ export default function HomePage() {
               }
             }
           }, 100); // 지도 이동 후 InfoWindow 표시 (지연 시간 단축)
+          } // shouldSkipInfoWindow 체크 종료
         } else if (mapType === 'google' && map.current && googleMapsLoaded) {
           // 구글 지도 이동 및 줌 레벨 조정 (즉시 실행)
+          try {
             map.current.panTo({ lat, lng });
             map.current.setZoom(16);
-            console.log('구글 지도 중심 이동:', selectedMember.name, { lat, lng });
+            console.log('[updateMemberMarkers] ✅ 구글 지도 중심 이동 성공:', selectedMember.name, { lat, lng });
+          } catch (e) {
+            console.error('[updateMemberMarkers] ❌ 구글 지도 이동 실패:', e);
+            // 대안: 즉시 이동
+            try {
+              map.current.setCenter({ lat, lng });
+              map.current.setZoom(16);
+              console.log('[updateMemberMarkers] ✅ 구글 지도 즉시 이동 성공:', selectedMember.name);
+            } catch (e2) {
+              console.error('[updateMemberMarkers] ❌ 구글 지도 즉시 이동도 실패:', e2);
+            }
+          }
 
           // 구글 지도용 InfoWindow 자동 표시 (짧은 지연)
+          if (!shouldSkipInfoWindow) {
           setTimeout(() => {
             const selectedMarkerIndex = (members && safeArrayCheck(members)) ? members.findIndex(member => member.isSelected) : -1;
             const selectedMarker = memberMarkers.current[selectedMarkerIndex];
@@ -4854,9 +4978,21 @@ export default function HomePage() {
                }
             }
           }, 100); // 지도 이동 후 InfoWindow 표시 (지연 시간 단축)
+          } // shouldSkipInfoWindow 체크 종료
         }
       } else {
-        console.warn('유효하지 않은 멤버 좌표:', selectedMember.name, selectedMember.location);
+        console.warn('[updateMemberMarkers] ❌ 유효하지 않은 멤버 좌표로 지도 이동 불가:', {
+          memberName: selectedMember.name,
+          realTime: { lat: realTimeLat, lng: realTimeLng },
+          default: { lat: defaultLat, lng: defaultLng },
+          selected: { lat, lng },
+          reasons: [
+            lat === null || lng === null ? '좌표가 null' : '',
+            lat === 0 || lng === 0 ? '좌표가 0' : '',
+            (lat !== null && (lat < 33 || lat > 43)) ? '위도가 한국 범위를 벗어남' : '',
+            (lng !== null && (lng < 124 || lng > 132)) ? '경도가 한국 범위를 벗어남' : ''
+          ].filter(Boolean)
+        });
       }
     }
 
