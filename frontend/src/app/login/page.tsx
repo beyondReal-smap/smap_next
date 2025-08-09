@@ -97,6 +97,27 @@ export default function LoginPage() {
           }
           authService.default.setUserData(data.user);
           
+          // FCM 토큰 체크 및 업데이트 (백그라운드에서 실행)
+          setTimeout(async () => {
+            try {
+              console.log('[LOGIN] 🔔 Google 로그인 후 FCM 토큰 체크/업데이트 시작');
+              const fcmTokenService = (await import('@/services/fcmTokenService')).default;
+              
+              if (data.user?.mt_idx) {
+                const fcmResult = await fcmTokenService.initializeAndCheckUpdateToken(data.user.mt_idx);
+                if (fcmResult.success) {
+                  console.log('[LOGIN] ✅ FCM 토큰 체크/업데이트 완료:', fcmResult.message);
+                } else {
+                  console.warn('[LOGIN] ⚠️ FCM 토큰 체크/업데이트 실패:', fcmResult.error);
+                }
+              } else {
+                console.warn('[LOGIN] ⚠️ FCM 토큰 체크/업데이트 스킵: mt_idx 없음');
+              }
+            } catch (fcmError) {
+              console.error('[LOGIN] ❌ FCM 토큰 체크/업데이트 중 오류:', fcmError);
+            }
+          }, 1000); // Google 로그인 후 1초 지연
+          
           console.log('Google 로그인 성공:', data.user);
           router.push('/home');
         }

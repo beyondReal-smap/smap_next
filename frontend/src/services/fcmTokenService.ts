@@ -323,4 +323,57 @@ class FCMTokenService {
 
 // 싱글톤 인스턴스 생성
 export const fcmTokenService = new FCMTokenService();
+
+// 개발 환경에서 브라우저 콘솔 테스트용 전역 함수
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  (window as any).testFCMToken = async () => {
+    try {
+      console.log('🔔 [FCM TEST] FCM 토큰 테스트 시작');
+      const token = await fcmTokenService.getFCMToken();
+      if (token) {
+        console.log('✅ [FCM TEST] 토큰 생성 성공');
+        console.log('📱 [FCM TEST] 토큰 길이:', token.length);
+        console.log('🔑 [FCM TEST] 토큰 미리보기:', token.substring(0, 50) + '...');
+        console.log('💾 [FCM TEST] 전체 토큰:', token);
+        return token;
+      } else {
+        console.warn('⚠️ [FCM TEST] 토큰 생성 실패');
+        return null;
+      }
+    } catch (error) {
+      console.error('❌ [FCM TEST] 토큰 테스트 중 오류:', error);
+      return null;
+    }
+  };
+
+  (window as any).testFCMRegister = async (mt_idx: number) => {
+    try {
+      console.log('🔔 [FCM TEST] FCM 토큰 등록 테스트 시작');
+      const result = await fcmTokenService.initializeAndRegisterToken(mt_idx);
+      console.log('📋 [FCM TEST] 등록 결과:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ [FCM TEST] 등록 테스트 중 오류:', error);
+      return null;
+    }
+  };
+
+  (window as any).testFCMUpdate = async (mt_idx: number) => {
+    try {
+      console.log('🔔 [FCM TEST] FCM 토큰 체크/업데이트 테스트 시작');
+      const result = await fcmTokenService.initializeAndCheckUpdateToken(mt_idx);
+      console.log('📋 [FCM TEST] 체크/업데이트 결과:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ [FCM TEST] 체크/업데이트 테스트 중 오류:', error);
+      return null;
+    }
+  };
+
+  console.log('🛠️ [FCM TEST] FCM 테스트 함수들이 전역에 등록되었습니다:');
+  console.log('- testFCMToken(): FCM 토큰 생성 테스트');
+  console.log('- testFCMRegister(mt_idx): FCM 토큰 등록 테스트');
+  console.log('- testFCMUpdate(mt_idx): FCM 토큰 체크/업데이트 테스트');
+}
+
 export default fcmTokenService;

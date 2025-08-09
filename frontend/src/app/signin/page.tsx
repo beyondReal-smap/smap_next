@@ -2217,14 +2217,35 @@ const SignInPage = () => {
               // 3. AuthContext 상태를 수동으로 동기화
               await refreshAuthState();
               
-              // 4. Google 로그인 성공 햅틱 피드백
+              // 4. FCM 토큰 체크 및 업데이트 (백그라운드에서 실행)
+              setTimeout(async () => {
+                try {
+                  console.log('[GOOGLE LOGIN] 🔔 FCM 토큰 체크/업데이트 시작');
+                  const fcmTokenService = (await import('@/services/fcmTokenService')).default;
+                  
+                  if (data.user?.mt_idx) {
+                    const fcmResult = await fcmTokenService.initializeAndCheckUpdateToken(data.user.mt_idx);
+                    if (fcmResult.success) {
+                      console.log('[GOOGLE LOGIN] ✅ FCM 토큰 체크/업데이트 완료:', fcmResult.message);
+                    } else {
+                      console.warn('[GOOGLE LOGIN] ⚠️ FCM 토큰 체크/업데이트 실패:', fcmResult.error);
+                    }
+                  } else {
+                    console.warn('[GOOGLE LOGIN] ⚠️ FCM 토큰 체크/업데이트 스킵: mt_idx 없음');
+                  }
+                } catch (fcmError) {
+                  console.error('[GOOGLE LOGIN] ❌ FCM 토큰 체크/업데이트 중 오류:', fcmError);
+                }
+              }, 1000); // Google 로그인 후 1초 지연
+              
+              // 5. Google 로그인 성공 햅틱 피드백
               triggerHapticFeedback(HapticFeedbackType.SUCCESS);
               console.log('🎮 [SIGNIN] Google 로그인 성공 햅틱 피드백 실행');
               
-              // 5. 리다이렉트 플래그 설정
+              // 6. 리다이렉트 플래그 설정
               isRedirectingRef.current = true;
               
-              // 6. 그룹 가입 처리
+              // 7. 그룹 가입 처리
               try {
                 const groupJoinResult = await handlePendingGroupJoin();
                 if (groupJoinResult) {
@@ -2235,7 +2256,7 @@ const SignInPage = () => {
                 // 그룹 가입 실패해도 로그인은 성공으로 처리
               }
               
-              // 7. 신규 사용자인 경우 회원가입 페이지로 이동, 기존 사용자는 홈으로 이동
+              // 8. 신규 사용자인 경우 회원가입 페이지로 이동, 기존 사용자는 홈으로 이동
               if (data.isNewUser) {
                 console.log('[GOOGLE LOGIN] 🆕 신규 사용자 - 회원가입 페이지로 이동');
                 console.log('[GOOGLE LOGIN] 이메일 정보:', data.user.email);
