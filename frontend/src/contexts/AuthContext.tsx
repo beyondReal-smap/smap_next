@@ -335,17 +335,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // FCM 토큰 체크 및 업데이트 (백그라운드에서 실행)
         setTimeout(() => {
           console.log('[AUTH] 🔔 로그인 후 FCM 토큰 체크/업데이트 시작');
-          fcmTokenService.initializeAndCheckUpdateToken(response.data.member.mt_idx)
-            .then((result) => {
-              if (result.success) {
-                console.log('[AUTH] ✅ FCM 토큰 체크/업데이트 완료:', result.message);
-              } else {
-                console.warn('[AUTH] ⚠️ FCM 토큰 체크/업데이트 실패:', result.error);
-              }
-            })
-            .catch((error) => {
-              console.error('[AUTH] ❌ FCM 토큰 체크/업데이트 중 오류:', error);
-            });
+          if (response.data?.member?.mt_idx) {
+            fcmTokenService.initializeAndCheckUpdateToken(response.data.member.mt_idx)
+              .then((result) => {
+                if (result.success) {
+                  console.log('[AUTH] ✅ FCM 토큰 체크/업데이트 완료:', result.message);
+                } else {
+                  console.warn('[AUTH] ⚠️ FCM 토큰 체크/업데이트 실패:', result.error);
+                }
+              })
+              .catch((error) => {
+                console.error('[AUTH] ❌ FCM 토큰 체크/업데이트 중 오류:', error);
+              });
+          } else {
+            console.warn('[AUTH] ⚠️ FCM 토큰 체크/업데이트 스킵: mt_idx 없음');
+          }
         }, 1000); // 로그인 후 1초 지연
 
         // 즉시 로딩 완료 처리 (사용자가 홈으로 빠르게 이동할 수 있도록)

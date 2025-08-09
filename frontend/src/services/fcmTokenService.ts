@@ -29,6 +29,13 @@ class FCMTokenService {
     try {
       console.log('[FCM Token Service] Firebase Messaging 초기화 시작');
       
+      // Firebase 앱이 초기화되어 있는지 확인
+      if (!app) {
+        console.warn('[FCM Token Service] ⚠️ Firebase 앱이 초기화되지 않음 - 환경변수 확인 필요');
+        this.isInitialized = true; // 에러 상태로 초기화 완료 처리
+        return;
+      }
+      
       // Firebase Messaging 초기화
       this.messaging = getMessaging(app);
       
@@ -40,7 +47,7 @@ class FCMTokenService {
       
     } catch (error) {
       console.error('[FCM Token Service] ❌ 초기화 실패:', error);
-      throw error;
+      this.isInitialized = true; // 에러 상태로도 초기화 완료 처리
     }
   }
 
@@ -87,8 +94,13 @@ class FCMTokenService {
 
     await this.initPromise;
 
+    if (!app) {
+      console.warn('[FCM Token Service] Firebase 앱이 초기화되지 않음 - 환경변수 확인 필요');
+      return null;
+    }
+
     if (!this.messaging) {
-      console.error('[FCM Token Service] Firebase Messaging이 초기화되지 않음');
+      console.warn('[FCM Token Service] Firebase Messaging이 초기화되지 않음');
       return null;
     }
 
