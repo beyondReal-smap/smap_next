@@ -221,18 +221,8 @@ body.sidebar-open .header-fixed {
 
 /* 사이드바가 열렸을 때 배경 스크롤 완전 차단 */
 body.sidebar-open {
+  /* iOS/WebView 안전 스크롤 잠금: 레이아웃은 그대로 두고 스크롤만 차단 */
   overflow: hidden !important;
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  touch-action: none !important;
-  -webkit-overflow-scrolling: auto !important;
 }
 
 /* 사이드바 내부 컨텐츠는 스크롤 허용 */
@@ -242,6 +232,7 @@ body.sidebar-open .sidebar-content {
   overscroll-behavior: contain !important;
   -webkit-overflow-scrolling: touch !important;
   overflow-y: auto !important;
+  max-height: 100vh;
 }
 
 body.sidebar-open .sidebar-content * {
