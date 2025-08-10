@@ -24,9 +24,8 @@ export default function AuthPage() {
         console.log('[AUTH] URL 파라미터:', { tokenId: !!tokenId, lat, long });
         
         if (!tokenId) {
-          console.error('[AUTH] 토큰이 없습니다');
-          setStatus('error');
-          setMessage('인증 토큰이 없습니다. 다시 로그인해주세요.');
+          console.warn('[AUTH] 토큰 없음 - 에러 화면 없이 signin으로 이동');
+          router.replace('/signin');
           return;
         }
 
@@ -59,20 +58,10 @@ export default function AuthPage() {
         }
       } catch (error: any) {
         console.error('[AUTH] 인증 처리 실패:', error);
-        
-        // 🚨 인증 실패 플래그 설정
-        (window as any).__AUTH_FAILED__ = true;
-        (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__ = true;
-        
-        setStatus('error');
-        setMessage('인증에 실패했습니다. 로그인 페이지로 이동합니다...');
-        
-        // 실패 시 signin 페이지로 리다이렉트 (에러 상태와 함께)
-        setTimeout(() => {
-          // 에러 메시지를 URL 파라미터로 전달
-          const errorMessage = encodeURIComponent(error.message || '인증에 실패했습니다.');
-          router.replace(`/signin?error=auth_failed&message=${errorMessage}`);
-        }, 2000);
+        // 에러 UI 노출 없이 즉시 signin으로 이동
+        const errorMessage = encodeURIComponent(error?.message || '인증에 실패했습니다.');
+        router.replace(`/signin?error=auth_failed&message=${errorMessage}`);
+        return;
       }
     };
 
