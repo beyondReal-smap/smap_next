@@ -286,6 +286,36 @@ window.SmapApp = {
 
     // 🆕 사용자 정보 전송 (프론트엔드 → iOS)
     user: {
+        // 전송 중복 방지 상태
+        __lastSentUserId: null,
+        __lastSentAt: 0,
+        __sendInProgress: false,
+
+        // 최근 전송 여부 확인 (동일 사용자 10초 이내 중복 차단)
+        __shouldSendNow(userId) {
+            const now = Date.now();
+            try {
+                const sentInfoRaw = sessionStorage.getItem('smap_user_info_sent');
+                if (sentInfoRaw) {
+                    const sentInfo = JSON.parse(sentInfoRaw);
+                    if (sentInfo && sentInfo.mt_idx === userId && (now - (sentInfo.timestamp || 0)) < 10000) {
+                        console.log('👤 [iOS Bridge] 사용자 정보 전송 건너뜀 (중복 방지 창 내):', { userId, sinceMs: now - (sentInfo.timestamp || 0) });
+                        return false;
+                    }
+                }
+            } catch (_) {}
+
+            const sameUser = this.__lastSentUserId && this.__lastSentUserId === userId;
+            if (sameUser && (now - this.__lastSentAt) < 10000) {
+                console.log('👤 [iOS Bridge] 사용자 정보 전송 건너뜀 (메모리 중복 방지):', { userId, sinceMs: now - this.__lastSentAt });
+                return false;
+            }
+            if (this.__sendInProgress) {
+                console.log('👤 [iOS Bridge] 사용자 정보 전송 대기 중 - 중복 전송 방지');
+                return false;
+            }
+            return true;
+        },
         // 로그인된 사용자 정보를 iOS로 전송
         sendUserInfo: function(userInfo) {
             console.log('👤 [iOS Bridge] 사용자 정보 iOS로 전송:', userInfo);
@@ -298,8 +328,19 @@ window.SmapApp = {
                 isLoggedIn: true,
                 timestamp: Date.now()
             };
+
+            // 전송 중복 방지 가드
+            if (!this.__shouldSendNow(userData.mt_idx)) {
+                return false;
+            }
+            this.__sendInProgress = true;
             
             window.SmapApp.sendMessage('userInfo', userData);
+            this.__lastSentUserId = userData.mt_idx;
+            this.__lastSentAt = Date.now();
+            try {
+                sessionStorage.setItem('smap_user_info_sent', JSON.stringify({ mt_idx: userData.mt_idx, timestamp: this.__lastSentAt }));
+            } catch (_) {}
             
             // 💾 로컬스토리지에도 저장 (iOS에서 필요시 접근)
             try {
@@ -308,6 +349,8 @@ window.SmapApp = {
             } catch (error) {
                 console.error('👤 [iOS Bridge] 로컬스토리지 저장 실패:', error);
             }
+            this.__sendInProgress = false;
+            return true;
         },
 
         // 로그아웃 시 사용자 정보 제거
@@ -351,6 +394,21 @@ window.SmapApp = {
             console.log('👤 [iOS Bridge] document.readyState:', document.readyState);
             
             try {
+                // 이미 최근에 전송되었으면 즉시 종료 (중복 방지)
+                try {
+                    const sent = sessionStorage.getItem('smap_user_info_sent');
+                    if (sent) {
+                        const { mt_idx, timestamp } = JSON.parse(sent) || {};
+                        if (mt_idx && Date.now() - (timestamp || 0) < 10000) {
+                            console.log('👤 [iOS Bridge] 최근 전송 기록 발견, 자동 확인 생략');
+                            return;
+                        }
+                    }
+                } catch (_) {}
+                if (this.__lastSentUserId && (Date.now() - this.__lastSentAt) < 10000) {
+                    console.log('👤 [iOS Bridge] 메모리 기준 최근 전송, 자동 확인 생략');
+                    return;
+                }
                 // 🔍 모든 가능한 저장소 검사
                 this.debugAllStorages();
                 
