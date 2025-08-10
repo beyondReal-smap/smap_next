@@ -317,35 +317,44 @@ apiClient.interceptors.response.use(
     // 401 오류 처리 (토큰 만료 또는 인증 실패)
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-      
+
+      const hasToken = !!getToken();
+      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+
       // 🚫 에러 모달이 표시 중이면 리다이렉트 방지
       if (typeof window !== 'undefined' && (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
         console.log('[API CLIENT] 🚫 에러 모달 표시 중 - 401 에러 리다이렉트 방지');
         return Promise.reject(error);
       }
-      
-              // refresh 요청 자체가 401이면 토큰 갱신 시도하지 않음
-        if (originalRequest.url?.includes('/auth/refresh')) {
-          console.log('[API CLIENT] 토큰 갱신 요청이 401 - 무효한 토큰으로 판단하여 로그아웃 처리');
-          removeToken();
-          
-          // 🚫 에러 모달이 표시 중이면 리다이렉트 방지
-          if (typeof window !== 'undefined' && (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
-            console.log('[API CLIENT] 🚫 에러 모달 표시 중 - 토큰 갱신 실패 리다이렉트 방지');
-            return Promise.reject(error);
-          }
-          
-          // 로그인 페이지로 리다이렉트 (NavigationManager 사용)
-          navigationManager.redirectToSignin();
+
+      // ✅ 초기 비로그인 상태(토큰 없음)에서는 리다이렉트/토큰갱신 시도하지 않고 조용히 실패 반환
+      if (!hasToken) {
+        console.log('[API CLIENT] 401 (초기 비로그인) - 리다이렉트/리프레시 생략');
+        return Promise.reject(error);
+      }
+
+      // refresh 요청 자체가 401이면 토큰 갱신 시도하지 않음
+      if (originalRequest.url?.includes('/auth/refresh')) {
+        console.log('[API CLIENT] 토큰 갱신 요청이 401 - 무효한 토큰으로 판단하여 로그아웃 처리');
+        removeToken();
+
+        // 🚫 에러 모달이 표시 중이면 리다이렉트 방지
+        if (typeof window !== 'undefined' && (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
+          console.log('[API CLIENT] 🚫 에러 모달 표시 중 - 토큰 갱신 실패 리다이렉트 방지');
           return Promise.reject(error);
         }
-      
+
+        // 로그인 페이지로 리다이렉트 (NavigationManager 사용)
+        navigationManager.redirectToSignin();
+        return Promise.reject(error);
+      }
+
       try {
         console.log('[API CLIENT] 토큰 갱신 시도');
         // 토큰 갱신 시도
         const refreshResponse = await apiClient.post('/auth/refresh');
         const newToken = refreshResponse.data.token;
-        
+
         if (newToken) {
           console.log('[API CLIENT] 토큰 갱신 성공');
           localStorage.setItem('auth-token', newToken);
@@ -354,18 +363,18 @@ apiClient.interceptors.response.use(
         }
       } catch (refreshError) {
         console.error('[TOKEN REFRESH ERROR]:', refreshError);
-        
+
         // 토큰 갱신 실패 시 로그아웃 처리
         console.log('[API CLIENT] 토큰 갱신 실패 - 로그아웃 처리');
         removeToken();
-        
+
         // 🚫 에러 모달이 표시 중이면 리다이렉트 방지
         if (typeof window !== 'undefined' && (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
           console.log('[API CLIENT] 🚫 에러 모달 표시 중 - 토큰 갱신 실패 리다이렉트 방지');
           return Promise.reject(error);
         }
-        
-        // 로그인 페이지로 리다이렉트 (NavigationManager 사용)
+
+        // 토큰이 있었던 사용자가 401이면 로그인 페이지로 리다이렉트 (초기 비로그인은 위에서 return됨)
         navigationManager.redirectToSignin();
       }
     }
