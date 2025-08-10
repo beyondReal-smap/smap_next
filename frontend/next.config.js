@@ -184,11 +184,11 @@ const nextConfig = {
             value: [
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval' *.map.naver.com *.googleapis.com *.gstatic.com *.google.com *.navercorp.com *.naver.net *.pstatic.net *.vercel-scripts.com *.vercel.com",
-              "connect-src 'self' *.map.naver.com *.apigw.ntruss.com *.googleapis.com *.google.com *.navercorp.com *.naver.net *.pstatic.net *.vercel-scripts.com *.vercel.com https://api3.smap.site wss: ws: data: blob:",
+              "connect-src 'self' *.map.naver.com *.apigw.ntruss.com *.googleapis.com *.google.com *.firebaseapp.com *.navercorp.com *.naver.net *.pstatic.net *.vercel-scripts.com *.vercel.com https://api3.smap.site wss: ws: data: blob:",
               "img-src 'self' data: blob: api3.smap.site https://api3.smap.site *.map.naver.com *.googleapis.com *.gstatic.com *.google.com *.navercorp.com *.naver.net *.pstatic.net *.vercel-scripts.com *.vercel.com",
               "style-src 'self' 'unsafe-inline' *.googleapis.com *.gstatic.com *.google.com accounts.google.com *.navercorp.com *.naver.net *.pstatic.net *.vercel-scripts.com *.vercel.com",
               "font-src 'self' *.gstatic.com *.googleapis.com *.navercorp.com *.naver.net *.pstatic.net *.vercel-scripts.com *.vercel.com",
-              "frame-src 'self' *.google.com *.navercorp.com *.naver.net *.pstatic.net *.vercel-scripts.com *.vercel.com smap:",
+              "frame-src 'self' *.google.com *.firebaseapp.com *.navercorp.com *.naver.net *.pstatic.net *.vercel-scripts.com *.vercel.com smap:",
               "worker-src 'self' blob:",
               "object-src 'none'",
               "base-uri 'self'"
