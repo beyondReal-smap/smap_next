@@ -27,14 +27,23 @@ class FCMTokenService {
     if (this.isInitialized) return;
 
     try {
-      console.log('[FCM Token Service] Firebase Messaging 초기화 시작');
+      console.log('[FCM Token Service] 🔥 Firebase Messaging 초기화 시작');
+      console.log('[FCM Token Service] 📍 현재 환경:', {
+        isWindow: typeof window !== 'undefined',
+        hasServiceWorker: 'serviceWorker' in navigator,
+        hasNotification: 'Notification' in window,
+        currentDomain: typeof window !== 'undefined' ? window.location.hostname : 'unknown'
+      });
       
       // Firebase 앱이 초기화되어 있는지 확인
       if (!app) {
         console.warn('[FCM Token Service] ⚠️ Firebase 앱이 초기화되지 않음 - 환경변수 확인 필요');
+        console.warn('[FCM Token Service] 💡 해결방법: .env.local에 NEXT_PUBLIC_FIREBASE_* 환경변수들을 설정하세요');
         this.isInitialized = true; // 에러 상태로 초기화 완료 처리
         return;
       }
+      
+      console.log('[FCM Token Service] ✅ Firebase 앱 초기화 상태 확인 완료');
 
       // FCM 지원 환경인지 확인
       if (!('serviceWorker' in navigator)) {
@@ -56,7 +65,8 @@ class FCMTokenService {
       this.messaging = getMessaging(app);
       
       this.isInitialized = true;
-      console.log('[FCM Token Service] ✅ 초기화 완료');
+      console.log('[FCM Token Service] ✅ Firebase Messaging 초기화 완료');
+      console.log('[FCM Token Service] 🚀 FCM 토큰 서비스 준비 완료 - 토큰 요청 가능');
       
     } catch (error) {
       console.error('[FCM Token Service] ❌ 초기화 실패:', error);
@@ -82,8 +92,16 @@ class FCMTokenService {
   private checkNativeFCMToken(): string | null {
     if (typeof window !== 'undefined' && (window as any).nativeFCMToken) {
       const token = (window as any).nativeFCMToken;
-      console.log('[FCM Token Service] iOS 네이티브 FCM 토큰 발견:', token.substring(0, 50) + '...');
+      console.log('[FCM Token Service] 📱 iOS 네이티브 FCM 토큰 발견:', token.substring(0, 50) + '...');
+      console.log('[FCM Token Service] 📱 토큰 전체 길이:', token.length, '문자');
       return token;
+    } else {
+      console.log('[FCM Token Service] 📱 iOS 네이티브 FCM 토큰 없음 - window.nativeFCMToken 미설정');
+      if (typeof window !== 'undefined') {
+        console.log('[FCM Token Service] 💡 iOS 앱에서 네이티브 토큰 주입 방법:');
+        console.log('[FCM Token Service] 💡   webView.evaluateJavaScript("window.nativeFCMToken = \'토큰값\';")');
+        console.log('[FCM Token Service] 💡   또는 SMAP_SET_NATIVE_FCM_TOKEN(\'토큰값\') 사용');
+      }
     }
     return null;
   }
@@ -92,36 +110,48 @@ class FCMTokenService {
    * FCM 토큰 획득 (웹/네이티브 통합)
    */
   async getFCMToken(): Promise<string | null> {
+    console.log('[FCM Token Service] 🔍 FCM 토큰 획득 프로세스 시작');
+    
     // 1. 먼저 iOS 네이티브에서 전달된 토큰 확인
     const nativeToken = this.checkNativeFCMToken();
     if (nativeToken) {
+      console.log('[FCM Token Service] 📱 iOS 네이티브 토큰 사용');
       this.currentToken = nativeToken;
       return nativeToken;
     }
+    
+    console.log('[FCM Token Service] 🌐 웹 환경에서 Firebase 토큰 시도');
 
     // 2. 웹 환경에서 Firebase로 토큰 획득
     if (!this.initPromise) {
-      console.warn('[FCM Token Service] 서비스가 초기화되지 않음');
+      console.warn('[FCM Token Service] ❌ 서비스가 초기화되지 않음');
       return null;
     }
 
+    console.log('[FCM Token Service] ⏳ Firebase 초기화 대기 중...');
     await this.initPromise;
 
     if (!app) {
-      console.warn('[FCM Token Service] Firebase 앱이 초기화되지 않음 - 환경변수 확인 필요');
+      console.warn('[FCM Token Service] ❌ Firebase 앱이 초기화되지 않음 - 환경변수 확인 필요');
+      console.warn('[FCM Token Service] 💡 해결방법: .env.local에 NEXT_PUBLIC_FIREBASE_* 환경변수들을 설정하세요');
       return null;
     }
 
     if (!this.messaging) {
-      console.warn('[FCM Token Service] Firebase Messaging이 초기화되지 않음');
+      console.warn('[FCM Token Service] ❌ Firebase Messaging이 초기화되지 않음');
       return null;
     }
 
     try {
-      console.log('[FCM Token Service] 웹 FCM 토큰 요청 중...');
+      console.log('[FCM Token Service] 🔑 웹 FCM 토큰 요청 중...');
       
       // VAPID 키는 Firebase 콘솔에서 가져와야 함
       const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+      console.log('[FCM Token Service] 📋 VAPID 키 상태:', vapidKey ? '설정됨' : '미설정');
+      
+      if (!vapidKey) {
+        console.warn('[FCM Token Service] ⚠️ VAPID 키가 설정되지 않음 - Firebase Console에서 VAPID 키를 생성하고 NEXT_PUBLIC_FIREBASE_VAPID_KEY 환경변수에 설정하세요');
+      }
       
       const token = await getToken(this.messaging, {
         vapidKey: vapidKey
@@ -337,8 +367,8 @@ class FCMTokenService {
 // 싱글톤 인스턴스 생성
 export const fcmTokenService = new FCMTokenService();
 
-// 개발 환경에서 브라우저 콘솔 테스트용 전역 함수
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+// 개발/프로덕션 환경에서 브라우저 콘솔 테스트용 전역 함수 (항상 활성화)
+if (typeof window !== 'undefined') {
   (window as any).testFCMToken = async () => {
     try {
       console.log('🔔 [FCM TEST] FCM 토큰 테스트 시작');

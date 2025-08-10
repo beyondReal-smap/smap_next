@@ -4,12 +4,12 @@ importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-comp
 
 // Firebase 설정 (환경변수는 서비스워커에서 접근 불가하므로 하드코딩 필요)
 const firebaseConfig = {
-  apiKey: "your-api-key",
-  authDomain: "your-project.firebaseapp.com", 
-  projectId: "your-project-id",
-  storageBucket: "your-project.appspot.com",
-  messagingSenderId: "your-sender-id",
-  appId: "your-app-id"
+  apiKey: "AIzaSyBKq515AfyN-oizndPdXBebBkcjTlI56qw",
+  authDomain: "com-dmonster-smap.firebaseapp.com", 
+  projectId: "com-dmonster-smap",
+  storageBucket: "com-dmonster-smap.firebasestorage.app",
+  messagingSenderId: "283271180972",
+  appId: "1:283271180972:web:6c8d4104b83f419403e509"
 };
 
 // Firebase 초기화

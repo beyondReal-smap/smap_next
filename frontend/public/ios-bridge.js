@@ -1101,10 +1101,17 @@ setTimeout(() => {
         console.log('   TEST_GOOGLE() - Google 로그인 완전 테스트');
         console.log('   SMAP_HAPTIC_TEST("success") - 고급 햅틱 테스트');
         console.log('   SMAP_DEBUG_INFO() - 상세 디버그 정보');
-        console.log('🆕 👤 [사용자 정보 테스트 함수들]:');
+                console.log('🆕 👤 [사용자 정보 테스트 함수들]:');
         console.log('   SMAP_TEST_USER_INFO() - 사용자 정보 자동 감지 및 전송');
         console.log('   SMAP_DEBUG_STORAGE() - 모든 저장소 내용 확인');
         console.log('   SMAP_FORCE_USER_SEND() - 테스트 사용자 정보 강제 전송');
+        console.log('🆕 🔔 [FCM 토큰 테스트 함수들]:');
+        console.log('   SMAP_TEST_FCM_TOKEN() - FCM 토큰 생성/확인 테스트');
+        console.log('   SMAP_SET_NATIVE_FCM_TOKEN(token) - iOS 네이티브 FCM 토큰 설정');
+        console.log('   SMAP_GET_CURRENT_FCM_TOKEN() - 현재 설정된 FCM 토큰 확인');
+console.log('🆕 🔔 [FCM 토큰 테스트 함수들]:');
+console.log('   SMAP_TEST_FCM_TOKEN() - FCM 토큰 생성/확인 테스트');
+console.log('   SMAP_SET_NATIVE_FCM_TOKEN(token) - iOS 네이티브 FCM 토큰 설정');
         
         // nextstep.smap.site에서 자동 디버그 정보 출력
         if (window.location.hostname === 'nextstep.smap.site') {
