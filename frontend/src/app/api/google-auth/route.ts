@@ -4,9 +4,11 @@ import { OAuth2Client } from 'google-auth-library';
 
 // Google Client ID (iOS 로그에서 확인된 값)
 // 동적 Google Client ID (서버 사이드에서는 환경변수 우선)
+// 서버 검증 기준으로 사용할 기본 Web Client ID (Android에서도 이 ID로 ID 토큰을 요청함)
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || 
                          process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || 
-                         '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com';
+                         process.env.GOOGLE_WEB_CLIENT_ID ||
+                         '283271180972-38reu7hqcogn8b465nu2dh89f5a03ac5.apps.googleusercontent.com';
 const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 // iOS 로그 전송 함수 (서버사이드)
@@ -77,14 +79,14 @@ export async function POST(request: NextRequest) {
       // 여러 Client ID로 검증 시도 (더 많은 가능성 추가)
       let ticket;
       const possibleAudiences = [
-        GOOGLE_CLIENT_ID, // 환경변수에서 가져온 값
-        '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com', // iOS Client ID
-        process.env.GOOGLE_CLIENT_ID, // 환경변수 직접 참조
-        '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com', // 하드코딩된 값 (중복이지만 안전장치)
-        // 웹 클라이언트 ID도 추가 (혹시 다른 클라이언트 ID가 있을 경우)
+        // 우선 순위: 서버(Web) 클라이언트 ID
+        GOOGLE_CLIENT_ID,
         process.env.GOOGLE_WEB_CLIENT_ID,
         process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
-      ].filter(Boolean).filter((value, index, self) => self.indexOf(value) === index); // 중복 제거
+        process.env.GOOGLE_CLIENT_ID,
+        // iOS 클라이언트 ID (iOS 네이티브에서 발급된 토큰 대비)
+        '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com'
+      ].filter(Boolean).filter((value, index, self) => self.indexOf(value) === index);
       
       sendLogToConsole('info', '가능한 audience 목록', possibleAudiences);
       
