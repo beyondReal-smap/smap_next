@@ -330,7 +330,6 @@ export default function PrivacyPolicyPage() {
 
           <ul className="mb-4 list-disc pl-5">
             <li>▶ 개인정보 보호책임자<br />- 담 당: 정진<br />- 전화번호: 070-8065-2207<br />- 이 메 일: admin@smap.site</li>
-            <li>▶ 개인정보 보호담당자<br />- 담 당: 정진<br />- 전화번호: 070-8065-2207<br />- 이 메 일: admin@smap.site</li>
           </ul>
 
           <p className="mb-4">

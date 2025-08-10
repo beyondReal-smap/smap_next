@@ -174,6 +174,14 @@ def create_user(db: Session, user_in: RegisterRequest) -> Member:
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
+    # 회원가입 시 전달된 FCM 토큰 저장
+    try:
+        if getattr(user_in, 'fcm_token', None):
+            db_user.mt_token_id = user_in.fcm_token
+            db.commit()
+            db.refresh(db_user)
+    except Exception:
+        db.rollback()
     return db_user
 
 def create_kakao_user(db: Session, kakao_data) -> Member:

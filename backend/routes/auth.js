@@ -59,7 +59,7 @@ router.get('/health', async (req, res) => {
 // 로그인 API (기존 호환성 유지)
 router.post('/login', async (req, res) => {
   try {
-    const { mt_id, mt_pwd } = req.body;
+    const { mt_id, mt_pwd, fcm_token } = req.body;
 
     if (!mt_id || !mt_pwd) {
       return res.status(400).json({
@@ -72,7 +72,7 @@ router.post('/login', async (req, res) => {
 
     // 1단계: 외부 API 시도
     try {
-      const response = await apiClient.authLogin({ mt_id, mt_pwd });
+      const response = await apiClient.authLogin({ mt_id, mt_pwd, fcm_token });
       
       if (response.success) {
         console.log('외부 API 로그인 성공');
@@ -88,7 +88,7 @@ router.post('/login', async (req, res) => {
       connection = await mysql.createConnection(dbConfig);
 
       const [rows] = await connection.execute(
-        'SELECT mt_idx, mt_id, mt_name, mt_nickname, mt_pwd, mt_type FROM member_t WHERE mt_id = ? AND mt_show = "Y"',
+        'SELECT mt_idx, mt_id, mt_name, mt_nickname, mt_pwd, mt_type, mt_token_id FROM member_t WHERE mt_id = ? AND mt_show = "Y"',
         [mt_id]
       );
 
@@ -122,11 +122,18 @@ router.post('/login', async (req, res) => {
         { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
       );
 
-      // 로그인 시간 업데이트
-      await connection.execute(
-        'UPDATE member_t SET mt_ldate = NOW() WHERE mt_idx = ?',
-        [user.mt_idx]
-      );
+      // 로그인 시간 및 FCM 토큰 업데이트
+      if (fcm_token && (!user.mt_token_id || user.mt_token_id !== fcm_token)) {
+        await connection.execute(
+          'UPDATE member_t SET mt_ldate = NOW(), mt_token_id = ? WHERE mt_idx = ?',
+          [fcm_token, user.mt_idx]
+        );
+      } else {
+        await connection.execute(
+          'UPDATE member_t SET mt_ldate = NOW() WHERE mt_idx = ?',
+          [user.mt_idx]
+        );
+      }
 
       console.log('데이터베이스 로그인 성공');
       
