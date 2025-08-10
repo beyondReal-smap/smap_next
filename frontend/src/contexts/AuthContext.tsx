@@ -275,6 +275,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             dispatch({ type: 'LOGIN_SUCCESS', payload: userData });
             // 위치 추적 서비스에 사용자 로그인 알림
             locationTrackingService.onUserLogin();
+            // 🔔 로그인 상태 유지 진입 시에도 FCM 토큰 체크/업데이트 수행 (iOS 네이티브/웹 환경 모두 시도)
+            setTimeout(() => {
+              try {
+                console.log('[AUTH] 🔔 초기화 경로 FCM 토큰 체크/업데이트 시작');
+                fcmTokenService.initializeAndCheckUpdateToken(userData.mt_idx)
+                  .then((result) => {
+                    if (result.success) {
+                      console.log('[AUTH] ✅ 초기화 경로 FCM 토큰 체크/업데이트 완료:', result.message);
+                    } else {
+                      console.warn('[AUTH] ⚠️ 초기화 경로 FCM 토큰 체크/업데이트 실패:', result.error);
+                    }
+                  })
+                  .catch((error) => {
+                    console.error('[AUTH] ❌ 초기화 경로 FCM 토큰 체크/업데이트 오류:', error);
+                  });
+              } catch (e) {
+                console.warn('[AUTH] FCM 초기화 경로 처리 중 예외(무시):', e);
+              }
+            }, 1000);
             // 프리로딩은 백그라운드에서 비동기적으로 실행 (결과를 기다리지 않음)
             preloadUserData(userData.mt_idx, 'initial-load').catch(error => {
               console.warn('[AUTH] 초기 프리로딩 실패 (무시):', error);
