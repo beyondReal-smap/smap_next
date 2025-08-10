@@ -102,6 +102,7 @@ export interface LoginResponse {
 export interface LoginRequest {
   mt_id: string;
   mt_pwd: string;
+  fcm_token?: string; // 선택적 FCM 토큰(로그인 시 서버에 전달)
 }
 
 // API 응답의 공통 타입

@@ -322,7 +322,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'SET_ERROR', payload: null });
 
-      const response = await authService.login(credentials);
+      // 로그인 전에 FCM 토큰 확보 시도 → 로그인 페이로드에 포함 (백엔드가 즉시 mt_token_id 업데이트)
+      let fcmToken: string | null = null;
+      try {
+        // iOS 네이티브 토큰 우선
+        if (typeof window !== 'undefined' && (window as any).nativeFCMToken) {
+          fcmToken = (window as any).nativeFCMToken as string;
+          console.log('[AUTH] iOS 네이티브 FCM 토큰 사용 (미리보기):', fcmToken.substring(0, 20) + '...');
+        } else {
+          // 웹 환경에서 토큰 획득 (가능한 경우)
+          fcmToken = await fcmTokenService.getFCMToken();
+          if (fcmToken) {
+            console.log('[AUTH] 웹 FCM 토큰 확보 (미리보기):', fcmToken.substring(0, 20) + '...');
+          } else {
+            console.log('[AUTH] FCM 토큰 없음 - 로그인은 계속 진행');
+          }
+        }
+      } catch (e) {
+        console.warn('[AUTH] FCM 토큰 확보 실패 - 로그인은 계속 진행:', e);
+      }
+
+      const augmentedCredentials: LoginRequest = {
+        ...credentials,
+        ...(fcmToken ? { fcm_token: fcmToken } : {})
+      };
+
+      const response = await authService.login(augmentedCredentials);
       console.log('[AUTH] 로그인 성공:', response.data?.member?.mt_name);
 
       // 로그인 성공 시 사용자 데이터 저장
