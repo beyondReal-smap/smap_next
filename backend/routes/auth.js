@@ -61,6 +61,8 @@ router.post('/login', async (req, res) => {
   try {
     const { mt_id, mt_pwd, fcm_token } = req.body;
 
+    console.log(`[NODE LOGIN] 요청 수신 - mt_id=${mt_id}, fcm_token_len=${fcm_token ? fcm_token.length : 0}`);
+
     if (!mt_id || !mt_pwd) {
       return res.status(400).json({
         success: false,
@@ -73,6 +75,7 @@ router.post('/login', async (req, res) => {
     // 1단계: 외부 API 시도
     try {
       const response = await apiClient.authLogin({ mt_id, mt_pwd, fcm_token });
+      console.log(`[NODE LOGIN] 외부 API 응답 - success=${response?.success}`);
       
       if (response.success) {
         console.log('외부 API 로그인 성공');
@@ -122,18 +125,22 @@ router.post('/login', async (req, res) => {
         { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
       );
 
-      // 로그인 시간 및 FCM 토큰 업데이트
+      // 로그인 시간 및 FCM 토큰 업데이트 (로그 포함)
+      console.log(`[NODE LOGIN] 기존 mt_token_id: ${user.mt_token_id ? user.mt_token_id.substring(0,20)+'...' : 'None'}`);
       if (fcm_token && (!user.mt_token_id || user.mt_token_id !== fcm_token)) {
+        console.log('[NODE LOGIN] 토큰 업데이트 수행');
         await connection.execute(
           'UPDATE member_t SET mt_ldate = NOW(), mt_token_id = ? WHERE mt_idx = ?',
           [fcm_token, user.mt_idx]
         );
       } else {
+        console.log('[NODE LOGIN] 토큰 업데이트 생략');
         await connection.execute(
           'UPDATE member_t SET mt_ldate = NOW() WHERE mt_idx = ?',
           [user.mt_idx]
         );
       }
+      console.log('[NODE LOGIN] 로그인/토큰 업데이트 쿼리 완료');
 
       console.log('데이터베이스 로그인 성공');
       

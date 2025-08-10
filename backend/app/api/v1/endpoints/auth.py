@@ -141,12 +141,24 @@ async def login_for_home_page(
             }
         )
         
-        # 로그인 시간 및 FCM 토큰 업데이트
+        # 로그인 시간 및 FCM 토큰 업데이트 (로그 포함)
+        incoming_token = getattr(login_request, 'fcm_token', None)
+        old_token = user.mt_token_id
+        logger.info(f"[LOGIN] FCM 토큰 수신 여부: {bool(incoming_token)}, 길이: {len(incoming_token) if incoming_token else 0}")
+        logger.info(f"[LOGIN] 업데이트 전 mt_token_id: {old_token[:20] + '...' if old_token else 'None'}")
+
         user.mt_ldate = datetime.utcnow()
-        if getattr(login_request, 'fcm_token', None):
-            if not user.mt_token_id or user.mt_token_id != login_request.fcm_token:
-                user.mt_token_id = login_request.fcm_token
+        if incoming_token:
+            if not old_token:
+                logger.info("[LOGIN] 기존 토큰 없음 → 신규 토큰 저장")
+                user.mt_token_id = incoming_token
+            elif old_token != incoming_token:
+                logger.info("[LOGIN] 기존 토큰과 상이 → 토큰 업데이트")
+                user.mt_token_id = incoming_token
+            else:
+                logger.info("[LOGIN] 기존 토큰과 동일 → 업데이트 생략")
         db.commit()
+        logger.info(f"[LOGIN] 커밋 후 mt_token_id: {user.mt_token_id[:20] + '...' if user.mt_token_id else 'None'}")
 
         # home/page.tsx의 Member 타입에 맞는 사용자 정보 구성
         user_data = {
@@ -272,12 +284,24 @@ async def login_for_access_token_custom(
         data=user_identity.model_dump()
     )
     
-    # 로그인 시간 및 FCM 토큰 업데이트
+    # 로그인 시간 및 FCM 토큰 업데이트 (로그 포함)
+    incoming_token = getattr(login_request, 'fcm_token', None)
+    old_token = user.mt_token_id
+    logger.info(f"[LOGIN_ORIGINAL] FCM 토큰 수신 여부: {bool(incoming_token)}, 길이: {len(incoming_token) if incoming_token else 0}")
+    logger.info(f"[LOGIN_ORIGINAL] 업데이트 전 mt_token_id: {old_token[:20] + '...' if old_token else 'None'}")
+
     user.mt_ldate = datetime.utcnow()
-    if getattr(login_request, 'fcm_token', None):
-        if not user.mt_token_id or user.mt_token_id != login_request.fcm_token:
-            user.mt_token_id = login_request.fcm_token
+    if incoming_token:
+        if not old_token:
+            logger.info("[LOGIN_ORIGINAL] 기존 토큰 없음 → 신규 토큰 저장")
+            user.mt_token_id = incoming_token
+        elif old_token != incoming_token:
+            logger.info("[LOGIN_ORIGINAL] 기존 토큰과 상이 → 토큰 업데이트")
+            user.mt_token_id = incoming_token
+        else:
+            logger.info("[LOGIN_ORIGINAL] 기존 토큰과 동일 → 업데이트 생략")
     db.commit()
+    logger.info(f"[LOGIN_ORIGINAL] 커밋 후 mt_token_id: {user.mt_token_id[:20] + '...' if user.mt_token_id else 'None'}")
 
     return LoginResponse(
         access_token=access_token,
@@ -396,12 +420,24 @@ async def kakao_login(
                 is_new_user = True
                 logger.info(f"[KAKAO LOGIN] 새 카카오 사용자 생성 (이메일 없음): mt_idx={user.mt_idx}")
 
-        # 로그인 시간 및 FCM 토큰 업데이트
+        # 로그인 시간 및 FCM 토큰 업데이트 (로그 포함)
+        incoming_token = getattr(kakao_request, 'fcm_token', None)
+        old_token = user.mt_token_id
+        logger.info(f"[KAKAO LOGIN] FCM 토큰 수신 여부: {bool(incoming_token)}, 길이: {len(incoming_token) if incoming_token else 0}")
+        logger.info(f"[KAKAO LOGIN] 업데이트 전 mt_token_id: {old_token[:20] + '...' if old_token else 'None'}")
+
         user.mt_ldate = datetime.utcnow()
-        if getattr(kakao_request, 'fcm_token', None):
-            if not user.mt_token_id or user.mt_token_id != kakao_request.fcm_token:
-                user.mt_token_id = kakao_request.fcm_token
+        if incoming_token:
+            if not old_token:
+                logger.info("[KAKAO LOGIN] 기존 토큰 없음 → 신규 토큰 저장")
+                user.mt_token_id = incoming_token
+            elif old_token != incoming_token:
+                logger.info("[KAKAO LOGIN] 기존 토큰과 상이 → 토큰 업데이트")
+                user.mt_token_id = incoming_token
+            else:
+                logger.info("[KAKAO LOGIN] 기존 토큰과 동일 → 업데이트 생략")
         db.commit()
+        logger.info(f"[KAKAO LOGIN] 커밋 후 mt_token_id: {user.mt_token_id[:20] + '...' if user.mt_token_id else 'None'}")
 
         # 사용자 정보 구성
         user_data = {
