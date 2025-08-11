@@ -668,7 +668,6 @@ const useImageWithFallback = (src: string | null, fallbackSrc: string) => {
 
   return { imageSrc, isLoading, hasError };
 };
-
 export default function LocationPage() {
   const router = useRouter();
   const { user } = useAuth(); // 현재 로그인한 사용자 정보
@@ -1376,12 +1375,19 @@ export default function LocationPage() {
   const handleSelectLocationForPanel = (place: any) => {
     const coordinates: [number, number] = [parseFloat(place.x), parseFloat(place.y)];
     
-    setNewLocation(prev => ({
-      ...prev,
-      name: place.place_name || '',
-      address: place.road_address_name || place.address_name || '',
-      coordinates
-    }));
+    console.log('[장소 검색 선택] 현재 newLocation 상태:', newLocation);
+    console.log('[장소 검색 선택] 선택한 장소:', place);
+    
+    setNewLocation(prev => {
+      const updated = {
+        ...prev,
+        name: place.place_name || '',
+        address: place.road_address_name || place.address_name || '',
+        coordinates
+      };
+      console.log('[장소 검색 선택] newLocation 업데이트:', { prev, updated });
+      return updated;
+    });
     
     setLocationSearchResults([]);
     setLocationSearchQuery('');
@@ -1437,7 +1443,6 @@ export default function LocationPage() {
       }
     }
   };
-
   // 패널 액션 확인 핸들러
   const handleConfirmPanelAction = async () => {
     if (!newLocation.name.trim() || !newLocation.address.trim()) {
@@ -2074,7 +2079,6 @@ export default function LocationPage() {
     
     console.log('[fetchGroupMembersData] 완료');
   };
-
   // 멤버 선택 핸들러 (디바운스 적용)
   const handleMemberSelectCore = async (memberId: string, openLocationPanel = false, membersArray?: GroupMember[], fromMarkerClick = false, clickedMarker?: any, onlyShowInfoWindow = false) => { 
     console.log('[handleMemberSelect] 멤버 선택:', memberId, '패널 열기:', openLocationPanel, '마커 클릭:', fromMarkerClick);
@@ -2867,7 +2871,6 @@ export default function LocationPage() {
       console.log('[지도 컨테이너] 렌더링 완료');
     }
   }, [mapContainer.current]);
-
   // 지도 초기화 (최적화 - 멤버 데이터가 있으면 즉시 초기화)
   useEffect(() => {
     console.log('[지도 초기화 조건 체크] (최적화)', {
@@ -2968,17 +2971,29 @@ export default function LocationPage() {
         const coord = e.coord;
         const coordinates: [number, number] = [coord.lng(), coord.lat()];
         
-        setClickedCoordinates(coordinates);
-        setNewLocation(prev => ({
-          ...prev,
-          coordinates,
-          address: '주소 변환 중...'
-        }));
+        console.log('[지도 클릭] 이벤트 발생:', { lat: coord.lat(), lng: coord.lng() });
+        console.log('[지도 클릭] 현재 newLocation 상태:', newLocation);
         
-        // 임시 마커 표시
+        setClickedCoordinates(coordinates);
+        
+        // 임시 마커 표시 (상태 업데이트 전에)
         if (tempMarker.current) {
           tempMarker.current.setMap(null);
         }
+        
+        // newLocation 상태 업데이트 (강제로 새 객체 생성)
+        const updatedLocation = {
+          name: '', // 지도 클릭 시 장소 이름 초기화
+          address: '주소 변환 중...',
+          coordinates,
+          category: newLocation.category,
+          memo: newLocation.memo,
+          favorite: newLocation.favorite,
+          notifications: newLocation.notifications
+        };
+        
+        console.log('[지도 클릭] newLocation 강제 업데이트:', { prev: newLocation, updated: updatedLocation });
+        setNewLocation(updatedLocation);
           
           console.log('[지도 클릭] 임시 마커 생성 시작:', coord.lat(), coord.lng());
         
@@ -3613,7 +3628,6 @@ export default function LocationPage() {
   // const updateMemberMarkers = (members: GroupMember[]) => {
   //   // 이 함수는 더 이상 사용되지 않습니다. updateAllMarkers 함수가 멤버와 장소 마커를 통합 관리합니다.
   // };
-
   // 지도에 장소 마커 표시 - updateAllMarkers로 통합됨 (사용 중지)
   const updateMapMarkers = (locations: LocationData[]) => {
     console.warn('[updateMapMarkers] ⚠️ 이 함수는 더 이상 사용되지 않습니다. updateAllMarkers를 사용하세요.');
@@ -4378,11 +4392,11 @@ export default function LocationPage() {
             <style>
               @keyframes selectedGlow {
                 0%, 100% { 
-                  transform: translate(-50%, -50%) scale(0.8); 
+                  transform: translate(-50%, -50%) scale(0.8);
                   opacity: 0.4; 
                 }
-                50% { 
-                  transform: translate(-50%, -50%) scale(1.2); 
+                50% {
+                  transform: translate(-50%, -50%) scale(1.2);
                   opacity: 0.1; 
                 }
               }
@@ -4396,7 +4410,6 @@ export default function LocationPage() {
       }
     });
   };
-
   // 선택된 장소가 변경될 때만 마커 스타일 업데이트 (무한 루프 방지)
   useEffect(() => {
     if (selectedMemberSavedLocations && selectedMemberSavedLocations.length > 0 && markers.length > 0) {
@@ -5052,7 +5065,6 @@ export default function LocationPage() {
   const toggleSidebar = () => {
     setIsSidebarOpen(prev => !prev);
   };
-
   // 장소 선택 핸들러 (사이드바에서 장소 클릭 시)
   const handleLocationSelect = (location: LocationData) => {
     console.log('[handleLocationSelect] 장소 선택:', location.name);
@@ -5506,7 +5518,6 @@ export default function LocationPage() {
       delete (window as any).handleLocationDeleteFromInfoWindow;
     };
   }, [infoWindow, otherMembersSavedLocations]);
-
   return (
     <>
       <style jsx global>{mobileStyles}</style>
@@ -5949,10 +5960,13 @@ export default function LocationPage() {
                   <input
                     type="text"
                     id="panelLocationName"
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-blue-900 text-sm"
+                      className="search-input w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-900 focus:border-blue-900 text-sm"
                     placeholder="이 장소에 대한 나만의 이름을 지어주세요."
                     value={newLocation.name}
-                    onChange={(e) => setNewLocation(prev => ({ ...prev, name: e.target.value }))}
+                    onChange={(e) => {
+                      console.log('[입력 필드] 장소 이름 변경:', e.target.value);
+                      setNewLocation(prev => ({ ...prev, name: e.target.value }));
+                    }}
                   />
                 </div>
 
@@ -6210,7 +6224,6 @@ export default function LocationPage() {
 
 
       </motion.div>
-
       {/* 개선된 커스텀 모달 */}
       <AnimatePresence>
         {isModalOpen && modalContent && (
