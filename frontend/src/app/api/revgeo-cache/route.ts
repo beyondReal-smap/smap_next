@@ -1,52 +1,58 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
-// Very simple in-memory cache (per server instance). For production, replace with Redis.
-const CACHE = new Map<string, { address: string; expiresAt: number }>();
-const DEFAULT_TTL_MS = 1000 * 60 * 10; // 10 minutes
-
-function key(lat: string, lng: string) {
-  // normalize to 4 decimal places
-  const latNum = Number(lat);
-  const lngNum = Number(lng);
-  const k = `${latNum.toFixed(4)},${lngNum.toFixed(4)}`;
-  return k;
+interface CacheEntry {
+  address: string;
+  timestamp: number;
+  ttlMs: number;
 }
 
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const lat = searchParams.get('lat');
-    const lng = searchParams.get('lng');
-    if (!lat || !lng) {
-      return NextResponse.json({ error: 'lat,lng required' }, { status: 400 });
+const cache = new Map<string, CacheEntry>();
+const DEFAULT_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+function getCacheKey(lat: number, lng: number): string {
+  return `${lat.toFixed(4)},${lng.toFixed(4)}`;
+}
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const lat = parseFloat(searchParams.get('lat') || '0');
+  const lng = parseFloat(searchParams.get('lng') || '0');
+
+  if (isNaN(lat) || isNaN(lng)) {
+    return NextResponse.json({ message: 'Invalid coordinates' }, { status: 400 });
+  }
+
+  const key = getCacheKey(lat, lng);
+  const entry = cache.get(key);
+
+  if (entry && (Date.now() - entry.timestamp < entry.ttlMs)) {
+    return NextResponse.json({ address: entry.address });
+  } else {
+    // Cache miss or expired
+    if (entry) {
+      cache.delete(key); // Clean up expired entry
     }
-    const k = key(lat, lng);
-    const entry = CACHE.get(k);
-    if (!entry) return NextResponse.json({ hit: false }, { status: 404 });
-    if (Date.now() > entry.expiresAt) {
-      CACHE.delete(k);
-      return NextResponse.json({ hit: false }, { status: 404 });
-    }
-    return NextResponse.json({ hit: true, address: entry.address });
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message || 'server error' }, { status: 500 });
+    return NextResponse.json({ message: 'Not Found' }, { status: 404 });
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { lat, lng, address, ttlMs } = body || {};
+    const { lat, lng, address, ttlMs } = await request.json();
+
     if (typeof lat !== 'number' || typeof lng !== 'number' || typeof address !== 'string') {
-      return NextResponse.json({ error: 'lat:number, lng:number, address:string required' }, { status: 400 });
+      return NextResponse.json({ message: 'Invalid payload' }, { status: 400 });
     }
-    const k = key(String(lat), String(lng));
-    const expiresAt = Date.now() + (typeof ttlMs === 'number' && ttlMs > 0 ? ttlMs : DEFAULT_TTL_MS);
-    CACHE.set(k, { address, expiresAt });
-    return NextResponse.json({ success: true });
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message || 'server error' }, { status: 500 });
+
+    const key = getCacheKey(lat, lng);
+    cache.set(key, {
+      address,
+      timestamp: Date.now(),
+      ttlMs: ttlMs || DEFAULT_TTL_MS,
+    });
+
+    return NextResponse.json({ message: 'Cached successfully' }, { status: 200 });
+  } catch (error) {
+    return NextResponse.json({ message: 'Error caching address', error: (error as Error).message }, { status: 500 });
   }
 }
-
-
