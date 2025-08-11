@@ -1,5 +1,6 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+// 안드로이드 WebView에서 불필요한 firebase/auth import로 인한 사이드로드를 방지
+// import { getAuth } from 'firebase/auth';
 import { getMessaging, isSupported } from 'firebase/messaging';
 
 // Firebase 설정 (환경변수에서 가져오기)
@@ -19,12 +20,17 @@ const isFirebaseConfigured = process.env.NEXT_PUBLIC_FIREBASE_API_KEY &&
                              process.env.NEXT_PUBLIC_FIREBASE_API_KEY !== 'demo-api-key';
 
 // Firebase 앱 초기화 (브라우저에서만, 그리고 설정이 되어있을 때만)
-export const app = typeof window !== 'undefined' && isFirebaseConfigured ? 
+// 안드로이드 WebView에서는 Firebase Web 초기화 자체를 차단 (네이티브 사용)
+const isAndroidWebView = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent) && /SMAP-Android|WebView|wv/i.test(navigator.userAgent);
+
+export const app = typeof window !== 'undefined' && isFirebaseConfigured && !isAndroidWebView ? 
   (getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]) : 
   null;
 
 // Firebase Auth 초기화 (앱이 있을 때만)
-export const auth = app ? getAuth(app) : null;
+// 안드로이드 WebView에서는 auth 미초기화 (네이티브 경로만 사용)
+// export const auth = app ? getAuth(app) : null;
+export const auth = null as any;
 
 // Firebase Messaging 초기화 (브라우저에서만)
 export const getFirebaseMessaging = async () => {
@@ -37,9 +43,13 @@ export const getFirebaseMessaging = async () => {
 // 로깅은 브라우저에서만
 if (typeof window !== 'undefined') {
   if (isFirebaseConfigured) {
-    console.log('[Firebase] 🔥 Firebase 초기화 완료');
-    console.log('[Firebase] Project ID:', firebaseConfig.projectId);
-    console.log('[Firebase] Messaging Sender ID:', firebaseConfig.messagingSenderId);
+    if (isAndroidWebView) {
+      console.log('[Firebase] ⚠️ Android WebView 감지 - Firebase Web 초기화 차단(네이티브 사용)');
+    } else {
+      console.log('[Firebase] 🔥 Firebase 초기화 완료');
+      console.log('[Firebase] Project ID:', firebaseConfig.projectId);
+      console.log('[Firebase] Messaging Sender ID:', firebaseConfig.messagingSenderId);
+    }
   } else {
     console.warn('[Firebase] ⚠️ Firebase 환경변수가 설정되지 않음 - FCM 기능 비활성화');
   }

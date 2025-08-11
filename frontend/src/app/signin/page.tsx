@@ -1428,10 +1428,12 @@ const SignInPage = () => {
   const handleGoogleSDKLogin = async (retryCount: number = 0) => {
     console.log('[GOOGLE SDK] 웹 Google SDK를 통한 로그인 시작', retryCount > 0 ? `(재시도 ${retryCount})` : '');
     
-    // 안드로이드에서는 웹 SDK 사용 금지
+    // 안드로이드에서는 웹 SDK 사용 금지 (강화)
     if (isAndroidWebView) {
-      console.log('[GOOGLE SDK] 안드로이드에서는 웹 SDK 사용 금지');
-      throw new Error('안드로이드에서는 네이티브 구글 로그인만 사용 가능합니다.');
+      console.log('[GOOGLE SDK] 안드로이드 WebView 감지 - 웹 SDK 로그인 경로 차단');
+      setError('Google 로그인은 안드로이드 앱에서는 네이티브 방식만 지원됩니다. 앱의 Google 로그인 버튼을 사용해주세요.');
+      // 사용자가 잘못된 경로를 타지 않도록 즉시 반환
+      return undefined;
     }
     
     // 중복 호출 방지
@@ -1454,7 +1456,7 @@ const SignInPage = () => {
     }
     
     try {
-      // Google Identity Services 초기화 (이미 로드되어 있다고 가정)
+    // Google Identity Services 초기화 (이미 로드되어 있다고 가정)
       if ((window as any).google?.accounts?.id) {
         const google = (window as any).google;
         
@@ -1479,7 +1481,7 @@ const SignInPage = () => {
           throw new Error('Google OAuth Client ID가 설정되지 않았습니다.');
         }
         
-        // 프로덕션 환경에서 추가 도메인 검증
+        // 프로덕션 환경에서 추가 도메인 검증 (안드로이드 WebView 차단 보강)
         if (window.location.hostname.includes('.smap.site')) {
           console.log('🔐 [GOOGLE OAUTH] 프로덕션 환경 감지 - 도메인 검증 수행');
           

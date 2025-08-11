@@ -1,4 +1,5 @@
-import { getAuth } from 'firebase/auth';
+// 안드로이드 WebView에서 firebase/auth 사용 방지 (네이티브 사용)
+// import { getAuth } from 'firebase/auth';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 import { app } from '../lib/firebase';
 
@@ -19,6 +20,13 @@ class FCMTokenService {
   constructor() {
     // 브라우저 환경에서만 초기화
     if (typeof window !== 'undefined') {
+      // 안드로이드 WebView에서는 웹 Firebase 초기화를 건너뜀 (네이티브 토큰만 사용)
+      const isAndroidWebView = /Android/i.test(navigator.userAgent) && /SMAP-Android|WebView|wv/i.test(navigator.userAgent);
+      if (isAndroidWebView) {
+        console.log('[FCM Token Service] Android WebView 감지 - 웹 Firebase 초기화 건너뜀 (네이티브 토큰만 사용)');
+        this.isInitialized = true;
+        return;
+      }
       this.initPromise = this.initialize();
     }
   }
@@ -121,6 +129,13 @@ class FCMTokenService {
     }
     
     console.log('[FCM Token Service] 🌐 웹 환경에서 Firebase 토큰 시도');
+
+    // 안드로이드 WebView에서는 네이티브 토큰만 허용
+    const isAndroidWebView = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent) && /SMAP-Android|WebView|wv/i.test(navigator.userAgent);
+    if (isAndroidWebView) {
+      console.log('[FCM Token Service] Android WebView - 웹 FCM 토큰 생성 차단');
+      return null;
+    }
 
     // 2. 웹 환경에서 Firebase로 토큰 획득
     if (!this.initPromise) {
