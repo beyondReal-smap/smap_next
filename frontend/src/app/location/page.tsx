@@ -2805,19 +2805,18 @@ export default function LocationPage() {
         console.warn('[LOCATION] ensureNaverMapsLoaded 실패, 수동 로딩으로 폴백', e);
       }
 
-      // 네이버 지도 API 로드용 URL 생성
+      // 네이버 지도 API 로드용 URL 생성 (안드로이드 WebView ORB 회피)
+      const isAndroidWebView = /Android/i.test(navigator.userAgent) && /WebView|wv|SMAP-Android/i.test(navigator.userAgent);
       const naverMapUrl = new URL(`https://oapi.map.naver.com/openapi/v3/maps.js`);
       naverMapUrl.searchParams.append('ncpKeyId', dynamicClientId);
-      
-      if (!isIOSWebView && !isProduction) {
-        // 개발 환경에서만 전체 서브모듈 로드
-        naverMapUrl.searchParams.append('submodules', 'geocoder,drawing,visualization');
-      } else if (!isIOSWebView && isProduction) {
-        // 프로덕션에서는 필수 모듈만 로드 (빠른 초기화)
-        naverMapUrl.searchParams.append('submodules', 'geocoder');
-      } else {
-        // iOS WebView에서는 최소 모듈만 (호환성 우선)
-        naverMapUrl.searchParams.append('submodules', 'geocoder');
+      if (!isAndroidWebView) {
+        if (!isIOSWebView && !isProduction) {
+          // 개발 환경: 전체 모듈
+          naverMapUrl.searchParams.append('submodules', 'geocoder,drawing,visualization');
+        } else {
+          // 프로덕션/IOS: 최소 모듈
+          naverMapUrl.searchParams.append('submodules', 'geocoder');
+        }
       }
       
       console.log(`🗺️ [LOCATION] 네이버 지도 URL: ${naverMapUrl.toString()}`);

@@ -62,7 +62,12 @@ function injectScript(src: string, id: string): Promise<void> {
 }
 
 export async function ensureNaverMapsLoaded(options?: EnsureOptions): Promise<void> {
-  const opts = { ...DEFAULT_OPTIONS, ...(options || {}) };
+  const isAndroidWebView = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent) && /WebView|wv|SMAP-Android/i.test(navigator.userAgent);
+  // 안드로이드 WebView에서는 네이버 스크립트 URL 리라이트 이슈(ORB, 경로 왜곡) 회피를 위해 submodules 제거 및 callback 미사용
+  const platformSafeOverrides: Partial<EnsureOptions> = isAndroidWebView
+    ? { submodules: '', useCallbackParam: false }
+    : {};
+  const opts = { ...DEFAULT_OPTIONS, ...platformSafeOverrides, ...(options || {}) };
 
   if (typeof window === 'undefined' || typeof document === 'undefined') {
     return;
