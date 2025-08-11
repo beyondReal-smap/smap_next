@@ -3622,7 +3622,6 @@ export default function LocationPage() {
       return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
     }
   };
-
   // 지도에 그룹멤버 마커 표시 (깜빡임 방지 최적화)
   // 사용하지 않는 함수 - updateAllMarkers로 통합됨 (중복 이벤트 방지)
   // const updateMemberMarkers = (members: GroupMember[]) => {
@@ -5956,11 +5955,11 @@ export default function LocationPage() {
                 </div>
 
                 <div className="mb-3"> 
-                    <label htmlFor="panelLocationName" className="block text-xs font-medium mb-1" style={{ color: '#0113A3' }}>장소 태그 (이름)</label>
+                    <label htmlFor="panelLocationName" className="block text-xs font-medium mb-2" style={{ color: '#0113A3' }}>장소 태그 (이름)</label>
                   <input
                     type="text"
                     id="panelLocationName"
-                      className="search-input w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-900 focus:border-blue-900 text-sm"
+                      className="search-input w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-blue-900 text-sm"
                     placeholder="이 장소에 대한 나만의 이름을 지어주세요."
                     value={newLocation.name}
                     onChange={(e) => {
@@ -6219,10 +6218,6 @@ export default function LocationPage() {
             </motion.div>
           )}
         </AnimatePresence>
-
-
-
-
       </motion.div>
       {/* 개선된 커스텀 모달 */}
       <AnimatePresence>
