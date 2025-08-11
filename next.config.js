@@ -38,7 +38,7 @@ const nextConfig = {
             value: [
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval' *.map.naver.com *.googleapis.com *.gstatic.com *.google.com",
-              "connect-src 'self' *.map.naver.com *.googleapis.com *.google.com wss: ws: data: blob:",
+              "connect-src 'self' *.map.naver.com dapi.kakao.com *.googleapis.com *.google.com wss: ws: data: blob:",
               "img-src 'self' data: blob: *.map.naver.com *.googleapis.com *.gstatic.com *.google.com",
               "style-src 'self' 'unsafe-inline' *.googleapis.com *.gstatic.com",
               "font-src 'self' *.gstatic.com *.googleapis.com",
