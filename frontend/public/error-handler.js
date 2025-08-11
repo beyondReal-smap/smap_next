@@ -67,12 +67,13 @@
       return false;
     }
     
-    // 네트워크 에러인 경우 재시도 로직
+    // 네트워크 에러인 경우 재시도 로직 (조용히 처리: 불필요한 토스트/알림 금지)
     if (event.message?.includes('Network') || event.message?.includes('fetch')) {
-      console.log('Network error detected, attempting recovery...');
+      console.log('Network error detected (silent retry)...');
+      // 사용자에게 보이는 토스트는 띄우지 않고, 조용히 재시도만 시도
       setTimeout(() => {
         if (isIOSWebView) {
-          window.location.reload();
+          try { window.location.reload(); } catch (_) { /* no-op */ }
         }
       }, 2000);
       event.preventDefault();
@@ -110,13 +111,12 @@
       return false;
     }
     
-    // 네트워크 관련 Promise rejection 처리
+    // 네트워크 관련 Promise rejection 처리 (조용히 처리)
     if (String(event.reason).includes('fetch') || String(event.reason).includes('Network')) {
-      console.log('Network promise rejection detected, attempting recovery...');
+      console.log('Network promise rejection detected (silent retry)...');
       setTimeout(() => {
         if (isIOSWebView) {
-          console.log('Reloading page due to network error...');
-          window.location.reload();
+          try { window.location.reload(); } catch (_) { /* no-op */ }
         }
       }, 3000);
       event.preventDefault();
