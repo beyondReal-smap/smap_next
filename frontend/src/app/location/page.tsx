@@ -2963,30 +2963,21 @@ export default function LocationPage() {
         
         setIsLocationInfoPanelOpen(true);
         setIsEditingPanel(false);
-        
-        // 주소 변환
-        if (window.naver.maps.Service) {
-          window.naver.maps.Service.reverseGeocode({
-            coords: coord,
-            orders: [
-              window.naver.maps.Service.OrderType.ADDR,
-              window.naver.maps.Service.OrderType.ROAD_ADDR
-            ].join(',')
-          }, (status: any, response: any) => {
-            if (status === window.naver.maps.Service.Status.OK) {
-              const result = response.v2;
-              const address = result.address;
-              const roadAddress = result.roadAddress;
-              
-              const finalAddress = roadAddress ? roadAddress.jibunAddress : address.jibunAddress;
-              
-              setNewLocation(prev => ({
-                ...prev,
-                address: finalAddress || '주소를 찾을 수 없습니다.'
-              }));
-            }
+
+        // 주소 변환 (신규 장소 등록용) - 캐시/서버 캐시 활용
+        getAddressFromCoordinates(coordinates[1], coordinates[0])
+          .then((resolvedAddress) => {
+            setNewLocation(prev => ({
+              ...prev,
+              address: resolvedAddress || '주소를 찾을 수 없습니다.'
+            }));
+          })
+          .catch(() => {
+            setNewLocation(prev => ({
+              ...prev,
+              address: '주소를 찾을 수 없습니다.'
+            }));
           });
-        }
       });
       } catch (error) {
         console.error('[지도 초기화] 오류:', error);
