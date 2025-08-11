@@ -42,6 +42,14 @@ const API_KEYS = {
   NAVER_MAPS_CLIENT_ID: process.env.NEXT_PUBLIC_NAVER_CLIENT_ID || ''
 };
 import ReactDOM from 'react-dom';
+
+// 역지오코딩 호출 최적화: 결과 캐시 + 진행 중 요청 공용화
+const reverseGeocodeCache = new Map<string, string>();
+const reverseGeocodeInflight = new Map<string, Promise<string>>();
+const normalizeLatLngKey = (lat: number, lng: number, precision: number = 4) => {
+  // 약 ~10m 그리드로 스냅하여 중복 호출 방지 (4자리 소수)
+  return `${lat.toFixed(precision)},${lng.toFixed(precision)}`;
+};
 import memberService from '@/services/memberService';
 import locationService, { OtherMemberLocationRaw } from '@/services/locationService';
 import groupService, { Group } from '@/services/groupService';
@@ -1996,8 +2004,8 @@ export default function LocationPage() {
     console.log('[fetchGroupMembersData] 완료');
   };
 
-  // 멤버 선택 핸들러
-  const handleMemberSelect = async (memberId: string, openLocationPanel = false, membersArray?: GroupMember[], fromMarkerClick = false, clickedMarker?: any, onlyShowInfoWindow = false) => { 
+  // 멤버 선택 핸들러 (디바운스 적용)
+  const handleMemberSelectCore = async (memberId: string, openLocationPanel = false, membersArray?: GroupMember[], fromMarkerClick = false, clickedMarker?: any, onlyShowInfoWindow = false) => { 
     console.log('[handleMemberSelect] 멤버 선택:', memberId, '패널 열기:', openLocationPanel, '마커 클릭:', fromMarkerClick);
     // 동일 멤버 재선택 시 아무 동작도 하지 않음 (요구사항)
     if (selectedMemberIdRef.current === memberId) {
@@ -2644,6 +2652,31 @@ export default function LocationPage() {
       }
     }
   };
+
+  // 200ms 디바운스 래퍼
+  const handleMemberSelect = useMemo(() => {
+    let timer: any = null;
+    let lastArgs: any[] | null = null;
+    const delay = 200;
+    const invoke = () => {
+      if (!lastArgs) return;
+      // @ts-ignore
+      handleMemberSelectCore(...lastArgs);
+      lastArgs = null;
+    };
+    return (
+      memberId: string,
+      openLocationPanel = false,
+      membersArray?: GroupMember[],
+      fromMarkerClick = false,
+      clickedMarker?: any,
+      onlyShowInfoWindow = false
+    ) => {
+      lastArgs = [memberId, openLocationPanel, membersArray, fromMarkerClick, clickedMarker, onlyShowInfoWindow];
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(invoke, delay);
+    };
+  }, [selectedMemberIdRef.current]);
 
   // 뷰 변경 핸들러 (자동 완성 스크롤)
   const handleViewChange = (view: 'selectedMemberPlaces' | 'otherMembersPlaces') => {
@@ -3294,113 +3327,158 @@ export default function LocationPage() {
   // 네이버 맵 역지오코딩 API를 사용한 좌표 -> 주소 변환
   const getAddressFromCoordinates = async (lat: number, lng: number): Promise<string> => {
     try {
-      // 네이버 맵 Service가 로드될 때까지 대기 (최대 5초)
-      let retryCount = 0;
-      const maxRetries = 50; // 5초 (100ms * 50)
-      
-      while (!window.naver?.maps?.Service && retryCount < maxRetries) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        retryCount++;
-      }
-      
-      if (!window.naver?.maps?.Service) {
-        console.warn('[getAddressFromCoordinates] 네이버 맵 Service 로드 타임아웃');
-        return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-      }
+      const key = normalizeLatLngKey(lat, lng);
+      if (reverseGeocodeCache.has(key)) return reverseGeocodeCache.get(key)!;
+      if (reverseGeocodeInflight.has(key)) return await reverseGeocodeInflight.get(key)!;
 
-      return new Promise((resolve) => {
-        const coord = createSafeLatLng(lat, lng);
-        if (!coord) {
-          console.warn('[getAddressFromCoordinates] LatLng 생성 실패');
-          resolve(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
-          return;
+      const inflight = (async () => {
+        // 0) 서버 캐시 조회 (히트 시 즉시 반환)
+        try {
+          const query = new URLSearchParams({ lat: lat.toString(), lng: lng.toString() }).toString();
+          const res = await fetch(`/api/revgeo-cache?${query}`, { method: 'GET', cache: 'no-store' });
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.address && typeof data.address === 'string') {
+              reverseGeocodeCache.set(key, data.address);
+              return data.address;
+            }
+          }
+        } catch (_) {
+          // 서버 캐시 조회 실패는 무시하고 클라이언트 역지오코딩 진행
+        }
+
+        // 네이버 맵 Service가 로드될 때까지 대기 (최대 5초)
+        let retryCount = 0;
+        const maxRetries = 50; // 5초 (100ms * 50)
+        
+        while (!window.naver?.maps?.Service && retryCount < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          retryCount++;
         }
         
-        window.naver.maps.Service.reverseGeocode({
-          coords: coord,
-          orders: [
-            window.naver.maps.Service.OrderType.ROAD_ADDR,
-            window.naver.maps.Service.OrderType.ADDR
-          ].join(',')
-        }, (status: any, response: any) => {
-          if (status === window.naver.maps.Service.Status.ERROR) {
-            console.warn('[getAddressFromCoordinates] 역지오코딩 오류:', status);
-            resolve(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+        if (!window.naver?.maps?.Service) {
+          console.warn('[getAddressFromCoordinates] 네이버 맵 Service 로드 타임아웃');
+          const fallback = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+          reverseGeocodeCache.set(key, fallback);
+          return fallback;
+        }
+
+        return new Promise<string>((resolve) => {
+          const coord = createSafeLatLng(lat, lng);
+          if (!coord) {
+            console.warn('[getAddressFromCoordinates] LatLng 생성 실패');
+            const fallback = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+            reverseGeocodeCache.set(key, fallback);
+            resolve(fallback);
             return;
           }
+          
+          window.naver.maps.Service.reverseGeocode({
+            coords: coord,
+            orders: [
+              window.naver.maps.Service.OrderType.ROAD_ADDR,
+              window.naver.maps.Service.OrderType.ADDR
+            ].join(',')
+          }, (status: any, response: any) => {
+            if (status === window.naver.maps.Service.Status.ERROR) {
+              console.warn('[getAddressFromCoordinates] 역지오코딩 오류:', status);
+              const fallback = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+              reverseGeocodeCache.set(key, fallback);
+              resolve(fallback);
+              return;
+            }
 
-          try {
-            console.log('[getAddressFromCoordinates] 전체 응답:', response);
-            
-            let address = '';
-            
-            // 도로명 주소 우선 처리
-            if (response?.v2?.results) {
-              for (const result of response.v2.results) {
-                console.log('[getAddressFromCoordinates] 결과 항목:', result);
-                
-                // 도로명 주소 확인
-                if (result.name && result.name !== 'addr' && result.name.includes('로') || result.name.includes('길')) {
-                  address = result.name;
-                  console.log('[getAddressFromCoordinates] 도로명 주소 사용:', address);
-                  break;
-                }
-                
-                // 지번 주소 구성 (region 정보 활용)
-                if (result.region && !address) {
-                  const parts = [];
-                  if (result.region.area1?.name) parts.push(result.region.area1.name);
-                  if (result.region.area2?.name) parts.push(result.region.area2.name);
-                  if (result.region.area3?.name) parts.push(result.region.area3.name);
-                  if (result.region.area4?.name) parts.push(result.region.area4.name);
+            try {
+              console.log('[getAddressFromCoordinates] 전체 응답:', response);
+              
+              let address = '';
+              
+              // 도로명 주소 우선 처리
+              if (response?.v2?.results) {
+                for (const result of response.v2.results) {
+                  console.log('[getAddressFromCoordinates] 결과 항목:', result);
                   
-                  // 지번 정보 추가
-                  if (result.land) {
-                    if (result.land.name) parts.push(result.land.name);
-                    if (result.land.number1) {
-                      if (result.land.number2) {
-                        parts.push(`${result.land.number1}-${result.land.number2}`);
-                      } else {
-                        parts.push(result.land.number1);
-                      }
-                    }
+                  // 도로명 주소 확인
+                  if (result.name && result.name !== 'addr' && result.name.includes('로') || result.name.includes('길')) {
+                    address = result.name;
+                    console.log('[getAddressFromCoordinates] 도로명 주소 사용:', address);
+                    break;
                   }
                   
-                  const regionAddress = parts.filter(part => part && part.trim()).join(' ');
-                  if (regionAddress && regionAddress.length > 5) {
-                    address = regionAddress;
-                    console.log('[getAddressFromCoordinates] 지번 주소 사용:', address);
+                  // 지번 주소 구성 (region 정보 활용)
+                  if (result.region && !address) {
+                    const parts: string[] = [];
+                    if (result.region.area1?.name) parts.push(result.region.area1.name);
+                    if (result.region.area2?.name) parts.push(result.region.area2.name);
+                    if (result.region.area3?.name) parts.push(result.region.area3.name);
+                    if (result.region.area4?.name) parts.push(result.region.area4.name);
+                    
+                    // 지번 정보 추가
+                    if (result.land) {
+                      if (result.land.name) parts.push(result.land.name);
+                      if (result.land.number1) {
+                        if (result.land.number2) {
+                          parts.push(`${result.land.number1}-${result.land.number2}`);
+                        } else {
+                          parts.push(result.land.number1);
+                        }
+                      }
+                    }
+                    
+                    const regionAddress = parts.filter(part => part && part.trim()).join(' ');
+                    if (regionAddress && regionAddress.length > 5) {
+                      address = regionAddress;
+                      console.log('[getAddressFromCoordinates] 지번 주소 사용:', address);
+                      break;
+                    }
+                  }
+                }
+              }
+              
+              // 결과가 여전히 없으면 단순한 이름 사용
+              if (!address && response?.v2?.results?.length > 0) {
+                for (const result of response.v2.results) {
+                  if (result.name && result.name !== 'addr' && result.name.length > 3) {
+                    address = result.name;
+                    console.log('[getAddressFromCoordinates] 기본 이름 사용:', address);
                     break;
                   }
                 }
               }
-            }
-            
-            // 결과가 여전히 없으면 단순한 이름 사용
-            if (!address && response?.v2?.results?.length > 0) {
-              for (const result of response.v2.results) {
-                if (result.name && result.name !== 'addr' && result.name.length > 3) {
-                  address = result.name;
-                  console.log('[getAddressFromCoordinates] 기본 이름 사용:', address);
-                  break;
-                }
+              
+              // 최종적으로 주소가 없거나 "addr"인 경우 좌표 표시
+              if (!address || address.trim() === 'addr' || address.trim() === '' || address.length < 3) {
+                address = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+                console.log('[getAddressFromCoordinates] 주소 파싱 실패, 좌표 사용:', address);
               }
+              
+              console.log('[getAddressFromCoordinates] 최종 주소:', address);
+              reverseGeocodeCache.set(key, address.trim());
+              resolve(address.trim());
+            } catch (parseError) {
+              console.error('[getAddressFromCoordinates] 응답 파싱 오류:', parseError);
+              const fallback = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+              reverseGeocodeCache.set(key, fallback);
+              resolve(fallback);
             }
-            
-            // 최종적으로 주소가 없거나 "addr"인 경우 좌표 표시
-            if (!address || address.trim() === 'addr' || address.trim() === '' || address.length < 3) {
-              address = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-              console.log('[getAddressFromCoordinates] 주소 파싱 실패, 좌표 사용:', address);
-            }
-            
-            console.log('[getAddressFromCoordinates] 최종 주소:', address);
-            resolve(address.trim());
-          } catch (parseError) {
-            console.error('[getAddressFromCoordinates] 응답 파싱 오류:', parseError);
-            resolve(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
-          }
+          });
         });
-      });
+      })();
+
+      reverseGeocodeInflight.set(key, inflight);
+      const result = await inflight;
+      reverseGeocodeInflight.delete(key);
+
+      // 1) 서버 캐시에 저장 (베스트 에포트)
+      try {
+        await fetch('/api/revgeo-cache', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lat, lng, address: result })
+        });
+      } catch (_) {}
+
+      return result;
     } catch (error) {
       console.error('[getAddressFromCoordinates] 역지오코딩 에러:', error);
       return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
