@@ -17,6 +17,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         FirebaseApp.configure()
         print("🔥 [Firebase] Firebase 초기화 완료")
         
+        // NotificationCenter 델리게이트 설정 (포그라운드 알림 표시용)
+        UNUserNotificationCenter.current().delegate = self
+
         // Firebase Messaging 델리게이트 설정
         Messaging.messaging().delegate = self
         
@@ -443,6 +446,23 @@ extension AppDelegate: MessagingDelegate {
         }
         
         return nil
+    }
+}
+
+// MARK: - 🔔 UNUserNotificationCenter 델리게이트
+extension AppDelegate: UNUserNotificationCenterDelegate {
+    // 앱이 포그라운드일 때도 배너/사운드로 표시
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                willPresent notification: UNNotification,
+                                withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([.banner, .list, .sound])
+    }
+
+    // 사용자가 알림을 탭했을 때 처리(필요 시 확장)
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                didReceive response: UNNotificationResponse,
+                                withCompletionHandler completionHandler: @escaping () -> Void) {
+        completionHandler()
     }
 }
 
