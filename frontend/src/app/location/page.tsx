@@ -2339,12 +2339,7 @@ export default function LocationPage() {
                     </div>
                   </div>
                   
-                  <div style="margin-bottom: 6px;">
-                    <div style="display: flex; align-items: flex-start; font-size: 12px; color: #64748b;">
-                      <span style="flex-shrink: 0;">📍 </span>
-                      <span id="member-address-${newlySelectedMember.id}" style="color: #0113A3; font-weight: 500; word-break: keep-all; line-height: 1.3; text-indent: hanging; padding-left: 0;">주소 변환 중...</span>
-                    </div>
-                  </div>
+                  <!-- 주소 표시 제거 -->
                   <div>
                     <p style="margin: 0; font-size: 11px; color: #9ca3af;">
                       🗺️ 현재 위치 정보
@@ -2362,22 +2357,7 @@ export default function LocationPage() {
             setInfoWindow(memberInfoWindow);
             console.log('[handleMemberSelect] 멤버 InfoWindow 표시 완료:', newlySelectedMember.name);
 
-            // 주소 변환 및 업데이트 (비동기 처리)
-            if (lat && lng) {
-              getAddressFromCoordinates(lat, lng).then(address => {
-                const addressElement = document.getElementById(`member-address-${newlySelectedMember.id}`);
-                if (addressElement) {
-                  addressElement.textContent = address;
-                  console.log('[handleMemberSelect] InfoWindow 주소 업데이트 완료:', { member: newlySelectedMember.name, address });
-                }
-              }).catch(error => {
-                console.error('[handleMemberSelect] InfoWindow 주소 변환 실패:', error);
-                const addressElement = document.getElementById(`member-address-${newlySelectedMember.id}`);
-                if (addressElement) {
-                  addressElement.textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-                }
-              });
-            }
+            // 주소 변환 제거
         } else {
             console.warn('[handleMemberSelect] 멤버 마커를 찾을 수 없음 - 좌표로 직접 InfoWindow 표시 시도:', {
               memberIndex,
@@ -2505,20 +2485,7 @@ export default function LocationPage() {
               setInfoWindow(memberInfoWindow);
               console.log('[handleMemberSelect] 멤버 InfoWindow 좌표로 직접 표시 완료:', newlySelectedMember.name);
 
-              // 주소 변환 및 업데이트 (비동기 처리)
-              getAddressFromCoordinates(lat, lng).then(address => {
-                const addressElement = document.getElementById(`member-address-${newlySelectedMember.id}`);
-                if (addressElement) {
-                  addressElement.textContent = address;
-                  console.log('[handleMemberSelect] InfoWindow 주소 업데이트 완료 (좌표기반):', { member: newlySelectedMember.name, address });
-                }
-              }).catch(error => {
-                console.error('[handleMemberSelect] InfoWindow 주소 변환 실패:', error);
-                const addressElement = document.getElementById(`member-address-${newlySelectedMember.id}`);
-                if (addressElement) {
-                  addressElement.textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-                }
-              });
+              // 주소 변환 제거
             } else {
               console.error('[handleMemberSelect] InfoWindow 표시 완전 실패 - 지도나 좌표 없음:', {
                 hasMap: !!map,
@@ -4515,22 +4482,7 @@ export default function LocationPage() {
       }
     }
     
-    // 주소 변환 및 업데이트 (비동기 처리)
-    if (lat && lng) {
-      getAddressFromCoordinates(lat, lng).then(address => {
-        const addressElement = document.getElementById(`member-address-${member.id}`);
-        if (addressElement) {
-          addressElement.textContent = address;
-          console.log('[createMemberInfoWindow] 주소 업데이트 완료:', { member: member.name, address });
-        }
-      }).catch(error => {
-        console.error('[createMemberInfoWindow] 주소 변환 실패:', error);
-        const addressElement = document.getElementById(`member-address-${member.id}`);
-        if (addressElement) {
-          addressElement.textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-        }
-      });
-    }
+    // 주소 변환 제거
     
     console.log('[createMemberInfoWindow] 멤버 InfoWindow 생성 완료:', member.name);
   };
