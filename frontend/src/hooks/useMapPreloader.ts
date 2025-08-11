@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { API_KEYS } from '../config';
+import { ensureNaverMapsLoaded } from '../services/ensureNaverMaps';
 
 interface MapPreloadStatus {
   naver: boolean;
@@ -62,49 +63,29 @@ export const useMapPreloader = () => {
     loadingInProgress.naver = true;
     console.log('[MapPreloader] Naver Maps API 프리로딩 시작');
 
-    return new Promise<void>((resolve, reject) => {
-      const script = document.createElement('script');
-      script.type = 'text/javascript';
-      script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${API_KEYS.NAVER_MAPS_CLIENT_ID}&submodules=geocoder,drawing,visualization`;
-      script.async = true;
-      script.defer = true;
-      script.id = 'naver-maps-preload';
-
-      script.onload = () => {
+    return ensureNaverMapsLoaded({ submodules: 'geocoder,drawing,visualization' })
+      .then(() => {
         console.log('[MapPreloader] Naver Maps API 프리로딩 완료');
         globalMapLoadStatus.naver = true;
         loadingInProgress.naver = false;
-        retryCount.naver = 0; // 성공 시 재시도 카운트 리셋
-        resolve();
-      };
-
-      script.onerror = (error) => {
+        retryCount.naver = 0;
+      })
+      .catch((error) => {
         console.warn('[MapPreloader] Naver Maps API 프리로딩 실패:', error);
         loadingInProgress.naver = false;
-        
-        // 재시도 로직
         if (retryCount.naver < MAX_RETRIES) {
           retryCount.naver++;
           console.log(`[MapPreloader] Naver Maps API 재시도 ${retryCount.naver}/${MAX_RETRIES}`);
-          
-          setTimeout(() => {
-            preloadNaverMaps().then(resolve).catch(reject);
-          }, RETRY_DELAY);
+          return new Promise<void>((resolve, reject) =>
+            setTimeout(() => {
+              preloadNaverMaps().then(resolve).catch(reject);
+            }, RETRY_DELAY)
+          );
         } else {
           console.log('[MapPreloader] Naver Maps API 최대 재시도 횟수 초과 - 프리로딩 건너뛰기');
           retryCount.naver = 0;
-          resolve(); // 실패해도 앱 동작에 영향 없도록 resolve
         }
-      };
-
-      // 기존 스크립트 제거 후 추가
-      const existingScript = document.getElementById('naver-maps-preload');
-      if (existingScript) {
-        existingScript.remove();
-      }
-
-      document.head.appendChild(script);
-    });
+      });
   };
 
   // Google 지도 API 프리로드

@@ -206,8 +206,8 @@ export default function LocationLayout({
           }
         `
       }} />
-      {/* Preconnect / DNS-prefetch (필요 시 유지) */}
-      <link rel="preconnect" href="https://openapi.map.naver.com" />
+      {/* Preconnect / DNS-prefetch */}
+      <link rel="preconnect" href="https://oapi.map.naver.com" />
       <link rel="dns-prefetch" href="https://oapi.map.naver.com" />
       <div className="location-page">
         {children}

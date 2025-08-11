@@ -2964,56 +2964,29 @@ export default function LocationPage() {
         setIsLocationInfoPanelOpen(true);
         setIsEditingPanel(false);
         
-        // 주소 변환 (Naver Reverse Geocoding API 사용)
-        (async () => {
-          try {
-            const lat = coord.lat();
-            const lng = coord.lng();
-            const params = new URLSearchParams({
-              coords: `${lng},${lat}`,
-              orders: 'roadaddr,addr',
-              output: 'json',
-            });
-            const res = await fetch(`/api/naver/reverse-geocode?${params.toString()}`, { cache: 'no-store' });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data = await res.json();
-            const results = data?.results || data?.v2?.results || [];
-
-            const composeAddress = (r: any) => {
-              const parts: string[] = [];
-              const region = r?.region || {};
-              if (region.area1?.name) parts.push(region.area1.name);
-              if (region.area2?.name) parts.push(region.area2.name);
-              if (region.area3?.name) parts.push(region.area3.name);
-              if (region.area4?.name) parts.push(region.area4.name);
-              const land = r?.land || {};
-              if (land.name) parts.push(land.name);
-              if (land.number1) parts.push(land.number2 ? `${land.number1}-${land.number2}` : `${land.number1}`);
-              return parts.filter(Boolean).join(' ');
-            };
-
-            let finalAddress = '';
-            // 도로명 우선
-            const road = results.find((r: any) => r?.name === 'roadaddr');
-            if (road) finalAddress = composeAddress(road);
-            if (!finalAddress) {
-              const jibun = results.find((r: any) => r?.name === 'addr');
-              if (jibun) finalAddress = composeAddress(jibun);
+        // 주소 변환
+        if (window.naver.maps.Service) {
+          window.naver.maps.Service.reverseGeocode({
+            coords: coord,
+            orders: [
+              window.naver.maps.Service.OrderType.ADDR,
+              window.naver.maps.Service.OrderType.ROAD_ADDR
+            ].join(',')
+          }, (status: any, response: any) => {
+            if (status === window.naver.maps.Service.Status.OK) {
+              const result = response.v2;
+              const address = result.address;
+              const roadAddress = result.roadAddress;
+              
+              const finalAddress = roadAddress ? roadAddress.jibunAddress : address.jibunAddress;
+              
+              setNewLocation(prev => ({
+                ...prev,
+                address: finalAddress || '주소를 찾을 수 없습니다.'
+              }));
             }
-            if (!finalAddress) finalAddress = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-
-            setNewLocation(prev => ({
-              ...prev,
-              address: finalAddress || '주소를 찾을 수 없습니다.'
-            }));
-          } catch (e) {
-            console.warn('[reverse-geocode] 실패, 좌표 표시로 대체', e);
-            setNewLocation(prev => ({
-              ...prev,
-              address: `${coord.lat().toFixed(4)}, ${coord.lng().toFixed(4)}`,
-            }));
-          }
-        })();
+          });
+        }
       });
       } catch (error) {
         console.error('[지도 초기화] 오류:', error);

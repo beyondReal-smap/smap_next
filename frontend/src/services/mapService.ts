@@ -1,4 +1,5 @@
 import { API_KEYS } from '../config';
+import { ensureNaverMapsLoaded } from './ensureNaverMaps';
 import React from 'react';
 
 // 지도 API 타입 정의
@@ -40,18 +41,9 @@ export const loadGoogleMapsAPI = (callback: () => void): void => {
 
 // Naver Maps API 로드 유틸리티
 export const loadNaverMapsAPI = (callback: () => void): void => {
-  if (typeof window === 'undefined' || window.naver?.maps) {
-    callback();
-    return;
-  }
-
-  // 스크립트 요소 생성 (올바른 파라미터명과 서브모듈 사용)
-  const script = document.createElement('script');
-  script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${MAP_API_KEYS.NAVER_CLIENT_ID}&submodules=geocoder`;
-  script.async = true;
-  script.defer = true;
-  script.onload = callback;
-  document.head.appendChild(script);
+  ensureNaverMapsLoaded({ submodules: 'geocoder' })
+    .then(() => callback())
+    .catch(() => callback()); // 실패해도 페이지 동작을 막지 않음
 };
 
 // Google 지도 인스턴스 정리 유틸리티

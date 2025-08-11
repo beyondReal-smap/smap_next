@@ -11,23 +11,26 @@ type EnsureOptions = {
   maxRetries?: number;
   initialDelayMs?: number;
   submodules?: string; // e.g., 'geocoder,drawing,visualization'
+  useCallbackParam?: boolean; // API 문서 스타일의 callback 파라미터 사용
 };
 
 const DEFAULT_OPTIONS: Required<EnsureOptions> = {
   maxRetries: 5,
   initialDelayMs: 400,
   submodules: 'geocoder',
+  useCallbackParam: true,
 };
 
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function buildScriptUrl(submodules: string): string {
+function buildScriptUrl(submodules: string, useCallbackParam: boolean, cbName: string): string {
   const clientId = API_KEYS.NAVER_MAPS_CLIENT_ID;
   const url = new URL('https://oapi.map.naver.com/openapi/v3/maps.js');
   url.searchParams.set('ncpKeyId', clientId);
   if (submodules) url.searchParams.set('submodules', submodules);
+  if (useCallbackParam) url.searchParams.set('callback', cbName);
   // 캐시 버스터
   url.searchParams.set('ts', String(Date.now()));
   return url.toString();
@@ -93,15 +96,26 @@ export async function ensureNaverMapsLoaded(options?: EnsureOptions): Promise<vo
     try {
       while (attempt <= opts.maxRetries) {
         try {
-          const src = buildScriptUrl(opts.submodules);
+          const cbName = '__NAVER_MAPS_READY__';
+          let resolvedByCallback = false;
+
+          // callback 방식 등록
+          if (opts.useCallbackParam) {
+            (window as any)[cbName] = () => {
+              resolvedByCallback = true;
+              resolve();
+            };
+          }
+
+          const src = buildScriptUrl(opts.submodules, !!opts.useCallbackParam, cbName);
           await injectScript(src, 'naver-maps-ensure');
 
-          // 로드 완료 대기 (최대 8초)
+          // 폴백: callback 미호출 시에도 준비 확인 (최대 8초)
           const deadline = Date.now() + 8000;
-          while (!window.naver?.maps && Date.now() < deadline) {
+          while (!window.naver?.maps && Date.now() < deadline && !resolvedByCallback) {
             await delay(50);
           }
-          if (window.naver?.maps) {
+          if (window.naver?.maps || resolvedByCallback) {
             resolve();
             return;
           }
