@@ -35,10 +35,7 @@
         <domain includeSubdomains="true">openapi.map.naver.com</domain>
         
         <!-- 🔥 IP 주소 직접 접근 (DNS 문제 우회) -->
-        <domain includeSubdomains="true">216.198.79.65</domain>
-        <domain includeSubdomains="true">64.29.17.65</domain>
-        <domain includeSubdomains="true">76.76.19.0</domain>
-        <domain includeSubdomains="true">76.76.19.1</domain>
+        <!-- IP 직접 접근은 SSL 핀/호스트네임 검증 문제 유발 가능하므로 제거 -->
         
         <!-- 🔥 추가 IP 주소 (DNS 해석 실패 대비) -->
         <domain includeSubdomains="true">76.76.19.2</domain>

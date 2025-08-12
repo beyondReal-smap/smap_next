@@ -551,10 +551,24 @@ export default function AddSchedulePage() {
 
   // DatePicker (시간) 변경 핸들러
   const handleTimeChange = (date: Date | null, name: 'startTime' | 'endTime') => {
-    if (date) {
+    if (!date) return;
+    const newTime = dayjs(date);
+    if (name === 'startTime') {
+      // 시작 시간 설정 시 종료 시간을 +1시간으로 자동 세팅 (자정 넘김 포함)
+      const startDateTime = dayjs(`${scheduleForm.startDate}T${newTime.format('HH:mm')}:00`);
+      const endCandidate = startDateTime.add(1, 'hour');
+
       setScheduleForm(prev => ({
         ...prev,
-        [name]: dayjs(date).format('HH:mm'), // Date 객체에서 'HH:mm' 문자열만 추출하여 저장
+        startTime: newTime.format('HH:mm'),
+        endDate: endCandidate.format('YYYY-MM-DD'),
+        endTime: endCandidate.format('HH:mm'),
+      }));
+    } else {
+      // 종료 시간 직접 변경
+      setScheduleForm(prev => ({
+        ...prev,
+        endTime: newTime.format('HH:mm'),
       }));
     }
   };
@@ -931,7 +945,16 @@ export default function AddSchedulePage() {
                     <DatePicker
                       ref={startDateRef}
                       selected={scheduleForm.startDate ? dayjs(scheduleForm.startDate).toDate() : null}
-                      onChange={(date: Date | null) => handleDateChange(date, 'startDate')}
+                      onChange={(date: Date | null) => {
+                        handleDateChange(date, 'startDate');
+                        // 시작 날짜가 바뀌면 종료 날짜도 동일하게 맞춤 (시간 로직은 handleTimeChange에서 보정)
+                        if (date) {
+                          setScheduleForm(prev => ({
+                            ...prev,
+                            endDate: dayjs(date).format('YYYY-MM-DD'),
+                          }));
+                        }
+                      }}
                       dateFormat="yyyy-MM-dd"
                       locale={ko}
                       className="block w-full border-none p-0 text-left text-sm font-medium focus:ring-0 bg-transparent cursor-pointer"
