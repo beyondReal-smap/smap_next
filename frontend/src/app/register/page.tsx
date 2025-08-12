@@ -575,13 +575,13 @@ export default function RegisterPage() {
             ...prev,
             mt_id: parsedData.email || '', // 이메일을 아이디로 사용
             mt_email: parsedData.email || '',
-            mt_name: parsedData.name || parsedData.given_name || 'Google User',
-            mt_nickname: parsedData.nickname || parsedData.given_name || parsedData.name || 'Google User',
-            // 구글 로그인 시 비밀번호는 자동으로 설정 (실제로는 사용되지 않지만 유효성 검사를 위해)
+            mt_name: parsedData.name || parsedData.given_name || (parsedData.provider === 'apple' ? 'Apple 사용자' : 'Google User'),
+            mt_nickname: parsedData.nickname || parsedData.given_name || parsedData.name || (parsedData.provider === 'apple' ? 'Apple 사용자' : 'Google User'),
+            // 구글 로그인 시만 임시 비밀번호 자동설정
             mt_pwd: parsedData.provider === 'google' ? 'google_auto_password_123' : '',
             isSocialLogin: true,
             socialProvider: parsedData.provider,
-            socialId: parsedData.kakao_id || parsedData.google_id || ''
+            socialId: parsedData.kakao_id || parsedData.google_id || parsedData.apple_id || ''
           }));
           
           // 소셜 로그인 시 약관 동의 단계로 시작 (소셜 로그인이므로 전화번호 인증은 생략)
@@ -1233,7 +1233,7 @@ export default function RegisterPage() {
       let requestData: any = {
         ...registerData,
         mt_type: registerData.isSocialLogin ? 
-          (registerData.socialProvider === 'google' ? 4 : 2) : 1, // 구글: 4, 카카오: 2, 일반: 1
+          (registerData.socialProvider === 'google' ? 4 : registerData.socialProvider === 'apple' ? 3 : 2) : 1, // 구글:4, 애플:3, 카카오:2
         mt_level: 2, // 일반(무료)
         mt_status: 1, // 정상
         mt_onboarding: 'N',
@@ -1241,7 +1241,7 @@ export default function RegisterPage() {
       };
 
       // 구글 로그인 시 비밀번호 제거 (실제로는 사용되지 않음)
-      if (registerData.isSocialLogin && registerData.socialProvider === 'google') {
+      if (registerData.isSocialLogin && (registerData.socialProvider === 'google' || registerData.socialProvider === 'apple')) {
         delete requestData.mt_pwd;
       }
 
@@ -1252,7 +1252,7 @@ export default function RegisterPage() {
 
       // 소셜 로그인 관련 데이터 추가
       if (registerData.isSocialLogin) {
-        if (registerData.socialProvider === 'google') {
+        if (registerData.socialProvider === 'google' || registerData.socialProvider === 'apple') {
           requestData.mt_google_id = registerData.socialId;
         } else if (registerData.socialProvider === 'kakao') {
           requestData.mt_kakao_id = registerData.socialId;
@@ -1517,7 +1517,7 @@ export default function RegisterPage() {
           /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(registerData.mt_email);
         
         // 구글 로그인 시 비밀번호 검사 건너뛰기
-        if (registerData.isSocialLogin && registerData.socialProvider === 'google') {
+        if (registerData.isSocialLogin && (registerData.socialProvider === 'google' || registerData.socialProvider === 'apple')) {
           return registerData.mt_name && 
                  registerData.mt_nickname &&
                  !emailError && // 이메일 에러가 없어야 함
@@ -1695,13 +1695,13 @@ export default function RegisterPage() {
                 </div>
                 <h2 className="text-lg font-bold text-gray-900 mb-1">
                   {registerData.isSocialLogin ? 
-                    `${registerData.socialProvider === 'google' ? '구글' : '카카오'} 회원가입` : 
+                    `${registerData.socialProvider === 'google' ? '구글' : registerData.socialProvider === 'apple' ? '애플' : '카카오'} 회원가입` : 
                     '서비스 이용약관'
                   }
                 </h2>
                 <p className="text-xs text-gray-600">
                   {registerData.isSocialLogin ? 
-                    `${registerData.socialProvider === 'google' ? '구글' : '카카오'} 계정으로 간편 회원가입을 진행합니다` :
+                    `${registerData.socialProvider === 'google' ? '구글' : registerData.socialProvider === 'apple' ? '애플' : '카카오'} 계정으로 간편 회원가입을 진행합니다` :
                     'SMAP 서비스 이용을 위해 약관에 동의해주세요'
                   }
                 </p>
@@ -2064,7 +2064,7 @@ export default function RegisterPage() {
                   <FiUser className="w-6 h-6 text-white" />
                 </div>
                 <h2 className="text-xl font-bold text-gray-900 mb-1">기본 정보</h2>
-                {registerData.isSocialLogin && registerData.socialProvider === 'google' && (
+                {registerData.isSocialLogin && (registerData.socialProvider === 'google' || registerData.socialProvider === 'apple') && (
                   <div className="flex items-center justify-center mb-2">
                     <div className="bg-[#0114a2] text-white text-xs px-3 py-1 rounded-full flex items-center">
                       <svg className="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="currentColor">
@@ -2078,7 +2078,7 @@ export default function RegisterPage() {
                   </div>
                 )}
                 <p className="text-sm text-gray-600" style={{ wordBreak: 'keep-all' }}>
-                  {registerData.isSocialLogin && registerData.socialProvider === 'google' 
+                  {registerData.isSocialLogin && (registerData.socialProvider === 'google' || registerData.socialProvider === 'apple') 
                     ? '구글 계정 정보가 자동으로 입력되었습니다. 필요시 수정해주세요' 
                     : '서비스 이용을 위한 기본 정보를 입력해주세요'
                   }
@@ -2087,7 +2087,7 @@ export default function RegisterPage() {
 
               <div className="flex-1 overflow-y-auto space-y-3 pb-4 register-form">
                 {/* 구글 로그인 시 안내 메시지 */}
-                {registerData.isSocialLogin && registerData.socialProvider === 'google' && (
+                {registerData.isSocialLogin && (registerData.socialProvider === 'google' || registerData.socialProvider === 'apple') && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
                     <div className="flex items-start">
                       <svg className="w-4 h-4 text-blue-600 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2236,7 +2236,7 @@ export default function RegisterPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     이름
                   </label>
-                  {registerData.isSocialLogin && registerData.socialProvider === 'google' && (
+                  {registerData.isSocialLogin && (registerData.socialProvider === 'google' || registerData.socialProvider === 'apple') && (
                     <p className="text-xs text-[#0114a2] mb-2" style={{ wordBreak: 'keep-all' }}>
                       구글 계정에서 가져온 이름이 자동으로 입력되었습니다
                     </p>
@@ -2258,7 +2258,7 @@ export default function RegisterPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     닉네임
                   </label>
-                  {registerData.isSocialLogin && registerData.socialProvider === 'google' && (
+                  {registerData.isSocialLogin && (registerData.socialProvider === 'google' || registerData.socialProvider === 'apple') && (
                     <p className="text-xs text-[#0114a2] mb-2" style={{ wordBreak: 'keep-all' }}>
                       구글 계정에서 가져온 닉네임이 자동으로 입력되었습니다
                     </p>
@@ -2282,7 +2282,7 @@ export default function RegisterPage() {
                   </label>
                   {registerData.isSocialLogin && (
                     <p className="text-xs text-[#0114a2] mb-2" style={{ wordBreak: 'keep-all' }}>
-                      {registerData.socialProvider === 'google' ? '구글' : '카카오'} 계정의 이메일이 ID로 사용됩니다
+                      {registerData.socialProvider === 'google' ? '구글' : registerData.socialProvider === 'apple' ? '애플' : '카카오'} 계정의 이메일이 ID로 사용됩니다
                     </p>
                   )}
                   <div className="relative register-input-container px-0.5">

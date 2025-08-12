@@ -2559,12 +2559,17 @@ const SignInPage = () => {
               if (data.success && data.data) {
                 if (data.data.isNewUser) {
                   // 신규 회원 - register 페이지로 이동
+                  const fallbackEmail = (result?.email && result.email.includes('@'))
+                    ? result.email
+                    : `apple_${String(result?.userIdentifier || '').slice(0, 8)}@privaterelay.appleid.com`;
+
                   const socialData = {
                     provider: 'apple',
                     userIdentifier: result.userIdentifier,
-                    email: result.email,
-                    name: result.userName,
-                    nickname: result.userName
+                    apple_id: result.userIdentifier,
+                    email: fallbackEmail,
+                    name: result.userName || 'Apple 사용자',
+                    nickname: result.userName || 'Apple 사용자'
                   };
                   
                   localStorage.setItem('socialLoginData', JSON.stringify(socialData));
