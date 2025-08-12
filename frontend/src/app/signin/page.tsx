@@ -2515,6 +2515,103 @@ const SignInPage = () => {
     }
   };
 
+  // Apple 로그인 핸들러
+  const handleAppleSignIn = async () => {
+    console.log('🍎 [APPLE LOGIN] Apple 로그인 시작');
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      // iOS WebView에서 실행 중인지 확인
+      const isIOSWebView = /iPhone|iPad|iPod/i.test(navigator.userAgent) && 
+                          (window as any).webkit?.messageHandlers?.smapIos;
+      
+      if (isIOSWebView) {
+        console.log('🍎 [APPLE LOGIN] iOS WebView에서 Apple 로그인 호출');
+        
+        // Apple 로그인 결과 처리 함수 등록
+        (window as any).handleAppleSignInResult = async (result: any) => {
+          console.log('🍎 [APPLE LOGIN] Apple 로그인 결과:', result);
+          
+          try {
+            if (result.success) {
+              // Apple 로그인 성공 - 서버로 전송
+              const response = await fetch('/api/auth/apple-login', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  userIdentifier: result.userIdentifier,
+                  userName: result.userName,
+                  email: result.email,
+                  identityToken: result.identityToken,
+                  authorizationCode: result.authorizationCode
+                }),
+              });
+
+              const data = await response.json();
+              
+              if (!response.ok) {
+                throw new Error(data.message || 'Apple 로그인에 실패했습니다.');
+              }
+
+              if (data.success && data.data) {
+                if (data.data.isNewUser) {
+                  // 신규 회원 - register 페이지로 이동
+                  const socialData = {
+                    provider: 'apple',
+                    userIdentifier: result.userIdentifier,
+                    email: result.email,
+                    name: result.userName,
+                    nickname: result.userName
+                  };
+                  
+                  localStorage.setItem('socialLoginData', JSON.stringify(socialData));
+                  router.push('/register?social=apple');
+                } else {
+                  // 기존 회원 - 로그인 처리
+                  const authService = await import('@/services/authService');
+                  if (data.data.token) {
+                    authService.default.setToken(data.data.token);
+                  }
+                  authService.default.setUserData(data.data.user);
+                  
+                  console.log('🍎 Apple 로그인 성공:', data.data.user);
+                  router.push('/home');
+                }
+              } else {
+                throw new Error(data.message || 'Apple 로그인에 실패했습니다.');
+              }
+            } else {
+              throw new Error(result.error || 'Apple 로그인이 취소되었습니다.');
+            }
+          } catch (err: any) {
+            console.error('🍎 [APPLE LOGIN] 처리 오류:', err);
+            setError(`Apple 로그인 중 오류가 발생했습니다: ${err.message}`);
+          } finally {
+            setIsLoading(false);
+          }
+        };
+        
+        // iOS Native Apple 로그인 호출
+        (window as any).webkit.messageHandlers.smapIos.postMessage({
+          action: 'appleSignIn'
+        });
+        
+      } else {
+        // 웹 브라우저에서는 Apple 로그인 불가
+        console.log('🍎 [APPLE LOGIN] 웹 브라우저에서는 Apple 로그인 불가');
+        setError('Apple 로그인은 iOS 앱에서만 지원됩니다.');
+        setIsLoading(false);
+      }
+    } catch (err: any) {
+      console.error('🍎 [APPLE LOGIN] 오류:', err);
+      setError(`Apple 로그인 중 오류가 발생했습니다: ${err.message}`);
+      setIsLoading(false);
+    }
+  };
+
   // 전화번호 로그인 핸들러
   const handlePhoneNumberLogin = async (e: React.FormEvent) => {
     // 폼 기본 제출 동작 방지
@@ -3981,6 +4078,36 @@ const SignInPage = () => {
                 </div>
               )} */}
             </div>
+
+            {/* Apple Sign In - iOS에서만 표시 */}
+            {typeof window !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent) && (
+              <div className="mb-4">
+                <button
+                  type="button"
+                  onClick={handleAppleSignIn}
+                  disabled={isLoading}
+                  className="w-full inline-flex items-center justify-center py-2.5 px-4 border border-gray-900 rounded-lg shadow-sm bg-black text-sm font-medium text-white hover:bg-gray-900 focus:outline-none disabled:opacity-70 transition-all"
+                  style={{ 
+                    zIndex: 100, 
+                    position: 'relative',
+                    pointerEvents: isLoading ? 'none' : 'auto'
+                  }}
+                  onFocus={(e) => (e.target as HTMLButtonElement).style.boxShadow = '0 0 0 2px #0113A3'}
+                  onBlur={(e) => (e.target as HTMLButtonElement).style.boxShadow = ''}
+                >
+                  {isLoading ? (
+                    <LoadingSpinner message="로그인 중..." fullScreen={false} size="sm" type="spinner" />
+                  ) : (
+                    <>
+                      <svg width="18" height="18" viewBox="0 0 24 24" className="mr-3" fill="currentColor">
+                        <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.19 2.33-.88 3.69-.73 1.58.23 2.76.89 3.53 2.24-3.2 2.1-2.69 6.11.48 7.65-.61 1.34-1.39 2.65-2.78 4.01m-6.89-15C10.29 2.68 12.7.75 15.29 1c.3 2.5-1.86 5.13-4.24 5.28-.3-2.5.42-3.5.11-4Z"/>
+                      </svg>
+                      Apple로 로그인
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
 
             {/* 카카오 로그인 버튼 제거 */}
           </div>

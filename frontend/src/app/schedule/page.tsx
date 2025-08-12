@@ -97,7 +97,15 @@ const getDefaultImage = (gender: number | null | undefined, index: number): stri
 // 안전한 이미지 URL 가져오기 함수 - location/home과 동일한 로직
 const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefined, index: number): string => {
   // 실제 사진이 있으면 사용하고, 없으면 기본 이미지 사용
-  return photoUrl ?? getDefaultImage(gender, index);
+  if (photoUrl) {
+    // 이미 전체 경로인 경우 그대로 사용, 파일명만 있는 경우 avatars 경로 추가
+    if (photoUrl.startsWith('/') || photoUrl.startsWith('http')) {
+      return photoUrl;
+    } else {
+      return `/images/avatars/${photoUrl}`;
+    }
+  }
+  return getDefaultImage(gender, index);
 };
 
 // GroupDropdownPortal 컴포넌트 (activelog의 GroupSelector에서 가져옴)
@@ -2185,7 +2193,8 @@ export default function SchedulePage() {
             groupName: newEvent.groupName,
             groupColor: newEvent.groupColor,
             memberName: selectedMember?.mt_name || selectedMember?.name || '',
-            memberPhoto: selectedMember?.mt_file1 ? `/images/avatars/${selectedMember.mt_file1}` : (selectedMember?.photo || ''),
+            memberNickname: selectedMember?.mt_nickname || selectedMember?.mt_name || selectedMember?.name || '',
+            memberPhoto: selectedMember?.mt_file1 || selectedMember?.photo || '',
             memberGender: selectedMember?.mt_gender || null,
             memberIdx: selectedMember?.mt_idx || 0,
             canEdit: true,
@@ -2201,9 +2210,9 @@ export default function SchedulePage() {
             isAllDay: newEvent.allDay,
             tgtMtIdx: selectedMember?.mt_idx || null,
             repeatJsonV: repeatData.sst_repeat_json_v,
-            tgtSgdtOwnerChk: (scheduleGroupMembers && Array.isArray(scheduleGroupMembers)) ? (scheduleGroupMembers.find(m => m.id === selectedMemberId)?.sgdt_owner_chk || 'N') : 'N', // 타겟 멤버의 오너 권한
-            tgtSgdtLeaderChk: (scheduleGroupMembers && Array.isArray(scheduleGroupMembers)) ? (scheduleGroupMembers.find(m => m.id === selectedMemberId)?.sgdt_leader_chk || 'N') : 'N', // 타겟 멤버의 리더 권한
-            tgtSgdtIdx: (scheduleGroupMembers && Array.isArray(scheduleGroupMembers)) ? scheduleGroupMembers.find(m => m.id === selectedMemberId)?.sgdt_idx : undefined, // 타겟 멤버의 그룹 상세 인덱스
+            tgtSgdtOwnerChk: (selectedMember?.sgdt_owner_chk as 'Y' | 'N') || 'N',
+            tgtSgdtLeaderChk: (selectedMember?.sgdt_leader_chk as 'Y' | 'N') || 'N',
+            tgtSgdtIdx: selectedMember?.sgdt_idx,
             sst_pidx: undefined
           };
           
@@ -2222,37 +2231,14 @@ export default function SchedulePage() {
           setSelectedEventDetails(null);
           setDateTimeError(null);
           
-          // 새 일정 추가 후 캐시 무효화 및 강제 새로고침
-          const currentDate = dayjs();
-          const cacheKey = `${currentDate.year()}-${String(currentDate.month() + 1).padStart(2, '0')}`;
+          // 새 일정 추가 후에는 전체 새로고침 대신 캐시 업데이트만 수행
+          console.log('[handleSaveEvent] ✅ 새 일정 추가 완료 - 캐시만 업데이트');
           
-          console.log('[handleSaveEvent] 🗑️ 새 일정 추가 후 캐시 무효화:', cacheKey);
-          
-          // 현재 월의 메모리 캐시 무효화
-          setMonthlyCache(prev => {
-            const newCache = new Map(prev);
-            newCache.delete(cacheKey);
-            return newCache;
-          });
-          
-          // 로드된 월 정보 무효화
-          setLoadedMonths(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(cacheKey);
-            return newSet;
-          });
-          
-          // 로컬 스토리지 캐시도 완전 초기화
-          clearCacheFromStorage();
-          
-          // DataCacheContext의 스케줄 캐시 무효화
+          // DataCacheContext의 스케줄 캐시만 무효화 (전체 리로드 방지)
           if (selectedGroupId) {
             console.log('[handleSaveEvent] 🗑️ DataCacheContext 스케줄 캐시 무효화 (생성):', selectedGroupId);
             invalidateCache('scheduleData', selectedGroupId);
           }
-          
-          // 서버에서 최신 데이터 강제 로드
-          await loadAllGroupSchedules(undefined, undefined, true, true);
           
           // 성공 토스트 모달 표시 (3초 후 자동 닫기)
           showToastModal('success', '일정 등록 완료', '일정이 성공적으로 등록되었습니다.');
@@ -3032,22 +3018,39 @@ export default function SchedulePage() {
 
   const handleTimeConfirm = () => {
     const timeString = `${selectedHour.toString().padStart(2, '0')}:${selectedMinute.toString().padStart(2, '0')}`;
-    
+
     // 날짜/시간 모달이 열려있으면 임시 상태 업데이트, 아니면 실제 상태 업데이트
     if (isDateTimeModalOpen) {
       if (timeModalType === 'start') {
-        setTempDateTime(prev => ({ ...prev, startTime: timeString }));
+        // 시작 시간을 설정하면 종료 시간을 +1시간으로 자동 세팅 (자정 넘어가면 23:59로 클램프)
+        setTempDateTime(prev => {
+          const start = dayjs(`${prev.date}T${timeString}:00`);
+          const endCandidate = start.add(1, 'hour');
+          let newEnd = endCandidate.format('HH:mm');
+          if (newEnd <= timeString) {
+            newEnd = '23:59';
+          }
+          return { ...prev, startTime: timeString, endTime: newEnd };
+        });
       } else {
         setTempDateTime(prev => ({ ...prev, endTime: timeString }));
       }
     } else {
       if (timeModalType === 'start') {
-        setNewEvent(prev => ({ ...prev, startTime: timeString }));
+        setNewEvent(prev => {
+          const start = dayjs(`${prev.date}T${timeString}:00`);
+          const endCandidate = start.add(1, 'hour');
+          let newEnd = endCandidate.format('HH:mm');
+          if (newEnd <= timeString) {
+            newEnd = '23:59';
+          }
+          return { ...prev, startTime: timeString, endTime: newEnd };
+        });
       } else {
         setNewEvent(prev => ({ ...prev, endTime: timeString }));
       }
     }
-    
+
     setIsTimeModalOpen(false);
   };
 
@@ -3337,6 +3340,7 @@ export default function SchedulePage() {
             
             // 실제 타겟 멤버 정보를 그룹 멤버 리스트에서 찾기
             const targetMtIdx = schedule.tgt_mt_idx || schedule.mt_idx; // 타겟 멤버 ID 우선
+            let targetMember = null; // 스코프 밖에서도 접근 가능하도록 선언
             
             // 디버깅 로그 추가
             // if (schedule.tgt_mt_idx && schedule.tgt_mt_idx !== schedule.mt_idx) {
@@ -3344,7 +3348,7 @@ export default function SchedulePage() {
             // }
             
             if (targetMtIdx && schedule.sgt_idx && allGroupMembers[schedule.sgt_idx]) {
-              const targetMember = allGroupMembers[schedule.sgt_idx].find(
+              targetMember = allGroupMembers[schedule.sgt_idx].find(
                 (member: any) => member.mt_idx === targetMtIdx
               );
               
@@ -3396,9 +3400,10 @@ export default function SchedulePage() {
               tgtMtIdx: schedule.tgt_mt_idx || null, // DB의 실제 타겟 멤버 ID 사용
               isAllDay: isAllDay, // 하루 종일 여부
               repeatJsonV: schedule.sst_repeat_json_v || '', // 반복 JSON 버전
-              tgtSgdtOwnerChk: scheduleGroupMembers.find(m => m.id === selectedMemberId)?.sgdt_owner_chk || 'N', // 타겟 멤버의 오너 권한
-              tgtSgdtLeaderChk: scheduleGroupMembers.find(m => m.id === selectedMemberId)?.sgdt_leader_chk || 'N', // 타겟 멤버의 리더 권한
-              tgtSgdtIdx: scheduleGroupMembers.find(m => m.id === selectedMemberId)?.sgdt_idx, // 타겟 멤버의 그룹 상세 인덱스
+              // 타겟 멤버 권한/식별자는 이벤트의 대상 멤버에서 가져와야 함 (선택된 멤버 아님)
+              tgtSgdtOwnerChk: (targetMember?.sgdt_owner_chk as 'Y' | 'N') || 'N',
+              tgtSgdtLeaderChk: (targetMember?.sgdt_leader_chk as 'Y' | 'N') || 'N',
+              tgtSgdtIdx: targetMember?.sgdt_idx, // 타겟 멤버의 그룹 상세 인덱스
               sst_pidx: undefined
             }
             
@@ -3409,6 +3414,10 @@ export default function SchedulePage() {
             
             // 멤버 위치 정보 매핑 및 거리 계산
             const eventWithLocation = mapMemberLocationToSchedule(event, allGroupMembers[schedule.sgt_idx] || []);
+            // 기존 이벤트의 이름이 뒤에서 바뀌지 않도록 최초 매핑된 이름을 잠그는 필드 유지
+            if (!eventWithLocation.memberName && targetMemberName) {
+              eventWithLocation.memberName = targetMemberName;
+            }
             
             allEvents.push(eventWithLocation);
             
@@ -3926,8 +3935,9 @@ export default function SchedulePage() {
     // 스케줄에 멤버 정보 추가
     const updatedSchedule = {
       ...schedule,
-      memberName: targetMember.mt_name || targetMember.name, // 실제 이름
-      memberNickname: targetMember.mt_nickname || targetMember.mt_name, // nickname 우선, 없으면 name
+      // 이미 설정되어 있는 경우 덮어쓰지 않음 (기존 이벤트 이름 보호)
+      memberName: schedule.memberName || targetMember.mt_name || targetMember.name,
+      memberNickname: schedule.memberNickname || targetMember.mt_nickname || targetMember.mt_name,
       memberCurrentLat: targetMember.mlt_lat,
       memberCurrentLng: targetMember.mlt_long,
       memberBattery: targetMember.mlt_battery,

@@ -294,15 +294,7 @@ export default function SocialLogin() {
           onClick={() => handleSocialLogin('구글')}
         />
 
-        {/* 애플 로그인 */}
-        <SocialLoginButton
-          provider="애플"
-          bgColor="bg-black"
-          hoverColor="bg-gray-900"
-          textColor="white"
-          icon={appleIcon}
-          onClick={() => handleSocialLogin('애플')}
-        />
+
       </div>
 
       {isLoading && (

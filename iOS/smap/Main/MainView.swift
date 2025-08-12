@@ -14,6 +14,7 @@ import GoogleSignIn
 import KakaoSDKCommon
 import KakaoSDKAuth
 import KakaoSDKUser
+import AuthenticationServices
 
 class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, WKUIDelegate {
     var popoverController: UIPopoverPresentationController?// 태블릿용 공유하기 띄우기
@@ -1830,6 +1831,9 @@ extension MainView {
             case "kakaoSignIn":
                 self.performKakaoSignIn()
                 break
+            case "appleSignIn":
+                self.performAppleSignIn()
+                break
                 
             case "googleSignOut":
                 self.performGoogleSignOut()
@@ -2353,5 +2357,139 @@ extension MainView {
                 print("✅ [SMAP-HAPTIC] JavaScript 함수 등록 성공")
             }
         }
+    }
+    
+    // MARK: - Apple Sign In Methods
+    @available(iOS 13.0, *)
+    func performAppleSignIn() {
+        print("🍎 [APPLE SIGNIN] Apple 로그인 시작")
+        
+        let request = ASAuthorizationAppleIDProvider().createRequest()
+        request.requestedScopes = [.fullName, .email]
+        
+        let authorizationController = ASAuthorizationController(authorizationRequests: [request])
+        authorizationController.delegate = self
+        authorizationController.presentationContextProvider = self
+        authorizationController.performRequests()
+    }
+}
+
+// MARK: - Apple Sign In Delegate
+@available(iOS 13.0, *)
+extension MainView: ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
+    
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        return self.view.window!
+    }
+    
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
+        print("🍎 [APPLE SIGNIN] 로그인 성공")
+        
+        if let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential {
+            let userIdentifier = appleIDCredential.user
+            let fullName = appleIDCredential.fullName
+            let email = appleIDCredential.email
+            let identityToken = appleIDCredential.identityToken
+            let authorizationCode = appleIDCredential.authorizationCode
+            
+            var userName = ""
+            if let givenName = fullName?.givenName, let familyName = fullName?.familyName {
+                userName = "\(familyName)\(givenName)"
+            } else if let givenName = fullName?.givenName {
+                userName = givenName
+            }
+            
+            var tokenString = ""
+            if let token = identityToken {
+                tokenString = String(data: token, encoding: .utf8) ?? ""
+            }
+            
+            var codeString = ""
+            if let code = authorizationCode {
+                codeString = String(data: code, encoding: .utf8) ?? ""
+            }
+            
+            print("🍎 [APPLE SIGNIN] userIdentifier: \(userIdentifier)")
+            print("🍎 [APPLE SIGNIN] userName: \(userName)")
+            print("🍎 [APPLE SIGNIN] email: \(email ?? "private")")
+            
+            // 웹뷰로 Apple 로그인 정보 전달
+            let appleSignInData: [String: Any] = [
+                "success": true,
+                "userIdentifier": userIdentifier,
+                "userName": userName,
+                "email": email ?? "",
+                "identityToken": tokenString,
+                "authorizationCode": codeString
+            ]
+            
+            do {
+                let jsonData = try JSONSerialization.data(withJSONObject: appleSignInData, options: [])
+                if let jsonString = String(data: jsonData, encoding: .utf8) {
+                    let script = """
+                    if (window.handleAppleSignInResult) {
+                        window.handleAppleSignInResult(\(jsonString));
+                    } else {
+                        console.log('🍎 [APPLE SIGNIN] handleAppleSignInResult 함수가 정의되지 않음');
+                        console.log('🍎 [APPLE SIGNIN] 결과:', \(jsonString));
+                    }
+                    """
+                    
+                    DispatchQueue.main.async {
+                        self.web_view.evaluateJavaScript(script) { (result, error) in
+                            if let error = error {
+                                print("❌ [APPLE SIGNIN] JavaScript 실행 실패: \(error)")
+                            } else {
+                                print("✅ [APPLE SIGNIN] JavaScript 실행 성공")
+                            }
+                        }
+                    }
+                }
+            } catch {
+                print("❌ [APPLE SIGNIN] JSON 직렬화 실패: \(error)")
+            }
+            
+            // 성공 햅틱
+            self.triggerSuccessHaptic()
+        }
+    }
+    
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
+        print("❌ [APPLE SIGNIN] 로그인 실패: \(error.localizedDescription)")
+        
+        // 웹뷰로 실패 정보 전달
+        let appleSignInError: [String: Any] = [
+            "success": false,
+            "error": error.localizedDescription
+        ]
+        
+        do {
+            let jsonData = try JSONSerialization.data(withJSONObject: appleSignInError, options: [])
+            if let jsonString = String(data: jsonData, encoding: .utf8) {
+                let script = """
+                if (window.handleAppleSignInResult) {
+                    window.handleAppleSignInResult(\(jsonString));
+                } else {
+                    console.log('🍎 [APPLE SIGNIN] handleAppleSignInResult 함수가 정의되지 않음');
+                    console.log('🍎 [APPLE SIGNIN] 오류:', \(jsonString));
+                }
+                """
+                
+                DispatchQueue.main.async {
+                    self.web_view.evaluateJavaScript(script) { (result, error) in
+                        if let error = error {
+                            print("❌ [APPLE SIGNIN] JavaScript 실행 실패: \(error)")
+                        } else {
+                            print("✅ [APPLE SIGNIN] JavaScript 실행 성공")
+                        }
+                    }
+                }
+            }
+        } catch {
+            print("❌ [APPLE SIGNIN] JSON 직렬화 실패: \(error)")
+        }
+        
+        // 실패 햅틱
+        self.triggerErrorHaptic()
     }
 }
