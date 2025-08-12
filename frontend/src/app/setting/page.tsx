@@ -15,18 +15,13 @@ import {
   FiFileText, 
   FiMessageSquare, 
   FiBell, 
-  FiGift, 
-  FiUserPlus, 
-  FiShoppingBag, 
-  FiCreditCard,
   FiCamera,
   FiEdit3,
   FiChevronRight,
   FiStar,
   FiShield,
   FiBook,
-  FiMail,
-  FiDollarSign
+  FiMail
 } from 'react-icons/fi';
 import { HiSparkles } from 'react-icons/hi2';
 import { useAuth } from '@/contexts/AuthContext';
@@ -382,7 +377,7 @@ export default function SettingsPage() {
           label: '사용 가이드', 
           href: '/setting/manual', 
           icon: FiBook,
-          color: 'bg-purple-500',
+          color: 'bg-yellow-500',
           description: '앱 사용법 및 도움말'
         },
         { 
@@ -401,32 +396,7 @@ export default function SettingsPage() {
         },
       ]
     },
-    {
-      title: '혜택 & 결제',
-      items: [
-        // { 
-        //   label: '쿠폰함', 
-        //   href: '/setting/coupon', 
-        //   icon: FiGift,
-        //   color: 'bg-pink-500',
-        //   description: '사용 가능한 쿠폰 확인'
-        // },
-        // { 
-        //   label: '친구 초대', 
-        //   href: '/setting/referrer', 
-        //   icon: FiUserPlus,
-        //   color: 'bg-indigo-500',
-        //   description: '친구 초대하고 혜택 받기'
-        // },
-        { 
-          label: '구독 내역', 
-          href: '/setting/purchase', 
-          icon: FiShoppingBag,
-          color: 'bg-emerald-500',
-          description: '결제 및 구독 이력'
-        },
-      ]
-    },
+
   ];
 
 

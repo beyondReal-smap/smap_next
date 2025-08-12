@@ -143,7 +143,7 @@ export default function ManualPage() {
     <>
       <style jsx global>{pageAnimations}</style>
       <div 
-        className="fixed inset-0 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 main-container"
+        className="fixed inset-0 overflow-hidden bg-gradient-to-br from-yellow-50 via-white to-amber-50 main-container"
         id="setting-manual-page-container"
         style={{
           paddingTop: '0px',
@@ -193,13 +193,13 @@ export default function ManualPage() {
             paddingTop: '72px'
           }}
         >
-          {/* 사용 가이드 정보 카드 - 보라색 테마 */}
+          {/* 사용 가이드 정보 카드 - 노란색 테마 */}
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.6 }}
           >
-            <div className="bg-[#A855F7] rounded-3xl p-6 text-white shadow-xl">
+            <div className="bg-[#F59E0B] rounded-3xl p-6 text-white shadow-xl">
               <div className="flex items-center space-x-4">
                 <div className="relative">
                   <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
@@ -212,11 +212,11 @@ export default function ManualPage() {
                     <h2 className="text-xl font-bold">사용 가이드</h2>
                     <div className="flex items-center space-x-1 bg-white/20 px-2 py-1 rounded-full">
                       <FiPlay className="w-3 h-3 text-purple-100" />
-                      <span className="text-xs font-medium text-purple-100">동영상</span>
+                      <span className="text-xs font-medium text-yellow-100">동영상</span>
                     </div>
                   </div>
-                  <p className="text-purple-100 text-sm mb-1">앱 사용법 및 도움말</p>
-                  <p className="text-purple-200 text-xs">동영상으로 쉽게 배우는 스케줄맵</p>
+                  <p className="text-yellow-100 text-sm mb-1">앱 사용법 및 도움말</p>
+                  <p className="text-yellow-200 text-xs">동영상으로 쉽게 배우는 스케줄맵</p>
                 </div>
               </div>
               
@@ -224,15 +224,15 @@ export default function ManualPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="text-center">
                     <div className="flex items-center justify-center space-x-1 mb-1">
-                      <FiPlay className="w-4 h-4 text-purple-200" />
-                      <span className="text-sm text-purple-100">총 영상</span>
+                      <FiPlay className="w-4 h-4 text-yellow-200" />
+                      <span className="text-sm text-yellow-100">총 영상</span>
                     </div>
                     <p className="text-lg font-bold">{videos.length}개</p>
                   </div>
                   <div className="text-center">
                     <div className="flex items-center justify-center space-x-1 mb-1">
-                      <FiBook className="w-4 h-4 text-purple-200" />
-                      <span className="text-sm text-purple-100">가이드</span>
+                      <FiBook className="w-4 h-4 text-yellow-200" />
+                      <span className="text-sm text-yellow-100">가이드</span>
                     </div>
                     <p className="text-lg font-bold">무료</p>
                   </div>
@@ -251,7 +251,7 @@ export default function ManualPage() {
             >
               <div className="p-3">
                 <div className="flex items-center space-x-3 mb-3">
-                  <div className="w-6 h-6 bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
+                  <div className="w-6 h-6 bg-gradient-to-r from-yellow-500 to-amber-600 rounded-lg flex items-center justify-center">
                     <FiPlay className="w-3 h-3 text-white" />
                   </div>
                   <div>
