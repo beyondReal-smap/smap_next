@@ -12,13 +12,8 @@ export async function POST(request: NextRequest) {
       hasAuthorizationCode: !!authorizationCode
     });
 
-    // Apple Identity Token 검증 (실제 구현에서는 Apple의 공개 키로 JWT 검증)
-    if (!identityToken) {
-      return NextResponse.json({
-        success: false,
-        message: 'Apple Identity Token이 필요합니다.'
-      }, { status: 400 });
-    }
+    // 개발 단계: identityToken이 없더라도 회원가입 플로우로 유도 (백엔드 연동 전 임시 처리)
+    // 실제 운영에서는 Apple 공개키로 JWT 검증 필수
 
     // 데모/개발 모드: Apple 로그인을 성공으로 처리
     const demoUser = {
@@ -33,34 +28,16 @@ export async function POST(request: NextRequest) {
       provider: 'apple'
     };
 
-    // 실제 구현에서는 여기서 데이터베이스 조회/생성
-    const isNewUser = Math.random() > 0.5; // 데모용 랜덤
-
-    if (isNewUser) {
-      // 신규 사용자
-      return NextResponse.json({
-        success: true,
-        message: '신규 Apple 사용자입니다.',
-        data: {
-          isNewUser: true,
-          user: demoUser,
-          token: null
-        }
-      });
-    } else {
-      // 기존 사용자
-      const mockToken = `apple-jwt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      
-      return NextResponse.json({
-        success: true,
-        message: 'Apple 로그인 성공',
-        data: {
-          isNewUser: false,
-          user: demoUser,
-          token: mockToken
-        }
-      });
-    }
+    // 임시: 항상 신규 가입 플로우로 유도 (토큰 발급 없음 → 홈 이동 시 백엔드 호출 422 방지)
+    return NextResponse.json({
+      success: true,
+      message: '신규 Apple 사용자입니다.',
+      data: {
+        isNewUser: true,
+        user: demoUser,
+        token: null
+      }
+    });
 
   } catch (error) {
     console.error('🍎 [API] Apple 로그인 오류:', error);

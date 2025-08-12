@@ -15,6 +15,8 @@ import KakaoSDKCommon
 import KakaoSDKAuth
 import KakaoSDKUser
 import AuthenticationServices
+import AVFoundation
+import Photos
 
 class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, WKUIDelegate {
     var popoverController: UIPopoverPresentationController?// 태블릿용 공유하기 띄우기
@@ -1731,7 +1733,9 @@ extension MainView {
         
         if validHandlers.contains(message.name) {
             guard let body = message.body as? [String: Any] else { return }
-            guard let type = body["type"] as? String else { return }
+            // 'type' 또는 'action' 키를 모두 지원
+            let type = (body["type"] as? String) ?? (body["action"] as? String) ?? ""
+            if type.isEmpty { return }
             
             switch type {
             case "pageLoadComplete":
@@ -1873,6 +1877,22 @@ extension MainView {
                 self.openPhoto(isCamera: false)
                 // 앨범 열기 시 햅틱
                 self.triggerMediumHaptic()
+                break
+            
+            case "requestCameraPermission":
+                self.requestCameraPermission()
+                break
+                
+            case "requestPhotoLibraryPermission":
+                self.requestPhotoLibraryPermission()
+                break
+                
+            case "requestLocationPermission":
+                self.requestLocationPermission()
+                break
+                
+            case "requestMicrophonePermission":
+                self.requestMicrophonePermission()
                 break
             
             case "urlClipBoard":
@@ -2491,5 +2511,90 @@ extension MainView: ASAuthorizationControllerDelegate, ASAuthorizationController
         
         // 실패 햅틱
         self.triggerErrorHaptic()
+    }
+    
+    // MARK: - 권한 요청 메서드들
+    
+    /// 카메라 권한 요청
+    private func requestCameraPermission() {
+        AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
+            DispatchQueue.main.async {
+                let result = ["granted": granted]
+                self?.sendPermissionResult(type: "camera", result: result)
+                print("📷 [PERMISSION] 카메라 권한 결과: \(granted)")
+            }
+        }
+    }
+    
+    /// 사진 라이브러리 권한 요청
+    private func requestPhotoLibraryPermission() {
+        PHPhotoLibrary.requestAuthorization { [weak self] status in
+            DispatchQueue.main.async {
+                let granted = status == .authorized
+                let result = ["granted": granted]
+                self?.sendPermissionResult(type: "photoLibrary", result: result)
+                print("📸 [PERMISSION] 사진 라이브러리 권한 결과: \(granted)")
+            }
+        }
+    }
+    
+    /// 위치 권한 요청
+    private func requestLocationPermission() {
+        LocationService.sharedInstance.startLocationUpdatesWithPermissionCheck()
+        
+        // 권한 결과는 LocationService의 delegate에서 처리되므로 여기서는 요청만 수행
+        print("📍 [PERMISSION] 위치 권한 요청됨")
+        
+        // 약간의 지연 후 현재 권한 상태를 웹뷰로 전달
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            var authStatus: CLAuthorizationStatus
+            if #available(iOS 14.0, *) {
+                authStatus = CLLocationManager().authorizationStatus
+            } else {
+                authStatus = CLLocationManager.authorizationStatus()
+            }
+            let granted = authStatus == .authorizedAlways || authStatus == .authorizedWhenInUse
+            let result = ["granted": granted]
+            self.sendPermissionResult(type: "location", result: result)
+            print("📍 [PERMISSION] 위치 권한 결과: \(granted)")
+        }
+    }
+    
+    /// 마이크 권한 요청
+    private func requestMicrophonePermission() {
+        AVAudioSession.sharedInstance().requestRecordPermission { [weak self] granted in
+            DispatchQueue.main.async {
+                let result = ["granted": granted]
+                self?.sendPermissionResult(type: "microphone", result: result)
+                print("🎤 [PERMISSION] 마이크 권한 결과: \(granted)")
+            }
+        }
+    }
+    
+    /// 권한 요청 결과를 웹뷰로 전달
+    private func sendPermissionResult(type: String, result: [String: Any]) {
+        do {
+            let jsonData = try JSONSerialization.data(withJSONObject: result, options: [])
+            if let jsonString = String(data: jsonData, encoding: .utf8) {
+                let script = """
+                if (window.onPermissionResult) {
+                    window.onPermissionResult('\(type)', \(jsonString));
+                } else {
+                    console.log('📱 [PERMISSION] onPermissionResult 함수가 정의되지 않음');
+                    console.log('📱 [PERMISSION] \(type) 권한 결과:', \(jsonString));
+                }
+                """
+                
+                web_view.evaluateJavaScript(script) { (result, error) in
+                    if let error = error {
+                        print("❌ [PERMISSION] JavaScript 실행 실패: \(error)")
+                    } else {
+                        print("✅ [PERMISSION] \(type) 권한 결과 전달 완료")
+                    }
+                }
+            }
+        } catch {
+            print("❌ [PERMISSION] JSON 직렬화 실패: \(error)")
+        }
     }
 }

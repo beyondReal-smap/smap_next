@@ -2594,8 +2594,9 @@ const SignInPage = () => {
           }
         };
         
-        // iOS Native Apple 로그인 호출
+        // iOS Native Apple 로그인 호출 (type/action 모두 전달)
         (window as any).webkit.messageHandlers.smapIos.postMessage({
+          type: 'appleSignIn',
           action: 'appleSignIn'
         });
         
