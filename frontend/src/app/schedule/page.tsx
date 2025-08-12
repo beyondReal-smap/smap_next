@@ -443,6 +443,7 @@ interface ScheduleGroupMember {
   mt_gender?: number | null;
   mt_idx: number;
   mt_name: string;
+  mt_nickname?: string;
   mt_file1?: string;
   sgdt_owner_chk?: string;
   sgdt_leader_chk?: string;

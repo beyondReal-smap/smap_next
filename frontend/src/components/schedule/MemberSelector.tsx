@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import Image from 'next/image';
 import { FiUsers } from 'react-icons/fi';
 
-interface ScheduleGroupMember {
+export interface ScheduleGroupMember {
   id: string;
   name: string;
   photo: string | null;
@@ -11,6 +11,7 @@ interface ScheduleGroupMember {
   mt_gender?: number | null;
   mt_idx: number;
   mt_name: string;
+  mt_nickname?: string;
   mt_file1?: string;
   sgdt_owner_chk?: string;
   sgdt_leader_chk?: string;
