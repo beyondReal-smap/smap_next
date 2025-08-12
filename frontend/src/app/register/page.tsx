@@ -79,6 +79,7 @@ interface SocialLoginData {
   profile_image?: string;
   google_id?: string;
   kakao_id?: string;
+  apple_id?: string;
 }
 
 interface RegisterData {
