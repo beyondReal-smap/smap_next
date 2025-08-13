@@ -33,7 +33,7 @@ export default function PrivacyPolicyPage() {
   };
 
   return (
-    <div className="fixed inset-0 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 main-container" style={{ paddingTop: '0px', marginTop: '0px', top: '0px' }}>
+    <div className={`${isEmbed ? 'min-h-screen overflow-auto bg-white' : 'fixed inset-0 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 main-container'}`} style={{ paddingTop: '0px', marginTop: '0px', top: '0px' }}>
       <style jsx global>{pageAnimations}</style>
         {!isEmbed && (
         <AnimatedHeader variant="enhanced" className="setting-header glass-effect">
@@ -49,7 +49,7 @@ export default function PrivacyPolicyPage() {
         </AnimatedHeader>
         )}
 
-        <motion.div initial="initial" animate="in" exit="out" className={`absolute inset-0 px-4 space-y-6 content-area hide-scrollbar ${isEmbed ? '' : 'pt-20'}`} style={{ overflow: 'hidden', overflowY: 'auto' }}>
+        <motion.div initial="initial" animate="in" exit="out" className={`${isEmbed ? '' : 'absolute inset-0'} px-4 space-y-6 content-area ${isEmbed ? '' : 'hide-scrollbar'} ${isEmbed ? 'pt-6' : 'pt-20'}`} style={isEmbed ? undefined : { overflow: 'hidden', overflowY: 'auto' }}>
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-fadeIn">
             <div className="p-6 text-sm leading-relaxed max-w-4xl mx-auto">
           <h2 className="text-2xl font-bold mb-6 text-center">개인정보 처리방침</h2>
