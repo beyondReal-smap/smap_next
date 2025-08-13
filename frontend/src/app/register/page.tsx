@@ -619,9 +619,14 @@ export default function RegisterPage() {
 
   // 진행률 계산
   const getProgress = () => {
-    const steps = Object.values(REGISTER_STEPS);
+    const allSteps = Object.values(REGISTER_STEPS);
+    const isSimpleSocial = registerData.isSocialLogin && (registerData.socialProvider === 'google' || registerData.socialProvider === 'apple');
+    const steps = isSimpleSocial
+      ? [REGISTER_STEPS.TERMS, REGISTER_STEPS.BASIC_INFO, REGISTER_STEPS.PROFILE, REGISTER_STEPS.COMPLETE]
+      : allSteps;
     const currentIndex = steps.indexOf(currentStep);
-    return ((currentIndex + 1) / (steps.length - 1)) * 100; // COMPLETE 제외
+    const safeIndex = currentIndex >= 0 ? currentIndex : 0;
+    return ((safeIndex + 1) / (steps.length - 1)) * 100; // COMPLETE 제외
   };
 
   // 전화번호 포맷팅 함수
@@ -1628,11 +1633,7 @@ export default function RegisterPage() {
             }}
             initial={{ width: 0 }}
             animate={{ width: `${getProgress()}%` }}
-            transition={{ 
-              duration: 0.5,
-              ease: [0.4, 0.0, 0.2, 1], // iOS 최적화된 이징
-              type: "tween"
-            }}
+            transition={{ duration: 0.5 }}
           />
         </div>
       )}
