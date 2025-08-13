@@ -1,7 +1,7 @@
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     "use client";
 
 import React, { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import AnimatedHeader from '../../../components/common/AnimatedHeader';
 import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
@@ -42,6 +42,8 @@ html, body {
 
 export default function ServiceTermsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isEmbed = (searchParams?.get('embed') === '1');
 
   useEffect(() => {
     document.body.style.overflowY = 'auto';
@@ -68,38 +70,39 @@ export default function ServiceTermsPage() {
         id="setting-service-terms-container"
         style={{ paddingTop: '0px', marginTop: '0px', top: '0px' }}
       >
-        {/* 고정 헤더 - 설정 서브 페이지와 동일 형식 */}
-        <AnimatedHeader variant="enhanced" className="setting-header glass-effect">
-          <motion.div
-            initial={{ opacity: 0, x: -40 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="setting-header-content motion-div"
-          >
-            <motion.button
-              onClick={handleBack}
-              className="setting-back-button"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              aria-label="뒤로가기"
+        {!isEmbed && (
+          <AnimatedHeader variant="enhanced" className="setting-header glass-effect">
+            <motion.div
+              initial={{ opacity: 0, x: -40 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
+              className="setting-header-content motion-div"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </motion.button>
-            <div className="setting-header-text">
-              <h1 className="text-lg font-bold text-gray-900 leading-tight">서비스 이용약관</h1>
-              <p className="text-xs text-gray-500 leading-tight">서비스 이용에 관한 약관을 확인하세요</p>
-            </div>
-          </motion.div>
-        </AnimatedHeader>
+              <motion.button
+                onClick={handleBack}
+                className="setting-back-button"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                aria-label="뒤로가기"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </motion.button>
+              <div className="setting-header-text">
+                <h1 className="text-lg font-bold text-gray-900 leading-tight">서비스 이용약관</h1>
+                <p className="text-xs text-gray-500 leading-tight">서비스 이용에 관한 약관을 확인하세요</p>
+              </div>
+            </motion.div>
+          </AnimatedHeader>
+        )}
 
         {/* 컨텐츠 영역 - 헤더 고정 기준으로 스크롤 */}
         <motion.div
           initial="initial"
           animate="in"
           exit="out"
-          className="absolute inset-0 px-4 space-y-6 content-area hide-scrollbar pt-20"
+          className={`absolute inset-0 px-4 space-y-6 content-area hide-scrollbar ${isEmbed ? '' : 'pt-20'}`}
           style={{ overflow: 'hidden', overflowY: 'auto' }}
         >
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-fadeIn">

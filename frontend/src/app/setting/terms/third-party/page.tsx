@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import AnimatedHeader from '../../../../components/common/AnimatedHeader';
 import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
@@ -15,6 +15,8 @@ html, body { width: 100%; overflow-x: hidden; position: relative; }
 
 export default function ThirdPartyConsentPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isEmbed = (searchParams?.get('embed') === '1');
 
   useEffect(() => {
     document.body.style.overflowY = 'auto';
@@ -34,6 +36,7 @@ export default function ThirdPartyConsentPage() {
     <>
       <style jsx global>{pageAnimations}</style>
       <div className="fixed inset-0 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 main-container" style={{ paddingTop: '0px', marginTop: '0px', top: '0px' }}>
+        {!isEmbed && (
         <AnimatedHeader variant="enhanced" className="setting-header glass-effect">
           <motion.div initial={{ opacity: 0, x: -40 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }} className="setting-header-content motion-div">
             <motion.button onClick={handleBack} className="setting-back-button" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} aria-label="뒤로가기">
@@ -45,8 +48,9 @@ export default function ThirdPartyConsentPage() {
             </div>
           </motion.div>
         </AnimatedHeader>
+        )}
 
-        <motion.div initial="initial" animate="in" exit="out" className="absolute inset-0 px-4 space-y-6 content-area hide-scrollbar pt-20" style={{ overflow: 'hidden', overflowY: 'auto' }}>
+        <motion.div initial="initial" animate="in" exit="out" className={`absolute inset-0 px-4 space-y-6 content-area hide-scrollbar ${isEmbed ? '' : 'pt-20'}`} style={{ overflow: 'hidden', overflowY: 'auto' }}>
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-fadeIn">
             <div className="p-6 text-sm leading-relaxed max-w-4xl mx-auto">
               <h2 className="text-2xl font-bold mb-6 text-center">개인정보 제3자 제공 동의</h2>
