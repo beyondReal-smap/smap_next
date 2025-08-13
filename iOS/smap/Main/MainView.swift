@@ -35,6 +35,7 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
     private var webViewPageType = ""
     private var fileUploadMtIdx = ""
 	private var didRunPrePermissionFlow = false
+    private var isPresentingPrepermission = false
     
     // 광고 관련 코드 제거됨 (웹뷰 앱에서는 사용하지 않음)
     // private var interstitial: GADInterstitialAd?
@@ -390,84 +391,137 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
 	}
 
     private func runPermissionsSequenceAfterLogin() {
+        print("🧭 [PERMISSION-FLOW] runPermissionsSequenceAfterLogin 시작")
+        // 1) Push → 2) Camera → 3) Photo → 4) Motion → 5) Location 순서를 하드 고정
         showPushPrePermissionIfNeeded { [weak self] in
+            print("🧭 [PERMISSION-FLOW] Push 완료 → Camera 단계로 이동")
             self?.showCameraPrePermissionIfNeeded { [weak self] in
+                print("🧭 [PERMISSION-FLOW] Camera 완료 → Photo 단계로 이동")
                 self?.showPhotoPrePermissionIfNeeded { [weak self] in
-                    self?.showMicrophonePrePermissionIfNeeded { [weak self] in
-                        self?.showMotionPrePermissionIfNeeded { [weak self] in
-                            self?.showLocationPrePermissionIfNeeded {}
-                        }
+                    print("🧭 [PERMISSION-FLOW] Photo 완료 → Motion 단계로 이동")
+                    self?.showMotionPrePermissionIfNeeded { [weak self] in
+                        print("🧭 [PERMISSION-FLOW] Motion 완료 → Location 단계로 이동")
+                        self?.showLocationPrePermissionIfNeeded {}
                     }
                 }
             }
         }
     }
 
-	private func presentPrePermissionAlert(title: String, message: String, continueTitle: String = "계속", cancelTitle: String = "나중에", onContinue: @escaping () -> Void, onCancel: (() -> Void)? = nil) {
-		let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
-		alert.addAction(UIAlertAction(title: cancelTitle, style: .cancel) { _ in onCancel?() })
-		alert.addAction(UIAlertAction(title: continueTitle, style: .default) { _ in onContinue() })
-		self.present(alert, animated: true)
-	}
+    private func presentPrePermissionAlert(title: String, message: String, continueTitle: String = "계속", cancelTitle: String = "나중에", onContinue: @escaping () -> Void, onCancel: (() -> Void)? = nil) {
+        func topMostController(base: UIViewController? = UIApplication.shared.keyWindow?.rootViewController) -> UIViewController? {
+            if let nav = base as? UINavigationController { return topMostController(base: nav.visibleViewController) }
+            if let tab = base as? UITabBarController { return topMostController(base: tab.selectedViewController) }
+            if let presented = base?.presentedViewController { return topMostController(base: presented) }
+            return base
+        }
 
-	private func showPushPrePermissionIfNeeded(completion: @escaping () -> Void) {
-		if UserDefaults.standard.bool(forKey: "smap_push_prepermission_done") {
-			return completion()
-		}
-		UNUserNotificationCenter.current().getNotificationSettings { settings in
-			DispatchQueue.main.async {
-				guard settings.authorizationStatus == .notDetermined else {
-					UserDefaults.standard.set(true, forKey: "smap_push_prepermission_done")
-					return completion()
-				}
-				self.presentPrePermissionAlert(
-					title: "알림 권한 안내",
-					message: "경고, 사운드 및 아이콘 배지 알림을 제공하기 위해 권한이 필요합니다. 설정에서 변경할 수 있습니다.",
-					onContinue: {
-						UserDefaults.standard.set(true, forKey: "smap_push_prepermission_done")
-						let options: UNAuthorizationOptions = [.alert, .badge, .sound]
-						UNUserNotificationCenter.current().requestAuthorization(options: options) { _, _ in
-							DispatchQueue.main.async {
-								UIApplication.shared.registerForRemoteNotifications()
-								completion()
-							}
-						}
-					},
-					onCancel: {
-						completion()
-					}
-				)
-			}
-		}
-	}
+        DispatchQueue.main.async {
+            guard !self.isPresentingPrepermission else { return }
+            self.isPresentingPrepermission = true
+            let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: cancelTitle, style: .cancel) { _ in
+                self.isPresentingPrepermission = false
+                onCancel?()
+            })
+            alert.addAction(UIAlertAction(title: continueTitle, style: .default) { _ in
+                self.isPresentingPrepermission = false
+                onContinue()
+            })
+            (topMostController() ?? self).present(alert, animated: true)
+        }
+    }
+
+    private func showPushPrePermissionIfNeeded(completion: @escaping () -> Void) {
+        print("🔎 [PUSH] Pre-permission 체크 시작")
+        if UserDefaults.standard.bool(forKey: "smap_push_prepermission_done") {
+            print("🔎 [PUSH] prepermission_done=true → 스킵")
+            return completion()
+        }
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            DispatchQueue.main.async {
+                print("🔎 [PUSH] 현재 authorizationStatus: \(settings.authorizationStatus.rawValue)")
+                guard settings.authorizationStatus == .notDetermined else {
+                    print("🔎 [PUSH] notDetermined 아님 → done 플래그 세팅 후 스킵")
+                    UserDefaults.standard.set(true, forKey: "smap_push_prepermission_done")
+                    return completion()
+                }
+                self.presentPrePermissionAlert(
+                    title: "알림 권한 안내",
+                    message: "경고, 사운드 및 아이콘 배지 알림을 제공하기 위해 권한이 필요합니다. 설정에서 변경할 수 있습니다.",
+                    onContinue: {
+                        print("🔎 [PUSH] 사용자 계속 선택 → 시스템 requestAuthorization 호출")
+                        UserDefaults.standard.set(true, forKey: "smap_push_prepermission_done")
+                        let options: UNAuthorizationOptions = [.alert, .badge, .sound]
+                        UNUserNotificationCenter.current().requestAuthorization(options: options) { _, _ in
+                            DispatchQueue.main.async {
+                                print("🔎 [PUSH] 시스템 requestAuthorization 완료 → registerForRemoteNotifications")
+                                UIApplication.shared.registerForRemoteNotifications()
+                                completion()
+                            }
+                        }
+                    },
+                    onCancel: {
+                        completion()
+                    }
+                )
+            }
+        }
+    }
 
     private func showLocationPrePermissionIfNeeded(completion: @escaping () -> Void) {
-        if UserDefaults.standard.bool(forKey: "smap_location_prepermission_done") {
-            return completion()
-        }
+        print("📍 [LOCATION] Pre-permission 체크 시작")
         let status = CLLocationManager.authorizationStatus()
-        guard status == .notDetermined else {
-            UserDefaults.standard.set(true, forKey: "smap_location_prepermission_done")
-            return completion()
+        print("📍 [LOCATION] 현재 authorizationStatus: \(status.rawValue)")
+        let infoFlagKey = "smap_location_prepermission_info_shown"
+        let hasShownInfo = UserDefaults.standard.bool(forKey: infoFlagKey)
+
+        // 1) 첫 로그인 이후 최초 1회는 권한 상태와 무관하게 안내를 보여준다 (정보용)
+        if !hasShownInfo {
+            presentPrePermissionAlert(
+                title: "위치 권한 안내",
+                message: "모임 장소 안내와 도착 알림을 위해 위치 정보가 필요합니다. 예: 일정 장소까지의 거리 표시 및 근접 시 알림 제공",
+                onContinue: { [status] in
+                    UserDefaults.standard.set(true, forKey: infoFlagKey)
+                    if status == .notDetermined {
+                        print("📍 [LOCATION] 상태 notDetermined → requestWhenInUseAuthorization 호출")
+                        LocationService.sharedInstance.requestWhenInUseAuthorization {
+                            completion()
+                        }
+                    } else {
+                        print("📍 [LOCATION] 이미 권한 설정됨(status=\(status.rawValue)) → 시스템 요청 없이 계속")
+                        completion()
+                    }
+                },
+                onCancel: { completion() }
+            )
+            return
         }
-        presentPrePermissionAlert(
-            title: "위치 권한 안내",
-            message: "모임 장소 안내와 도착 알림을 위해 위치 정보가 필요합니다. 예: 일정 장소까지의 거리 표시 및 근접 시 알림 제공",
-            onContinue: {
-                UserDefaults.standard.set(true, forKey: "smap_location_prepermission_done")
-                // 즉시 시스템 위치 권한 팝업 표출 후 완료 시 콜백
-                LocationService.sharedInstance.requestWhenInUseAuthorization {
-                    completion()
-                }
-            },
-            onCancel: { completion() }
-        )
+
+        // 2) 정보 안내를 이미 본 경우, notDetermined일 때만 시스템 팝업 유도
+        if status == .notDetermined {
+            presentPrePermissionAlert(
+                title: "위치 권한 안내",
+                message: "정확한 위치 기반 기능 제공을 위해 위치 권한이 필요합니다.",
+                onContinue: {
+                    LocationService.sharedInstance.requestWhenInUseAuthorization {
+                        completion()
+                    }
+                },
+                onCancel: { completion() }
+            )
+        } else {
+            print("📍 [LOCATION] notDetermined 아님 → 스킵")
+            completion()
+        }
     }
 
 	private func showCameraPrePermissionIfNeeded(completion: @escaping () -> Void) {
-		if UserDefaults.standard.bool(forKey: "smap_camera_prepermission_done") {
-			return completion()
-		}
+        print("📷 [CAMERA] Pre-permission 체크 시작")
+        if UserDefaults.standard.bool(forKey: "smap_camera_prepermission_done") {
+            print("📷 [CAMERA] prepermission_done=true → 스킵")
+            return completion()
+        }
 		let status = AVCaptureDevice.authorizationStatus(for: .video)
 		guard status == .notDetermined else {
 			UserDefaults.standard.set(true, forKey: "smap_camera_prepermission_done")
@@ -476,20 +530,23 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
 		presentPrePermissionAlert(
 			title: "카메라 권한 안내",
 			message: "프로필 및 그룹 사진 등록을 위해 카메라가 필요합니다. 예: 그룹 아바타 촬영 및 업로드",
-			onContinue: {
-				UserDefaults.standard.set(true, forKey: "smap_camera_prepermission_done")
-				AVCaptureDevice.requestAccess(for: .video) { _ in
-					DispatchQueue.main.async { completion() }
-				}
-			},
+            onContinue: {
+                print("📷 [CAMERA] 사용자 계속 선택 → 시스템 requestAccess 호출")
+                UserDefaults.standard.set(true, forKey: "smap_camera_prepermission_done")
+                AVCaptureDevice.requestAccess(for: .video) { _ in
+                    DispatchQueue.main.async { completion() }
+                }
+            },
 			onCancel: { completion() }
 		)
 	}
 
 	private func showPhotoPrePermissionIfNeeded(completion: @escaping () -> Void) {
-		if UserDefaults.standard.bool(forKey: "smap_photo_prepermission_done") {
-			return completion()
-		}
+        print("📸 [PHOTO] Pre-permission 체크 시작")
+        if UserDefaults.standard.bool(forKey: "smap_photo_prepermission_done") {
+            print("📸 [PHOTO] prepermission_done=true → 스킵")
+            return completion()
+        }
 		let status: PHAuthorizationStatus
 		if #available(iOS 14, *) {
 			status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
@@ -503,26 +560,29 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
 		presentPrePermissionAlert(
 			title: "사진 보관함 권한 안내",
 			message: "프로필 및 그룹 사진 업로드/저장을 위해 사진 보관함 접근이 필요합니다.",
-			onContinue: {
-				UserDefaults.standard.set(true, forKey: "smap_photo_prepermission_done")
-				if #available(iOS 14, *) {
-					PHPhotoLibrary.requestAuthorization(for: .readWrite) { _ in
-						DispatchQueue.main.async { completion() }
-					}
-				} else {
-					PHPhotoLibrary.requestAuthorization { _ in
-						DispatchQueue.main.async { completion() }
-					}
-				}
-			},
+            onContinue: {
+                print("📸 [PHOTO] 사용자 계속 선택 → 시스템 requestAuthorization 호출")
+                UserDefaults.standard.set(true, forKey: "smap_photo_prepermission_done")
+                if #available(iOS 14, *) {
+                    PHPhotoLibrary.requestAuthorization(for: .readWrite) { _ in
+                        DispatchQueue.main.async { completion() }
+                    }
+                } else {
+                    PHPhotoLibrary.requestAuthorization { _ in
+                        DispatchQueue.main.async { completion() }
+                    }
+                }
+            },
 			onCancel: { completion() }
 		)
 	}
 
 	private func showMicrophonePrePermissionIfNeeded(completion: @escaping () -> Void) {
-		if UserDefaults.standard.bool(forKey: "smap_microphone_prepermission_done") {
-			return completion()
-		}
+        print("🎤 [MIC] Pre-permission 체크 시작")
+        if UserDefaults.standard.bool(forKey: "smap_microphone_prepermission_done") {
+            print("🎤 [MIC] prepermission_done=true → 스킵")
+            return completion()
+        }
 		let status = AVAudioSession.sharedInstance().recordPermission
 		guard status == .undetermined else {
 			UserDefaults.standard.set(true, forKey: "smap_microphone_prepermission_done")
@@ -531,44 +591,71 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
 		presentPrePermissionAlert(
 			title: "마이크 권한 안내",
 			message: "음성 메시지 기능을 사용하기 위해 마이크 접근이 필요합니다.",
-			onContinue: {
-				UserDefaults.standard.set(true, forKey: "smap_microphone_prepermission_done")
-				AVAudioSession.sharedInstance().requestRecordPermission { _ in
-					DispatchQueue.main.async { completion() }
-				}
-			},
+            onContinue: {
+                print("🎤 [MIC] 사용자 계속 선택 → requestRecordPermission 호출")
+                UserDefaults.standard.set(true, forKey: "smap_microphone_prepermission_done")
+                AVAudioSession.sharedInstance().requestRecordPermission { _ in
+                    DispatchQueue.main.async { completion() }
+                }
+            },
 			onCancel: { completion() }
 		)
 	}
 
-	private func showMotionPrePermissionIfNeeded(completion: @escaping () -> Void) {
-		if UserDefaults.standard.bool(forKey: "smap_motion_prepermission_done") {
-			return completion()
-		}
-		if #available(iOS 11.0, *) {
-			let status = CMMotionActivityManager.authorizationStatus()
-			guard status == .notDetermined else {
-				UserDefaults.standard.set(true, forKey: "smap_motion_prepermission_done")
-				return completion()
-			}
-			presentPrePermissionAlert(
-				title: "동작 및 피트니스 권한 안내",
-				message: "이동 거리 계산 및 활동 기반 알림 제공을 위해 동작 및 피트니스 데이터 접근이 필요합니다.",
-				onContinue: {
-					UserDefaults.standard.set(true, forKey: "smap_motion_prepermission_done")
-					let manager = CMMotionActivityManager()
-					let now = Date()
-					let tenMinAgo = now.addingTimeInterval(-600)
-					manager.queryActivityStarting(from: tenMinAgo, to: now, to: OperationQueue.main) { _, _ in
-						DispatchQueue.main.async { completion() }
-					}
-				},
-				onCancel: { completion() }
-			)
-		} else {
-			completion()
-		}
-	}
+    private func showMotionPrePermissionIfNeeded(completion: @escaping () -> Void) {
+        print("🏃 [MOTION] Pre-permission 체크 시작")
+        if #available(iOS 11.0, *) {
+            let status = CMMotionActivityManager.authorizationStatus()
+            print("🏃 [MOTION] 현재 authorizationStatus: \(status.rawValue)")
+            let infoFlagKey = "smap_motion_prepermission_info_shown"
+            let hasShownInfo = UserDefaults.standard.bool(forKey: infoFlagKey)
+
+            if !hasShownInfo {
+                presentPrePermissionAlert(
+                    title: "동작 및 피트니스 권한 안내",
+                    message: "이동 거리 계산 및 활동 기반 알림 제공을 위해 동작 및 피트니스 데이터 접근이 필요합니다.",
+                    onContinue: { [status] in
+                        UserDefaults.standard.set(true, forKey: infoFlagKey)
+                        if status == .notDetermined {
+                            print("🏃 [MOTION] 상태 notDetermined → queryActivityStarting 호출")
+                            let manager = CMMotionActivityManager()
+                            let now = Date()
+                            let tenMinAgo = now.addingTimeInterval(-600)
+                            manager.queryActivityStarting(from: tenMinAgo, to: now, to: OperationQueue.main) { _, _ in
+                                DispatchQueue.main.async { completion() }
+                            }
+                        } else {
+                            print("🏃 [MOTION] 이미 권한 설정됨(status=\(status.rawValue)) → 시스템 요청 없이 계속")
+                            completion()
+                        }
+                    },
+                    onCancel: { completion() }
+                )
+                return
+            }
+
+            if status == .notDetermined {
+                presentPrePermissionAlert(
+                    title: "동작 및 피트니스 권한 안내",
+                    message: "동작 및 피트니스 데이터 접근이 필요합니다.",
+                    onContinue: {
+                        let manager = CMMotionActivityManager()
+                        let now = Date()
+                        let tenMinAgo = now.addingTimeInterval(-600)
+                        manager.queryActivityStarting(from: tenMinAgo, to: now, to: OperationQueue.main) { _, _ in
+                            DispatchQueue.main.async { completion() }
+                        }
+                    },
+                    onCancel: { completion() }
+                )
+            } else {
+                print("🏃 [MOTION] notDetermined 아님 → 스킵")
+                completion()
+            }
+        } else {
+            completion()
+        }
+    }
     
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
         super.viewWillTransition(to: size, with: coordinator)
@@ -2059,6 +2146,23 @@ extension MainView {
             // 'type' 또는 'action' 키를 모두 지원
             let type = (body["type"] as? String) ?? (body["action"] as? String) ?? ""
             if type.isEmpty { return }
+
+            // 🔒 로그인 전 권한 관련 요청 완전 차단 (네이티브 레벨)
+            let blockedTypesBeforeLogin: Set<String> = [
+                "requestNotificationPermission",
+                "requestCameraPermission",
+                "requestPhotoLibraryPermission",
+                "requestLocationPermission",
+                "openPhoto",
+                "openAlbum",
+                "startLocationUpdates",
+                "checkLocationPermission",
+                "setAlarmPermission"
+            ]
+            if UserDefaults.standard.bool(forKey: "is_logged_in") == false && blockedTypesBeforeLogin.contains(type) {
+                print("🔒 [PERMISSION] 로그인 전 네이티브 권한 요청 차단: \(type)")
+                return
+            }
             
             switch type {
             case "pageLoadComplete":

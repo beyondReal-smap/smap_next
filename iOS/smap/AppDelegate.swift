@@ -135,6 +135,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         }
         
         print("✅ [SMAP-iOS] 앱 초기화 완료")
+
+        // 🚨 퍼미션 디버그 스위즐 설치 (로그인 전 푸시 권한 호출을 원천 차단 + 호출 스택 로깅)
+        Self.installPermissionDebugGuards()
         return true
     }
     
@@ -633,5 +636,47 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         
         print("⚠️ 처리되지 않은 URL: \(url)")
         return false
+    }
+}
+
+// MARK: - 🚨 Permission Debug Guards (Swizzling)
+import ObjectiveC
+
+extension AppDelegate {
+    private static var didInstallDebugGuards = false
+    static func installPermissionDebugGuards() {
+        guard !didInstallDebugGuards else { return }
+        didInstallDebugGuards = true
+        UNUserNotificationCenter.smap_installRequestAuthSwizzle()
+    }
+}
+
+extension UNUserNotificationCenter {
+    private static let smap_swizzleOnce: Void = {
+        let originalSelector = #selector(UNUserNotificationCenter.requestAuthorization(options:completionHandler:))
+        let swizzledSelector = #selector(UNUserNotificationCenter.smap_requestAuthorization(options:completionHandler:))
+        if let originalMethod = class_getInstanceMethod(UNUserNotificationCenter.self, originalSelector),
+           let swizzledMethod = class_getInstanceMethod(UNUserNotificationCenter.self, swizzledSelector) {
+            method_exchangeImplementations(originalMethod, swizzledMethod)
+            print("🧩 [SWZ-PUSH] requestAuthorization swizzled for debug logging")
+        } else {
+            print("❌ [SWZ-PUSH] Failed to swizzle requestAuthorization")
+        }
+    }()
+    static func smap_installRequestAuthSwizzle() {
+        _ = smap_swizzleOnce
+    }
+
+    @objc func smap_requestAuthorization(options: UNAuthorizationOptions, completionHandler: @escaping (Bool, Error?) -> Void) {
+        let isLoggedIn = UserDefaults.standard.bool(forKey: "is_logged_in")
+        let stack = Thread.callStackSymbols.joined(separator: "\n")
+        print("🛑 [SWZ-PUSH] requestAuthorization intercepted. isLoggedIn=\(isLoggedIn). Options=\(options).\n📚 CallStack:\n\(stack)")
+        if !isLoggedIn {
+            print("🛑 [SWZ-PUSH] Blocked push permission before login → returning (false)")
+            DispatchQueue.main.async { completionHandler(false, nil) }
+            return
+        }
+        // Call original (swizzled) implementation
+        self.smap_requestAuthorization(options: options, completionHandler: completionHandler)
     }
 }

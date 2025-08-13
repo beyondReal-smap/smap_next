@@ -330,7 +330,8 @@ function PermissionGuard() {
           console.log('[SMAP-PERM] Page-level permission guards installed');
         }
       }
-      (window as any).__SMAP_PERM_ALLOW__ = !!isLoggedIn;
+      // 로그인 여부와 무관하게, 네이티브 완료 신호(SMAP_ENABLE_PERMISSIONS)로만 해제
+      // (window as any).__SMAP_PERM_ALLOW__ = !!isLoggedIn;
     } catch (e) {
       console.error('[SMAP-PERM] guard error:', e);
     }
