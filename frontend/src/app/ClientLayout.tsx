@@ -133,6 +133,70 @@ function PermissionGuard() {
           console.log('[SMAP-PERM] Permissions enabled after login');
         };
         console.log('[SMAP-PERM] Permission guard installed (web)');
+
+        // iOS 네이티브 브리지 가드: 로그인 전 권한 유발 메시지 차단
+        const w: any = window as any;
+        const mh = w.webkit?.messageHandlers;
+        if (mh && mh.smapIos && typeof mh.smapIos.postMessage === 'function') {
+          if (!w.__SMAP_POSTMESSAGE_GUARD_INSTALLED__) {
+            w.__SMAP_POSTMESSAGE_GUARD_INSTALLED__ = true;
+            w.__SMAP_ORIG_POSTMESSAGE__ = mh.smapIos.postMessage.bind(mh.smapIos);
+            mh.smapIos.postMessage = function(message: any) {
+              try {
+                const allow = !!w.__SMAP_PERM_ALLOW__;
+                const type = message?.type || '';
+                const isPermissionTrigger = (
+                  type === 'requestCameraPermission' ||
+                  type === 'requestPhotoLibraryPermission' ||
+                  type === 'requestMicrophonePermission' ||
+                  type === 'requestLocationPermission' ||
+                  type === 'setAlarmPermission' ||
+                  type === 'openPhoto' ||
+                  type === 'openAlbum'
+                );
+                if (!allow && isPermissionTrigger) {
+                  console.warn('[SMAP-PERM] smapIos.postMessage blocked until login:', type);
+                  return; // 차단
+                }
+              } catch (_) {}
+              return w.__SMAP_ORIG_POSTMESSAGE__(message);
+            };
+            console.log('[SMAP-PERM] iOS bridge guard installed');
+          }
+        }
+
+        // geolocation 가드: 로그인 전 위치 권한 요청 차단
+        if (!w.__SMAP_GEO_GUARD_INSTALLED__ && 'geolocation' in navigator) {
+          w.__SMAP_GEO_GUARD_INSTALLED__ = true;
+          const geo: any = navigator.geolocation as any;
+          if (typeof geo.getCurrentPosition === 'function') {
+            w.__SMAP_ORIG_GETCURRENT__ = geo.getCurrentPosition.bind(geo);
+            geo.getCurrentPosition = function(success: any, error?: any, options?: any) {
+              if (!w.__SMAP_PERM_ALLOW__) {
+                console.warn('[SMAP-PERM] geolocation.getCurrentPosition blocked until login');
+                if (typeof error === 'function') {
+                  try { error({ code: 1, message: 'SMAP: blocked until login', PERMISSION_DENIED: 1 }); } catch(_) {}
+                }
+                return;
+              }
+              return w.__SMAP_ORIG_GETCURRENT__(success, error, options);
+            };
+          }
+          if (typeof geo.watchPosition === 'function') {
+            w.__SMAP_ORIG_WATCH__ = geo.watchPosition.bind(geo);
+            geo.watchPosition = function(success: any, error?: any, options?: any) {
+              if (!w.__SMAP_PERM_ALLOW__) {
+                console.warn('[SMAP-PERM] geolocation.watchPosition blocked until login');
+                if (typeof error === 'function') {
+                  try { error({ code: 1, message: 'SMAP: blocked until login', PERMISSION_DENIED: 1 }); } catch(_) {}
+                }
+                return -1;
+              }
+              return w.__SMAP_ORIG_WATCH__(success, error, options);
+            };
+          }
+          console.log('[SMAP-PERM] geolocation guard installed');
+        }
       }
       (window as any).__SMAP_PERM_ALLOW__ = !!isLoggedIn;
     } catch (e) {
