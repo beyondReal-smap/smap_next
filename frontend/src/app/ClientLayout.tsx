@@ -182,6 +182,77 @@ export default function ClientLayout({
     return null; // 서버 사이드 렌더링 중에는 아무것도 렌더링하지 않음
   }
 
+  // Permission Guard: 로그인 전 웹 권한 요청 차단, 로그인 후 해제
+  const { isLoggedIn } = useAuth();
+  useEffect(() => {
+    try {
+      // 설치(1회)
+      if (!(window as any).__SMAP_PERMISSION_GUARD_INSTALLED__) {
+        (window as any).__SMAP_PERMISSION_GUARD_INSTALLED__ = true;
+        (window as any).__SMAP_PERM_ALLOW__ = false;
+        
+        const hasNotification = typeof (window as any).Notification !== 'undefined';
+        const NotificationAny = (window as any).Notification;
+        if (hasNotification && NotificationAny.requestPermission) {
+          const originalReq = NotificationAny.requestPermission.bind(NotificationAny);
+          NotificationAny.__originalRequestPermission__ = originalReq;
+          NotificationAny.requestPermission = function(cb?: any){
+            if (!(window as any).__SMAP_PERM_ALLOW__) {
+              console.warn('[SMAP-PERM] Notification.requestPermission blocked until login');
+              const p = Promise.resolve('default');
+              if (typeof cb === 'function') { try { cb('default'); } catch(_) {} }
+              return p as any;
+            }
+            return originalReq(cb);
+          };
+        }
+        
+        const md: any = (navigator as any).mediaDevices;
+        if (md && typeof md.getUserMedia === 'function') {
+          const originalGUM = md.getUserMedia.bind(md);
+          md.__originalGetUserMedia__ = originalGUM;
+          md.getUserMedia = function(constraints: any){
+            if (!(window as any).__SMAP_PERM_ALLOW__) {
+              console.warn('[SMAP-PERM] getUserMedia blocked until login');
+              return Promise.reject(new DOMException('NotAllowedError', 'SMAP: blocked until login'));
+            }
+            return originalGUM(constraints);
+          };
+        }
+        
+        const perm: any = (navigator as any).permissions;
+        if (perm && typeof perm.query === 'function') {
+          const originalQuery = perm.query.bind(perm);
+          perm.__originalQuery__ = originalQuery;
+          perm.query = function(descriptor: any){
+            try {
+              const name = (descriptor && (descriptor.name || descriptor)) || '';
+              if (!(window as any).__SMAP_PERM_ALLOW__ && (name === 'notifications' || name === 'camera' || name === 'microphone')) {
+                return Promise.resolve({ state: 'prompt' });
+              }
+            } catch(_) {}
+            return originalQuery(descriptor);
+          };
+        }
+        
+        ;(window as any).SMAP_ENABLE_PERMISSIONS = function(){
+          (window as any).__SMAP_PERM_ALLOW__ = true;
+          console.log('[SMAP-PERM] Permissions enabled after login');
+        };
+        console.log('[SMAP-PERM] Permission guard installed (web)');
+      }
+      
+      // 로그인 상태에 따라 허용/차단 토글
+      if (isLoggedIn) {
+        (window as any).__SMAP_PERM_ALLOW__ = true;
+      } else {
+        (window as any).__SMAP_PERM_ALLOW__ = false;
+      }
+    } catch (e) {
+      console.error('[SMAP-PERM] guard error:', e);
+    }
+  }, [isLoggedIn]);
+
   return (
     <>
       <DataCacheProvider>

@@ -17,6 +17,8 @@ import KakaoSDKUser
 import AuthenticationServices
 import AVFoundation
 import Photos
+import UserNotifications
+import CoreMotion
 
 class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, WKUIDelegate {
     var popoverController: UIPopoverPresentationController?// 태블릿용 공유하기 띄우기
@@ -31,6 +33,7 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
     
     private var webViewPageType = ""
     private var fileUploadMtIdx = ""
+	private var didRunPrePermissionFlow = false
     
     // 광고 관련 코드 제거됨 (웹뷰 앱에서는 사용하지 않음)
     // private var interstitial: GADInterstitialAd?
@@ -217,6 +220,77 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
         let userScript = WKUserScript(source: errorScript, injectionTime: .atDocumentStart, forMainFrameOnly: false)
         self.web_view.configuration.userContentController.addUserScript(userScript)
         
+        // 🔐 권한 가드 스크립트: 로그인 전 웹 권한 요청 차단 (알림/카메라)
+        let permissionGuardScript = """
+            (function(){
+              try {
+                if (window.__SMAP_PERMISSION_GUARD_INSTALLED__) return;
+                window.__SMAP_PERMISSION_GUARD_INSTALLED__ = true;
+                
+                // 전역 플래그: 로그인 전에는 false, 로그인 후 iOS가 true로 전환
+                window.__SMAP_PERM_ALLOW__ = false;
+                
+                // Notification.requestPermission 가드
+                const hasNotification = typeof window.Notification !== 'undefined';
+                const originalRequestPermission = hasNotification && Notification.requestPermission ? Notification.requestPermission.bind(Notification) : null;
+                if (originalRequestPermission) {
+                  Notification.__originalRequestPermission__ = originalRequestPermission;
+                  Notification.requestPermission = function(callback){
+                    if (!window.__SMAP_PERM_ALLOW__) {
+                      console.warn('[SMAP-PERM] Notification.requestPermission blocked until login');
+                      const p = Promise.resolve('default');
+                      if (typeof callback === 'function') try { callback('default'); } catch(_){ }
+                      return p;
+                    }
+                    return originalRequestPermission(callback);
+                  };
+                }
+                
+                // mediaDevices.getUserMedia 가드 (카메라/마이크)
+                const md = navigator.mediaDevices;
+                if (md && typeof md.getUserMedia === 'function') {
+                  const originalGetUserMedia = md.getUserMedia.bind(md);
+                  navigator.mediaDevices.__originalGetUserMedia__ = originalGetUserMedia;
+                  navigator.mediaDevices.getUserMedia = function(constraints){
+                    if (!window.__SMAP_PERM_ALLOW__) {
+                      console.warn('[SMAP-PERM] getUserMedia blocked until login');
+                      return Promise.reject(new DOMException('NotAllowedError', 'SMAP: blocked until login'));
+                    }
+                    return originalGetUserMedia(constraints);
+                  };
+                }
+                
+                // permissions.query 가드 (알림/카메라 상태를 임시로 prompt로 노출)
+                const perm = navigator.permissions;
+                if (perm && typeof perm.query === 'function') {
+                  const originalQuery = perm.query.bind(perm);
+                  navigator.permissions.__originalQuery__ = originalQuery;
+                  navigator.permissions.query = function(descriptor){
+                    try {
+                      const name = (descriptor && (descriptor.name || descriptor)) || '';
+                      if (!window.__SMAP_PERM_ALLOW__ && (name === 'notifications' || name === 'camera' || name === 'microphone')) {
+                        return Promise.resolve({ state: 'prompt' });
+                      }
+                    } catch(_) {}
+                    return originalQuery(descriptor);
+                  };
+                }
+                
+                // 로그인 후 권한 해제 함수 (iOS에서 호출)
+                window.SMAP_ENABLE_PERMISSIONS = function(){
+                  try { window.__SMAP_PERM_ALLOW__ = true; } catch(_) {}
+                  console.log('[SMAP-PERM] Permissions enabled after login');
+                };
+                
+                console.log('[SMAP-PERM] Permission guard installed');
+              } catch(e) {
+                console.error('[SMAP-PERM] install error:', e);
+              }
+            })();
+        """
+        let permGuardUserScript = WKUserScript(source: permissionGuardScript, injectionTime: .atDocumentStart, forMainFrameOnly: false)
+        self.web_view.configuration.userContentController.addUserScript(permGuardUserScript)
+        
         self.web_view.navigationDelegate = self
         self.web_view.uiDelegate = self
         self.web_view.allowsBackForwardNavigationGestures = false
@@ -291,6 +365,208 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
         // 🎮 햅틱 시스템 테스트 (항상 실행 - 실제 기기 테스트용)
         // testHapticSystem()
     }
+
+	override func viewDidAppear(_ animated: Bool) {
+		super.viewDidAppear(animated)
+        // 최초 1회만 프리퍼미션 플로우 실행 (로그인 후로 지연)
+        if !didRunPrePermissionFlow {
+            didRunPrePermissionFlow = true
+            DispatchQueue.main.async { [weak self] in
+                self?.dispatchPrePermissionFlow()
+            }
+        }
+	}
+
+    // MARK: - Pre-permission Flow (Push → Camera → Photo → Microphone → Motion → Location)
+	private func dispatchPrePermissionFlow() {
+        // 로그인 완료 전에는 권한 안내/요청을 보류하고, 로그인 후(userInfo 수신) 실행
+        if UserDefaults.standard.bool(forKey: "is_logged_in") == true {
+            self.runPermissionsSequenceAfterLogin()
+        } else {
+            print("🔒 [PERMISSION] 로그인 전 - 권한 시퀀스 보류")
+        }
+	}
+
+    private func runPermissionsSequenceAfterLogin() {
+        showPushPrePermissionIfNeeded { [weak self] in
+            self?.showCameraPrePermissionIfNeeded { [weak self] in
+                self?.showPhotoPrePermissionIfNeeded { [weak self] in
+                    self?.showMicrophonePrePermissionIfNeeded { [weak self] in
+                        self?.showMotionPrePermissionIfNeeded { [weak self] in
+                            self?.showLocationPrePermissionIfNeeded {}
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+	private func presentPrePermissionAlert(title: String, message: String, continueTitle: String = "계속", cancelTitle: String = "나중에", onContinue: @escaping () -> Void, onCancel: (() -> Void)? = nil) {
+		let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+		alert.addAction(UIAlertAction(title: cancelTitle, style: .cancel) { _ in onCancel?() })
+		alert.addAction(UIAlertAction(title: continueTitle, style: .default) { _ in onContinue() })
+		self.present(alert, animated: true)
+	}
+
+	private func showPushPrePermissionIfNeeded(completion: @escaping () -> Void) {
+		if UserDefaults.standard.bool(forKey: "smap_push_prepermission_done") {
+			return completion()
+		}
+		UNUserNotificationCenter.current().getNotificationSettings { settings in
+			DispatchQueue.main.async {
+				guard settings.authorizationStatus == .notDetermined else {
+					UserDefaults.standard.set(true, forKey: "smap_push_prepermission_done")
+					return completion()
+				}
+				self.presentPrePermissionAlert(
+					title: "알림 권한 안내",
+					message: "경고, 사운드 및 아이콘 배지 알림을 제공하기 위해 권한이 필요합니다. 설정에서 변경할 수 있습니다.",
+					onContinue: {
+						UserDefaults.standard.set(true, forKey: "smap_push_prepermission_done")
+						let options: UNAuthorizationOptions = [.alert, .badge, .sound]
+						UNUserNotificationCenter.current().requestAuthorization(options: options) { _, _ in
+							DispatchQueue.main.async {
+								UIApplication.shared.registerForRemoteNotifications()
+								completion()
+							}
+						}
+					},
+					onCancel: {
+						completion()
+					}
+				)
+			}
+		}
+	}
+
+    private func showLocationPrePermissionIfNeeded(completion: @escaping () -> Void) {
+        if UserDefaults.standard.bool(forKey: "smap_location_prepermission_done") {
+            return completion()
+        }
+        let status = CLLocationManager.authorizationStatus()
+        guard status == .notDetermined else {
+            UserDefaults.standard.set(true, forKey: "smap_location_prepermission_done")
+            return completion()
+        }
+        presentPrePermissionAlert(
+            title: "위치 권한 안내",
+            message: "모임 장소 안내와 도착 알림을 위해 위치 정보가 필요합니다. 예: 일정 장소까지의 거리 표시 및 근접 시 알림 제공",
+            onContinue: {
+                UserDefaults.standard.set(true, forKey: "smap_location_prepermission_done")
+                // 즉시 시스템 위치 권한 팝업 표출 후 완료 시 콜백
+                LocationService.sharedInstance.requestWhenInUseAuthorization {
+                    completion()
+                }
+            },
+            onCancel: { completion() }
+        )
+    }
+
+	private func showCameraPrePermissionIfNeeded(completion: @escaping () -> Void) {
+		if UserDefaults.standard.bool(forKey: "smap_camera_prepermission_done") {
+			return completion()
+		}
+		let status = AVCaptureDevice.authorizationStatus(for: .video)
+		guard status == .notDetermined else {
+			UserDefaults.standard.set(true, forKey: "smap_camera_prepermission_done")
+			return completion()
+		}
+		presentPrePermissionAlert(
+			title: "카메라 권한 안내",
+			message: "프로필 및 그룹 사진 등록을 위해 카메라가 필요합니다. 예: 그룹 아바타 촬영 및 업로드",
+			onContinue: {
+				UserDefaults.standard.set(true, forKey: "smap_camera_prepermission_done")
+				AVCaptureDevice.requestAccess(for: .video) { _ in
+					DispatchQueue.main.async { completion() }
+				}
+			},
+			onCancel: { completion() }
+		)
+	}
+
+	private func showPhotoPrePermissionIfNeeded(completion: @escaping () -> Void) {
+		if UserDefaults.standard.bool(forKey: "smap_photo_prepermission_done") {
+			return completion()
+		}
+		let status: PHAuthorizationStatus
+		if #available(iOS 14, *) {
+			status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+		} else {
+			status = PHPhotoLibrary.authorizationStatus()
+		}
+		guard status == .notDetermined else {
+			UserDefaults.standard.set(true, forKey: "smap_photo_prepermission_done")
+			return completion()
+		}
+		presentPrePermissionAlert(
+			title: "사진 보관함 권한 안내",
+			message: "프로필 및 그룹 사진 업로드/저장을 위해 사진 보관함 접근이 필요합니다.",
+			onContinue: {
+				UserDefaults.standard.set(true, forKey: "smap_photo_prepermission_done")
+				if #available(iOS 14, *) {
+					PHPhotoLibrary.requestAuthorization(for: .readWrite) { _ in
+						DispatchQueue.main.async { completion() }
+					}
+				} else {
+					PHPhotoLibrary.requestAuthorization { _ in
+						DispatchQueue.main.async { completion() }
+					}
+				}
+			},
+			onCancel: { completion() }
+		)
+	}
+
+	private func showMicrophonePrePermissionIfNeeded(completion: @escaping () -> Void) {
+		if UserDefaults.standard.bool(forKey: "smap_microphone_prepermission_done") {
+			return completion()
+		}
+		let status = AVAudioSession.sharedInstance().recordPermission
+		guard status == .undetermined else {
+			UserDefaults.standard.set(true, forKey: "smap_microphone_prepermission_done")
+			return completion()
+		}
+		presentPrePermissionAlert(
+			title: "마이크 권한 안내",
+			message: "음성 메시지 기능을 사용하기 위해 마이크 접근이 필요합니다.",
+			onContinue: {
+				UserDefaults.standard.set(true, forKey: "smap_microphone_prepermission_done")
+				AVAudioSession.sharedInstance().requestRecordPermission { _ in
+					DispatchQueue.main.async { completion() }
+				}
+			},
+			onCancel: { completion() }
+		)
+	}
+
+	private func showMotionPrePermissionIfNeeded(completion: @escaping () -> Void) {
+		if UserDefaults.standard.bool(forKey: "smap_motion_prepermission_done") {
+			return completion()
+		}
+		if #available(iOS 11.0, *) {
+			let status = CMMotionActivityManager.authorizationStatus()
+			guard status == .notDetermined else {
+				UserDefaults.standard.set(true, forKey: "smap_motion_prepermission_done")
+				return completion()
+			}
+			presentPrePermissionAlert(
+				title: "동작 및 피트니스 권한 안내",
+				message: "이동 거리 계산 및 활동 기반 알림 제공을 위해 동작 및 피트니스 데이터 접근이 필요합니다.",
+				onContinue: {
+					UserDefaults.standard.set(true, forKey: "smap_motion_prepermission_done")
+					let manager = CMMotionActivityManager()
+					let now = Date()
+					let tenMinAgo = now.addingTimeInterval(-600)
+					manager.queryActivityStarting(from: tenMinAgo, to: now, to: OperationQueue.main) { _, _ in
+						DispatchQueue.main.async { completion() }
+					}
+				},
+				onCancel: { completion() }
+			)
+		} else {
+			completion()
+		}
+	}
     
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
         super.viewWillTransition(to: size, with: coordinator)
@@ -1402,6 +1678,21 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
         }
         
         print("🎉 [USER INFO MAINVIEW] 사용자 정보 처리 완료!")
+
+        // ✅ 로그인 직후 권한 시퀀스 실행 (최초 1회)
+        if !UserDefaults.standard.bool(forKey: "smap_permissions_after_login_done") {
+            UserDefaults.standard.set(true, forKey: "smap_permissions_after_login_done")
+            // 로그인 직후 즉시 실행
+            runPermissionsSequenceAfterLogin()
+        }
+        
+        // 🔓 웹 권한 가드 해제 (알림/카메라 등 웹 API 사용 허용)
+        let enablePermScript = """
+            try { if (typeof window.SMAP_ENABLE_PERMISSIONS === 'function') { window.SMAP_ENABLE_PERMISSIONS(); } } catch(_) {}
+        """
+        DispatchQueue.main.async { [weak self] in
+            self?.web_view.evaluateJavaScript(enablePermScript, completionHandler: nil)
+        }
     }
     
     /// 사용자 로그아웃 처리

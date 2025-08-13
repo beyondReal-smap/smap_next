@@ -71,9 +71,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         if #available(iOS 10.0, *) {
             // For iOS 10 display notification (sent via APNS)
             UNUserNotificationCenter.current().delegate = self
-            
-            // 먼저 현재 권한 상태 확인
-            setupPushNotificationPermissions()
+            // 앱 시작 시 자동 권한 요청 완전 비활성화 (로그인 후 MainView에서 프리퍼미션 처리)
+            print("🔔 [PUSH] 런치 시 권한 요청 비활성화 - 로그인 후 처리")
         } else {
             let settings: UIUserNotificationSettings =
                 UIUserNotificationSettings(types: [.alert, .badge, .sound], categories: nil)
@@ -85,8 +84,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         IQKeyboardManager.shared.enableAutoToolbar = false
         IQKeyboardManager.shared.resignOnTouchOutside = true
         
-        // iOS 14+ 권장 방식: delegate 기반 위치 서비스 시작
-        LocationService.sharedInstance.startLocationUpdatesWithPermissionCheck()
+        // iOS 14+ 권장 방식: delegate 기반 위치 서비스 시작 (프리퍼미션 이후)
+        if UserDefaults.standard.bool(forKey: "smap_location_prepermission_done") {
+            LocationService.sharedInstance.startLocationUpdatesWithPermissionCheck()
+        } else {
+            print("📍 [LOCATION] 앱 시작 시 자동 위치 권한 요청 생략 (프리퍼미션 대기)")
+        }
         
         StoreKitManager.shared.fetchReceipt { encryptedReceipt, error in
             if let error = error {
