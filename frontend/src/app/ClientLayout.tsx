@@ -146,7 +146,6 @@ function PermissionGuard() {
         console.log('[SMAP-PERM] Permission guard installed (web)');
 
         // iOS 네이티브 브리지 가드: 로그인 전 권한 유발 메시지 차단
-        const w: any = window as any;
         const mh = w.webkit?.messageHandlers;
         if (mh && mh.smapIos && typeof mh.smapIos.postMessage === 'function') {
           if (!w.__SMAP_POSTMESSAGE_GUARD_INSTALLED__) {
