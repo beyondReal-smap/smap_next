@@ -2568,15 +2568,15 @@ const SignInPage = () => {
                   const providedFamilyName = (result as any)?.familyName || (result as any)?.family_name || null;
                   const providedUserName = (result as any)?.userName || (result as any)?.fullName || null;
 
-                  // 표시용 이름 구성: userName > "given family" > fallback
+                  // 표시용 이름 구성: userName > "given family" > (없으면 공백)
                   const constructedDisplayName = providedUserName
                     ? String(providedUserName)
                     : (providedGivenName || providedFamilyName)
                       ? `${providedGivenName ? String(providedGivenName) : ''}${providedGivenName && providedFamilyName ? ' ' : ''}${providedFamilyName ? String(providedFamilyName) : ''}`.trim()
-                      : 'Apple 사용자';
+                      : '';
 
-                  // 닉네임은 표시용 이름과 동일 기본값 사용
-                  const constructedNickname = constructedDisplayName || 'Apple 사용자';
+                  // 닉네임은 표시용 이름과 동일 기본값 사용 (없으면 공백)
+                  const constructedNickname = constructedDisplayName || '';
 
                   const socialData = {
                     provider: 'apple',

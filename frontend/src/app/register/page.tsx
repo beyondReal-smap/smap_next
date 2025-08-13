@@ -577,10 +577,16 @@ export default function RegisterPage() {
             ...prev,
             mt_id: parsedData.email || '', // 이메일을 아이디로 사용
             mt_email: parsedData.email || '',
-            mt_name: parsedData.name || parsedData.given_name || (parsedData.provider === 'apple' ? 'Apple 사용자' : 'Google User'),
-            mt_nickname: parsedData.nickname || parsedData.given_name || parsedData.name || (parsedData.provider === 'apple' ? 'Apple 사용자' : 'Google User'),
-            // 구글 로그인 시만 임시 비밀번호 자동설정
-            mt_pwd: parsedData.provider === 'google' ? 'google_auto_password_123' : '',
+            mt_name: parsedData.provider === 'apple'
+              ? (parsedData.name || parsedData.given_name || '')
+              : (parsedData.name || parsedData.given_name || 'Google User'),
+            mt_nickname: parsedData.provider === 'apple'
+              ? (parsedData.nickname || parsedData.given_name || parsedData.name || '')
+              : (parsedData.nickname || parsedData.given_name || parsedData.name || 'Google User'),
+            // 구글/애플 로그인 시 임시 비밀번호 자동설정 (회원가입 API 검증 통과용)
+            mt_pwd: parsedData.provider === 'google' 
+              ? 'google_auto_password_123' 
+              : (parsedData.provider === 'apple' ? 'apple_auto_password_123' : ''),
             isSocialLogin: true,
             socialProvider: parsedData.provider,
             socialId: parsedData.kakao_id || parsedData.google_id || parsedData.apple_id || ''
