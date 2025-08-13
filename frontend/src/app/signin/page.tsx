@@ -2563,13 +2563,31 @@ const SignInPage = () => {
                     ? result.email
                     : `apple_${String(result?.userIdentifier || '').slice(0, 8)}@privaterelay.appleid.com`;
 
+                  // Apple은 최초 승인 시에만 이름(fullName/givenName/familyName)을 제공할 수 있음
+                  const providedGivenName = (result as any)?.givenName || (result as any)?.given_name || null;
+                  const providedFamilyName = (result as any)?.familyName || (result as any)?.family_name || null;
+                  const providedUserName = (result as any)?.userName || (result as any)?.fullName || null;
+
+                  // 표시용 이름 구성: userName > "given family" > fallback
+                  const constructedDisplayName = providedUserName
+                    ? String(providedUserName)
+                    : (providedGivenName || providedFamilyName)
+                      ? `${providedGivenName ? String(providedGivenName) : ''}${providedGivenName && providedFamilyName ? ' ' : ''}${providedFamilyName ? String(providedFamilyName) : ''}`.trim()
+                      : 'Apple 사용자';
+
+                  // 닉네임은 표시용 이름과 동일 기본값 사용
+                  const constructedNickname = constructedDisplayName || 'Apple 사용자';
+
                   const socialData = {
                     provider: 'apple',
                     userIdentifier: result.userIdentifier,
                     apple_id: result.userIdentifier,
                     email: fallbackEmail,
-                    name: result.userName || 'Apple 사용자',
-                    nickname: result.userName || 'Apple 사용자'
+                    name: constructedDisplayName,
+                    nickname: constructedNickname,
+                    // 추가 보관: 일부 플로우에서 given/family를 별도로 사용하는 경우 대비
+                    given_name: providedGivenName || undefined,
+                    family_name: providedFamilyName || undefined
                   };
                   
                   localStorage.setItem('socialLoginData', JSON.stringify(socialData));

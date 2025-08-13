@@ -401,7 +401,12 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
                     print("🧭 [PERMISSION-FLOW] Photo 완료 → Motion 단계로 이동")
                     self?.showMotionPrePermissionIfNeeded { [weak self] in
                         print("🧭 [PERMISSION-FLOW] Motion 완료 → Location 단계로 이동")
-                        self?.showLocationPrePermissionIfNeeded {}
+                        self?.showLocationPrePermissionIfNeeded {
+                            // 최종 단계 완료 후에만 위치 업데이트 시작
+                            print("📍 [LOCATION] 권한 플로우 완료 → 위치 업데이트 시작")
+                            UserDefaults.standard.set(true, forKey: "smap_allow_location_request_now")
+                            LocationService.sharedInstance.startLocationUpdatesWithPermissionCheck(completion: nil)
+                        }
                     }
                 }
             }
@@ -485,6 +490,8 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
                     UserDefaults.standard.set(true, forKey: infoFlagKey)
                     if status == .notDetermined {
                         print("📍 [LOCATION] 상태 notDetermined → requestWhenInUseAuthorization 호출")
+                        // 스위즐 게이트 허용 플래그 ON (이 시점에만 시스템 팝업 허용)
+                        UserDefaults.standard.set(true, forKey: "smap_allow_location_request_now")
                         LocationService.sharedInstance.requestWhenInUseAuthorization {
                             completion()
                         }
@@ -504,6 +511,8 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
                 title: "위치 권한 안내",
                 message: "정확한 위치 기반 기능 제공을 위해 위치 권한이 필요합니다.",
                 onContinue: {
+                    // 스위즐 게이트 허용 플래그 ON
+                    UserDefaults.standard.set(true, forKey: "smap_allow_location_request_now")
                     LocationService.sharedInstance.requestWhenInUseAuthorization {
                         completion()
                     }

@@ -1539,8 +1539,6 @@ export default function RegisterPage() {
                isEmailValid; // 빈 값이거나 유효한 이메일
       case REGISTER_STEPS.PROFILE:
         return registerData.mt_birth && registerData.mt_gender !== null;
-      case REGISTER_STEPS.LOCATION:
-        return true; // 선택사항
       default:
         return false;
     }
@@ -2449,148 +2447,7 @@ export default function RegisterPage() {
             </motion.div>
           )}
 
-          {/* 위치 정보 단계 */}
-          {currentStep === REGISTER_STEPS.LOCATION && (
-            <motion.div
-              key="location"
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -50 }}
-              transition={{ 
-                duration: 0.3,
-                ease: [0.4, 0.0, 0.2, 1], // iOS 최적화된 이징
-                type: "tween"
-              }}
-              className="w-full h-full flex flex-col justify-center"
-              style={{
-                // iOS 애니메이션 최적화
-                willChange: 'transform, opacity',
-                transform: 'translateZ(0)', // 하드웨어 가속 활성화
-                backfaceVisibility: 'hidden'
-              }}
-            >
-              <div className="text-center mb-6">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0114a2'}}>
-                  <FiMapPin className="w-6 h-6 text-white" />
-                </div>
-                <h2 className="text-xl font-bold text-gray-900 mb-1">위치 정보</h2>
-                <p className="text-sm text-gray-600" style={{ wordBreak: 'keep-all' }}>
-                  위치 기반 서비스 이용을 위해<br />
-                  현재 위치를 설정해주세요
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                {/* 위치 정보 성공 */}
-                {registerData.mt_lat && registerData.mt_long && !locationLoading && (
-                  <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <FiCheck className="w-5 h-5 text-green-500" />
-                      <span className="text-green-700 font-medium">위치 정보가 설정되었습니다</span>
-                    </div>
-                    <p className="text-green-600 text-sm mb-3" style={{ wordBreak: 'keep-all' }}>
-                      위도: {registerData.mt_lat.toFixed(6)}<br />
-                      경도: {registerData.mt_long.toFixed(6)}
-                    </p>
-                    <motion.button
-                      onClick={handleGetLocation}
-                      disabled={locationLoading}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      className="w-full py-2.5 bg-green-100 text-green-700 rounded-xl font-medium text-sm border border-green-200 hover:bg-green-200 transition-colors"
-                    >
-                      위치 다시 가져오기
-                    </motion.button>
-                  </div>
-                )}
-
-                {/* 위치 정보 요청 */}
-                {!registerData.mt_lat && !registerData.mt_long && !locationLoading && !locationError && (
-                  <div className="rounded-xl p-4" style={{backgroundColor: '#eff6ff', border: '1px solid #c7d2fe'}}>
-                    <div className="flex items-center space-x-2 mb-2">
-                      <FiMapPin className="w-5 h-5" style={{color: '#0114a2'}} />
-                      <span className="font-medium" style={{color: '#1e40af'}}>위치 정보 설정</span>
-                    </div>
-                    <p className="text-sm mb-4" style={{ wordBreak: 'keep-all', color: '#0114a2' }}>
-                      그룹 멤버들과의 위치 공유, 주변 정보 제공 등을 위해 위치 정보가 필요합니다.
-                    </p>
-                    <motion.button
-                      onClick={handleGetLocation}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      className="w-full py-3 text-white rounded-xl font-semibold shadow-lg"
-                      style={{backgroundColor: '#0114a2'}}
-                    >
-                      현재 위치 가져오기
-                    </motion.button>
-                  </div>
-                )}
-
-                {/* 로딩 상태 */}
-                {locationLoading && (
-                  <div className="bg-[#0114a2]/10 border border-[#0114a2]/20 rounded-xl p-4">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <div className="w-5 h-5 border-2 border-[#0114a2] border-t-transparent rounded-full animate-spin"></div>
-                      <span className="text-[#0114a2] font-medium">위치 정보를 가져오는 중...</span>
-                    </div>
-                    <p className="text-[#0114a2] text-sm" style={{ wordBreak: 'keep-all' }}>
-                      브라우저에서 위치 권한을 요청할 수 있습니다.<br />
-                      '허용'을 선택해주세요.
-                    </p>
-                  </div>
-                )}
-
-                {/* 에러 상태 */}
-                {locationError && (
-                  <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                      </svg>
-                      <span className="text-red-700 font-medium">위치 정보 가져오기 실패</span>
-                    </div>
-                    <p className="text-red-600 text-sm mb-3" style={{ wordBreak: 'keep-all' }}>
-                      {locationError}
-                    </p>
-                    <div className="space-y-2">
-                      <motion.button
-                        onClick={handleGetLocation}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        className="w-full py-2.5 bg-red-600 text-white rounded-xl font-medium text-sm shadow-lg"
-                      >
-                        다시 시도
-                      </motion.button>
-                      <motion.button
-                        onClick={() => {
-                          setLocationError('');
-                          // 위치 정보 없이 진행하는 경우 (선택사항이므로)
-                        }}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        className="w-full py-2.5 bg-gray-100 text-gray-700 rounded-xl font-medium text-sm border border-gray-200 hover:bg-gray-200 transition-colors"
-                      >
-                        위치 정보 없이 진행
-                      </motion.button>
-                    </div>
-                  </div>
-                )}
-
-                {/* 위치 정보 안내 */}
-                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-                  <div className="flex items-start space-x-2">
-                    <FiShield className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="text-gray-700 text-sm font-medium mb-1">개인정보 보호</p>
-                      <p className="text-gray-600 text-xs leading-relaxed" style={{ wordBreak: 'keep-all' }}>
-                        위치 정보는 그룹 서비스 제공 목적으로만 사용되며, 사용자의 동의 없이 제3자에게 제공되지 않습니다. 언제든지 설정에서 위치 공유를 중단할 수 있습니다.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
+          
 
           {/* 완료 단계 */}
           {currentStep === REGISTER_STEPS.COMPLETE && (
@@ -2735,7 +2592,7 @@ export default function RegisterPage() {
                 } else if (currentStep === REGISTER_STEPS.VERIFICATION) {
                   console.log('인증번호 확인 함수 호출');
                   handleVerifyCode();
-                } else if (currentStep === REGISTER_STEPS.LOCATION) {
+                } else if (currentStep === REGISTER_STEPS.PROFILE) {
                   console.log('회원가입 완료 함수 호출');
                   handleRegister();
                 } else {
@@ -2761,7 +2618,7 @@ export default function RegisterPage() {
                locationLoading ? '위치 정보 가져오는 중...' :
                currentStep === REGISTER_STEPS.PHONE ? '인증번호 발송' :
                currentStep === REGISTER_STEPS.VERIFICATION ? '인증번호 확인' :
-               currentStep === REGISTER_STEPS.LOCATION ? '회원가입 완료' : '다음'}
+               currentStep === REGISTER_STEPS.PROFILE ? '회원가입 완료' : '다음'}
             </motion.button>
           </motion.div>
         </div>

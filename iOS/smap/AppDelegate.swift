@@ -648,6 +648,7 @@ extension AppDelegate {
         guard !didInstallDebugGuards else { return }
         didInstallDebugGuards = true
         UNUserNotificationCenter.smap_installRequestAuthSwizzle()
+        CLLocationManager.smap_installLocationAuthSwizzle()
     }
 }
 
@@ -678,5 +679,48 @@ extension UNUserNotificationCenter {
         }
         // Call original (swizzled) implementation
         self.smap_requestAuthorization(options: options, completionHandler: completionHandler)
+    }
+}
+
+// MARK: - 🧩 CLLocationManager Swizzle (requestWhenInUseAuthorization / requestAlwaysAuthorization)
+extension CLLocationManager {
+    private static let smap_swizzleOnceLoc: Void = {
+        let targetPairs: [(Selector, Selector)] = [
+            (#selector(CLLocationManager.requestWhenInUseAuthorization), #selector(CLLocationManager.smap_requestWhenInUseAuthorization)),
+            (#selector(CLLocationManager.requestAlwaysAuthorization), #selector(CLLocationManager.smap_requestAlwaysAuthorization))
+        ]
+        for (origSel, swzSel) in targetPairs {
+            if let m1 = class_getInstanceMethod(CLLocationManager.self, origSel),
+               let m2 = class_getInstanceMethod(CLLocationManager.self, swzSel) {
+                method_exchangeImplementations(m1, m2)
+            }
+        }
+        print("🧩 [SWZ-LOC] CLLocationManager auth methods swizzled for debug logging")
+    }()
+    static func smap_installLocationAuthSwizzle() { _ = smap_swizzleOnceLoc }
+
+    @objc func smap_requestWhenInUseAuthorization() {
+        let isLoggedIn = UserDefaults.standard.bool(forKey: "is_logged_in")
+        let allowNow = UserDefaults.standard.bool(forKey: "smap_allow_location_request_now")
+        let stack = Thread.callStackSymbols.joined(separator: "\n")
+        print("🛑 [SWZ-LOC] requestWhenInUseAuthorization intercepted. isLoggedIn=\(isLoggedIn), allowNow=\(allowNow)\n📚 CallStack:\n\(stack)")
+        guard isLoggedIn && allowNow else {
+            print("🛑 [SWZ-LOC] Blocked location auth request (not allowed at this stage)")
+            return
+        }
+        UserDefaults.standard.set(false, forKey: "smap_allow_location_request_now")
+        self.smap_requestWhenInUseAuthorization()
+    }
+
+    @objc func smap_requestAlwaysAuthorization() {
+        let isLoggedIn = UserDefaults.standard.bool(forKey: "is_logged_in")
+        let allowNow = UserDefaults.standard.bool(forKey: "smap_allow_location_request_now")
+        print("🛑 [SWZ-LOC] requestAlwaysAuthorization intercepted. isLoggedIn=\(isLoggedIn), allowNow=\(allowNow)")
+        guard isLoggedIn && allowNow else {
+            print("🛑 [SWZ-LOC] Blocked location ALWAYS auth request")
+            return
+        }
+        UserDefaults.standard.set(false, forKey: "smap_allow_location_request_now")
+        self.smap_requestAlwaysAuthorization()
     }
 }

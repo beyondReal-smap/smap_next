@@ -9,7 +9,6 @@ export const REGISTER_STEPS = {
   VERIFICATION: 'verification',
   BASIC_INFO: 'basic_info',
   PROFILE: 'profile',
-  LOCATION: 'location',
   COMPLETE: 'complete'
 };
 
@@ -20,7 +19,6 @@ export const STEP_NAMES = {
   [REGISTER_STEPS.VERIFICATION]: '인증번호 확인',
   [REGISTER_STEPS.BASIC_INFO]: '기본 정보',
   [REGISTER_STEPS.PROFILE]: '프로필 정보',
-  [REGISTER_STEPS.LOCATION]: '위치 정보',
   [REGISTER_STEPS.COMPLETE]: '가입 완료'
 };
 

@@ -327,8 +327,6 @@ export default function NewRegisterPage() {
                isEmailValid;
       case REGISTER_STEPS.PROFILE:
         return registerData.mt_birth && registerData.mt_gender !== null;
-      case REGISTER_STEPS.LOCATION:
-        return true; // 선택사항
       default:
         return false;
     }
