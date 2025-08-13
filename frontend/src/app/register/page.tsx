@@ -2115,8 +2115,8 @@ export default function RegisterPage() {
                   </div>
                 )}
                 
-                {/* 비밀번호 - 구글 로그인 시 숨김 */}
-                {(!registerData.isSocialLogin || registerData.socialProvider !== 'google') && (
+                {/* 비밀번호 - 소셜 로그인(구글/애플) 시 숨김 */}
+                {(!registerData.isSocialLogin || (registerData.socialProvider !== 'google' && registerData.socialProvider !== 'apple')) && (
                   <>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
