@@ -1,5 +1,31 @@
 'use client';
 
+// 🚨🚨🚨 EMERGENCY PERMISSION BLOCK - 즉시 실행 🚨🚨🚨
+if (typeof window !== 'undefined') {
+  console.log('🚨🚨🚨 EMERGENCY PERMISSION GUARD LOADING... 🚨🚨🚨');
+  (window as any).__SMAP_PERM_ALLOW__ = false;
+  (window as any).__SMAP_EMERGENCY_BLOCK__ = true;
+  
+  // 즉시 모든 권한 API 차단
+  if (typeof (window as any).Notification !== 'undefined' && (window as any).Notification.requestPermission) {
+    const origNotif = (window as any).Notification.requestPermission;
+    (window as any).Notification.requestPermission = function() {
+      console.warn('🚨🚨🚨 EMERGENCY: Notification blocked immediately! 🚨🚨🚨');
+      return Promise.resolve('denied');
+    };
+  }
+  
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    const origGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    navigator.mediaDevices.getUserMedia = function() {
+      console.warn('🚨🚨🚨 EMERGENCY: Camera/Mic blocked immediately! 🚨🚨🚨');
+      return Promise.reject(new Error('EMERGENCY: Camera/Mic blocked until login'));
+    };
+  }
+  
+  console.log('🚨🚨🚨 EMERGENCY PERMISSION GUARD INSTALLED IMMEDIATELY! 🚨🚨🚨');
+}
+
 import React, { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 // import { SessionProvider } from 'next-auth/react'; // 임시 비활성화
@@ -88,13 +114,23 @@ function PermissionGuard() {
         (window as any).__SMAP_PERMISSION_GUARD_INSTALLED__ = true;
         (window as any).__SMAP_PERM_ALLOW__ = false;
         
-        console.log('🚨 [SMAP-PERM] CRITICAL: Installing comprehensive permission guard - BLOCKING ALL PERMISSIONS UNTIL LOGIN');
+        console.log('🚨🚨🚨 [SMAP-PERM] EMERGENCY GUARD v2.0: BLOCKING ALL PERMISSIONS UNTIL LOGIN 🚨🚨🚨');
+        console.log('🚨🚨🚨 [SMAP-PERM] BUILD TIME:', '2025-08-13-v2.0', 'FORCE CACHE BREAK 🚨🚨🚨');
         
         // 🚨 CRITICAL: 모든 권한 요청을 원천 차단
         const w: any = window as any;
         
         // 🚨 1. IMMEDIATE BLOCK: 즉시 모든 권한 API를 무력화
         w.__SMAP_BLOCK_ALL_PERMISSIONS__ = true;
+        
+        // 🚨 EMERGENCY: 모든 권한 관련 함수를 즉시 무력화
+        const emergencyBlock = () => {
+          console.warn('🚨🚨🚨 [EMERGENCY] PERMISSION REQUEST BLOCKED - LOGIN FIRST! 🚨🚨🚨');
+          return Promise.resolve('denied');
+        };
+        
+        // 🚨 전역 권한 차단 플래그 설정
+        w.__SMAP_EMERGENCY_PERMISSION_BLOCK__ = true;
         
         // 🚨 2. Notification API 완전 차단
         const hasNotification = typeof (window as any).Notification !== 'undefined';
@@ -103,7 +139,7 @@ function PermissionGuard() {
           const originalReq = NotificationAny.requestPermission.bind(NotificationAny);
           NotificationAny.__originalRequestPermission__ = originalReq;
           NotificationAny.requestPermission = function(cb?: any){
-            console.warn('🚨 [SMAP-PERM] CRITICAL BLOCK: Notification.requestPermission DENIED UNTIL LOGIN');
+            console.warn('🚨🚨🚨 [EMERGENCY] Notification.requestPermission COMPLETELY BLOCKED! 🚨🚨🚨');
             if (!(window as any).__SMAP_PERM_ALLOW__) {
               const p = Promise.resolve('denied');
               if (typeof cb === 'function') { try { cb('denied'); } catch(_) {} }
@@ -117,9 +153,9 @@ function PermissionGuard() {
           const originalGUM = md.getUserMedia.bind(md);
           md.__originalGetUserMedia__ = originalGUM;
           md.getUserMedia = function(constraints: any){
-            console.warn('🚨 [SMAP-PERM] CRITICAL BLOCK: getUserMedia (CAMERA/MIC) DENIED UNTIL LOGIN');
+            console.warn('🚨🚨🚨 [EMERGENCY] getUserMedia (CAMERA/MIC) COMPLETELY BLOCKED! 🚨🚨🚨');
             if (!(window as any).__SMAP_PERM_ALLOW__) {
-              return Promise.reject(new DOMException('NotAllowedError', 'SMAP: Camera/Microphone blocked until login'));
+              return Promise.reject(new DOMException('NotAllowedError', 'SMAP EMERGENCY: Camera/Microphone blocked until login'));
             }
             return originalGUM(constraints);
           };
