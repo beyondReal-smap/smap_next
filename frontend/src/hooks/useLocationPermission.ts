@@ -206,10 +206,11 @@ export const useLocationPermission = () => {
     setShowPermissionModal(false);
   }, []);
 
-  // 초기 권한 상태 확인
-  useEffect(() => {
-    checkPermission();
-  }, [checkPermission]);
+  // 🚨 자동 권한 체크 차단: signin 전에는 권한 체크하지 않음
+  // 권한 체크는 로그인 후 home 화면에서 수동으로 호출하도록 변경됨
+  // useEffect(() => {
+  //   checkPermission();
+  // }, [checkPermission]);
 
   return {
     permissionState,

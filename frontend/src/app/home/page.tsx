@@ -98,11 +98,11 @@ import {
 } from '../../utils/domainDetection';
 
 import memberService from '@/services/memberService';
+import { useAuth } from '@/contexts/AuthContext';
 import LocationTrackingStatus from '@/components/common/LocationTrackingStatus';
 import GroupInitModal from '@/components/common/GroupInitModal';
 import scheduleService from '../../services/scheduleService';
 import groupService from '@/services/groupService';
-import { useAuth } from '@/contexts/AuthContext';
 import authService from '@/services/authService';
 import notificationService from '@/services/notificationService';
 import { 
@@ -935,6 +935,38 @@ export default function HomePage() {
       delete (window as any).__REDIRECT_TIMESTAMP__;
     }
   }, [router]);
+  
+  // 🚨 로그인 완료 후 권한 요청 활성화
+  useEffect(() => {
+    if (isLoggedIn && user && !authLoading) {
+      console.log('🔒 [PERMISSION] 로그인 완료 - 권한 요청 활성화');
+      
+      // 웹 권한 가드 해제
+      if (typeof window !== 'undefined') {
+        (window as any).__SMAP_PERM_ALLOW__ = true;
+        if (typeof (window as any).SMAP_ENABLE_PERMISSIONS === 'function') {
+          (window as any).SMAP_ENABLE_PERMISSIONS();
+        }
+      }
+      
+      // iOS 네이티브에게 로그인 완료 알림 및 권한 요청 시작
+      if (typeof window !== 'undefined' && (window as any).webkit?.messageHandlers?.smapIos) {
+        try {
+          (window as any).webkit.messageHandlers.smapIos.postMessage({
+            type: 'userInfo',
+            userInfo: {
+              mt_idx: user.mt_idx,
+              mt_name: user.mt_name,
+              isLoggedIn: true
+            }
+          });
+          console.log('🚨 [PERMISSION] iOS에게 로그인 완료 및 권한 요청 시작 알림');
+        } catch (error) {
+          console.error('🚨 [PERMISSION] iOS 알림 실패:', error);
+        }
+      }
+    }
+  }, [isLoggedIn, user, authLoading]);
   
   // 🔧 사용자 정보 디버깅
   useEffect(() => {

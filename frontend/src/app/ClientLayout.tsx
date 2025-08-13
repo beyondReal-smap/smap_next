@@ -87,16 +87,26 @@ function PermissionGuard() {
       if (!(window as any).__SMAP_PERMISSION_GUARD_INSTALLED__) {
         (window as any).__SMAP_PERMISSION_GUARD_INSTALLED__ = true;
         (window as any).__SMAP_PERM_ALLOW__ = false;
+        
+        console.log('🚨 [SMAP-PERM] CRITICAL: Installing comprehensive permission guard - BLOCKING ALL PERMISSIONS UNTIL LOGIN');
+        
+        // 🚨 CRITICAL: 모든 권한 요청을 원천 차단
+        const w: any = window as any;
+        
+        // 🚨 1. IMMEDIATE BLOCK: 즉시 모든 권한 API를 무력화
+        w.__SMAP_BLOCK_ALL_PERMISSIONS__ = true;
+        
+        // 🚨 2. Notification API 완전 차단
         const hasNotification = typeof (window as any).Notification !== 'undefined';
         const NotificationAny = (window as any).Notification;
         if (hasNotification && NotificationAny.requestPermission) {
           const originalReq = NotificationAny.requestPermission.bind(NotificationAny);
           NotificationAny.__originalRequestPermission__ = originalReq;
           NotificationAny.requestPermission = function(cb?: any){
+            console.warn('🚨 [SMAP-PERM] CRITICAL BLOCK: Notification.requestPermission DENIED UNTIL LOGIN');
             if (!(window as any).__SMAP_PERM_ALLOW__) {
-              console.warn('[SMAP-PERM] Notification.requestPermission blocked until login');
-              const p = Promise.resolve('default');
-              if (typeof cb === 'function') { try { cb('default'); } catch(_) {} }
+              const p = Promise.resolve('denied');
+              if (typeof cb === 'function') { try { cb('denied'); } catch(_) {} }
               return p as any;
             }
             return originalReq(cb);
@@ -107,9 +117,9 @@ function PermissionGuard() {
           const originalGUM = md.getUserMedia.bind(md);
           md.__originalGetUserMedia__ = originalGUM;
           md.getUserMedia = function(constraints: any){
+            console.warn('🚨 [SMAP-PERM] CRITICAL BLOCK: getUserMedia (CAMERA/MIC) DENIED UNTIL LOGIN');
             if (!(window as any).__SMAP_PERM_ALLOW__) {
-              console.warn('[SMAP-PERM] getUserMedia blocked until login');
-              return Promise.reject(new DOMException('NotAllowedError', 'SMAP: blocked until login'));
+              return Promise.reject(new DOMException('NotAllowedError', 'SMAP: Camera/Microphone blocked until login'));
             }
             return originalGUM(constraints);
           };
@@ -121,8 +131,9 @@ function PermissionGuard() {
           perm.query = function(descriptor: any){
             try {
               const name = (descriptor && (descriptor.name || descriptor)) || '';
-              if (!(window as any).__SMAP_PERM_ALLOW__ && (name === 'notifications' || name === 'camera' || name === 'microphone')) {
-                return Promise.resolve({ state: 'prompt' });
+              if (!(window as any).__SMAP_PERM_ALLOW__ && (name === 'notifications' || name === 'camera' || name === 'microphone' || name === 'geolocation')) {
+                console.warn('🚨 [SMAP-PERM] CRITICAL BLOCK: permissions.query DENIED UNTIL LOGIN for:', name);
+                return Promise.resolve({ state: 'denied' });
               }
             } catch(_) {}
             return originalQuery(descriptor);
@@ -152,7 +163,9 @@ function PermissionGuard() {
                   type === 'requestLocationPermission' ||
                   type === 'setAlarmPermission' ||
                   type === 'openPhoto' ||
-                  type === 'openAlbum'
+                  type === 'openAlbum' ||
+                  type === 'checkLocationPermission' ||
+                  type === 'startLocationUpdates'
                 );
                 if (!allow && isPermissionTrigger) {
                   console.warn('[SMAP-PERM] smapIos.postMessage blocked until login:', type);
@@ -163,6 +176,42 @@ function PermissionGuard() {
             };
             console.log('[SMAP-PERM] iOS bridge guard installed');
           }
+        }
+
+        // 전역 권한 요청 함수들 차단
+        if (!w.__SMAP_GLOBAL_PERMS_GUARDED__) {
+          w.__SMAP_GLOBAL_PERMS_GUARDED__ = true;
+          
+          // 전역 alert/confirm도 권한 관련이면 차단
+          const origAlert = w.alert;
+          const origConfirm = w.confirm;
+          if (origAlert) {
+            w.__SMAP_ORIG_ALERT__ = origAlert;
+            w.alert = function(message: any) {
+              if (!w.__SMAP_PERM_ALLOW__ && typeof message === 'string') {
+                const msg = message.toLowerCase();
+                if (msg.includes('권한') || msg.includes('permission') || msg.includes('camera') || msg.includes('location') || msg.includes('microphone')) {
+                  console.warn('[SMAP-PERM] alert blocked (permission-related):', message);
+                  return;
+                }
+              }
+              return origAlert(message);
+            };
+          }
+          if (origConfirm) {
+            w.__SMAP_ORIG_CONFIRM__ = origConfirm;
+            w.confirm = function(message: any) {
+              if (!w.__SMAP_PERM_ALLOW__ && typeof message === 'string') {
+                const msg = message.toLowerCase();
+                if (msg.includes('권한') || msg.includes('permission') || msg.includes('camera') || msg.includes('location') || msg.includes('microphone')) {
+                  console.warn('[SMAP-PERM] confirm blocked (permission-related):', message);
+                  return false;
+                }
+              }
+              return origConfirm(message);
+            };
+          }
+          console.log('[SMAP-PERM] Global permission guards installed');
         }
 
         // geolocation 가드: 로그인 전 위치 권한 요청 차단
@@ -196,6 +245,54 @@ function PermissionGuard() {
             };
           }
           console.log('[SMAP-PERM] geolocation guard installed');
+        }
+
+        // 🚨 웹뷰 페이지 로드 시 자동 권한 체크/요청 차단
+        if (!w.__SMAP_PAGE_PERM_GUARD__) {
+          w.__SMAP_PAGE_PERM_GUARD__ = true;
+          
+          // 페이지 로드 완료 이벤트도 차단
+          const origAddEventListener = w.addEventListener;
+          if (origAddEventListener) {
+            w.__SMAP_ORIG_ADDEVENT__ = origAddEventListener;
+            w.addEventListener = function(type: string, listener: any, options?: any) {
+              if (!w.__SMAP_PERM_ALLOW__ && (type === 'load' || type === 'DOMContentLoaded')) {
+                const wrappedListener = function(event: any) {
+                  console.warn('[SMAP-PERM] Page load event listener blocked until login:', type);
+                  // 로그인 전에는 권한 요청 코드가 실행되지 않도록 리스너 차단
+                  if (w.__SMAP_PERM_ALLOW__) {
+                    return listener(event);
+                  }
+                };
+                return origAddEventListener.call(this, type, wrappedListener, options);
+              }
+              return origAddEventListener.call(this, type, listener, options);
+            };
+          }
+          
+          // fetch/XMLHttpRequest도 권한 관련 API 호출 차단
+          const origFetch = w.fetch;
+          if (origFetch) {
+            w.__SMAP_ORIG_FETCH__ = origFetch;
+            w.fetch = function(input: any, init?: any) {
+              const url = typeof input === 'string' ? input : input?.url || '';
+              if (!w.__SMAP_PERM_ALLOW__ && typeof url === 'string') {
+                const blockedPaths = [
+                  '/api/permissions',
+                  '/api/fcm',
+                  '/api/location',
+                  'requestPermission',
+                  'checkPermission'
+                ];
+                if (blockedPaths.some(path => url.includes(path))) {
+                  console.warn('[SMAP-PERM] fetch blocked (permission-related):', url);
+                  return Promise.reject(new Error('SMAP: Permission API blocked until login'));
+                }
+              }
+              return origFetch.call(this, input, init);
+            };
+          }
+          console.log('[SMAP-PERM] Page-level permission guards installed');
         }
       }
       (window as any).__SMAP_PERM_ALLOW__ = !!isLoggedIn;

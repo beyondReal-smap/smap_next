@@ -19,6 +19,7 @@ import AVFoundation
 import Photos
 import UserNotifications
 import CoreMotion
+import FirebaseMessaging
 
 class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, WKUIDelegate {
     var popoverController: UIPopoverPresentationController?// 태블릿용 공유하기 띄우기
@@ -368,13 +369,9 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
 
 	override func viewDidAppear(_ animated: Bool) {
 		super.viewDidAppear(animated)
-        // 최초 1회만 프리퍼미션 플로우 실행 (로그인 후로 지연)
-        if !didRunPrePermissionFlow {
-            didRunPrePermissionFlow = true
-            DispatchQueue.main.async { [weak self] in
-                self?.dispatchPrePermissionFlow()
-            }
-        }
+        // 🚨 권한 요청 완전 차단: signin 전에는 절대 권한 요청하지 않음
+        // 권한 요청은 로그인 후 home 화면에서만 실행하도록 변경됨
+        print("🔒 [PERMISSION] viewDidAppear - 자동 권한 요청 차단됨 (로그인 후 home 화면에서만 실행)")
 	}
 
     // MARK: - Pre-permission Flow (Push → Camera → Photo → Microphone → Motion → Location)
@@ -1679,12 +1676,33 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
         
         print("🎉 [USER INFO MAINVIEW] 사용자 정보 처리 완료!")
 
-        // ✅ 로그인 직후 권한 시퀀스 실행 (최초 1회)
+        // 🚨 로그인 완료 후 FCM 수동 활성화
+        print("🔥 [FCM] 로그인 완료 - FCM 수동 활성화 시작")
+        DispatchQueue.main.async {
+            // FCM 자동 초기화 활성화
+            Messaging.messaging().isAutoInitEnabled = true
+            // FCM delegate 설정
+            Messaging.messaging().delegate = UIApplication.shared.delegate as? MessagingDelegate
+            print("✅ [FCM] 수동 활성화 완료")
+        }
+
+        // 🚨 로그인 완료 후 권한 요청 시작
+        print("🔒 [PERMISSION] 로그인 완료 - 권한 요청 시퀀스 시작")
+        
+        // 최초 1회만 권한 요청하도록 체크
         if !UserDefaults.standard.bool(forKey: "smap_permissions_after_login_done") {
             UserDefaults.standard.set(true, forKey: "smap_permissions_after_login_done")
-            // 로그인 직후 즉시 실행
-            runPermissionsSequenceAfterLogin()
+            UserDefaults.standard.synchronize()
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                self?.runPermissionsSequenceAfterLogin()
+            }
+            print("🚨 [PERMISSION] 1초 후 권한 요청 시퀀스 시작 예약됨")
+        } else {
+            print("🔒 [PERMISSION] 이미 권한 요청을 완료한 사용자 - 스킵")
         }
+
+
         
         // 🔓 웹 권한 가드 해제 (알림/카메라 등 웹 API 사용 허용)
         let enablePermScript = """

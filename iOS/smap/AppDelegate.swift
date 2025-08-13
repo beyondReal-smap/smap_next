@@ -65,19 +65,26 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         // GADMobileAds.sharedInstance().start(completionHandler: nil)
 
         
-        Messaging.messaging().isAutoInitEnabled = true
-        Messaging.messaging().delegate = self
+        // 🚨 FCM 자동 초기화 완전 비활성화 - 로그인 후에만 활성화
+        Messaging.messaging().isAutoInitEnabled = false
+        print("🚨 [FCM] 자동 초기화 비활성화 - 로그인 후 수동 활성화 예정")
+        
+        // 🚨 FCM delegate 설정도 로그인 후로 지연
+        // Messaging.messaging().delegate = self  // 일단 주석 처리
         
         if #available(iOS 10.0, *) {
             // For iOS 10 display notification (sent via APNS)
             UNUserNotificationCenter.current().delegate = self
-            // 앱 시작 시 자동 권한 요청 완전 비활성화 (로그인 후 MainView에서 프리퍼미션 처리)
-            print("🔔 [PUSH] 런치 시 권한 요청 비활성화 - 로그인 후 처리")
+            // 🚨 앱 시작 시 자동 권한 요청 완전 비활성화 (로그인 후 MainView에서 프리퍼미션 처리)
+            print("🔔 [PUSH] 런치 시 권한 요청 완전 비활성화 - 로그인 후 처리")
+            print("🚨 [PUSH] FCM delegate 설정도 로그인 후로 지연")
         } else {
-            let settings: UIUserNotificationSettings =
-                UIUserNotificationSettings(types: [.alert, .badge, .sound], categories: nil)
-            application.registerUserNotificationSettings(settings)
-            application.registerForRemoteNotifications()
+            // iOS 10 미만에서도 자동 권한 요청 비활성화
+            print("🚨 [PUSH] iOS 10 미만에서도 자동 권한 요청 비활성화")
+            // let settings: UIUserNotificationSettings =
+            //     UIUserNotificationSettings(types: [.alert, .badge, .sound], categories: nil)
+            // application.registerUserNotificationSettings(settings)
+            // application.registerForRemoteNotifications()
         }
         
         IQKeyboardManager.shared.enable = true
@@ -192,11 +199,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     }
     
     private func checkPushNotificationStatus() {
+        // 🚨 로그인 전에는 권한 상태 체크하지 않음
+        guard UserDefaults.standard.bool(forKey: "is_logged_in") else {
+            print("🔒 [PUSH] 로그인 전 - 권한 상태 체크 생략")
+            return
+        }
+        
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             DispatchQueue.main.async {
                 print("🔍 [PUSH] 앱 활성화 시 권한 상태: \(self.authorizationStatusString(settings.authorizationStatus))")
                 
-                // Firebase 토큰과 함께 상태 출력
+                // Firebase 토큰과 함께 상태 출력 (로그인된 경우만)
                 if let token = Messaging.messaging().fcmToken {
                     print("🔔 [PUSH] 현재 FCM 토큰: \(token)")
                     
@@ -285,8 +298,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         // 앱 활성화 시 성능 최적화
         URLCache.shared.removeAllCachedResponses()
         
-        // 푸시 알림 권한 상태 확인
-        checkPushNotificationStatus()
+        // 🚨 로그인 전에는 푸시 알림 권한 체크하지 않음
+        if UserDefaults.standard.bool(forKey: "is_logged_in") {
+            print("🔍 [PUSH] 로그인 상태 - 푸시 알림 권한 상태 확인")
+            checkPushNotificationStatus()
+        } else {
+            print("🔒 [PUSH] 로그인 전 - 푸시 알림 권한 상태 체크 생략")
+        }
     }
 
     func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {

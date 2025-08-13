@@ -191,8 +191,12 @@ window.SmapApp = {
 
     // 네이티브 기능들
     notification: {
-        // 알림 권한 요청
+        // 알림 권한 요청 (로그인 전 차단)
         requestPermission: function() {
+            if (!(window.__SMAP_PERM_ALLOW__)) {
+                console.warn('[SMAP-PERM] ios-bridge notification.requestPermission blocked until login');
+                return;
+            }
             window.SmapApp.sendMessage('requestNotificationPermission');
         }
     },
@@ -1215,8 +1219,12 @@ console.log('   SMAP_SET_NATIVE_FCM_TOKEN(token) - iOS 네이티브 FCM 토큰 �
 window.iosBridge = {
     // 기존 메서드들...
     
-    // 알림 관련
+    // 알림 관련 (로그인 전 차단)
     requestNotificationPermission() {
+        if (!(window.__SMAP_PERM_ALLOW__)) {
+            console.warn('[SMAP-PERM] ios-bridge requestNotificationPermission blocked until login');
+            return;
+        }
         if (window.webkit?.messageHandlers?.smapIos) {
             window.webkit.messageHandlers.smapIos.postMessage({
                 type: 'requestNotificationPermission',
