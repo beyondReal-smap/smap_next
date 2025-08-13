@@ -361,7 +361,12 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
         //     await self.loadAds(isShow:false, errorCount:0)
         // }
         
-        self.locationPermissionCheck()
+        // 로그인 전에는 위치 권한 관련 알림/체크를 수행하지 않음
+        if UserDefaults.standard.bool(forKey: "is_logged_in") {
+            self.locationPermissionCheck()
+        } else {
+            print("🔒 [PERMISSION] 로그인 전 - locationPermissionCheck 스킵(viewDidLoad)")
+        }
         
         // 🎮 햅틱 시스템 테스트 (항상 실행 - 실제 기기 테스트용)
         // testHapticSystem()
@@ -577,7 +582,11 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
     @objc func appStateForeground(){
         self.web_view.reload()
         
-        self.locationPermissionCheck()
+        if UserDefaults.standard.bool(forKey: "is_logged_in") {
+            self.locationPermissionCheck()
+        } else {
+            print("🔒 [PERMISSION] 로그인 전 - locationPermissionCheck 스킵(appStateForeground)")
+        }
         
         let location = LocationService.sharedInstance.getLastLocation()
         let lat = location.coordinate.latitude
@@ -626,6 +635,11 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
     }
     
     private func locationPermissionCheck() {
+        // 로그인 전에는 어떤 위치 권한 안내/요청도 표시하지 않음
+        guard UserDefaults.standard.bool(forKey: "is_logged_in") else {
+            print("🔒 [PERMISSION] 로그인 전 - locationPermissionCheck 스킵")
+            return
+        }
         print("locationPermissionCheck 호출됨")
         
         // 현재 위치 권한 상태를 정확히 확인

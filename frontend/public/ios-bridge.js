@@ -119,32 +119,38 @@ console.log('🌉 [iOS Bridge] User Agent:', navigator.userAgent);
 
             // 🚨 퍼미션 가드: 로그인 전 권한 유발 postMessage 차단 (가장 이른 시점에 설치)
             try {
-                if (!window.__SMAP_PM_GUARD_INSTALLED__ && window.webkit.messageHandlers.smapIos && typeof window.webkit.messageHandlers.smapIos.postMessage === 'function') {
+                if (!window.__SMAP_PM_GUARD_INSTALLED__) {
                     window.__SMAP_PM_GUARD_INSTALLED__ = true;
-                    const __origPost__ = window.webkit.messageHandlers.smapIos.postMessage.bind(window.webkit.messageHandlers.smapIos);
-                    window.webkit.messageHandlers.smapIos.postMessage = function(message) {
-                        try {
-                            const allow = !!window.__SMAP_PERM_ALLOW__;
-                            const type = (message && (message.type || message.action)) || '';
-                            const blockedTypes = [
-                                'requestNotificationPermission',
-                                'requestCameraPermission',
-                                'requestPhotoLibraryPermission',
-                                'requestLocationPermission',
-                                'openPhoto',
-                                'openAlbum',
-                                'startLocationUpdates',
-                                'checkLocationPermission',
-                                'setAlarmPermission'
-                            ];
-                            if (!allow && blockedTypes.includes(type)) {
-                                console.warn('[SMAP-PERM] postMessage blocked until login:', type);
-                                return;
-                            }
-                        } catch (e) {}
-                        return __origPost__(message);
+                    const blockedTypes = [
+                        'requestNotificationPermission',
+                        'requestCameraPermission',
+                        'requestPhotoLibraryPermission',
+                        'requestLocationPermission',
+                        'openPhoto',
+                        'openAlbum',
+                        'startLocationUpdates',
+                        'checkLocationPermission',
+                        'setAlarmPermission'
+                    ];
+                    const wrapHandler = (handlerName) => {
+                        const handler = window.webkit.messageHandlers[handlerName];
+                        if (!handler || typeof handler.postMessage !== 'function' || handler.__smapWrapped__) return;
+                        const __origPost__ = handler.postMessage.bind(handler);
+                        handler.postMessage = function(message) {
+                            try {
+                                const allow = !!window.__SMAP_PERM_ALLOW__;
+                                const type = (message && (message.type || message.action)) || '';
+                                if (!allow && blockedTypes.includes(type)) {
+                                    console.warn('[SMAP-PERM] postMessage blocked until login:', handlerName, type);
+                                    return;
+                                }
+                            } catch (e) {}
+                            return __origPost__(message);
+                        };
+                        handler.__smapWrapped__ = true;
+                        debugLog(`[iOS Bridge] postMessage permission guard installed for ${handlerName}`);
                     };
-                    debugLog('[iOS Bridge] postMessage permission guard installed');
+                    Object.keys(window.webkit.messageHandlers).forEach(wrapHandler);
                 }
             } catch (e) {
                 console.warn('[iOS Bridge] postMessage guard install failed:', e);
