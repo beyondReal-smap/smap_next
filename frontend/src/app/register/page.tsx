@@ -37,35 +37,35 @@ const TERMS_DATA = [
     title: '서비스 이용약관',
     required: true,
     content: 'SMAP 서비스 이용에 관한 기본 약관입니다.',
-    link: 'https://schedulemap.notion.site/30b32b5ad0bc4f99a39b28c0fe5f1de4?source=copy_link'
+    link: '/setting/service'
   },
   {
     id: 'mt_agree2', 
     title: '개인정보 처리방침',
     required: true,
     content: '개인정보 수집, 이용, 보관에 관한 정책입니다.',
-    link: 'https://schedulemap.notion.site/2ac62e02f97b4d61945d68c2d89109e9?source=copy_link'
+    link: '/setting/terms/privacy'
   },
   {
     id: 'mt_agree3',
     title: '위치기반서비스 이용약관',
     required: true,
     content: '위치정보 수집 및 이용에 관한 약관입니다.',
-    link: 'https://schedulemap.notion.site/69cf94c6a04e471d8c3e3043f95baefb?source=copy_link'
+    link: '/setting/terms/location'
   },
   {
     id: 'mt_agree4',
     title: '개인정보 제3자 제공 동의',
     required: false,
     content: '서비스 향상을 위한 개인정보 제3자 제공 동의입니다.',
-    link: 'https://schedulemap.notion.site/3-21b302dcaba0490fbaa9430618a74f01?source=copy_link'
+    link: '/setting/terms/third-party'
   },
   {
     id: 'mt_agree5',
     title: '마케팅 정보 수신 동의',
     required: false,
     content: '이벤트, 혜택 등 마케팅 정보 수신 동의입니다.',
-    link: 'https://schedulemap.notion.site/7e35638d106f433f86fa95f88ba6efb1?source=copy_link'
+    link: '/setting/terms/marketing'
   }
 ];
 
@@ -1793,7 +1793,19 @@ export default function RegisterPage() {
                         className="flex-shrink-0 p-2 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
                         onClick={(e) => {
                           e.stopPropagation();
-                          window.open(term.link, '_blank');
+                          // 내부 라우트로 이동 (새 탭이 아닌 현재 탭에서)
+                          try {
+                            const isInternal = term.link && term.link.startsWith('/');
+                            if (isInternal) {
+                              window.location.href = term.link;
+                            } else if (term.link) {
+                              window.open(term.link, '_blank');
+                            }
+                          } catch {
+                            if (term.link) {
+                              window.open(term.link, '_blank');
+                            }
+                          }
                         }}
                       >
                         <FiChevronRight className="w-4 h-4 text-gray-400" />
