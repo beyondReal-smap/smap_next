@@ -303,6 +303,17 @@ function RegisterLayoutContent({
 }) {
   const router = useRouter();
   const { getCurrentStepNumber, getTotalSteps, getStepName, currentStep, isComplete, setCurrentStep, REGISTER_STEPS, hasOpenModal, setBirthModalOpen } = useRegisterContext();
+
+  // 소셜 간편가입(구글/애플) 여부 감지 (URL 파라미터 기반)
+  const isSimpleSocial = React.useMemo(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const social = params.get('social');
+      return social === 'google' || social === 'apple';
+    } catch {
+      return false;
+    }
+  }, []);
   
   // 소셜 로그인 상태 확인을 위해 registerData가 필요하지만 
   // layout에서는 직접 접근할 수 없으므로 sessionStorage에서 확인
@@ -525,11 +536,13 @@ function RegisterLayoutContent({
                     <div className="flex items-center space-x-2">
                       <div className="flex items-center space-x-1">
                         <span className="text-xs font-semibold" style={{color: '#0114a2'}}>
-                          {getCurrentStepNumber()}
+                          {isSimpleSocial 
+                            ? (currentStep === REGISTER_STEPS.TERMS ? 1 : currentStep === REGISTER_STEPS.BASIC_INFO ? 2 : currentStep === REGISTER_STEPS.PROFILE ? 3 : 3)
+                            : getCurrentStepNumber()}
                         </span>
                         <span className="text-xs text-gray-400">/</span>
                         <span className="text-xs text-gray-500">
-                          {getTotalSteps()}
+                          {isSimpleSocial ? 3 : getTotalSteps()}
                         </span>
                         <span className="text-xs text-gray-500">
                           • {getStepName(currentStep)}
