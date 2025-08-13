@@ -1,14 +1,55 @@
 "use client";
-import Header from '@/components/Header';
-import React from 'react';
+
+import React, { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
+import AnimatedHeader from '../../../../components/common/AnimatedHeader';
+import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
+
+const pageAnimations = `
+html, body { width: 100%; overflow-x: hidden; position: relative; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.animate-fadeIn { animation: fadeIn 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards; }
+.glass-effect { position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; z-index: 9999 !important; background: rgba(255, 255, 255, 0.8) !important; backdrop-filter: blur(10px) !important; -webkit-backdrop-filter: blur(10px) !important; border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important; box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08) !important; }
+`;
 
 export default function PrivacyPolicyPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    document.body.style.overflowY = 'auto';
+    document.documentElement.style.overflowY = 'auto';
+    return () => {
+      document.body.style.overflowY = '';
+      document.documentElement.style.overflowY = '';
+    };
+  }, []);
+
+  const handleBack = () => {
+    triggerHapticFeedback(HapticFeedbackType.SELECTION, '개인정보 처리방침 뒤로가기', { component: 'setting-terms', action: 'back-navigation' });
+    router.push('/setting');
+  };
+
   return (
-    <div className="bg-gray-50 min-h-screen flex flex-col">
-      <Header title="개인정보 처리방침" />
-      <div className="flex-1 px-4 py-8 max-w-2xl mx-auto">
-        <div className="bg-white rounded-2xl shadow-md p-6 text-sm leading-relaxed">
-          <h1 className="text-xl font-bold mb-4">개인정보처리방침</h1>
+    <div className="fixed inset-0 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 main-container" style={{ paddingTop: '0px', marginTop: '0px', top: '0px' }}>
+      <style jsx global>{pageAnimations}</style>
+        <AnimatedHeader variant="enhanced" className="setting-header glass-effect">
+          <motion.div initial={{ opacity: 0, x: -40 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }} className="setting-header-content motion-div">
+            <motion.button onClick={handleBack} className="setting-back-button" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} aria-label="뒤로가기">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+            </motion.button>
+            <div className="setting-header-text">
+              <h1 className="text-lg font-bold text-gray-900 leading-tight">개인정보 처리방침</h1>
+              <p className="text-xs text-gray-500 leading-tight">개인정보 수집 및 처리 방침을 확인하세요</p>
+            </div>
+          </motion.div>
+        </AnimatedHeader>
+
+        <motion.div initial="initial" animate="in" exit="out" className="absolute inset-0 px-4 space-y-6 content-area hide-scrollbar pt-20" style={{ overflow: 'hidden', overflowY: 'auto' }}>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-fadeIn">
+            <div className="p-6 text-sm leading-relaxed max-w-4xl mx-auto">
+          <h2 className="text-2xl font-bold mb-6 text-center">개인정보 처리방침</h2>
+          <p className="text-sm text-gray-500 mb-8 text-center">시행일: 2024-05-30</p>
           <p className="mb-4">
             비욘드리얼 ("회사"라 함)는 정보통신망 이용촉진 및 정보보호 등에 관한 법률, 개인정보보호법, 통신비밀보호법, 전기통신사업법, 등 정보통신서비스제공자가 준수하여야 할 관련 법령상의 개인정보보호 규정을 준수하며, 관련 법령에 의거한 개인정보처리방침을 정하여 이용자 권익 보호에 최선을 다하고 있습니다.
           </p>
@@ -344,6 +385,7 @@ export default function PrivacyPolicyPage() {
           </ul>
         </div>
       </div>
-    </div>
+    </motion.div>
+  </div>
   );
 } 

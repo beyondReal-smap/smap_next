@@ -353,23 +353,51 @@ export default function SettingsPage() {
           label: '계정설정', 
           href: '/setting/account', 
           icon: FiUser,
-          color: 'bg-blue-500',
+          color: 'bg-indigo-500',
           description: '프로필 및 개인정보 관리'
         },
       ]
     },
-    // {
-    //   title: '약관 & 정책',
-    //   items: [
-    //     { 
-    //       label: '약관 및 정책', 
-    //       href: '/setting/terms', 
-    //       icon: FiFileText,
-    //       color: 'bg-yellow-500',
-    //       description: '이용약관 및 개인정보처리방침'
-    //     },
-    //   ]
-    // },
+    {
+      title: '약관 & 정책',
+      items: [
+        { 
+          label: '서비스 이용약관', 
+          href: '/setting/service', 
+          icon: FiFileText,
+          color: 'bg-emerald-500',
+          description: '서비스 이용에 관한 약관'
+        },
+        { 
+          label: '개인정보 처리방침', 
+          href: '/setting/terms/privacy', 
+          icon: FiShield,
+          color: 'bg-cyan-500',
+          description: '개인정보 수집 및 처리 방침'
+        },
+        { 
+          label: '위치기반서비스 이용약관', 
+          href: '/setting/terms/location', 
+          icon: FiSettings,
+          color: 'bg-violet-500',
+          description: '위치정보 수집 및 이용 약관'
+        },
+        { 
+          label: '마케팅 정보 수집 및 이용 동의', 
+          href: '/setting/terms/marketing', 
+          icon: FiStar,
+          color: 'bg-[#0114a2]',
+          description: '이벤트/혜택 안내를 위한 정보 수집 동의'
+        },
+        { 
+          label: '개인정보 제3자 제공 동의', 
+          href: '/setting/terms/third-party', 
+          icon: FiHelpCircle,
+          color: 'bg-pink-500',
+          description: '제3자 제공에 대한 동의'
+        },
+      ]
+    },
     {
       title: '고객 지원',
       items: [

@@ -179,20 +179,9 @@ const MOCK_COUPONS: Coupon[] = [
     minAmount: 10000,
     category: '전체'
   },
+
   {
     id: '2',
-    title: '프리미엄 플랜 할인',
-    description: '프리미엄 구독 시 할인',
-    discount: '5,000원',
-    type: 'fixed',
-    code: 'PREMIUM5K',
-    expiryDate: '2024-11-30',
-    status: 'active',
-    minAmount: 20000,
-    category: '구독'
-  },
-  {
-    id: '3',
     title: '무료 배송',
     description: '배송비 무료 혜택',
     discount: '배송비',
@@ -203,7 +192,7 @@ const MOCK_COUPONS: Coupon[] = [
     category: '배송'
   },
   {
-    id: '4',
+    id: '3',
     title: '여름 특가',
     description: '여름 시즌 한정 할인',
     discount: '15%',
