@@ -10,6 +10,8 @@ import FirebaseCore
 import FirebaseMessaging
 import IQKeyboardManagerSwift
 import CoreLocation
+import AVFoundation
+import Photos
 import CoreMotion
 import SwiftyStoreKit
 import GoogleSignIn
@@ -307,11 +309,40 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         if UserDefaults.standard.bool(forKey: "is_logged_in") {
             print("🔍 [PUSH] 로그인 상태 - 푸시 알림 권한 상태 확인")
             checkPushNotificationStatus()
-            // 로그인 후 권한 온보딩/보완 실행
-            runPermissionOnboardingIfNeeded()
+            // 로그인 후 권한 온보딩/보완 실행 - 반드시 푸시 권한 요청이 끝난 다음에 진행
+            waitForPushPermissionSettlement { [weak self] in
+                self?.runPermissionOnboardingIfNeeded()
+            }
         } else {
             print("🔒 [PUSH] 로그인 전 - 푸시 알림 권한 상태 체크 생략")
         }
+    }
+
+    // MARK: - 🔔 푸시 권한 요청 종료 대기
+    private func waitForPushPermissionSettlement(maxWaitSeconds: Double = 8.0, completion: @escaping () -> Void) {
+        let center = UNUserNotificationCenter.current()
+        var waited: Double = 0
+        func poll() {
+            center.getNotificationSettings { settings in
+                DispatchQueue.main.async {
+                    let status = settings.authorizationStatus
+                    // notDetermined가 아니면 요청창이 사라진 상태로 간주
+                    if status != .notDetermined {
+                        print("🔔 [PUSH] 권한 상태 확정: \(self.authorizationStatusString(status)) → 후속 온보딩 진행")
+                        completion()
+                        return
+                    }
+                    if waited >= maxWaitSeconds {
+                        print("⚠️ [PUSH] 권한 상태 대기 타임아웃 → 후속 온보딩 진행")
+                        completion()
+                        return
+                    }
+                    waited += 0.4
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { poll() }
+                }
+            }
+        }
+        poll()
     }
 
     // MARK: - 📍🏃 권한 온보딩/보완 로직
@@ -322,24 +353,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         let hasDoneOnboarding = UserDefaults.standard.bool(forKey: "smap_permission_onboarding_done")
 
         if !hasDoneOnboarding {
-            print("🧭 [PERM] 첫 진입 - 모든 주요 권한 안내 및 요청 시작")
-            // 1) 위치 권한: 한 번만 자동 허용 플래그 세팅 후 요청
-            UserDefaults.standard.set(true, forKey: "smap_allow_location_request_now")
-            requestLocationWhenInUse()
-
-            // 2) 동작(모션) 권한: 미결정이면 요청 트리거
-            requestMotionPermissionIfNeeded()
-
-            // 온보딩 완료 마크 (다음부터는 보완 로직으로)
-            UserDefaults.standard.set(true, forKey: "smap_permission_onboarding_done")
-            print("✅ [PERM] 권한 온보딩 완료 마크")
+            print("🧭 [PERM] 첫 진입 - 모든 주요 권한 순차 요청 시작 (모션 → 위치)")
+            performInitialPermissionSequence { [weak self] in
+                // 온보딩 완료 마크 (다음부터는 보완 로직으로)
+                UserDefaults.standard.set(true, forKey: "smap_permission_onboarding_done")
+                print("✅ [PERM] 권한 온보딩 완료 마크")
+                // 보완 체크 한 번 더 (혹시 한쪽이 여전히 notDetermined이면)
+                self?.ensureMissingPermissionsSequence()
+            }
             return
         }
 
         // 온보딩 이후: 결핍된 권한만 보완 요청
-        print("🧭 [PERM] 재진입 - 결핍된 권한만 보완 요청")
-        ensureLocationPermissionIfNotDetermined()
-        ensureMotionPermissionIfNotDetermined()
+        print("🧭 [PERM] 재진입 - 결핍된 권한만 보완 요청 (모션 → 위치)")
+        ensureMissingPermissionsSequence()
     }
 
     private func requestLocationWhenInUse() {
@@ -395,6 +422,153 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             }
         }
     }
+
+    // MARK: - 🔁 순차 권한 요청 시나리오
+    private func performInitialPermissionSequence(completion: @escaping () -> Void) {
+        // 순서: 카메라 → 사진 → 모션 → 위치
+        requestCameraPermissionSequential { [weak self] in
+            self?.requestPhotoPermissionSequential { [weak self] in
+                self?.requestMotionPermissionIfNeededSequential { [weak self] in
+                    self?.requestLocationPermissionSequential {
+                        completion()
+                    }
+                }
+            }
+        }
+    }
+
+    private func ensureMissingPermissionsSequence() {
+        // 재진입 보완: 요구사항에 따라 모션/위치만 보완 (카메라/사진은 제외)
+        // 순서: 모션 → 위치
+        let motionStatus = CMMotionActivityManager.isActivityAvailable() ? CMMotionActivityManager.authorizationStatus() : .authorized
+        let locStatus: CLAuthorizationStatus = {
+            if #available(iOS 14.0, *) { return CLLocationManager().authorizationStatus }
+            return CLLocationManager.authorizationStatus()
+        }()
+
+        if motionStatus == .notDetermined {
+            requestMotionPermissionIfNeededSequential { [weak self] in
+                if locStatus == .notDetermined {
+                    self?.requestLocationPermissionSequential { }
+                }
+            }
+        } else if locStatus == .notDetermined {
+            requestLocationPermissionSequential { }
+        } else {
+            print("✅ [PERM] 모든 권한 이미 처리됨")
+        }
+    }
+
+    // 모션 권한 요청 (순차용) - 완료 콜백 제공
+    private func requestMotionPermissionIfNeededSequential(completion: @escaping () -> Void) {
+        guard CMMotionActivityManager.isActivityAvailable() else { completion(); return }
+        let status = CMMotionActivityManager.authorizationStatus()
+        if status != .notDetermined {
+            completion();
+            return
+        }
+        print("🏃 [PERM] 모션 권한 요청 시작 (순차)")
+        var attempts = 0
+        motionManager.startActivityUpdates(to: OperationQueue.main) { [weak self] _ in
+            attempts += 1
+            let current = CMMotionActivityManager.authorizationStatus()
+            if current != .notDetermined || attempts >= 3 {
+                self?.motionManager.stopActivityUpdates()
+                print("🏃 [PERM] 모션 권한 요청 완료. status=\(current.rawValue)")
+                completion()
+            }
+        }
+    }
+
+    // 위치 권한 요청 (순차용) - 완료 콜백 제공
+    private func requestLocationPermissionSequential(completion: @escaping () -> Void) {
+        let status: CLAuthorizationStatus = {
+            if #available(iOS 14.0, *) { return CLLocationManager().authorizationStatus }
+            return CLLocationManager.authorizationStatus()
+        }()
+        if status != .notDetermined {
+            completion()
+            return
+        }
+        print("📍 [PERM] 위치 권한 요청 시작 (순차)")
+        UserDefaults.standard.set(true, forKey: "smap_allow_location_request_now")
+        let lm = CLLocationManager()
+        lm.requestWhenInUseAuthorization() // 스위즐 가드로 컨트롤됨
+
+        // 상태가 결정될 때까지 폴링 (최대 10초)
+        var waited: Double = 0
+        func poll() {
+            let s: CLAuthorizationStatus = {
+                if #available(iOS 14.0, *) { return CLLocationManager().authorizationStatus }
+                return CLLocationManager.authorizationStatus()
+            }()
+            if s != .notDetermined {
+                print("📍 [PERM] 위치 권한 요청 완료. status=\(s.rawValue)")
+                completion()
+            } else if waited >= 10.0 {
+                print("⚠️ [PERM] 위치 권한 요청 타임아웃")
+                completion()
+            } else {
+                waited += 0.3
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { poll() }
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { poll() }
+    }
+
+    // 카메라 권한 요청 (순차용)
+    private func requestCameraPermissionSequential(completion: @escaping () -> Void) {
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+        switch status {
+        case .authorized, .restricted, .denied:
+            // 이미 결정됨 (restricted/denied 포함) → 다음 단계로 진행
+            completion()
+        case .notDetermined:
+            print("📷 [PERM] 카메라 권한 요청 시작 (순차)")
+            AVCaptureDevice.requestAccess(for: .video) { _ in
+                DispatchQueue.main.async {
+                    print("📷 [PERM] 카메라 권한 요청 완료")
+                    completion()
+                }
+            }
+        @unknown default:
+            completion()
+        }
+    }
+
+    // 사진 라이브러리 권한 요청 (순차용)
+    private func requestPhotoPermissionSequential(completion: @escaping () -> Void) {
+        let completeOnMain: () -> Void = { DispatchQueue.main.async { completion() } }
+        if #available(iOS 14.0, *) {
+            let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+            switch status {
+            case .authorized, .limited, .denied, .restricted:
+                completeOnMain()
+            case .notDetermined:
+                print("🖼️ [PERM] 사진 권한 요청 시작 (순차, readWrite)")
+                PHPhotoLibrary.requestAuthorization(for: .readWrite) { _ in
+                    completeOnMain()
+                }
+            @unknown default:
+                completeOnMain()
+            }
+        } else {
+            let status = PHPhotoLibrary.authorizationStatus()
+            switch status {
+            case .authorized, .denied, .restricted:
+                completeOnMain()
+            case .notDetermined:
+                print("🖼️ [PERM] 사진 권한 요청 시작 (순차, legacy)")
+                PHPhotoLibrary.requestAuthorization { _ in
+                    completeOnMain()
+                }
+            @unknown default:
+                completeOnMain()
+            }
+        }
+    }
+
+    // 프리퍼미션 알림 제거: 시스템 권한 시트만 노출 (UsageDescription으로 안내)
 
     func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
         // 세로방향 고정
