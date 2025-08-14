@@ -768,7 +768,7 @@ const ForgotPasswordPage = () => {
     return (
       <div className="flex items-center justify-center min-h-screen bg-white">
         <div className="text-center">
-          <IOSCompatibleSpinner size="lg" />
+          <IOSCompatibleSpinner size="sm" />
           <p className="text-gray-600 text-sm mt-4">페이지를 준비하고 있습니다...</p>
         </div>
       </div>

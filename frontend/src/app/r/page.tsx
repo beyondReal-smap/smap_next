@@ -23,7 +23,7 @@ export default function ShortUrlPage() {
   return (
     <div className="min-h-screen bg-white flex items-center justify-center">
       <div className="text-center">
-        <IOSCompatibleSpinner size="lg" />
+        <IOSCompatibleSpinner size="sm" />
         <p className="text-gray-600 text-sm mt-4">페이지를 이동하고 있습니다...</p>
       </div>
     </div>

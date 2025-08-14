@@ -81,7 +81,7 @@ export default function AuthPage() {
               <motion.div
                 animate={{ rotate: 360 }}
                 transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                className="mx-auto w-12 h-12 text-blue-600 mb-4"
+                className="mx-auto w-6 h-6 text-blue-600 mb-4"
               >
                 <FiLoader className="w-full h-full" />
               </motion.div>

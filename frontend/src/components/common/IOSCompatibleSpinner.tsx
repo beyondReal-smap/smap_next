@@ -77,13 +77,13 @@ export default function IOSCompatibleSpinner({
     };
   }, []);
 
-  // 크기별 클래스
+  // 크기별 클래스 (더 작은 크기로 조정)
   const getSizeClasses = () => {
     switch (size) {
-      case 'sm': return { spinner: 'w-6 h-6 border-2', text: 'text-sm' };
-      case 'md': return { spinner: 'w-8 h-8 border-4', text: 'text-base' };
-      case 'lg': return { spinner: 'w-10 h-10 border-4', text: 'text-lg' };
-      default: return { spinner: 'w-8 h-8 border-4', text: 'text-base' };
+      case 'sm': return { spinner: 'w-4 h-4 border-2', text: 'text-sm' };
+      case 'md': return { spinner: 'w-5 h-5 border-2', text: 'text-base' };
+      case 'lg': return { spinner: 'w-6 h-6 border-3', text: 'text-lg' };
+      default: return { spinner: 'w-5 h-5 border-2', text: 'text-base' };
     }
   };
 

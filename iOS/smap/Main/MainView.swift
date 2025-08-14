@@ -451,25 +451,17 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
                     UserDefaults.standard.set(true, forKey: "smap_push_prepermission_done")
                     return completion()
                 }
-                self.presentPrePermissionAlert(
-                    title: "알림 권한 안내",
-                    message: "경고, 사운드 및 아이콘 배지 알림을 제공하기 위해 권한이 필요합니다. 설정에서 변경할 수 있습니다.",
-                    onContinue: {
-                        print("🔎 [PUSH] 사용자 계속 선택 → 시스템 requestAuthorization 호출")
-                        UserDefaults.standard.set(true, forKey: "smap_push_prepermission_done")
-                        let options: UNAuthorizationOptions = [.alert, .badge, .sound]
-                        UNUserNotificationCenter.current().requestAuthorization(options: options) { _, _ in
-                            DispatchQueue.main.async {
-                                print("🔎 [PUSH] 시스템 requestAuthorization 완료 → registerForRemoteNotifications")
-                                UIApplication.shared.registerForRemoteNotifications()
-                                completion()
-                            }
-                        }
-                    },
-                    onCancel: {
+                // 🚨 프리퍼미션 모달 완전 비활성화 - 바로 시스템 권한으로 진행
+                print("🚨 [PUSH] 프리퍼미션 모달 비활성화 - 직접 시스템 권한 요청")
+                UserDefaults.standard.set(true, forKey: "smap_push_prepermission_done")
+                let options: UNAuthorizationOptions = [.alert, .badge, .sound]
+                UNUserNotificationCenter.current().requestAuthorization(options: options) { _, _ in
+                    DispatchQueue.main.async {
+                        print("🔎 [PUSH] 시스템 requestAuthorization 완료 → registerForRemoteNotifications")
+                        UIApplication.shared.registerForRemoteNotifications()
                         completion()
                     }
-                )
+                }
             }
         }
     }
@@ -481,44 +473,32 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
         let infoFlagKey = "smap_location_prepermission_info_shown"
         let hasShownInfo = UserDefaults.standard.bool(forKey: infoFlagKey)
 
-        // 1) 첫 로그인 이후 최초 1회는 권한 상태와 무관하게 안내를 보여준다 (정보용)
+        // 🚨 위치 첫 번째 프리퍼미션 모달 비활성화 - 바로 권한 요청으로 진행
         if !hasShownInfo {
-            presentPrePermissionAlert(
-                title: "위치 권한 안내",
-                message: "모임 장소 안내와 도착 알림을 위해 위치 정보가 필요합니다. 예: 일정 장소까지의 거리 표시 및 근접 시 알림 제공",
-                onContinue: { [status] in
-                    UserDefaults.standard.set(true, forKey: infoFlagKey)
-                    if status == .notDetermined {
-                        print("📍 [LOCATION] 상태 notDetermined → requestWhenInUseAuthorization 호출")
-                        // 스위즐 게이트 허용 플래그 ON (이 시점에만 시스템 팝업 허용)
-                        UserDefaults.standard.set(true, forKey: "smap_allow_location_request_now")
-                        LocationService.sharedInstance.requestWhenInUseAuthorization {
-                            completion()
-                        }
-                    } else {
-                        print("📍 [LOCATION] 이미 권한 설정됨(status=\(status.rawValue)) → 시스템 요청 없이 계속")
-                        completion()
-                    }
-                },
-                onCancel: { completion() }
-            )
+            print("🚨 [LOCATION] 첫 번째 프리퍼미션 모달 비활성화")
+            UserDefaults.standard.set(true, forKey: infoFlagKey)
+            if status == .notDetermined {
+                print("📍 [LOCATION] 상태 notDetermined → requestWhenInUseAuthorization 호출")
+                // 스위즐 게이트 허용 플래그 ON (이 시점에만 시스템 팝업 허용)
+                UserDefaults.standard.set(true, forKey: "smap_allow_location_request_now")
+                LocationService.sharedInstance.requestWhenInUseAuthorization {
+                    completion()
+                }
+            } else {
+                print("📍 [LOCATION] 이미 권한 설정됨(status=\(status.rawValue)) → 시스템 요청 없이 계속")
+                completion()
+            }
             return
         }
 
-        // 2) 정보 안내를 이미 본 경우, notDetermined일 때만 시스템 팝업 유도
+        // 🚨 위치 두 번째 프리퍼미션 모달 비활성화 - 바로 권한 요청으로 진행
         if status == .notDetermined {
-            presentPrePermissionAlert(
-                title: "위치 권한 안내",
-                message: "정확한 위치 기반 기능 제공을 위해 위치 권한이 필요합니다.",
-                onContinue: {
-                    // 스위즐 게이트 허용 플래그 ON
-                    UserDefaults.standard.set(true, forKey: "smap_allow_location_request_now")
-                    LocationService.sharedInstance.requestWhenInUseAuthorization {
-                        completion()
-                    }
-                },
-                onCancel: { completion() }
-            )
+            print("🚨 [LOCATION] 두 번째 프리퍼미션 모달 비활성화 - 직접 권한 요청")
+            // 스위즐 게이트 허용 플래그 ON
+            UserDefaults.standard.set(true, forKey: "smap_allow_location_request_now")
+            LocationService.sharedInstance.requestWhenInUseAuthorization {
+                completion()
+            }
         } else {
             print("📍 [LOCATION] notDetermined 아님 → 스킵")
             completion()
@@ -536,18 +516,12 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
 			UserDefaults.standard.set(true, forKey: "smap_camera_prepermission_done")
 			return completion()
 		}
-		presentPrePermissionAlert(
-			title: "카메라 권한 안내",
-			message: "프로필 및 그룹 사진 등록을 위해 카메라가 필요합니다. 예: 그룹 아바타 촬영 및 업로드",
-            onContinue: {
-                print("📷 [CAMERA] 사용자 계속 선택 → 시스템 requestAccess 호출")
-                UserDefaults.standard.set(true, forKey: "smap_camera_prepermission_done")
-                AVCaptureDevice.requestAccess(for: .video) { _ in
-                    DispatchQueue.main.async { completion() }
-                }
-            },
-			onCancel: { completion() }
-		)
+		// 🚨 카메라 프리퍼미션 모달 비활성화 - 바로 시스템 권한으로 진행
+		print("🚨 [CAMERA] 프리퍼미션 모달 비활성화 - 직접 시스템 권한 요청")
+		UserDefaults.standard.set(true, forKey: "smap_camera_prepermission_done")
+		AVCaptureDevice.requestAccess(for: .video) { _ in
+			DispatchQueue.main.async { completion() }
+		}
 	}
 
 	private func showPhotoPrePermissionIfNeeded(completion: @escaping () -> Void) {
@@ -566,24 +540,18 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
 			UserDefaults.standard.set(true, forKey: "smap_photo_prepermission_done")
 			return completion()
 		}
-		presentPrePermissionAlert(
-			title: "사진 보관함 권한 안내",
-			message: "프로필 및 그룹 사진 업로드/저장을 위해 사진 보관함 접근이 필요합니다.",
-            onContinue: {
-                print("📸 [PHOTO] 사용자 계속 선택 → 시스템 requestAuthorization 호출")
-                UserDefaults.standard.set(true, forKey: "smap_photo_prepermission_done")
-                if #available(iOS 14, *) {
-                    PHPhotoLibrary.requestAuthorization(for: .readWrite) { _ in
-                        DispatchQueue.main.async { completion() }
-                    }
-                } else {
-                    PHPhotoLibrary.requestAuthorization { _ in
-                        DispatchQueue.main.async { completion() }
-                    }
-                }
-            },
-			onCancel: { completion() }
-		)
+		// 🚨 사진 보관함 프리퍼미션 모달 비활성화 - 바로 시스템 권한으로 진행
+		print("🚨 [PHOTO] 프리퍼미션 모달 비활성화 - 직접 시스템 권한 요청")
+		UserDefaults.standard.set(true, forKey: "smap_photo_prepermission_done")
+		if #available(iOS 14, *) {
+			PHPhotoLibrary.requestAuthorization(for: .readWrite) { _ in
+				DispatchQueue.main.async { completion() }
+			}
+		} else {
+			PHPhotoLibrary.requestAuthorization { _ in
+				DispatchQueue.main.async { completion() }
+			}
+		}
 	}
 
 	private func showMicrophonePrePermissionIfNeeded(completion: @escaping () -> Void) {
@@ -597,18 +565,12 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
 			UserDefaults.standard.set(true, forKey: "smap_microphone_prepermission_done")
 			return completion()
 		}
-		presentPrePermissionAlert(
-			title: "마이크 권한 안내",
-			message: "음성 메시지 기능을 사용하기 위해 마이크 접근이 필요합니다.",
-            onContinue: {
-                print("🎤 [MIC] 사용자 계속 선택 → requestRecordPermission 호출")
-                UserDefaults.standard.set(true, forKey: "smap_microphone_prepermission_done")
-                AVAudioSession.sharedInstance().requestRecordPermission { _ in
-                    DispatchQueue.main.async { completion() }
-                }
-            },
-			onCancel: { completion() }
-		)
+		// 🚨 마이크 프리퍼미션 모달 비활성화 - 바로 시스템 권한으로 진행
+		print("🚨 [MIC] 프리퍼미션 모달 비활성화 - 직접 시스템 권한 요청")
+		UserDefaults.standard.set(true, forKey: "smap_microphone_prepermission_done")
+		AVAudioSession.sharedInstance().requestRecordPermission { _ in
+			DispatchQueue.main.async { completion() }
+		}
 	}
 
     private func showMotionPrePermissionIfNeeded(completion: @escaping () -> Void) {
@@ -620,43 +582,33 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
             let hasShownInfo = UserDefaults.standard.bool(forKey: infoFlagKey)
 
             if !hasShownInfo {
-                presentPrePermissionAlert(
-                    title: "동작 및 피트니스 권한 안내",
-                    message: "이동 거리 계산 및 활동 기반 알림 제공을 위해 동작 및 피트니스 데이터 접근이 필요합니다.",
-                    onContinue: { [status] in
-                        UserDefaults.standard.set(true, forKey: infoFlagKey)
-                        if status == .notDetermined {
-                            print("🏃 [MOTION] 상태 notDetermined → queryActivityStarting 호출")
-                            let manager = CMMotionActivityManager()
-                            let now = Date()
-                            let tenMinAgo = now.addingTimeInterval(-600)
-                            manager.queryActivityStarting(from: tenMinAgo, to: now, to: OperationQueue.main) { _, _ in
-                                DispatchQueue.main.async { completion() }
-                            }
-                        } else {
-                            print("🏃 [MOTION] 이미 권한 설정됨(status=\(status.rawValue)) → 시스템 요청 없이 계속")
-                            completion()
-                        }
-                    },
-                    onCancel: { completion() }
-                )
+                // 🚨 Motion 첫 번째 프리퍼미션 모달 비활성화 - 바로 권한 요청으로 진행
+                print("🚨 [MOTION] 첫 번째 프리퍼미션 모달 비활성화")
+                UserDefaults.standard.set(true, forKey: infoFlagKey)
+                if status == .notDetermined {
+                    print("🏃 [MOTION] 상태 notDetermined → queryActivityStarting 호출")
+                    let manager = CMMotionActivityManager()
+                    let now = Date()
+                    let tenMinAgo = now.addingTimeInterval(-600)
+                    manager.queryActivityStarting(from: tenMinAgo, to: now, to: OperationQueue.main) { _, _ in
+                        DispatchQueue.main.async { completion() }
+                    }
+                } else {
+                    print("🏃 [MOTION] 이미 권한 설정됨(status=\(status.rawValue)) → 시스템 요청 없이 계속")
+                    completion()
+                }
                 return
             }
 
             if status == .notDetermined {
-                presentPrePermissionAlert(
-                    title: "동작 및 피트니스 권한 안내",
-                    message: "동작 및 피트니스 데이터 접근이 필요합니다.",
-                    onContinue: {
-                        let manager = CMMotionActivityManager()
-                        let now = Date()
-                        let tenMinAgo = now.addingTimeInterval(-600)
-                        manager.queryActivityStarting(from: tenMinAgo, to: now, to: OperationQueue.main) { _, _ in
-                            DispatchQueue.main.async { completion() }
-                        }
-                    },
-                    onCancel: { completion() }
-                )
+                // 🚨 Motion 두 번째 프리퍼미션 모달 비활성화 - 바로 권한 요청으로 진행
+                print("🚨 [MOTION] 두 번째 프리퍼미션 모달 비활성화 - 직접 권한 요청")
+                let manager = CMMotionActivityManager()
+                let now = Date()
+                let tenMinAgo = now.addingTimeInterval(-600)
+                manager.queryActivityStarting(from: tenMinAgo, to: now, to: OperationQueue.main) { _, _ in
+                    DispatchQueue.main.async { completion() }
+                }
             } else {
                 print("🏃 [MOTION] notDetermined 아님 → 스킵")
                 completion()

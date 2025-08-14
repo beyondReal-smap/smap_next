@@ -90,7 +90,7 @@ export const MapSkeleton: React.FC<MapSkeletonProps> = ({
                   backfaceVisibility: 'hidden',
                   WebkitBackfaceVisibility: 'hidden'
                 }}>
-                  <IOSCompatibleSpinner size="md" />
+                  <IOSCompatibleSpinner size="sm" />
                 </div>
               </motion.div>
             </motion.div>

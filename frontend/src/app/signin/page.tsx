@@ -4245,7 +4245,7 @@ const SignInPage = () => {
             }}
           >
             <div className="bg-white px-6 py-4 rounded-xl shadow-lg">
-              <IOSCompatibleSpinner size="md" message="처리 중..." />
+              <IOSCompatibleSpinner size="sm" message="처리 중..." />
             </div>
           </div>
         )}

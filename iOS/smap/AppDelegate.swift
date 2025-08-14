@@ -142,6 +142,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
         // 🚨 퍼미션 디버그 스위즐 설치 (로그인 전 푸시 권한 호출을 원천 차단 + 호출 스택 로깅)
         Self.installPermissionDebugGuards()
+
+        // 디버그: Info.plist 권한 문구 확인
+        debugPrintUsageDescriptions()
+        
+        // 🚨 임시 해결책: Info.plist 값이 비어있을 경우 런타임 경고
+        checkAndWarnEmptyUsageDescriptions()
+        
         return true
     }
     
@@ -166,16 +173,16 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                     print("❌ [PUSH] 권한이 거부되어 있음")
                     
                 case .notDetermined:
-                    print("🔄 [PUSH] 권한 미결정 - 권한 요청 시작")
-                    self.requestPushNotificationPermission()
+                    print("🔄 [PUSH] 권한 미결정 - 로그인 후 요청 예정")
+                    print("🔒 [PUSH] 로그인 전 자동 권한 요청 차단")
                     
                 case .ephemeral:
                     print("⏱️ [PUSH] 임시 권한")
                     UIApplication.shared.registerForRemoteNotifications()
                     
                 @unknown default:
-                    print("❓ [PUSH] 알 수 없는 권한 상태")
-                    self.requestPushNotificationPermission()
+                    print("❓ [PUSH] 알 수 없는 권한 상태 - 로그인 후 처리")
+                    print("🔒 [PUSH] 로그인 전 자동 권한 요청 차단")
                 }
             }
         }
@@ -903,6 +910,106 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 import ObjectiveC
 
 extension AppDelegate {
+    fileprivate func debugPrintUsageDescriptions() {
+        print("🔎 [PERM] UsageDescription 체크 시작")
+        
+        // 번들 정보 상세 출력
+        print("🔎 [PERM] Bundle Path: \(Bundle.main.bundlePath)")
+        print("🔎 [PERM] Bundle URL: \(Bundle.main.bundleURL)")
+        print("🔎 [PERM] BundleIdentifier: \(Bundle.main.bundleIdentifier ?? "nil")")
+        
+        // Info.plist 파일 직접 읽기 시도
+        let infoPlistPath = Bundle.main.path(forResource: "Info", ofType: "plist")
+        print("🔎 [PERM] Info.plist Path: \(infoPlistPath ?? "NOT FOUND")")
+        
+        if let path = infoPlistPath,
+           let plistData = NSDictionary(contentsOfFile: path) {
+            print("🔎 [PERM] Info.plist 직접 읽기 성공")
+            print("🔎 [PERM] Direct NSCameraUsageDescription: \(plistData["NSCameraUsageDescription"] as? String ?? "EMPTY")")
+            print("🔎 [PERM] Direct NSPhotoLibraryUsageDescription: \(plistData["NSPhotoLibraryUsageDescription"] as? String ?? "EMPTY")")
+            print("🔎 [PERM] Direct NSMotionUsageDescription: \(plistData["NSMotionUsageDescription"] as? String ?? "EMPTY")")
+            print("🔎 [PERM] Direct NSLocationWhenInUseUsageDescription: \(plistData["NSLocationWhenInUseUsageDescription"] as? String ?? "EMPTY")")
+            
+            // 🔧 실제 번들 내 Info.plist 파일의 모든 키 출력
+            print("🔎 [PERM] 실제 Info.plist 파일 내 모든 키:")
+            let allKeys = plistData.allKeys.compactMap { $0 as? String }.sorted()
+            for key in allKeys.filter({ $0.contains("Usage") }) {
+                let value = plistData[key] as? String ?? "nil"
+                print("   \(key): \(value)")
+            }
+        } else {
+            print("🔎 [PERM] Info.plist 직접 읽기 실패")
+        }
+        
+        // Bundle.main을 통한 읽기 (기존)
+        let keys = [
+            "NSCameraUsageDescription",
+            "NSPhotoLibraryUsageDescription", 
+            "NSPhotoLibraryAddUsageDescription",
+            "NSMotionUsageDescription",
+            "NSLocationWhenInUseUsageDescription",
+            "NSLocationAlwaysAndWhenInUseUsageDescription"
+        ]
+        
+        for key in keys {
+            let value = Bundle.main.object(forInfoDictionaryKey: key) as? String
+            print("🔎 [PERM] Bundle \(key): \(value ?? "<nil>")")
+        }
+        
+        // infoDictionary 전체 출력 (일부만)
+        if let infoDict = Bundle.main.infoDictionary {
+            print("🔎 [PERM] infoDictionary keys count: \(infoDict.keys.count)")
+            let permissionKeys = infoDict.keys.filter { $0.contains("Usage") }
+            print("🔎 [PERM] Found permission keys: \(permissionKeys)")
+        }
+    }
+    
+    fileprivate func checkAndWarnEmptyUsageDescriptions() {
+        let criticalKeys = [
+            "NSCameraUsageDescription": "카메라",
+            "NSPhotoLibraryUsageDescription": "사진 보관함",
+            "NSMotionUsageDescription": "모션",
+            "NSLocationWhenInUseUsageDescription": "위치"
+        ]
+        
+        var emptyKeys: [String] = []
+        for (key, name) in criticalKeys {
+            let value = Bundle.main.object(forInfoDictionaryKey: key) as? String
+            if value?.isEmpty != false {
+                emptyKeys.append("\(name)(\(key))")
+            }
+        }
+        
+        if !emptyKeys.isEmpty {
+            print("🚨🚨🚨 [CRITICAL] Info.plist UsageDescription 값들이 런타임에서 비어있습니다!")
+            print("🚨🚨🚨 [CRITICAL] 비어있는 키들: \(emptyKeys.joined(separator: ", "))")
+            print("🚨🚨🚨 [CRITICAL] 시스템 권한 다이얼로그에서 설명이 표시되지 않습니다!")
+            print("🔧 [FIX] 해결 방법:")
+            print("   1. Xcode에서 Shift+Cmd+K (Clean Build Folder)")
+            print("   2. 시뮬레이터/기기에서 앱 완전 삭제")
+            print("   3. 프로젝트 재빌드 및 설치")
+            print("   4. Build Settings > Packaging > Info.plist File 경로 확인")
+        } else {
+            print("✅ [PERM] 모든 필수 UsageDescription 값들이 정상적으로 로드됨")
+        }
+        
+        // 🔧 Info.plist 문제 해결 시도: 런타임에서 강제로 설정
+        if !emptyKeys.isEmpty {
+            print("🔧 [FIX] Info.plist 문제로 인해 런타임 하드코딩 설명 사용 활성화")
+            setupRuntimePermissionDescriptions()
+        }
+    }
+    
+    private func setupRuntimePermissionDescriptions() {
+        print("🔧 [RUNTIME] 런타임 권한 설명 설정 시작")
+        
+        // Bundle의 Info dictionary에 직접 값 설정 시도 (읽기 전용이므로 실패할 가능성 높음)
+        // 하지만 iOS는 이미 앱 시작 시 Info.plist를 로드하므로 런타임에서 수정 불가
+        
+        // 대신 권한 요청 시 커스텀 alert를 먼저 보여주는 방식으로 해결
+        print("🔧 [RUNTIME] Info.plist는 런타임에서 수정 불가 - 권한 요청 시 커스텀 설명 제공 예정")
+    }
+    
     private static var didInstallDebugGuards = false
     static func installPermissionDebugGuards() {
         guard !didInstallDebugGuards else { return }
