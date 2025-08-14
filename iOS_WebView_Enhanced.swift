@@ -1646,6 +1646,15 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
                 return
             }
         }
+
+        // 추가 가드: 로그인 및 명시적 허용 플래그가 없으면 차단
+        let isLoggedIn = UserDefaults.standard.bool(forKey: "is_logged_in")
+        let allowNow = UserDefaults.standard.bool(forKey: "smap_allow_location_request_now")
+        if !isLoggedIn || !allowNow {
+            print("🛑 [LOCATION] 권한 요청 차단 - isLoggedIn=\(isLoggedIn), allowNow=\(allowNow)")
+            sendLocationPermissionResult(success: false, error: "사용자 요청 시에만 위치 권한을 요청합니다.")
+            return
+        }
         
         // 위치 서비스 활성화 상태 먼저 확인
         guard CLLocationManager.locationServicesEnabled() else {
@@ -1663,12 +1672,21 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
         switch authorizationStatus {
         case .notDetermined:
             // 권한 요청
-            print("📍 [LOCATION] 권한 미결정 - 권한 요청")
-            requestLocationPermission()
+            print("📍 [LOCATION] 권한 미결정 - 권한 요청 가드 확인")
+            if allowNow {
+                requestLocationPermission()
+            } else {
+                print("🛑 [LOCATION] 권한 요청 차단 (allowNow=false)")
+                sendLocationPermissionResult(success: false, error: "사용자 요청 시에만 위치 권한을 요청합니다.")
+            }
         case .denied, .restricted:
             // 권한 거부됨 - 설정 안내만 하고 팝업은 한 번만
-            print("❌ [LOCATION] 권한 거부됨 - 설정으로 이동 필요")
-            showLocationPermissionAlert()
+            print("❌ [LOCATION] 권한 거부됨 - 설정 안내 가드 확인")
+            if allowNow {
+                showLocationPermissionAlert()
+            } else {
+                sendLocationPermissionResult(success: false, error: "위치 권한이 거부되어 있습니다. 설정에서 변경해주세요.")
+            }
         case .authorizedWhenInUse, .authorizedAlways:
             // 권한 있음 - 바로 위치 정보 가져오기 (팝업 없음)
             print("✅ [LOCATION] 권한 있음 - 위치 정보 가져오기")
@@ -1692,6 +1710,7 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
         // 위치 권한 상태 확인
         let locationManager = CLLocationManager()
         let authorizationStatus = locationManager.authorizationStatus
+        let allowNow = UserDefaults.standard.bool(forKey: "smap_allow_location_request_now")
         
         switch authorizationStatus {
         case .authorizedWhenInUse, .authorizedAlways:
@@ -1700,8 +1719,13 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
         case .denied, .restricted:
             print("❌ [LOCATION] 권한 거부됨 - 지속적 위치 추적 불가")
         case .notDetermined:
-            print("⏳ [LOCATION] 권한 미결정 - 권한 요청 후 추적 시작")
-            requestLocationPermission()
+            print("⏳ [LOCATION] 권한 미결정 - 권한 요청 가드 확인")
+            if allowNow {
+                requestLocationPermission()
+            } else {
+                print("🛑 [LOCATION] 권한 요청 차단 (allowNow=false) - 추적 시작 보류")
+                sendLocationPermissionResult(success: false, error: "사용자 요청 시에만 위치 권한을 요청합니다.")
+            }
         @unknown default:
             print("❓ [LOCATION] 알 수 없는 권한 상태")
         }
@@ -1715,6 +1739,12 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
     
     private func requestLocationPermission() {
         print("📍 [LOCATION] 위치 권한 요청 시작")
+        let isLoggedIn = UserDefaults.standard.bool(forKey: "is_logged_in")
+        let allowNow = UserDefaults.standard.bool(forKey: "smap_allow_location_request_now")
+        guard isLoggedIn && allowNow else {
+            print("🛑 [LOCATION] 요청 차단 - isLoggedIn=\(isLoggedIn), allowNow=\(allowNow)")
+            return
+        }
         
         let locationManager = CLLocationManager()
         locationManager.delegate = self
@@ -1723,6 +1753,8 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
         
         // 위치 매니저를 유지하기 위해 프로퍼티로 저장
         self.locationManager = locationManager
+        // 한 번 요청 후 자동 차단
+        UserDefaults.standard.set(false, forKey: "smap_allow_location_request_now")
     }
     
     private func getCurrentLocation() {
@@ -1869,37 +1901,10 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
     }
     
     private func showLocationPermissionAlert() {
-        print("📍 [LOCATION] 위치 권한 알림 표시")
-        
-        // 이미 팝업이 표시 중인지 확인 (중복 방지)
-        if self.presentedViewController is UIAlertController {
-            print("⚠️ [LOCATION] 이미 팝업이 표시 중 - 중복 방지")
-            return
-        }
-        
-        DispatchQueue.main.async {
-            let alert = UIAlertController(
-                title: "위치 권한 요청",
-                message: "서비스 이용을 위해 위치 권한이 필요합니다. 설정에서 위치 권한을 허용해주세요.",
-                preferredStyle: .alert
-            )
-            
-            alert.addAction(UIAlertAction(
-                title: "설정으로 이동",
-                style: .default
-            ) { _ in
-                self.openAppSettings()
-            })
-            
-            alert.addAction(UIAlertAction(
-                title: "취소",
-                style: .cancel
-            ) { _ in
-                self.sendLocationPermissionResult(success: false, error: "사용자가 권한 요청을 취소했습니다.")
-            })
-            
-            self.present(alert, animated: true)
-        }
+        // 네이티브 설정 이동 알림 창 비활성화
+        print("🚫 [LOCATION] 설정 이동 알림 창 표시 생략")
+        // 콜백으로만 알림
+        self.sendLocationPermissionResult(success: false, error: "위치 권한이 거부되어 있습니다. 설정에서 변경해주세요.")
     }
     
     private func handleOpenSettings() {

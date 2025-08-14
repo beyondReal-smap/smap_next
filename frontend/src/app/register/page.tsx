@@ -1793,11 +1793,22 @@ export default function RegisterPage() {
                         className="flex-shrink-0 p-2 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
                         onClick={(e) => {
                           e.stopPropagation();
-                          // 내부 라우트로 이동 (새 탭이 아닌 현재 탭에서)
+                          // 내부 라우트로 이동 (현재 탭) + 약관 페이지는 embed 모드로 열기
                           try {
                             const isInternal = term.link && term.link.startsWith('/');
                             if (isInternal) {
-                              window.location.href = term.link;
+                              let target = term.link as string;
+                              if (target.startsWith('/setting')) {
+                                target += (target.includes('?') ? '&' : '?') + 'embed=1';
+                              }
+                              // Next.js Router 사용
+                              try {
+                                const { push } = require('next/navigation');
+                                // require 사용 시 훅과 충돌하므로 안전하게 window.location로 폴백
+                                (push && typeof push === 'function') ? push(target) : (window.location.href = target);
+                              } catch {
+                                window.location.href = target;
+                              }
                             } else if (term.link) {
                               window.open(term.link, '_blank');
                             }

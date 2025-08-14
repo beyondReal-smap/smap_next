@@ -10,6 +10,7 @@ import FirebaseCore
 import FirebaseMessaging
 import IQKeyboardManagerSwift
 import CoreLocation
+import CoreMotion
 import SwiftyStoreKit
 import GoogleSignIn
 import WebKit
@@ -19,6 +20,7 @@ import KakaoSDKAuth
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterDelegate, MessagingDelegate {
     var window: UIWindow?
+    private let motionManager = CMMotionActivityManager()
     
     var title = String()
     var body = String()
@@ -305,8 +307,92 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         if UserDefaults.standard.bool(forKey: "is_logged_in") {
             print("🔍 [PUSH] 로그인 상태 - 푸시 알림 권한 상태 확인")
             checkPushNotificationStatus()
+            // 로그인 후 권한 온보딩/보완 실행
+            runPermissionOnboardingIfNeeded()
         } else {
             print("🔒 [PUSH] 로그인 전 - 푸시 알림 권한 상태 체크 생략")
+        }
+    }
+
+    // MARK: - 📍🏃 권한 온보딩/보완 로직
+    private func runPermissionOnboardingIfNeeded() {
+        let isLoggedIn = UserDefaults.standard.bool(forKey: "is_logged_in")
+        guard isLoggedIn else { return }
+
+        let hasDoneOnboarding = UserDefaults.standard.bool(forKey: "smap_permission_onboarding_done")
+
+        if !hasDoneOnboarding {
+            print("🧭 [PERM] 첫 진입 - 모든 주요 권한 안내 및 요청 시작")
+            // 1) 위치 권한: 한 번만 자동 허용 플래그 세팅 후 요청
+            UserDefaults.standard.set(true, forKey: "smap_allow_location_request_now")
+            requestLocationWhenInUse()
+
+            // 2) 동작(모션) 권한: 미결정이면 요청 트리거
+            requestMotionPermissionIfNeeded()
+
+            // 온보딩 완료 마크 (다음부터는 보완 로직으로)
+            UserDefaults.standard.set(true, forKey: "smap_permission_onboarding_done")
+            print("✅ [PERM] 권한 온보딩 완료 마크")
+            return
+        }
+
+        // 온보딩 이후: 결핍된 권한만 보완 요청
+        print("🧭 [PERM] 재진입 - 결핍된 권한만 보완 요청")
+        ensureLocationPermissionIfNotDetermined()
+        ensureMotionPermissionIfNotDetermined()
+    }
+
+    private func requestLocationWhenInUse() {
+        let lm = CLLocationManager()
+        // 스위즐 가드에 의해 is_logged_in && smap_allow_location_request_now 일 때만 실제 요청됨
+        lm.requestWhenInUseAuthorization()
+        // 요청 후 자동 차단되도록 스위즐 측에서 allow 플래그를 false로 돌림
+    }
+
+    private func ensureLocationPermissionIfNotDetermined() {
+        let status: CLAuthorizationStatus
+        if #available(iOS 14.0, *) {
+            status = CLLocationManager().authorizationStatus
+        } else {
+            status = CLLocationManager.authorizationStatus()
+        }
+        if status == .notDetermined {
+            print("📍 [PERM] 위치 권한 미결정 - 요청 진행")
+            UserDefaults.standard.set(true, forKey: "smap_allow_location_request_now")
+            requestLocationWhenInUse()
+        } else {
+            print("📍 [PERM] 위치 권한 상태: \(status.rawValue)")
+        }
+    }
+
+    private func requestMotionPermissionIfNeeded() {
+        if CMMotionActivityManager.isActivityAvailable() {
+            let status = CMMotionActivityManager.authorizationStatus()
+            if status == .notDetermined {
+                print("🏃 [PERM] 모션 권한 미결정 - 요청 트리거")
+                motionManager.startActivityUpdates(to: OperationQueue.main) { _ in
+                    // 즉시 중지 (권한 요청만 트리거)
+                    self.motionManager.stopActivityUpdates()
+                    print("🏃 [PERM] 모션 권한 요청 트리거 완료")
+                }
+            } else {
+                print("🏃 [PERM] 모션 권한 상태: \(status.rawValue)")
+            }
+        } else {
+            print("🏃 [PERM] 모션 액티비티 비지원 디바이스")
+        }
+    }
+
+    private func ensureMotionPermissionIfNotDetermined() {
+        if CMMotionActivityManager.isActivityAvailable() {
+            let status = CMMotionActivityManager.authorizationStatus()
+            if status == .notDetermined {
+                print("🏃 [PERM] 모션 권한 미결정 - 보완 요청 트리거")
+                motionManager.startActivityUpdates(to: OperationQueue.main) { _ in
+                    self.motionManager.stopActivityUpdates()
+                    print("🏃 [PERM] 모션 권한 보완 요청 완료")
+                }
+            }
         }
     }
 
