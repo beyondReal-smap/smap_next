@@ -2576,17 +2576,22 @@ const SignInPage = () => {
                           /Safari/i.test(navigator.userAgent) && 
                           !(window as any).webkit?.messageHandlers;
       
+      // iPad 앱 내 WebView 감지 (Safari가 아니어도 허용)
+      const isIPadApp = /iPad/i.test(navigator.userAgent) && 
+                       (window as any).webkit?.messageHandlers;
+      
       console.log('🍎 [APPLE LOGIN] 환경 감지:', {
         isIOSWebView,
         isIPadSafari,
+        isIPadApp,
         userAgent: navigator.userAgent,
         hasWebKit: !!(window as any).webkit,
         hasMessageHandlers: !!(window as any).webkit?.messageHandlers,
         attemptCount: appleLoginAttempts + 1
       });
       
-      if (isIOSWebView) {
-        console.log('🍎 [APPLE LOGIN] iOS WebView에서 Apple 로그인 호출 (iPhone/iPad)');
+      if (isIOSWebView || isIPadApp) {
+        console.log('🍎 [APPLE LOGIN] iOS 앱에서 Apple 로그인 호출 (iPhone/iPad 앱)');
         
         // Apple 로그인 결과 처리 함수 등록 (기존 함수 제거 후 재등록)
         if ((window as any).handleAppleSignInResult) {
@@ -2684,11 +2689,31 @@ const SignInPage = () => {
           }
         };
         
-        // iOS Native Apple 로그인 호출 (iPhone, iPad 모두 동일하게 처리)
-        (window as any).webkit.messageHandlers.smapIos.postMessage({
-          type: 'appleSignIn',
-          action: 'appleSignIn'
-        });
+        // iOS Native Apple 로그인 호출 (iPhone, iPad 앱 모두 동일하게 처리)
+        if ((window as any).webkit?.messageHandlers?.smapIos) {
+          (window as any).webkit.messageHandlers.smapIos.postMessage({
+            type: 'appleSignIn',
+            action: 'appleSignIn'
+          });
+        } else if ((window as any).webkit?.messageHandlers) {
+          // 다른 메시지 핸들러가 있는 경우 (iPad 앱 등)
+          const messageHandlers = (window as any).webkit.messageHandlers;
+          if (messageHandlers.appleSignIn) {
+            messageHandlers.appleSignIn.postMessage({
+              type: 'appleSignIn',
+              action: 'appleSignIn'
+            });
+          } else {
+            // 기본 메시지 핸들러로 시도
+            const handlerKeys = Object.keys(messageHandlers);
+            if (handlerKeys.length > 0) {
+              messageHandlers[handlerKeys[0]].postMessage({
+                type: 'appleSignIn',
+                action: 'appleSignIn'
+              });
+            }
+          }
+        }
         
       } else if (isIPadSafari) {
         // iPad Safari에서 Apple 로그인 시도
@@ -2884,7 +2909,7 @@ const SignInPage = () => {
           } else {
             // Apple ID SDK가 없는 경우
             console.log('🍎 [APPLE LOGIN] Apple ID SDK가 로드되지 않음');
-            setError('Apple 로그인을 사용할 수 없습니다. Safari 브라우저에서 시도해주세요.');
+            setError('Apple 로그인을 사용할 수 없습니다. 잠시 후 다시 시도해주세요.');
             setIsLoading(false);
           }
         } catch (appleError: any) {
@@ -4406,15 +4431,15 @@ const SignInPage = () => {
               )} */}
             </div>
 
-            {/* Apple Sign In - iOS 및 iPad Safari에서 표시 (iPad 호환성 개선) */}
+            {/* Apple Sign In - iOS 디바이스에서 표시 (iPad 앱 포함) */}
             {(() => {
-              // 더 강력한 iOS 감지 (iPad Safari 포함)
+              // 더 강력한 iOS 감지 (iPad 앱 포함)
               if (typeof window !== 'undefined') {
                 const userAgent = navigator.userAgent;
                 const platform = navigator.platform;
                 const vendor = (navigator as any).vendor || '';
                 
-                // iOS WebView 감지
+                // iOS WebView 감지 (iOS 앱 내)
                 const isIOSWebView = /iPhone|iPad|iPod/i.test(userAgent) && 
                                    (window as any).webkit?.messageHandlers?.smapIos;
                 
@@ -4423,10 +4448,15 @@ const SignInPage = () => {
                                    /Safari/i.test(userAgent) && 
                                    !(window as any).webkit?.messageHandlers;
                 
-                // 다양한 iOS 감지 방법 (iPad Safari 포함)
+                // iPad 앱 내 WebView 감지 (Safari가 아니어도 허용)
+                const isIPadApp = /iPad/i.test(userAgent) && 
+                                 (window as any).webkit?.messageHandlers;
+                
+                // 다양한 iOS 감지 방법 (iPad 앱, Safari 모두 포함)
                 const isIOS = 
                   isIOSWebView ||
                   isIPadSafari ||
+                  isIPadApp ||  // iPad 앱 내에서도 허용
                   /iPhone|iPad|iPod/i.test(userAgent) || 
                   /Macintosh/i.test(userAgent) ||
                   /iPad/i.test(platform) ||
@@ -4449,6 +4479,7 @@ const SignInPage = () => {
                   isIOS,
                   isIOSWebView,
                   isIPadSafari,
+                  isIPadApp,
                   showButton: isIOS
                 });
                 
