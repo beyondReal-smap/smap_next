@@ -2540,48 +2540,19 @@ const SignInPage = () => {
     }
   };
 
-  // Apple 로그인 핸들러
+  // Apple 로그인 핸들러 (단순화된 버전)
   const handleAppleSignIn = async () => {
     console.log('🍎 [APPLE LOGIN] Apple 로그인 시작');
     setIsLoading(true);
     setError(null);
     
     try {
-      // iOS WebView에서 실행 중인지 확인
+      // iOS WebView에서 실행 중인지 확인 (iPhone, iPad 모두 포함)
       const isIOSWebView = /iPhone|iPad|iPod/i.test(navigator.userAgent) && 
                           (window as any).webkit?.messageHandlers?.smapIos;
       
-      // Apple ID SDK 초기화 확인 및 시도
-      if (!isIOSWebView && (!(window as any).AppleID || !(window as any).AppleID.auth)) {
-        console.log('🍎 [APPLE LOGIN] Apple ID SDK 초기화 시도');
-        
-        // Apple ID SDK가 로드되지 않은 경우 동적으로 로드 시도
-        try {
-          // Apple ID SDK 스크립트 동적 로드
-          if (!document.querySelector('script[src*="appleid.auth.js"]')) {
-            const script = document.createElement('script');
-            script.src = 'https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js';
-            script.async = true;
-            script.onload = () => {
-              console.log('🍎 [APPLE LOGIN] Apple ID SDK 로드 완료');
-              // SDK 로드 후 Apple 로그인 재시도
-              setTimeout(() => handleAppleSignIn(), 100);
-            };
-            script.onerror = () => {
-              console.error('🍎 [APPLE LOGIN] Apple ID SDK 로드 실패');
-              setError('Apple 로그인을 사용할 수 없습니다. Safari 브라우저에서 시도해주세요.');
-              setIsLoading(false);
-            };
-            document.head.appendChild(script);
-            return; // 스크립트 로드 중이므로 여기서 종료
-          }
-        } catch (loadError) {
-          console.error('🍎 [APPLE LOGIN] Apple ID SDK 로드 중 오류:', loadError);
-        }
-      }
-      
       if (isIOSWebView) {
-        console.log('🍎 [APPLE LOGIN] iOS WebView에서 Apple 로그인 호출');
+        console.log('🍎 [APPLE LOGIN] iOS WebView에서 Apple 로그인 호출 (iPhone/iPad)');
         
         // Apple 로그인 결과 처리 함수 등록
         (window as any).handleAppleSignInResult = async (result: any) => {
@@ -2671,14 +2642,14 @@ const SignInPage = () => {
           }
         };
         
-        // iOS Native Apple 로그인 호출 (type/action 모두 전달)
+        // iOS Native Apple 로그인 호출 (iPhone, iPad 모두 동일하게 처리)
         (window as any).webkit.messageHandlers.smapIos.postMessage({
           type: 'appleSignIn',
           action: 'appleSignIn'
         });
         
       } else {
-        // 웹 브라우저에서 Apple 로그인 시도
+        // 웹 브라우저에서 Apple 로그인 시도 (Safari, Chrome 등)
         console.log('🍎 [APPLE LOGIN] 웹 브라우저에서 Apple 로그인 시도');
         
         try {
