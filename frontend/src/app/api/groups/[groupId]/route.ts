@@ -215,6 +215,12 @@ export async function DELETE(
         'Content-Type': 'application/json',
         'Accept': 'application/json',
         'User-Agent': 'Next.js API Proxy',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+        'X-Force-Refresh': 'true',
+        'X-Timestamp': Date.now().toString(),
+        'X-Environment': process.env.NODE_ENV || 'development'
       },
       body: JSON.stringify(updateData), // sgt_show: 'N' 전송
       // @ts-ignore - Next.js 환경에서 SSL 인증서 검증 우회

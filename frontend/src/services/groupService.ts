@@ -304,17 +304,31 @@ class GroupService {
   // 현재 로그인한 사용자의 그룹 목록 조회
   async getCurrentUserGroups(ignoreCache: boolean = false): Promise<Group[]> {
     try {
-      console.log('[GroupService] 현재 사용자 그룹 목록 조회 시작', ignoreCache ? '(캐시 무시)' : '');
+      // 환경 감지
+      const isProduction = typeof window !== 'undefined' && 
+        (window.location.hostname.includes('smap.site') || window.location.hostname.includes('vercel.app'));
+      const environment = process.env.NODE_ENV || 'development';
+      
+      console.log('[GroupService] 현재 사용자 그룹 목록 조회 시작', ignoreCache ? '(캐시 무시)' : '', {
+        isProduction,
+        environment,
+        hostname: typeof window !== 'undefined' ? window.location.hostname : 'server'
+      });
       
       // 캐시 무시인 경우 로컬 캐시 정리
       if (ignoreCache) {
         this.clearGroupCache();
       }
       
-      // 캐시 버스팅을 위한 쿼리 파라미터와 헤더 추가
+      // 운영 환경에서는 더 강력한 캐시 무효화
       const timestamp = Date.now();
       const params = ignoreCache ? 
-        { _t: timestamp, _force_refresh: 'true' } : 
+        { 
+          _t: timestamp, 
+          _force_refresh: 'true',
+          _env: environment,
+          _bust: Math.random().toString(36).substr(2, 9) // 추가 캐시 버스팅
+        } : 
         {};
       
       const headers = ignoreCache ? {
@@ -322,7 +336,9 @@ class GroupService {
         'Pragma': 'no-cache',
         'Expires': '0',
         'X-Force-Refresh': 'true',
-        'X-Timestamp': timestamp.toString()
+        'X-Timestamp': timestamp.toString(),
+        'X-Environment': environment,
+        'X-Cache-Bust': Math.random().toString(36).substr(2, 9)
       } : {};
       
       // 백엔드 API 문서에 따라 현재 사용자가 속한 그룹 목록 조회

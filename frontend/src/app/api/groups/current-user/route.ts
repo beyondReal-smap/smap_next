@@ -11,12 +11,21 @@ try {
 }
 
 export async function GET(request: NextRequest) {
-  // 읽기 위주 API: 60초 재검증으로 캐시
-  // 주의: 사용자별 응답이므로 쿠키/헤더 종속 시 캐시 키 분리 필요
-  // Next.js는 기본적으로 헤더/쿠키를 포함한 요청을 캐시하지 않으므로 안전
-  ;(global as any)
   try {
     console.log('[Current User Groups API] 현재 사용자 그룹 목록 조회 요청');
+    
+    // 쿼리 파라미터 확인 (강제 새로고침 여부)
+    const { searchParams } = new URL(request.url);
+    const forceRefresh = searchParams.get('_force_refresh') === 'true';
+    const timestamp = searchParams.get('_t');
+    const environment = process.env.NODE_ENV || 'development';
+    
+    console.log('[Current User Groups API] 요청 파라미터:', {
+      forceRefresh,
+      timestamp,
+      environment,
+      domain: process.env.VERCEL_URL || 'localhost'
+    });
 
     // 현재 로그인한 사용자 ID 가져오기
     const currentUserId = getCurrentUserId(request);
@@ -75,6 +84,14 @@ export async function GET(request: NextRequest) {
         'Accept': 'application/json',
         'User-Agent': 'Next.js API Proxy',
         ...(authorization && { 'Authorization': authorization }),
+        ...(forceRefresh && {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+          'X-Force-Refresh': 'true',
+          'X-Timestamp': timestamp || Date.now().toString(),
+          'X-Environment': environment
+        })
       },
       // @ts-ignore - Next.js 환경에서 SSL 인증서 검증 우회
       rejectUnauthorized: false,
@@ -91,7 +108,8 @@ export async function GET(request: NextRequest) {
       // 기본 fetch 시도
       response = await fetch(backendUrl, {
         ...fetchOptions,
-        next: { revalidate: 60 },
+        next: forceRefresh ? { revalidate: 0 } : { revalidate: 60 },
+        cache: forceRefresh ? 'no-store' : 'default'
       });
       console.log('[Current User Groups API] 기본 fetch 성공');
     } catch (fetchError) {
@@ -163,8 +181,17 @@ export async function GET(request: NextRequest) {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
             'User-Agent': 'Next.js API Proxy (fallback)',
+            ...(forceRefresh && {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache',
+              'Expires': '0',
+              'X-Force-Refresh': 'true',
+              'X-Timestamp': timestamp || Date.now().toString(),
+              'X-Environment': environment
+            })
           },
-          next: { revalidate: 60 },
+          next: forceRefresh ? { revalidate: 0 } : { revalidate: 60 },
+          cache: forceRefresh ? 'no-store' : 'default'
         });
         
         if (fallbackResponse.ok) {
@@ -196,7 +223,19 @@ export async function GET(request: NextRequest) {
       sampleData: Array.isArray(data) && data.length > 0 ? data[0] : data
     });
 
-    return NextResponse.json(data);
+    const responseObj = NextResponse.json(data);
+    
+    // 강제 새로고침인 경우 응답에도 캐시 무효화 헤더 추가
+    if (forceRefresh) {
+      responseObj.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      responseObj.headers.set('Pragma', 'no-cache');
+      responseObj.headers.set('Expires', '0');
+      responseObj.headers.set('X-Force-Refresh', 'true');
+      responseObj.headers.set('X-Timestamp', timestamp || Date.now().toString());
+      responseObj.headers.set('X-Environment', environment);
+    }
+
+    return responseObj;
 
   } catch (error) {
     console.error('[Current User Groups API] 오류:', error);
