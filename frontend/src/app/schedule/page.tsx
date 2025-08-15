@@ -879,8 +879,8 @@ export default function SchedulePage() {
       const headers = document.querySelectorAll('.schedule-header, header.schedule-header');
       headers.forEach(header => {
         if (header) {
-          (header as HTMLElement).style.setProperty('height', '72px', 'important');
-          (header as HTMLElement).style.setProperty('min-height', '72px', 'important');
+          (header as HTMLElement).style.setProperty('height', '64px', 'important');
+          (header as HTMLElement).style.setProperty('min-height', '64px', 'important');
           (header as HTMLElement).style.setProperty('max-height', 'none', 'important');
 
         }
@@ -4287,8 +4287,8 @@ export default function SchedulePage() {
             left: '0px', 
             right: '0px',
             zIndex: 2147483647,
-            height: '72px',
-            minHeight: '72px',
+            height: '56px',
+            minHeight: '56px',
             backgroundColor: 'rgba(255, 255, 255, 0.95)',
             backdropFilter: 'blur(12px)',
             WebkitBackdropFilter: 'blur(12px)',
@@ -4312,8 +4312,8 @@ export default function SchedulePage() {
                 // 부모 헤더 요소 찾아서 높이 강제 변경
                 const header = el.closest('header');
                 if (header) {
-                  header.style.setProperty('height', '72px', 'important');
-                  header.style.setProperty('min-height', '72px', 'important');
+                  header.style.setProperty('height', '64px', 'important');
+                  header.style.setProperty('min-height', '64px', 'important');
                   header.style.setProperty('max-height', 'none', 'important');
                   }
               }
@@ -4360,11 +4360,11 @@ export default function SchedulePage() {
             variants={pageVariants}
             className="absolute inset-0 px-4 space-y-5 pb-24 overflow-y-auto content-area pt-4"
             style={{ 
-              top: '72px', // 새로운 헤더 높이만큼 아래로
+              top: '64px', // 새로운 헤더 높이만큼 아래로
               bottom: '0', // 화면 끝까지 확장
               left: '0',
               right: '0',
-              height: 'calc(100vh - 72px)', // 전체 높이에서 헤더만 제외
+              height: 'calc(100vh - 64px)', // 전체 높이에서 헤더만 제외
               overflowY: 'auto',
               WebkitOverflowScrolling: 'touch'
             }}
