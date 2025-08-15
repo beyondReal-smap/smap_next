@@ -2663,6 +2663,13 @@ const SignInPage = () => {
                   };
                   
                   localStorage.setItem('socialLoginData', JSON.stringify(socialData));
+                  
+                  // 리다이렉트 차단 해제 후 이동
+                  if ((window as any).__REDIRECT_CONTROL__) {
+                    (window as any).__REDIRECT_CONTROL__.allowRedirects();
+                  }
+                  (window as any).__BLOCK_ALL_REDIRECTS__ = false;
+                  
                   router.push('/register?social=apple');
                 } else {
                   // 기존 회원 - 로그인 처리
@@ -2672,7 +2679,19 @@ const SignInPage = () => {
                   }
                   authService.default.setUserData(data.data.user);
                   
+                  // 리다이렉트 차단 해제 후 이동
+                  if ((window as any).__REDIRECT_CONTROL__) {
+                    (window as any).__REDIRECT_CONTROL__.allowRedirects();
+                  }
+                  (window as any).__BLOCK_ALL_REDIRECTS__ = false;
+                  
                   console.log('🍎 Apple 로그인 성공:', data.data.user);
+                  // 리다이렉트 차단 해제 후 이동
+                  if ((window as any).__REDIRECT_CONTROL__) {
+                    (window as any).__REDIRECT_CONTROL__.allowRedirects();
+                  }
+                  (window as any).__BLOCK_ALL_REDIRECTS__ = false;
+                  
                   router.push('/home');
                 }
               } else {
@@ -2777,6 +2796,12 @@ const SignInPage = () => {
                   };
                   
                   localStorage.setItem('socialLoginData', JSON.stringify(socialData));
+                  // 리다이렉트 차단 해제 후 이동
+                  if ((window as any).__REDIRECT_CONTROL__) {
+                    (window as any).__REDIRECT_CONTROL__.allowRedirects();
+                  }
+                  (window as any).__BLOCK_ALL_REDIRECTS__ = false;
+                  
                   router.push('/register?social=apple');
                 } else {
                   // 기존 회원 - 로그인 처리
@@ -2787,6 +2812,12 @@ const SignInPage = () => {
                   authService.default.setUserData(serverData.data.user);
                   
                   console.log('🍎 Apple 로그인 성공:', serverData.data.user);
+                  // 리다이렉트 차단 해제 후 이동
+                  if ((window as any).__REDIRECT_CONTROL__) {
+                    (window as any).__REDIRECT_CONTROL__.allowRedirects();
+                  }
+                  (window as any).__BLOCK_ALL_REDIRECTS__ = false;
+                  
                   router.push('/home');
                 }
               } else {
@@ -2852,15 +2883,97 @@ const SignInPage = () => {
             
             try {
               if (result.success) {
-                console.log('🍎 [APPLE LOGIN] iOS Apple 로그인 성공, 홈으로 이동');
-                router.push('/home');
+                // Apple 로그인 성공 - 서버로 전송하여 제대로 처리
+                console.log('🍎 [APPLE LOGIN] iOS Apple 로그인 성공, 서버 처리 시작');
+                
+                const response = await fetch('/api/auth/apple-login', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    userIdentifier: result.userIdentifier,
+                    userName: result.userName,
+                    email: result.email,
+                    identityToken: result.identityToken,
+                    authorizationCode: result.authorizationCode
+                  }),
+                });
+
+                const data = await response.json();
+                console.log('🍎 [APPLE LOGIN] 서버 응답:', data);
+                
+                if (!response.ok) {
+                  throw new Error(data.message || 'Apple 로그인에 실패했습니다.');
+                }
+
+                if (data.success && data.data) {
+                  if (data.data.isNewUser) {
+                    // 신규 회원 - register 페이지로 이동
+                    const fallbackEmail = (result?.email && result.email.includes('@'))
+                      ? result.email
+                      : `apple_${String(result?.userIdentifier || '').slice(0, 8)}@privaterelay.appleid.com`;
+
+                    const socialData = {
+                      provider: 'apple',
+                      userIdentifier: result.userIdentifier,
+                      apple_id: result.userIdentifier,
+                      email: fallbackEmail,
+                      name: result.userName || '',
+                      nickname: result.userName || ''
+                    };
+                    
+                    localStorage.setItem('socialLoginData', JSON.stringify(socialData));
+                    
+                    // 리다이렉트 차단 해제 후 이동
+                    if ((window as any).__REDIRECT_CONTROL__) {
+                      (window as any).__REDIRECT_CONTROL__.allowRedirects();
+                    }
+                    (window as any).__BLOCK_ALL_REDIRECTS__ = false;
+                    
+                    console.log('🍎 [APPLE LOGIN] 신규 회원, 회원가입 페이지로 이동');
+                    // 리다이렉트 차단 해제 후 이동
+                  if ((window as any).__REDIRECT_CONTROL__) {
+                    (window as any).__REDIRECT_CONTROL__.allowRedirects();
+                  }
+                  (window as any).__BLOCK_ALL_REDIRECTS__ = false;
+                  
+                  router.push('/register?social=apple');
+                  } else {
+                    // 기존 회원 - 로그인 처리
+                    const authService = await import('@/services/authService');
+                    if (data.data.token) {
+                      authService.default.setToken(data.data.token);
+                    }
+                    authService.default.setUserData(data.data.user);
+                    
+                    // 리다이렉트 차단 해제 후 이동
+                    if ((window as any).__REDIRECT_CONTROL__) {
+                      (window as any).__REDIRECT_CONTROL__.allowRedirects();
+                    }
+                    (window as any).__BLOCK_ALL_REDIRECTS__ = false;
+                    
+                    console.log('🍎 [APPLE LOGIN] 기존 회원, 홈으로 이동');
+                    // 리다이렉트 차단 해제 후 이동
+                  if ((window as any).__REDIRECT_CONTROL__) {
+                    (window as any).__REDIRECT_CONTROL__.allowRedirects();
+                  }
+                  (window as any).__BLOCK_ALL_REDIRECTS__ = false;
+                  
+                  router.push('/home');
+                  }
+                } else {
+                  throw new Error(data.message || 'Apple 로그인에 실패했습니다.');
+                }
               } else {
                 console.log('🍎 [APPLE LOGIN] iOS Apple 로그인 실패:', result.error);
                 setError(result.error || 'Apple 로그인이 취소되었습니다.');
               }
             } catch (err: any) {
               console.error('🍎 [APPLE LOGIN] iOS 결과 처리 오류:', err);
-              setError('Apple 로그인 중 오류가 발생했습니다.');
+              const errorMessage = `Apple 로그인 중 오류가 발생했습니다: ${err.message}`;
+              setError(errorMessage);
+              setLastAppleLoginError(errorMessage);
             } finally {
               setIsLoading(false);
               delete (window as any).handleAppleSignInResult;
@@ -2949,6 +3062,12 @@ const SignInPage = () => {
                   };
                   
                   localStorage.setItem('socialLoginData', JSON.stringify(socialData));
+                  // 리다이렉트 차단 해제 후 이동
+                  if ((window as any).__REDIRECT_CONTROL__) {
+                    (window as any).__REDIRECT_CONTROL__.allowRedirects();
+                  }
+                  (window as any).__BLOCK_ALL_REDIRECTS__ = false;
+                  
                   router.push('/register?social=apple');
                 } else {
                   // 기존 회원 - 로그인 처리
@@ -2959,6 +3078,12 @@ const SignInPage = () => {
                   authService.default.setUserData(serverData.data.user);
                   
                   console.log('🍎 Apple 로그인 성공:', serverData.data.user);
+                  // 리다이렉트 차단 해제 후 이동
+                  if ((window as any).__REDIRECT_CONTROL__) {
+                    (window as any).__REDIRECT_CONTROL__.allowRedirects();
+                  }
+                  (window as any).__BLOCK_ALL_REDIRECTS__ = false;
+                  
                   router.push('/home');
                 }
               } else {
@@ -2989,10 +3114,54 @@ const SignInPage = () => {
                 const response = await (window as any).AppleID.auth.signIn();
                 console.log('🍎 [APPLE LOGIN] 재시도 응답:', response);
                 
-                // 위와 동일한 처리 로직 (간단히 처리)
+                // 제대로 된 처리 로직
                 if (response && response.authorization) {
-                  console.log('🍎 [APPLE LOGIN] 재시도 성공, 홈으로 이동');
+                  const appleData = {
+                    userIdentifier: response.user,
+                    userName: response.fullName?.givenName || response.fullName?.familyName || '',
+                    email: response.email || '',
+                    identityToken: response.authorization.id_token,
+                    authorizationCode: response.authorization.code
+                  };
+                  
+                  // 서버로 전송
+                  const serverResponse = await fetch('/api/auth/apple-login', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(appleData),
+                  });
+
+                  const serverData = await serverResponse.json();
+                  console.log('🍎 [APPLE LOGIN] 재시도 서버 응답:', serverData);
+                  
+                  if (serverResponse.ok && serverData.success && serverData.data) {
+                    // 인증 토큰 및 사용자 데이터 설정
+                    const authService = await import('@/services/authService');
+                    if (serverData.data.token) {
+                      authService.default.setToken(serverData.data.token);
+                    }
+                    authService.default.setUserData(serverData.data.user);
+                    
+                    // 리다이렉트 차단 해제 후 이동
+                    if ((window as any).__REDIRECT_CONTROL__) {
+                      (window as any).__REDIRECT_CONTROL__.allowRedirects();
+                    }
+                    (window as any).__BLOCK_ALL_REDIRECTS__ = false;
+                    
+                    console.log('🍎 [APPLE LOGIN] 재시도 성공, 홈으로 이동');
+                    // 리다이렉트 차단 해제 후 이동
+                  if ((window as any).__REDIRECT_CONTROL__) {
+                    (window as any).__REDIRECT_CONTROL__.allowRedirects();
+                  }
+                  (window as any).__BLOCK_ALL_REDIRECTS__ = false;
+                  
                   router.push('/home');
+                  } else {
+                    console.log('🍎 [APPLE LOGIN] 재시도 서버 처리 실패');
+                    setError('Apple 로그인 처리에 실패했습니다.');
+                  }
                 }
               } else {
                 // SDK 로드에 실패해도 에러 표시하지 않고 조용히 처리
