@@ -4807,21 +4807,21 @@ const SignInPage = () => {
 
             {/* 카카오 로그인 버튼 제거 */}
           </div>
-
-          {/* 회원가입 링크 */}
-          <div className="text-center mt-4">
-            <p className="text-sm text-gray-600">
-              아직 계정이 없으신가요?{' '}
-              <Link href="/register" className="font-medium transition-colors"
-                style={{color: '#0113A3'}}
-                onMouseEnter={(e) => (e.target as HTMLElement).style.color = '#1e40af'}
-                onMouseLeave={(e) => (e.target as HTMLElement).style.color = '#0113A3'}>
-                회원가입
-              </Link>
-            </p>
-          </div>
         </div>
         )}
+
+        {/* 회원가입 링크 - Android에서도 표시 */}
+        <div className="text-center mt-4">
+          <p className="text-sm text-gray-600">
+            아직 계정이 없으신가요?{' '}
+            <Link href="/register" className="font-medium transition-colors"
+              style={{color: '#0113A3'}}
+              onMouseEnter={(e) => (e.target as HTMLElement).style.color = '#1e40af'}
+              onMouseLeave={(e) => (e.target as HTMLElement).style.color = '#0113A3'}>
+              회원가입
+            </Link>
+          </p>
+        </div>
       </motion.div>
 
       {/* 에러 모달 - 단순화된 버전 */}
