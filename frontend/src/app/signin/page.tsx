@@ -1463,7 +1463,7 @@ const SignInPage = () => {
         console.log('[GOOGLE SDK] Google Identity Services 초기화');
         
         // 🔥 Client ID 설정 (하드코딩으로 문제 해결)
-        const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '283271180972-lamjiad6ljpa02fk30k6nh6arqq4rc4o.apps.googleusercontent.com';
+        const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '283271180972-02ajuasfuecajd0holgu7iqb5hvtjgbp.apps.googleusercontent.com';
         
         console.log('[GOOGLE SDK] Client ID 확인:', {
           hasPublicEnv: !!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,

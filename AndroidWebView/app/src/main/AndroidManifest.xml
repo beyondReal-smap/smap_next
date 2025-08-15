@@ -104,6 +104,14 @@
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="@string/admob_app_id"/>
+        
+        <!-- 🔥 ORB 정책 완전 비활성화를 위한 WebView 메타데이터 -->
+        <meta-data 
+            android:name="android.webkit.WebView.EnabledFeatures"
+            android:value="DisableWebSecurity,AllowUniversalAccessFromFileURLs" />
+        <meta-data 
+            android:name="android.webkit.WebView.DisabledFeatures"
+            android:value="OriginBoundRequests,CrossOriginProtection" />
     </application>
 
 </manifest> 

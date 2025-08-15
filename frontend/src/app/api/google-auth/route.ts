@@ -8,7 +8,7 @@ import { OAuth2Client } from 'google-auth-library';
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || 
                          process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || 
                          process.env.GOOGLE_WEB_CLIENT_ID ||
-                         '283271180972-n6gsgc0chrtqcehjr4ve249k42ont8q2.apps.googleusercontent.com';
+                         '283271180972-02ajuasfuecajd0holgu7iqb5hvtjgbp.apps.googleusercontent.com';
 const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 // iOS 로그 전송 함수 (서버사이드)

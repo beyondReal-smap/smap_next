@@ -347,7 +347,7 @@ class AuthService {
           
           // Google SDK 재초기화 (캐시 완전 정리)
           if ((window as any).google.accounts.id.initialize) {
-            const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '283271180972-lamjiad6ljpa02fk30k6nh6arqq4rc4o.apps.googleusercontent.com';
+            const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '283271180972-02ajuasfuecajd0holgu7iqb5hvtjgbp.apps.googleusercontent.com';
             (window as any).google.accounts.id.initialize({
               client_id: clientId,
               auto_select: false,
