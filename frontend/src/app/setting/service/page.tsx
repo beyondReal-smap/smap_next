@@ -46,13 +46,46 @@ export default function ServiceTermsPage() {
   const isEmbed = (searchParams?.get('embed') === '1');
 
   useEffect(() => {
-    document.body.style.overflowY = 'auto';
-    document.documentElement.style.overflowY = 'auto';
+    // iPad/iOS WebView 최적화 스타일 적용
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    
+    if (isEmbed) {
+      // embed 모드일 때는 내부 웹뷰처럼 작동
+      document.body.style.position = 'relative';
+      document.body.style.overflow = 'auto';
+      document.body.style.height = 'auto';
+      document.body.style.minHeight = '100vh';
+      document.body.style.background = 'white';
+      document.documentElement.style.position = 'relative';
+      document.documentElement.style.overflow = 'auto';
+      document.documentElement.style.height = 'auto';
+      
+      // iOS에서 추가 최적화
+      if (isIOS) {
+        document.body.style.setProperty('-webkit-overflow-scrolling', 'touch');
+        document.body.style.setProperty('-webkit-transform', 'translateZ(0)');
+        document.body.style.setProperty('-webkit-backface-visibility', 'hidden');
+      }
+    } else {
+      document.body.style.overflowY = 'auto';
+      document.documentElement.style.overflowY = 'auto';
+    }
+    
     return () => {
-      document.body.style.overflowY = '';
+      document.body.style.position = '';
+      document.body.style.overflow = '';
+      document.body.style.height = '';
+      document.body.style.minHeight = '';
+      document.body.style.background = '';
+      document.body.style.removeProperty('-webkit-overflow-scrolling');
+      document.body.style.removeProperty('-webkit-transform');
+      document.body.style.removeProperty('-webkit-backface-visibility');
+      document.documentElement.style.position = '';
+      document.documentElement.style.overflow = '';
+      document.documentElement.style.height = '';
       document.documentElement.style.overflowY = '';
     };
-  }, []);
+  }, [isEmbed]);
 
   const handleBack = () => {
     triggerHapticFeedback(HapticFeedbackType.SELECTION, '서비스 이용약관 뒤로가기', {

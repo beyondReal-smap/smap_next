@@ -19,13 +19,46 @@ export default function PrivacyPolicyPage() {
   const isEmbed = (searchParams?.get('embed') === '1');
 
   useEffect(() => {
-    document.body.style.overflowY = 'auto';
-    document.documentElement.style.overflowY = 'auto';
+    // iPad/iOS WebView 최적화 스타일 적용
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    
+    if (isEmbed) {
+      // embed 모드일 때는 내부 웹뷰처럼 작동
+      document.body.style.position = 'relative';
+      document.body.style.overflow = 'auto';
+      document.body.style.height = 'auto';
+      document.body.style.minHeight = '100vh';
+      document.body.style.background = 'white';
+      document.documentElement.style.position = 'relative';
+      document.documentElement.style.overflow = 'auto';
+      document.documentElement.style.height = 'auto';
+      
+      // iOS에서 추가 최적화
+      if (isIOS) {
+        document.body.style.setProperty('-webkit-overflow-scrolling', 'touch');
+        document.body.style.setProperty('-webkit-transform', 'translateZ(0)');
+        document.body.style.setProperty('-webkit-backface-visibility', 'hidden');
+      }
+    } else {
+      document.body.style.overflowY = 'auto';
+      document.documentElement.style.overflowY = 'auto';
+    }
+    
     return () => {
-      document.body.style.overflowY = '';
+      document.body.style.position = '';
+      document.body.style.overflow = '';
+      document.body.style.height = '';
+      document.body.style.minHeight = '';
+      document.body.style.background = '';
+      document.body.style.removeProperty('-webkit-overflow-scrolling');
+      document.body.style.removeProperty('-webkit-transform');
+      document.body.style.removeProperty('-webkit-backface-visibility');
+      document.documentElement.style.position = '';
+      document.documentElement.style.overflow = '';
+      document.documentElement.style.height = '';
       document.documentElement.style.overflowY = '';
     };
-  }, []);
+  }, [isEmbed]);
 
   const handleBack = () => {
     triggerHapticFeedback(HapticFeedbackType.SELECTION, '개인정보 처리방침 뒤로가기', { component: 'setting-terms', action: 'back-navigation' });
@@ -33,8 +66,46 @@ export default function PrivacyPolicyPage() {
   };
 
   return (
-    <div className={`${isEmbed ? 'min-h-screen overflow-auto bg-white' : 'fixed inset-0 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 main-container'}`} style={{ paddingTop: '0px', marginTop: '0px', top: '0px' }}>
-      <style jsx global>{pageAnimations}</style>
+    <div className={`${isEmbed ? 'min-h-screen overflow-auto bg-white' : 'fixed inset-0 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 main-container'}`} 
+         style={{ 
+           paddingTop: '0px', 
+           marginTop: '0px', 
+           top: '0px',
+           ...(isEmbed && {
+             position: 'relative',
+             width: '100%',
+             minHeight: '100vh',
+             WebkitOverflowScrolling: 'touch',
+             WebkitTransform: 'translateZ(0)',
+             WebkitBackfaceVisibility: 'hidden'
+           })
+         }}>
+      <style jsx global>{`
+        ${pageAnimations}
+        ${isEmbed ? `
+          /* iPad WebView 최적화 스타일 */
+          body, html {
+            position: relative !important;
+            overflow: auto !important;
+            height: auto !important;
+            min-height: 100vh !important;
+            -webkit-overflow-scrolling: touch !important;
+            -webkit-transform: translateZ(0) !important;
+            -webkit-backface-visibility: hidden !important;
+          }
+          
+          .main-container {
+            position: relative !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            width: 100% !important;
+            min-height: 100vh !important;
+            height: auto !important;
+          }
+        ` : ''}
+      `}</style>
         {!isEmbed && (
         <AnimatedHeader variant="enhanced" className="setting-header glass-effect">
           <motion.div initial={{ opacity: 0, x: -40 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }} className="setting-header-content motion-div">
