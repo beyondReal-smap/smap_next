@@ -2540,21 +2540,59 @@ const SignInPage = () => {
     }
   };
 
-  // Apple 로그인 핸들러 (단순화된 버전)
+  // Apple 로그인 상태 추적
+  const [appleLoginAttempts, setAppleLoginAttempts] = useState(0);
+  const [lastAppleLoginError, setLastAppleLoginError] = useState<string | null>(null);
+  
+  // Apple 로그인 핸들러 (iPad 호환성 개선)
   const handleAppleSignIn = async () => {
-    console.log('🍎 [APPLE LOGIN] Apple 로그인 시작');
+    console.log('🍎 [APPLE LOGIN] Apple 로그인 시작 (시도 횟수:', appleLoginAttempts + 1, ')');
+    
+    // 이미 로딩 중이면 중복 호출 방지
+    if (isLoading) {
+      console.log('🍎 [APPLE LOGIN] 이미 로딩 중, 중복 호출 무시');
+      return;
+    }
+    
+    // 이전 오류가 있으면 정리
+    if (lastAppleLoginError) {
+      setLastAppleLoginError(null);
+      setError(null);
+    }
+    
     setIsLoading(true);
     setError(null);
     
     try {
+      // 시도 횟수 증가
+      setAppleLoginAttempts(prev => prev + 1);
+      
       // iOS WebView에서 실행 중인지 확인 (iPhone, iPad 모두 포함)
       const isIOSWebView = /iPhone|iPad|iPod/i.test(navigator.userAgent) && 
                           (window as any).webkit?.messageHandlers?.smapIos;
       
+      // iPad Safari 브라우저에서도 Apple 로그인 시도
+      const isIPadSafari = /iPad/i.test(navigator.userAgent) && 
+                          /Safari/i.test(navigator.userAgent) && 
+                          !(window as any).webkit?.messageHandlers;
+      
+      console.log('🍎 [APPLE LOGIN] 환경 감지:', {
+        isIOSWebView,
+        isIPadSafari,
+        userAgent: navigator.userAgent,
+        hasWebKit: !!(window as any).webkit,
+        hasMessageHandlers: !!(window as any).webkit?.messageHandlers,
+        attemptCount: appleLoginAttempts + 1
+      });
+      
       if (isIOSWebView) {
         console.log('🍎 [APPLE LOGIN] iOS WebView에서 Apple 로그인 호출 (iPhone/iPad)');
         
-        // Apple 로그인 결과 처리 함수 등록
+        // Apple 로그인 결과 처리 함수 등록 (기존 함수 제거 후 재등록)
+        if ((window as any).handleAppleSignInResult) {
+          delete (window as any).handleAppleSignInResult;
+        }
+        
         (window as any).handleAppleSignInResult = async (result: any) => {
           console.log('🍎 [APPLE LOGIN] Apple 로그인 결과:', result);
           
@@ -2636,9 +2674,13 @@ const SignInPage = () => {
             }
           } catch (err: any) {
             console.error('🍎 [APPLE LOGIN] 처리 오류:', err);
-            setError(`Apple 로그인 중 오류가 발생했습니다: ${err.message}`);
+            const errorMessage = `Apple 로그인 중 오류가 발생했습니다: ${err.message}`;
+            setError(errorMessage);
+            setLastAppleLoginError(errorMessage);
           } finally {
             setIsLoading(false);
+            // 결과 처리 함수 정리
+            delete (window as any).handleAppleSignInResult;
           }
         };
         
@@ -2648,8 +2690,123 @@ const SignInPage = () => {
           action: 'appleSignIn'
         });
         
+      } else if (isIPadSafari) {
+        // iPad Safari에서 Apple 로그인 시도
+        console.log('🍎 [APPLE LOGIN] iPad Safari에서 Apple 로그인 시도');
+        
+        try {
+          // Apple 로그인 SDK가 로드되어 있는지 확인
+          if ((window as any).AppleID && (window as any).AppleID.auth) {
+            console.log('🍎 [APPLE LOGIN] Apple ID SDK 발견, iPad Safari 로그인 시도');
+            
+            // Apple ID SDK 초기화
+            if (!initializeAppleID()) {
+              throw new Error('Apple ID SDK 초기화에 실패했습니다.');
+            }
+            
+            // Apple 로그인 요청
+            const response = await (window as any).AppleID.auth.signIn();
+            console.log('🍎 [APPLE LOGIN] Apple ID SDK 응답:', response);
+            
+            if (response && response.authorization) {
+              // Apple 로그인 성공 - 서버로 전송
+              const appleData = {
+                userIdentifier: response.user,
+                userName: response.fullName?.givenName || response.fullName?.familyName || '',
+                email: response.email || '',
+                identityToken: response.authorization.id_token,
+                authorizationCode: response.authorization.code
+              };
+              
+              console.log('🍎 [APPLE LOGIN] iPad Safari에서 받은 Apple 데이터:', appleData);
+              
+              // 서버로 전송
+              const serverResponse = await fetch('/api/auth/apple-login', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(appleData),
+              });
+
+              const serverData = await serverResponse.json();
+              
+              if (!serverResponse.ok) {
+                throw new Error(serverData.message || 'Apple 로그인에 실패했습니다.');
+              }
+
+              if (serverData.success && serverData.data) {
+                if (serverData.data.isNewUser) {
+                  // 신규 회원 - register 페이지로 이동
+                  const socialData = {
+                    provider: 'apple',
+                    userIdentifier: appleData.userIdentifier,
+                    apple_id: appleData.userIdentifier,
+                    email: appleData.email || `apple_${String(appleData.userIdentifier).slice(0, 8)}@privaterelay.appleid.com`,
+                    name: appleData.userName || '',
+                    nickname: appleData.userName || ''
+                  };
+                  
+                  localStorage.setItem('socialLoginData', JSON.stringify(socialData));
+                  router.push('/register?social=apple');
+                } else {
+                  // 기존 회원 - 로그인 처리
+                  const authService = await import('@/services/authService');
+                  if (serverData.data.token) {
+                    authService.default.setToken(serverData.data.token);
+                  }
+                  authService.default.setUserData(serverData.data.user);
+                  
+                  console.log('🍎 Apple 로그인 성공:', serverData.data.user);
+                  router.push('/home');
+                }
+              } else {
+                throw new Error(serverData.message || 'Apple 로그인에 실패했습니다.');
+              }
+            } else {
+              throw new Error('Apple 로그인 응답이 올바르지 않습니다.');
+            }
+          } else {
+            // Apple ID SDK가 없는 경우 - iPad Safari에서도 시도
+            console.log('🍎 [APPLE LOGIN] iPad Safari에서 Apple ID SDK 로드 시도');
+            
+            // Apple ID SDK 동적 로드
+            await loadAppleIDSDK();
+            
+            // 다시 시도
+            if ((window as any).AppleID && (window as any).AppleID.auth) {
+              console.log('🍎 [APPLE LOGIN] Apple ID SDK 동적 로드 성공, 다시 시도');
+              
+              if (!initializeAppleID()) {
+                throw new Error('Apple ID SDK 초기화에 실패했습니다.');
+              }
+              
+              const response = await (window as any).AppleID.auth.signIn();
+              // ... 위와 동일한 처리 로직
+              console.log('🍎 [APPLE LOGIN] 재시도 성공:', response);
+            } else {
+              throw new Error('Apple ID SDK를 로드할 수 없습니다.');
+            }
+          }
+        } catch (appleError: any) {
+          console.error('🍎 [APPLE LOGIN] iPad Safari Apple 로그인 오류:', appleError);
+          
+          let errorMessage = '';
+          if (appleError.error === 'popup_closed_by_user') {
+            errorMessage = 'Apple 로그인이 취소되었습니다.';
+          } else if (appleError.error === 'invalid_request') {
+            errorMessage = 'Apple 로그인 요청이 잘못되었습니다.';
+          } else {
+            errorMessage = `Apple 로그인 중 오류가 발생했습니다: ${appleError.message || appleError.error || '알 수 없는 오류'}`;
+          }
+          
+          setError(errorMessage);
+          setLastAppleLoginError(errorMessage);
+          setIsLoading(false);
+        }
+        
       } else {
-        // 웹 브라우저에서 Apple 로그인 시도 (Safari, Chrome 등)
+        // 일반 웹 브라우저에서 Apple 로그인 시도 (Safari, Chrome 등)
         console.log('🍎 [APPLE LOGIN] 웹 브라우저에서 Apple 로그인 시도');
         
         try {
@@ -2733,21 +2890,53 @@ const SignInPage = () => {
         } catch (appleError: any) {
           console.error('🍎 [APPLE LOGIN] 웹 Apple 로그인 오류:', appleError);
           
+          let errorMessage = '';
           if (appleError.error === 'popup_closed_by_user') {
-            setError('Apple 로그인이 취소되었습니다.');
+            errorMessage = 'Apple 로그인이 취소되었습니다.';
           } else if (appleError.error === 'invalid_request') {
-            setError('Apple 로그인 요청이 잘못되었습니다.');
+            errorMessage = 'Apple 로그인 요청이 잘못되었습니다.';
           } else {
-            setError(`Apple 로그인 중 오류가 발생했습니다: ${appleError.message || appleError.error || '알 수 없는 오류'}`);
+            errorMessage = `Apple 로그인 중 오류가 발생했습니다: ${appleError.message || appleError.error || '알 수 없는 오류'}`;
           }
+          
+          setError(errorMessage);
+          setLastAppleLoginError(errorMessage);
           setIsLoading(false);
         }
       }
     } catch (err: any) {
       console.error('🍎 [APPLE LOGIN] 오류:', err);
-      setError(`Apple 로그인 중 오류가 발생했습니다: ${err.message}`);
+      const errorMessage = `Apple 로그인 중 오류가 발생했습니다: ${err.message}`;
+      setError(errorMessage);
+      setLastAppleLoginError(errorMessage);
       setIsLoading(false);
     }
+  };
+
+  // Apple ID SDK 동적 로드 함수
+  const loadAppleIDSDK = async (): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      // 이미 로드되어 있으면 즉시 반환
+      if ((window as any).AppleID) {
+        resolve();
+        return;
+      }
+      
+      // Apple ID SDK 스크립트 동적 로드
+      const script = document.createElement('script');
+      script.src = 'https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js';
+      script.async = true;
+      script.onload = () => {
+        console.log('🍎 [APPLE LOGIN] Apple ID SDK 동적 로드 성공');
+        resolve();
+      };
+      script.onerror = () => {
+        console.error('🍎 [APPLE LOGIN] Apple ID SDK 동적 로드 실패');
+        reject(new Error('Apple ID SDK 로드에 실패했습니다.'));
+      };
+      
+      document.head.appendChild(script);
+    });
   };
 
   // 전화번호 로그인 핸들러
@@ -4217,16 +4406,27 @@ const SignInPage = () => {
               )} */}
             </div>
 
-            {/* Apple Sign In - iOS에서만 표시 (개선된 조건) */}
+            {/* Apple Sign In - iOS 및 iPad Safari에서 표시 (iPad 호환성 개선) */}
             {(() => {
-              // 더 강력한 iOS 감지
+              // 더 강력한 iOS 감지 (iPad Safari 포함)
               if (typeof window !== 'undefined') {
                 const userAgent = navigator.userAgent;
                 const platform = navigator.platform;
                 const vendor = (navigator as any).vendor || '';
                 
-                // 다양한 iOS 감지 방법
+                // iOS WebView 감지
+                const isIOSWebView = /iPhone|iPad|iPod/i.test(userAgent) && 
+                                   (window as any).webkit?.messageHandlers?.smapIos;
+                
+                // iPad Safari 브라우저 감지
+                const isIPadSafari = /iPad/i.test(userAgent) && 
+                                   /Safari/i.test(userAgent) && 
+                                   !(window as any).webkit?.messageHandlers;
+                
+                // 다양한 iOS 감지 방법 (iPad Safari 포함)
                 const isIOS = 
+                  isIOSWebView ||
+                  isIPadSafari ||
                   /iPhone|iPad|iPod/i.test(userAgent) || 
                   /Macintosh/i.test(userAgent) ||
                   /iPad/i.test(platform) ||
@@ -4247,14 +4447,37 @@ const SignInPage = () => {
                   platform,
                   vendor,
                   isIOS,
+                  isIOSWebView,
+                  isIPadSafari,
                   showButton: isIOS
                 });
                 
-                return isIOS;
+                                return isIOS;
               }
               return false;
             })() && (
               <div className="mb-4">
+                {/* 재시도 안내 메시지 */}
+                {lastAppleLoginError && appleLoginAttempts > 0 && (
+                  <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0">
+                        <svg className="w-4 h-4 text-blue-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm text-blue-800">
+                          이전 시도에서 오류가 발생했습니다. 다시 시도해보세요.
+                        </p>
+                        <p className="text-xs text-blue-600 mt-1">
+                          시도 횟수: {appleLoginAttempts}회
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
                 <button
                   type="button"
                   onClick={handleAppleSignIn}
