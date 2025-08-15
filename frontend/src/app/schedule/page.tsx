@@ -873,9 +873,28 @@ export default function SchedulePage() {
   useEffect(() => {
     document.body.style.overflowY = 'auto';
     document.documentElement.style.overflowY = 'auto';
+    
+    // 🔥 헤더 높이 강제 설정 - 최후의 수단
+    const forceHeaderHeight = () => {
+      const headers = document.querySelectorAll('.schedule-header, header.schedule-header');
+      headers.forEach(header => {
+        if (header) {
+          (header as HTMLElement).style.setProperty('height', '72px', 'important');
+          (header as HTMLElement).style.setProperty('min-height', '72px', 'important');
+          (header as HTMLElement).style.setProperty('max-height', 'none', 'important');
+
+        }
+      });
+    };
+    
+    // 즉시 실행하고 주기적으로 실행
+    forceHeaderHeight();
+    const heightInterval = setInterval(forceHeaderHeight, 500);
+    
     return () => {
       document.body.style.overflowY = '';
       document.documentElement.style.overflowY = '';
+      clearInterval(heightInterval);
     };
   }, []);
   const [selectedDay, setSelectedDay] = useState<Dayjs | null>(dayjs());
@@ -4259,47 +4278,79 @@ export default function SchedulePage() {
           top: '0px'
         }}
       >
-        {/* 통일된 헤더 애니메이션 */}
-        <AnimatedHeader 
-            variant="simple"
-            className="fixed top-0 left-0 right-0 z-[2147483647] glass-effect header-fixed schedule-header"
-            style={{ 
-              paddingTop: '0px',
-              marginTop: '0px',
-              top: '0px',
-              position: 'fixed',
-              zIndex: 2147483647,
-              pointerEvents: 'auto',
-              width: '100vw',
+        {/* 🔥 직접 만든 헤더 - AnimatedHeader 우회 */}
+        <header 
+          className="fixed top-0 left-0 right-0 z-[2147483647] glass-effect header-fixed schedule-header"
+          style={{
+            position: 'fixed',
+            top: '0px',
+            left: '0px', 
+            right: '0px',
+            zIndex: 2147483647,
+            height: '72px',
+            minHeight: '72px',
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            borderBottom: '1px solid rgba(229, 231, 235, 0.8)',
+            display: 'flex',
+            alignItems: 'stretch',
+            width: '100vw',
+            margin: '0px',
+            padding: '0px',
+
+          }}
+        >
+          <div 
+            ref={(el) => {
+              if (el) {
+                // 패딩 적용
+                el.style.setProperty('padding-top', '8px', 'important');
+                el.style.setProperty('padding-bottom', '8px', 'important');
+
+                
+                // 부모 헤더 요소 찾아서 높이 강제 변경
+                const header = el.closest('header');
+                if (header) {
+                  header.style.setProperty('height', '72px', 'important');
+                  header.style.setProperty('min-height', '72px', 'important');
+                  header.style.setProperty('max-height', 'none', 'important');
+                  }
+              }
+            }}
+            className="flex items-center justify-between px-4 w-full" 
+            style={{
+              width: '100%',
               height: '56px',
+              maxHeight: '56px',
               minHeight: '56px',
-              maxHeight: '56px'
+              display: 'flex',
+              alignItems: 'center'
             }}
           >
-            <div className="flex items-center justify-between h-14 px-4">
-              <AnimatePresence mode="wait">
-                <motion.div 
-                  key="schedule-header"
-                  initial={{ opacity: 0, x: -40 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -40 }}
-                  transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
-                  className="flex items-center space-x-3 motion-div"
-                >
-                  <div className="flex items-center space-x-3">
-                    <div>
-                      <h1 className="text-lg font-bold text-gray-900">일정</h1>
-                      <p className="text-xs text-gray-500">그룹 멤버들과 일정을 공유해보세요</p>
-                    </div>
+            <AnimatePresence mode="wait">
+              <motion.div 
+                key="schedule-header"
+                initial={{ opacity: 0, x: -40 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -40 }}
+                transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
+                className="flex items-center space-x-3 motion-div"
+              >
+                <div className="flex items-center space-x-3">
+                  <div>
+                    <h1 className="text-lg font-bold text-gray-900">일정</h1>
+                    <p className="text-xs text-gray-500">그룹 멤버들과 일정을 공유해보세요</p>
                   </div>
-                </motion.div>
-              </AnimatePresence>
-              
-              <div className="flex items-center space-x-2">
-                {/* 필요시 추가 버튼들을 여기에 배치 */}
-              </div>
+                </div>
+              </motion.div>
+            </AnimatePresence>
+            
+            <div className="flex items-center space-x-2">
+              {/* 필요시 추가 버튼들을 여기에 배치 */}
             </div>
-          </AnimatedHeader>
+          </div>
+        </header>
 
         {/* 메인 컨텐츠 - 고정 위치 */}
           <motion.div
@@ -4309,11 +4360,11 @@ export default function SchedulePage() {
             variants={pageVariants}
             className="absolute inset-0 px-4 space-y-5 pb-24 overflow-y-auto content-area pt-4"
             style={{ 
-              top: '56px', // 헤더 높이만큼 아래로
+              top: '72px', // 새로운 헤더 높이만큼 아래로
               bottom: '0', // 화면 끝까지 확장
               left: '0',
               right: '0',
-              height: 'calc(100vh - 56px)', // 전체 높이에서 헤더만 제외
+              height: 'calc(100vh - 72px)', // 전체 높이에서 헤더만 제외
               overflowY: 'auto',
               WebkitOverflowScrolling: 'touch'
             }}
