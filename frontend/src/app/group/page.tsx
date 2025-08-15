@@ -993,11 +993,15 @@ function GroupPageContent() {
       
       const createdGroup = await groupService.createGroup(groupData);
       
-      // 그룹 생성 후 최신 그룹 목록을 다시 조회하여 코드 등 모든 정보를 업데이트
+      // 그룹 생성 후 강제로 모든 캐시 무효화 및 최신 그룹 목록 조회
       await fetchGroups();
       
-      // 생성된 그룹을 선택된 그룹으로 설정 (최신 정보 포함)
-      const updatedGroups = await groupService.getCurrentUserGroups();
+      // UserContext 그룹 데이터 강제 새로고침 (캐시 무시)
+      console.log('[GROUP PAGE] 그룹 생성 후 UserContext 데이터 강제 새로고침');
+      await forceRefreshGroups();
+      
+      // 생성된 그룹을 선택된 그룹으로 설정 (최신 정보 포함, 캐시 무시)
+      const updatedGroups = await groupService.getCurrentUserGroups(true); // 캐시 무시
       const freshGroup = (updatedGroups && Array.isArray(updatedGroups)) ? updatedGroups.find(g => g.sgt_idx === createdGroup.sgt_idx) : null;
       
       if (freshGroup) {
@@ -1093,6 +1097,25 @@ function GroupPageContent() {
       setTimeout(async () => {
         console.log('[GROUP PAGE] 그룹 삭제 후 추가 데이터 새로고침');
         await forceRefreshGroups();
+        
+        // 로컬 스토리지 캐시 완전 정리
+        if (typeof window !== 'undefined') {
+          const keysToRemove: string[] = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && (
+              key.startsWith('user_groups') || 
+              key.startsWith('group_') ||
+              key.includes('group') ||
+              key.startsWith('schedule_') ||
+              key.startsWith('member_')
+            )) {
+              keysToRemove.push(key);
+            }
+          }
+          keysToRemove.forEach(key => localStorage.removeItem(key));
+          console.log('[GROUP PAGE] 그룹 삭제 후 로컬 캐시 완전 정리:', keysToRemove.length, '개 항목 삭제');
+        }
       }, 300);
       
       // 로컬 상태 업데이트

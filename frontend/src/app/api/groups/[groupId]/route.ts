@@ -199,7 +199,9 @@ export async function DELETE(
 
     // 소프트 삭제를 위한 PUT 요청으로 sgt_show를 'N'으로 업데이트
     const updateData = {
-      sgt_show: 'N'
+      sgt_show: 'N',
+      _timestamp: Date.now(),
+      _force_refresh: true
     };
 
     const backendBase = resolveBackendBaseUrl();
@@ -235,11 +237,20 @@ export async function DELETE(
       memberCount: 0 // 기본값
     };
     
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       data: groupData,
       message: '그룹이 목록에서 숨겨졌습니다. (소프트 삭제)'
     });
+    
+    // 캐시 무효화 헤더 추가
+    response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+    response.headers.set('X-Force-Refresh', 'true');
+    response.headers.set('X-Timestamp', Date.now().toString());
+    
+    return response;
 
   } catch (error) {
     console.error('[Group Delete API] 소프트 삭제 오류:', error);

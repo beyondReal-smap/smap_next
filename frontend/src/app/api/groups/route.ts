@@ -142,6 +142,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     console.log('[Groups API] 그룹 생성 요청:', body);
 
+    // 캐시 무효화를 위한 추가 데이터
+    const enhancedBody = {
+      ...body,
+      _timestamp: Date.now(),
+      _force_refresh: true
+    };
+
     // 백엔드 그룹 생성 API 호출
     const backendBase = resolveBackendBaseUrl();
     const backendUrl = `${backendBase}/api/v1/groups`;
@@ -153,8 +160,13 @@ export async function POST(request: NextRequest) {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
         'User-Agent': 'Next.js API Proxy',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+        'X-Force-Refresh': 'true',
+        'X-Timestamp': Date.now().toString()
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(enhancedBody),
       // @ts-ignore - Next.js 환경에서 SSL 인증서 검증 우회
       rejectUnauthorized: false,
     };
@@ -221,10 +233,19 @@ export async function POST(request: NextRequest) {
     const data = await response.json();
     console.log('[Groups API] 백엔드 그룹 생성 응답:', data);
 
-    return NextResponse.json({
+    const responseObj = NextResponse.json({
       success: true,
       data: data
     });
+    
+    // 캐시 무효화 헤더 추가
+    responseObj.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    responseObj.headers.set('Pragma', 'no-cache');
+    responseObj.headers.set('Expires', '0');
+    responseObj.headers.set('X-Force-Refresh', 'true');
+    responseObj.headers.set('X-Timestamp', Date.now().toString());
+    
+    return responseObj;
 
   } catch (error) {
     console.error('[Groups API] 그룹 생성 오류:', error);

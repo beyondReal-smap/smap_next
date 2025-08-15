@@ -169,16 +169,72 @@ class GroupService {
   // 그룹 생성
   async createGroup(groupData: GroupCreate): Promise<Group> {
     try {
-      const response = await apiClient.post('/groups', groupData);
+      // 캐시 버스팅을 위한 헤더와 데이터 추가
+      const createData = {
+        ...groupData,
+        _timestamp: Date.now(),
+        _force_refresh: true
+      };
+      
+      const response = await apiClient.post('/groups', createData, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+          'X-Force-Refresh': 'true',
+          'X-Timestamp': Date.now().toString()
+        }
+      });
       
       if (!response.data.success) {
         throw new Error(response.data.message || '그룹 생성에 실패했습니다.');
       }
       
+      // 그룹 생성 후 캐시 정리
+      this.clearGroupCache();
+      
       return response.data.data;
     } catch (error) {
       console.error('Failed to create group:', error);
       throw error;
+    }
+  }
+
+  // 캐시 정리 함수
+  private clearGroupCache(): void {
+    try {
+      console.log('[GroupService] 그룹 관련 캐시 정리 시작');
+      
+      if (typeof window !== 'undefined') {
+        const keysToRemove: string[] = [];
+        
+        // localStorage에서 그룹 관련 키 찾기
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && (
+            key.startsWith('user_groups_') || 
+            key.startsWith('user_group_count_') ||
+            key === 'user_groups' ||
+            key === 'user_group_count' ||
+            key.startsWith('group_members_') ||
+            key.startsWith('group_data_') ||
+            key.startsWith('groups_') ||
+            key.includes('group')
+          )) {
+            keysToRemove.push(key);
+          }
+        }
+        
+        // 찾은 키들 삭제
+        keysToRemove.forEach(key => {
+          localStorage.removeItem(key);
+          console.log('[GroupService] 캐시 삭제:', key);
+        });
+        
+        console.log('[GroupService] 그룹 캐시 정리 완료:', keysToRemove.length, '개 항목 삭제');
+      }
+    } catch (error) {
+      console.error('[GroupService] 캐시 정리 오류:', error);
     }
   }
 
@@ -209,7 +265,9 @@ class GroupService {
       
       // DELETE 대신 PUT을 사용하여 sgt_show를 'N'으로 업데이트
       const updateData = {
-        sgt_show: 'N'
+        sgt_show: 'N',
+        _timestamp: Date.now(), // 캐시 무효화를 위한 타임스탬프 추가
+        _force_refresh: true    // 강제 새로고침 플래그
       };
       
       console.log('[GroupService] 전송할 데이터:', updateData);
@@ -217,11 +275,23 @@ class GroupService {
       console.log('[GroupService] 요청 메서드: PUT');
       console.log('[GroupService] 🚨 주의: DELETE 메서드가 아닌 PUT 메서드 사용 중');
       
-      const response = await apiClient.put(`/groups/${groupId}`, updateData);
+      // 캐시 버스팅을 위한 헤더 추가
+      const response = await apiClient.put(`/groups/${groupId}`, updateData, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+          'X-Force-Refresh': 'true',
+          'X-Timestamp': Date.now().toString()
+        }
+      });
       
       console.log('[GroupService] 삭제 응답 성공:', response.data);
       console.log('[GroupService] ✅ 소프트 삭제 완료 - 실제 DB 삭제 아님');
       console.log('[GroupService] 응답 데이터 sgt_show 값:', response.data?.data?.sgt_show);
+      
+      // 로컬 스토리지 캐시 즉시 정리
+      this.clearGroupCache();
       
       return response.data.data || response.data;
     } catch (error) {
@@ -236,15 +306,34 @@ class GroupService {
     try {
       console.log('[GroupService] 현재 사용자 그룹 목록 조회 시작', ignoreCache ? '(캐시 무시)' : '');
       
+      // 캐시 무시인 경우 로컬 캐시 정리
+      if (ignoreCache) {
+        this.clearGroupCache();
+      }
+      
+      // 캐시 버스팅을 위한 쿼리 파라미터와 헤더 추가
+      const timestamp = Date.now();
+      const params = ignoreCache ? 
+        { _t: timestamp, _force_refresh: 'true' } : 
+        {};
+      
+      const headers = ignoreCache ? {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+        'X-Force-Refresh': 'true',
+        'X-Timestamp': timestamp.toString()
+      } : {};
+      
       // 백엔드 API 문서에 따라 현재 사용자가 속한 그룹 목록 조회
       // Authorization 헤더를 통해 현재 사용자 식별
       const response = await apiClient.get('/groups/current-user', {
-        headers: {
-          ...(ignoreCache && { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' })
-        }
+        params,
+        headers
       });
       
       console.log('[GroupService] 현재 사용자 그룹 목록 응답:', response.data);
+      console.log('[GroupService] 그룹 목록 조회 성공:', response.data?.length || 0, '개');
       
       return response.data;
     } catch (error) {
