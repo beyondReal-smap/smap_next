@@ -967,12 +967,31 @@ export default function HomePage() {
         }
       }
       
+      // 🔥 안드로이드 환경 상세 체크
+      const androidCheck = isAndroid();
+      const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown';
+      const hasAndroidInterface = typeof window.AndroidPermissions !== 'undefined';
+      
+      console.log('🔥 [HOME] 환경 체크 상세:', {
+        isAndroid: androidCheck,
+        userAgent,
+        hasAndroidInterface,
+        windowObject: typeof window,
+        androidPermissionsInterface: window.AndroidPermissions
+      });
+      
       // 🔥 안드로이드에서 home 진입 시 권한 요청 (첫 로그인 또는 권한 부족 시)
-      if (isAndroid()) {
-        console.log('🔥 [HOME] 안드로이드 home 진입 - 권한 상태 체크');
+      if (androidCheck) {
+        console.log('🔥 [HOME] ✅ 안드로이드 환경 확인됨 - 권한 상태 체크');
         
         // 2초 후 권한 요청 (UI가 안정화된 후)
         setTimeout(() => {
+          console.log('🔥 [HOME] 2초 후 권한 체크 시작');
+          console.log('🔥 [HOME] AndroidPermissions 인터페이스:', {
+            exists: typeof window.AndroidPermissions !== 'undefined',
+            methods: window.AndroidPermissions ? Object.keys(window.AndroidPermissions) : 'N/A'
+          });
+          
           const hasPermissions = hasAllPermissions();
           
           console.log('🔥 [HOME] 권한 체크 결과:', { hasPermissions });
@@ -992,6 +1011,8 @@ export default function HomePage() {
             console.log('✅ [HOME] 안드로이드 권한이 이미 모두 허용됨');
           }
         }, 2000);
+      } else {
+        console.log('🔥 [HOME] ❌ 안드로이드 환경이 아니므로 권한 요청 생략');
       }
     }
   }, [isLoggedIn, user, authLoading]);
