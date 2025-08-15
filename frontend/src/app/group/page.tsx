@@ -643,10 +643,12 @@ function GroupPageContent() {
   const sidebarDraggingRef = useRef(false);
 
   // 그룹 목록 조회
-  const fetchGroups = async () => {
+  const fetchGroups = async (forceRefresh: boolean = false) => {
     setLoading(true);
     try {
-      const data = await groupService.getCurrentUserGroups();
+      console.log('[GROUP PAGE] 그룹 목록 조회 시작:', forceRefresh ? '(강제 새로고침)' : '(일반 조회)');
+      const data = await groupService.getCurrentUserGroups(forceRefresh);
+      console.log('[GROUP PAGE] 조회된 그룹 수:', data.length);
       setGroups(data);
 
       const memberCounts: {[key: number]: number} = {};
@@ -936,16 +938,29 @@ function GroupPageContent() {
         return;
       }
 
-      // 사용자 정보가 있으면 그룹 데이터 로드
+      // 사용자 정보가 있으면 그룹 데이터 로드 (강제 새로고침)
       if (isLoggedIn || authService.getToken()) {
-        console.log('[GROUP] 그룹 데이터 로드 시작');
-        fetchGroups();
+        console.log('[GROUP] 그룹 데이터 로드 시작 (페이지 마운트 - 강제 새로고침)');
+        fetchGroups(true); // 페이지 마운트 시 항상 강제 새로고침
       }
     };
 
     // 바로 실행
     initializeAuth();
   }, [isLoggedIn, user, router]);
+
+  // 페이지 포커스 시 데이터 새로고침 (다른 메뉴에서 돌아올 때)
+  useEffect(() => {
+    const handleFocus = () => {
+      if (isLoggedIn || authService.getToken()) {
+        console.log('[GROUP] 페이지 포커스 - 그룹 데이터 강제 새로고침');
+        fetchGroups(true);
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [isLoggedIn]);
 
   // 선택된 그룹의 멤버 및 통계 조회
   useEffect(() => {
@@ -1004,7 +1019,7 @@ function GroupPageContent() {
       console.log('[GROUP PAGE] 로컬 상태에 새 그룹 즉시 추가:', createdGroup.sgt_idx);
       
       // 그룹 생성 후 강제로 모든 캐시 무효화 및 최신 그룹 목록 조회
-      await fetchGroups();
+      await fetchGroups(true);
       
       // UserContext 그룹 데이터 강제 새로고침 (캐시 무시)
       console.log('[GROUP PAGE] 그룹 생성 후 UserContext 데이터 강제 새로고침');
@@ -1138,6 +1153,9 @@ function GroupPageContent() {
       setShowGroupActions(false);
       setIsDeleteModalOpen(false);
       setCurrentView('list');
+      
+      // 그룹 삭제 후 최신 상태로 fetchGroups도 호출
+      await fetchGroups(true);
       
       // 그룹이 0개가 되면 홈으로 이동
       const updatedGroups = await forceRefreshGroups();

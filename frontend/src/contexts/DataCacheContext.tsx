@@ -676,17 +676,23 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
   
   // 사용자 그룹 - set 함수를 먼저 정의
   const setUserGroups = useCallback((groups: GroupInfo[]) => {
-    // 로깅 제거 - 과도한 로그 방지
+    // 활성 그룹만 필터링하여 저장 (sgt_show='Y'인 그룹만)
+    const activeGroups = Array.isArray(groups) 
+      ? groups.filter((group: any) => !group.sgt_show || group.sgt_show === 'Y')
+      : [];
+      
+    console.log('[DATA CACHE] setUserGroups - 활성 그룹 저장:', groups?.length || 0, '→', activeGroups.length);
+    
     setCache(prev => ({
       ...prev,
-      userGroups: groups,
+      userGroups: activeGroups,
       lastUpdated: {
         ...prev.lastUpdated,
         userGroups: Date.now(),
       },
     }));
-    // localStorage에도 저장
-    saveToLocalStorage('userGroups', groups);
+    // localStorage에도 필터링된 데이터 저장
+    saveToLocalStorage('userGroups', activeGroups);
   }, [saveToLocalStorage]);
 
   const getUserGroups = useCallback((ignoreCache: boolean = false) => {
@@ -698,17 +704,24 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
     
     const isValid = isCacheValid('userGroups');
     if (isValid && cache.userGroups.length > 0) {
-      // 로깅 제거 - 과도한 로그 방지
-      return cache.userGroups;
+      // sgt_show='Y'인 그룹만 반환 (삭제된 그룹 필터링)
+      const activeGroups = cache.userGroups.filter((group: any) => 
+        !group.sgt_show || group.sgt_show === 'Y'
+      );
+      console.log('[DATA CACHE] 활성 그룹 필터링:', cache.userGroups.length, '→', activeGroups.length);
+      return activeGroups;
     } else {
       // 캐시 미스 시 localStorage에서 로드 시도
       const localData = loadFromLocalStorage('userGroups');
       if (localData && localData.length > 0) {
-        // 로깅 제거 - 과도한 로그 방지
-        setUserGroups(localData);
-        return localData;
+        // localStorage 데이터도 필터링
+        const activeGroups = localData.filter((group: any) => 
+          !group.sgt_show || group.sgt_show === 'Y'
+        );
+        console.log('[DATA CACHE] localStorage 활성 그룹 필터링:', localData.length, '→', activeGroups.length);
+        setUserGroups(activeGroups);
+        return activeGroups;
       }
-      // 로깅 제거 - 과도한 로그 방지
       return [];
     }
   }, [cache.userGroups, isCacheValid, loadFromLocalStorage, setUserGroups]);
