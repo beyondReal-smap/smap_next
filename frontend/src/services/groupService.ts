@@ -335,7 +335,14 @@ class GroupService {
       console.log('[GroupService] 현재 사용자 그룹 목록 응답:', response.data);
       console.log('[GroupService] 그룹 목록 조회 성공:', response.data?.length || 0, '개');
       
-      return response.data;
+      // 프론트엔드에서 sgt_show='N'인 그룹 필터링 (즉시 UI 반영)
+      const filteredGroups = Array.isArray(response.data) 
+        ? response.data.filter((group: any) => group.sgt_show === 'Y')
+        : [];
+      
+      console.log('[GroupService] 필터링 후 활성 그룹:', filteredGroups.length, '개');
+      
+      return filteredGroups;
     } catch (error) {
       console.error('[GroupService] 현재 사용자 그룹 목록 조회 실패:', error);
       throw error;

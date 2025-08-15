@@ -993,6 +993,16 @@ function GroupPageContent() {
       
       const createdGroup = await groupService.createGroup(groupData);
       
+      // 즉시 로컬 상태에 새 그룹 추가 (UI 즉시 반영)
+      const newGroupItem: ExtendedGroup = {
+        ...createdGroup,
+        sgt_code: (createdGroup as any).sgt_code || null,
+        sgt_memo: createdGroup.sgt_content || '',
+        memberCount: 1
+      };
+      setGroups(prevGroups => [...prevGroups, newGroupItem]);
+      console.log('[GROUP PAGE] 로컬 상태에 새 그룹 즉시 추가:', createdGroup.sgt_idx);
+      
       // 그룹 생성 후 강제로 모든 캐시 무효화 및 최신 그룹 목록 조회
       await fetchGroups();
       
@@ -1088,6 +1098,10 @@ function GroupPageContent() {
       
       // 그룹 삭제 실행
       await groupService.deleteGroup(selectedGroup.sgt_idx);
+      
+      // 즉시 로컬 상태에서 삭제된 그룹 제거
+      setGroups(prevGroups => prevGroups.filter(group => group.sgt_idx !== selectedGroup.sgt_idx));
+      console.log('[GROUP PAGE] 로컬 상태에서 삭제된 그룹 즉시 제거:', selectedGroup.sgt_idx);
       
       // UserContext 그룹 데이터 강제 새로고침 (실시간 데이터)
       console.log('[GROUP PAGE] UserContext 그룹 데이터 강제 새로고침 시작');
