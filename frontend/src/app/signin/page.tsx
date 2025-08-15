@@ -39,6 +39,12 @@ enum HapticFeedbackType {
 
 const SignInPage = () => {
 
+  // 플랫폼 감지 (컴포넌트 상단에 정의)
+  const isAndroid = React.useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    return /Android/.test(navigator.userAgent);
+  }, []);
+
   // iOS 로거 함수 (컴포넌트 내부로 이동)
   const iosLogger = {
     info: (message: string, data?: any) => {
@@ -4590,7 +4596,8 @@ const SignInPage = () => {
           </button>
                   </form>
 
-        {/* 그룹 3: 구분선, Google 로그인 버튼, 회원가입 링크 - 한번에 등장 */}
+        {/* 그룹 3: 구분선, Google 로그인 버튼, 회원가입 링크 - Android에서는 숨김 */}
+        {!isAndroid && (
         <div className="mt-4">
           <div className="relative">
             <div className="absolute inset-0 flex items-center" aria-hidden="true">
@@ -4814,6 +4821,7 @@ const SignInPage = () => {
             </p>
           </div>
         </div>
+        )}
       </motion.div>
 
       {/* 에러 모달 - 단순화된 버전 */}

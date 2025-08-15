@@ -52,8 +52,8 @@ export default function GoogleSignInButton({
     signOut();
   };
 
-  // iOS/Android가 아닌 경우 표시하지 않음
-  if (!isIOS && !isAndroid) {
+  // Android에서는 Google 로그인 숨김, iOS에서만 표시
+  if (!isIOS || isAndroid) {
     return null;
   }
 
