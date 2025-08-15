@@ -4103,8 +4103,43 @@ const SignInPage = () => {
               )} */}
             </div>
 
-            {/* Apple Sign In - iOS에서만 표시 */}
-            {typeof window !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent) && (
+            {/* Apple Sign In - iOS에서만 표시 (개선된 조건) */}
+            {(() => {
+              // 더 강력한 iOS 감지
+              if (typeof window !== 'undefined') {
+                const userAgent = navigator.userAgent;
+                const platform = navigator.platform;
+                const vendor = (navigator as any).vendor || '';
+                
+                // 다양한 iOS 감지 방법
+                const isIOS = 
+                  /iPhone|iPad|iPod/i.test(userAgent) || 
+                  /Macintosh/i.test(userAgent) ||
+                  /iPad/i.test(platform) ||
+                  /iPhone/i.test(platform) ||
+                  /iPod/i.test(platform) ||
+                  /iPad/i.test(vendor) ||
+                  /iPhone/i.test(vendor) ||
+                  /iPod/i.test(vendor) ||
+                  (platform === 'MacIntel' && /iPad/i.test(userAgent)) || // iPad Pro (macOS 모드)
+                  (platform === 'MacIntel' && /iPhone/i.test(userAgent)) || // iPhone (macOS 모드)
+                  (platform === 'MacIntel' && /iPod/i.test(userAgent)) || // iPod (macOS 모드)
+                  // 개발용 강제 표시 (테스트 후 제거 가능)
+                  (process.env.NODE_ENV === 'development' && /iPad/i.test(userAgent)) ||
+                  (process.env.NODE_ENV === 'development' && /iPad/i.test(platform));
+                
+                console.log('🍎 [APPLE LOGIN] 디버깅 정보:', {
+                  userAgent,
+                  platform,
+                  vendor,
+                  isIOS,
+                  showButton: isIOS
+                });
+                
+                return isIOS;
+              }
+              return false;
+            })() && (
               <div className="mb-4">
                 <button
                   type="button"
