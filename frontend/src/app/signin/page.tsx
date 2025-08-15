@@ -2515,6 +2515,31 @@ const SignInPage = () => {
     }
   };
 
+  // Apple ID SDK 초기화 함수
+  const initializeAppleID = () => {
+    try {
+      if ((window as any).AppleID && (window as any).AppleID.auth) {
+        console.log('🍎 [APPLE LOGIN] Apple ID SDK 초기화 시작');
+        
+        // Apple ID SDK 초기화
+        (window as any).AppleID.auth.init({
+          clientId: 'com.dmonster.smap.web', // 웹용 클라이언트 ID
+          scope: 'name email',
+          redirectURI: window.location.origin + '/signin',
+          state: 'apple-signin-' + Date.now(),
+          usePopup: true
+        });
+        
+        console.log('🍎 [APPLE LOGIN] Apple ID SDK 초기화 완료');
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('🍎 [APPLE LOGIN] Apple ID SDK 초기화 오류:', error);
+      return false;
+    }
+  };
+
   // Apple 로그인 핸들러
   const handleAppleSignIn = async () => {
     console.log('🍎 [APPLE LOGIN] Apple 로그인 시작');
@@ -2525,6 +2550,35 @@ const SignInPage = () => {
       // iOS WebView에서 실행 중인지 확인
       const isIOSWebView = /iPhone|iPad|iPod/i.test(navigator.userAgent) && 
                           (window as any).webkit?.messageHandlers?.smapIos;
+      
+      // Apple ID SDK 초기화 확인 및 시도
+      if (!isIOSWebView && (!(window as any).AppleID || !(window as any).AppleID.auth)) {
+        console.log('🍎 [APPLE LOGIN] Apple ID SDK 초기화 시도');
+        
+        // Apple ID SDK가 로드되지 않은 경우 동적으로 로드 시도
+        try {
+          // Apple ID SDK 스크립트 동적 로드
+          if (!document.querySelector('script[src*="appleid.auth.js"]')) {
+            const script = document.createElement('script');
+            script.src = 'https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js';
+            script.async = true;
+            script.onload = () => {
+              console.log('🍎 [APPLE LOGIN] Apple ID SDK 로드 완료');
+              // SDK 로드 후 Apple 로그인 재시도
+              setTimeout(() => handleAppleSignIn(), 100);
+            };
+            script.onerror = () => {
+              console.error('🍎 [APPLE LOGIN] Apple ID SDK 로드 실패');
+              setError('Apple 로그인을 사용할 수 없습니다. Safari 브라우저에서 시도해주세요.');
+              setIsLoading(false);
+            };
+            document.head.appendChild(script);
+            return; // 스크립트 로드 중이므로 여기서 종료
+          }
+        } catch (loadError) {
+          console.error('🍎 [APPLE LOGIN] Apple ID SDK 로드 중 오류:', loadError);
+        }
+      }
       
       if (isIOSWebView) {
         console.log('🍎 [APPLE LOGIN] iOS WebView에서 Apple 로그인 호출');
@@ -2624,10 +2678,99 @@ const SignInPage = () => {
         });
         
       } else {
-        // 웹 브라우저에서는 Apple 로그인 불가
-        console.log('🍎 [APPLE LOGIN] 웹 브라우저에서는 Apple 로그인 불가');
-        setError('Apple 로그인은 iOS 앱에서만 지원됩니다.');
-        setIsLoading(false);
+        // 웹 브라우저에서 Apple 로그인 시도
+        console.log('🍎 [APPLE LOGIN] 웹 브라우저에서 Apple 로그인 시도');
+        
+        try {
+          // Apple 로그인 SDK가 로드되어 있는지 확인
+          if ((window as any).AppleID && (window as any).AppleID.auth) {
+            console.log('🍎 [APPLE LOGIN] Apple ID SDK 발견, 웹 로그인 시도');
+            
+            // Apple ID SDK 초기화
+            if (!initializeAppleID()) {
+              throw new Error('Apple ID SDK 초기화에 실패했습니다.');
+            }
+            
+            // Apple 로그인 요청
+            const response = await (window as any).AppleID.auth.signIn();
+            console.log('🍎 [APPLE LOGIN] Apple ID SDK 응답:', response);
+            
+            if (response && response.authorization) {
+              // Apple 로그인 성공 - 서버로 전송
+              const appleData = {
+                userIdentifier: response.user,
+                userName: response.fullName?.givenName || response.fullName?.familyName || '',
+                email: response.email || '',
+                identityToken: response.authorization.id_token,
+                authorizationCode: response.authorization.code
+              };
+              
+              console.log('🍎 [APPLE LOGIN] 웹에서 받은 Apple 데이터:', appleData);
+              
+              // 서버로 전송
+              const serverResponse = await fetch('/api/auth/apple-login', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(appleData),
+              });
+
+              const serverData = await serverResponse.json();
+              
+              if (!serverResponse.ok) {
+                throw new Error(serverData.message || 'Apple 로그인에 실패했습니다.');
+              }
+
+              if (serverData.success && serverData.data) {
+                if (serverData.data.isNewUser) {
+                  // 신규 회원 - register 페이지로 이동
+                  const socialData = {
+                    provider: 'apple',
+                    userIdentifier: appleData.userIdentifier,
+                    apple_id: appleData.userIdentifier,
+                    email: appleData.email || `apple_${String(appleData.userIdentifier).slice(0, 8)}@privaterelay.appleid.com`,
+                    name: appleData.userName || '',
+                    nickname: appleData.userName || ''
+                  };
+                  
+                  localStorage.setItem('socialLoginData', JSON.stringify(socialData));
+                  router.push('/register?social=apple');
+                } else {
+                  // 기존 회원 - 로그인 처리
+                  const authService = await import('@/services/authService');
+                  if (serverData.data.token) {
+                    authService.default.setToken(serverData.data.token);
+                  }
+                  authService.default.setUserData(serverData.data.user);
+                  
+                  console.log('🍎 Apple 로그인 성공:', serverData.data.user);
+                  router.push('/home');
+                }
+              } else {
+                throw new Error(serverData.message || 'Apple 로그인에 실패했습니다.');
+              }
+            } else {
+              throw new Error('Apple 로그인 응답이 올바르지 않습니다.');
+            }
+          } else {
+            // Apple ID SDK가 없는 경우
+            console.log('🍎 [APPLE LOGIN] Apple ID SDK가 로드되지 않음');
+            setError('Apple 로그인을 사용할 수 없습니다. Safari 브라우저에서 시도해주세요.');
+            setIsLoading(false);
+          }
+        } catch (appleError: any) {
+          console.error('🍎 [APPLE LOGIN] 웹 Apple 로그인 오류:', appleError);
+          
+          if (appleError.error === 'popup_closed_by_user') {
+            setError('Apple 로그인이 취소되었습니다.');
+          } else if (appleError.error === 'invalid_request') {
+            setError('Apple 로그인 요청이 잘못되었습니다.');
+          } else {
+            setError(`Apple 로그인 중 오류가 발생했습니다: ${appleError.message || appleError.error || '알 수 없는 오류'}`);
+          }
+          setIsLoading(false);
+        }
       }
     } catch (err: any) {
       console.error('🍎 [APPLE LOGIN] 오류:', err);
