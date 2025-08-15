@@ -29,7 +29,6 @@ import {
 import { FaApple } from 'react-icons/fa';
 import groupService from '@/services/groupService';
 import { REGISTER_STEPS, useRegisterContext } from './RegisterContext';
-import { setFirstLogin, isAndroid } from '@/utils/androidPermissions';
 
 // 약관 데이터
 const TERMS_DATA = [
@@ -1345,20 +1344,6 @@ export default function RegisterPage() {
         console.log('🔥 [REGISTER] 회원가입 성공 후 socialLoginData 제거');
         
         setCurrentStep(REGISTER_STEPS.COMPLETE);
-        
-        // 🔥 안드로이드에서 회원가입 완료 시 권한 요청
-        if (isAndroid()) {
-          console.log('🔥 [REGISTER] 회원가입 완료 - 안드로이드 권한 요청 시작');
-          setFirstLogin(true).then((success) => {
-            if (success) {
-              console.log('✅ [REGISTER] 안드로이드 권한 요청 완료');
-            } else {
-              console.log('⚠️ [REGISTER] 안드로이드 권한 요청 실패 또는 타임아웃');
-            }
-          }).catch((error) => {
-            console.error('❌ [REGISTER] 안드로이드 권한 요청 중 오류:', error);
-          });
-        }
       } else {
         throw new Error(data.error || data.message || '회원가입에 실패했습니다.');
       }

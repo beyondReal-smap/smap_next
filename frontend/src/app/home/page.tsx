@@ -114,6 +114,7 @@ import LogParser from '../components/layout/LogParser';
 import AnimatedHeader from '../../components/common/AnimatedHeader';
 import GroupSelector from '@/components/location/GroupSelector';
 import FloatingButton from '../../components/common/FloatingButton';
+import { setFirstLogin, isAndroid, hasAllPermissions } from '@/utils/androidPermissions';
 // BottomNavBar는 ClientLayout에서 전역으로 관리됨
 
 declare global {
@@ -964,6 +965,33 @@ export default function HomePage() {
         } catch (error) {
           console.error('🚨 [PERMISSION] iOS 알림 실패:', error);
         }
+      }
+      
+      // 🔥 안드로이드에서 home 진입 시 권한 요청 (첫 로그인 또는 권한 부족 시)
+      if (isAndroid()) {
+        console.log('🔥 [HOME] 안드로이드 home 진입 - 권한 상태 체크');
+        
+        // 2초 후 권한 요청 (UI가 안정화된 후)
+        setTimeout(() => {
+          const hasPermissions = hasAllPermissions();
+          
+          console.log('🔥 [HOME] 권한 체크 결과:', { hasPermissions });
+          
+          if (!hasPermissions) {
+            console.log('🔥 [HOME] 안드로이드 권한 요청 시작');
+            setFirstLogin(true).then((success) => {
+              if (success) {
+                console.log('✅ [HOME] 안드로이드 권한 요청 완료');
+              } else {
+                console.log('⚠️ [HOME] 안드로이드 권한 요청 실패 또는 타임아웃');
+              }
+            }).catch((error) => {
+              console.error('❌ [HOME] 안드로이드 권한 요청 중 오류:', error);
+            });
+          } else {
+            console.log('✅ [HOME] 안드로이드 권한이 이미 모두 허용됨');
+          }
+        }, 2000);
       }
     }
   }, [isLoggedIn, user, authLoading]);
