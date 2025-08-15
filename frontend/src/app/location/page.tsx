@@ -25,6 +25,7 @@ import {
 } from 'react-icons/fi';
 import { FaSearch as FaSearchSolid, FaTrash, FaCrown } from 'react-icons/fa';
 import dynamic from 'next/dynamic';
+import { hasLocationAndActivityPermissions, requestLocationAndActivityPermissions } from '@/utils/androidPermissions';
 
 
 // 커스텀 알림 상태 추가 (react-toastify 관련 없음)
@@ -672,12 +673,40 @@ export default function LocationPage() {
   const router = useRouter();
   const { user } = useAuth(); // 현재 로그인한 사용자 정보
   
-  // 성능 측정을 위한 페이지 로드 시작 시간 기록
+  // 성능 측정을 위한 페이지 로드 시간 기록
   useEffect(() => {
     if (typeof window !== 'undefined' && !(window as any).pageLoadStart) {
       (window as any).pageLoadStart = performance.now();
       console.log('[성능] Location 페이지 로드 시작 (최적화 버전)');
     }
+  }, []);
+
+  // 🔥 위치 페이지 진입 시 권한 체크
+  useEffect(() => {
+    const checkLocationPermissions = async () => {
+      console.log('🔥 [LOCATION_PAGE] 위치 권한 체크 시작');
+      
+      if (!hasLocationAndActivityPermissions()) {
+        console.log('⚠️ [LOCATION_PAGE] 위치/동작 권한이 없음 - 요청');
+        try {
+          const granted = await requestLocationAndActivityPermissions();
+          if (granted) {
+            console.log('✅ [LOCATION_PAGE] 위치/동작 권한 요청 성공');
+          } else {
+            console.log('⚠️ [LOCATION_PAGE] 위치/동작 권한 요청 실패');
+          }
+        } catch (error) {
+          console.error('❌ [LOCATION_PAGE] 위치/동작 권한 요청 중 오류:', error);
+        }
+      } else {
+        console.log('✅ [LOCATION_PAGE] 위치/동작 권한 이미 허용됨');
+      }
+    };
+
+    // 페이지 로드 후 1초 뒤에 권한 체크
+    const timeoutId = setTimeout(checkLocationPermissions, 1000);
+    
+    return () => clearTimeout(timeoutId);
   }, []);
 
   // 헤더 상단 패딩 강제 제거 (런타임)

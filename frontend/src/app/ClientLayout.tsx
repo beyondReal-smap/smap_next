@@ -35,6 +35,7 @@ import { UserProvider } from '@/contexts/UserContext';
 import { DataCacheProvider } from '@/contexts/DataCacheContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMapPreloader } from '@/hooks/useMapPreloader';
+import { useAndroidPermissionChecker } from '@/hooks/useAndroidPermissionChecker';
 // iOS 호환 스피너 컴포넌트를 인라인으로 정의
 // import { useServiceWorker } from '@/hooks/useServiceWorker';
 // import PerformanceMonitor from '@/components/PerformanceMonitor';
@@ -350,6 +351,9 @@ export default function ClientLayout({
   // 지도 API 프리로딩 및 서비스 워커 등록
   useMapPreloader();
   // useServiceWorker(); // 임시 비활성화
+  
+  // 🔥 안드로이드 권한 지속적 체크
+  useAndroidPermissionChecker();
   
   // Service Worker 완전 해제 (페이지 새로고침 방지)
   useEffect(() => {

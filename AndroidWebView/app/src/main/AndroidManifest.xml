@@ -33,6 +33,9 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" 
         android:maxSdkVersion="28"/>
     
+    <!-- 동작 인식 권한 -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    
     <!-- 블루투스 권한 -->
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />

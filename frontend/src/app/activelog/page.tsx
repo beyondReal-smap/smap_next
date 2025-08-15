@@ -20,6 +20,7 @@ import { useDataCache } from '@/contexts/DataCacheContext';
 import { hapticFeedback } from '@/utils/haptic';
 import GroupSelector from '../../components/location/GroupSelector';
 import memberService from '@/services/memberService';
+import { hasLocationAndActivityPermissions, requestLocationAndActivityPermissions } from '@/utils/androidPermissions';
 import { cubicBezier } from 'framer-motion';
 
 // Dynamic Imports for better code splitting
@@ -883,6 +884,34 @@ export default function ActivelogPage() {
   const instanceId = useRef(Math.random().toString(36).substr(2, 9));
   const hasExecuted = useRef(false);
   const isMainInstance = useRef(false);
+  
+  // 🔥 활동로그 페이지 진입 시 권한 체크
+  useEffect(() => {
+    const checkActivityPermissions = async () => {
+      console.log('🔥 [ACTIVELOG_PAGE] 동작/위치 권한 체크 시작');
+      
+      if (!hasLocationAndActivityPermissions()) {
+        console.log('⚠️ [ACTIVELOG_PAGE] 위치/동작 권한이 없음 - 요청');
+        try {
+          const granted = await requestLocationAndActivityPermissions();
+          if (granted) {
+            console.log('✅ [ACTIVELOG_PAGE] 위치/동작 권한 요청 성공');
+          } else {
+            console.log('⚠️ [ACTIVELOG_PAGE] 위치/동작 권한 요청 실패');
+          }
+        } catch (error) {
+          console.error('❌ [ACTIVELOG_PAGE] 위치/동작 권한 요청 중 오류:', error);
+        }
+      } else {
+        console.log('✅ [ACTIVELOG_PAGE] 위치/동작 권한 이미 허용됨');
+      }
+    };
+
+    // 페이지 로드 후 1초 뒤에 권한 체크
+    const timeoutId = setTimeout(checkActivityPermissions, 1000);
+    
+    return () => clearTimeout(timeoutId);
+  }, []);
 
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
   // WebKit 환경에서 안정적인 금일 날짜 생성

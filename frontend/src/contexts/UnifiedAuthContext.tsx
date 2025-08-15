@@ -6,6 +6,7 @@ import { Group } from '@/services/groupService';
 import authService from '@/services/authService';
 import { useDataCache } from '@/contexts/DataCacheContext';
 import dataPreloadService from '@/services/dataPreloadService';
+import { setFirstLogin, isAndroid } from '@/utils/androidPermissions';
 
 // 확장된 사용자 정보 타입
 interface ExtendedUserInfo {
@@ -292,6 +293,21 @@ const unifiedAuthReducer = (state: UnifiedAuthState, action: UnifiedAuthAction):
 
     case 'LOGIN_SUCCESS':
       const extendedUser = convertToExtendedUserInfo(action.payload.user);
+      
+      // 🔥 안드로이드에서 첫 로그인인 경우 권한 요청
+      if (isAndroid() && extendedUser.login_count === 1) {
+        console.log('🔥 [AUTH] 첫 로그인 감지 - 안드로이드 권한 요청 시작');
+        setFirstLogin(true).then((success) => {
+          if (success) {
+            console.log('✅ [AUTH] 안드로이드 권한 요청 완료');
+          } else {
+            console.log('⚠️ [AUTH] 안드로이드 권한 요청 실패 또는 타임아웃');
+          }
+        }).catch((error) => {
+          console.error('❌ [AUTH] 안드로이드 권한 요청 중 오류:', error);
+        });
+      }
+      
       return {
         ...state,
         isLoggedIn: true,
