@@ -3,6 +3,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { FiRefreshCw, FiAlertCircle } from 'react-icons/fi';
+import IOSCompatibleSpinner from './IOSCompatibleSpinner';
 
 interface RetryButtonProps {
   onRetry: () => void;
@@ -73,9 +74,11 @@ export default function RetryButton({
               }
             `}
           >
-            <FiRefreshCw 
-              className={`w-5 h-5 ${isRetrying ? 'animate-spin' : ''}`} 
-            />
+            {isRetrying ? (
+              <IOSCompatibleSpinner size="sm" />
+            ) : (
+              <FiRefreshCw className="w-5 h-5" />
+            )}
             <span>{isRetrying ? '재시도 중...' : '다시 시도'}</span>
           </motion.button>
         </div>
@@ -100,10 +103,12 @@ export default function RetryButton({
         ${className}
       `}
     >
-      <FiRefreshCw 
-        className={`${iconSizes[size]} ${isRetrying ? 'animate-spin' : ''}`} 
-      />
-      <span>{isRetrying ? '재시도 중...' : '다시 시도'}</span>
+                  {isRetrying ? (
+              <IOSCompatibleSpinner size="sm" />
+            ) : (
+              <FiRefreshCw className={iconSizes[size]} />
+            )}
+            <span>{isRetrying ? '재시도 중...' : '다시 시도'}</span>
     </motion.button>
   );
 } 

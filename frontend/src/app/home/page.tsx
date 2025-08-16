@@ -78,6 +78,7 @@ import { PageContainer, Card, Button } from '../components/layout';
 import { Loader } from '@googlemaps/js-api-loader';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { MapSkeleton } from '@/components/common/MapSkeleton';
+import IOSCompatibleSpinner from '@/components/common/IOSCompatibleSpinner';
 import { FiLoader, FiChevronDown, FiUser, FiCalendar } from 'react-icons/fi';
 import { FaCrown } from 'react-icons/fa';
 import config, { API_KEYS, detectLanguage, MAP_CONFIG } from '../../config';
@@ -1644,7 +1645,7 @@ export default function HomePage() {
       return (
         <div className="min-h-screen bg-white flex items-center justify-center">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+            <IOSCompatibleSpinner size="lg" />
             <p className="text-gray-600">로딩 중...</p>
           </div>
         </div>

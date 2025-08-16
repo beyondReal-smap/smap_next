@@ -217,7 +217,7 @@ const InviteCodeSection = memo<{
         >
           {isJoiningGroup ? (
             <div className="flex items-center">
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+              <IOSCompatibleSpinner size="sm" />
               가입 중...
             </div>
           ) : (
@@ -1974,7 +1974,7 @@ function GroupPageContent() {
                         <div className="flex items-center justify-center flex-1">
                         {membersLoading ? (
                             <div className="flex flex-col items-center justify-center">
-                              <div className="w-4 h-4 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin mb-1"></div>
+                              <IOSCompatibleSpinner size="sm" />
                           </div>
                         ) : (
                           <div className="text-lg font-bold">
@@ -1995,7 +1995,7 @@ function GroupPageContent() {
                         <div className="flex items-center justify-center flex-1">
                         {statsLoading ? (
                             <div className="flex flex-col items-center justify-center">
-                              <div className="w-4 h-4 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin mb-1"></div>
+                              <IOSCompatibleSpinner size="sm" />
                               {/* <div className="text-xs text-yellow-800">로딩중...</div> */}
                           </div>
                         ) : (
@@ -2017,7 +2017,7 @@ function GroupPageContent() {
                         <div className="flex items-center justify-center flex-1">
                         {statsLoading ? (
                             <div className="flex flex-col items-center justify-center">
-                              <div className="w-4 h-4 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin mb-1"></div>
+                              <IOSCompatibleSpinner size="sm" />
                               {/* <div className="text-xs text-blue-800">로딩중...</div> */}
                           </div>
                         ) : (
@@ -2090,7 +2090,7 @@ function GroupPageContent() {
                         {membersLoading ? (
                           <div className="flex items-center justify-center py-8">
                             <div className="flex flex-col items-center justify-center">
-                              <div className="w-6 h-6 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin mb-2"></div>
+                              <IOSCompatibleSpinner size="md" />
                               <span className="text-sm text-gray-600">그룹원을 불러오는 중...</span>
                             </div>
                           </div>
@@ -2458,7 +2458,7 @@ function GroupPageContent() {
                       >
                         {isCreatingGroup ? (
                           <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full unified-animate-spin mr-2"></div>
+                            <IOSCompatibleSpinner size="sm" />
                             생성 중...
                           </>
                         ) : (
@@ -2631,7 +2631,7 @@ function GroupPageContent() {
                 >
                   {isUpdatingGroup ? (
                     <>
-                      <div className="w-3 h-3 border-2 border-gray-300 border-t-white rounded-full unified-animate-spin mr-1"></div>
+                      <IOSCompatibleSpinner size="sm" />
                       수정 중...
                     </>
                   ) : (
@@ -2681,7 +2681,7 @@ function GroupPageContent() {
                 >
                   {isDeleting ? (
                     <>
-                      <div className="w-3 h-3 border-2 border-gray-300 border-t-white rounded-full unified-animate-spin mr-1"></div>
+                      <IOSCompatibleSpinner size="sm" />
                       삭제중
                     </>
                   ) : (
@@ -2731,7 +2731,7 @@ function GroupPageContent() {
                     whileTap={{ scale: 0.98 }}
                   >
                     {isUpdatingMember ? (
-                      <div className="w-3 h-3 border-2 border-gray-300 border-t-white rounded-full unified-animate-spin mr-2"></div>
+                      <IOSCompatibleSpinner size="sm" />
                     ) : (
                       <FaUsers className="w-4 h-4 mr-2" />
                     )}
@@ -2746,7 +2746,7 @@ function GroupPageContent() {
                     whileTap={{ scale: 0.98 }}
                   >
                     {isUpdatingMember ? (
-                      <div className="w-3 h-3 border-2 border-gray-300 border-t-white rounded-full unified-animate-spin mr-2"></div>
+                      <IOSCompatibleSpinner size="sm" />
                     ) : (
                       <FaCrown className="w-4 h-4 mr-2" />
                     )}
@@ -2762,7 +2762,7 @@ function GroupPageContent() {
                   whileTap={{ scale: 0.98 }}
                 >
                   {isUpdatingMember ? (
-                    <div className="w-3 h-3 border-2 border-gray-300 border-t-white rounded-full unified-animate-spin mr-2"></div>
+                    <IOSCompatibleSpinner size="sm" />
                   ) : (
                     <FaTrash className="w-4 h-4 mr-2" />
                   )}
@@ -2811,7 +2811,7 @@ function GroupPageContent() {
                         </svg>
                       )}
                       {toastModal.type === 'loading' && (
-                        <div className="w-5 h-5 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin"></div>
+                        <IOSCompatibleSpinner size="md" />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">

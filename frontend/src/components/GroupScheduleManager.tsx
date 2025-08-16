@@ -8,6 +8,7 @@ import scheduleService, {
   CreateScheduleRequest, 
   UpdateScheduleRequest 
 } from '@/services/scheduleService';
+import IOSCompatibleSpinner from './common/IOSCompatibleSpinner';
 
 interface GroupScheduleManagerProps {
   groupId: number;
@@ -328,7 +329,7 @@ const GroupScheduleManager: React.FC<GroupScheduleManagerProps> = ({
       {/* 로딩 상태 */}
       {isLoading && (
         <div className="text-center py-8">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <IOSCompatibleSpinner size="lg" />
           <p className="mt-2 text-gray-600">로딩 중...</p>
         </div>
       )}

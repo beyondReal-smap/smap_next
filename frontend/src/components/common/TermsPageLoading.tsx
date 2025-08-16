@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import IOSCompatibleSpinner from './IOSCompatibleSpinner';
 
 interface TermsPageLoadingProps {
   message?: string;
@@ -18,12 +19,10 @@ export default function TermsPageLoading({
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        {/* 로딩 스피너 */}
-        <motion.div 
-          className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto mb-6"
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-        />
+        {/* iOS 호환 로딩 스피너 */}
+        <div className="mb-6">
+          <IOSCompatibleSpinner size="lg" />
+        </div>
         
         {/* 메인 메시지 */}
         <motion.h2 

@@ -43,6 +43,7 @@ import { useDataCache } from '../../contexts/DataCacheContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { hapticFeedback } from '../../utils/haptic';
 import FloatingButton from '../../components/common/FloatingButton';
+import IOSCompatibleSpinner from '../../components/common/IOSCompatibleSpinner';
 
 // Dynamic Imports for better code splitting
 const AnimatedHeader = dynamic(() => import('../../components/common/AnimatedHeader'), {
@@ -5415,7 +5416,7 @@ export default function SchedulePage() {
                       >
                         {isSearchingLocation ? (
                           <>
-                            <div className="w-4 h-4 border-2 border-gray-300 border-t-white rounded-full unified-animate-spin"></div>
+                            <IOSCompatibleSpinner size="sm" />
                             <span>검색 중...</span>
                           </>
                         ) : (
@@ -5449,10 +5450,7 @@ export default function SchedulePage() {
                       {isSearchingLocation ? (
                         <div className="text-center py-8 px-6">
                           <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <svg className="unified-animate-spin h-6 w-6 text-orange-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
+                                    <IOSCompatibleSpinner size="md" />
                           </div>
                           <p className="text-gray-600 font-medium">장소를 검색하는 중입니다...</p>
                           <p className="text-xs text-gray-500 mt-1">잠시만 기다려주세요</p>
@@ -6250,7 +6248,7 @@ export default function SchedulePage() {
                                 >
                                   {isLoadingGroups ? (
                                     <div className="flex flex-col items-center justify-center p-4 text-gray-500">
-                                      <div className="w-5 h-5 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin mb-2"></div>
+                                      <IOSCompatibleSpinner size="md" />
                                       <span className="text-sm">그룹 목록을 불러오는 중...</span>
                                     </div>
                                   ) : userGroups.length > 0 ? (
@@ -6297,7 +6295,7 @@ export default function SchedulePage() {
                         <label className="block text-sm font-medium text-gray-700 mb-3">멤버 선택</label>
                         {isFetchingMembers ? (
                           <div className="flex flex-col items-center justify-center py-6 text-gray-500">
-                            <div className="w-6 h-6 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin mb-2"></div>
+                            <IOSCompatibleSpinner size="lg" />
                             <span className="text-sm">멤버 목록을 불러오는 중...</span>
                           </div>
                         ) : scheduleGroupMembers.length > 0 ? (
@@ -6593,7 +6591,7 @@ export default function SchedulePage() {
                               </svg>
                             )}
                             {toastModal.type === 'loading' && (
-                              <div className="w-5 h-5 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin"></div>
+                              <IOSCompatibleSpinner size="md" />
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
