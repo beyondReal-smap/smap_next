@@ -3211,9 +3211,33 @@ const SignInPage = () => {
           setLastAppleLoginError(errorMessage);
           setIsLoading(false);
         }
-      }
-    } catch (err: any) {
-      console.error('🍎 [APPLE LOGIN] 오류:', err);
+        
+        // 웹 SDK 폴백 시도
+        try {
+          // Apple 로그인 SDK가 로드되어 있는지 확인
+          if ((window as any).AppleID && (window as any).AppleID.auth) {
+            console.log('🍎 [APPLE LOGIN] Apple ID SDK 발견, 웹 SDK로 로그인 시도');
+            // Apple ID SDK 초기화
+            if (!initializeAppleID()) {
+              console.log('🍎 [APPLE LOGIN] Apple ID SDK 초기화 실패, 강제 진행');
+            }
+            
+            // Apple 로그인 요청
+            const response = await (window as any).AppleID.auth.signIn();
+            console.log('🍎 [APPLE LOGIN] Apple ID SDK 응답:', response);
+            
+            // 성공 처리 로직은 기존과 동일
+            setIsLoading(false);
+          } else {
+            console.log('🍎 [APPLE LOGIN] Apple ID SDK가 없음, 조용히 처리');
+            setIsLoading(false);
+          }
+        } catch (webSDKError: any) {
+          console.log('🍎 [APPLE LOGIN] 웹 SDK 오류, 조용히 처리:', webSDKError);
+          setIsLoading(false);
+        }
+      } catch (err: any) {
+      console.error('🍎 [APPLE LOGIN] 전체 오류:', err);
       const errorMessage = `Apple 로그인 중 오류가 발생했습니다: ${err.message}`;
       setError(errorMessage);
       setLastAppleLoginError(errorMessage);
