@@ -2238,6 +2238,23 @@ export default function LocationPage() {
         // *** 중요: handleMemberSelect에서 직접 updateAllMarkers 호출하지 않음 ***
         // useEffect에서 groupMembers와 selectedMemberSavedLocations 변경을 감지하여 자동으로 마커 업데이트
         console.log('[handleMemberSelect] 마커 업데이트는 useEffect에서 자동으로 처리됩니다 - 중복 호출 방지');
+        
+        // 강제로 마커 업데이트 트리거 (useEffect 의존성 변경 보장)
+        console.log('[handleMemberSelect] 강제 마커 업데이트 트리거:', {
+          selectedMemberId: memberId,
+          locationsCount: convertedLocations.length,
+          timestamp: Date.now()
+        });
+        
+        // 즉시 마커 업데이트 실행 (useEffect 대기 없이)
+        setTimeout(() => {
+          if (map && isMapReady) {
+            console.log('[handleMemberSelect] 즉시 마커 업데이트 실행');
+            const selMember = groupMembers.find(m => m.id === memberId);
+            const locationsForSelected = selMember ? convertedLocations : [];
+            updateAllMarkers(groupMembers, locationsForSelected);
+          }
+        }, 100);
       } catch (error) {
         console.error('[handleMemberSelect] 장소 데이터 로드 실패:', error);
         setSelectedMemberSavedLocations([]);
@@ -4000,7 +4017,8 @@ export default function LocationPage() {
         selectedMemberName: selectedMember.name,
         selectedMemberId: selectedMember.id,
         locationsCount: locations.length,
-        locationsPreview: locations.slice(0, 3).map(loc => ({ name: loc.name, coordinates: loc.coordinates }))
+        locationsPreview: locations.slice(0, 3).map(loc => ({ name: loc.name, coordinates: loc.coordinates })),
+        locationsFull: locations.map(loc => ({ id: loc.id, name: loc.name, coordinates: loc.coordinates }))
       });
       
       // 선택된 멤버의 장소만 반영: locations는 이미 선택 멤버의 장소로 전달됨
@@ -4295,7 +4313,7 @@ export default function LocationPage() {
         groupMembersLength: groupMembers.length
       });
     }
-  }, [groupMembers, selectedMemberSavedLocations, map, isMapReady, isFirstMemberSelectionComplete]);
+  }, [groupMembers, selectedMemberSavedLocations, map, isMapReady, isFirstMemberSelectionComplete, selectedMemberIdRef.current]);
 
   // 선택된 멤버 변경 또는 멤버 마커 생성 후 InfoWindow 자동 표시 보강
   useEffect(() => {
