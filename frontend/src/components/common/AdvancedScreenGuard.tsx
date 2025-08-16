@@ -107,25 +107,36 @@ export default function AdvancedScreenGuard({
     };
   }, []);
 
-  // 흰 화면 판단 함수
-  const isWhiteScreen = useCallback((state: ScreenState): boolean => {
-    // 컨테이너가 너무 작거나 없는 경우
-    if (state.containerSize.width < 100 || state.containerSize.height < 100) {
-      return true;
-    }
-
-    // 콘텐츠가 전혀 없는 경우
-    if (!state.hasContent) {
-      return true;
-    }
-
-    // 텍스트, 이미지, 인터랙티브 요소가 모두 없는 경우
-    if (!state.hasText && !state.hasImages && !state.hasInteractiveElements) {
-      return true;
-    }
-
-    return false;
-  }, []);
+           // 흰 화면 판단 함수 - 홈 페이지는 더 관대하게 처리
+         const isWhiteScreen = useCallback((state: ScreenState): boolean => {
+           // 컨테이너가 너무 작거나 없는 경우
+           if (state.containerSize.width < 100 || state.containerSize.height < 100) {
+             return true;
+           }
+       
+           // 홈 페이지는 더 관대하게 처리
+           const isHomePage = window.location.pathname === '/home';
+           
+           if (isHomePage) {
+             // 홈 페이지는 기본적으로 콘텐츠가 있다고 가정 (로딩 중일 수 있음)
+             if (state.containerSize.width > 200 && state.containerSize.height > 200) {
+               console.log('[AdvancedScreenGuard] 홈 페이지 - 콘텐츠 로딩 중으로 간주');
+               return false;
+             }
+           }
+       
+           // 콘텐츠가 전혀 없는 경우
+           if (!state.hasContent) {
+             return true;
+           }
+       
+           // 텍스트, 이미지, 인터랙티브 요소가 모두 없는 경우
+           if (!state.hasText && !state.hasImages && !state.hasInteractiveElements) {
+             return true;
+           }
+       
+           return false;
+         }, []);
 
   // 복구 시도 함수
   const attemptRecovery = useCallback(async () => {

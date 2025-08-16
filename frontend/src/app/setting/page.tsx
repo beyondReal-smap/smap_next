@@ -445,9 +445,9 @@ export default function SettingsPage() {
       <style jsx global>{pageAnimations}</style>
       <AdvancedScreenGuard 
         fallbackToHome={true}
-        enableAutoRecovery={true}
-        recoveryAttempts={3}
-        checkInterval={2000}
+        enableAutoRecovery={false}
+        recoveryAttempts={1}
+        checkInterval={5000}
         className="setting-page-guard"
       >
         <div 

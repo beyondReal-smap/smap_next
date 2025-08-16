@@ -79,7 +79,7 @@ import { Loader } from '@googlemaps/js-api-loader';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { MapSkeleton } from '@/components/common/MapSkeleton';
 import IOSCompatibleSpinner from '@/components/common/IOSCompatibleSpinner';
-import AdvancedScreenGuard from '@/components/common/AdvancedScreenGuard';
+// import AdvancedScreenGuard from '@/components/common/AdvancedScreenGuard';
 import { FiLoader, FiChevronDown, FiUser, FiCalendar } from 'react-icons/fi';
 import { FaCrown } from 'react-icons/fa';
 import config, { API_KEYS, detectLanguage, MAP_CONFIG } from '../../config';
@@ -1604,29 +1604,72 @@ export default function HomePage() {
     try {
       if (navigator.geolocation) {
         console.log('🏠 [HOME] Geolocation API 사용 가능');
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const { longitude, latitude } = position.coords;
-            console.log('🏠 [HOME] ✅ 위치 정보 획득 성공:', { latitude, longitude });
-            setUserLocation({ lat: latitude, lng: longitude });
-            setIsLocationEnabled(true);
+        
+        // 권한 상태 확인
+        if (navigator.permissions && navigator.permissions.query) {
+          navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+            console.log('🏠 [HOME] 위치 권한 상태:', result.state);
             
-            // 정적 위치 정보 설정 (Geocoding API 대신 간단한 해결책)
-            setLocationName("현재 위치");
-          },
-          (error) => {
-            console.error('🏠 [HOME] ❌ 위치 정보 획득 실패:', error);
+            if (result.state === 'denied') {
+              console.warn('🏠 [HOME] 위치 권한이 거부됨');
+              setIsLocationEnabled(false);
+              setUserLocation({ lat: 37.5642, lng: 127.0016 });
+              setLocationName("서울시");
+              return;
+            }
+            
+            // 권한이 허용되었거나 prompt 상태일 때만 위치 정보 요청
+            if (result.state === 'granted' || result.state === 'prompt') {
+              navigator.geolocation.getCurrentPosition(
+                (position) => {
+                  const { longitude, latitude } = position.coords;
+                  console.log('🏠 [HOME] ✅ 위치 정보 획득 성공:', { latitude, longitude });
+                  setUserLocation({ lat: latitude, lng: longitude });
+                  setIsLocationEnabled(true);
+                  setLocationName("현재 위치");
+                },
+                (error) => {
+                  console.error('🏠 [HOME] ❌ 위치 정보 획득 실패:', error);
+                  setIsLocationEnabled(false);
+                  setUserLocation({ lat: 37.5642, lng: 127.0016 });
+                  setLocationName("서울시");
+                },
+                {
+                  enableHighAccuracy: true,
+                  timeout: 10000,
+                  maximumAge: 300000
+                }
+              );
+            }
+          }).catch((error) => {
+            console.warn('🏠 [HOME] 권한 확인 실패, 기본 위치 사용:', error);
             setIsLocationEnabled(false);
-            // 기본 위치로 폴백
             setUserLocation({ lat: 37.5642, lng: 127.0016 });
             setLocationName("서울시");
-          },
-          {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 300000 // 5분간 캐시
-          }
-        );
+          });
+        } else {
+          // 권한 API를 지원하지 않는 경우 직접 시도
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              const { longitude, latitude } = position.coords;
+              console.log('🏠 [HOME] ✅ 위치 정보 획득 성공:', { latitude, longitude });
+              setUserLocation({ lat: latitude, lng: longitude });
+              setIsLocationEnabled(true);
+              setLocationName("현재 위치");
+            },
+            (error) => {
+              console.error('🏠 [HOME] ❌ 위치 정보 획득 실패:', error);
+              setIsLocationEnabled(false);
+              setUserLocation({ lat: 37.5642, lng: 127.0016 });
+              setLocationName("서울시");
+            },
+            {
+              enableHighAccuracy: true,
+              timeout: 10000,
+              maximumAge: 300000
+            }
+          );
+        }
       } else {
         console.error('🏠 [HOME] ❌ Geolocation API 지원하지 않음');
         setIsLocationEnabled(false);
@@ -6257,13 +6300,7 @@ export default function HomePage() {
     // Critical Error 상태 처리
     if (criticalError) {
       return (
-        <AdvancedScreenGuard 
-          fallbackToHome={true}
-          enableAutoRecovery={true}
-          recoveryAttempts={3}
-          checkInterval={2000}
-          className="home-error-guard"
-        >
+
           <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-xl shadow-lg p-6 max-w-md w-full">
               <div className="text-center">
@@ -6289,7 +6326,7 @@ export default function HomePage() {
               </div>
             </div>
           </div>
-        </AdvancedScreenGuard>
+
       );
     }
 
