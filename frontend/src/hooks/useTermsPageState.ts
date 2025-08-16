@@ -22,58 +22,45 @@ export const useTermsPageState = ({ pageName, isEmbed = false }: UseTermsPageSta
 
   // 스타일 적용 함수
   const applyStyles = useCallback(() => {
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    
-    if (isEmbed) {
-      // embed 모드일 때는 내부 웹뷰처럼 작동
-      document.body.style.position = 'relative';
-      document.body.style.overflow = 'auto';
-      document.body.style.height = 'auto';
-      document.body.style.minHeight = '100vh';
-      document.body.style.background = 'white';
-      document.documentElement.style.position = 'relative';
-      document.documentElement.style.overflow = 'auto';
-      document.documentElement.style.height = 'auto';
+    // 약관 페이지에서는 전역 스타일 조작을 최소화
+    // Next.js 레이아웃 시스템과의 충돌 방지
+    try {
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
       
-      // iOS에서 추가 최적화
-      if (isIOS) {
-        document.body.style.setProperty('-webkit-overflow-scrolling', 'touch');
-        document.body.style.setProperty('-webkit-transform', 'translateZ(0)');
-        document.body.style.setProperty('-webkit-backface-visibility', 'hidden');
+      if (isEmbed) {
+        // 임베드 모드에서는 최소한의 스타일만 적용
+        if (document.body) {
+          document.body.style.setProperty('overflow', 'hidden', 'important');
+        }
+        if (document.documentElement) {
+          document.documentElement.style.setProperty('overflow', 'hidden', 'important');
+        }
+      } else {
+        // 일반 모드에서는 스타일 조작을 하지 않음
+        // Next.js가 기본 스타일을 관리하도록 함
       }
-    } else {
-      // 일반 모드에서는 기본 스타일 유지
-      document.body.style.overflowY = 'auto';
-      document.documentElement.style.overflowY = 'auto';
       
-      // iOS에서 추가 최적화
-      if (isIOS) {
-        document.body.style.setProperty('-webkit-overflow-scrolling', 'touch');
-        document.body.style.setProperty('-webkit-transform', 'translateZ(0)');
-        document.body.style.setProperty('-webkit-backface-visibility', 'hidden');
-      }
+      console.log(`[${pageName}] 스타일 적용 완료 - 모드: ${isEmbed ? 'embed' : 'normal'}`);
+    } catch (error) {
+      console.warn(`[${pageName}] 스타일 적용 중 오류 (무시됨):`, error);
     }
-    
-    console.log(`[${pageName}] 스타일 적용 완료 - 모드: ${isEmbed ? 'embed' : 'normal'}`);
   }, [isEmbed, pageName]);
 
   // 스타일 복원 함수
   const restoreStyles = useCallback(() => {
-    // 기본 스타일로 복원
-    document.body.style.position = '';
-    document.body.style.overflow = '';
-    document.body.style.height = '';
-    document.body.style.minHeight = '';
-    document.body.style.background = '';
-    document.body.style.removeProperty('-webkit-overflow-scrolling');
-    document.body.style.removeProperty('-webkit-transform');
-    document.body.style.removeProperty('-webkit-backface-visibility');
-    document.documentElement.style.position = '';
-    document.documentElement.style.overflow = '';
-    document.documentElement.style.height = '';
-    document.documentElement.style.overflowY = '';
-    
-    console.log(`[${pageName}] 스타일 복원 완료`);
+    // 약관 페이지에서는 전역 스타일 복원을 최소화
+    try {
+      if (document.body) {
+        document.body.style.removeProperty('overflow');
+      }
+      if (document.documentElement) {
+        document.documentElement.style.removeProperty('overflow');
+      }
+      
+      console.log(`[${pageName}] 스타일 복원 완료`);
+    } catch (error) {
+      console.warn(`[${pageName}] 스타일 복원 중 오류 (무시됨):`, error);
+    }
   }, [pageName]);
 
   // 인증 상태 확인 및 복원 함수

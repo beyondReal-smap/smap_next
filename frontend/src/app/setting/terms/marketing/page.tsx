@@ -89,22 +89,9 @@ export default function MarketingTermsPage() {
         ` : ''}
       `}</style>
     <div 
-      className={`${isEmbed ? 'min-h-screen overflow-auto bg-white' : 'fixed inset-0 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 main-container'}`} 
+      className={`${isEmbed ? 'min-h-screen overflow-auto bg-white' : 'min-h-screen overflow-auto bg-gradient-to-br from-indigo-50 via-white to-purple-50 main-container'}`} 
       data-page="/setting/terms/marketing"
       data-content-type="marketing-page"
-      style={{ 
-        paddingTop: '0px', 
-        marginTop: '0px', 
-        top: '0px',
-        ...(isEmbed && {
-          position: 'relative',
-          width: '100%',
-          minHeight: '100vh',
-          WebkitOverflowScrolling: 'touch',
-          WebkitTransform: 'translateZ(0)',
-          WebkitBackfaceVisibility: 'hidden'
-        })
-      }}
     >
         {!isEmbed && (
         <AnimatedHeader variant="enhanced" className="setting-header glass-effect">
@@ -120,7 +107,7 @@ export default function MarketingTermsPage() {
         </AnimatedHeader>
         )}
 
-        <motion.div initial="initial" animate="in" exit="out" className={`${isEmbed ? '' : 'absolute inset-0'} px-4 space-y-6 content-area ${isEmbed ? '' : 'hide-scrollbar'} ${isEmbed ? 'pt-6' : 'pt-20'}`} style={isEmbed ? undefined : { overflow: 'hidden', overflowY: 'auto' }}>
+        <motion.div initial="initial" animate="in" exit="out" className={`px-4 space-y-6 content-area ${isEmbed ? 'pt-6' : 'pt-20'}`}>
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-fadeIn marketing-content">
             <div className="p-6 text-sm leading-relaxed max-w-4xl mx-auto">
               <h2 className="text-2xl font-bold mb-6 text-center">마케팅 정보 수집 및 이용 동의</h2>

@@ -62,22 +62,9 @@ export default function PrivacyPolicyPage() {
 
   return (
     <div 
-      className={`${isEmbed ? 'min-h-screen overflow-auto bg-white' : 'fixed inset-0 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 main-container'}`} 
+      className={`${isEmbed ? 'min-h-screen overflow-auto bg-white' : 'min-h-screen overflow-auto bg-gradient-to-br from-indigo-50 via-white to-purple-50 main-container'}`} 
       data-page="/setting/terms/privacy"
       data-content-type="privacy-page"
-      style={{ 
-        paddingTop: '0px', 
-        marginTop: '0px', 
-        top: '0px',
-        ...(isEmbed && {
-          position: 'relative',
-          width: '100%',
-          minHeight: '100vh',
-          WebkitOverflowScrolling: 'touch',
-          WebkitTransform: 'translateZ(0)',
-          WebkitBackfaceVisibility: 'hidden'
-        })
-      }}
     >
       <style jsx global>{`
         ${pageAnimations}
@@ -123,8 +110,7 @@ export default function PrivacyPolicyPage() {
           initial="initial" 
           animate="in" 
           exit="out" 
-          className={`${isEmbed ? '' : 'absolute inset-0'} px-4 space-y-6 content-area ${isEmbed ? '' : 'hide-scrollbar'} ${isEmbed ? 'pt-6' : 'pt-20'}`} 
-          style={isEmbed ? undefined : { overflow: 'hidden', overflowY: 'auto' }}
+          className={`px-4 space-y-6 content-area ${isEmbed ? 'pt-6' : 'pt-20'}`}
         >
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-fadeIn privacy-content">
             <div className="p-6 text-sm leading-relaxed max-w-4xl mx-auto">
