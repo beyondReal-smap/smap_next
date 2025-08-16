@@ -49,10 +49,29 @@ export default function ServiceTermsPage() {
   const isEmbed = (searchParams?.get('embed') === '1');
 
   // 약관 페이지 상태 관리 훅 사용
-  const { isVisible, isLoading, isInitialized } = useTermsPageState({
+  const { isVisible, isLoading, isInitialized, applyStyles } = useTermsPageState({
     pageName: 'SERVICE',
     isEmbed
   });
+  
+  // 페이지 가시성 변경 감지 및 복원
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('[SERVICE] 페이지 가시성 복원 - 스타일 재적용');
+        // 약간의 지연 후 스타일 재적용
+        setTimeout(() => {
+          applyStyles();
+        }, 200);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [applyStyles]);
 
   const handleBack = () => {
     triggerHapticFeedback(HapticFeedbackType.SELECTION, '서비스 이용약관 뒤로가기', {

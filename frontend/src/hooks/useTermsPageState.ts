@@ -9,12 +9,16 @@ interface UseTermsPageStateOptions {
 export const useTermsPageState = ({ pageName, isEmbed = false }: UseTermsPageStateOptions) => {
   const router = useRouter();
   const [isVisible, setIsVisible] = useState(true);
-  const [isLoading, setIsLoading] = useState(false); // false로 변경하여 즉시 렌더링
-  const [isInitialized, setIsInitialized] = useState(true); // true로 변경하여 즉시 초기화 완료
+  const [isLoading, setIsLoading] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(true);
   
   // 인증 상태 추적을 위한 ref
   const authCheckRef = useRef<boolean>(false);
   const lastAuthCheckRef = useRef<number>(0);
+  
+  // 앱 상태 변경 추적을 위한 ref
+  const appStateRef = useRef<'foreground' | 'background'>('foreground');
+  const lastAppStateChangeRef = useRef<number>(0);
 
   // 스타일 적용 함수
   const applyStyles = useCallback(() => {
@@ -38,13 +42,24 @@ export const useTermsPageState = ({ pageName, isEmbed = false }: UseTermsPageSta
         document.body.style.setProperty('-webkit-backface-visibility', 'hidden');
       }
     } else {
+      // 일반 모드에서는 기본 스타일 유지
       document.body.style.overflowY = 'auto';
       document.documentElement.style.overflowY = 'auto';
+      
+      // iOS에서 추가 최적화
+      if (isIOS) {
+        document.body.style.setProperty('-webkit-overflow-scrolling', 'touch');
+        document.body.style.setProperty('-webkit-transform', 'translateZ(0)');
+        document.body.style.setProperty('-webkit-backface-visibility', 'hidden');
+      }
     }
-  }, [isEmbed]);
+    
+    console.log(`[${pageName}] 스타일 적용 완료 - 모드: ${isEmbed ? 'embed' : 'normal'}`);
+  }, [isEmbed, pageName]);
 
   // 스타일 복원 함수
   const restoreStyles = useCallback(() => {
+    // 기본 스타일로 복원
     document.body.style.position = '';
     document.body.style.overflow = '';
     document.body.style.height = '';
@@ -57,7 +72,9 @@ export const useTermsPageState = ({ pageName, isEmbed = false }: UseTermsPageSta
     document.documentElement.style.overflow = '';
     document.documentElement.style.height = '';
     document.documentElement.style.overflowY = '';
-  }, []);
+    
+    console.log(`[${pageName}] 스타일 복원 완료`);
+  }, [pageName]);
 
   // 인증 상태 확인 및 복원 함수
   const checkAndRestoreAuth = useCallback(async () => {
@@ -110,51 +127,75 @@ export const useTermsPageState = ({ pageName, isEmbed = false }: UseTermsPageSta
 
   // 앱 상태 감지 및 복원
   const handleAppStateChange = useCallback(async (isActive: boolean) => {
-    console.log(`[${pageName}] 앱 상태 변경:`, isActive ? '포그라운드' : '백그라운드');
+    const now = Date.now();
+    const newState = isActive ? 'foreground' : 'background';
+    
+    // 상태가 실제로 변경되었는지 확인
+    if (appStateRef.current === newState) {
+      console.log(`[${pageName}] 앱 상태 변경 스킵 (동일한 상태)`);
+      return;
+    }
+    
+    // 너무 빠른 상태 변경 방지 (100ms 이내)
+    if (now - lastAppStateChangeRef.current < 100) {
+      console.log(`[${pageName}] 앱 상태 변경 스킵 (너무 빠름)`);
+      return;
+    }
+    
+    console.log(`[${pageName}] 앱 상태 변경: ${appStateRef.current} → ${newState}`);
+    
+    appStateRef.current = newState;
+    lastAppStateChangeRef.current = now;
     
     if (isActive) {
       // 앱이 포그라운드로 돌아올 때
       setIsVisible(true);
       
-      // 인증 상태 확인 및 복원
-      const authValid = await checkAndRestoreAuth();
+      // 약간의 지연 후 스타일 재적용 (DOM 업데이트 대기)
+      setTimeout(() => {
+        console.log(`[${pageName}] 포그라운드 복귀 - 스타일 재적용`);
+        applyStyles();
+        
+        // 페이지 가시성 강제 업데이트
+        if (document.hidden === false) {
+          console.log(`[${pageName}] 페이지 가시성 확인됨 - 정상 상태`);
+        }
+      }, 100);
       
-      if (authValid) {
-        console.log(`[${pageName}] 인증 상태 복원 성공 - 스타일 재적용`);
-        // 스타일 재적용
-        applyStyles();
-      } else {
-        console.log(`[${pageName}] 인증 상태 없음 - 기본 상태로 복원`);
-        // 약관 페이지에서는 로그인 페이지로 이동하지 않고 기본 상태 유지
-        applyStyles();
-      }
     } else {
       // 앱이 백그라운드로 갈 때
       setIsVisible(false);
-      restoreStyles();
+      console.log(`[${pageName}] 백그라운드 전환 - 스타일 유지`);
+      // 백그라운드에서는 스타일을 복원하지 않음 (약관 페이지 유지)
     }
-  }, [pageName, applyStyles, restoreStyles, checkAndRestoreAuth]);
+  }, [pageName, applyStyles]);
 
   // 앱 상태 감지 이벤트 리스너
   useEffect(() => {
     const handleVisibilityChange = () => {
-      handleAppStateChange(document.visibilityState === 'visible');
+      const isVisible = document.visibilityState === 'visible';
+      console.log(`[${pageName}] visibilitychange: ${isVisible ? 'visible' : 'hidden'}`);
+      handleAppStateChange(isVisible);
     };
 
     const handleFocus = () => {
+      console.log(`[${pageName}] window focus`);
       handleAppStateChange(true);
     };
 
     const handleBlur = () => {
+      console.log(`[${pageName}] window blur`);
       handleAppStateChange(false);
     };
 
     // iOS WebView 전용 이벤트
     const handlePageShow = () => {
+      console.log(`[${pageName}] pageshow`);
       handleAppStateChange(true);
     };
 
     const handlePageHide = () => {
+      console.log(`[${pageName}] pagehide`);
       handleAppStateChange(false);
     };
 
@@ -189,6 +230,10 @@ export const useTermsPageState = ({ pageName, isEmbed = false }: UseTermsPageSta
         console.log(`[${pageName}] 약관 페이지 초기화 완료`);
         setIsInitialized(true);
         setIsLoading(false);
+        
+        // 초기 앱 상태 설정
+        appStateRef.current = document.hidden ? 'background' : 'foreground';
+        console.log(`[${pageName}] 초기 앱 상태: ${appStateRef.current}`);
       }
     };
 
