@@ -2267,10 +2267,21 @@ export default function LocationPage() {
           return updatedMembers;
         });
         
+        // 🚨 상태 업데이트 후 실제 확인
         console.log('[handleMemberSelect] 📊 선택된 멤버 장소 데이터 업데이트 완료:', {
           선택된멤버: newlySelectedMember?.name,
           장소개수: convertedLocations.length
         });
+        
+        // 🚨 추가 검증: updatedMembers 상태 확인
+        console.log('[handleMemberSelect] 🚨 updatedMembers 최종 상태:', 
+          updatedMembers.map(m => ({ 
+            name: m.name, 
+            count: m.savedLocationCount, 
+            isSelected: m.isSelected,
+            hasLocations: !!m.savedLocations?.length 
+          }))
+        );
         
         // 새로 선택된 멤버의 장소 마커들을 지도에 표시
         console.log('[handleMemberSelect] 장소 마커 업데이트 시작:', {
@@ -2292,8 +2303,8 @@ export default function LocationPage() {
           console.log('[handleMemberSelect] 선택된 멤버 장소 추가:', convertedLocations.length, '개');
         }
         
-        // 2. 다른 멤버들의 장소 데이터 (groupMembers에서 가져옴)
-        groupMembers.forEach(member => {
+        // 2. 다른 멤버들의 장소 데이터 (updatedMembers에서 가져옴 - 이미 업데이트된 상태)
+        updatedMembers.forEach(member => {
           if (member.id !== memberId && member.savedLocations && member.savedLocations.length > 0) {
             allLocationsForMarkers.push(...member.savedLocations);
             console.log('[handleMemberSelect] 다른 멤버 장소 추가:', member.name, member.savedLocations.length, '개');
@@ -2309,7 +2320,8 @@ export default function LocationPage() {
         // 🚨 즉시 마커 업데이트 실행 (강제 모드)
         if (map && isMapReady && allLocationsForMarkers.length > 0) {
           console.log('[handleMemberSelect] 🚨 즉시 마커 업데이트 실행');
-          updateAllMarkers(groupMembers, allLocationsForMarkers, true);
+          // 🚨 updatedMembers 사용 (이미 업데이트된 상태)
+          updateAllMarkers(updatedMembers, allLocationsForMarkers, true);
         } else {
           console.log('[handleMemberSelect] 마커 업데이트 조건 미충족:', {
             hasMap: !!map,
@@ -2317,6 +2329,41 @@ export default function LocationPage() {
             locationsCount: allLocationsForMarkers.length
           });
         }
+        
+        // 🚨 강제로 상태 동기화 및 마커 재생성
+        setTimeout(() => {
+          console.log('[handleMemberSelect] 🚨 강제 상태 동기화 및 마커 재생성');
+          
+          // 현재 groupMembers 상태 확인
+          console.log('[handleMemberSelect] 🚨 현재 groupMembers 상태:', 
+            groupMembers.map(m => ({ 
+              name: m.name, 
+              count: m.savedLocationCount, 
+              isSelected: m.isSelected 
+            }))
+          );
+          
+          // 강제로 마커 재생성
+          if (map && isMapReady) {
+            const currentAllLocations: LocationData[] = [];
+            
+            // 모든 멤버의 장소 데이터 수집
+            groupMembers.forEach(member => {
+              if (member.savedLocations && member.savedLocations.length > 0) {
+                currentAllLocations.push(...member.savedLocations);
+              }
+            });
+            
+            console.log('[handleMemberSelect] 🚨 강제 마커 재생성 데이터:', {
+              전체장소수: currentAllLocations.length,
+              멤버수: groupMembers.length
+            });
+            
+            if (currentAllLocations.length > 0) {
+              updateAllMarkers(groupMembers, currentAllLocations, true);
+            }
+          }
+        }, 100);
       } catch (error) {
         console.error('[handleMemberSelect] 장소 데이터 로드 실패:', error);
         setSelectedMemberSavedLocations([]);
