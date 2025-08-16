@@ -62,8 +62,8 @@ export default function ServiceTermsPage() {
     router.push('/setting');
   };
 
-  // 로딩 상태 또는 가시성 문제 시 로딩 화면 표시
-  if (isLoading || !isVisible || !isInitialized) {
+  // 로딩 상태일 때만 로딩 화면 표시 (가시성과 초기화 상태는 무시)
+  if (isLoading) {
     return (
       <TermsPageLoading 
         message="서비스 이용약관 로딩 중..."

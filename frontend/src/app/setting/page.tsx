@@ -449,6 +449,7 @@ export default function SettingsPage() {
           id="setting-page-container"
           data-page="/setting"
           data-content-type="setting-page"
+          data-testid="setting-page-main"
           style={{
             paddingTop: '0px',
             marginTop: '0px',
@@ -489,6 +490,8 @@ export default function SettingsPage() {
           animate="in"
           exit="out"
           className="absolute inset-0 px-4 space-y-6 content-area hide-scrollbar pt-20"
+          data-testid="setting-page-content"
+          data-content-type="setting-page-content"
           style={{ 
             top: '0px',
             bottom: '0px',

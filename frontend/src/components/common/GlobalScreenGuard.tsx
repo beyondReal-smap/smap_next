@@ -107,13 +107,27 @@ export default function GlobalScreenGuard({
       }
 
       if (pathname.startsWith('/setting')) {
-        // 설정 페이지 및 약관 페이지들 검증
-        const settingContent = document.querySelector('.setting-content, [data-page="setting"], [data-page="/setting"]');
+        // 설정 페이지 및 약관 페이지들 검증 - 더 포괄적인 검증
+        const settingContent = document.querySelector('.setting-content, [data-page="setting"], [data-page="/setting"], #setting-page-container, [data-testid="setting-page-main"]');
         const termsContent = document.querySelector('.terms-content, .privacy-content, .service-content, .location-content, .marketing-content, .third-party-content');
-        const pageContent = document.querySelector('main, [role="main"], .main-content, #__next');
+        const pageContent = document.querySelector('main, [role="main"], .main-content, #__next, .main-container, [data-testid="setting-page-content"]');
+        const headerContent = document.querySelector('.setting-header, .AnimatedHeader');
+        const menuContent = document.querySelector('.menu-item-hover, .bg-white.rounded-2xl');
+        
+        // 디버깅을 위한 로그
+        console.log('[GlobalScreenGuard] 설정 페이지 검증:', {
+          pathname,
+          hasSettingContent: !!settingContent,
+          hasTermsContent: !!termsContent,
+          hasPageContent: !!pageContent,
+          hasHeaderContent: !!headerContent,
+          hasMenuContent: !!menuContent,
+          settingContent: settingContent?.className || 'none',
+          pageContent: pageContent?.className || 'none'
+        });
         
         // 설정 페이지 콘텐츠가 없고, 약관 콘텐츠도 없고, 페이지 콘텐츠도 없는 경우에만 흰 화면으로 간주
-        if (!settingContent && !termsContent && !pageContent) {
+        if (!settingContent && !termsContent && !pageContent && !headerContent && !menuContent) {
           console.warn('[GlobalScreenGuard] 설정 페이지 콘텐츠를 찾을 수 없음');
           return true;
         }
@@ -126,6 +140,10 @@ export default function GlobalScreenGuard({
             return true;
           }
         }
+        
+        // 설정 페이지가 정상적으로 렌더링된 것으로 간주
+        console.log('[GlobalScreenGuard] 설정 페이지 콘텐츠 확인됨');
+        return false;
       }
 
       return false; // 흰 화면이 아님
@@ -253,6 +271,21 @@ export default function GlobalScreenGuard({
           clearInterval(checkIntervalRef.current);
         }
       };
+    } else if (pathname.startsWith('/setting')) {
+      // 설정 페이지는 렌더링 완료를 기다린 후 첫 번째 체크 실행
+      const initialCheckTimeout = setTimeout(() => {
+        checkScreen();
+        
+        // 이후 정기적으로 체크
+        checkIntervalRef.current = setInterval(checkScreen, checkInterval);
+      }, 2000); // 2초 후 첫 번째 체크 실행
+      
+      return () => {
+        clearTimeout(initialCheckTimeout);
+        if (checkIntervalRef.current) {
+          clearInterval(checkIntervalRef.current);
+        }
+      };
     } else {
       // 다른 페이지는 즉시 체크 시작
       checkScreen();
@@ -315,27 +348,72 @@ export default function GlobalScreenGuard({
   if (screenState.isRecovering) {
     return (
       <div className="fixed inset-0 bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center z-[9999]">
-        <div className="text-center">
-          <IOSCompatibleSpinner size="lg" />
-          <p className="mt-4 text-gray-600 font-medium">
-            화면 복구 중... ({screenState.recoveryAttempts}/5)
-          </p>
-          <p className="mt-2 text-sm text-gray-500">
-            {screenState.recoveryAttempts >= 5 ? '최대 시도 횟수에 도달했습니다' : '잠시만 기다려주세요'}
-          </p>
-          <p className="mt-1 text-xs text-gray-400">
-            현재 페이지: {pathname}
-          </p>
-          {screenState.recoveryAttempts >= 5 && (
-            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm text-red-600 font-medium">
-                🚨 복구 실패 - 홈으로 이동합니다
-              </p>
-              <p className="text-xs text-red-500 mt-1">
-                잠시 후 자동으로 홈 페이지로 이동됩니다
-              </p>
+        <div className="bg-white/80 backdrop-blur-lg rounded-3xl p-8 shadow-2xl border border-white/20 max-w-md mx-4">
+          <div className="text-center">
+            {/* 애니메이션 로딩 스피너 */}
+            <div className="mb-6">
+              <div className="relative w-20 h-20 mx-auto">
+                <div className="absolute inset-0 border-4 border-indigo-200 rounded-full"></div>
+                <div className="absolute inset-0 border-4 border-transparent border-t-indigo-500 rounded-full animate-spin"></div>
+                <div className="absolute inset-2 border-4 border-transparent border-r-indigo-400 rounded-full animate-spin" style={{animationDirection: 'reverse', animationDuration: '1.5s'}}></div>
+              </div>
             </div>
-          )}
+            
+            {/* 메인 메시지 */}
+            <h2 className="text-xl font-bold text-gray-800 mb-2">
+              화면 복구 중...
+            </h2>
+            
+            {/* 진행 상황 표시 */}
+            <div className="mb-4">
+              <div className="flex items-center justify-center space-x-2 mb-2">
+                <span className="text-sm text-gray-600">복구 시도</span>
+                <span className="text-lg font-bold text-indigo-600">{screenState.recoveryAttempts}</span>
+                <span className="text-sm text-gray-400">/ 5</span>
+              </div>
+              
+              {/* 진행 바 */}
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div 
+                  className="bg-gradient-to-r from-indigo-500 to-purple-500 h-2 rounded-full transition-all duration-500"
+                  style={{ width: `${(screenState.recoveryAttempts / 5) * 100}%` }}
+                ></div>
+              </div>
+            </div>
+            
+            {/* 상태 메시지 */}
+            <p className="text-sm text-gray-600 mb-3">
+              {screenState.recoveryAttempts >= 5 ? '최대 시도 횟수에 도달했습니다' : '잠시만 기다려주세요'}
+            </p>
+            
+            {/* 현재 페이지 정보 */}
+            <div className="bg-gray-50 rounded-lg p-3 mb-4">
+              <p className="text-xs text-gray-500 mb-1">현재 페이지</p>
+              <p className="text-sm font-medium text-gray-700 font-mono">{pathname}</p>
+            </div>
+            
+            {/* 경고 메시지 (5번 시도 시) */}
+            {screenState.recoveryAttempts >= 5 && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex items-center mb-2">
+                  <span className="text-red-500 text-lg mr-2">🚨</span>
+                  <p className="text-sm font-semibold text-red-700">
+                    복구 실패 - 홈으로 이동합니다
+                  </p>
+                </div>
+                <p className="text-xs text-red-600">
+                  잠시 후 자동으로 홈 페이지로 이동됩니다
+                </p>
+              </div>
+            )}
+            
+            {/* 추가 인디케이터 */}
+            <div className="flex justify-center space-x-1 mt-4">
+              <div className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse"></div>
+              <div className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
+              <div className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
+            </div>
+          </div>
         </div>
       </div>
     );

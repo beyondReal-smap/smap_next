@@ -9,8 +9,8 @@ interface UseTermsPageStateOptions {
 export const useTermsPageState = ({ pageName, isEmbed = false }: UseTermsPageStateOptions) => {
   const router = useRouter();
   const [isVisible, setIsVisible] = useState(true);
-  const [isLoading, setIsLoading] = useState(true); // 초기값을 true로 변경
-  const [isInitialized, setIsInitialized] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // false로 변경하여 즉시 렌더링
+  const [isInitialized, setIsInitialized] = useState(true); // true로 변경하여 즉시 초기화 완료
   
   // 인증 상태 추적을 위한 ref
   const authCheckRef = useRef<boolean>(false);
@@ -115,7 +115,6 @@ export const useTermsPageState = ({ pageName, isEmbed = false }: UseTermsPageSta
     if (isActive) {
       // 앱이 포그라운드로 돌아올 때
       setIsVisible(true);
-      setIsLoading(true);
       
       // 인증 상태 확인 및 복원
       const authValid = await checkAndRestoreAuth();
@@ -124,25 +123,14 @@ export const useTermsPageState = ({ pageName, isEmbed = false }: UseTermsPageSta
         console.log(`[${pageName}] 인증 상태 복원 성공 - 스타일 재적용`);
         // 스타일 재적용
         applyStyles();
-        
-        // 초기화 완료 표시
-        setTimeout(() => {
-          setIsInitialized(true);
-          setIsLoading(false);
-        }, 300);
       } else {
         console.log(`[${pageName}] 인증 상태 없음 - 기본 상태로 복원`);
         // 약관 페이지에서는 로그인 페이지로 이동하지 않고 기본 상태 유지
         applyStyles();
-        setTimeout(() => {
-          setIsInitialized(true);
-          setIsLoading(false);
-        }, 300);
       }
     } else {
       // 앱이 백그라운드로 갈 때
       setIsVisible(false);
-      setIsInitialized(false);
       restoreStyles();
     }
   }, [pageName, applyStyles, restoreStyles, checkAndRestoreAuth]);
@@ -191,23 +179,20 @@ export const useTermsPageState = ({ pageName, isEmbed = false }: UseTermsPageSta
     let isMounted = true;
     
     const initializePage = async () => {
-      console.log(`[${pageName}] 페이지 초기화 시작`);
+      console.log(`[${pageName}] 약관 페이지 초기화 시작`);
       
       // 초기 스타일 적용
       applyStyles();
       
-      // 초기 인증 상태 확인
-      const authValid = await checkAndRestoreAuth();
-      
-      if (!isMounted) return;
-      
-      // 약관 페이지는 인증 상태와 관계없이 기본적으로 렌더링 허용
-      console.log(`[${pageName}] 약관 페이지 초기화 완료`);
-      setIsInitialized(true);
-      setIsLoading(false);
+      // 약관 페이지는 즉시 초기화 완료 (인증 상태와 관계없이)
+      if (isMounted) {
+        console.log(`[${pageName}] 약관 페이지 초기화 완료`);
+        setIsInitialized(true);
+        setIsLoading(false);
+      }
     };
 
-    // 약관 페이지는 즉시 초기화 (인증 상태와 관계없이)
+    // 약관 페이지는 즉시 초기화
     initializePage();
 
     return () => {
@@ -215,7 +200,7 @@ export const useTermsPageState = ({ pageName, isEmbed = false }: UseTermsPageSta
       // cleanup 시 스타일 복원
       restoreStyles();
     };
-  }, [applyStyles, restoreStyles, checkAndRestoreAuth, pageName]);
+  }, [applyStyles, restoreStyles, pageName]);
 
   return {
     isVisible,
