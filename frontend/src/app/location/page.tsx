@@ -4019,17 +4019,17 @@ export default function LocationPage() {
       hasSelectedMember: !!selectedMember,
       selectedMemberName: selectedMember?.name || '없음',
       hasLocations: !!locations,
-      locationsLength: locations?.length || 0,
-      locations: locations?.map(loc => ({
+      locationsLength: Array.isArray(locations) ? locations.length : 0,
+      locations: Array.isArray(locations) ? locations.map(loc => ({
         id: loc.id,
         name: loc.name,
         coordinates: loc.coordinates,
         isValidCoords: loc.coordinates[0] !== 0 && loc.coordinates[1] !== 0
-      })) || []
+      })) : []
     });
     
     // *** 핵심 로직: 모든 멤버의 장소 마커 생성 (선택된 멤버의 장소는 강조 표시) ***
-    if (Array.isArray(locations)) {
+    if (Array.isArray(locations) && locations.length > 0) {
       console.log('[updateAllMarkers] 🎯 모든 멤버의 장소 마커 생성 시작:', {
         selectedMemberName: selectedMember?.name || '없음',
         selectedMemberId: selectedMember?.id || '없음',
@@ -4220,13 +4220,13 @@ export default function LocationPage() {
       });
     } else {
       // *** 중요: 선택된 멤버가 없거나 장소 데이터가 없으면 장소 마커를 생성하지 않음 ***
-      // 이로 인해 다른 멤버의 장소 마커가 지도에 표시되지 않음 (이전 멤버 장소 마커 완전 제거됨)
-      console.log('[updateAllMarkers] 🚫 장소 마커 생성 건너뜀 (이전 멤버 장소 완전 제거됨):', {
+      // 이제 모든 멤버의 장소 마커를 표시하므로 이 조건은 거의 발생하지 않음
+      console.log('[updateAllMarkers] 🚫 장소 마커 생성 건너뜀:', {
         hasSelectedMember: !!selectedMember,
         selectedMemberName: selectedMember?.name || '없음',
         hasLocations: !!locations,
-        locationsLength: locations?.length || 0,
-        reason: !selectedMember ? '선택된 멤버 없음' : !locations ? '장소 데이터 없음' : '장소 배열 비어있음'
+        locationsLength: Array.isArray(locations) ? locations.length : 0,
+        reason: !selectedMember ? '선택된 멤버 없음' : !Array.isArray(locations) ? '장소 데이터가 배열이 아님' : '장소 배열 비어있음'
       });
     }
 
