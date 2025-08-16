@@ -2590,13 +2590,18 @@ const SignInPage = () => {
       const isIPadApp = /iPad/i.test(navigator.userAgent) && 
                        (window as any).webkit?.messageHandlers;
       
+      // Android WebView 환경 감지
+      const isAndroidWebView = /Android/.test(navigator.userAgent);
+      
       console.log('🍎 [APPLE LOGIN] 환경 감지:', {
         isIOSWebView,
         isIPadSafari,
         isIPadApp,
+        isAndroidWebView,
         userAgent: navigator.userAgent,
         hasWebKit: !!(window as any).webkit,
         hasMessageHandlers: !!(window as any).webkit?.messageHandlers,
+        hasAndroid: !!(window as any).Android,
         attemptCount: appleLoginAttempts + 1
       });
       
@@ -2606,6 +2611,19 @@ const SignInPage = () => {
         // Apple 로그인 결과 처리 함수 등록 (기존 함수 제거 후 재등록)
         if ((window as any).handleAppleSignInResult) {
           delete (window as any).handleAppleSignInResult;
+        }
+        
+        // 네이티브 애플 로그인 호출
+        if ((window as any).webkit && (window as any).webkit.messageHandlers && (window as any).webkit.messageHandlers.appleLogin) {
+          console.log('🍎 [APPLE LOGIN] iOS 네이티브 애플 로그인 호출');
+          (window as any).webkit.messageHandlers.appleLogin.postMessage({
+            action: 'login'
+          });
+        } else {
+          console.error('🍎 [APPLE LOGIN] iOS 네이티브 애플 로그인 핸들러를 찾을 수 없음');
+          setError('애플 로그인을 사용할 수 없습니다.');
+          setIsLoading(false);
+          return;
         }
         
         (window as any).handleAppleSignInResult = async (result: any) => {
@@ -2742,6 +2760,28 @@ const SignInPage = () => {
               });
             }
           }
+        }
+        
+      } else if (isAndroidWebView) {
+        // Android WebView에서 Apple 로그인 시도
+        console.log('🍎 [APPLE LOGIN] Android WebView에서 Apple 로그인 시도');
+        
+        try {
+          // Android 네이티브 애플 로그인 호출
+          if ((window as any).Android && (window as any).Android.appleLogin) {
+            console.log('🍎 [APPLE LOGIN] Android 네이티브 애플 로그인 호출');
+            (window as any).Android.appleLogin();
+          } else {
+            console.error('🍎 [APPLE LOGIN] Android 네이티브 애플 로그인 핸들러를 찾을 수 없음');
+            setError('Android에서 애플 로그인을 사용할 수 없습니다.');
+            setIsLoading(false);
+            return;
+          }
+        } catch (err: any) {
+          console.error('🍎 [APPLE LOGIN] Android 애플 로그인 오류:', err);
+          setError('Android 애플 로그인 중 오류가 발생했습니다.');
+          setIsLoading(false);
+          return;
         }
         
       } else if (isIPadSafari) {
