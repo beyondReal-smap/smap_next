@@ -870,6 +870,12 @@ export default function HomePage() {
   
   // 🚨 iOS 시뮬레이터 에러 핸들링
   const [componentError, setComponentError] = useState<string | null>(null);
+  
+  // 지도 초기화 상태 추적
+  const [isMapInitialized, setIsMapInitialized] = useState(false);
+
+  // 컴포넌트 마운트 상태 추적
+  const [isComponentMounted, setIsComponentMounted] = useState(false);
 
 
   
@@ -2225,7 +2231,8 @@ export default function HomePage() {
   useEffect(() => {
     // 네이버 지도를 기본으로 사용 (개발 환경에서도 네이버 지도 사용)
     setMapType('naver');
-      }, []);
+    setIsComponentMounted(true);
+  }, []);
  
     // 컴포넌트 마운트 시 그룹 목록 불러오기
     // useEffect(() => {
@@ -3068,6 +3075,7 @@ export default function HomePage() {
       window.google.maps.event.addListenerOnce(map.current, 'tilesloaded', () => {
         setIsMapLoading(false);
         setMapsInitialized(prev => ({...prev, google: true}));
+        setIsMapInitialized(true);
         console.log('Google Maps 타일 로딩 완료');
       });
       
@@ -3213,6 +3221,7 @@ export default function HomePage() {
           
           setIsMapLoading(false);
           setMapsInitialized(prev => ({...prev, naver: true}));
+          setIsMapInitialized(true);
           console.log('Naver Maps 초기화 완료');
           
           // 인증 오류 리스너 제거
@@ -4721,6 +4730,22 @@ export default function HomePage() {
     // 안전성 체크
     if (!members || members.length === 0) {
       console.warn('[updateMemberMarkers] members가 비어있음');
+      return;
+    }
+
+    // 지도가 초기화되지 않은 경우 대기
+    if (!isMapInitialized) {
+      console.log('[updateMemberMarkers] 지도가 아직 초기화되지 않음 - 대기');
+      return;
+    }
+    
+    if (mapType === 'naver' && !naverMap.current) {
+      console.log('[updateMemberMarkers] Naver 지도가 아직 초기화되지 않음 - 대기');
+      return;
+    }
+    
+    if (mapType === 'google' && !map.current) {
+      console.log('[updateMemberMarkers] Google 지도가 아직 초기화되지 않음 - 대기');
       return;
     }
     
@@ -6298,7 +6323,7 @@ export default function HomePage() {
     }
 
     // 마운트되지 않은 상태 처리
-    if (!isMounted) {
+    if (!isMounted || !isComponentMounted) {
       return (
         <div style={{ 
           minHeight: '100vh', 

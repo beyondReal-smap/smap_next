@@ -5,8 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import AnimatedHeader from '../../../../components/common/AnimatedHeader';
 import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
-import useAppState from '@/hooks/useAppState';
-
 const pageAnimations = `
 html, body { width: 100%; overflow-x: hidden; position: relative; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -62,13 +60,6 @@ export default function PrivacyPolicyPage() {
     document.documentElement.style.overflowY = '';
   };
 
-  // App State 감지 및 스타일 관리
-  const { isVisible } = useAppState({
-    onFocus: applyStyles,
-    onBlur: restoreStyles,
-    delay: 100
-  });
-
   useEffect(() => {
     // 초기 스타일 적용
     applyStyles();
@@ -83,18 +74,6 @@ export default function PrivacyPolicyPage() {
     triggerHapticFeedback(HapticFeedbackType.SELECTION, '개인정보 처리방침 뒤로가기', { component: 'setting-terms', action: 'back-navigation' });
     router.push('/setting');
   };
-
-  // 컴포넌트가 보이지 않을 때는 로딩 상태 표시
-  if (!isVisible) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">로딩 중...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className={`${isEmbed ? 'min-h-screen overflow-auto bg-white' : 'fixed inset-0 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 main-container'}`} 
