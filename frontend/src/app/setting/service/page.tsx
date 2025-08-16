@@ -78,6 +78,8 @@ export default function ServiceTermsPage() {
       <div
         className={`${isEmbed ? 'min-h-screen overflow-auto bg-white' : 'fixed inset-0 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 main-container'}`}
         id="setting-service-terms-container"
+        data-page="/setting/service"
+        data-content-type="service-page"
         style={{ paddingTop: '0px', marginTop: '0px', top: '0px' }}
       >
         {!isEmbed && (
@@ -115,7 +117,7 @@ export default function ServiceTermsPage() {
           className={`${isEmbed ? '' : 'absolute inset-0'} px-4 space-y-6 content-area ${isEmbed ? '' : 'hide-scrollbar'} ${isEmbed ? 'pt-6' : 'pt-20'}`}
           style={isEmbed ? undefined : { overflow: 'hidden', overflowY: 'auto' }}
         >
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-fadeIn service-content">
             <div className="p-6 text-sm leading-relaxed max-w-4xl mx-auto">
               <h2 className="text-2xl font-bold mb-6 text-center">서비스 이용약관</h2>
               <p className="text-sm text-gray-500 mb-8 text-center">시행일: 2024-05-30</p>

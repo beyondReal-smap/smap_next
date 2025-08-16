@@ -71,20 +71,24 @@ export default function LocationTermsPage() {
           }
         ` : ''}
       `}</style>
-    <div className={`${isEmbed ? 'min-h-screen overflow-auto bg-white' : 'fixed inset-0 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 main-container'}`} 
-         style={{ 
-           paddingTop: '0px', 
-           marginTop: '0px', 
-           top: '0px',
-           ...(isEmbed && {
-             position: 'relative',
-             width: '100%',
-             minHeight: '100vh',
-             WebkitOverflowScrolling: 'touch',
-             WebkitTransform: 'translateZ(0)',
-             WebkitBackfaceVisibility: 'hidden'
-           })
-         }}>
+    <div 
+      className={`${isEmbed ? 'min-h-screen overflow-auto bg-white' : 'fixed inset-0 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 main-container'}`} 
+      data-page="/setting/terms/location"
+      data-content-type="location-page"
+      style={{ 
+        paddingTop: '0px', 
+        marginTop: '0px', 
+        top: '0px',
+        ...(isEmbed && {
+          position: 'relative',
+          width: '100%',
+          minHeight: '100vh',
+          WebkitOverflowScrolling: 'touch',
+          WebkitTransform: 'translateZ(0)',
+          WebkitBackfaceVisibility: 'hidden'
+        })
+      }}
+    >
         {!isEmbed && (
         <AnimatedHeader variant="enhanced" className="setting-header glass-effect">
           <motion.div initial={{ opacity: 0, x: -40 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }} className="setting-header-content motion-div">
@@ -100,7 +104,7 @@ export default function LocationTermsPage() {
         )}
 
         <motion.div initial="initial" animate="in" exit="out" className={`${isEmbed ? '' : 'absolute inset-0'} px-4 space-y-6 content-area ${isEmbed ? '' : 'hide-scrollbar'} ${isEmbed ? 'pt-6' : 'pt-20'}`} style={isEmbed ? undefined : { overflow: 'hidden', overflowY: 'auto' }}>
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-fadeIn location-content">
             <div className="p-6 text-sm leading-relaxed max-w-4xl mx-auto">
               <h2 className="text-2xl font-bold mb-6 text-center">위치기반서비스 이용약관</h2>
               <p className="text-sm text-gray-500 mb-8 text-center">시행일: 2024-05-30</p>

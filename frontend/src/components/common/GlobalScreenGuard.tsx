@@ -107,10 +107,24 @@ export default function GlobalScreenGuard({
       }
 
       if (pathname.startsWith('/setting')) {
-        const settingContent = document.querySelector('.setting-content, [data-page="setting"]');
-        if (!settingContent) {
+        // 설정 페이지 및 약관 페이지들 검증
+        const settingContent = document.querySelector('.setting-content, [data-page="setting"], [data-page="/setting"]');
+        const termsContent = document.querySelector('.terms-content, .privacy-content, .service-content, .location-content, .marketing-content, .third-party-content');
+        const pageContent = document.querySelector('main, [role="main"], .main-content, #__next');
+        
+        // 설정 페이지 콘텐츠가 없고, 약관 콘텐츠도 없고, 페이지 콘텐츠도 없는 경우에만 흰 화면으로 간주
+        if (!settingContent && !termsContent && !pageContent) {
           console.warn('[GlobalScreenGuard] 설정 페이지 콘텐츠를 찾을 수 없음');
           return true;
+        }
+        
+        // 약관 페이지의 경우 추가 검증
+        if (pathname.includes('/terms/') || pathname.includes('/service/')) {
+          const hasAnyContent = document.querySelector('h1, h2, h3, p, div') !== null;
+          if (!hasAnyContent) {
+            console.warn('[GlobalScreenGuard] 약관 페이지 콘텐츠가 비어있음');
+            return true;
+          }
         }
       }
 

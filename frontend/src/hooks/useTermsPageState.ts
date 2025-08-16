@@ -9,7 +9,7 @@ interface UseTermsPageStateOptions {
 export const useTermsPageState = ({ pageName, isEmbed = false }: UseTermsPageStateOptions) => {
   const router = useRouter();
   const [isVisible, setIsVisible] = useState(true);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // 초기값을 true로 변경
   const [isInitialized, setIsInitialized] = useState(false);
   
   // 인증 상태 추적을 위한 ref
@@ -201,18 +201,13 @@ export const useTermsPageState = ({ pageName, isEmbed = false }: UseTermsPageSta
       
       if (!isMounted) return;
       
-      if (authValid) {
-        console.log(`[${pageName}] 초기 인증 상태 확인 성공`);
-        setIsInitialized(true);
-        setIsLoading(false);
-      } else {
-        console.log(`[${pageName}] 초기 인증 상태 확인 실패 - 로그인 페이지로 이동`);
-        // 약관 페이지에서는 로그인 페이지로 이동하지 않고 기본 상태 유지
-        setIsInitialized(true);
-        setIsLoading(false);
-      }
+      // 약관 페이지는 인증 상태와 관계없이 기본적으로 렌더링 허용
+      console.log(`[${pageName}] 약관 페이지 초기화 완료`);
+      setIsInitialized(true);
+      setIsLoading(false);
     };
 
+    // 약관 페이지는 즉시 초기화 (인증 상태와 관계없이)
     initializePage();
 
     return () => {
