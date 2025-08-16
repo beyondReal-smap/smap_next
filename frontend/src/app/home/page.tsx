@@ -79,6 +79,7 @@ import { Loader } from '@googlemaps/js-api-loader';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { MapSkeleton } from '@/components/common/MapSkeleton';
 import IOSCompatibleSpinner from '@/components/common/IOSCompatibleSpinner';
+import AdvancedScreenGuard from '@/components/common/AdvancedScreenGuard';
 import { FiLoader, FiChevronDown, FiUser, FiCalendar } from 'react-icons/fi';
 import { FaCrown } from 'react-icons/fa';
 import config, { API_KEYS, detectLanguage, MAP_CONFIG } from '../../config';
@@ -6254,31 +6255,39 @@ export default function HomePage() {
     // Critical Error 상태 처리
     if (criticalError) {
       return (
-        <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-lg p-6 max-w-md w-full">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
+        <AdvancedScreenGuard 
+          fallbackToHome={true}
+          enableAutoRecovery={true}
+          recoveryAttempts={3}
+          checkInterval={2000}
+          className="home-error-guard"
+        >
+          <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl shadow-lg p-6 max-w-md w-full">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Critical Error</h3>
+                <p className="text-sm text-gray-600 mb-4">{criticalError}</p>
+                <button 
+                  onClick={() => window.location.reload()}
+                  className="w-full bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-600 transition-colors"
+                >
+                  페이지 새로고침
+                </button>
+                <button 
+                  onClick={() => setCriticalError(null)}
+                  className="w-full mt-2 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  오류 무시하고 계속
+                </button>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Critical Error</h3>
-              <p className="text-sm text-gray-600 mb-4">{criticalError}</p>
-              <button 
-                onClick={() => window.location.reload()}
-                className="w-full bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-600 transition-colors"
-              >
-                페이지 새로고침
-              </button>
-              <button 
-                onClick={() => setCriticalError(null)}
-                className="w-full mt-2 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                오류 무시하고 계속
-              </button>
             </div>
           </div>
-        </div>
+        </AdvancedScreenGuard>
       );
     }
 

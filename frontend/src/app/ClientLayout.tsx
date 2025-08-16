@@ -36,6 +36,7 @@ import { DataCacheProvider } from '@/contexts/DataCacheContext';
 import { useMapPreloader } from '@/hooks/useMapPreloader';
 import { useAndroidPermissionChecker } from '@/hooks/useAndroidPermissionChecker';
 import { initializePermissionState } from '@/utils/androidPermissions';
+import GlobalScreenGuard from '@/components/common/GlobalScreenGuard';
 // iOS 호환 스피너 컴포넌트를 인라인으로 정의
 // import { useServiceWorker } from '@/hooks/useServiceWorker';
 // import PerformanceMonitor from '@/components/PerformanceMonitor';
@@ -443,7 +444,13 @@ export default function ClientLayout({
 
   return (
     <>
-              <DataCacheProvider>
+      <GlobalScreenGuard 
+        enableGlobalProtection={true}
+        enableAutoRedirect={true}
+        redirectDelay={8000}
+        checkInterval={3000}
+      >
+        <DataCacheProvider>
           <AuthProvider>
             <UserProvider>
               <PermissionGuard />
@@ -452,9 +459,10 @@ export default function ClientLayout({
             </UserProvider>
           </AuthProvider>
         </DataCacheProvider>
-      
-      {/* 전역 네비게이션 바 - 모든 페이지에서 일관된 위치 보장 */}
-      {!shouldHideNavBar && <BottomNavBar />}
+        
+        {/* 전역 네비게이션 바 - 모든 페이지에서 일관된 위치 보장 */}
+        {!shouldHideNavBar && <BottomNavBar />}
+      </GlobalScreenGuard>
     </>
   );
 } // force change Wed Aug 13 19:53:43 KST 2025
