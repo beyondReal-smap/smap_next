@@ -13,8 +13,62 @@ declare global {
       hasLocationAndActivityPermissions(): boolean;
       requestLocationAndActivityPermissions(): void;
       getMissingLocationAndActivityPermissions(): string;
+      resetPermissionState?(): void; // 권한 상태 초기화 메서드 추가
     };
   }
+}
+
+// 앱 재설치 감지를 위한 키
+const APP_INSTALL_KEY = 'smap_app_install_id';
+const LAST_PERMISSION_CHECK_KEY = 'smap_last_permission_check';
+
+/**
+ * 앱 재설치 여부 확인
+ */
+function isAppReinstalled(): boolean {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return false;
+  }
+
+  const currentInstallId = localStorage.getItem(APP_INSTALL_KEY);
+  const lastPermissionCheck = localStorage.getItem(LAST_PERMISSION_CHECK_KEY);
+  
+  // 설치 ID가 없거나 권한 체크 기록이 없으면 재설치로 간주
+  if (!currentInstallId || !lastPermissionCheck) {
+    // 새로운 설치 ID 생성
+    const newInstallId = `install_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    localStorage.setItem(APP_INSTALL_KEY, newInstallId);
+    localStorage.setItem(LAST_PERMISSION_CHECK_KEY, Date.now().toString());
+    console.log('🔄 [PERMISSIONS] 앱 재설치 감지됨 - 새로운 설치 ID 생성:', newInstallId);
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * 권한 상태 강제 초기화
+ */
+function forceResetPermissionState(): void {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return;
+  }
+
+  // 권한 관련 로컬 스토리지 키들 초기화
+  const keysToRemove = [
+    'smap_permissions_granted',
+    'smap_location_permission',
+    'smap_activity_permission',
+    'smap_camera_permission',
+    'smap_notification_permission',
+    'smap_storage_permission'
+  ];
+
+  keysToRemove.forEach(key => {
+    localStorage.removeItem(key);
+  });
+
+  console.log('🔄 [PERMISSIONS] 권한 상태 강제 초기화 완료');
 }
 
 /**
@@ -93,14 +147,35 @@ export function requestPermissions(): Promise<boolean> {
       // 권한 요청 실행
       window.AndroidPermissions!.requestPermissions();
       
-      // 10초 후 타임아웃
+      // 15초 후 타임아웃 (권한 요청 창이 나타날 시간을 고려하여 증가)
       setTimeout(() => {
         if (window.onPermissionsGranted) {
-          console.log('⚠️ [PERMISSIONS] 권한 요청 타임아웃');
+          console.log('⚠️ [PERMISSIONS] 권한 요청 타임아웃 - 직접 권한 요청 시도');
           delete window.onPermissionsGranted;
-          resolve(false);
+          
+          // 타임아웃 후 직접 권한 요청 시도
+          try {
+            if (window.AndroidPermissions?.requestPermissions) {
+              window.AndroidPermissions.requestPermissions();
+              console.log('🔄 [PERMISSIONS] 타임아웃 후 직접 권한 요청 재시도');
+              
+              // 추가 10초 대기
+              setTimeout(() => {
+                if (window.onPermissionsGranted) {
+                  console.log('❌ [PERMISSIONS] 재시도 후에도 타임아웃');
+                  delete window.onPermissionsGranted;
+                  resolve(false);
+                }
+              }, 10000);
+            } else {
+              resolve(false);
+            }
+          } catch (error) {
+            console.error('❌ [PERMISSIONS] 타임아웃 후 권한 요청 재시도 실패:', error);
+            resolve(false);
+          }
         }
-      }, 10000);
+      }, 15000);
       
     } catch (error) {
       console.error('❌ [PERMISSIONS] 권한 요청 중 오류:', error);
@@ -123,22 +198,68 @@ export function setFirstLogin(isFirst: boolean = true): Promise<boolean> {
     try {
       console.log('🔥 [PERMISSIONS] 첫 로그인 설정:', isFirst);
       
+      // 앱 재설치 감지 및 권한 상태 초기화
+      if (isAppReinstalled()) {
+        console.log('🔄 [PERMISSIONS] 앱 재설치 감지 - 권한 상태 초기화');
+        forceResetPermissionState();
+        
+        // 네이티브 권한 상태도 초기화 시도
+        if (window.AndroidPermissions?.resetPermissionState) {
+          try {
+            window.AndroidPermissions.resetPermissionState();
+            console.log('✅ [PERMISSIONS] 네이티브 권한 상태 초기화 완료');
+          } catch (error) {
+            console.log('⚠️ [PERMISSIONS] 네이티브 권한 상태 초기화 실패:', error);
+          }
+        }
+        
+        // 강제로 첫 로그인으로 설정
+        isFirst = true;
+      }
+      
       if (isFirst) {
         // 권한 요청 결과를 받기 위한 콜백 등록
         window.onPermissionsGranted = () => {
           console.log('✅ [PERMISSIONS] 첫 로그인 권한 요청 완료');
           delete window.onPermissionsGranted;
+          
+          // 권한 체크 시간 업데이트
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(LAST_PERMISSION_CHECK_KEY, Date.now().toString());
+          }
+          
           resolve(true);
         };
 
-        // 타임아웃 설정
+        // 타임아웃 설정 (20초로 증가)
         setTimeout(() => {
           if (window.onPermissionsGranted) {
-            console.log('⚠️ [PERMISSIONS] 첫 로그인 권한 요청 타임아웃');
+            console.log('⚠️ [PERMISSIONS] 첫 로그인 권한 요청 타임아웃 - 직접 권한 요청 시도');
             delete window.onPermissionsGranted;
-            resolve(false);
+            
+            // 타임아웃 후 직접 권한 요청 시도
+            try {
+              if (window.AndroidPermissions?.requestPermissions) {
+                window.AndroidPermissions.requestPermissions();
+                console.log('🔄 [PERMISSIONS] 첫 로그인 타임아웃 후 직접 권한 요청 재시도');
+                
+                // 추가 15초 대기
+                setTimeout(() => {
+                  if (window.onPermissionsGranted) {
+                    console.log('❌ [PERMISSIONS] 첫 로그인 재시도 후에도 타임아웃');
+                    delete window.onPermissionsGranted;
+                    resolve(false);
+                  }
+                }, 15000);
+              } else {
+                resolve(false);
+              }
+            } catch (error) {
+              console.error('❌ [PERMISSIONS] 첫 로그인 타임아웃 후 권한 요청 재시도 실패:', error);
+              resolve(false);
+            }
           }
-        }, 15000);
+        }, 20000);
       }
 
       // 첫 로그인 설정 실행 (내부적으로 권한 요청도 함께 실행됨)
@@ -281,6 +402,49 @@ export function checkLocationAndActivityPermissionsOnFocus(): Promise<boolean> {
       resolve(true);
     }
   });
+}
+
+/**
+ * 앱 시작 시 권한 상태 자동 확인 및 초기화
+ */
+export function initializePermissionState(): void {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return;
+  }
+
+  try {
+    console.log('🔄 [PERMISSIONS] 앱 시작 시 권한 상태 초기화 시작');
+    
+    // 앱 재설치 감지
+    if (isAppReinstalled()) {
+      console.log('🔄 [PERMISSIONS] 앱 재설치 감지 - 권한 상태 강제 초기화');
+      forceResetPermissionState();
+      
+      // 네이티브 권한 상태도 초기화 시도
+      if (isAndroidPermissionsAvailable() && window.AndroidPermissions?.resetPermissionState) {
+        try {
+          window.AndroidPermissions.resetPermissionState();
+          console.log('✅ [PERMISSIONS] 네이티브 권한 상태 초기화 완료');
+        } catch (error) {
+          console.log('⚠️ [PERMISSIONS] 네이티브 권한 상태 초기화 실패:', error);
+        }
+      }
+    } else {
+      console.log('✅ [PERMISSIONS] 앱 재설치 아님 - 기존 권한 상태 유지');
+    }
+    
+    // 권한 상태 로깅
+    const currentInstallId = localStorage.getItem(APP_INSTALL_KEY);
+    const lastPermissionCheck = localStorage.getItem(LAST_PERMISSION_CHECK_KEY);
+    console.log('🔍 [PERMISSIONS] 현재 권한 상태:', {
+      installId: currentInstallId,
+      lastCheck: lastPermissionCheck,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('❌ [PERMISSIONS] 권한 상태 초기화 중 오류:', error);
+  }
 }
 
 // 전역 콜백 타입 선언

@@ -984,38 +984,155 @@ export default function HomePage() {
       if (androidCheck) {
         console.log('🔥 [HOME] ✅ 안드로이드 환경 확인됨 - 권한 상태 체크');
         
-        // 2초 후 권한 요청 (UI가 안정화된 후)
-        setTimeout(() => {
-          console.log('🔥 [HOME] 2초 후 권한 체크 시작');
+        // 앱 재설치 감지 및 강제 권한 요청
+        const checkAndRequestPermissions = () => {
+          console.log('🔥 [HOME] 권한 체크 및 요청 시작');
           console.log('🔥 [HOME] AndroidPermissions 인터페이스:', {
             exists: typeof window.AndroidPermissions !== 'undefined',
             methods: window.AndroidPermissions ? Object.keys(window.AndroidPermissions) : 'N/A'
           });
           
-          const hasPermissions = hasAllPermissions();
+          // 앱 재설치 감지를 위한 추가 체크
+          const isReinstalled = checkAppReinstalled();
+          if (isReinstalled) {
+            console.log('🔄 [HOME] 앱 재설치 감지 - 강제 권한 요청');
+            // 강제로 권한 요청 실행
+            setFirstLogin(true).then((success) => {
+              if (success) {
+                console.log('✅ [HOME] 앱 재설치 후 권한 요청 완료');
+              } else {
+                console.log('⚠️ [HOME] 앱 재설치 후 권한 요청 실패 또는 타임아웃');
+                // 실패 시 추가 권한 요청 시도
+                setTimeout(() => {
+                  console.log('🔄 [HOME] 권한 요청 재시도');
+                  setFirstLogin(true);
+                }, 3000);
+              }
+            }).catch((error) => {
+              console.error('❌ [HOME] 앱 재설치 후 권한 요청 중 오류:', error);
+            });
+            return;
+          }
           
+          const hasPermissions = hasAllPermissions();
           console.log('🔥 [HOME] 권한 체크 결과:', { hasPermissions });
           
           if (!hasPermissions) {
             console.log('🔥 [HOME] 안드로이드 권한 요청 시작');
+            
+            // 1. setFirstLogin을 통한 권한 요청
             setFirstLogin(true).then((success) => {
               if (success) {
-                console.log('✅ [HOME] 안드로이드 권한 요청 완료');
+                console.log('✅ [HOME] setFirstLogin을 통한 권한 요청 완료');
               } else {
-                console.log('⚠️ [HOME] 안드로이드 권한 요청 실패 또는 타임아웃');
+                console.log('⚠️ [HOME] setFirstLogin을 통한 권한 요청 실패');
+                
+                // 2. 권한 상태 강제 초기화
+                console.log('🔄 [HOME] 권한 상태 강제 초기화 시도');
+                if (window.AndroidPermissions?.resetPermissionState) {
+                  try {
+                    window.AndroidPermissions.resetPermissionState();
+                    console.log('✅ [HOME] 권한 상태 초기화 완료');
+                  } catch (error) {
+                    console.error('❌ [HOME] 권한 상태 초기화 실패:', error);
+                  }
+                }
+                
+                // 3. 직접 권한 요청 시도
+                setTimeout(() => {
+                  console.log('🔄 [HOME] 직접 권한 요청 시도');
+                  if (window.AndroidPermissions?.requestPermissions) {
+                    try {
+                      window.AndroidPermissions.requestPermissions();
+                      console.log('✅ [HOME] 직접 권한 요청 호출 완료');
+                    } catch (error) {
+                      console.error('❌ [HOME] 직접 권한 요청 호출 실패:', error);
+                    }
+                  }
+                }, 1000);
+                
+                // 4. 위치/동작 권한 직접 요청
+                setTimeout(() => {
+                  console.log('🔄 [HOME] 위치/동작 권한 직접 요청 시도');
+                  if (window.AndroidPermissions?.requestLocationAndActivityPermissions) {
+                    try {
+                      window.AndroidPermissions.requestLocationAndActivityPermissions();
+                      console.log('✅ [HOME] 위치/동작 권한 직접 요청 호출 완료');
+                    } catch (error) {
+                      console.error('❌ [HOME] 위치/동작 권한 직접 요청 호출 실패:', error);
+                    }
+                  }
+                }, 3000);
+                
+                // 5. 최종 재시도
+                setTimeout(() => {
+                  console.log('🔄 [HOME] 최종 권한 요청 재시도');
+                  setFirstLogin(true);
+                }, 5000);
               }
             }).catch((error) => {
               console.error('❌ [HOME] 안드로이드 권한 요청 중 오류:', error);
+              
+              // 오류 발생 시에도 직접 권한 요청 시도
+              setTimeout(() => {
+                console.log('🔄 [HOME] 오류 후 직접 권한 요청 시도');
+                if (window.AndroidPermissions?.requestPermissions) {
+                  try {
+                    window.AndroidPermissions.requestPermissions();
+                    console.log('✅ [HOME] 오류 후 직접 권한 요청 호출 완료');
+                  } catch (error) {
+                    console.error('❌ [HOME] 오류 후 직접 권한 요청 호출 실패:', error);
+                  }
+                }
+              }, 2000);
             });
           } else {
             console.log('✅ [HOME] 안드로이드 권한이 이미 모두 허용됨');
           }
-        }, 2000);
+        };
+        
+        // 2초 후 권한 요청 (UI가 안정화된 후)
+        setTimeout(checkAndRequestPermissions, 2000);
       } else {
         console.log('🔥 [HOME] ❌ 안드로이드 환경이 아니므로 권한 요청 생략');
       }
     }
   }, [isLoggedIn, user, authLoading]);
+  
+  // 앱 재설치 감지 함수
+  const checkAppReinstalled = (): boolean => {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return false;
+    }
+
+    const currentInstallId = localStorage.getItem('smap_app_install_id');
+    const lastPermissionCheck = localStorage.getItem('smap_last_permission_check');
+    const lastLoginTime = localStorage.getItem('smap_last_login_time');
+    
+    // 설치 ID가 없거나 권한 체크 기록이 없으면 재설치로 간주
+    if (!currentInstallId || !lastPermissionCheck || !lastLoginTime) {
+      // 새로운 설치 ID 생성
+      const newInstallId = `install_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      localStorage.setItem('smap_app_install_id', newInstallId);
+      localStorage.setItem('smap_last_permission_check', Date.now().toString());
+      localStorage.setItem('smap_last_login_time', Date.now().toString());
+      console.log('🔄 [HOME] 앱 재설치 감지됨 - 새로운 설치 ID 생성:', newInstallId);
+      return true;
+    }
+
+    // 마지막 로그인 시간이 24시간 이상 지났으면 재설치로 간주
+    const lastLogin = parseInt(lastLoginTime);
+    const now = Date.now();
+    const hoursSinceLastLogin = (now - lastLogin) / (1000 * 60 * 60);
+    
+    if (hoursSinceLastLogin > 24) {
+      console.log('🔄 [HOME] 장기간 미사용 감지 - 권한 재요청');
+      localStorage.setItem('smap_last_login_time', now.toString());
+      return true;
+    }
+
+    return false;
+  };
   
   // 🔧 사용자 정보 디버깅
   useEffect(() => {
@@ -2461,7 +2578,7 @@ export default function HomePage() {
       }
       
       // 지도가 초기화되지 않은 경우 재시도
-      if (mapType === 'naver' && naverMapsLoaded && window.naver?.maps && !naverMap.current) {
+      if (mapType === 'naver' && naverMapsLoaded && window.naver?.maps?.LatLng && !naverMap.current) {
         console.log('[HOME] 네이버맵 초기화 누락 감지 - 재시도');
         setTimeout(() => initNaverMap(), 500);
       }

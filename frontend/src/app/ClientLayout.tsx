@@ -36,6 +36,7 @@ import { DataCacheProvider } from '@/contexts/DataCacheContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMapPreloader } from '@/hooks/useMapPreloader';
 import { useAndroidPermissionChecker } from '@/hooks/useAndroidPermissionChecker';
+import { initializePermissionState } from '@/utils/androidPermissions';
 // iOS 호환 스피너 컴포넌트를 인라인으로 정의
 // import { useServiceWorker } from '@/hooks/useServiceWorker';
 // import PerformanceMonitor from '@/components/PerformanceMonitor';
@@ -347,6 +348,31 @@ export default function ClientLayout({
 }) {
   const [isMounted, setIsMounted] = useState(false);
   const pathname = usePathname();
+  const { isLoggedIn } = useAuth();
+  const { preloadNaverMaps, preloadGoogleMaps } = useMapPreloader();
+  const { handleAppResumed } = useAndroidPermissionChecker();
+  
+  // 🔥 앱 시작 시 권한 상태 초기화
+  useEffect(() => {
+    try {
+      console.log('🚀 [CLIENT_LAYOUT] 앱 시작 - 권한 상태 초기화');
+      initializePermissionState();
+    } catch (error) {
+      console.error('❌ [CLIENT_LAYOUT] 권한 상태 초기화 중 오류:', error);
+    }
+  }, []);
+  
+  // 앱 포커스 시 권한 체크
+  useEffect(() => {
+    const handleFocus = () => {
+      if (isLoggedIn) {
+        handleAppResumed();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [isLoggedIn, handleAppResumed]);
 
   // 지도 API 프리로딩 및 서비스 워커 등록
   useMapPreloader();

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import AnimatedHeader from '../../../../components/common/AnimatedHeader';
 import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
+import useAppState from '@/hooks/useAppState';
 
 const pageAnimations = `
 html, body { width: 100%; overflow-x: hidden; position: relative; }
@@ -18,8 +19,8 @@ export default function ThirdPartyConsentPage() {
   const searchParams = useSearchParams();
   const isEmbed = (searchParams?.get('embed') === '1');
 
-  useEffect(() => {
-    // iPad/iOS WebView 최적화 스타일 적용
+  // 스타일 적용 함수
+  const applyStyles = () => {
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     
     if (isEmbed) {
@@ -43,20 +44,38 @@ export default function ThirdPartyConsentPage() {
       document.body.style.overflowY = 'auto';
       document.documentElement.style.overflowY = 'auto';
     }
-    
+  };
+
+  // 스타일 복원 함수
+  const restoreStyles = () => {
+    document.body.style.position = '';
+    document.body.style.overflow = '';
+    document.body.style.height = '';
+    document.body.style.minHeight = '';
+    document.body.style.background = '';
+    document.body.style.removeProperty('-webkit-overflow-scrolling');
+    document.body.style.removeProperty('-webkit-transform');
+    document.body.style.removeProperty('-webkit-backface-visibility');
+    document.documentElement.style.position = '';
+    document.documentElement.style.overflow = '';
+    document.documentElement.style.height = '';
+    document.documentElement.style.overflowY = '';
+  };
+
+  // App State 감지 및 스타일 관리
+  const { isVisible } = useAppState({
+    onFocus: applyStyles,
+    onBlur: restoreStyles,
+    delay: 100
+  });
+
+  useEffect(() => {
+    // 초기 스타일 적용
+    applyStyles();
+
     return () => {
-      document.body.style.position = '';
-      document.body.style.overflow = '';
-      document.body.style.height = '';
-      document.body.style.minHeight = '';
-      document.body.style.background = '';
-      document.body.style.removeProperty('-webkit-overflow-scrolling');
-      document.body.style.removeProperty('-webkit-transform');
-      document.body.style.removeProperty('-webkit-backface-visibility');
-      document.documentElement.style.position = '';
-      document.documentElement.style.overflow = '';
-      document.documentElement.style.height = '';
-      document.documentElement.style.overflowY = '';
+      // cleanup 시 스타일 복원
+      restoreStyles();
     };
   }, [isEmbed]);
 
@@ -64,6 +83,18 @@ export default function ThirdPartyConsentPage() {
     triggerHapticFeedback(HapticFeedbackType.SELECTION, '개인정보 제3자 제공 동의 뒤로가기', { component: 'setting-terms', action: 'back-navigation' });
     router.push('/setting');
   };
+
+  // 컴포넌트가 보이지 않을 때는 로딩 상태 표시
+  if (!isVisible) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">로딩 중...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>

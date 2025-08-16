@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import AnimatedHeader from '../../../../components/common/AnimatedHeader';
 import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
+import useAppState from '@/hooks/useAppState';
 
 const pageAnimations = `
 html, body { width: 100%; overflow-x: hidden; position: relative; }
@@ -18,8 +19,8 @@ export default function PrivacyPolicyPage() {
   const searchParams = useSearchParams();
   const isEmbed = (searchParams?.get('embed') === '1');
 
-  useEffect(() => {
-    // iPad/iOS WebView 최적화 스타일 적용
+  // 스타일 적용 함수
+  const applyStyles = () => {
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     
     if (isEmbed) {
@@ -43,20 +44,38 @@ export default function PrivacyPolicyPage() {
       document.body.style.overflowY = 'auto';
       document.documentElement.style.overflowY = 'auto';
     }
-    
+  };
+
+  // 스타일 복원 함수
+  const restoreStyles = () => {
+    document.body.style.position = '';
+    document.body.style.overflow = '';
+    document.body.style.height = '';
+    document.body.style.minHeight = '';
+    document.body.style.background = '';
+    document.body.style.removeProperty('-webkit-overflow-scrolling');
+    document.body.style.removeProperty('-webkit-transform');
+    document.body.style.removeProperty('-webkit-backface-visibility');
+    document.documentElement.style.position = '';
+    document.documentElement.style.overflow = '';
+    document.documentElement.style.height = '';
+    document.documentElement.style.overflowY = '';
+  };
+
+  // App State 감지 및 스타일 관리
+  const { isVisible } = useAppState({
+    onFocus: applyStyles,
+    onBlur: restoreStyles,
+    delay: 100
+  });
+
+  useEffect(() => {
+    // 초기 스타일 적용
+    applyStyles();
+
     return () => {
-      document.body.style.position = '';
-      document.body.style.overflow = '';
-      document.body.style.height = '';
-      document.body.style.minHeight = '';
-      document.body.style.background = '';
-      document.body.style.removeProperty('-webkit-overflow-scrolling');
-      document.body.style.removeProperty('-webkit-transform');
-      document.body.style.removeProperty('-webkit-backface-visibility');
-      document.documentElement.style.position = '';
-      document.documentElement.style.overflow = '';
-      document.documentElement.style.height = '';
-      document.documentElement.style.overflowY = '';
+      // cleanup 시 스타일 복원
+      restoreStyles();
     };
   }, [isEmbed]);
 
@@ -64,6 +83,18 @@ export default function PrivacyPolicyPage() {
     triggerHapticFeedback(HapticFeedbackType.SELECTION, '개인정보 처리방침 뒤로가기', { component: 'setting-terms', action: 'back-navigation' });
     router.push('/setting');
   };
+
+  // 컴포넌트가 보이지 않을 때는 로딩 상태 표시
+  if (!isVisible) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">로딩 중...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`${isEmbed ? 'min-h-screen overflow-auto bg-white' : 'fixed inset-0 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 main-container'}`} 
@@ -132,7 +163,7 @@ export default function PrivacyPolicyPage() {
             본 개인정보처리방침은 회사가 제공하는 "홈페이지(www.smap.co.kr)" 및 "어플리케이션 (smap)" (이하에서는 홈페이지 및 어플리케이션을 이하 '서비스'라 합니다.) 이용에 적용되며 다음과 같은 내용을 담고 있습니다.
           </p>
 
-          <h2 className="text-lg font-semibold mt-6 mb-2">개인정보 수집 항목 및 이용목적</h2>
+          <h2 className="text-lg font-semibold mt-6 mb-2 text-blue-900">개인정보 수집 항목 및 이용목적</h2>
           <p className="mb-4">
             "회사"는 회원가입, 원활한 고객상담, 각종 서비스의 제공을 위해 아래와 같은 최소한의 개인정보를 필수항목으로 수집하고 있습니다.<br />
             "회사"는 처리하고 있는 개인정보는 다음의 목적 이외의 용도로는 이용되지 않으며, 이용 목적이 변경되는 경우에는 개인정보 보호법 제18조에 따라 별도의 동의를 받는 등 필요한 조치를 이행할 예정입니다.
@@ -215,7 +246,7 @@ export default function PrivacyPolicyPage() {
             </table>
           </div>
 
-          <h2 className="text-lg font-semibold mt-6 mb-2">개인정보의 제3자에 대한 제공</h2>
+          <h2 className="text-lg font-semibold mt-6 mb-2 text-blue-900">개인정보의 제3자에 대한 제공</h2>
           <p className="mb-4">
             1. "회사"는 회원들의 개인정보를 "개인정보의 수집 및 이용목적"에서 고지한 범위 내에서 사용하며, 회원의 사전 동의 없이는 동 범위를 초과하여 이용하거나 원칙적으로 회원의 개인정보를 외부에 공개하지 않습니다. 다만 다음의 경우에는 회원의 개인정보를 제3자에게 제공(공유를 포함)할 수 있습니다.<br />
             2. 다음의 경우<br />
@@ -245,7 +276,7 @@ export default function PrivacyPolicyPage() {
             </table>
           </div>
 
-          <h2 className="text-lg font-semibold mt-6 mb-2">개인정보 처리의 위탁</h2>
+          <h2 className="text-lg font-semibold mt-6 mb-2 text-blue-900">개인정보 처리의 위탁</h2>
           <p className="mb-4">
             1. 회사는 서비스 향상을 위해서 회원의 개인정보를 외부 전문업체에 위탁하여 처리할 수 있습니다. 개인정보의 처리를 위탁하는 경우에는 미리 그 사실을 회원에게 공지하여 회원의 동의를 받을 것입니다.<br />
             2. 회원의 개인정보의 위탁 처리하는 경우에는 위탁계약(위탁업무 수행 목적 외 개인정보 처리 금지, 개인정보의 기술적 관리적 보호조치, 위탁업무의 목적 및 범위, 재위탁 제한, 개인정보에 대한 접근 제한 등 안정성 확보 조치, 위탁업무와 관련하여 보유하고 있는 개인정보의 관리 현황 점검 등 감독, 수탁자가 준수하여야 할 의무를 위반한 경우의 손해배상 등이 내용이 포함됨)을 통하여 서비스제공자의 개인정보보호 관련 지시엄수, 개인정보에 관한 비밀유지, 제3자 제공의 금지 및 사고시의 책임부담 등을 명확히 규정하고 당해 계약내용을 서면 또는 전자적으로 보관할 것입니다.<br />
@@ -287,12 +318,12 @@ export default function PrivacyPolicyPage() {
             </table>
           </div>
 
-          <h2 className="text-lg font-semibold mt-6 mb-2">개인정보 수집 및 이용에 대한 동의</h2>
+          <h2 className="text-lg font-semibold mt-6 mb-2 text-blue-900">개인정보 수집 및 이용에 대한 동의</h2>
           <p className="mb-4">
             회사는 회원들이 회사의 개인정보 보호정책 또는 이용약관의 내용에 대하여 "동의" 버튼을 클릭할 수 있는 절차를 마련하여, "동의" 버튼을 클릭하면 개인정보 수집 및 이용에 대해 동의한 것으로 봅니다.
           </p>
 
-          <h2 className="text-lg font-semibold mt-6 mb-2">개인정보의 처리 및 보유 기간</h2>
+          <h2 className="text-lg font-semibold mt-6 mb-2 text-blue-900">개인정보의 처리 및 보유 기간</h2>
           <p className="mb-4">
             1. 회원의 개인정보는 그 수집목적 또는 제공받은 목적이 달성되거나 회원이 이용계약 해지(회원탈퇴)를 요청한 경우 파기하는 것을 원칙으로 하며, 이 경우 회원의 개인정보는 재생할 수 없는 방법에 의하여 시스템에서 완전히 삭제되며 어떠한 용도로도 열람 또는 이용할 수 없도록 처리됩니다. 또한, 일시적인 목적(설문조사 등)으로 입력 받은 개인정보는 그 목적이 달성된 이후에는 동일한 방법으로 사후 재생이 불가능한 방법으로 처리됩니다.<br />
             2. 회사는 불량 회원의 부정한 이용의 재발을 방지하기 위해 이용계약 해지일(회원탈퇴일)로부터 2년간 해당 회원의 개인정보를 보유할 수 있습니다. 그리고 상법, 전자상거래 등에서의 소비자보호에 관한 법률 등 관계법령의 규정에 의하여 보존할 필요가 있는 경우 회사는 관계법령에서 정한 일정한 기간 동안 회원정보를 보관합니다. 이 경우 회사는 보관하는 정보를 그 보관의 목적으로만 이용하며 보존기간은 아래와 같습니다.
@@ -370,12 +401,12 @@ export default function PrivacyPolicyPage() {
             2. 2020년 5월 6일 이후 가입한 회원이 1년간 서비스 거래기록이 없을 시, 서비스 미사용 회원의 개인정보는 '정보통신망 이용촉진 및 정보보호 등에 관한 법률 제29조' 에 근거하여 회원에게 사전통지하고 개인정보를 파기하거나 별도로 분리하여 저장 관리합니다. 고객의 요청이 있을 경우에는 위 기간을 달리 정할 수 있습니다. 단, 통신비밀보호법, 전자상거래 등에서의 소비자보호에 관한 법률 등의 관계법령의 규정에 의하여 보존할 필요가 있는 경우 관계법령에서 규정한 일정한 기간 동안 회원 개인정보를 보관합니다. 회사는 위의 1년의 기간 만료 30일 전까지 개인정보가 파기되거나 분리되어 저장•관리되는 사실과 기간 만료일 및 해당 개인정보의 항목을 전자우편 등의 방법으로 고객에게 알립니다. 이를 위해 고객은 정확한 연락처 정보를 제공/수정하여야 합니다.
           </p>
 
-          <h2 className="text-lg font-semibold mt-6 mb-2">만 14세 미만 아동의 가입제한</h2>
+          <h2 className="text-lg font-semibold mt-6 mb-2 text-blue-900">만 14세 미만 아동의 가입제한</h2>
           <p className="mb-4">
             회사는 법정 대리인의 동의가 필요한 만 14세미만 아동의 서비스 이용 및 회원가입을 제한하고 있습니다.
           </p>
 
-          <h2 className="text-lg font-semibold mt-6 mb-2">개인정보 파기절차 및 방법</h2>
+          <h2 className="text-lg font-semibold mt-6 mb-2 text-blue-900">개인정보 파기절차 및 방법</h2>
           <p className="mb-4">
             회원의 개인정보는 원칙적으로 보유기간의 경과, 개인정보의 수집 및 이용목적 달성 등 그 개인정보가 불필요하게 되었을 때에는 지체 없이 파기합니다. 회사의 개인정보 파기절차 및 방법은 다음과 같습니다.
           </p>
@@ -397,7 +428,7 @@ export default function PrivacyPolicyPage() {
             회사는 법령에 따라 개인정보를 파기하지 않고 보존하는 경우에 해당 개인정보 또는 개인정보파일을 다른 개인정보와 분리하여 저장 관리합니다. 회사는 별도 DB로 옮긴 개인정보를 법률에 의한 경우가 아니고서는 보유하는 이외의 다른 목적으로 이용하지 않습니다.
           </p>
 
-          <h2 className="text-lg font-semibold mt-6 mb-2">개인정보주체의 권리와 의무 및 그 행사방법</h2>
+          <h2 className="text-lg font-semibold mt-6 mb-2 text-blue-900">개인정보주체의 권리와 의무 및 그 행사방법</h2>
           <p className="mb-4">
             1. 회원은 언제든지 회사에 "SMAP" 서비스를 통하여 등록되어 있는 자신의 개인정보, 회사가 회원의 개인정보를 이용하거나 제3자에게 제공한 현황, 회사에게 개인정보 수집, 이용, 제공 등의 동의를 한 현황에 대하여 열람이나 제공을 요구할 수 있고, 오류가 있는 경우에는 그 정정을 요구할 수 있으며, 삭제 내지 가입해지를 요구할 수도 있습니다.<br />
             2. 회원의 개인정보 조회, 수정을 위해서는 '개인정보변경'(또는 '회원정보수정' 등)을, 가입해지(동의철회)를 위해서는 "회원탈퇴"를 클릭하여 본인 확인 절차를 거치신 후 직접 열람, 정정 또는 탈퇴가 가능합니다.<br />
@@ -406,7 +437,7 @@ export default function PrivacyPolicyPage() {
             5. 개인정보와 관련하여 의의나 의견이 있으신 분은 개인정보 보호책임자 및 담당자에게 서면, 전화 또는 E-mail로 연락하시면 접수 즉시 처리하고 결과를 안내해 드리겠습니다. 로그온(log-on)한 상태에서는 주위의 다른 사람에게 개인정보가 유출되지 않도록 특별히 주의를 기울이시기 바랍니다.
           </p>
 
-          <h2 className="text-lg font-semibold mt-6 mb-2">개인정보 자동 수집 장치의 설치/운영 및 거부에 관한 사항</h2>
+          <h2 className="text-lg font-semibold mt-6 mb-2 text-blue-900">개인정보 자동 수집 장치의 설치/운영 및 거부에 관한 사항</h2>
           <p className="mb-4">
             회사는 회원들에게 특화된 맞춤서비스를 제공하기 위해서 회원들의 정보를 저장하고 수시로 불러오는 '쿠키(cookie)'를 사용합니다. 쿠키는 웹사이트를 운영하는데 이용되는 서버(HTTP)가 회원의 컴퓨터 브라우저에게 보내는 소량의 정보이며 회원들의 PC 컴퓨터내의 하드디스크에 저장되기도 합니다.
           </p>
@@ -424,7 +455,7 @@ export default function PrivacyPolicyPage() {
             ④ 다만, 쿠키의 저장을 거부할 경우에는 로그인이 필요한 일부 서비스는 이용에 어려움이 있을 수 있습니다.
           </p>
 
-          <h2 className="text-lg font-semibold mt-6 mb-2">개인정보의 안전성 확보조치</h2>
+          <h2 className="text-lg font-semibold mt-6 mb-2 text-blue-900">개인정보의 안전성 확보조치</h2>
           <p className="mb-4">
             1. 회사는 회원들의 개인정보를 취급함에 있어 개인정보가 분실, 도난, 유출, 변조 또는 훼손되지 않도록 안전성 확보를 위하여 다음과 같은 기술적 대책을 강구하고 있습니다.<br />
             - 회원의 개인정보는 비밀번호에 의해 보호되며 파일 및 전송데이터를 암호화하거나 파일 잠금기능(Lock)을 사용하여 중요한 데이터는 별도의 보안기능을 통해 보호되고 있습니다.<br />
@@ -439,7 +470,7 @@ export default function PrivacyPolicyPage() {
             단, 회원 본인의 부주의나 인터넷상의 문제로 ID, 비밀번호, 주민등록번호 등 개인정보가 유출해 발생한 문제에 대해 회사는 일체의 책임을 지지 않습니다.
           </p>
 
-          <h2 className="text-lg font-semibold mt-6 mb-2">개인정보관련 의견수렴 및 침해, 불만처리에 관한 사항</h2>
+          <h2 className="text-lg font-semibold mt-6 mb-2 text-blue-900">개인정보관련 의견수렴 및 침해, 불만처리에 관한 사항</h2>
           <p className="mb-4">
             "회사"는 개인정보보호와 관련하여 "회원"의 의견을 수렴하고 있으며 불만을 처리하기 위하여 모든 절차와 방법을 마련하고 있습니다. "회원"은 회사의 서비스 이용 중 발생한 모든 개인정보 보호 관련 문의, 불만처리, 피해구제 등에 관한 사항을 아래 개인정보 보호책임자 및 담당자에게 문의할 수 있습니다. "회사"는 "회원"의 신고사항에 대하여 신속하게 처리하여 답변해 드립니다.
           </p>

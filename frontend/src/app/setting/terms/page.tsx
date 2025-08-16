@@ -29,6 +29,7 @@ import authService from '@/services/authService';
 import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
 import AnimatedHeader from '../../../components/common/AnimatedHeader';
 import apiClient from '@/services/apiClient';
+import useAppState from '@/hooks/useAppState';
 
 // 모바일 최적화된 CSS 애니메이션 (노란색 테마)
 const pageAnimations = `
@@ -416,8 +417,8 @@ export default function TermsPage() {
   const [isLoadingConsents, setIsLoadingConsents] = useState(true);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
 
-  // body에 data-page 속성 추가 및 스크롤 스타일 제어
-  useEffect(() => {
+  // 스타일 적용 함수
+  const applyStyles = () => {
     document.body.setAttribute('data-page', '/setting/terms');
     
     // 이 페이지에서만 스크롤 허용
@@ -434,14 +435,35 @@ export default function TermsPage() {
       body.style.touchAction = 'none';
       contentElement.classList.add('scrollable-content');
     }
+  };
+
+  // 스타일 복원 함수
+  const restoreStyles = () => {
+    document.body.removeAttribute('data-page');
+    // 페이지를 떠날 때 원래 스타일로 복구
+    const html = document.documentElement;
+    const body = document.body;
+    html.style.overflow = '';
+    body.style.overflow = '';
+    body.style.height = '';
+    body.style.touchAction = '';
+  };
+
+  // App State 감지 및 스타일 관리
+  const { isVisible } = useAppState({
+    onFocus: applyStyles,
+    onBlur: restoreStyles,
+    delay: 100
+  });
+
+  // body에 data-page 속성 추가 및 스크롤 스타일 제어
+  useEffect(() => {
+    // 초기 스타일 적용
+    applyStyles();
 
     return () => {
-      document.body.removeAttribute('data-page');
-      // 페이지를 떠날 때 원래 스타일로 복구
-      html.style.overflow = '';
-      body.style.overflow = '';
-      body.style.height = '';
-      body.style.touchAction = '';
+      // cleanup 시 스타일 복원
+      restoreStyles();
     };
   }, []);
 
@@ -460,6 +482,18 @@ export default function TermsPage() {
       document.body.style.overflow = 'auto';
     };
   }, []);
+
+  // 컴포넌트가 보이지 않을 때는 로딩 상태 표시
+  if (!isVisible) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">로딩 중...</p>
+        </div>
+      </div>
+    );
+  }
 
   // 사용자의 동의 정보를 로드하는 함수
   const loadUserConsents = async () => {
