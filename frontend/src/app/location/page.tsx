@@ -1214,8 +1214,8 @@ export default function LocationPage() {
   const moveToSelectedMember = () => {
     const selectedMember = groupMembers.find(m => m.isSelected);
     if (selectedMember && map) {
-      const lat = parseCoordinate(selectedMember.mlt_lat) || parseCoordinate(selectedMember.location?.lat);
-      const lng = parseCoordinate(selectedMember.mlt_long) || parseCoordinate(selectedMember.location?.lng);
+      const lat = parseCoordinate(selectedMember?.mlt_lat) || parseCoordinate(selectedMember?.location?.lat);
+      const lng = parseCoordinate(selectedMember?.mlt_long) || parseCoordinate(selectedMember?.location?.lng);
       
       if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
         const position = createSafeLatLng(lat, lng);
@@ -1227,7 +1227,7 @@ export default function LocationPage() {
           duration: 800,
           easing: 'easeOutCubic'
         });
-        console.log('[지도 이동] 선택된 멤버 위치로 이동:', selectedMember.name, { lat, lng });
+        console.log('[지도 이동] 선택된 멤버 위치로 이동:', selectedMember?.name || '알 수 없음', { lat, lng });
       }
     }
   };
@@ -1966,9 +1966,9 @@ export default function LocationPage() {
         // selectedMemberIdRef 업데이트 - 선택된 멤버의 ID로 설정
         const selectedMember = convertedMembers.find(member => member.isSelected);
         if (selectedMember) {
-          selectedMemberIdRef.current = selectedMember.id;
+          selectedMemberIdRef.current = selectedMember?.id || convertedMembers[0]?.id;
         } else if (convertedMembers.length > 0) {
-          selectedMemberIdRef.current = convertedMembers[0].id;
+          selectedMemberIdRef.current = convertedMembers[0]?.id;
         }
 
         setGroupMembers(convertedMembers);
@@ -2177,7 +2177,7 @@ export default function LocationPage() {
     // 선택된 멤버의 장소 데이터 로드
     const loadSelectedMemberLocations = async () => {
       try {
-        console.log('[handleMemberSelect] 선택된 멤버 장소 데이터 로드 시작:', newlySelectedMember.name);
+        console.log('[handleMemberSelect] 선택된 멤버 장소 데이터 로드 시작:', newlySelectedMember?.name || '알 수 없음');
         
         const memberLocationsRaw = await locationService.getOtherMembersLocations(memberId);
         if (selectionVersionRef.current !== currentSelectionVersion) {
@@ -2295,20 +2295,20 @@ export default function LocationPage() {
         console.log('[handleMemberSelect] 지도 이동 건너뜀 - 장소 선택 중:', isLocationSelectingRef.current, '마커 클릭:', fromMarkerClick);
       } else {
         // 선택된 멤버의 위치로 지도 중심 이동 (바텀시트에 가려지지 않도록 아래쪽으로 오프셋)
-        console.log('[handleMemberSelect] 멤버 선택:', newlySelectedMember.name, '위치 데이터:', {
-          mlt_lat: newlySelectedMember.mlt_lat,
-          mlt_long: newlySelectedMember.mlt_long,
-          location: newlySelectedMember.location
+        console.log('[handleMemberSelect] 멤버 선택:', newlySelectedMember?.name || '알 수 없음', '위치 데이터:', {
+          mlt_lat: newlySelectedMember?.mlt_lat,
+          mlt_long: newlySelectedMember?.mlt_long,
+          location: newlySelectedMember?.location
         });
       
       // 좌표 파싱 및 검증 - 실시간 위치(mlt_lat, mlt_long) 우선 사용
-      const lat = parseCoordinate(newlySelectedMember.mlt_lat) || parseCoordinate(newlySelectedMember.location?.lat);
-      const lng = parseCoordinate(newlySelectedMember.mlt_long) || parseCoordinate(newlySelectedMember.location?.lng);
+      const lat = parseCoordinate(newlySelectedMember?.mlt_lat) || parseCoordinate(newlySelectedMember?.location?.lat);
+      const lng = parseCoordinate(newlySelectedMember?.mlt_long) || parseCoordinate(newlySelectedMember?.location?.lng);
       
       console.log('[handleMemberSelect] 좌표 파싱 결과:', {
-        mlt_lat: newlySelectedMember.mlt_lat,
-        mlt_long: newlySelectedMember.mlt_long,
-        location: newlySelectedMember.location,
+        mlt_lat: newlySelectedMember?.mlt_lat,
+        mlt_long: newlySelectedMember?.mlt_long,
+        location: newlySelectedMember?.location,
         parsed: { lat, lng },
         isValid: lat !== null && lng !== null && lat !== 0 && lng !== 0 && 
                 Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && 
@@ -2329,7 +2329,7 @@ export default function LocationPage() {
           }
           
         console.log('[handleMemberSelect] 지도 중심 이동 실행 (무조건):', {
-          member: newlySelectedMember.name,
+          member: newlySelectedMember?.name || '알 수 없음',
           position: { lat, lng },
           mapInstance: !!map
         });
@@ -2395,7 +2395,7 @@ export default function LocationPage() {
           }
           
           console.log('[handleMemberSelect] 멤버 InfoWindow 표시 시도:', {
-            memberName: newlySelectedMember.name,
+            memberName: newlySelectedMember?.name || '알 수 없음',
             hasClickedMarker: !!clickedMarker,
             hasSelectedMarker: !!selectedMarker,
             memberIndex,
@@ -2407,7 +2407,7 @@ export default function LocationPage() {
           
           // 마커가 있고 지도와 네이버 맵스가 로드되었을 때만 InfoWindow 표시
             if (selectedMarker && map && window.naver?.maps) {
-            const photoForMarker = getSafeImageUrl(newlySelectedMember.photo, newlySelectedMember.mt_gender, newlySelectedMember.original_index);
+            const photoForMarker = getSafeImageUrl(newlySelectedMember?.photo, newlySelectedMember?.mt_gender, newlySelectedMember?.original_index);
             const borderColor = '#f59e0b'; // 선택된 멤버 색상
 
             const memberInfoWindow = new window.naver.maps.InfoWindow({
@@ -2473,7 +2473,7 @@ export default function LocationPage() {
                         font-size: 14px;
                         font-weight: 600;
                         color: #111827;
-                      ">👤 ${newlySelectedMember.name}</h3>
+                      ">👤 ${newlySelectedMember?.name || '알 수 없음'}</h3>
                     </div>
                   </div>
                 </div>
@@ -2486,7 +2486,7 @@ export default function LocationPage() {
 
             memberInfoWindow.open(map, selectedMarker);
             setInfoWindow(memberInfoWindow);
-            console.log('[handleMemberSelect] 멤버 InfoWindow 표시 완료:', newlySelectedMember.name);
+            console.log('[handleMemberSelect] 멤버 InfoWindow 표시 완료:', newlySelectedMember?.name || '알 수 없음');
 
             // 주소 변환 제거
         } else {
@@ -2494,14 +2494,14 @@ export default function LocationPage() {
               memberIndex,
               hasSelectedMarker: !!selectedMarker,
               totalMarkers: memberMarkers.length,
-              memberName: newlySelectedMember.name,
+              memberName: newlySelectedMember?.name || '알 수 없음',
               hasValidCoords: lat && lng,
               coordinates: { lat, lng }
             });
             
             // 마커를 찾을 수 없을 때 좌표로 직접 InfoWindow 표시
             if (map && window.naver?.maps && lat && lng) {
-              const photoForMarker = getSafeImageUrl(newlySelectedMember.photo, newlySelectedMember.mt_gender, newlySelectedMember.original_index);
+              const photoForMarker = getSafeImageUrl(newlySelectedMember?.photo, newlySelectedMember?.mt_gender, newlySelectedMember?.original_index);
               const borderColor = '#f59e0b'; // 선택된 멤버 색상
               const memberPosition = createSafeLatLng(lat, lng);
               if (!memberPosition) {
@@ -2584,7 +2584,7 @@ export default function LocationPage() {
                           font-size: 14px;
                           font-weight: 600;
                           color: #111827;
-                        ">👤 ${newlySelectedMember.name}</h3>
+                        ">👤 ${newlySelectedMember?.name || '알 수 없음'}</h3>
                         <p style="
                           margin: 2px 0 0 0;
                           font-size: 12px;
@@ -2596,7 +2596,7 @@ export default function LocationPage() {
                     <div style="margin-bottom: 6px;">
                       <div style="display: flex; align-items: flex-start; font-size: 12px; color: #64748b;">
                         <span style="flex-shrink: 0;">📍 </span>
-                        <span id="member-address-${newlySelectedMember.id}" style="color: #0113A3; font-weight: 500; word-break: keep-all; line-height: 1.3; text-indent: hanging; padding-left: 0;">주소 변환 중...</span>
+                        <span id="member-address-${newlySelectedMember?.id || 'unknown'}" style="color: #0113A3; font-weight: 500; word-break: keep-all; line-height: 1.3; text-indent: hanging; padding-left: 0;">주소 변환 중...</span>
                       </div>
                     </div>
                   </div>
@@ -2609,7 +2609,7 @@ export default function LocationPage() {
 
               memberInfoWindow.open(map, memberPosition);
               setInfoWindow(memberInfoWindow);
-              console.log('[handleMemberSelect] 멤버 InfoWindow 좌표로 직접 표시 완료:', newlySelectedMember.name);
+              console.log('[handleMemberSelect] 멤버 InfoWindow 좌표로 직접 표시 완료:', newlySelectedMember?.name || '알 수 없음');
 
               // 주소 변환 제거
             } else {
@@ -2638,7 +2638,7 @@ export default function LocationPage() {
       }
       
       // 멤버의 저장된 장소 처리
-      if (newlySelectedMember.savedLocations && newlySelectedMember.savedLocations.length > 0) {
+      if (newlySelectedMember?.savedLocations && newlySelectedMember.savedLocations.length > 0) {
         // 이미 로드된 장소가 있으면 바로 사용
         console.log('[handleMemberSelect] 이미 로드된 장소 사용:', newlySelectedMember.savedLocations.length, '개');
         setSelectedMemberSavedLocations(newlySelectedMember.savedLocations);
@@ -2667,11 +2667,11 @@ export default function LocationPage() {
         
       } else {
         // 저장된 장소가 없으면 API에서 조회
-        console.log('[handleMemberSelect] API에서 장소 조회 시작:', newlySelectedMember.name);
+        console.log('[handleMemberSelect] API에서 장소 조회 시작:', newlySelectedMember?.name || '알 수 없음');
         setIsLoadingOtherLocations(true);
         
         try {
-          const memberLocationsRaw = await locationService.getOtherMembersLocations(newlySelectedMember.id);
+          const memberLocationsRaw = await locationService.getOtherMembersLocations(newlySelectedMember?.id || '');
           console.log("[handleMemberSelect] API에서 조회한 장소 (raw):", memberLocationsRaw);
           
           // LocationData 형식으로 변환
@@ -2726,7 +2726,7 @@ export default function LocationPage() {
         }
       }
 
-      console.log('[handleMemberSelect] 멤버 선택 및 데이터 로딩 완료:', newlySelectedMember.name);
+              console.log('[handleMemberSelect] 멤버 선택 및 데이터 로딩 완료:', newlySelectedMember?.name || '알 수 없음');
         }
       }
       
@@ -3295,7 +3295,7 @@ export default function LocationPage() {
       if (activeView === 'otherMembersPlaces' && currentSelectedMember?.id) {
         setIsLoadingOtherLocations(true);
         try {
-          const fetchedLocationsRaw = await locationService.getOtherMembersLocations(currentSelectedMember.id);
+          const fetchedLocationsRaw = await locationService.getOtherMembersLocations(currentSelectedMember?.id || '');
           console.log("[useEffect/activeView] Other members' locations (raw):", fetchedLocationsRaw);
           setOtherMembersSavedLocations(fetchedLocationsRaw);
         } catch (error) {
@@ -3912,7 +3912,7 @@ export default function LocationPage() {
         const shouldPreserve = isMemberInfoWindow && selectedMember && infoWindowContent.includes(`member-address-${selectedMember.id}`);
 
         if (shouldPreserve) {
-          console.log('[updateAllMarkers] 현재 선택 멤버 InfoWindow 보존:', selectedMember?.name);
+          console.log('[updateAllMarkers] 현재 선택 멤버 InfoWindow 보존:', selectedMember?.name || '알 수 없음');
         } else {
           // 장소 InfoWindow나 기타 InfoWindow는 닫기
           infoWindow.close();
@@ -4208,8 +4208,8 @@ export default function LocationPage() {
         console.log(`[updateAllMarkers] ✅ 장소 마커 생성 완료: ${location.name} (${lat}, ${lng})`);
       });
       
-      console.log('[updateAllMarkers] 🎯 선택된 멤버의 장소 마커 생성 완료:', {
-        selectedMemberName: selectedMember.name,
+      console.log('[updateAllMarkers] 🎯 모든 멤버의 장소 마커 생성 완료:', {
+        selectedMemberName: selectedMember?.name || '없음',
         totalMarkersCreated: newLocationMarkers.length,
         expectedCount: locations.length,
         createdMarkers: newLocationMarkers.map((marker, idx) => ({
@@ -4243,8 +4243,8 @@ export default function LocationPage() {
     setMarkers(newLocationMarkers);
     locationMarkersRef.current = newLocationMarkers;
     
-    console.log('[updateAllMarkers] ✅ 완료 - 멤버 마커:', newMemberMarkers.length, '개, 선택된 멤버의 장소 마커:', newLocationMarkers.length, '개');
-    console.log('[updateAllMarkers] ✅ 핵심 결과: 다른 멤버 장소 마커 완전 제거됨, 선택된 멤버', selectedMember?.name || '없음', '의 장소만 표시');
+    console.log('[updateAllMarkers] ✅ 완료 - 멤버 마커:', newMemberMarkers.length, '개, 모든 멤버의 장소 마커:', newLocationMarkers.length, '개');
+    console.log('[updateAllMarkers] ✅ 핵심 결과: 모든 멤버의 장소 마커 표시, 선택된 멤버', selectedMember?.name || '없음', '의 장소는 강조 표시');
     
     // 실제 지도에 표시된 마커 확인
     setTimeout(() => {
