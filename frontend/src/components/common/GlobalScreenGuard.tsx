@@ -139,12 +139,19 @@ export default function GlobalScreenGuard({
   const attemptRecovery = useCallback(async () => {
     const now = Date.now();
     
-    if (screenState.isRecovering) {
-      console.log('[GlobalScreenGuard] 이미 복구 중입니다');
+    // 이미 복구 중이거나 최대 시도 횟수에 도달한 경우
+    if (screenState.isRecovering || screenState.recoveryAttempts >= 5) {
+      if (screenState.recoveryAttempts >= 5) {
+        console.warn('[GlobalScreenGuard] 최대 복구 시도 횟수에 도달했습니다');
+        // 즉시 리다이렉트 시도
+        redirectToHome();
+      } else {
+        console.log('[GlobalScreenGuard] 이미 복구 중입니다');
+      }
       return;
     }
 
-    console.warn(`[GlobalScreenGuard] 흰 화면 감지 - 복구 시도 ${screenState.recoveryAttempts + 1}`);
+    console.warn(`[GlobalScreenGuard] 흰 화면 감지 - 복구 시도 ${screenState.recoveryAttempts + 1}/5`);
     
     setScreenState(prev => ({
       ...prev,
@@ -189,7 +196,7 @@ export default function GlobalScreenGuard({
       console.error('[GlobalScreenGuard] 복구 시도 중 오류:', error);
       setScreenState(prev => ({ ...prev, isRecovering: false }));
     }
-  }, [screenState.isRecovering, screenState.recoveryAttempts, checkGlobalScreenState]);
+  }, [screenState.isRecovering, screenState.recoveryAttempts, checkGlobalScreenState, redirectToHome]);
 
   // 홈으로 리다이렉트
   const redirectToHome = useCallback(() => {
@@ -221,9 +228,12 @@ export default function GlobalScreenGuard({
         pagePath: pathname
       }));
 
-      if (isWhiteScreen) {
+      if (isWhiteScreen && screenState.recoveryAttempts < 5) {
         console.warn('[GlobalScreenGuard] 전역 흰 화면 감지됨');
         attemptRecovery();
+      } else if (isWhiteScreen && screenState.recoveryAttempts >= 5) {
+        console.warn('[GlobalScreenGuard] 최대 복구 시도 횟수에 도달하여 리다이렉트 시도');
+        redirectToHome();
       }
     };
 
@@ -254,7 +264,7 @@ export default function GlobalScreenGuard({
         clearInterval(checkIntervalRef.current);
       }
     };
-  }, [enableGlobalProtection, checkInterval, pathname, attemptRecovery, checkGlobalScreenState]);
+  }, [enableGlobalProtection, checkInterval, pathname, attemptRecovery, checkGlobalScreenState, screenState.recoveryAttempts]);
 
   // 에러 카운트가 높거나 복구 시도가 많으면 리다이렉트
   useEffect(() => {
@@ -316,6 +326,16 @@ export default function GlobalScreenGuard({
           <p className="mt-1 text-xs text-gray-400">
             현재 페이지: {pathname}
           </p>
+          {screenState.recoveryAttempts >= 5 && (
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-600 font-medium">
+                🚨 복구 실패 - 홈으로 이동합니다
+              </p>
+              <p className="text-xs text-red-500 mt-1">
+                잠시 후 자동으로 홈 페이지로 이동됩니다
+              </p>
+            </div>
+          )}
         </div>
       </div>
     );
