@@ -27,6 +27,7 @@ import { HiSparkles } from 'react-icons/hi2';
 import { useAuth } from '@/contexts/AuthContext';
 import { hapticFeedback, triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
 import AnimatedHeader from '../../components/common/AnimatedHeader';
+import AdvancedScreenGuard from '@/components/common/AdvancedScreenGuard';
 
 
 // 기본 이미지 가져오기 함수 (schedule/page.tsx에서 가져옴)
@@ -442,15 +443,24 @@ export default function SettingsPage() {
   return (
     <>
       <style jsx global>{pageAnimations}</style>
-      <div 
-        className="fixed inset-0 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 main-container"
-        id="setting-page-container"
-        style={{
-          paddingTop: '0px',
-          marginTop: '0px',
-          top: '0px'
-        }}
+      <AdvancedScreenGuard 
+        fallbackToHome={true}
+        enableAutoRecovery={true}
+        recoveryAttempts={3}
+        checkInterval={2000}
+        className="setting-page-guard"
       >
+        <div 
+          className="fixed inset-0 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 main-container setting-content"
+          id="setting-page-container"
+          data-page="/setting"
+          data-content-type="setting-page"
+          style={{
+            paddingTop: '0px',
+            marginTop: '0px',
+            top: '0px'
+          }}
+        >
         {/* 통일된 헤더 애니메이션 */}
         <AnimatedHeader 
           variant="enhanced"
@@ -554,7 +564,8 @@ export default function SettingsPage() {
             <div className="text-xs text-gray-500">버전 2.2.0</div>
           </motion.div>
         </motion.div>
-      </div>
+        </div>
+      </AdvancedScreenGuard>
     </>
   );
 } 

@@ -1653,7 +1653,7 @@ export default function HomePage() {
       );
     }
 
-    // 그룹 멤버 및 스케줄 데이터 가져오기 - 중복 실행 방지 개선
+    // 그룹 멤버 및 스케줄 데이터 가져오기 - 강제 실행으로 변경
   useEffect(() => {
     let isMounted = true;
     
@@ -1664,23 +1664,25 @@ export default function HomePage() {
         return;
       }
       
-      // 🔥 AuthContext의 로딩이 완료될 때까지만 기다리기 (프리로딩 조건 완화)
-      if (authLoading) {
-        console.log('🏠 [fetchAllGroupData] AuthContext 로딩 중이므로 대기:', { authLoading, isPreloadingComplete });
-        return;
-      }
+      // 🔥 AuthContext 로딩 상태와 무관하게 강제 실행
+      console.log('🏠 [fetchAllGroupData] 🚀 강제 데이터 페칭 시작:', { 
+        authLoading, 
+        isPreloadingComplete, 
+        selectedGroupId: userContextSelectedGroupId 
+      });
       
-      // 프리로딩 완료를 기다리지 않고 진행 (사용자 경험 개선)
-      if (!isPreloadingComplete) {
-        console.log('🏠 [fetchAllGroupData] ⚠️ 프리로딩 미완료지만 진행 (UX 개선):', { authLoading, isPreloadingComplete });
-        // 프리로딩을 기다리지 않고 바로 진행 (응답성 개선)
-      }
-      
-      console.log('🏠 [fetchAllGroupData] ✅ AuthContext 체크 완료, 데이터 페칭 시작');
+      // 프리로딩 완료 여부와 무관하게 진행
+      console.log('🏠 [fetchAllGroupData] ✅ 데이터 페칭 강제 실행');
 
-      const groupIdToUse = selectedGroupId?.toString() || '';
+      const groupIdToUse = selectedGroupId?.toString() || userContextSelectedGroupId?.toString() || '';
       if (!groupIdToUse) {
-        console.log('[fetchAllGroupData] selectedGroupId가 없어서 실행 중단');
+        console.log('[fetchAllGroupData] selectedGroupId가 없어서 실행 중단, 3초 후 재시도');
+        // 3초 후 재시도
+        setTimeout(() => {
+          if (isMounted) {
+            fetchAllGroupData();
+          }
+        }, 3000);
         return;
       }
 
@@ -2227,7 +2229,7 @@ export default function HomePage() {
     }
 
     return () => { isMounted = false; };
-  }, [selectedGroupId, authLoading, isPreloadingComplete, isVisible]); // App State 감지 추가
+  }, [selectedGroupId, isVisible]); // authLoading, isPreloadingComplete 제거
 
   // 컴포넌트 마운트 시 초기 지도 타입 설정
   useEffect(() => {
