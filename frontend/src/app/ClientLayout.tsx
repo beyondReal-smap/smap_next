@@ -27,13 +27,12 @@ if (typeof window !== 'undefined') {
 }
 
 import React, { useEffect, useState } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 // import { SessionProvider } from 'next-auth/react'; // 임시 비활성화
 import { BottomNavBar } from './components/layout';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { UserProvider } from '@/contexts/UserContext';
 import { DataCacheProvider } from '@/contexts/DataCacheContext';
-import { useAuth } from '@/contexts/AuthContext';
 import { useMapPreloader } from '@/hooks/useMapPreloader';
 import { useAndroidPermissionChecker } from '@/hooks/useAndroidPermissionChecker';
 import { initializePermissionState } from '@/utils/androidPermissions';
@@ -53,63 +52,22 @@ const isGroupJoinPage = (pathname: string) => {
 
 
 
-// 인증 가드 컴포넌트 (리디렉션 로직 제거)
-function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { isLoggedIn, loading } = useAuth();
-  const router = useRouter();
 
-  // 앱 시작 시 대기 중인 그룹 가입 처리 로직은 유지
-  useEffect(() => {
-    const handlePendingGroupJoin = async () => {
-      // 로그인되지 않았거나 로딩 중이면 처리하지 않음
-      if (!isLoggedIn || loading) return;
-      
-      const pendingJoin = localStorage.getItem('pendingGroupJoin');
-      if (!pendingJoin) return;
-      
-      try {
-        const { groupId, groupTitle, timestamp } = JSON.parse(pendingJoin);
-        
-        // 24시간 이내의 요청만 처리 (만료된 요청 방지)
-        const isExpired = Date.now() - timestamp > 24 * 60 * 60 * 1000;
-        if (isExpired) {
-          localStorage.removeItem('pendingGroupJoin');
-          return;
-        }
-        
-        console.log('[AuthGuard] 대기 중인 그룹 가입 처리:', { groupId, groupTitle });
-        
-        // 그룹 가입 API 호출
-        const groupService = (await import('@/services/groupService')).default;
-        await groupService.joinGroup(parseInt(groupId));
-        
-        // 성공 시 localStorage에서 제거
-        localStorage.removeItem('pendingGroupJoin');
-        
-        // 그룹 페이지로 이동
-        router.push('/group');
-        
-        // 성공 알림 (선택사항)
-        console.log(`[AuthGuard] 그룹 "${groupTitle}" 가입 완료!`);
-        
-      } catch (error) {
-        console.error('[AuthGuard] 자동 그룹 가입 실패:', error);
-        // 실패해도 localStorage는 정리
-        localStorage.removeItem('pendingGroupJoin');
-      }
-    };
-    
-    handlePendingGroupJoin();
-  }, [isLoggedIn, loading, router]);
-
-  // 로딩 중일 때도 children을 렌더링 (스피너 제거)
-  // 리디렉션 책임은 하위의 (authenticated)/layout.tsx 로 위임
-
-  return <>{children}</>;
-}
 
 function PermissionGuard() {
-  const { isLoggedIn } = useAuth();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  // 로컬 스토리지에서 로그인 상태 확인
+  useEffect(() => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const userData = localStorage.getItem('user_data');
+      setIsLoggedIn(!!(token && userData));
+    } catch (error) {
+      console.warn('[PermissionGuard] 로컬 스토리지 접근 실패:', error);
+      setIsLoggedIn(false);
+    }
+  }, []);
   useEffect(() => {
     try {
       if (!(window as any).__SMAP_PERMISSION_GUARD_INSTALLED__) {
@@ -347,10 +305,22 @@ export default function ClientLayout({
   children: React.ReactNode;
 }) {
   const [isMounted, setIsMounted] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const pathname = usePathname();
-  const { isLoggedIn } = useAuth();
   const { preloadNaverMaps, preloadGoogleMaps } = useMapPreloader();
   const { handleAppResumed } = useAndroidPermissionChecker();
+
+  // 로컬 스토리지에서 로그인 상태 확인
+  useEffect(() => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const userData = localStorage.getItem('user_data');
+      setIsLoggedIn(!!(token && userData));
+    } catch (error) {
+      console.warn('[ClientLayout] 로컬 스토리지 접근 실패:', error);
+      setIsLoggedIn(false);
+    }
+  }, []);
   
   // 🔥 앱 시작 시 권한 상태 초기화
   useEffect(() => {
@@ -473,17 +443,15 @@ export default function ClientLayout({
 
   return (
     <>
-      <DataCacheProvider>
-        <AuthProvider>
-          <UserProvider>
-            <AuthGuard>
+              <DataCacheProvider>
+          <AuthProvider>
+            <UserProvider>
               <PermissionGuard />
               {children}
               {/* <PerformanceMonitor /> */}
-            </AuthGuard>
-          </UserProvider>
-        </AuthProvider>
-      </DataCacheProvider>
+            </UserProvider>
+          </AuthProvider>
+        </DataCacheProvider>
       
       {/* 전역 네비게이션 바 - 모든 페이지에서 일관된 위치 보장 */}
       {!shouldHideNavBar && <BottomNavBar />}
