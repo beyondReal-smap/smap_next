@@ -6,6 +6,8 @@ import { motion } from 'framer-motion';
 import AnimatedHeader from '../../../components/common/AnimatedHeader';
 import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
 import { useAuth } from '@/contexts/AuthContext';
+import useTermsPageState from '@/hooks/useTermsPageState';
+import TermsPageLoading from '@/components/common/TermsPageLoading';
 
 // 모바일 최적화된 CSS 애니메이션 (setting/manual/page.tsx 참고)
 const pageAnimations = `
@@ -46,47 +48,11 @@ export default function ServiceTermsPage() {
   const searchParams = useSearchParams();
   const isEmbed = (searchParams?.get('embed') === '1');
 
-  useEffect(() => {
-    // iPad/iOS WebView 최적화 스타일 적용
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    
-    if (isEmbed) {
-      // embed 모드일 때는 내부 웹뷰처럼 작동
-      document.body.style.position = 'relative';
-      document.body.style.overflow = 'auto';
-      document.body.style.height = 'auto';
-      document.body.style.minHeight = '100vh';
-      document.body.style.background = 'white';
-      document.documentElement.style.position = 'relative';
-      document.documentElement.style.overflow = 'auto';
-      document.documentElement.style.height = 'auto';
-      
-      // iOS에서 추가 최적화
-      if (isIOS) {
-        document.body.style.setProperty('-webkit-overflow-scrolling', 'touch');
-        document.body.style.setProperty('-webkit-transform', 'translateZ(0)');
-        document.body.style.setProperty('-webkit-backface-visibility', 'hidden');
-      }
-    } else {
-      document.body.style.overflowY = 'auto';
-      document.documentElement.style.overflowY = 'auto';
-    }
-    
-    return () => {
-      document.body.style.position = '';
-      document.body.style.overflow = '';
-      document.body.style.height = '';
-      document.body.style.minHeight = '';
-      document.body.style.background = '';
-      document.body.style.removeProperty('-webkit-overflow-scrolling');
-      document.body.style.removeProperty('-webkit-transform');
-      document.body.style.removeProperty('-webkit-backface-visibility');
-      document.documentElement.style.position = '';
-      document.documentElement.style.overflow = '';
-      document.documentElement.style.height = '';
-      document.documentElement.style.overflowY = '';
-    };
-  }, [isEmbed]);
+  // 약관 페이지 상태 관리 훅 사용
+  const { isVisible, isLoading, isInitialized } = useTermsPageState({
+    pageName: 'SERVICE',
+    isEmbed
+  });
 
   const handleBack = () => {
     triggerHapticFeedback(HapticFeedbackType.SELECTION, '서비스 이용약관 뒤로가기', {
@@ -95,6 +61,16 @@ export default function ServiceTermsPage() {
     });
     router.push('/setting');
   };
+
+  // 로딩 상태 또는 가시성 문제 시 로딩 화면 표시
+  if (isLoading || !isVisible || !isInitialized) {
+    return (
+      <TermsPageLoading 
+        message="서비스 이용약관 로딩 중..."
+        subMessage="잠시만 기다려주세요"
+      />
+    );
+  }
 
   return (
     <>

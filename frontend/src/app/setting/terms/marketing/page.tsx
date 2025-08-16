@@ -6,6 +6,8 @@ import { motion } from 'framer-motion';
 import AnimatedHeader from '../../../../components/common/AnimatedHeader';
 import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
 import { useAuth } from '@/contexts/AuthContext';
+import useTermsPageState from '@/hooks/useTermsPageState';
+import TermsPageLoading from '@/components/common/TermsPageLoading';
 const pageAnimations = `
 html, body { width: 100%; overflow-x: hidden; position: relative; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -18,63 +20,26 @@ export default function MarketingTermsPage() {
   const searchParams = useSearchParams();
   const isEmbed = (searchParams?.get('embed') === '1');
 
-  // 스타일 적용 함수
-  const applyStyles = () => {
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    
-    if (isEmbed) {
-      // embed 모드일 때는 내부 웹뷰처럼 작동
-      document.body.style.position = 'relative';
-      document.body.style.overflow = 'auto';
-      document.body.style.height = 'auto';
-      document.body.style.minHeight = '100vh';
-      document.body.style.background = 'white';
-      document.documentElement.style.position = 'relative';
-      document.documentElement.style.overflow = 'auto';
-      document.documentElement.style.height = 'auto';
-      
-      // iOS에서 추가 최적화
-      if (isIOS) {
-        document.body.style.setProperty('-webkit-overflow-scrolling', 'touch');
-        document.body.style.setProperty('-webkit-transform', 'translateZ(0)');
-        document.body.style.setProperty('-webkit-backface-visibility', 'hidden');
-      }
-    } else {
-      document.body.style.overflowY = 'auto';
-      document.documentElement.style.overflowY = 'auto';
-    }
-  };
-
-  // 스타일 복원 함수
-  const restoreStyles = () => {
-    document.body.style.position = '';
-    document.body.style.overflow = '';
-    document.body.style.height = '';
-    document.body.style.minHeight = '';
-    document.body.style.background = '';
-    document.body.style.removeProperty('-webkit-overflow-scrolling');
-    document.body.style.removeProperty('-webkit-transform');
-    document.body.style.removeProperty('-webkit-backface-visibility');
-    document.documentElement.style.position = '';
-    document.documentElement.style.overflow = '';
-    document.documentElement.style.height = '';
-    document.documentElement.style.overflowY = '';
-  };
-
-  useEffect(() => {
-    // 초기 스타일 적용
-    applyStyles();
-
-    return () => {
-      // cleanup 시 스타일 복원
-      restoreStyles();
-    };
-  }, [isEmbed]);
+  // 약관 페이지 상태 관리 훅 사용
+  const { isVisible, isLoading, isInitialized } = useTermsPageState({
+    pageName: 'MARKETING',
+    isEmbed
+  });
 
   const handleBack = () => {
     triggerHapticFeedback(HapticFeedbackType.SELECTION, '마케팅 정보 수집 동의 뒤로가기', { component: 'setting-terms', action: 'back-navigation' });
     router.push('/setting');
   };
+
+  // 로딩 상태 또는 가시성 문제 시 로딩 화면 표시
+  if (isLoading || !isVisible || !isInitialized) {
+    return (
+      <TermsPageLoading 
+        message="마케팅 정보 수집 동의 로딩 중..."
+        subMessage="잠시만 기다려주세요"
+      />
+    );
+  }
 
   return (
     <>

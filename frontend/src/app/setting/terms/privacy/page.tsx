@@ -7,6 +7,7 @@ import AnimatedHeader from '../../../../components/common/AnimatedHeader';
 import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
 import { useAuth } from '@/contexts/AuthContext';
 import useTermsPageState from '@/hooks/useTermsPageState';
+import TermsPageLoading from '@/components/common/TermsPageLoading';
 const pageAnimations = `
 html, body { width: 100%; overflow-x: hidden; position: relative; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -23,7 +24,7 @@ export default function PrivacyPolicyPage() {
   const { isLoggedIn, loading: authLoading } = useAuth();
   
   // 약관 페이지 상태 관리 훅 사용
-  const { isVisible, isLoading } = useTermsPageState({
+  const { isVisible, isLoading, isInitialized } = useTermsPageState({
     pageName: 'PRIVACY',
     isEmbed
   });
@@ -34,15 +35,12 @@ export default function PrivacyPolicyPage() {
   };
 
   // 로딩 상태 또는 가시성 문제 시 로딩 화면 표시
-  if (isLoading || !isVisible) {
+  if (isLoading || !isVisible || !isInitialized) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 text-lg">페이지 로딩 중...</p>
-          <p className="text-gray-400 text-sm mt-2">잠시만 기다려주세요</p>
-        </div>
-      </div>
+      <TermsPageLoading 
+        message="개인정보 처리방침 로딩 중..."
+        subMessage="잠시만 기다려주세요"
+      />
     );
   }
 
