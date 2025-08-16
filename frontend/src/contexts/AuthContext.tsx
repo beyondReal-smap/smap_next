@@ -700,6 +700,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (context === undefined) {
+    // 빌드 시 정적 생성 오류 방지
+    if (typeof window === 'undefined') {
+      return {
+        user: null,
+        isLoggedIn: false,
+        loading: true,
+        error: null,
+        selectedGroup: null,
+        isPreloadingComplete: false,
+        login: async () => {},
+        logout: async () => {},
+        updateUser: async () => {},
+        selectGroup: async () => {},
+        refreshUserData: async () => {},
+        refreshGroups: async () => {},
+        setError: () => {},
+        refreshAuthState: async () => {},
+      };
+    }
     throw new Error('useAuth는 AuthProvider 내부에서 사용되어야 합니다.');
   }
   return context;

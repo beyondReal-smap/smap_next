@@ -98,6 +98,7 @@ import {
 } from '../../utils/domainDetection';
 
 import memberService from '@/services/memberService';
+import useAppState from '@/hooks/useAppState';
 import { useAuth } from '@/contexts/AuthContext';
 import LocationTrackingStatus from '@/components/common/LocationTrackingStatus';
 import GroupInitModal from '@/components/common/GroupInitModal';
@@ -869,6 +870,8 @@ export default function HomePage() {
   
   // 🚨 iOS 시뮬레이터 에러 핸들링
   const [componentError, setComponentError] = useState<string | null>(null);
+
+
   
   useEffect(() => {
     // home 페이지 식별을 위한 data-page 속성 설정
@@ -919,6 +922,8 @@ export default function HomePage() {
     forceRefreshGroups
   } = useUser();
   
+
+
   // NavigationManager 플래그 처리
   useEffect(() => {
     // 리다이렉트 플래그 처리 (NavigationManager에서 설정된 경우)
@@ -1376,6 +1381,38 @@ export default function HomePage() {
   // 그룹 드롭다운 ref 추가
   const groupDropdownRef = useRef<HTMLDivElement>(null);
 
+  // App State 감지 및 데이터 강제 새로고침
+  const { isVisible } = useAppState({
+    onFocus: () => {
+      console.log('[HOME] 🚀 앱이 포그라운드로 돌아옴 - 데이터 강제 새로고침 시작');
+      
+      // 지연 후 데이터 새로고침 실행
+      setTimeout(() => {
+        if (userContextSelectedGroupId && dataFetchedRef.current && !dataFetchedRef.current.loading) {
+          console.log('[HOME] 🔄 강제 데이터 새로고침 실행');
+          
+          // 캐시 무효화
+          dataFetchedRef.current.members = false;
+          dataFetchedRef.current.schedules = false;
+          dataFetchedRef.current.currentGroupId = null;
+          
+          // 지도 마커 강제 새로고침
+          if (groupMembers && groupMembers.length > 0) {
+            console.log('[HOME] 🔄 마커 강제 새로고침 실행');
+            updateMemberMarkers(groupMembers, true);
+          }
+          
+          // 강제로 데이터 다시 로드 (기존 useEffect가 자동으로 실행됨)
+          console.log('[HOME] 🔄 데이터 새로고침 트리거 완료');
+        }
+      }, 1000);
+    },
+    onBlur: () => {
+      console.log('[HOME] 📱 앱이 백그라운드로 이동');
+    },
+    delay: 500
+  });
+
   // 달력 스와이프 관련 상태 - calendarBaseDate 제거, x만 유지
   const x = useMotionValue(0); // 드래그 위치를 위한 motionValue
   const sidebarDateX = useMotionValue(0); // 사이드바 날짜 선택용 motionValue
@@ -1595,6 +1632,18 @@ export default function HomePage() {
       setLocationName("서울시");
     }
   }, []);
+
+    // 컴포넌트가 보이지 않을 때는 로딩 상태 표시
+    if (!isVisible) {
+      return (
+        <div className="min-h-screen bg-white flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">로딩 중...</p>
+          </div>
+        </div>
+      );
+    }
 
     // 그룹 멤버 및 스케줄 데이터 가져오기 - 중복 실행 방지 개선
   useEffect(() => {
@@ -2170,7 +2219,7 @@ export default function HomePage() {
     }
 
     return () => { isMounted = false; };
-  }, [selectedGroupId, authLoading, isPreloadingComplete]); // 캐시 함수들은 의존성에서 제거 (안정적인 참조 유지)
+  }, [selectedGroupId, authLoading, isPreloadingComplete, isVisible]); // App State 감지 추가
 
   // 컴포넌트 마운트 시 초기 지도 타입 설정
   useEffect(() => {
@@ -4668,11 +4717,21 @@ export default function HomePage() {
   };
 
   // 멤버 마커 업데이트 함수 - 모든 그룹멤버 표시
-  const updateMemberMarkers = (members: GroupMember[]) => {
+  const updateMemberMarkers = (members: GroupMember[], forceRefresh = false) => {
     // 안전성 체크
     if (!members || members.length === 0) {
       console.warn('[updateMemberMarkers] members가 비어있음');
       return;
+    }
+    
+    // 강제 새로고침인 경우 기존 마커 모두 삭제
+    if (forceRefresh) {
+      console.log('[updateMemberMarkers] 🔄 강제 새로고침 - 기존 마커 모두 삭제');
+      memberMarkerMapRef.current.clear();
+      if (currentInfoWindowRef.current) {
+        currentInfoWindowRef.current.close();
+        currentInfoWindowRef.current = null;
+      }
     }
     
     console.log('[updateMemberMarkers] 🎯 마커 업데이트 시작:', {

@@ -57,8 +57,14 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // 초기화 완료 상태 추가
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // AuthContext와 DataCache 사용
-  const { user, isLoggedIn, loading: authLoading, isPreloadingComplete } = useAuth();
+  // AuthContext와 DataCache 사용 (빌드 시 안전한 fallback)
+  const authContext = useAuth();
+  const { user, isLoggedIn, loading: authLoading, isPreloadingComplete } = authContext || {
+    user: null,
+    isLoggedIn: false,
+    loading: true,
+    isPreloadingComplete: false
+  };
   const { getUserProfile, getUserGroups } = useDataCache();
 
   // 사용자 데이터 새로고침 함수 (실시간 데이터 조회)

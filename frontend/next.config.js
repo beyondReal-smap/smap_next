@@ -13,12 +13,14 @@ const nextConfig = {
     optimizeCss: true,
     scrollRestoration: true,
     optimizePackageImports: ['framer-motion', '@heroicons/react', 'react-icons'],
-    turbo: {
-      rules: {
-        '*.svg': {
-          loaders: ['@svgr/webpack'],
-          as: '*.js',
-        },
+  },
+  
+  // Turbopack 설정 (stable)
+  turbopack: {
+    rules: {
+      '*.svg': {
+        loaders: ['@svgr/webpack'],
+        as: '*.js',
       },
     },
   },
@@ -244,6 +246,11 @@ const nextConfig = {
   // TypeScript 빌드 시 무시
   typescript: {
     ignoreBuildErrors: false,
+  },
+  
+  // 에러 페이지 프리렌더링 방지
+  generateBuildId: async () => {
+    return 'build-' + Date.now();
   },
   
   // 출력 설정 - Vercel 호환성 (기본값 사용)
