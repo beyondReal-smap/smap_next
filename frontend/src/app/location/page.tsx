@@ -2243,35 +2243,11 @@ export default function LocationPage() {
           timestamp: Date.now()
         });
         
-        // 즉시 마커 업데이트 실행 (useEffect 대기 없이)
-        setTimeout(() => {
-          if (map && isMapReady) {
-            console.log('[handleMemberSelect] 즉시 마커 업데이트 실행');
-            const selMember = groupMembers.find(m => m.id === memberId);
-            
-            // 모든 멤버의 장소 데이터를 수집하여 전달
-            const allLocations: LocationData[] = [];
-            
-            // 선택된 멤버의 장소 데이터 추가
-            if (convertedLocations && convertedLocations.length > 0) {
-              allLocations.push(...convertedLocations);
-            }
-            
-            // 다른 멤버들의 장소 데이터도 추가 (이미 groupMembers에 저장된 경우)
-            groupMembers.forEach(member => {
-              if (member.id !== memberId && member.savedLocations && member.savedLocations.length > 0) {
-                allLocations.push(...member.savedLocations);
-              }
-            });
-            
-            console.log('[handleMemberSelect] 즉시 마커 업데이트 - 모든 멤버 장소 데이터:', {
-              선택된멤버장소수: convertedLocations?.length || 0,
-              전체장소수: allLocations.length
-            });
-            
-            updateAllMarkers(groupMembers, allLocations);
-          }
-        }, 100);
+        // 마커 업데이트는 useEffect에서만 처리 (중복 호출 방지)
+        console.log('[handleMemberSelect] 마커 업데이트는 useEffect에서 자동 처리됩니다:', {
+          선택된멤버장소수: convertedLocations?.length || 0,
+          useEffect트리거: '상태 변경으로 자동 실행'
+        });
       } catch (error) {
         console.error('[handleMemberSelect] 장소 데이터 로드 실패:', error);
         setSelectedMemberSavedLocations([]);
@@ -3863,9 +3839,15 @@ export default function LocationPage() {
       locations: (locations || []).map(l => ({ id: l.id, coords: l.coordinates }))
     });
 
-    if (lastMarkersSignatureRef.current === markerSignature) {
-      console.log('[updateAllMarkers] ⏭️ 시그니처 동일 - 마커 재생성/InfoWindow 중복 방지');
+    // 시그니처 중복 체크 완화 - 마커가 실제로 표시되지 않은 경우 강제 업데이트
+    const hasVisibleMarkers = memberMarkers.length > 0 && locationMarkersRef.current.length >= 0;
+    const shouldSkipUpdate = lastMarkersSignatureRef.current === markerSignature && hasVisibleMarkers;
+    
+    if (shouldSkipUpdate) {
+      console.log('[updateAllMarkers] ⏭️ 시그니처 동일하고 마커 존재 - 중복 방지');
       return;
+    } else if (lastMarkersSignatureRef.current === markerSignature) {
+      console.log('[updateAllMarkers] 🔄 시그니처 동일하지만 마커 없음 - 강제 업데이트');
     }
     lastMarkersSignatureRef.current = markerSignature;
     console.log('[updateAllMarkers] 📊 현재 마커 상태:', {
@@ -4098,7 +4080,8 @@ export default function LocationPage() {
           pos && marker.setPosition(pos);
           marker.setZIndex && marker.setZIndex(markerZIndex);
         } else {
-        marker = new window.naver.maps.Marker({
+          try {
+            marker = new window.naver.maps.Marker({
           position,
           map,
           title: location.name,
@@ -4173,7 +4156,6 @@ export default function LocationPage() {
           zIndex: markerZIndex
         });
         (marker as any).__key = key;
-        }
 
         // 장소 마커 클릭 이벤트
         window.naver.maps.Event.addListener(marker, 'click', () => {
@@ -4204,8 +4186,13 @@ export default function LocationPage() {
           console.log('[updateAllMarkers] 장소 선택됨:', location.id, location.name, '이전 선택:', previousSelectedId);
         });
 
-        newLocationMarkers.push(marker);
-        console.log(`[updateAllMarkers] ✅ 장소 마커 생성 완료: ${location.name} (${lat}, ${lng})`);
+            newLocationMarkers.push(marker);
+            console.log(`[updateAllMarkers] ✅ 장소 마커 생성 완료: ${location.name} (${lat}, ${lng})`);
+          } catch (markerError) {
+            console.error(`[updateAllMarkers] ❌ 장소 마커 생성 실패: ${location.name}`, markerError);
+            // 마커 생성 실패해도 계속 진행
+          }
+        }
       });
       
       console.log('[updateAllMarkers] 🎯 모든 멤버의 장소 마커 생성 완료:', {
@@ -4323,7 +4310,26 @@ export default function LocationPage() {
         모든멤버장소: allLocations.map(loc => ({ name: loc.name, memberId: loc.id }))
       });
       
-      updateAllMarkers(groupMembers, allLocations);
+      // 마커 업데이트 실행 (실패 방지를 위한 재시도 로직)
+      const executeMarkerUpdate = () => {
+        try {
+          updateAllMarkers(groupMembers, allLocations);
+          console.log('[useEffect 통합 마커] ✅ 마커 업데이트 성공');
+        } catch (error) {
+          console.error('[useEffect 통합 마커] ❌ 마커 업데이트 실패:', error);
+          // 100ms 후 재시도
+          setTimeout(() => {
+            try {
+              console.log('[useEffect 통합 마커] 🔄 마커 업데이트 재시도');
+              updateAllMarkers(groupMembers, allLocations);
+            } catch (retryError) {
+              console.error('[useEffect 통합 마커] ❌ 마커 업데이트 재시도 실패:', retryError);
+            }
+          }, 100);
+        }
+      };
+      
+      executeMarkerUpdate();
       
       // 첫번째 멤버 선택 완료 후 InfoWindow 자동 생성
       const selectedMember2 = groupMembers.find(m => m.isSelected);

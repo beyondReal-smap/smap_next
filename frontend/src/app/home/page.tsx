@@ -1389,24 +1389,23 @@ export default function HomePage() {
   // 그룹 드롭다운 ref 추가
   const groupDropdownRef = useRef<HTMLDivElement>(null);
 
-  // App State 감지 및 데이터 강제 새로고침
-  const { isVisible } = useAppState({
-    onFocus: () => {
-      console.log('[HOME] 🚀 앱이 포그라운드로 돌아옴 - 데이터 강제 새로고침 시작');
-      
-      // 지연 후 데이터 새로고침 실행
-      setTimeout(() => {
-        if (userContextSelectedGroupId && dataFetchedRef.current && !dataFetchedRef.current.loading) {
-          console.log('[HOME] 🔄 강제 데이터 새로고침 실행');
-          
-          // 캐시 무효화
-          dataFetchedRef.current.members = false;
-          dataFetchedRef.current.schedules = false;
-          dataFetchedRef.current.currentGroupId = null;
-          
-          // 지도 마커 강제 새로고침
-          if (groupMembers && groupMembers.length > 0) {
-            console.log('[HOME] 🔄 마커 강제 새로고침 실행');
+  // App State 감지 콜백 메모이제이션
+  const handleAppFocus = useCallback(() => {
+    console.log('[HOME] 🚀 앱이 포그라운드로 돌아옴 - 데이터 강제 새로고침 시작');
+    
+    // 지연 후 데이터 새로고침 실행
+    setTimeout(() => {
+      if (userContextSelectedGroupId && dataFetchedRef.current && !dataFetchedRef.current.loading) {
+        console.log('[HOME] 🔄 강제 데이터 새로고침 실행');
+        
+        // 캐시 무효화
+        dataFetchedRef.current.members = false;
+        dataFetchedRef.current.schedules = false;
+        dataFetchedRef.current.currentGroupId = null;
+        
+        // 지도 마커 강제 새로고침
+        if (groupMembers && groupMembers.length > 0) {
+          console.log('[HOME] 🔄 마커 강제 새로고침 실행');
             updateMemberMarkers(groupMembers, true);
           }
           
@@ -1414,10 +1413,16 @@ export default function HomePage() {
           console.log('[HOME] 🔄 데이터 새로고침 트리거 완료');
         }
       }, 1000);
-    },
-    onBlur: () => {
-      console.log('[HOME] 📱 앱이 백그라운드로 이동');
-    },
+  }, [userContextSelectedGroupId, groupMembers]);
+
+  const handleAppBlur = useCallback(() => {
+    console.log('[HOME] 📱 앱이 백그라운드로 이동');
+  }, []);
+
+  // App State 감지 및 데이터 강제 새로고침
+  const { isVisible } = useAppState({
+    onFocus: handleAppFocus,
+    onBlur: handleAppBlur,
     delay: 500
   });
 
@@ -2272,7 +2277,7 @@ export default function HomePage() {
     }
 
     return () => { isMounted = false; };
-  }, [selectedGroupId, isVisible]); // authLoading, isPreloadingComplete 제거
+  }, [selectedGroupId]); // isVisible 제거로 무한 루프 방지
 
   // 컴포넌트 마운트 시 초기 지도 타입 설정
   useEffect(() => {
