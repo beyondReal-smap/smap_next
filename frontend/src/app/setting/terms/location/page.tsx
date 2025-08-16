@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import AnimatedHeader from '../../../../components/common/AnimatedHeader';
 import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
+import { useAuth } from '@/contexts/AuthContext';
 const pageAnimations = `
 html, body { width: 100%; overflow-x: hidden; position: relative; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -16,6 +17,11 @@ export default function LocationTermsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isEmbed = (searchParams?.get('embed') === '1');
+  
+  // 인증 상태 관리
+  const { isLoggedIn, loading: authLoading } = useAuth();
+  const [isVisible, setIsVisible] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
 
   // 스타일 적용 함수
   const applyStyles = () => {
@@ -60,20 +66,130 @@ export default function LocationTermsPage() {
     document.documentElement.style.overflowY = '';
   };
 
+  // 앱 상태 감지 및 복원
+  const handleAppStateChange = useCallback((isActive: boolean) => {
+    console.log('[LOCATION] 앱 상태 변경:', isActive ? '포그라운드' : '백그라운드');
+    
+    if (isActive) {
+      // 앱이 포그라운드로 돌아올 때
+      setIsVisible(true);
+      setIsLoading(true);
+      
+      // 인증 상태 확인 및 복원
+      setTimeout(() => {
+        try {
+          // 로컬 스토리지에서 인증 상태 확인
+          const token = localStorage.getItem('auth_token');
+          const userData = localStorage.getItem('user_data');
+          
+          if (token && userData) {
+            console.log('[LOCATION] 인증 상태 복원 성공');
+            // 스타일 재적용
+            applyStyles();
+          } else {
+            console.log('[LOCATION] 인증 상태 없음 - 로그인 페이지로 이동');
+            router.push('/signin');
+            return;
+          }
+        } catch (error) {
+          console.error('[LOCATION] 인증 상태 복원 실패:', error);
+          router.push('/signin');
+          return;
+        } finally {
+          setIsLoading(false);
+        }
+      }, 100);
+    } else {
+      // 앱이 백그라운드로 갈 때
+      setIsVisible(false);
+      restoreStyles();
+    }
+  }, [router]);
+
+  // 앱 상태 감지 이벤트 리스너
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      handleAppStateChange(document.visibilityState === 'visible');
+    };
+
+    const handleFocus = () => {
+      handleAppStateChange(true);
+    };
+
+    const handleBlur = () => {
+      handleAppStateChange(false);
+    };
+
+    // iOS WebView 전용 이벤트
+    const handlePageShow = () => {
+      handleAppStateChange(true);
+    };
+
+    const handlePageHide = () => {
+      handleAppStateChange(false);
+    };
+
+    // 이벤트 리스너 등록
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('blur', handleBlur);
+    window.addEventListener('pageshow', handlePageShow);
+    window.addEventListener('pagehide', handlePageHide);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('pageshow', handlePageShow);
+      window.removeEventListener('pagehide', handlePageHide);
+    };
+  }, [handleAppStateChange]);
+
   useEffect(() => {
     // 초기 스타일 적용
     applyStyles();
+
+    // 초기 인증 상태 확인
+    if (!isLoggedIn && !authLoading) {
+      try {
+        const token = localStorage.getItem('auth_token');
+        const userData = localStorage.getItem('user_data');
+        
+        if (!token || !userData) {
+          console.log('[LOCATION] 초기 인증 상태 없음 - 로그인 페이지로 이동');
+          router.push('/signin');
+          return;
+        }
+      } catch (error) {
+        console.error('[LOCATION] 초기 인증 상태 확인 실패:', error);
+        router.push('/signin');
+          return;
+      }
+    }
 
     return () => {
       // cleanup 시 스타일 복원
       restoreStyles();
     };
-  }, [isEmbed]);
+  }, [isEmbed, isLoggedIn, authLoading, router]);
 
   const handleBack = () => {
     triggerHapticFeedback(HapticFeedbackType.SELECTION, '위치기반서비스 약관 뒤로가기', { component: 'setting-terms', action: 'back-navigation' });
     router.push('/setting');
   };
+
+  // 로딩 상태 또는 가시성 문제 시 로딩 화면 표시
+  if (isLoading || !isVisible) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 text-lg">페이지 로딩 중...</p>
+          <p className="text-gray-400 text-sm mt-2">잠시만 기다려주세요</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>

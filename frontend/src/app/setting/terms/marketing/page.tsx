@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import AnimatedHeader from '../../../../components/common/AnimatedHeader';
 import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
+import { useAuth } from '@/contexts/AuthContext';
 const pageAnimations = `
 html, body { width: 100%; overflow-x: hidden; position: relative; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }

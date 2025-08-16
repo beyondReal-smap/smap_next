@@ -1,10 +1,11 @@
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     "use client";
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import AnimatedHeader from '../../../components/common/AnimatedHeader';
 import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
+import { useAuth } from '@/contexts/AuthContext';
 
 // 모바일 최적화된 CSS 애니메이션 (setting/manual/page.tsx 참고)
 const pageAnimations = `
