@@ -87,11 +87,23 @@ export default function GlobalScreenGuard({
 
       // 4. 특정 페이지별 추가 검증
       if (pathname === '/home') {
-        const homeContent = document.querySelector('.home-content, [data-page="home"]');
-        if (!homeContent) {
+        // 홈 페이지는 더 관대하게 검증 (여러 가능한 콘텐츠 요소 확인)
+        const homeContent = document.querySelector('.home-content, [data-page="home"], #home-page-container, .main-container, main');
+        const bodyElement = document.querySelector('body');
+        const hasAnyContent = bodyElement && bodyElement.children.length > 0;
+        
+        if (!homeContent && !hasAnyContent) {
           console.warn('[GlobalScreenGuard] 홈 페이지 콘텐츠를 찾을 수 없음');
           return true;
         }
+        
+        // 홈 페이지는 기본적으로 콘텐츠가 있다고 가정 (로딩 중일 수 있음)
+        console.log('[GlobalScreenGuard] 홈 페이지 콘텐츠 확인됨:', {
+          hasHomeContent: !!homeContent,
+          hasAnyContent,
+          bodyChildren: bodyElement ? bodyElement.children.length : 0
+        });
+        return false; // 홈 페이지는 흰 화면이 아님
       }
 
       if (pathname.startsWith('/setting')) {
@@ -201,11 +213,27 @@ export default function GlobalScreenGuard({
       }
     };
 
-    // 첫 번째 체크는 즉시 실행
-    checkScreen();
-    
-    // 이후 정기적으로 체크
-    checkIntervalRef.current = setInterval(checkScreen, checkInterval);
+    // 홈 페이지는 렌더링 완료를 기다린 후 첫 번째 체크 실행
+    if (pathname === '/home') {
+      // 3초 후 첫 번째 체크 실행 (홈 페이지 렌더링 완료 대기)
+      const initialCheckTimeout = setTimeout(() => {
+        checkScreen();
+        
+        // 이후 정기적으로 체크
+        checkIntervalRef.current = setInterval(checkScreen, checkInterval);
+      }, 3000);
+      
+      return () => {
+        clearTimeout(initialCheckTimeout);
+        if (checkIntervalRef.current) {
+          clearInterval(checkIntervalRef.current);
+        }
+      };
+    } else {
+      // 다른 페이지는 즉시 체크 시작
+      checkScreen();
+      checkIntervalRef.current = setInterval(checkScreen, checkInterval);
+    }
 
     return () => {
       if (checkIntervalRef.current) {

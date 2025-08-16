@@ -6335,31 +6335,22 @@ export default function HomePage() {
     // 마운트되지 않은 상태 처리
     if (!isMounted || !isComponentMounted) {
       return (
-        <div style={{ 
-          minHeight: '100vh', 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center',
-          backgroundColor: '#f8fafc'
-        }}>
+        <div 
+          className="home-content main-container"
+          data-page="/home"
+          data-content-type="home-page"
+          style={{ 
+            minHeight: '100vh', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)'
+          }}
+        >
           <div style={{ textAlign: 'center' }}>
-            <div style={{
-              width: '40px',
-              height: '40px',
-              border: '3px solid #e2e8f0',
-              borderTop: '3px solid #3b82f6',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite',
-              margin: '0 auto 16px'
-            }}></div>
-            <p style={{ color: '#64748b', fontSize: '14px' }}>로딩 중...</p>
+            <IOSCompatibleSpinner size="lg" />
+            <p style={{ color: '#64748b', fontSize: '14px', marginTop: '16px' }}>홈 페이지 로딩 중...</p>
           </div>
-          <style jsx>{`
-            @keyframes spin {
-              0% { transform: rotate(0deg); }
-              100% { transform: rotate(360deg); }
-            }
-          `}</style>
         </div>
       );
     }
@@ -6371,7 +6362,7 @@ export default function HomePage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="min-h-screen relative"
+          className="min-h-screen relative home-content main-container"
           style={{ 
             background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
             paddingBottom: '72px', // 네비게이션 바를 위한 하단 여백 (56px + 16px)
@@ -6381,6 +6372,7 @@ export default function HomePage() {
           }}
           data-react-mount="true"
           data-page="/home"
+          data-content-type="home-page"
           id="home-page-container"
         >
         {/* 통일된 헤더 애니메이션 */}
