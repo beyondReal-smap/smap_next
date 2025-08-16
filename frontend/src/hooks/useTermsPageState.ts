@@ -131,9 +131,13 @@ export const useTermsPageState = ({ pageName, isEmbed = false }: UseTermsPageSta
           setIsLoading(false);
         }, 300);
       } else {
-        console.log(`[${pageName}] 인증 상태 없음 - 로그인 페이지로 이동`);
-        router.push('/signin');
-        return;
+        console.log(`[${pageName}] 인증 상태 없음 - 기본 상태로 복원`);
+        // 약관 페이지에서는 로그인 페이지로 이동하지 않고 기본 상태 유지
+        applyStyles();
+        setTimeout(() => {
+          setIsInitialized(true);
+          setIsLoading(false);
+        }, 300);
       }
     } else {
       // 앱이 백그라운드로 갈 때
@@ -141,7 +145,7 @@ export const useTermsPageState = ({ pageName, isEmbed = false }: UseTermsPageSta
       setIsInitialized(false);
       restoreStyles();
     }
-  }, [pageName, router, applyStyles, restoreStyles, checkAndRestoreAuth]);
+  }, [pageName, applyStyles, restoreStyles, checkAndRestoreAuth]);
 
   // 앱 상태 감지 이벤트 리스너
   useEffect(() => {
@@ -184,6 +188,8 @@ export const useTermsPageState = ({ pageName, isEmbed = false }: UseTermsPageSta
 
   // 초기화
   useEffect(() => {
+    let isMounted = true;
+    
     const initializePage = async () => {
       console.log(`[${pageName}] 페이지 초기화 시작`);
       
@@ -193,24 +199,28 @@ export const useTermsPageState = ({ pageName, isEmbed = false }: UseTermsPageSta
       // 초기 인증 상태 확인
       const authValid = await checkAndRestoreAuth();
       
+      if (!isMounted) return;
+      
       if (authValid) {
         console.log(`[${pageName}] 초기 인증 상태 확인 성공`);
         setIsInitialized(true);
         setIsLoading(false);
       } else {
         console.log(`[${pageName}] 초기 인증 상태 확인 실패 - 로그인 페이지로 이동`);
-        router.push('/signin');
-        return;
+        // 약관 페이지에서는 로그인 페이지로 이동하지 않고 기본 상태 유지
+        setIsInitialized(true);
+        setIsLoading(false);
       }
     };
 
     initializePage();
 
     return () => {
+      isMounted = false;
       // cleanup 시 스타일 복원
       restoreStyles();
     };
-  }, [applyStyles, restoreStyles, checkAndRestoreAuth, router, pageName]);
+  }, [applyStyles, restoreStyles, checkAndRestoreAuth, pageName]);
 
   return {
     isVisible,

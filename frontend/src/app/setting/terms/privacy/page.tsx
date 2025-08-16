@@ -20,9 +20,6 @@ export default function PrivacyPolicyPage() {
   const searchParams = useSearchParams();
   const isEmbed = (searchParams?.get('embed') === '1');
   
-  // 인증 상태 관리
-  const { isLoggedIn, loading: authLoading } = useAuth();
-  
   // 약관 페이지 상태 관리 훅 사용
   const { isVisible, isLoading, isInitialized } = useTermsPageState({
     pageName: 'PRIVACY',

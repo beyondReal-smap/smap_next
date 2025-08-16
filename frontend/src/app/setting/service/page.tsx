@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import AnimatedHeader from '../../../components/common/AnimatedHeader';
 import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
-import { useAuth } from '@/contexts/AuthContext';
+
 import useTermsPageState from '@/hooks/useTermsPageState';
 import TermsPageLoading from '@/components/common/TermsPageLoading';
 
