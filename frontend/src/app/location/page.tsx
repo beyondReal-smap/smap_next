@@ -1130,15 +1130,7 @@ export default function LocationPage() {
     };
   }, [selectedMemberSavedLocations, otherMembersSavedLocations, infoWindow]);
 
-  // 사이드바 업데이트 확인용 useEffect (디버깅)
-  useEffect(() => {
-    console.log('[사이드바 업데이트] groupMembers 변경됨:', groupMembers.map(m => ({
-      name: m.name,
-      isSelected: m.isSelected,
-      savedLocationsCount: m.savedLocations?.length || 0,
-      savedLocationCount: m.savedLocationCount
-    })));
-  }, [groupMembers]);
+  // 🚨 사이드바 업데이트 디버깅 로그 제거 (성능 최적화)
   
   // 뒤로가기 핸들러
   const handleBack = () => {
@@ -1895,17 +1887,26 @@ export default function LocationPage() {
     
     console.log('[handleGroupSelect] 기존 데이터 초기화 완료, 새 그룹 데이터 로딩 시작');
     
-    // 그룹 변경 시 즉시 새 그룹 데이터 로딩 (useEffect 의존성 때문에 지연될 수 있어서 직접 호출)
-    setTimeout(() => {
-      console.log('[handleGroupSelect] 새 그룹 데이터 즉시 로딩 시작 - 그룹ID:', groupId);
-      fetchGroupMembersData(groupId);
-    }, 100); // 상태 업데이트 완료 후 호출
-  }, [selectedGroupId, map, memberMarkers, markers, infoWindow, isFetchingGroupMembers]);
+    // 🚨 중복 호출 방지: useEffect에서 자동으로 처리되므로 직접 호출 제거
+    console.log('[handleGroupSelect] 그룹 변경 완료 - useEffect에서 자동으로 데이터 로딩됨');
+  }, [selectedGroupId]); // 🚨 중복 호출 방지: 불필요한 의존성 제거
 
   const fetchGroupMembersData = async (groupId?: number) => {
     const targetGroupId = groupId || selectedGroupId;
     if (!targetGroupId) {
       console.error('[fetchGroupMembersData] 선택된 그룹이 없습니다.');
+      return;
+    }
+
+    // 🚨 중복 호출 방지: 이미 해당 그룹 데이터를 가져오는 중이면 중단
+    if (isFetchingGroupMembers) {
+      console.warn('[fetchGroupMembersData] 이미 그룹 데이터를 가져오는 중입니다. 중복 호출 방지.');
+      return;
+    }
+
+    // 🚨 중복 호출 방지: 이미 해당 그룹 데이터가 있으면 중단 (그룹 변경이 아닌 경우)
+    if (dataFetchedRef.current.members && groupMembers.length > 0 && !groupId) {
+      console.warn('[fetchGroupMembersData] 이미 멤버 데이터가 있습니다. 중복 호출 방지.');
       return;
     }
 
@@ -2019,8 +2020,8 @@ export default function LocationPage() {
                     ? { ...member, savedLocations: convertedLocations, savedLocationCount: convertedLocations.length }
                     : {
                         ...member,
-                        savedLocations: member.savedLocations || [],
-                        savedLocationCount: member.savedLocationCount || 0
+                        savedLocations: member.savedLocations,
+                        savedLocationCount: member.savedLocationCount
                       }
                 )
               );
@@ -2060,8 +2061,8 @@ export default function LocationPage() {
                             ? { ...prevMember, savedLocationCount: memberLocations.length }
                             : {
                                 ...prevMember,
-                                savedLocations: prevMember.savedLocations || [],
-                                savedLocationCount: prevMember.savedLocationCount || 0
+                                savedLocations: prevMember.savedLocations,
+                                savedLocationCount: prevMember.savedLocationCount
                               }
                         )
                       );
@@ -2184,24 +2185,17 @@ export default function LocationPage() {
     );
     
     // 선택 상태만 변경하고 기존 데이터는 절대 건드리지 않음
-    const updatedMembers = (membersArray || groupMembers).map(member => ({
+        console.log('[handleMemberSelect] 🔍 멤버 선택 - 다른 멤버 데이터는 절대 건드리지 않음');
+    
+    // 🚨 핵심 수정: 선택 상태만 업데이트 (다른 멤버 데이터는 절대 건드리지 않음)
+    setGroupMembers(prevMembers => 
+      prevMembers.map(member => ({
         ...member,
         isSelected: member.id === memberId
-        // 🚨 savedLocations, savedLocationCount는 절대 건드리지 않음!
-    }));
-    
-    console.log('[handleMemberSelect] 🔍 멤버 선택 후 업데이트된 상태:', 
-      updatedMembers.map(m => ({ 
-        name: m.name, 
-        count: m.savedLocationCount, 
-        isSelected: m.isSelected,
-        hasLocations: !!m.savedLocations?.length 
+        // 🚨 savedLocations와 savedLocationCount는 절대 건드리지 않음!
       }))
     );
-    
-    // 선택 상태만 업데이트 (장소 데이터는 절대 건드리지 않음)
-    setGroupMembers(updatedMembers);
-    console.log('[handleMemberSelect] 선택 상태 업데이트 완료:', memberId, '선택된 멤버:', updatedMembers.find(m => m.isSelected)?.name);
+    console.log('[handleMemberSelect] 선택 상태 업데이트 완료:', memberId);
     
     // 선택된 멤버의 장소 데이터 로드
     const loadSelectedMemberLocations = async () => {
@@ -2237,7 +2231,7 @@ export default function LocationPage() {
         setSelectedMemberSavedLocations(convertedLocations);
         setActiveView('selectedMemberPlaces');
         
-        // 🚀 선택된 멤버의 장소 데이터만 업데이트 (다른 멤버는 절대 건드리지 않음)
+        // 🚨 핵심 수정: 선택된 멤버의 장소 데이터만 업데이트 (다른 멤버는 절대 건드리지 않음)
         setGroupMembers(prevMembers => {
           const updatedMembers = prevMembers.map(member => {
             if (member.id === memberId) {
@@ -2248,8 +2242,13 @@ export default function LocationPage() {
                 savedLocationCount: convertedLocations.length 
               };
             } else {
-              // 🚨 다른 멤버는 기존 데이터를 절대 건드리지 않음
-              return member;
+              // 🚨 다른 멤버는 기존 데이터를 절대 건드리지 않음 (0으로 초기화하지 않음!)
+              return {
+                ...member,
+                // 🚨 savedLocations와 savedLocationCount는 절대 건드리지 않음!
+                savedLocations: member.savedLocations,
+                savedLocationCount: member.savedLocationCount
+              };
             }
           });
           
@@ -2273,22 +2272,14 @@ export default function LocationPage() {
           장소개수: convertedLocations.length
         });
         
-        // 🚨 추가 검증: updatedMembers 상태 확인
-        console.log('[handleMemberSelect] 🚨 updatedMembers 최종 상태:', 
-          updatedMembers.map(m => ({ 
-            name: m.name, 
-            count: m.savedLocationCount, 
-            isSelected: m.isSelected,
-            hasLocations: !!m.savedLocations?.length 
-          }))
-        );
+        // 🚨 장소 데이터 업데이트 완료
+        console.log('[handleMemberSelect] 🚨 선택된 멤버 장소 데이터 업데이트 완료');
         
         // 새로 선택된 멤버의 장소 마커들을 지도에 표시
         console.log('[handleMemberSelect] 장소 마커 업데이트 시작:', {
           hasConvertedLocations: convertedLocations.length > 0,
           hasMap: !!map,
-          updatedMembersCount: updatedMembers.length,
-          selectedMemberFromUpdated: updatedMembers.find(m => m.isSelected)?.name
+          groupMembersCount: groupMembers.length
         });
         
         // 🚨 핵심 수정: 멤버 선택 후 즉시 마커 업데이트 실행
@@ -2303,67 +2294,16 @@ export default function LocationPage() {
           console.log('[handleMemberSelect] 선택된 멤버 장소 추가:', convertedLocations.length, '개');
         }
         
-        // 2. 다른 멤버들의 장소 데이터 (updatedMembers에서 가져옴 - 이미 업데이트된 상태)
-        updatedMembers.forEach(member => {
-          if (member.id !== memberId && member.savedLocations && member.savedLocations.length > 0) {
-            allLocationsForMarkers.push(...member.savedLocations);
-            console.log('[handleMemberSelect] 다른 멤버 장소 추가:', member.name, member.savedLocations.length, '개');
-          }
-        });
-        
-        console.log('[handleMemberSelect] 🚨 마커 업데이트용 전체 장소 데이터:', {
-          선택된멤버장소수: convertedLocations?.length || 0,
-          전체장소수: allLocationsForMarkers.length,
-          모든멤버장소: allLocationsForMarkers.map(loc => ({ name: loc.name, memberId: loc.id }))
-        });
-        
-        // 🚨 즉시 마커 업데이트 실행 (강제 모드)
-        if (map && isMapReady && allLocationsForMarkers.length > 0) {
-          console.log('[handleMemberSelect] 🚨 즉시 마커 업데이트 실행');
-          // 🚨 updatedMembers 사용 (이미 업데이트된 상태)
-          updateAllMarkers(updatedMembers, allLocationsForMarkers, true);
-        } else {
-          console.log('[handleMemberSelect] 마커 업데이트 조건 미충족:', {
-            hasMap: !!map,
-            isMapReady,
-            locationsCount: allLocationsForMarkers.length
-          });
-        }
+        // 🚨 마커 업데이트는 useEffect에서 자동으로 처리됨
+        console.log('[handleMemberSelect] 🚨 마커 업데이트는 useEffect에서 자동 처리됨');
         
         // 🚨 강제로 상태 동기화 및 마커 재생성
         setTimeout(() => {
           console.log('[handleMemberSelect] 🚨 강제 상태 동기화 및 마커 재생성');
           
-          // 현재 groupMembers 상태 확인
-          console.log('[handleMemberSelect] 🚨 현재 groupMembers 상태:', 
-            groupMembers.map(m => ({ 
-              name: m.name, 
-              count: m.savedLocationCount, 
-              isSelected: m.isSelected 
-            }))
-          );
-          
-          // 강제로 마커 재생성
-          if (map && isMapReady) {
-            const currentAllLocations: LocationData[] = [];
-            
-            // 모든 멤버의 장소 데이터 수집
-            groupMembers.forEach(member => {
-              if (member.savedLocations && member.savedLocations.length > 0) {
-                currentAllLocations.push(...member.savedLocations);
-              }
-            });
-            
-            console.log('[handleMemberSelect] 🚨 강제 마커 재생성 데이터:', {
-              전체장소수: currentAllLocations.length,
-              멤버수: groupMembers.length
-            });
-            
-            if (currentAllLocations.length > 0) {
-              updateAllMarkers(groupMembers, currentAllLocations, true);
-            }
-          }
-        }, 100);
+          // 🚨 마커 업데이트는 useEffect에서 자동으로 처리됨
+          console.log('[handleMemberSelect] 🚨 마커 업데이트는 useEffect에서 자동 처리됨');
+        }, 300); // 🚨 React 상태 업데이트 완료를 위한 지연 시간 증가
       } catch (error) {
         console.error('[handleMemberSelect] 장소 데이터 로드 실패:', error);
         setSelectedMemberSavedLocations([]);
@@ -2479,7 +2419,7 @@ export default function LocationPage() {
           
           // 클릭된 마커가 없을 경우에만 배열에서 찾기
           if (!selectedMarker) {
-            memberIndex = updatedMembers.findIndex(m => m.id === memberId);
+            memberIndex = groupMembers.findIndex(m => m.id === memberId);
             // memberMarkers 상태가 업데이트되기 전일 수 있으므로 실패할 수 있음
             if (memberIndex >= 0 && memberMarkers.length > memberIndex) {
               selectedMarker = memberMarkers[memberIndex];
@@ -2494,7 +2434,7 @@ export default function LocationPage() {
             totalMarkers: memberMarkers.length,
             fromMarkerClick,
             memberId,
-            selectedMemberIsOnMap: updatedMembers[memberIndex]?.mlt_lat && updatedMembers[memberIndex]?.mlt_long
+            selectedMemberIsOnMap: groupMembers[memberIndex]?.mlt_lat && groupMembers[memberIndex]?.mlt_long
           });
           
           // 마커가 있고 지도와 네이버 맵스가 로드되었을 때만 InfoWindow 표시
@@ -3253,7 +3193,7 @@ export default function LocationPage() {
         fetchGroupMembersData();
       }
     }
-  }, [selectedGroupId, isFetchingGroupMembers, groupMembers.length]); // groupMembers.length 추가로 빈 상태 감지
+  }, [selectedGroupId]); // 🚨 중복 호출 방지: groupMembers.length와 isFetchingGroupMembers 의존성 제거
   
   // 첫번째 멤버 자동 선택을 위한 안전한 조건 검사
   const shouldSelectFirstMember = useMemo(() => {
@@ -4175,21 +4115,32 @@ export default function LocationPage() {
         
         const isMarkerSelected = selectedLocationIdRef.current === location.id;
         
+        // 🚨 디버깅: 선택 상태 확인
+        if (location.id === selectedLocationIdRef.current) {
+          console.log('[updateAllMarkers] 🔴 선택된 장소 마커 생성:', {
+            locationId: location.id,
+            locationName: location.name,
+            selectedLocationId: selectedLocationIdRef.current,
+            isMarkerSelected: isMarkerSelected,
+            willBeRed: isMarkerSelected
+          });
+        }
+        
         // 선택된 멤버의 장소인지 확인 (selectedMemberSavedLocations에 있는지 체크)
         const isSelectedMemberLocation = selectedMember && selectedMemberSavedLocations && 
           selectedMemberSavedLocations.some(selectedLoc => selectedLoc.id === location.id);
         
-        // 마커 색상 결정: 선택된 장소 > 선택된 멤버의 장소 > 다른 멤버의 장소
-        let markerColor = '#6366f1'; // 기본 색상 (다른 멤버의 장소)
+        // 🚨 마커 색상 결정: 사용자 요구사항에 맞게 수정
+        let markerColor = '#6366f1'; // 기본 색상 (선택된 멤버의 다른 장소들 - 파란색)
         let markerSize = '24px';
         let markerZIndex = 120;
         
         if (isMarkerSelected) {
-          markerColor = '#ec4899'; // 선택된 장소
+          markerColor = '#ef4444'; // 선택된 장소 - 빨간색
           markerSize = '28px';
           markerZIndex = 220;
         } else if (isSelectedMemberLocation) {
-          markerColor = '#10b981'; // 선택된 멤버의 장소 (초록색)
+          markerColor = '#6366f1'; // 선택된 멤버의 다른 장소들 - 파란색
           markerSize = '26px';
           markerZIndex = 160;
         }
@@ -4506,7 +4457,7 @@ export default function LocationPage() {
         groupMembersLength: groupMembers.length
       });
     }
-  }, [groupMembers, selectedMemberSavedLocations, map, isMapReady, isFirstMemberSelectionComplete, selectedMemberIdRef.current]);
+  }, [groupMembers, selectedMemberSavedLocations, selectedMemberIdRef.current]); // 🚨 중복 호출 방지: map, isMapReady 의존성 제거
 
   // 선택된 멤버 변경 또는 멤버 마커 생성 후 InfoWindow 자동 표시 보강
   useEffect(() => {
@@ -4667,7 +4618,7 @@ export default function LocationPage() {
                   width: 28px;
                   height: 28px;
                   background-color: white;
-                  border: 2px solid ${isSelected ? '#ec4899' : '#6366f1'};
+                  border: 2px solid ${isSelected ? '#ef4444' : '#6366f1'};
                   border-radius: 50%;
                   overflow: hidden;
                   display: flex;
@@ -4678,7 +4629,7 @@ export default function LocationPage() {
                   z-index: ${isSelected ? '200' : '150'};
                   transition: all 0.3s ease;
                 ">
-                  <svg width="16" height="16" fill="${isSelected ? '#ec4899' : '#6366f1'}" viewBox="0 0 24 24">
+                  <svg width="16" height="16" fill="${isSelected ? '#ef4444' : '#6366f1'}" viewBox="0 0 24 24">
                     <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"/>
                   </svg>
                 </div>
@@ -5359,11 +5310,13 @@ export default function LocationPage() {
           infoWindow.close();
         }
         
-        // 1. 선택 상태 업데이트 (마커 재생성 방지를 위해 ref만 업데이트)
+        // 1. 선택 상태 업데이트 (즉시 ref와 state 모두 업데이트)
         const previousSelectedId = selectedLocationIdRef.current;
         selectedLocationIdRef.current = location.id;
+        setSelectedLocationId(location.id); // 🚨 state도 즉시 업데이트
         
         console.log('[handleLocationSelect] 장소 선택됨:', location.id, location.name, '이전 선택:', previousSelectedId);
+        console.log('[handleLocationSelect] 🚨 selectedLocationIdRef 업데이트 완료:', selectedLocationIdRef.current);
         
         // 2. 마커 상태 확인 및 업데이트
         console.log('[handleLocationSelect] 마커 상태 확인:', {
@@ -5391,7 +5344,7 @@ export default function LocationPage() {
                         width: ${isSelected ? '28px' : '24px'};
                         height: ${isSelected ? '28px' : '24px'};
                         background-color: white;
-                        border: 2px solid ${isSelected ? '#ec4899' : '#6366f1'};
+                        border: 2px solid ${isSelected ? '#ef4444' : '#6366f1'};
                         border-radius: 50%;
                         overflow: hidden;
                         display: flex;
@@ -5402,7 +5355,7 @@ export default function LocationPage() {
                         z-index: ${isSelected ? '200' : '150'};
                         transition: all 0.3s ease;
                       ">
-                        <svg width="${isSelected ? '16' : '12'}" height="${isSelected ? '16' : '12'}" fill="${isSelected ? '#ec4899' : '#6366f1'}" viewBox="0 0 24 24">
+                        <svg width="${isSelected ? '16' : '12'}" height="${isSelected ? '16' : '12'}" fill="${isSelected ? '#ef4444' : '#6366f1'}" viewBox="0 0 24 24">
                           <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"/>
                         </svg>
                       </div>
@@ -5466,29 +5419,23 @@ export default function LocationPage() {
             // 마커가 없는 경우 새로 생성
             console.log('[handleLocationSelect] 마커가 없어 새로 생성');
             if (groupMembers.length > 0) {
-              // 모든 멤버의 장소 데이터를 수집하여 마커 생성
-              const allLocations: LocationData[] = [];
+              // 🚨 사용자 요구사항: 선택된 멤버의 장소만 표시, 다른 멤버 장소는 표시하지 않음
+              const selectedMemberLocations: LocationData[] = [];
               
-              // 선택된 멤버의 장소 데이터 추가
+              // 선택된 멤버의 장소 데이터만 추가
               if (selectedMemberSavedLocations && selectedMemberSavedLocations.length > 0) {
-                allLocations.push(...selectedMemberSavedLocations);
+                selectedMemberLocations.push(...selectedMemberSavedLocations);
               }
               
-              // 다른 멤버들의 장소 데이터도 추가
-              groupMembers.forEach(member => {
-                const selectedMember = groupMembers.find(m => m.isSelected);
-                if (member.id !== selectedMember?.id && member.savedLocations && member.savedLocations.length > 0) {
-                  allLocations.push(...member.savedLocations);
-                }
+              console.log('[handleLocationSelect] 선택된 멤버 장소만 마커 생성:', {
+                선택된멤버: groupMembers.find(m => m.isSelected)?.name || '없음',
+                선택된멤버장소수: selectedMemberLocations.length,
+                선택된장소: location.name
               });
               
-              console.log('[handleLocationSelect] 모든 멤버 장소 데이터로 마커 생성:', {
-                선택된멤버장소수: selectedMemberSavedLocations?.length || 0,
-                전체장소수: allLocations.length
-              });
-              
-              // 🚨 강제 업데이트 모드로 마커 생성
-              updateAllMarkers(groupMembers, allLocations, true);
+              // 🚨 장소 선택 시 즉시 마커 업데이트 (선택된 멤버 장소만)
+              updateAllMarkers(groupMembers, selectedMemberLocations, true);
+              console.log('[handleLocationSelect] 즉시 마커 업데이트 완료 - 선택된 멤버 장소만 표시');
             }
           }
         }
@@ -5499,8 +5446,7 @@ export default function LocationPage() {
           console.log('[handleLocationSelect] 사이드바 닫기 완료');
         }, 100); // 빠른 응답성을 위해 짧은 지연
         
-        // 즉시 상태 업데이트 (마커 업데이트와 함께)
-        setSelectedLocationId(location.id);
+        // 🚨 상태는 이미 위에서 업데이트됨 (중복 제거)
         
         // 🔥 장소 선택 시 무조건 마커 강제 재생성
         setTimeout(() => {
@@ -5515,23 +5461,16 @@ export default function LocationPage() {
           setMarkers([]);
           locationMarkersRef.current = [];
           
-          // 2. 모든 멤버의 장소 데이터를 다시 수집
-          const allLocationsForce: LocationData[] = [];
+          // 🚨 선택된 멤버의 장소 데이터만 수집 (사용자 요구사항)
+          const selectedMemberLocationsForce: LocationData[] = [];
           
           if (selectedMemberSavedLocations && selectedMemberSavedLocations.length > 0) {
-            allLocationsForce.push(...selectedMemberSavedLocations);
+            selectedMemberLocationsForce.push(...selectedMemberSavedLocations);
           }
-          
-          groupMembers.forEach(member => {
-            const selectedMember = groupMembers.find(m => m.isSelected);
-            if (member.id !== selectedMember?.id && member.savedLocations && member.savedLocations.length > 0) {
-              allLocationsForce.push(...member.savedLocations);
-            }
-          });
           
           console.log('[handleLocationSelect] 🔥 강제 마커 재생성 데이터:', {
             선택된장소ID: location.id,
-            전체장소수: allLocationsForce.length,
+            선택된멤버장소수: selectedMemberLocationsForce.length,
             멤버수: groupMembers.length,
             기존마커제거완료: true
           });
@@ -5539,9 +5478,9 @@ export default function LocationPage() {
           // 3. 시그니처 완전 리셋 후 새로 생성
           lastMarkersSignatureRef.current = '';
           
-          if (allLocationsForce.length > 0) {
-            // 🚨 강제 업데이트 모드로 마커 생성 (시그니처 체크 완전 우회)
-            updateAllMarkers(groupMembers, allLocationsForce, true);
+          if (selectedMemberLocationsForce.length > 0) {
+            // 🚨 강제 업데이트 모드로 마커 생성 (선택된 멤버 장소만)
+            updateAllMarkers(groupMembers, selectedMemberLocationsForce, true);
           }
         }, 50);
         
