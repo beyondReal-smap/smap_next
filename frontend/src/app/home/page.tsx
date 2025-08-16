@@ -2288,6 +2288,8 @@ export default function HomePage() {
   
     // 로그인 상태 확인 및 사용자 정보 초기화 (Google 로그인 동기화 개선)
   useEffect(() => {
+    let isMounted = true;
+    
     // 🚨 카카오 로그인 처리
     const processPendingKakaoLogin = async () => {
       try {
@@ -2530,6 +2532,10 @@ export default function HomePage() {
     };
 
     runAuthSequence();
+    
+    return () => {
+      isMounted = false;
+    };
   }, [authLoading, isLoggedIn, user, router]);
 
   // 🗺️ 지도 API 로딩 및 초기화 - 컴포넌트 마운트 시 시작 (중복 실행 방지)
@@ -3158,7 +3164,26 @@ export default function HomePage() {
     // 조건 검증
     if (!naverMapContainer.current) {
       console.error('[HOME] Naver Maps 컨테이너가 없음');
-      return;
+      // 컨테이너를 다시 찾아보기
+      const container = document.getElementById('naver-map-container');
+      if (container) {
+        console.log('[HOME] Naver Maps 컨테이너를 다시 찾았습니다');
+        // ref는 직접 할당할 수 없으므로 DOM에서 직접 사용
+        try {
+          // 컨테이너가 있으면 지도 초기화 재시도
+          setTimeout(() => {
+            if (naverMapContainer.current) {
+              initNaverMap();
+            }
+          }, 100);
+        } catch (error) {
+          console.error('[HOME] 컨테이너로 지도 초기화 실패:', error);
+        }
+        return;
+      } else {
+        console.error('[HOME] Naver Maps 컨테이너를 찾을 수 없음 - 지도 초기화 건너뜀');
+        return;
+      }
     }
     
     if (!naverMapsLoaded) {
@@ -4777,6 +4802,16 @@ export default function HomePage() {
     // 안전성 체크
     if (!members || members.length === 0) {
       console.warn('[updateMemberMarkers] members가 비어있음');
+      // 멤버 데이터가 없을 때는 기본 마커만 표시
+      if (userLocation.lat && userLocation.lng) {
+        console.log('[updateMemberMarkers] 사용자 위치로 기본 마커 표시');
+        // 사용자 위치에 기본 마커 표시
+        setTimeout(() => {
+          if (groupMembers.length > 0) {
+            updateMemberMarkers(groupMembers, true);
+          }
+        }, 2000);
+      }
       return;
     }
 
