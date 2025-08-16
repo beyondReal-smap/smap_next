@@ -2012,12 +2012,16 @@ export default function LocationPage() {
               setOtherMembersSavedLocations(memberLocationsRaw);
               setActiveView('selectedMemberPlaces');
               
-              // 첫 번째 멤버의 장소 개수 업데이트
+              // 첫 번째 멤버의 장소 개수 업데이트 (다른 멤버 데이터 보존)
               setGroupMembers(prevMembers => 
                 prevMembers.map((member, index) => 
                   index === 0 
                     ? { ...member, savedLocations: convertedLocations, savedLocationCount: convertedLocations.length }
-                    : member
+                    : {
+                        ...member,
+                        savedLocations: member.savedLocations || [],
+                        savedLocationCount: member.savedLocationCount || 0
+                      }
                 )
               );
               
@@ -2049,12 +2053,16 @@ export default function LocationPage() {
                       const memberLocations = await locationService.getOtherMembersLocations(member.id);
                       const actualIndex = i + batchIndex + 1; // +1은 첫 번째 멤버 제외
                       
-                      // 장소 개수만 업데이트
+                      // 장소 개수만 업데이트 (기존 데이터 보존)
                       setGroupMembers(prevMembers => 
                         prevMembers.map((prevMember, index) => 
                           index === actualIndex 
                             ? { ...prevMember, savedLocationCount: memberLocations.length }
-                            : prevMember
+                            : {
+                                ...prevMember,
+                                savedLocations: prevMember.savedLocations || [],
+                                savedLocationCount: prevMember.savedLocationCount || 0
+                              }
                         )
                       );
                       
@@ -2212,9 +2220,9 @@ export default function LocationPage() {
         setSelectedMemberSavedLocations(convertedLocations);
         setActiveView('selectedMemberPlaces');
         
-        // 멤버 데이터에 장소 정보 추가
-        setGroupMembers(prevMembers => 
-          prevMembers.map(member => {
+        // 디버깅: 모든 멤버의 장소 개수 확인 및 데이터 업데이트
+        setGroupMembers(prevMembers => {
+          const updatedMembers = prevMembers.map(member => {
             if (member.id === memberId) {
               return { 
                 ...member, 
@@ -2222,11 +2230,24 @@ export default function LocationPage() {
                 savedLocationCount: convertedLocations.length 
               };
             }
-            return member;
-          })
-        );
-        
-        console.log('[handleMemberSelect] 멤버 장소 데이터 업데이트 완료:', convertedLocations.length, '개');
+            // 다른 멤버들의 기존 데이터를 명시적으로 보존
+            return {
+              ...member,
+              savedLocations: member.savedLocations || [],
+              savedLocationCount: member.savedLocationCount || 0
+            };
+          });
+          
+          console.log('[handleMemberSelect] 📊 멤버별 장소 개수 현황:', 
+            updatedMembers.map(m => ({ 
+              name: m.name, 
+              count: m.savedLocationCount, 
+              isSelected: m.isSelected 
+            }))
+          );
+          
+          return updatedMembers;
+        });
         
         // 새로 선택된 멤버의 장소 마커들을 지도에 표시
         console.log('[handleMemberSelect] 장소 마커 업데이트 시작:', {
@@ -5373,6 +5394,37 @@ export default function LocationPage() {
         
         // 즉시 상태 업데이트 (마커 업데이트와 함께)
         setSelectedLocationId(location.id);
+        
+        // 장소 선택 직후 강제 마커 업데이트 트리거
+        setTimeout(() => {
+          console.log('[handleLocationSelect] 강제 마커 업데이트 트리거');
+          
+          // 모든 멤버의 장소 데이터를 다시 수집
+          const allLocationsForce: LocationData[] = [];
+          
+          if (selectedMemberSavedLocations && selectedMemberSavedLocations.length > 0) {
+            allLocationsForce.push(...selectedMemberSavedLocations);
+          }
+          
+          groupMembers.forEach(member => {
+            const selectedMember = groupMembers.find(m => m.isSelected);
+            if (member.id !== selectedMember?.id && member.savedLocations && member.savedLocations.length > 0) {
+              allLocationsForce.push(...member.savedLocations);
+            }
+          });
+          
+          console.log('[handleLocationSelect] 강제 마커 업데이트 데이터:', {
+            선택된장소ID: location.id,
+            전체장소수: allLocationsForce.length,
+            멤버수: groupMembers.length
+          });
+          
+          if (allLocationsForce.length > 0) {
+            // 시그니처 리셋하여 강제 업데이트
+            lastMarkersSignatureRef.current = '';
+            updateAllMarkers(groupMembers, allLocationsForce);
+          }
+        }, 50);
         
         // 3. InfoWindow 생성 및 표시 (지도 위치에 표시)
         setTimeout(() => {
