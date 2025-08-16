@@ -2165,12 +2165,16 @@ export default function LocationPage() {
       shouldAutoOpenInfoWindowRef.current = true;
     }
   
+    // 선택 상태만 업데이트하고 기존 장소 데이터는 보존
     const updatedMembers = (membersArray || groupMembers).map(member => ({
         ...member,
-        isSelected: member.id === memberId
+        isSelected: member.id === memberId,
+        // 기존 장소 정보 보존
+        savedLocations: member.savedLocations || [],
+        savedLocationCount: member.savedLocationCount || 0
     }));
     
-    // 먼저 선택 상태 업데이트
+    // 먼저 선택 상태 업데이트 (장소 데이터 보존)
     setGroupMembers(updatedMembers);
     console.log('[handleMemberSelect] 선택 상태 업데이트 완료:', memberId, '선택된 멤버:', updatedMembers.find(m => m.isSelected)?.name);
     
@@ -3827,7 +3831,7 @@ export default function LocationPage() {
     const selectedMember = members.find(member => member.isSelected);
     console.log('[updateAllMarkers] 🚀 시작 - 멤버:', members.length, '명, 선택된 멤버:', selectedMember?.name || '없음', '장소:', locations?.length || 0, '개');
 
-    // 현재 상태의 시그니처 생성 (멤버 좌표 + 선택된 멤버 + 장소 좌표)
+    // 현재 상태의 시그니처 생성 (멤버 좌표 + 선택된 멤버 + 장소 좌표 + 선택된 장소)
     const markerSignature = JSON.stringify({
       members: (members || []).map(m => ({
         id: m.id,
@@ -3836,6 +3840,7 @@ export default function LocationPage() {
         isSelected: !!m.isSelected,
       })),
       selectedMemberId: selectedMember?.id || null,
+      selectedLocationId: selectedLocationIdRef.current || null,
       locations: (locations || []).map(l => ({ id: l.id, coords: l.coordinates }))
     });
 
@@ -5334,7 +5339,28 @@ export default function LocationPage() {
             // 마커가 없는 경우 새로 생성
             console.log('[handleLocationSelect] 마커가 없어 새로 생성');
             if (groupMembers.length > 0) {
-              updateAllMarkers(groupMembers, selectedMemberSavedLocations);
+              // 모든 멤버의 장소 데이터를 수집하여 마커 생성
+              const allLocations: LocationData[] = [];
+              
+              // 선택된 멤버의 장소 데이터 추가
+              if (selectedMemberSavedLocations && selectedMemberSavedLocations.length > 0) {
+                allLocations.push(...selectedMemberSavedLocations);
+              }
+              
+              // 다른 멤버들의 장소 데이터도 추가
+              groupMembers.forEach(member => {
+                const selectedMember = groupMembers.find(m => m.isSelected);
+                if (member.id !== selectedMember?.id && member.savedLocations && member.savedLocations.length > 0) {
+                  allLocations.push(...member.savedLocations);
+                }
+              });
+              
+              console.log('[handleLocationSelect] 모든 멤버 장소 데이터로 마커 생성:', {
+                선택된멤버장소수: selectedMemberSavedLocations?.length || 0,
+                전체장소수: allLocations.length
+              });
+              
+              updateAllMarkers(groupMembers, allLocations);
             }
           }
         }
@@ -5344,6 +5370,9 @@ export default function LocationPage() {
           setIsSidebarOpen(false);
           console.log('[handleLocationSelect] 사이드바 닫기 완료');
         }, 100); // 빠른 응답성을 위해 짧은 지연
+        
+        // 즉시 상태 업데이트 (마커 업데이트와 함께)
+        setSelectedLocationId(location.id);
         
         // 3. InfoWindow 생성 및 표시 (지도 위치에 표시)
         setTimeout(() => {
@@ -5397,10 +5426,7 @@ export default function LocationPage() {
           console.log('[handleLocationSelect] InfoWindow 설정 완료');
         }, 300); // 마커 업데이트 완료 후 InfoWindow 표시
         
-        // 4. 상태 업데이트는 마지막에 (마커 업데이트 완료 후)
-        setTimeout(() => {
-          setSelectedLocationId(location.id);
-        }, 400);
+        // 상태 업데이트는 이미 위에서 완료됨
         
         // 지속적으로 지도 중심을 해당 장소로 유지 (다른 로직의 간섭 방지)
         const keepLocationCentered = () => {
