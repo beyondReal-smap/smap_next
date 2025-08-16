@@ -2613,9 +2613,15 @@ const SignInPage = () => {
           delete (window as any).handleAppleSignInResult;
         }
         
-        // 네이티브 애플 로그인 호출
-        if ((window as any).webkit && (window as any).webkit.messageHandlers && (window as any).webkit.messageHandlers.appleLogin) {
-          console.log('🍎 [APPLE LOGIN] iOS 네이티브 애플 로그인 호출');
+        // 네이티브 애플 로그인 호출 - smapIos 핸들러 우선 사용
+        if ((window as any).webkit?.messageHandlers?.smapIos) {
+          console.log('🍎 [APPLE LOGIN] iOS smapIos 핸들러를 통한 애플 로그인 호출');
+          (window as any).webkit.messageHandlers.smapIos.postMessage({
+            type: 'appleSignIn',
+            action: 'appleSignIn'
+          });
+        } else if ((window as any).webkit?.messageHandlers?.appleLogin) {
+          console.log('🍎 [APPLE LOGIN] iOS appleLogin 핸들러를 통한 애플 로그인 호출');
           (window as any).webkit.messageHandlers.appleLogin.postMessage({
             action: 'login'
           });
@@ -2626,8 +2632,10 @@ const SignInPage = () => {
           return;
         }
         
+        // 애플 로그인 결과 처리 콜백 함수 등록
+        console.log('🍎 [APPLE LOGIN] Apple 로그인 결과 처리 함수 등록');
         (window as any).handleAppleSignInResult = async (result: any) => {
-          console.log('🍎 [APPLE LOGIN] Apple 로그인 결과:', result);
+          console.log('🍎 [APPLE LOGIN] Apple 로그인 결과 수신:', result);
           
           try {
             if (result.success) {
@@ -2736,53 +2744,26 @@ const SignInPage = () => {
           }
         };
         
-        // iOS Native Apple 로그인 호출 (iPhone, iPad 앱 모두 동일하게 처리)
-        if ((window as any).webkit?.messageHandlers?.smapIos) {
-          (window as any).webkit.messageHandlers.smapIos.postMessage({
-            type: 'appleSignIn',
-            action: 'appleSignIn'
-          });
-        } else if ((window as any).webkit?.messageHandlers) {
-          // 다른 메시지 핸들러가 있는 경우 (iPad 앱 등)
-          const messageHandlers = (window as any).webkit.messageHandlers;
-          if (messageHandlers.appleSignIn) {
-            messageHandlers.appleSignIn.postMessage({
-              type: 'appleSignIn',
-              action: 'appleSignIn'
-            });
-          } else {
-            // 기본 메시지 핸들러로 시도
-            const handlerKeys = Object.keys(messageHandlers);
-            if (handlerKeys.length > 0) {
-              messageHandlers[handlerKeys[0]].postMessage({
-                type: 'appleSignIn',
-                action: 'appleSignIn'
-              });
-            }
-          }
-        }
+        // iOS Native Apple 로그인 호출은 위에서 이미 처리했으므로 여기서는 불필요
+        console.log('🍎 [APPLE LOGIN] iOS 네이티브 호출 완료, 결과 대기 중...');
         
       } else if (isAndroidWebView) {
-        // Android WebView에서 Apple 로그인 시도
-        console.log('🍎 [APPLE LOGIN] Android WebView에서 Apple 로그인 시도');
+        console.log('🍎 [APPLE LOGIN] Android WebView에서 Apple 로그인 호출');
         
-        try {
-          // Android 네이티브 애플 로그인 호출
-          if ((window as any).Android && (window as any).Android.appleLogin) {
-            console.log('🍎 [APPLE LOGIN] Android 네이티브 애플 로그인 호출');
-            (window as any).Android.appleLogin();
-          } else {
-            console.error('🍎 [APPLE LOGIN] Android 네이티브 애플 로그인 핸들러를 찾을 수 없음');
-            setError('Android에서 애플 로그인을 사용할 수 없습니다.');
-            setIsLoading(false);
-            return;
-          }
-        } catch (err: any) {
-          console.error('🍎 [APPLE LOGIN] Android 애플 로그인 오류:', err);
-          setError('Android 애플 로그인 중 오류가 발생했습니다.');
+        // Android 네이티브 애플 로그인 호출
+        if ((window as any).Android && (window as any).Android.appleLogin) {
+          console.log('🍎 [APPLE LOGIN] Android 네이티브 애플 로그인 호출');
+          (window as any).Android.appleLogin();
+        } else {
+          console.error('🍎 [APPLE LOGIN] Android 네이티브 애플 로그인 핸들러를 찾을 수 없음');
+          setError('애플 로그인을 사용할 수 없습니다.');
           setIsLoading(false);
           return;
         }
+        
+        // Android 환경에서는 네이티브 콜백을 통해 결과를 받으므로 여기서 함수 종료
+        console.log('🍎 [APPLE LOGIN] Android 네이티브 호출 완료, 콜백 대기');
+        return;
         
       } else if (isIPadSafari) {
         // iPad Safari에서 Apple 로그인 시도
@@ -2915,14 +2896,8 @@ const SignInPage = () => {
         // iPad/iOS 환경에서 Apple 로그인 시도 (제한 없이 통과)
         console.log('🍎 [APPLE LOGIN] iPad/iOS 환경에서 Apple 로그인 시도 (제한 없이 허용)');
         
-        // iOS 환경에서는 우선 네이티브 메시지 핸들러로 시도
-        if ((window as any).webkit?.messageHandlers) {
-          console.log('🍎 [APPLE LOGIN] iOS 환경에서 네이티브 Apple 로그인 시도');
-          
-          // Apple 로그인 결과 처리 함수 등록
-          if ((window as any).handleAppleSignInResult) {
-            delete (window as any).handleAppleSignInResult;
-          }
+        // iOS 환경에서는 우선 네이티브 메시지 핸들러로 시도 (이미 위에서 처리됨)
+        console.log('🍎 [APPLE LOGIN] iOS/iPad 환경 - 웹 SDK 폴백 시도');
           
           (window as any).handleAppleSignInResult = async (result: any) => {
             console.log('🍎 [APPLE LOGIN] iOS Apple 로그인 결과:', result);
