@@ -135,6 +135,21 @@ export default function GlobalScreenGuard({
     }
   }, [pathname]);
 
+  // 홈으로 리다이렉트
+  const redirectToHome = useCallback(() => {
+    if (!enableAutoRedirect) return;
+    
+    console.error('[GlobalScreenGuard] 최대 복구 시도 실패 - 홈으로 이동');
+    
+    // 현재 페이지가 홈이 아닌 경우에만 이동
+    if (pathname !== '/home') {
+      router.push('/home');
+    } else {
+      // 홈 페이지에서도 문제가 있으면 새로고침
+      window.location.reload();
+    }
+  }, [enableAutoRedirect, pathname, router]);
+
   // 복구 시도
   const attemptRecovery = useCallback(async () => {
     const now = Date.now();
@@ -197,21 +212,6 @@ export default function GlobalScreenGuard({
       setScreenState(prev => ({ ...prev, isRecovering: false }));
     }
   }, [screenState.isRecovering, screenState.recoveryAttempts, checkGlobalScreenState, redirectToHome]);
-
-  // 홈으로 리다이렉트
-  const redirectToHome = useCallback(() => {
-    if (!enableAutoRedirect) return;
-    
-    console.error('[GlobalScreenGuard] 최대 복구 시도 실패 - 홈으로 이동');
-    
-    // 현재 페이지가 홈이 아닌 경우에만 이동
-    if (pathname !== '/home') {
-      router.push('/home');
-    } else {
-      // 홈 페이지에서도 문제가 있으면 새로고침
-      window.location.reload();
-    }
-  }, [enableAutoRedirect, pathname, router]);
 
   // 정기적인 화면 상태 체크
   useEffect(() => {
