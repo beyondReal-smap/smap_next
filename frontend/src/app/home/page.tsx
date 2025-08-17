@@ -98,6 +98,8 @@ import {
   checkNetworkStatus,
   type EnvironmentConfig 
 } from '../../utils/domainDetection';
+import { AndroidPermissionRequest } from '../../components/AndroidPermissionRequest';
+import { useAndroidPermissions } from '../../hooks/useAndroidPermissions';
 
 import memberService from '@/services/memberService';
 import useAppState from '@/hooks/useAppState';
@@ -929,6 +931,16 @@ export default function HomePage() {
     setSelectedGroupId: setUserContextSelectedGroupId,
     forceRefreshGroups
   } = useUser();
+
+  // 🆕 안드로이드 권한 관리
+  const {
+    permissions: androidPermissions,
+    isLoading: permissionsLoading,
+    error: permissionsError,
+    checkEssential,
+    requestEssential,
+    essentialPermissionsGranted
+  } = useAndroidPermissions();
   
 
 
@@ -1201,6 +1213,45 @@ export default function HomePage() {
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
   }, [isLoggedIn, user, forceRefreshGroups]);
+
+  // 🆕 로그인 후 필수 권한 체크 (안드로이드 전용)
+  useEffect(() => {
+    if (isLoggedIn && user && !authLoading && typeof window !== 'undefined' && window.Android) {
+      console.log('[HOME] 🆕 로그인 완료 - 안드로이드 필수 권한 체크 시작');
+      
+      const checkAndRequestEssentialPermissions = async () => {
+        try {
+          // 필수 권한 상태 체크
+          const essentialStatus = await checkEssential();
+          console.log('[HOME] 🆕 필수 권한 상태:', essentialStatus);
+          
+          // 필수 권한이 부족한 경우 요청
+          if (!essentialStatus.activity || !essentialStatus.location) {
+            console.log('[HOME] 🆕 필수 권한 부족 - 권한 요청 시작');
+            
+            // 3초 후 권한 요청 (사용자가 홈 화면을 볼 수 있도록)
+            setTimeout(async () => {
+              const results = await requestEssential();
+              console.log('[HOME] 🆕 필수 권한 요청 결과:', results);
+              
+              // 권한 요청 실패 시 추가 처리
+              if (!results.activity.success || !results.location.success) {
+                console.log('[HOME] 🆕 필수 권한 요청 실패 - 사용자에게 안내');
+                // 여기서 사용자에게 권한 설정 안내를 표시할 수 있습니다
+              }
+            }, 3000);
+          } else {
+            console.log('[HOME] 🆕 모든 필수 권한이 승인됨');
+          }
+        } catch (error) {
+          console.error('[HOME] 🆕 필수 권한 체크 중 오류:', error);
+        }
+      };
+      
+      // 1초 후 권한 체크 시작 (사용자가 홈 화면을 볼 수 있도록)
+      setTimeout(checkAndRequestEssentialPermissions, 1000);
+    }
+  }, [isLoggedIn, user, authLoading, checkEssential, requestEssential]);
   
   // 🆕 그룹 초기화 모달 핸들러
   const handleGroupInitSuccess = useCallback(async () => {
@@ -7092,6 +7143,14 @@ export default function HomePage() {
               
               {/* 📍 위치 추적 상태 표시 */}
               <LocationTrackingStatus />
+              
+              {/* 🆕 안드로이드 권한 요청 컴포넌트 */}
+              <AndroidPermissionRequest 
+                showEssentialOnly={true}
+                onComplete={() => {
+                  console.log('[HOME] 🆕 안드로이드 필수 권한 요청 완료');
+                }}
+              />
       </>
     );
   } catch (renderError) {

@@ -4294,7 +4294,7 @@ export default function LocationPage() {
                   overflow: hidden;
                   text-overflow: ellipsis;
                 ">
-                  ${location.name}
+                  ${location.name || (location as any).slt_title || '제목 없음'}
                 </div>
               </div>
             `;
@@ -4307,7 +4307,7 @@ export default function LocationPage() {
             
             existingMarker.setZIndex(220);
             
-            console.log(`[updateAllMarkers] 🔴 기존 마커 선택 상태 스타일 업데이트 완료: ${location.name}`);
+            console.log(`[updateAllMarkers] 🔴 기존 마커 선택 상태 스타일 업데이트 완료: ${location.name || (location as any).slt_title || '제목 없음'}`);
           } else {
             // 선택되지 않은 마커는 기본 스타일로 업데이트
             const newIconContent = `
@@ -4344,7 +4344,7 @@ export default function LocationPage() {
                   overflow: hidden;
                   text-overflow: ellipsis;
                 ">
-                  ${location.name}
+                  ${location.name || (location as any).slt_title || '제목 없음'}
                 </div>
               </div>
             `;
@@ -4361,7 +4361,7 @@ export default function LocationPage() {
           // 🚨 중복 방지: 기존 마커를 새 배열에 추가
           if (!newLocationMarkers.some(m => (m as any).__key === key)) {
             newLocationMarkers.push(existingMarker);
-            console.log(`[updateAllMarkers] 🔄 기존 마커 재사용 + 스타일 업데이트 완료: ${location.name} (${lat}, ${lng})`);
+            console.log(`[updateAllMarkers] 🔄 기존 마커 재사용 + 스타일 업데이트 완료: ${location.name || (location as any).slt_title || '제목 없음'} (${lat}, ${lng})`);
           }
         } else {
           try {
@@ -4430,7 +4430,7 @@ export default function LocationPage() {
                   overflow: hidden;
                   text-overflow: ellipsis;
                 ">
-                  ${location.name}
+                  ${location.name || (location as any).slt_title || '제목 없음'}
                 </div>
               </div>
             `,
@@ -4506,7 +4506,11 @@ export default function LocationPage() {
           });
 
           // 🚨 InfoWindow 즉시 생성 및 표시
-          const newInfoWindow = createLocationInfoWindow(location.name, location.address, location);
+          const newInfoWindow = createLocationInfoWindow(
+            location.name || (location as any).slt_title || '제목 없음', 
+            location.address || (location as any).slt_add || '주소 정보 없음', 
+            location
+          );
           newInfoWindow.open(map, marker);
           setInfoWindow(newInfoWindow);
           
@@ -4580,7 +4584,7 @@ export default function LocationPage() {
                   overflow: hidden;
                   text-overflow: ellipsis;
                 ">
-                  ${location.name}
+                  ${location.name || (location as any).slt_title || '제목 없음'}
                 </div>
               </div>
             `;
@@ -4594,7 +4598,7 @@ export default function LocationPage() {
             marker.setZIndex(markerZIndex);
             
             console.log('[updateAllMarkers] 🔴 마커 스타일 즉시 업데이트 완료:', {
-              장소명: location.name,
+              장소명: location.name || (location as any).slt_title || '제목 없음',
               색상: markerColor,
               크기: markerSize,
               zIndex: markerZIndex
@@ -4666,14 +4670,14 @@ export default function LocationPage() {
             }
           });
 
-          console.log('[updateAllMarkers] 🔴 장소 마커 클릭 처리 완료:', {
-            장소ID: location.id,
-            장소명: location.name,
-            이전선택: previousSelectedId,
-            현재선택: location.id,
-            InfoWindow생성: !!newInfoWindow,
-            마커스타일업데이트: '완료'
-          });
+              console.log('[updateAllMarkers] 🔴 장소 마커 클릭 처리 완료:', {
+      장소ID: location.id,
+      장소명: location.name || (location as any).slt_title || '제목 없음',
+      이전선택: previousSelectedId,
+      현재선택: location.id,
+      InfoWindow생성: !!newInfoWindow,
+      마커스타일업데이트: '완료'
+    });
         });
 
             // 🚨 중복 방지: 동일한 키를 가진 마커가 이미 배열에 있는지 확인
@@ -5301,6 +5305,11 @@ export default function LocationPage() {
     };
 
     const locationId = locationData ? getLocationId(locationData) : '';
+    
+    // 🆕 slt_title을 고려한 장소명 처리
+    const displayName = locationData && 'slt_title' in locationData && locationData.slt_title 
+      ? locationData.slt_title 
+      : locationName;
 
     const newInfoWindow = new window.naver.maps.InfoWindow({
       content: `
@@ -5410,7 +5419,7 @@ export default function LocationPage() {
           </button>
           
           <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #111827; padding-right: ${locationData ? '60px' : '30px'};">
-            📍 ${locationName}
+            📍 ${displayName}
           </h3>
           <div style="margin-bottom: 6px;">
             <p style="margin: 0; font-size: 12px; color: #64748b;">
@@ -5994,7 +6003,11 @@ export default function LocationPage() {
             setInfoWindow(null);
           }
           
-          const newInfoWindow = createLocationInfoWindow(location.name, location.address, location);
+          const newInfoWindow = createLocationInfoWindow(
+            location.name || (location as any).slt_title || '제목 없음', 
+            location.address || (location as any).slt_add || '주소 정보 없음', 
+            location
+          );
           
           // 해당 장소의 마커 찾기
           const locationIndex = selectedMemberSavedLocations ? selectedMemberSavedLocations.findIndex(loc => loc.id === location.id) : -1;
@@ -6010,7 +6023,7 @@ export default function LocationPage() {
           if (selectedMarker) {
             // 마커에 InfoWindow 연결
             newInfoWindow.open(map, selectedMarker);
-            console.log('[handleLocationSelect] InfoWindow를 마커에 연결:', location.name);
+            console.log('[handleLocationSelect] InfoWindow를 마커에 연결:', location.name || (location as any).slt_title || '제목 없음');
           } else {
             // 마커가 없으면 임시 마커를 생성하여 InfoWindow 표시
             console.log('[handleLocationSelect] 마커가 없어 임시 마커 생성');
@@ -6021,7 +6034,7 @@ export default function LocationPage() {
             });
             
             newInfoWindow.open(map, tempInfoMarker);
-            console.log('[handleLocationSelect] InfoWindow를 임시 마커에 연결:', location.name);
+            console.log('[handleLocationSelect] InfoWindow를 임시 마커에 연결:', location.name || (location as any).slt_title || '제목 없음');
             
             // 임시 마커는 InfoWindow가 닫힐 때 같이 제거되도록 설정
             setTimeout(() => {
