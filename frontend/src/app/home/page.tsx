@@ -78,8 +78,6 @@ import { PageContainer, Card, Button } from '../components/layout';
 import { Loader } from '@googlemaps/js-api-loader';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { MapSkeleton } from '@/components/common/MapSkeleton';
-import IOSCompatibleSpinner from '@/components/common/IOSCompatibleSpinner';
-// import AdvancedScreenGuard from '@/components/common/AdvancedScreenGuard';
 import { FiLoader, FiChevronDown, FiUser, FiCalendar } from 'react-icons/fi';
 import { FaCrown } from 'react-icons/fa';
 import config, { API_KEYS, detectLanguage, MAP_CONFIG } from '../../config';
@@ -98,12 +96,10 @@ import {
   checkNetworkStatus,
   type EnvironmentConfig 
 } from '../../utils/domainDetection';
-import { AndroidPermissionRequest } from '../../components/AndroidPermissionRequest';
-import { useAndroidPermissions } from '../../hooks/useAndroidPermissions';
 
 import memberService from '@/services/memberService';
-import useAppState from '@/hooks/useAppState';
 import { useAuth } from '@/contexts/AuthContext';
+import { useFCMTokenAutoRefresh } from '@/hooks/useFCMTokenAutoRefresh';
 import LocationTrackingStatus from '@/components/common/LocationTrackingStatus';
 import GroupInitModal from '@/components/common/GroupInitModal';
 import scheduleService from '../../services/scheduleService';
@@ -849,39 +845,29 @@ const getScheduleStatus = (schedule: Schedule): { name: 'completed' | 'ongoing' 
 };
 
 export default function HomePage() {
-  // 🛡️ 최상위 에러 캐처
+  // 🛡️ 최상위 에러 캐처 - 모든 Hook을 최상단에서 호출
   const [criticalError, setCriticalError] = useState<string | null>(null);
   const [renderAttempts, setRenderAttempts] = useState(0);
-  
-  // 🆕 그룹 초기화 모달 관련 상태
   const [showGroupInitModal, setShowGroupInitModal] = useState(false);
+  const [componentError, setComponentError] = useState<string | null>(null);
   
   // 🚨 iOS 시뮬레이터 디버깅 - 즉시 실행 로그
   console.log('🏠 [HOME] HomePage 컴포넌트 시작');
   
-  // 🔧 초기 환경 체크를 try-catch로 감싸기
-  try {
-    console.log('🏠 [HOME] 환경 체크:', {
-      isIOSWebView: !!(window as any).webkit?.messageHandlers,
-      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
-      isClient: typeof window !== 'undefined',
-      timestamp: new Date().toISOString()
-    });
-  } catch (envError) {
-    console.error('🏠 [HOME] 환경 체크 중 오류:', envError);
-    setCriticalError(`환경 체크 오류: ${envError}`);
-  }
-  
-  // 🚨 iOS 시뮬레이터 에러 핸들링
-  const [componentError, setComponentError] = useState<string | null>(null);
-  
-  // 지도 초기화 상태 추적
-  const [isMapInitialized, setIsMapInitialized] = useState(false);
-
-  // 컴포넌트 마운트 상태 추적
-  const [isComponentMounted, setIsComponentMounted] = useState(false);
-
-
+  // 🔧 초기 환경 체크를 useEffect로 이동
+  useEffect(() => {
+    try {
+      console.log('🏠 [HOME] 환경 체크:', {
+        isIOSWebView: !!(window as any).webkit?.messageHandlers,
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+        isClient: typeof window !== 'undefined',
+        timestamp: new Date().toISOString()
+      });
+    } catch (envError) {
+      console.error('🏠 [HOME] 환경 체크 중 오류:', envError);
+      setCriticalError(`환경 체크 오류: ${envError}`);
+    }
+  }, []);
   
   useEffect(() => {
     // home 페이지 식별을 위한 data-page 속성 설정
@@ -931,19 +917,7 @@ export default function HomePage() {
     setSelectedGroupId: setUserContextSelectedGroupId,
     forceRefreshGroups
   } = useUser();
-
-  // 🆕 안드로이드 권한 관리
-  const {
-    permissions: androidPermissions,
-    isLoading: permissionsLoading,
-    error: permissionsError,
-    checkEssential,
-    requestEssential,
-    essentialPermissionsGranted
-  } = useAndroidPermissions();
   
-
-
   // NavigationManager 플래그 처리
   useEffect(() => {
     // 리다이렉트 플래그 처리 (NavigationManager에서 설정된 경우)
@@ -1009,155 +983,38 @@ export default function HomePage() {
       if (androidCheck) {
         console.log('🔥 [HOME] ✅ 안드로이드 환경 확인됨 - 권한 상태 체크');
         
-        // 앱 재설치 감지 및 강제 권한 요청
-        const checkAndRequestPermissions = () => {
-          console.log('🔥 [HOME] 권한 체크 및 요청 시작');
+        // 2초 후 권한 요청 (UI가 안정화된 후)
+        setTimeout(() => {
+          console.log('🔥 [HOME] 2초 후 권한 체크 시작');
           console.log('🔥 [HOME] AndroidPermissions 인터페이스:', {
             exists: typeof window.AndroidPermissions !== 'undefined',
             methods: window.AndroidPermissions ? Object.keys(window.AndroidPermissions) : 'N/A'
           });
           
-          // 앱 재설치 감지를 위한 추가 체크
-          const isReinstalled = checkAppReinstalled();
-          if (isReinstalled) {
-            console.log('🔄 [HOME] 앱 재설치 감지 - 강제 권한 요청');
-            // 강제로 권한 요청 실행
-            setFirstLogin(true).then((success) => {
-              if (success) {
-                console.log('✅ [HOME] 앱 재설치 후 권한 요청 완료');
-              } else {
-                console.log('⚠️ [HOME] 앱 재설치 후 권한 요청 실패 또는 타임아웃');
-                // 실패 시 추가 권한 요청 시도
-                setTimeout(() => {
-                  console.log('🔄 [HOME] 권한 요청 재시도');
-                  setFirstLogin(true);
-                }, 3000);
-              }
-            }).catch((error) => {
-              console.error('❌ [HOME] 앱 재설치 후 권한 요청 중 오류:', error);
-            });
-            return;
-          }
-          
           const hasPermissions = hasAllPermissions();
+          
           console.log('🔥 [HOME] 권한 체크 결과:', { hasPermissions });
           
           if (!hasPermissions) {
             console.log('🔥 [HOME] 안드로이드 권한 요청 시작');
-            
-            // 1. setFirstLogin을 통한 권한 요청
             setFirstLogin(true).then((success) => {
               if (success) {
-                console.log('✅ [HOME] setFirstLogin을 통한 권한 요청 완료');
+                console.log('✅ [HOME] 안드로이드 권한 요청 완료');
               } else {
-                console.log('⚠️ [HOME] setFirstLogin을 통한 권한 요청 실패');
-                
-                // 2. 권한 상태 강제 초기화
-                console.log('🔄 [HOME] 권한 상태 강제 초기화 시도');
-                if (window.AndroidPermissions?.resetPermissionState) {
-                  try {
-                    window.AndroidPermissions.resetPermissionState();
-                    console.log('✅ [HOME] 권한 상태 초기화 완료');
-                  } catch (error) {
-                    console.error('❌ [HOME] 권한 상태 초기화 실패:', error);
-                  }
-                }
-                
-                // 3. 직접 권한 요청 시도
-                setTimeout(() => {
-                  console.log('🔄 [HOME] 직접 권한 요청 시도');
-                  if (window.AndroidPermissions?.requestPermissions) {
-                    try {
-                      window.AndroidPermissions.requestPermissions();
-                      console.log('✅ [HOME] 직접 권한 요청 호출 완료');
-                    } catch (error) {
-                      console.error('❌ [HOME] 직접 권한 요청 호출 실패:', error);
-                    }
-                  }
-                }, 1000);
-                
-                // 4. 위치/동작 권한 직접 요청
-                setTimeout(() => {
-                  console.log('🔄 [HOME] 위치/동작 권한 직접 요청 시도');
-                  if (window.AndroidPermissions?.requestLocationAndActivityPermissions) {
-                    try {
-                      window.AndroidPermissions.requestLocationAndActivityPermissions();
-                      console.log('✅ [HOME] 위치/동작 권한 직접 요청 호출 완료');
-                    } catch (error) {
-                      console.error('❌ [HOME] 위치/동작 권한 직접 요청 호출 실패:', error);
-                    }
-                  }
-                }, 3000);
-                
-                // 5. 최종 재시도
-                setTimeout(() => {
-                  console.log('🔄 [HOME] 최종 권한 요청 재시도');
-                  setFirstLogin(true);
-                }, 5000);
+                console.log('⚠️ [HOME] 안드로이드 권한 요청 실패 또는 타임아웃');
               }
             }).catch((error) => {
               console.error('❌ [HOME] 안드로이드 권한 요청 중 오류:', error);
-              
-              // 오류 발생 시에도 직접 권한 요청 시도
-              setTimeout(() => {
-                console.log('🔄 [HOME] 오류 후 직접 권한 요청 시도');
-                if (window.AndroidPermissions?.requestPermissions) {
-                  try {
-                    window.AndroidPermissions.requestPermissions();
-                    console.log('✅ [HOME] 오류 후 직접 권한 요청 호출 완료');
-                  } catch (error) {
-                    console.error('❌ [HOME] 오류 후 직접 권한 요청 호출 실패:', error);
-                  }
-                }
-              }, 2000);
             });
           } else {
             console.log('✅ [HOME] 안드로이드 권한이 이미 모두 허용됨');
           }
-        };
-        
-        // 2초 후 권한 요청 (UI가 안정화된 후)
-        setTimeout(checkAndRequestPermissions, 2000);
+        }, 2000);
       } else {
         console.log('🔥 [HOME] ❌ 안드로이드 환경이 아니므로 권한 요청 생략');
       }
     }
   }, [isLoggedIn, user, authLoading]);
-  
-  // 앱 재설치 감지 함수
-  const checkAppReinstalled = (): boolean => {
-    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
-      return false;
-    }
-
-    const currentInstallId = localStorage.getItem('smap_app_install_id');
-    const lastPermissionCheck = localStorage.getItem('smap_last_permission_check');
-    const lastLoginTime = localStorage.getItem('smap_last_login_time');
-    
-    // 설치 ID가 없거나 권한 체크 기록이 없으면 재설치로 간주
-    if (!currentInstallId || !lastPermissionCheck || !lastLoginTime) {
-      // 새로운 설치 ID 생성
-      const newInstallId = `install_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      localStorage.setItem('smap_app_install_id', newInstallId);
-      localStorage.setItem('smap_last_permission_check', Date.now().toString());
-      localStorage.setItem('smap_last_login_time', Date.now().toString());
-      console.log('🔄 [HOME] 앱 재설치 감지됨 - 새로운 설치 ID 생성:', newInstallId);
-      return true;
-    }
-
-    // 마지막 로그인 시간이 24시간 이상 지났으면 재설치로 간주
-    const lastLogin = parseInt(lastLoginTime);
-    const now = Date.now();
-    const hoursSinceLastLogin = (now - lastLogin) / (1000 * 60 * 60);
-    
-    if (hoursSinceLastLogin > 24) {
-      console.log('🔄 [HOME] 장기간 미사용 감지 - 권한 재요청');
-      localStorage.setItem('smap_last_login_time', now.toString());
-      return true;
-    }
-
-    return false;
-  };
   
   // 🔧 사용자 정보 디버깅
   useEffect(() => {
@@ -1201,6 +1058,38 @@ export default function HomePage() {
     }
   }, [isLoggedIn, user, isUserDataLoading, userGroups]);
 
+  // 🔄 FCM 토큰 자동 갱신 훅
+  const {
+    isInitialized: isFCMInitialized,
+    isLoading: isFCMLoading,
+    isRefreshing: isFCMRefreshing,
+    error: fcmError,
+    token: fcmToken,
+    lastUpdateTime: fcmLastUpdateTime,
+    autoRefreshStatus: fcmAutoRefreshStatus,
+    initializeAndUpdateToken: fcmInitializeAndUpdateToken,
+    startAutoRefresh: fcmStartAutoRefresh,
+    stopAutoRefresh: fcmStopAutoRefresh,
+    triggerManualRefresh: fcmTriggerManualRefresh,
+    getAutoRefreshStatus: fcmGetAutoRefreshStatus,
+    environment: fcmEnvironment,
+    forceRefresh: fcmForceRefresh,
+    refreshToken: fcmRefreshToken
+  } = useFCMTokenAutoRefresh({
+    userId: userInfo?.mt_idx,
+    enabled: isLoggedIn,
+    autoRefreshInterval: 30 * 60 * 1000, // 30분
+    onSuccess: (result: any) => {
+      console.log('[HOME] ✅ FCM 토큰 자동 갱신 성공:', result);
+    },
+    onError: (error: any) => {
+      console.warn('[HOME] ⚠️ FCM 토큰 자동 갱신 실패:', error);
+    },
+    onTokenUpdate: (token: string) => {
+      console.log('[HOME] 🔑 FCM 토큰 업데이트됨:', token.substring(0, 50) + '...');
+    }
+  });
+
   // 🆕 페이지 포커스 시 실시간 데이터 새로고침
   useEffect(() => {
     const handleFocus = async () => {
@@ -1213,45 +1102,6 @@ export default function HomePage() {
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
   }, [isLoggedIn, user, forceRefreshGroups]);
-
-  // 🆕 로그인 후 필수 권한 체크 (안드로이드 전용)
-  useEffect(() => {
-    if (isLoggedIn && user && !authLoading && typeof window !== 'undefined' && window.Android) {
-      console.log('[HOME] 🆕 로그인 완료 - 안드로이드 필수 권한 체크 시작');
-      
-      const checkAndRequestEssentialPermissions = async () => {
-        try {
-          // 필수 권한 상태 체크
-          const essentialStatus = await checkEssential();
-          console.log('[HOME] 🆕 필수 권한 상태:', essentialStatus);
-          
-          // 필수 권한이 부족한 경우 요청
-          if (!essentialStatus.activity || !essentialStatus.location) {
-            console.log('[HOME] 🆕 필수 권한 부족 - 권한 요청 시작');
-            
-            // 3초 후 권한 요청 (사용자가 홈 화면을 볼 수 있도록)
-            setTimeout(async () => {
-              const results = await requestEssential();
-              console.log('[HOME] 🆕 필수 권한 요청 결과:', results);
-              
-              // 권한 요청 실패 시 추가 처리
-              if (!results.activity.success || !results.location.success) {
-                console.log('[HOME] 🆕 필수 권한 요청 실패 - 사용자에게 안내');
-                // 여기서 사용자에게 권한 설정 안내를 표시할 수 있습니다
-              }
-            }, 3000);
-          } else {
-            console.log('[HOME] 🆕 모든 필수 권한이 승인됨');
-          }
-        } catch (error) {
-          console.error('[HOME] 🆕 필수 권한 체크 중 오류:', error);
-        }
-      };
-      
-      // 1초 후 권한 체크 시작 (사용자가 홈 화면을 볼 수 있도록)
-      setTimeout(checkAndRequestEssentialPermissions, 1000);
-    }
-  }, [isLoggedIn, user, authLoading, checkEssential, requestEssential]);
   
   // 🆕 그룹 초기화 모달 핸들러
   const handleGroupInitSuccess = useCallback(async () => {
@@ -1324,10 +1174,16 @@ export default function HomePage() {
         }
       }
     };
+    
+    // 🔥 fetchAllGroupData 강제 실행 전역 함수 (나중에 설정)
+    (window as any).__forceFetchGroupData__ = () => {
+      console.log('[HOME] 🔥 전역 함수로 fetchAllGroupData 강제 실행 - 함수가 정의된 후 설정됨');
+    };
 
     // 컴포넌트 언마운트 시 전역 함수 정리
     return () => {
       delete (window as any).closeCurrentInfoWindow;
+      delete (window as any).__forceFetchGroupData__;
     };
   }, []);
 
@@ -1352,10 +1208,43 @@ export default function HomePage() {
       }
     };
     
+    // 🔥 강제 로그인 및 데이터 로딩 함수
+    (window as any).__FORCE_LOGIN__ = () => {
+      console.log('[FORCE LOGIN] localStorage에서 사용자 정보로 강제 로그인');
+      try {
+        const localUserInfo = localStorage.getItem('smap_user_info');
+        const localUserData = localStorage.getItem('smap_user_data');
+        
+        if (localUserInfo && localUserData) {
+          const userInfo = JSON.parse(localUserInfo);
+          const userData = JSON.parse(localUserData);
+          
+          console.log('[FORCE LOGIN] 사용자 정보:', userInfo);
+          
+          // AuthContext 강제 업데이트
+          if (typeof window !== 'undefined' && (window as any).__authContext__?.forceLogin) {
+            (window as any).__authContext__.forceLogin(userInfo, userData);
+            console.log('[FORCE LOGIN] AuthContext 강제 로그인 완료');
+          }
+        }
+      } catch (error) {
+        console.error('[FORCE LOGIN] 실패:', error);
+      }
+    };
+    
+    (window as any).__FORCE_FETCH_DATA__ = () => {
+      console.log('[FORCE FETCH] 데이터 강제 로딩');
+      if (typeof window !== 'undefined' && (window as any).__forceFetchGroupData__) {
+        (window as any).__forceFetchGroupData__();
+      }
+    };
+    
     console.log('[TEST] 전역 테스트 함수 등록 완료:');
     console.log('  - window.__TEST_GROUP_INIT_MODAL__.showModal()');
     console.log('  - window.__TEST_GROUP_INIT_MODAL__.hideModal()');
     console.log('  - window.__TEST_GROUP_INIT_MODAL__.checkStatus()');
+    console.log('  - window.__FORCE_LOGIN__() // localStorage에서 강제 로그인');
+    console.log('  - window.__FORCE_FETCH_DATA__() // 데이터 강제 로딩');
     
     return () => {
       delete (window as any).__TEST_GROUP_INIT_MODAL__;
@@ -1439,43 +1328,6 @@ export default function HomePage() {
 
   // 그룹 드롭다운 ref 추가
   const groupDropdownRef = useRef<HTMLDivElement>(null);
-
-  // App State 감지 콜백 메모이제이션
-  const handleAppFocus = useCallback(() => {
-    console.log('[HOME] 🚀 앱이 포그라운드로 돌아옴 - 데이터 강제 새로고침 시작');
-    
-    // 지연 후 데이터 새로고침 실행
-    setTimeout(() => {
-      if (userContextSelectedGroupId && dataFetchedRef.current && !dataFetchedRef.current.loading) {
-        console.log('[HOME] 🔄 강제 데이터 새로고침 실행');
-        
-        // 캐시 무효화
-        dataFetchedRef.current.members = false;
-        dataFetchedRef.current.schedules = false;
-        dataFetchedRef.current.currentGroupId = null;
-        
-        // 지도 마커 강제 새로고침
-        if (groupMembers && groupMembers.length > 0) {
-          console.log('[HOME] 🔄 마커 강제 새로고침 실행');
-            updateMemberMarkers(groupMembers, true);
-          }
-          
-          // 강제로 데이터 다시 로드 (기존 useEffect가 자동으로 실행됨)
-          console.log('[HOME] 🔄 데이터 새로고침 트리거 완료');
-        }
-      }, 1000);
-  }, [userContextSelectedGroupId, groupMembers]);
-
-  const handleAppBlur = useCallback(() => {
-    console.log('[HOME] 📱 앱이 백그라운드로 이동');
-  }, []);
-
-  // App State 감지 및 데이터 강제 새로고침
-  const { isVisible } = useAppState({
-    onFocus: handleAppFocus,
-    onBlur: handleAppBlur,
-    delay: 500
-  });
 
   // 달력 스와이프 관련 상태 - calendarBaseDate 제거, x만 유지
   const x = useMotionValue(0); // 드래그 위치를 위한 motionValue
@@ -1660,72 +1512,29 @@ export default function HomePage() {
     try {
       if (navigator.geolocation) {
         console.log('🏠 [HOME] Geolocation API 사용 가능');
-        
-        // 권한 상태 확인
-        if (navigator.permissions && navigator.permissions.query) {
-          navigator.permissions.query({ name: 'geolocation' }).then((result) => {
-            console.log('🏠 [HOME] 위치 권한 상태:', result.state);
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { longitude, latitude } = position.coords;
+            console.log('🏠 [HOME] ✅ 위치 정보 획득 성공:', { latitude, longitude });
+            setUserLocation({ lat: latitude, lng: longitude });
+            setIsLocationEnabled(true);
             
-            if (result.state === 'denied') {
-              console.warn('🏠 [HOME] 위치 권한이 거부됨');
-              setIsLocationEnabled(false);
-              setUserLocation({ lat: 37.5642, lng: 127.0016 });
-              setLocationName("서울시");
-              return;
-            }
-            
-            // 권한이 허용되었거나 prompt 상태일 때만 위치 정보 요청
-            if (result.state === 'granted' || result.state === 'prompt') {
-              navigator.geolocation.getCurrentPosition(
-                (position) => {
-                  const { longitude, latitude } = position.coords;
-                  console.log('🏠 [HOME] ✅ 위치 정보 획득 성공:', { latitude, longitude });
-                  setUserLocation({ lat: latitude, lng: longitude });
-                  setIsLocationEnabled(true);
-                  setLocationName("현재 위치");
-                },
-                (error) => {
-                  console.error('🏠 [HOME] ❌ 위치 정보 획득 실패:', error);
-                  setIsLocationEnabled(false);
-                  setUserLocation({ lat: 37.5642, lng: 127.0016 });
-                  setLocationName("서울시");
-                },
-                {
-                  enableHighAccuracy: true,
-                  timeout: 10000,
-                  maximumAge: 300000
-                }
-              );
-            }
-          }).catch((error) => {
-            console.warn('🏠 [HOME] 권한 확인 실패, 기본 위치 사용:', error);
+            // 정적 위치 정보 설정 (Geocoding API 대신 간단한 해결책)
+            setLocationName("현재 위치");
+          },
+          (error) => {
+            console.error('🏠 [HOME] ❌ 위치 정보 획득 실패:', error);
             setIsLocationEnabled(false);
+            // 기본 위치로 폴백
             setUserLocation({ lat: 37.5642, lng: 127.0016 });
             setLocationName("서울시");
-          });
-        } else {
-          // 권한 API를 지원하지 않는 경우 직접 시도
-          navigator.geolocation.getCurrentPosition(
-            (position) => {
-              const { longitude, latitude } = position.coords;
-              console.log('🏠 [HOME] ✅ 위치 정보 획득 성공:', { latitude, longitude });
-              setUserLocation({ lat: latitude, lng: longitude });
-              setIsLocationEnabled(true);
-              setLocationName("현재 위치");
-            },
-            (error) => {
-              console.error('🏠 [HOME] ❌ 위치 정보 획득 실패:', error);
-              setIsLocationEnabled(false);
-              setUserLocation({ lat: 37.5642, lng: 127.0016 });
-              setLocationName("서울시");
-            },
-            {
-              enableHighAccuracy: true,
-              timeout: 10000,
-              maximumAge: 300000
-            }
-          );
-        }
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 300000 // 5분간 캐시
+          }
+        );
       } else {
         console.error('🏠 [HOME] ❌ Geolocation API 지원하지 않음');
         setIsLocationEnabled(false);
@@ -1740,42 +1549,37 @@ export default function HomePage() {
     }
   }, []);
 
-    // 컴포넌트가 보이지 않을 때는 로딩 상태 표시
-    if (!isVisible) {
-      return (
-        <div className="min-h-screen bg-white flex items-center justify-center">
-          <div className="text-center">
-            <IOSCompatibleSpinner size="lg" />
-            <p className="text-gray-600">로딩 중...</p>
-          </div>
-        </div>
-      );
-    }
-
-    // 그룹 멤버 및 스케줄 데이터 가져오기 - 강제 실행으로 변경
+    // 그룹 멤버 및 스케줄 데이터 가져오기 - 중복 실행 방지 개선
   useEffect(() => {
     let isMounted = true;
     
     const fetchAllGroupData = async () => {
-      // 중복 실행 방지 - 이미 로딩 중이거나 해당 그룹의 데이터가 이미 로드된 경우
+      console.log('🏠 [fetchAllGroupData] 🔥 강제 실행 시작');
+      
+      // 중복 실행 방지 - 이미 로딩 중인 경우만 체크
       if (dataFetchedRef.current.loading) {
         console.log('[fetchAllGroupData] 중복 실행 방지 - 이미 로딩 중');
         return;
       }
       
-      // 🔥 AuthContext 로딩 상태와 무관하게 강제 실행
-      console.log('🏠 [fetchAllGroupData] 🚀 강제 데이터 페칭 시작:', { 
-        authLoading, 
-        isPreloadingComplete, 
-        selectedGroupId: userContextSelectedGroupId 
-      });
+      // 🔥 AuthContext 로딩 체크 완화 - 로딩 중이어도 진행
+      if (authLoading) {
+        console.log('🏠 [fetchAllGroupData] AuthContext 로딩 중이지만 강제 진행:', { authLoading, isPreloadingComplete });
+        // 로딩 중이어도 진행 (응답성 개선)
+      }
       
-      // 프리로딩 완료 여부와 무관하게 진행
-      console.log('🏠 [fetchAllGroupData] ✅ 데이터 페칭 강제 실행');
+      // 프리로딩 완료 체크 완화 - 완료되지 않아도 진행
+      if (!isPreloadingComplete) {
+        console.log('🏠 [fetchAllGroupData] 프리로딩 미완료지만 강제 진행 (UX 개선):', { authLoading, isPreloadingComplete });
+        // 프리로딩을 기다리지 않고 바로 진행 (응답성 개선)
+      }
+      
+      console.log('🏠 [fetchAllGroupData] ✅ 모든 체크 완료, 데이터 페칭 시작');
 
+      // 🔥 그룹 ID 체크 완화 - selectedGroupId가 없어도 userContextSelectedGroupId 사용
       const groupIdToUse = selectedGroupId?.toString() || userContextSelectedGroupId?.toString() || '';
       if (!groupIdToUse) {
-        console.log('[fetchAllGroupData] selectedGroupId가 없어서 실행 중단, 3초 후 재시도');
+        console.log('[fetchAllGroupData] 그룹 ID가 없어서 3초 후 재시도');
         // 3초 후 재시도
         setTimeout(() => {
           if (isMounted) {
@@ -1785,15 +1589,17 @@ export default function HomePage() {
         return;
       }
 
-      // 이미 해당 그룹의 데이터가 로드되었는지 확인
+      // 🔥 중복 실행 방지 완화 - 멤버가 없으면 다시 로드
       if (dataFetchedRef.current.currentGroupId === parseInt(groupIdToUse) && 
           dataFetchedRef.current.members && 
-          dataFetchedRef.current.schedules) {
+          dataFetchedRef.current.schedules &&
+          groupMembers.length > 0) {
         console.log('[fetchAllGroupData] 중복 실행 방지 - 해당 그룹 데이터 이미 로드됨:', {
           currentGroupId: dataFetchedRef.current.currentGroupId,
           selectedGroupId: parseInt(groupIdToUse),
           members: dataFetchedRef.current.members,
-          schedules: dataFetchedRef.current.schedules
+          schedules: dataFetchedRef.current.schedules,
+          groupMembersLength: groupMembers.length
         });
         return;
       }
@@ -2281,6 +2087,14 @@ export default function HomePage() {
             component: 'home', 
             action: 'data-load-complete' 
           });
+          
+          // 🔥 전역 함수 업데이트
+          if (typeof window !== 'undefined') {
+            (window as any).__forceFetchGroupData__ = () => {
+              console.log('[HOME] 🔥 전역 함수로 fetchAllGroupData 강제 실행');
+              fetchAllGroupData();
+            };
+          }
         }
       }
     };
@@ -2328,14 +2142,13 @@ export default function HomePage() {
     }
 
     return () => { isMounted = false; };
-  }, [selectedGroupId]); // isVisible 제거로 무한 루프 방지
+  }, [selectedGroupId, userContextSelectedGroupId, userGroups]); // userGroups 추가
 
   // 컴포넌트 마운트 시 초기 지도 타입 설정
   useEffect(() => {
     // 네이버 지도를 기본으로 사용 (개발 환경에서도 네이버 지도 사용)
     setMapType('naver');
-    setIsComponentMounted(true);
-  }, []);
+      }, []);
  
     // 컴포넌트 마운트 시 그룹 목록 불러오기
     // useEffect(() => {
@@ -2344,8 +2157,6 @@ export default function HomePage() {
   
     // 로그인 상태 확인 및 사용자 정보 초기화 (Google 로그인 동기화 개선)
   useEffect(() => {
-    let isMounted = true;
-    
     // 🚨 카카오 로그인 처리
     const processPendingKakaoLogin = async () => {
       try {
@@ -2427,6 +2238,46 @@ export default function HomePage() {
       }
 
       console.log('[HOME] 인증 상태 확인:', { isLoggedIn, user: user?.mt_idx });
+
+      // 🔥 localStorage에서 사용자 정보 강제 동기화
+      try {
+        const localUserInfo = localStorage.getItem('smap_user_info');
+        const localUserData = localStorage.getItem('smap_user_data');
+        
+        if (localUserInfo && localUserData) {
+          const userInfo = JSON.parse(localUserInfo);
+          const userData = JSON.parse(localUserData);
+          
+          console.log('[HOME] 🔥 localStorage에서 사용자 정보 발견:', {
+            userInfo,
+            userData,
+            isLoggedIn: userInfo.isLoggedIn,
+            mt_idx: userInfo.mt_idx
+          });
+          
+          // 로그인 상태이지만 AuthContext가 동기화되지 않은 경우
+          if (userInfo.isLoggedIn && userInfo.mt_idx && !isLoggedIn) {
+            console.log('[HOME] 🔥 AuthContext 강제 동기화 시작');
+            
+            // AuthContext 상태 강제 업데이트
+            if (typeof window !== 'undefined' && (window as any).__authContext__?.forceLogin) {
+              (window as any).__authContext__.forceLogin(userInfo, userData);
+              console.log('[HOME] 🔥 AuthContext 강제 로그인 완료');
+            }
+            
+            // 페이지 새로고침 없이 상태만 업데이트
+            setTimeout(() => {
+              console.log('[HOME] 🔥 상태 업데이트 후 데이터 로딩 재시도');
+              // fetchAllGroupData 강제 실행
+              if (typeof window !== 'undefined' && (window as any).__forceFetchGroupData__) {
+                (window as any).__forceFetchGroupData__();
+              }
+            }, 1000);
+          }
+        }
+      } catch (error) {
+        console.error('[HOME] localStorage 동기화 실패:', error);
+      }
 
       // 추가 인증 상태 확인 (localStorage 직접 확인)
       const hasToken = authService.getToken();
@@ -2588,10 +2439,6 @@ export default function HomePage() {
     };
 
     runAuthSequence();
-    
-    return () => {
-      isMounted = false;
-    };
   }, [authLoading, isLoggedIn, user, router]);
 
   // 🗺️ 지도 API 로딩 및 초기화 - 컴포넌트 마운트 시 시작 (중복 실행 방지)
@@ -3184,7 +3031,6 @@ export default function HomePage() {
       window.google.maps.event.addListenerOnce(map.current, 'tilesloaded', () => {
         setIsMapLoading(false);
         setMapsInitialized(prev => ({...prev, google: true}));
-        setIsMapInitialized(true);
         console.log('Google Maps 타일 로딩 완료');
       });
       
@@ -3220,26 +3066,7 @@ export default function HomePage() {
     // 조건 검증
     if (!naverMapContainer.current) {
       console.error('[HOME] Naver Maps 컨테이너가 없음');
-      // 컨테이너를 다시 찾아보기
-      const container = document.getElementById('naver-map-container');
-      if (container) {
-        console.log('[HOME] Naver Maps 컨테이너를 다시 찾았습니다');
-        // ref는 직접 할당할 수 없으므로 DOM에서 직접 사용
-        try {
-          // 컨테이너가 있으면 지도 초기화 재시도
-          setTimeout(() => {
-            if (naverMapContainer.current) {
-              initNaverMap();
-            }
-          }, 100);
-        } catch (error) {
-          console.error('[HOME] 컨테이너로 지도 초기화 실패:', error);
-        }
-        return;
-      } else {
-        console.error('[HOME] Naver Maps 컨테이너를 찾을 수 없음 - 지도 초기화 건너뜀');
-        return;
-      }
+      return;
     }
     
     if (!naverMapsLoaded) {
@@ -3325,6 +3152,13 @@ export default function HomePage() {
           return;
         }
         
+        // Naver Maps 컨테이너 존재 여부 확인
+        if (!naverMapContainer.current) {
+          console.error('[HOME] Naver Maps 컨테이너가 없음 - 초기화 중단');
+          setIsMapLoading(false);
+          return;
+        }
+        
         const mapOptions = {
           ...MAP_CONFIG.NAVER.DEFAULT_OPTIONS,
           center: new window.naver.maps.LatLng(centerLat, centerLng),
@@ -3349,7 +3183,6 @@ export default function HomePage() {
           
           setIsMapLoading(false);
           setMapsInitialized(prev => ({...prev, naver: true}));
-          setIsMapInitialized(true);
           console.log('Naver Maps 초기화 완료');
           
           // 인증 오류 리스너 제거
@@ -4854,47 +4687,31 @@ export default function HomePage() {
   };
 
   // 멤버 마커 업데이트 함수 - 모든 그룹멤버 표시
-  const updateMemberMarkers = (members: GroupMember[], forceRefresh = false) => {
+  const updateMemberMarkers = (members: GroupMember[]) => {
     // 안전성 체크
     if (!members || members.length === 0) {
-      console.warn('[updateMemberMarkers] members가 비어있음');
-      // 멤버 데이터가 없을 때는 기본 마커만 표시
-      if (userLocation.lat && userLocation.lng) {
-        console.log('[updateMemberMarkers] 사용자 위치로 기본 마커 표시');
-        // 사용자 위치에 기본 마커 표시
-        setTimeout(() => {
-          if (groupMembers.length > 0) {
-            updateMemberMarkers(groupMembers, true);
+      console.log('[updateMemberMarkers] 멤버 데이터가 비어있음 - 마커 업데이트 스킵');
+      
+      // 기존 마커 정리
+      if (memberMarkerMapRef.current.size > 0) {
+        console.log('[updateMemberMarkers] 기존 마커 정리 중...');
+        memberMarkerMapRef.current.forEach((marker) => {
+          if (marker && marker.setMap) {
+            marker.setMap(null);
           }
-        }, 2000);
+        });
+        memberMarkerMapRef.current.clear();
       }
-      return;
-    }
-
-    // 지도가 초기화되지 않은 경우 대기
-    if (!isMapInitialized) {
-      console.log('[updateMemberMarkers] 지도가 아직 초기화되지 않음 - 대기');
-      return;
-    }
-    
-    if (mapType === 'naver' && !naverMap.current) {
-      console.log('[updateMemberMarkers] Naver 지도가 아직 초기화되지 않음 - 대기');
-      return;
-    }
-    
-    if (mapType === 'google' && !map.current) {
-      console.log('[updateMemberMarkers] Google 지도가 아직 초기화되지 않음 - 대기');
-      return;
-    }
-    
-    // 강제 새로고침인 경우 기존 마커 모두 삭제
-    if (forceRefresh) {
-      console.log('[updateMemberMarkers] 🔄 강제 새로고침 - 기존 마커 모두 삭제');
-      memberMarkerMapRef.current.clear();
+      
+      // InfoWindow 정리
       if (currentInfoWindowRef.current) {
-        currentInfoWindowRef.current.close();
+        if (currentInfoWindowRef.current.close) {
+          currentInfoWindowRef.current.close();
+        }
         currentInfoWindowRef.current = null;
       }
+      
+      return;
     }
     
     console.log('[updateMemberMarkers] 🎯 마커 업데이트 시작:', {
@@ -5798,18 +5615,32 @@ export default function HomePage() {
     }
   }, [isGroupSelectorOpen]);
 
-  // 첫번째 멤버 자동 선택을 위한 안전한 조건 검사
+  // 첫번째 멤버 자동 선택을 위한 안전한 조건 검사 - 강화된 로직
   const shouldSelectFirstMember = useMemo(() => {
     try {
-      return groupMembers && safeArrayCheck(groupMembers) && groupMembers.length > 0 && 
-             !(groupMembers && safeArrayCheck(groupMembers) && groupMembers.some(m => m.isSelected)) && 
-             !firstMemberSelected &&
-             selectedGroupId;
+      const hasMembers = groupMembers && safeArrayCheck(groupMembers) && groupMembers.length > 0;
+      const noSelectedMember = !(groupMembers && safeArrayCheck(groupMembers) && groupMembers.some(m => m.isSelected));
+      const notYetSelected = !firstMemberSelected;
+      const hasGroupId = selectedGroupId || userContextSelectedGroupId;
+      
+      console.log('[HOME] 첫 번째 멤버 선택 조건 체크:', {
+        hasMembers,
+        noSelectedMember,
+        notYetSelected,
+        hasGroupId,
+        groupMembersLength: groupMembers?.length || 0,
+        selectedGroupId,
+        userContextSelectedGroupId,
+        isFirstMemberSelectionComplete
+      });
+      
+      // 🔥 조건 완화 - 멤버가 있으면 무조건 선택
+      return hasMembers && noSelectedMember && notYetSelected;
     } catch (error) {
       console.error('[HOME] shouldSelectFirstMember 계산 오류:', error);
       return false;
     }
-  }, [groupMembers?.length, groupMembers?.some && groupMembers.some(m => m.isSelected), firstMemberSelected, selectedGroupId]);
+  }, [groupMembers?.length, groupMembers?.some && groupMembers.some(m => m.isSelected), firstMemberSelected, selectedGroupId, userContextSelectedGroupId, isFirstMemberSelectionComplete]);
 
   // 첫번째 멤버 자동 선택 - 직접 상태 업데이트 방식 (iOS WebView 타임아웃 방지)
   useEffect(() => {
@@ -6391,33 +6222,31 @@ export default function HomePage() {
     // Critical Error 상태 처리
     if (criticalError) {
       return (
-
-          <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl shadow-lg p-6 max-w-md w-full">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Critical Error</h3>
-                <p className="text-sm text-gray-600 mb-4">{criticalError}</p>
-                <button 
-                  onClick={() => window.location.reload()}
-                  className="w-full bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-600 transition-colors"
-                >
-                  페이지 새로고침
-                </button>
-                <button 
-                  onClick={() => setCriticalError(null)}
-                  className="w-full mt-2 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors"
-                >
-                  오류 무시하고 계속
-                </button>
+        <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-lg p-6 max-w-md w-full">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
               </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Critical Error</h3>
+              <p className="text-sm text-gray-600 mb-4">{criticalError}</p>
+              <button 
+                onClick={() => window.location.reload()}
+                className="w-full bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-600 transition-colors"
+              >
+                페이지 새로고침
+              </button>
+              <button 
+                onClick={() => setCriticalError(null)}
+                className="w-full mt-2 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                오류 무시하고 계속
+              </button>
             </div>
           </div>
-
+        </div>
       );
     }
 
@@ -6463,24 +6292,33 @@ export default function HomePage() {
     }
 
     // 마운트되지 않은 상태 처리
-    if (!isMounted || !isComponentMounted) {
+    if (!isMounted) {
       return (
-        <div 
-          className="home-content main-container"
-          data-page="/home"
-          data-content-type="home-page"
-          style={{ 
-            minHeight: '100vh', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)'
-          }}
-        >
+        <div style={{ 
+          minHeight: '100vh', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          backgroundColor: '#f8fafc'
+        }}>
           <div style={{ textAlign: 'center' }}>
-            <IOSCompatibleSpinner size="lg" />
-            <p style={{ color: '#64748b', fontSize: '14px', marginTop: '16px' }}>홈 페이지 로딩 중...</p>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              border: '3px solid #e2e8f0',
+              borderTop: '3px solid #3b82f6',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite',
+              margin: '0 auto 16px'
+            }}></div>
+            <p style={{ color: '#64748b', fontSize: '14px' }}>로딩 중...</p>
           </div>
+          <style jsx>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
         </div>
       );
     }
@@ -6492,7 +6330,7 @@ export default function HomePage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="min-h-screen relative home-content main-container"
+          className="min-h-screen relative"
           style={{ 
             background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
             paddingBottom: '72px', // 네비게이션 바를 위한 하단 여백 (56px + 16px)
@@ -6502,7 +6340,6 @@ export default function HomePage() {
           }}
           data-react-mount="true"
           data-page="/home"
-          data-content-type="home-page"
           id="home-page-container"
         >
         {/* 통일된 헤더 애니메이션 */}
@@ -7143,14 +6980,6 @@ export default function HomePage() {
               
               {/* 📍 위치 추적 상태 표시 */}
               <LocationTrackingStatus />
-              
-              {/* 🆕 안드로이드 권한 요청 컴포넌트 */}
-              <AndroidPermissionRequest 
-                showEssentialOnly={true}
-                onComplete={() => {
-                  console.log('[HOME] 🆕 안드로이드 필수 권한 요청 완료');
-                }}
-              />
       </>
     );
   } catch (renderError) {
