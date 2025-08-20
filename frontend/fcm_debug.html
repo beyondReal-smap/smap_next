@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FCM 디버깅 도구</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .debug-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .warning { background-color: #fff3cd; border-color: #ffeaa7; }
+        button { padding: 10px 15px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔔 FCM 디버깅 도구</h1>
+    
+    <div class="debug-section">
+        <h3>1. 환경 정보 확인</h3>
+        <button onclick="checkEnvironment()">환경 정보 확인</button>
+        <div id="environment-info"></div>
+    </div>
+
+    <div class="debug-section">
+        <h3>2. FCM 지원 여부 확인</h3>
+        <button onclick="checkFCMSupport()">FCM 지원 확인</button>
+        <div id="fcm-support-info"></div>
+    </div>
+
+    <div class="debug-section">
+        <h3>3. 현재 FCM 토큰 확인</h3>
+        <button onclick="checkCurrentToken()">현재 토큰 확인</button>
+        <div id="current-token-info"></div>
+    </div>
+
+    <div class="debug-section">
+        <h3>4. 서비스 워커 상태 확인</h3>
+        <button onclick="checkServiceWorker()">서비스 워커 확인</button>
+        <div id="sw-info"></div>
+    </div>
+
+    <div class="debug-section">
+        <h3>5. 알림 권한 확인</h3>
+        <button onclick="checkNotificationPermission()">알림 권한 확인</button>
+        <div id="permission-info"></div>
+    </div>
+
+    <div class="debug-section">
+        <h3>6. FCM 토큰 새로고침</h3>
+        <button onclick="refreshFCMToken()">토큰 새로고침</button>
+        <div id="refresh-info"></div>
+    </div>
+
+    <div class="debug-section">
+        <h3>7. 테스트 푸시 발송</h3>
+        <button onclick="sendTestPush()">테스트 푸시 발송</button>
+        <div id="test-push-info"></div>
+    </div>
+
+    <script>
+        // 환경 정보 확인
+        function checkEnvironment() {
+            const info = {
+                userAgent: navigator.userAgent,
+                platform: navigator.platform,
+                language: navigator.language,
+                cookieEnabled: navigator.cookieEnabled,
+                onLine: navigator.onLine,
+                location: window.location.href,
+                timestamp: new Date().toISOString()
+            };
+            
+            document.getElementById('environment-info').innerHTML = `
+                <div class="success">
+                    <h4>✅ 환경 정보</h4>
+                    <pre>${JSON.stringify(info, null, 2)}</pre>
+                </div>
+            `;
+        }
+
+        // FCM 지원 여부 확인
+        function checkFCMSupport() {
+            const support = {
+                serviceWorker: 'serviceWorker' in navigator,
+                pushManager: 'PushManager' in window,
+                notification: 'Notification' in window,
+                firebase: typeof firebase !== 'undefined',
+                messaging: typeof firebase !== 'undefined' && firebase.messaging
+            };
+            
+            const status = Object.values(support).every(Boolean) ? 'success' : 'warning';
+            const icon = Object.values(support).every(Boolean) ? '✅' : '⚠️';
+            
+            document.getElementById('fcm-support-info').innerHTML = `
+                <div class="${status}">
+                    <h4>${icon} FCM 지원 여부</h4>
+                    <pre>${JSON.stringify(support, null, 2)}</pre>
+                </div>
+            `;
+        }
+
+        // 현재 FCM 토큰 확인
+        async function checkCurrentToken() {
+            try {
+                // localStorage에서 토큰 확인
+                const userStr = localStorage.getItem('user');
+                const user = userStr ? JSON.parse(userStr) : null;
+                
+                // 전역 함수 확인
+                if (typeof window.getFCMTokenStatus === 'function') {
+                    const status = await window.getFCMTokenStatus();
+                    document.getElementById('current-token-info').innerHTML = `
+                        <div class="success">
+                            <h4>✅ FCM 토큰 상태</h4>
+                            <pre>${JSON.stringify(status, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    document.getElementById('current-token-info').innerHTML = `
+                        <div class="warning">
+                            <h4>⚠️ FCM 토큰 상태</h4>
+                            <p>getFCMTokenStatus 함수를 찾을 수 없습니다.</p>
+                            <p>사용자 정보: ${user ? JSON.stringify(user) : '없음'}</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('current-token-info').innerHTML = `
+                    <div class="error">
+                        <h4>❌ FCM 토큰 확인 실패</h4>
+                        <p>오류: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        // 서비스 워커 상태 확인
+        async function checkServiceWorker() {
+            try {
+                if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    const swInfo = registrations.map(reg => ({
+                        scope: reg.scope,
+                        active: !!reg.active,
+                        waiting: !!reg.waiting,
+                        installing: !!reg.installing,
+                        state: reg.active ? reg.active.state : 'unknown'
+                    }));
+                    
+                    document.getElementById('sw-info').innerHTML = `
+                        <div class="success">
+                            <h4>✅ 서비스 워커 상태</h4>
+                            <pre>${JSON.stringify(swInfo, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    document.getElementById('sw-info').innerHTML = `
+                        <div class="error">
+                            <h4>❌ 서비스 워커 미지원</h4>
+                            <p>이 브라우저는 서비스 워커를 지원하지 않습니다.</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('sw-info').innerHTML = `
+                    <div class="error">
+                        <h4>❌ 서비스 워커 확인 실패</h4>
+                        <p>오류: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        // 알림 권한 확인
+        function checkNotificationPermission() {
+            if ('Notification' in window) {
+                const permission = Notification.permission;
+                const status = permission === 'granted' ? 'success' : 
+                              permission === 'denied' ? 'error' : 'warning';
+                const icon = permission === 'granted' ? '✅' : 
+                            permission === 'denied' ? '❌' : '⚠️';
+                
+                document.getElementById('permission-info').innerHTML = `
+                    <div class="${status}">
+                        <h4>${icon} 알림 권한 상태</h4>
+                        <p>현재 권한: <strong>${permission}</strong></p>
+                        ${permission === 'default' ? '<button onclick="requestNotificationPermission()">권한 요청</button>' : ''}
+                    </div>
+                `;
+            } else {
+                document.getElementById('permission-info').innerHTML = `
+                    <div class="error">
+                        <h4>❌ 알림 API 미지원</h4>
+                        <p>이 브라우저는 알림 API를 지원하지 않습니다.</p>
+                    </div>
+                `;
+            }
+        }
+
+        // 알림 권한 요청
+        async function requestNotificationPermission() {
+            try {
+                const permission = await Notification.requestPermission();
+                checkNotificationPermission(); // 상태 다시 확인
+            } catch (error) {
+                console.error('알림 권한 요청 실패:', error);
+            }
+        }
+
+        // FCM 토큰 새로고침
+        async function refreshFCMToken() {
+            try {
+                if (typeof window.forceRefreshFCMToken === 'function') {
+                    const userStr = localStorage.getItem('user');
+                    const user = userStr ? JSON.parse(userStr) : null;
+                    
+                    if (user && user.mt_idx) {
+                        const result = await window.forceRefreshFCMToken(user.mt_idx);
+                        document.getElementById('refresh-info').innerHTML = `
+                            <div class="success">
+                                <h4>✅ FCM 토큰 새로고침</h4>
+                                <pre>${JSON.stringify(result, null, 2)}</pre>
+                            </div>
+                        `;
+                    } else {
+                        document.getElementById('refresh-info').innerHTML = `
+                            <div class="warning">
+                                <h4>⚠️ 사용자 정보 없음</h4>
+                                <p>사용자 정보를 찾을 수 없습니다.</p>
+                            </div>
+                        `;
+                    }
+                } else {
+                    document.getElementById('refresh-info').innerHTML = `
+                        <div class="warning">
+                            <h4>⚠️ forceRefreshFCMToken 함수 없음</h4>
+                            <p>FCM 토큰 새로고침 함수를 찾을 수 없습니다.</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('refresh-info').innerHTML = `
+                    <div class="error">
+                        <h4>❌ FCM 토큰 새로고침 실패</h4>
+                        <p>오류: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        // 테스트 푸시 발송
+        async function sendTestPush() {
+            try {
+                const userStr = localStorage.getItem('user');
+                const user = userStr ? JSON.parse(userStr) : null;
+                
+                if (!user || !user.mt_idx) {
+                    document.getElementById('test-push-info').innerHTML = `
+                        <div class="error">
+                            <h4>❌ 사용자 정보 없음</h4>
+                            <p>사용자 정보를 찾을 수 없습니다.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const testData = {
+                    plt_type: "TEST",
+                    sst_idx: "0",
+                    plt_condition: "테스트",
+                    plt_memo: "FCM 디버깅용 테스트 메시지",
+                    mt_idx: user.mt_idx,
+                    plt_title: "🔔 FCM 테스트",
+                    plt_content: "이것은 FCM 디버깅을 위한 테스트 메시지입니다. " + new Date().toLocaleString()
+                };
+
+                const response = await fetch('https://api3.smap.site/api/v1/fcm_sendone/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                    },
+                    body: JSON.stringify(testData)
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('test-push-info').innerHTML = `
+                        <div class="success">
+                            <h4>✅ 테스트 푸시 발송 성공</h4>
+                            <pre>${JSON.stringify(result, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    document.getElementById('test-push-info').innerHTML = `
+                        <div class="error">
+                            <h4>❌ 테스트 푸시 발송 실패</h4>
+                            <p>상태 코드: ${response.status}</p>
+                            <pre>${JSON.stringify(result, null, 2)}</pre>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('test-push-info').innerHTML = `
+                    <div class="error">
+                        <h4>❌ 테스트 푸시 발송 실패</h4>
+                        <p>오류: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        // 페이지 로드 시 기본 정보 표시
+        window.addEventListener('load', () => {
+            checkEnvironment();
+            checkFCMSupport();
+            checkNotificationPermission();
+        });
+    </script>
+</body>
+</html>
