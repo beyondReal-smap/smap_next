@@ -2808,17 +2808,17 @@ export default function HomePage() {
       // 지도 상태 확인 및 복구
       const checkAndRecoverMap = () => {
         if (mapType === 'naver') {
-          // 네이버맵 상태 확인
-          if (!naverMap.current || !isNaverMapsReady()) {
-            console.log('[HOME] 네이버맵 상태 이상 감지 - 복구 시도');
+          // 네이버맵 상태 확인 (isNaverMapsReady 체크 우회)
+          if (!naverMap.current) {
+            console.log('[HOME] 네이버맵 인스턴스 없음 - 강제 복구 시도');
             
             // DOM 컨테이너 상태 확인
             const container = document.getElementById('naver-map-container');
             if (container && container.style.display !== 'none') {
-              console.log('[HOME] 네이버맵 컨테이너 존재 - 지도 재초기화');
+              console.log('[HOME] 네이버맵 컨테이너 존재 - 지도 강제 재초기화');
               setTimeout(() => initNaverMap(), 300);
             } else {
-              console.log('[HOME] 네이버맵 컨테이너 숨김 상태 - 표시 후 재초기화');
+              console.log('[HOME] 네이버맵 컨테이너 숨김 상태 - 표시 후 강제 재초기화');
               if (container) container.style.display = 'block';
               setTimeout(() => initNaverMap(), 500);
             }
@@ -3450,12 +3450,36 @@ export default function HomePage() {
     }
     
     if (!naverMapsLoaded) {
-      console.error('[HOME] Naver Maps API가 로드되지 않음');
-      return;
+      console.warn('[HOME] Naver Maps API가 로드되지 않음 - 강제 초기화 시도');
+      
+      // 강제로 API 로딩 시도
+      setTimeout(() => {
+        console.log('[HOME] 🔄 Naver Maps API 강제 로딩 시도');
+        loadNaverMapsAPI();
+      }, 1000);
+      
+      // 3초 후 재시도
+      setTimeout(() => {
+        if (!naverMapsLoaded) {
+          console.log('[HOME] 🔄 Naver Maps API 재로딩 시도 (3초 후)');
+          loadNaverMapsAPI();
+        }
+      }, 3000);
+      
+      // 5초 후에도 재시도
+      setTimeout(() => {
+        if (!naverMapsLoaded) {
+          console.log('[HOME] 🔄 Naver Maps API 최종 재시도 (5초 후)');
+          loadNaverMapsAPI();
+        }
+      }, 5000);
+      
+      // API가 로드되지 않아도 지도 초기화 시도 (강제)
+      console.log('[HOME] 🚀 API 로딩 상태와 관계없이 지도 초기화 시도');
     }
     
     if (!window.naver || !window.naver.maps) {
-      console.error('[HOME] Naver Maps 객체가 없음');
+      console.warn('[HOME] Naver Maps 객체가 없음 - 강제 재시도');
       
       // iOS WebView에서 네이버맵 로딩 재시도
       if ((window as any).webkit && (window as any).webkit.messageHandlers) {
@@ -3464,7 +3488,23 @@ export default function HomePage() {
           loadNaverMapsAPI();
         }, 2000);
       }
-      return;
+      
+      // 일반적인 경우에도 강제 재시도
+      setTimeout(() => {
+        console.log('[HOME] 🔄 Naver Maps API 강제 재시도 (2초 후)');
+        loadNaverMapsAPI();
+      }, 2000);
+      
+      // 5초 후에도 재시도
+      setTimeout(() => {
+        if (!window.naver || !window.naver.maps) {
+          console.log('[HOME] 🔄 Naver Maps API 최종 재시도 (5초 후)');
+          loadNaverMapsAPI();
+        }
+      }, 5000);
+      
+      // API 객체가 없어도 지도 초기화 시도 (강제)
+      console.log('[HOME] 🚀 API 객체 상태와 관계없이 지도 초기화 시도');
     }
     
     console.log('[HOME] Naver Maps 초기화 조건 충족');
@@ -3592,24 +3632,28 @@ export default function HomePage() {
           // 컴포넌트 언마운트 시 정리
           return () => {
             clearInterval(mapHealthCheck);
+            clearTimeout(mapLoadTimeout);
           };
         });
         
-        // iOS WebView에서 지도 로딩 타임아웃 설정 (10초)
+        // iOS WebView에서 지도 로딩 타임아웃 설정 (30초로 연장 - 네이버맵 우선)
         const mapLoadTimeout = setTimeout(() => {
           if (isMapLoading) {
-            console.warn('Naver Maps 로딩 타임아웃, Google Maps로 전환');
+            console.warn('Naver Maps 로딩 타임아웃 (30초) - 네이버맵 재시도');
             setIsMapLoading(false);
             window.naver.maps.Event.removeListener(errorListener);
             window.naver.maps.Event.removeListener(initListener);
             
-            // 구글 지도로 전환
-            setMapType('google');
-            if (!apiLoadStatus.google) {
-              loadGoogleMapsAPI();
-            }
+            // 구글 지도로 전환하지 않고 네이버맵 재시도
+            console.log('[HOME] 🚀 네이버맵 타임아웃 후 재시도 시작');
+            setTimeout(() => {
+              if (mapType === 'naver' && !naverMap.current) {
+                console.log('[HOME] 🔄 네이버맵 타임아웃 후 재초기화');
+                initNaverMap();
+              }
+            }, 2000);
           }
-        }, 10000);
+        }, 30000); // 30초로 연장
       } catch (innerError) {
         console.error('Naver Maps 객체 생성 오류:', innerError);
         window.naver.maps.Event.removeListener(errorListener);
@@ -3631,12 +3675,20 @@ export default function HomePage() {
     }
   };
 
-  // 지도 API 로드 관리
+  // 지도 API 로드 관리 (네이버맵 우선)
   useEffect(() => {
-    // 네이버 지도 API를 우선적으로 로드
+    // 네이버 지도 API를 우선적으로 로드 (항상 먼저 시도)
+    if (!apiLoadStatus.naver && !naverMapsLoaded) {
+      console.log('[HOME] 🚀 네이버맵 우선 로딩 시작');
+      loadNaverMapsAPI();
+    }
+    
+    // 현재 선택된 지도 타입에 따라 추가 로딩
     if (mapType === 'naver' && !apiLoadStatus.naver) {
+      console.log('[HOME] 🗺️ 네이버맵 추가 로딩 시도');
       loadNaverMapsAPI();
     } else if (mapType === 'google' && !apiLoadStatus.google) {
+      console.log('[HOME] 🗺️ 구글맵 로딩 시도');
       loadGoogleMapsAPI();
     }
     
@@ -3684,6 +3736,12 @@ export default function HomePage() {
       if (event.detail.source === 'ios-webview-fix') {
         console.log('[iOS WebView] Naver Maps optimized and ready');
         setNaverMapsLoaded(true);
+        
+        // 네이버맵이 준비되면 자동으로 네이버맵으로 전환
+        if (mapType !== 'naver') {
+          console.log('[HOME] 🚀 네이버맵 준비 완료 - 자동으로 네이버맵으로 전환');
+          setMapType('naver');
+        }
         
         // 네이버 지도 초기화
         setTimeout(() => {
@@ -3820,9 +3878,23 @@ export default function HomePage() {
     return isNaN(num) ? null : num;
   };
 
-  // 네이버 지도 API 상태 확인 헬퍼 함수
+  // 네이버 지도 API 상태 확인 헬퍼 함수 (더 관대하게 수정)
   const isNaverMapsReady = useCallback((): boolean => {
-    return !!(window.naver?.maps && window.naver?.maps?.LatLng && naverMapsLoaded);
+    // naverMapsLoaded 상태와 관계없이 window.naver?.maps가 있으면 true 반환
+    // 이렇게 하면 API가 로드되었지만 상태가 업데이트되지 않은 경우에도 지도 초기화 가능
+    const hasNaverMaps = !!(window.naver?.maps && window.naver?.maps?.LatLng);
+    const isReady = hasNaverMaps && naverMapsLoaded;
+    
+    if (hasNaverMaps && !naverMapsLoaded) {
+      console.log('[HOME] 🚀 Naver Maps API는 로드되었지만 상태가 업데이트되지 않음 - 강제 상태 업데이트');
+      // API가 로드되었지만 상태가 업데이트되지 않은 경우 강제로 상태 업데이트
+      setTimeout(() => {
+        setNaverMapsLoaded(true);
+        console.log('[HOME] ✅ Naver Maps 상태 강제 업데이트 완료');
+      }, 100);
+    }
+    
+    return isReady;
   }, [naverMapsLoaded]);
 
   // 안전한 LatLng 객체 생성 헬퍼 함수
@@ -6632,21 +6704,11 @@ export default function HomePage() {
 
   // 🛡️ 안전한 렌더링 - 백그라운드 전환 시 에러 방지
   try {
-    // 백그라운드 전환 중일 때는 에러 처리를 건너뛰고 기본 UI 유지
+    // 백그라운드 전환 중일 때도 지도를 계속 표시 (UI 제거)
     if (isTransitioning || !isVisible) {
-      console.log('[HOME] 🛡️ 백그라운드 전환 중 - 안전 모드 활성화');
-      // 백그라운드 전환 중에는 기존 UI를 유지하여 hooks 순서 변경 방지
-      // 에러 페이지 표시 방지
-      return (
-        <div className="home-content main-container" data-page="/home" data-content-type="home-page">
-          <div className="min-h-screen bg-white flex items-center justify-center">
-            <div className="text-center">
-              <IOSCompatibleSpinner size="lg" />
-              <p className="text-gray-600">백그라운드 전환 중...</p>
-            </div>
-          </div>
-        </div>
-      );
+      console.log('[HOME] 🛡️ 백그라운드 전환 중 - 지도 계속 표시 (UI 제거됨)');
+      // 백그라운드 전환 중에도 지도를 계속 표시하여 사용자 경험 향상
+      // hooks 순서 변경 방지 및 에러 페이지 표시 방지
     }
     
     // 네이버 지도 API 로딩 상태 확인 및 안전 처리
