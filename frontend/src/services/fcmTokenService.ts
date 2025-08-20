@@ -342,7 +342,18 @@ class FCMTokenService {
             console.error('[FCM Token Service]   2. 프로젝트가 일시중지되지 않았는지 확인');
             console.error('[FCM Token Service]   3. VAPID 키 재생성 시도');
             console.error('[FCM Token Service]   4. 프로젝트 권한 확인');
+            console.error('[FCM Token Service]   5. FCM API 활성화 확인');
+            console.error('[FCM Token Service]   6. 서비스 계정 권한 확인');
             console.error('[FCM Token Service] 🔗 Firebase 콘솔: https://console.firebase.google.com');
+            console.error('[FCM Token Service] 🔗 Google Cloud Console: https://console.cloud.google.com');
+            
+            // 추가 디버깅 정보
+            console.error('[FCM Token Service] 🔍 디버깅 정보:', {
+              projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+              hasVapidKey: !!process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
+              isLocalhost: typeof window !== 'undefined' ? window.location.hostname === 'localhost' : 'unknown',
+              protocol: typeof window !== 'undefined' ? window.location.protocol : 'unknown'
+            });
           }
           
           // 인증 에러인 경우 상세 정보 로깅

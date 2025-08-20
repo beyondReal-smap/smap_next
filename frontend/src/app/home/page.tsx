@@ -2800,38 +2800,149 @@ export default function HomePage() {
     }
   }, [googleMapsLoaded, mapType]);
 
-  // 🗺️ 지도 초기화 보장을 위한 추가 안전장치 (중복 실행 방지)
+    // 🗺️ 지도 초기화 보장을 위한 강화된 안전장치 (탭 전환 시 지도 복구)
   useEffect(() => {
     const ensureMapInitialization = () => {
-      console.log('[HOME] 지도 초기화 보장 체크');
+      console.log('[HOME] 지도 초기화 보장 체크 (강화됨)');
       
-      // 중복 실행 방지 - 이미 초기화된 경우 스킵
-      if ((mapType === 'naver' && naverMap.current) || (mapType === 'google' && map.current)) {
-        console.log('[HOME] 지도 이미 초기화됨 - 보장 체크 스킵');
-        return;
-      }
+      // 지도 상태 확인 및 복구
+      const checkAndRecoverMap = () => {
+        if (mapType === 'naver') {
+          // 네이버맵 상태 확인
+          if (!naverMap.current || !isNaverMapsReady()) {
+            console.log('[HOME] 네이버맵 상태 이상 감지 - 복구 시도');
+            
+            // DOM 컨테이너 상태 확인
+            const container = document.getElementById('naver-map-container');
+            if (container && container.style.display !== 'none') {
+              console.log('[HOME] 네이버맵 컨테이너 존재 - 지도 재초기화');
+              setTimeout(() => initNaverMap(), 300);
+            } else {
+              console.log('[HOME] 네이버맵 컨테이너 숨김 상태 - 표시 후 재초기화');
+              if (container) container.style.display = 'block';
+              setTimeout(() => initNaverMap(), 500);
+            }
+          } else {
+            console.log('[HOME] 네이버맵 정상 상태 확인');
+          }
+        } else if (mapType === 'google') {
+          // 구글맵 상태 확인
+          if (!map.current || !googleMapsLoaded) {
+            console.log('[HOME] 구글맵 상태 이상 감지 - 복구 시도');
+            setTimeout(() => initGoogleMap(), 300);
+          } else {
+            console.log('[HOME] 구글맵 정상 상태 확인');
+          }
+        }
+      };
+
+      // 즉시 체크 및 복구
+      checkAndRecoverMap();
       
-      // 지도가 초기화되지 않은 경우 재시도
-              if (mapType === 'naver' && isNaverMapsReady() && !naverMap.current) {
-        console.log('[HOME] 네이버맵 초기화 누락 감지 - 재시도');
-        setTimeout(() => initNaverMap(), 500);
-      }
-      
-      if (mapType === 'google' && googleMapsLoaded && window.google?.maps && !map.current) {
-        console.log('[HOME] 구글맵 초기화 누락 감지 - 재시도');
-        setTimeout(() => initGoogleMap(), 500);
-      }
+      // 지연 후 재체크 (DOM 안정화 대기)
+      setTimeout(checkAndRecoverMap, 1000);
     };
 
-    // 페이지 로드 후 2초, 5초, 10초에 지도 초기화 상태 확인 (중복 방지)
+    // 페이지 로드 후 1초, 3초, 6초, 12초에 지도 초기화 상태 확인 (더 자주 체크)
     const timers = [
-      setTimeout(ensureMapInitialization, 2000),
-      setTimeout(ensureMapInitialization, 5000),
-      setTimeout(ensureMapInitialization, 10000)
+      setTimeout(ensureMapInitialization, 1000),
+      setTimeout(ensureMapInitialization, 3000),
+      setTimeout(ensureMapInitialization, 6000),
+      setTimeout(ensureMapInitialization, 12000)
     ];
 
     return () => {
       timers.forEach(timer => clearTimeout(timer));
+    };
+  }, [mapType, naverMapsLoaded, googleMapsLoaded]);
+
+  // 🗺️ 탭 전환 감지 및 지도 상태 복구 (새로 추가)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('[HOME] 탭 전환 감지 - 지도 상태 복구 시작');
+        
+        // 약간의 지연 후 지도 상태 확인 및 복구
+        setTimeout(() => {
+          if (mapType === 'naver' && (!naverMap.current || !isNaverMapsReady())) {
+            console.log('[HOME] 탭 전환 후 네이버맵 상태 이상 - 복구 시도');
+            
+            // DOM 컨테이너 확인
+            const container = document.getElementById('naver-map-container');
+            if (container) {
+              // 컨테이너가 숨겨져 있으면 표시
+              if (container.style.display === 'none') {
+                container.style.display = 'block';
+                console.log('[HOME] 네이버맵 컨테이너 표시됨');
+              }
+              
+              // 지도 재초기화
+              setTimeout(() => initNaverMap(), 500);
+            }
+          } else if (mapType === 'google' && (!map.current || !googleMapsLoaded)) {
+            console.log('[HOME] 탭 전환 후 구글맵 상태 이상 - 복구 시도');
+            setTimeout(() => initGoogleMap(), 500);
+          }
+        }, 1000);
+      }
+    };
+
+    // 페이지 가시성 변경 이벤트 리스너 추가
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // 페이지 포커스 이벤트 리스너 추가 (iOS Safari 대응)
+    window.addEventListener('focus', handleVisibilityChange);
+    
+    // 페이지 블러 이벤트 리스너 추가
+    window.addEventListener('blur', () => {
+      console.log('[HOME] 페이지 블러 감지 - 지도 상태 저장');
+    });
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
+      window.removeEventListener('blur', () => {});
+    };
+  }, [mapType, naverMapsLoaded, googleMapsLoaded]);
+
+  // 🗺️ 지도 초기화 최종 보장 (새로 추가)
+  useEffect(() => {
+    const finalMapCheck = () => {
+      console.log('[HOME] 지도 초기화 최종 보장 체크');
+      
+      // 네이버맵이 선택되었지만 초기화되지 않은 경우
+      if (mapType === 'naver' && (!naverMap.current || !isNaverMapsReady())) {
+        console.log('[HOME] 네이버맵 최종 보장 체크 - 재초기화 시도');
+        
+        // DOM 컨테이너 상태 확인
+        const container = document.getElementById('naver-map-container');
+        if (container) {
+          // 컨테이너가 숨겨져 있으면 표시
+          if (container.style.display === 'none') {
+            container.style.display = 'block';
+            console.log('[HOME] 네이버맵 컨테이너 최종 표시');
+          }
+          
+          // 지도 재초기화
+          setTimeout(() => initNaverMap(), 800);
+        }
+      }
+      
+      // 구글맵이 선택되었지만 초기화되지 않은 경우
+      if (mapType === 'google' && (!map.current || !googleMapsLoaded)) {
+        console.log('[HOME] 구글맵 최종 보장 체크 - 재초기화 시도');
+        setTimeout(() => initGoogleMap(), 800);
+      }
+    };
+
+    // 페이지 로드 후 15초, 30초에 최종 체크
+    const finalTimers = [
+      setTimeout(finalMapCheck, 15000),
+      setTimeout(finalMapCheck, 30000)
+    ];
+
+    return () => {
+      finalTimers.forEach(timer => clearTimeout(timer));
     };
   }, [mapType, naverMapsLoaded, googleMapsLoaded]);
 
@@ -3282,31 +3393,58 @@ export default function HomePage() {
     }
   };
 
-  // Naver 지도 초기화
+  // Naver 지도 초기화 (강화됨)
   const initNaverMap = () => {
-    console.log('[HOME] Naver Maps 초기화 시작');
+    console.log('[HOME] Naver Maps 초기화 시작 (강화됨)');
     
-    // 조건 검증
+    // 조건 검증 및 복구
     if (!naverMapContainer.current) {
-      console.error('[HOME] Naver Maps 컨테이너가 없음');
-      // 컨테이너를 다시 찾아보기
+      console.log('[HOME] Naver Maps 컨테이너 ref가 없음 - DOM에서 직접 찾기 시도');
+      
+      // DOM에서 컨테이너를 직접 찾기
       const container = document.getElementById('naver-map-container');
       if (container) {
-        console.log('[HOME] Naver Maps 컨테이너를 다시 찾았습니다');
-        // ref는 직접 할당할 수 없으므로 DOM에서 직접 사용
-        try {
-          // 컨테이너가 있으면 지도 초기화 재시도
-          setTimeout(() => {
-            if (naverMapContainer.current) {
-              initNaverMap();
-            }
-          }, 100);
-        } catch (error) {
-          console.error('[HOME] 컨테이너로 지도 초기화 실패:', error);
+        console.log('[HOME] Naver Maps 컨테이너를 DOM에서 찾았습니다');
+        
+        // 컨테이너가 숨겨져 있으면 표시
+        if (container.style.display === 'none') {
+          container.style.display = 'block';
+          console.log('[HOME] 네이버맵 컨테이너 표시됨');
         }
+        
+        // 컨테이너 크기 확인 및 조정
+        if (container.offsetWidth === 0 || container.offsetHeight === 0) {
+          console.log('[HOME] 네이버맵 컨테이너 크기 이상 - 기본 크기 설정');
+          container.style.width = '100%';
+          container.style.height = '400px';
+        }
+        
+        // 약간의 지연 후 지도 초기화 재시도
+        setTimeout(() => {
+          console.log('[HOME] DOM 컨테이너로 지도 초기화 재시도');
+          initNaverMap();
+        }, 200);
         return;
       } else {
-        console.error('[HOME] Naver Maps 컨테이너를 찾을 수 없음 - 지도 초기화 건너뜀');
+        console.error('[HOME] Naver Maps 컨테이너를 DOM에서도 찾을 수 없음');
+        
+        // 컨테이너가 없는 경우 동적으로 생성 시도
+        console.log('[HOME] 네이버맵 컨테이너 동적 생성 시도');
+        const mapSection = document.querySelector('.map-section');
+        if (mapSection) {
+          const newContainer = document.createElement('div');
+          newContainer.id = 'naver-map-container';
+          newContainer.style.width = '100%';
+          newContainer.style.height = '400px';
+          newContainer.style.display = 'block';
+          mapSection.appendChild(newContainer);
+          
+          console.log('[HOME] 네이버맵 컨테이너 동적 생성 완료');
+          setTimeout(() => initNaverMap(), 300);
+          return;
+        }
+        
+        console.error('[HOME] 지도 섹션을 찾을 수 없음 - 지도 초기화 건너뜀');
         return;
       }
     }
@@ -3358,6 +3496,20 @@ export default function HomePage() {
           return;
         } catch (error) {
           console.error('[HOME] 네이버 지도 인스턴스 업데이트 실패:', error);
+          
+          // 업데이트 실패 시 지도 재초기화 시도
+          console.log('[HOME] 지도 업데이트 실패 - 재초기화 시도');
+          setTimeout(() => {
+            if (naverMap.current) {
+              try {
+                naverMap.current.destroy();
+                naverMap.current = null;
+              } catch (destroyError) {
+                console.warn('[HOME] 기존 지도 인스턴스 정리 실패:', destroyError);
+              }
+            }
+            initNaverMap();
+          }, 1000);
           return;
         }
       }
@@ -3424,6 +3576,23 @@ export default function HomePage() {
           // 인증 오류 리스너 제거
           window.naver.maps.Event.removeListener(errorListener);
           window.naver.maps.Event.removeListener(initListener);
+          
+          // 지도 초기화 완료 후 추가 안전장치
+          console.log('[HOME] 네이버맵 초기화 완료 - 추가 안전장치 설정');
+          
+          // 지도 상태 주기적 확인 (탭 전환 시 복구)
+          const mapHealthCheck = setInterval(() => {
+            if (naverMap.current && !isNaverMapsReady()) {
+              console.warn('[HOME] 네이버맵 상태 이상 감지 - 복구 시도');
+              clearInterval(mapHealthCheck);
+              setTimeout(() => initNaverMap(), 500);
+            }
+          }, 5000); // 5초마다 체크
+          
+          // 컴포넌트 언마운트 시 정리
+          return () => {
+            clearInterval(mapHealthCheck);
+          };
         });
         
         // iOS WebView에서 지도 로딩 타임아웃 설정 (10초)
