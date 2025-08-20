@@ -441,8 +441,51 @@ class FCMTokenService {
             hasMessaging: !!this.messaging,
             messagingConstructor: this.messaging?.constructor?.name || '알 수 없음'
           });
+          
+          // localhost 환경에서 FCM 작동을 위한 추가 설정
+          console.log('[FCM Token Service] 🔧 localhost 환경에서 FCM 작동을 위한 추가 설정');
+          
+          // 1. 알림 권한 확인
+          if ('Notification' in window) {
+            const permission = Notification.permission;
+            console.log('[FCM Token Service] 📱 알림 권한 상태:', permission);
+            
+            if (permission === 'default') {
+              console.log('[FCM Token Service] 🔔 알림 권한 요청 시도');
+              try {
+                const newPermission = await Notification.requestPermission();
+                console.log('[FCM Token Service] 🔔 알림 권한 결과:', newPermission);
+              } catch (permError) {
+                console.warn('[FCM Token Service] ⚠️ 알림 권한 요청 실패:', permError);
+              }
+            }
+          }
+          
+          // 2. Service Worker 상태 상세 확인
+          if ('serviceWorker' in navigator) {
+            try {
+              const registration = await navigator.serviceWorker.getRegistration();
+              if (registration) {
+                console.log('[FCM Token Service] 🔧 Service Worker 상세 상태:', {
+                  scope: registration.scope,
+                  active: !!registration.active,
+                  waiting: !!registration.waiting,
+                  installing: !!registration.installing,
+                  updateViaCache: registration.updateViaCache
+                });
+                
+                // Service Worker가 waiting 상태라면 강제 활성화 시도
+                if (registration.waiting) {
+                  console.log('[FCM Token Service] ⚡ Service Worker 강제 활성화 시도');
+                  registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                }
+              }
+            } catch (swError) {
+              console.warn('[FCM Token Service] ⚠️ Service Worker 상태 확인 실패:', swError);
+            }
+          }
         }
-
+        
         // getToken() 호출에 타임아웃 적용 (localhost 환경에서는 더 긴 타임아웃)
         const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost';
         const timeoutDuration = isLocalhost ? 60000 : 30000; // localhost: 60초, 기타: 30초
