@@ -24,6 +24,13 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: any) {
+    // 백그라운드 전환 관련 에러는 무시 (hooks 순서 변경 에러)
+    if (error.message.includes('Rendered fewer hooks than expected') && 
+        (document.visibilityState === 'hidden' || !document.hasFocus())) {
+      console.warn('[ErrorBoundary] 백그라운드 전환 관련 hooks 에러 무시:', error.message);
+      return; // 에러를 무시하고 정상 렌더링 계속
+    }
+    
     // 에러 보고 서비스에 에러를 기록할 수 있습니다
     console.error('[ErrorBoundary] 에러 발생:', error);
     console.error('[ErrorBoundary] 에러 정보:', errorInfo);

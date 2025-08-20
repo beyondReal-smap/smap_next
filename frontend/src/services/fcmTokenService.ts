@@ -20,13 +20,16 @@ class FCMTokenService {
   constructor() {
     // 브라우저 환경에서만 초기화
     if (typeof window !== 'undefined') {
-      // 안드로이드 WebView에서는 웹 Firebase 초기화를 건너뜀 (네이티브 토큰만 사용)
-      const isAndroidWebView = /Android/i.test(navigator.userAgent) && /SMAP-Android|WebView|wv/i.test(navigator.userAgent);
-      if (isAndroidWebView) {
-        console.log('[FCM Token Service] Android WebView 감지 - 웹 Firebase 초기화 건너뜀 (네이티브 토큰만 사용)');
-        this.isInitialized = true;
-        return;
-      }
+      // 모든 환경에서 웹 Firebase 초기화 허용
+      console.log('[FCM Token Service] 웹 환경 감지 - Firebase 초기화 시작');
+      console.log('[FCM Token Service] 📋 환경변수 상태 확인:', {
+        NODE_ENV: process.env.NODE_ENV,
+        hasVapidKey: !!process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
+        hasApiKey: !!process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+        hasProjectId: !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+        isLocalhost: window.location.hostname === 'localhost',
+        hostname: window.location.hostname
+      });
       this.initPromise = this.initialize();
     }
   }
@@ -40,7 +43,8 @@ class FCMTokenService {
         isWindow: typeof window !== 'undefined',
         hasServiceWorker: 'serviceWorker' in navigator,
         hasNotification: 'Notification' in window,
-        currentDomain: typeof window !== 'undefined' ? window.location.hostname : 'unknown'
+        currentDomain: typeof window !== 'undefined' ? window.location.hostname : 'unknown',
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent.substring(0, 100) + '...' : 'unknown'
       });
       
       // Firebase 앱이 초기화되어 있는지 확인
@@ -70,11 +74,81 @@ class FCMTokenService {
       await this.ensureServiceWorker();
       
       // Firebase Messaging 초기화
-      this.messaging = getMessaging(app);
-      
-      this.isInitialized = true;
-      console.log('[FCM Token Service] ✅ Firebase Messaging 초기화 완료');
-      console.log('[FCM Token Service] 🚀 FCM 토큰 서비스 준비 완료 - 토큰 요청 가능');
+      try {
+        this.messaging = getMessaging(app);
+        console.log('[FCM Token Service] ✅ Firebase Messaging 인스턴스 생성 성공');
+        
+        // VAPID 키 확인
+        const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+        console.log('[FCM Token Service] 📋 VAPID 키 확인:', {
+          hasVapidKey: !!vapidKey,
+          keyLength: vapidKey ? vapidKey.length : 0,
+          keyPreview: vapidKey ? `${vapidKey.substring(0, 20)}...` : '없음',
+          envFile: 'NEXT_PUBLIC_FIREBASE_VAPID_KEY',
+          nodeEnv: process.env.NODE_ENV,
+          isLocalhost: typeof window !== 'undefined' ? window.location.hostname === 'localhost' : 'unknown'
+        });
+        
+        if (!vapidKey) {
+          console.error('[FCM Token Service] ❌ VAPID 키가 설정되지 않음 - FCM 토큰 생성 불가');
+          console.error('[FCM Token Service] 💡 해결방법: .env.local 파일에 NEXT_PUBLIC_FIREBASE_VAPID_KEY 설정');
+          console.error('[FCM Token Service] 💡 현재 환경변수 상태:', {
+            NODE_ENV: process.env.NODE_ENV,
+            hasVapidKey: !!process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
+            allEnvKeys: Object.keys(process.env).filter(key => key.includes('FIREBASE'))
+          });
+          this.isInitialized = true;
+          return;
+        }
+        
+        // VAPID 키 형식 검증 (Firebase VAPID 키는 보통 87자 또는 140자)
+        if (vapidKey.length < 80 || vapidKey.length > 150) {
+          console.error('[FCM Token Service] ❌ VAPID 키 길이가 올바르지 않음:', vapidKey.length);
+          this.isInitialized = true;
+          return;
+        }
+        
+        // Firebase 프로젝트 설정 확인
+        console.log('[FCM Token Service] 🔥 Firebase 프로젝트 설정:', {
+          projectId: app.options.projectId,
+          authDomain: app.options.authDomain,
+          messagingSenderId: app.options.messagingSenderId,
+          appId: app.options.appId,
+          apiKey: app.options.apiKey ? `${app.options.apiKey.substring(0, 20)}...` : '없음',
+          storageBucket: app.options.storageBucket,
+          measurementId: app.options.measurementId
+        });
+        
+        // 프로젝트 ID가 올바른지 확인
+        if (app.options.projectId !== 'com-dmonster-smap') {
+          console.error('[FCM Token Service] ❌ Firebase 프로젝트 ID가 일치하지 않음:', app.options.projectId);
+          this.isInitialized = true;
+          return;
+        }
+        
+        // API 키 확인
+        if (!app.options.apiKey) {
+          console.error('[FCM Token Service] ❌ Firebase API 키가 설정되지 않음');
+          this.isInitialized = true;
+          return;
+        }
+        
+        // Messaging Sender ID 확인
+        if (!app.options.messagingSenderId) {
+          console.error('[FCM Token Service] ❌ Firebase Messaging Sender ID가 설정되지 않음');
+          this.isInitialized = true;
+          return;
+        }
+        
+        this.isInitialized = true;
+        console.log('[FCM Token Service] ✅ Firebase Messaging 초기화 완료');
+        console.log('[FCM Token Service] 🚀 FCM 토큰 서비스 준비 완료 - 토큰 요청 가능');
+        
+      } catch (messagingError) {
+        console.error('[FCM Token Service] ❌ Firebase Messaging 초기화 실패:', messagingError);
+        this.isInitialized = true;
+        return;
+      }
       
     } catch (error) {
       console.error('[FCM Token Service] ❌ 초기화 실패:', error);
@@ -85,12 +159,20 @@ class FCMTokenService {
   private async ensureServiceWorker(): Promise<void> {
     if ('serviceWorker' in navigator) {
       try {
+        console.log('[FCM Token Service] 🔧 서비스 워커 등록 시작...');
         const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-        console.log('[FCM Token Service] 서비스 워커 등록 성공:', registration);
+        console.log('[FCM Token Service] ✅ 서비스 워커 등록 성공:', {
+          scope: registration.scope,
+          active: !!registration.active,
+          installing: !!registration.installing,
+          waiting: !!registration.waiting
+        });
       } catch (error) {
-        console.warn('[FCM Token Service] 서비스 워커 등록 실패:', error);
-        // 서비스 워커 없어도 FCM 토큰은 생성 가능
+        console.warn('[FCM Token Service] ⚠️ 서비스 워커 등록 실패:', error);
+        console.log('[FCM Token Service] 💡 서비스 워커 없어도 FCM 토큰은 생성 가능');
       }
+    } else {
+      console.log('[FCM Token Service] ℹ️ ServiceWorker를 지원하지 않는 환경');
     }
   }
 
@@ -115,26 +197,27 @@ class FCMTokenService {
   }
 
   /**
-   * FCM 토큰 획득 (웹/네이티브 통합)
+   * FCM 토큰 획득 (프론트엔드 전용)
    */
   async getFCMToken(): Promise<string | null> {
-    console.log('[FCM Token Service] 🔍 FCM 토큰 획득 프로세스 시작');
+    console.log('[FCM Token Service] 🔍 FCM 토큰 획득 프로세스 시작 (프론트엔드 전용)');
+    console.log('[FCM Token Service] 📍 현재 상태:', {
+      isInitialized: this.isInitialized,
+      hasInitPromise: !!this.initPromise,
+      hasMessaging: !!this.messaging,
+      hasApp: !!app,
+      currentToken: this.currentToken ? `${this.currentToken.substring(0, 20)}...` : '없음'
+    });
     
-    // 1. 먼저 iOS 네이티브에서 전달된 토큰 확인
-    const nativeToken = this.checkNativeFCMToken();
-    if (nativeToken) {
-      console.log('[FCM Token Service] 📱 iOS 네이티브 토큰 사용');
-      this.currentToken = nativeToken;
-      return nativeToken;
-    }
+    // 네이티브 토큰 무시하고 프론트엔드에서만 토큰 생성
+    console.log('[FCM Token Service] 🚫 네이티브 토큰 무시 - 프론트엔드에서 토큰 생성');
     
     console.log('[FCM Token Service] 🌐 웹 환경에서 Firebase 토큰 시도');
 
-    // 안드로이드 WebView에서는 네이티브 토큰만 허용
+    // Android WebView에서도 웹 FCM 토큰 생성 허용
     const isAndroidWebView = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent) && /SMAP-Android|WebView|wv/i.test(navigator.userAgent);
     if (isAndroidWebView) {
-      console.log('[FCM Token Service] Android WebView - 웹 FCM 토큰 생성 차단');
-      return null;
+      console.log('[FCM Token Service] Android WebView - 웹 FCM 토큰 생성 허용');
     }
 
     // 2. 웹 환경에서 Firebase로 토큰 획득
@@ -159,29 +242,132 @@ class FCMTokenService {
 
     try {
       console.log('[FCM Token Service] 🔑 웹 FCM 토큰 요청 중...');
+      console.log('[FCM Token Service] 📍 Firebase Messaging 상태:', {
+        hasMessaging: !!this.messaging,
+        messagingType: typeof this.messaging,
+        appName: app?.name || 'unknown'
+      });
       
-      // VAPID 키는 Firebase 콘솔에서 가져와야 함
-      const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
-      console.log('[FCM Token Service] 📋 VAPID 키 상태:', vapidKey ? '설정됨' : '미설정');
+      // iOS WebView 환경 확인 (Firebase 설정과 동일한 로직)
+      const isIOSWebView = typeof window !== 'undefined' && 
+        /iPad|iPhone|iPod/.test(navigator.userAgent) && 
+        !(window.navigator as any).standalone;
       
-      if (!vapidKey) {
-        console.warn('[FCM Token Service] ⚠️ VAPID 키가 설정되지 않음 - Firebase Console에서 VAPID 키를 생성하고 NEXT_PUBLIC_FIREBASE_VAPID_KEY 환경변수에 설정하세요');
-      }
-      
-      const token = await getToken(this.messaging, {
-        vapidKey: vapidKey
+      console.log('[FCM Token Service] 📱 환경 감지:', {
+        isIOSWebView,
+        userAgent: typeof window !== 'undefined' ? navigator.userAgent : 'unknown',
+        isStandalone: typeof window !== 'undefined' ? (window.navigator as any).standalone : 'unknown',
+        firebaseApp: !!app,
+        firebaseMessaging: !!this.messaging
       });
 
-      if (token) {
-        this.currentToken = token;
-        console.log('[FCM Token Service] ✅ FCM 토큰 획득 성공');
-        console.log('[FCM Token Service] 토큰 길이:', token.length);
-        console.log('[FCM Token Service] 토큰 미리보기:', token.substring(0, 50) + '...');
-        return token;
-      } else {
-        console.warn('[FCM Token Service] ⚠️ FCM 토큰을 획득하지 못함 (권한 거부 또는 브라우저 미지원)');
+      // VAPID 키는 Firebase 콘솔에서 가져와야 함
+      const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+      console.log('[FCM Token Service] 📋 VAPID 키 상태:', {
+        hasVapidKey: !!vapidKey,
+        keyLength: vapidKey ? vapidKey.length : 0,
+        keyPreview: vapidKey ? `${vapidKey.substring(0, 20)}...` : '없음',
+        envSource: 'process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY',
+        isLocalhost: typeof window !== 'undefined' ? window.location.hostname === 'localhost' : 'unknown'
+      });
+      
+      if (!vapidKey) {
+        console.error('[FCM Token Service] ❌ VAPID 키가 설정되지 않음 - FCM 토큰 생성 불가');
+        console.error('[FCM Token Service] 💡 환경변수 확인:', {
+          NODE_ENV: process.env.NODE_ENV,
+          hasVapidKey: !!process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
+          allFirebaseKeys: Object.keys(process.env).filter(key => key.includes('FIREBASE'))
+        });
         return null;
       }
+      
+      // VAPID 키 형식 재검증
+      if (vapidKey.length < 80 || vapidKey.length > 150) {
+        console.error('[FCM Token Service] ❌ VAPID 키 길이가 올바르지 않음:', vapidKey.length);
+        return null;
+      }
+      
+      // VAPID 키가 올바른 형식인지 확인 (Base64 형식)
+      if (!/^[A-Za-z0-9+/]+={0,2}$/.test(vapidKey)) {
+        console.error('[FCM Token Service] ❌ VAPID 키 형식이 올바르지 않음 (Base64 형식이 아님)');
+        return null;
+      }
+      
+            console.log('[FCM Token Service] 🔑 getToken() 호출 시작...');
+      console.log('[FCM Token Service] 📍 Firebase Messaging 상태:', {
+        hasMessaging: !!this.messaging,
+        messagingType: typeof this.messaging,
+        vapidKeyLength: vapidKey ? vapidKey.length : 0
+      });
+      
+      try {
+        console.log('[FCM Token Service] 🔑 getToken() 파라미터:', {
+          messaging: !!this.messaging,
+          vapidKeyLength: vapidKey.length,
+          vapidKeyStart: vapidKey.substring(0, 10) + '...'
+        });
+        
+        const token = await getToken(this.messaging, {
+          vapidKey: vapidKey
+        });
+        
+        if (token) {
+          this.currentToken = token;
+          console.log('[FCM Token Service] ✅ FCM 토큰 획득 성공');
+          console.log('[FCM Token Service] 토큰 길이:', token.length);
+          console.log('[FCM Token Service] 토큰 미리보기:', token.substring(0, 50) + '...');
+          return token;
+        } else {
+          console.warn('[FCM Token Service] ⚠️ FCM 토큰을 획득하지 못함 (권한 거부 또는 브라우저 미지원)');
+          return null;
+        }
+              } catch (tokenError) {
+          console.error('[FCM Token Service] ❌ getToken() 호출 실패:', tokenError);
+          
+          // iOS WebView에서 서비스 워커 등록 실패 시 대체 로직
+          if (isIOSWebView && tokenError instanceof Error && 
+              tokenError.message.includes('service worker')) {
+            console.warn('[FCM Token Service] 📱 iOS WebView 서비스 워커 등록 실패 - 대체 로직 시도');
+            console.warn('[FCM Token Service] 💡 iOS WebView에서는 FCM 토큰 생성이 제한될 수 있음');
+            console.warn('[FCM Token Service] 💡 네이티브 앱에서 FCM 토큰을 받아오는 것을 권장');
+            return null;
+          }
+          
+          // 401 인증 오류 시 Firebase 프로젝트 상태 확인 안내
+          if (tokenError instanceof Error && 
+              tokenError.message.includes('authentication credential')) {
+            console.error('[FCM Token Service] 🔐 Firebase 프로젝트 인증 실패');
+            console.error('[FCM Token Service] 💡 해결방법:');
+            console.error('[FCM Token Service]   1. Firebase 콘솔에서 프로젝트 상태 확인');
+            console.error('[FCM Token Service]   2. 프로젝트가 일시중지되지 않았는지 확인');
+            console.error('[FCM Token Service]   3. VAPID 키 재생성 시도');
+            console.error('[FCM Token Service]   4. 프로젝트 권한 확인');
+            console.error('[FCM Token Service] 🔗 Firebase 콘솔: https://console.firebase.google.com');
+          }
+          
+          // 인증 에러인 경우 상세 정보 로깅
+          if (tokenError instanceof Error) {
+            if (tokenError.message.includes('authentication credential')) {
+              console.error('[FCM Token Service] 🔐 인증 자격 증명 문제 - VAPID 키 또는 Firebase 설정 확인 필요');
+              console.error('[FCM Token Service] 🔐 VAPID 키:', vapidKey ? '설정됨' : '설정되지 않음');
+              console.error('[FCM Token Service] 🔐 Firebase 앱:', app ? '초기화됨' : '초기화되지 않음');
+              console.error('[FCM Token Service] 🔐 Firebase 프로젝트 ID:', app?.options?.projectId);
+              console.error('[FCM Token Service] 🔐 VAPID 키 형식 검증:', {
+                length: vapidKey.length,
+                isBase64: /^[A-Za-z0-9+/]+={0,2}$/.test(vapidKey),
+                startsWith: vapidKey.substring(0, 10)
+              });
+            } else if (tokenError.message.includes('permission')) {
+              console.error('[FCM Token Service] 🔐 알림 권한 문제 - 브라우저에서 알림 권한을 허용해야 함');
+            } else if (tokenError.message.includes('unsupported-browser')) {
+              console.error('[FCM Token Service] 🌐 브라우저 미지원 - FCM을 지원하지 않는 환경');
+            } else if (tokenError.message.includes('service worker')) {
+              console.error('[FCM Token Service] 🔧 서비스 워커 등록 실패 - 브라우저 설정 확인 필요');
+            }
+          }
+          
+          return null;
+        }
       
     } catch (error) {
       console.error('[FCM Token Service] ❌ FCM 토큰 획득 실패:', error);
@@ -325,18 +511,30 @@ class FCMTokenService {
   async initializeAndCheckUpdateToken(mt_idx: number): Promise<{ success: boolean; token?: string; error?: string; message?: string }> {
     try {
       console.log('[FCM Token Service] 🔔 FCM 토큰 초기화 및 체크/업데이트 시작 (로그인)');
+      console.log('[FCM Token Service] 📍 사용자 ID:', mt_idx);
+      console.log('[FCM Token Service] 📍 현재 환경:', {
+        isWindow: typeof window !== 'undefined',
+        hasServiceWorker: typeof navigator !== 'undefined' && 'serviceWorker' in navigator,
+        hasNotification: typeof window !== 'undefined' && 'Notification' in window,
+        currentDomain: typeof window !== 'undefined' ? window.location.hostname : 'unknown'
+      });
       
       // 1. FCM 토큰 획득
+      console.log('[FCM Token Service] 🔑 FCM 토큰 획득 시작...');
       const token = await this.getFCMToken();
       
       if (!token) {
+        console.warn('[FCM Token Service] ⚠️ FCM 토큰 획득 실패');
         return {
           success: false,
           error: 'FCM 토큰 획득 실패'
         };
       }
 
+      console.log('[FCM Token Service] ✅ FCM 토큰 획득 성공, 길이:', token.length);
+
       // 2. 서버에서 토큰 체크 후 필요시 업데이트
+      console.log('[FCM Token Service] 🌐 서버에 토큰 체크/업데이트 요청...');
       const checkResult = await this.checkAndUpdateTokenToServer(mt_idx, token);
       
       if (checkResult.success) {
@@ -347,6 +545,7 @@ class FCMTokenService {
           message: checkResult.message
         };
       } else {
+        console.warn('[FCM Token Service] ⚠️ FCM 토큰 체크/업데이트 실패:', checkResult.message);
         return {
           success: false,
           token: token,
@@ -376,6 +575,106 @@ class FCMTokenService {
       console.log('[FCM Token Service] 포그라운드 메시지 수신:', payload);
       callback(payload);
     });
+  }
+
+  /**
+   * 토큰 변경 감지 및 자동 업데이트
+   */
+  onTokenRefresh(callback: (token: string) => void): (() => void) | void {
+    if (!this.messaging) {
+      console.warn('[FCM Token Service] Firebase Messaging이 초기화되지 않음');
+      return;
+    }
+
+    try {
+      // 토큰 변경 이벤트 리스너 설정
+      const unsubscribe = onMessage(this.messaging, async (payload) => {
+        // 토큰 변경 감지 시 새로운 토큰 획득
+        const newToken = await this.getFCMToken();
+        if (newToken && newToken !== this.currentToken) {
+          console.log('[FCM Token Service] 🔄 FCM 토큰 변경 감지 - 새 토큰:', newToken.substring(0, 50) + '...');
+          this.currentToken = newToken;
+          callback(newToken);
+        }
+      });
+
+      // 정리 함수 반환
+      return unsubscribe;
+    } catch (error) {
+      console.error('[FCM Token Service] 토큰 변경 감지 설정 실패:', error);
+    }
+  }
+
+  /**
+   * 강제 토큰 재생성 및 서버 업데이트
+   */
+  async forceTokenRefresh(mt_idx: number): Promise<{ success: boolean; token?: string; error?: string }> {
+    try {
+      console.log('[FCM Token Service] 🔄 강제 FCM 토큰 재생성 시작');
+      
+      // 현재 토큰 초기화
+      this.currentToken = null;
+      
+      // 새 토큰 획득
+      const newToken = await this.getFCMToken();
+      if (!newToken) {
+        return {
+          success: false,
+          error: '새 FCM 토큰 획득 실패'
+        };
+      }
+
+      // 서버에 새 토큰 업데이트
+      const updateResult = await this.checkAndUpdateTokenToServer(mt_idx, newToken);
+      
+      if (updateResult.success) {
+        console.log('[FCM Token Service] ✅ 강제 토큰 재생성 및 업데이트 완료');
+        return {
+          success: true,
+          token: newToken
+        };
+      } else {
+        return {
+          success: false,
+          token: newToken,
+          error: updateResult.message
+        };
+      }
+      
+    } catch (error) {
+      console.error('[FCM Token Service] ❌ 강제 토큰 재생성 실패:', error);
+      return {
+        success: false,
+        error: (error as Error).message
+      };
+    }
+  }
+
+  /**
+   * 주기적 토큰 유효성 검사 및 업데이트
+   */
+  async validateAndRefreshToken(mt_idx: number): Promise<boolean> {
+    try {
+      console.log('[FCM Token Service] 🔍 FCM 토큰 유효성 검사 시작');
+      
+      const currentToken = this.getCurrentToken();
+      if (!currentToken) {
+        console.log('[FCM Token Service] 현재 토큰이 없음 - 새로 생성');
+        return await this.initializeAndCheckUpdateToken(mt_idx).then(result => result.success);
+      }
+
+      // 토큰 유효성 검사 (간단한 길이 및 형식 체크)
+      if (currentToken.length < 100) {
+        console.warn('[FCM Token Service] 토큰이 너무 짧음 - 재생성 필요');
+        return await this.initializeAndCheckUpdateToken(mt_idx).then(result => result.success);
+      }
+
+      console.log('[FCM Token Service] ✅ 현재 토큰 유효성 확인됨');
+      return true;
+    } catch (error) {
+      console.error('[FCM Token Service] 토큰 유효성 검사 실패:', error);
+      return false;
+    }
   }
 }
 

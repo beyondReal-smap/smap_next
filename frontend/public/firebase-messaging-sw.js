@@ -9,7 +9,8 @@ const firebaseConfig = {
   projectId: "com-dmonster-smap",
   storageBucket: "com-dmonster-smap.firebasestorage.app",
   messagingSenderId: "283271180972",
-  appId: "1:283271180972:web:6c8d4104b83f419403e509"
+  appId: "1:283271180972:web:6c8d4104b83f419403e509",
+  measurementId: "G-1B733FGCQ5"
 };
 
 // Firebase 초기화

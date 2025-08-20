@@ -21,7 +21,9 @@ const isFirebaseConfigured = process.env.NEXT_PUBLIC_FIREBASE_API_KEY &&
 
 // Firebase 앱 초기화 (브라우저에서만, 그리고 설정이 되어있을 때만)
 // 안드로이드 WebView에서는 Firebase Web 초기화 자체를 차단 (네이티브 사용)
+// iOS WebView에서는 Firebase Web 초기화 허용 (FCM 토큰 생성 시도)
 const isAndroidWebView = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent) && /SMAP-Android|WebView|wv/i.test(navigator.userAgent);
+const isIOSWebView = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent) && !(navigator as any).standalone;
 
 export const app = typeof window !== 'undefined' && isFirebaseConfigured && !isAndroidWebView ? 
   (getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]) : 
@@ -45,6 +47,11 @@ if (typeof window !== 'undefined') {
   if (isFirebaseConfigured) {
     if (isAndroidWebView) {
       console.log('[Firebase] ⚠️ Android WebView 감지 - Firebase Web 초기화 차단(네이티브 사용)');
+    } else if (isIOSWebView) {
+      console.log('[Firebase] 📱 iOS WebView 감지 - Firebase Web 초기화 허용(FCM 토큰 생성 시도)');
+      console.log('[Firebase] 🔥 Firebase 초기화 완료');
+      console.log('[Firebase] Project ID:', firebaseConfig.projectId);
+      console.log('[Firebase] Messaging Sender ID:', firebaseConfig.messagingSenderId);
     } else {
       console.log('[Firebase] 🔥 Firebase 초기화 완료');
       console.log('[Firebase] Project ID:', firebaseConfig.projectId);
