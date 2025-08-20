@@ -964,6 +964,7 @@ export default function HomePage() {
               console.log('✅ [FCM] FCM 토큰 업데이트 성공:', result.message);
             } else {
               console.warn('⚠️ [FCM] FCM 토큰 업데이트 실패:', result.error);
+              console.log('🔥 [FCM] FCM 토큰 업데이트 실패해도 계속 진행');
             }
           })
           .catch(error => {
@@ -986,6 +987,9 @@ export default function HomePage() {
             .then(result => {
               if (result.success) {
                 console.log('✅ [FCM] 주기적 토큰 검증 완료:', result.message);
+              } else {
+                console.warn('⚠️ [FCM] 주기적 토큰 검증 실패:', result.error);
+                console.log('🔥 [FCM] 주기적 토큰 검증 실패해도 계속 진행');
               }
             })
             .catch(error => {
@@ -1052,10 +1056,12 @@ export default function HomePage() {
                   console.log('📱 [FCM] FCM 토큰이 서버에 저장되어 푸시 알림 수신 가능');
                 } else {
                   console.warn('⚠️ [FCM] FCM 토큰 업데이트 실패:', result.error);
+                  console.log('🔥 [FCM] FCM 토큰 업데이트 실패해도 계속 진행');
                 }
               })
               .catch(error => {
                 console.error('❌ [FCM] FCM 토큰 업데이트 중 오류:', error);
+                console.log('🔥 [FCM] FCM 토큰 업데이트 오류가 발생해도 계속 진행');
               });
           } else {
             console.log('⏳ [FCM] 권한 대기 중, 2초 후 재시도...');

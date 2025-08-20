@@ -177,21 +177,33 @@ class FCMTokenService {
   }
 
   /**
-   * 알림 권한 요청
+   * 알림 권한 요청 (iOS WebView에서는 건너뛰기)
    */
   private async requestNotificationPermission(): Promise<NotificationPermission> {
-    if (typeof window === 'undefined' || !('Notification' in window)) {
-      console.log('[FCM Token Service] ℹ️ 이 브라우저는 푸시 알림을 지원하지 않습니다.');
-      return 'denied';
+    console.log('[FCM Token Service] 🔔 알림 권한 요청 시작...');
+    
+    // iOS WebView 환경에서는 알림 권한 요청을 건너뛰고 바로 'granted'로 가정
+    if (typeof window !== 'undefined') {
+      const userAgent = navigator.userAgent;
+      const isIOS = /iPad|iPhone|iPod/.test(userAgent);
+      const isWebView = /WebView|wv|SMAP-Android/i.test(userAgent);
+      
+      if (isIOS || isWebView) {
+        console.log('[FCM Token Service] 📱 iOS/WebView 환경 감지 - 알림 권한 요청 건너뛰기');
+        console.log('[FCM Token Service] 📱 Firebase FCM 토큰 생성을 위해 권한을 자동으로 허용으로 가정');
+        return 'granted';
+      }
     }
-
+    
+    // 일반 브라우저에서만 알림 권한 요청
     try {
       const permission = await Notification.requestPermission();
       console.log('[FCM Token Service] 🔔 알림 권한 상태:', permission);
       return permission;
     } catch (error) {
       console.error('[FCM Token Service] ❌ 알림 권한 요청 실패:', error);
-      return 'denied';
+      console.log('[FCM Token Service] 🔥 권한 요청 실패해도 계속 진행');
+      return 'denied'; // 실패해도 계속 진행
     }
   }
 
@@ -636,18 +648,41 @@ class FCMTokenService {
         currentDomain: typeof window !== 'undefined' ? window.location.hostname : 'unknown'
       });
       
-      // 1. 알림 권한 요청
-      console.log('[FCM Token Service] 🔔 알림 권한 요청 시작...');
+      // 알림 권한 확인
       const permission = await this.requestNotificationPermission();
-      
-      if (permission !== 'granted') {
+      if (permission === 'denied') {
         console.warn('[FCM Token Service] ⚠️ 알림 권한이 거부됨');
-        return {
-          success: false,
-          error: '알림 권한이 거부되었습니다'
-        };
+        console.log('[FCM Token Service] 🔥 권한이 거부되어도 Firebase FCM 토큰 생성 시도');
+        
+        // 권한이 거부되어도 Firebase FCM 토큰 생성 시도
+        try {
+          const fcmToken = await this.getFCMToken();
+          if (fcmToken) {
+            console.log('[FCM Token Service] ✅ 권한 거부 상태에서도 FCM 토큰 생성 성공:', fcmToken.substring(0, 50) + '...');
+            
+            // 토큰을 서버에 등록/업데이트
+            await this.checkAndUpdateTokenToServer(mt_idx, fcmToken);
+            return {
+              success: true,
+              token: fcmToken,
+              message: '권한 거부 상태에서도 FCM 토큰 생성 성공'
+            };
+          } else {
+            console.warn('[FCM Token Service] ⚠️ 권한 거부 상태에서 FCM 토큰 생성 실패');
+            return {
+              success: false,
+              error: '권한 거부 상태에서 FCM 토큰 생성 실패'
+            };
+          }
+        } catch (tokenError) {
+          console.error('[FCM Token Service] ❌ 권한 거부 상태에서 FCM 토큰 생성 중 오류:', tokenError);
+          return {
+            success: false,
+            error: '권한 거부 상태에서 FCM 토큰 생성 중 오류 발생'
+          };
+        }
       }
-      
+
       // 2. FCM 토큰 획득
       console.log('[FCM Token Service] 🔑 FCM 토큰 획득 시작...');
       const token = await this.getFCMToken();
@@ -856,7 +891,7 @@ if (typeof window !== 'undefined') {
     }
   };
 
-  console.log('🛠️ [FCM TEST] FCM 테스트 함수들이 전역에 등록되었습니다:');
+  console.log('��️ [FCM TEST] FCM 테스트 함수들이 전역에 등록되었습니다:');
   console.log('- testFCMToken(): FCM 토큰 생성 테스트');
   console.log('- testFCMRegister(mt_idx): FCM 토큰 등록 테스트');
   console.log('- testFCMUpdate(mt_idx): FCM 토큰 체크/업데이트 테스트');
