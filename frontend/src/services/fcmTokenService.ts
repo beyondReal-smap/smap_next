@@ -117,7 +117,7 @@ export class FCMTokenService {
   /**
    * FCM 토큰 획득
    */
-  async getFCMToken(): Promise<string | null> {
+  async getFCMToken(mt_idx?: number): Promise<string | null> {
     try {
       // 서버 사이드에서는 FCM 토큰 생성 불가
       if (typeof window === 'undefined') {
@@ -144,18 +144,20 @@ export class FCMTokenService {
         const dummyToken = this.generateDummyFCMToken();
         console.log('[FCM Token Service] 🎭 dummy FCM 토큰 생성됨:', dummyToken.substring(0, 20) + '...');
         
-        // dummy 토큰을 DB에 업데이트
-        try {
-          await this.updateFCMTokenInDB(dummyToken);
-          console.log('[FCM Token Service] ✅ dummy FCM 토큰 DB 업데이트 성공');
-          this.currentToken = dummyToken;
-          return dummyToken;
-        } catch (dbError) {
-          console.warn('[FCM Token Service] ⚠️ dummy FCM 토큰 DB 업데이트 실패:', dbError);
-          // DB 업데이트 실패해도 dummy 토큰은 반환
-          this.currentToken = dummyToken;
-          return dummyToken;
+        // dummy 토큰을 DB에 업데이트 (사용자 ID가 있을 때만)
+        if (mt_idx) {
+          try {
+            await this.updateFCMTokenInDB(dummyToken, mt_idx);
+            console.log('[FCM Token Service] ✅ dummy FCM 토큰 DB 업데이트 성공');
+          } catch (dbError) {
+            console.warn('[FCM Token Service] ⚠️ dummy FCM 토큰 DB 업데이트 실패:', dbError);
+          }
+        } else {
+          console.log('[FCM Token Service] ℹ️ 사용자 ID 없음 - dummy FCM 토큰 DB 업데이트 건너뜀');
         }
+        
+        this.currentToken = dummyToken;
+        return dummyToken;
       }
 
       // 실제 Firebase FCM 토큰 생성
@@ -173,12 +175,16 @@ export class FCMTokenService {
       if (token) {
         console.log('[FCM Token Service] ✅ FCM 토큰 생성 성공:', token.substring(0, 20) + '...');
         
-        // 토큰을 DB에 업데이트
-        try {
-          await this.updateFCMTokenInDB(token);
-          console.log('[FCM Token Service] ✅ FCM 토큰 DB 업데이트 성공');
-        } catch (dbError) {
-          console.warn('[FCM Token Service] ⚠️ FCM 토큰 DB 업데이트 실패:', dbError);
+        // 토큰을 DB에 업데이트 (사용자 ID가 있을 때만)
+        if (mt_idx) {
+          try {
+            await this.updateFCMTokenInDB(token, mt_idx);
+            console.log('[FCM Token Service] ✅ FCM 토큰 DB 업데이트 성공');
+          } catch (dbError) {
+            console.warn('[FCM Token Service] ⚠️ FCM 토큰 DB 업데이트 실패:', dbError);
+          }
+        } else {
+          console.log('[FCM Token Service] ℹ️ 사용자 ID 없음 - FCM 토큰 DB 업데이트 건너뜀');
         }
         
         this.currentToken = token;
@@ -219,8 +225,8 @@ export class FCMTokenService {
 
       console.log(`[FCM Token Service] 🔄 FCM 토큰 DB 업데이트 시작 (사용자 ID: ${userId})`);
 
-      // API 호출
-      const response = await fetch(`https://api3.smap.site/api/v1/member-fcm-token`, {
+      // API 호출 - check-and-update 엔드포인트 사용
+      const response = await fetch(`https://api3.smap.site/api/v1/member-fcm-token/check-and-update`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -306,7 +312,7 @@ export class FCMTokenService {
       console.log('[FCM Token Service] 📍 사용자 ID:', mt_idx);
       
       // FCM 토큰 획득
-      const token = await this.getFCMToken();
+      const token = await this.getFCMToken(mt_idx);
       
       if (!token) {
         console.warn('[FCM Token Service] ⚠️ FCM 토큰 획득 실패');
@@ -354,7 +360,7 @@ export class FCMTokenService {
       console.log('[FCM Token Service] 📍 사용자 ID:', mt_idx);
       
       // FCM 토큰 획득
-      const token = await this.getFCMToken();
+      const token = await this.getFCMToken(mt_idx);
       
       if (!token) {
         console.warn('[FCM Token Service] ⚠️ FCM 토큰 획득 실패');
@@ -433,7 +439,7 @@ export class FCMTokenService {
       this.currentToken = null;
       
       // 새 토큰 획득
-      const newToken = await this.getFCMToken();
+      const newToken = await this.getFCMToken(mt_idx);
       if (!newToken) {
         return {
           success: false,
@@ -495,7 +501,7 @@ export class FCMTokenService {
       (window as any).testFCMRegister = async (mt_idx?: number) => {
         console.log('🔔 [FCM TEST] FCM 토큰 등록 테스트 시작');
         try {
-          const token = await this.getFCMToken();
+          const token = await this.getFCMToken(mt_idx);
           if (token) {
             console.log('✅ [FCM TEST] 토큰 생성 성공:', token.substring(0, 20) + '...');
             
@@ -523,7 +529,7 @@ export class FCMTokenService {
           console.log('📋 [FCM TEST] 현재 저장된 토큰:', currentToken ? currentToken.substring(0, 20) + '...' : '없음');
           
           // 새 토큰 생성 및 DB 업데이트
-          const newToken = await this.getFCMToken();
+          const newToken = await this.getFCMToken(mt_idx);
           if (newToken) {
             console.log('✅ [FCM TEST] 새 토큰 생성 성공:', newToken.substring(0, 20) + '...');
             
