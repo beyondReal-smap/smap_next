@@ -136,11 +136,47 @@ export class FCMTokenService {
         throw new Error('VAPID 키가 설정되지 않음');
       }
 
-      // localhost 환경 감지
+      // localhost 환경이어도 실제 Firebase 토큰 생성 시도
       const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost';
       
       if (isLocalhost) {
-        console.log('[FCM Token Service] 🏠 localhost 환경 감지 - dummy FCM 토큰 생성');
+        console.log('[FCM Token Service] 🏠 localhost 환경 감지 - 실제 Firebase 토큰 생성 시도');
+        
+        // 실제 Firebase 토큰 생성 시도
+        try {
+          if (this.messaging) {
+            const { getToken } = await import('firebase/messaging');
+            const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+            
+            if (vapidKey) {
+              const realToken = await getToken(this.messaging, {
+                vapidKey: vapidKey,
+                serviceWorkerRegistration: undefined
+              });
+              
+              if (realToken) {
+                console.log('[FCM Token Service] ✅ localhost에서 실제 Firebase 토큰 생성 성공:', realToken.substring(0, 20) + '...');
+                
+                // 실제 토큰을 DB에 업데이트
+                if (mt_idx) {
+                  try {
+                    await this.updateFCMTokenInDB(realToken, mt_idx);
+                    console.log('[FCM Token Service] ✅ 실제 Firebase 토큰 DB 업데이트 성공');
+                  } catch (dbError) {
+                    console.warn('[FCM Token Service] ⚠️ 실제 Firebase 토큰 DB 업데이트 실패:', dbError);
+                  }
+                }
+                
+                this.currentToken = realToken;
+                return realToken;
+              }
+            }
+          }
+        } catch (error) {
+          console.warn('[FCM Token Service] ⚠️ localhost에서 실제 Firebase 토큰 생성 실패:', error);
+        }
+        
+        // 실제 토큰 생성 실패 시 dummy 토큰 사용
         const dummyToken = this.generateDummyFCMToken();
         console.log('[FCM Token Service] 🎭 dummy FCM 토큰 생성됨:', dummyToken.substring(0, 20) + '...');
         
@@ -438,8 +474,36 @@ export class FCMTokenService {
       // 현재 토큰 초기화
       this.currentToken = null;
       
-      // 새 토큰 획득
-      const newToken = await this.getFCMToken(mt_idx);
+      // 강제로 실제 Firebase 토큰 생성 시도
+      let newToken: string | null = null;
+      
+      try {
+        if (this.messaging) {
+          const { getToken } = await import('firebase/messaging');
+          const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+          
+          if (vapidKey) {
+            console.log('[FCM Token Service] 🔄 Firebase에서 새 토큰 생성 중...');
+            newToken = await getToken(this.messaging, {
+              vapidKey: vapidKey,
+              serviceWorkerRegistration: undefined
+            });
+            
+            if (newToken) {
+              console.log('[FCM Token Service] ✅ Firebase에서 새 토큰 생성 성공:', newToken.substring(0, 20) + '...');
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('[FCM Token Service] ⚠️ Firebase 토큰 생성 실패:', error);
+      }
+      
+      // Firebase 토큰 생성 실패 시 기존 방식 사용
+      if (!newToken) {
+        console.log('[FCM Token Service] 🔄 기존 방식으로 새 토큰 획득 시도');
+        newToken = await this.getFCMToken(mt_idx);
+      }
+      
       if (!newToken) {
         return {
           success: false,
