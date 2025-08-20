@@ -617,10 +617,34 @@ export class FCMTokenService {
         }
       };
 
+      // 추가 전역 함수들 등록
+      (window as any).forceRefreshFCMToken = async (mt_idx: number) => {
+        return await this.forceTokenRefresh(mt_idx);
+      };
+      
+      (window as any).getFCMTokenStatus = async () => {
+        return {
+          hasToken: !!this.currentToken,
+          tokenPreview: this.currentToken ? `${this.currentToken.substring(0, 20)}...` : null,
+          environment: typeof window !== 'undefined' ? window.location.hostname : 'unknown',
+          isSupported: 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window,
+          timestamp: new Date().toISOString()
+        };
+      };
+      
+      (window as any).getCurrentFCMToken = () => {
+        return this.currentToken;
+      };
+      
+      (window as any).fcmTokenService = this; // 인스턴스도 전역에 등록
+      
       console.log('🔔 [FCM TEST] FCM 테스트 함수들이 전역에 등록되었습니다:');
       console.log('- testFCMToken(): FCM 토큰 생성 테스트');
       console.log('- testFCMRegister(mt_idx): FCM 토큰 등록 테스트 (DB 업데이트 포함)');
       console.log('- testFCMUpdate(mt_idx): FCM 토큰 체크/업데이트 테스트 (DB 업데이트 포함)');
+      console.log('- forceRefreshFCMToken(mt_idx): 강제 토큰 새로고침');
+      console.log('- getFCMTokenStatus(): 현재 FCM 토큰 상태');
+      console.log('- getCurrentFCMToken(): 현재 FCM 토큰 반환');
     }
   }
 }
