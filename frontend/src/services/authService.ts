@@ -2,8 +2,10 @@ import apiClient from './apiClient';
 import { Member, Group, GroupDetail, GroupWithMembers, UserProfile, LoginRequest, LoginResponse } from '@/types/auth';
 
 class AuthService {
-  private readonly TOKEN_KEY = 'auth-token';
+  private readonly TOKEN_KEY = 'smap_auth_token';
   private readonly USER_KEY = 'smap_user_data';
+  private readonly LOGIN_TIME_KEY = 'smap_login_time';
+  private readonly SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7일
 
   /**
    * 로그인
@@ -33,6 +35,9 @@ class AuthService {
         // 사용자 기본 정보만 조회 (그룹 정보는 나중에)
         const userProfile = await this.getUserBasicProfile(response.data.data.member.mt_idx);
         this.setUserData(userProfile);
+        
+        // 로그인 시간 저장
+        this.setLoginTime();
       } else {
         // 백엔드에서 success: false로 응답한 경우
         console.log('[AUTH SERVICE] 백엔드 로그인 실패 응답:', response.data);
@@ -42,24 +47,7 @@ class AuthService {
       return response.data;
     } catch (error: any) {
       console.error('[AUTH SERVICE] 로그인 실패:', error);
-      
-      // API 응답에서 메시지 추출 (여러 경우 고려)
-      let errorMessage = '로그인에 실패했습니다.';
-      
-      if (error.response?.data) {
-        // HTTP 응답이 있는 경우
-        if (error.response.data.message) {
-          errorMessage = error.response.data.message;
-        } else if (typeof error.response.data === 'string') {
-          errorMessage = error.response.data;
-        }
-      } else if (error.message) {
-        // 네트워크 오류 등의 경우
-        errorMessage = error.message;
-      }
-      
-      console.log('[AUTH SERVICE] 최종 에러 메시지:', errorMessage);
-      throw new Error(errorMessage);
+      throw error;
     }
   }
 
@@ -327,6 +315,7 @@ class AuthService {
     if (typeof window !== 'undefined') {
       localStorage.removeItem(this.TOKEN_KEY);
       localStorage.removeItem(this.USER_KEY);
+      localStorage.removeItem(this.LOGIN_TIME_KEY); // 로그인 시간 삭제
       
       // 쿠키에서도 토큰 삭제
       const isSecure = window.location.protocol === 'https:' ? '; Secure' : '';
@@ -371,7 +360,8 @@ class AuthService {
   isLoggedIn(): boolean {
     const token = this.getToken();
     const userData = this.getUserData();
-    
+    const loginTime = this.getLoginTime();
+
     // 로컬스토리지에 토큰이 없으면 쿠키도 확인
     if (!token && typeof window !== 'undefined') {
       const cookieToken = document.cookie
@@ -385,7 +375,21 @@ class AuthService {
       }
     }
     
-    return !!(token && userData);
+    // 토큰이 있고, 사용자 데이터가 있으며, 로그인 시간이 유효한 경우
+    if (token && userData && loginTime) {
+      const currentTime = Date.now();
+      const timeSinceLogin = currentTime - loginTime;
+      if (timeSinceLogin < this.SESSION_DURATION) {
+        console.log('[AUTH SERVICE] 토큰 유효, 로그인 시간 유효, 자동 로그인 유지');
+        return true;
+      } else {
+        console.warn('[AUTH SERVICE] 토큰 유효, 로그인 시간 만료, 로그아웃 필요');
+        this.clearAuthData(); // 세션 만료된 경우 데이터 삭제
+        return false;
+      }
+    }
+    
+    return false;
   }
 
   /**
@@ -458,6 +462,26 @@ class AuthService {
       // 실패 시 저장된 정보 반환
       return this.getUserData();
     }
+  }
+
+  /**
+   * 로그인 시간 저장
+   */
+  setLoginTime(): void {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(this.LOGIN_TIME_KEY, Date.now().toString());
+    }
+  }
+
+  /**
+   * 로그인 시간 조회
+   */
+  getLoginTime(): number | null {
+    if (typeof window !== 'undefined') {
+      const loginTime = localStorage.getItem(this.LOGIN_TIME_KEY);
+      return loginTime ? parseInt(loginTime, 10) : null;
+    }
+    return null;
   }
 }
 

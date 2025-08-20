@@ -2512,19 +2512,19 @@ export default function HomePage() {
       console.log('[HOME] 인증 상태 확인:', { isLoggedIn, user: user?.mt_idx });
 
       // 추가 인증 상태 확인 (localStorage 직접 확인)
-      const hasToken = authService.getToken();
-      const hasUserData = authService.getUserData();
+      const authToken = authService.getToken();
+      const authUserData = authService.getUserData();
       
       console.log('[HOME] 인증 데이터 상세 확인:', {
         authContextLoggedIn: isLoggedIn,
-        hasToken: !!hasToken,
-        hasUserData: !!hasUserData,
+        hasToken: !!authToken,
+        hasUserData: !!authUserData,
         contextUser: user?.mt_idx,
-        localUser: hasUserData?.mt_idx
+        localUser: authUserData?.mt_idx
       });
 
       // 🔥 Google 로그인 직후 상태 확인 - 3초간 여유 시간 제공
-      if (!isLoggedIn && (hasToken || hasUserData)) {
+      if (!isLoggedIn && (authToken || authUserData)) {
         console.log('[HOME] 🔄 Google 로그인 후 AuthContext 동기화 대기 중...');
         
         // 최대 3초까지 AuthContext 동기화 대기
@@ -2542,7 +2542,7 @@ export default function HomePage() {
         }
         
         // 동기화 대기 완료 후 다시 상태 확인
-        const finalUser = user || hasUserData;
+        const finalUser = user || authUserData;
         if (finalUser) {
           console.log('[HOME] 🎉 Google 로그인 인증 완료:', finalUser.mt_name);
           // 사용자 정보 초기화는 아래에서 처리
@@ -2555,7 +2555,36 @@ export default function HomePage() {
       
       // 🔥 더 관대한 인증 체크 (페이지 간 이동 시 세션 유지)
       
-      // 1. 쿠키에서도 토큰 확인
+      // 1. localStorage에서 인증 정보 확인
+      let hasLocalToken = false;
+      let hasLocalUserData = false;
+      let hasLoginTime = false;
+      
+      if (typeof window !== 'undefined') {
+        hasLocalToken = !!localStorage.getItem('smap_auth_token');
+        hasLocalUserData = !!localStorage.getItem('smap_user_data');
+        hasLoginTime = !!localStorage.getItem('smap_login_time');
+        
+        // 로그인 시간 유효성 확인
+        if (hasLoginTime) {
+          const currentTime = Date.now();
+          const loginTime = parseInt(localStorage.getItem('smap_login_time') || '0', 10);
+          const timeSinceLogin = currentTime - loginTime;
+          const sessionDuration = 7 * 24 * 60 * 60 * 1000; // 7일
+          
+          if (timeSinceLogin >= sessionDuration) {
+            console.log('[HOME] 로그인 세션 만료, 데이터 정리');
+            localStorage.removeItem('smap_auth_token');
+            localStorage.removeItem('smap_user_data');
+            localStorage.removeItem('smap_login_time');
+            hasLocalToken = false;
+            hasLocalUserData = false;
+            hasLoginTime = false;
+          }
+        }
+      }
+      
+      // 2. 쿠키에서도 토큰 확인
       let hasCookieToken = false;
       if (typeof window !== 'undefined') {
         const cookieToken = document.cookie
@@ -2566,25 +2595,26 @@ export default function HomePage() {
         
         console.log('[HOME] 🔍 인증 상태 완전 체크:', {
           authContextLoggedIn: isLoggedIn,
-          hasLocalStorageToken: !!hasToken,
-          hasLocalStorageUser: !!hasUserData,
+          hasLocalStorageToken: hasLocalToken,
+          hasLocalStorageUser: hasLocalUserData,
+          hasLocalStorageLoginTime: hasLoginTime,
           hasCookieToken,
-          totalAuthSources: [isLoggedIn, !!hasToken, !!hasUserData, hasCookieToken].filter(Boolean).length
+          totalAuthSources: [isLoggedIn, hasLocalToken, hasLocalUserData, hasLoginTime, hasCookieToken].filter(Boolean).length
         });
       }
       
-      // 2. 모든 인증 소스가 없을 때만 리다이렉트 (더 관대한 정책)
-      if (!isLoggedIn && !hasToken && !hasUserData && !hasCookieToken) {
+      // 3. 모든 인증 소스가 없을 때만 리다이렉트 (더 관대한 정책)
+      if (!isLoggedIn && !hasLocalToken && !hasLocalUserData && !hasLoginTime && !hasCookieToken) {
         console.log('[HOME] ❌ 완전히 로그인되지 않음 - signin 페이지로 리다이렉트');
         router.push('/signin');
         return;
       }
       
-      // 3. 하나라도 인증 정보가 있으면 계속 진행 (세션 유지 우선)
-      if (!isLoggedIn && (hasToken || hasUserData || hasCookieToken)) {
+      // 4. 하나라도 인증 정보가 있으면 계속 진행 (세션 유지 우선)
+      if (!isLoggedIn && (hasLocalToken || hasLocalUserData || hasCookieToken)) {
         console.log('[HOME] ⚡ AuthContext 미동기화 상태지만 계속 진행', {
-          hasToken: !!hasToken,
-          hasUserData: !!hasUserData,
+          hasLocalToken: !!hasLocalToken,
+          hasLocalUserData: !!hasLocalUserData,
           hasCookieToken,
           action: 'continue_without_redirect'
         });
@@ -2604,7 +2634,7 @@ export default function HomePage() {
       }
 
               // 사용자 정보가 있는 경우 초기화 (AuthContext 또는 localStorage에서)
-        const currentUser = user || hasUserData;
+        const currentUser = user || authUserData;
         if (currentUser) {
           setUserName(currentUser.mt_name || '사용자');
 
@@ -6764,43 +6794,53 @@ export default function HomePage() {
     }
     // Component Error 상태 처리
     if (componentError) {
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-lg p-6 max-w-lg w-full">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">홈 페이지 오류 발생</h3>
-              <p className="text-sm text-gray-600 mb-4 break-words">{componentError}</p>
-              <div className="flex flex-col gap-2">
-                <button 
-                  onClick={() => {
-                    console.log('[HOME ERROR] 사용자가 앱 재시작 요청');
-                    setComponentError(null);
-                    window.location.reload();
-                  }}
-                  className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors"
-                >
-                  앱 다시 시작
-                </button>
-                <button 
-                  onClick={() => {
-                    console.log('[HOME ERROR] 사용자가 홈으로 강제 이동 요청');
-                    setComponentError(null);
-                    window.location.href = '/home';
-                  }}
-                  className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
-                >
-                  홈으로 강제 이동
-                </button>
+      // Firebase Messaging 관련 오류는 무시하고 정상 렌더링
+      if (componentError.includes('FirebaseError') || 
+          componentError.includes('Messaging') || 
+          componentError.includes('unsupported-browser') ||
+          componentError.includes('messaging/unsupported-browser')) {
+        console.log('[HOME] Firebase Messaging 오류 무시 - 정상 렌더링 계속');
+        setComponentError(null); // 오류 상태 초기화
+      } else {
+        // 다른 중요한 오류만 표시
+        return (
+          <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl shadow-lg p-6 max-w-lg w-full">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">홈 페이지 오류 발생</h3>
+                <p className="text-sm text-gray-600 mb-4 break-words">{componentError}</p>
+                <div className="flex flex-col gap-2">
+                  <button 
+                    onClick={() => {
+                      console.log('[HOME ERROR] 사용자가 앱 재시작 요청');
+                      setComponentError(null);
+                      window.location.reload();
+                    }}
+                    className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors"
+                  >
+                    앱 다시 시작
+                  </button>
+                  <button 
+                    onClick={() => {
+                      console.log('[HOME ERROR] 사용자가 홈으로 강제 이동 요청');
+                      setComponentError(null);
+                      window.location.href = '/home';
+                    }}
+                    className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
+                  >
+                    홈으로 강제 이동
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      );
+        );
+      }
     }
 
     // 마운트되지 않은 상태 처리

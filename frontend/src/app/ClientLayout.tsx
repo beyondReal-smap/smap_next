@@ -61,9 +61,29 @@ function PermissionGuard() {
   // 로컬 스토리지에서 로그인 상태 확인
   useEffect(() => {
     try {
-      const token = localStorage.getItem('auth_token');
-      const userData = localStorage.getItem('user_data');
-      setIsLoggedIn(!!(token && userData));
+      const token = localStorage.getItem('smap_auth_token');
+      const userData = localStorage.getItem('smap_user_data');
+      const loginTime = localStorage.getItem('smap_login_time');
+      
+      // 로그인 시간 유효성 확인 (7일)
+      let isValidSession = false;
+      if (token && userData && loginTime) {
+        const currentTime = Date.now();
+        const timeSinceLogin = currentTime - parseInt(loginTime, 10);
+        const sessionDuration = 7 * 24 * 60 * 60 * 1000; // 7일
+        
+        if (timeSinceLogin < sessionDuration) {
+          isValidSession = true;
+          console.log('[PermissionGuard] 유효한 로그인 세션 발견, 자동 로그인 유지');
+        } else {
+          console.log('[PermissionGuard] 로그인 세션 만료, 데이터 정리');
+          localStorage.removeItem('smap_auth_token');
+          localStorage.removeItem('smap_user_data');
+          localStorage.removeItem('smap_login_time');
+        }
+      }
+      
+      setIsLoggedIn(isValidSession);
     } catch (error) {
       console.warn('[PermissionGuard] 로컬 스토리지 접근 실패:', error);
       setIsLoggedIn(false);
@@ -314,9 +334,29 @@ export default function ClientLayout({
   // 로컬 스토리지에서 로그인 상태 확인
   useEffect(() => {
     try {
-      const token = localStorage.getItem('auth_token');
-      const userData = localStorage.getItem('user_data');
-      setIsLoggedIn(!!(token && userData));
+      const token = localStorage.getItem('smap_auth_token');
+      const userData = localStorage.getItem('smap_user_data');
+      const loginTime = localStorage.getItem('smap_login_time');
+      
+      // 로그인 시간 유효성 확인 (7일)
+      let isValidSession = false;
+      if (token && userData && loginTime) {
+        const currentTime = Date.now();
+        const timeSinceLogin = currentTime - parseInt(loginTime, 10);
+        const sessionDuration = 7 * 24 * 60 * 60 * 1000; // 7일
+        
+        if (timeSinceLogin < sessionDuration) {
+          isValidSession = true;
+          console.log('[ClientLayout] 유효한 로그인 세션 발견, 자동 로그인 유지');
+        } else {
+          console.log('[ClientLayout] 로그인 세션 만료, 데이터 정리');
+          localStorage.removeItem('smap_auth_token');
+          localStorage.removeItem('smap_user_data');
+          localStorage.removeItem('smap_login_time');
+        }
+      }
+      
+      setIsLoggedIn(isValidSession);
     } catch (error) {
       console.warn('[ClientLayout] 로컬 스토리지 접근 실패:', error);
       setIsLoggedIn(false);
