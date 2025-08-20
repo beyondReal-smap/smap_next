@@ -1039,17 +1039,31 @@ export default function HomePage() {
       // 🔔 FCM 토큰 자동 업데이트
       if (user && user.mt_idx) {
         console.log('🔔 [FCM] 로그인 완료 - FCM 토큰 자동 업데이트 시작');
-        fcmTokenService.initializeAndCheckUpdateToken(user.mt_idx)
-          .then(result => {
-            if (result.success) {
-              console.log('✅ [FCM] FCM 토큰 업데이트 성공:', result.message);
-            } else {
-              console.warn('⚠️ [FCM] FCM 토큰 업데이트 실패:', result.error);
-            }
-          })
-          .catch(error => {
-            console.error('❌ [FCM] FCM 토큰 업데이트 중 오류:', error);
-          });
+        
+        // 권한이 준비될 때까지 대기
+        const checkPermissionAndUpdate = () => {
+          if ((window as any).__SMAP_PERM_ALLOW__) {
+            console.log('✅ [FCM] 권한 준비됨, FCM 토큰 업데이트 실행');
+            fcmTokenService.initializeAndCheckUpdateToken(user.mt_idx)
+              .then(result => {
+                if (result.success) {
+                  console.log('✅ [FCM] FCM 토큰 업데이트 성공:', result.message);
+                  // 성공 시 member_t 테이블의 mt_token_id가 업데이트됨
+                  console.log('📱 [FCM] FCM 토큰이 서버에 저장되어 푸시 알림 수신 가능');
+                } else {
+                  console.warn('⚠️ [FCM] FCM 토큰 업데이트 실패:', result.error);
+                }
+              })
+              .catch(error => {
+                console.error('❌ [FCM] FCM 토큰 업데이트 중 오류:', error);
+              });
+          } else {
+            console.log('⏳ [FCM] 권한 대기 중, 2초 후 재시도...');
+            setTimeout(checkPermissionAndUpdate, 2000);
+          }
+        };
+        
+        checkPermissionAndUpdate();
       }
       
       console.log('🔥 [HOME] 환경 체크 상세:', {
@@ -7193,6 +7207,8 @@ export default function HomePage() {
                        </div>
                      </div>
                    </div>
+
+
 
                    {/* 그룹 목록 섹션 */}
                    <div className="mb-5">

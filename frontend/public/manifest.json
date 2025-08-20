@@ -1,28 +1,35 @@
 {
-  "name": "스맵 - 스케줄과 지도를 한번에",
-  "short_name": "스맵",
-  "description": "스케줄과 지도를 한번에 관리하는 스마트한 앱",
+  "name": "SMAP - 위치 기반 일정 관리",
+  "short_name": "SMAP",
+  "description": "위치 기반 일정 관리 및 그룹 위치 공유 서비스",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#22C55D",
+  "theme_color": "#0113A3",
   "orientation": "portrait-primary",
   "scope": "/",
-  "lang": "ko-KR",
-  "dir": "ltr",
-  "categories": ["productivity", "lifestyle", "navigation"],
+  "lang": "ko",
+  "categories": ["productivity", "social", "navigation"],
   "icons": [
     {
-      "src": "/images/smap_logo.webp",
+      "src": "/images/logo.png",
       "sizes": "192x192",
-      "type": "image/webp",
+      "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/images/smap_logo.webp",
+      "src": "/images/logo.png",
       "sizes": "512x512",
-      "type": "image/webp",
+      "type": "image/png",
       "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/images/home/security-check.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
     }
   ],
   "shortcuts": [
@@ -30,50 +37,14 @@
       "name": "홈",
       "short_name": "홈",
       "description": "메인 홈 화면으로 이동",
-      "url": "/home",
+      "url": "/",
       "icons": [
         {
-          "src": "/images/smap_logo.webp",
-          "sizes": "96x96"
-        }
-      ]
-    },
-    {
-      "name": "위치",
-      "short_name": "위치",
-      "description": "실시간 위치 확인",
-      "url": "/location",
-      "icons": [
-        {
-          "src": "/images/smap_logo.webp",
-          "sizes": "96x96"
-        }
-      ]
-    },
-    {
-      "name": "일정",
-      "short_name": "일정",
-      "description": "일정 관리",
-      "url": "/schedule",
-      "icons": [
-        {
-          "src": "/images/smap_logo.webp",
+          "src": "/images/logo.png",
           "sizes": "96x96"
         }
       ]
     }
   ],
-  "screenshots": [
-    {
-      "src": "/images/screenshot-mobile.png",
-      "sizes": "390x844",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "모바일 홈 화면"
-    }
-  ],
-  "prefer_related_applications": false,
-  "edge_side_panel": {
-    "preferred_width": 400
-  }
+  "gcm_sender_id": "283271180972"
 } 

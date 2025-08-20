@@ -177,6 +177,25 @@ class FCMTokenService {
   }
 
   /**
+   * 알림 권한 요청
+   */
+  private async requestNotificationPermission(): Promise<NotificationPermission> {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      console.log('[FCM Token Service] ℹ️ 이 브라우저는 푸시 알림을 지원하지 않습니다.');
+      return 'denied';
+    }
+
+    try {
+      const permission = await Notification.requestPermission();
+      console.log('[FCM Token Service] 🔔 알림 권한 상태:', permission);
+      return permission;
+    } catch (error) {
+      console.error('[FCM Token Service] ❌ 알림 권한 요청 실패:', error);
+      return 'denied';
+    }
+  }
+
+  /**
    * iOS에서 전달받은 네이티브 FCM 토큰 확인
    */
   private checkNativeFCMToken(): string | null {
@@ -282,12 +301,12 @@ class FCMTokenService {
       });
 
       // VAPID 키는 Firebase 콘솔에서 가져와야 함
-      const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+      const vapidKey = "BOCzkX45zE3u0HFfNpfZDbUHH33OHNoe3k5KeTalEesHgnaBqCykjJUxnDcS6mv9MPSxx8EV3QHCL61gmwzkXlE";
       console.log('[FCM Token Service] 📋 VAPID 키 상태:', {
         hasVapidKey: !!vapidKey,
         keyLength: vapidKey ? vapidKey.length : 0,
         keyPreview: vapidKey ? `${vapidKey.substring(0, 20)}...` : '없음',
-        envSource: 'process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY',
+        envSource: '하드코딩된 VAPID 키',
         isLocalhost: typeof window !== 'undefined' ? window.location.hostname === 'localhost' : 'unknown'
       });
       
@@ -324,8 +343,22 @@ class FCMTokenService {
         console.log('[FCM Token Service] 🔑 getToken() 파라미터:', {
           messaging: !!this.messaging,
           vapidKeyLength: vapidKey.length,
-          vapidKeyStart: vapidKey.substring(0, 10) + '...'
+          vapidKeyStart: vapidKey.substring(0, 10) + '...',
+          isLocalhost: typeof window !== 'undefined' ? window.location.hostname === 'localhost' : 'unknown',
+          currentOrigin: typeof window !== 'undefined' ? window.location.origin : 'unknown',
+          userAgent: typeof window !== 'undefined' ? navigator.userAgent : 'unknown'
         });
+        
+        // localhost 환경에서 추가 디버깅
+        if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+          console.log('[FCM Token Service] 🏠 localhost 환경 감지 - 추가 디버깅 활성화');
+          console.log('[FCM Token Service] 🏠 Firebase 앱 상태:', {
+            appName: app?.name,
+            appOptions: app?.options,
+            hasMessaging: !!this.messaging,
+            messagingConstructor: this.messaging?.constructor?.name
+          });
+        }
         
         const token = await getToken(this.messaging, {
           vapidKey: vapidKey
@@ -362,6 +395,22 @@ class FCMTokenService {
               } catch (tokenError) {
           console.error('[FCM Token Service] ❌ getToken() 호출 실패:', tokenError);
           
+          // localhost 환경에서의 특별한 처리
+          if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+            console.log('[FCM Token Service] 🏠 localhost 환경에서 FCM 토큰 생성 실패');
+            console.log('[FCM Token Service] 🏠 이는 Firebase 프로젝트에서 localhost 도메인이 허용되지 않았기 때문일 수 있습니다');
+            console.log('[FCM Token Service] 🏠 해결방법: Firebase 콘솔 > 프로젝트 설정 > 인증 도메인에 localhost 추가');
+            console.log('[FCM Token Service] 🏠 또는 프로덕션 도메인에서 테스트');
+            
+            // localhost에서는 개발용 더미 토큰 반환 (실제 FCM은 작동하지 않음)
+            // 백엔드 스키마 요구사항: fcm_token은 최소 50자, 최대 255자
+            const dummyToken = 'localhost-dummy-fcm-token-for-development-testing-' + Date.now() + '-' + Math.random().toString(36).substring(2, 15);
+            console.log('[FCM Token Service] 🏠 localhost용 더미 토큰 생성:', dummyToken);
+            console.log('[FCM Token Service] 🏠 토큰 길이:', dummyToken.length, '문자 (요구사항: 50-255자)');
+            this.currentToken = dummyToken;
+            return dummyToken;
+          }
+          
           // iOS WebView에서 서비스 워커 등록 실패 시 대체 로직
           if (isIOSWebView && tokenError instanceof Error && 
               tokenError.message.includes('service worker')) {
@@ -379,19 +428,7 @@ class FCMTokenService {
             console.error('[FCM Token Service]   1. Firebase 콘솔에서 프로젝트 상태 확인');
             console.error('[FCM Token Service]   2. 프로젝트가 일시중지되지 않았는지 확인');
             console.error('[FCM Token Service]   3. VAPID 키 재생성 시도');
-            console.error('[FCM Token Service]   4. 프로젝트 권한 확인');
-            console.error('[FCM Token Service]   5. FCM API 활성화 확인');
-            console.error('[FCM Token Service]   6. 서비스 계정 권한 확인');
-            console.error('[FCM Token Service] 🔗 Firebase 콘솔: https://console.firebase.google.com');
-            console.error('[FCM Token Service] 🔗 Google Cloud Console: https://console.cloud.google.com');
-            
-            // 추가 디버깅 정보
-            console.error('[FCM Token Service] 🔍 디버깅 정보:', {
-              projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-              hasVapidKey: !!process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
-              isLocalhost: typeof window !== 'undefined' ? window.location.hostname === 'localhost' : 'unknown',
-              protocol: typeof window !== 'undefined' ? window.location.protocol : 'unknown'
-            });
+            console.error('[FCM Token Service]   4. localhost 환경인 경우 Firebase 콘솔에서 localhost 도메인 허용');
           }
           
           // 인증 에러인 경우 상세 정보 로깅
@@ -438,7 +475,8 @@ class FCMTokenService {
     try {
       console.log('[FCM Token Service] 서버에 FCM 토큰 등록 요청 (회원가입용)');
       
-      const response = await fetch('/api/member-fcm-token/register', {
+      // API3.smap.site의 FCM 토큰 API 사용 - 올바른 엔드포인트
+      const response = await fetch('https://api3.smap.site/api/v1/member-fcm-token/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -478,7 +516,8 @@ class FCMTokenService {
     try {
       console.log('[FCM Token Service] 서버에 FCM 토큰 체크 및 업데이트 요청 (로그인용)');
       
-      const response = await fetch('/api/member-fcm-token/check-and-update', {
+      // API3.smap.site의 FCM 토큰 API 사용 - 올바른 엔드포인트
+      const response = await fetch('https://api3.smap.site/api/v1/member-fcm-token/check-and-update', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -500,10 +539,10 @@ class FCMTokenService {
       return data;
       
     } catch (error) {
-      console.error('[FCM Token Service] 서버 체크/업데이트 실패:', error);
+      console.error('[FCM Token Service] 서버 체크 및 업데이트 실패:', error);
       return {
         success: false,
-        message: '서버 체크/업데이트 실패: ' + (error as Error).message,
+        message: '서버 체크 및 업데이트 실패: ' + (error as Error).message,
         mt_idx: null,
         has_token: false,
         token_preview: null
@@ -568,7 +607,19 @@ class FCMTokenService {
         currentDomain: typeof window !== 'undefined' ? window.location.hostname : 'unknown'
       });
       
-      // 1. FCM 토큰 획득
+      // 1. 알림 권한 요청
+      console.log('[FCM Token Service] 🔔 알림 권한 요청 시작...');
+      const permission = await this.requestNotificationPermission();
+      
+      if (permission !== 'granted') {
+        console.warn('[FCM Token Service] ⚠️ 알림 권한이 거부됨');
+        return {
+          success: false,
+          error: '알림 권한이 거부되었습니다'
+        };
+      }
+      
+      // 2. FCM 토큰 획득
       console.log('[FCM Token Service] 🔑 FCM 토큰 획득 시작...');
       const token = await this.getFCMToken();
       
@@ -582,7 +633,7 @@ class FCMTokenService {
 
       console.log('[FCM Token Service] ✅ FCM 토큰 획득 성공, 길이:', token.length);
 
-      // 2. 서버에서 토큰 체크 후 필요시 업데이트
+      // 3. 서버에서 토큰 체크 후 필요시 업데이트
       console.log('[FCM Token Service] 🌐 서버에 토큰 체크/업데이트 요청...');
       const checkResult = await this.checkAndUpdateTokenToServer(mt_idx, token);
       

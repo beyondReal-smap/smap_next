@@ -3,21 +3,19 @@ import { initializeApp, getApps } from 'firebase/app';
 // import { getAuth } from 'firebase/auth';
 import { getMessaging, isSupported } from 'firebase/messaging';
 
-// Firebase 설정 (환경변수에서 가져오기)
+// Firebase 설정 (하드코딩으로 환경변수 문제 해결)
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || 'demo-api-key',
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || 'demo-project.firebaseapp.com',
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'demo-project',
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || 'demo-project.appspot.com',
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '123456789',
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || 'demo-app-id',
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || 'demo-measurement-id'
+  apiKey: "AIzaSyBKq515AfyN-oizndPdXBebBkcjTlI56qw",
+  authDomain: "com-dmonster-smap.firebaseapp.com",
+  projectId: "com-dmonster-smap",
+  storageBucket: "com-dmonster-smap.firebasestorage.app",
+  messagingSenderId: "283271180972",
+  appId: "1:283271180972:web:6c8d4104b83f419403e509",
+  measurementId: "G-1B733FGCQ5"
 };
 
 // Firebase가 제대로 설정되었는지 확인
-const isFirebaseConfigured = process.env.NEXT_PUBLIC_FIREBASE_API_KEY && 
-                             process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID &&
-                             process.env.NEXT_PUBLIC_FIREBASE_API_KEY !== 'demo-api-key';
+const isFirebaseConfigured = true; // 하드코딩으로 항상 true
 
 // Firebase 앱 초기화 (브라우저에서만, 그리고 설정이 되어있을 때만)
 // 안드로이드 WebView에서는 Firebase Web 초기화 자체를 차단 (네이티브 사용)
