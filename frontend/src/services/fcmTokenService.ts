@@ -227,7 +227,19 @@ class FCMTokenService {
     }
 
     console.log('[FCM Token Service] ⏳ Firebase 초기화 대기 중...');
-    await this.initPromise;
+    
+    // Firebase 초기화 대기 (타임아웃 추가)
+    try {
+      await Promise.race([
+        this.initPromise,
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Firebase 초기화 타임아웃')), 10000)
+        )
+      ]);
+    } catch (timeoutError) {
+      console.warn('[FCM Token Service] ⚠️ Firebase 초기화 타임아웃 - 강제 진행 시도');
+      // 타임아웃이 발생해도 강제로 진행
+    }
 
     if (!app) {
       console.warn('[FCM Token Service] ❌ Firebase 앱이 초기화되지 않음 - 환경변수 확인 필요');
@@ -236,8 +248,16 @@ class FCMTokenService {
     }
 
     if (!this.messaging) {
-      console.warn('[FCM Token Service] ❌ Firebase Messaging이 초기화되지 않음');
-      return null;
+      console.warn('[FCM Token Service] ❌ Firebase Messaging이 초기화되지 않음 - 강제 초기화 시도');
+      
+      // Firebase Messaging 강제 초기화 시도
+      try {
+        this.messaging = getMessaging(app);
+        console.log('[FCM Token Service] ✅ Firebase Messaging 강제 초기화 성공');
+      } catch (forceInitError) {
+        console.error('[FCM Token Service] ❌ Firebase Messaging 강제 초기화 실패:', forceInitError);
+        return null;
+      }
     }
 
     try {
@@ -319,6 +339,24 @@ class FCMTokenService {
           return token;
         } else {
           console.warn('[FCM Token Service] ⚠️ FCM 토큰을 획득하지 못함 (권한 거부 또는 브라우저 미지원)');
+          
+          // 권한 요청 시도
+          try {
+            const permission = await Notification.requestPermission();
+            if (permission === 'granted') {
+              console.log('[FCM Token Service] 🔔 알림 권한 획득 성공 - 토큰 재시도');
+              // 권한을 받았으면 토큰 재시도
+              const retryToken = await getToken(this.messaging, { vapidKey: vapidKey });
+              if (retryToken) {
+                this.currentToken = retryToken;
+                console.log('[FCM Token Service] ✅ FCM 토큰 재시도 성공');
+                return retryToken;
+              }
+            }
+          } catch (permissionError) {
+            console.warn('[FCM Token Service] ⚠️ 알림 권한 요청 실패:', permissionError);
+          }
+          
           return null;
         }
               } catch (tokenError) {
