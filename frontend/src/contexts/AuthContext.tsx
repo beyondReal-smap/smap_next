@@ -10,7 +10,7 @@ import { comprehensivePreloadData } from '@/services/dataPreloadService';
 import groupService from '@/services/groupService';
 import navigationManager from '@/utils/navigationManager';
 import locationTrackingService from '@/services/locationTrackingService';
-import fcmTokenService from '@/services/fcmTokenService';
+// fcmTokenService는 동적으로 import하여 서버사이드 렌더링 문제 방지
 
 // 전역 상태로 중복 실행 방지
 let globalPreloadingState = {
@@ -276,20 +276,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             // 위치 추적 서비스에 사용자 로그인 알림
             locationTrackingService.onUserLogin();
             // 🔔 로그인 상태 유지 진입 시에도 FCM 토큰 체크/업데이트 수행 (iOS 네이티브/웹 환경 모두 시도)
-            setTimeout(() => {
+            setTimeout(async () => {
               try {
                 console.log('[AUTH] 🔔 초기화 경로 FCM 토큰 체크/업데이트 시작');
-                fcmTokenService.initializeAndCheckUpdateToken(userData.mt_idx)
-                  .then((result) => {
-                    if (result.success) {
-                      console.log('[AUTH] ✅ 초기화 경로 FCM 토큰 체크/업데이트 완료:', result.message);
-                    } else {
-                      console.warn('[AUTH] ⚠️ 초기화 경로 FCM 토큰 체크/업데이트 실패:', result.error);
-                    }
-                  })
-                  .catch((error) => {
-                    console.error('[AUTH] ❌ 초기화 경로 FCM 토큰 체크/업데이트 오류:', error);
-                  });
+                const { fcmTokenService } = await import('@/services/fcmTokenService');
+                if (fcmTokenService) {
+                  const result = await fcmTokenService.initializeAndCheckUpdateToken(userData.mt_idx);
+                  if (result.success) {
+                    console.log('[AUTH] ✅ 초기화 경로 FCM 토큰 체크/업데이트 완료:', result.message);
+                  } else {
+                    console.warn('[AUTH] ⚠️ 초기화 경로 FCM 토큰 체크/업데이트 실패:', result.error);
+                  }
+                }
               } catch (e) {
                 console.warn('[AUTH] FCM 초기화 경로 처리 중 예외(무시):', e);
               }
@@ -350,11 +348,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           console.log('[AUTH] iOS 네이티브 FCM 토큰 사용 (미리보기):', fcmToken.substring(0, 20) + '...');
         } else {
           // 웹 환경에서 토큰 획득 (가능한 경우)
-          fcmToken = await fcmTokenService.getFCMToken();
-          if (fcmToken) {
-            console.log('[AUTH] 웹 FCM 토큰 확보 (미리보기):', fcmToken.substring(0, 20) + '...');
-          } else {
-            console.log('[AUTH] FCM 토큰 없음 - 로그인은 계속 진행');
+          try {
+            const { fcmTokenService } = await import('@/services/fcmTokenService');
+            if (fcmTokenService) {
+              fcmToken = await fcmTokenService.getFCMToken();
+              if (fcmToken) {
+                console.log('[AUTH] 웹 FCM 토큰 확보 (미리보기):', fcmToken.substring(0, 20) + '...');
+              } else {
+                console.log('[AUTH] FCM 토큰 없음 - 로그인은 계속 진행');
+              }
+            }
+          } catch (e) {
+            console.log('[AUTH] FCM 토큰 서비스 초기화 실패 - 로그인은 계속 진행');
           }
         }
       } catch (e) {
@@ -377,20 +382,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         locationTrackingService.onUserLogin();
         
         // FCM 토큰 체크 및 업데이트 (백그라운드에서 실행)
-        setTimeout(() => {
+        setTimeout(async () => {
           console.log('[AUTH] 🔔 로그인 후 FCM 토큰 체크/업데이트 시작');
           if (response.data?.member?.mt_idx) {
-            fcmTokenService.initializeAndCheckUpdateToken(response.data.member.mt_idx)
-              .then((result) => {
+            try {
+              const { fcmTokenService } = await import('@/services/fcmTokenService');
+              if (fcmTokenService) {
+                const result = await fcmTokenService.initializeAndCheckUpdateToken(response.data.member.mt_idx);
                 if (result.success) {
                   console.log('[AUTH] ✅ FCM 토큰 체크/업데이트 완료:', result.message);
                 } else {
                   console.warn('[AUTH] ⚠️ FCM 토큰 체크/업데이트 실패:', result.error);
                 }
-              })
-              .catch((error) => {
-                console.error('[AUTH] ❌ FCM 토큰 체크/업데이트 중 오류:', error);
-              });
+              }
+            } catch (error: any) {
+              console.error('[AUTH] ❌ FCM 토큰 체크/업데이트 중 오류:', error);
+            }
           } else {
             console.warn('[AUTH] ⚠️ FCM 토큰 체크/업데이트 스킵: mt_idx 없음');
           }

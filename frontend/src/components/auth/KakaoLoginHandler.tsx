@@ -105,24 +105,28 @@ const KakaoLoginHandler = forwardRef<KakaoLoginHandlerRef, KakaoLoginHandlerProp
         setTimeout(async () => {
           try {
             console.log('🔔 [KAKAO] 로그인 후 FCM 토큰 처리 시작');
-            const fcmTokenService = (await import('@/services/fcmTokenService')).default;
+            const { fcmTokenService } = await import('@/services/fcmTokenService');
             
-            if (data.isNewUser) {
-              // 신규 사용자 - FCM 토큰 등록
-              const fcmResult = await fcmTokenService.initializeAndRegisterToken(userProfile.mt_idx);
-              if (fcmResult.success) {
-                console.log('✅ [KAKAO] 신규 사용자 FCM 토큰 등록 완료');
+            if (fcmTokenService) {
+              if (data.isNewUser) {
+                // 신규 사용자 - FCM 토큰 등록
+                const fcmResult = await fcmTokenService.initializeAndRegisterToken(userProfile.mt_idx);
+                if (fcmResult.success) {
+                  console.log('✅ [KAKAO] 신규 사용자 FCM 토큰 등록 완료');
+                } else {
+                  console.warn('⚠️ [KAKAO] 신규 사용자 FCM 토큰 등록 실패:', fcmResult.error);
+                }
               } else {
-                console.warn('⚠️ [KAKAO] 신규 사용자 FCM 토큰 등록 실패:', fcmResult.error);
+                // 기존 사용자 - FCM 토큰 체크/업데이트
+                const fcmResult = await fcmTokenService.initializeAndCheckUpdateToken(userProfile.mt_idx);
+                if (fcmResult.success) {
+                  console.log('✅ [KAKAO] 기존 사용자 FCM 토큰 체크/업데이트 완료:', fcmResult.message);
+                } else {
+                  console.warn('⚠️ [KAKAO] 기존 사용자 FCM 토큰 체크/업데이트 실패:', fcmResult.error);
+                }
               }
             } else {
-              // 기존 사용자 - FCM 토큰 체크/업데이트
-              const fcmResult = await fcmTokenService.initializeAndCheckUpdateToken(userProfile.mt_idx);
-              if (fcmResult.success) {
-                console.log('✅ [KAKAO] 기존 사용자 FCM 토큰 체크/업데이트 완료:', fcmResult.message);
-              } else {
-                console.warn('⚠️ [KAKAO] 기존 사용자 FCM 토큰 체크/업데이트 실패:', fcmResult.error);
-              }
+              console.warn('⚠️ [KAKAO] FCM 토큰 처리 스킵: fcmTokenService 초기화 실패');
             }
           } catch (fcmError) {
             console.error('❌ [KAKAO] FCM 토큰 처리 중 오류:', fcmError);

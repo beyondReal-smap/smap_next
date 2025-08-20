@@ -1324,14 +1324,18 @@ export default function RegisterPage() {
           setTimeout(async () => {
             try {
               console.log('🔔 [REGISTER] 회원가입 완료 후 FCM 토큰 등록 시작');
-              const fcmTokenService = (await import('@/services/fcmTokenService')).default;
+              const { fcmTokenService } = await import('@/services/fcmTokenService');
               
-              const fcmResult = await fcmTokenService.initializeAndRegisterToken(data.data.mt_idx);
-              
-              if (fcmResult.success) {
-                console.log('✅ [REGISTER] FCM 토큰 등록 완료');
+              if (fcmTokenService) {
+                const fcmResult = await fcmTokenService.initializeAndRegisterToken(data.data.mt_idx);
+                
+                if (fcmResult.success) {
+                  console.log('✅ [REGISTER] FCM 토큰 등록 완료');
+                } else {
+                  console.warn('⚠️ [REGISTER] FCM 토큰 등록 실패:', fcmResult.error);
+                }
               } else {
-                console.warn('⚠️ [REGISTER] FCM 토큰 등록 실패:', fcmResult.error);
+                console.warn('⚠️ [REGISTER] FCM 토큰 등록 스킵: fcmTokenService 초기화 실패');
               }
             } catch (fcmError) {
               console.error('❌ [REGISTER] FCM 토큰 등록 중 오류:', fcmError);

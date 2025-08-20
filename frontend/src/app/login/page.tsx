@@ -101,9 +101,9 @@ export default function LoginPage() {
           setTimeout(async () => {
             try {
               console.log('[LOGIN] 🔔 Google 로그인 후 FCM 토큰 체크/업데이트 시작');
-              const fcmTokenService = (await import('@/services/fcmTokenService')).default;
+              const { fcmTokenService } = await import('@/services/fcmTokenService');
               
-              if (data.user?.mt_idx) {
+              if (data.user?.mt_idx && fcmTokenService) {
                 const fcmResult = await fcmTokenService.initializeAndCheckUpdateToken(data.user.mt_idx);
                 if (fcmResult.success) {
                   console.log('[LOGIN] ✅ FCM 토큰 체크/업데이트 완료:', fcmResult.message);
@@ -111,7 +111,7 @@ export default function LoginPage() {
                   console.warn('[LOGIN] ⚠️ FCM 토큰 체크/업데이트 실패:', fcmResult.error);
                 }
               } else {
-                console.warn('[LOGIN] ⚠️ FCM 토큰 체크/업데이트 스킵: mt_idx 없음');
+                console.warn('[LOGIN] ⚠️ FCM 토큰 체크/업데이트 스킵: mt_idx 없음 또는 fcmTokenService 초기화 실패');
               }
             } catch (fcmError) {
               console.error('[LOGIN] ❌ FCM 토큰 체크/업데이트 중 오류:', fcmError);

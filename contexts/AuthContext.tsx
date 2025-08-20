@@ -1,8 +1,22 @@
 'use client';
 
-import React, { createContext, useContext, useReducer, useEffect, ReactNode, useState } from 'react';
-import { AuthState, AuthAction, UserProfile, GroupWithMembers, LoginRequest } from '@/types/auth';
-import authService from '@/services/authService';
+import React, { createContext, useContext, useReducer, useEffect, ReactNode, useState, useCallback } from 'react';
+import { AuthState, AuthAction, UserProfile, GroupWithMembers, LoginRequest } from '../frontend/src/types/auth';
+import authService from '../frontend/src/services/authService';
+import { useDataCache } from '../frontend/src/contexts/DataCacheContext';
+import dataPreloadService from '../frontend/src/services/dataPreloadService';
+import { comprehensivePreloadData } from '../frontend/src/services/dataPreloadService';
+import groupService from '../frontend/src/services/groupService';
+import navigationManager from '../frontend/src/utils/navigationManager';
+import locationTrackingService from '../frontend/src/services/locationTrackingService';
+import { fcmTokenService } from '../frontend/src/services/fcmTokenService';
+
+// 전역 상태로 중복 실행 방지
+let globalPreloadingState = {
+  isPreloading: false,
+  completedUsers: new Set<number>(),
+  lastPreloadTime: 0
+};
 
 // 초기 상태
 const initialState: AuthState = {
@@ -11,6 +25,7 @@ const initialState: AuthState = {
   selectedGroup: null,
   loading: true,
   error: null,
+  isPreloadingComplete: false,
 };
 
 // Reducer 함수
@@ -82,186 +97,168 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         error: action.payload,
       };
 
+    case 'SET_PRELOADING_COMPLETE':
+      return {
+        ...state,
+        isPreloadingComplete: action.payload,
+      };
+
     default:
       return state;
   }
 };
 
 // Context 생성
-interface AuthContextType extends AuthState {
+const AuthContext = createContext<{
+  state: AuthState;
+  dispatch: React.Dispatch<AuthAction>;
   login: (credentials: LoginRequest) => Promise<void>;
   logout: () => Promise<void>;
-  updateUser: (updateData: Partial<UserProfile>) => Promise<void>;
+  updateUser: (updates: Partial<UserProfile>) => void;
   selectGroup: (group: GroupWithMembers | null) => void;
-  refreshUserData: () => Promise<void>;
-  refreshGroups: () => Promise<void>;
+  updateGroups: (groups: GroupWithMembers[]) => void;
+  setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+  setPreloadingComplete: (complete: boolean) => void;
+} | null>(null);
 
 // Provider 컴포넌트
-interface AuthProviderProps {
-  children: ReactNode;
-}
-
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
-
-  // 초기 인증 상태 확인
-  useEffect(() => {
-    const initializeAuth = async () => {
-      try {
-        if (authService.isLoggedIn()) {
-          const userData = authService.getUserData();
-          if (userData) {
-            dispatch({ type: 'LOGIN_SUCCESS', payload: userData });
-            // 최신 데이터로 갱신
-            await refreshUserData();
-          } else {
-            dispatch({ type: 'SET_LOADING', payload: false });
-          }
-        } else {
-          dispatch({ type: 'SET_LOADING', payload: false });
-        }
-      } catch (error) {
-        console.error('[AUTH CONTEXT] 초기 인증 상태 확인 실패:', error);
-        dispatch({ type: 'SET_LOADING', payload: false });
-      }
-    };
-
-    initializeAuth();
-  }, []);
+  const { preloadUserData } = useDataCache();
 
   // 로그인
   const login = async (credentials: LoginRequest): Promise<void> => {
     try {
-      dispatch({ type: 'LOGIN_START' });
+      console.log('[AUTH] 로그인 시도:', credentials.mt_id);
+      dispatch({ type: 'SET_LOADING', payload: true });
+      dispatch({ type: 'SET_ERROR', payload: null });
+
       const response = await authService.login(credentials);
-      
-      if (response.success && response.data) {
-        const userProfile = await authService.getUserProfile(response.data.member.mt_idx);
-        dispatch({ type: 'LOGIN_SUCCESS', payload: userProfile });
-      } else {
-        throw new Error(response.message || '로그인에 실패했습니다.');
+      console.log('[AUTH] 로그인 성공:', response.data?.member?.mt_name);
+
+      if (response.data?.member) {
+        dispatch({ type: 'LOGIN_SUCCESS', payload: response.data.member });
+        
+        // 위치 추적 서비스에 사용자 로그인 알림
+        locationTrackingService.onUserLogin();
+        
+        // FCM 토큰 체크 및 업데이트 (백그라운드에서 실행)
+        setTimeout(() => {
+          console.log('[AUTH] 🔔 로그인 후 FCM 토큰 체크/업데이트 시작');
+          if (response.data?.member?.mt_idx) {
+            fcmTokenService.initializeAndCheckUpdateToken(response.data.member.mt_idx)
+              .then((result: { success: boolean; token?: string; error?: string; message?: string }) => {
+                if (result.success) {
+                  console.log('[AUTH] ✅ FCM 토큰 체크/업데이트 완료:', result.message);
+                } else {
+                  console.warn('[AUTH] ⚠️ FCM 토큰 체크/업데이트 실패:', result.error);
+                }
+              })
+              .catch((error: any) => {
+                console.error('[AUTH] ❌ FCM 토큰 체크/업데이트 중 오류:', error);
+              });
+          } else {
+            console.warn('[AUTH] ⚠️ FCM 토큰 체크/업데이트 스킵: mt_idx 없음');
+          }
+        }, 1000);
+
+        // 즉시 로딩 완료 처리
+        dispatch({ type: 'SET_LOADING', payload: false });
+        
+        // 백그라운드에서 최소한의 데이터만 프리로딩
+        setTimeout(() => {
+          console.log('[AUTH] 🚀 백그라운드 최소 데이터 프리로딩 시작');
+          
+          groupService.getCurrentUserGroups()
+            .then((groups: any[]) => {
+              if (groups && groups.length > 0) {
+                dispatch({ type: 'UPDATE_GROUPS', payload: groups as GroupWithMembers[] });
+                console.log('[AUTH] ✅ 백그라운드 그룹 데이터 로딩 완료');
+              }
+            })
+            .catch((error: any) => {
+              console.warn('[AUTH] ⚠️ 백그라운드 그룹 데이터 로딩 실패:', error);
+            });
+        }, 500);
       }
+
     } catch (error: any) {
-      const errorMessage = error.message || '로그인에 실패했습니다.';
-      dispatch({ type: 'LOGIN_FAILURE', payload: errorMessage });
-      throw error;
+      console.error('[AUTH] 로그인 실패:', error);
+      
+      const errorMessage = error.response?.data?.message || error.message || '로그인에 실패했습니다.';
+      dispatch({ type: 'SET_ERROR', payload: errorMessage });
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
   // 로그아웃
   const logout = async (): Promise<void> => {
     try {
+      console.log('[AUTH] 로그아웃 시작');
+      
       await authService.logout();
       dispatch({ type: 'LOGOUT' });
+      
+      console.log('[AUTH] 로그아웃 완료');
     } catch (error) {
-      console.error('[AUTH CONTEXT] 로그아웃 실패:', error);
-      // 로그아웃은 에러가 발생해도 상태를 초기화
+      console.error('[AUTH] 로그아웃 실패:', error);
+      // 로그아웃 실패해도 상태는 초기화
       dispatch({ type: 'LOGOUT' });
     }
   };
 
   // 사용자 정보 업데이트
-  const updateUser = async (updateData: Partial<UserProfile>): Promise<void> => {
-    if (!state.user) {
-      throw new Error('로그인된 사용자가 없습니다.');
-    }
-
-    try {
-      const updatedUser = await authService.updateUserProfile(state.user.mt_idx, updateData);
-      dispatch({ type: 'UPDATE_USER', payload: updatedUser });
-    } catch (error: any) {
-      const errorMessage = error.message || '사용자 정보 업데이트에 실패했습니다.';
-      dispatch({ type: 'SET_ERROR', payload: errorMessage });
-      throw error;
-    }
+  const updateUser = (updates: Partial<UserProfile>) => {
+    dispatch({ type: 'UPDATE_USER', payload: updates });
   };
 
   // 그룹 선택
-  const selectGroup = (group: GroupWithMembers | null): void => {
+  const selectGroup = (group: GroupWithMembers | null) => {
     dispatch({ type: 'SELECT_GROUP', payload: group });
   };
 
-  // 사용자 데이터 새로고침
-  const refreshUserData = async (): Promise<void> => {
-    if (!state.user) return;
-
-    try {
-      const userProfile = await authService.getUserProfile(state.user.mt_idx);
-      authService.setUserData(userProfile);
-      dispatch({ type: 'LOGIN_SUCCESS', payload: userProfile });
-    } catch (error: any) {
-      console.error('[AUTH CONTEXT] 사용자 데이터 새로고침 실패:', error);
-      dispatch({ type: 'SET_ERROR', payload: '사용자 정보를 새로고침할 수 없습니다.' });
-    }
+  // 그룹 목록 업데이트
+  const updateGroups = (groups: GroupWithMembers[]) => {
+    dispatch({ type: 'UPDATE_GROUPS', payload: groups });
   };
 
-  // 그룹 데이터 새로고침
-  const refreshGroups = async (): Promise<void> => {
-    if (!state.user) return;
-
-    try {
-      const groups = await authService.getUserGroups(state.user.mt_idx);
-      dispatch({ type: 'UPDATE_GROUPS', payload: groups });
-    } catch (error: any) {
-      console.error('[AUTH CONTEXT] 그룹 데이터 새로고침 실패:', error);
-      dispatch({ type: 'SET_ERROR', payload: '그룹 정보를 새로고침할 수 없습니다.' });
-    }
+  // 로딩 상태 설정
+  const setLoading = (loading: boolean) => {
+    dispatch({ type: 'SET_LOADING', payload: loading });
   };
 
-  // 에러 설정
-  const setError = (error: string | null): void => {
+  // 에러 상태 설정
+  const setError = (error: string | null) => {
     dispatch({ type: 'SET_ERROR', payload: error });
   };
 
-  const contextValue: AuthContextType = {
-    ...state,
+  // 프리로딩 완료 상태 설정
+  const setPreloadingComplete = (complete: boolean) => {
+    dispatch({ type: 'SET_PRELOADING_COMPLETE', payload: complete });
+  };
+
+  const value = {
+    state,
+    dispatch,
     login,
     logout,
     updateUser,
     selectGroup,
-    refreshUserData,
-    refreshGroups,
+    updateGroups,
+    setLoading,
     setError,
+    setPreloadingComplete,
   };
 
-  return (
-    <AuthContext.Provider value={contextValue}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-// Custom Hook
-export const useAuth = (): AuthContextType => {
+// Hook
+export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth는 AuthProvider 내부에서 사용되어야 합니다.');
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-};
-
-// 편의를 위한 개별 hooks
-export const useUser = () => {
-  const { user } = useAuth();
-  return user;
-};
-
-export const useGroups = () => {
-  const { user } = useAuth();
-  return {
-    allGroups: user?.groups || [],
-    ownedGroups: user?.ownedGroups || [],
-    joinedGroups: user?.joinedGroups || [],
-  };
-};
-
-export const useSelectedGroup = () => {
-  const { selectedGroup, selectGroup } = useAuth();
-  return { selectedGroup, selectGroup };
 }; 
-
- 

@@ -1,4 +1,4 @@
-import { fcmTokenService } from './fcmTokenService';
+// fcmTokenService는 동적으로 import하여 서버사이드 렌더링 문제 방지
 
 interface AutoRefreshConfig {
   enabled: boolean;
@@ -119,17 +119,28 @@ class FCMTokenAutoRefreshService {
       const startTime = Date.now();
       
       // FCM 토큰 갱신 실행
-      const result = await fcmTokenService.initializeAndCheckUpdateToken(this.config.userId);
-      
-      const endTime = Date.now();
-      const duration = endTime - startTime;
-      
-      if (result.success) {
-        console.log(`[FCM Auto Refresh] ✅ 토큰 갱신 성공 (${duration}ms):`, result.message);
-        this.retryCount = 0; // 성공 시 재시도 카운트 리셋
-        this.lastRefreshTime = Date.now();
-      } else {
-        console.warn(`[FCM Auto Refresh] ⚠️ 토큰 갱신 실패 (${duration}ms):`, result.error);
+      try {
+        const { fcmTokenService } = await import('./fcmTokenService');
+        if (fcmTokenService) {
+          const result = await fcmTokenService.initializeAndCheckUpdateToken(this.config.userId);
+          
+          const endTime = Date.now();
+          const duration = endTime - startTime;
+          
+          if (result.success) {
+            console.log(`[FCM Auto Refresh] ✅ 토큰 갱신 성공 (${duration}ms):`, result.message);
+            this.retryCount = 0; // 성공 시 재시도 카운트 리셋
+            this.lastRefreshTime = Date.now();
+          } else {
+            console.warn(`[FCM Auto Refresh] ⚠️ 토큰 갱신 실패 (${duration}ms):`, result.error);
+            this.handleRefreshFailure();
+          }
+        } else {
+          console.warn('[FCM Auto Refresh] ⚠️ fcmTokenService 초기화 실패');
+          this.handleRefreshFailure();
+        }
+      } catch (error) {
+        console.error('[FCM Auto Refresh] ❌ fcmTokenService import 실패:', error);
         this.handleRefreshFailure();
       }
       
@@ -233,18 +244,34 @@ class FCMTokenAutoRefreshService {
 
       console.log(`[FCM Auto Refresh] 🔄 수동 갱신 트리거 (사용자 ID: ${this.config.userId})`);
       
-      const result = await (fcmTokenService as any).initializeAndCheckUpdateToken(this.config.userId, true);
-      
-      if (result.success) {
-        this.lastRefreshTime = Date.now();
-        return {
-          success: true,
-          message: result.message || '수동 갱신 성공'
-        };
-      } else {
+      try {
+        const { fcmTokenService } = await import('./fcmTokenService');
+        if (fcmTokenService) {
+          const result = await fcmTokenService.initializeAndCheckUpdateToken(this.config.userId);
+          
+          if (result.success) {
+            this.lastRefreshTime = Date.now();
+            return {
+              success: true,
+              message: result.message || '수동 갱신 성공'
+            };
+          } else {
+            return {
+              success: false,
+              error: result.error || '수동 갱신 실패'
+            };
+          }
+        } else {
+          return {
+            success: false,
+            error: 'fcmTokenService 초기화 실패'
+          };
+        }
+      } catch (error) {
+        console.error('[FCM Auto Refresh] ❌ fcmTokenService import 실패:', error);
         return {
           success: false,
-          error: result.error || '수동 갱신 실패'
+          error: 'fcmTokenService import 실패'
         };
       }
       
