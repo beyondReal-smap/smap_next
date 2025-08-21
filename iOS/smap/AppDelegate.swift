@@ -251,11 +251,46 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                         print("❌ [PUSH] 경고: FCM 토큰은 있지만 권한이 거부됨!")
                     } else if settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional {
                         print("✅ [PUSH] FCM 토큰과 권한 모두 정상!")
+                        
+                        // 🔔 중요: FCM 토큰이 변경되었는지 확인하고 서버에 업데이트
+                        self.checkAndUpdateFCMTokenIfNeeded(currentToken: token)
                     }
                 } else {
                     print("❌ [PUSH] FCM 토큰이 없음")
                 }
             }
+        }
+    }
+    
+    // MARK: - 🔔 FCM 토큰 변경 감지 및 서버 업데이트
+    private func checkAndUpdateFCMTokenIfNeeded(currentToken: String) {
+        // 🔒 중복 실행 방지: 이미 업데이트 진행 중이면 스킵
+        if UserDefaults.standard.bool(forKey: "fcm_update_in_progress") {
+            print("⏳ [FCM] FCM 토큰 업데이트 이미 진행 중 - 스킵")
+            return
+        }
+        
+        // 이전에 저장된 FCM 토큰과 비교
+        let lastSavedToken = UserDefaults.standard.string(forKey: "last_fcm_token")
+        
+        if lastSavedToken != currentToken {
+            print("🔄 [FCM] FCM 토큰 변경 감지!")
+            print("🔄 [FCM] 이전 토큰: \(lastSavedToken ?? "없음")")
+            print("🔄 [FCM] 현재 토큰: \(currentToken)")
+            
+            // 🔒 업데이트 진행 중 플래그 설정
+            UserDefaults.standard.set(true, forKey: "fcm_update_in_progress")
+            UserDefaults.standard.synchronize()
+            
+            // 새로운 토큰을 UserDefaults에 저장
+            UserDefaults.standard.set(currentToken, forKey: "last_fcm_token")
+            UserDefaults.standard.synchronize()
+            
+            // 서버에 FCM 토큰 업데이트
+            print("🚀 [FCM] 변경된 FCM 토큰을 서버에 업데이트 시작")
+            self.sendFCMTokenToServer(token: currentToken)
+        } else {
+            print("✅ [FCM] FCM 토큰 변경 없음 - 서버 업데이트 생략")
         }
     }
     
@@ -705,8 +740,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                     return
                 }
                 
-                // FCM 토큰을 직접 API로 전송 (웹뷰 전달 대신)
-                self.sendFCMTokenToServer(token: token)
+                // 🔔 중요: FCM 토큰 변경 감지 및 서버 업데이트
+                self.checkAndUpdateFCMTokenIfNeeded(currentToken: token)
             }
         }
     }
@@ -766,10 +801,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         // URLSession으로 API 호출
         let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             DispatchQueue.main.async {
-                if let error = error {
-                    print("❌ [FCM API] 네트워크 오류: \(error.localizedDescription)")
-                    return
-                }
+                                    if let error = error {
+                        print("❌ [FCM API] 네트워크 오류: \(error.localizedDescription)")
+                        
+                        // 🔒 네트워크 오류 시에도 플래그 해제
+                        DispatchQueue.main.async {
+                            UserDefaults.standard.set(false, forKey: "fcm_update_in_progress")
+                            UserDefaults.standard.synchronize()
+                            print("🔓 [FCM] 네트워크 오류로 인한 플래그 해제됨")
+                        }
+                        return
+                    }
                 
                 guard let httpResponse = response as? HTTPURLResponse else {
                     print("❌ [FCM API] HTTP 응답이 아님")
@@ -782,11 +824,21 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                     print("📨 [FCM API] 서버 응답: \(responseString)")
                 }
                 
-                if httpResponse.statusCode == 200 || httpResponse.statusCode == 201 {
-                    print("✅ [FCM API] FCM 토큰 서버 업데이트 성공!")
-                } else {
-                    print("❌ [FCM API] FCM 토큰 서버 업데이트 실패 - 상태 코드: \(httpResponse.statusCode)")
-                }
+                                        if httpResponse.statusCode == 200 || httpResponse.statusCode == 201 {
+                            print("✅ [FCM API] FCM 토큰 서버 업데이트 성공!")
+                            
+                            // 🔒 업데이트 진행 중 플래그 해제
+                            UserDefaults.standard.set(false, forKey: "fcm_update_in_progress")
+                            UserDefaults.standard.synchronize()
+                            print("🔓 [FCM] FCM 토큰 업데이트 진행 중 플래그 해제됨")
+                        } else {
+                            print("❌ [FCM API] FCM 토큰 서버 업데이트 실패 - 상태 코드: \(httpResponse.statusCode)")
+                            
+                            // 🔒 실패 시에도 플래그 해제
+                            UserDefaults.standard.set(false, forKey: "fcm_update_in_progress")
+                            UserDefaults.standard.synchronize()
+                            print("🔓 [FCM] FCM 토큰 업데이트 실패로 인한 플래그 해제됨")
+                        }
             }
         }
         
@@ -837,6 +889,18 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                 
                 if let token = token, !token.isEmpty {
                     print("✅ [FCM STATUS] FCM 토큰 존재: \(token.prefix(50))...")
+                    
+                    // 🔔 FCM 토큰 상태 상세 정보 출력
+                    let lastSavedToken = UserDefaults.standard.string(forKey: "last_fcm_token")
+                    print("🔍 [FCM STATUS] 마지막으로 저장된 FCM 토큰: \(lastSavedToken ?? "없음")")
+                    print("🔍 [FCM STATUS] 현재 FCM 토큰: \(token)")
+                    print("🔍 [FCM STATUS] 토큰 변경 여부: \(lastSavedToken != token ? "변경됨" : "변경 없음")")
+                    
+                    // 토큰이 변경되었다면 서버에 업데이트
+                    if lastSavedToken != token {
+                        print("🔄 [FCM STATUS] 토큰 변경 감지 - 서버 업데이트 시작")
+                        self.checkAndUpdateFCMTokenIfNeeded(currentToken: token)
+                    }
                 } else {
                     print("❌ [FCM STATUS] FCM 토큰이 nil이거나 비어있음")
                 }
@@ -873,14 +937,125 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         
         if retryCount > maxRetries {
             print("❌ [FCM API] 최대 재시도 횟수 초과")
+            
+            // 🔒 재시도 실패 시 플래그 해제
+            UserDefaults.standard.set(false, forKey: "fcm_update_in_progress")
+            UserDefaults.standard.synchronize()
+            print("🔓 [FCM] 재시도 실패로 인한 플래그 해제됨")
             return
         }
         
         print("�� [FCM API] FCM 토큰 업데이트 재시도 \(retryCount)/\(maxRetries)")
         
         DispatchQueue.main.asyncAfter(deadline: .now() + Double(retryCount) * 5.0) {
-            self.sendFCMTokenToServer(token: token)
+            self.sendFCMTokenUpdateWithRetry(token: token, retryCount: retryCount + 1)
         }
+    }
+    
+    // MARK: - 🔄 재시도용 FCM 토큰 업데이트 (플래그 없이)
+    private func sendFCMTokenUpdateWithRetry(token: String, retryCount: Int) {
+        print("🔄 [FCM API] 재시도 \(retryCount) - FCM 토큰 서버 업데이트 시작")
+        
+        // UserDefaults에서 mt_idx 가져오기 (여러 키에서 시도)
+        let mtIdx = UserDefaults.standard.string(forKey: "mt_idx") ??
+                   UserDefaults.standard.string(forKey: "savedMtIdx") ??
+                   UserDefaults.standard.string(forKey: "current_mt_idx")
+        
+        guard let mtIdx = mtIdx, !mtIdx.isEmpty else {
+            print("⚠️ [FCM API] 재시도 \(retryCount) - mt_idx를 찾을 수 없음")
+            if retryCount < 3 {
+                self.retryFCMTokenUpdate(token: token, retryCount: retryCount)
+            } else {
+                // 🔒 최대 재시도 실패 시 플래그 해제
+                UserDefaults.standard.set(false, forKey: "fcm_update_in_progress")
+                UserDefaults.standard.synchronize()
+                print("🔓 [FCM] 최대 재시도 실패로 인한 플래그 해제됨")
+            }
+            return
+        }
+        
+        print("✅ [FCM API] 재시도 \(retryCount) - mt_idx 발견: \(mtIdx)")
+        
+        // API 요청 데이터 준비
+        let requestData: [String: Any] = [
+            "mt_idx": mtIdx,
+            "fcm_token": token,
+            "device_type": "ios",
+            "platform": "ios"
+        ]
+        
+        // JSON 데이터로 변환
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: requestData) else {
+            print("❌ [FCM API] 재시도 \(retryCount) - JSON 데이터 변환 실패")
+            return
+        }
+        
+        // API URL 구성
+        let urlString = Http.shared.BASE_URL + Http.shared.memberFcmTokenUrl
+        guard let url = URL(string: urlString) else {
+            print("❌ [FCM API] 재시도 \(retryCount) - 잘못된 URL: \(urlString)")
+            return
+        }
+        
+        print("🌐 [FCM API] 재시도 \(retryCount) - 요청 URL: \(urlString)")
+        print("📤 [FCM API] 재시도 \(retryCount) - 요청 데이터: \(requestData)")
+        
+        // URLRequest 구성
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = jsonData
+        
+        // URLSession으로 API 호출
+        let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("❌ [FCM API] 재시도 \(retryCount) - 네트워크 오류: \(error.localizedDescription)")
+                    if retryCount < 3 {
+                        self?.retryFCMTokenUpdate(token: token, retryCount: retryCount)
+                    } else {
+                        // 🔒 최대 재시도 실패 시 플래그 해제
+                        UserDefaults.standard.set(false, forKey: "fcm_update_in_progress")
+                        UserDefaults.standard.synchronize()
+                        print("🔓 [FCM] 최대 재시도 실패로 인한 플래그 해제됨")
+                    }
+                    return
+                }
+                
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    print("❌ [FCM API] 재시도 \(retryCount) - HTTP 응답이 아님")
+                    return
+                }
+                
+                print("📡 [FCM API] 재시도 \(retryCount) - HTTP 상태 코드: \(httpResponse.statusCode)")
+                
+                if let data = data, let responseString = String(data: data, encoding: .utf8) {
+                    print("📨 [FCM API] 재시도 \(retryCount) - 서버 응답: \(responseString)")
+                }
+                
+                if httpResponse.statusCode == 200 || httpResponse.statusCode == 201 {
+                    print("✅ [FCM API] 재시도 \(retryCount) - FCM 토큰 업데이트 성공!")
+                    
+                    // 🔒 업데이트 진행 중 플래그 해제
+                    UserDefaults.standard.set(false, forKey: "fcm_update_in_progress")
+                    UserDefaults.standard.synchronize()
+                    print("🔓 [FCM] 재시도 성공으로 인한 플래그 해제됨")
+                } else {
+                    print("❌ [FCM API] 재시도 \(retryCount) - FCM 토큰 업데이트 실패 - 상태 코드: \(httpResponse.statusCode)")
+                    
+                    if retryCount < 3 {
+                        self?.retryFCMTokenUpdate(token: token, retryCount: retryCount)
+                    } else {
+                        // 🔒 최대 재시도 실패 시 플래그 해제
+                        UserDefaults.standard.set(false, forKey: "fcm_update_in_progress")
+                        UserDefaults.standard.synchronize()
+                        print("🔓 [FCM] 재시도 실패로 인한 플래그 해제됨")
+                    }
+                }
+            }
+        }
+        
+        task.resume()
     }
     
     private func verifyFCMTokenUpdate(mtIdx: Int) {
