@@ -1019,7 +1019,7 @@ export default function HomePage() {
     }
     
     // 6. DOM 변경 감지하여 지도 렌더링 강제 실행 (깜빡임 방지를 위해 디바운싱 적용)
-    let mapRenderTimeout: NodeJS.Timeout | null = null;
+    let mapRenderTimeout: ReturnType<typeof setTimeout> | null = null;
     const observer = new MutationObserver((mutations) => {
       // 디바운싱: 연속된 DOM 변경을 하나로 묶어서 처리
       if (mapRenderTimeout) {
@@ -1046,8 +1046,8 @@ export default function HomePage() {
     observer.observe(document.body, {
       childList: true,
       subtree: true,
-      attributes: false, // style, class 변경은 감지하지 않음 (깜빡임 방지)
-      attributeFilter: [] // 모든 속성 변경 감지 비활성화
+      attributes: false // style, class 변경은 감지하지 않음 (깜빡임 방지)
+      // attributeFilter는 attributes가 true일 때만 사용 가능하므로 제거
     });
     
     // 7. 주기적 실행 (깜빡임 방지를 위해 빈도 줄임)
