@@ -41,7 +41,13 @@ export class FCMTokenService {
    */
   private async performInitialization(): Promise<void> {
     try {
-      console.log('[FCM Token Service] 웹 환경 감지 - Firebase 초기화 시작');
+      console.log('[FCM Token Service] 🔧 FCM 토큰 서비스 초기화 시작');
+      
+      // 서버 사이드에서는 초기화하지 않음
+      if (typeof window === 'undefined') {
+        console.log('[FCM Token Service] 서버 사이드 - 초기화 건너뜀');
+        return;
+      }
       
       // 환경변수 상태 확인
       const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
@@ -57,7 +63,7 @@ export class FCMTokenService {
       });
 
       if (!vapidKey) {
-        throw new Error('VAPID 키가 설정되지 않음');
+        console.warn('[FCM Token Service] ⚠️ VAPID 키가 설정되지 않음 - 일부 기능 제한됨');
       }
 
       console.log('[FCM Token Service] 🔥 Firebase Messaging 초기화 시작');
@@ -75,12 +81,12 @@ export class FCMTokenService {
 
       // Firebase 앱 초기화 상태 확인
       if (!app) {
-        throw new Error('Firebase 앱이 초기화되지 않음');
+        console.warn('[FCM Token Service] ⚠️ Firebase 앱이 초기화되지 않음 - 일부 기능 제한됨');
+      } else {
+        console.log('[FCM Token Service] ✅ Firebase 앱 초기화 상태 확인 완료');
       }
-      
-      console.log('[FCM Token Service] ✅ Firebase 앱 초기화 상태 확인 완료');
 
-      // Service Worker 등록
+      // Service Worker 등록 (선택적)
       if ('serviceWorker' in navigator) {
         console.log('[FCM Token Service] 🔧 서비스 워커 등록 시작...');
         
@@ -88,17 +94,22 @@ export class FCMTokenService {
           const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
           console.log('[FCM Token Service] ✅ 서비스 워커 등록 성공:', registration.scope);
         } catch (error) {
-          console.warn('[FCM Token Service] ⚠️ 서비스 워커 등록 실패:', error);
+          console.warn('[FCM Token Service] ⚠️ 서비스 워커 등록 실패 (계속 진행):', error);
         }
       }
 
-      // Firebase Messaging 초기화
+      // Firebase Messaging 초기화 (선택적)
       try {
-        this.messaging = getMessaging(app);
-        console.log('[FCM Token Service] ✅ Firebase Messaging 초기화 성공');
+        if (app) {
+          this.messaging = getMessaging(app);
+          console.log('[FCM Token Service] ✅ Firebase Messaging 초기화 성공');
+        } else {
+          console.warn('[FCM Token Service] ⚠️ Firebase 앱이 없음 - Messaging 초기화 건너뜀');
+          this.messaging = null;
+        }
       } catch (error) {
-        console.error('[FCM Token Service] ❌ Firebase Messaging 초기화 실패:', error);
-        throw error;
+        console.warn('[FCM Token Service] ⚠️ Firebase Messaging 초기화 실패 (계속 진행):', error);
+        this.messaging = null;
       }
 
       this.isInitialized = true;
@@ -110,7 +121,8 @@ export class FCMTokenService {
     } catch (error) {
       console.error('[FCM Token Service] ❌ 초기화 실패:', error);
       this.isInitialized = false;
-      throw error;
+      // 초기화 실패해도 계속 진행 (기본 기능은 작동)
+      console.log('[FCM Token Service] 🔥 초기화 실패했지만 기본 기능은 계속 진행');
     }
   }
 
@@ -248,7 +260,13 @@ export class FCMTokenService {
         if (userStr) {
           try {
             const user = JSON.parse(userStr);
-            userId = user.id;
+            // mt_idx가 있는지 먼저 확인
+            if (user.mt_idx) {
+              userId = user.mt_idx;
+            } else if (user.id) {
+              userId = user.id;
+            }
+            console.log('[FCM Token Service] 🔍 사용자 정보에서 ID 추출:', { mt_idx: user.mt_idx, id: user.id, finalUserId: userId });
           } catch (parseError) {
             console.warn('[FCM Token Service] ⚠️ 사용자 정보 파싱 실패:', parseError);
           }
@@ -261,28 +279,62 @@ export class FCMTokenService {
 
       console.log(`[FCM Token Service] 🔄 FCM 토큰 DB 업데이트 시작 (사용자 ID: ${userId})`);
 
-      // API 호출 - check-and-update 엔드포인트 사용
-      const response = await fetch(`https://api3.smap.site/api/v1/member-fcm-token/check-and-update`, {
+      // Next.js API 라우트를 통해 백엔드 호출 (프록시 역할)
+      const apiUrl = '/api/member-fcm-token/check-and-update';
+      console.log('[FCM Token Service] 📡 API 호출:', apiUrl);
+
+      // 인증 토큰 가져오기
+      const authToken = localStorage.getItem('token') || localStorage.getItem('auth_token');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+        console.log('[FCM Token Service] 🔐 인증 토큰 포함됨');
+      } else {
+        console.log('[FCM Token Service] ⚠️ 인증 토큰 없음');
+      }
+
+      const response = await fetch(apiUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
-        },
+        headers,
         body: JSON.stringify({
           mt_idx: userId,
           fcm_token: token,
           device_type: this.detectDeviceType(),
           platform: this.detectPlatform()
-        })
+        }),
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        console.error('[FCM Token Service] ❌ API 응답 오류:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorData
+        });
         throw new Error(`API 호출 실패: ${response.status} ${response.statusText} - ${errorData.message || '알 수 없는 오류'}`);
       }
 
       const result = await response.json();
       console.log('[FCM Token Service] ✅ FCM 토큰 DB 업데이트 완료:', result);
+      
+      // 성공적으로 업데이트된 경우 currentToken 업데이트
+      if (result.success) {
+        this.currentToken = token;
+        console.log('[FCM Token Service] 🔄 currentToken 업데이트됨');
+        
+        // 백엔드 응답에서 토큰 상태 확인
+        if (result.has_token) {
+          console.log('[FCM Token Service] ✅ 서버에서 토큰 상태 확인됨');
+        } else {
+          console.warn('[FCM Token Service] ⚠️ 서버에서 토큰 상태 확인 실패');
+        }
+      } else {
+        console.error('[FCM Token Service] ❌ 서버 응답에서 성공하지 않음:', result.message);
+        throw new Error(`서버 응답 실패: ${result.message}`);
+      }
       
     } catch (error) {
       console.error('[FCM Token Service] ❌ FCM 토큰 DB 업데이트 실패:', error);
@@ -340,46 +392,60 @@ export class FCMTokenService {
   }
 
   /**
-   * FCM 토큰 획득 및 서버 체크/업데이트 (로그인용)
+   * FCM 토큰 초기화 및 체크/업데이트
    */
-  async initializeAndCheckUpdateToken(mt_idx: number): Promise<{ success: boolean; token?: string; error?: string; message?: string }> {
+  async initializeAndCheckUpdateToken(mt_idx: number): Promise<{ success: boolean; message?: string; error?: string }> {
     try {
-      console.log('[FCM Token Service] 🔔 FCM 토큰 초기화 및 체크/업데이트 시작 (로그인)');
-      console.log('[FCM Token Service] 📍 사용자 ID:', mt_idx);
+      console.log(`[FCM Token Service] 🔄 FCM 토큰 초기화 및 체크/업데이트 시작 (사용자 ID: ${mt_idx})`);
       
-      // FCM 토큰 획득
-      const token = await this.getFCMToken(mt_idx);
-      
-      if (!token) {
-        console.warn('[FCM Token Service] ⚠️ FCM 토큰 획득 실패');
+      // 초기화 대기
+      if (!this.isInitialized) {
+        console.log('[FCM Token Service] ⏳ 초기화 대기 중...');
+        await this.initialize();
+      }
+
+      // 현재 토큰 확인
+      const currentToken = this.currentToken;
+      console.log('[FCM Token Service] 📋 현재 저장된 토큰:', currentToken ? currentToken.substring(0, 20) + '...' : '없음');
+
+      // 새 토큰 생성
+      const newToken = await this.getFCMToken(mt_idx);
+      if (!newToken) {
+        console.error('[FCM Token Service] ❌ 새 FCM 토큰 생성 실패');
         return {
           success: false,
-          error: 'FCM 토큰 획득 실패'
+          error: '새 FCM 토큰 생성 실패'
         };
       }
 
-      console.log('[FCM Token Service] ✅ FCM 토큰 획득 성공, 길이:', token.length);
+      console.log('[FCM Token Service] ✅ 새 FCM 토큰 생성 성공:', newToken.substring(0, 20) + '...');
 
-      // 토큰을 DB에 업데이트
+      // 토큰이 변경되었는지 확인
+      if (currentToken === newToken) {
+        console.log('[FCM Token Service] ℹ️ 토큰 변경 없음 - DB 업데이트만 수행');
+      } else {
+        console.log('[FCM Token Service] 🔄 토큰 변경됨 - DB 업데이트 수행');
+      }
+
+      // DB 업데이트 수행
       try {
-        await this.updateFCMTokenInDB(token, mt_idx);
+        await this.updateFCMTokenInDB(newToken, mt_idx);
         console.log('[FCM Token Service] ✅ FCM 토큰 DB 업데이트 완료');
+        
         return {
           success: true,
-          token: token,
-          message: 'FCM 토큰 초기화 및 DB 업데이트 완료'
+          message: 'FCM 토큰이 성공적으로 업데이트되었습니다.'
         };
       } catch (dbError) {
-        console.warn('[FCM Token Service] ⚠️ FCM 토큰 DB 업데이트 실패:', dbError);
+        console.error('[FCM Token Service] ❌ FCM 토큰 DB 업데이트 실패:', dbError);
         return {
           success: false,
-          token: token,
           error: 'DB 업데이트 실패: ' + (dbError instanceof Error ? dbError.message : String(dbError))
         };
       }
       
     } catch (error) {
-      console.error('[FCM Token Service] ❌ FCM 토큰 체크/업데이트 실패:', error);
+      console.error('[FCM Token Service] ❌ FCM 토큰 초기화 및 체크/업데이트 실패:', error);
       return {
         success: false,
         error: (error instanceof Error ? error.message : String(error))
@@ -433,6 +499,13 @@ export class FCMTokenService {
         error: (error instanceof Error ? error.message : String(error))
       };
     }
+  }
+
+  /**
+   * 현재 FCM 토큰 반환
+   */
+  getCurrentFCMToken(): string | null {
+    return this.currentToken;
   }
 
   /**
@@ -633,7 +706,7 @@ export class FCMTokenService {
       };
       
       (window as any).getCurrentFCMToken = () => {
-        return this.currentToken;
+        return this.getCurrentFCMToken();
       };
       
       (window as any).fcmTokenService = this; // 인스턴스도 전역에 등록

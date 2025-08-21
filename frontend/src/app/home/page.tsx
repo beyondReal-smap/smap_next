@@ -959,47 +959,54 @@ export default function HomePage() {
       // 약간의 지연 후 FCM 토큰 업데이트 실행 (다른 초기화 작업 완료 대기)
       const fcmUpdateTimeout = setTimeout(async () => {
         try {
+          console.log('🔔 [FCM] FCM 토큰 업데이트 시작 (사용자 ID:', user.mt_idx, ')');
+          
           const { fcmTokenService } = await import('@/services/fcmTokenService');
           if (fcmTokenService) {
             const result: any = await fcmTokenService.initializeAndCheckUpdateToken(user.mt_idx);
             if (result.success) {
               console.log('✅ [FCM] FCM 토큰 업데이트 성공:', result.message);
+              // 성공 시 사용자 정보에 FCM 토큰 상태 반영
+              console.log('📱 [FCM] FCM 토큰이 서버에 저장되어 푸시 알림 수신 가능');
             } else {
               console.warn('⚠️ [FCM] FCM 토큰 업데이트 실패:', result.error);
               console.log('🔥 [FCM] FCM 토큰 업데이트 실패해도 계속 진행');
             }
+          } else {
+            console.warn('⚠️ [FCM] FCM 토큰 서비스를 찾을 수 없음');
           }
         } catch (error: any) {
           console.error('❌ [FCM] FCM 토큰 업데이트 중 오류:', error);
+          console.log('🔥 [FCM] FCM 토큰 업데이트 오류가 발생해도 계속 진행');
         }
-      }, 2000); // 2초 후 실행
+      }, 3000); // 3초 후 실행 (더 안정적인 초기화 대기)
       
-      // 주기적 FCM 토큰 검증 및 업데이트 (5분마다)
+      // 주기적 FCM 토큰 검증 및 업데이트 (10분마다)
       const periodicFCMCheck = setInterval(async () => {
         if (user && user.mt_idx) {
-          console.log('🔔 [FCM] 주기적 토큰 검증 시작');
+          console.log('🔔 [FCM] 주기적 토큰 검증 시작 (사용자 ID:', user.mt_idx, ')');
           try {
             const { fcmTokenService } = await import('@/services/fcmTokenService');
             if (fcmTokenService) {
-              const isValid: any = await fcmTokenService.validateAndRefreshToken(user.mt_idx);
-              if (!isValid) {
-                console.log('🔄 [FCM] 토큰이 유효하지 않음 - 재생성 시작');
+              // 간단한 토큰 유효성 검사
+              const currentToken = fcmTokenService.getCurrentFCMToken();
+              if (!currentToken) {
+                console.log('🔄 [FCM] 토큰이 없음 - 재생성 시작');
                 const result: any = await fcmTokenService.initializeAndCheckUpdateToken(user.mt_idx);
                 if (result.success) {
-                  console.log('✅ [FCM] 주기적 토큰 검증 완료:', result.message);
+                  console.log('✅ [FCM] 주기적 토큰 재생성 완료:', result.message);
                 } else {
-                  console.warn('⚠️ [FCM] 주기적 토큰 검증 실패:', result.error);
-                  console.log('🔥 [FCM] 주기적 토큰 검증 실패해도 계속 진행');
+                  console.warn('⚠️ [FCM] 주기적 토큰 재생성 실패:', result.error);
                 }
               } else {
-                console.log('✅ [FCM] 주기적 토큰 검증 완료: 토큰 유효성 확인됨');
+                console.log('✅ [FCM] 주기적 토큰 검증 완료: 토큰 존재함');
               }
             }
           } catch (error: any) {
             console.error('❌ [FCM] 주기적 토큰 검증 실패:', error);
           }
         }
-      }, 5 * 60 * 1000); // 5분마다
+      }, 10 * 60 * 1000); // 10분마다 (더 긴 간격으로 변경)
       
       return () => {
         clearTimeout(fcmUpdateTimeout);
