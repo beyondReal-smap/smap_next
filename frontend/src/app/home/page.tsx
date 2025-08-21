@@ -954,17 +954,14 @@ export default function HomePage() {
           }
         }
         
-        // 일반적인 지도 컨테이너 강제 리사이즈
+        // 일반적인 지도 컨테이너 강제 리사이즈 (깜빡임 방지를 위해 display 변경 제거)
         const mapContainers = document.querySelectorAll('[id*="map"], [class*="map"], [id*="Map"], [class*="Map"]');
         mapContainers.forEach((container, index) => {
           if (container && (container as HTMLElement).style) {
-            console.log(`🗺️ [HOME] 지도 컨테이너 ${index} 강제 리사이즈`);
+            console.log(`🗺️ [HOME] 지도 컨테이너 ${index} 강제 리사이즈 (깜빡임 방지)`);
             const htmlContainer = container as HTMLElement;
-            htmlContainer.style.display = 'none';
-            setTimeout(() => {
-              htmlContainer.style.display = '';
-              htmlContainer.offsetHeight; // 강제 리플로우
-            }, 10);
+            // display 변경으로 인한 깜빡임 방지
+            htmlContainer.offsetHeight; // 강제 리플로우만 실행
           }
         });
         
@@ -1009,45 +1006,52 @@ export default function HomePage() {
     (window as any).SMAP_FORCE_MAP_RENDER = forceMapRender;
     (window as any).SMAP_CHECK_MAP_RENDERING = checkMapRendering;
     
-    // 4. 즉시 실행
-    setTimeout(forceMapRender, 100);
+    // 4. 즉시 실행 (깜빡임 방지를 위해 한 번만 실행)
     setTimeout(forceMapRender, 500);
-    setTimeout(forceMapRender, 1000);
-    setTimeout(forceMapRender, 2000);
     
-    // 5. 페이지 로딩 완료 후 실행
+    // 5. 페이지 로딩 완료 후 실행 (깜빡임 방지를 위해 한 번만 실행)
     if (document.readyState === 'complete') {
-      forceMapRender();
+      setTimeout(forceMapRender, 1000);
     } else {
       window.addEventListener('load', () => {
-        setTimeout(forceMapRender, 100);
-        setTimeout(forceMapRender, 500);
+        setTimeout(forceMapRender, 1000);
       });
     }
     
-    // 6. DOM 변경 감지하여 지도 렌더링 강제 실행
+    // 6. DOM 변경 감지하여 지도 렌더링 강제 실행 (깜빡임 방지를 위해 디바운싱 적용)
+    let mapRenderTimeout: NodeJS.Timeout | null = null;
     const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        if (mutation.type === 'childList' || mutation.type === 'attributes') {
-          const mapElements = (mutation.target as Element).querySelectorAll && 
-                            (mutation.target as Element).querySelectorAll('[id*="map"], [class*="map"]');
-          if (mapElements && mapElements.length > 0) {
-            console.log('🗺️ [HOME] DOM 변경 감지 - 지도 렌더링 강제 실행');
-            setTimeout(forceMapRender, 100);
+      // 디바운싱: 연속된 DOM 변경을 하나로 묶어서 처리
+      if (mapRenderTimeout) {
+        clearTimeout(mapRenderTimeout);
+      }
+      
+      mapRenderTimeout = setTimeout(() => {
+        const hasMapElements = mutations.some(mutation => {
+          if (mutation.type === 'childList' || mutation.type === 'attributes') {
+            const mapElements = (mutation.target as Element).querySelectorAll && 
+                              (mutation.target as Element).querySelectorAll('[id*="map"], [class*="map"]');
+            return mapElements && mapElements.length > 0;
           }
+          return false;
+        });
+        
+        if (hasMapElements) {
+          console.log('🗺️ [HOME] DOM 변경 감지 - 지도 렌더링 강제 실행 (디바운싱 적용)');
+          forceMapRender();
         }
-      });
+      }, 300); // 300ms 디바운싱
     });
     
     observer.observe(document.body, {
       childList: true,
       subtree: true,
-      attributes: true,
-      attributeFilter: ['style', 'class']
+      attributes: false, // style, class 변경은 감지하지 않음 (깜빡임 방지)
+      attributeFilter: [] // 모든 속성 변경 감지 비활성화
     });
     
-    // 7. 주기적 실행 (iOS WebView 호환성)
-    const intervalId = setInterval(forceMapRender, 5000); // 5초마다 실행
+    // 7. 주기적 실행 (깜빡임 방지를 위해 빈도 줄임)
+    const intervalId = setInterval(forceMapRender, 30000); // 30초마다 실행 (5초 → 30초)
     
     console.log('🗺️ [HOME] 지도 렌더링 강제 실행 시스템 완료');
     
@@ -1803,16 +1807,13 @@ export default function HomePage() {
             }
           }
           
-          // 지도 컨테이너 강제 리사이즈
+          // 지도 컨테이너 강제 리사이즈 (깜빡임 방지를 위해 display 변경 제거)
           const mapContainers = document.querySelectorAll('[id*="map"], [class*="map"], [id*="Map"], [class*="Map"]');
           mapContainers.forEach((container, index) => {
             if (container && (container as HTMLElement).style) {
               const htmlContainer = container as HTMLElement;
-              htmlContainer.style.display = 'none';
-              setTimeout(() => {
-                htmlContainer.style.display = '';
-                htmlContainer.offsetHeight; // 강제 리플로우
-              }, 10);
+              // display 변경으로 인한 깜빡임 방지
+              htmlContainer.offsetHeight; // 강제 리플로우만 실행
             }
           });
           
@@ -1822,10 +1823,8 @@ export default function HomePage() {
         }
       };
       
-      // 지연 실행으로 지도 완전 로딩 대기
-      setTimeout(forceMapRender, 500);
+      // 지연 실행으로 지도 완전 로딩 대기 (깜빡임 방지를 위해 한 번만 실행)
       setTimeout(forceMapRender, 1000);
-      setTimeout(forceMapRender, 2000);
       
     }
   }, [isMapInitialized, mapType, googleMapsLoaded, naverMapsLoaded]);
@@ -7203,12 +7202,12 @@ export default function HomePage() {
             className="full-map-container" 
             style={{ paddingTop: '0px', touchAction: 'manipulation', overflow: 'visible' }}
             onLoad={() => {
-              // 🗺️ 지도 컨테이너 로드 완료 시 강제 렌더링 실행
+              // 🗺️ 지도 컨테이너 로드 완료 시 강제 렌더링 실행 (깜빡임 방지를 위해 지연 시간 증가)
               setTimeout(() => {
                 if ((window as any).SMAP_FORCE_MAP_RENDER) {
                   (window as any).SMAP_FORCE_MAP_RENDER();
                 }
-              }, 100);
+              }, 500);
             }}
           >
             <div 
@@ -7216,12 +7215,12 @@ export default function HomePage() {
               className="w-full h-full absolute top-0 left-0" 
               style={{ display: mapType === 'google' ? 'block' : 'none', zIndex: 6 }}
               onLoad={() => {
-                // 🗺️ Google Maps 컨테이너 로드 완료 시 강제 렌더링
+                // 🗺️ Google Maps 컨테이너 로드 완료 시 강제 렌더링 (깜빡임 방지를 위해 지연 시간 증가)
                 setTimeout(() => {
                   if ((window as any).SMAP_FORCE_MAP_RENDER) {
                     (window as any).SMAP_FORCE_MAP_RENDER();
                   }
-                }, 200);
+                }, 800);
               }}
             ></div>
             <div 
@@ -7229,12 +7228,12 @@ export default function HomePage() {
               className="w-full h-full absolute top-0 left-0" 
               style={{ display: mapType === 'naver' ? 'block' : 'none', zIndex: 6 }}
               onLoad={() => {
-                // 🗺️ 네이버 지도 컨테이너 로드 완료 시 강제 렌더링
+                // 🗺️ 네이버 지도 컨테이너 로드 완료 시 강제 렌더링 (깜빡임 방지를 위해 지연 시간 증가)
                 setTimeout(() => {
                   if ((window as any).SMAP_FORCE_MAP_RENDER) {
                     (window as any).SMAP_FORCE_MAP_RENDER();
                   }
-                }, 200);
+                }, 800);
               }}
             ></div>
           </div>
@@ -7458,12 +7457,12 @@ export default function HomePage() {
             overflow: 'visible'
           }}
           onLoad={() => {
-            // 🗺️ 지도 컨테이너 로드 완료 시 강제 렌더링 실행
+            // 🗺️ 지도 컨테이너 로드 완료 시 강제 렌더링 실행 (깜빡임 방지를 위해 지연 시간 증가)
             setTimeout(() => {
               if ((window as any).SMAP_FORCE_MAP_RENDER) {
                 (window as any).SMAP_FORCE_MAP_RENDER();
               }
-            }, 100);
+            }, 500);
           }}
         >
           {/* 스켈레톤 UI - 지도 로딩 중일 때 표시 */}
@@ -7480,12 +7479,12 @@ export default function HomePage() {
             className="w-full h-full absolute top-0 left-0" 
             style={{ display: mapType === 'google' ? 'block' : 'none', zIndex: 6 }}
             onLoad={() => {
-              // 🗺️ Google Maps 컨테이너 로드 완료 시 강제 렌더링
+              // 🗺️ Google Maps 컨테이너 로드 완료 시 강제 렌더링 (깜빡임 방지를 위해 지연 시간 증가)
               setTimeout(() => {
                 if ((window as any).SMAP_FORCE_MAP_RENDER) {
                   (window as any).SMAP_FORCE_MAP_RENDER();
                 }
-              }, 200);
+              }, 800);
             }}
           ></div>
           <div 
@@ -7493,12 +7492,12 @@ export default function HomePage() {
             className="w-full h-full absolute top-0 left-0" 
             style={{ display: mapType === 'naver' ? 'block' : 'none', zIndex: 6 }}
             onLoad={() => {
-              // 🗺️ 네이버 지도 컨테이너 로드 완료 시 강제 렌더링
+              // 🗺️ 네이버 지도 컨테이너 로드 완료 시 강제 렌더링 (깜빡임 방지를 위해 지연 시간 증가)
               setTimeout(() => {
                 if ((window as any).SMAP_FORCE_MAP_RENDER) {
                   (window as any).SMAP_FORCE_MAP_RENDER();
                 }
-              }, 200);
+              }, 800);
             }}
           ></div>
         </div>
