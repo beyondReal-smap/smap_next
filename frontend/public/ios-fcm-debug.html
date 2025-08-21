@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iOS FCM 디버깅</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .button-group {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        button {
+            padding: 15px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .primary { background-color: #007AFF; color: white; }
+        .primary:hover { background-color: #0056CC; }
+        .secondary { background-color: #34C759; color: white; }
+        .secondary:hover { background-color: #28A745; }
+        .warning { background-color: #FF9500; color: white; }
+        .warning:hover { background-color: #E6850E; }
+        .danger { background-color: #FF3B30; color: white; }
+        .danger:hover { background-color: #D70015; }
+        .log-area {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            min-height: 300px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 14px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin-bottom: 8px;
+            padding: 8px;
+            border-radius: 4px;
+        }
+        .log-info { background-color: #d1ecf1; color: #0c5460; }
+        .log-success { background-color: #d4edda; color: #155724; }
+        .log-warning { background-color: #fff3cd; color: #856404; }
+        .log-error { background-color: #f8d7da; color: #721c24; }
+        .status {
+            text-align: center;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+        .status.ios { background-color: #d4edda; color: #155724; }
+        .status.web { background-color: #fff3cd; color: #856404; }
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .info-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+        .info-card h3 {
+            margin-top: 0;
+            color: #495057;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🍎 iOS FCM 디버깅</h1>
+        
+        <div class="status ios" id="status">
+            🔍 iOS 앱 환경 확인 중...
+        </div>
+        
+        <div class="button-group">
+            <button class="primary" onclick="checkIOSEnvironment()">
+                🔍 iOS 환경 상태 확인
+            </button>
+            <button class="secondary" onclick="checkFCMTokenStatus()">
+                🔔 FCM 토큰 상태 확인
+            </button>
+            <button class="warning" onclick="updateFCMToken()">
+                🔄 FCM 토큰 업데이트
+            </button>
+            <button class="danger" onclick="testPushNotification()">
+                📱 푸시 알림 테스트
+            </button>
+        </div>
+        
+        <div class="info-grid">
+            <div class="info-card">
+                <h3>📱 디바이스 정보</h3>
+                <div id="deviceInfo">로딩 중...</div>
+            </div>
+            <div class="info-card">
+                <h3>🔔 FCM 상태</h3>
+                <div id="fcmStatus">로딩 중...</div>
+            </div>
+        </div>
+        
+        <div class="log-area" id="logArea">
+            <div class="log-entry log-info">🚀 iOS FCM 디버깅 페이지 로드됨</div>
+        </div>
+    </div>
+
+    <script>
+        // 로그 함수들
+        function log(message, type = 'info') {
+            const logArea = document.getElementById('logArea');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry log-${type}`;
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            logArea.appendChild(logEntry);
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+
+        // iOS 환경 감지
+        function detectEnvironment() {
+            const status = document.getElementById('status');
+            
+            if (window.webkit && window.webkit.messageHandlers) {
+                status.className = 'status ios';
+                status.textContent = '✅ iOS 앱 환경에서 실행 중';
+                log('✅ iOS 앱 환경 감지됨', 'success');
+                
+                // 사용 가능한 핸들러 확인
+                const handlers = Object.keys(window.webkit.messageHandlers);
+                log(`📱 사용 가능한 핸들러: ${handlers.join(', ')}`, 'info');
+                
+                if (handlers.includes('fcmHandler')) {
+                    log('🔔 fcmHandler 사용 가능', 'success');
+                } else {
+                    log('⚠️ fcmHandler를 찾을 수 없음', 'warning');
+                }
+                
+                return true;
+            } else {
+                status.className = 'status web';
+                status.textContent = '🌐 웹 브라우저에서 실행 중 (iOS 앱에서만 FCM 기능 작동)';
+                log('🌐 웹 브라우저 환경 감지됨', 'warning');
+                return false;
+            }
+        }
+
+        // 디바이스 정보 표시
+        function updateDeviceInfo() {
+            const deviceInfo = document.getElementById('deviceInfo');
+            const userAgent = navigator.userAgent;
+            const isIOS = /iPad|iPhone|iPod/.test(userAgent);
+            const isWebView = /WebView|wv/.test(userAgent);
+            
+            deviceInfo.innerHTML = `
+                <strong>User Agent:</strong><br>
+                <small>${userAgent}</small><br><br>
+                <strong>디바이스:</strong> ${isIOS ? 'iOS' : '기타'}<br>
+                <strong>WebView:</strong> ${isWebView ? '예' : '아니오'}<br>
+                <strong>화면 해상도:</strong> ${screen.width}x${screen.height}<br>
+                <strong>언어:</strong> ${navigator.language}
+            `;
+        }
+
+        // FCM 상태 표시
+        function updateFCMStatus() {
+            const fcmStatus = document.getElementById('fcmStatus');
+            const hasWebKit = !!(window.webkit && window.webkit.messageHandlers);
+            const hasFCMHandler = hasWebKit && !!window.webkit.messageHandlers.fcmHandler;
+            const hasServiceWorker = 'serviceWorker' in navigator;
+            const hasNotification = 'Notification' in window;
+            const notificationPermission = hasNotification ? Notification.permission : 'N/A';
+            
+            fcmStatus.innerHTML = `
+                <strong>WebKit:</strong> ${hasWebKit ? '✅' : '❌'}<br>
+                <strong>FCM Handler:</strong> ${hasFCMHandler ? '✅' : '❌'}<br>
+                <strong>Service Worker:</strong> ${hasServiceWorker ? '✅' : '❌'}<br>
+                <strong>Notification API:</strong> ${hasNotification ? '✅' : '❌'}<br>
+                <strong>알림 권한:</strong> ${notificationPermission}
+            `;
+        }
+
+        // iOS 환경 상태 확인
+        function checkIOSEnvironment() {
+            log('🔍 iOS 환경 상태 확인 시작', 'info');
+            
+            if (!detectEnvironment()) {
+                log('❌ iOS 앱 환경이 아닙니다', 'error');
+                return;
+            }
+            
+            updateDeviceInfo();
+            updateFCMStatus();
+            
+            // 추가 환경 정보 수집
+            const envInfo = {
+                hasWebKit: !!(window.webkit && window.webkit.messageHandlers),
+                handlers: window.webkit ? Object.keys(window.webkit.messageHandlers) : [],
+                hasServiceWorker: 'serviceWorker' in navigator,
+                hasNotification: 'Notification' in window,
+                notificationPermission: 'Notification' in window ? Notification.permission : 'N/A',
+                userAgent: navigator.userAgent,
+                platform: navigator.platform,
+                language: navigator.language,
+                cookieEnabled: navigator.cookieEnabled,
+                onLine: navigator.onLine
+            };
+            
+            log('📋 환경 정보 수집 완료', 'success');
+            log(`📱 WebKit: ${envInfo.hasWebKit}`, 'info');
+            log(`🔧 핸들러: ${envInfo.handlers.join(', ')}`, 'info');
+            log(`🔔 알림 권한: ${envInfo.notificationPermission}`, 'info');
+            log(`🌐 온라인 상태: ${envInfo.onLine}`, 'info');
+        }
+
+        // FCM 토큰 상태 확인
+        function checkFCMTokenStatus() {
+            log('🔔 FCM 토큰 상태 확인 시작', 'info');
+            
+            if (!detectEnvironment()) {
+                log('❌ iOS 앱 환경이 아닙니다', 'error');
+                return;
+            }
+            
+            if (!window.webkit.messageHandlers.fcmHandler) {
+                log('❌ fcmHandler를 찾을 수 없습니다', 'error');
+                return;
+            }
+            
+            try {
+                const message = {
+                    type: 'checkFCMTokenStatus',
+                    param: 'status',
+                    timestamp: Date.now(),
+                    source: 'ios-fcm-debug'
+                };
+                
+                window.webkit.messageHandlers.fcmHandler.postMessage(message);
+                log('✅ FCM 토큰 상태 확인 메시지 전송 성공', 'success');
+                log(`📤 전송된 메시지: ${JSON.stringify(message)}`, 'info');
+            } catch (error) {
+                log(`❌ FCM 토큰 상태 확인 메시지 전송 실패: ${error.message}`, 'error');
+            }
+        }
+
+        // FCM 토큰 업데이트
+        function updateFCMToken() {
+            log('🔄 FCM 토큰 업데이트 시작', 'info');
+            
+            if (!detectEnvironment()) {
+                log('❌ iOS 앱 환경이 아닙니다', 'error');
+                return;
+            }
+            
+            if (!window.webkit.messageHandlers.fcmHandler) {
+                log('❌ fcmHandler를 찾을 수 없습니다', 'error');
+                return;
+            }
+            
+            try {
+                const message = {
+                    type: 'updateFCMToken',
+                    param: 'manual',
+                    timestamp: Date.now(),
+                    source: 'ios-fcm-debug'
+                };
+                
+                window.webkit.messageHandlers.fcmHandler.postMessage(message);
+                log('✅ FCM 토큰 업데이트 메시지 전송 성공', 'success');
+                log(`📤 전송된 메시지: ${JSON.stringify(message)}`, 'info');
+            } catch (error) {
+                log(`❌ FCM 토큰 업데이트 메시지 전송 실패: ${error.message}`, 'error');
+            }
+        }
+
+        // 푸시 알림 테스트
+        function testPushNotification() {
+            log('📱 푸시 알림 테스트 시작', 'info');
+            
+            if (!detectEnvironment()) {
+                log('❌ iOS 앱 환경이 아닙니다', 'error');
+                return;
+            }
+            
+            // 1. 알림 권한 확인
+            if ('Notification' in window) {
+                log(`🔔 현재 알림 권한: ${Notification.permission}`, 'info');
+                
+                if (Notification.permission === 'default') {
+                    log('🔔 알림 권한 요청 중...', 'info');
+                    Notification.requestPermission().then(permission => {
+                        log(`🔔 알림 권한 결과: ${permission}`, permission === 'granted' ? 'success' : 'warning');
+                        if (permission === 'granted') {
+                            showTestNotification();
+                        }
+                    });
+                } else if (Notification.permission === 'granted') {
+                    showTestNotification();
+                } else {
+                    log('❌ 알림 권한이 거부되었습니다', 'error');
+                }
+            } else {
+                log('❌ Notification API를 지원하지 않습니다', 'error');
+            }
+        }
+
+        // 테스트 알림 표시
+        function showTestNotification() {
+            try {
+                const notification = new Notification('🍎 iOS FCM 테스트', {
+                    body: '이 알림이 보이면 푸시 알림이 정상 작동합니다!',
+                    icon: '/favicon.ico',
+                    badge: '/favicon.ico',
+                    tag: 'ios-fcm-test',
+                    requireInteraction: true
+                });
+                
+                log('✅ 테스트 알림 표시 성공', 'success');
+                
+                notification.onclick = () => {
+                    log('👆 테스트 알림 클릭됨', 'info');
+                    window.focus();
+                };
+                
+                notification.onshow = () => {
+                    log('👀 테스트 알림 표시됨', 'info');
+                };
+                
+                // 5초 후 자동으로 닫기
+                setTimeout(() => {
+                    notification.close();
+                    log('⏰ 테스트 알림 자동 닫힘', 'info');
+                }, 5000);
+                
+            } catch (error) {
+                log(`❌ 테스트 알림 표시 실패: ${error.message}`, 'error');
+            }
+        }
+
+        // iOS 이벤트 리스너
+        function setupEventListeners() {
+            // FCM 토큰 업데이트 완료 이벤트
+            window.addEventListener('ios-fcm-token-update', function(event) {
+                log('✅ iOS에서 FCM 토큰 업데이트 완료 이벤트 수신', 'success');
+                log(`📱 이벤트 상세: ${JSON.stringify(event.detail)}`, 'info');
+            });
+
+            // FCM 토큰 상태 확인 완료 이벤트
+            window.addEventListener('ios-fcm-token-status-check', function(event) {
+                log('✅ iOS에서 FCM 토큰 상태 확인 완료 이벤트 수신', 'success');
+                log(`📱 이벤트 상세: ${JSON.stringify(event.detail)}`, 'info');
+            });
+
+            // 사용자 정보 저장 완료 이벤트
+            window.addEventListener('ios-user-info-saved', function(event) {
+                log('✅ iOS에서 사용자 정보 저장 완료 이벤트 수신', 'success');
+                log(`📱 이벤트 상세: ${JSON.stringify(event.detail)}`, 'info');
+            });
+        }
+
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            log('🚀 페이지 로드 완료', 'info');
+            detectEnvironment();
+            setupEventListeners();
+            updateDeviceInfo();
+            updateFCMStatus();
+            
+            // 1초 후 환경 재확인
+            setTimeout(() => {
+                detectEnvironment();
+            }, 1000);
+        });
+
+        // 페이지 완전 로드 후 추가 확인
+        window.addEventListener('load', function() {
+            log('🌐 페이지 완전 로드 완료', 'info');
+            setTimeout(() => {
+                detectEnvironment();
+            }, 500);
+        });
+    </script>
+</body>
+</html>
