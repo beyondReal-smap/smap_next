@@ -673,7 +673,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                     Utils.shared.setToken(token: token)
                     
                     // 즉시 서버에 업데이트
-                    self.updateFCMTokenToServer(token: token)
+                    self.sendFCMTokenToServer(token: token)
                 } else {
                     print("❌ [FCM] FCM 토큰이 nil입니다")
                 }
@@ -682,26 +682,47 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     }
     
     func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
-        guard let token = fcmToken else {return}
+        print("🔥 [FCM] FCM 토큰 업데이트 델리게이트 호출됨")
+        print("🔥 [FCM] 새로운 FCM 토큰: \(fcmToken ?? "nil")")
+        
+        guard let token = fcmToken else {
+            print("❌ [FCM] FCM 토큰이 nil입니다")
+            return
+        }
+        
         Utils.shared.setToken(token: token)
-
         print("🔥 [FCM] Firebase registration token: \(token)")
         print("🔥 [FCM] 토큰 길이: \(token.count) 문자")
         print("🔥 [FCM] 토큰 미리보기: \(token.prefix(30))...")
         
-        // ✅ 즉시 FCM 토큰을 서버에 업데이트 (지연 제거)
-        DispatchQueue.main.async {
-            self.updateFCMTokenToServer(token: token)
+        // 권한 상태 확인 먼저
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            DispatchQueue.main.async {
+                print("🔥 [FCM] 토큰 업데이트 시 권한 상태: \(self.authorizationStatusString(settings.authorizationStatus))")
+                
+                if settings.authorizationStatus == .denied {
+                    print("❌ [FCM] 경고: FCM 토큰은 있지만 푸시 알림 권한이 거부됨!")
+                    return
+                }
+                
+                // FCM 토큰을 직접 API로 전송 (웹뷰 전달 대신)
+                self.sendFCMTokenToServer(token: token)
+            }
         }
     }
     
     // MARK: - 🚀 FCM 토큰 직접 API 업데이트
     
-    private func updateFCMTokenToServer(token: String) {
+    private func sendFCMTokenToServer(token: String) {
         print("🚀 [FCM API] FCM 토큰 서버 업데이트 시작")
         
-        // 현재 로그인된 사용자 정보 가져오기
-        guard let currentUserMtIdx = getCurrentUserMtIdx() else {
+        // UserDefaults에서 mt_idx 가져오기 (여러 키에서 시도)
+        let mtIdx = UserDefaults.standard.string(forKey: "mt_idx") ?? 
+                   UserDefaults.standard.string(forKey: "savedMtIdx") ??
+                   UserDefaults.standard.string(forKey: "current_mt_idx")
+        
+        guard let mtIdx = mtIdx, !mtIdx.isEmpty else {
+            print("⚠️ [FCM API] 로그인 상태이지만 mt_idx를 찾을 수 없음 - 나중에 재시도")
             print("❌ [FCM API] 현재 사용자 정보를 찾을 수 없음 - 나중에 재시도")
             // 5초 후 재시도
             DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
@@ -710,7 +731,117 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             return
         }
         
-        sendFCMTokenToServer(token: token, mtIdx: currentUserMtIdx)
+        print("✅ [FCM API] mt_idx 발견: \(mtIdx)")
+        
+        // API 요청 데이터 준비
+        let requestData: [String: Any] = [
+            "mt_idx": mtIdx,
+            "fcm_token": token,
+            "device_type": "ios",
+            "platform": "ios"
+        ]
+        
+        // JSON 데이터로 변환
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: requestData) else {
+            print("❌ [FCM API] JSON 데이터 변환 실패")
+            return
+        }
+        
+        // API URL 구성
+        let urlString = Http.shared.BASE_URL + Http.shared.memberFcmTokenUrl
+        guard let url = URL(string: urlString) else {
+            print("❌ [FCM API] 잘못된 URL: \(urlString)")
+            return
+        }
+        
+        print("🌐 [FCM API] 요청 URL: \(urlString)")
+        print("📤 [FCM API] 요청 데이터: \(requestData)")
+        
+        // URLRequest 구성
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = jsonData
+        
+        // URLSession으로 API 호출
+        let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("❌ [FCM API] 네트워크 오류: \(error.localizedDescription)")
+                    return
+                }
+                
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    print("❌ [FCM API] HTTP 응답이 아님")
+                    return
+                }
+                
+                print("📡 [FCM API] HTTP 상태 코드: \(httpResponse.statusCode)")
+                
+                if let data = data, let responseString = String(data: data, encoding: .utf8) {
+                    print("📨 [FCM API] 서버 응답: \(responseString)")
+                }
+                
+                if httpResponse.statusCode == 200 || httpResponse.statusCode == 201 {
+                    print("✅ [FCM API] FCM 토큰 서버 업데이트 성공!")
+                } else {
+                    print("❌ [FCM API] FCM 토큰 서버 업데이트 실패 - 상태 코드: \(httpResponse.statusCode)")
+                }
+            }
+        }
+        
+        task.resume()
+    }
+    
+    // MARK: - 🔔 FCM 토큰 수동 업데이트 (웹뷰에서 호출 가능)
+    @objc func updateFCMTokenManually() {
+        print("🚀 [FCM MANUAL] 수동 FCM 토큰 업데이트 시작")
+        
+        // 현재 FCM 토큰 가져오기
+        Messaging.messaging().token { [weak self] token, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("❌ [FCM MANUAL] FCM 토큰 가져오기 실패: \(error.localizedDescription)")
+                    return
+                }
+                
+                guard let token = token, !token.isEmpty else {
+                    print("❌ [FCM MANUAL] FCM 토큰이 nil이거나 비어있음")
+                    return
+                }
+                
+                print("✅ [FCM MANUAL] FCM 토큰 가져오기 성공: \(token.prefix(50))...")
+                self?.sendFCMTokenToServer(token: token)
+            }
+        }
+    }
+    
+    // MARK: - 🔍 현재 FCM 토큰 상태 확인
+    @objc func checkCurrentFCMTokenStatus() {
+        print("🔍 [FCM STATUS] 현재 FCM 토큰 상태 확인")
+        
+        // UserDefaults에서 mt_idx 확인
+        let mtIdx = UserDefaults.standard.string(forKey: "mt_idx") ?? 
+                   UserDefaults.standard.string(forKey: "savedMtIdx") ??
+                   UserDefaults.standard.string(forKey: "current_mt_idx")
+        
+        print("🔍 [FCM STATUS] UserDefaults mt_idx: \(mtIdx ?? "nil")")
+        
+        // 현재 FCM 토큰 확인
+        Messaging.messaging().token { token, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("❌ [FCM STATUS] FCM 토큰 확인 실패: \(error.localizedDescription)")
+                    return
+                }
+                
+                if let token = token, !token.isEmpty {
+                    print("✅ [FCM STATUS] FCM 토큰 존재: \(token.prefix(50))...")
+                } else {
+                    print("❌ [FCM STATUS] FCM 토큰이 nil이거나 비어있음")
+                }
+            }
+        }
     }
     
     private func getCurrentUserMtIdx() -> Int? {
@@ -735,77 +866,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         return 1186
     }
     
-    private func sendFCMTokenToServer(token: String, mtIdx: Int) {
-        print("🌐 [FCM API] 서버로 토큰 전송 시작 - mt_idx: \(mtIdx)")
-        
-        // API 엔드포인트 URL
-        guard let url = URL(string: "https://api3.smap.site/api/v1/member-fcm-token/check-and-update") else {
-            print("❌ [FCM API] 잘못된 URL")
-            return
-        }
-        
-        // 요청 데이터 구성
-        let requestData: [String: Any] = [
-            "mt_idx": mtIdx,
-            "fcm_token": token
-        ]
-        
-        // HTTP 요청 설정
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("SMAP-iOS-App", forHTTPHeaderField: "User-Agent")
-        
-        do {
-            request.httpBody = try JSONSerialization.data(withJSONObject: requestData)
-        } catch {
-            print("❌ [FCM API] JSON 직렬화 실패: \(error.localizedDescription)")
-            return
-        }
-        
-        // API 호출
-        let session = URLSession.shared
-        let task = session.dataTask(with: request) { data, response, error in
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("❌ [FCM API] 네트워크 오류: \(error.localizedDescription)")
-                    // 재시도
-                    self.retryFCMTokenUpdate(token: token, retryCount: 1)
-                    return
-                }
-                
-                guard let httpResponse = response as? HTTPURLResponse else {
-                    print("❌ [FCM API] 잘못된 응답")
-                    return
-                }
-                
-                print("🌐 [FCM API] HTTP 응답 코드: \(httpResponse.statusCode)")
-                
-                if let data = data {
-                    do {
-                        if let jsonResponse = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                            print("📋 [FCM API] 서버 응답: \(jsonResponse)")
-                            
-                            if let success = jsonResponse["success"] as? Bool, success {
-                                print("✅ [FCM API] FCM 토큰 업데이트 성공!")
-                                
-                                // 성공 후 확인
-                                self.verifyFCMTokenUpdate(mtIdx: mtIdx)
-                            } else {
-                                let message = jsonResponse["message"] as? String ?? "알 수 없는 오류"
-                                print("❌ [FCM API] 서버 오류: \(message)")
-                            }
-                        }
-                    } catch {
-                        print("❌ [FCM API] JSON 파싱 오류: \(error.localizedDescription)")
-                    }
-                }
-            }
-        }
-        
-        task.resume()
-        print("🚀 [FCM API] API 요청 전송됨")
-    }
+
     
     private func retryFCMTokenUpdate(token: String, retryCount: Int) {
         let maxRetries = 3
@@ -818,7 +879,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         print("�� [FCM API] FCM 토큰 업데이트 재시도 \(retryCount)/\(maxRetries)")
         
         DispatchQueue.main.asyncAfter(deadline: .now() + Double(retryCount) * 5.0) {
-            self.updateFCMTokenToServer(token: token)
+            self.sendFCMTokenToServer(token: token)
         }
     }
     
@@ -1137,3 +1198,5 @@ extension CLLocationManager {
         self.smap_requestAlwaysAuthorization()
     }
 }
+
+

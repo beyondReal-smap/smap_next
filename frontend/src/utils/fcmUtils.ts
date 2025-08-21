@@ -21,6 +21,59 @@ export const detectEnvironment = (): 'web' | 'android' | 'android_webview' | 'io
 };
 
 /**
+ * 디바이스 타입 감지 (iOS, Android, Desktop 등)
+ */
+export const detectDeviceType = (): string => {
+  if (typeof window === 'undefined') return 'unknown';
+  
+  const userAgent = navigator.userAgent.toLowerCase();
+  if (/iphone|ipad|ipod/.test(userAgent)) return 'ios';
+  if (/android/.test(userAgent)) return 'android';
+  if (/windows/.test(userAgent)) return 'desktop';
+  if (/macintosh|mac os x/.test(userAgent)) return 'desktop';
+  if (/linux/.test(userAgent)) return 'desktop';
+  
+  return 'mobile';
+};
+
+/**
+ * iOS 환경에서 FCM 토큰 업데이트 안내
+ */
+export const getIOSFCMTokenUpdateInfo = (): { 
+  isIOS: boolean; 
+  message: string; 
+  instructions: string[]; 
+  availableFunctions: string[] 
+} => {
+  const isIOS = detectDeviceType() === 'ios';
+  
+  if (!isIOS) {
+    return {
+      isIOS: false,
+      message: 'iOS 디바이스가 아닙니다.',
+      instructions: [],
+      availableFunctions: []
+    };
+  }
+  
+  return {
+    isIOS: true,
+    message: '🍎 iOS 환경에서는 Swift에서 FCM 토큰을 직접 관리합니다.',
+    instructions: [
+      '웹에서 FCM 토큰 업데이트를 시도하지 마세요.',
+      'Swift에서 자동으로 FCM 토큰을 서버에 전송합니다.',
+      '수동 업데이트가 필요한 경우 window.updateFCMToken() 함수를 사용하세요.',
+      'FCM 토큰 상태 확인은 window.checkFCMTokenStatus() 함수를 사용하세요.'
+    ],
+    availableFunctions: [
+      'window.updateFCMToken() - FCM 토큰 수동 업데이트',
+      'window.checkFCMTokenStatus() - FCM 토큰 상태 확인',
+      'window.getFCMTokenStatus() - FCM 토큰 상태 상세 정보'
+    ]
+  };
+};
+
+/**
  * FCM 지원 여부 확인
  */
 export const isFCMSupported = (): boolean => {
@@ -145,6 +198,18 @@ export const forceRefreshFCMToken = async (userId: number): Promise<{ success: b
   try {
     console.log(`[FCM Utils] 🔄 FCM 토큰 강제 갱신 시작 (사용자 ID: ${userId})`);
     
+    // iOS 환경 감지
+    const isIOS = detectDeviceType() === 'ios';
+    if (isIOS) {
+      console.log('[FCM Utils] 🍎 iOS 환경 감지 - FCM 토큰 강제 갱신 건너뛰기 (Swift에서 직접 처리)');
+      console.log('[FCM Utils] 📱 iOS에서는 window.updateFCMToken() 함수를 사용하여 네이티브 FCM 토큰 업데이트를 수행하세요');
+      return { 
+        success: false, 
+        error: 'iOS에서는 FCM 토큰 강제 갱신을 지원하지 않습니다. window.updateFCMToken() 함수를 사용하세요.',
+        message: 'iOS에서는 Swift에서 FCM 토큰을 직접 관리합니다.'
+      };
+    }
+    
     try {
       const { fcmTokenService } = await import('../services/fcmTokenService');
       if (fcmTokenService) {
@@ -169,7 +234,7 @@ export const forceRefreshFCMToken = async (userId: number): Promise<{ success: b
         success: false,
         error: 'fcmTokenService import 실패'
       };
-    }
+      }
     
   } catch (error) {
     console.error('[FCM Utils] ❌ FCM 토큰 강제 갱신 중 오류:', error);
@@ -317,5 +382,6 @@ export default {
   startFCMAutoRefresh,
   stopFCMAutoRefresh,
   getFCMTokenStatus,
-  debugFCMToken
+  debugFCMToken,
+  getIOSFCMTokenUpdateInfo
 };

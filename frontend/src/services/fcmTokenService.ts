@@ -286,36 +286,15 @@ export class FCMTokenService {
         userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown'
       });
 
-      // iOS에서 특별한 처리
+      // iOS 환경에서는 FCM 토큰 생성을 건너뛰고 Swift에서 처리하도록 안내
       if (isIOS) {
-        console.log('[FCM Token Service] 🍎 iOS 환경 감지 - 특별 처리 시작');
+        console.log('[FCM Token Service] 🍎 iOS 환경 감지 - FCM 토큰 생성 건너뛰기 (Swift에서 직접 처리)');
+        console.log('[FCM Token Service] 📱 iOS에서는 window.updateFCMToken() 함수를 사용하여 네이티브 FCM 토큰 업데이트를 수행하세요');
         
-        // iOS에서 Firebase Messaging 초기화 재시도
-        if (!this.messaging) {
-          try {
-            if (app) {
-              this.messaging = getMessaging(app);
-              console.log('[FCM Token Service] ✅ iOS에서 Firebase Messaging 재초기화 성공');
-            }
-          } catch (error) {
-            console.warn('[FCM Token Service] ⚠️ iOS에서 Firebase Messaging 초기화 실패:', error);
-          }
-        }
-        
-        // iOS에서 알림 권한 확인 및 요청
-        if ('Notification' in window) {
-          if (Notification.permission === 'default') {
-            console.log('[FCM Token Service] 🔔 iOS에서 알림 권한 요청');
-            try {
-              const permission = await Notification.requestPermission();
-              console.log('[FCM Token Service] 🔔 iOS 알림 권한 결과:', permission);
-            } catch (error) {
-              console.warn('[FCM Token Service] ⚠️ iOS 알림 권한 요청 실패:', error);
-            }
-          } else {
-            console.log('[FCM Token Service] 🔔 iOS 알림 권한 상태:', Notification.permission);
-          }
-        }
+        // iOS에서는 더미 토큰 반환 (실제 FCM 토큰은 Swift에서 관리)
+        const iosDummyToken = `ios_dummy_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+        this.currentToken = iosDummyToken;
+        return iosDummyToken;
       }
 
       // localhost 환경이어도 실제 Firebase 토큰 생성 시도
@@ -674,6 +653,14 @@ export class FCMTokenService {
    */
   private async updateFCMTokenInDB(token: string, mt_idx?: number): Promise<void> {
     try {
+      // iOS 환경에서는 FCM 토큰 업데이트 건너뛰기 (Swift에서 직접 처리)
+      const isIOS = this.detectDeviceType() === 'ios';
+      if (isIOS) {
+        console.log('[FCM Token Service] 🍎 iOS 환경 감지 - FCM 토큰 업데이트 건너뛰기 (Swift에서 직접 처리)');
+        console.log('[FCM Token Service] 📱 iOS에서는 window.updateFCMToken() 함수를 사용하여 네이티브 FCM 토큰 업데이트를 수행하세요');
+        return;
+      }
+      
       // 현재 사용자 ID 가져오기
       let userId = mt_idx;
       if (!userId) {
@@ -1531,6 +1518,18 @@ export class FCMTokenService {
 
       // 추가 전역 함수들 등록
       (window as any).forceRefreshFCMToken = async (mt_idx: number) => {
+        // iOS 환경에서는 FCM 토큰 새로고침 건너뛰기 (Swift에서 직접 처리)
+        const isIOS = this.detectDeviceType() === 'ios';
+        if (isIOS) {
+          console.log('[FCM Token Service] 🍎 iOS 환경 감지 - FCM 토큰 새로고침 건너뛰기 (Swift에서 직접 처리)');
+          console.log('[FCM Token Service] 📱 iOS에서는 window.updateFCMToken() 함수를 사용하여 네이티브 FCM 토큰 업데이트를 수행하세요');
+          return { 
+            success: false, 
+            error: 'iOS에서는 FCM 토큰 새로고침을 지원하지 않습니다. window.updateFCMToken() 함수를 사용하세요.',
+            message: 'iOS에서는 Swift에서 FCM 토큰을 직접 관리합니다.'
+          };
+        }
+        
         return await this.forceTokenRefresh(mt_idx);
       };
       
