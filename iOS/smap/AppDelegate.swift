@@ -69,26 +69,46 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         // GADMobileAds.sharedInstance().start(completionHandler: nil)
 
         
-        // 🚨 FCM 자동 초기화 완전 비활성화 - 로그인 후에만 활성화
-        Messaging.messaging().isAutoInitEnabled = false
-        print("🚨 [FCM] 자동 초기화 비활성화 - 로그인 후 수동 활성화 예정")
+        // ✅ FCM 자동 초기화 활성화 - 즉시 푸시 알림 수신 가능하도록
+        Messaging.messaging().isAutoInitEnabled = true
+        print("✅ [FCM] 자동 초기화 활성화 - 푸시 알림 즉시 수신 가능")
         
-        // 🚨 FCM delegate 설정도 로그인 후로 지연
-        // Messaging.messaging().delegate = self  // 일단 주석 처리
+        // ✅ FCM delegate 즉시 설정
+        Messaging.messaging().delegate = self
+        print("✅ [FCM] FCM delegate 설정 완료")
         
         if #available(iOS 10.0, *) {
             // For iOS 10 display notification (sent via APNS)
             UNUserNotificationCenter.current().delegate = self
-            // 🚨 앱 시작 시 자동 권한 요청 완전 비활성화 (로그인 후 MainView에서 프리퍼미션 처리)
-            print("🔔 [PUSH] 런치 시 권한 요청 완전 비활성화 - 로그인 후 처리")
-            print("🚨 [PUSH] FCM delegate 설정도 로그인 후로 지연")
+            // ✅ 앱 시작 시 푸시 알림 권한 요청 활성화
+            print("🔔 [PUSH] 런치 시 푸시 알림 권한 요청 활성화")
+            
+            // 즉시 푸시 알림 권한 요청
+            let authOptions: UNAuthorizationOptions = [.alert, .badge, .sound]
+            UNUserNotificationCenter.current().requestAuthorization(
+                options: authOptions,
+                completionHandler: { didAllow, error in
+                    DispatchQueue.main.async {
+                        if let error = error {
+                            print("❌ [PUSH] 푸시 알림 권한 요청 오류: \(error.localizedDescription)")
+                        } else {
+                            print("✅ [PUSH] 푸시 알림 권한 요청 완료: \(didAllow)")
+                            if didAllow {
+                                // 권한이 허용되면 원격 알림 등록
+                                UIApplication.shared.registerForRemoteNotifications()
+                                print("✅ [PUSH] 원격 알림 등록 완료")
+                            }
+                        }
+                    }
+                }
+            )
         } else {
-            // iOS 10 미만에서도 자동 권한 요청 비활성화
-            print("🚨 [PUSH] iOS 10 미만에서도 자동 권한 요청 비활성화")
-            // let settings: UIUserNotificationSettings =
-            //     UIUserNotificationSettings(types: [.alert, .badge, .sound], categories: nil)
-            // application.registerUserNotificationSettings(settings)
-            // application.registerForRemoteNotifications()
+            // iOS 10 미만에서도 푸시 알림 권한 요청
+            print("✅ [PUSH] iOS 10 미만에서도 푸시 알림 권한 요청")
+            let settings: UIUserNotificationSettings =
+                UIUserNotificationSettings(types: [.alert, .badge, .sound], categories: nil)
+            application.registerUserNotificationSettings(settings)
+            application.registerForRemoteNotifications()
         }
         
         IQKeyboardManager.shared.enable = true
@@ -278,7 +298,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             print("⚠️ [SMAP-iOS] 메모리 경고 수신, 캐시 정리 수행")
             // WebView 캐시 정리
             URLCache.shared.removeAllCachedResponses()
-            WKWebsiteDataStore.default().removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: Date.distantPast) { }
+            WKWebsiteDataStore.default().removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: Date.distantPast) { 
+                print("✅ [SMAP-iOS] WebView 데이터 정리 완료")
+            }
         }
         
         // 백그라운드 진입 시 최적화
@@ -456,11 +478,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         if motionStatus == .notDetermined {
             requestMotionPermissionIfNeededSequential { [weak self] in
                 if locStatus == .notDetermined {
-                    self?.requestLocationPermissionSequential { }
+                    self?.requestLocationPermissionSequential { 
+                        print("✅ [PERM] 위치 권한 보완 완료")
+                    }
                 }
             }
         } else if locStatus == .notDetermined {
-            requestLocationPermissionSequential { }
+            requestLocationPermissionSequential { 
+                print("✅ [PERM] 위치 권한 보완 완료")
+            }
         } else {
             print("✅ [PERM] 모든 권한 이미 처리됨")
         }
@@ -471,7 +497,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         guard CMMotionActivityManager.isActivityAvailable() else { completion(); return }
         let status = CMMotionActivityManager.authorizationStatus()
         if status != .notDetermined {
-            completion();
+            completion()
             return
         }
         print("🏃 [PERM] 모션 권한 요청 시작 (순차)")
@@ -635,11 +661,24 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         Messaging.messaging().setAPNSToken(deviceToken as Data, type: .unknown)
-        print("didRegisterForRemoteNotificationsWithDeviceToken -- 1", Messaging.messaging().apnsToken ?? String())
+        print("✅ [APNS] APNS 디바이스 토큰 등록 완료")
         
-        guard let token = Messaging.messaging().fcmToken else { return }
-        Utils.shared.setToken(token: token)
-        print("token --> \(token)")
+        // ✅ 즉시 FCM 토큰 가져오기 시도
+        Messaging.messaging().token { token, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("❌ [FCM] FCM 토큰 가져오기 실패: \(error.localizedDescription)")
+                } else if let token = token {
+                    print("✅ [FCM] FCM 토큰 즉시 가져오기 성공: \(token.prefix(30))...")
+                    Utils.shared.setToken(token: token)
+                    
+                    // 즉시 서버에 업데이트
+                    self.updateFCMTokenToServer(token: token)
+                } else {
+                    print("❌ [FCM] FCM 토큰이 nil입니다")
+                }
+            }
+        }
     }
     
     func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
@@ -650,8 +689,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         print("🔥 [FCM] 토큰 길이: \(token.count) 문자")
         print("🔥 [FCM] 토큰 미리보기: \(token.prefix(30))...")
         
-        // 🚀 직접 API 호출로 FCM 토큰을 서버에 업데이트
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+        // ✅ 즉시 FCM 토큰을 서버에 업데이트 (지연 제거)
+        DispatchQueue.main.async {
             self.updateFCMTokenToServer(token: token)
         }
     }
@@ -681,10 +720,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             return mtIdx
         }
         
-        // 방법 2: Utils에서 사용자 정보 확인 (기존 방식)
-        // Utils.shared에서 사용자 정보를 가져오는 로직 (존재하는 경우)
+        // 방법 2: Utils에서 사용자 정보 확인 (기존 방식) - 비동기 처리 필요하므로 생략
+        // Utils.getToken은 비동기 메서드이므로 동기적 처리가 필요한 이 컨텍스트에서는 사용하지 않음
         
-        // 방법 3: 하드코딩된 테스트 사용자 (임시)
+        // 방법 3: 로그인 상태 확인
+        let isLoggedIn = UserDefaults.standard.bool(forKey: "is_logged_in")
+        if isLoggedIn {
+            print("⚠️ [FCM API] 로그인 상태이지만 mt_idx를 찾을 수 없음 - 나중에 재시도")
+            return nil
+        }
+        
+        // 방법 4: 하드코딩된 테스트 사용자 (개발/테스트용)
         print("⚠️ [FCM API] 사용자 정보 없음 - 테스트 사용자(1186) 사용")
         return 1186
     }
@@ -769,7 +815,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             return
         }
         
-        print("🔄 [FCM API] FCM 토큰 업데이트 재시도 \(retryCount)/\(maxRetries)")
+        print("�� [FCM API] FCM 토큰 업데이트 재시도 \(retryCount)/\(maxRetries)")
         
         DispatchQueue.main.asyncAfter(deadline: .now() + Double(retryCount) * 5.0) {
             self.updateFCMTokenToServer(token: token)
