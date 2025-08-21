@@ -1,4 +1,4 @@
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    "use client";
+"use client";
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -9,7 +9,7 @@ import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
 import useTermsPageState from '@/hooks/useTermsPageState';
 import TermsPageLoading from '@/components/common/TermsPageLoading';
 
-// 모바일 최적화된 CSS 애니메이션 (setting/manual/page.tsx 참고)
+// 모바일 최적화된 CSS 애니메이션 (setting 페이지와 동일한 구조)
 const pageAnimations = `
 html, body {
   width: 100%;
@@ -30,16 +30,71 @@ html, body {
 .animate-fadeIn { animation: fadeIn 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards; }
 
 .glass-effect {
+  backdrop-filter: blur(20px);
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.setting-header {
   position: fixed !important;
   top: 0 !important;
   left: 0 !important;
   right: 0 !important;
   z-index: 9999 !important;
-  background: rgba(255, 255, 255, 0.8) !important;
-  backdrop-filter: blur(10px) !important;
-  -webkit-backdrop-filter: blur(10px) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
+  height: 62px !important;
+  min-height: 62px !important;
+  max-height: 62px !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.8) !important;
   box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08) !important;
+  display: flex !important;
+  align-items: center !important;
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
+}
+
+.setting-header-content {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 12px;
+}
+
+.setting-back-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(229, 231, 235, 0.8);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.setting-header-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.content-area {
+  padding-top: 80px !important;
+  margin-top: 0 !important;
+}
+
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 `;
 
@@ -53,6 +108,31 @@ export default function ServiceTermsPage() {
     pageName: 'SERVICE',
     isEmbed
   });
+  
+  // 페이지 로드 시 body, html 스타일 초기화 (헤더 고정을 위해 필요)
+  useEffect(() => {
+    document.body.setAttribute('data-page', '/setting/service');
+    document.body.classList.add('service-terms-page-active');
+    
+    // body, html 스타일 강제 초기화 (헤더 고정을 위해 필요)
+    document.body.style.position = 'static';
+    document.body.style.overflow = 'visible';
+    document.body.style.transform = 'none';
+    document.body.style.willChange = 'auto';
+    document.body.style.perspective = 'none';
+    document.body.style.backfaceVisibility = 'visible';
+    document.documentElement.style.position = 'static';
+    document.documentElement.style.overflow = 'visible';
+    document.documentElement.style.transform = 'none';
+    document.documentElement.style.willChange = 'auto';
+    document.documentElement.style.perspective = 'none';
+    document.documentElement.style.backfaceVisibility = 'visible';
+    
+    return () => {
+      document.body.removeAttribute('data-page');
+      document.body.classList.remove('service-terms-page-active');
+    };
+  }, []);
   
   // 페이지 가시성 변경 감지 및 복원
   useEffect(() => {
@@ -95,13 +175,18 @@ export default function ServiceTermsPage() {
     <>
       <style jsx global>{pageAnimations}</style>
       <div
-        className={`${isEmbed ? 'min-h-screen overflow-auto bg-white' : 'min-h-screen overflow-auto bg-gradient-to-br from-indigo-50 via-white to-purple-50 main-container'}`}
+        className={`fixed inset-0 overflow-hidden ${isEmbed ? 'bg-white' : 'bg-gradient-to-br from-indigo-50 via-white to-purple-50 main-container'}`}
         id="setting-service-terms-container"
         data-page="/setting/service"
         data-content-type="service-page"
+        style={{
+          paddingTop: '0px',
+          marginTop: '0px',
+          top: '0px'
+        }}
       >
         {!isEmbed && (
-          <AnimatedHeader variant="enhanced" className="setting-header glass-effect">
+          <AnimatedHeader variant="enhanced" className="setting-header">
             <motion.div
               initial={{ opacity: 0, x: -40 }}
               animate={{ opacity: 1, x: 0 }}
@@ -127,12 +212,24 @@ export default function ServiceTermsPage() {
           </AnimatedHeader>
         )}
 
-        {/* 컨텐츠 영역 - 일반 스크롤 */}
+        {/* 컨텐츠 영역 - 고정 위치 (setting 페이지와 동일한 구조) */}
         <motion.div
           initial="initial"
           animate="in"
           exit="out"
-          className={`px-4 space-y-6 content-area ${isEmbed ? 'pt-6' : 'pt-20'}`}
+          className={`absolute inset-0 px-4 space-y-6 content-area hide-scrollbar ${isEmbed ? 'pt-6' : 'pt-20'}`}
+          data-testid="service-terms-page-content"
+          data-content-type="service-terms-page-content"
+          style={{ 
+            top: '0px',
+            bottom: '0px',
+            left: '0',
+            right: '0',
+            overflow: 'hidden',
+            overflowY: 'auto',
+            scrollbarWidth: 'none', /* Firefox */
+            msOverflowStyle: 'none', /* IE and Edge */
+          }}
         >
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-fadeIn service-content">
             <div className="p-6 text-sm leading-relaxed max-w-4xl mx-auto">
@@ -142,41 +239,41 @@ export default function ServiceTermsPage() {
               <div className="space-y-6 text-gray-800 leading-7">
                 <section>
                   <h3 className="text-lg font-semibold mb-3 text-blue-900">제1조(목적)</h3>
-                  <p>이 약관은 비욘드리얼(이하 “회사”)가 제공하는 제반 서비스의 이용과 관련하여 회사와 회원 간의 권리, 의무 및 책임사항, 기타 필요한 사항을 규정함을 목적으로 합니다.</p>
+                  <p>이 약관은 비욘드리얼(이하 "회사")가 제공하는 제반 서비스의 이용과 관련하여 회사와 회원 간의 권리, 의무 및 책임사항, 기타 필요한 사항을 규정함을 목적으로 합니다.</p>
                 </section>
 
                 <section>
                   <h3 className="text-lg font-semibold mb-3 text-blue-900">제2조(정의)</h3>
                   <ol className="list-decimal pl-5 space-y-1 text-sm">
-                    <li>“서비스”라 함은 구현되는 단말기(PC, TV, 휴대형단말기 등의 각종 유무선 장치를 포함)와 상관없이 이용자가 이용할 수 있는 회사의 제반 서비스를 의미합니다.
+                    <li>"서비스"라 함은 구현되는 단말기(PC, TV, 휴대형단말기 등의 각종 유무선 장치를 포함)와 상관없이 이용자가 이용할 수 있는 회사의 제반 서비스를 의미합니다.
                       <ol className="list-decimal pl-5 mt-1">
                         <li>smap 서비스</li>
                         <li>기타 회사가 정하는 서비스</li>
                       </ol>
                     </li>
-                    <li>“smap 서비스”라 함은 실시간 위치조회, 위치와 일정 기반 알림 등 회사가 이용자에게 제공하는 서비스를 말합니다.</li>
-                    <li>“이용자”란 회사가 제공하는 서비스를 받는 개인회원과 비회원을 말합니다.</li>
-                    <li>“개인회원”은 회사에 개인정보를 제공하여 회원등록을 한 사람으로, 회사로부터 지속적으로 정보를 제공받고 서비스를 계속적으로 이용할 수 있는 자를 말합니다.</li>
-                    <li>“비회원”은 회원가입 없이 회사가 제공하는 서비스를 이용하는 자를 말합니다.</li>
-                    <li>“아이디(ID)”란 회원의 식별과 서비스 이용을 위하여 회원이 정하고 회사가 승인하는 문자 또는 문자와 숫자의 조합을 의미합니다.</li>
-                    <li>“비밀번호”란 회원이 부여받은 아이디와 일치되는 회원임을 확인하고 비밀의 보호를 위해 회원이 정한 문자(특수문자 포함)와 숫자의 조합을 의미합니다.</li>
-                    <li>“유료서비스”란 회사가 유료로 제공하는 제반 서비스를 의미합니다.</li>
-                    <li>“결제”란 회사가 제공하는 유료서비스를 이용하기 위하여 회원이 지불수단을 선택하고 금융정보를 입력하는 행위를 말합니다.</li>
-                    <li>“할인쿠폰”은 이용자가 회사의 서비스를 이용하면서 그 대가를 지급하는 데 사용하기 위하여 회사가 발행 및 관리하는 지급수단을 말합니다.</li>
-                    <li>“콘텐츠”란 정보통신망법에 따라 정보통신망에서 사용되는 부호·문자·음성·음향·이미지 또는 영상 등으로 정보 형태의 글, 사진, 동영상 및 각종 파일과 링크 등을 말합니다.</li>
+                    <li>"smap 서비스"라 함은 실시간 위치조회, 위치와 일정 기반 알림 등 회사가 이용자에게 제공하는 서비스를 말합니다.</li>
+                    <li>"이용자"란 회사가 제공하는 서비스를 받는 개인회원과 비회원을 말합니다.</li>
+                    <li>"개인회원"은 회사에 개인정보를 제공하여 회원등록을 한 사람으로, 회사로부터 지속적으로 정보를 제공받고 서비스를 계속적으로 이용할 수 있는 자를 말합니다.</li>
+                    <li>"비회원"은 회원가입 없이 회사가 제공하는 서비스를 이용하는 자를 말합니다.</li>
+                    <li>"아이디(ID)"란 회원의 식별과 서비스 이용을 위하여 회원이 정하고 회사가 승인하는 문자 또는 문자와 숫자의 조합을 의미합니다.</li>
+                    <li>"비밀번호"란 회원이 부여받은 아이디와 일치되는 회원임을 확인하고 비밀의 보호를 위해 회원이 정한 문자(특수문자 포함)와 숫자의 조합을 의미합니다.</li>
+                    <li>"유료서비스"란 회사가 유료로 제공하는 제반 서비스를 의미합니다.</li>
+                    <li>"결제"란 회사가 제공하는 유료서비스를 이용하기 위하여 회원이 지불수단을 선택하고 금융정보를 입력하는 행위를 말합니다.</li>
+                    <li>"할인쿠폰"은 이용자가 회사의 서비스를 이용하면서 그 대가를 지급하는 데 사용하기 위하여 회사가 발행 및 관리하는 지급수단을 말합니다.</li>
+                    <li>"콘텐츠"란 정보통신망법에 따라 정보통신망에서 사용되는 부호·문자·음성·음향·이미지 또는 영상 등으로 정보 형태의 글, 사진, 동영상 및 각종 파일과 링크 등을 말합니다.</li>
                   </ol>
                 </section>
 
                 <section>
                   <h3 className="text-lg font-semibold mb-3 text-blue-900">제3조(약관 외 준칙)</h3>
-                  <p className="text-sm">이 약관에서 정하지 아니한 사항은 법령 또는 회사가 정한 서비스의 개별약관, 운영정책 및 규칙 등(이하 “세부지침”)의 규정에 따르며, 본 약관과 세부지침이 충돌할 경우 세부지침이 우선합니다.</p>
+                  <p className="text-sm">이 약관에서 정하지 아니한 사항은 법령 또는 회사가 정한 서비스의 개별약관, 운영정책 및 규칙 등(이하 "세부지침")의 규정에 따르며, 본 약관과 세부지침이 충돌할 경우 세부지침이 우선합니다.</p>
                 </section>
 
                 <section>
                   <h3 className="text-lg font-semibold mb-3 text-blue-900">제4조(약관의 효력과 변경)</h3>
                   <ol className="list-decimal pl-5 space-y-1 text-sm">
                     <li>이 약관은 회사가 제공하는 모든 인터넷서비스에 게시하여 공시합니다. 회사는 전자상거래법, 약관규제법, 정보통신망법 등 관련 법령에 위배되지 않는 범위에서 본 약관을 변경할 수 있으며, 변경 시 최소 7일(불리하거나 중대한 사항은 30일) 이전부터 공지합니다. 기존 이용자에게는 전자적 수단(전자우편, 문자메시지, 서비스 내 알림 등)으로 개별 통지할 수 있습니다. 변경된 약관은 시행일부터 효력이 발생합니다.</li>
-                    <li>회사는 개정약관 공지 또는 통지 시, ‘변경에 동의하지 아니한 경우 공지일 또는 통지를 받은 날로부터 7일(불리하거나 중대한 사항은 30일) 내 해지 가능하며, 해지 의사표시가 없으면 동의한 것으로 간주’됨을 함께 통지합니다.</li>
+                    <li>회사는 개정약관 공지 또는 통지 시, '변경에 동의하지 아니한 경우 공지일 또는 통지를 받은 날로부터 7일(불리하거나 중대한 사항은 30일) 내 해지 가능하며, 해지 의사표시가 없으면 동의한 것으로 간주'됨을 함께 통지합니다.</li>
                     <li>이용자가 전항의 기간 내 거절 의사를 표시하지 않을 때에는 개정 약관에 동의한 것으로 봅니다.</li>
                   </ol>
                 </section>
