@@ -3335,6 +3335,15 @@ const SignInPage = () => {
     try {
       console.log('[SIGNIN] AuthContext login 호출 시작');
       
+      // 🔄 전화번호 로그인 전에 이전 계정의 모든 데이터 완전 정리
+      console.log('[SIGNIN] 🔄 전화번호 로그인 전 이전 계정 데이터 정리 시작');
+      try {
+        authService.clearAllPreviousAccountData();
+        console.log('[SIGNIN] ✅ 이전 계정 데이터 정리 완료');
+      } catch (clearError) {
+        console.warn('[SIGNIN] ⚠️ 이전 계정 데이터 정리 중 오류 (계속 진행):', clearError);
+      }
+      
       // iOS 로그 전송 - API 호출 시작
       sendLogToiOS('info', '🔄 전화번호 로그인 API 호출 시작', {
         timestamp: new Date().toISOString(),
@@ -3415,6 +3424,28 @@ const SignInPage = () => {
           delete (window as any).__DELAY_HOME_INIT__;
         }, 2000); // 2초 후 초기화 허용
       }
+      
+      // FCM 토큰 체크 및 업데이트 (백그라운드에서 실행)
+      setTimeout(async () => {
+        try {
+          console.log('[SIGNIN] 🔔 전화번호 로그인 후 FCM 토큰 강제 업데이트 시작');
+          const { fcmTokenService } = await import('@/services/fcmTokenService');
+          
+          const userData = authService.getUserData();
+          if (userData?.mt_idx && fcmTokenService) {
+            const fcmResult = await fcmTokenService.forceUpdateOnLogin(userData.mt_idx);
+            if (fcmResult.success) {
+              console.log('[SIGNIN] ✅ FCM 토큰 강제 업데이트 완료:', fcmResult.message);
+            } else {
+              console.warn('[SIGNIN] ⚠️ FCM 토큰 강제 업데이트 실패:', fcmResult.error);
+            }
+          } else {
+            console.warn('[SIGNIN] ⚠️ FCM 토큰 강제 업데이트 스킵: mt_idx 없음 또는 fcmTokenService 초기화 실패');
+            }
+          } catch (fcmError) {
+            console.error('[SIGNIN] ❌ FCM 토큰 강제 업데이트 중 오류:', fcmError);
+          }
+        }, 1000); // 전화번호 로그인 후 1초 지연
       
       router.replace('/home');
       
@@ -3703,6 +3734,15 @@ const SignInPage = () => {
       } catch (error) {
         console.warn('[GOOGLE LOGIN] 이전 로그인 정리 실패:', error);
       }
+    }
+    
+    // 🔄 Google 로그인 전에 이전 계정의 모든 데이터 완전 정리
+    console.log('[GOOGLE LOGIN] 🔄 Google 로그인 전 이전 계정 데이터 정리 시작');
+    try {
+      authService.clearAllPreviousAccountData();
+      console.log('[GOOGLE LOGIN] ✅ 이전 계정 데이터 정리 완료');
+    } catch (clearError) {
+      console.warn('[GOOGLE LOGIN] ⚠️ 이전 계정 데이터 정리 중 오류 (계속 진행):', clearError);
     }
     
     setIsLoading(true);

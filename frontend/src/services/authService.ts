@@ -12,6 +12,10 @@ class AuthService {
    */
   async login(credentials: LoginRequest): Promise<LoginResponse> {
     try {
+      // 🔄 새로운 계정으로 로그인하기 전에 이전 계정의 모든 데이터 완전 정리
+      console.log('[AUTH SERVICE] 🔄 새 계정 로그인 전 이전 계정 데이터 정리 시작');
+      this.clearAllPreviousAccountData();
+      
       const response = await apiClient.post<LoginResponse>('/auth/login', credentials);
       
       if (response.data.success && response.data.data) {
@@ -38,6 +42,8 @@ class AuthService {
         
         // 로그인 시간 저장
         this.setLoginTime();
+        
+        console.log('[AUTH SERVICE] ✅ 새 계정 로그인 완료 및 데이터 저장 완료');
       } else {
         // 백엔드에서 success: false로 응답한 경우
         console.log('[AUTH SERVICE] 백엔드 로그인 실패 응답:', response.data);
@@ -351,6 +357,132 @@ class AuthService {
       }
       
       console.log('[AUTH SERVICE] 로컬스토리지, 쿠키, Google SDK 캐시 삭제 완료');
+    }
+  }
+
+  /**
+   * 이전 계정의 모든 데이터 완전 정리 (새 계정 로그인 전)
+   */
+  clearAllPreviousAccountData(): void {
+    if (typeof window !== 'undefined') {
+      console.log('[AUTH SERVICE] 🔄 이전 계정의 모든 데이터 완전 정리 시작');
+      
+      // 1. 기본 인증 데이터 정리
+      this.clearAuthData();
+      
+      // 2. 사용자 관련 모든 데이터 정리
+      const keysToRemove = [
+        // 기본 인증 관련
+        'smap_auth_token',
+        'smap_user_data', 
+        'smap_login_time',
+        'auth-token',
+        
+        // 사용자 프로필 관련
+        'user_profile',
+        'user_groups',
+        'user_group_members',
+        'user_schedules',
+        'user_group_places',
+        'user_location_data',
+        'user_daily_location_counts',
+        
+        // FCM 관련
+        'fcm_token',
+        'fcm_token_data',
+        
+        // 기타 앱 데이터
+        'app_settings',
+        'user_preferences',
+        'last_known_location',
+        'location_permission_status',
+        
+        // 소셜 로그인 관련
+        'google_auth_state',
+        'kakao_auth_state',
+        'apple_auth_state',
+        
+        // 캐시 관련
+        'data_cache',
+        'api_cache',
+        'map_cache',
+        
+        // 세션 관련
+        'session_data',
+        'temp_data',
+        'form_data'
+      ];
+      
+      // 3. 모든 관련 키 삭제
+      keysToRemove.forEach(key => {
+        if (localStorage.getItem(key)) {
+          localStorage.removeItem(key);
+          console.log(`[AUTH SERVICE] 🗑️ ${key} 삭제됨`);
+        }
+      });
+      
+      // 4. 패턴으로 시작하는 키들도 삭제 (동적으로 생성된 키들)
+      const allKeys = Object.keys(localStorage);
+      const patternKeys = [
+        'user_',
+        'group_',
+        'schedule_',
+        'location_',
+        'fcm_',
+        'cache_',
+        'temp_',
+        'session_'
+      ];
+      
+      patternKeys.forEach(pattern => {
+        allKeys.forEach(key => {
+          if (key.startsWith(pattern) && key !== 'user_groups') { // user_groups는 이미 삭제됨
+            localStorage.removeItem(key);
+            console.log(`[AUTH SERVICE] 🗑️ 패턴 키 ${key} 삭제됨`);
+          }
+        });
+      });
+      
+      // 5. 쿠키에서도 관련 데이터 정리
+      const cookiesToRemove = [
+        'auth-token',
+        'user-session',
+        'login-state',
+        'social-auth'
+      ];
+      
+      cookiesToRemove.forEach(cookieName => {
+        const isSecure = window.location.protocol === 'https:' ? '; Secure' : '';
+        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax${isSecure}`;
+      });
+      
+      // 6. sessionStorage도 정리
+      if (sessionStorage.length > 0) {
+        sessionStorage.clear();
+        console.log('[AUTH SERVICE] 🗑️ sessionStorage 완전 정리됨');
+      }
+      
+      // 7. 전역 변수들 정리
+      if (typeof window !== 'undefined') {
+        const globalVarsToClear = [
+          '__SIGNIN_ERROR_MODAL_ACTIVE__',
+          '__GOOGLE_LOGIN_IN_PROGRESS__',
+          '__BLOCK_ALL_REDIRECTS__',
+          'nativeFCMToken',
+          'fcmTokenService',
+          'googleAuthState',
+          'kakaoAuthState'
+        ];
+        
+        globalVarsToClear.forEach(varName => {
+          if ((window as any)[varName] !== undefined) {
+            delete (window as any)[varName];
+            console.log(`[AUTH SERVICE] 🗑️ 전역 변수 ${varName} 삭제됨`);
+          }
+        });
+      }
+      
+      console.log('[AUTH SERVICE] ✅ 이전 계정의 모든 데이터 완전 정리 완료');
     }
   }
 
