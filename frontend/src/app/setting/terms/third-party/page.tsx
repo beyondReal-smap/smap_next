@@ -261,7 +261,7 @@ export default function ThirdPartyTermsPage() {
                 
                 <div className="bg-gray-50 p-4 rounded-lg border-t-4 border-blue-500 mt-6">
                   <h4 className="font-semibold mb-2 text-sm">동의 철회 방법</h4>
-                  <p className="text-xs text-gray-700">설정 > 개인정보 처리방침에서 동의 철회 가능</p>
+                  <p className="text-xs text-gray-700">설정 {'>'} 개인정보 처리방침에서 동의 철회 가능</p>
                 </div>
               </div>
             </div>

@@ -1493,32 +1493,40 @@ export default function HomePage() {
   const handleAppFocus = useCallback(() => {
     console.log('[HOME] 🚀 앱이 포그라운드로 돌아옴 - 데이터 강제 새로고침 시작');
     
-    // 지연 후 데이터 새로고침 실행
+    // 즉시 데이터 새로고침 실행 (지연 없이)
+    if (userContextSelectedGroupId && dataFetchedRef.current && !dataFetchedRef.current.loading) {
+      console.log('[HOME] 🔄 즉시 강제 데이터 새로고침 실행');
+      
+      // 캐시 무효화
+      dataFetchedRef.current.members = false;
+      dataFetchedRef.current.schedules = false;
+      dataFetchedRef.current.currentGroupId = null;
+      
+      // 지도 마커 강제 새로고침 (네이버 지도 API 상태 확인 후 실행)
+      if (groupMembers && groupMembers.length > 0) {
+        console.log('[HOME] 🔄 마커 강제 새로고침 실행');
+        
+        // 네이버 지도 API가 준비된 경우에만 마커 업데이트 실행
+        if (mapType === 'naver' && isNaverMapsReady()) {
+          updateMemberMarkers(groupMembers, true);
+        } else if (mapType === 'naver') {
+          console.log('[HOME] 🗺️ 네이버 지도 API가 아직 준비되지 않음 - 마커 업데이트 건너뛰기');
+        }
+      }
+      
+      // 강제로 데이터 다시 로드 (기존 useEffect가 자동으로 실행됨)
+      console.log('[HOME] 🔄 데이터 새로고침 트리거 완료');
+    }
+    
+    // 추가로 500ms 후에도 한 번 더 체크 (안전장치)
     setTimeout(() => {
       if (userContextSelectedGroupId && dataFetchedRef.current && !dataFetchedRef.current.loading) {
-        console.log('[HOME] 🔄 강제 데이터 새로고침 실행');
-        
-        // 캐시 무효화
+        console.log('[HOME] 🔄 지연 데이터 새로고침 실행 (안전장치)');
         dataFetchedRef.current.members = false;
         dataFetchedRef.current.schedules = false;
         dataFetchedRef.current.currentGroupId = null;
-        
-        // 지도 마커 강제 새로고침 (네이버 지도 API 상태 확인 후 실행)
-        if (groupMembers && groupMembers.length > 0) {
-          console.log('[HOME] 🔄 마커 강제 새로고침 실행');
-          
-          // 네이버 지도 API가 준비된 경우에만 마커 업데이트 실행
-          if (mapType === 'naver' && isNaverMapsReady()) {
-            updateMemberMarkers(groupMembers, true);
-          } else if (mapType === 'naver') {
-            console.log('[HOME] 🗺️ 네이버 지도 API가 아직 준비되지 않음 - 마커 업데이트 건너뛰기');
-          }
-        }
-        
-        // 강제로 데이터 다시 로드 (기존 useEffect가 자동으로 실행됨)
-        console.log('[HOME] 🔄 데이터 새로고침 트리거 완료');
       }
-    }, 1000);
+    }, 500);
   }, [userContextSelectedGroupId, groupMembers, mapType]);
 
   const handleAppBlur = useCallback(() => {
@@ -1527,6 +1535,19 @@ export default function HomePage() {
     try {
       // 백그라운드 전환 시에는 최소한의 작업만 수행
       console.log('[HOME] 📱 백그라운드 전환 - 안전 모드 활성화');
+      
+      // 백그라운드 전환 시 불필요한 API 호출 중단
+      if (dataFetchedRef.current.loading) {
+        console.log('[HOME] 📱 백그라운드 전환 - 데이터 로딩 중단');
+        dataFetchedRef.current.loading = false;
+      }
+      
+      // 지도 업데이트 중단
+      if (markersUpdating.current) {
+        console.log('[HOME] 📱 백그라운드 전환 - 마커 업데이트 중단');
+        markersUpdating.current = false;
+      }
+      
     } catch (error) {
       console.warn('[HOME] 📱 백그라운드 전환 중 경고:', error);
     }
@@ -1536,7 +1557,7 @@ export default function HomePage() {
   const { isVisible, isTransitioning } = useAppState({
     onFocus: handleAppFocus,
     onBlur: handleAppBlur,
-    delay: 500
+    delay: 300 // 지연 시간을 줄여서 더 빠른 반응
   });
 
   // 🔔 앱 포그라운드 복귀 시 FCM 토큰 자동 업데이트
@@ -6767,7 +6788,7 @@ export default function HomePage() {
 
   // 🛡️ 안전한 렌더링 - 백그라운드 전환 시 에러 방지
   try {
-    // 백그라운드 전환 중일 때도 지도를 계속 표시 (UI 제거)
+    // 백그라운드 전환 중일 때는 지도를 계속 표시 (UI 제거)
     if (isTransitioning || !isVisible) {
       console.log('[HOME] 🛡️ 백그라운드 전환 중 - 지도 계속 표시 (UI 제거됨)');
       // 백그라운드 전환 중에도 지도를 계속 표시하여 사용자 경험 향상
@@ -6779,40 +6800,39 @@ export default function HomePage() {
       console.log('[HOME] 🗺️ 네이버 지도 API가 아직 준비되지 않음 - 지도 기능 일시 비활성화');
     }
     
-    // Critical Error 상태 처리
-    if (criticalError) {
+    // Critical Error 상태 처리 - 백그라운드 전환 중에는 표시하지 않음
+    if (criticalError && !isTransitioning && isVisible) {
       return (
-
-          <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl shadow-lg p-6 max-w-md w-full">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Critical Error</h3>
-                <p className="text-sm text-gray-600 mb-4">{criticalError}</p>
-                <button 
-                  onClick={() => window.location.reload()}
-                  className="w-full bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-600 transition-colors"
-                >
-                  페이지 새로고침
-                </button>
-                <button 
-                  onClick={() => setCriticalError(null)}
-                  className="w-full mt-2 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors"
-                >
-                  오류 무시하고 계속
-                </button>
+        <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-lg p-6 max-w-md w-full">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
               </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Critical Error</h3>
+              <p className="text-sm text-gray-600 mb-4">{criticalError}</p>
+              <button 
+                onClick={() => window.location.reload()}
+                className="w-full bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-600 transition-colors"
+              >
+                페이지 새로고침
+              </button>
+              <button 
+                onClick={() => setCriticalError(null)}
+                className="w-full mt-2 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                오류 무시하고 계속
+              </button>
             </div>
           </div>
-
+        </div>
       );
     }
-    // Component Error 상태 처리
-    if (componentError) {
+    
+    // Component Error 상태 처리 - 백그라운드 전환 중에는 표시하지 않음
+    if (componentError && !isTransitioning && isVisible) {
       // Firebase Messaging 관련 오류는 무시하고 정상 렌더링
       if (componentError.includes('FirebaseError') || 
           componentError.includes('Messaging') || 
@@ -6862,7 +6882,7 @@ export default function HomePage() {
       }
     }
 
-    // 마운트되지 않은 상태 처리
+    // 마운트되지 않은 상태 처리 - 백그라운드 전환 중에는 로딩 화면 표시
     if (!isMounted || !isComponentMounted) {
       return (
         <div 
@@ -6880,6 +6900,47 @@ export default function HomePage() {
           <div style={{ textAlign: 'center' }}>
             <IOSCompatibleSpinner size="lg" />
             <p style={{ color: '#64748b', fontSize: '14px', marginTop: '16px' }}>홈 페이지 로딩 중...</p>
+          </div>
+        </div>
+      );
+    }
+
+    // 백그라운드 전환 중일 때는 기본 UI만 표시 (에러 방지)
+    if (isTransitioning || !isVisible) {
+      return (
+        <div 
+          className="home-content main-container"
+          data-page="/home"
+          data-content-type="home-page"
+          style={{ 
+            minHeight: '100vh',
+            background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
+            paddingBottom: '72px',
+            paddingTop: '0px',
+            marginTop: '0px',
+            top: '0px'
+          }}
+        >
+          {/* 지도 영역만 표시 (UI 요소는 숨김) */}
+          <div className="full-map-container" style={{ paddingTop: '0px', touchAction: 'manipulation', overflow: 'visible' }}>
+            <div 
+              ref={googleMapContainer} 
+              className="w-full h-full absolute top-0 left-0" 
+              style={{ display: mapType === 'google' ? 'block' : 'none', zIndex: 6 }}
+            ></div>
+            <div 
+              ref={naverMapContainer} 
+              className="w-full h-full absolute top-0 left-0" 
+              style={{ display: mapType === 'naver' ? 'block' : 'none', zIndex: 6 }}
+            ></div>
+          </div>
+          
+          {/* 간단한 로딩 표시 */}
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 bg-white/90 backdrop-blur-sm rounded-lg px-4 py-2 shadow-lg">
+            <div className="flex items-center space-x-2">
+              <IOSCompatibleSpinner size="sm" />
+              <span className="text-sm text-gray-600">앱 전환 중...</span>
+            </div>
           </div>
         </div>
       );
@@ -7565,6 +7626,7 @@ export default function HomePage() {
       );
     }
     
+    // 일반적인 렌더링 오류일 때만 에러 페이지 표시
     return (
       <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-xl shadow-lg p-6 max-w-md w-full">
