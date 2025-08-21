@@ -313,8 +313,8 @@ export default function LocationTermsPage() {
                 </div>
               </div>
             </div>
-          </motion.div>
-        </div>
+          </div>
+        </motion.div>
       </div>
     </>
   );

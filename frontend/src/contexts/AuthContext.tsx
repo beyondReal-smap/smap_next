@@ -383,23 +383,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         // FCM 토큰 체크 및 업데이트 (백그라운드에서 실행)
         setTimeout(async () => {
-          console.log('[AUTH] 🔔 로그인 후 FCM 토큰 체크/업데이트 시작');
+          console.log('[AUTH] 🔔 로그인 후 FCM 토큰 강제 업데이트 시작');
           if (response.data?.member?.mt_idx) {
             try {
               const { fcmTokenService } = await import('@/services/fcmTokenService');
               if (fcmTokenService) {
-                const result = await fcmTokenService.initializeAndCheckUpdateToken(response.data.member.mt_idx);
+                // 로그인 시이므로 강제 업데이트 사용
+                const result = await fcmTokenService.forceUpdateOnLogin(response.data.member.mt_idx);
                 if (result.success) {
-                  console.log('[AUTH] ✅ FCM 토큰 체크/업데이트 완료:', result.message);
+                  console.log('[AUTH] ✅ FCM 토큰 강제 업데이트 완료:', result.message);
                 } else {
-                  console.warn('[AUTH] ⚠️ FCM 토큰 체크/업데이트 실패:', result.error);
+                  console.warn('[AUTH] ⚠️ FCM 토큰 강제 업데이트 실패:', result.error);
                 }
               }
             } catch (error: any) {
-              console.error('[AUTH] ❌ FCM 토큰 체크/업데이트 중 오류:', error);
+              console.error('[AUTH] ❌ FCM 토큰 강제 업데이트 중 오류:', error);
             }
           } else {
-            console.warn('[AUTH] ⚠️ FCM 토큰 체크/업데이트 스킵: mt_idx 없음');
+            console.warn('[AUTH] ⚠️ FCM 토큰 강제 업데이트 스킵: mt_idx 없음');
           }
         }, 1000); // 로그인 후 1초 지연
 

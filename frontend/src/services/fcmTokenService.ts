@@ -392,6 +392,42 @@ export class FCMTokenService {
   }
 
   /**
+   * 로그인 시 FCM 토큰 강제 업데이트
+   */
+  async forceUpdateOnLogin(mt_idx: number): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      console.log(`[FCM Token Service] 🔄 로그인 시 FCM 토큰 강제 업데이트 (사용자 ID: ${mt_idx})`);
+      
+      // 현재 토큰 확인
+      const currentToken = this.currentToken;
+      console.log('[FCM Token Service] 📋 현재 토큰:', currentToken ? currentToken.substring(0, 20) + '...' : '없음');
+      
+      // dummy 토큰인지 확인
+      if (currentToken && currentToken.startsWith('dummy')) {
+        console.log('[FCM Token Service] 🎭 dummy 토큰 감지 - 강제 교체 필요');
+      }
+      
+      // 새 토큰 생성 (무조건)
+      const newToken = await this.getFCMToken(mt_idx);
+      if (!newToken) {
+        return { success: false, error: '새 토큰 생성 실패' };
+      }
+      
+      console.log('[FCM Token Service] ✅ 새 토큰 생성:', newToken.substring(0, 20) + '...');
+      
+      // DB 업데이트 (무조건)
+      await this.updateFCMTokenInDB(newToken, mt_idx);
+      console.log('[FCM Token Service] ✅ 로그인 시 FCM 토큰 DB 업데이트 완료');
+      
+      return { success: true, message: '로그인 시 FCM 토큰 업데이트 완료' };
+      
+    } catch (error) {
+      console.error('[FCM Token Service] ❌ 로그인 시 FCM 토큰 강제 업데이트 실패:', error);
+      return { success: false, error: String(error) };
+    }
+  }
+
+  /**
    * FCM 토큰 초기화 및 체크/업데이트
    */
   async initializeAndCheckUpdateToken(mt_idx: number): Promise<{ success: boolean; message?: string; error?: string }> {
@@ -659,33 +695,29 @@ export class FCMTokenService {
 
       // FCM 토큰 체크/업데이트 테스트
       (window as any).testFCMUpdate = async (mt_idx?: number) => {
-        console.log('🔔 [FCM TEST] FCM 토큰 체크/업데이트 테스트 시작');
+        console.log('🔔 [FCM TEST] FCM 토큰 강제 업데이트 테스트 시작');
         try {
           // 현재 토큰 확인
           const currentToken = this.currentToken;
           console.log('📋 [FCM TEST] 현재 저장된 토큰:', currentToken ? currentToken.substring(0, 20) + '...' : '없음');
           
-          // 새 토큰 생성 및 DB 업데이트
-          const newToken = await this.getFCMToken(mt_idx);
-          if (newToken) {
-            console.log('✅ [FCM TEST] 새 토큰 생성 성공:', newToken.substring(0, 20) + '...');
-            
-            // DB 업데이트
-            await this.updateFCMTokenInDB(newToken, mt_idx);
-            console.log('✅ [FCM TEST] FCM 토큰 DB 업데이트 완료');
-            
+          // 강제 업데이트 사용
+          const result = await this.forceUpdateOnLogin(mt_idx || 0);
+          if (result.success) {
+            console.log('✅ [FCM TEST] FCM 토큰 강제 업데이트 완료');
             return { 
               success: true, 
               oldToken: currentToken ? currentToken.substring(0, 20) + '...' : '없음',
-              newToken: newToken.substring(0, 20) + '...',
-              updated: currentToken !== newToken
+              newToken: this.currentToken ? this.currentToken.substring(0, 20) + '...' : '없음',
+              updated: currentToken !== this.currentToken,
+              message: result.message
             };
           } else {
-            console.log('❌ [FCM TEST] 새 토큰 생성 실패');
-            return { success: false, error: '새 토큰 생성 실패' };
+            console.log('❌ [FCM TEST] FCM 토큰 강제 업데이트 실패:', result.error);
+            return { success: false, error: result.error };
           }
         } catch (error) {
-          console.error('❌ [FCM TEST] 토큰 업데이트 오류:', error);
+          console.error('❌ [FCM TEST] 토큰 강제 업데이트 오류:', error);
           return { success: false, error: error instanceof Error ? error.message : String(error) };
         }
       };
@@ -714,7 +746,7 @@ export class FCMTokenService {
       console.log('🔔 [FCM TEST] FCM 테스트 함수들이 전역에 등록되었습니다:');
       console.log('- testFCMToken(): FCM 토큰 생성 테스트');
       console.log('- testFCMRegister(mt_idx): FCM 토큰 등록 테스트 (DB 업데이트 포함)');
-      console.log('- testFCMUpdate(mt_idx): FCM 토큰 체크/업데이트 테스트 (DB 업데이트 포함)');
+      console.log('- testFCMUpdate(mt_idx): FCM 토큰 강제 업데이트 테스트 (DB 업데이트 포함)');
       console.log('- forceRefreshFCMToken(mt_idx): 강제 토큰 새로고침');
       console.log('- getFCMTokenStatus(): 현재 FCM 토큰 상태');
       console.log('- getCurrentFCMToken(): 현재 FCM 토큰 반환');

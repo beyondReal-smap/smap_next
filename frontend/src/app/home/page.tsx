@@ -1050,30 +1050,31 @@ export default function HomePage() {
       const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown';
       const hasAndroidInterface = typeof window.AndroidPermissions !== 'undefined';
       
-      // 🔔 FCM 토큰 자동 업데이트
+      // 🔔 FCM 토큰 자동 업데이트 (로그인 완료 후)
       if (user && user.mt_idx) {
-        console.log('🔔 [FCM] 로그인 완료 - FCM 토큰 자동 업데이트 시작');
+        console.log('🔔 [FCM] 로그인 완료 - FCM 토큰 강제 업데이트 시작');
         
         // 권한이 준비될 때까지 대기
         const checkPermissionAndUpdate = async () => {
           if ((window as any).__SMAP_PERM_ALLOW__) {
-            console.log('✅ [FCM] 권한 준비됨, FCM 토큰 업데이트 실행');
+            console.log('✅ [FCM] 권한 준비됨, FCM 토큰 강제 업데이트 실행');
             try {
               const { fcmTokenService } = await import('@/services/fcmTokenService');
               if (fcmTokenService) {
-                const result: any = await fcmTokenService.initializeAndCheckUpdateToken(user.mt_idx);
+                // 로그인 완료 후이므로 강제 업데이트 사용
+                const result: any = await fcmTokenService.forceUpdateOnLogin(user.mt_idx);
                 if (result.success) {
-                  console.log('✅ [FCM] FCM 토큰 업데이트 성공:', result.message);
+                  console.log('✅ [FCM] FCM 토큰 강제 업데이트 성공:', result.message);
                   // 성공 시 member_t 테이블의 mt_token_id가 업데이트됨
                   console.log('📱 [FCM] FCM 토큰이 서버에 저장되어 푸시 알림 수신 가능');
                 } else {
-                  console.warn('⚠️ [FCM] FCM 토큰 업데이트 실패:', result.error);
-                  console.log('🔥 [FCM] FCM 토큰 업데이트 실패해도 계속 진행');
+                  console.warn('⚠️ [FCM] FCM 토큰 강제 업데이트 실패:', result.error);
+                  console.log('🔥 [FCM] FCM 토큰 강제 업데이트 실패해도 계속 진행');
                 }
               }
             } catch (error: any) {
-              console.error('❌ [FCM] FCM 토큰 업데이트 중 오류:', error);
-              console.log('🔥 [FCM] FCM 토큰 업데이트 오류가 발생해도 계속 진행');
+              console.error('❌ [FCM] FCM 토큰 강제 업데이트 중 오류:', error);
+              console.log('🔥 [FCM] FCM 토큰 강제 업데이트 오류가 발생해도 계속 진행');
             }
           } else {
             console.log('⏳ [FCM] 권한 대기 중, 2초 후 재시도...');
