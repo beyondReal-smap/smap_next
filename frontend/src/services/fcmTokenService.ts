@@ -88,78 +88,125 @@ export class FCMTokenService {
 
       // iOS 환경 특별 처리
       const isIOS = this.detectDeviceType() === 'ios';
+      const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+      
+      console.log('[FCM Token Service] 📱 디바이스 정보:', {
+        deviceType: this.detectDeviceType(),
+        platform: this.detectPlatform(),
+        isIOS,
+        isLocalhost,
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+        isWebView: typeof window !== 'undefined' && (window as any).webkit?.messageHandlers,
+        hasServiceWorker: typeof navigator !== 'undefined' && 'serviceWorker' in navigator,
+        hasPushManager: typeof window !== 'undefined' && 'PushManager' in window
+      });
+
+      // iOS WebView 환경 특별 처리
       if (isIOS) {
         console.log('[FCM Token Service] 🍎 iOS 환경 감지 - 특별 처리 시작');
         
-        // iOS에서 알림 권한을 더 적극적으로 요청
-        if ('Notification' in window) {
-          console.log('[FCM Token Service] 🔔 iOS 알림 권한 상태 확인:', Notification.permission);
-          
-          if (Notification.permission === 'default') {
-            console.log('[FCM Token Service] 🔔 iOS에서 알림 권한 요청 시작');
-            try {
-              // iOS에서는 사용자 상호작용이 필요할 수 있음
-              const permission = await Notification.requestPermission();
-              console.log('[FCM Token Service] 🔔 iOS 알림 권한 결과:', permission);
-              
-              if (permission === 'granted') {
-                console.log('[FCM Token Service] ✅ iOS 알림 권한 획득 성공');
-              } else {
-                console.warn('[FCM Token Service] ⚠️ iOS 알림 권한 거부됨:', permission);
-              }
-            } catch (error) {
-              console.warn('[FCM Token Service] ⚠️ iOS 알림 권한 요청 실패:', error);
+        // iOS WebView에서 Firebase Messaging 초기화 재시도
+        if (!this.messaging) {
+          try {
+            if (app) {
+              this.messaging = getMessaging(app);
+              console.log('[FCM Token Service] ✅ iOS에서 Firebase Messaging 재초기화 성공');
             }
-          } else if (Notification.permission === 'granted') {
-            console.log('[FCM Token Service] ✅ iOS 알림 권한 이미 허용됨');
-          } else {
-            console.warn('[FCM Token Service] ⚠️ iOS 알림 권한 거부됨:', Notification.permission);
+          } catch (error) {
+            console.warn('[FCM Token Service] ⚠️ iOS에서 Firebase Messaging 초기화 실패:', error);
           }
         }
         
-        // iOS에서 Service Worker 등록을 더 적극적으로 시도
+        // iOS WebView에서 알림 권한 확인 및 요청
+        if ('Notification' in window) {
+          console.log('[FCM Token Service] 🔔 iOS WebView 알림 권한 상태:', Notification.permission);
+          
+          if (Notification.permission === 'default') {
+            console.log('[FCM Token Service] 🔔 iOS WebView에서 알림 권한 요청');
+            try {
+              // iOS WebView에서는 사용자 상호작용이 필요할 수 있음
+              const permission = await Notification.requestPermission();
+              console.log('[FCM Token Service] 🔔 iOS WebView 알림 권한 결과:', permission);
+              
+              if (permission === 'granted') {
+                console.log('[FCM Token Service] ✅ iOS WebView 알림 권한 획득 성공');
+              } else {
+                console.warn('[FCM Token Service] ⚠️ iOS WebView 알림 권한 거부됨:', permission);
+              }
+            } catch (error) {
+              console.warn('[FCM Token Service] ⚠️ iOS WebView 알림 권한 요청 실패:', error);
+            }
+          } else if (Notification.permission === 'granted') {
+            console.log('[FCM Token Service] ✅ iOS WebView 알림 권한 이미 허용됨');
+          } else {
+            console.warn('[FCM Token Service] ⚠️ iOS WebView 알림 권한 거부됨:', Notification.permission);
+          }
+        }
+        
+        // iOS WebView에서 Service Worker 등록 상태 확인 및 강제 재등록
         if ('serviceWorker' in navigator) {
-          console.log('[FCM Token Service] 🔧 iOS에서 서비스 워커 등록 시도');
+          console.log('[FCM Token Service] 🔧 iOS WebView Service Worker 상태 확인');
           
           try {
-            // iOS에서는 여러 번 시도
-            let registration = null;
-            let retryCount = 0;
-            const maxRetries = 3;
-            
-            while (!registration && retryCount < maxRetries) {
-              try {
-                console.log(`[FCM Token Service] 🔧 iOS 서비스 워커 등록 시도 ${retryCount + 1}/${maxRetries}`);
-                registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-                console.log('[FCM Token Service] ✅ iOS 서비스 워커 등록 성공:', registration.scope);
-                break;
-              } catch (error) {
-                console.warn(`[FCM Token Service] ⚠️ iOS 서비스 워커 등록 시도 ${retryCount + 1} 실패:`, error);
-                retryCount++;
-                
-                if (retryCount < maxRetries) {
-                  // 잠시 대기 후 재시도
-                  await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
-                }
+            // 기존 Service Worker 등록 상태 확인
+            const existingRegistration = await navigator.serviceWorker.getRegistration();
+            if (existingRegistration) {
+              console.log('[FCM Token Service] 🍎 iOS WebView 기존 Service Worker 발견:', existingRegistration.scope);
+              
+              // Service Worker 상태 확인
+              if (existingRegistration.active) {
+                console.log('[FCM Token Service] ✅ iOS WebView Service Worker 활성 상태');
+              } else {
+                console.log('[FCM Token Service] ⚠️ iOS WebView Service Worker 비활성 상태 - 재등록 시도');
+                await existingRegistration.unregister();
+                throw new Error('Service Worker 비활성 상태로 재등록 필요');
               }
+            } else {
+              console.log('[FCM Token Service] 🍎 iOS WebView Service Worker 없음 - 새로 등록');
+              throw new Error('Service Worker 등록 필요');
             }
+          } catch (swError) {
+            console.log('[FCM Token Service] 🔧 iOS WebView Service Worker 재등록 시작');
             
-            if (!registration) {
-              console.warn('[FCM Token Service] ⚠️ iOS 서비스 워커 등록 최종 실패');
+            try {
+              // 기존 Service Worker 모두 제거
+              const registrations = await navigator.serviceWorker.getRegistrations();
+              for (const registration of registrations) {
+                await registration.unregister();
+                console.log('[FCM Token Service] 🗑️ iOS WebView 기존 Service Worker 제거됨');
+              }
+              
+              // 새로 등록
+              const newRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+              console.log('[FCM Token Service] ✅ iOS WebView 새 Service Worker 등록됨:', newRegistration.scope);
+              
+              // Service Worker 활성화 대기
+              if (newRegistration.installing) {
+                console.log('[FCM Token Service] ⏳ iOS WebView Service Worker 설치 중...');
+                await new Promise<void>((resolve) => {
+                  newRegistration.installing!.addEventListener('statechange', () => {
+                    if (newRegistration.installing?.state === 'installed') {
+                      resolve();
+                    }
+                  });
+                });
+              }
+              
+              console.log('[FCM Token Service] ✅ iOS WebView Service Worker 준비 완료');
+            } catch (registerError) {
+              console.warn('[FCM Token Service] ⚠️ iOS WebView Service Worker 재등록 실패:', registerError);
             }
-          } catch (error) {
-            console.warn('[FCM Token Service] ⚠️ iOS 서비스 워커 등록 중 오류:', error);
           }
         }
       } else {
         // 비-iOS 환경에서 Service Worker 등록 (선택적)
-        if ('serviceWorker' in navigator) {
-          console.log('[FCM Token Service] 🔧 서비스 워커 등록 시작...');
-          
-          try {
-            const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-            console.log('[FCM Token Service] ✅ 서비스 워커 등록 성공:', registration.scope);
-          } catch (error) {
+      if ('serviceWorker' in navigator) {
+        console.log('[FCM Token Service] 🔧 서비스 워커 등록 시작...');
+        
+        try {
+          const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+          console.log('[FCM Token Service] ✅ 서비스 워커 등록 성공:', registration.scope);
+        } catch (error) {
             console.warn('[FCM Token Service] ⚠️ 서비스 워커 등록 실패 (계속 진행):', error);
           }
         }
@@ -168,8 +215,8 @@ export class FCMTokenService {
       // Firebase Messaging 초기화 (iOS에서는 더 강력하게)
       try {
         if (app) {
-          this.messaging = getMessaging(app);
-          console.log('[FCM Token Service] ✅ Firebase Messaging 초기화 성공');
+        this.messaging = getMessaging(app);
+        console.log('[FCM Token Service] ✅ Firebase Messaging 초기화 성공');
           
           // iOS에서는 추가 검증
           if (isIOS) {
@@ -337,123 +384,145 @@ export class FCMTokenService {
         if (isIOS) {
           console.log('[FCM Token Service] 🍎 iOS 환경에서 Messaging 없이 계속 진행');
         } else {
-          throw new Error('Firebase Messaging이 초기화되지 않음');
+        throw new Error('Firebase Messaging이 초기화되지 않음');
         }
       }
 
       // iOS에서 특별한 토큰 생성 시도
       if (isIOS && this.messaging) {
-        console.log('[FCM Token Service] 🍎 iOS에서 Firebase 토큰 생성 시도');
+        console.log('[FCM Token Service] 🍎 iOS WebView에서 Firebase 토큰 생성 시도');
         
         try {
           const { getToken } = await import('firebase/messaging');
           
-          // iOS에서는 더 긴 타임아웃과 재시도 로직
+          // iOS WebView에서는 더 긴 타임아웃과 재시도 로직
           let token: string | null = null;
           let retryCount = 0;
-          const maxRetries = 5; // iOS에서는 더 많은 재시도
+          const maxRetries = 7; // iOS WebView에서는 더 많은 재시도
           
           while (!token && retryCount < maxRetries) {
             try {
-              console.log(`[FCM Token Service] 🍎 iOS 토큰 생성 시도 ${retryCount + 1}/${maxRetries}`);
+              console.log(`[FCM Token Service] 🍎 iOS WebView 토큰 생성 시도 ${retryCount + 1}/${maxRetries}`);
               
-              // iOS에서는 Service Worker 등록 상태를 먼저 확인
+              // iOS WebView에서는 Service Worker 등록 상태를 매번 확인
               if ('serviceWorker' in navigator) {
                 try {
                   const registration = await navigator.serviceWorker.getRegistration();
-                  if (registration) {
-                    console.log('[FCM Token Service] 🍎 iOS Service Worker 등록 상태 확인됨:', registration.scope);
+                  if (registration && registration.active) {
+                    console.log('[FCM Token Service] 🍎 iOS WebView Service Worker 활성 상태 확인됨:', registration.scope);
                   } else {
-                    console.log('[FCM Token Service] 🍎 iOS Service Worker 등록되지 않음 - 새로 등록 시도');
+                    console.log('[FCM Token Service] 🍎 iOS WebView Service Worker 비활성 - 재등록 시도');
+                    if (registration) await registration.unregister();
                     await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+                    
+                    // Service Worker 활성화 대기
+                    await new Promise(resolve => setTimeout(resolve, 2000));
                   }
                 } catch (swError) {
-                  console.warn('[FCM Token Service] 🍎 iOS Service Worker 확인/등록 실패:', swError);
+                  console.warn('[FCM Token Service] 🍎 iOS WebView Service Worker 확인/등록 실패:', swError);
                 }
               }
               
-              // iOS에서 알림 권한 재확인
+              // iOS WebView에서 알림 권한 재확인
               if ('Notification' in window && Notification.permission !== 'granted') {
-                console.log('[FCM Token Service] 🍎 iOS 알림 권한 재요청');
+                console.log('[FCM Token Service] 🍎 iOS WebView 알림 권한 재요청');
                 try {
                   const permission = await Notification.requestPermission();
-                  console.log('[FCM Token Service] 🍎 iOS 알림 권한 재요청 결과:', permission);
+                  console.log('[FCM Token Service] 🍎 iOS WebView 알림 권한 재요청 결과:', permission);
+                  
+                  if (permission === 'granted') {
+                    console.log('[FCM Token Service] ✅ iOS WebView 알림 권한 획득 성공');
+                  } else {
+                    console.warn('[FCM Token Service] ⚠️ iOS WebView 알림 권한 거부됨:', permission);
+                  }
                 } catch (permError) {
-                  console.warn('[FCM Token Service] 🍎 iOS 알림 권한 재요청 실패:', permError);
+                  console.warn('[FCM Token Service] 🍎 iOS WebView 알림 권한 재요청 실패:', permError);
                 }
               }
               
-              // Firebase 토큰 생성 시도
+              // iOS WebView에서 Firebase 토큰 생성 시도
+              console.log('[FCM Token Service] 🍎 iOS WebView Firebase 토큰 생성 시도 중...');
               token = await getToken(this.messaging, {
                 vapidKey: vapidKey,
-                serviceWorkerRegistration: undefined // iOS에서는 undefined로 설정
+                serviceWorkerRegistration: undefined // iOS WebView에서는 undefined로 설정
               });
               
               if (token) {
-                console.log('[FCM Token Service] ✅ iOS에서 Firebase 토큰 생성 성공:', token.substring(0, 20) + '...');
+                console.log('[FCM Token Service] ✅ iOS WebView에서 Firebase 토큰 생성 성공:', token.substring(0, 20) + '...');
+                
+                // 토큰 유효성 검증 (dummy 토큰이 아닌지 확인)
+                if (token.startsWith('dummy') || token.startsWith('ios_')) {
+                  console.warn('[FCM Token Service] ⚠️ iOS WebView에서 dummy/ios 토큰 생성됨 - 재시도 필요');
+                  token = null; // 유효하지 않은 토큰으로 간주하고 재시도
+                  retryCount++;
+                  continue;
+                }
+                
                 break;
               }
             } catch (error) {
-              console.warn(`[FCM Token Service] ⚠️ iOS 토큰 생성 시도 ${retryCount + 1} 실패:`, error);
+              console.warn(`[FCM Token Service] ⚠️ iOS WebView 토큰 생성 시도 ${retryCount + 1} 실패:`, error);
               retryCount++;
               
               if (retryCount < maxRetries) {
-                // iOS에서는 더 긴 대기 시간
-                const waitTime = 2000 * retryCount; // 2초, 4초, 6초, 8초
-                console.log(`[FCM Token Service] 🍎 iOS ${waitTime}ms 대기 후 재시도`);
+                // iOS WebView에서는 더 긴 대기 시간
+                const waitTime = 3000 * retryCount; // 3초, 6초, 9초, 12초, 15초, 18초
+                console.log(`[FCM Token Service] 🍎 iOS WebView ${waitTime}ms 대기 후 재시도`);
                 await new Promise(resolve => setTimeout(resolve, waitTime));
               }
             }
           }
           
-          if (token) {
-            // 토큰을 DB에 업데이트 (사용자 ID가 있을 때만)
+          if (token && !token.startsWith('dummy') && !token.startsWith('ios_')) {
+            // 유효한 Firebase 토큰을 DB에 업데이트
             if (mt_idx) {
               try {
                 await this.updateFCMTokenInDB(token, mt_idx);
-                console.log('[FCM Token Service] ✅ iOS FCM 토큰 DB 업데이트 성공');
+                console.log('[FCM Token Service] ✅ iOS WebView FCM 토큰 DB 업데이트 성공');
               } catch (dbError) {
-                console.warn('[FCM Token Service] ⚠️ iOS FCM 토큰 DB 업데이트 실패:', dbError);
+                console.warn('[FCM Token Service] ⚠️ iOS WebView FCM 토큰 DB 업데이트 실패:', dbError);
               }
             } else {
-              console.log('[FCM Token Service] ℹ️ 사용자 ID 없음 - iOS FCM 토큰 DB 업데이트 건너뜀');
+              console.log('[FCM Token Service] ℹ️ 사용자 ID 없음 - iOS WebView FCM 토큰 DB 업데이트 건너뜀');
             }
             
             this.currentToken = token;
             return token;
+          } else {
+            console.warn('[FCM Token Service] ⚠️ iOS WebView에서 유효한 Firebase 토큰 생성 실패');
           }
         } catch (error) {
-          console.warn('[FCM Token Service] ⚠️ iOS에서 Firebase 토큰 생성 실패:', error);
+          console.warn('[FCM Token Service] ⚠️ iOS WebView에서 Firebase 토큰 생성 실패:', error);
         }
       }
 
       // 일반적인 Firebase FCM 토큰 생성
       if (this.messaging) {
         try {
-          const { getToken } = await import('firebase/messaging');
-          
-          const token = await getToken(this.messaging, {
-            vapidKey: vapidKey,
-            serviceWorkerRegistration: undefined
-          });
+      const { getToken } = await import('firebase/messaging');
+      
+      const token = await getToken(this.messaging, {
+        vapidKey: vapidKey,
+        serviceWorkerRegistration: undefined
+      });
 
-          if (token) {
-            console.log('[FCM Token Service] ✅ FCM 토큰 생성 성공:', token.substring(0, 20) + '...');
-            
-            // 토큰을 DB에 업데이트 (사용자 ID가 있을 때만)
-            if (mt_idx) {
-              try {
-                await this.updateFCMTokenInDB(token, mt_idx);
-                console.log('[FCM Token Service] ✅ FCM 토큰 DB 업데이트 성공');
-              } catch (dbError) {
-                console.warn('[FCM Token Service] ⚠️ FCM 토큰 DB 업데이트 실패:', dbError);
-              }
-            } else {
-              console.log('[FCM Token Service] ℹ️ 사용자 ID 없음 - FCM 토큰 DB 업데이트 건너뜀');
-            }
-            
-            this.currentToken = token;
-            return token;
+      if (token) {
+        console.log('[FCM Token Service] ✅ FCM 토큰 생성 성공:', token.substring(0, 20) + '...');
+        
+        // 토큰을 DB에 업데이트 (사용자 ID가 있을 때만)
+        if (mt_idx) {
+          try {
+            await this.updateFCMTokenInDB(token, mt_idx);
+            console.log('[FCM Token Service] ✅ FCM 토큰 DB 업데이트 성공');
+          } catch (dbError) {
+            console.warn('[FCM Token Service] ⚠️ FCM 토큰 DB 업데이트 실패:', dbError);
+          }
+        } else {
+          console.log('[FCM Token Service] ℹ️ 사용자 ID 없음 - FCM 토큰 DB 업데이트 건너뜀');
+        }
+        
+        this.currentToken = token;
+        return token;
           }
         } catch (error) {
           console.warn('[FCM Token Service] ⚠️ 일반 Firebase 토큰 생성 실패:', error);
@@ -471,7 +540,7 @@ export class FCMTokenService {
           // Firebase Messaging 재초기화
           if (app) {
             this.messaging = getMessaging(app);
-            console.log('[FCM Token Service] 🍎 iOS Firebase Messaging 재초기화 완료');
+            console.log('[FCM Token Service] ✅ iOS Firebase Messaging 재초기화 완료');
             
             // Service Worker 강제 재등록
             if ('serviceWorker' in navigator) {
@@ -480,12 +549,12 @@ export class FCMTokenService {
                 const registrations = await navigator.serviceWorker.getRegistrations();
                 for (const registration of registrations) {
                   await registration.unregister();
-                  console.log('[FCM Token Service] 🍎 iOS 기존 Service Worker 제거됨');
+                  console.log('[FCM Token Service] 🗑️ iOS 기존 Service Worker 제거됨');
                 }
                 
                 // 새로 등록
                 const newRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-                console.log('[FCM Token Service] 🍎 iOS 새 Service Worker 등록됨:', newRegistration.scope);
+                console.log('[FCM Token Service] ✅ iOS 새 Service Worker 등록됨:', newRegistration.scope);
                 
                 // 잠시 대기 후 토큰 생성 시도
                 await new Promise(resolve => setTimeout(resolve, 3000));
@@ -503,7 +572,7 @@ export class FCMTokenService {
                   if (mt_idx) {
                     try {
                       await this.updateFCMTokenInDB(finalToken, mt_idx);
-                      console.log('[FCM Token Service] ✅ iOS 마지막 시도 FCM 토큰 DB 업데이트 성공');
+                      console.log('[FCM Token Service] ✅ iOS 마지막 시도 FCM 토큰 DB 업데이트 완료');
                     } catch (dbError) {
                       console.warn('[FCM Token Service] ⚠️ iOS 마지막 시도 FCM 토큰 DB 업데이트 실패:', dbError);
                     }
@@ -519,6 +588,56 @@ export class FCMTokenService {
           }
         } catch (finalError) {
           console.warn('[FCM Token Service] ⚠️ iOS 마지막 강력한 시도 중 오류:', finalError);
+        }
+        
+        // Firebase SDK가 지원되지 않는 경우 iOS WebView 전용 대체 방법
+        console.log('[FCM Token Service] 🍎 iOS WebView Firebase SDK 미지원 - 전용 대체 방법 시도');
+        
+        try {
+          // iOS WebView에서 네이티브 FCM 토큰 요청 시도
+          if (typeof window !== 'undefined' && (window as any).webkit?.messageHandlers?.smapIos) {
+            console.log('[FCM Token Service] 🍎 iOS WebView 네이티브 FCM 토큰 요청 시도');
+            
+            // 네이티브에 FCM 토큰 요청
+            (window as any).webkit.messageHandlers.smapIos.postMessage({
+              action: 'requestFCMToken',
+              callback: 'handleNativeFCMToken'
+            });
+            
+            // 네이티브 응답 대기 (최대 5초)
+            const nativeToken = await new Promise<string | null>((resolve) => {
+              const timeout = setTimeout(() => {
+                console.log('[FCM Token Service] ⏰ iOS 네이티브 FCM 토큰 응답 타임아웃');
+                resolve(null);
+              }, 5000);
+              
+              // 전역 콜백 함수 설정
+              (window as any).handleNativeFCMToken = (token: string) => {
+                clearTimeout(timeout);
+                console.log('[FCM Token Service] ✅ iOS 네이티브 FCM 토큰 수신:', token ? token.substring(0, 20) + '...' : '없음');
+                resolve(token);
+              };
+            });
+            
+            if (nativeToken && !nativeToken.startsWith('dummy') && !nativeToken.startsWith('ios_')) {
+              console.log('[FCM Token Service] ✅ iOS 네이티브 FCM 토큰 사용:', nativeToken.substring(0, 20) + '...');
+              
+              // 토큰을 DB에 업데이트
+              if (mt_idx) {
+                try {
+                  await this.updateFCMTokenInDB(nativeToken, mt_idx);
+                  console.log('[FCM Token Service] ✅ iOS 네이티브 FCM 토큰 DB 업데이트 완료');
+                } catch (dbError) {
+                  console.warn('[FCM Token Service] ⚠️ iOS 네이티브 FCM 토큰 DB 업데이트 실패:', dbError);
+                }
+              }
+              
+              this.currentToken = nativeToken;
+              return nativeToken;
+            }
+          }
+        } catch (nativeError) {
+          console.warn('[FCM Token Service] ⚠️ iOS 네이티브 FCM 토큰 요청 실패:', nativeError);
         }
         
         // 모든 Firebase 시도가 실패한 경우에만 대체 토큰 생성
@@ -558,22 +677,115 @@ export class FCMTokenService {
       // 현재 사용자 ID 가져오기
       let userId = mt_idx;
       if (!userId) {
-        // localStorage에서 사용자 ID 가져오기
-        const userStr = localStorage.getItem('user');
+        // localStorage에서 사용자 ID 가져오기 (여러 방법 시도)
+        console.log('[FCM Token Service] 🔍 사용자 ID 직접 전달되지 않음 - 로컬스토리지에서 조회 시도');
+        
+        // 1. 표준 키에서 조회
+        const userStr = localStorage.getItem('smap_user_data');
         if (userStr) {
           try {
             const user = JSON.parse(userStr);
-            // mt_idx가 있는지 먼저 확인
             if (user.mt_idx) {
               userId = user.mt_idx;
+              console.log('[FCM Token Service] ✅ smap_user_data에서 mt_idx 조회 성공:', userId);
             } else if (user.id) {
               userId = user.id;
+              console.log('[FCM Token Service] ✅ smap_user_data에서 id 조회 성공:', userId);
             }
-            console.log('[FCM Token Service] 🔍 사용자 정보에서 ID 추출:', { mt_idx: user.mt_idx, id: user.id, finalUserId: userId });
           } catch (parseError) {
-            console.warn('[FCM Token Service] ⚠️ 사용자 정보 파싱 실패:', parseError);
+            console.warn('[FCM Token Service] ⚠️ smap_user_data 파싱 실패:', parseError);
           }
         }
+        
+        // 2. 대체 키에서 조회
+        if (!userId) {
+          const altUserStr = localStorage.getItem('user');
+          if (altUserStr) {
+            try {
+              const user = JSON.parse(altUserStr);
+              if (user.mt_idx) {
+                userId = user.mt_idx;
+                console.log('[FCM Token Service] ✅ user에서 mt_idx 조회 성공:', userId);
+              } else if (user.id) {
+                userId = user.id;
+                console.log('[FCM Token Service] ✅ user에서 id 조회 성공:', userId);
+              }
+            } catch (parseError) {
+              console.warn('[FCM Token Service] ⚠️ user 파싱 실패:', parseError);
+            }
+          }
+        }
+        
+        // 3. 전역 변수에서 조회 (iOS WebView 특수 환경)
+        if (!userId && typeof window !== 'undefined') {
+          if ((window as any).__CURRENT_USER_MT_IDX__) {
+            userId = (window as any).__CURRENT_USER_MT_IDX__;
+            console.log('[FCM Token Service] ✅ 전역 변수에서 mt_idx 조회 성공:', userId);
+          } else if ((window as any).__CURRENT_USER_ID__) {
+            userId = (window as any).__CURRENT_USER_ID__;
+            console.log('[FCM Token Service] ✅ 전역 변수에서 id 조회 성공:', userId);
+          }
+        }
+        
+        // 4. sessionStorage에서 조회
+        if (!userId && typeof sessionStorage !== 'undefined') {
+          const sessionUserStr = sessionStorage.getItem('current_user');
+          if (sessionUserStr) {
+            try {
+              const user = JSON.parse(sessionUserStr);
+              if (user.mt_idx) {
+                userId = user.mt_idx;
+                console.log('[FCM Token Service] ✅ sessionStorage에서 mt_idx 조회 성공:', userId);
+              } else if (user.id) {
+                userId = user.id;
+                console.log('[FCM Token Service] ✅ sessionStorage에서 id 조회 성공:', userId);
+              }
+            } catch (parseError) {
+              console.warn('[FCM Token Service] ⚠️ sessionStorage 파싱 실패:', parseError);
+            }
+          }
+        }
+        
+        // 5. iOS WebView 특수 환경에서 추가 조회
+        if (!userId && typeof window !== 'undefined') {
+          // iOS WebView에서 자주 사용되는 키들
+          const iosKeys = [
+            'ios_user_data',
+            'webview_user_data',
+            'native_user_data',
+            'current_user_data'
+          ];
+          
+          for (const key of iosKeys) {
+            const iosUserStr = localStorage.getItem(key);
+            if (iosUserStr) {
+              try {
+                const user = JSON.parse(iosUserStr);
+                if (user.mt_idx) {
+                  userId = user.mt_idx;
+                  console.log(`[FCM Token Service] ✅ ${key}에서 mt_idx 조회 성공:`, userId);
+                  break;
+                } else if (user.id) {
+                  userId = user.id;
+                  console.log(`[FCM Token Service] ✅ ${key}에서 id 조회 성공:`, userId);
+                  break;
+                }
+              } catch (parseError) {
+                console.warn(`[FCM Token Service] ⚠️ ${key} 파싱 실패:`, parseError);
+              }
+            }
+          }
+        }
+        
+        console.log('[FCM Token Service] 🔍 사용자 정보에서 ID 추출:', { 
+          mt_idx: userId, 
+          localStorageKeys: Object.keys(localStorage).filter(key => key.includes('user') || key.includes('smap')),
+          sessionStorageKeys: typeof sessionStorage !== 'undefined' ? Object.keys(sessionStorage).filter(key => key.includes('user')) : [],
+          globalVars: typeof window !== 'undefined' ? {
+            __CURRENT_USER_MT_IDX__: (window as any).__CURRENT_USER_MT_IDX__,
+            __CURRENT_USER_ID__: (window as any).__CURRENT_USER_ID__
+          } : {}
+        });
       }
 
       if (!userId) {
@@ -1511,6 +1723,191 @@ export class FCMTokenService {
         }
       };
       
+      // iOS WebView 전용 Firebase 토큰 강제 생성 테스트
+      (window as any).forceIOSWebViewFirebaseToken = async (mt_idx: number) => {
+        console.log('🍎 [iOS WEBVIEW FIREBASE TOKEN FORCE] iOS WebView Firebase 토큰 강제 생성 시작');
+        try {
+          const isIOS = this.detectDeviceType() === 'ios';
+          if (!isIOS) {
+            return { success: false, error: 'iOS 디바이스가 아닙니다.' };
+          }
+          
+          // 먼저 사용자 정보 강제 동기화
+          const syncResult = await this.forceSyncUserInfo(mt_idx);
+          if (!syncResult) {
+            return { success: false, error: '사용자 정보 동기화 실패' };
+          }
+          
+          // WebView 환경 확인
+          const isWebView = typeof window !== 'undefined' && (window as any).webkit?.messageHandlers;
+          console.log('🍎 [iOS WEBVIEW FIREBASE TOKEN FORCE] WebView 환경:', isWebView);
+          
+          // 1단계: Service Worker 완전 재설정
+          if ('serviceWorker' in navigator) {
+            try {
+              console.log('🍎 [iOS WEBVIEW FIREBASE TOKEN FORCE] Service Worker 완전 재설정 시작');
+              
+              // 기존 Service Worker 모두 제거
+              const registrations = await navigator.serviceWorker.getRegistrations();
+              for (const registration of registrations) {
+                await registration.unregister();
+                console.log('🍎 [iOS WEBVIEW FIREBASE TOKEN FORCE] 기존 Service Worker 제거됨');
+              }
+              
+              // 새로 등록
+              const newRegistration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+              console.log('🍎 [iOS WEBVIEW FIREBASE TOKEN FORCE] 새 Service Worker 등록됨:', newRegistration.scope);
+              
+              // Service Worker 활성화 대기
+              if (newRegistration.installing) {
+                console.log('🍎 [iOS WEBVIEW FIREBASE TOKEN FORCE] Service Worker 설치 중...');
+                await new Promise<void>((resolve) => {
+                  newRegistration.installing!.addEventListener('statechange', () => {
+                    if (newRegistration.installing?.state === 'installed') {
+                      resolve();
+                    }
+                  });
+                });
+              }
+              
+              // 추가 대기
+              await new Promise(resolve => setTimeout(resolve, 3000));
+              console.log('🍎 [iOS WEBVIEW FIREBASE TOKEN FORCE] Service Worker 준비 완료');
+            } catch (swError) {
+              console.warn('🍎 [iOS WEBVIEW FIREBASE TOKEN FORCE] Service Worker 재설정 실패:', swError);
+            }
+          }
+          
+          // 2단계: 알림 권한 재확인
+          if ('Notification' in window) {
+            try {
+              if (Notification.permission !== 'granted') {
+                console.log('🍎 [iOS WEBVIEW FIREBASE TOKEN FORCE] 알림 권한 재요청');
+                const permission = await Notification.requestPermission();
+                console.log('🍎 [iOS WEBVIEW FIREBASE TOKEN FORCE] 알림 권한 결과:', permission);
+              } else {
+                console.log('🍎 [iOS WEBVIEW FIREBASE TOKEN FORCE] 알림 권한 이미 허용됨');
+              }
+            } catch (permError) {
+              console.warn('🍎 [iOS WEBVIEW FIREBASE TOKEN FORCE] 알림 권한 처리 실패:', permError);
+            }
+          }
+          
+          // 3단계: Firebase Messaging 재초기화
+          if (app) {
+            this.messaging = getMessaging(app);
+            console.log('🍎 [iOS WEBVIEW FIREBASE TOKEN FORCE] Firebase Messaging 재초기화 완료');
+          }
+          
+          // 4단계: Firebase 토큰 생성 시도 (여러 번)
+          if (this.messaging) {
+            const { getToken } = await import('firebase/messaging');
+            const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+            
+            if (vapidKey) {
+              let token: string | null = null;
+              let retryCount = 0;
+              const maxRetries = 5;
+              
+              while (!token && retryCount < maxRetries) {
+                try {
+                  console.log(`🍎 [iOS WEBVIEW FIREBASE TOKEN FORCE] 토큰 생성 시도 ${retryCount + 1}/${maxRetries}`);
+                  
+                  token = await getToken(this.messaging, {
+                    vapidKey: vapidKey,
+                    serviceWorkerRegistration: undefined
+                  });
+                  
+                  if (token && !token.startsWith('dummy') && !token.startsWith('ios_')) {
+                    console.log('🍎 [iOS WEBVIEW FIREBASE TOKEN FORCE] 유효한 Firebase 토큰 생성 성공:', token.substring(0, 20) + '...');
+                    break;
+                  } else if (token) {
+                    console.warn('🍎 [iOS WEBVIEW FIREBASE TOKEN FORCE] dummy/ios 토큰 생성됨 - 재시도');
+                    token = null;
+                  }
+                } catch (error) {
+                  console.warn(`🍎 [iOS WEBVIEW FIREBASE TOKEN FORCE] 토큰 생성 시도 ${retryCount + 1} 실패:`, error);
+                }
+                
+                retryCount++;
+                if (retryCount < maxRetries) {
+                  await new Promise(resolve => setTimeout(resolve, 3000));
+                }
+              }
+              
+              if (token && !token.startsWith('dummy') && !token.startsWith('ios_')) {
+                // DB 업데이트
+                try {
+                  await this.updateFCMTokenInDB(token, mt_idx);
+                  this.currentToken = token;
+                  return {
+                    success: true,
+                    message: 'iOS WebView Firebase 토큰 강제 생성 성공',
+                    token: token.substring(0, 20) + '...',
+                    method: 'WebView Firebase',
+                    retryCount
+                  };
+                } catch (dbError) {
+                  return {
+                    success: true,
+                    message: 'iOS WebView Firebase 토큰 생성 성공, DB 업데이트 실패',
+                    token: token.substring(0, 20) + '...',
+                    method: 'WebView Firebase',
+                    dbError: String(dbError),
+                    retryCount
+                  };
+                }
+              } else {
+                return { success: false, error: 'iOS WebView에서 유효한 Firebase 토큰 생성 실패' };
+              }
+            } else {
+              return { success: false, error: 'VAPID 키가 설정되지 않음' };
+            }
+          } else {
+            return { success: false, error: 'Firebase Messaging이 초기화되지 않음' };
+          }
+        } catch (error) {
+          console.error('🍎 [iOS WEBVIEW FIREBASE TOKEN FORCE] iOS WebView Firebase 토큰 강제 생성 오류:', error);
+          return { success: false, error: String(error) };
+        }
+      };
+      
+      // iOS WebView 사용자 정보 동기화 테스트
+      (window as any).forceIOSWebViewUserSync = async (mt_idx: number) => {
+        console.log('🍎 [iOS WEBVIEW USER SYNC] iOS WebView 사용자 정보 강제 동기화 시작');
+        try {
+          const result = await this.forceSyncUserInfo(mt_idx);
+          return {
+            success: result,
+            message: result ? 'iOS WebView 사용자 정보 동기화 성공' : 'iOS WebView 사용자 정보 동기화 실패'
+          };
+        } catch (error) {
+          console.error('🍎 [iOS WEBVIEW USER SYNC] iOS WebView 사용자 정보 동기화 오류:', error);
+          return { success: false, error: String(error) };
+        }
+      };
+      
+      // iOS 네이티브 FCM 토큰 요청 테스트
+      (window as any).requestIOSNativeFCMToken = async (mt_idx: number) => {
+        console.log('🍎 [iOS NATIVE FCM] iOS 네이티브 FCM 토큰 요청 시작');
+        try {
+          const token = await this.requestNativeFCMToken(mt_idx);
+          if (token) {
+            return {
+              success: true,
+              message: 'iOS 네이티브 FCM 토큰 요청 성공',
+              token: token.substring(0, 20) + '...',
+              method: 'Native'
+            };
+          } else {
+            return { success: false, error: 'iOS 네이티브 FCM 토큰 요청 실패' };
+          }
+        } catch (error) {
+          console.error('🍎 [iOS NATIVE FCM] iOS 네이티브 FCM 토큰 요청 오류:', error);
+          return { success: false, error: String(error) };
+        }
+      };
+      
       (window as any).fcmTokenService = this; // 인스턴스도 전역에 등록
       
       console.log('🔔 [FCM TEST] FCM 테스트 함수들이 전역에 등록되었습니다:');
@@ -1526,6 +1923,182 @@ export class FCMTokenService {
       console.log('- forceIOSFCMRefresh(mt_idx): iOS FCM 강제 재생성');
       console.log('- forceIOSFirebaseInit(): iOS Firebase 강제 초기화');
       console.log('- forceIOSFirebaseToken(mt_idx): iOS Firebase 토큰 강제 생성');
+      console.log('🍎 [iOS WebView 전용] iOS WebView Firebase 토큰 강제 생성:');
+      console.log('- forceIOSWebViewFirebaseToken(mt_idx): iOS WebView Firebase 토큰 강제 생성');
+      console.log('- forceIOSWebViewUserSync(mt_idx): iOS WebView 사용자 정보 강제 동기화');
+      console.log('- requestIOSNativeFCMToken(mt_idx): iOS 네이티브 FCM 토큰 요청');
+      console.log('🔧 [사용자 정보 동기화] 사용자 정보 관리 함수들:');
+      console.log('- fcmTokenService.setCurrentUserInfo(mt_idx, mt_id, mt_name, mt_email): 전역 사용자 정보 설정');
+      console.log('- fcmTokenService.getCurrentUserInfo(): 전역 사용자 정보 조회');
+      console.log('- fcmTokenService.forceSyncUserInfo(mt_idx): 사용자 정보 강제 동기화');
+    }
+  }
+
+  /**
+   * iOS WebView에서 Firebase 토큰 생성이 실패한 경우 네이티브 FCM 토큰 요청
+   */
+  async requestNativeFCMToken(mt_idx: number): Promise<string | null> {
+    try {
+      console.log('[FCM Token Service] 🍎 iOS 네이티브 FCM 토큰 요청 시작');
+      
+      if (typeof window === 'undefined' || !(window as any).webkit?.messageHandlers?.smapIos) {
+        console.log('[FCM Token Service] ⚠️ iOS WebView 환경이 아님');
+        return null;
+      }
+      
+      // 네이티브에 FCM 토큰 요청
+      (window as any).webkit.messageHandlers.smapIos.postMessage({
+        action: 'requestFCMToken',
+        callback: 'handleNativeFCMToken',
+        mt_idx: mt_idx
+      });
+      
+      // 네이티브 응답 대기 (최대 10초)
+      const nativeToken = await new Promise<string | null>((resolve) => {
+        const timeout = setTimeout(() => {
+          console.log('[FCM Token Service] ⏰ iOS 네이티브 FCM 토큰 응답 타임아웃');
+          resolve(null);
+        }, 10000);
+        
+        // 전역 콜백 함수 설정
+        (window as any).handleNativeFCMToken = (token: string) => {
+          clearTimeout(timeout);
+          console.log('[FCM Token Service] ✅ iOS 네이티브 FCM 토큰 수신:', token ? token.substring(0, 20) + '...' : '없음');
+          resolve(token);
+        };
+      });
+      
+      if (nativeToken && !nativeToken.startsWith('dummy') && !nativeToken.startsWith('ios_')) {
+        console.log('[FCM Token Service] ✅ iOS 네이티브 FCM 토큰 사용:', nativeToken.substring(0, 20) + '...');
+        
+        // 토큰을 DB에 업데이트
+        try {
+          await this.updateFCMTokenInDB(nativeToken, mt_idx);
+          console.log('[FCM Token Service] ✅ iOS 네이티브 FCM 토큰 DB 업데이트 완료');
+          this.currentToken = nativeToken;
+          return nativeToken;
+        } catch (dbError) {
+          console.warn('[FCM Token Service] ⚠️ iOS 네이티브 FCM 토큰 DB 업데이트 실패:', dbError);
+          return nativeToken; // DB 업데이트 실패해도 토큰은 반환
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('[FCM Token Service] ❌ iOS 네이티브 FCM 토큰 요청 실패:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 사용자 정보를 전역 변수에 설정 (iOS WebView 동기화용)
+   */
+  setCurrentUserInfo(mt_idx: number, mt_id?: string, mt_name?: string, mt_email?: string): void {
+    if (typeof window !== 'undefined') {
+      console.log('[FCM Token Service] 🔧 전역 사용자 정보 설정:', { mt_idx, mt_id, mt_name, mt_email });
+      
+      // 전역 변수에 사용자 정보 설정
+      (window as any).__CURRENT_USER_MT_IDX__ = mt_idx;
+      (window as any).__CURRENT_USER_ID__ = mt_id;
+      (window as any).__CURRENT_USER_NAME__ = mt_name;
+      (window as any).__CURRENT_USER_EMAIL__ = mt_email;
+      
+      // 추가 전역 변수들
+      (window as any).__CURRENT_USER_INFO__ = {
+        mt_idx,
+        mt_id,
+        mt_name,
+        mt_email,
+        timestamp: Date.now()
+      };
+      
+      console.log('[FCM Token Service] ✅ 전역 사용자 정보 설정 완료');
+    }
+  }
+
+  /**
+   * 전역 변수에서 사용자 정보 조회
+   */
+  getCurrentUserInfo(): { mt_idx?: number; mt_id?: string; mt_name?: string; mt_email?: string } | null {
+    if (typeof window !== 'undefined') {
+      const globalUser = (window as any).__CURRENT_USER_INFO__;
+      if (globalUser && globalUser.mt_idx) {
+        console.log('[FCM Token Service] 🔍 전역 변수에서 사용자 정보 조회:', globalUser);
+        return globalUser;
+      }
+      
+      // 개별 전역 변수에서 조회
+      const mt_idx = (window as any).__CURRENT_USER_MT_IDX__;
+      const mt_id = (window as any).__CURRENT_USER_ID__;
+      const mt_name = (window as any).__CURRENT_USER_NAME__;
+      const mt_email = (window as any).__CURRENT_USER_EMAIL__;
+      
+      if (mt_idx) {
+        const userInfo = { mt_idx, mt_id, mt_name, mt_email };
+        console.log('[FCM Token Service] 🔍 개별 전역 변수에서 사용자 정보 조회:', userInfo);
+        return userInfo;
+      }
+    }
+    
+    return null;
+  }
+
+  /**
+   * iOS WebView 환경에서 사용자 정보 강제 동기화
+   */
+  async forceSyncUserInfo(mt_idx: number): Promise<boolean> {
+    try {
+      console.log('[FCM Token Service] 🔄 iOS WebView 사용자 정보 강제 동기화 시작:', mt_idx);
+      
+      // 1. 전역 변수에 사용자 정보 설정
+      this.setCurrentUserInfo(mt_idx);
+      
+      // 2. localStorage에 사용자 정보 저장 (여러 키에 백업)
+      if (typeof window !== 'undefined') {
+        const userData = {
+          mt_idx,
+          timestamp: Date.now()
+        };
+        
+        // 여러 키에 백업 저장
+        const backupKeys = [
+          'smap_user_data',
+          'user',
+          'ios_user_data',
+          'webview_user_data',
+          'current_user_data'
+        ];
+        
+        backupKeys.forEach(key => {
+          try {
+            localStorage.setItem(key, JSON.stringify(userData));
+            console.log(`[FCM Token Service] 💾 ${key}에 사용자 정보 백업 저장 완료`);
+          } catch (error) {
+            console.warn(`[FCM Token Service] ⚠️ ${key}에 사용자 정보 저장 실패:`, error);
+          }
+        });
+        
+        // sessionStorage에도 백업
+        try {
+          sessionStorage.setItem('current_user', JSON.stringify(userData));
+          console.log('[FCM Token Service] 💾 sessionStorage에 사용자 정보 백업 저장 완료');
+        } catch (error) {
+          console.warn('[FCM Token Service] ⚠️ sessionStorage에 사용자 정보 저장 실패:', error);
+        }
+      }
+      
+      // 3. 동기화 확인
+      const syncedUserInfo = this.getCurrentUserInfo();
+      if (syncedUserInfo && syncedUserInfo.mt_idx === mt_idx) {
+        console.log('[FCM Token Service] ✅ iOS WebView 사용자 정보 강제 동기화 완료');
+        return true;
+      } else {
+        console.warn('[FCM Token Service] ⚠️ iOS WebView 사용자 정보 동기화 확인 실패');
+        return false;
+      }
+    } catch (error) {
+      console.error('[FCM Token Service] ❌ iOS WebView 사용자 정보 강제 동기화 실패:', error);
+      return false;
     }
   }
 }
