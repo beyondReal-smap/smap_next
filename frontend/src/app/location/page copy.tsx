@@ -818,6 +818,7 @@ export default function LocationPage() {
   const memberMarkersRef = useRef<NaverMarker[]>([]);
   // 중복 마커 생성으로 인한 깜빡임 방지용 시그니처
   const lastMarkersSignatureRef = useRef<string>('');
+
   const [infoWindow, setInfoWindow] = useState<NaverInfoWindow | null>(null);
   const mapContainer = useRef<HTMLDivElement>(null);
   const tempMarker = useRef<NaverMarker | null>(null);
@@ -837,14 +838,29 @@ export default function LocationPage() {
   // 멤버 선택 플로우 진행 중 가드
   const selectionFlowInProgressRef = useRef<boolean>(false);
 
-  // 선택된 멤버의 InfoWindow를 강제로 띄우는 헬퍼
+  // 🚨 선택된 멤버의 InfoWindow를 강제로 띄우는 헬퍼 - 강화된 버전
   const openInfoWindowForSelectedMember = useCallback((): boolean => {
     try {
-      if (!shouldAutoOpenInfoWindowRef.current) return false;
-      if (!map || !window.naver?.maps) return false;
+      if (!shouldAutoOpenInfoWindowRef.current) {
+        console.log('[openInfoWindowForSelectedMember] 🚨 자동 열기 플래그 비활성화');
+        return false;
+      }
+      if (!map || !window.naver?.maps) {
+        console.warn('[openInfoWindowForSelectedMember] 🚨 맵 또는 네이버 맵스 API 없음');
+        return false;
+      }
 
       const sel = groupMembers.find((m) => m.isSelected);
-      if (!sel) return false;
+      if (!sel) {
+        console.warn('[openInfoWindowForSelectedMember] 🚨 선택된 멤버 없음');
+        return false;
+      }
+      
+      console.log('[openInfoWindowForSelectedMember] 🚨 선택된 멤버 확인:', {
+        memberId: sel.id,
+        memberName: sel.name,
+        isSelected: sel.isSelected
+      });
 
       // 기존 InfoWindow는 닫고 새로 생성
       try {
@@ -854,26 +870,72 @@ export default function LocationPage() {
         }
       } catch (_) {}
 
-      // 멤버 마커 찾기: __key(id) → 인덱스 순 → title 매칭
+      // 🚨 멤버 마커 찾기 로직 강화: 여러 방법으로 마커 찾기
       const key = String(sel.id);
       let selectedMarker: any = null;
+      
+      console.log('[openInfoWindowForSelectedMember] 🚨 마커 찾기 시작:', {
+        memberId: sel.id,
+        memberName: sel.name,
+        memberMarkersRefLength: memberMarkersRef.current?.length || 0,
+        memberMarkersLength: memberMarkers.length
+      });
+      
+      // 1. __key로 찾기
       const byKey = memberMarkersRef.current?.find((mk: any) => mk && (mk as any).__key === key) || null;
-      if (byKey) selectedMarker = byKey;
+      if (byKey) {
+        selectedMarker = byKey;
+        console.log('[openInfoWindowForSelectedMember] 🚨 __key로 마커 찾음');
+      }
+      
+      // 2. 인덱스로 찾기
       if (!selectedMarker) {
         const idx = groupMembers.findIndex((m) => m.id === sel.id);
         if (idx >= 0 && memberMarkersRef.current && memberMarkersRef.current[idx]) {
           selectedMarker = memberMarkersRef.current[idx];
+          console.log('[openInfoWindowForSelectedMember] 🚨 인덱스로 마커 찾음:', idx);
         }
       }
+      
+      // 3. title로 찾기
       if (!selectedMarker && memberMarkersRef.current?.length) {
         selectedMarker = memberMarkersRef.current.find((mk: any) => mk?.getTitle?.() === sel.name) || null;
+        if (selectedMarker) {
+          console.log('[openInfoWindowForSelectedMember] 🚨 title로 마커 찾음');
+        }
       }
+      
+      // 4. memberMarkers 상태에서도 찾기
+      if (!selectedMarker && memberMarkers.length > 0) {
+        const idx = groupMembers.findIndex((m) => m.id === sel.id);
+        if (idx >= 0 && memberMarkers[idx]) {
+          selectedMarker = memberMarkers[idx];
+          console.log('[openInfoWindowForSelectedMember] 🚨 memberMarkers 상태에서 마커 찾음:', idx);
+        }
+      }
+      
+      console.log('[openInfoWindowForSelectedMember] 🚨 마커 찾기 결과:', {
+        found: !!selectedMarker,
+        markerExists: !!selectedMarker?.getMap,
+        markerOnMap: selectedMarker?.getMap ? !!selectedMarker.getMap() : false
+      });
 
       if (selectedMarker) {
+        console.log('[openInfoWindowForSelectedMember] 🚨 마커 찾음, InfoWindow 생성 시작');
+        
+        // 마커가 지도에 제대로 표시되어 있는지 확인
+        if (selectedMarker.getMap && !selectedMarker.getMap()) {
+          console.warn('[openInfoWindowForSelectedMember] 🚨 마커가 지도에 없음, 지도에 추가');
+          selectedMarker.setMap(map);
+        }
+        
+        // InfoWindow 생성
         createMemberInfoWindow(sel, selectedMarker);
         shouldAutoOpenInfoWindowRef.current = false; // 한 번 열면 플래그 해제
         return true;
       }
+      
+      console.warn('[openInfoWindowForSelectedMember] 🚨 마커를 찾을 수 없음');
       return false;
     } catch (e) {
       console.warn('[openInfoWindowForSelectedMember] 실패:', e);
@@ -1053,20 +1115,10 @@ export default function LocationPage() {
         serviceMethods: window.naver?.maps?.Service ? Object.getOwnPropertyNames(window.naver.maps.Service) : []
       };
       
-      console.log('[TEST] 네이버 맵 상태:', status);
-      alert(`네이버 맵 상태:\n${JSON.stringify(status, null, 2)}`);
       return status;
     };
-    
-    console.log('[TEST] 테스트 함수 등록 완료');
-    console.log('[TEST] 콘솔에서 다음 명령어를 사용하세요:');
-    console.log('[TEST] - checkNaverMapStatus(): 네이버 맵 상태 확인');
-    // console.log('[TEST] - testReverseGeocode(): 기본 좌표로 역지오코딩 테스트');
-    // console.log('[TEST] - testReverseGeocode(37.5194524, 126.9229853): 특정 좌표로 테스트');
 
     (window as any).handleLocationDeleteFromInfoWindow = (locationId: string) => {
-      console.log('[InfoWindow 삭제] 장소 삭제 요청:', locationId);
-      
       // 해당 장소 찾기
       let targetLocation: LocationData | OtherMemberLocationRaw | null = null;
       
@@ -1099,32 +1151,19 @@ export default function LocationPage() {
 
     // InfoWindow 닫기 전역 함수
     (window as any).closeInfoWindow = () => {
-      console.log('[InfoWindow 닫기] 닫기 요청');
-      console.log('[InfoWindow 닫기] 현재 infoWindow 상태:', !!infoWindow);
       if (infoWindow) {
         try {
-          console.log('[InfoWindow 닫기] close() 메서드 호출 시작');
           infoWindow.close();
           setInfoWindow(null);
-          console.log('[InfoWindow 닫기] 성공');
         } catch (error) {
           console.error('[InfoWindow 닫기] 실패:', error);
           setInfoWindow(null);
         }
-      } else {
-        console.warn('[InfoWindow 닫기] infoWindow가 null이므로 닫을 수 없음');
       }
     };
 
-    // 전역 함수 설정 완료 로그
-    console.log('[전역 함수 설정] 완료:', {
-      handleLocationDeleteFromInfoWindow: typeof (window as any).handleLocationDeleteFromInfoWindow,
-      closeInfoWindow: typeof (window as any).closeInfoWindow
-    });
-
     // 컴포넌트 언마운트 시 전역 함수 정리
     return () => {
-      console.log('[전역 함수 정리] 컴포넌트 언마운트');
       delete (window as any).handleLocationDeleteFromInfoWindow;
       delete (window as any).closeInfoWindow;
     };
@@ -1749,20 +1788,15 @@ export default function LocationPage() {
     const velocityX = duration > 0 ? Math.abs(swipeDeltaX) / duration : 0;
     const velocityY = duration > 0 ? Math.abs(dragDeltaY) / duration : 0;
 
-    console.log('[DragEnd] isHorizontalSwipe:', isHorizontalSwipe, 'swipeDeltaX:', swipeDeltaX, 'dragDeltaY:', dragDeltaY, 'velocityX:', velocityX, 'velocityY:', velocityY);
-
     // 방향이 결정되었을 때만 해당 방향의 완료 로직 실행
     if (isHorizontalSwipe === true) {
         // 가로 스와이프 완료 처리
-        console.log('[DragEnd] 가로 스와이프 처리');
         if (Math.abs(swipeDeltaX) > swipeThresholdEnd || velocityX > velocityThreshold) {
             if (swipeDeltaX > 0) {
                 // 오른쪽 스와이프 → 첫 번째 뷰 (selectedMemberPlaces)
-                console.log('[DragEnd] 오른쪽 스와이프 감지 -> selectedMemberPlaces');
                 handleViewChange('selectedMemberPlaces');
             } else {
                 // 왼쪽 스와이프 → 두 번째 뷰 (otherMembersPlaces)
-                console.log('[DragEnd] 왼쪽 스와이프 감지 -> otherMembersPlaces');
                 handleViewChange('otherMembersPlaces');
             }
              // 햅틱 피드백 (더 부드러운 진동)
@@ -1775,11 +1809,9 @@ export default function LocationPage() {
             }
         } else {
             // 임계값 미달 시 현재 뷰로 되돌림 (handleViewChange 내부에서 처리)
-            console.log('[DragEnd] 가로 스와이프 임계값 미달 -> 현재 뷰 유지');
             handleViewChange(activeView); // 현재 뷰로 스크롤 위치 복원
         }
     } else { // 세로 드래그 완료 처리 (isHorizontalSwipe === false)
-        console.log('[DragEnd] 세로 드래그 처리');
         const triggerHaptic = () => {
           try {
             if ('vibrate' in navigator) {
@@ -1790,9 +1822,6 @@ export default function LocationPage() {
             console.debug('햅틱 피드백이 차단되었습니다:', error);
           }
         };
-
-        // 바텀시트 제거로 인한 드래그 로직 간소화
-        console.log('[DragEnd] 드래그 완료');
     }
     // _startedAt 초기화 (이벤트 객체에 직접 접근은 불안정할 수 있음)
     (e.target as any)._startedAt = 0; // 시작 시간 초기화
@@ -1835,7 +1864,7 @@ export default function LocationPage() {
         try {
           if (marker && typeof marker.setMap === 'function' && marker.getMap()) {
             marker.setMap(null);
-            console.log('[handleGroupSelect] 장소 마커 제거 성공:', index);
+
           }
         } catch (error) {
           console.warn('[handleGroupSelect] 장소 마커 제거 실패:', index, error);
@@ -1855,12 +1884,7 @@ export default function LocationPage() {
       setInfoWindow(null);
     }
     
-    console.log('[handleGroupSelect] 그룹 변경으로 지도 초기화 완료');
-    
-    // 이전 그룹 캐시 무효화 (선택적)
-    if (selectedGroupId) {
-      console.log('[handleGroupSelect] 이전 그룹 캐시 무효화:', selectedGroupId);
-    }
+
     
     // 먼저 그룹 ID 변경
     setSelectedGroupId(groupId);
@@ -1885,10 +1909,7 @@ export default function LocationPage() {
     setSelectedLocationId(null);
     selectedLocationIdRef.current = null;
     
-    console.log('[handleGroupSelect] 기존 데이터 초기화 완료, 새 그룹 데이터 로딩 시작');
-    
-    // 🚨 중복 호출 방지: useEffect에서 자동으로 처리되므로 직접 호출 제거
-    console.log('[handleGroupSelect] 그룹 변경 완료 - useEffect에서 자동으로 데이터 로딩됨');
+
   }, [selectedGroupId]); // 🚨 중복 호출 방지: 불필요한 의존성 제거
 
   const fetchGroupMembersData = async (groupId?: number) => {
@@ -1914,19 +1935,16 @@ export default function LocationPage() {
     setIsFirstMemberSelectionComplete(false);
 
     try {
-      console.log('[fetchGroupMembersData] 시작, 그룹ID:', targetGroupId);
       const membersData = await retryDataFetch(
         () => memberService.getGroupMembers(targetGroupId.toString()),
         'LOCATION_GROUP_MEMBERS'
       );
-      console.log('[fetchGroupMembersData] 멤버 데이터 조회 완료:', membersData);
 
       if (membersData && membersData.length > 0) {
         // 장소 개수는 나중에 필요시에만 로딩 (초기 로딩 속도 개선)
         const memberLocationCounts: { [key: string]: number } = {};
         
         // 첫 번째 멤버만 즉시 로딩, 나머지는 백그라운드에서 처리
-        console.log('[fetchGroupMembersData] 첫 번째 멤버만 우선 로딩으로 속도 개선');
 
         // 데이터 즉시 처리 (장소 개수는 나중에 로딩)
         const convertedMembers = membersData.map((member: any, index: number) => {
@@ -1999,8 +2017,8 @@ export default function LocationPage() {
                 name: loc.name || loc.slt_title || '제목 없음',
                 address: loc.address || loc.slt_add || '주소 정보 없음',
                 coordinates: [
-                  parseFloat(String(loc.slt_long || '0')) || 0,
-                  parseFloat(String(loc.slt_lat || '0')) || 0
+                  parseFloat(String(loc.slt_lat || '0')) || 0,
+                  parseFloat(String(loc.slt_long || '0')) || 0
                 ] as [number, number],
                 category: loc.category || '기타',
                 memo: loc.memo || '',
@@ -2148,8 +2166,24 @@ export default function LocationPage() {
     // 위 가드에서 동일 멤버는 이미 반환되므로 이하 로직 진행
     
     // *** 마커 정리 로직 강화 ***
-    // 1. 하드 리셋: 모든 오버레이/타이머/시그니처 정리
-    hardResetMapOverlays('[handleMemberSelect] 멤버 변경');
+    // 🚨 마커 클릭 시에는 하드 리셋하지 않음 (장소 마커 보존)
+    if (!fromMarkerClick) {
+      // 1. 하드 리셋: 모든 오버레이/타이머/시그니처 정리 (사이드바 선택 시에만)
+      hardResetMapOverlays('[handleMemberSelect] 멤버 변경 (사이드바)');
+      console.log('[handleMemberSelect] 🚨 하드 리셋 실행 - 사이드바 선택');
+    } else {
+      // 🚨 마커 클릭 시에는 InfoWindow만 정리 (장소 마커는 보존)
+      try {
+        if (infoWindow) {
+          infoWindow.close();
+          setInfoWindow(null);
+        }
+
+      } catch (e) {
+        console.warn('[handleMemberSelect] InfoWindow 정리 실패:', e);
+      }
+    }
+    
     // 선택 버전 증가 (이후 비동기 처리에서 최신 선택만 유효하도록)
     selectionVersionRef.current += 1;
     const currentSelectionVersion = selectionVersionRef.current;
@@ -2159,13 +2193,14 @@ export default function LocationPage() {
     const isSelectingSameMember = currentlySelectedMember?.id === memberId;
     
     if (!isSelectingSameMember) {
-      console.log('[handleMemberSelect] 다른 멤버 선택 - 선택된 장소만 초기화');
       setSelectedLocationId(null);
       selectedLocationIdRef.current = null;
       // 다른 멤버 선택 시에도 기존 멤버들의 장소 데이터는 유지
       // setSelectedMemberSavedLocations(null); // 이 줄 제거 - 다른 멤버 장소 데이터 보존
     } else {
-      console.log('[handleMemberSelect] 같은 멤버 재선택 - 장소 상태 유지');
+      // 🚨 같은 멤버 재선택 시 장소 선택 상태 초기화
+      setSelectedLocationId(null);
+      selectedLocationIdRef.current = null;
     }
     
     selectedMemberIdRef.current = memberId;
@@ -2174,33 +2209,52 @@ export default function LocationPage() {
       shouldAutoOpenInfoWindowRef.current = true;
     }
   
-    // 🚨 멤버 선택 시 다른 멤버 데이터를 절대 건드리지 않음
-    console.log('[handleMemberSelect] 🔍 멤버 선택 전 현재 상태:', 
-      groupMembers.map(m => ({ 
-        name: m.name, 
-        count: m.savedLocationCount, 
-        isSelected: m.isSelected,
-        hasLocations: !!m.savedLocations?.length 
-      }))
-    );
-    
     // 선택 상태만 변경하고 기존 데이터는 절대 건드리지 않음
-        console.log('[handleMemberSelect] 🔍 멤버 선택 - 다른 멤버 데이터는 절대 건드리지 않음');
     
-    // 🚨 핵심 수정: 선택 상태만 업데이트 (다른 멤버 데이터는 절대 건드리지 않음)
-    setGroupMembers(prevMembers => 
-      prevMembers.map(member => ({
-        ...member,
-        isSelected: member.id === memberId
-        // 🚨 savedLocations와 savedLocationCount는 절대 건드리지 않음!
-      }))
-    );
-    console.log('[handleMemberSelect] 선택 상태 업데이트 완료:', memberId);
+            // 🚨 핵심 수정: 선택 상태만 업데이트 (다른 멤버 데이터는 절대 건드리지 않음)
+        setGroupMembers(prevMembers => 
+          prevMembers.map(member => ({
+            ...member,
+            isSelected: member.id === memberId
+            // 🚨 savedLocations와 savedLocationCount는 절대 건드리지 않음!
+          }))
+        );
+        // 🚨 멤버 선택 상태 변경 후 마커 즉시 업데이트
+        setTimeout(() => {
+          if (map && isMapReady) {
+            // 강제 업데이트로 마커 색상 변경 보장
+            // 현재 선택된 멤버의 장소 데이터만 사용
+            const currentSelectedMember = groupMembers.find(m => m.isSelected);
+            const currentLocations = currentSelectedMember?.savedLocations || [];
+            // 🚨 같은 멤버 재선택 시에는 더 강력한 강제 업데이트
+            const forceUpdateMode = isSelectingSameMember ? true : true;
+            updateAllMarkers(groupMembers, currentLocations, forceUpdateMode);
+            
+            // 🚨 멤버 선택 후 InfoWindow 자동 생성
+            setTimeout(() => {
+              if (currentSelectedMember) {
+                // 현재 선택된 멤버의 마커 찾기
+                const memberMarker = memberMarkers.find(m => {
+                  try {
+                    const markerKey = (m as any).__key;
+                    return markerKey === String(currentSelectedMember.id);
+                  } catch {
+                    return false;
+                  }
+                });
+                
+                if (memberMarker) {
+                  createMemberInfoWindow(currentSelectedMember, memberMarker);
+                }
+              }
+            }, 200); // 마커 업데이트 완료 후 InfoWindow 생성
+          }
+        }, 100);
     
     // 선택된 멤버의 장소 데이터 로드
     const loadSelectedMemberLocations = async () => {
       try {
-        console.log('[handleMemberSelect] 선택된 멤버 장소 데이터 로드 시작:', newlySelectedMember?.name || '알 수 없음');
+
         
         const memberLocationsRaw = await locationService.getOtherMembersLocations(memberId);
         if (selectionVersionRef.current !== currentSelectionVersion) {
@@ -2212,20 +2266,20 @@ export default function LocationPage() {
           원본데이터수: memberLocationsRaw.length
         });
         
-        // LocationData 형식으로 변환
-        const convertedLocations = memberLocationsRaw.map(loc => ({
-          id: loc.slt_idx ? loc.slt_idx.toString() : Date.now().toString(),
-          name: loc.name || loc.slt_title || '제목 없음',
-          address: loc.address || loc.slt_add || '주소 정보 없음',
-          coordinates: [
-            parseFloat(String(loc.slt_long || '0')) || 0,
-            parseFloat(String(loc.slt_lat || '0')) || 0
-          ] as [number, number],
-          category: loc.category || '기타',
-          memo: loc.memo || '',
-          favorite: loc.favorite || false,
-          notifications: loc.notifications !== undefined ? loc.notifications : ((loc as any).slt_enter_alarm === 'Y' || (loc as any).slt_enter_alarm === undefined)
-        }));
+                      // LocationData 형식으로 변환
+              const convertedLocations = memberLocationsRaw.map(loc => ({
+                id: loc.slt_idx ? loc.slt_idx.toString() : Date.now().toString(),
+                name: loc.name || loc.slt_title || '제목 없음',
+                address: loc.address || loc.slt_add || '주소 정보 없음',
+                coordinates: [
+                  parseFloat(String(loc.slt_lat || '0')) || 0,
+                  parseFloat(String(loc.slt_long || '0')) || 0
+                ] as [number, number],
+                category: loc.category || '기타',
+                memo: loc.memo || '',
+                favorite: loc.favorite || false,
+                notifications: loc.notifications !== undefined ? loc.notifications : ((loc as any).slt_enter_alarm === 'Y' || (loc as any).slt_enter_alarm === undefined)
+              }));
         
         // 상태 업데이트 - 선택된 멤버의 장소만 설정
         setSelectedMemberSavedLocations(convertedLocations);
@@ -2275,26 +2329,48 @@ export default function LocationPage() {
         // 🚨 장소 데이터 업데이트 완료
         console.log('[handleMemberSelect] 🚨 선택된 멤버 장소 데이터 업데이트 완료');
         
-        // 🚨 즉시 마커 업데이트 실행 (useEffect 대기하지 않음)
-        console.log('[handleMemberSelect] 🚨 즉시 마커 업데이트 실행');
+        // 🚨 상태 업데이트 후 마커 업데이트 실행 (setTimeout으로 상태 업데이트 완료 대기)
+        console.log('[handleMemberSelect] 🚨 상태 업데이트 후 마커 업데이트 스케줄링');
         
-        // 🚨 선택된 멤버의 장소 데이터로 즉시 마커 업데이트
-        if (convertedLocations && convertedLocations.length > 0 && map && isMapReady) {
-          console.log('[handleMemberSelect] 🚨 즉시 마커 업데이트 실행:', {
-            장소수: convertedLocations.length,
-            지도준비상태: !!map && !!isMapReady
+        setTimeout(() => {
+          console.log('[handleMemberSelect] 🚨 상태 업데이트 완료 후 마커 업데이트 실행');
+          
+          // 🚨 업데이트된 groupMembers 상태에서 선택된 멤버 찾기
+          const updatedSelectedMember = groupMembers.find(m => m.id === memberId);
+          if (!updatedSelectedMember) {
+            console.warn('[handleMemberSelect] 🚨 업데이트된 선택 멤버를 찾을 수 없음');
+            return;
+          }
+          
+          console.log('[handleMemberSelect] 🚨 업데이트된 멤버 데이터:', {
+            멤버명: updatedSelectedMember.name,
+            장소수: updatedSelectedMember.savedLocations?.length || 0,
+            장소데이터: updatedSelectedMember.savedLocations?.map(loc => ({ id: loc.id, name: loc.name })) || []
           });
           
-          // 🚨 즉시 마커 업데이트 실행 (forceUpdate: false로 선택 상태 보존)
-          updateAllMarkers(groupMembers, convertedLocations, false);
-          console.log('[handleMemberSelect] 🚨 즉시 마커 업데이트 완료');
-        } else {
-          console.warn('[handleMemberSelect] 🚨 즉시 마커 업데이트 조건 미충족:', {
-            hasLocations: !!(convertedLocations && convertedLocations.length > 0),
-            hasMap: !!map,
-            isMapReady
-          });
-        }
+          // 🚨 선택된 멤버의 장소 데이터로 마커 업데이트
+          if (updatedSelectedMember.savedLocations && updatedSelectedMember.savedLocations.length > 0 && map && isMapReady) {
+            console.log('[handleMemberSelect] 🚨 마커 업데이트 실행:', {
+              장소수: updatedSelectedMember.savedLocations.length,
+              지도준비상태: !!map && !!isMapReady
+            });
+            
+            // 🚨 멤버 변경 시에는 항상 강제 업데이트로 마커 교체 보장
+            console.log('[handleMemberSelect] 🚨 멤버 변경 - 강제 업데이트로 마커 교체');
+            updateAllMarkers(groupMembers, updatedSelectedMember.savedLocations, true);
+            console.log('[handleMemberSelect] 🚨 마커 업데이트 완료');
+          } else if (map && isMapReady) {
+            // 🚨 장소 데이터가 없는 경우 빈 배열로 마커 업데이트 (기존 마커 제거)
+            console.log('[handleMemberSelect] 🚨 장소 데이터 없음 - 기존 마커 제거');
+            updateAllMarkers(groupMembers, [], true);
+          } else {
+            console.warn('[handleMemberSelect] 🚨 마커 업데이트 조건 미충족:', {
+              hasLocations: !!(updatedSelectedMember.savedLocations && updatedSelectedMember.savedLocations.length > 0),
+              hasMap: !!map,
+              isMapReady
+            });
+          }
+        }, 100); // 상태 업데이트 완료를 위한 짧은 대기
       } catch (error) {
         console.error('[handleMemberSelect] 장소 데이터 로드 실패:', error);
         setSelectedMemberSavedLocations([]);
@@ -2305,17 +2381,45 @@ export default function LocationPage() {
     // 장소 데이터 로드 실행
     await loadSelectedMemberLocations();
 
-    // 사이드바 선택 시 멤버 마커/장소 마커가 생성된 직후 InfoWindow 자동 오픈 시도
+    // 🚨 사이드바 선택 시 마커 업데이트 완료 후 InfoWindow 자동 오픈 - 강화된 버전
     if (!fromMarkerClick) {
+      console.log('[handleMemberSelect] 🚨 InfoWindow 자동 생성 스케줄링 시작');
+      
+      // 1차 시도: 마커 업데이트 완료 후
       setTimeout(() => {
-        openInfoWindowForSelectedMember();
-      }, 250);
+        console.log('[handleMemberSelect] 🚨 1차 InfoWindow 생성 시도');
+        const opened = openInfoWindowForSelectedMember();
+        if (opened) {
+          console.log('[handleMemberSelect] 🚨 1차 InfoWindow 생성 성공');
+        } else {
+          console.log('[handleMemberSelect] 🚨 1차 InfoWindow 생성 실패 - 2차 시도 예정');
+        }
+      }, 1000); // 마커 업데이트 완료를 위한 충분한 시간
+      
+      // 2차 시도: 더 긴 시간 후
+      setTimeout(() => {
+        console.log('[handleMemberSelect] 🚨 2차 InfoWindow 생성 시도');
+        const opened = openInfoWindowForSelectedMember();
+        if (opened) {
+          console.log('[handleMemberSelect] 🚨 2차 InfoWindow 생성 성공');
+        } else {
+          console.log('[handleMemberSelect] 🚨 2차 InfoWindow 생성 실패 - 3차 시도 예정');
+        }
+      }, 2000);
+      
+      // 3차 시도: 최종 시도
+      setTimeout(() => {
+        console.log('[handleMemberSelect] 🚨 3차 InfoWindow 생성 시도 (최종)');
+        const opened = openInfoWindowForSelectedMember();
+        console.log('[handleMemberSelect] 🚨 최종 InfoWindow 생성 결과:', opened);
+      }, 3000);
     }
   
     if (map && window.naver?.maps) {
       // 장소 선택 중이거나 마커 클릭인 경우 지도 이동 방지 (마커 클릭에서 이미 이동했음)
-      if (isLocationSelectingRef.current || fromMarkerClick) {
-        console.log('[handleMemberSelect] 지도 이동 건너뜀 - 장소 선택 중:', isLocationSelectingRef.current, '마커 클릭:', fromMarkerClick);
+      // 단, 사이드바에서 멤버를 선택한 경우(openLocationPanel=true)에는 지도 이동 허용
+      if ((isLocationSelectingRef.current || fromMarkerClick) && !openLocationPanel) {
+        console.log('[handleMemberSelect] 지도 이동 건너뜀 - 장소 선택 중:', isLocationSelectingRef.current, '마커 클릭:', fromMarkerClick, '패널 열기:', openLocationPanel);
       } else {
         // 선택된 멤버의 위치로 지도 중심 이동 (바텀시트에 가려지지 않도록 아래쪽으로 오프셋)
         console.log('[handleMemberSelect] 멤버 선택:', newlySelectedMember?.name || '알 수 없음', '위치 데이터:', {
@@ -2357,13 +2461,29 @@ export default function LocationPage() {
           mapInstance: !!map
         });
           
-          // 부드러운 이동을 위해 panTo 사용
-          map.panTo(position, {
-            duration: 800,
-            easing: 'easeOutCubic'
-          });
+          // 🚨 지도 이동 강화: 여러 번의 명령으로 확실하게 이동
+          console.log('[handleMemberSelect] 🚨 지도 이동 강화 시작');
           
-          // 적절한 줌 레벨 설정 (너무 가깝지 않게)
+          // 1. 즉시 setCenter로 이동
+          map.setCenter(position);
+          console.log('[handleMemberSelect] 1차 setCenter 완료');
+          
+          // 2. 부드러운 panTo 이동
+          setTimeout(() => {
+            map.panTo(position, {
+              duration: 800,
+              easing: 'easeOutCubic'
+            });
+            console.log('[handleMemberSelect] 2차 panTo 완료');
+          }, 100);
+          
+          // 3. 한 번 더 setCenter로 확실하게 이동
+          setTimeout(() => {
+            map.setCenter(position);
+            console.log('[handleMemberSelect] 3차 setCenter 완료');
+          }, 300);
+          
+          // 4. 적절한 줌 레벨 설정
           const currentZoom = map.getZoom();
           if (currentZoom < 14) {
             setTimeout(() => {
@@ -2371,33 +2491,154 @@ export default function LocationPage() {
                 duration: 400,
                 easing: 'easeOutQuad'
               });
-            }, 400);
+              console.log('[handleMemberSelect] 줌 레벨 조정 완료');
+            }, 500);
           }
           
-          console.log('[handleMemberSelect] 지도 중심 이동 완료');
+          console.log('[handleMemberSelect] 🚨 지도 중심 이동 강화 완료');
         
         // 사이드바는 유지하여 사용자가 장소 리스트를 볼 수 있도록 함
         // 멤버 선택 시 사이드바 자동 닫기 비활성화
         console.log('[handleMemberSelect] 사이드바 유지 - 장소 리스트 표시를 위해');
         
-        // 기존 InfoWindow 처리 (마커 클릭인 경우 제외)
-        if (infoWindow && !fromMarkerClick) {
+        // 🚨 멤버 선택 시 기존 InfoWindow 처리 강화
+        if (infoWindow) {
           try {
-            // 기존 InfoWindow가 장소 InfoWindow인 경우에만 닫기
-            const infoWindowContent = infoWindow.getContent();
-            const isMemberInfoWindow = infoWindowContent && infoWindowContent.includes('member-info-window-container');
-            
-            if (!isMemberInfoWindow) {
-              infoWindow.close();
-              console.log('[handleMemberSelect] 기존 장소 InfoWindow 닫기');
-            } else {
-              console.log('[handleMemberSelect] 기존 멤버 InfoWindow 유지');
-            }
+            // 기존 InfoWindow 닫기 (새 멤버 선택 시에는 모든 InfoWindow 닫기)
+            infoWindow.close();
+            setInfoWindow(null);
+            console.log('[handleMemberSelect] 🚨 기존 InfoWindow 닫기 완료');
           } catch (error) {
-            console.error('[handleMemberSelect] InfoWindow 처리 오류:', error);
+            console.error('[handleMemberSelect] InfoWindow 닫기 오류:', error);
+            setInfoWindow(null);
           }
-        } else if (fromMarkerClick) {
-          console.log('[handleMemberSelect] 마커 클릭으로 인한 호출 - InfoWindow 닫지 않음');
+        }
+        
+        // 🚨 멤버 선택 시 기존 멤버 마커 테두리 색상 초기화
+        if (memberMarkers.length > 0) {
+          memberMarkers.forEach((memberMarker, index) => {
+            try {
+              if (memberMarker && typeof memberMarker.setIcon === 'function') {
+                const member = groupMembers[index];
+                if (member && member.isSelected) {
+                  // 이전에 선택된 멤버의 테두리를 파란색으로 변경
+                  const photoForMarker = getSafeImageUrl(member.photo, member.mt_gender, member.original_index);
+                  
+                  const newIconContent = `
+                    <div style="position: relative; text-align: center;">
+                      <div style="width: 28px; height: 28px; background-color: white; border: 2px solid #0113A3; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+                        <img 
+                          src="${photoForMarker}" 
+                          alt="${member.name}" 
+                          style="width: 100%; height: 100%; object-fit: cover;" 
+                          onerror="this.src='/images/avatar1.png'"
+                        />
+                      </div>
+                      <div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.8); color: white; padding: 2px 6px; border-radius: 4px; white-space: nowrap; font-size: 10px; font-weight: 500;">
+                        ${member.name}
+                      </div>
+                    </div>
+                  `;
+                  
+                  memberMarker.setIcon({
+                    content: newIconContent,
+                    size: new window.naver.maps.Size(60, 50),
+                    anchor: new window.naver.maps.Point(30, 32)
+                  });
+                  
+                  console.log(`[handleMemberSelect] 🚨 이전 멤버 마커 테두리 색상 초기화: ${member.name} -> 파란색`);
+                }
+              }
+            } catch (error) {
+              console.warn(`[handleMemberSelect] 멤버 마커 ${index} 테두리 색상 초기화 실패:`, error);
+            }
+          });
+        }
+        
+        // 🚨 같은 멤버 재선택 시 장소 마커 색상 초기화
+        if (isSelectingSameMember && (markers.length > 0 || locationMarkersRef.current.length > 0)) {
+          try {
+            const allLocationMarkers = [...markers, ...locationMarkersRef.current];
+            allLocationMarkers.forEach(marker => {
+              if (marker && typeof marker.setIcon === 'function') {
+                // 장소 마커를 파란색으로 초기화
+                const markerKey = (marker as any).__key;
+                const locationId = markerKey?.split('-')[0]; // 키에서 location ID 추출
+                
+                if (locationId) {
+                  const newIconContent = `
+                    <div style="position: relative; text-align: center;">
+                      <div style="
+                        width: 26px;
+                        height: 26px;
+                        background-color: white;
+                        border: 2px solid #6366f1;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                        transition: all 0.3s ease;
+                      ">
+                        <svg width="14" height="14" fill="#6366f1" viewBox="0 0 24 24">
+                          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"/>
+                        </svg>
+                      </div>
+                      <div style="
+                        position: absolute;
+                        bottom: -18px;
+                        left: 50%;
+                        transform: translateX(-50%);
+                        background-color: rgba(0,0,0,0.7);
+                        color: white;
+                        padding: 2px 5px;
+                        border-radius: 3px;
+                        white-space: nowrap;
+                        font-size: 10px;
+                        font-weight: 500;
+                        max-width: 80px;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                      ">
+                        ${marker.getTitle() || '장소'}
+                      </div>
+                    </div>
+                  `;
+                  
+                  marker.setIcon({
+                    content: newIconContent,
+                    size: new window.naver.maps.Size(26, 26),
+                    anchor: new window.naver.maps.Point(13, 13)
+                  });
+                  
+                  console.log(`[handleMemberSelect] 🚨 같은 멤버 재선택 - 장소 마커 색상 초기화: ${locationId} -> 파란색`);
+                }
+              }
+            });
+            console.log('[handleMemberSelect] 🚨 같은 멤버 재선택 - 장소 마커 색상 초기화 완료');
+          } catch (error) {
+            console.error('[handleMemberSelect] 장소 마커 색상 초기화 실패:', error);
+          }
+        }
+        
+        // 🚨 멤버 선택 시 기존 장소 마커 제거 (새 멤버의 장소만 표시하기 위해)
+        if (markers.length > 0 || locationMarkersRef.current.length > 0) {
+          try {
+            // 현재 표시된 장소 마커들 제거
+            const allLocationMarkers = [...markers, ...locationMarkersRef.current];
+            allLocationMarkers.forEach(marker => {
+              if (marker && typeof marker.setMap === 'function') {
+                marker.setMap(null);
+              }
+            });
+            
+            // 상태 초기화
+            setMarkers([]);
+            locationMarkersRef.current = [];
+            console.log('[handleMemberSelect] 🚨 기존 장소 마커 제거 완료:', allLocationMarkers.length, '개');
+          } catch (error) {
+            console.error('[handleMemberSelect] 장소 마커 제거 오류:', error);
+          }
         }
         
         // 멤버 InfoWindow 생성 및 표시 (마커 클릭 및 사이드바 선택 시 모두 생성)
@@ -2702,10 +2943,10 @@ export default function LocationPage() {
             id: loc.slt_idx ? loc.slt_idx.toString() : Date.now().toString(),
             name: loc.name || loc.slt_title || '제목 없음',
             address: loc.address || loc.slt_add || '주소 정보 없음',
-            coordinates: [
-              parseFloat(String(loc.slt_long || '0')) || 0,
-              parseFloat(String(loc.slt_lat || '0')) || 0
-            ] as [number, number],
+                      coordinates: [
+            parseFloat(String(loc.slt_lat || '0')) || 0,
+            parseFloat(String(loc.slt_long || '0')) || 0
+          ] as [number, number],
             category: loc.category || '기타',
             memo: loc.memo || '',
             favorite: loc.favorite || false,
@@ -2769,30 +3010,19 @@ export default function LocationPage() {
     }
   };
 
-  // 200ms 디바운스 래퍼
-  const handleMemberSelect = useMemo(() => {
-    let timer: any = null;
-    let lastArgs: any[] | null = null;
-    const delay = 200;
-    const invoke = () => {
-      if (!lastArgs) return;
-      // @ts-ignore
-      handleMemberSelectCore(...lastArgs);
-      lastArgs = null;
-    };
-    return (
-      memberId: string,
-      openLocationPanel = false,
-      membersArray?: GroupMember[],
-      fromMarkerClick = false,
-      clickedMarker?: any,
-      onlyShowInfoWindow = false
-    ) => {
-      lastArgs = [memberId, openLocationPanel, membersArray, fromMarkerClick, clickedMarker, onlyShowInfoWindow];
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(invoke, delay);
-    };
-  }, [selectedMemberIdRef.current]);
+  // 🚨 멤버 선택 핸들러 - 즉시 실행 (디바운스 제거)
+  const handleMemberSelect = (
+    memberId: string,
+    openLocationPanel = false,
+    membersArray?: GroupMember[],
+    fromMarkerClick = false,
+    clickedMarker?: any,
+    onlyShowInfoWindow = false
+  ) => {
+    console.log('[handleMemberSelect] 즉시 실행:', memberId, '패널 열기:', openLocationPanel, '마커 클릭:', fromMarkerClick);
+    // 즉시 handleMemberSelectCore 호출
+    handleMemberSelectCore(memberId, openLocationPanel, membersArray, fromMarkerClick, clickedMarker, onlyShowInfoWindow);
+  };
 
   // 뷰 변경 핸들러 (자동 완성 스크롤)
   const handleViewChange = (view: 'selectedMemberPlaces' | 'otherMembersPlaces') => {
@@ -3711,7 +3941,7 @@ export default function LocationPage() {
   // 모든 마커 생성은 updateAllMarkers 함수에서 통합 관리됨
 
   // 통합 마커 업데이트 함수 - 멤버 마커와 선택된 멤버의 장소 마커만 동시 생성
-  const updateAllMarkers = (members: GroupMember[], locations: LocationData[] | null, forceUpdate: boolean = false) => {
+  const updateAllMarkers = useCallback((members: GroupMember[], locations: LocationData[] | null, forceUpdate: boolean = false) => {
     // 🚨 디버깅: 파라미터 상세 로깅
     console.log('[updateAllMarkers] 🚨 파라미터 상세 분석:', {
       membersCount: members?.length || 0,
@@ -3773,27 +4003,43 @@ export default function LocationPage() {
       호출시간: new Date().toLocaleTimeString()
     });
 
-    // 🚨 선택된 장소가 있고 강제 업데이트가 아닌 경우 마커 제거 최소화
-    const hasSelectedLocation = !!selectedLocationIdRef.current;
-    const shouldPreserveMarkers = hasSelectedLocation && !forceUpdate;
+    // 🚨 마커 보존 조건 개선: 멤버 변경 시에는 항상 마커 교체
+    const hasSelectedMember = !!selectedMember;
+    const currentSelectedMemberLocations = selectedMemberSavedLocations || [];
+    const hasSelectedMemberLocations = currentSelectedMemberLocations.length > 0;
+    
+    // 🚨 마커 보존 조건 개선: forceUpdate일 때만 기존 마커 제거
+    const shouldPreserveMarkers = !forceUpdate;
+    
+    // 🚨 마커 제거 조건: 강제 업데이트일 때만 제거
+    const shouldRemoveMarkers = forceUpdate;
     
     if (shouldPreserveMarkers) {
-      console.log('[updateAllMarkers] 🚨 선택된 장소 보존 모드 - 기존 마커 유지:', selectedLocationIdRef.current);
+      console.log('[updateAllMarkers] 🚨 마커 보존 모드 - 기존 마커 유지:', {
+        forceUpdate,
+        reason: '일반 업데이트 모드'
+      });
     } else {
-      // 기존 장소 마커는 모두 제거하여 "선택된 멤버의 장소만" 남도록 보장
-      const markersToRemove = locationMarkersRef.current?.length ? locationMarkersRef.current : markers;
-      if (markersToRemove.length > 0) {
-        try {
-          markersToRemove.forEach(marker => {
-            if (marker && typeof marker.setMap === 'function' && marker.getMap && marker.getMap()) {
-              marker.setMap(null);
-            }
-          });
-          setMarkers([]);
-          locationMarkersRef.current = [];
-          console.log('[updateAllMarkers] 기존 장소 마커 전부 제거 완료:', markersToRemove.length);
-        } catch (e) {
-          console.warn('[updateAllMarkers] 기존 장소 마커 제거 중 경고:', e);
+      console.log('[updateAllMarkers] 🚨 마커 교체 모드 - 기존 마커 제거:', {
+        forceUpdate,
+        reason: '강제 업데이트 모드'
+      });
+      
+      if (shouldRemoveMarkers) {
+        const markersToRemove = locationMarkersRef.current?.length ? locationMarkersRef.current : markers;
+        if (markersToRemove.length > 0) {
+          try {
+            markersToRemove.forEach(marker => {
+              if (marker && typeof marker.setMap === 'function' && marker.getMap && marker.getMap()) {
+                marker.setMap(null);
+              }
+            });
+            setMarkers([]);
+            locationMarkersRef.current = [];
+            console.log('[updateAllMarkers] 기존 장소 마커 제거 완료:', markersToRemove.length);
+          } catch (e) {
+            console.warn('[updateAllMarkers] 기존 장소 마커 제거 중 경고:', e);
+          }
         }
       }
     }
@@ -3860,9 +4106,35 @@ export default function LocationPage() {
           const key = String(member.id || member.name || index);
           let marker = (memberMarkers.find(m => (m as any).__key === key) || null) as any;
           if (marker && marker.setPosition) {
+            // 🚨 기존 마커 재사용 시 색상과 z-index 업데이트
             const pos = createSafeLatLng(lat, lng);
             pos && marker.setPosition(pos);
             marker.setZIndex && marker.setZIndex(member.isSelected ? 200 : 150);
+            
+            // 🚨 기존 마커의 테두리 색상 업데이트
+            const newIconContent = `
+              <div style="position: relative; text-align: center;">
+                <div style="width: 28px; height: 28px; background-color: white; border: 2px solid ${borderColor}; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+                  <img 
+                    src="${photoForMarker}" 
+                    alt="${member.name}" 
+                    style="width: 100%; height: 100%; object-fit: cover;" 
+                    onerror="this.src='/images/avatar1.png'"
+                  />
+                </div>
+                <div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.8); color: white; padding: 2px 6px; border-radius: 4px; white-space: nowrap; font-size: 10px; font-weight: 500;">
+                  ${member.name}
+                </div>
+              </div>
+            `;
+            
+            marker.setIcon({
+              content: newIconContent,
+              size: new window.naver.maps.Size(60, 50),
+              anchor: new window.naver.maps.Point(30, 32)
+            });
+            
+            console.log(`[updateAllMarkers] 🚨 기존 멤버 마커 색상 업데이트: ${member.name} (선택됨: ${member.isSelected}, 색상: ${borderColor})`);
           } else {
             marker = new window.naver.maps.Marker({
             position: position,
@@ -3952,187 +4224,14 @@ export default function LocationPage() {
     
     // *** 핵심 로직: 모든 멤버의 장소 마커 생성 (선택된 멤버의 장소는 강조 표시) ***
     if (Array.isArray(locations) && locations.length > 0) {
-      // 🚨 마커 보존 모드일 때 기존 마커 재사용 여부 결정
+      // 🚨 보존 모드에서는 기존 마커 재사용, 강제 업데이트에서는 새 마커 생성
       const shouldReuseExistingMarkers = shouldPreserveMarkers && locationMarkersRef.current.length > 0;
       
       if (shouldReuseExistingMarkers) {
-        console.log('[updateAllMarkers] 🚨 마커 보존 모드 - 기존 장소 마커 재사용:', locationMarkersRef.current.length);
-        
-        // 🚨 기존 마커들의 지도 표시 상태 확인 및 복구
-        locationMarkersRef.current.forEach((marker, index) => {
-          const markerKey = (marker as any).__key;
-          const isOnMap = marker.getMap && marker.getMap();
-          
-          console.log(`[updateAllMarkers] 🚨 기존 마커 ${index + 1} 상태 확인:`, {
-            hasKey: !!markerKey,
-            key: markerKey,
-            isOnMap: !!isOnMap,
-            hasGetMapMethod: !!marker.getMap,
-            title: marker.getTitle ? marker.getTitle() : '제목없음'
-          });
-          
-          // 🚨 마커가 지도에 표시되지 않았다면 다시 설정
-          if (!isOnMap && map) {
-            console.warn(`[updateAllMarkers] 🚨 기존 마커가 지도에 없음 - 다시 설정:`, markerKey);
-            marker.setMap(map);
-          }
-          
-          if (markerKey) {
-            const [, locationId] = markerKey.split('_');
-            const isSelected = selectedLocationIdRef.current === locationId;
-            
-            // 🚨 마커 스타일 업데이트 (색상, 크기, z-index)
-            if (isSelected) {
-              console.log('[updateAllMarkers] 🚨 기존 마커 선택 상태 업데이트:', locationId);
-              
-              // 🚨 선택된 마커 스타일 업데이트
-              const markerColor = '#ef4444'; // 빨간색
-              const markerSize = '28px';
-              const markerZIndex = 220;
-              
-              // 마커 아이콘 업데이트
-              const newIconContent = `
-                <div style="position: relative; text-align: center;">
-                  <div style="
-                    width: ${markerSize};
-                    height: ${markerSize};
-                    background-color: white;
-                    border: 2px solid ${markerColor};
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-                    transition: all 0.3s ease;
-                  ">
-                    <svg width="16" height="16" fill="${markerColor}" viewBox="0 0 24 24">
-                      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"/>
-                    </svg>
-                  </div>
-                  <div style="
-                    position: absolute;
-                    top: 50%;
-                    left: 50%;
-                    transform: translate(-50%, -50%);
-                    width: 40px;
-                    height: 40px;
-                    background: rgba(236, 72, 153, 0.2);
-                    border-radius: 50%;
-                    animation: selectedGlow 2s ease-in-out infinite;
-                    z-index: -1;
-                  "></div>
-                  <style>
-                    @keyframes selectedGlow {
-                      0%, 100% { 
-                        transform: translate(-50%, -50%) scale(0.8);
-                        opacity: 0.4; 
-                      }
-                      50% {
-                        transform: translate(-50%, -50%) scale(1.2);
-                        opacity: 0.1; 
-                      }
-                    }
-                  </style>
-                  <div style="
-                    position: absolute;
-                    bottom: -18px;
-                    left: 50%;
-                    transform: translateX(-50%);
-                    background-color: rgba(0,0,0,0.7);
-                    color: white;
-                    padding: 2px 5px;
-                    border-radius: 3px;
-                    white-space: nowrap;
-                    font-size: 10px;
-                    font-weight: 500;
-                    max-width: 80px;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                  ">
-                    ${marker.getTitle ? marker.getTitle() : '제목없음'}
-                  </div>
-                </div>
-              `;
-              
-              // 마커 아이콘 업데이트
-              marker.setIcon({
-                content: newIconContent,
-                size: new window.naver.maps.Size(parseInt(markerSize), parseInt(markerSize)),
-                anchor: new window.naver.maps.Point(parseInt(markerSize) / 2, parseInt(markerSize) / 2)
-              });
-              
-              // z-index 업데이트
-              marker.setZIndex(markerZIndex);
-              
-              console.log('[updateAllMarkers] 🚨 선택된 마커 스타일 업데이트 완료:', {
-                locationId,
-                color: markerColor,
-                size: markerSize,
-                zIndex: markerZIndex
-              });
-            } else {
-              // 🚨 선택되지 않은 마커는 기본 스타일로 업데이트
-              const markerColor = '#6366f1'; // 파란색
-              const markerSize = '26px';
-              const markerZIndex = 160;
-              
-              const newIconContent = `
-                <div style="position: relative; text-align: center;">
-                  <div style="
-                    width: ${markerSize};
-                    height: ${markerSize};
-                    background-color: white;
-                    border: 2px solid ${markerColor};
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-                    transition: all 0.3s ease;
-                  ">
-                    <svg width="14" height="14" fill="${markerColor}" viewBox="0 0 24 24">
-                      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"/>
-                    </svg>
-                  </div>
-                  <div style="
-                    position: absolute;
-                    bottom: -18px;
-                    left: 50%;
-                    transform: translateX(-50%);
-                    background-color: rgba(0,0,0,0.7);
-                    color: white;
-                    padding: 2px 5px;
-                    border-radius: 3px;
-                    white-space: nowrap;
-                    font-size: 10px;
-                    font-weight: 500;
-                    max-width: 80px;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                  ">
-                    ${marker.getTitle ? marker.getTitle() : '제목없음'}
-                  </div>
-                </div>
-              `;
-              
-              marker.setIcon({
-                content: newIconContent,
-                size: new window.naver.maps.Size(parseInt(markerSize), parseInt(markerSize)),
-                anchor: new window.naver.maps.Point(parseInt(markerSize) / 2, parseInt(markerSize) / 2)
-              });
-              
-              marker.setZIndex(markerZIndex);
-            }
-          }
-        });
-        
-        // 기존 마커들을 새 배열에 복사
+        console.log('[updateAllMarkers] 🚨 마커 보존 모드 - 기존 마커 재사용:', locationMarkersRef.current.length);
+        // 기존 마커들을 새 배열에 복사하여 보존
         newLocationMarkers.push(...locationMarkersRef.current);
-        
-        console.log('[updateAllMarkers] 🚨 기존 마커 재사용 완료:', {
-          재사용된마커수: newLocationMarkers.length,
-          기존배열길이: locationMarkersRef.current.length
-        });
+        console.log('[updateAllMarkers] 🚨 기존 마커 보존 완료:', newLocationMarkers.length, '개');
       }
       console.log('[updateAllMarkers] 🎯 모든 멤버의 장소 마커 생성 시작:', {
         selectedMemberName: selectedMember?.name || '없음',
@@ -4148,7 +4247,7 @@ export default function LocationPage() {
         
         // 모든 멤버의 장소를 반영하되, 선택된 멤버의 장소는 강조 표시
         locations.forEach((location, index) => {
-        const [lng, lat] = location.coordinates;
+        const [lat, lng] = location.coordinates;
         
         console.log(`[updateAllMarkers] 장소 ${index + 1}/${locations.length} 처리:`, {
           id: location.id,
@@ -4199,6 +4298,14 @@ export default function LocationPage() {
             selectedLocationId: selectedLocationIdRef.current,
             isMarkerSelected: isMarkerSelected,
             willBeRed: isMarkerSelected
+          });
+        } else {
+          console.log('[updateAllMarkers] 🔵 선택되지 않은 장소 마커 생성:', {
+            locationId: location.id,
+            locationName: location.name,
+            selectedLocationId: selectedLocationIdRef.current,
+            isMarkerSelected: isMarkerSelected,
+            willBeBlue: !isMarkerSelected
           });
         }
         
@@ -4367,7 +4474,7 @@ export default function LocationPage() {
           try {
             const marker = new window.naver.maps.Marker({
           position,
-          map,
+          map: map, // 🚨 map 객체 명시적 전달
           title: location.name,
           icon: {
             content: `
@@ -4486,6 +4593,50 @@ export default function LocationPage() {
           setSelectedLocationId(location.id);
           selectedLocationIdRef.current = location.id;
           
+          // 🚨 장소 마커 선택 시 멤버 마커 테두리 색상 변경
+          if (memberMarkers.length > 0) {
+            memberMarkers.forEach((memberMarker, index) => {
+              try {
+                if (memberMarker && typeof memberMarker.setIcon === 'function') {
+                  // 현재 선택된 멤버인지 확인
+                  const isCurrentMemberSelected = groupMembers[index]?.isSelected;
+                  
+                  if (isCurrentMemberSelected) {
+                    // 선택된 멤버의 테두리를 파란색으로 변경
+                    const member = groupMembers[index];
+                    const photoForMarker = getSafeImageUrl(member.photo, member.mt_gender, member.original_index);
+                    
+                    const newIconContent = `
+                      <div style="position: relative; text-align: center;">
+                        <div style="width: 28px; height: 28px; background-color: white; border: 2px solid #0113A3; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+                          <img 
+                            src="${photoForMarker}" 
+                            alt="${member.name}" 
+                            style="width: 100%; height: 100%; object-fit: cover;" 
+                            onerror="this.src='/images/avatar1.png'"
+                          />
+                        </div>
+                        <div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.8); color: white; padding: 2px 6px; border-radius: 4px; white-space: nowrap; font-size: 10px; font-weight: 500;">
+                          ${member.name}
+                        </div>
+                      </div>
+                    `;
+                    
+                    memberMarker.setIcon({
+                      content: newIconContent,
+                      size: new window.naver.maps.Size(60, 50),
+                      anchor: new window.naver.maps.Point(30, 32)
+                    });
+                    
+                    console.log(`[updateAllMarkers] 🔴 장소 마커 선택 시 멤버 마커 테두리 색상 변경: ${member.name} -> 파란색`);
+                  }
+                }
+              } catch (error) {
+                console.warn(`[updateAllMarkers] 멤버 마커 ${index} 테두리 색상 변경 실패:`, error);
+              }
+            });
+          }
+          
           console.log('[updateAllMarkers] 🔴 선택 상태 즉시 업데이트:', {
             이전선택: previousSelectedId,
             현재선택: location.id,
@@ -4493,7 +4644,7 @@ export default function LocationPage() {
           });
 
           // 🚨 장소 위치로 지도 중심 이동
-          const [lng, lat] = location.coordinates;
+          const [lat, lng] = location.coordinates;
           const position = createSafeLatLng(lat, lng);
           if (!position) {
             console.warn('[updateAllMarkers] 장소 마커 클릭 LatLng 생성 실패');
@@ -4699,16 +4850,12 @@ export default function LocationPage() {
             // 마커 생성 실패해도 계속 진행
           }
         }
-        });
-      } else {
-        // 🚨 보존 모드일 때는 새 마커 생성하지 않음
-        console.log('[updateAllMarkers] 🚨 마커 보존 모드 - 새 마커 생성 건너뜀');
+        }); // 🚨 locations.forEach 루프 닫기
       } // 🚨 새로운 장소 마커 생성 모드 종료
       
       console.log('[updateAllMarkers] 🎯 모든 멤버의 장소 마커 처리 완료:', {
-        selectedMemberName: selectedMember?.name || '없음',
         totalMarkersCreated: newLocationMarkers.length,
-        expectedCount: locations.length,
+        expectedCount: locations?.length || 0,
         createdMarkers: newLocationMarkers.map((marker, idx) => ({
           index: idx,
           title: marker.getTitle?.() || '제목없음',
@@ -4719,11 +4866,9 @@ export default function LocationPage() {
       // *** 중요: 선택된 멤버가 없거나 장소 데이터가 없으면 장소 마커를 생성하지 않음 ***
       // 이제 모든 멤버의 장소 마커를 표시하므로 이 조건은 거의 발생하지 않음
       console.log('[updateAllMarkers] 🚫 장소 마커 생성 건너뜀:', {
-        hasSelectedMember: !!selectedMember,
-        selectedMemberName: selectedMember?.name || '없음',
         hasLocations: !!locations,
         locationsLength: Array.isArray(locations) ? locations.length : 0,
-        reason: !selectedMember ? '선택된 멤버 없음' : !Array.isArray(locations) ? '장소 데이터가 배열이 아님' : '장소 배열 비어있음'
+        reason: !Array.isArray(locations) ? '장소 데이터가 배열이 아님' : '장소 배열 비어있음'
       });
     }
 
@@ -4740,25 +4885,27 @@ export default function LocationPage() {
     setMemberMarkers(newMemberMarkers);
     memberMarkersRef.current = newMemberMarkers;
     
-    // 🚨 장소 마커는 보존 모드가 아닐 때만 업데이트
-    if (!shouldPreserveMarkers) {
-      setMarkers(newLocationMarkers);
-      locationMarkersRef.current = newLocationMarkers;
-      console.log('[updateAllMarkers] 🚨 장소 마커 상태 업데이트 완료');
-    } else {
-      console.log('[updateAllMarkers] 🚨 보존 모드 - 장소 마커 상태 업데이트 건너뜀');
+    // 🚨 장소 마커는 항상 업데이트 (보존 모드여도 새 마커로 교체)
+    setMarkers(newLocationMarkers);
+    locationMarkersRef.current = newLocationMarkers;
+    console.log('[updateAllMarkers] 🚨 장소 마커 상태 업데이트 완료');
+    
+    // 🚨 마커 생성 후 일정 시간 동안은 제거되지 않도록 보호
+    if (newLocationMarkers.length > 0) {
+      // 🚨 마커 보호 플래그 설정
+      // 🚨 간단한 마커 생성 완료 로깅
+      console.log('[updateAllMarkers] 🚨 마커 생성 완료 - 안정화됨');
     }
     
     console.log('[updateAllMarkers] ✅ 완료 - 멤버 마커:', newMemberMarkers.length, '개, 모든 멤버의 장소 마커:', newLocationMarkers.length, '개');
-    console.log('[updateAllMarkers] ✅ 핵심 결과: 모든 멤버의 장소 마커 표시, 선택된 멤버', selectedMember?.name || '없음', '의 장소는 강조 표시');
+    console.log('[updateAllMarkers] ✅ 핵심 결과: 모든 멤버의 장소 마커 표시 완료');
     
     // 실제 지도에 표시된 마커 확인
     setTimeout(() => {
       console.log('[updateAllMarkers] 📍 지도 상태 확인 (500ms 후):', {
         지도준비상태: !!map,
         현재멤버마커배열길이: memberMarkers.length,
-        현재장소마커배열길이: markers.length,
-        선택된멤버: selectedMember?.name || '없음'
+        현재장소마커배열길이: markers.length
       });
     }, 500);
     
@@ -4777,147 +4924,9 @@ export default function LocationPage() {
     
     // 첫번째 멤버 선택 완료 (InfoWindow는 표시하지 않음)
     console.log('[updateAllMarkers] 멤버 마커 생성 완료 - InfoWindow 표시하지 않음');
-  };
+  }, [map, isMapReady, memberMarkers, markers, infoWindow, selectedLocationIdRef, lastMarkersSignatureRef, parseCoordinate, createSafeLatLng, selectedMemberSavedLocations]);
 
-  // 멤버 마커와 선택된 멤버의 장소 마커를 동시 업데이트
-  useEffect(() => {
-    console.log('[useEffect 통합 마커] 조건 체크:', {
-      hasMap: !!map,
-      isMapReady,
-      groupMembersCount: groupMembers.length,
-      selectedMemberIdRef: selectedMemberIdRef.current,
-      hasSelectedLocations: !!(selectedMemberSavedLocations && selectedMemberSavedLocations.length > 0),
-      locationsCount: selectedMemberSavedLocations?.length || 0,
-      locations: selectedMemberSavedLocations?.map(loc => ({ 
-        id: loc.id, 
-        name: loc.name, 
-        coordinates: loc.coordinates,
-        hasValidCoords: loc.coordinates[0] !== 0 && loc.coordinates[1] !== 0
-      })) || []
-    });
-    
-    if (map && isMapReady && groupMembers.length > 0) {
-      console.log('[useEffect 통합 마커] 📍 통합 마커 업데이트 시작 (중복 호출 방지됨)');
-      console.log('[useEffect 통합 마커] 전달할 데이터:', {
-        멤버수: groupMembers.length,
-        선택된멤버: groupMembers.find(m => m.isSelected)?.name || '없음',
-        장소수: selectedMemberSavedLocations?.length || 0,
-        장소데이터: selectedMemberSavedLocations
-      });
-      
-      // 🚨 핵심 수정: 장소 데이터가 로드된 후에만 마커 업데이트 실행
-      const selMember = groupMembers.find(m => m.isSelected);
-      if (!selMember) {
-        console.log('[useEffect 통합 마커] 선택된 멤버 없음 - 마커 업데이트 건너뜀');
-        return;
-      }
-      
-      // 🚨 멤버 선택 직후에는 장소 데이터가 아직 로드되지 않았을 수 있음
-      // groupMembers에 저장된 장소 데이터를 우선 사용
-      const allLocations: LocationData[] = [];
-      
-      // 🚨 사용자 요구사항: 선택된 멤버의 장소만 표시, 다른 멤버 장소는 표시하지 않음
-      if (selMember.savedLocations && selMember.savedLocations.length > 0) {
-        allLocations.push(...selMember.savedLocations);
-        console.log('[useEffect 통합 마커] 선택된 멤버 장소 데이터 사용:', selMember.savedLocations.length, '개');
-      }
-      
-      // 🚨 제거: 다른 멤버들의 장소 데이터는 수집하지 않음 (사용자 요구사항)
-      console.log('[useEffect 통합 마커] 🚨 다른 멤버 장소 제외 - 선택된 멤버만 표시');
-      
-      console.log('[useEffect 통합 마커] 🚨 선택된 멤버의 장소 데이터 수집 완료:', {
-        선택된멤버: selMember.name,
-        선택된멤버장소수: selMember.savedLocations?.length || 0,
-        장소수: allLocations.length,
-        선택된멤버장소: allLocations.map(loc => ({ name: loc.name, id: loc.id }))
-      });
-      
-      // 🚨 마커 업데이트 실행 (실패 방지를 위한 재시도 로직)
-      const executeMarkerUpdate = () => {
-        try {
-          // 🚨 선택된 장소가 있다면 강제 업데이트 방지 (선택 상태 보존)
-          const hasSelectedLocation = !!selectedLocationIdRef.current;
-          const shouldForceUpdate = !hasSelectedLocation; // 선택된 장소가 없을 때만 강제 업데이트
-          
-          console.log('[useEffect 통합 마커] 🚨 업데이트 모드 결정:', {
-            hasSelectedLocation,
-            selectedLocationId: selectedLocationIdRef.current,
-            shouldForceUpdate,
-            updateMode: shouldForceUpdate ? '강제 업데이트' : '일반 업데이트'
-          });
-          
-          updateAllMarkers(groupMembers, allLocations, shouldForceUpdate);
-          console.log('[useEffect 통합 마커] ✅ 마커 업데이트 성공');
-        } catch (error) {
-          console.error('[useEffect 통합 마커] ❌ 마커 업데이트 실패:', error);
-          // 100ms 후 재시도
-          setTimeout(() => {
-            try {
-              console.log('[useEffect 통합 마커] 🔄 마커 업데이트 재시도');
-              // 🚨 재시도 시에도 선택 상태 고려
-              const hasSelectedLocation = !!selectedLocationIdRef.current;
-              const shouldForceUpdate = !hasSelectedLocation;
-              updateAllMarkers(groupMembers, allLocations, shouldForceUpdate);
-            } catch (retryError) {
-              console.error('[useEffect 통합 마커] ❌ 마커 업데이트 재시도 실패:', retryError);
-            }
-          }, 100);
-        }
-      };
-      
-      executeMarkerUpdate();
-      
-      // 첫번째 멤버 선택 완료 후 InfoWindow 자동 생성
-      const selectedMember2 = groupMembers.find(m => m.isSelected);
-      if (selectedMember2 && isFirstMemberSelectionComplete && !infoWindow && !isLocationSelectingRef.current) {
-        // 마커 업데이트 완료 후 InfoWindow 생성
-        // 단, 장소 선택 중이면 멤버 InfoWindow 생성을 방지
-        setTimeout(() => {
-          const memberIndex = groupMembers.findIndex(m => m.id === selectedMember2.id);
-          if (memberIndex >= 0 && memberMarkers.length > memberIndex && memberMarkers[memberIndex]) {
-            console.log('[useEffect 통합 마커] 선택된 멤버 InfoWindow 자동 생성:', selectedMember2.name);
-            createMemberInfoWindow(selectedMember2, memberMarkers[memberIndex]);
-          } else {
-            console.log('[useEffect 통합 마커] InfoWindow 생성 실패 - 마커 없음:', {
-              memberIndex,
-              totalMarkers: memberMarkers.length,
-              selectedMember: selectedMember2.name
-            });
-          }
-        }, 300); // 마커 생성 완료를 위한 지연
-      } else if (selectedMember2 && isFirstMemberSelectionComplete && isLocationSelectingRef.current) {
-        console.log('[useEffect 통합 마커] 장소 선택 중 - 멤버 InfoWindow 생성 방지');
-      }
-    } else if (map && isMapReady && groupMembers.length === 0) {
-      // 🚨 그룹 멤버가 없을 때만 마커 제거 (안전 조건 추가)
-      console.log('[useEffect 통합 마커] 그룹 멤버 없음 - 기존 마커들 제거');
-      memberMarkers.forEach(marker => {
-        if (marker && marker.setMap) {
-          marker.setMap(null);
-        }
-      });
-      markers.forEach(marker => marker.setMap(null));
-      setMemberMarkers([]);
-      setMarkers([]);
-      if (infoWindow) {
-        infoWindow.close();
-        setInfoWindow(null);
-      }
-    } else if (!map || !isMapReady) {
-      // 🚨 지도가 준비되지 않은 경우는 로그만 남기고 마커 제거하지 않음
-      console.log('[useEffect 통합 마커] 지도 준비 대기 중 - 마커 제거하지 않음:', {
-        hasMap: !!map,
-        isMapReady,
-        groupMembersCount: groupMembers.length
-      });
-    } else {
-      console.log('[useEffect 통합 마커] 조건 미충족:', {
-        hasMap: !!map,
-        isMapReady,
-        groupMembersLength: groupMembers.length
-      });
-    }
-  }, [groupMembers, selectedMemberSavedLocations, selectedMemberIdRef.current, selectedLocationIdRef.current]); // 🚨 선택된 장소 상태 보존을 위해 selectedLocationIdRef.current 추가
+
 
   // 선택된 멤버 변경 또는 멤버 마커 생성 후 InfoWindow 자동 표시 보강
   useEffect(() => {
@@ -5059,104 +5068,25 @@ export default function LocationPage() {
       }
     });
   };
-  // 선택된 장소가 변경될 때만 마커 스타일 업데이트 (무한 루프 방지)
-  useEffect(() => {
-    if (selectedMemberSavedLocations && selectedMemberSavedLocations.length > 0 && markers.length > 0) {
-      console.log('[useEffect] 선택된 장소 변경으로 마커 스타일 업데이트:', selectedLocationIdRef.current);
-      
-      // 기존 마커들의 스타일만 업데이트 (재생성 없이)
-      markers.forEach((marker, index) => {
-        const location = selectedMemberSavedLocations[index];
-        if (location) {
-          const isSelected = selectedLocationIdRef.current === location.id;
-          
-          // 마커 아이콘 업데이트
-          marker.setIcon({
-            content: `
-              <div style="position: relative; text-align: center;">
-                <div style="
-                  width: 28px;
-                  height: 28px;
-                  background-color: white;
-                  border: 2px solid ${isSelected ? '#ef4444' : '#6366f1'};
-                  border-radius: 50%;
-                  overflow: hidden;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-                  position: relative;
-                  z-index: ${isSelected ? '200' : '150'};
-                  transition: all 0.3s ease;
-                ">
-                  <svg width="16" height="16" fill="${isSelected ? '#ef4444' : '#6366f1'}" viewBox="0 0 24 24">
-                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"/>
-                  </svg>
-                </div>
-                
-                ${isSelected ? `
-                  <div style="
-                    position: absolute;
-                    top: 50%;
-                    left: 50%;
-                    transform: translate(-50%, -50%);
-                    width: 40px;
-                    height: 40px;
-                    background: rgba(245, 158, 11, 0.2);
-                    border-radius: 50%;
-                    animation: selectedGlow 2s ease-in-out infinite;
-                    z-index: 140;
-                  "></div>
-                ` : ''}
-                
-                <div style="
-                  position: absolute;
-                  bottom: -18px;
-                  left: 50%;
-                  transform: translateX(-50%);
-                  background-color: rgba(0,0,0,0.7);
-                  color: white;
-                  padding: 2px 5px;
-                  border-radius: 3px;
-                  white-space: nowrap;
-                  font-size: 10px;
-                  font-weight: 500;
-                  max-width: 80px;
-                  overflow: hidden;
-                  text-overflow: ellipsis;
-                ">
-                  ${location.name}
-                </div>
-              </div>
-              
-              <style>
-                @keyframes selectedGlow {
-                  0%, 100% { 
-                    transform: translate(-50%, -50%) scale(0.8); 
-                    opacity: 0.4; 
-                  }
-                  50% { 
-                    transform: translate(-50%, -50%) scale(1.2); 
-                    opacity: 0.1; 
-                  }
-                }
-              </style>
-            `,
-            anchor: new window.naver.maps.Point(16, 16)
-          });
-          
-          // z-index 업데이트
-          marker.setZIndex(isSelected ? 200 : 150);
-        }
-      });
-    }
-  }, [selectedLocationId]); // selectedLocationId가 변경될 때만 실행
 
 
-  // 멤버 InfoWindow 생성 함수
+
+  // 🚨 멤버 InfoWindow 생성 함수 - 강화된 버전
   const createMemberInfoWindow = (member: GroupMember, marker: NaverMarker) => {
-    if (!map || !window.naver?.maps) return;
+    if (!map || !window.naver?.maps) {
+      console.warn('[createMemberInfoWindow] 맵 또는 네이버 맵스 API 없음');
+      return;
+    }
     
+    console.log('[createMemberInfoWindow] 🚨 시작:', {
+      memberName: member.name,
+      memberId: member.id,
+      hasMarker: !!marker,
+      markerOnMap: marker?.getMap ? !!marker.getMap() : false,
+      mapReady: !!map
+    });
+    
+    // 🚨 getSafeImageUrl 호출 수정 - 올바른 파라미터 전달
     const photoUrl = getSafeImageUrl(member.photo, member.mt_gender, member.original_index);
     const lat = member.mlt_lat || 0;
     const lng = member.mlt_long || 0;
@@ -5245,26 +5175,7 @@ export default function LocationPage() {
               ">그룹 멤버</p>
             </div>
           </div>
-          
-
-          
-          ${member.mlt_gps_time ? `
-            <div style="margin-bottom: 4px;">
-              <div style="display: flex; align-items: center; font-size: 11px; color: #9ca3af;">
-                <span style="flex-shrink: 0;">🕐 </span>
-                <span style="margin-left: 2px;">마지막 업데이트: ${formatTimeToMMDDHHMM(member.mlt_gps_time)}</span>
-              </div>
-            </div>
-          ` : ''}
-          
-          ${member.mlt_battery ? `
-            <div style="margin-bottom: 4px;">
-              <div style="display: flex; align-items: center; font-size: 11px; color: #9ca3af;">
-                <span style="flex-shrink: 0;">🔋 </span>
-                <span style="margin-left: 2px;">배터리: ${member.mlt_battery}%</span>
-              </div>
-            </div>
-          ` : ''}
+ 
         </div>
       `,
       borderWidth: 0,
@@ -5273,19 +5184,43 @@ export default function LocationPage() {
       pixelOffset: new window.naver.maps.Point(0, -20)
     });
 
+    // 🚨 InfoWindow 열기 시도 - 강화된 에러 처리
     try {
+      console.log('[createMemberInfoWindow] 🚨 InfoWindow 열기 시도:', {
+        markerExists: !!marker,
+        markerOnMap: marker?.getMap ? !!marker.getMap() : false,
+        markerPosition: marker?.getPosition ? marker.getPosition() : null
+      });
+      
+      // 1차 시도: 마커로 열기
       memberInfoWindow.open(map, marker);
       setInfoWindow(memberInfoWindow);
+      console.log('[createMemberInfoWindow] 🚨 InfoWindow 마커로 열기 성공');
+      
     } catch (e) {
-      // 마커 레퍼런스가 준비되지 않은 경우 좌표로 직접 오픈 시도
-      const latVal = parseCoordinate(member.mlt_lat) || parseCoordinate(member.location?.lat);
-      const lngVal = parseCoordinate(member.mlt_long) || parseCoordinate(member.location?.lng);
-      const pos = latVal !== null && lngVal !== null ? createSafeLatLng(latVal, lngVal) : null;
-      if (pos) {
-        try {
-          memberInfoWindow.open(map, pos as any);
-          setInfoWindow(memberInfoWindow);
-        } catch (_) {}
+      console.warn('[createMemberInfoWindow] 🚨 마커로 InfoWindow 열기 실패:', e);
+      
+      // 2차 시도: 좌표로 직접 열기
+      try {
+        const latVal = parseCoordinate(member.mlt_lat) || parseCoordinate(member.location?.lat);
+        const lngVal = parseCoordinate(member.mlt_long) || parseCoordinate(member.location?.lng);
+        
+        console.log('[createMemberInfoWindow] 🚨 좌표로 열기 시도:', { latVal, lngVal });
+        
+        if (latVal !== null && lngVal !== null) {
+          const pos = createSafeLatLng(latVal, lngVal);
+          if (pos) {
+            memberInfoWindow.open(map, pos as any);
+            setInfoWindow(memberInfoWindow);
+            console.log('[createMemberInfoWindow] 🚨 InfoWindow 좌표로 열기 성공');
+          } else {
+            console.warn('[createMemberInfoWindow] 🚨 좌표 생성 실패');
+          }
+        } else {
+          console.warn('[createMemberInfoWindow] 🚨 유효한 좌표 없음');
+        }
+      } catch (e2) {
+        console.error('[createMemberInfoWindow] 🚨 좌표로 열기도 실패:', e2);
       }
     }
     
@@ -5741,7 +5676,7 @@ export default function LocationPage() {
     
     // 지도에서 해당 장소로 이동 (사이드바 닫기 전에 먼저 실행)
     if (map && location.coordinates) {
-      const [lng, lat] = location.coordinates;
+              const [lat, lng] = location.coordinates;
       
       if (lat && lng && lat !== 0 && lng !== 0) {
         console.log('[handleLocationSelect] 지도 이동:', { lat, lng });
@@ -6220,58 +6155,6 @@ export default function LocationPage() {
     };
   }, [infoWindow]);
 
-  // ESC 키로 InfoWindow 닫기
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && infoWindow && infoWindow.getMap && infoWindow.getMap()) {
-        console.log('[ESC] InfoWindow 닫기');
-        infoWindow.close();
-        setInfoWindow(null);
-      }
-    };
-
-    if (infoWindow) {
-      document.addEventListener('keydown', handleKeyDown);
-      return () => {
-        document.removeEventListener('keydown', handleKeyDown);
-      };
-    }
-  }, [infoWindow]);
-
-  // InfoWindow 관련 전역 함수 등록
-  useEffect(() => {
-    // InfoWindow 닫기 함수 등록
-    (window as any).closeInfoWindow = () => {
-      console.log('[window.closeInfoWindow] InfoWindow 닫기 함수 호출됨');
-      if (infoWindow) {
-        infoWindow.close();
-        setInfoWindow(null);
-        console.log('[window.closeInfoWindow] InfoWindow 닫기 완료');
-      } else {
-        console.log('[window.closeInfoWindow] 닫을 InfoWindow가 없음');
-      }
-    };
-
-    // 장소 삭제 함수 등록 (기존 함수 유지)
-    (window as any).handleLocationDeleteFromInfoWindow = (locationId: string) => {
-      console.log('[window.handleLocationDeleteFromInfoWindow] 장소 삭제 함수 호출됨:', locationId);
-      const targetLocation = otherMembersSavedLocations.find(loc => 
-        (loc.slt_idx ? loc.slt_idx.toString() : loc.id) === locationId
-      );
-      
-      if (targetLocation) {
-        openLocationDeleteModal(targetLocation);
-      } else {
-        console.error('[window.handleLocationDeleteFromInfoWindow] 삭제할 장소를 찾을 수 없음:', locationId);
-      }
-    };
-
-    // 컴포넌트 언마운트 시 전역 함수 정리
-    return () => {
-      delete (window as any).closeInfoWindow;
-      delete (window as any).handleLocationDeleteFromInfoWindow;
-    };
-  }, [infoWindow, otherMembersSavedLocations]);
   return (
     <>
       <style jsx global>{mobileStyles}</style>
@@ -6912,11 +6795,9 @@ export default function LocationPage() {
                             // 즉시 사이드바 닫기 (상태 변경 순서 중요)
                             setIsSidebarOpen(false);
                             
-                            // 짧은 딜레이 후 멤버 선택 (InfoWindow 포함)
-                            setTimeout(() => {
-                              handleMemberSelect(member.id, false, groupMembers, false, null, false);
-                              console.log('[사이드바 멤버 선택] 멤버 선택 완료 - InfoWindow 생성 포함:', member.name);
-                            }, 100);
+                            // 즉시 멤버 선택 실행 (InfoWindow 포함, 지도 이동 활성화)
+                            handleMemberSelect(member.id, true, groupMembers, false, null, false);
+                            console.log('[사이드바 멤버 선택] 멤버 선택 완료 - InfoWindow 생성 포함, 지도 이동 활성화:', member.name);
                           }}
                           className={`p-3 rounded-xl border cursor-pointer transition-all duration-200 ${
                             member.isSelected 

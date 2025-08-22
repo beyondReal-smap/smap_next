@@ -422,11 +422,6 @@ export default function ClientLayout({
 
       // 네비게이션 바를 보여줄 페이지들만 지정 - 화이트리스트 방식
   const shouldHideNavBar = React.useMemo(() => {
-    // 🚨 home 화면은 무조건 고정 (항상 네비게이션 바 표시)
-    if (pathname === '/home') {
-      return false; // home 화면에서는 네비게이션 바를 숨기지 않음
-    }
-    
     // 네비게이션바를 보여줄 페이지들 (정확한 경로 매칭)
     const showNavBarPages = ['/home', '/group', '/schedule', '/location', '/activelog'];
     

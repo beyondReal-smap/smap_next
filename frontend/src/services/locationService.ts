@@ -78,8 +78,8 @@ const locationService = {
         name: item.slt_title || '제목 없음',
         address: item.slt_add || '주소 없음',
         coordinates: [
-          parseFloat(item.slt_long || '0'), 
-          parseFloat(item.slt_lat || '0')
+          parseFloat(item.slt_lat || '0'),   // 🚨 위도(latitude)를 먼저
+          parseFloat(item.slt_long || '0')   // 🚨 경도(longitude)를 나중에
         ] as [number, number],
         category: '기타', // 백엔드 응답에 category 필드가 있다면 사용 (예: item.slt_category)
         memo: '', // 백엔드 응답에 memo 필드가 있다면 사용 (예: item.slt_memo)
