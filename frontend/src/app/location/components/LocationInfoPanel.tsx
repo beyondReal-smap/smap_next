@@ -2,14 +2,15 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { LocationData } from '../hooks/useLocationUI';
 
 interface LocationInfoPanelProps {
   isOpen: boolean;
   onClose: () => void;
-  location: any;
+  location: LocationData;
   onEdit: () => void;
-  onDelete: () => void;
-  onSave: (location: any) => void;
+  onDelete: (location: LocationData) => void;
+  onSave: (location: LocationData) => void;
   isEditing: boolean;
   onCancelEdit: () => void;
 }
@@ -24,11 +25,11 @@ export const LocationInfoPanel: React.FC<LocationInfoPanelProps> = ({
   isEditing,
   onCancelEdit
 }) => {
-  const [editedLocation, setEditedLocation] = useState(location);
+  const [editedLocation, setEditedLocation] = useState<LocationData>(location);
 
   // 편집 모드에서 위치 정보 변경 처리
   const handleInputChange = (field: string, value: any) => {
-    setEditedLocation(prev => ({
+    setEditedLocation((prev: LocationData) => ({
       ...prev,
       [field]: value
     }));
@@ -43,6 +44,11 @@ export const LocationInfoPanel: React.FC<LocationInfoPanelProps> = ({
   const handleCancelEdit = () => {
     setEditedLocation(location);
     onCancelEdit();
+  };
+
+  // 삭제 처리
+  const handleDelete = () => {
+    onDelete(location);
   };
 
   if (!location) return null;
@@ -75,7 +81,7 @@ export const LocationInfoPanel: React.FC<LocationInfoPanelProps> = ({
                       </svg>
                     </button>
                     <button
-                      onClick={onDelete}
+                      onClick={handleDelete}
                       className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                       title="삭제"
                     >

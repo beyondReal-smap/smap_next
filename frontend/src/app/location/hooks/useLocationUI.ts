@@ -2,6 +2,18 @@
 
 import { useState, useCallback } from 'react';
 
+// 위치 데이터 인터페이스 정의
+export interface LocationData {
+  id?: string;
+  name: string;
+  address: string;
+  coordinates: [number, number];
+  category: string;
+  memo: string;
+  favorite: boolean;
+  notifications: boolean;
+}
+
 interface UseLocationUIProps {
   onMemberSelect: (memberId: string, openLocationPanel?: boolean, membersArray?: any[], fromMarkerClick?: boolean, clickedMarker?: any, onlyShowInfoWindow?: boolean) => void;
   onLocationSelect: (location: any) => void;
@@ -65,7 +77,7 @@ export const useLocationUI = ({ onMemberSelect, onLocationSelect }: UseLocationU
   const [locationSearchModalCaller, setLocationSearchModalCaller] = useState<'panel' | 'modal' | null>(null);
   
   // 새 장소 입력 상태
-  const [newLocation, setNewLocation] = useState<any>({
+  const [newLocation, setNewLocation] = useState<LocationData>({
     name: '',
     address: '',
     coordinates: [0, 0],

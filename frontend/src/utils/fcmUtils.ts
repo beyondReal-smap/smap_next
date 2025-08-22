@@ -156,7 +156,7 @@ export const updateFCMTokenAfterLogin = async (
         const result = await fcmTokenService.initializeAndCheckUpdateToken(userId);
         
         if (result.success) {
-          console.log(`[FCM Utils] ✅ ${loginType} 로그인 후 FCM 토큰 업데이트 완료:`, result.message);
+          console.log('[FCM Utils] ✅ FCM 토큰 업데이트 완료:', result.token_preview ? `토큰: ${result.token_preview}...` : '성공');
           
           // 자동 갱신 서비스 시작
           try {
@@ -167,7 +167,12 @@ export const updateFCMTokenAfterLogin = async (
           }
         }
         
-        return result;
+        return {
+          success: result.success,
+          token: result.token_preview || undefined,
+          error: result.error || undefined,
+          message: result.message
+        };
       } else {
         return {
           success: false,
@@ -216,12 +221,17 @@ export const forceRefreshFCMToken = async (userId: number): Promise<{ success: b
         const result = await fcmTokenService.forceTokenRefresh(userId);
         
         if (result.success) {
-          console.log('[FCM Utils] ✅ FCM 토큰 강제 갱신 완료:', result.token ? `토큰: ${result.token.substring(0, 20)}...` : '성공');
+          console.log('[FCM Utils] ✅ FCM 토큰 강제 갱신 완료:', result.token_preview ? `토큰: ${result.token_preview.substring(0, 20)}...` : '성공');
         } else {
           console.warn('[FCM Utils] ⚠️ FCM 토큰 강제 갱신 실패:', result.error);
         }
         
-        return result;
+        return {
+          success: result.success,
+          token: result.token_preview || undefined,
+          error: result.error || undefined,
+          message: result.message
+        };
       } else {
         return {
           success: false,

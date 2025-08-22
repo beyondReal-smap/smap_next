@@ -350,7 +350,7 @@ export default function MarkerManager({
             font-size: 13px; 
             color: #6b7280;
             line-height: 1.4;
-          ">${member.address || '위치 정보 없음'}</div>
+          ">위치: ${member.location ? `${member.location.lat.toFixed(6)}, ${member.location.lng.toFixed(6)}` : '위치 정보 없음'}</div>
         </div>
         
         <div style="

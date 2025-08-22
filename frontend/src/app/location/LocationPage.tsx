@@ -6,7 +6,7 @@ import { LocationSidebar } from './components/LocationSidebar';
 import { LocationInfoPanel } from './components/LocationInfoPanel';
 import { Modal, LocationDeleteModal, ToastModal } from './components/LocationModals';
 import { useLocationData } from './hooks/useLocationData';
-import { useLocationUI } from './hooks/useLocationUI';
+import { useLocationUI, LocationData } from './hooks/useLocationUI';
 import { validateLocationData, normalizeLocationData } from './utils/locationUtils';
 
 export default function LocationPage() {
@@ -15,7 +15,7 @@ export default function LocationPage() {
   const [isMapInitialized, setIsMapInitialized] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
-  const [selectedLocation, setSelectedLocation] = useState<any | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null);
 
   // 데이터 관리 훅
   const {
@@ -168,7 +168,7 @@ export default function LocationPage() {
     setClickedCoordinates([lat, lng]);
     
     // 새 위치 정보 초기화
-    setNewLocation(prev => ({
+    setNewLocation((prev: LocationData) => ({
       ...prev,
       coordinates: [lat, lng]
     }));
@@ -273,7 +273,7 @@ export default function LocationPage() {
   // 에러 처리
   useEffect(() => {
     if (error) {
-      showToastModal('error', '오류 발생', error.message || '알 수 없는 오류가 발생했습니다.');
+      showToastModal('error', '오류 발생', error);
     }
   }, [error, showToastModal]);
 
