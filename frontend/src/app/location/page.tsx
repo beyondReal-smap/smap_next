@@ -1867,22 +1867,8 @@ export default function LocationPage() {
     
     console.log('[handleGroupSelect] 새로운 그룹 선택 - 데이터 초기화 및 새 그룹 로딩 시작');
     
-    // 그룹 변경 시 즉시 지도 초기화 (멤버 마커도 제거)
-    if (map && memberMarkers.length > 0) {
-      console.log('[handleGroupSelect] 기존 멤버 마커 즉시 제거 시작:', memberMarkers.length, '개');
-      memberMarkers.forEach((marker, index) => {
-        try {
-          if (marker && typeof marker.setMap === 'function' && marker.getMap()) {
-            marker.setMap(null);
-            console.log('[handleGroupSelect] 멤버 마커 제거 성공:', index);
-          }
-        } catch (error) {
-          console.warn('[handleGroupSelect] 멤버 마커 제거 실패:', index, error);
-        }
-      });
-      console.log('[handleGroupSelect] 기존 멤버 마커 지도에서 제거 완료');
-    }
-    setMemberMarkers([]); // 상태 배열도 확실히 비움
+    // 🚨 그룹 변경 시 멤버 마커는 보존하고 장소 마커만 제거 (멤버 마커 사라짐 문제 해결)
+    console.log('[handleGroupSelect] 🚨 멤버 마커 보존 - 장소 마커만 제거');
     
     // 장소 마커도 안전하게 제거
     if (markers.length > 0) {
@@ -4059,6 +4045,7 @@ export default function LocationPage() {
           
           let marker = (memberMarkers.find(m => (m as any).__key === key) || null) as any;
           if (marker && marker.setPosition) {
+            // 🚨 기존 마커 재사용 - 위치와 색상 업데이트
             const pos = createSafeLatLng(lat, lng);
             pos && marker.setPosition(pos);
             marker.setZIndex && marker.setZIndex(member.isSelected ? 200 : 150);
@@ -4086,7 +4073,7 @@ export default function LocationPage() {
               anchor: new window.naver.maps.Point(30, 32)
             });
             
-            console.log(`[updateAllMarkers] 🚨 기존 멤버 마커 색상 업데이트: ${member.name} (${borderColor})`);
+            console.log(`[updateAllMarkers] 🚨 기존 멤버 마커 재사용 및 업데이트: ${member.name} (${borderColor})`);
           } else {
             marker = new window.naver.maps.Marker({
             position: position,
@@ -4880,9 +4867,21 @@ export default function LocationPage() {
       보존모드: shouldPreserveMarkers
     });
     
-    // 멤버 마커는 항상 업데이트
-    setMemberMarkers(newMemberMarkers);
-    memberMarkersRef.current = newMemberMarkers;
+    // 🚨 멤버 마커는 기존 것을 보존하면서 새로 생성된 것과 병합
+    const existingMemberMarkers = memberMarkers.filter(existingMarker => {
+      const existingKey = (existingMarker as any).__key;
+      return !newMemberMarkers.some(newMarker => (newMarker as any).__key === existingKey);
+    });
+    
+    const mergedMemberMarkers = [...existingMemberMarkers, ...newMemberMarkers];
+    setMemberMarkers(mergedMemberMarkers);
+    memberMarkersRef.current = mergedMemberMarkers;
+    
+    console.log('[updateAllMarkers] 🚨 멤버 마커 병합 완료:', {
+      기존마커수: existingMemberMarkers.length,
+      새마커수: newMemberMarkers.length,
+      병합된마커수: mergedMemberMarkers.length
+    });
     
     // 🚨 장소 마커는 보존 모드가 아닐 때만 업데이트
     if (!shouldPreserveMarkers) {

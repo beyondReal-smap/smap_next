@@ -3,6 +3,7 @@
 export interface FCMTokenUpdateResponse {
   success: boolean;
   message: string;
+  error?: string | null;
   mt_idx: number | null;
   has_token: boolean;
   token_preview: string | null;
@@ -162,6 +163,7 @@ export class FCMTokenService {
     return {
       success: true,
       message: '네이티브에서 FCM 토큰 관리',
+      error: null,
       mt_idx,
       has_token: true,
       token_preview: 'native_managed'
@@ -173,6 +175,7 @@ export class FCMTokenService {
     return {
       success: true,
       message: '네이티브에서 FCM 토큰 관리',
+      error: null,
       mt_idx,
       has_token: true,
       token_preview: 'native_managed'
@@ -184,6 +187,7 @@ export class FCMTokenService {
     return {
       success: true,
       message: '네이티브에서 FCM 토큰 관리',
+      error: null,
       mt_idx,
       has_token: true,
       token_preview: 'native_managed'
@@ -195,6 +199,7 @@ export class FCMTokenService {
     return {
       success: true,
       message: '네이티브에서 FCM 토큰 관리',
+      error: null,
       mt_idx,
       has_token: true,
       token_preview: 'native_managed'
