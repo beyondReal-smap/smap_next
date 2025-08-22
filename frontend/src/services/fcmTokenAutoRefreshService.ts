@@ -118,31 +118,16 @@ class FCMTokenAutoRefreshService {
       
       const startTime = Date.now();
       
-      // FCM 토큰 갱신 실행
-      try {
-        const { fcmTokenService } = await import('./fcmTokenService');
-        if (fcmTokenService) {
-          const result = await fcmTokenService.initializeAndCheckUpdateToken(this.config.userId);
-          
-          const endTime = Date.now();
-          const duration = endTime - startTime;
-          
-          if (result.success) {
-            console.log(`[FCM Auto Refresh] ✅ 토큰 갱신 성공 (${duration}ms):`, result.message);
-            this.retryCount = 0; // 성공 시 재시도 카운트 리셋
-            this.lastRefreshTime = Date.now();
-          } else {
-            console.warn(`[FCM Auto Refresh] ⚠️ 토큰 갱신 실패 (${duration}ms):`, result.error);
-            this.handleRefreshFailure();
-          }
-        } else {
-          console.warn('[FCM Auto Refresh] ⚠️ fcmTokenService 초기화 실패');
-          this.handleRefreshFailure();
-        }
-      } catch (error) {
-        console.error('[FCM Auto Refresh] ❌ fcmTokenService import 실패:', error);
-        this.handleRefreshFailure();
-      }
+      // 🚨 Firebase 토큰 생성 로직 제거 - 네이티브에서 처리
+      console.log('[FCM Auto Refresh] 🚨 Firebase 토큰 생성 로직 제거됨 - 네이티브에서 FCM 토큰 관리');
+      
+      // 네이티브에서 FCM 토큰을 관리하므로 갱신 완료로 처리
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+      
+      console.log(`[FCM Auto Refresh] ✅ 네이티브 FCM 토큰 관리 - 갱신 완료 (${duration}ms)`);
+      this.retryCount = 0; // 성공 시 재시도 카운트 리셋
+      this.lastRefreshTime = Date.now();
       
     } catch (error) {
       console.error('[FCM Auto Refresh] ❌ 토큰 갱신 중 예상치 못한 오류:', error);

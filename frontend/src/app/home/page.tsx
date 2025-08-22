@@ -1112,55 +1112,21 @@ export default function HomePage() {
     if (isLoggedIn && user && user.mt_idx && !authLoading) {
       console.log('🔔 [FCM] 사용자 정보 변경 감지 - FCM 토큰 자동 업데이트');
       
-      // 약간의 지연 후 FCM 토큰 업데이트 실행 (다른 초기화 작업 완료 대기)
+      // 🚨 Firebase 토큰 생성 로직 제거 - 네이티브에서 관리
       const fcmUpdateTimeout = setTimeout(async () => {
         try {
-          console.log('🔔 [FCM] FCM 토큰 업데이트 시작 (사용자 ID:', user.mt_idx, ')');
-          
-          const { fcmTokenService } = await import('@/services/fcmTokenService');
-          if (fcmTokenService) {
-            const result: any = await fcmTokenService.initializeAndCheckUpdateToken(user.mt_idx);
-            if (result.success) {
-              console.log('✅ [FCM] FCM 토큰 업데이트 성공:', result.message);
-              // 성공 시 사용자 정보에 FCM 토큰 상태 반영
-              console.log('📱 [FCM] FCM 토큰이 서버에 저장되어 푸시 알림 수신 가능');
-            } else {
-              console.warn('⚠️ [FCM] FCM 토큰 업데이트 실패:', result.error);
-              console.log('🔥 [FCM] FCM 토큰 업데이트 실패해도 계속 진행');
-            }
-          } else {
-            console.warn('⚠️ [FCM] FCM 토큰 서비스를 찾을 수 없음');
-          }
+          console.log('🚨 [FCM] Firebase 토큰 생성 로직 제거됨 - 네이티브에서 FCM 토큰 관리');
+          console.log('📱 [FCM] 네이티브에서는 window.updateFCMToken() 함수를 사용하여 FCM 토큰 업데이트를 수행하세요');
         } catch (error: any) {
-          console.error('❌ [FCM] FCM 토큰 업데이트 중 오류:', error);
-          console.log('🔥 [FCM] FCM 토큰 업데이트 오류가 발생해도 계속 진행');
+          console.error('❌ [FCM] FCM 처리 중 오류:', error);
         }
       }, 3000); // 3초 후 실행 (더 안정적인 초기화 대기)
       
-      // 주기적 FCM 토큰 검증 및 업데이트 (10분마다)
+      // 🚨 Firebase 토큰 생성 로직 제거 - 네이티브에서 관리
       const periodicFCMCheck = setInterval(async () => {
         if (user && user.mt_idx) {
-          console.log('🔔 [FCM] 주기적 토큰 검증 시작 (사용자 ID:', user.mt_idx, ')');
-          try {
-            const { fcmTokenService } = await import('@/services/fcmTokenService');
-            if (fcmTokenService) {
-              // 간단한 토큰 유효성 검사
-              const currentToken = fcmTokenService.getCurrentFCMToken();
-              if (!currentToken) {
-                console.log('🔄 [FCM] 토큰이 없음 - 재생성 시작');
-                const result: any = await fcmTokenService.initializeAndCheckUpdateToken(user.mt_idx);
-                if (result.success) {
-                  console.log('✅ [FCM] 주기적 토큰 재생성 완료:', result.message);
-                } else {
-                  console.warn('⚠️ [FCM] 주기적 토큰 재생성 실패:', result.error);
-                }
-              } else {
-                console.log('✅ [FCM] 주기적 토큰 검증 완료: 토큰 존재함');
-              }
-            }
-          } catch (error: any) {
-            console.error('❌ [FCM] 주기적 토큰 검증 실패:', error);
-          }
+          console.log('🚨 [FCM] Firebase 토큰 생성 로직 제거됨 - 네이티브에서 FCM 토큰 관리');
+          console.log('📱 [FCM] 네이티브에서는 window.updateFCMToken() 함수를 사용하여 FCM 토큰 업데이트를 수행하세요');
         }
       }, 10 * 60 * 1000); // 10분마다 (더 긴 간격으로 변경)
       
@@ -1206,39 +1172,10 @@ export default function HomePage() {
       const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown';
       const hasAndroidInterface = typeof window.AndroidPermissions !== 'undefined';
       
-      // 🔔 FCM 토큰 자동 업데이트 (로그인 완료 후)
+      // 🚨 Firebase 토큰 생성 로직 제거 - 네이티브에서 관리
       if (user && user.mt_idx) {
-        console.log('🔔 [FCM] 로그인 완료 - FCM 토큰 강제 업데이트 시작');
-        
-        // 권한이 준비될 때까지 대기
-        const checkPermissionAndUpdate = async () => {
-          if ((window as any).__SMAP_PERM_ALLOW__) {
-            console.log('✅ [FCM] 권한 준비됨, FCM 토큰 강제 업데이트 실행');
-            try {
-              const { fcmTokenService } = await import('@/services/fcmTokenService');
-              if (fcmTokenService) {
-                // 로그인 완료 후이므로 강제 업데이트 사용
-                const result: any = await fcmTokenService.forceUpdateOnLogin(user.mt_idx);
-                if (result.success) {
-                  console.log('✅ [FCM] FCM 토큰 강제 업데이트 성공:', result.message);
-                  // 성공 시 member_t 테이블의 mt_token_id가 업데이트됨
-                  console.log('📱 [FCM] FCM 토큰이 서버에 저장되어 푸시 알림 수신 가능');
-                } else {
-                  console.warn('⚠️ [FCM] FCM 토큰 강제 업데이트 실패:', result.error);
-                  console.log('🔥 [FCM] FCM 토큰 강제 업데이트 실패해도 계속 진행');
-                }
-              }
-            } catch (error: any) {
-              console.error('❌ [FCM] FCM 토큰 강제 업데이트 중 오류:', error);
-              console.log('🔥 [FCM] FCM 토큰 강제 업데이트 오류가 발생해도 계속 진행');
-            }
-          } else {
-            console.log('⏳ [FCM] 권한 대기 중, 2초 후 재시도...');
-            setTimeout(checkPermissionAndUpdate, 2000);
-          }
-        };
-        
-        checkPermissionAndUpdate();
+        console.log('🚨 [FCM] Firebase 토큰 생성 로직 제거됨 - 네이티브에서 FCM 토큰 관리');
+        console.log('📱 [FCM] 네이티브에서는 window.updateFCMToken() 함수를 사용하여 FCM 토큰 업데이트를 수행하세요');
       }
       
       console.log('🔥 [HOME] 환경 체크 상세:', {

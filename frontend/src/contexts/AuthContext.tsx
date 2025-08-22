@@ -278,18 +278,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             // 🔔 로그인 상태 유지 진입 시에도 FCM 토큰 체크/업데이트 수행 (iOS 네이티브/웹 환경 모두 시도)
             setTimeout(async () => {
               try {
-                console.log('[AUTH] 🔔 초기화 경로 FCM 토큰 체크/업데이트 시작');
-                const { fcmTokenService } = await import('@/services/fcmTokenService');
-                if (fcmTokenService) {
-                  const result = await fcmTokenService.initializeAndCheckUpdateToken(userData.mt_idx);
-                  if (result.success) {
-                    console.log('[AUTH] ✅ 초기화 경로 FCM 토큰 체크/업데이트 완료:', result.message);
-                  } else {
-                    console.warn('[AUTH] ⚠️ 초기화 경로 FCM 토큰 체크/업데이트 실패:', result.error);
-                  }
-                }
+                console.log('[AUTH] 🚨 FCM 토큰 생성 로직 제거됨 - 네이티브에서 관리');
+                // 🚨 Firebase 토큰 생성 로직 제거 - 네이티브에서 FCM 토큰 관리
+                console.log('[AUTH] 📱 네이티브에서는 window.updateFCMToken() 함수를 사용하여 FCM 토큰 업데이트를 수행하세요');
               } catch (e) {
-                console.warn('[AUTH] FCM 초기화 경로 처리 중 예외(무시):', e);
+                console.warn('[AUTH] FCM 처리 중 예외(무시):', e);
               }
             }, 1000);
             // 프리로딩은 백그라운드에서 비동기적으로 실행 (결과를 기다리지 않음)
@@ -347,20 +340,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           fcmToken = (window as any).nativeFCMToken as string;
           console.log('[AUTH] iOS 네이티브 FCM 토큰 사용 (미리보기):', fcmToken.substring(0, 20) + '...');
         } else {
-          // 웹 환경에서 토큰 획득 (가능한 경우)
-          try {
-            const { fcmTokenService } = await import('@/services/fcmTokenService');
-            if (fcmTokenService) {
-              fcmToken = await fcmTokenService.getFCMToken();
-              if (fcmToken) {
-                console.log('[AUTH] 웹 FCM 토큰 확보 (미리보기):', fcmToken.substring(0, 20) + '...');
-              } else {
-                console.log('[AUTH] FCM 토큰 없음 - 로그인은 계속 진행');
-              }
-            }
-          } catch (e) {
-            console.log('[AUTH] FCM 토큰 서비스 초기화 실패 - 로그인은 계속 진행');
-          }
+                  // 🚨 Firebase 토큰 생성 로직 제거 - 네이티브에서 관리
+        console.log('[AUTH] 🚨 Firebase 토큰 생성 로직 제거됨 - 네이티브에서 FCM 토큰 관리');
+        console.log('[AUTH] 📱 네이티브에서는 window.updateFCMToken() 함수를 사용하여 FCM 토큰 업데이트를 수행하세요');
         }
       } catch (e) {
         console.warn('[AUTH] FCM 토큰 확보 실패 - 로그인은 계속 진행:', e);
@@ -381,27 +363,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // 위치 추적 서비스에 사용자 로그인 알림
         locationTrackingService.onUserLogin();
         
-        // FCM 토큰 체크 및 업데이트 (백그라운드에서 실행)
+        // 🚨 Firebase 토큰 생성 로직 제거 - 네이티브에서 관리
         setTimeout(async () => {
-          console.log('[AUTH] 🔔 로그인 후 FCM 토큰 강제 업데이트 시작');
-          if (response.data?.member?.mt_idx) {
-            try {
-              const { fcmTokenService } = await import('@/services/fcmTokenService');
-              if (fcmTokenService) {
-                // 로그인 시이므로 강제 업데이트 사용
-                const result = await fcmTokenService.forceUpdateOnLogin(response.data.member.mt_idx);
-                if (result.success) {
-                  console.log('[AUTH] ✅ FCM 토큰 강제 업데이트 완료:', result.message);
-                } else {
-                  console.warn('[AUTH] ⚠️ FCM 토큰 강제 업데이트 실패:', result.error);
-                }
-              }
-            } catch (error: any) {
-              console.error('[AUTH] ❌ FCM 토큰 강제 업데이트 중 오류:', error);
-            }
-          } else {
-            console.warn('[AUTH] ⚠️ FCM 토큰 강제 업데이트 스킵: mt_idx 없음');
-          }
+          console.log('[AUTH] 🚨 Firebase 토큰 생성 로직 제거됨 - 네이티브에서 FCM 토큰 관리');
+          console.log('[AUTH] 📱 네이티브에서는 window.updateFCMToken() 함수를 사용하여 FCM 토큰 업데이트를 수행하세요');
         }, 1000); // 로그인 후 1초 지연
 
         // 즉시 로딩 완료 처리 (사용자가 홈으로 빠르게 이동할 수 있도록)

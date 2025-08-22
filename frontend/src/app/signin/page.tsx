@@ -2227,23 +2227,13 @@ const SignInPage = () => {
               await refreshAuthState();
               
               // 4. FCM 토큰 체크 및 업데이트 (백그라운드에서 실행)
+              // 🚨 Firebase 토큰 생성 로직 제거 - 네이티브에서 관리
               setTimeout(async () => {
                 try {
-                  console.log('[GOOGLE LOGIN] 🔔 FCM 토큰 강제 업데이트 시작');
-                  const { fcmTokenService } = await import('@/services/fcmTokenService');
-                  
-                  if (data.user?.mt_idx && fcmTokenService) {
-                    const fcmResult = await fcmTokenService.forceUpdateOnLogin(data.user.mt_idx);
-                    if (fcmResult.success) {
-                      console.log('[GOOGLE LOGIN] ✅ FCM 토큰 강제 업데이트 완료:', fcmResult.message);
-                    } else {
-                      console.warn('[GOOGLE LOGIN] ⚠️ FCM 토큰 강제 업데이트 실패:', fcmResult.error);
-                    }
-                  } else {
-                    console.warn('[GOOGLE LOGIN] ⚠️ FCM 토큰 강제 업데이트 스킵: mt_idx 없음 또는 fcmTokenService 초기화 실패');
-                  }
+                  console.log('[GOOGLE LOGIN] 🚨 Firebase 토큰 생성 로직 제거됨 - 네이티브에서 FCM 토큰 관리');
+                  console.log('[GOOGLE LOGIN] 📱 네이티브에서는 window.updateFCMToken() 함수를 사용하여 FCM 토큰 업데이트를 수행하세요');
                 } catch (fcmError) {
-                  console.error('[GOOGLE LOGIN] ❌ FCM 토큰 강제 업데이트 중 오류:', fcmError);
+                  console.error('[GOOGLE LOGIN] ❌ FCM 처리 중 오류:', fcmError);
                 }
               }, 1000); // Google 로그인 후 1초 지연
               
@@ -3428,23 +3418,13 @@ const SignInPage = () => {
       
       // FCM 토큰 체크 및 업데이트 (백그라운드에서 실행)
       setTimeout(async () => {
-        try {
-          console.log('[SIGNIN] 🔔 전화번호 로그인 후 FCM 토큰 강제 업데이트 시작');
-          const { fcmTokenService } = await import('@/services/fcmTokenService');
-          
-          const userData = authService.getUserData();
-          if (userData?.mt_idx && fcmTokenService) {
-            const fcmResult = await fcmTokenService.forceUpdateOnLogin(userData.mt_idx);
-            if (fcmResult.success) {
-              console.log('[SIGNIN] ✅ FCM 토큰 강제 업데이트 완료:', fcmResult.message);
-            } else {
-              console.warn('[SIGNIN] ⚠️ FCM 토큰 강제 업데이트 실패:', fcmResult.error);
-            }
-          } else {
-            console.warn('[SIGNIN] ⚠️ FCM 토큰 강제 업데이트 스킵: mt_idx 없음 또는 fcmTokenService 초기화 실패');
-            }
-          } catch (fcmError) {
-            console.error('[SIGNIN] ❌ FCM 토큰 강제 업데이트 중 오류:', fcmError);
+                  try {
+            console.log('[SIGNIN] 🔔 전화번호 로그인 후 FCM 토큰 강제 업데이트 시작');
+            // 🚨 Firebase 토큰 생성 로직 제거 - 네이티브에서 관리
+            console.log('[SIGNIN] 🚨 Firebase 토큰 생성 로직 제거됨 - 네이티브에서 FCM 토큰 관리');
+            console.log('[SIGNIN] 📱 네이티브에서는 window.updateFCMToken() 함수를 사용하여 FCM 토큰 업데이트를 수행하세요');
+          } catch (error) {
+            console.error('[SIGNIN] ❌ FCM 처리 중 오류:', error);
           }
         }, 1000); // 전화번호 로그인 후 1초 지연
       

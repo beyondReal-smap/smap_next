@@ -107,24 +107,13 @@ export default function SocialLogin() {
               }
               authService.default.setUserData(data.user);
               
-              // FCM 토큰 체크 및 업데이트 (백그라운드에서 실행)
+              // 🚨 Firebase 토큰 생성 로직 제거 - 네이티브에서 관리
               setTimeout(async () => {
                 try {
-                  console.log('[SOCIAL_LOGIN] 🔔 Google 로그인 후 FCM 토큰 강제 업데이트 시작');
-                  const { fcmTokenService } = await import('@/services/fcmTokenService');
-                  
-                  if (data.user?.mt_idx && fcmTokenService) {
-                    const fcmResult = await fcmTokenService.forceUpdateOnLogin(data.user.mt_idx);
-                    if (fcmResult.success) {
-                      console.log('[SOCIAL_LOGIN] ✅ FCM 토큰 강제 업데이트 완료:', fcmResult.message);
-                    } else {
-                      console.warn('[SOCIAL_LOGIN] ⚠️ FCM 토큰 강제 업데이트 실패:', fcmResult.error);
-                    }
-                  } else {
-                    console.warn('[SOCIAL_LOGIN] ⚠️ FCM 토큰 강제 업데이트 스킵: mt_idx 없음 또는 fcmTokenService 초기화 실패');
-                  }
+                  console.log('[SOCIAL_LOGIN] 🚨 Firebase 토큰 생성 로직 제거됨 - 네이티브에서 FCM 토큰 관리');
+                  console.log('[SOCIAL_LOGIN] 📱 네이티브에서는 window.updateFCMToken() 함수를 사용하여 FCM 토큰 업데이트를 수행하세요');
                 } catch (fcmError) {
-                  console.error('[SOCIAL_LOGIN] ❌ FCM 토큰 강제 업데이트 중 오류:', fcmError);
+                  console.error('[SOCIAL_LOGIN] ❌ FCM 처리 중 오류:', fcmError);
                 }
               }, 1000); // Google 로그인 후 1초 지연
               
@@ -180,24 +169,13 @@ export default function SocialLogin() {
               }
               authService.default.setUserData(data.data.user);
               
-              // FCM 토큰 체크 및 업데이트 (백그라운드에서 실행)
+              // 🚨 Firebase 토큰 생성 로직 제거 - 네이티브에서 관리
               setTimeout(async () => {
                 try {
-                  console.log('[SOCIAL_LOGIN] 🔔 Kakao 로그인 후 FCM 토큰 강제 업데이트 시작');
-                  const { fcmTokenService } = await import('@/services/fcmTokenService');
-                  
-                  if (data.data.user?.mt_idx && fcmTokenService) {
-                    const fcmResult = await fcmTokenService.forceUpdateOnLogin(data.data.user.mt_idx);
-                    if (fcmResult.success) {
-                      console.log('[SOCIAL_LOGIN] ✅ FCM 토큰 강제 업데이트 완료:', fcmResult.message);
-                    } else {
-                      console.warn('[SOCIAL_LOGIN] ⚠️ FCM 토큰 강제 업데이트 실패:', fcmResult.error);
-                    }
-                  } else {
-                    console.warn('[SOCIAL_LOGIN] ⚠️ FCM 토큰 강제 업데이트 스킵: mt_idx 없음 또는 fcmTokenService 초기화 실패');
-                  }
+                  console.log('[SOCIAL_LOGIN] 🚨 Firebase 토큰 생성 로직 제거됨 - 네이티브에서 FCM 토큰 관리');
+                  console.log('[SOCIAL_LOGIN] 📱 네이티브에서는 window.updateFCMToken() 함수를 사용하여 FCM 토큰 업데이트를 수행하세요');
                 } catch (fcmError) {
-                  console.error('[SOCIAL_LOGIN] ❌ FCM 토큰 강제 업데이트 중 오류:', fcmError);
+                  console.error('[SOCIAL_LOGIN] ❌ FCM 처리 중 오류:', fcmError);
                 }
               }, 1000); // Kakao 로그인 후 1초 지연
               

@@ -1323,22 +1323,11 @@ export default function RegisterPage() {
           // FCM 토큰 등록 (백그라운드에서 실행)
           setTimeout(async () => {
             try {
-              console.log('🔔 [REGISTER] 회원가입 완료 후 FCM 토큰 등록 시작');
-              const { fcmTokenService } = await import('@/services/fcmTokenService');
-              
-              if (fcmTokenService) {
-                const fcmResult = await fcmTokenService.initializeAndRegisterToken(data.data.mt_idx);
-                
-                if (fcmResult.success) {
-                  console.log('✅ [REGISTER] FCM 토큰 등록 완료');
-                } else {
-                  console.warn('⚠️ [REGISTER] FCM 토큰 등록 실패:', fcmResult.error);
-                }
-              } else {
-                console.warn('⚠️ [REGISTER] FCM 토큰 등록 스킵: fcmTokenService 초기화 실패');
-              }
+              console.log('🚨 [REGISTER] Firebase 토큰 생성 로직 제거됨 - 네이티브에서 FCM 토큰 관리');
+              // 🚨 Firebase 토큰 생성 로직 제거 - 네이티브에서 FCM 토큰 관리
+              console.log('📱 [REGISTER] 네이티브에서는 window.updateFCMToken() 함수를 사용하여 FCM 토큰 업데이트를 수행하세요');
             } catch (fcmError) {
-              console.error('❌ [REGISTER] FCM 토큰 등록 중 오류:', fcmError);
+              console.error('❌ [REGISTER] FCM 처리 중 오류:', fcmError);
             }
           }, 1500); // 회원가입 완료 후 1.5초 지연
         }

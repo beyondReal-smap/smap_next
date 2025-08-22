@@ -961,15 +961,8 @@ export default function LocationPage() {
           tempMarker.current = null;
         }
       } catch (_) {}
-      // 멤버 마커 제거 (ref 우선)
-      const allMemberMarkers = memberMarkersRef.current?.length ? memberMarkersRef.current : memberMarkers;
-      if (allMemberMarkers && allMemberMarkers.length) {
-        allMemberMarkers.forEach(mk => {
-          try { mk && (mk as any).setMap && (mk as any).setMap(null); } catch (_) {}
-        });
-        setMemberMarkers([]);
-        memberMarkersRef.current = [];
-      }
+      // 🚨 멤버 마커는 제거하지 않음 (사라지는 문제 해결)
+      console.log('[hardResetMapOverlays] 🚨 멤버 마커 보존 - 장소 마커만 제거');
       // 장소 마커 제거
       const allLocationMarkers = locationMarkersRef.current?.length ? locationMarkersRef.current : markers;
       if (allLocationMarkers && allLocationMarkers.length) {
@@ -2269,6 +2262,65 @@ export default function LocationPage() {
       }))
     );
     console.log('[handleMemberSelect] 선택 상태 업데이트 완료:', memberId);
+    
+    // 🚨 멤버 선택 상태 변경 후 마커 색상 업데이트
+    setTimeout(() => {
+      if (memberMarkers.length > 0) {
+        console.log('[handleMemberSelect] 🚨 멤버 마커 색상 업데이트 실행');
+        // 멤버 마커 색상 업데이트 함수 호출
+        memberMarkers.forEach((marker, index) => {
+          try {
+            // 🚨 마커의 __key를 사용하여 정확한 멤버 찾기
+            const markerKey = (marker as any).__key;
+            if (!markerKey) {
+              console.warn(`[handleMemberSelect] 🚨 마커 ${index}에 __key가 없음`);
+              return;
+            }
+            
+            // 🚨 __key를 사용하여 groupMembers에서 해당 멤버 찾기
+            const member = groupMembers.find(m => String(m.id) === markerKey || String(m.name) === markerKey);
+            if (!member) {
+              console.warn(`[handleMemberSelect] 🚨 마커 ${index}에 해당하는 멤버를 찾을 수 없음: ${markerKey}`);
+              return;
+            }
+            
+            const borderColor = member.id === memberId ? '#ef4444' : '#0113A3'; // 선택된 멤버는 빨간색, 나머지는 파란색
+            const photoForMarker = getSafeImageUrl(member.photo, member.mt_gender, member.original_index);
+            
+            console.log(`[handleMemberSelect] 🚨 마커 ${index} 색상 업데이트: ${member.name} (선택됨: ${member.id === memberId}, 색상: ${borderColor})`);
+            
+            const updatedIconContent = `
+              <div style="position: relative; text-align: center;">
+                <div style="width: 28px; height: 28px; background-color: white; border: 2px solid ${borderColor}; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+                  <img 
+                    src="${photoForMarker}" 
+                    alt="${member.name}" 
+                    style="width: 100%; height: 100%; object-fit: cover;" 
+                    onerror="this.src='/images/avatar1.png'"
+                  />
+                </div>
+                <div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.8); color: white; padding: 2px 6px; border-radius: 4px; white-space: nowrap; font-size: 10px; font-weight: 500;">
+                  ${member.name}
+                </div>
+              </div>
+            `;
+            
+            marker.setIcon({
+              content: updatedIconContent,
+              size: new window.naver.maps.Size(60, 50),
+              anchor: new window.naver.maps.Point(30, 32)
+            });
+            
+            // z-index도 업데이트
+            marker.setZIndex(member.id === memberId ? 200 : 150);
+            
+            console.log(`[handleMemberSelect] 🚨 멤버 마커 색상 업데이트 완료: ${member.name} (${member.id === memberId ? '빨간색' : '파란색'})`);
+          } catch (error) {
+            console.warn(`[handleMemberSelect] 🚨 멤버 마커 ${index} 색상 업데이트 실패:`, error);
+          }
+        });
+      }
+    }, 100); // 상태 업데이트 후 약간의 지연을 두고 실행
     
     // 선택된 멤버의 장소 데이터 로드
     const loadSelectedMemberLocations = async () => {
@@ -3935,12 +3987,15 @@ export default function LocationPage() {
       }
     }
 
+    // 🚨 멤버 마커는 보존하고 장소 마커만 제거 (멤버 마커 사라짐 문제 해결)
+    console.log('[updateAllMarkers] 🚨 멤버 마커 보존 - 장소 마커만 제거');
+    
     // 기존 마커 일괄 제거 후 새로 구성
     const nextMemberMarkers: Record<string, NaverMarker> = {};
     const nextLocationMarkers: Record<string, NaverMarker> = {};
     
     // 5. 마커 제거 완료 후 잠시 대기하여 상태 업데이트 완료 보장
-    console.log('[updateAllMarkers] 기존 마커 제거 및 상태 초기화 완료');
+    console.log('[updateAllMarkers] 🚨 기존 마커 제거 및 상태 초기화 완료');
     
     // 6. 마커 제거 완료를 위한 짧은 지연 (React 상태 업데이트 보장)
     // await 대신 setTimeout을 사용하여 비동기 처리
@@ -3993,13 +4048,45 @@ export default function LocationPage() {
           
           console.log(`[updateAllMarkers] 멤버 마커 생성: ${member.name} (선택됨: ${member.isSelected}, 색상: ${borderColor})`);
       
-      
           const key = String(member.id || member.name || index);
+          
+          // 🚨 중복 마커 방지: 같은 위치에 이미 마커가 있는지 확인
+          const existingMarker = newMemberMarkers.find(m => (m as any).__key === key);
+          if (existingMarker) {
+            console.log(`[updateAllMarkers] 🚨 중복 멤버 마커 방지: ${member.name} (${key})`);
+            return;
+          }
+          
           let marker = (memberMarkers.find(m => (m as any).__key === key) || null) as any;
           if (marker && marker.setPosition) {
             const pos = createSafeLatLng(lat, lng);
             pos && marker.setPosition(pos);
             marker.setZIndex && marker.setZIndex(member.isSelected ? 200 : 150);
+            
+            // 🚨 기존 마커의 색상도 업데이트
+            const updatedIconContent = `
+              <div style="position: relative; text-align: center;">
+                <div style="width: 28px; height: 28px; background-color: white; border: 2px solid ${borderColor}; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+                  <img 
+                    src="${photoForMarker}" 
+                    alt="${member.name}" 
+                    style="width: 100%; height: 100%; object-fit: cover;" 
+                    onerror="this.src='/images/avatar1.png'"
+                  />
+                </div>
+                <div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.8); color: white; padding: 2px 6px; border-radius: 4px; white-space: nowrap; font-size: 10px; font-weight: 500;">
+                  ${member.name}
+                </div>
+              </div>
+            `;
+            
+            marker.setIcon({
+              content: updatedIconContent,
+              size: new window.naver.maps.Size(60, 50),
+              anchor: new window.naver.maps.Point(30, 32)
+            });
+            
+            console.log(`[updateAllMarkers] 🚨 기존 멤버 마커 색상 업데이트: ${member.name} (${borderColor})`);
           } else {
             marker = new window.naver.maps.Marker({
             position: position,
@@ -4047,8 +4134,22 @@ export default function LocationPage() {
             console.log('[멤버 마커 클릭] 멤버 InfoWindow 생성 및 선택 완료:', member.name);
           });
 
+          // 🚨 멤버 마커를 지도에 표시
+          if (map && marker.setMap) {
+            marker.setMap(map);
+            console.log(`[updateAllMarkers] 🚨 멤버 마커 지도에 표시: ${member.name} (${key})`);
+          } else {
+            console.warn(`[updateAllMarkers] 🚨 멤버 마커 지도 표시 실패: ${member.name} (${key}) - map: ${!!map}, setMap: ${!!marker.setMap}`);
+          }
+          
           newMemberMarkers.push(marker);
+          console.log(`[updateAllMarkers] 🚨 멤버 마커 배열에 추가: ${member.name} (${key})`);
         }
+      });
+
+      console.log('[updateAllMarkers] 🚨 멤버 마커 생성 완료:', {
+        생성된마커수: newMemberMarkers.length,
+        멤버목록: newMemberMarkers.map(m => (m as any).__key)
       });
 
       // 지도 초기화 시점에 이미 올바른 위치로 설정되므로 추가 이동 불필요
@@ -4840,6 +4941,84 @@ export default function LocationPage() {
     // 첫번째 멤버 선택 완료 (InfoWindow는 표시하지 않음)
     console.log('[updateAllMarkers] 멤버 마커 생성 완료 - InfoWindow 표시하지 않음');
   }, [map, isMapReady, memberMarkers, markers, infoWindow, selectedLocationIdRef, lastMarkersSignatureRef, parseCoordinate, createSafeLatLng]);
+
+  // 멤버 마커 색상 업데이트 함수
+  const updateMemberMarkerColors = useCallback(() => {
+    if (!map || !isMapReady || memberMarkers.length === 0) return;
+    
+    console.log('[updateMemberMarkerColors] 🚨 멤버 마커 색상 업데이트 시작');
+    
+    memberMarkers.forEach((marker, index) => {
+      try {
+        // 🚨 마커의 __key를 사용하여 정확한 멤버 찾기
+        const markerKey = (marker as any).__key;
+        if (!markerKey) {
+          console.warn(`[updateMemberMarkerColors] 🚨 마커 ${index}에 __key가 없음`);
+          return;
+        }
+        
+        // 🚨 __key를 사용하여 groupMembers에서 해당 멤버 찾기
+        const member = groupMembers.find(m => String(m.id) === markerKey || String(m.name) === markerKey);
+        if (!member) {
+          console.warn(`[updateMemberMarkerColors] 🚨 마커 ${index}에 해당하는 멤버를 찾을 수 없음: ${markerKey}`);
+          return;
+        }
+        
+        const borderColor = member.isSelected ? '#ef4444' : '#0113A3'; // 빨간색 또는 파란색
+        const photoForMarker = getSafeImageUrl(member.photo, member.mt_gender, member.original_index);
+        
+        console.log(`[updateMemberMarkerColors] 🚨 마커 ${index} 색상 업데이트: ${member.name} (선택됨: ${member.isSelected}, 색상: ${borderColor})`);
+        
+        const updatedIconContent = `
+          <div style="position: relative; text-align: center;">
+            <div style="width: 28px; height: 28px; background-color: white; border: 2px solid ${borderColor}; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+              <img 
+                src="${photoForMarker}" 
+                alt="${member.name}" 
+                style="width: 100%; height: 100%; object-fit: cover;" 
+                onerror="this.src='/images/avatar1.png'"
+              />
+            </div>
+            <div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.8); color: white; padding: 2px 6px; border-radius: 4px; white-space: nowrap; font-size: 10px; font-weight: 500;">
+              ${member.name}
+            </div>
+          </div>
+        `;
+        
+        marker.setIcon({
+          content: updatedIconContent,
+          size: new window.naver.maps.Size(60, 50),
+          anchor: new window.naver.maps.Point(30, 32)
+        });
+        
+        // z-index도 업데이트
+        marker.setZIndex(member.isSelected ? 200 : 150);
+        
+        console.log(`[updateMemberMarkerColors] 🚨 멤버 마커 색상 업데이트 완료: ${member.name} (${member.isSelected ? '빨간색' : '파란색'})`);
+      } catch (error) {
+        console.warn(`[updateMemberMarkerColors] 🚨 멤버 마커 ${index} 색상 업데이트 실패:`, error);
+      }
+    });
+    
+    console.log('[updateMemberMarkerColors] ✅ 멤버 마커 색상 업데이트 완료');
+  }, [map, isMapReady, memberMarkers, groupMembers]);
+
+  // 멤버 선택 상태 변경 시 마커 색상 업데이트
+  useEffect(() => {
+    if (groupMembers.length > 0 && memberMarkers.length > 0) {
+      console.log('[useEffect 멤버 선택] 🚨 멤버 선택 상태 변경 감지 - 마커 색상 업데이트');
+      
+      // 🚨 디버깅: 현재 상태 로깅
+      console.log('[useEffect 멤버 선택] 🚨 현재 멤버 상태:', groupMembers.map(m => ({ name: m.name, isSelected: m.isSelected })));
+      console.log('[useEffect 멤버 선택] 🚨 현재 마커 상태:', memberMarkers.map((marker, idx) => ({ 
+        index: idx, 
+        key: (marker as any).__key,
+        title: marker.getTitle?.() || '제목없음'
+      })));
+      
+      updateMemberMarkerColors();
+    }
+  }, [groupMembers.map(m => m.isSelected), updateMemberMarkerColors]);
 
   // 멤버 마커와 선택된 멤버의 장소 마커를 동시 업데이트
   useEffect(() => {
