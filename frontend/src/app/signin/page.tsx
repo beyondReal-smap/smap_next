@@ -565,6 +565,7 @@ const SignInPage = () => {
 
   const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState('');
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -4613,7 +4614,7 @@ const SignInPage = () => {
                 style={focusedField === 'password' || password ? {color: '#0113A3'} : {}} />
               </div>
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onFocus={(e) => {
@@ -4629,13 +4630,26 @@ const SignInPage = () => {
                   }
                 }}
                 placeholder="비밀번호를 입력해주세요"
-                className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent transition-all duration-200 ${
+                className={`w-full pl-10 pr-12 py-3 border rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent transition-all duration-200 ${
                   formErrors.password 
                     ? 'border-red-300 focus:ring-red-500' 
                     : 'border-gray-200'
                 }`}
                 style={{ outline: 'none' }}
               />
+              {/* 비밀번호 표시/숨기기 버튼 */}
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-4 flex items-center z-10 text-gray-400 hover:text-gray-600 transition-colors duration-200"
+                tabIndex={-1}
+              >
+                {showPassword ? (
+                  <FiEyeOff className="w-4 h-4" />
+                ) : (
+                  <FiEye className="w-4 h-4" />
+                )}
+              </button>
             </div>
             {formErrors.password && (
               <p className="text-red-500 text-sm mt-1" style={{ wordBreak: 'keep-all' }}>{formErrors.password}</p>
