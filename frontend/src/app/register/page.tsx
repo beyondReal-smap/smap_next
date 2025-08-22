@@ -578,10 +578,10 @@ export default function RegisterPage() {
             mt_id: parsedData.email || '', // 이메일을 아이디로 사용
             mt_email: parsedData.email || '',
             mt_name: parsedData.provider === 'apple'
-              ? (parsedData.name || parsedData.given_name || '')
+              ? (parsedData.name || parsedData.given_name || 'Apple User')
               : (parsedData.name || parsedData.given_name || 'Google User'),
             mt_nickname: parsedData.provider === 'apple'
-              ? (parsedData.nickname || parsedData.given_name || parsedData.name || '')
+              ? (parsedData.nickname || parsedData.given_name || parsedData.name || 'Apple User')
               : (parsedData.nickname || parsedData.given_name || parsedData.name || 'Google User'),
             // 구글/애플 로그인 시 임시 비밀번호 자동설정 (회원가입 API 검증 통과용)
             mt_pwd: parsedData.provider === 'google' 
@@ -592,8 +592,15 @@ export default function RegisterPage() {
             socialId: parsedData.kakao_id || parsedData.google_id || parsedData.apple_id || ''
           }));
           
-          // 소셜 로그인 시 약관 동의 단계로 시작 (소셜 로그인이므로 전화번호 인증은 생략)
-          setCurrentStep(REGISTER_STEPS.TERMS);
+          // Apple 로그인의 경우 기본 정보 입력 단계를 건너뛰고 프로필 단계로 시작
+          if (parsedData.provider === 'apple') {
+            setCurrentStep(REGISTER_STEPS.PROFILE);
+            console.log('🔥 [REGISTER] Apple 로그인 - 기본 정보 입력 단계 건너뛰고 PROFILE로 시작');
+          } else {
+            // 구글/카카오 로그인 시 약관 동의 단계로 시작
+            setCurrentStep(REGISTER_STEPS.TERMS);
+            console.log('🔥 [REGISTER] 구글/카카오 로그인 - TERMS로 시작');
+          }
           
           console.log(`🔥 [REGISTER] ${parsedData.provider} 소셜 로그인 데이터 로드 완료`);
           console.log('🔥 [REGISTER] 현재 스텝을 TERMS로 설정');
@@ -620,10 +627,21 @@ export default function RegisterPage() {
   // 진행률 계산
   const getProgress = () => {
     const allSteps = Object.values(REGISTER_STEPS);
-    const isSimpleSocial = registerData.isSocialLogin && (registerData.socialProvider === 'google' || registerData.socialProvider === 'apple');
-    const steps = isSimpleSocial
-      ? [REGISTER_STEPS.TERMS, REGISTER_STEPS.BASIC_INFO, REGISTER_STEPS.PROFILE, REGISTER_STEPS.COMPLETE]
-      : allSteps;
+    let steps: string[];
+    
+    if (registerData.isSocialLogin) {
+      if (registerData.socialProvider === 'apple') {
+        // Apple 로그인: 약관 → 프로필 → 완료 (기본 정보 입력 단계 건너뛰기)
+        steps = [REGISTER_STEPS.TERMS, REGISTER_STEPS.PROFILE, REGISTER_STEPS.COMPLETE];
+      } else {
+        // 구글/카카오 로그인: 약관 → 기본 정보 → 프로필 → 완료
+        steps = [REGISTER_STEPS.TERMS, REGISTER_STEPS.BASIC_INFO, REGISTER_STEPS.PROFILE, REGISTER_STEPS.COMPLETE];
+      }
+    } else {
+      // 일반 회원가입: 모든 단계
+      steps = allSteps;
+    }
+    
     const currentIndex = steps.indexOf(currentStep);
     const safeIndex = currentIndex >= 0 ? currentIndex : 0;
     return ((safeIndex + 1) / (steps.length - 1)) * 100; // COMPLETE 제외

@@ -201,7 +201,7 @@ export default function MarkerManager({
     const newMarkers: NaverMarker[] = [];
     
     selectedMemberSavedLocations.forEach((location, index) => {
-      const [lng, lat] = location.coordinates;
+              const [lat, lng] = location.coordinates;
       
       if (lat !== 0 && lng !== 0) {
         const position = createSafeLatLng(lat, lng);
