@@ -91,16 +91,16 @@ body {
 
 .full-map-container {
   position: fixed;
-  top: 0;
+  top: 56px; /* 헤더 높이만큼 아래에서 시작 */
   left: 0;
   right: 0;
-  bottom: 0;
+  bottom: 72px; /* 하단 네비게이션 바 높이만큼 위에서 끝 */
   width: 100vw;
-  height: 100vh;
+  height: calc(100vh - 56px - 72px); /* 헤더와 네비게이션 바 높이를 제외한 높이 */
   margin: 0;
   padding: 0;
   overflow: hidden;
-  z-index: 1;
+  z-index: 10; /* 헤더(z-50)보다 낮고, 일반 콘텐츠보다 높게 설정 */
 }
 
 .hide-scrollbar {
@@ -208,6 +208,19 @@ html, body {
   touch-action: manipulation !important;
 }
 
+/* 지도 컨테이너 위치 정확성 보장 */
+.full-map-container {
+  position: fixed !important;
+  top: 56px !important; /* 헤더 높이 */
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 72px !important; /* 네비게이션 바 높이 */
+  width: 100vw !important;
+  height: calc(100vh - 56px - 72px) !important;
+  z-index: 10 !important;
+  pointer-events: auto !important;
+}
+
 /* 모바일 사파리 bounce 효과 비활성화 */
 body {
   overscroll-behavior: none !important;
@@ -237,6 +250,27 @@ div[class*="nmap_control_zoom"] {
 /* 네이버 지도 컨트롤 전체 */
 .nmap_control {
   top: 195px !important;
+}
+
+/* 지도 컨테이너 내부 지도 요소 독립적 움직임 보장 */
+.full-map-container > div,
+.full-map-container > div > div,
+.full-map-container iframe,
+.full-map-container canvas {
+  position: relative !important;
+  transform: none !important;
+  -webkit-transform: none !important;
+  will-change: auto !important;
+  touch-action: pan-x pan-y !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+/* 지도 터치 이벤트 격리 */
+.full-map-container {
+  touch-action: pan-x pan-y !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: contain !important;
 }
 
 /* 줌 컨트롤 버튼들 - 간격 제거 */
