@@ -1356,9 +1356,11 @@ export default function RegisterPage() {
         console.log('회원가입 성공:', data);
         
         // 회원가입 성공 시 mt_idx를 localStorage에 저장
+        console.log('🔍 [REGISTER] API 응답에서 mt_idx 확인:', data.data);
+        
         if (data.data && data.data.mt_idx) {
           localStorage.setItem('newMemberMtIdx', data.data.mt_idx.toString());
-          console.log('새 회원 mt_idx 저장:', data.data.mt_idx);
+          console.log('✅ [REGISTER] 새 회원 mt_idx 저장 완료:', data.data.mt_idx);
           
           // FCM 토큰 등록 (백그라운드에서 실행)
           setTimeout(async () => {
@@ -1370,6 +1372,10 @@ export default function RegisterPage() {
               console.error('❌ [REGISTER] FCM 처리 중 오류:', fcmError);
             }
           }, 1500); // 회원가입 완료 후 1.5초 지연
+        } else {
+          console.error('❌ [REGISTER] API 응답에 mt_idx가 없음:', data);
+          console.error('❌ [REGISTER] data.data:', data.data);
+          console.error('❌ [REGISTER] data.data.mt_idx:', data.data?.mt_idx);
         }
         
         // 소셜 로그인 데이터 정리 (회원가입 성공 시에만)
@@ -2590,6 +2596,8 @@ export default function RegisterPage() {
                 {!isJoiningGroup && !isOpeningApp && (
                   <motion.button
                     onClick={async () => {
+                      console.log('🚀 [REGISTER] 로그인하러가기 버튼 클릭됨');
+                      
                       // 사용자 입력 정보를 localStorage에 저장
                       const userInfo = {
                         phone: registerData.mt_id,
@@ -2605,16 +2613,18 @@ export default function RegisterPage() {
                         localStorage.setItem('recentUserInfo', JSON.stringify(userInfo));
                         // 로그인 페이지에서 사용할 전화번호도 별도 저장
                         localStorage.setItem('lastRegisteredPhone', registerData.mt_id);
+                        console.log('✅ [REGISTER] 사용자 정보 localStorage 저장 완료');
                       } catch (error) {
-                        console.error('사용자 정보 저장 실패:', error);
+                        console.error('❌ [REGISTER] 사용자 정보 저장 실패:', error);
                       }
                       
                       // 가입 완료된 mt_idx를 사용하여 자동 로그인 처리
                       const newMemberMtIdx = localStorage.getItem('newMemberMtIdx');
+                      console.log('🔍 [REGISTER] localStorage에서 newMemberMtIdx 확인:', newMemberMtIdx);
                       
                       if (newMemberMtIdx) {
                         try {
-                          console.log('새로 가입된 회원 자동 로그인 시도:', newMemberMtIdx);
+                          console.log('🔄 [REGISTER] 새로 가입된 회원 자동 로그인 시도:', newMemberMtIdx);
                           
                           // 자동 로그인 API 호출
                           const loginResponse = await fetch('/api/auth/auto-login', {
@@ -2628,37 +2638,40 @@ export default function RegisterPage() {
                             }),
                           });
                           
+                          console.log('📡 [REGISTER] 자동 로그인 API 응답 상태:', loginResponse.status);
                           const loginData = await loginResponse.json();
+                          console.log('📡 [REGISTER] 자동 로그인 API 응답 데이터:', loginData);
                           
                           if (loginResponse.ok && loginData.success) {
-                            console.log('자동 로그인 성공:', loginData);
+                            console.log('✅ [REGISTER] 자동 로그인 성공:', loginData);
                             
                             // 로그인 성공 시 토큰과 사용자 정보 저장
                             if (loginData.data && loginData.data.token) {
                               localStorage.setItem('auth_token', loginData.data.token);
                               localStorage.setItem('user_data', JSON.stringify(loginData.data.user));
+                              console.log('💾 [REGISTER] 로그인 정보 localStorage 저장 완료');
                               
                               // newMemberMtIdx는 더 이상 필요하지 않으므로 제거
                               localStorage.removeItem('newMemberMtIdx');
                               
                               // home 페이지로 이동
+                              console.log('🏠 [REGISTER] home 페이지로 이동');
                               router.push('/home');
                               return;
                             }
                           } else {
-                            console.warn('자동 로그인 실패:', loginData);
+                            console.warn('⚠️ [REGISTER] 자동 로그인 실패:', loginData);
                           }
                         } catch (loginError) {
-                          console.error('자동 로그인 중 오류:', loginError);
+                          console.error('❌ [REGISTER] 자동 로그인 중 오류:', loginError);
                         }
+                      } else {
+                        console.log('❌ [REGISTER] newMemberMtIdx가 localStorage에 없음');
                       }
                       
-                      // 자동 로그인 실패 시 기본 동작
-                      if (isAppleLogin || isGoogleLogin || registerData.mt_id) {
-                        router.push('/home');
-                      } else {
-                        router.push('/signin');
-                      }
+                      // 자동 로그인 실패 시 signin 페이지로 이동
+                      console.log('🔀 [REGISTER] 자동 로그인 실패 또는 mt_idx 없음, signin 페이지로 이동');
+                      router.push('/signin');
                     }}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
