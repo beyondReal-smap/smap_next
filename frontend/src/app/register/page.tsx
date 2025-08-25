@@ -1829,13 +1829,17 @@ export default function RegisterPage() {
                         className="flex-shrink-0 p-2 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
                         onClick={(e) => {
                           e.stopPropagation();
-                          // 내부 라우트로 이동 (현재 탭) + 약관 페이지는 embed 모드로 열기
+                          // 내부 라우트로 이동 (현재 탭) + 약관 페이지는 일반 모드로 열기 (헤더 표시)
                           try {
                             const isInternal = term.link && term.link.startsWith('/');
                             if (isInternal) {
                               let target = term.link as string;
-                              if (target.startsWith('/setting')) {
-                                target += (target.includes('?') ? '&' : '?') + 'embed=1';
+                              // embed 파라미터 제거하여 헤더가 표시되도록 함
+                              if (target.includes('?embed=')) {
+                                target = target.replace(/[?&]embed=[^&]*/, '');
+                                if (target.includes('?') && target.endsWith('?')) {
+                                  target = target.slice(0, -1);
+                                }
                               }
                               // Next.js Router 사용
                               try {

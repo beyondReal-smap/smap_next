@@ -30,6 +30,9 @@ interface RegisterContextType {
   getStepName: (step: string) => string;
   isComplete: boolean;
   REGISTER_STEPS: typeof REGISTER_STEPS;
+  // 소셜 로그인 관련
+  isAppleLogin: boolean;
+  isGoogleLogin: boolean;
   // 모달 상태 관리
   birthModalOpen: boolean;
   setBirthModalOpen: (open: boolean) => void;
@@ -42,15 +45,57 @@ export function RegisterProvider({ children }: { children: ReactNode }) {
   const [currentStep, setCurrentStep] = useState(REGISTER_STEPS.TERMS);
   const [birthModalOpen, setBirthModalOpen] = useState(false);
 
+  // 소셜 로그인 상태 감지
+  const isAppleLogin = React.useMemo(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const social = params.get('social');
+      return social === 'apple';
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const isGoogleLogin = React.useMemo(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const social = params.get('social');
+      return social === 'google';
+    } catch {
+      return false;
+    }
+  }, []);
+
   const getCurrentStepNumber = () => {
-    const steps = Object.values(REGISTER_STEPS);
-    const currentIndex = steps.indexOf(currentStep);
-    return currentIndex + 1;
+    if (isAppleLogin) {
+      // 애플 로그인: 약관동의 → 프로필 → 완료 (2단계)
+      const steps = [REGISTER_STEPS.TERMS, REGISTER_STEPS.PROFILE, REGISTER_STEPS.COMPLETE];
+      const currentIndex = steps.indexOf(currentStep);
+      return currentIndex >= 0 ? currentIndex + 1 : 1;
+    } else if (isGoogleLogin) {
+      // 구글 로그인: 약관동의 → 기본정보 → 프로필 → 완료 (3단계)
+      const steps = [REGISTER_STEPS.TERMS, REGISTER_STEPS.BASIC_INFO, REGISTER_STEPS.PROFILE, REGISTER_STEPS.COMPLETE];
+      const currentIndex = steps.indexOf(currentStep);
+      return currentIndex >= 0 ? currentIndex + 1 : 1;
+    } else {
+      // 일반 회원가입: 모든 단계
+      const steps = Object.values(REGISTER_STEPS);
+      const currentIndex = steps.indexOf(currentStep);
+      return currentIndex + 1;
+    }
   };
 
   const getTotalSteps = () => {
-    // COMPLETE 단계는 제외하고 실제 진행 단계만 카운트
-    return Object.values(REGISTER_STEPS).length - 1; 
+    if (isAppleLogin) {
+      // 애플 로그인: 2단계 (COMPLETE 제외)
+      return 2;
+    } else if (isGoogleLogin) {
+      // 구글 로그인: 3단계 (COMPLETE 제외)
+      return 3;
+    } else {
+      // 일반 회원가입: COMPLETE 단계는 제외하고 실제 진행 단계만 카운트
+      return Object.values(REGISTER_STEPS).length - 1;
+    }
   };
 
   const getStepName = (step: string) => {
@@ -72,6 +117,8 @@ export function RegisterProvider({ children }: { children: ReactNode }) {
       getStepName,
       isComplete,
       REGISTER_STEPS,
+      isAppleLogin,
+      isGoogleLogin,
       birthModalOpen,
       setBirthModalOpen,
       hasOpenModal

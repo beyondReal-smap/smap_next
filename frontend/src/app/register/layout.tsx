@@ -315,6 +315,8 @@ function RegisterLayoutContent({
     }
   }, []);
   
+
+  
   // 소셜 로그인 상태 확인을 위해 registerData가 필요하지만 
   // layout에서는 직접 접근할 수 없으므로 sessionStorage에서 확인
   const isSocialLogin = React.useMemo(() => {
@@ -536,13 +538,11 @@ function RegisterLayoutContent({
                     <div className="flex items-center space-x-2">
                       <div className="flex items-center space-x-1">
                         <span className="text-xs font-semibold" style={{color: '#0114a2'}}>
-                          {isSimpleSocial 
-                            ? (currentStep === REGISTER_STEPS.TERMS ? 1 : currentStep === REGISTER_STEPS.BASIC_INFO ? 2 : currentStep === REGISTER_STEPS.PROFILE ? 3 : 3)
-                            : getCurrentStepNumber()}
+                          {getCurrentStepNumber()}
                         </span>
                         <span className="text-xs text-gray-400">/</span>
                         <span className="text-xs text-gray-500">
-                          {isSimpleSocial ? 3 : getTotalSteps()}
+                          {getTotalSteps()}
                         </span>
                         <span className="text-xs text-gray-500">
                           • {getStepName(currentStep)}

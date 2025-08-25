@@ -698,7 +698,7 @@ export default function TermsPage() {
         className="min-h-screen bg-gradient-to-br from-yellow-50 via-white to-amber-50 scrollable-content"
         data-page="/setting/terms"
       >
-        {/* notice 페이지와 동일한 헤더 */}
+        {/* notice 페이지와 동일한 헤더 - 항상 표시 */}
         <AnimatedHeader 
           variant="enhanced"
           className="setting-header"

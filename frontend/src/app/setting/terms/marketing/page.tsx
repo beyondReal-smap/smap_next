@@ -149,7 +149,18 @@ export default function MarketingTermsPage() {
 
   const handleBack = () => {
     triggerHapticFeedback(HapticFeedbackType.SELECTION, '마케팅 정보 수집 및 이용 동의 뒤로가기', { component: 'setting-terms', action: 'back-navigation' });
-    router.push('/setting');
+    
+    // 이전 페이지가 register인지 확인
+    const referrer = document.referrer;
+    const isFromRegister = referrer.includes('/register') || referrer.includes('register');
+    
+    if (isFromRegister) {
+      // register 페이지에서 온 경우 register로 돌아가기
+      router.push('/register');
+    } else {
+      // setting 페이지에서 온 경우 setting으로 돌아가기
+      router.push('/setting');
+    }
   };
 
   // 로딩 상태일 때만 로딩 화면 표시 (가시성과 초기화 상태는 무시)
@@ -175,8 +186,8 @@ export default function MarketingTermsPage() {
           top: '0px'
         }}
       >
-        {!isEmbed && (
-          <AnimatedHeader variant="enhanced" className="setting-header">
+        {/* embed 모드가 아닐 때만 헤더 표시 (register에서 온 경우에도 헤더 표시) */}
+        <AnimatedHeader variant="enhanced" className="setting-header">
             <motion.div 
               initial={{ opacity: 0, x: -40 }} 
               animate={{ opacity: 1, x: 0 }} 
