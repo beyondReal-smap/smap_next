@@ -2589,7 +2589,7 @@ export default function RegisterPage() {
                 
                 {!isJoiningGroup && !isOpeningApp && (
                   <motion.button
-                    onClick={() => {
+                    onClick={async () => {
                       // 사용자 입력 정보를 localStorage에 저장
                       const userInfo = {
                         phone: registerData.mt_id,
@@ -2609,11 +2609,54 @@ export default function RegisterPage() {
                         console.error('사용자 정보 저장 실패:', error);
                       }
                       
-                      // 애플 아이디, 구글, 전화번호로 가입한 경우 home으로 바로 이동
+                      // 가입 완료된 mt_idx를 사용하여 자동 로그인 처리
+                      const newMemberMtIdx = localStorage.getItem('newMemberMtIdx');
+                      
+                      if (newMemberMtIdx) {
+                        try {
+                          console.log('새로 가입된 회원 자동 로그인 시도:', newMemberMtIdx);
+                          
+                          // 자동 로그인 API 호출
+                          const loginResponse = await fetch('/api/auth/auto-login', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                              mt_idx: newMemberMtIdx,
+                              action: 'auto-login'
+                            }),
+                          });
+                          
+                          const loginData = await loginResponse.json();
+                          
+                          if (loginResponse.ok && loginData.success) {
+                            console.log('자동 로그인 성공:', loginData);
+                            
+                            // 로그인 성공 시 토큰과 사용자 정보 저장
+                            if (loginData.data && loginData.data.token) {
+                              localStorage.setItem('auth_token', loginData.data.token);
+                              localStorage.setItem('user_data', JSON.stringify(loginData.data.user));
+                              
+                              // newMemberMtIdx는 더 이상 필요하지 않으므로 제거
+                              localStorage.removeItem('newMemberMtIdx');
+                              
+                              // home 페이지로 이동
+                              router.push('/home');
+                              return;
+                            }
+                          } else {
+                            console.warn('자동 로그인 실패:', loginData);
+                          }
+                        } catch (loginError) {
+                          console.error('자동 로그인 중 오류:', loginError);
+                        }
+                      }
+                      
+                      // 자동 로그인 실패 시 기본 동작
                       if (isAppleLogin || isGoogleLogin || registerData.mt_id) {
                         router.push('/home');
                       } else {
-                        // 그 외의 경우 signin으로 이동
                         router.push('/signin');
                       }
                     }}
