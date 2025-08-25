@@ -2607,7 +2607,13 @@ export default function RegisterPage() {
                         console.error('사용자 정보 저장 실패:', error);
                       }
                       
-                      router.push('/signin');
+                      // 애플 아이디, 구글, 전화번호로 가입한 경우 home으로 바로 이동
+                      if (isAppleLogin || isGoogleLogin || registerData.mt_id) {
+                        router.push('/home');
+                      } else {
+                        // 그 외의 경우 signin으로 이동
+                        router.push('/signin');
+                      }
                     }}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
