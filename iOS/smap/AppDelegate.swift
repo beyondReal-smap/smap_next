@@ -839,12 +839,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     
     //앱이 현재 화면에서 실행되고 있을 때
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        let userInfo = notification.request.content.userInfo
+        print("🔔 [FCM] 포그라운드에서 푸시 알림 수신")
+        print("📨 [FCM] 알림 데이터: \(userInfo)")
         print("Handle push from foreground")
-        print("\(notification.request.content.userInfo)")
+        print("\(userInfo)")
         
-        self.title = "\(notification.request.content.userInfo["title"] ?? String())"
-        self.body = "\(notification.request.content.userInfo["body"] ?? String())"
-        self.event_url = "\(notification.request.content.userInfo["event_url"] ?? String())"
+        self.title = "\(userInfo["title"] ?? String())"
+        self.body = "\(userInfo["body"] ?? String())"
+        self.event_url = "\(userInfo["event_url"] ?? String())"
         
         print("title - \(self.title) body - \(self.body) event_url - \(self.event_url)")
         
@@ -852,29 +855,32 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             navigationController.popToRootViewController(animated: true)
         }
         
-        let userInfo: [AnyHashable: Any] = ["title":self.title, "body": self.body, "event_url": self.event_url]
+        let pushUserInfo: [AnyHashable: Any] = ["title":self.title, "body": self.body, "event_url": self.event_url]
         UserDefaults.standard.set(self.event_url, forKey: "event_url")
-        NotificationCenter.default.post(name: Notification.Name("getPush"), object: nil, userInfo: userInfo)
+        NotificationCenter.default.post(name: Notification.Name("getPush"), object: nil, userInfo: pushUserInfo)
         
         completionHandler([.alert, .sound, .badge])
     }
     
     //앱은 꺼져있지만 완전히 종료되지 않고 백그라운드에서 실행중일 때
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
+        let userInfo = response.notification.request.content.userInfo
+        print("🔔 [FCM] 백그라운드에서 푸시 알림 수신")
+        print("📨 [FCM] 알림 데이터: \(userInfo)")
         print("Handle push from background or closed")
-        print("\(response.notification.request.content.userInfo)")
+        print("\(userInfo)")
     
-        self.title = "\(response.notification.request.content.userInfo["title"] ?? String())"
-        self.body = "\(response.notification.request.content.userInfo["body"] ?? String())"
-        self.event_url = "\(response.notification.request.content.userInfo["event_url"] ?? String())"
+        self.title = "\(userInfo["title"] ?? String())"
+        self.body = "\(userInfo["body"] ?? String())"
+        self.event_url = "\(userInfo["event_url"] ?? String())"
         
         if let navigationController = self.window?.rootViewController as? UINavigationController {
             navigationController.popToRootViewController(animated: true)
         }
         
-        let userInfo: [AnyHashable: Any] = ["title":self.title, "body": self.body, "event_url": self.event_url]
+        let pushUserInfo: [AnyHashable: Any] = ["title":self.title, "body": self.body, "event_url": self.event_url]
         UserDefaults.standard.set(self.event_url, forKey: "event_url")
-        NotificationCenter.default.post(name: Notification.Name("getPush"), object: nil, userInfo: userInfo)
+        NotificationCenter.default.post(name: Notification.Name("getPush"), object: nil, userInfo: pushUserInfo)
         completionHandler()
     }
     
@@ -1039,24 +1045,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         task.resume()
     }
     
-    // MARK: - 🔔 FCM 포그라운드 메시지 수신
-    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-        let userInfo = notification.request.content.userInfo
-        print("🔔 [FCM] 포그라운드에서 푸시 알림 수신")
-        print("📨 [FCM] 알림 데이터: \(userInfo)")
-        
-        // 포그라운드에서도 알림 표시
-        completionHandler([.alert, .badge, .sound])
-    }
-    
-    // MARK: - 🔔 FCM 백그라운드 메시지 수신
-    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
-        let userInfo = response.notification.request.content.userInfo
-        print("🔔 [FCM] 백그라운드에서 푸시 알림 수신")
-        print("📨 [FCM] 알림 데이터: \(userInfo)")
-        
-        completionHandler()
-    }
+
     
     // MARK: - 🔔 FCM 자동 업데이트 시작 (로그인 완료 시 호출)
     @objc func startFCMAutoUpdateAfterLogin() {
