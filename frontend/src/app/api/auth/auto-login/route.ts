@@ -24,20 +24,18 @@ export async function POST(request: NextRequest) {
 
     // 백엔드 API를 통해 mt_idx로 사용자 정보 조회
     try {
-      const backendUrl = 'https://api3.smap.site/api/v1/members/profile';
+      // mt_idx로 사용자 정보를 조회할 수 있는 엔드포인트 사용
+      const backendUrl = `https://api3.smap.site/api/v1/members/${mt_idx}`;
       console.log('🔍 [AUTO-LOGIN] 백엔드 API 호출 시작:', {
         url: backendUrl,
         mt_idx: parseInt(mt_idx)
       });
 
       const backendResponse = await fetch(backendUrl, {
-        method: 'POST',
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          mt_idx: parseInt(mt_idx)
-        }),
       });
 
       console.log('📡 [AUTO-LOGIN] 백엔드 응답 상태:', backendResponse.status);
@@ -53,8 +51,8 @@ export async function POST(request: NextRequest) {
       const backendData = await backendResponse.json();
       console.log('📡 [AUTO-LOGIN] 백엔드 응답 데이터:', backendData);
 
-      if (backendData.success && backendData.data?.member) {
-        const userData = backendData.data.member;
+      if (backendData.success && backendData.data) {
+        const userData = backendData.data;
         console.log('✅ [AUTO-LOGIN] 사용자 정보 조회 성공:', userData.mt_name);
 
         // JWT 토큰 생성
