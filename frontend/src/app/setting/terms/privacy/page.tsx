@@ -212,7 +212,6 @@ export default function PrivacyPolicyPage() {
               </div>
             </motion.div>
           </AnimatedHeader>
-        )}
 
         {/* 컨텐츠 영역 - 고정 위치 (setting 페이지와 동일한 구조) */}
         <motion.div
