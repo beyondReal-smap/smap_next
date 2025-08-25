@@ -2626,7 +2626,7 @@ export default function RegisterPage() {
                         try {
                           console.log('🔄 [REGISTER] 새로 가입된 회원 자동 로그인 시도:', newMemberMtIdx);
                           
-                          // 자동 로그인 API 호출
+                          // 자동 로그인 API 호출 (사용자 정보 포함)
                           const loginResponse = await fetch('/api/auth/auto-login', {
                             method: 'POST',
                             headers: {
@@ -2634,7 +2634,21 @@ export default function RegisterPage() {
                             },
                             body: JSON.stringify({
                               mt_idx: newMemberMtIdx,
-                              action: 'auto-login'
+                              action: 'auto-login',
+                              userInfo: {
+                                mt_idx: parseInt(newMemberMtIdx),
+                                mt_id: registerData.mt_id,
+                                mt_name: registerData.mt_name,
+                                mt_nickname: registerData.mt_nickname,
+                                mt_hp: registerData.mt_id,
+                                mt_email: registerData.mt_email,
+                                mt_birth: registerData.mt_birth,
+                                mt_gender: registerData.mt_gender,
+                                mt_type: registerData.isSocialLogin ? 
+                                  (registerData.socialProvider === 'google' ? 4 : registerData.socialProvider === 'apple' ? 3 : 2) : 1,
+                                mt_level: 2,
+                                mt_file1: ''
+                              }
                             }),
                           });
                           
