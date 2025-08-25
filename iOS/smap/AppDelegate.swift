@@ -19,10 +19,18 @@ import WebKit
 import KakaoSDKCommon
 import KakaoSDKAuth
 
+// FCM Token Manager - 자동 토큰 업데이트 기능
+
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterDelegate, MessagingDelegate {
     var window: UIWindow?
     private let motionManager = CMMotionActivityManager()
+    
+    // MARK: - FCM 자동 토큰 업데이트 관련 프로퍼티
+    private var fcmAutoUpdateTimer: Timer?
+    private var lastFCMTokenUpdateTime: Date?
+    private let fcmTokenUpdateInterval: TimeInterval = 300 // 5분 (300초)
+    private var isFCMUpdateInProgress = false
     
     var title = String()
     var body = String()
@@ -169,7 +177,141 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         // 🚨 임시 해결책: Info.plist 값이 비어있을 경우 런타임 경고
         checkAndWarnEmptyUsageDescriptions()
         
+        // ✅ FCM 자동 토큰 업데이트 초기화
+        setupFCMAutoTokenUpdate()
+        
         return true
+    }
+    
+    // MARK: - 🔔 FCM 자동 토큰 업데이트 관리
+    
+    private func setupFCMAutoTokenUpdate() {
+        print("🚀 [FCM Auto] FCM 자동 토큰 업데이트 초기화")
+        
+        // 앱 상태 변화 감지기 설정
+        setupFCMAppStateObservers()
+        
+        // 로그인 상태일 때만 자동 업데이트 시작
+        if UserDefaults.standard.bool(forKey: "is_logged_in") {
+            startFCMAutoTokenUpdate()
+        }
+    }
+    
+    private func setupFCMAppStateObservers() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(fcmAppDidBecomeActive),
+            name: UIApplication.didBecomeActiveNotification,
+            object: nil
+        )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(fcmAppDidEnterBackground),
+            name: UIApplication.didEnterBackgroundNotification,
+            object: nil
+        )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(fcmAppWillEnterForeground),
+            name: UIApplication.willEnterForegroundNotification,
+            object: nil
+        )
+        
+        print("✅ [FCM Auto] 앱 상태 변화 감지기 설정 완료")
+    }
+    
+    private func startFCMAutoTokenUpdate() {
+        print("🚀 [FCM Auto] 자동 FCM 토큰 업데이트 시작")
+        
+        // 기존 타이머 정리
+        stopFCMAutoTokenUpdate()
+        
+        // 즉시 첫 번째 토큰 업데이트 실행
+        updateFCMTokenIfNeeded()
+        
+        // 5분마다 자동 업데이트 타이머 시작
+        fcmAutoUpdateTimer = Timer.scheduledTimer(withTimeInterval: fcmTokenUpdateInterval, repeats: true) { [weak self] _ in
+            self?.updateFCMTokenIfNeeded()
+        }
+        
+        print("✅ [FCM Auto] 5분마다 자동 FCM 토큰 업데이트 타이머 시작됨")
+    }
+    
+    private func stopFCMAutoTokenUpdate() {
+        print("⏹️ [FCM Auto] 자동 FCM 토큰 업데이트 중지")
+        
+        fcmAutoUpdateTimer?.invalidate()
+        fcmAutoUpdateTimer = nil
+        
+        print("✅ [FCM Auto] 자동 FCM 토큰 업데이트 타이머 중지됨")
+    }
+    
+    private func updateFCMTokenIfNeeded() {
+        // 🔒 중복 실행 방지
+        guard !isFCMUpdateInProgress else {
+            print("⏳ [FCM Auto] FCM 토큰 업데이트 이미 진행 중 - 스킵")
+            return
+        }
+        
+        // 로그인 상태 확인
+        guard UserDefaults.standard.bool(forKey: "is_logged_in") else {
+            print("🔒 [FCM Auto] 로그인 상태가 아님 - FCM 토큰 업데이트 스킵")
+            return
+        }
+        
+        // 마지막 업데이트 시간 확인 (5분 간격 강제)
+        if let lastUpdate = lastFCMTokenUpdateTime,
+           Date().timeIntervalSince(lastUpdate) < fcmTokenUpdateInterval {
+            print("⏰ [FCM Auto] 마지막 업데이트 후 \(Int(Date().timeIntervalSince(lastUpdate)))초 경과 - 5분 간격 대기")
+            return
+        }
+        
+        print("🔄 [FCM Auto] FCM 토큰 업데이트 시작")
+        isFCMUpdateInProgress = true
+        
+        // 현재 FCM 토큰 가져오기
+        Messaging.messaging().token { [weak self] token, error in
+            DispatchQueue.main.async {
+                defer {
+                    self?.isFCMUpdateInProgress = false
+                }
+                
+                if let error = error {
+                    print("❌ [FCM Auto] FCM 토큰 가져오기 실패: \(error.localizedDescription)")
+                    return
+                }
+                
+                guard let token = token, !token.isEmpty else {
+                    print("❌ [FCM Auto] FCM 토큰이 nil이거나 비어있음")
+                    return
+                }
+                
+                print("✅ [FCM Auto] FCM 토큰 가져오기 성공: \(token.prefix(30))...")
+                
+                // 토큰 변경 감지 및 서버 업데이트
+                self?.checkAndUpdateFCMTokenIfNeeded(currentToken: token)
+            }
+        }
+    }
+    
+    // MARK: - 🔔 FCM 앱 상태 변화 핸들러
+    
+    @objc private func fcmAppDidBecomeActive() {
+        print("▶️ [FCM Auto] 앱이 활성화됨 - 즉시 FCM 토큰 업데이트")
+        updateFCMTokenIfNeeded()
+    }
+    
+    @objc private func fcmAppDidEnterBackground() {
+        print("⏸️ [FCM Auto] 앱이 백그라운드로 진입")
+        // 백그라운드 진입 시에도 토큰 업데이트 (필요시)
+        // updateFCMTokenIfNeeded()
+    }
+    
+    @objc private func fcmAppWillEnterForeground() {
+        print("▶️ [FCM Auto] 앱이 포그라운드로 진입 예정 - 즉시 FCM 토큰 업데이트")
+        updateFCMTokenIfNeeded()
     }
     
     // MARK: - 🔔 푸시 알림 권한 처리
@@ -254,6 +396,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                         
                         // 🔔 중요: FCM 토큰이 변경되었는지 확인하고 서버에 업데이트
                         self.checkAndUpdateFCMTokenIfNeeded(currentToken: token)
+                        
+                        // ✅ FCM 자동 업데이트 시간 기록
+                        self.lastFCMTokenUpdateTime = Date()
                     }
                 } else {
                     print("❌ [PUSH] FCM 토큰이 없음")
@@ -292,6 +437,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         } else {
             print("✅ [FCM] FCM 토큰 변경 없음 - 서버 업데이트 생략")
         }
+        
+        // ✅ FCM 자동 업데이트 시간 기록
+        lastFCMTokenUpdateTime = Date()
     }
     
     private func authorizationStatusString(_ status: UNAuthorizationStatus) -> String {
@@ -377,6 +525,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             waitForPushPermissionSettlement { [weak self] in
                 self?.runPermissionOnboardingIfNeeded()
             }
+            
+            // ✅ FCM 자동 토큰 업데이트 시작
+            startFCMAutoTokenUpdate()
         } else {
             print("🔒 [PUSH] 로그인 전 - 푸시 알림 권한 상태 체크 생략")
         }
@@ -1122,6 +1273,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         let userInfo: [AnyHashable: Any] = ["state": "background"]
 
         NotificationCenter.default.post(name: Notification.Name("appStateChange"), object: nil, userInfo: userInfo)
+        
+        // ✅ 백그라운드 진입 시 FCM 자동 토큰 업데이트 중지
+        stopFCMAutoTokenUpdate()
+        
         // Use this method to release shared resources, save user data, invalidate timers, and store enough application state information to restore your application to its current state in case it is terminated later.
         // If your application supports background execution, this method is called instead of applicationWillTerminate: when the user quits.
     }
@@ -1185,6 +1340,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         
         print("⚠️ 처리되지 않은 URL: \(url)")
         return false
+    }
+    
+    // MARK: - 정리
+    deinit {
+        print("🧹 [FCM Auto] AppDelegate 정리 시작")
+        
+        // FCM 자동 토큰 업데이트 타이머 정리
+        stopFCMAutoTokenUpdate()
+        
+        // 앱 상태 변화 감지기 제거
+        NotificationCenter.default.removeObserver(self)
+        
+        print("✅ [FCM Auto] AppDelegate 정리 완료")
     }
 }
 
@@ -1282,6 +1450,8 @@ extension AppDelegate {
         }
     }
     
+
+    
     private func setupRuntimePermissionDescriptions() {
         print("🔧 [RUNTIME] 런타임 권한 설명 설정 시작")
         
@@ -1299,6 +1469,7 @@ extension AppDelegate {
         UNUserNotificationCenter.smap_installRequestAuthSwizzle()
         CLLocationManager.smap_installLocationAuthSwizzle()
     }
+    
 }
 
 extension UNUserNotificationCenter {

@@ -620,10 +620,21 @@ export default function RegisterPage() {
   // 진행률 계산
   const getProgress = () => {
     const allSteps = Object.values(REGISTER_STEPS);
-    const isSimpleSocial = registerData.isSocialLogin && (registerData.socialProvider === 'google' || registerData.socialProvider === 'apple');
-    const steps = isSimpleSocial
-      ? [REGISTER_STEPS.TERMS, REGISTER_STEPS.BASIC_INFO, REGISTER_STEPS.PROFILE, REGISTER_STEPS.COMPLETE]
-      : allSteps;
+    const isAppleLogin = registerData.isSocialLogin && registerData.socialProvider === 'apple';
+    const isGoogleLogin = registerData.isSocialLogin && registerData.socialProvider === 'google';
+    
+    let steps;
+    if (isAppleLogin) {
+      // 애플 로그인: 약관동의 → 프로필 → 완료 (2단계)
+      steps = [REGISTER_STEPS.TERMS, REGISTER_STEPS.PROFILE, REGISTER_STEPS.COMPLETE];
+    } else if (isGoogleLogin) {
+      // 구글 로그인: 약관동의 → 기본정보 → 프로필 → 완료 (3단계)
+      steps = [REGISTER_STEPS.TERMS, REGISTER_STEPS.BASIC_INFO, REGISTER_STEPS.PROFILE, REGISTER_STEPS.COMPLETE];
+    } else {
+      // 일반 회원가입: 모든 단계
+      steps = allSteps;
+    }
+    
     const currentIndex = steps.indexOf(currentStep);
     const safeIndex = currentIndex >= 0 ? currentIndex : 0;
     return ((safeIndex + 1) / (steps.length - 1)) * 100; // COMPLETE 제외
@@ -982,20 +993,38 @@ export default function RegisterPage() {
     // 소셜 로그인 시 전화번호 인증 단계 건너뛰기
     if (registerData.isSocialLogin) {
       if (currentStep === REGISTER_STEPS.TERMS) {
-        // iOS에서는 약간의 지연을 두어 애니메이션이 완료된 후 전환
-        if (isIOS) {
-          setTimeout(() => {
-            setCurrentStep(REGISTER_STEPS.BASIC_INFO);
-          }, 50);
+        // 애플 로그인 시 기본정보 단계 건너뛰기
+        if (registerData.socialProvider === 'apple') {
+          if (isIOS) {
+            setTimeout(() => {
+              setCurrentStep(REGISTER_STEPS.PROFILE);
+            }, 50);
+          } else {
+            setCurrentStep(REGISTER_STEPS.PROFILE);
+          }
         } else {
-          setCurrentStep(REGISTER_STEPS.BASIC_INFO);
+          // 구글 로그인 등 다른 소셜 로그인은 기본정보 단계로
+          if (isIOS) {
+            setTimeout(() => {
+              setCurrentStep(REGISTER_STEPS.BASIC_INFO);
+            }, 50);
+          } else {
+            setCurrentStep(REGISTER_STEPS.BASIC_INFO);
+          }
         }
         return;
       }
     }
     
     if (currentIndex < steps.length - 1) {
-      // iOS에서는 약간의 지연을 두어 애니메이션이 완료된 후 전환
+      // 애플 ID 로그인 시 프로필 단계에서 회원가입 완료
+      if (registerData.isSocialLogin && registerData.socialProvider === 'apple' && currentStep === REGISTER_STEPS.PROFILE) {
+        console.log('🔥 [REGISTER] 애플 ID 로그인 - 프로필 단계에서 회원가입 완료');
+        handleRegister();
+        return;
+      }
+      
+      // iOS에서는 약간의 지연을 두어 애니메이션 완료된 후 전환
       if (isIOS) {
         setTimeout(() => {
           setCurrentStep(steps[currentIndex + 1]);
@@ -1253,8 +1282,17 @@ export default function RegisterPage() {
         mt_show: 'Y'
       };
 
-      // 구글 로그인 시 비밀번호 제거 (실제로는 사용되지 않음)
-      if (registerData.isSocialLogin && (registerData.socialProvider === 'google' || registerData.socialProvider === 'apple')) {
+      // 애플 ID 로그인 시 기본정보 단계를 건너뛰었으므로, 애플에서 제공한 기본 정보 사용
+      if (registerData.isSocialLogin && registerData.socialProvider === 'apple') {
+        // 애플에서 제공한 기본 정보로 채우기
+        requestData.mt_name = requestData.mt_name || 'Apple User';
+        requestData.mt_nickname = requestData.mt_nickname || 'Apple User';
+        requestData.mt_email = requestData.mt_email || '';
+        
+        // 애플 ID 로그인 시 비밀번호 제거
+        delete requestData.mt_pwd;
+      } else if (registerData.isSocialLogin && registerData.socialProvider === 'google') {
+        // 구글 로그인 시 비밀번호 제거 (실제로는 사용되지 않음)
         delete requestData.mt_pwd;
       }
 
@@ -1542,6 +1580,11 @@ export default function RegisterPage() {
                !emailError && // 이메일 에러가 없어야 함
                isEmailValid; // 빈 값이거나 유효한 이메일
       case REGISTER_STEPS.PROFILE:
+        // 애플 ID 로그인 시에는 애플에서 제공한 기본 정보가 이미 있으므로, 생년월일과 성별만 확인
+        if (registerData.isSocialLogin && registerData.socialProvider === 'apple') {
+          return registerData.mt_birth && registerData.mt_gender !== null;
+        }
+        // 일반 회원가입이나 다른 소셜 로그인의 경우 기존 로직 유지
         return registerData.mt_birth && registerData.mt_gender !== null;
       default:
         return false;
