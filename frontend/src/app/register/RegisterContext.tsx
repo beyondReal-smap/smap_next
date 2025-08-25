@@ -42,7 +42,19 @@ interface RegisterContextType {
 const RegisterContext = createContext<RegisterContextType | undefined>(undefined);
 
 export function RegisterProvider({ children }: { children: ReactNode }) {
-  const [currentStep, setCurrentStep] = useState(REGISTER_STEPS.TERMS);
+  // URL에서 단계 정보를 읽어와서 초기 단계 설정
+  const [currentStep, setCurrentStep] = useState(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const step = params.get('step');
+      if (step && Object.values(REGISTER_STEPS).includes(step as any)) {
+        return step;
+      }
+    } catch {
+      // 에러 발생 시 기본값 사용
+    }
+    return REGISTER_STEPS.TERMS;
+  });
   const [birthModalOpen, setBirthModalOpen] = useState(false);
 
   // 소셜 로그인 상태 감지

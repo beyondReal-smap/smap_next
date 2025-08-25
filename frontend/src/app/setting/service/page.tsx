@@ -165,7 +165,20 @@ export default function ServiceTermsPage() {
     
     if (isFromRegister) {
       // register 페이지에서 온 경우 register로 돌아가기
-      router.push('/register');
+      // URL에서 소셜 로그인 정보와 현재 단계 정보를 유지
+      const urlParams = new URLSearchParams(window.location.search);
+      const social = urlParams.get('social');
+      const step = urlParams.get('step') || 'terms';
+      
+      let targetUrl = '/register';
+      if (social) {
+        targetUrl += `?social=${social}`;
+        if (step) {
+          targetUrl += `&step=${step}`;
+        }
+      }
+      
+      router.push(targetUrl);
     } else {
       // setting 페이지에서 온 경우 setting으로 돌아가기
       router.push('/setting');

@@ -1841,6 +1841,19 @@ export default function RegisterPage() {
                                   target = target.slice(0, -1);
                                 }
                               }
+                              
+                              // 현재 소셜 로그인 정보와 단계 정보를 약관 페이지 URL에 추가
+                              const urlParams = new URLSearchParams(window.location.search);
+                              const social = urlParams.get('social');
+                              const currentStep = currentStep; // 현재 단계
+                              
+                              if (social) {
+                                target += (target.includes('?') ? '&' : '?') + `social=${social}`;
+                              }
+                              if (currentStep) {
+                                target += (target.includes('?') ? '&' : '?') + `step=${currentStep}`;
+                              }
+                              
                               // Next.js Router 사용
                               try {
                                 const { push } = require('next/navigation');
