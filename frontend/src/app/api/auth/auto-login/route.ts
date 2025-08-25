@@ -20,12 +20,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('🔍 [AUTO-LOGIN] 자동 로그인 요청:', { mt_idx, action, hasUserInfo: !!userInfo });
+    console.log('🔍 [AUTO-LOGIN] 자동 로그인 요청:', { 
+      mt_idx, 
+      action, 
+      hasUserInfo: !!userInfo,
+      userInfoKeys: userInfo ? Object.keys(userInfo) : [],
+      userInfoValues: userInfo ? Object.values(userInfo) : []
+    });
 
     // 회원가입 시 받은 사용자 정보를 직접 사용
     if (userInfo && userInfo.mt_idx) {
       const userData = userInfo;
-      console.log('✅ [AUTO-LOGIN] 회원가입 정보로 자동 로그인:', userData.mt_name);
+      console.log('✅ [AUTO-LOGIN] 회원가입 정보로 자동 로그인:', {
+        mt_idx: userData.mt_idx,
+        mt_name: userData.mt_name,
+        mt_email: userData.mt_email,
+        mt_type: userData.mt_type
+      });
 
       // JWT 토큰 생성
       const jwtToken = generateJWT({

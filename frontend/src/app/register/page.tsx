@@ -2626,6 +2626,35 @@ export default function RegisterPage() {
                         try {
                           console.log('🔄 [REGISTER] 새로 가입된 회원 자동 로그인 시도:', newMemberMtIdx);
                           
+                          // localStorage에서 socialLoginData 가져오기
+                          const socialLoginDataStr = localStorage.getItem('socialLoginData');
+                          let socialLoginData = null;
+                          if (socialLoginDataStr) {
+                            try {
+                              socialLoginData = JSON.parse(socialLoginDataStr);
+                            } catch (e) {
+                              console.warn('⚠️ [REGISTER] socialLoginData 파싱 실패:', e);
+                            }
+                          }
+
+                          // 사용자 정보 구성 (안전한 방식)
+                          const userInfo = {
+                            mt_idx: parseInt(newMemberMtIdx),
+                            mt_id: registerData.mt_id || socialLoginData?.apple_id || '',
+                            mt_name: registerData.mt_name || socialLoginData?.name || '',
+                            mt_nickname: registerData.mt_nickname || socialLoginData?.name || '',
+                            mt_hp: registerData.mt_id || socialLoginData?.apple_id || '',
+                            mt_email: registerData.mt_email || socialLoginData?.email || '',
+                            mt_birth: registerData.mt_birth || '',
+                            mt_gender: registerData.mt_gender || '',
+                            mt_type: registerData.isSocialLogin ? 
+                              (registerData.socialProvider === 'google' ? 4 : registerData.socialProvider === 'apple' ? 3 : 2) : 1,
+                            mt_level: 2,
+                            mt_file1: ''
+                          };
+
+                          console.log('🔍 [REGISTER] 자동 로그인용 사용자 정보:', userInfo);
+
                           // 자동 로그인 API 호출 (사용자 정보 포함)
                           const loginResponse = await fetch('/api/auth/auto-login', {
                             method: 'POST',
@@ -2635,20 +2664,7 @@ export default function RegisterPage() {
                             body: JSON.stringify({
                               mt_idx: newMemberMtIdx,
                               action: 'auto-login',
-                              userInfo: {
-                                mt_idx: parseInt(newMemberMtIdx),
-                                mt_id: registerData.mt_id,
-                                mt_name: registerData.mt_name,
-                                mt_nickname: registerData.mt_nickname,
-                                mt_hp: registerData.mt_id,
-                                mt_email: registerData.mt_email,
-                                mt_birth: registerData.mt_birth,
-                                mt_gender: registerData.mt_gender,
-                                mt_type: registerData.isSocialLogin ? 
-                                  (registerData.socialProvider === 'google' ? 4 : registerData.socialProvider === 'apple' ? 3 : 2) : 1,
-                                mt_level: 2,
-                                mt_file1: ''
-                              }
+                              userInfo: userInfo
                             }),
                           });
                           
