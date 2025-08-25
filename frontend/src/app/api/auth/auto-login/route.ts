@@ -22,37 +22,37 @@ export async function POST(request: NextRequest) {
 
     console.log('🔍 [AUTO-LOGIN] 자동 로그인 요청:', { mt_idx, action });
 
-    // 백엔드 API를 통해 mt_idx로 사용자 정보 조회
+    // 프론트엔드 API를 통해 mt_idx로 사용자 정보 조회
     try {
-      // mt_idx로 사용자 정보를 조회할 수 있는 엔드포인트 사용
-      const backendUrl = `https://api3.smap.site/api/v1/members/${mt_idx}`;
-      console.log('🔍 [AUTO-LOGIN] 백엔드 API 호출 시작:', {
-        url: backendUrl,
+      // 기존에 구현된 members API 사용
+      const frontendUrl = `/api/members/${mt_idx}`;
+      console.log('🔍 [AUTO-LOGIN] 프론트엔드 API 호출 시작:', {
+        url: frontendUrl,
         mt_idx: parseInt(mt_idx)
       });
 
-      const backendResponse = await fetch(backendUrl, {
+      const frontendResponse = await fetch(frontendUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
       });
 
-      console.log('📡 [AUTO-LOGIN] 백엔드 응답 상태:', backendResponse.status);
+      console.log('📡 [AUTO-LOGIN] 프론트엔드 응답 상태:', frontendResponse.status);
 
-      if (!backendResponse.ok) {
-        console.error('❌ [AUTO-LOGIN] 백엔드 사용자 정보 조회 실패:', backendResponse.status);
+      if (!frontendResponse.ok) {
+        console.error('❌ [AUTO-LOGIN] 프론트엔드 사용자 정보 조회 실패:', frontendResponse.status);
         return NextResponse.json(
           { success: false, error: '사용자 정보를 찾을 수 없습니다.' },
           { status: 404 }
         );
       }
 
-      const backendData = await backendResponse.json();
-      console.log('📡 [AUTO-LOGIN] 백엔드 응답 데이터:', backendData);
+      const frontendData = await frontendResponse.json();
+      console.log('📡 [AUTO-LOGIN] 프론트엔드 응답 데이터:', frontendData);
 
-      if (backendData.success && backendData.data) {
-        const userData = backendData.data;
+      if (frontendData.mt_idx) {
+        const userData = frontendData;
         console.log('✅ [AUTO-LOGIN] 사용자 정보 조회 성공:', userData.mt_name);
 
         // JWT 토큰 생성
@@ -100,10 +100,10 @@ export async function POST(request: NextRequest) {
         );
       }
 
-    } catch (backendError) {
-      console.error('❌ [AUTO-LOGIN] 백엔드 연결 실패:', backendError);
+    } catch (frontendError) {
+      console.error('❌ [AUTO-LOGIN] 프론트엔드 API 호출 실패:', frontendError);
       return NextResponse.json(
-        { success: false, error: '서버 연결에 실패했습니다.' },
+        { success: false, error: '사용자 정보 조회에 실패했습니다.' },
         { status: 503 }
       );
     }
