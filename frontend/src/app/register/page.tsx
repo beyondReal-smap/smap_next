@@ -365,7 +365,9 @@ export default function RegisterPage() {
     currentStep, 
     setCurrentStep,
     birthModalOpen,
-    setBirthModalOpen 
+    setBirthModalOpen,
+    isAppleLogin,
+    isGoogleLogin
   } = useRegisterContext();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
