@@ -187,20 +187,74 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     
     private func setupFCMAutoTokenUpdate() {
         print("🚀 [FCM Auto] FCM 자동 토큰 업데이트 초기화")
-        
+
         // 앱 상태 변화 감지기 설정
         setupFCMAppStateObservers()
-        
+
         // 로그인 상태 확인 (여러 키에서 확인)
         let isLoggedIn = UserDefaults.standard.bool(forKey: "is_logged_in") ||
                         UserDefaults.standard.string(forKey: "mt_idx") != nil ||
                         UserDefaults.standard.string(forKey: "savedMtIdx") != nil
-        
+
         if isLoggedIn {
             print("✅ [FCM Auto] 로그인 상태 감지됨 - 자동 업데이트 시작")
             startFCMAutoTokenUpdate()
+
+            // 🚨 앱 시작 시 즉시 FCM 토큰 확인 및 갱신
+            performImmediateFCMTokenValidation()
         } else {
             print("🔒 [FCM Auto] 로그인 상태가 아님 - 자동 업데이트 대기")
+        }
+    }
+
+    // MARK: - 🚨 앱 시작 시 즉시 FCM 토큰 검증
+    private func performImmediateFCMTokenValidation() {
+        print("🔍 [FCM] 앱 시작 시 즉시 FCM 토큰 검증 시작")
+
+        // 마지막 토큰 업데이트 시간 확인
+        let lastUpdateTime = UserDefaults.standard.double(forKey: "last_fcm_token_update_time")
+        let currentTime = Date().timeIntervalSince1970
+        let timeSinceLastUpdate = currentTime - lastUpdateTime
+
+        print("📊 [FCM] 마지막 토큰 업데이트로부터 \(String(format: "%.1f", timeSinceLastUpdate / 3600))시간 경과")
+
+        // 24시간 이상 경과했거나 처음 실행인 경우 강제 토큰 갱신
+        if timeSinceLastUpdate > (24 * 60 * 60) || lastUpdateTime == 0 {
+            print("🚨 [FCM] 24시간 이상 경과 또는 첫 실행 - 강제 토큰 갱신 실행")
+            forceRefreshFCMTokenOnAppStart()
+        } else {
+            print("✅ [FCM] 최근에 토큰 업데이트됨 - 일반 검증 진행")
+            updateFCMTokenIfNeeded()
+        }
+    }
+
+    private func forceRefreshFCMTokenOnAppStart() {
+        print("🔄 [FCM] 앱 시작 시 강제 토큰 갱신")
+
+        // 기존 토큰 무효화
+        UserDefaults.standard.removeObject(forKey: "last_fcm_token")
+        UserDefaults.standard.synchronize()
+
+        // FCM 토큰 재생성 요청
+        Messaging.messaging().token { [weak self] token, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("❌ [FCM] 앱 시작 시 토큰 갱신 실패: \(error.localizedDescription)")
+                    // 네트워크 문제일 수 있으므로 30초 후 재시도
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 30.0) {
+                        self?.updateFCMTokenIfNeeded()
+                    }
+                    return
+                }
+
+                guard let token = token, !token.isEmpty else {
+                    print("❌ [FCM] 앱 시작 시 토큰이 nil이거나 비어있음")
+                    return
+                }
+
+                print("✅ [FCM] 앱 시작 시 토큰 갱신 성공: \(token.prefix(30))...")
+                self?.checkAndUpdateFCMTokenIfNeeded(currentToken: token)
+            }
         }
     }
     
@@ -272,14 +326,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             return
         }
         
-        // 마지막 업데이트 시간 확인 (5분 간격 강제)
-        if let lastUpdate = lastFCMTokenUpdateTime,
-           Date().timeIntervalSince(lastUpdate) < fcmTokenUpdateInterval {
-            print("⏰ [FCM Auto] 마지막 업데이트 후 \(Int(Date().timeIntervalSince(lastUpdate)))초 경과 - 1분 간격 대기")
-            return
-        }
-        
-        print("🔄 [FCM Auto] FCM 토큰 업데이트 시작")
+        // 🚨 강제 업데이트: 1분마다 무조건 업데이트 실행
+        print("🔄 [FCM Auto] FCM 토큰 업데이트 시작 (1분마다 강제)")
         isFCMUpdateInProgress = true
         
         // 현재 FCM 토큰 가져오기
@@ -456,33 +504,32 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         // 이전에 저장된 FCM 토큰과 비교
         let lastSavedToken = UserDefaults.standard.string(forKey: "last_fcm_token")
         
-        // 🚨 강제 업데이트: 토큰이 다르거나 저장된 토큰이 없으면 업데이트
-        let shouldUpdate = lastSavedToken != currentToken || lastSavedToken == nil
+        // 🚨 강제 업데이트: 1분마다 무조건 서버에 업데이트
+        print("🔄 [FCM] FCM 토큰 강제 업데이트 실행!")
+        print("🔄 [FCM] 이전 토큰: \(lastSavedToken ?? "없음")")
+        print("🔄 [FCM] 현재 토큰: \(currentToken)")
+        print("🔄 [FCM] 토큰 변경 여부: \(lastSavedToken != currentToken)")
+        print("🔄 [FCM] 저장된 토큰 없음: \(lastSavedToken == nil)")
         
-        if shouldUpdate {
-            print("🔄 [FCM] FCM 토큰 업데이트 필요!")
-            print("🔄 [FCM] 이전 토큰: \(lastSavedToken ?? "없음")")
-            print("🔄 [FCM] 현재 토큰: \(currentToken)")
-            print("🔄 [FCM] 토큰 변경 여부: \(lastSavedToken != currentToken)")
-            print("🔄 [FCM] 저장된 토큰 없음: \(lastSavedToken == nil)")
-            
-            // 🔒 업데이트 진행 중 플래그 설정
-            UserDefaults.standard.set(true, forKey: "fcm_update_in_progress")
-            UserDefaults.standard.synchronize()
-            
-            // 새로운 토큰을 UserDefaults에 저장
-            UserDefaults.standard.set(currentToken, forKey: "last_fcm_token")
-            UserDefaults.standard.synchronize()
-            
-            // 서버에 FCM 토큰 업데이트
-            print("🚀 [FCM] FCM 토큰을 서버에 업데이트 시작")
-            self.sendFCMTokenToServer(token: currentToken)
-        } else {
-            print("✅ [FCM] FCM 토큰 변경 없음 - 서버 업데이트 생략")
-        }
+        // 🔒 업데이트 진행 중 플래그 설정
+        UserDefaults.standard.set(true, forKey: "fcm_update_in_progress")
+        UserDefaults.standard.synchronize()
         
-        // ✅ FCM 자동 업데이트 시간 기록
+        // 새로운 토큰을 UserDefaults에 저장
+        UserDefaults.standard.set(currentToken, forKey: "last_fcm_token")
+        UserDefaults.standard.synchronize()
+
+        // 서버에 FCM 토큰 업데이트 (무조건 실행)
+        print("🚀 [FCM] FCM 토큰을 서버에 강제 업데이트 시작")
+        self.sendFCMTokenToServer(token: currentToken)
+
+        // ✅ FCM 자동 업데이트 시간 기록 (UserDefaults에도 저장)
+        let currentTime = Date().timeIntervalSince1970
+        UserDefaults.standard.set(currentTime, forKey: "last_fcm_token_update_time")
+        UserDefaults.standard.synchronize()
         lastFCMTokenUpdateTime = Date()
+
+        print("📅 [FCM] 토큰 업데이트 시간 기록됨: \(Date().description)")
     }
     
     private func authorizationStatusString(_ status: UNAuthorizationStatus) -> String {
@@ -556,10 +603,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     
     func applicationDidBecomeActive(_ application: UIApplication) {
         print("▶️ [SMAP-iOS] 앱이 활성화됨")
-        
+
         // 앱 활성화 시 성능 최적화
         URLCache.shared.removeAllCachedResponses()
-        
+
         // 🚨 로그인 전에는 푸시 알림 권한 체크하지 않음
         if UserDefaults.standard.bool(forKey: "is_logged_in") {
             print("🔍 [PUSH] 로그인 상태 - 푸시 알림 권한 상태 확인")
@@ -568,9 +615,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             waitForPushPermissionSettlement { [weak self] in
                 self?.runPermissionOnboardingIfNeeded()
             }
-            
+
             // ✅ FCM 자동 토큰 업데이트 시작
             startFCMAutoTokenUpdate()
+
+            // 🔔 큐에 저장된 FCM 메시지들 처리
+            processQueuedFCMMessages()
+
+            // 🔄 백그라운드 푸시 데이터 처리
+            processBackgroundPushData()
         } else {
             print("🔒 [PUSH] 로그인 전 - 푸시 알림 권한 상태 체크 생략")
         }
@@ -889,9 +942,133 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     }
 
     func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any], fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
-        
+        print("🔔 [FCM] 백그라운드에서 원격 알림 수신 (앱 종료 상태 가능)")
+        print("📨 [FCM] 백그라운드 메시지 데이터: \(userInfo)")
+
         Messaging.messaging().appDidReceiveMessage(userInfo)
-        completionHandler(UIBackgroundFetchResult.newData)
+
+        // 백그라운드 푸시인지 확인
+        let isBackgroundPush = userInfo["content-available"] as? String == "1" ||
+                              userInfo["content-available"] as? Int == 1
+
+        if isBackgroundPush {
+            print("🔄 [FCM] 백그라운드 푸시 감지 - 백그라운드에서 처리")
+            handleBackgroundPushMessage(userInfo, completionHandler: completionHandler)
+        } else {
+            print("🔔 [FCM] 일반 푸시 알림 - 큐에 저장 후 완료")
+            // 백그라운드에서 FCM 메시지 수신 시 처리
+            handleBackgroundFCMMessage(userInfo)
+            completionHandler(UIBackgroundFetchResult.newData)
+        }
+    }
+
+    // MARK: - 🔄 백그라운드 푸시 처리
+    private func handleBackgroundPushMessage(_ userInfo: [AnyHashable: Any], completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
+        print("🔄 [FCM] 백그라운드 푸시 메시지 처리 시작")
+
+        // 백그라운드에서 수행할 작업들
+        DispatchQueue.global(qos: .background).async {
+            // 1. 데이터 미리 가져오기 (필요시)
+            self.prefetchDataIfNeeded(userInfo)
+
+            // 2. 로컬 저장소 업데이트
+            self.updateLocalStorageWithBackgroundData(userInfo)
+
+            // 3. 중요하지 않은 작업들은 메인 큐에서 처리
+            DispatchQueue.main.async {
+                // 4. 메시지를 큐에 저장
+                self.saveFCMMessageToQueue(userInfo)
+
+                // 5. 백그라운드 푸시의 경우 사용자에게 알림 표시하지 않음
+                // (필요시 조건부로 표시 가능)
+                if self.shouldShowNotificationForBackgroundPush(userInfo) {
+                    self.showLocalNotificationForBackgroundPush(userInfo)
+                }
+
+                print("✅ [FCM] 백그라운드 푸시 처리 완료")
+                completionHandler(.newData)
+            }
+        }
+    }
+
+    private func prefetchDataIfNeeded(_ userInfo: [AnyHashable: Any]) {
+        print("📥 [FCM] 백그라운드 데이터 미리 가져오기")
+
+        // 메시지에 따라 필요한 데이터 미리 가져오기
+        if let eventUrl = userInfo["event_url"] as? String {
+            // 이벤트 관련 데이터 미리 로드
+            print("🔗 [FCM] 이벤트 URL 데이터 미리 로드: \(eventUrl)")
+            // 실제로는 여기서 API 호출 등을 통해 데이터를 캐싱
+        }
+
+        // 그룹 일정 데이터 미리 로드 등의 작업 가능
+        if let scheduleId = userInfo["schedule_id"] as? String {
+            print("📅 [FCM] 일정 데이터 미리 로드: \(scheduleId)")
+        }
+    }
+
+    private func updateLocalStorageWithBackgroundData(_ userInfo: [AnyHashable: Any]) {
+        print("💾 [FCM] 백그라운드 데이터 로컬 저장소 업데이트")
+
+        // 백그라운드에서 받은 데이터를 로컬에 저장
+        let backgroundDataKey = "background_push_data"
+        var existingData = UserDefaults.standard.dictionary(forKey: backgroundDataKey) ?? [:]
+
+        // 타임스탬프와 함께 저장
+        let timestampedData: [String: Any] = [
+            "userInfo": userInfo,
+            "timestamp": Date().timeIntervalSince1970,
+            "processed": false
+        ]
+
+        existingData["last_background_push"] = timestampedData
+        UserDefaults.standard.set(existingData, forKey: backgroundDataKey)
+        UserDefaults.standard.synchronize()
+
+        print("✅ [FCM] 백그라운드 데이터 저장 완료")
+    }
+
+    private func shouldShowNotificationForBackgroundPush(_ userInfo: [AnyHashable: Any]) -> Bool {
+        // 백그라운드 푸시의 경우 특정 조건에서만 알림 표시
+        // 예: 긴급한 메시지이거나 사용자가 설정한 경우
+
+        if let priority = userInfo["priority"] as? String, priority == "high" {
+            return true
+        }
+
+        if let showNotification = userInfo["show_notification"] as? String, showNotification == "true" {
+            return true
+        }
+
+        // 기본적으로 백그라운드 푸시는 알림을 표시하지 않음
+        return false
+    }
+
+    private func showLocalNotificationForBackgroundPush(_ userInfo: [AnyHashable: Any]) {
+        print("📢 [FCM] 백그라운드 푸시에 대한 로컬 알림 표시")
+
+        guard let aps = userInfo["aps"] as? [AnyHashable: Any],
+              let alert = aps["alert"] as? [AnyHashable: Any] else {
+            print("⚠️ [FCM] 백그라운드 푸시 알림 데이터 없음")
+            return
+        }
+
+        let content = UNMutableNotificationContent()
+        content.title = alert["title"] as? String ?? "백그라운드 알림"
+        content.body = alert["body"] as? String ?? ""
+        content.sound = .default
+        content.badge = 1
+        content.userInfo = userInfo
+
+        let request = UNNotificationRequest(identifier: "background_push_\(UUID().uuidString)", content: content, trigger: nil)
+
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("❌ [FCM] 백그라운드 푸시 로컬 알림 표시 실패: \(error.localizedDescription)")
+            } else {
+                print("✅ [FCM] 백그라운드 푸시 로컬 알림 표시 성공")
+            }
+        }
     }                                          
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
@@ -1078,6 +1255,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         UserDefaults.standard.removeObject(forKey: "last_fcm_token")
         UserDefaults.standard.synchronize()
         print("🗑️ [FCM FORCE] 저장된 토큰 초기화 완료")
+        
+        // 즉시 FCM 토큰 업데이트 실행
+        updateFCMTokenIfNeeded()
+    }
+    
+    // MARK: - 🔔 FCM 토큰 즉시 업데이트 (디버깅용)
+    @objc func updateFCMTokenNow() {
+        print("🚨 [FCM NOW] FCM 토큰 즉시 업데이트 실행")
+        
+        // 저장된 토큰 초기화
+        UserDefaults.standard.removeObject(forKey: "last_fcm_token")
+        UserDefaults.standard.synchronize()
+        print("🗑️ [FCM NOW] 저장된 토큰 초기화 완료")
         
         // 즉시 FCM 토큰 업데이트 실행
         updateFCMTokenIfNeeded()
@@ -1480,16 +1670,225 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         return false
     }
     
+    // MARK: - 🔔 백그라운드 FCM 메시지 처리 헬퍼 메서드들
+
+    private func handleBackgroundFCMMessage(_ userInfo: [AnyHashable : Any]) {
+        print("🔄 [FCM] 백그라운드 FCM 메시지 처리 시작")
+
+        // 메시지를 로컬 저장소에 큐잉 (앱 재시작 시 처리)
+        saveFCMMessageToQueue(userInfo)
+
+        // 중요 메시지인 경우 로컬 알림 표시
+        if isImportantMessage(userInfo) {
+            showLocalNotificationForFCMMessage(userInfo)
+        }
+    }
+
+    private func saveFCMMessageToQueue(_ userInfo: [AnyHashable : Any]) {
+        print("💾 [FCM] FCM 메시지를 큐에 저장")
+
+        var queuedMessages = UserDefaults.standard.array(forKey: "fcm_message_queue") as? [[AnyHashable: Any]] ?? []
+
+        // 큐 크기 제한 (최대 50개)
+        if queuedMessages.count >= 50 {
+            queuedMessages.removeFirst()
+        }
+
+        let messageWithTimestamp: [AnyHashable: Any] = [
+            "userInfo": userInfo,
+            "timestamp": Date().timeIntervalSince1970,
+            "processed": false
+        ]
+
+        queuedMessages.append(messageWithTimestamp)
+
+        UserDefaults.standard.set(queuedMessages, forKey: "fcm_message_queue")
+        UserDefaults.standard.synchronize()
+
+        print("✅ [FCM] 큐에 메시지 저장 완료 (총 \(queuedMessages.count)개)")
+    }
+
+    private func isImportantMessage(_ userInfo: [AnyHashable : Any]) -> Bool {
+        // 일정 관련 메시지나 중요한 알림은 중요 메시지로 간주
+        if let aps = userInfo["aps"] as? [AnyHashable: Any],
+           let alert = aps["alert"] as? [AnyHashable: Any],
+           let title = alert["title"] as? String {
+            return title.contains("일정") || title.contains("알림") || title.contains("초대")
+        }
+        return false
+    }
+
+    private func showLocalNotificationForFCMMessage(_ userInfo: [AnyHashable : Any]) {
+        print("📢 [FCM] 중요 메시지에 대한 로컬 알림 표시")
+
+        guard let aps = userInfo["aps"] as? [AnyHashable: Any],
+              let alert = aps["alert"] as? [AnyHashable: Any] else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = alert["title"] as? String ?? "알림"
+        content.body = alert["body"] as? String ?? ""
+        content.sound = .default
+        content.badge = 1
+
+        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("❌ [FCM] 로컬 알림 표시 실패: \(error.localizedDescription)")
+            } else {
+                print("✅ [FCM] 로컬 알림 표시 성공")
+            }
+        }
+    }
+
+    // MARK: - 📋 큐에 저장된 메시지 처리
+    func processQueuedFCMMessages() {
+        print("🔄 [FCM] 큐에 저장된 메시지들 처리 시작")
+
+        guard let queuedMessages = UserDefaults.standard.array(forKey: "fcm_message_queue") as? [[AnyHashable: Any]] else {
+            print("ℹ️ [FCM] 처리할 큐 메시지가 없음")
+            return
+        }
+
+        var processedCount = 0
+        for messageData in queuedMessages {
+            if let userInfo = messageData["userInfo"] as? [AnyHashable: Any],
+               let processed = messageData["processed"] as? Bool,
+               !processed {
+                // 메시지 처리
+                processQueuedMessage(userInfo)
+                processedCount += 1
+            }
+        }
+
+        if processedCount > 0 {
+            print("✅ [FCM] \(processedCount)개의 큐 메시지 처리 완료")
+            // 처리된 메시지들은 다음 앱 시작 때까지 유지 (중복 처리 방지)
+        } else {
+            print("ℹ️ [FCM] 처리할 새로운 큐 메시지가 없음")
+        }
+    }
+
+    private func processQueuedMessage(_ userInfo: [AnyHashable: Any]) {
+        print("📨 [FCM] 큐 메시지 처리: \(userInfo)")
+
+        // WebView에 메시지 전달 (WebView가 로드된 경우)
+        if let webView = findWebViewInHierarchy() {
+            DispatchQueue.main.async {
+                let messageData = [
+                    "type": "queued_fcm_message",
+                    "userInfo": userInfo,
+                    "timestamp": Date().timeIntervalSince1970
+                ] as [String: Any]
+
+                if let jsonData = try? JSONSerialization.data(withJSONObject: messageData),
+                   let jsonString = String(data: jsonData, encoding: .utf8) {
+                    let jsCode = "window.dispatchEvent(new CustomEvent('queuedFCMMessage', { detail: \(jsonString) }));"
+                    webView.evaluateJavaScript(jsCode) { result, error in
+                        if let error = error {
+                            print("❌ [FCM] 큐 메시지 WebView 전달 실패: \(error.localizedDescription)")
+                        } else {
+                            print("✅ [FCM] 큐 메시지 WebView 전달 성공")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - 🔄 백그라운드 푸시 데이터 처리
+    func processBackgroundPushData() {
+        print("🔄 [FCM] 백그라운드 푸시 데이터 처리 시작")
+
+        guard let backgroundData = UserDefaults.standard.dictionary(forKey: "background_push_data") else {
+            print("ℹ️ [FCM] 처리할 백그라운드 푸시 데이터가 없음")
+            return
+        }
+
+        var processedCount = 0
+        for (key, value) in backgroundData {
+            if key == "last_background_push",
+               let pushData = value as? [String: Any],
+               let processed = pushData["processed"] as? Bool,
+               !processed {
+
+                // 백그라운드 푸시 데이터를 WebView에 전달
+                processBackgroundPushToWebView(pushData)
+                processedCount += 1
+
+                // 처리 완료로 표시
+                var updatedData = pushData
+                updatedData["processed"] = true
+                var updatedBackgroundData = backgroundData
+                updatedBackgroundData[key] = updatedData
+                UserDefaults.standard.set(updatedBackgroundData, forKey: "background_push_data")
+                UserDefaults.standard.synchronize()
+            }
+        }
+
+        if processedCount > 0 {
+            print("✅ [FCM] \(processedCount)개의 백그라운드 푸시 데이터 처리 완료")
+        } else {
+            print("ℹ️ [FCM] 처리할 새로운 백그라운드 푸시 데이터가 없음")
+        }
+    }
+
+    private func processBackgroundPushToWebView(_ pushData: [String: Any]) {
+        print("📨 [FCM] 백그라운드 푸시 데이터를 WebView에 전달")
+
+        if let webView = findWebViewInHierarchy() {
+            DispatchQueue.main.async {
+                let messageData = [
+                    "type": "background_push_data",
+                    "pushData": pushData,
+                    "timestamp": Date().timeIntervalSince1970
+                ] as [String: Any]
+
+                if let jsonData = try? JSONSerialization.data(withJSONObject: messageData),
+                   let jsonString = String(data: jsonData, encoding: .utf8) {
+                    let jsCode = "window.dispatchEvent(new CustomEvent('backgroundPushData', { detail: \(jsonString) }));"
+                    webView.evaluateJavaScript(jsCode) { result, error in
+                        if let error = error {
+                            print("❌ [FCM] 백그라운드 푸시 데이터 WebView 전달 실패: \(error.localizedDescription)")
+                        } else {
+                            print("✅ [FCM] 백그라운드 푸시 데이터 WebView 전달 성공")
+                        }
+                    }
+                }
+            }
+        } else {
+            print("⚠️ [FCM] WebView를 찾을 수 없어 백그라운드 푸시 데이터 처리 스킵")
+        }
+    }
+
+    private func findWebViewInHierarchy() -> WKWebView? {
+        guard let window = UIApplication.shared.windows.first else { return nil }
+
+        func findWebView(in view: UIView) -> WKWebView? {
+            if let webView = view as? WKWebView {
+                return webView
+            }
+            for subview in view.subviews {
+                if let found = findWebView(in: subview) {
+                    return found
+                }
+            }
+            return nil
+        }
+
+        return findWebView(in: window)
+    }
+
     // MARK: - 정리
     deinit {
         print("🧹 [FCM Auto] AppDelegate 정리 시작")
-        
+
         // FCM 자동 토큰 업데이트 타이머 정리
         stopFCMAutoTokenUpdate()
-        
+
         // 앱 상태 변화 감지기 제거
         NotificationCenter.default.removeObserver(self)
-        
+
         print("✅ [FCM Auto] AppDelegate 정리 완료")
     }
 }

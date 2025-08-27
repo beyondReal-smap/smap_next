@@ -209,6 +209,217 @@ export class FCMTokenService {
   getCurrentFCMToken(): string | null {
     return this.getCurrentToken();
   }
+
+  /**
+   * 보류된 FCM 메시지들을 확인하고 처리
+   */
+  async checkAndProcessPendingMessages(mt_idx: number): Promise<void> {
+    try {
+      console.log('[FCM Token Service] 📋 보류된 FCM 메시지 확인 시작');
+
+      // 마지막 확인 시간 가져오기
+      const lastCheckTime = localStorage.getItem('last_pending_message_check');
+      const sinceTimestamp = lastCheckTime ? parseFloat(lastCheckTime) : null;
+
+      // 보류된 메시지 API 호출
+      const response = await fetch(`/api/v1/push-fcms/pending/${mt_idx}?since_timestamp=${sinceTimestamp || ''}`);
+
+      if (!response.ok) {
+        throw new Error(`보류된 메시지 확인 실패: ${response.status}`);
+      }
+
+      const pendingMessages = await response.json();
+
+      if (pendingMessages && pendingMessages.length > 0) {
+        console.log(`[FCM Token Service] 📨 ${pendingMessages.length}개의 보류된 메시지 발견`);
+
+        // 각 메시지를 처리
+        for (const message of pendingMessages) {
+          await this.processPendingMessage(message, mt_idx);
+        }
+
+        // 마지막 확인 시간 업데이트
+        localStorage.setItem('last_pending_message_check', Date.now().toString());
+
+        console.log('[FCM Token Service] ✅ 보류된 메시지 처리 완료');
+      } else {
+        console.log('[FCM Token Service] ℹ️ 보류된 메시지가 없음');
+      }
+
+    } catch (error) {
+      console.error('[FCM Token Service] ❌ 보류된 메시지 확인 실패:', error);
+    }
+  }
+
+  /**
+   * 개별 보류된 메시지 처리
+   */
+  private async processPendingMessage(message: any, mt_idx: number): Promise<void> {
+    try {
+      console.log(`[FCM Token Service] 📨 보류된 메시지 처리: ${message.pft_title}`);
+
+      // 메시지를 로컬 알림으로 표시하거나 다른 방식으로 처리
+      if (typeof window !== 'undefined' && 'Notification' in window) {
+        if (Notification.permission === 'granted') {
+          new Notification(message.pft_title || '알림', {
+            body: message.pft_content || '',
+            icon: '/favicon.ico'
+          });
+        }
+      }
+
+      // 메시지를 전달 완료로 표시 (선택적)
+      if (message.pft_idx) {
+        try {
+          await fetch(`/api/v1/push-fcms/mark-delivered/${message.pft_idx}`, {
+            method: 'POST'
+          });
+          console.log(`[FCM Token Service] ✅ 메시지 전달 완료 표시: ${message.pft_idx}`);
+        } catch (markError) {
+          console.warn(`[FCM Token Service] ⚠️ 메시지 전달 완료 표시 실패: ${markError}`);
+        }
+      }
+
+    } catch (error) {
+      console.error('[FCM Token Service] ❌ 보류된 메시지 처리 실패:', error);
+    }
+  }
+
+  /**
+   * 주기적으로 보류된 메시지 확인 시작
+   */
+  startPendingMessageCheck(mt_idx: number, intervalMinutes: number = 30): void {
+    console.log(`[FCM Token Service] 🔄 보류된 메시지 주기적 확인 시작 (${intervalMinutes}분 간격)`);
+
+    // 즉시 첫 번째 확인
+    setTimeout(() => {
+      this.checkAndProcessPendingMessages(mt_idx);
+    }, 5000); // 앱 시작 후 5초 후 첫 확인
+
+    // 주기적 확인 설정
+    setInterval(() => {
+      this.checkAndProcessPendingMessages(mt_idx);
+    }, intervalMinutes * 60 * 1000);
+  }
+
+  /**
+   * 백그라운드 푸시 데이터 처리
+   */
+  handleBackgroundPush(userInfo: any, timestamp: number): void {
+    console.log('[FCM Token Service] 🔄 백그라운드 푸시 처리:', userInfo);
+
+    try {
+      // 백그라운드 푸시 데이터를 로컬 저장소에 저장
+      this.saveBackgroundPushData(userInfo, timestamp);
+
+      // 백그라운드 푸시 이벤트 발생
+      this.emitBackgroundPushEvent(userInfo, timestamp);
+
+      console.log('[FCM Token Service] ✅ 백그라운드 푸시 처리 완료');
+    } catch (error) {
+      console.error('[FCM Token Service] ❌ 백그라운드 푸시 처리 실패:', error);
+    }
+  }
+
+  /**
+   * 큐에 저장된 FCM 메시지 처리
+   */
+  handleQueuedMessage(userInfo: any, timestamp: number): void {
+    console.log('[FCM Token Service] 📨 큐 메시지 처리:', userInfo);
+
+    try {
+      // 큐 메시지를 로컬 알림으로 표시
+      if (typeof window !== 'undefined' && 'Notification' in window) {
+        if (Notification.permission === 'granted') {
+          const title = userInfo.title || userInfo['title'] || '알림';
+          const body = userInfo.body || userInfo['body'] || '';
+
+          new Notification(title, {
+            body: body,
+            icon: '/favicon.ico',
+            tag: 'queued-fcm-message',
+            data: { userInfo, timestamp }
+          });
+        }
+      }
+
+      console.log('[FCM Token Service] ✅ 큐 메시지 처리 완료');
+    } catch (error) {
+      console.error('[FCM Token Service] ❌ 큐 메시지 처리 실패:', error);
+    }
+  }
+
+  /**
+   * 백그라운드 푸시 데이터를 로컬 저장소에 저장
+   */
+  private saveBackgroundPushData(userInfo: any, timestamp: number): void {
+    try {
+      const backgroundPushKey = 'background_push_data';
+      const existingData = JSON.parse(localStorage.getItem(backgroundPushKey) || '[]');
+
+      const pushData = {
+        userInfo,
+        timestamp,
+        receivedAt: Date.now(),
+        processed: false
+      };
+
+      existingData.push(pushData);
+
+      // 최대 10개의 백그라운드 푸시 데이터만 유지
+      if (existingData.length > 10) {
+        existingData.splice(0, existingData.length - 10);
+      }
+
+      localStorage.setItem(backgroundPushKey, JSON.stringify(existingData));
+      console.log('[FCM Token Service] 💾 백그라운드 푸시 데이터 저장 완료');
+    } catch (error) {
+      console.warn('[FCM Token Service] ⚠️ 백그라운드 푸시 데이터 저장 실패:', error);
+    }
+  }
+
+  /**
+   * 백그라운드 푸시 이벤트 발생
+   */
+  private emitBackgroundPushEvent(userInfo: any, timestamp: number): void {
+    // 커스텀 이벤트 발생으로 다른 모듈에서 처리 가능
+    if (typeof window !== 'undefined') {
+      const event = new CustomEvent('fcmBackgroundPushReceived', {
+        detail: {
+          userInfo,
+          timestamp,
+          receivedAt: Date.now()
+        }
+      });
+      window.dispatchEvent(event);
+    }
+  }
+
+  /**
+   * 저장된 백그라운드 푸시 데이터 조회
+   */
+  getBackgroundPushData(): any[] {
+    try {
+      const backgroundPushKey = 'background_push_data';
+      const data = JSON.parse(localStorage.getItem(backgroundPushKey) || '[]');
+      return data;
+    } catch (error) {
+      console.warn('[FCM Token Service] ⚠️ 백그라운드 푸시 데이터 조회 실패:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 백그라운드 푸시 데이터 초기화
+   */
+  clearBackgroundPushData(): void {
+    try {
+      localStorage.removeItem('background_push_data');
+      console.log('[FCM Token Service] 🗑️ 백그라운드 푸시 데이터 초기화 완료');
+    } catch (error) {
+      console.warn('[FCM Token Service] ⚠️ 백그라운드 푸시 데이터 초기화 실패:', error);
+    }
+  }
 }
 
 // 전역 인스턴스 생성

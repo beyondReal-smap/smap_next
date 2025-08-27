@@ -6,6 +6,8 @@ from app.models.push_log import PushLog
 from app.schemas.fcm_notification import FCMSendRequest, FCMSendResponse
 from app.services.firebase_service import firebase_service
 from datetime import datetime
+from pydantic import BaseModel
+from typing import Optional
 import logging
 
 logger = logging.getLogger(__name__)
@@ -14,6 +16,21 @@ router = APIRouter()
 
 SUCCESS = "true"
 FAILURE = "false"
+
+# 백그라운드 푸시 요청 모델
+class BackgroundPushRequest(BaseModel):
+    plt_type: str
+    sst_idx: str
+    plt_condition: str
+    plt_memo: str
+    mt_idx: int
+    plt_title: str
+    plt_content: str
+    content_available: bool = True  # 백그라운드 푸시를 위한 플래그
+    priority: str = "normal"  # high 또는 normal
+    show_notification: bool = False  # 백그라운드 푸시에서는 기본적으로 알림 표시하지 않음
+    event_url: Optional[str] = None  # 이벤트 URL
+    schedule_id: Optional[str] = None  # 일정 ID
 
 def create_response(success: str, title: str, message: str, data=None) -> dict:
     """응답 생성 헬퍼 함수"""
@@ -144,6 +161,112 @@ def send_fcm_push_notification(
             str(e)
         )
 
+@router.post("/background", response_model=FCMSendResponse)
+def send_background_fcm_push_notification(
+    request: BackgroundPushRequest,
+    db: Session = Depends(deps.get_db)
+):
+    """
+    백그라운드 FCM 푸시 알림 단건 전송
+    앱이 백그라운드나 종료된 상태에서도 데이터를 처리할 수 있도록 함
+
+    Args:
+        request: 백그라운드 FCM 푸시 알림 전송 요청 데이터
+        db: 데이터베이스 세션
+
+    Returns:
+        FCMSendResponse: 전송 결과
+    """
+    try:
+        logger.debug("백그라운드 푸시 발송 요청 파라미터 파싱 중")
+        args = request.dict()
+        logger.debug(f"파싱된 파라미터: {args}")
+
+        logger.debug("회원 정보 조회 중")
+        # mt_idx로 회원 조회
+        member = Member.find_by_idx(db, args['mt_idx'])
+
+        logger.debug(f"조회된 회원 정보: {member}")
+
+        if not member:
+            logger.debug("존재하지 않는 회원 인덱스로 백그라운드 푸시 발송 실패")
+            return create_response(
+                FAILURE,
+                "백그라운드 푸시발송 실패",
+                "존재하지 않는 회원입니다."
+            )
+
+        if not member.mt_token_id:
+            logger.debug("앱 토큰이 존재하지 않아 백그라운드 푸시 발송 실패")
+            # 상태 4: 토큰 없음
+            push_log = create_push_log(args, member.mt_idx, 4, db)
+            db.add(push_log)
+            db.commit()
+            return create_response(
+                FAILURE,
+                "백그라운드 푸시발송 실패",
+                "앱토큰이 존재하지 않습니다."
+            )
+
+        # Firebase 사용 가능 여부 확인
+        if not firebase_service.is_available():
+            logger.debug("Firebase가 사용 불가능하여 백그라운드 푸시 발송 실패")
+            # 상태 5: Firebase 사용 불가
+            push_log = create_push_log(args, member.mt_idx, 5, db)
+            db.add(push_log)
+            db.commit()
+            return create_response(
+                FAILURE,
+                "백그라운드 푸시발송 실패",
+                "Firebase 서비스가 사용 불가능합니다. 관리자에게 문의하세요."
+            )
+
+        logger.debug("백그라운드 푸시 메시지 전송 중")
+        try:
+            response = firebase_service.send_background_push_notification(
+                member.mt_token_id,
+                args['plt_title'],
+                args['plt_content'],
+                args.get('content_available', True),
+                args.get('priority', 'normal'),
+                args.get('event_url'),
+                args.get('schedule_id')
+            )
+            logger.debug(f"Firebase 백그라운드 푸시 응답: {response}")
+
+            # 상태 2: 전송 성공
+            push_log = create_push_log(args, member.mt_idx, 2, db)
+            db.add(push_log)
+            db.commit()
+
+            logger.debug("백그라운드 푸시 발송 성공")
+            return create_response(
+                SUCCESS,
+                "백그라운드 푸시발송 성공",
+                "백그라운드 푸시발송 성공했습니다."
+            )
+
+        except Exception as firebase_error:
+            logger.error(f"Firebase 백그라운드 푸시 전송 실패: {firebase_error}")
+            # 상태 3: 전송 실패
+            push_log = create_push_log(args, member.mt_idx, 3, db)
+            db.add(push_log)
+            db.commit()
+
+            return create_response(
+                FAILURE,
+                "백그라운드 푸시발송 실패",
+                f"Firebase 전송 실패: {str(firebase_error)}"
+            )
+
+    except Exception as e:
+        logger.error(f"백그라운드 푸시 발송 중 오류 발생: {str(e)}")
+        return create_response(
+            FAILURE,
+            "백그라운드 푸시발송 실패",
+            str(e)
+        )
+
 @router.post("/test", response_model=FCMSendResponse)
 def test_fcm_push_notification(
     request: FCMSendRequest,
@@ -155,8 +278,8 @@ def test_fcm_push_notification(
     """
     args = request.dict()
     return create_response(
-        SUCCESS, 
-        "푸시발송(단건) 성공", 
-        "푸시발송(단건) 성공했습니다.", 
+        SUCCESS,
+        "푸시발송(단건) 성공",
+        "푸시발송(단건) 성공했습니다.",
         args
     ) 

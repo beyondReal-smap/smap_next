@@ -138,6 +138,67 @@ class FirebaseService:
             logger.error(f"Failed to send FCM message: {e}")
             raise
 
+    def send_background_push_notification(
+        self,
+        token: str,
+        title: str,
+        content: str,
+        content_available: bool = True,
+        priority: str = "normal",
+        event_url: Optional[str] = None,
+        schedule_id: Optional[str] = None
+    ) -> str:
+        """
+        백그라운드 푸시 알림 전송
+        content-available 플래그를 사용하여 앱이 백그라운드에서 데이터를 처리할 수 있도록 함
+        """
+        if not self._firebase_available:
+            logger.warning("Firebase가 초기화되지 않아 백그라운드 푸시 알림을 건너뜁니다.")
+            return "firebase_disabled"
+
+        try:
+            # 백그라운드 푸시를 위한 데이터 구성
+            data = {
+                'title': title,
+                'body': content,
+                'content-available': '1' if content_available else '0',
+                'priority': priority
+            }
+
+            if event_url:
+                data['event_url'] = event_url
+            if schedule_id:
+                data['schedule_id'] = schedule_id
+
+            # 백그라운드 푸시의 경우 알림을 표시하지 않음
+            message = messaging.Message(
+                data=data,
+                android=messaging.AndroidConfig(
+                    priority='normal' if priority == 'normal' else 'high',
+                ),
+                apns=messaging.APNSConfig(
+                    headers={
+                        "apns-push-type": "background",
+                        "apns-priority": "5" if priority == 'normal' else "10"
+                    },
+                    payload=messaging.APNSPayload(
+                        aps=messaging.Aps(
+                            content_available=True,
+                            # 백그라운드 푸시는 사용자에게 표시되지 않음
+                        )
+                    )
+                ),
+                token=token,
+            )
+
+            response = messaging.send(message)
+            logger.info(f"Successfully sent background FCM message: {response}")
+            return response
+
+        except Exception as e:
+            logger.error(f"Failed to send background FCM message: {e}")
+            raise
+
     def is_available(self) -> bool:
         """Firebase 서비스 사용 가능 여부 확인"""
         return self._firebase_available

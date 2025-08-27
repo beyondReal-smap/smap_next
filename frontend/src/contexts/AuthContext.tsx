@@ -281,6 +281,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 console.log('[AUTH] 🚨 FCM 토큰 생성 로직 제거됨 - 네이티브에서 관리');
                 // 🚨 Firebase 토큰 생성 로직 제거 - 네이티브에서 FCM 토큰 관리
                 console.log('[AUTH] 📱 네이티브에서는 window.updateFCMToken() 함수를 사용하여 FCM 토큰 업데이트를 수행하세요');
+
+                // 📋 보류된 FCM 메시지 확인 시작
+                const { fcmTokenService } = await import('@/services/fcmTokenService');
+                fcmTokenService.startPendingMessageCheck(userData.mt_idx, 30); // 30분마다 확인
+                console.log('[AUTH] 📋 보류된 FCM 메시지 주기적 확인 시작됨');
               } catch (e) {
                 console.warn('[AUTH] FCM 처리 중 예외(무시):', e);
               }

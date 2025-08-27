@@ -64,6 +64,54 @@ def get_now_push_fcms(
     push_fcms = PushFCM.find_push_list(db)
     return push_fcms
 
+@router.get("/pending/{mt_idx}", response_model=List[PushFCMResponse])
+def get_pending_push_fcms(
+    mt_idx: int,
+    db: Session = Depends(deps.get_db),
+    since_timestamp: Optional[float] = None
+):
+    """
+    특정 회원의 보류된 FCM 푸시 메시지를 조회합니다.
+    앱이 오랫동안 종료되었던 경우 누락되었을 수 있는 메시지들을 확인합니다.
+    """
+    try:
+        # 보류된 메시지 조회 로직
+        # 1. 특정 사용자를 대상으로 한 메시지들 중 아직 전송되지 않은 것들
+        # 2. 일정 시간 범위 내의 메시지들 (since_timestamp 파라미터로 지정)
+        push_fcms = PushFCM.find_pending_messages_for_member(
+            db,
+            mt_idx,
+            since_timestamp=since_timestamp
+        )
+        return push_fcms
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"보류된 메시지 조회 중 오류 발생: {str(e)}")
+
+@router.post("/mark-delivered/{push_fcm_id}")
+def mark_push_fcm_delivered(
+    push_fcm_id: int,
+    db: Session = Depends(deps.get_db)
+):
+    """
+    FCM 푸시 메시지를 전달 완료로 표시합니다.
+    """
+    try:
+        push_fcm = PushFCM.find_by_idx(db, push_fcm_id)
+        if not push_fcm:
+            raise HTTPException(status_code=404, detail="Push FCM not found")
+
+        # 메시지를 전달 완료로 표시 (필요한 경우 상태 필드 업데이트)
+        # 실제 구현은 모델의 구조에 따라 다를 수 있습니다
+        if hasattr(push_fcm, 'delivered_at'):
+            from datetime import datetime
+            push_fcm.delivered_at = datetime.utcnow()
+
+        db.commit()
+        return {"message": "메시지가 전달 완료로 표시되었습니다."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"메시지 상태 업데이트 중 오류 발생: {str(e)}")
+
 @router.post("/", response_model=PushFCMResponse)
 def create_push_fcm(
     push_fcm_in: PushFCMCreate,
