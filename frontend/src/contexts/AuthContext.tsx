@@ -9,7 +9,7 @@ import { comprehensivePreloadData } from '@/services/dataPreloadService';
 import groupService from '@/services/groupService';
 import navigationManager from '@/utils/navigationManager';
 import locationTrackingService from '@/services/locationTrackingService';
-import { fcmTokenService } from '@/services/fcmTokenService';
+import { fcmTokenService, FCMTokenUpdateResponse } from '@/services/fcmTokenService';
 
 // 전역 상태로 중복 실행 방지
 let globalPreloadingState = {
@@ -148,7 +148,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           console.log('[AUTH] 🔔 로그인 후 FCM 토큰 체크/업데이트 시작');
           if (response.data?.member?.mt_idx) {
             fcmTokenService.initializeAndCheckUpdateToken(response.data.member.mt_idx)
-              .then((result: { success: boolean; token?: string; error?: string; message?: string }) => {
+              .then((result: FCMTokenUpdateResponse) => {
                 if (result.success) {
                   console.log('[AUTH] ✅ FCM 토큰 체크/업데이트 완료:', result.message);
                 } else {
