@@ -43,7 +43,11 @@ class MemberFCMTokenStatusResponse(BaseModel):
     mt_level: Optional[int] = Field(None, description="회원 등급")
     mt_status: Optional[int] = Field(None, description="회원 상태")
     last_updated: Optional[str] = Field(None, description="마지막 업데이트 시간 (ISO format)")
-    
+    token_updated_at: Optional[str] = Field(None, description="FCM 토큰 마지막 업데이트 시간 (ISO format)")
+    token_expiry_date: Optional[str] = Field(None, description="FCM 토큰 예상 만료일 (ISO format)")
+    is_token_expired: bool = Field(False, description="FCM 토큰 만료 여부")
+    is_token_near_expiry: bool = Field(False, description="FCM 토큰 만료 임박 여부 (1일 이내)")
+
     class Config:
         schema_extra = {
             "example": {
@@ -52,6 +56,10 @@ class MemberFCMTokenStatusResponse(BaseModel):
                 "token_preview": "fz6CAxDq4UVBmoaEdMt...",
                 "mt_level": 2,
                 "mt_status": 1,
-                "last_updated": "2025-01-16T10:30:00"
+                "last_updated": "2025-01-16T10:30:00",
+                "token_updated_at": "2025-01-16T10:30:00",
+                "token_expiry_date": "2025-01-23T10:30:00",
+                "is_token_expired": False,
+                "is_token_near_expiry": False
             }
         }

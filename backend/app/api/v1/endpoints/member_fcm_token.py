@@ -67,6 +67,8 @@ async def register_member_fcm_token(
         
         # FCM 토큰 업데이트
         member.mt_token_id = request.fcm_token
+        member.mt_token_updated_at = datetime.now()  # FCM 토큰 업데이트 일시
+        member.mt_token_expiry_date = datetime.now() + datetime.timedelta(days=7)  # 7일 후 만료 예상
         member.mt_udate = datetime.now()  # 수정일시 업데이트
         
         db.commit()
@@ -126,13 +128,28 @@ async def get_member_fcm_token_status(
         has_token = bool(member.mt_token_id)
         token_preview = member.mt_token_id[:20] + "..." if member.mt_token_id else None
         
+        # 토큰 만료 상태 확인
+        is_token_expired = False
+        is_token_near_expiry = False
+
+        if member.mt_token_expiry_date:
+            now = datetime.now()
+            if now > member.mt_token_expiry_date:
+                is_token_expired = True
+            elif (member.mt_token_expiry_date - now).days <= 1:  # 만료 1일 전
+                is_token_near_expiry = True
+
         return MemberFCMTokenStatusResponse(
             mt_idx=member.mt_idx,
             has_token=has_token,
             token_preview=token_preview,
             mt_level=member.mt_level,
             mt_status=member.mt_status,
-            last_updated=member.mt_udate.isoformat() if member.mt_udate else None
+            last_updated=member.mt_udate.isoformat() if member.mt_udate else None,
+            token_updated_at=member.mt_token_updated_at.isoformat() if member.mt_token_updated_at else None,
+            token_expiry_date=member.mt_token_expiry_date.isoformat() if member.mt_token_expiry_date else None,
+            is_token_expired=is_token_expired,
+            is_token_near_expiry=is_token_near_expiry
         )
         
     except HTTPException:
@@ -205,6 +222,8 @@ async def check_and_update_fcm_token(
         
         if needs_update:
             member.mt_token_id = request.fcm_token
+            member.mt_token_updated_at = datetime.now()  # FCM 토큰 업데이트 일시
+            member.mt_token_expiry_date = datetime.now() + datetime.timedelta(days=7)  # 7일 후 만료 예상
             member.mt_udate = datetime.now()
             db.commit()
             db.refresh(member)
@@ -225,4 +244,109 @@ async def check_and_update_fcm_token(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="FCM 토큰 체크/업데이트 중 서버 오류가 발생했습니다."
+        )
+
+
+@router.post("/validate-and-refresh", response_model=MemberFCMTokenResponse)
+async def validate_and_refresh_fcm_token(
+    request: MemberFCMTokenRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    FCM 토큰 유효성 검증 및 필요시 갱신
+    앱 시작 시 호출하여 토큰 만료 상태를 확인하고 갱신을 유도합니다.
+
+    Args:
+        request: mt_idx와 fcm_token을 포함한 요청 데이터
+        db: 데이터베이스 세션
+
+    Returns:
+        MemberFCMTokenResponse: 검증/갱신 결과
+    """
+    try:
+        logger.info(f"FCM 토큰 유효성 검증 요청 - 회원 ID: {request.mt_idx}")
+
+        # 회원 존재 확인
+        member = Member.find_by_idx(db, request.mt_idx)
+        if not member:
+            logger.warning(f"존재하지 않는 회원: mt_idx={request.mt_idx}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="해당 회원을 찾을 수 없습니다."
+            )
+
+        # 회원 상태 확인
+        if member.mt_level == 1:  # 탈퇴회원
+            logger.warning(f"탈퇴회원의 FCM 토큰 검증 시도: mt_idx={request.mt_idx}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="탈퇴한 회원은 FCM 토큰을 사용할 수 없습니다."
+            )
+
+        # 현재 시간
+        now = datetime.now()
+
+        # 토큰 만료 상태 확인
+        needs_refresh = False
+        reason = ""
+
+        if not member.mt_token_id:
+            # 토큰이 없는 경우
+            needs_refresh = True
+            reason = "FCM 토큰이 존재하지 않습니다."
+        elif member.mt_token_id != request.fcm_token:
+            # 토큰이 다른 경우 (앱에서 새로운 토큰이 생성됨)
+            needs_refresh = True
+            reason = "FCM 토큰이 변경되었습니다."
+        elif member.mt_token_expiry_date and now > member.mt_token_expiry_date:
+            # 토큰이 만료된 경우
+            needs_refresh = True
+            reason = "FCM 토큰이 만료되었습니다."
+        elif member.mt_token_expiry_date and (member.mt_token_expiry_date - now).days <= 1:
+            # 토큰 만료 임박 (1일 이내)
+            needs_refresh = True
+            reason = "FCM 토큰이 곧 만료됩니다."
+        elif not member.mt_token_updated_at or (now - member.mt_token_updated_at).days >= 3:
+            # 3일 이상 업데이트되지 않은 경우
+            needs_refresh = True
+            reason = "FCM 토큰이 3일 이상 업데이트되지 않았습니다."
+
+        if needs_refresh:
+            logger.info(f"FCM 토큰 갱신 필요 - 회원 ID: {request.mt_idx}, 사유: {reason}")
+
+            # 토큰 업데이트
+            member.mt_token_id = request.fcm_token
+            member.mt_token_updated_at = now
+            member.mt_token_expiry_date = now + datetime.timedelta(days=7)
+            member.mt_udate = now
+
+            db.commit()
+            db.refresh(member)
+
+            return MemberFCMTokenResponse(
+                success=True,
+                message=f"FCM 토큰이 갱신되었습니다. 사유: {reason}",
+                mt_idx=member.mt_idx,
+                has_token=True,
+                token_preview=request.fcm_token[:20] + "..." if len(request.fcm_token) > 20 else request.fcm_token
+            )
+        else:
+            logger.info(f"FCM 토큰 검증 통과 - 회원 ID: {request.mt_idx}")
+
+            return MemberFCMTokenResponse(
+                success=True,
+                message="FCM 토큰이 유효합니다.",
+                mt_idx=member.mt_idx,
+                has_token=True,
+                token_preview=request.fcm_token[:20] + "..." if len(request.fcm_token) > 20 else request.fcm_token
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"FCM 토큰 유효성 검증 중 오류 발생: {str(e)}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="FCM 토큰 유효성 검증 중 서버 오류가 발생했습니다."
         )

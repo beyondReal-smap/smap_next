@@ -179,6 +179,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         
         // ✅ FCM 자동 토큰 업데이트 초기화
         setupFCMAutoTokenUpdate()
+
+        // 🚨 FCM 토큰 유효성 검증 초기화
+        setupFCMTokenValidation()
         
         return true
     }
@@ -204,6 +207,159 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             performImmediateFCMTokenValidation()
         } else {
             print("🔒 [FCM Auto] 로그인 상태가 아님 - 자동 업데이트 대기")
+        }
+    }
+
+    // MARK: - 🔍 FCM 토큰 유효성 검증 초기화
+    private func setupFCMTokenValidation() {
+        print("🔍 [FCM Validation] FCM 토큰 유효성 검증 초기화")
+
+        // 로그인 상태 확인
+        let isLoggedIn = UserDefaults.standard.bool(forKey: "is_logged_in") ||
+                        UserDefaults.standard.string(forKey: "mt_idx") != nil ||
+                        UserDefaults.standard.string(forKey: "savedMtIdx") != nil
+
+        if isLoggedIn {
+            print("✅ [FCM Validation] 로그인 상태 감지됨 - 토큰 검증 시작")
+            performFCMTokenValidation()
+        } else {
+            print("🔒 [FCM Validation] 로그인 상태가 아님 - 토큰 검증 대기")
+        }
+    }
+
+    // MARK: - 🔍 FCM 토큰 유효성 검증 실행
+    private func performFCMTokenValidation() {
+        print("🔍 [FCM Validation] FCM 토큰 유효성 검증 시작")
+
+        // 사용자 ID 확인
+        guard let mtIdxString = UserDefaults.standard.string(forKey: "mt_idx") ??
+                              UserDefaults.standard.string(forKey: "savedMtIdx") ??
+                              UserDefaults.standard.string(forKey: "current_mt_idx"),
+              let mtIdx = Int(mtIdxString) else {
+            print("❌ [FCM Validation] 사용자 ID를 찾을 수 없음")
+            return
+        }
+
+        // 현재 FCM 토큰 가져오기
+        Messaging.messaging().token { [weak self] token, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("❌ [FCM Validation] FCM 토큰 가져오기 실패: \(error.localizedDescription)")
+                    return
+                }
+
+                guard let token = token, !token.isEmpty else {
+                    print("❌ [FCM Validation] FCM 토큰이 nil이거나 비어있음")
+                    return
+                }
+
+                print("✅ [FCM Validation] FCM 토큰 획득 성공: \(token.prefix(30))...")
+                self?.validateTokenWithServer(token: token, mtIdx: mtIdx)
+            }
+        }
+    }
+
+    // MARK: - 🌐 서버에 FCM 토큰 유효성 검증 요청
+    private func validateTokenWithServer(token: String, mtIdx: Int) {
+        print("🌐 [FCM Validation] 서버에 토큰 검증 요청 시작")
+
+        let urlString = "\(Http.shared.BASE_URL)\(Http.shared.memberFcmTokenUrl)/validate-and-refresh"
+        guard let url = URL(string: urlString) else {
+            print("❌ [FCM Validation] 잘못된 URL: \(urlString)")
+            return
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let requestData: [String: Any] = [
+            "mt_idx": mtIdx,
+            "fcm_token": token,
+            "device_type": "ios",
+            "platform": "ios"
+        ]
+
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: requestData)
+        } catch {
+            print("❌ [FCM Validation] JSON 변환 실패: \(error.localizedDescription)")
+            return
+        }
+
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("❌ [FCM Validation] 네트워크 오류: \(error.localizedDescription)")
+                    return
+                }
+
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    print("❌ [FCM Validation] HTTP 응답이 아님")
+                    return
+                }
+
+                print("🌐 [FCM Validation] HTTP 상태 코드: \(httpResponse.statusCode)")
+
+                if let data = data {
+                    do {
+                        if let jsonResponse = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                            print("📋 [FCM Validation] 서버 응답: \(jsonResponse)")
+
+                            let success = jsonResponse["success"] as? Bool ?? false
+                            let message = jsonResponse["message"] as? String ?? "알 수 없는 응답"
+
+                            if success {
+                                print("✅ [FCM Validation] 토큰 검증 성공: \(message)")
+
+                                // 토큰이 갱신된 경우 로컬에도 업데이트
+                                if message.contains("갱신") {
+                                    UserDefaults.standard.set(token, forKey: "last_fcm_token")
+                                    UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "last_fcm_token_update_time")
+                                    UserDefaults.standard.synchronize()
+                                }
+                            } else {
+                                print("⚠️ [FCM Validation] 토큰 검증 실패: \(message)")
+
+                                // 토큰이 유효하지 않은 경우 새 토큰 요청
+                                if message.contains("만료") || message.contains("유효하지") {
+                                    print("🔄 [FCM Validation] 토큰 만료 감지 - 새 토큰 요청")
+                                    self?.forceRefreshFCMToken()
+                                }
+                            }
+                        }
+                    } catch {
+                        print("❌ [FCM Validation] JSON 파싱 오류: \(error.localizedDescription)")
+                    }
+                }
+            }
+        }.resume()
+    }
+
+    // MARK: - 🔄 FCM 토큰 강제 갱신
+    private func forceRefreshFCMToken() {
+        print("🔄 [FCM Force] FCM 토큰 강제 갱신 시작")
+
+        // 기존 토큰 무효화
+        UserDefaults.standard.removeObject(forKey: "last_fcm_token")
+        UserDefaults.standard.synchronize()
+
+        // FCM 토큰 재생성 요청
+        Messaging.messaging().token { [weak self] token, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("❌ [FCM Force] 토큰 갱신 실패: \(error.localizedDescription)")
+                    return
+                }
+
+                guard let token = token, !token.isEmpty else {
+                    print("❌ [FCM Force] 새 토큰이 nil이거나 비어있음")
+                    return
+                }
+
+                print("✅ [FCM Force] 새 토큰 생성 성공: \(token.prefix(30))...")
+                self?.sendFCMTokenToServer(token: token)
+            }
         }
     }
 

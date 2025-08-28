@@ -101,10 +101,28 @@ def send_fcm_push_notification(
             db.add(push_log)
             db.commit()
             return create_response(
-                FAILURE, 
-                "푸시발송(단건) 실패", 
+                FAILURE,
+                "푸시발송(단건) 실패",
                 "앱토큰이 존재하지 않습니다."
             )
+
+        # FCM 토큰 만료 여부 확인
+        now = datetime.now()
+        if member.mt_token_expiry_date and now > member.mt_token_expiry_date:
+            logger.warning(f"FCM 토큰이 만료됨 - 회원 ID: {member.mt_idx}, 만료일: {member.mt_token_expiry_date}")
+            # 상태 6: 토큰 만료
+            push_log = create_push_log(args, member.mt_idx, 6, db)
+            db.add(push_log)
+            db.commit()
+            return create_response(
+                FAILURE,
+                "푸시발송(단건) 실패",
+                "FCM 토큰이 만료되었습니다. 앱을 재시작하여 토큰을 갱신해주세요."
+            )
+
+        # FCM 토큰이 3일 이상 업데이트되지 않은 경우 경고 로그
+        if member.mt_token_updated_at and (now - member.mt_token_updated_at).days >= 3:
+            logger.warning(f"FCM 토큰이 3일 이상 업데이트되지 않음 - 회원 ID: {member.mt_idx}, 마지막 업데이트: {member.mt_token_updated_at}")
 
         # Firebase 사용 가능 여부 확인
         if not firebase_service.is_available():
