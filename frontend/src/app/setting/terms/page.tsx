@@ -407,7 +407,8 @@ const CONSENT_HISTORY: ConsentHistory[] = [
 
 export default function TermsPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { state } = useAuth();
+  const { user } = state;
 
   const [terms, setTerms] = useState(TERMS_DATA);
   const [showPreviewModal, setShowPreviewModal] = useState(false);

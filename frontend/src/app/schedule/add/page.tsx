@@ -112,7 +112,8 @@ interface ScheduleForm {
 
 export default function AddSchedulePage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { state } = useAuth();
+  const { user } = state;
   const [scheduleForm, setScheduleForm] = useState<ScheduleForm>({
     title: '',
     startDate: dayjs().format('YYYY-MM-DD'),

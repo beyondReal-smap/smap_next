@@ -100,7 +100,8 @@ export default function TestTermsPage() {
   console.log('🚨🚨🚨 [TEST-TERMS] 컴포넌트 시작!!!');
   
   const router = useRouter();
-  const { user } = useAuth();
+  const { state } = useAuth();
+  const { user } = state;
   const [terms, setTerms] = useState(TERMS_DATA);
   const [isLoadingConsents, setIsLoadingConsents] = useState(true);
 

@@ -61,7 +61,8 @@ const truncateContent = (content: string, maxLength: number = 100): string => {
 
 export default function NoticePage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { state } = useAuth();
+  const { user } = state;
   const [notices, setNotices] = useState<Notice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

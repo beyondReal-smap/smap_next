@@ -123,10 +123,10 @@ const nextConfig = {
       };
     }
     
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      'react/jsx-runtime': require.resolve('react/jsx-runtime'),
-    };
+    // config.resolve.alias = {
+    //   ...config.resolve.alias,
+    //   'react/jsx-runtime': require.resolve('react/jsx-runtime'),
+    // };
     
     if (!isServer) {
       config.externals = {
@@ -139,7 +139,7 @@ const nextConfig = {
     return config;
   },
   experimental: {
-    optimizeCss: true,
+    // optimizeCss: true, // CSS 최적화 비활성화
     scrollRestoration: true,
   },
   trailingSlash: false,

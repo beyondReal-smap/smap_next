@@ -15,7 +15,8 @@ import AnimatedHeader from '../../../components/common/AnimatedHeader';
 export default function NoticeDetailPage() {
   const router = useRouter();
   const params = useParams();
-  const { user } = useAuth();
+  const { state } = useAuth();
+  const { user } = state;
   const [notice, setNotice] = useState<PushLog | null>(null);
   const [loading, setLoading] = useState(true);
 

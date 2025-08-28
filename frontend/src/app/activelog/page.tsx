@@ -848,7 +848,8 @@ export default function ActivelogPage() {
                    window.location.hostname.includes('nextstep.smap.site'));
   
   // 인증 관련 상태 추가 (home/page.tsx와 동일)
-  const { user, isLoggedIn, loading: authLoading } = useAuth();
+  const { state } = useAuth();
+  const { user, isLoggedIn, loading: authLoading } = state;
   // UserContext 사용
   const { userInfo, userGroups, isUserDataLoading, userDataError, refreshUserData } = useUser();
     // DataCacheContext 사용 - ACTIVELOG 페이지에서는 캐시 비활성화

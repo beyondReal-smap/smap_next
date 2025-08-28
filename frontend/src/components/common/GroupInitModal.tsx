@@ -27,7 +27,8 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   
-  const { user } = useAuth();
+  const { state } = useAuth();
+  const { user } = state;
   
   console.log('[GroupInitModal] 컴포넌트 렌더링:', { 
     isOpen, 

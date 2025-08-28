@@ -250,7 +250,8 @@ const GENDER_OPTIONS = [
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { state } = useAuth();
+  const { user } = state;
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);

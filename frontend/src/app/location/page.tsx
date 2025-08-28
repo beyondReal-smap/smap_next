@@ -705,7 +705,8 @@ const useImageWithFallback = (src: string | null, fallbackSrc: string) => {
 };
 export default function LocationPage() {
   const router = useRouter();
-  const { user } = useAuth(); // 현재 로그인한 사용자 정보
+  const { state } = useAuth();
+  const { user } = state; // 현재 로그인한 사용자 정보
   
   // 성능 측정을 위한 페이지 로드 시간 기록
   useEffect(() => {

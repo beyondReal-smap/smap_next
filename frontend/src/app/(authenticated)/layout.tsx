@@ -21,7 +21,8 @@ export default function AuthenticatedLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { isLoggedIn, loading } = useAuth();
+  const { state } = useAuth();
+  const { isLoggedIn, loading } = state;
   const router = useRouter();
 
   // SSR 쿠키 확인 로직은 서버 컴포넌트에서 처리 (여기는 클라이언트 전용)

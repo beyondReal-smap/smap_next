@@ -59,7 +59,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // AuthContext와 DataCache 사용 (빌드 시 안전한 fallback)
   const authContext = useAuth();
-  const { user, isLoggedIn, loading: authLoading, isPreloadingComplete } = authContext || {
+  const { user, isLoggedIn, loading: authLoading, isPreloadingComplete } = authContext.state || {
     user: null,
     isLoggedIn: false,
     loading: true,

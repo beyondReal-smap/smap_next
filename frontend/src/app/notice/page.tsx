@@ -38,7 +38,8 @@ function groupByDate(list: PushLog[]): Record<string, PushLog[]> {
 
     export default function NoticePage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { state } = useAuth();
+  const { user } = state;
   const [notices, setNotices] = useState<PushLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

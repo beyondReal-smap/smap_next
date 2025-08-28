@@ -17,6 +17,7 @@ import {
 } from 'react-icons/fi';
 import { HiSparkles } from 'react-icons/hi2';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUser } from '@/contexts/UserContext';
 import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
 import AnimatedHeader from '../../../components/common/AnimatedHeader';
 
@@ -263,7 +264,9 @@ html, body {
 
 export default function AccountSettingsPage() {
   const router = useRouter();
-  const { user, logout, refreshUserData } = useAuth();
+  const { state, logout } = useAuth();
+  const { user } = state;
+  const { refreshUserData } = useUser();
   const [profileImg, setProfileImg] = useState(getSafeImageUrl(user?.mt_file1 || null, user?.mt_gender, user?.mt_idx || 0));
   const [showSheet, setShowSheet] = useState(false);
   const [isClosing, setIsClosing] = useState(false);

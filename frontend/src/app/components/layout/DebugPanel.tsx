@@ -39,13 +39,13 @@ const DebugPanel: React.FC = () => {
       // 2. AuthContext 상태 확인
       results.push({
         component: 'AuthContext',
-        status: auth.isLoggedIn ? 'success' : 'error',
-        message: auth.isLoggedIn ? '로그인됨' : '로그인 안됨',
+        status: auth.state.isLoggedIn ? 'success' : 'error',
+        message: auth.state.isLoggedIn ? '로그인됨' : '로그인 안됨',
         details: {
-          loading: auth.loading,
-          user: auth.user ? { mt_idx: auth.user.mt_idx, mt_name: auth.user.mt_name } : null,
-          selectedGroup: auth.selectedGroup ? { sgt_idx: auth.selectedGroup.sgt_idx, sgt_title: auth.selectedGroup.sgt_title } : null,
-          error: auth.error
+          loading: auth.state.loading,
+          user: auth.state.user ? { mt_idx: auth.state.user.mt_idx, mt_name: auth.state.user.mt_name } : null,
+          selectedGroup: auth.state.selectedGroup ? { sgt_idx: auth.state.selectedGroup.sgt_idx, sgt_title: auth.state.selectedGroup.sgt_title } : null,
+          error: auth.state.error
         }
       });
 
@@ -62,11 +62,11 @@ const DebugPanel: React.FC = () => {
           userDataError: user.userDataError,
           // AuthContext 의존성 상태
           authContext: {
-            isLoggedIn: auth.isLoggedIn,
-            loading: auth.loading,
-            isPreloadingComplete: auth.isPreloadingComplete,
-            hasUser: !!auth.user,
-            userId: auth.user?.mt_idx || null
+            isLoggedIn: auth.state.isLoggedIn,
+            loading: auth.state.loading,
+            isPreloadingComplete: auth.state.isPreloadingComplete,
+            hasUser: !!auth.state.user,
+            userId: auth.state.user?.mt_idx || null
           }
         }
       });
@@ -125,7 +125,7 @@ const DebugPanel: React.FC = () => {
 
       // 6. 백엔드 직접 연결 테스트
       try {
-        const userId = auth.user?.mt_idx || user.userInfo?.mt_idx;
+        const userId = auth.state.user?.mt_idx || user.userInfo?.mt_idx;
         if (userId) {
           const directResponse = await fetch(`https://api3.smap.site/api/v1/groups/member/${userId}`, {
             method: 'GET',

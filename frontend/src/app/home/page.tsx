@@ -43,13 +43,13 @@ if (typeof window !== 'undefined') {
     
     // 추가 안전장치: 현재 스코프에서도 Array 확인
     if (typeof Array === 'undefined' || !Array) {
-      window.Array = window.Array || Array || function() {
-        const arr = [];
+      window.Array = window.Array || Array || (function() {
+        const arr: any[] = [];
         for (let i = 0; i < arguments.length; i++) {
           arr[i] = arguments[i];
         }
         return arr;
-      };
+      } as any);
     }
     
     console.log('[HOME] ✅ Array.isArray 폴리필 적용 완료:', {
@@ -1069,7 +1069,8 @@ export default function HomePage() {
   
   const router = useRouter();
   // 인증 관련 상태 추가
-  const { user, isLoggedIn, loading: authLoading, isPreloadingComplete } = useAuth();
+  const { state } = useAuth();
+  const { user, isLoggedIn, loading: authLoading, isPreloadingComplete } = state;
   
   // UserContext 사용 (최상단으로 이동)
   const { 
@@ -1312,11 +1313,10 @@ export default function HomePage() {
 
         // 2초 후 권한 요청 (UI가 안정화된 후)
         setTimeout(() => {
-          checkAndRequestPermissions().finally(() => {
-            // 권한 요청 프로세스가 완료되었음을 표시
-            setPermissionRequestCompleted(true);
-            console.log('🔥 [HOME] 권한 요청 프로세스 완료');
-          });
+          checkAndRequestPermissions();
+          // 권한 요청 프로세스가 완료되었음을 표시
+          setPermissionRequestCompleted(true);
+          console.log('🔥 [HOME] 권한 요청 프로세스 완료');
         }, 2000);
       } else {
         console.log('🔥 [HOME] ❌ 안드로이드 환경이 아니므로 권한 요청 생략');

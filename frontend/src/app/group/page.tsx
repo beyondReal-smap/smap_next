@@ -582,7 +582,8 @@ const modalVariants = {
 // 메인 컴포넌트
 function GroupPageContent() {
   const router = useRouter();
-  const { user, isLoggedIn } = useAuth();
+  const { state } = useAuth();
+  const { user, isLoggedIn } = state;
   const { forceRefreshGroups } = useUser();
   const { 
     getUserProfile, 

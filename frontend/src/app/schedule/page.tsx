@@ -819,7 +819,8 @@ const MobileCalendar = memo(({
 
 export default function SchedulePage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { state } = useAuth();
+  const { user } = state;
   
   // DataCache 컨텍스트 사용
   const { invalidateCache } = useDataCache();
