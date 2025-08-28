@@ -582,14 +582,24 @@ const SignInPage = () => {
     console.error('[SIGNIN] useAuth 컨텍스트 오류:', error);
     authContextData = {
       login: () => Promise.resolve(),
-      isLoggedIn: false,
-      loading: false,
-      error: null,
-      setError: () => {},
-      refreshAuthState: () => Promise.resolve()
+      state: {
+        isLoggedIn: false,
+        loading: false,
+        error: null,
+        user: null
+      },
+      setError: () => {}
     };
   }
-  const { login, isLoggedIn, loading, error, setError, refreshAuthState } = authContextData;
+
+  // useAuth()의 새로운 구조에 맞게 데이터 추출
+  const { login, setError } = authContextData;
+  const { isLoggedIn, loading, error, user } = authContextData.state || {
+    isLoggedIn: false,
+    loading: false,
+    error: null,
+    user: null
+  };
   
   // 🆕 DataCache 접근
   let dataCacheContextData;
@@ -779,23 +789,18 @@ const SignInPage = () => {
             
             // 4. AuthContext 상태를 수동으로 동기화
             try {
-              await refreshAuthState();
-              console.log('[NATIVE CALLBACK] AuthContext 상태 동기화 완료');
-              
+              // refreshAuthState 함수가 제거됨 - AuthContext가 자동으로 상태 관리
+              console.log('[NATIVE CALLBACK] AuthContext 상태 동기화 완료 (자동 관리)');
+
               // 5. 동기화 후 상태 재확인
               const isLoggedInAfterRefresh = authService.isLoggedIn();
               console.log('[NATIVE CALLBACK] 동기화 후 로그인 상태:', isLoggedInAfterRefresh);
-              
+
               if (!isLoggedInAfterRefresh) {
                 console.warn('[NATIVE CALLBACK] ⚠️ 동기화 후에도 로그인 상태가 false');
-                
-                // 6. 강제로 AuthContext 상태 설정
-                if (typeof refreshAuthState === 'function') {
-                  console.log('[NATIVE CALLBACK] 강제 AuthContext 재설정 시도');
-                  await refreshAuthState();
-                }
+                // AuthContext가 자동으로 상태를 관리하므로 수동 개입 불필요
               }
-              
+
             } catch (error) {
               console.error('[NATIVE CALLBACK] AuthContext 동기화 실패:', error);
             }
@@ -1548,9 +1553,9 @@ const SignInPage = () => {
                 }
                 
                 console.log('[GOOGLE SDK] AuthContext 상태 동기화 시작');
-                
+
                 // AuthContext 상태 동기화
-                await refreshAuthState();
+                // refreshAuthState 함수가 제거됨 - AuthContext가 자동으로 상태 관리
                 
                 // 상태 동기화 확인 (최대 3초 대기)
                 let syncAttempts = 0;
@@ -1559,7 +1564,7 @@ const SignInPage = () => {
                 while (syncAttempts < maxSyncAttempts && !isLoggedIn) {
                   console.log('[GOOGLE SDK] 인증 상태 동기화 대기 중...', syncAttempts + 1);
                   await new Promise(resolve => setTimeout(resolve, 200));
-                  await refreshAuthState();
+                  // refreshAuthState 함수가 제거됨 - AuthContext가 자동으로 상태 관리
                   syncAttempts++;
                 }
                 
@@ -2224,7 +2229,7 @@ const SignInPage = () => {
               console.log('[GOOGLE LOGIN] 🔄 AuthContext 상태 동기화 시작');
               
               // 3. AuthContext 상태를 수동으로 동기화
-              await refreshAuthState();
+              // refreshAuthState 함수가 제거됨 - AuthContext가 자동으로 상태 관리
               
               // 4. FCM 토큰 체크 및 업데이트 (백그라운드에서 실행)
               // 🚨 Firebase 토큰 생성 로직 제거 - 네이티브에서 관리
@@ -3371,9 +3376,8 @@ const SignInPage = () => {
         const userData = authService.getUserData();
         if (userData) {
           console.log('[SIGNIN] AuthContext 상태 동기화 시작:', userData.mt_name);
-          // AuthContext의 refreshAuthState 함수를 사용하여 상태 동기화
-          await refreshAuthState();
-          console.log('[SIGNIN] AuthContext 상태 동기화 완료');
+          // AuthContext의 refreshAuthState 함수가 제거됨 - AuthContext가 자동으로 상태 관리
+          console.log('[SIGNIN] AuthContext 상태 동기화 완료 (자동 관리)');
         }
       } catch (error) {
         console.warn('[SIGNIN] AuthContext 상태 동기화 실패 (무시):', error);
