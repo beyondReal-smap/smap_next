@@ -23,6 +23,8 @@ class Member(BaseModel):
     mt_pwd = Column(String(200), nullable=True, comment='비밀번호')
     mt_pwd_cnt = Column(TINYINT(1), nullable=True, comment='비밀번호 체크 카운터 로그인하면 리셋')
     mt_token_id = Column(String(255), nullable=True, comment='앱토큰 아이디')
+    mt_token_updated_at = Column(DateTime, nullable=True, comment='FCM 토큰 마지막 업데이트 일시')
+    mt_token_expiry_date = Column(DateTime, nullable=True, comment='FCM 토큰 예상 만료일 (7일 후)')
     mt_name = Column(String(50), nullable=True, comment='이름')
     mt_nickname = Column(String(50), nullable=True, comment='닉네임')
     mt_hp = Column(String(20), nullable=True, comment='연락처')

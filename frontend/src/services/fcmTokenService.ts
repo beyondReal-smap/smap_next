@@ -159,15 +159,71 @@ export class FCMTokenService {
 
   // 🚨 기존 메서드들을 네이티브 처리로 대체
   async initializeAndCheckUpdateToken(mt_idx: number): Promise<FCMTokenUpdateResponse> {
-    console.log('[FCM Token Service] 🚨 Firebase 토큰 생성 로직 제거됨 - 네이티브에서 FCM 토큰 관리');
-    return {
-      success: true,
-      message: '네이티브에서 FCM 토큰 관리',
-      error: null,
-      mt_idx,
-      has_token: true,
-      token_preview: 'native_managed'
-    };
+    try {
+      console.log('[FCM Token Service] 🔍 FCM 토큰 유효성 검증 시작');
+
+      // 현재 FCM 토큰 가져오기 (네이티브에서 관리)
+      const currentToken = this.getCurrentToken();
+
+      if (!currentToken || currentToken.startsWith('native_dummy_')) {
+        console.log('[FCM Token Service] ⚠️ 유효한 FCM 토큰이 없음 - 네이티브에 토큰 요청 필요');
+        return {
+          success: false,
+          message: '유효한 FCM 토큰이 없습니다.',
+          error: 'NO_VALID_TOKEN',
+          mt_idx,
+          has_token: false,
+          token_preview: null
+        };
+      }
+
+      // 백엔드에 토큰 유효성 검증 요청
+      const response = await fetch('/api/member-fcm-token/validate-and-refresh', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          mt_idx: mt_idx,
+          fcm_token: currentToken
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        console.log('[FCM Token Service] ✅ FCM 토큰 검증 완료:', result.message);
+        return {
+          success: true,
+          message: result.message,
+          error: null,
+          mt_idx,
+          has_token: result.has_token,
+          token_preview: result.token_preview
+        };
+      } else {
+        console.error('[FCM Token Service] ❌ FCM 토큰 검증 실패:', result.message);
+        return {
+          success: false,
+          message: result.message || 'FCM 토큰 검증 실패',
+          error: 'VALIDATION_FAILED',
+          mt_idx,
+          has_token: false,
+          token_preview: null
+        };
+      }
+
+    } catch (error) {
+      console.error('[FCM Token Service] ❌ FCM 토큰 검증 중 오류:', error);
+      return {
+        success: false,
+        message: 'FCM 토큰 검증 중 오류 발생',
+        error: error instanceof Error ? error.message : 'UNKNOWN_ERROR',
+        mt_idx,
+        has_token: false,
+        token_preview: null
+      };
+    }
   }
 
   async initializeAndRegisterToken(mt_idx: number): Promise<FCMTokenUpdateResponse> {

@@ -719,27 +719,38 @@ export default function LocationPage() {
   useEffect(() => {
     const checkLocationPermissions = async () => {
       console.log('🔥 [LOCATION_PAGE] 위치 권한 체크 시작');
-      
-      if (!hasLocationAndActivityPermissions()) {
-        console.log('⚠️ [LOCATION_PAGE] 위치/동작 권한이 없음 - 요청');
-        try {
+
+      try {
+        if (!hasLocationAndActivityPermissions()) {
+          console.log('⚠️ [LOCATION_PAGE] 위치/동작 권한이 없음 - 요청');
           const granted = await requestLocationAndActivityPermissions();
           if (granted) {
             console.log('✅ [LOCATION_PAGE] 위치/동작 권한 요청 성공');
+            setPermissionGranted(true);
+            setPermissionError(null);
           } else {
             console.log('⚠️ [LOCATION_PAGE] 위치/동작 권한 요청 실패');
+            setPermissionGranted(false);
+            setPermissionError('위치 및 동작 권한이 필요합니다. 설정에서 권한을 허용해주세요.');
           }
-        } catch (error) {
-          console.error('❌ [LOCATION_PAGE] 위치/동작 권한 요청 중 오류:', error);
+        } else {
+          console.log('✅ [LOCATION_PAGE] 위치/동작 권한 이미 허용됨');
+          setPermissionGranted(true);
         }
-      } else {
-        console.log('✅ [LOCATION_PAGE] 위치/동작 권한 이미 허용됨');
+      } catch (error) {
+        console.error('❌ [LOCATION_PAGE] 위치/동작 권한 요청 중 오류:', error);
+        setPermissionGranted(false);
+        setPermissionError('권한 요청 중 오류가 발생했습니다. 다시 시도해주세요.');
+      } finally {
+        // 권한 요청이 완료되었음을 표시
+        setPermissionRequestCompleted(true);
+        console.log('🔥 [LOCATION_PAGE] 권한 요청 프로세스 완료');
       }
     };
 
     // 페이지 로드 후 1초 뒤에 권한 체크
     const timeoutId = setTimeout(checkLocationPermissions, 1000);
-    
+
     return () => clearTimeout(timeoutId);
   }, []);
 
@@ -845,6 +856,9 @@ export default function LocationPage() {
   
   // 지도 관련 상태
   const [map, setMap] = useState<NaverMap | null>(null);
+  const [permissionRequestCompleted, setPermissionRequestCompleted] = useState(false);
+  const [permissionGranted, setPermissionGranted] = useState(false);
+  const [permissionError, setPermissionError] = useState<string | null>(null);
   const [markers, setMarkers] = useState<NaverMarker[]>([]);
   const [memberMarkers, setMemberMarkers] = useState<NaverMarker[]>([]); // Add state for member markers
   // 최신 마커 배열을 추적하기 위한 ref (setState 비동기 반영 지연으로 인한 누락 방지)
@@ -3065,7 +3079,20 @@ export default function LocationPage() {
   useEffect(() => {
     const loadNaverMaps = async () => {
       console.log('[네이버 지도 로드] 시작');
-      
+
+      // 권한 요청이 완료되지 않은 경우 지도 로드를 대기
+      if (!permissionRequestCompleted) {
+        console.log('[네이버 지도 로드] 권한 요청 대기 중 - 지도 로드 스킵');
+        return;
+      }
+
+      // 권한이 거부된 경우 지도 로드를 취소
+      if (permissionRequestCompleted && !permissionGranted) {
+        console.log('[네이버 지도 로드] 권한 거부됨 - 지도 로드 취소');
+        setIsMapLoading(false);
+        return;
+      }
+
       if (window.naver && window.naver.maps) {
         console.log('[네이버 지도 로드] 이미 로드됨');
         setIsMapLoading(false);
@@ -3143,6 +3170,7 @@ export default function LocationPage() {
       setTimeout(() => {
         if (!window.naver?.maps && !hasErrorOccurred) {
           console.warn(`[네이버 지도 로드] 타임아웃 (${timeout}ms)`);
+          console.warn(`[네이버 지도 로드] 권한 상태: 요청완료=${permissionRequestCompleted}, 권한허용=${permissionGranted}`);
           hasErrorOccurred = true;
           setIsMapLoading(false);
         }
@@ -3150,7 +3178,7 @@ export default function LocationPage() {
     };
 
     loadNaverMaps();
-  }, []);
+  }, [permissionRequestCompleted, permissionGranted]);
 
   // 지도 컨테이너 렌더링 확인
   useEffect(() => {
@@ -3158,6 +3186,89 @@ export default function LocationPage() {
       console.log('[지도 컨테이너] 렌더링 완료');
     }
   }, [mapContainer.current]);
+
+  // 🚨 권한 요청 완료 후 지도 초기화 재시도
+  useEffect(() => {
+    if (permissionRequestCompleted && !permissionGranted) {
+      console.log('⚠️ [LOCATION_PAGE] 위치 권한이 거부됨 - 지도 로딩 취소');
+      setIsMapLoading(false);
+
+      // 사용자에게 권한 거부 알림
+      if (permissionError) {
+        console.warn('🚨 [LOCATION_PAGE] 권한 오류:', permissionError);
+        // 여기서 사용자에게 알림을 표시할 수 있음 (예: toast나 modal)
+      }
+      return;
+    }
+
+    if (permissionRequestCompleted && permissionGranted && !map && !isMapLoading && window.naver && window.naver.maps && mapContainer.current) {
+      console.log('🔄 [LOCATION_PAGE] 권한 요청 완료 후 지도 초기화 재시도');
+
+      // 2초 후 지도 초기화 재시도
+      const retryTimer = setTimeout(() => {
+        if (!map && window.naver && window.naver.maps && mapContainer.current) {
+          console.log('🔄 [LOCATION_PAGE] 지도 초기화 재시도 시작');
+          console.log('🔄 [LOCATION_PAGE] 재시도 조건:', {
+            hasMap: !!map,
+            hasNaverAPI: !!(window.naver && window.naver.maps),
+            hasMapContainer: !!mapContainer.current,
+            permissionRequestCompleted,
+            permissionGranted
+          });
+
+          try {
+            const defaultCenter = createSafeLatLng(37.5665, 126.9780);
+            if (!defaultCenter) {
+              console.error('[지도 초기화 재시도] 기본 LatLng 생성 실패');
+              return;
+            }
+
+            const mapOptions = {
+              center: defaultCenter,
+              zoom: 16,
+              minZoom: 8,
+              maxZoom: 18,
+              mapTypeControl: false,
+              scaleControl: false,
+              logoControl: false,
+              mapDataControl: false,
+              zoomControl: false
+            };
+
+            const retryMap = new window.naver.maps.Map(mapContainer.current, mapOptions);
+
+            window.naver.maps.Event.addListener(retryMap, 'init', () => {
+              console.log('[지도 초기화 재시도] ✅ 네이버 지도 초기화 완료');
+              setIsMapInitialized(true);
+              setIsMapReady(true);
+              setMap(retryMap);
+            });
+
+            // 지도 초기화 타임아웃 (10초)
+            setTimeout(() => {
+              if (!map) {
+                console.error('[지도 초기화 재시도] 타임아웃 - 지도 초기화 실패');
+                setIsMapLoading(false);
+              }
+            }, 10000);
+
+          } catch (error) {
+            console.error('[지도 초기화 재시도] 실패:', error);
+            setIsMapLoading(false);
+          }
+        } else {
+          console.log('🔄 [LOCATION_PAGE] 재시도 조건 불충분 - 지도 초기화 스킵');
+          console.log('🔄 [LOCATION_PAGE] 스킵 이유:', {
+            hasMap: !!map,
+            hasNaverAPI: !!(window.naver && window.naver.maps),
+            hasMapContainer: !!mapContainer.current
+          });
+        }
+      }, 2000);
+
+      return () => clearTimeout(retryTimer);
+    }
+  }, [permissionRequestCompleted, permissionGranted, map, isMapLoading]);
   // 지도 초기화 (최적화 - 멤버 데이터가 있으면 즉시 초기화)
   useEffect(() => {
     console.log('[지도 초기화 조건 체크] (최적화)', {
@@ -3166,11 +3277,13 @@ export default function LocationPage() {
       hasNaverAPI: !!(window.naver && window.naver.maps),
       hasMap: !!map,
       hasGroupMembers: groupMembers.length > 0,
-      isFetchingGroupMembers
+      isFetchingGroupMembers,
+      permissionRequestCompleted,
+      permissionGranted
     });
     
-    // 그룹멤버 로딩이 완료되면 즉시 지도 초기화 (장소 데이터 로딩 대기 없이)
-    if (!isMapLoading && mapContainer.current && window.naver && window.naver.maps && !map && groupMembers.length > 0 && !isFetchingGroupMembers) {
+    // 권한 요청 완료 후 그룹멤버 로딩이 완료되면 즉시 지도 초기화 (장소 데이터 로딩 대기 없이)
+    if (!isMapLoading && mapContainer.current && window.naver && window.naver.maps && !map && groupMembers.length > 0 && !isFetchingGroupMembers && permissionRequestCompleted) {
       console.log('[지도 초기화] 시작 - 첫 번째 그룹멤버 위치로 초기화');
       
       try {
@@ -6729,12 +6842,56 @@ export default function LocationPage() {
           }}
         >
           {/* 스켈레톤 UI - 지도 로딩 중일 때 표시 */}
-          {isMapLoading && (
-            <MapSkeleton 
-              showControls={true} 
+          {isMapLoading && !permissionError && (
+            <MapSkeleton
+              showControls={true}
               showMemberList={false}
-              className="absolute top-0 left-0 w-full h-full z-5" 
+              className="absolute top-0 left-0 w-full h-full z-5"
             />
+          )}
+
+          {/* 권한 오류 UI - 권한이 거부되었을 때 표시 */}
+          {permissionRequestCompleted && !permissionGranted && permissionError && (
+            <div className="absolute top-0 left-0 w-full h-full z-5 bg-white flex flex-col items-center justify-center p-6">
+              <div className="text-center">
+                <FiAlertTriangle className="mx-auto mb-4 text-6xl text-red-500" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  위치 권한이 필요합니다
+                </h3>
+                <p className="text-gray-600 mb-6 max-w-sm">
+                  {permissionError}
+                </p>
+                <div className="space-y-3">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => {
+                      // 권한 재요청
+                      setPermissionError(null);
+                      setPermissionRequestCompleted(false);
+                      // 1초 후 권한 요청 재시도
+                      setTimeout(() => {
+                        window.location.reload();
+                      }, 1000);
+                    }}
+                    className="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-3 px-6 rounded-lg transition-colors"
+                  >
+                    권한 재요청
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => {
+                      // 홈으로 돌아가기
+                      window.history.back();
+                    }}
+                    className="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-2 px-4 rounded-lg transition-colors"
+                  >
+                    뒤로가기
+                  </motion.button>
+                </div>
+              </div>
+            </div>
           )}
 
           <div ref={mapContainer} className="w-full h-full" />

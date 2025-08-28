@@ -873,7 +873,12 @@ export default function HomePage() {
   
   // 🚨 iOS 시뮬레이터 에러 핸들링
   const [componentError, setComponentError] = useState<string | null>(null);
-  
+
+  // 🔥 권한 요청 상태 추적
+  const [permissionRequestCompleted, setPermissionRequestCompleted] = useState(false);
+  const [permissionGranted, setPermissionGranted] = useState(false);
+  const [permissionError, setPermissionError] = useState<string | null>(null);
+
   // 지도 초기화 상태 추적
   const [isMapInitialized, setIsMapInitialized] = useState(false);
 
@@ -1230,9 +1235,13 @@ export default function HomePage() {
             setFirstLogin(true).then((success) => {
               if (success) {
                 console.log('✅ [HOME] setFirstLogin을 통한 권한 요청 완료');
+                setPermissionGranted(true);
+                setPermissionError(null);
               } else {
                 console.log('⚠️ [HOME] setFirstLogin을 통한 권한 요청 실패');
-                
+                setPermissionGranted(false);
+                setPermissionError('위치 및 동작 권한이 필요합니다. 설정에서 권한을 허용해주세요.');
+
                 // 2. 권한 상태 강제 초기화
                 console.log('🔄 [HOME] 권한 상태 강제 초기화 시도');
                 if (window.AndroidPermissions?.resetPermissionState) {
@@ -1243,7 +1252,7 @@ export default function HomePage() {
                     console.error('❌ [HOME] 권한 상태 초기화 실패:', error);
                   }
                 }
-                
+
                 // 3. 직접 권한 요청 시도
                 setTimeout(() => {
                   console.log('🔄 [HOME] 직접 권한 요청 시도');
@@ -1256,7 +1265,7 @@ export default function HomePage() {
                     }
                   }
                 }, 1000);
-                
+
                 // 4. 위치/동작 권한 직접 요청
                 setTimeout(() => {
                   console.log('🔄 [HOME] 위치/동작 권한 직접 요청 시도');
@@ -1269,7 +1278,7 @@ export default function HomePage() {
                     }
                   }
                 }, 3000);
-                
+
                 // 5. 최종 재시도
                 setTimeout(() => {
                   console.log('🔄 [HOME] 최종 권한 요청 재시도');
@@ -1278,7 +1287,9 @@ export default function HomePage() {
               }
             }).catch((error) => {
               console.error('❌ [HOME] 안드로이드 권한 요청 중 오류:', error);
-              
+              setPermissionGranted(false);
+              setPermissionError('권한 요청 중 오류가 발생했습니다. 다시 시도해주세요.');
+
               // 오류 발생 시에도 직접 권한 요청 시도
               setTimeout(() => {
                 console.log('🔄 [HOME] 오류 후 직접 권한 요청 시도');
@@ -1294,11 +1305,19 @@ export default function HomePage() {
             });
           } else {
             console.log('✅ [HOME] 안드로이드 권한이 이미 모두 허용됨');
+            setPermissionGranted(true);
+            setPermissionError(null);
           }
         };
-        
+
         // 2초 후 권한 요청 (UI가 안정화된 후)
-        setTimeout(checkAndRequestPermissions, 2000);
+        setTimeout(() => {
+          checkAndRequestPermissions().finally(() => {
+            // 권한 요청 프로세스가 완료되었음을 표시
+            setPermissionRequestCompleted(true);
+            console.log('🔥 [HOME] 권한 요청 프로세스 완료');
+          });
+        }, 2000);
       } else {
         console.log('🔥 [HOME] ❌ 안드로이드 환경이 아니므로 권한 요청 생략');
       }
@@ -2908,6 +2927,19 @@ export default function HomePage() {
   useEffect(() => {
     console.log('[HOME] 🗺️ 지도 초기화 시작 - 재방문 시에도 안전하게 처리');
     
+    // 권한 요청이 완료되지 않은 경우 지도 로드를 대기
+    if (!permissionRequestCompleted) {
+      console.log('[HOME] 🗺️ 권한 요청 대기 중 - 지도 로드 스킵');
+      return;
+    }
+
+    // 권한이 거부된 경우 지도 로드를 취소
+    if (permissionRequestCompleted && !permissionGranted) {
+      console.log('[HOME] 🗺️ 권한 거부됨 - 지도 로드 취소');
+      setIsMapLoading(false);
+      return;
+    }
+
     // 중복 실행 방지 - 이미 초기화 중이거나 완료된 경우
     if (isMapLoading && (naverMap.current || map.current)) {
       console.log('[HOME] 🗺️ 지도 이미 초기화됨 - 중복 실행 방지');
@@ -3024,7 +3056,44 @@ export default function HomePage() {
       clearTimeout(initTimeout);
       clearTimeout(domCheckTimeout);
     };
-  }, [mapType]); // mapType 변경 시에도 재실행
+  }, [mapType, permissionRequestCompleted, permissionGranted]); // 권한 상태 변경 시에도 재실행
+
+  // 🚨 권한 요청 완료 후 지도 초기화 재시도
+  useEffect(() => {
+    if (permissionRequestCompleted && !permissionGranted) {
+      console.log('⚠️ [HOME] 위치 권한이 거부됨 - 지도 로딩 취소');
+      setIsMapLoading(false);
+      return;
+    }
+
+    if (permissionRequestCompleted && permissionGranted && !map.current && !naverMap.current && !isMapLoading && window.naver && window.naver.maps) {
+      console.log('🔄 [HOME] 권한 요청 완료 후 지도 초기화 재시도');
+
+      // 3초 후 지도 초기화 재시도
+      const retryTimer = setTimeout(() => {
+        if (!map.current && !naverMap.current && window.naver && window.naver.maps) {
+          console.log('🔄 [HOME] 지도 초기화 재시도 시작');
+
+          try {
+            if (mapType === 'naver' && naverMapContainer.current) {
+              console.log('[HOME] 네이버맵 재초기화 시도');
+              initNaverMap();
+            } else if (mapType === 'google' && googleMapContainer.current) {
+              console.log('[HOME] 구글맵 재초기화 시도');
+              initGoogleMap();
+            }
+          } catch (error) {
+            console.error('[HOME] 지도 초기화 재시도 실패:', error);
+            setIsMapLoading(false);
+          }
+        } else {
+          console.log('🔄 [HOME] 재시도 조건 불충분 - 지도 초기화 스킵');
+        }
+      }, 3000);
+
+      return () => clearTimeout(retryTimer);
+    }
+  }, [permissionRequestCompleted, permissionGranted, mapType]);
 
   // 🗺️ 지도 API 로드 완료 시 자동 초기화 - iOS WebView 호환성
   useEffect(() => {
@@ -7403,12 +7472,57 @@ export default function HomePage() {
           }}
         >
           {/* 스켈레톤 UI - 지도 로딩 중일 때 표시 */}
-          {isMapLoading && (
-            <MapSkeleton 
-              showControls={true} 
+          {isMapLoading && !permissionError && (
+            <MapSkeleton
+              showControls={true}
               showMemberList={false}
-              className="absolute top-0 left-0 w-full h-full z-5" 
+              className="absolute top-0 left-0 w-full h-full z-5"
             />
+          )}
+
+          {/* 권한 오류 UI - 권한이 거부되었을 때 표시 */}
+          {permissionRequestCompleted && !permissionGranted && permissionError && (
+            <div className="absolute top-0 left-0 w-full h-full z-5 bg-white flex flex-col items-center justify-center p-6">
+              <div className="text-center">
+                <div className="text-6xl mb-4">🗺️</div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  지도를 표시할 수 없습니다
+                </h3>
+                <p className="text-gray-600 mb-6 max-w-sm">
+                  {permissionError}
+                </p>
+                <div className="space-y-3">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => {
+                      // 권한 재요청
+                      setPermissionError(null);
+                      setPermissionRequestCompleted(false);
+                      setPermissionGranted(false);
+                      // 1초 후 권한 요청 재시도
+                      setTimeout(() => {
+                        window.location.reload();
+                      }, 1000);
+                    }}
+                    className="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-3 px-6 rounded-lg transition-colors"
+                  >
+                    권한 재요청
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => {
+                      // 메인으로 돌아가기
+                      window.location.href = '/';
+                    }}
+                    className="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-2 px-4 rounded-lg transition-colors"
+                  >
+                    메인으로 돌아가기
+                  </motion.button>
+                </div>
+              </div>
+            </div>
           )}
 
           <div 
