@@ -1,4 +1,4 @@
-import { API_KEYS } from '@/config';
+import { API_KEYS } from '../config';
 import React from 'react';
 
 // 지도 API 타입 정의

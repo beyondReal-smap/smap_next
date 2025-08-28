@@ -43,13 +43,13 @@ if (typeof window !== 'undefined') {
     
     // 추가 안전장치: 현재 스코프에서도 Array 확인
     if (typeof Array === 'undefined' || !Array) {
-      window.Array = window.Array || Array || function() {
-        const arr = [];
+      window.Array = window.Array || Array || (function() {
+        const arr: any[] = [];
         for (let i = 0; i < arguments.length; i++) {
           arr[i] = arguments[i];
         }
         return arr;
-      };
+      } as any);
     }
     
     console.log('[HOME] ✅ Array.isArray 폴리필 적용 완료:', {

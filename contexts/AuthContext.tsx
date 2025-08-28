@@ -125,7 +125,7 @@ const AuthContext = createContext<{
 // Provider 컴포넌트
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
-  const { preloadUserData } = useDataCache();
+  // const { preloadUserData } = useDataCache(); // 사용되지 않는 코드 제거
 
   // 로그인
   const login = async (credentials: LoginRequest): Promise<void> => {
