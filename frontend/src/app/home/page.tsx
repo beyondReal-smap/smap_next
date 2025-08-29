@@ -1140,42 +1140,10 @@ export default function HomePage() {
 
   }, [router, isLoggedIn, authLoading, user]);
   
-  // 🔔 FCM 토큰 자동 업데이트 (사용자 정보 변경 시) - iOS WebView 호환성
+  // 🚫 FCM 토큰 자동 업데이트 비활성화 - 네이티브에서 관리
   useEffect(() => {
-    // iOS WebView에서는 Firebase가 지원되지 않으므로 FCM 토큰 업데이트 건너뛰기
-    const isIOSWebView = typeof window !== 'undefined' && 
-                         (window as any).webkit?.messageHandlers?.smapIos;
-    
-    if (isIOSWebView) {
-      console.log('🍎 [FCM] iOS WebView 환경 감지 - FCM 토큰 업데이트 건너뛰기 (Swift에서 직접 처리)');
-      return;
-    }
-    
     if (isLoggedIn && user && user.mt_idx && !authLoading) {
-      console.log('🔔 [FCM] 사용자 정보 변경 감지 - FCM 토큰 자동 업데이트');
-      
-      // 🚨 Firebase 토큰 생성 로직 제거 - 네이티브에서 관리
-      const fcmUpdateTimeout = setTimeout(async () => {
-        try {
-          console.log('🚨 [FCM] Firebase 토큰 생성 로직 제거됨 - 네이티브에서 FCM 토큰 관리');
-          console.log('📱 [FCM] 네이티브에서는 window.updateFCMToken() 함수를 사용하여 FCM 토큰 업데이트를 수행하세요');
-        } catch (error: any) {
-          console.error('❌ [FCM] FCM 처리 중 오류:', error);
-        }
-      }, 3000); // 3초 후 실행 (더 안정적인 초기화 대기)
-      
-      // 🚨 Firebase 토큰 생성 로직 제거 - 네이티브에서 관리
-      const periodicFCMCheck = setInterval(async () => {
-        if (user && user.mt_idx) {
-          console.log('🚨 [FCM] Firebase 토큰 생성 로직 제거됨 - 네이티브에서 FCM 토큰 관리');
-          console.log('📱 [FCM] 네이티브에서는 window.updateFCMToken() 함수를 사용하여 FCM 토큰 업데이트를 수행하세요');
-        }
-      }, 10 * 60 * 1000); // 10분마다 (더 긴 간격으로 변경)
-      
-      return () => {
-        clearTimeout(fcmUpdateTimeout);
-        clearInterval(periodicFCMCheck);
-      };
+      console.log('🚫 [FCM] FCM 토큰 자동 업데이트 로직 비활성화됨 - 네이티브에서 관리');
     }
   }, [isLoggedIn, user?.mt_idx, authLoading]);
 
@@ -1214,10 +1182,9 @@ export default function HomePage() {
       const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown';
       const hasAndroidInterface = typeof window.AndroidPermissions !== 'undefined';
       
-      // 🚨 Firebase 토큰 생성 로직 제거 - 네이티브에서 관리
+      // 🚫 FCM 토큰 생성 로직 비활성화됨
       if (user && user.mt_idx) {
-        console.log('🚨 [FCM] Firebase 토큰 생성 로직 제거됨 - 네이티브에서 FCM 토큰 관리');
-        console.log('📱 [FCM] 네이티브에서는 window.updateFCMToken() 함수를 사용하여 FCM 토큰 업데이트를 수행하세요');
+        console.log('🚫 [FCM] FCM 토큰 생성 로직 비활성화됨 - 네이티브에서 관리');
       }
       
       console.log('🔥 [HOME] 환경 체크 상세:', {
@@ -1695,44 +1662,10 @@ export default function HomePage() {
     delay: 300 // 지연 시간을 줄여서 더 빠른 반응
   });
 
-  // 🔔 앱 포그라운드 복귀 시 FCM 토큰 자동 업데이트 - iOS WebView 호환성
+  // 🚫 앱 포그라운드 복귀 시 FCM 토큰 자동 업데이트 비활성화 - 네이티브에서 관리
   useEffect(() => {
-    // iOS WebView에서는 Firebase가 지원되지 않으므로 FCM 토큰 업데이트 건너뛰기
-    const isIOSWebView = typeof window !== 'undefined' && 
-                         (window as any).webkit?.messageHandlers?.smapIos;
-    
-    if (isIOSWebView) {
-      console.log('[HOME] 🍎 iOS WebView 환경 감지 - FCM 토큰 업데이트 건너뛰기 (Swift에서 직접 처리)');
-      return;
-    }
-    
     if (isVisible && !isTransitioning && user && user.mt_idx && !authLoading) {
-      console.log('[HOME] 🔔 앱 포그라운드 복귀 감지 - FCM 토큰 자동 업데이트 시작');
-      console.log('[HOME] 🔔 FCM 업데이트 조건 확인:', {
-        isVisible,
-        isTransitioning,
-        hasUser: !!user,
-        userId: user?.mt_idx,
-        authLoading,
-        timestamp: new Date().toISOString()
-      });
-      
-      // 약간의 지연 후 FCM 토큰 업데이트 실행
-      const fcmUpdateTimeout = setTimeout(async () => {
-        console.log('[HOME] 🔔 FCM 토큰 업데이트 실행 시작 (지연 완료)');
-        // FCM 관련 로직 제거됨 - 네이티브에서 관리
-        console.log('[HOME] FCM 관련 로직 제거됨 - 네이티브에서 관리');
-      }, 1000); // 1초 후 실행
-      
-      return () => clearTimeout(fcmUpdateTimeout);
-    } else {
-      console.log('[HOME] 🔔 FCM 토큰 업데이트 조건 불충족:', {
-        isVisible,
-        isTransitioning,
-        hasUser: !!user,
-        userId: user?.mt_idx,
-        authLoading
-      });
+      console.log('[HOME] 🚫 FCM 토큰 자동 업데이트 로직 비활성화됨 - 네이티브에서 관리');
     }
   }, [isVisible, isTransitioning, user?.mt_idx, authLoading]);
   

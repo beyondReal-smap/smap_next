@@ -1367,7 +1367,7 @@ export default function RegisterPage() {
             try {
               console.log('🚨 [REGISTER] Firebase 토큰 생성 로직 제거됨 - 네이티브에서 FCM 토큰 관리');
               // 🚨 Firebase 토큰 생성 로직 제거 - 네이티브에서 FCM 토큰 관리
-              console.log('📱 [REGISTER] 네이티브에서는 window.updateFCMToken() 함수를 사용하여 FCM 토큰 업데이트를 수행하세요');
+              console.log('🚫 [REGISTER] FCM 토큰 업데이트 로직 비활성화됨 - 네이티브에서 관리');
             } catch (fcmError) {
               console.error('❌ [REGISTER] FCM 처리 중 오류:', fcmError);
             }

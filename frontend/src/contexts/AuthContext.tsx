@@ -380,25 +380,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'SET_ERROR', payload: null });
 
-      // 로그인 전에 FCM 토큰 확보 시도 → 로그인 페이로드에 포함 (백엔드가 즉시 mt_token_id 업데이트)
-      let fcmToken: string | null = null;
-      try {
-        // iOS 네이티브 토큰 우선
-        if (typeof window !== 'undefined' && (window as any).nativeFCMToken) {
-          fcmToken = (window as any).nativeFCMToken as string;
-          console.log('[AUTH] iOS 네이티브 FCM 토큰 사용 (미리보기):', fcmToken.substring(0, 20) + '...');
-        } else {
-                  // 🚨 Firebase 토큰 생성 로직 제거 - 네이티브에서 관리
-        console.log('[AUTH] 🚨 Firebase 토큰 생성 로직 제거됨 - 네이티브에서 FCM 토큰 관리');
-        console.log('[AUTH] 📱 네이티브에서는 window.updateFCMToken() 함수를 사용하여 FCM 토큰 업데이트를 수행하세요');
-        }
-      } catch (e) {
-        console.warn('[AUTH] FCM 토큰 확보 실패 - 로그인은 계속 진행:', e);
-      }
-
+      // FCM 토큰 업데이트 로직 비활성화 - 네이티브에서 관리
+      console.log('[AUTH] 🚫 FCM 토큰 업데이트 로직 비활성화됨 - 네이티브에서 관리');
+      
       const augmentedCredentials: LoginRequest = {
-        ...credentials,
-        ...(fcmToken ? { fcm_token: fcmToken } : {})
+        ...credentials
       };
 
       const response = await authService.login(augmentedCredentials);
@@ -414,11 +400,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // 2. 위치 추적 서비스에 사용자 로그인 알림
         locationTrackingService.onUserLogin();
 
-        // 3. FCM 토큰 처리
-        setTimeout(async () => {
-          console.log('[AUTH] 🚨 Firebase 토큰 생성 로직 제거됨 - 네이티브에서 관리');
-          console.log('[AUTH] 📱 네이티브에서는 window.updateFCMToken() 함수를 사용하여 FCM 토큰 업데이트를 수행하세요');
-        }, 1000);
+        // 3. FCM 토큰 처리 - 비활성화됨
+        console.log('[AUTH] 🚫 FCM 토큰 처리 로직 비활성화됨 - 네이티브에서 관리');
 
         // 4. 로그인 시간 저장 (세션 유지 강화)
         authService.setLoginTime();

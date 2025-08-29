@@ -370,8 +370,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   console.log('');
                   console.log('   🔍 debugPushNotificationStatus()    // 종합 상태 진단');
                   console.log('   🔧 showFCMTroubleshootingGuide()    // 문제 해결 가이드');
-                  console.log('   🔄 updateFCMTokenManually()         // 토큰 수동 업데이트');
-                  console.log('   🧪 testFCMTokenGeneration()         // 토큰 재생성 테스트');
+                  console.log('   🚫 updateFCMTokenManually()         // FCM 토큰 업데이트 비활성화됨');
+                  console.log('   🚫 testFCMTokenGeneration()         // FCM 토큰 테스트 비활성화됨');
                   console.log('');
                   console.log('💡 또는 Xcode 콘솔에서 직접 실행 가능');
                   console.log('💡 실제 기기에서는 Safari 웹 인스펙터 사용');
