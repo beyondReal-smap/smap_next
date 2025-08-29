@@ -252,7 +252,7 @@ def send_background_fcm_push_notification(
                 args['plt_title'],
                 args['plt_content'],
                 args.get('content_available', True),
-                args.get('priority', 'normal'),
+                'high',  # iOS 푸시 문제 해결을 위해 항상 high로 설정
                 args.get('event_url'),
                 args.get('schedule_id')
             )
@@ -401,7 +401,7 @@ def send_silent_fcm_push_notification(
             response = firebase_service.send_silent_push_notification(
                 member.mt_token_id,
                 args.get('reason', 'token_refresh'),
-                args.get('priority', 'low')
+                'normal'  # iOS 무시 방지를 위해 normal로 설정
             )
             logger.debug(f"Firebase Silent 푸시 응답: {response}")
 
@@ -444,4 +444,68 @@ def test_fcm_push_notification(
         "푸시발송(단건) 성공",
         "푸시발송(단건) 성공했습니다.",
         args
-    ) 
+    )
+
+@router.post("/test-send/{mt_idx}", response_model=FCMSendResponse)
+def test_send_fcm_push_to_user(
+    mt_idx: int,
+    db: Session = Depends(deps.get_db)
+):
+    """
+    특정 사용자에게 테스트 FCM 푸시 알림 전송
+    실제 푸시 전송을 테스트하기 위한 용도
+    """
+    try:
+        logger.info(f"테스트 푸시 전송 요청 - 회원 ID: {mt_idx}")
+
+        # 회원 조회
+        member = Member.find_by_idx(db, mt_idx)
+        if not member:
+            return create_response(
+                FAILURE,
+                "테스트 푸시 실패",
+                "존재하지 않는 회원입니다."
+            )
+
+        if not member.mt_token_id:
+            return create_response(
+                FAILURE,
+                "테스트 푸시 실패",
+                "FCM 토큰이 등록되지 않았습니다."
+            )
+
+        # Firebase 사용 가능 여부 확인
+        if not firebase_service.is_available():
+            return create_response(
+                FAILURE,
+                "테스트 푸시 실패",
+                "Firebase 서비스가 사용 불가능합니다."
+            )
+
+        # 테스트 푸시 메시지 생성 (시간 포함)
+        current_time = datetime.now()
+        test_title = "🧪 푸시 테스트 알림"
+        test_content = f"테스트 푸시 알림입니다. 수신 시간: {current_time.strftime('%Y-%m-%d %H:%M:%S')} | 회원 ID: {mt_idx}"
+
+        # FCM 푸시 전송
+        response = firebase_service.send_push_notification(
+            member.mt_token_id,
+            test_title,
+            test_content
+        )
+
+        logger.info(f"테스트 푸시 전송 성공 - 회원 ID: {mt_idx}, FCM 응답: {response}")
+
+        return create_response(
+            SUCCESS,
+            "테스트 푸시 전송 성공",
+            f"테스트 푸시가 성공적으로 전송되었습니다. (응답: {response})"
+        )
+
+    except Exception as e:
+        logger.error(f"테스트 푸시 전송 중 오류 발생: {str(e)}")
+        return create_response(
+            FAILURE,
+            "테스트 푸시 실패",
+            f"테스트 푸시 전송 중 오류가 발생했습니다: {str(e)}"
+        ) 

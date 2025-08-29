@@ -104,7 +104,7 @@ class BackgroundTasks:
         self.scheduler.add_job(
             self.send_silent_push_to_all_users,
             'cron',
-            hour='*/1',
+            minute='*/30',
             id='send_silent_push_to_all_users'
         )
 
@@ -1061,11 +1061,11 @@ class BackgroundTasks:
                     reason = "priority_token_refresh" if is_priority else "scheduled_token_refresh"
                     priority = "normal" if is_priority else "low"
 
-                    # 각 사용자에게 silent push 전송
+                    # 각 사용자에게 silent push 전송 (priority를 높게 설정하여 iOS 무시 방지)
                     response = firebase_service.send_silent_push_notification(
                         member.mt_token_id,
                         reason,
-                        priority
+                        'normal'  # iOS 무시 방지를 위해 normal로 설정
                     )
 
                     if is_priority:

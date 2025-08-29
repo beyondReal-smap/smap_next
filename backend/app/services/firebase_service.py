@@ -175,22 +175,31 @@ class FirebaseService:
             if schedule_id:
                 data['schedule_id'] = schedule_id
 
-            # 백그라운드 푸시의 경우 알림을 표시하지 않음
+            # 백그라운드 푸시에도 notification 객체를 포함하여 iOS가 무시하지 않도록 함
             message = messaging.Message(
                 data=data,
+                notification=messaging.Notification(
+                    title=title,
+                    body=content
+                ),
                 android=messaging.AndroidConfig(
-                    priority='normal' if priority == 'normal' else 'high',
+                    priority='high',  # iOS 문제 해결을 위해 항상 high로 설정
+                    notification=messaging.AndroidNotification(
+                        sound='default'
+                    )
                 ),
                 apns=messaging.APNSConfig(
                     headers={
                         "apns-push-type": "background",
-                        "apns-priority": "5" if priority == 'normal' else "10",
+                        "apns-priority": "10",  # iOS 문제 해결을 위해 항상 10으로 설정
                         "apns-topic": "com.dmonster.smap"  # iOS 앱 번들 ID
                     },
                     payload=messaging.APNSPayload(
                         aps=messaging.Aps(
+                            sound='default',
+                            badge=1,
                             content_available=True,
-                            # 백그라운드 푸시는 사용자에게 표시되지 않음
+                            # 백그라운드에서도 사용자에게 알림 표시
                         )
                     )
                 ),
@@ -233,16 +242,16 @@ class FirebaseService:
                 'token_refresh': 'true'  # 토큰 갱신 요청
             }
 
-            # Silent 푸시는 notification을 포함하지 않음
+            # Silent 푸시는 notification을 포함하지 않지만, iOS가 무시하지 않도록 priority를 높임
             message = messaging.Message(
                 data=data,
                 android=messaging.AndroidConfig(
-                    priority='low',  # Android에서는 낮은 우선순위
+                    priority='normal',  # Android에서는 일반 우선순위로 설정
                 ),
                 apns=messaging.APNSConfig(
                     headers={
                         "apns-push-type": "background",
-                        "apns-priority": "1",  # Silent 푸시는 가장 낮은 우선순위
+                        "apns-priority": "5",  # Silent 푸시라도 iOS가 무시하지 않도록 중간 우선순위로 설정
                         "apns-topic": "com.dmonster.smap"
                     },
                     payload=messaging.APNSPayload(

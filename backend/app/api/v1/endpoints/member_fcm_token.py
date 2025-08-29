@@ -74,10 +74,10 @@ async def register_member_fcm_token(
         old_token = member.mt_token_id
         is_new_token = old_token != request.fcm_token
         
-        # FCM 토큰 업데이트 (백그라운드 고려하여 30일로 연장)
+        # FCM 토큰 업데이트 (iOS APNS 토큰 만료 고려하여 7일로 설정)
         member.mt_token_id = request.fcm_token
         member.mt_token_updated_at = datetime.now()  # FCM 토큰 업데이트 일시
-        member.mt_token_expiry_date = datetime.now() + timedelta(days=30)  # 30일 후 만료 예상 (백그라운드 최적화)
+        member.mt_token_expiry_date = datetime.now() + timedelta(days=7)  # 7일 후 만료 예상 (APNS 토큰 만료 고려)
         member.mt_udate = datetime.now()  # 수정일시 업데이트
         
         db.commit()
@@ -145,7 +145,7 @@ async def get_member_fcm_token_status(
             now = datetime.now()
             if now > member.mt_token_expiry_date:
                 is_token_expired = True
-            elif (member.mt_token_expiry_date - now).days <= 7:  # 만료 7일 전 (백그라운드 고려)
+            elif (member.mt_token_expiry_date - now).days <= 3:  # 만료 3일 전 (APNS 토큰 만료 고려)
                 is_token_near_expiry = True
 
         return MemberFCMTokenStatusResponse(
@@ -232,7 +232,7 @@ async def check_and_update_fcm_token(
         if needs_update:
             member.mt_token_id = request.fcm_token
             member.mt_token_updated_at = datetime.now()  # FCM 토큰 업데이트 일시
-            member.mt_token_expiry_date = datetime.now() + timedelta(days=30)  # 30일 후 만료 예상 (백그라운드 최적화)
+            member.mt_token_expiry_date = datetime.now() + timedelta(days=7)  # 7일 후 만료 예상 (APNS 토큰 만료 고려)
             member.mt_udate = datetime.now()
             db.commit()
             db.refresh(member)
@@ -311,8 +311,8 @@ async def validate_and_refresh_fcm_token(
             # 토큰이 만료된 경우
             needs_refresh = True
             reason = "FCM 토큰이 만료되었습니다."
-        elif member.mt_token_expiry_date and (member.mt_token_expiry_date - now).days <= 7:
-            # 토큰 만료 임박 (7일 이내, 백그라운드 고려)
+        elif member.mt_token_expiry_date and (member.mt_token_expiry_date - now).days <= 3:
+            # 토큰 만료 임박 (3일 이내, APNS 토큰 만료 고려)
             needs_refresh = True
             reason = "FCM 토큰이 곧 만료됩니다."
         elif not member.mt_token_updated_at or (now - member.mt_token_updated_at).days >= 3:
@@ -323,10 +323,10 @@ async def validate_and_refresh_fcm_token(
         if needs_refresh:
             logger.info(f"FCM 토큰 갱신 필요 - 회원 ID: {request.mt_idx}, 사유: {reason}")
 
-            # 토큰 업데이트 (백그라운드 고려하여 30일로 연장)
+            # 토큰 업데이트 (iOS APNS 토큰 만료 고려하여 7일로 설정)
             member.mt_token_id = request.fcm_token
             member.mt_token_updated_at = now
-            member.mt_token_expiry_date = now + timedelta(days=30)  # 30일 후 만료 예상 (백그라운드 최적화)
+            member.mt_token_expiry_date = now + timedelta(days=7)  # 7일 후 만료 예상 (APNS 토큰 만료 고려)
             member.mt_udate = now
 
             db.commit()
@@ -418,8 +418,8 @@ async def background_token_check(
             needs_refresh = True
             reason = "강제 토큰 갱신 요청"
         elif request.check_type == "background" and member.mt_token_expiry_date:
-            # 백그라운드 검증의 경우 더 엄격한 만료 기준 적용
-            if (member.mt_token_expiry_date - current_time).days <= 3:  # 3일 이내 만료
+            # 백그라운드 검증의 경우 더 엄격한 만료 기준 적용 (APNS 토큰 만료 고려)
+            if (member.mt_token_expiry_date - current_time).days <= 1:  # 1일 이내 만료
                 needs_refresh = True
                 reason = "백그라운드 검증: 토큰이 곧 만료됩니다."
         elif member.mt_token_updated_at and (current_time - member.mt_token_updated_at).days >= 7:
@@ -430,10 +430,10 @@ async def background_token_check(
         if needs_refresh:
             logger.info(f"FCM 토큰 백그라운드 갱신 필요 - 회원 ID: {request.mt_idx}, 사유: {reason}")
 
-            # 토큰 업데이트 (백그라운드 최적화된 만료 시간 적용)
+            # 토큰 업데이트 (iOS APNS 토큰 만료 고려하여 7일로 설정)
             member.mt_token_id = request.fcm_token
             member.mt_token_updated_at = current_time
-            member.mt_token_expiry_date = current_time + timedelta(days=30)  # 30일 후 만료
+            member.mt_token_expiry_date = current_time + timedelta(days=7)  # 7일 후 만료 (APNS 토큰 만료 고려)
             member.mt_udate = current_time
 
             db.commit()
