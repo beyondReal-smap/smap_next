@@ -857,7 +857,22 @@ export default function HomePage() {
   
   // 🚨 iOS 시뮬레이터 디버깅 - 즉시 실행 로그
   console.log('🏠 [HOME] HomePage 컴포넌트 시작');
-  
+
+  // 🔄 인증 상태 초기화 대기
+  if (authLoading) {
+    console.log('[HOME] ⏳ AuthContext 초기화 중... 로딩 화면 표시');
+    return (
+      <div className="home-content main-container" data-page="/home" data-content-type="home-page">
+        <div className="min-h-screen bg-white flex items-center justify-center">
+          <div className="text-center">
+            <IOSCompatibleSpinner size="lg" />
+            <p className="text-gray-600 mt-4">로그인 상태 확인 중...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // 🔧 초기 환경 체크를 try-catch로 감싸기
   try {
     console.log('🏠 [HOME] 환경 체크:', {
@@ -1064,7 +1079,7 @@ export default function HomePage() {
   
   const router = useRouter();
   // 인증 관련 상태 추가
-  const { user, isLoggedIn, loading: authLoading, isPreloadingComplete } = useAuth();
+  const { user, isLoggedIn, loading: authLoading, isPreloadingComplete, refreshAuthState } = useAuth();
   
   // UserContext 사용 (최상단으로 이동)
   const { 
@@ -1080,8 +1095,14 @@ export default function HomePage() {
   
 
 
-  // NavigationManager 플래그 처리
+  // NavigationManager 플래그 처리 및 초기 인증 상태 확인
   useEffect(() => {
+    // AuthContext 초기화가 완료될 때까지 기다림
+    if (authLoading) {
+      console.log('[HOME] ⏳ AuthContext 초기화 중... 기다리는 중');
+      return;
+    }
+
     // 리다이렉트 플래그 처리 (NavigationManager에서 설정된 경우)
     if ((window as any).__REDIRECT_TO_SIGNIN__) {
       console.log('[HOME] NavigationManager signin 리다이렉트 플래그 감지 - 처리');
@@ -1089,14 +1110,35 @@ export default function HomePage() {
       delete (window as any).__REDIRECT_TIMESTAMP__;
       // signin으로 리다이렉트 (Next.js 라우터 사용)
       router.replace('/signin');
+      return;
     }
-    
+
     if ((window as any).__REDIRECT_TO_HOME__) {
       console.log('[HOME] NavigationManager 홈 리다이렉트 플래그 감지 - 이미 홈 페이지에 있으므로 무시');
       delete (window as any).__REDIRECT_TO_HOME__;
       delete (window as any).__REDIRECT_TIMESTAMP__;
     }
-  }, [router]);
+
+    // 로그인 상태 검증 (AuthContext 초기화 완료 후)
+    console.log('[HOME] 🔍 로그인 상태 검증 시작:', {
+      isLoggedIn,
+      authLoading,
+      hasUser: !!user,
+      userName: user?.mt_name
+    });
+
+    // 로그인되지 않은 경우에만 signin으로 리다이렉트
+    if (!isLoggedIn && !authLoading) {
+      console.log('[HOME] ❌ 로그인되지 않음 - signin 페이지로 리다이렉트');
+      router.replace('/signin');
+      return;
+    }
+
+    if (isLoggedIn && user) {
+      console.log('[HOME] ✅ 로그인 상태 확인됨:', user.mt_name);
+    }
+
+  }, [router, isLoggedIn, authLoading, user]);
   
   // 🔔 FCM 토큰 자동 업데이트 (사용자 정보 변경 시) - iOS WebView 호환성
   useEffect(() => {

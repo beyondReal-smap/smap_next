@@ -763,19 +763,60 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('========================');
     };
 
-    (window as any).SMAP_FORCE_REFRESH_AUTH = () => {
+    (window as any).SMAP_FORCE_REFRESH_AUTH = async () => {
       console.log('🔄 수동 인증 상태 새로고침 실행...');
-      refreshAuthState().then(() => {
+      try {
+        await refreshAuthState();
         console.log('✅ 수동 인증 상태 새로고침 완료');
-      }).catch((error) => {
+      } catch (error) {
         console.error('❌ 수동 인증 상태 새로고침 실패:', error);
-      });
+      }
+    };
+
+    (window as any).SMAP_CHECK_STORAGE = () => {
+      console.log('=== 📦 로컬 스토리지 상태 확인 ===');
+      if (typeof window !== 'undefined') {
+        const token = localStorage.getItem('smap_auth_token');
+        const userData = localStorage.getItem('smap_user_data');
+        const loginTime = localStorage.getItem('smap_login_time');
+
+        console.log('토큰 존재:', !!token);
+        console.log('사용자 데이터 존재:', !!userData);
+        console.log('로그인 시간 존재:', !!loginTime);
+
+        if (userData) {
+          try {
+            const user = JSON.parse(userData);
+            console.log('사용자 정보:', user.mt_name, `(${user.mt_idx})`);
+          } catch (e) {
+            console.error('사용자 데이터 파싱 오류:', e);
+          }
+        }
+      }
+      console.log('================================');
+    };
+
+    (window as any).SMAP_TEST_LOGIN = async () => {
+      console.log('=== 🔐 로그인 상태 종합 테스트 ===');
+      const isLoggedIn = authService.isLoggedIn();
+      console.log('authService.isLoggedIn():', isLoggedIn);
+
+      if (isLoggedIn) {
+        const userProfile = await authService.getCurrentUserProfile();
+        console.log('getCurrentUserProfile():', userProfile ? '성공' : '실패');
+        if (userProfile) {
+          console.log('사용자:', userProfile.mt_name, `(${userProfile.mt_idx})`);
+        }
+      }
+      console.log('================================');
     };
 
     // 사용법 출력
     console.log('🔧 SMAP 디버깅 함수들:');
     console.log('  - SMAP_DEBUG_AUTH(): 현재 인증 상태 확인');
     console.log('  - SMAP_FORCE_REFRESH_AUTH(): 강제 인증 상태 새로고침');
+    console.log('  - SMAP_CHECK_STORAGE(): 로컬 스토리지 상태 확인');
+    console.log('  - SMAP_TEST_LOGIN(): 로그인 상태 종합 테스트');
   }
 
   return (
