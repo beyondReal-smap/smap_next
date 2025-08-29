@@ -268,8 +268,7 @@ const nextConfig = {
       optimizeCss: true,
       scrollRestoration: true,
       optimizePackageImports: ['framer-motion', 'react-icons'],
-      // Vercel에서 더 안정적인 빌드
-      memoryBasedWorkers: true,
+      // memoryBasedWorkers 옵션은 Next.js 최신 버전에서 제거됨
     },
   }),
   
