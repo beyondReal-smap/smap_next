@@ -858,21 +858,6 @@ export default function HomePage() {
   // 🚨 iOS 시뮬레이터 디버깅 - 즉시 실행 로그
   console.log('🏠 [HOME] HomePage 컴포넌트 시작');
 
-  // 🔄 인증 상태 초기화 대기
-  if (authLoading) {
-    console.log('[HOME] ⏳ AuthContext 초기화 중... 로딩 화면 표시');
-    return (
-      <div className="home-content main-container" data-page="/home" data-content-type="home-page">
-        <div className="min-h-screen bg-white flex items-center justify-center">
-          <div className="text-center">
-            <IOSCompatibleSpinner size="lg" />
-            <p className="text-gray-600 mt-4">로그인 상태 확인 중...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // 🔧 초기 환경 체크를 try-catch로 감싸기
   try {
     console.log('🏠 [HOME] 환경 체크:', {
@@ -1080,13 +1065,28 @@ export default function HomePage() {
   const router = useRouter();
   // 인증 관련 상태 추가
   const { user, isLoggedIn, loading: authLoading, isPreloadingComplete, refreshAuthState } = useAuth();
-  
+
+  // 🔄 인증 상태 초기화 대기 (hook 호출 직후)
+  if (authLoading) {
+    console.log('[HOME] ⏳ AuthContext 초기화 중... 로딩 화면 표시');
+    return (
+      <div className="home-content main-container" data-page="/home" data-content-type="home-page">
+        <div className="min-h-screen bg-white flex items-center justify-center">
+          <div className="text-center">
+            <IOSCompatibleSpinner size="lg" />
+            <p className="text-gray-600 mt-4">로그인 상태 확인 중...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // UserContext 사용 (최상단으로 이동)
-  const { 
-    userInfo, 
-    userGroups, 
-    isUserDataLoading, 
-    userDataError, 
+  const {
+    userInfo,
+    userGroups,
+    isUserDataLoading,
+    userDataError,
     refreshUserData,
     selectedGroupId: userContextSelectedGroupId,
     setSelectedGroupId: setUserContextSelectedGroupId,
