@@ -121,12 +121,14 @@ class FirebaseService:
                     headers={
                         "apns-push-type": "alert",
                         "apns-priority": "10",
-                        "apns-topic": "com.dmonster.smap"  # iOS 앱 번들 ID
+                        "apns-topic": Config.IOS_BUNDLE_ID  # iOS 앱 번들 ID
                     },
                     payload=messaging.APNSPayload(
                         aps=messaging.Aps(
                             sound='default',
-                            badge=1
+                            badge=1,
+                            content_available=False,  # 백그라운드 앱에서 데이터 처리 가능하도록 함
+                            mutable_content=True  # iOS에서 콘텐츠 수정 가능하도록 함
                         )
                     )
                 ),
@@ -160,14 +162,15 @@ class FirebaseService:
             return "firebase_disabled"
 
         try:
-            # 백그라운드 푸시를 위한 데이터 구성
+            # 백그라운드 푸시를 위한 데이터 구성 (원래 코드와 유사하게)
             data = {
                 'title': title,
                 'body': content,
-                'content-available': '1' if content_available else '0',
+                'content_available': '1' if content_available else '0',
                 'priority': priority,
                 'background_push': 'true',  # 백그라운드 푸시임을 명시
-                'timestamp': str(int(time.time() * 1000))  # 타임스탬프 추가
+                'timestamp': str(int(time.time() * 1000)),  # 타임스탬프 추가
+                'show_notification': 'false'  # 백그라운드에서는 기본적으로 알림 표시하지 않음
             }
 
             if event_url:
@@ -183,23 +186,24 @@ class FirebaseService:
                     body=content
                 ),
                 android=messaging.AndroidConfig(
-                    priority='high',  # iOS 문제 해결을 위해 항상 high로 설정
+                    priority='high',  # 무조건 high로 설정하여 푸시 수신 보장
                     notification=messaging.AndroidNotification(
                         sound='default'
                     )
                 ),
                 apns=messaging.APNSConfig(
                     headers={
-                        "apns-push-type": "background",
-                        "apns-priority": "10",  # iOS 문제 해결을 위해 항상 10으로 설정
-                        "apns-topic": "com.dmonster.smap"  # iOS 앱 번들 ID
+                        "apns-push-type": "alert",  # alert로 설정하여 사용자에게 표시
+                        "apns-priority": "10",  # 최고 우선순위로 설정
+                        "apns-topic": Config.IOS_BUNDLE_ID  # iOS 앱 번들 ID
                     },
                     payload=messaging.APNSPayload(
                         aps=messaging.Aps(
                             sound='default',
                             badge=1,
-                            content_available=True,
-                            # 백그라운드에서도 사용자에게 알림 표시
+                            alert=messaging.ApsAlert(title=title, body=content),  # 알림 표시를 위해 alert 추가
+                            content_available=True,  # 백그라운드에서도 앱이 깨어나도록 설정
+                            mutable_content=True  # iOS에서 콘텐츠 수정 가능하도록 함
                         )
                     )
                 ),
@@ -246,12 +250,12 @@ class FirebaseService:
             message = messaging.Message(
                 data=data,
                 android=messaging.AndroidConfig(
-                    priority='normal',  # Android에서는 일반 우선순위로 설정
+                    priority='high',  # Android에서도 high로 설정하여 푸시 수신 보장
                 ),
                 apns=messaging.APNSConfig(
                     headers={
                         "apns-push-type": "background",
-                        "apns-priority": "5",  # Silent 푸시라도 iOS가 무시하지 않도록 중간 우선순위로 설정
+                        "apns-priority": "10",  # Silent 푸시라도 최고 우선순위로 설정하여 무시 방지
                         "apns-topic": "com.dmonster.smap"
                     },
                     payload=messaging.APNSPayload(

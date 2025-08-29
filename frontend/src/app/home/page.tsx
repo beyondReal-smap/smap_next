@@ -199,13 +199,8 @@ html, body {
   user-select: none;
 }
 
-/* iOS 웹뷰 고정 헤더 최적화 */
+/* iOS 웹뷰 헤더 최적화 - position fixed 제거하고 CSS 클래스 기반으로 처리 */
 .header-fixed {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  z-index: 9999 !important;
   background: rgba(255, 255, 255, 0.95) !important;
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
@@ -245,13 +240,8 @@ body.sidebar-open .sidebar-content * {
   pointer-events: auto !important;
 }
 
-/* iOS 웹뷰 하단 네비게이션 최적화 */
+/* iOS 웹뷰 하단 네비게이션 최적화 - position fixed 제거 */
 .navigation-fixed {
-  position: fixed !important;
-  bottom: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  z-index: 9999 !important;
   background: rgba(255, 255, 255, 0.95) !important;
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
@@ -288,14 +278,12 @@ body.sidebar-open .sidebar-content * {
     -webkit-position: sticky;
     -webkit-position: -webkit-sticky;
     position: sticky;
-    position: fixed;
   }
-  
+
   .navigation-fixed {
     -webkit-position: sticky;
     -webkit-position: -webkit-sticky;
     position: sticky;
-    position: fixed;
   }
 }
 
@@ -1841,50 +1829,46 @@ export default function HomePage() {
     };
   }, []);
 
-  // 헤더 상단 패딩 강제 제거 (런타임) - 아이콘 위치 조정 제거
+  // 헤더 상단 패딩 안전하게 제거 (CSS 클래스 기반)
   useEffect(() => {
-    const forceRemoveHeaderPadding = () => {
+    const safeRemoveHeaderPadding = () => {
       if (typeof document === 'undefined') return;
-      
-      // 모든 헤더 관련 요소 선택
-      const selectors = [
-        'header',
-        '.header-fixed',
-        '.glass-effect',
-        '.register-header-fixed',
-        '.schedule-header',
-        '.activelog-header',
-        '.location-header',
-        '.group-header',
-        '.home-header',
-        '[role="banner"]',
-        '#home-page-container'
-      ];
-      
-      selectors.forEach(selector => {
-        const elements = document.querySelectorAll(selector);
-        elements.forEach((element: Element) => {
-          const htmlElement = element as HTMLElement;
-          htmlElement.style.paddingTop = '0px';
-          htmlElement.style.marginTop = '0px';
-          htmlElement.style.setProperty('padding-top', '0px', 'important');
-          htmlElement.style.setProperty('margin-top', '0px', 'important');
-          if (selector === 'header' || selector.includes('header')) {
-            htmlElement.style.setProperty('top', '0px', 'important');
-            htmlElement.style.setProperty('position', 'fixed', 'important');
-          }
-        });
-      });
-      
-      // body와 html 요소도 확인
+
+      // 1. 헤더 요소를 찾아서 CSS 클래스로 제어
+      const headerElement = document.querySelector('header');
+      if (headerElement) {
+        const htmlHeader = headerElement as HTMLElement;
+
+        // position fixed는 CSS에서 처리하도록 하고, 여기서는 패딩만 제거
+        htmlHeader.style.setProperty('padding-top', '0px', 'important');
+        htmlHeader.style.setProperty('margin-top', '0px', 'important');
+        htmlHeader.style.setProperty('top', '0px', 'important');
+
+        // position은 CSS 클래스에서 제어하도록 함 (강제 fixed 제거)
+        htmlHeader.style.removeProperty('position');
+      }
+
+      // 2. body와 html 요소의 불필요한 패딩/마진 제거
       document.body.style.setProperty('padding-top', '0px', 'important');
       document.body.style.setProperty('margin-top', '0px', 'important');
       document.documentElement.style.setProperty('padding-top', '0px', 'important');
       document.documentElement.style.setProperty('margin-top', '0px', 'important');
+
+      // 3. 메인 컨텐츠 영역에 상단 여백이 제대로 적용되는지 확인
+      const mainElement = document.querySelector('main');
+      if (mainElement) {
+        const htmlMain = mainElement as HTMLElement;
+        // mt-14 클래스에 해당하는 3.5rem (56px) 상단 마진 적용
+        htmlMain.style.setProperty('margin-top', '56px', 'important');
+      }
+
+      console.log('✅ [HOME] 헤더 패딩 안전하게 제거됨');
     };
-    
-    // 즉시 실행 (아이콘 위치 조정은 제거)
-    forceRemoveHeaderPadding();
+
+    // 약간의 지연 후 실행하여 DOM이 완전히 로드된 후 적용
+    const timeoutId = setTimeout(safeRemoveHeaderPadding, 100);
+
+    return () => clearTimeout(timeoutId);
   }, []);
   
   // useEffect를 사용하여 클라이언트 사이드에서 날짜 관련 상태 초기화
@@ -7193,153 +7177,18 @@ export default function HomePage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="min-h-screen relative home-content main-container"
-          style={{ 
+          className="min-h-screen relative home-content main-container w-full"
+          style={{
             background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
             paddingBottom: '72px', // 네비게이션 바를 위한 하단 여백 (56px + 16px)
-            paddingTop: '0px', // 상단 패딩 강제 제거
-            marginTop: '0px', // 상단 마진 강제 제거
-            top: '0px' // 최상단 고정
+            // 상단 패딩/마진은 AppLayout에서 자동으로 처리되도록 제거
           }}
           data-react-mount="true"
           data-page="/home"
           data-content-type="home-page"
           id="home-page-container"
         >
-        {/* 통일된 헤더 애니메이션 */}
-        <AnimatedHeader 
-          variant="simple"
-          className={`fixed top-0 left-0 right-0 glass-effect header-fixed home-header ${isSidebarOpen ? 'z-40' : 'z-50'}`}
-          style={{ 
-            paddingTop: '0px',
-            marginTop: '0px',
-            top: '0px',
-            position: 'fixed'
-          }}
-        >
-            <div 
-              className="flex items-center" 
-              style={{ 
-                paddingLeft: '16px', 
-                paddingRight: '0px !important',  // 오른쪽 패딩 제거
-                paddingTop: '0px !important',    // 위쪽 패딩 제거
-                paddingBottom: '0px !important', // 아래쪽 패딩 제거
-                height: '56px',  // 정확한 높이 설정
-                width: '100%',
-                boxSizing: 'border-box',
-                position: 'relative'  // 절대 위치 아이콘들을 위한 relative 설정
-              }}
-            >
-              {/* 왼쪽 영역 - 고정 너비 */}
-              <AnimatePresence mode="wait">
-                <motion.div 
-                  key="home-header"
-                  initial={{ opacity: 0, x: -40 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -40 }}
-                  transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
-                  className="flex items-center space-x-3 motion-div"
-                >
-                  <div className="flex items-center space-x-3">
-                    <div>
-                      <h1 className="text-lg font-bold text-gray-900">홈</h1>
-                      <p className="text-xs text-gray-500">그룹 멤버들과 실시간으로 소통해보세요</p>
-                    </div>
-                  </div>
-                </motion.div>
-              </AnimatePresence>
-              
-              {/* 오른쪽 영역 - 아이콘들 */}
-              <motion.div 
-                className="flex items-center justify-center"
-                style={{ 
-                  position: 'absolute',
-                  right: '16px',  // 절대 위치로 오른쪽에서 16px 떨어진 곳에 고정
-                  top: '0',
-                  bottom: '0',
-                  gap: '12px',  // 아이콘 간격 늘리기
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  height: '56px'  // 헤더 높이와 동일하게 설정
-                }}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ 
-                  duration: 0.3,
-                  delay: 0.1
-                }}
-              >
-                <button
-                 className="p-0.5 hover:bg-white/50 rounded-xl transition-all duration-200 relative"
-                 onClick={async () => {
-                   // 알림 페이지로 이동하면서 모든 알림을 읽음 처리
-                   try {
-                     if (user?.mt_idx && hasNewNotifications) {
-                       await notificationService.markAllAsRead(user.mt_idx);
-                       console.log('[HOME] 모든 알림 읽음 처리 완료');
-                     }
-                     setHasNewNotifications(false);
-                     router.push('/notice');
-                   } catch (error) {
-                     console.error('[HOME] 알림 읽음 처리 실패:', error);
-                     // 실패해도 페이지는 이동
-                     setHasNewNotifications(false);
-                     router.push('/notice');
-                   }
-                 }}
-               >
-                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill="gray">
-                   <path fillRule="evenodd" d="M5.25 9a6.75 6.75 0 0 1 13.5 0v.75c0 2.123.8 4.057 2.118 5.52a.75.75 0 0 1-.297 1.206c-1.544.57-3.16.99-4.831 1.243a3.75 3.75 0 1 1-7.48 0 24.585 24.585 0 0 1-4.831-1.244.75.75 0 0 1-.298-1.205A8.217 8.217 0 0 0 5.25 9.75V9Zm4.502 8.9a2.25 2.25 0 1 0 4.496 0 25.057 25.057 0 0 1-4.496 0Z" clipRule="evenodd" />
-                 </svg>
-                 {/* 읽지 않은 알림이 있을 때만 빨간색 점 표시 */}
-                 {hasNewNotifications && (
-                   <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full animate-pulse">
-                 </div>
-                 )}
-               </button>
-               
-               {/* 햅틱 테스트 버튼 (개발 환경에서만 표시) */}
-               {process.env.NODE_ENV === 'development' && (
-                 <button
-                   className="p-0.5 hover:bg-white/50 rounded-xl transition-all duration-200"
-                   onClick={() => {
-                     triggerHapticFeedback(HapticFeedbackType.LIGHT, '햅틱 테스트 페이지 이동', { 
-                       component: 'home', 
-                       action: 'test-page-navigation' 
-                     });
-                     router.push('/test-haptic');
-                   }}
-                   title="햅틱 테스트"
-                 >
-                   <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="gray" strokeWidth="2">
-                     <path d="M9 12l2 2 4-4"/>
-                     <path d="M21 12c.552 0 1-.448 1-1s-.448-1-1-1-1 .448-1 1 .448 1 1 1z"/>
-                     <path d="M3 12c.552 0 1-.448 1-1s-.448-1-1-1-1 .448-1 1 .448 1 1 1z"/>
-                     <path d="M12 21c.552 0 1-.448 1-1s-.448-1-1-1-1 .448-1 1 .448 1 1 1z"/>
-                     <path d="M12 3c.552 0 1-.448 1-1s-.448-1-1-1-1 .448-1 1 .448 1 1 1z"/>
-                   </svg>
-                 </button>
-               )}
-               
-               <button
-                 className="p-0.5 hover:bg-white/50 rounded-xl transition-all duration-200"
-                 onClick={() => {
-                   // 🎮 설정 페이지 이동 햅틱 피드백
-                   triggerHapticFeedback(HapticFeedbackType.SELECTION, '설정 페이지 이동', { 
-                     component: 'home', 
-                     action: 'navigate-to-setting' 
-                   });
-                   router.push('/setting');
-                 }}
-               >
-                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill="gray">
-                   <path fillRule="evenodd" d="M11.078 2.25c-.917 0-1.699.663-1.85 1.567L9.05 4.889c-.02.12-.115.26-.297.348a7.493 7.493 0 0 0-.986.57c-.166.115-.334.126-.45.083L6.3 5.508a1.875 1.875 0 0 0-2.282.819l-.922 1.597a1.875 1.875 0 0 0 .432 2.385l.84.692c.095.078.17.229.154.43a7.598 7.598 0 0 0 0 1.139c.015.2-.059.352-.153.43l-.841.692a1.875 1.875 0 0 0-.432 2.385l.922 1.597a1.875 1.875 0 0 0 2.282.818l1.019-.382c.115-.043.283-.031.45.082.312.214.641.405.985.57.182.088.277.228.297.35l.178 1.071c.151.904.933 1.567 1.85 1.567h1.844c.916 0 1.699-.663 1.85-1.567l.178-1.072c.02-.12.114-.26.297-.349.344-.165.673-.356.985-.570.167-.114.335-.125.45-.082l1.02.382a1.875 1.875 0 0 0 2.28-.819l.923-1.597a1.875 1.875 0 0 0-.432-2.385l-.84-.692c-.095-.078-.17-.229-.154-.43a7.614 7.614 0 0 0 0-1.139c-.016-.2.059-.352.153-.43l.84-.692c.708-.582.891-1.59.433-2.385l-.922-1.597a1.875 1.875 0 0 0-2.282-.818l-1.02.382c-.114.043-.282.031-.449-.083a7.49 7.49 0 0 0-.985-.57c-.183-.087-.277-.227-.297-.348l-.179-1.072a1.875 1.875 0 0 0-1.85-1.567h-1.843ZM12 15.75a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5Z" clipRule="evenodd" />
-                 </svg>
-               </button>
-              </motion.div>
-            </div>
-          </AnimatedHeader>
+        {/* AppLayout에서 헤더를 처리하므로 여기서는 제거 */}
 
         {/* 🚨 iOS 시뮬레이터 디버깅 패널 (개발 환경에서만 표시) */}
         {/* {process.env.NODE_ENV === 'development' && (

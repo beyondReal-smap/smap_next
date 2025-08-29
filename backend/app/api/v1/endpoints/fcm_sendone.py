@@ -146,8 +146,8 @@ def send_fcm_push_notification(
         logger.debug("푸시 메시지 전송 중")
         try:
             response = firebase_service.send_push_notification(
-                member.mt_token_id, 
-                args['plt_title'], 
+                member.mt_token_id,
+                args['plt_title'],
                 args['plt_content']
             )
             logger.debug(f"Firebase 응답: {response}")
@@ -252,7 +252,7 @@ def send_background_fcm_push_notification(
                 args['plt_title'],
                 args['plt_content'],
                 args.get('content_available', True),
-                'high',  # iOS 푸시 문제 해결을 위해 항상 high로 설정
+                'high',  # 백그라운드 푸시에서도 항상 최고 우선순위로 설정
                 args.get('event_url'),
                 args.get('schedule_id')
             )
@@ -401,7 +401,7 @@ def send_silent_fcm_push_notification(
             response = firebase_service.send_silent_push_notification(
                 member.mt_token_id,
                 args.get('reason', 'token_refresh'),
-                'normal'  # iOS 무시 방지를 위해 normal로 설정
+                'high'  # 무조건 high로 설정하여 푸시 수신 보장
             )
             logger.debug(f"Firebase Silent 푸시 응답: {response}")
 

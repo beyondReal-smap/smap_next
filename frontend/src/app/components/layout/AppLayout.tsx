@@ -43,6 +43,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
   
   // 현재 페이지가 홈 페이지인지 확인
   const isHomePage = pathname?.startsWith('/home') ?? false;
+
+  // 홈 페이지 레이아웃 고정을 위한 특별 처리
+  const homePageFixedLayout = isHomePage;
   
   // 현재 페이지의 타이틀 가져오기
   let currentPageTitle = '홈'; // 기본값 \'홈\'으로 초기화
@@ -61,8 +64,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   // children을 감싸는 div의 클래스를 동적으로 결정
   const mainContentWrapperClass = isScheduleAddPage || isSimplifiedHeader || isNoHeader
-    ? 'h-full' // /schedule/add, simplifiedHeaderPages, 또는 noHeaderPages에서는 패딩 없이 높이 100%
-    : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6'; // 기존 패딩
+    ? 'h-full overflow-auto' // /schedule/add, simplifiedHeaderPages, 또는 noHeaderPages에서는 패딩 없이 높이 100%
+    : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 overflow-auto'; // 기존 패딩
   
   // 메인 영역 배경색 결정
   const mainBgClass = isSimplifiedHeader ? 'bg-gray-50' : ''; // simplifiedHeader 페이지에 배경색 적용
@@ -73,10 +76,41 @@ export default function AppLayout({ children }: AppLayoutProps) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+    <>
+      {/* 홈 페이지 레이아웃 고정을 위한 CSS */}
+      <style jsx global>{`
+        .home-page-layout {
+          position: relative;
+          min-height: calc(100vh - 56px);
+          overflow-y: auto;
+          overflow-x: hidden;
+        }
+
+        .home-page-content {
+          position: relative;
+          width: 100%;
+          min-height: 100%;
+        }
+
+        /* 홈 페이지에서 스크롤이 제대로 작동하도록 보장 */
+        .home-page-layout::-webkit-scrollbar {
+          width: 4px;
+        }
+
+        .home-page-layout::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        .home-page-layout::-webkit-scrollbar-thumb {
+          background: rgba(0, 0, 0, 0.2);
+          border-radius: 2px;
+        }
+      `}</style>
+
+      <div className="min-h-screen flex flex-col bg-gradient-to-br from-indigo-50 via-white to-purple-50 relative overflow-hidden">
       {/* 헤더 (조건부 렌더링) */}
       {!isNoHeader && (
-        <header className="bg-white shadow-sm fixed left-0 right-0 z-10" style={{ top: '0px', paddingTop: '0px', marginTop: '0px' }}>
+        <header className="bg-white shadow-sm fixed left-0 right-0 z-10 top-0">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             {isSimplifiedHeader ? (
               // 간소화된 헤더 (그룹, 일정, 내장소, 로그 페이지, /schedule/add 포함)
@@ -300,13 +334,58 @@ export default function AppLayout({ children }: AppLayoutProps) {
       </AnimatePresence>
 
       {/* 메인 컨텐츠 - 배경색 조건부 적용 */}
-      <main className={`flex-grow ${mainMarginTopClass} overflow-auto ${mainBgClass}`}>
-        <div className={mainContentWrapperClass}>
+      <main className={`flex-grow ${mainMarginTopClass} overflow-auto ${mainBgClass} relative ${homePageFixedLayout ? 'home-page-layout' : ''}`}>
+        <div className={`${mainContentWrapperClass} relative ${homePageFixedLayout ? 'home-page-content' : ''}`}>
           {children}
         </div>
       </main>
 
+      {/* 개발용 푸시 디버그 버튼 */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <div className="bg-red-500 text-white px-3 py-2 rounded-lg shadow-lg">
+            <button
+              onClick={() => {
+                // iOS 푸시 상태 디버그
+                if (typeof window !== 'undefined' && window.webkit?.messageHandlers?.debugPushNotificationStatus) {
+                  window.webkit.messageHandlers.debugPushNotificationStatus.postMessage({});
+                  console.log('📱 iOS 푸시 디버그 함수 호출됨');
+
+                  // 2초 후 문제 해결 가이드도 표시
+                  setTimeout(() => {
+                    if (window.webkit?.messageHandlers?.showFCMTroubleshootingGuide) {
+                      window.webkit.messageHandlers.showFCMTroubleshootingGuide.postMessage({});
+                      console.log('📖 FCM 문제 해결 가이드 표시됨');
+                    }
+                  }, 2000);
+                } else {
+                  console.log('🚨 iOS 푸시 디버그 안내');
+                  console.log('📱 iOS 앱에서 푸시 디버그를 실행하려면:');
+                  console.log('');
+                  console.log('1️⃣ Safari 브라우저 열기');
+                  console.log('2️⃣ Safari 환경설정 > 고급 > 메뉴 막대에서 "개발자용 메뉴 보기" 체크');
+                  console.log('3️⃣ Safari 메뉴 > 개발 > 시뮬레이터/기기 이름 > 웹뷰 선택');
+                  console.log('4️⃣ Console 탭에서 다음 함수들 실행:');
+                  console.log('');
+                  console.log('   🔍 debugPushNotificationStatus()    // 종합 상태 진단');
+                  console.log('   🔧 showFCMTroubleshootingGuide()    // 문제 해결 가이드');
+                  console.log('   🔄 updateFCMTokenManually()         // 토큰 수동 업데이트');
+                  console.log('   🧪 testFCMTokenGeneration()         // 토큰 재생성 테스트');
+                  console.log('');
+                  console.log('💡 또는 Xcode 콘솔에서 직접 실행 가능');
+                  console.log('💡 실제 기기에서는 Safari 웹 인스펙터 사용');
+                }
+              }}
+              className="text-sm font-medium"
+            >
+              🚨 푸시 디버그
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 하단 네비게이션 바는 ClientLayout에서 관리하므로 여기서는 제거 */}
-    </div>
+      </div>
+    </>
   );
 } 

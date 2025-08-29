@@ -19,6 +19,7 @@ class Config:
     
     # Firebase 설정
     FIREBASE_CREDENTIALS_PATH = os.getenv('FIREBASE_CREDENTIALS_PATH', 'backend/com-dmonster-smap-firebase-adminsdk-2zx5p-2610556cf5.json')
+    IOS_BUNDLE_ID = os.getenv('IOS_BUNDLE_ID', 'com.dmonster.smap')
     
     # 비밀번호 해시화 설정 (PHP PASSWORD_DEFAULT와 유사)
     PASSWORD_DEFAULT = "2y"  # bcrypt 알고리즘 식별자
@@ -36,4 +37,7 @@ class Config:
     
     # 이메일 설정
     EMAIL_SENDER = os.getenv('EMAIL_SENDER', 'your-email@gmail.com')
-    EMAIL_PASSWORD = os.getenv('EMAIL_PASSWORD', 'your-app-password') 
+    EMAIL_PASSWORD = os.getenv('EMAIL_PASSWORD', 'your-app-password')
+
+# 설정 인스턴스 생성
+settings = Config() 
