@@ -52,21 +52,39 @@ export default function BottomNavBar() {
     };
   }, []);
   
-  // 네비게이션 바 레이아웃 안정화를 위한 최소한의 스타일
+  // 네비게이션 바 마진 제거를 위한 전역 스타일
   useEffect(() => {
     const style = document.createElement('style');
     style.textContent = `
+      #bottom-navigation-bar * {
+        margin: 0 !important;
+        padding: 0 !important;
+      }
       #bottom-navigation-bar {
-        contain: layout style paint;
-        will-change: auto;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      #bottom-navigation-bar nav {
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      #bottom-navigation-bar a {
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      #bottom-navigation-bar div {
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      #bottom-navigation-bar span {
+        margin: 0 !important;
+        padding: 0 !important;
       }
     `;
     document.head.appendChild(style);
-
+    
     return () => {
-      if (document.head.contains(style)) {
-        document.head.removeChild(style);
-      }
+      document.head.removeChild(style);
     };
   }, []);
   
@@ -98,17 +116,22 @@ export default function BottomNavBar() {
   };
 
   return (
-    <div
-      className={`fixed left-0 right-0 bg-white border-t shadow-xl z-[999] rounded-t-2xl m-0 p-0 ${
-        isHomePage ? 'bottom-[72px]' : 'bottom-0'
-      }`}
+    <div 
+      className="fixed left-0 right-0 bg-white border-t shadow-xl z-[999] rounded-t-2xl m-0 p-0"
       id="bottom-navigation-bar"
       style={{
+        position: 'fixed',
+        bottom: '0px',
+        left: '0px',
+        right: '0px',
+        zIndex: 999999,
         width: '100%',
         minHeight: '72px',
         display: 'block',
         visibility: 'visible',
         opacity: 1,
+        transform: 'none',
+        WebkitTransform: 'none',
         pointerEvents: 'auto',
         backgroundColor: 'white',
         borderTop: '1px solid #e5e7eb',
@@ -117,28 +140,66 @@ export default function BottomNavBar() {
         borderTopRightRadius: '16px',
         borderBottomLeftRadius: '0px',
         borderBottomRightRadius: '0px',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        touchAction: 'manipulation',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        WebkitTouchCallout: 'none',
+        WebkitTapHighlightColor: 'transparent'
       }}
     >
-      <nav className="flex justify-around items-center px-2 h-full">
+      <nav 
+        className="flex justify-around items-center px-2 m-0 p-0 h-full" 
+        style={{ 
+          margin: '0 !important', 
+          padding: '0 !important',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-around'
+        }}
+      >
         {navItems.map(({ name, path, icon }) => {
           const isActive = pathname === path;
           
           return (
-            <Link
+            <Link 
               key={path}
               href={path}
               onClick={() => handleNavClick({ name, path, icon })}
-              className="flex flex-col items-center justify-center transition-colors duration-200 flex-1 min-w-0 h-full"
+              className="flex flex-col items-center justify-center transition-colors duration-200 flex-1 min-w-0 m-0 p-0 h-full"
+              style={{ 
+                margin: '0 !important', 
+                padding: '0 !important',
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
             >
-                <div className="relative flex flex-col items-center justify-center gap-0.5">
+                <div 
+                  className="relative flex flex-col items-center justify-center m-0 p-0" 
+                  style={{ 
+                    margin: '0 !important', 
+                    padding: '0 !important',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '2px'
+                  }}
+                >
                 {/* 아이콘 컨테이너 */}
-                <div
-                  className={`w-5 h-5 flex items-center justify-center relative ${
-                    isActive ? 'text-blue-600 drop-shadow-sm' : 'text-gray-500'
-                  }`}
-                  style={{
-                    filter: isActive ? 'drop-shadow(0 0 4px rgba(1, 19, 163, 0.3))' : 'none'
+                <div 
+                  className="w-5 h-5 flex items-center justify-center relative m-0 p-0"
+                  style={{ 
+                    color: isActive ? '#0113A3' : '#6b7280',
+                    transform: 'none',
+                    margin: '0 !important',
+                    padding: '0 !important',
+                    filter: isActive ? 'drop-shadow(0 0 4px rgba(1, 19, 163, 0.3))' : 'none',
+                    animation: isActive ? 'icon-glow 2s ease-in-out infinite alternate' : 'none'
                   }}
                 >
                   {/* 선택된 아이템 배경 표시 */}
@@ -253,11 +314,12 @@ export default function BottomNavBar() {
                 </div>
                 
                 {/* 텍스트 라벨 */}
-              <span
-                  className={`text-xs font-medium relative z-10 text-center ${
-                    isActive ? 'text-blue-600' : 'text-gray-500'
-                  }`}
-                  style={{
+              <span 
+                  className="text-xs font-medium relative z-10 text-center"
+                  style={{ 
+                    color: isActive ? '#0113A3' : '#6b7280',
+                    transform: 'none',
+                    margin: '0px !important',
                     fontSize: '11px',
                     lineHeight: '14px'
                   }}

@@ -3046,6 +3046,24 @@ body[data-page="/setting/notice/[id]"] * {
   box-sizing: border-box !important;
 }
 
+/* Home 페이지 네비게이션 바 드래그 방지 */
+#home-bottom-navigation-wrapper,
+#home-bottom-navigation-wrapper *,
+.home-page #home-bottom-navigation-wrapper,
+.home-page #home-bottom-navigation-wrapper * {
+  touch-action: manipulation !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -webkit-touch-callout: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  pointer-events: auto !important;
+  transform: none !important;
+  -webkit-transform: none !important;
+  -webkit-user-drag: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+}
+
 /* 전역 헤더 고정 - data-page 없이도 작동 */
 .fixed.top-0.left-0.right-0.z-50.glass-effect.header-fixed.notice-header {
   position: fixed !important;
