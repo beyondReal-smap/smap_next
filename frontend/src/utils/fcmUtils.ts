@@ -111,7 +111,9 @@ export const getUnifiedFCMToken = async (): Promise<string | null> => {
       return nativeToken;
     }
     
-    // 2. 웹 FCM 토큰 획득 시도
+    // 2. 웹 FCM 토큰 획득 시도 - FCM 서비스 제거됨
+    console.log('[FCM Utils] 🚨 웹 FCM 토큰 획득 불가 - FCM 서비스 제거됨');
+    /*
     if (isFCMSupported()) {
       console.log('[FCM Utils] 🌐 웹 FCM 토큰 획득 시도');
       try {
@@ -127,6 +129,7 @@ export const getUnifiedFCMToken = async (): Promise<string | null> => {
         console.warn('[FCM Utils] ⚠️ fcmTokenService import 실패:', error);
       }
     }
+    */
     
     console.log('[FCM Utils] ⚠️ FCM 토큰 획득 실패');
     return null;
@@ -140,24 +143,26 @@ export const getUnifiedFCMToken = async (): Promise<string | null> => {
 /**
  * 로그인 후 FCM 토큰 업데이트 (모든 로그인 방식에서 사용)
  */
+// FCM 서비스 제거됨 - 네이티브에서 FCM 토큰 관리
+/*
 export const updateFCMTokenAfterLogin = async (
-  userId: number, 
+  userId: number,
   loginType: string = 'unknown'
 ): Promise<{ success: boolean; token?: string; error?: string; message?: string }> => {
   try {
     console.log(`[FCM Utils] 🔔 ${loginType} 로그인 후 FCM 토큰 업데이트 시작`);
     console.log(`[FCM Utils] 📋 사용자 ID: ${userId}, 로그인 타입: ${loginType}`);
     console.log(`[FCM Utils] 🌐 환경: ${detectEnvironment()}`);
-    
+
     // FCM 토큰 획득 및 서버 업데이트
     try {
       const { fcmTokenService } = await import('../services/fcmTokenService');
       if (fcmTokenService) {
         const result = await fcmTokenService.initializeAndCheckUpdateToken(userId);
-        
+
         if (result.success) {
           console.log('[FCM Utils] ✅ FCM 토큰 업데이트 완료:', result.token_preview ? `토큰: ${result.token_preview}...` : '성공');
-          
+
           // 자동 갱신 서비스 시작
           try {
             const { fcmTokenAutoRefreshService } = await import('../services/fcmTokenAutoRefreshService');
@@ -166,7 +171,7 @@ export const updateFCMTokenAfterLogin = async (
             console.warn('[FCM Utils] ⚠️ 자동 갱신 서비스 시작 실패:', error);
           }
         }
-        
+
         return {
           success: result.success,
           token: result.token_preview || undefined,
@@ -186,7 +191,7 @@ export const updateFCMTokenAfterLogin = async (
         error: 'fcmTokenService import 실패'
       };
     }
-    
+
   } catch (error) {
     console.error(`[FCM Utils] ❌ ${loginType} 로그인 후 FCM 토큰 업데이트 중 오류:`, error);
     return {
@@ -195,142 +200,92 @@ export const updateFCMTokenAfterLogin = async (
     };
   }
 };
+*/
+
+// FCM 서비스 제거됨으로 인한 더미 함수
+export const updateFCMTokenAfterLogin = async (
+  userId: number,
+  loginType: string = 'unknown'
+): Promise<{ success: boolean; token?: string; error?: string; message?: string }> => {
+  console.log(`[FCM Utils] 🚨 FCM 서비스 제거됨 - 네이티브에서 FCM 토큰 관리`);
+  console.log(`[FCM Utils] 📋 사용자 ID: ${userId}, 로그인 타입: ${loginType}`);
+
+  return {
+    success: false,
+    error: 'FCM 서비스 제거됨',
+    message: '네이티브에서 FCM 토큰 관리'
+  };
+};
 
 /**
  * FCM 토큰 강제 갱신
  */
+// FCM 서비스 제거됨으로 인한 더미 함수
 export const forceRefreshFCMToken = async (userId: number): Promise<{ success: boolean; token?: string; error?: string; message?: string }> => {
-  try {
-    console.log(`[FCM Utils] 🔄 FCM 토큰 강제 갱신 시작 (사용자 ID: ${userId})`);
-    
-    // iOS 환경 감지
-    const isIOS = detectDeviceType() === 'ios';
-    if (isIOS) {
-      console.log('[FCM Utils] 🍎 iOS 환경 감지 - FCM 토큰 강제 갱신 건너뛰기 (Swift에서 직접 처리)');
-      console.log('[FCM Utils] 📱 iOS에서는 window.updateFCMToken() 함수를 사용하여 네이티브 FCM 토큰 업데이트를 수행하세요');
-      return { 
-        success: false, 
-        error: 'iOS에서는 FCM 토큰 강제 갱신을 지원하지 않습니다. window.updateFCMToken() 함수를 사용하세요.',
-        message: 'iOS에서는 Swift에서 FCM 토큰을 직접 관리합니다.'
-      };
-    }
-    
-    try {
-      const { fcmTokenService } = await import('../services/fcmTokenService');
-      if (fcmTokenService) {
-        const result = await fcmTokenService.forceTokenRefresh(userId);
-        
-        if (result.success) {
-          console.log('[FCM Utils] ✅ FCM 토큰 강제 갱신 완료:', result.token_preview ? `토큰: ${result.token_preview.substring(0, 20)}...` : '성공');
-        } else {
-          console.warn('[FCM Utils] ⚠️ FCM 토큰 강제 갱신 실패:', result.error);
-        }
-        
-        return {
-          success: result.success,
-          token: result.token_preview || undefined,
-          error: result.error || undefined,
-          message: result.message
-        };
-      } else {
-        return {
-          success: false,
-          error: 'fcmTokenService 초기화 실패'
-        };
-      }
-    } catch (error) {
-      console.error('[FCM Utils] ❌ fcmTokenService import 실패:', error);
-      return {
-        success: false,
-        error: 'fcmTokenService import 실패'
-      };
-      }
-    
-  } catch (error) {
-    console.error('[FCM Utils] ❌ FCM 토큰 강제 갱신 중 오류:', error);
+  console.log(`[FCM Utils] 🚨 FCM 서비스 제거됨 - 네이티브에서 FCM 토큰 관리`);
+  console.log(`[FCM Utils] 🔄 FCM 토큰 강제 갱신 요청 (사용자 ID: ${userId})`);
+
+  // iOS 환경 감지
+  const isIOS = detectDeviceType() === 'ios';
+  if (isIOS) {
+    console.log('[FCM Utils] 🍎 iOS 환경 감지');
+    console.log('[FCM Utils] 📱 iOS에서는 window.updateFCMToken() 함수를 사용하여 네이티브 FCM 토큰 업데이트를 수행하세요');
     return {
       success: false,
-      error: error instanceof Error ? error.message : '알 수 없는 오류'
+      error: 'iOS에서는 FCM 토큰 강제 갱신을 지원하지 않습니다. window.updateFCMToken() 함수를 사용하세요.',
+      message: 'iOS에서는 Swift에서 FCM 토큰을 직접 관리합니다.'
     };
   }
+
+  return {
+    success: false,
+    error: 'FCM 서비스 제거됨',
+    message: '네이티브에서 FCM 토큰 관리'
+  };
 };
 
 /**
  * FCM 자동 갱신 서비스 시작
  */
+// FCM 서비스 제거됨으로 인한 더미 함수
 export const startFCMAutoRefresh = async (userId: number, interval?: number): Promise<void> => {
-  try {
-    console.log(`[FCM Utils] 🔄 FCM 자동 갱신 서비스 시작 (사용자 ID: ${userId})`);
-    const { fcmTokenAutoRefreshService } = await import('../services/fcmTokenAutoRefreshService');
-    fcmTokenAutoRefreshService.startPeriodicRefresh(userId, interval);
-  } catch (error) {
-    console.error('[FCM Utils] ❌ FCM 자동 갱신 서비스 시작 실패:', error);
-  }
+  console.log(`[FCM Utils] 🚨 FCM 서비스 제거됨 - 네이티브에서 FCM 토큰 관리`);
+  console.log(`[FCM Utils] 🔄 FCM 자동 갱신 서비스 시작 요청 (사용자 ID: ${userId})`);
+  console.log('[FCM Utils] 📱 네이티브에서 FCM 토큰 자동 갱신을 처리합니다.');
 };
 
 /**
  * FCM 자동 갱신 서비스 중지
  */
+// FCM 서비스 제거됨으로 인한 더미 함수
 export const stopFCMAutoRefresh = async (): Promise<void> => {
-  try {
-    console.log('[FCM Utils] ⏹️ FCM 자동 갱신 서비스 중지');
-    const { fcmTokenAutoRefreshService } = await import('../services/fcmTokenAutoRefreshService');
-    fcmTokenAutoRefreshService.stopPeriodicRefresh();
-  } catch (error) {
-    console.error('[FCM Utils] ❌ FCM 자동 갱신 서비스 중지 실패:', error);
-  }
+  console.log('[FCM Utils] 🚨 FCM 서비스 제거됨 - 네이티브에서 FCM 토큰 관리');
+  console.log('[FCM Utils] ⏹️ FCM 자동 갱신 서비스 중지 요청');
+  console.log('[FCM Utils] 📱 네이티브에서 FCM 토큰 자동 갱신을 중지합니다.');
 };
 
 /**
  * FCM 토큰 상태 확인
  */
+// FCM 서비스 제거됨으로 인한 더미 함수
 export const getFCMTokenStatus = async () => {
-  try {
-    let currentToken: string | null = null;
-    let autoRefreshStatus: any = null;
-    
-    try {
-      const { fcmTokenService } = await import('../services/fcmTokenService');
-      if (fcmTokenService) {
-        currentToken = fcmTokenService.getCurrentToken();
-      }
-    } catch (error) {
-      console.warn('[FCM Utils] ⚠️ fcmTokenService import 실패:', error);
-    }
-    
-    try {
-      const { fcmTokenAutoRefreshService } = await import('../services/fcmTokenAutoRefreshService');
-      autoRefreshStatus = fcmTokenAutoRefreshService.getStatus();
-    } catch (error) {
-      console.warn('[FCM Utils] ⚠️ fcmTokenAutoRefreshService import 실패:', error);
-    }
-    
-    const environment = detectEnvironment();
-    const isSupported = isFCMSupported();
-    const nativeToken = getNativeFCMToken();
-    
-    return {
-      hasToken: !!currentToken,
-      tokenPreview: currentToken ? `${currentToken.substring(0, 20)}...` : null,
-      environment,
-      isSupported,
-      hasNativeToken: !!nativeToken,
-      autoRefreshStatus,
-      timestamp: new Date().toISOString()
-    };
-  } catch (error) {
-    console.error('[FCM Utils] ❌ FCM 토큰 상태 확인 실패:', error);
-    return {
-      hasToken: false,
-      tokenPreview: null,
-      environment: 'unknown',
-      isSupported: false,
-      hasNativeToken: false,
-      autoRefreshStatus: null,
-      error: error instanceof Error ? error.message : '알 수 없는 오류',
-      timestamp: new Date().toISOString()
-    };
-  }
+  console.log('[FCM Utils] 🚨 FCM 서비스 제거됨 - 네이티브에서 FCM 토큰 관리');
+
+  const environment = detectEnvironment();
+  const isSupported = isFCMSupported();
+  const nativeToken = getNativeFCMToken();
+
+  return {
+    hasToken: false, // 웹 FCM 토큰은 더 이상 사용하지 않음
+    tokenPreview: null,
+    environment,
+    isSupported,
+    hasNativeToken: !!nativeToken,
+    nativeTokenPreview: nativeToken ? `${nativeToken.substring(0, 20)}...` : null,
+    autoRefreshStatus: '네이티브에서 관리',
+    message: 'FCM 서비스 제거됨 - 네이티브에서 FCM 토큰 관리',
+    timestamp: new Date().toISOString()
+  };
 };
 
 /**

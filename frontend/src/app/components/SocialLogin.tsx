@@ -217,26 +217,8 @@ export default function SocialLogin() {
           }
           authService.default.setUserData(data.data.member);
           
-          // FCM 토큰 체크 및 업데이트 (백그라운드에서 실행)
-          setTimeout(async () => {
-            try {
-              console.log('[SOCIAL_LOGIN] 🔔 기타 소셜 로그인 후 FCM 토큰 강제 업데이트 시작');
-              const { fcmTokenService } = await import('@/services/fcmTokenService');
-              
-              if (data.data.member?.mt_idx && fcmTokenService) {
-                const fcmResult = await fcmTokenService.forceUpdateOnLogin(data.data.member.mt_idx);
-                if (fcmResult.success) {
-                  console.log('[SOCIAL_LOGIN] ✅ FCM 토큰 강제 업데이트 완료:', fcmResult.message);
-                } else {
-                  console.warn('[SOCIAL_LOGIN] ⚠️ FCM 토큰 강제 업데이트 실패:', fcmResult.error);
-                }
-              } else {
-                console.warn('[SOCIAL_LOGIN] ⚠️ FCM 토큰 강제 업데이트 스킵: mt_idx 없음 또는 fcmTokenService 초기화 실패');
-              }
-            } catch (fcmError) {
-              console.error('[SOCIAL_LOGIN] ❌ FCM 토큰 강제 업데이트 중 오류:', fcmError);
-            }
-          }, 1000); // 기타 소셜 로그인 후 1초 지연
+          // FCM 관련 로직 제거됨 - 네이티브에서 관리
+          console.log('[SOCIAL_LOGIN] FCM 관련 로직 제거됨 - 네이티브에서 관리');
 
           console.log(`${provider} 로그인 성공:`, data.data.member);
           router.push('/home');

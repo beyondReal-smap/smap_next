@@ -128,7 +128,26 @@ const apiClient: CustomApiClient = axios.create(createApiClientConfig()) as Cust
 // 토큰 관리 유틸리티
 const getToken = (): string | null => {
   if (typeof window !== 'undefined') {
-    return localStorage.getItem('auth-token'); // 실제 사용하는 키로 변경
+    try {
+      // 새로운 토큰 키로 조회
+      let token = localStorage.getItem('smap_auth_token');
+
+      // 만약 새로운 키에 토큰이 없고, 기존 키에 토큰이 있다면 마이그레이션
+      if (!token) {
+        const oldToken = localStorage.getItem('auth-token');
+        if (oldToken) {
+          console.log('[API CLIENT] 기존 토큰을 새로운 키로 마이그레이션');
+          localStorage.setItem('smap_auth_token', oldToken);
+          localStorage.removeItem('auth-token');
+          token = oldToken;
+        }
+      }
+
+      return token;
+    } catch (error) {
+      console.error('[API CLIENT] 토큰 조회 중 오류:', error);
+      return null;
+    }
   }
   return null;
 };

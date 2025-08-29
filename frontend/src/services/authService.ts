@@ -271,25 +271,35 @@ class AuthService {
   }
 
   /**
-   * 토큰 조회
+   * 토큰 조회 (호환성 개선)
    */
   getToken(): string | null {
     if (typeof window !== 'undefined') {
-      // 새로운 토큰 키로 조회
-      let token = localStorage.getItem(this.TOKEN_KEY);
-      
-      // 만약 새로운 키에 토큰이 없고, 기존 키에 토큰이 있다면 마이그레이션
-      if (!token) {
-        const oldToken = localStorage.getItem('smap_auth_token');
-        if (oldToken) {
-          console.log('[AUTH SERVICE] 기존 토큰을 새로운 키로 마이그레이션');
-          localStorage.setItem(this.TOKEN_KEY, oldToken);
-          localStorage.removeItem('smap_auth_token'); // 기존 토큰 삭제
-          token = oldToken;
+      try {
+        // 1. 기본 키로 시도
+        let token = localStorage.getItem(this.TOKEN_KEY);
+
+        // 2. 기본 키에 없으면 이전 버전 키들로 시도 (호환성)
+        if (!token) {
+          const legacyKeys = ['smap_auth_token', 'auth_token', 'token'];
+          for (const key of legacyKeys) {
+            token = localStorage.getItem(key);
+            if (token) {
+              console.log('[AUTH SERVICE] 이전 버전 키에서 토큰 발견:', key);
+              // 발견된 토큰을 새 키로 마이그레이션
+              localStorage.setItem(this.TOKEN_KEY, token);
+              localStorage.removeItem(key);
+              console.log('[AUTH SERVICE] 토큰 마이그레이션 완료');
+              break;
+            }
+          }
         }
+
+        return token;
+      } catch (error) {
+        console.error('[AUTH SERVICE] 토큰 조회 중 오류:', error);
+        return null;
       }
-      
-      return token;
     }
     return null;
   }
@@ -304,12 +314,47 @@ class AuthService {
   }
 
   /**
-   * 사용자 데이터 조회
+   * 사용자 데이터 조회 (호환성 개선)
    */
   getUserData(): UserProfile | null {
     if (typeof window !== 'undefined') {
-      const data = localStorage.getItem(this.USER_KEY);
-      return data ? JSON.parse(data) : null;
+      try {
+        // 1. 기본 키로 시도
+        let data = localStorage.getItem(this.USER_KEY);
+
+        // 2. 기본 키에 없으면 이전 버전 키들로 시도 (호환성)
+        if (!data) {
+          const legacyKeys = ['user_data', 'user_profile', 'smap_user_profile'];
+          for (const key of legacyKeys) {
+            data = localStorage.getItem(key);
+            if (data) {
+              console.log('[AUTH SERVICE] 이전 버전 키에서 사용자 데이터 발견:', key);
+              // 발견된 데이터를 새 키로 마이그레이션
+              localStorage.setItem(this.USER_KEY, data);
+              localStorage.removeItem(key);
+              console.log('[AUTH SERVICE] 사용자 데이터 마이그레이션 완료');
+              break;
+            }
+          }
+        }
+
+        if (!data) {
+          console.log('[AUTH SERVICE] localStorage에 사용자 데이터 없음 (키:', this.USER_KEY, ')');
+          return null;
+        }
+
+        const parsedData = JSON.parse(data);
+        console.log('[AUTH SERVICE] 사용자 데이터 조회 성공:', parsedData.mt_name, `(${parsedData.mt_idx})`);
+        return parsedData;
+      } catch (error) {
+        console.error('[AUTH SERVICE] 사용자 데이터 파싱 실패:', error);
+        console.error('[AUTH SERVICE] 원본 데이터:', localStorage.getItem(this.USER_KEY));
+
+        // 파싱 실패 시 데이터 삭제
+        localStorage.removeItem(this.USER_KEY);
+        console.log('[AUTH SERVICE] 손상된 사용자 데이터 삭제됨');
+        return null;
+      }
     }
     return null;
   }
@@ -487,41 +532,85 @@ class AuthService {
   }
 
   /**
-   * 로그인 상태 확인
+   * 로그인 상태 확인 (강화된 버전)
    */
   isLoggedIn(): boolean {
-    const token = this.getToken();
-    const userData = this.getUserData();
-    const loginTime = this.getLoginTime();
+    try {
+      const token = this.getToken();
+      const userData = this.getUserData();
+      const loginTime = this.getLoginTime();
 
-    // 로컬스토리지에 토큰이 없으면 쿠키도 확인
-    if (!token && typeof window !== 'undefined') {
-      const cookieToken = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('auth-token='))
-        ?.split('=')[1];
-      
-      if (cookieToken && userData) {
-        console.log('[AUTH SERVICE] 쿠키에서 토큰 발견, 자동 로그인 유지');
-        return true;
-      }
-    }
-    
-    // 토큰이 있고, 사용자 데이터가 있으며, 로그인 시간이 유효한 경우
-    if (token && userData && loginTime) {
-      const currentTime = Date.now();
-      const timeSinceLogin = currentTime - loginTime;
-      if (timeSinceLogin < this.SESSION_DURATION) {
-        console.log('[AUTH SERVICE] 토큰 유효, 로그인 시간 유효, 자동 로그인 유지');
-        return true;
-      } else {
-        console.warn('[AUTH SERVICE] 토큰 유효, 로그인 시간 만료, 로그아웃 필요');
-        this.clearAuthData(); // 세션 만료된 경우 데이터 삭제
+      // 1. 기본 데이터 존재 여부 확인
+      if (!token || !userData) {
+        // 쿠키에서 토큰 확인
+        if (typeof window !== 'undefined') {
+          const cookieToken = document.cookie
+            .split('; ')
+            .find(row => row.startsWith('auth-token='))
+            ?.split('=')[1];
+
+          if (cookieToken && userData) {
+            console.log('[AUTH SERVICE] 쿠키에서 토큰 발견, 자동 로그인 유지');
+            return true;
+          }
+        }
         return false;
       }
+
+      // 2. 로그인 시간 검증
+      if (!loginTime) {
+        console.warn('[AUTH SERVICE] 로그인 시간 정보 없음, 세션 만료로 처리');
+        this.clearAuthData();
+        return false;
+      }
+
+      const currentTime = Date.now();
+      const timeSinceLogin = currentTime - loginTime;
+
+      if (timeSinceLogin > this.SESSION_DURATION) {
+        console.warn('[AUTH SERVICE] 세션 만료 (로그인 후 7일 경과)');
+        this.clearAuthData();
+        return false;
+      }
+
+      // 3. JWT 토큰 유효성 검증
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const currentTimestamp = Math.floor(currentTime / 1000);
+
+        if (payload.exp && payload.exp < currentTimestamp) {
+          console.warn('[AUTH SERVICE] JWT 토큰 만료됨');
+          this.clearAuthData();
+          return false;
+        }
+
+        // 토큰이 유효하지만 만료가 임박한 경우 (1일 이내)
+        if (payload.exp && (payload.exp - currentTimestamp) < (24 * 60 * 60)) {
+          console.log('[AUTH SERVICE] 토큰 만료 임박, 자동 갱신 필요');
+          // 토큰 갱신은 AuthContext에서 처리
+        }
+
+      } catch (tokenError) {
+        console.error('[AUTH SERVICE] JWT 토큰 파싱 실패:', tokenError);
+        this.clearAuthData();
+        return false;
+      }
+
+      // 4. 사용자 데이터 유효성 검증
+      if (!userData.mt_idx || !userData.mt_name) {
+        console.warn('[AUTH SERVICE] 사용자 데이터 불완전');
+        this.clearAuthData();
+        return false;
+      }
+
+      console.log('[AUTH SERVICE] 로그인 상태 유효함 - 자동 로그인 유지');
+      return true;
+
+    } catch (error) {
+      console.error('[AUTH SERVICE] 로그인 상태 확인 중 오류:', error);
+      this.clearAuthData();
+      return false;
     }
-    
-    return false;
   }
 
   /**
@@ -540,59 +629,110 @@ class AuthService {
   }
 
   /**
-   * 토큰 만료 확인 및 자동 갱신
+   * 토큰 만료 확인 및 자동 갱신 (강화된 버전)
    */
   async checkAndRefreshToken(): Promise<boolean> {
     try {
       const token = this.getToken();
-      if (!token) return false;
+      const userData = this.getUserData();
+
+      if (!token || !userData) {
+        console.warn('[AUTH SERVICE] 토큰 또는 사용자 데이터 없음');
+        return false;
+      }
 
       // JWT 토큰 디코딩하여 만료 시간 확인
       const payload = JSON.parse(atob(token.split('.')[1]));
       const currentTime = Math.floor(Date.now() / 1000);
       const timeUntilExpiry = payload.exp - currentTime;
 
-      // 토큰이 3일 이내에 만료되면 갱신
-      if (timeUntilExpiry < 60 * 60 * 24 * 3) {
-        console.log('[AUTH SERVICE] 토큰 만료 임박, 자동 갱신 시도');
-        await this.refreshToken();
-        return true;
+      // 토큰이 이미 만료됨
+      if (timeUntilExpiry <= 0) {
+        console.warn('[AUTH SERVICE] 토큰이 이미 만료됨');
+        this.clearAuthData();
+        return false;
+      }
+
+      // 토큰이 1일 이내에 만료되면 갱신 (더 적극적)
+      if (timeUntilExpiry < 60 * 60 * 24) {
+        console.log('[AUTH SERVICE] 토큰 만료 임박 (24시간 이내), 자동 갱신 시도');
+
+        try {
+          const newToken = await this.refreshToken();
+          console.log('[AUTH SERVICE] 토큰 갱신 성공');
+
+          // 사용자 정보도 최신 상태로 업데이트
+          const updatedProfile = await this.getCurrentUserProfile();
+          if (updatedProfile) {
+            console.log('[AUTH SERVICE] 사용자 정보 최신화 완료');
+          }
+
+          return true;
+        } catch (refreshError) {
+          console.error('[AUTH SERVICE] 토큰 갱신 실패:', refreshError);
+          this.clearAuthData();
+          return false;
+        }
       }
 
       return true;
     } catch (error) {
       console.error('[AUTH SERVICE] 토큰 확인 실패:', error);
+      this.clearAuthData();
       return false;
     }
   }
 
   /**
-   * 현재 로그인된 사용자의 최신 정보 조회
+   * 현재 로그인된 사용자의 최신 정보 조회 (디버깅 강화)
    */
   async getCurrentUserProfile(): Promise<UserProfile | null> {
     try {
+      console.log('[AUTH SERVICE] 🔍 getCurrentUserProfile() 시작');
+
       // 현재 저장된 사용자 정보 확인
       const currentUser = this.getUserData();
       if (!currentUser) {
-        console.log('[AUTH SERVICE] 저장된 사용자 정보 없음');
+        console.log('[AUTH SERVICE] ❌ 저장된 사용자 정보 없음');
         return null;
       }
 
-      console.log('[AUTH SERVICE] 현재 사용자 최신 정보 조회 시작:', currentUser.mt_idx);
+      console.log('[AUTH SERVICE] ✅ 저장된 사용자 정보 발견:', currentUser.mt_name, `(${currentUser.mt_idx})`);
+
+      // 토큰 유효성 확인
+      const token = this.getToken();
+      if (!token) {
+        console.log('[AUTH SERVICE] ❌ 유효한 토큰 없음');
+        return currentUser; // 토큰이 없어도 저장된 정보 반환
+      }
+
+      console.log('[AUTH SERVICE] ✅ 토큰 존재, API 호출 시도');
 
       // 최신 사용자 정보 조회
       const updatedProfile = await this.getUserProfile(currentUser.mt_idx);
-      
-      // 로컬 스토리지 업데이트
-      this.setUserData(updatedProfile);
-      
-      console.log('[AUTH SERVICE] 사용자 정보 업데이트 완료');
-      return updatedProfile;
+
+      if (updatedProfile) {
+        // 로컬 스토리지 업데이트
+        this.setUserData(updatedProfile);
+        console.log('[AUTH SERVICE] ✅ 사용자 정보 업데이트 완료:', updatedProfile.mt_name);
+        return updatedProfile;
+      } else {
+        console.log('[AUTH SERVICE] ⚠️ API에서 사용자 정보 조회 실패, 저장된 정보 반환');
+        return currentUser;
+      }
+
     } catch (error) {
-      console.error('[AUTH SERVICE] 현재 사용자 정보 조회 실패:', error);
-      
-      // 실패 시 저장된 정보 반환
-      return this.getUserData();
+      console.error('[AUTH SERVICE] ❌ 현재 사용자 정보 조회 실패:', error);
+
+      // 실패 시 저장된 정보 반환 (더미 데이터가 아닌 실제 저장된 데이터)
+      const fallbackUser = this.getUserData();
+      if (fallbackUser) {
+        console.log('[AUTH SERVICE] ℹ️ API 실패로 저장된 정보 반환:', fallbackUser.mt_name);
+        return fallbackUser;
+      }
+
+      console.log('[AUTH SERVICE] ❌ 저장된 정보조차 없음');
+      return null;
     }
   }
 
@@ -603,6 +743,68 @@ class AuthService {
     if (typeof window !== 'undefined') {
       localStorage.setItem(this.LOGIN_TIME_KEY, Date.now().toString());
     }
+  }
+
+  /**
+   * 개발용: 로그인 상태 디버깅 정보 출력
+   */
+  debugAuthState(): void {
+    if (typeof window !== 'undefined') {
+      console.log('=== 🔍 로그인 상태 디버깅 정보 ===');
+
+      // 실제 localStorage 데이터 확인
+      const rawToken = localStorage.getItem(this.TOKEN_KEY);
+      const rawUserData = localStorage.getItem(this.USER_KEY);
+      const rawLoginTime = localStorage.getItem(this.LOGIN_TIME_KEY);
+
+      console.log('📦 LocalStorage 원본 데이터:');
+      console.log('  - 토큰 키:', this.TOKEN_KEY);
+      console.log('  - 토큰 원본:', rawToken ? `${rawToken.substring(0, 20)}...` : '없음');
+      console.log('  - 사용자 데이터 키:', this.USER_KEY);
+      console.log('  - 사용자 데이터 원본:', rawUserData ? `${rawUserData.substring(0, 50)}...` : '없음');
+      console.log('  - 로그인 시간 키:', this.LOGIN_TIME_KEY);
+      console.log('  - 로그인 시간 원본:', rawLoginTime);
+
+      console.log('🔧 파싱된 데이터:');
+      console.log('  - 토큰 존재:', !!this.getToken());
+      console.log('  - 사용자 데이터 존재:', !!this.getUserData());
+      console.log('  - 로그인 시간:', this.getLoginTime());
+
+      // 사용자 데이터 파싱 시도
+      if (rawUserData) {
+        try {
+          const parsedUserData = JSON.parse(rawUserData);
+          console.log('  - 사용자 데이터 파싱 성공:', parsedUserData.mt_name, `(${parsedUserData.mt_idx})`);
+        } catch (error) {
+          console.log('  - 사용자 데이터 파싱 실패:', error);
+        }
+      }
+
+      console.log('📊 최종 상태:');
+      console.log('  - isLoggedIn():', this.isLoggedIn());
+      console.log('  - 세션 만료까지 남은 시간:', this.getSessionTimeRemaining());
+      console.log('================================');
+    }
+  }
+
+  /**
+   * 세션 남은 시간 조회 (개발용)
+   */
+  getSessionTimeRemaining(): string {
+    const loginTime = this.getLoginTime();
+    if (!loginTime) return '로그인 정보 없음';
+
+    const currentTime = Date.now();
+    const timeSinceLogin = currentTime - loginTime;
+    const timeRemaining = this.SESSION_DURATION - timeSinceLogin;
+
+    if (timeRemaining <= 0) return '세션 만료됨';
+
+    const days = Math.floor(timeRemaining / (24 * 60 * 60 * 1000));
+    const hours = Math.floor((timeRemaining % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+    const minutes = Math.floor((timeRemaining % (60 * 60 * 1000)) / (60 * 1000));
+
+    return `${days}일 ${hours}시간 ${minutes}분 남음`;
   }
 
   /**
@@ -619,4 +821,84 @@ class AuthService {
 
 // 싱글톤 인스턴스 생성
 const authService = new AuthService();
+
+// 개발용 디버깅 함수들을 전역에 노출
+if (typeof window !== 'undefined') {
+  (window as any).SMAP_AUTH_SERVICE = authService;
+
+  // 테스트용 함수들
+  (window as any).SMAP_TEST_PERSISTENCE = async () => {
+    console.log('🧪 로그인 상태 유지 테스트 시작...');
+
+    try {
+      console.log('1. 현재 상태 확인...');
+      const isLoggedIn = authService.isLoggedIn();
+      console.log('   결과:', isLoggedIn);
+
+      console.log('2. 토큰 검증...');
+      const tokenValid = await authService.checkAndRefreshToken();
+      console.log('   결과:', tokenValid);
+
+      console.log('3. 사용자 정보 조회...');
+      const userProfile = await authService.getCurrentUserProfile();
+      console.log('   결과:', userProfile ? `${userProfile.mt_name} (${userProfile.mt_idx})` : 'null');
+
+      console.log('4. 전체 상태 요약:');
+      console.log('   - 로그인 상태:', isLoggedIn);
+      console.log('   - 토큰 유효:', tokenValid);
+      console.log('   - 사용자 정보:', !!userProfile);
+
+      // 상세한 문제 진단
+      console.log('5. 문제 진단:');
+      const token = authService.getToken();
+      const userData = authService.getUserData();
+      console.log('   - 토큰 존재:', !!token);
+      console.log('   - 사용자 데이터 존재:', !!userData);
+
+      if (token && !userData) {
+        console.log('   🔍 진단: 토큰은 있지만 사용자 데이터가 없음');
+        console.log('   💡 해결: 서버에서 사용자 정보를 다시 가져와야 함');
+      } else if (!token && userData) {
+        console.log('   🔍 진단: 사용자 데이터는 있지만 토큰이 없음');
+        console.log('   💡 해결: 재로그인이 필요함');
+      } else if (!token && !userData) {
+        console.log('   🔍 진단: 토큰과 사용자 데이터 모두 없음');
+        console.log('   💡 해결: 로그인이 필요함');
+      } else if (token && userData) {
+        console.log('   🔍 진단: 토큰과 사용자 데이터 모두 존재');
+        console.log('   ✅ 상태: 정상');
+      }
+
+      if (isLoggedIn && tokenValid && userProfile) {
+        console.log('✅ 모든 테스트 통과 - 로그인 상태 유지 기능 정상 작동');
+      } else {
+        console.log('⚠️ 일부 테스트 실패 - 로그인 상태 유지 기능에 문제가 있음');
+        console.log('🔧 권장 조치:');
+        if (!userProfile && tokenValid) {
+          console.log('   - 서버에서 사용자 정보를 다시 동기화하세요');
+        }
+        if (!tokenValid) {
+          console.log('   - 재로그인이 필요합니다');
+        }
+      }
+
+    } catch (error) {
+      console.error('❌ 테스트 중 오류 발생:', error);
+    }
+
+    console.log('✅ 테스트 완료');
+  };
+
+  (window as any).SMAP_CLEAR_AUTH = () => {
+    console.log('🗑️ 인증 데이터 초기화...');
+    authService.clearAuthData();
+    console.log('✅ 초기화 완료');
+  };
+
+  console.log('🔧 SMAP AuthService 디버깅 함수들:');
+  console.log('  - SMAP_TEST_PERSISTENCE(): 로그인 상태 유지 테스트');
+  console.log('  - SMAP_CLEAR_AUTH(): 인증 데이터 초기화');
+  console.log('  - SMAP_AUTH_SERVICE.debugAuthState(): 상세 디버깅 정보');
+}
+
 export default authService; 

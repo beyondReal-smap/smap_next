@@ -71,7 +71,7 @@ import Link from 'next/link';
 import { motion, useMotionValue, AnimatePresence } from 'framer-motion';
 import { useUser } from '@/contexts/UserContext';
 import { useDataCache } from '@/contexts/DataCacheContext';
-// fcmTokenService는 동적으로 import하여 서버사이드 렌더링 문제 방지
+// FCM 관련 서비스 제거됨 - 네이티브에서 FCM 토큰 관리
 import axios from 'axios';
 import { format, addDays } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -1678,25 +1678,8 @@ export default function HomePage() {
       // 약간의 지연 후 FCM 토큰 업데이트 실행
       const fcmUpdateTimeout = setTimeout(async () => {
         console.log('[HOME] 🔔 FCM 토큰 업데이트 실행 시작 (지연 완료)');
-        try {
-          const { fcmTokenService } = await import('@/services/fcmTokenService');
-          if (fcmTokenService) {
-            const result: any = await fcmTokenService.initializeAndCheckUpdateToken(user.mt_idx);
-            if (result.success) {
-              console.log('[HOME] ✅ FCM 토큰 업데이트 성공:', result.message);
-            } else {
-              console.warn('[HOME] ⚠️ FCM 토큰 업데이트 실패:', result.error);
-              // 실패 시 강제 재시도
-              console.log('[HOME] 🔄 FCM 토큰 강제 재생성 시도');
-              const refreshResult: any = await fcmTokenService.forceTokenRefresh(user.mt_idx);
-              if (refreshResult && refreshResult.success) {
-                console.log('[HOME] ✅ FCM 토큰 강제 재생성 성공');
-              }
-            }
-          }
-        } catch (error: any) {
-          console.error('[HOME] ❌ FCM 토큰 업데이트 중 오류:', error);
-        }
+        // FCM 관련 로직 제거됨 - 네이티브에서 관리
+        console.log('[HOME] FCM 관련 로직 제거됨 - 네이티브에서 관리');
       }, 1000); // 1초 후 실행
       
       return () => clearTimeout(fcmUpdateTimeout);

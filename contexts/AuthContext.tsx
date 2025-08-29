@@ -9,7 +9,7 @@ import { comprehensivePreloadData } from '../frontend/src/services/dataPreloadSe
 import groupService from '../frontend/src/services/groupService';
 import navigationManager from '../frontend/src/utils/navigationManager';
 import locationTrackingService from '../frontend/src/services/locationTrackingService';
-import { fcmTokenService } from '../frontend/src/services/fcmTokenService';
+// import { fcmTokenService } from '../frontend/src/services/fcmTokenService'; // FCM 서비스 제거됨
 
 // 전역 상태로 중복 실행 방지
 let globalPreloadingState = {
@@ -143,7 +143,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // 위치 추적 서비스에 사용자 로그인 알림
         locationTrackingService.onUserLogin();
         
-        // FCM 토큰 체크 및 업데이트 (백그라운드에서 실행)
+        // FCM 토큰 체크 및 업데이트 (백그라운드에서 실행) - FCM 서비스 제거됨
+        /*
         setTimeout(() => {
           console.log('[AUTH] 🔔 로그인 후 FCM 토큰 체크/업데이트 시작');
           if (response.data?.member?.mt_idx) {
@@ -162,6 +163,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             console.warn('[AUTH] ⚠️ FCM 토큰 체크/업데이트 스킵: mt_idx 없음');
           }
         }, 1000);
+        */
 
         // 즉시 로딩 완료 처리
         dispatch({ type: 'SET_LOADING', payload: false });

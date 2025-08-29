@@ -10,7 +10,7 @@ import { comprehensivePreloadData } from '@/services/dataPreloadService';
 import groupService from '@/services/groupService';
 import navigationManager from '@/utils/navigationManager';
 import locationTrackingService from '@/services/locationTrackingService';
-// fcmTokenService는 동적으로 import하여 서버사이드 렌더링 문제 방지
+// FCM 관련 서비스 제거됨 - 네이티브에서 FCM 토큰 관리
 
 // 전역 상태로 중복 실행 방지
 let globalPreloadingState = {
@@ -76,15 +76,40 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
       };
 
     case 'UPDATE_GROUPS':
-      return {
-        ...state,
-        user: state.user ? {
-          ...state.user,
-          groups: action.payload,
-          ownedGroups: action.payload.filter(group => group.myRole.isOwner),
-          joinedGroups: action.payload.filter(group => !group.myRole.isOwner),
-        } : null,
-      };
+      try {
+        // 그룹 데이터 안전성 검증 및 로깅
+        const validGroups = action.payload?.filter(group => group && group.myRole) || [];
+
+        if (validGroups.length !== action.payload?.length) {
+          console.warn('[AUTH CONTEXT] 일부 그룹 데이터에 myRole이 없음:', {
+            total: action.payload?.length || 0,
+            valid: validGroups.length,
+            invalid: (action.payload?.length || 0) - validGroups.length
+          });
+        }
+
+        return {
+          ...state,
+          user: state.user ? {
+            ...state.user,
+            groups: validGroups,
+            ownedGroups: validGroups.filter(group => group.myRole.isOwner === true),
+            joinedGroups: validGroups.filter(group => group.myRole.isOwner === false),
+          } : null,
+        };
+      } catch (error) {
+        console.error('[AUTH CONTEXT] UPDATE_GROUPS 처리 중 오류:', error);
+        // 오류 발생 시 빈 그룹 배열로 처리
+        return {
+          ...state,
+          user: state.user ? {
+            ...state.user,
+            groups: [],
+            ownedGroups: [],
+            joinedGroups: [],
+          } : null,
+        };
+      }
 
     case 'SET_LOADING':
       return {
@@ -254,46 +279,64 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, [setUserProfile, setUserGroups, setGroupMembers, setScheduleData, setGroupPlaces, setLocationData, setDailyLocationCounts]);
 
-  // 초기 인증 상태 확인 (로직 단순화 및 강화)
+  // 초기 인증 상태 확인 (강화된 버전)
   useEffect(() => {
     let isMounted = true;
 
     const initializeAuth = async () => {
       // 항상 로딩 시작
       dispatch({ type: 'SET_LOADING', payload: true });
-      
+
       try {
         console.log('[AUTH CONTEXT] 초기 인증 상태 확인 시작');
 
-        // authService를 통해 토큰과 사용자 데이터를 직접 확인
-        const token = authService.getToken();
-        const userData = authService.getUserData();
+        // 1. authService를 통해 로그인 상태 종합 검증
+        const isLoggedIn = authService.isLoggedIn();
 
-        if (token && userData) {
-          console.log('[AUTH CONTEXT] 유효한 토큰과 사용자 데이터 발견:', userData.mt_name);
-          if (isMounted) {
-            dispatch({ type: 'LOGIN_SUCCESS', payload: userData });
-            // 위치 추적 서비스에 사용자 로그인 알림
-            locationTrackingService.onUserLogin();
-            // 🔔 로그인 상태 유지 진입 시에도 FCM 토큰 체크/업데이트 수행 (iOS 네이티브/웹 환경 모두 시도)
-            setTimeout(async () => {
-              try {
-                console.log('[AUTH] 🚨 FCM 토큰 생성 로직 제거됨 - 네이티브에서 관리');
-                // 🚨 Firebase 토큰 생성 로직 제거 - 네이티브에서 FCM 토큰 관리
-                console.log('[AUTH] 📱 네이티브에서는 window.updateFCMToken() 함수를 사용하여 FCM 토큰 업데이트를 수행하세요');
+        if (isLoggedIn) {
+          console.log('[AUTH CONTEXT] 로그인 상태 유효함');
 
-                // 📋 보류된 FCM 메시지 확인 시작
-                const { fcmTokenService } = await import('@/services/fcmTokenService');
-                fcmTokenService.startPendingMessageCheck(userData.mt_idx, 30); // 30분마다 확인
-                console.log('[AUTH] 📋 보류된 FCM 메시지 주기적 확인 시작됨');
-              } catch (e) {
-                console.warn('[AUTH] FCM 처리 중 예외(무시):', e);
+          // 2. 토큰 유효성 및 갱신 확인
+          const tokenValid = await authService.checkAndRefreshToken();
+
+          if (tokenValid) {
+            // 3. 최신 사용자 데이터 가져오기
+            const updatedUserData = await authService.getCurrentUserProfile();
+
+            if (updatedUserData && isMounted) {
+              console.log('[AUTH CONTEXT] 사용자 데이터 최신화 성공:', updatedUserData.mt_name);
+              dispatch({ type: 'LOGIN_SUCCESS', payload: updatedUserData });
+
+              // 위치 추적 서비스에 사용자 로그인 알림
+              locationTrackingService.onUserLogin();
+
+              // FCM 토큰 처리 (기존 로직 유지)
+              setTimeout(async () => {
+                try {
+                  console.log('[AUTH] 🚨 FCM 토큰 생성 로직 제거됨 - 네이티브에서 관리');
+                  console.log('[AUTH] 📱 네이티브에서는 window.updateFCMToken() 함수를 사용하여 FCM 토큰 업데이트를 수행하세요');
+                  console.log('[AUTH] FCM 관련 로직 제거됨 - 네이티브에서 관리');
+                } catch (e) {
+                  console.warn('[AUTH] FCM 처리 중 예외(무시):', e);
+                }
+              }, 1000);
+
+              // 백그라운드에서 사용자 데이터 프리로딩
+              preloadUserData(updatedUserData.mt_idx, 'initial-load').catch(error => {
+                console.warn('[AUTH] 초기 프리로딩 실패 (무시):', error);
+              });
+
+            } else {
+              console.warn('[AUTH CONTEXT] 사용자 데이터 최신화 실패');
+              if (isMounted) {
+                dispatch({ type: 'LOGOUT' });
               }
-            }, 1000);
-            // 프리로딩은 백그라운드에서 비동기적으로 실행 (결과를 기다리지 않음)
-            preloadUserData(userData.mt_idx, 'initial-load').catch(error => {
-              console.warn('[AUTH] 초기 프리로딩 실패 (무시):', error);
-            });
+            }
+          } else {
+            console.warn('[AUTH CONTEXT] 토큰 검증 실패');
+            if (isMounted) {
+              dispatch({ type: 'LOGOUT' });
+            }
           }
         } else {
           console.log('[AUTH CONTEXT] 유효한 세션 없음. 로그아웃 상태로 설정.');
@@ -314,15 +357,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     };
 
-    // 즉시 실행하고 3초 후에도 강제로 로딩 상태 해제
+    // 즉시 실행하고 5초 후에도 강제로 로딩 상태 해제 (시간 증가)
     initializeAuth();
-    
+
     const timeout = setTimeout(() => {
       if (isMounted) {
         console.log('[AUTH CONTEXT] 로딩 타임아웃 - 강제로 로딩 상태 해제');
         dispatch({ type: 'SET_LOADING', payload: false });
       }
-    }, 3000);
+    }, 5000); // 타임아웃 시간을 5초로 증가
 
     return () => {
       isMounted = false;
@@ -361,37 +404,51 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const response = await authService.login(augmentedCredentials);
       console.log('[AUTH] 로그인 성공:', response.data?.member?.mt_name);
 
-      // 로그인 성공 시 사용자 데이터 저장
+      // 로그인 성공 시 사용자 데이터 저장 및 상태 업데이트
       if (response.data?.member) {
-        dispatch({ type: 'LOGIN_SUCCESS', payload: response.data.member });
-        
-        // 위치 추적 서비스에 사용자 로그인 알림
-        locationTrackingService.onUserLogin();
-        
-        // 🚨 Firebase 토큰 생성 로직 제거 - 네이티브에서 관리
-        setTimeout(async () => {
-          console.log('[AUTH] 🚨 Firebase 토큰 생성 로직 제거됨 - 네이티브에서 FCM 토큰 관리');
-          console.log('[AUTH] 📱 네이티브에서는 window.updateFCMToken() 함수를 사용하여 FCM 토큰 업데이트를 수행하세요');
-        }, 1000); // 로그인 후 1초 지연
+        const userData = response.data.member;
 
-        // 즉시 로딩 완료 처리 (사용자가 홈으로 빠르게 이동할 수 있도록)
+        // 1. AuthContext 상태 업데이트
+        dispatch({ type: 'LOGIN_SUCCESS', payload: userData });
+
+        // 2. 위치 추적 서비스에 사용자 로그인 알림
+        locationTrackingService.onUserLogin();
+
+        // 3. FCM 토큰 처리
+        setTimeout(async () => {
+          console.log('[AUTH] 🚨 Firebase 토큰 생성 로직 제거됨 - 네이티브에서 관리');
+          console.log('[AUTH] 📱 네이티브에서는 window.updateFCMToken() 함수를 사용하여 FCM 토큰 업데이트를 수행하세요');
+        }, 1000);
+
+        // 4. 로그인 시간 저장 (세션 유지 강화)
+        authService.setLoginTime();
+
+        // 5. 즉시 로딩 완료 처리
         dispatch({ type: 'SET_LOADING', payload: false });
-        
-        // 백그라운드에서 최소한의 데이터만 프리로딩 (성능 최적화)
-        setTimeout(() => {
-          console.log('[AUTH] 🚀 백그라운드 최소 데이터 프리로딩 시작');
-          
-          // 사용자 그룹만 먼저 조회 (가장 중요한 데이터)
-          groupService.getCurrentUserGroups()
-            .then((groups: any[]) => {
-              if (groups && groups.length > 0) {
-                dispatch({ type: 'UPDATE_GROUPS', payload: groups as GroupWithMembers[] });
-                console.log('[AUTH] ✅ 백그라운드 그룹 데이터 로딩 완료');
-              }
-            })
-            .catch((error: any) => {
-              console.warn('[AUTH] ⚠️ 백그라운드 그룹 데이터 로딩 실패:', error);
-            });
+
+        // 6. 백그라운드에서 사용자 데이터 프리로딩 (강화된 버전)
+        setTimeout(async () => {
+          try {
+            console.log('[AUTH] 🚀 백그라운드 사용자 데이터 프리로딩 시작');
+
+            // 최신 사용자 프로필 및 그룹 정보 조회
+            const [userProfile, groups] = await Promise.all([
+              authService.getCurrentUserProfile(),
+              groupService.getCurrentUserGroups().catch(() => [])
+            ]);
+
+            if (userProfile) {
+              console.log('[AUTH] ✅ 최신 사용자 프로필 로딩 완료');
+            }
+
+            if (groups && groups.length > 0) {
+              dispatch({ type: 'UPDATE_GROUPS', payload: groups as GroupWithMembers[] });
+              console.log('[AUTH] ✅ 백그라운드 그룹 데이터 로딩 완료');
+            }
+
+          } catch (error: any) {
+            console.warn('[AUTH] ⚠️ 백그라운드 데이터 로딩 실패 (무시):', error);
+          }
         }, 500);
       }
 
@@ -596,57 +653,82 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     dispatch({ type: 'SET_ERROR', payload: error });
   };
 
-  // 수동으로 AuthContext 상태 새로고침
+  // 수동으로 AuthContext 상태 새로고침 (강화된 버전)
   const refreshAuthState = async (): Promise<void> => {
     try {
       console.log('[AUTH CONTEXT] 수동 상태 새로고침 시작');
-      
+
       const isLoggedInFromService = authService.isLoggedIn();
       console.log('[AUTH CONTEXT] authService.isLoggedIn():', isLoggedInFromService);
-      
+
       if (isLoggedInFromService) {
-        const userData = authService.getUserData();
-        console.log('[AUTH CONTEXT] authService.getUserData():', userData);
-        if (userData) {
-          console.log('[AUTH CONTEXT] 사용자 데이터 발견, 상태 업데이트:', userData.mt_name);
-          
-          // 🔥 localStorage에서 그룹 데이터도 확인하여 사용자 객체에 병합
-          let enhancedUserData = { ...userData };
-          try {
-            if (typeof window !== 'undefined') {
-              const storedGroups = localStorage.getItem('user_groups');
-              const groupCount = localStorage.getItem('user_group_count');
-              if (storedGroups) {
-                const groups = JSON.parse(storedGroups);
-                if (Array.isArray(groups) && groups.length > 0) {
-                  console.log('[AUTH CONTEXT] localStorage에서 그룹 데이터 발견:', groups.length, '개');
-                  enhancedUserData = {
-                    ...enhancedUserData,
-                    groups: groups,
-                    ownedGroups: groups.filter(g => g.myRole?.isOwner || g.is_owner),
-                    joinedGroups: groups.filter(g => !(g.myRole?.isOwner || g.is_owner))
-                  };
-                  console.log('[AUTH CONTEXT] 그룹 정보 병합 완료:', {
-                    totalGroups: groups.length,
-                    ownedGroups: enhancedUserData.ownedGroups?.length || 0,
-                    joinedGroups: enhancedUserData.joinedGroups?.length || 0
-                  });
+        console.log('[AUTH CONTEXT] 로그인 상태 유효함, 사용자 정보 최신화 시도');
+
+        // 1. 토큰 유효성 검증 및 갱신
+        const tokenValid = await authService.checkAndRefreshToken();
+
+        if (tokenValid) {
+          // 2. 최신 사용자 데이터 조회
+          const updatedUserData = await authService.getCurrentUserProfile();
+
+          if (updatedUserData) {
+            console.log('[AUTH CONTEXT] 최신 사용자 데이터 조회 성공:', updatedUserData.mt_name);
+
+            // 3. localStorage에서 그룹 데이터 병합 (기존 로직 유지)
+            let enhancedUserData = { ...updatedUserData };
+            try {
+              if (typeof window !== 'undefined') {
+                const storedGroups = localStorage.getItem('user_groups');
+                if (storedGroups) {
+                  const groups = JSON.parse(storedGroups);
+                  if (Array.isArray(groups) && groups.length > 0) {
+                    console.log('[AUTH CONTEXT] localStorage에서 그룹 데이터 발견:', groups.length, '개');
+                    enhancedUserData = {
+                      ...enhancedUserData,
+                      groups: groups,
+                      ownedGroups: groups.filter(g => g.myRole?.isOwner || g.is_owner),
+                      joinedGroups: groups.filter(g => !(g.myRole?.isOwner || g.is_owner))
+                    };
+                    console.log('[AUTH CONTEXT] 그룹 정보 병합 완료:', {
+                      totalGroups: groups.length,
+                      ownedGroups: enhancedUserData.ownedGroups?.length || 0,
+                      joinedGroups: enhancedUserData.joinedGroups?.length || 0
+                    });
+                  }
                 }
               }
+            } catch (error) {
+              console.warn('[AUTH CONTEXT] localStorage 그룹 데이터 파싱 실패:', error);
             }
-          } catch (error) {
-            console.warn('[AUTH CONTEXT] localStorage 그룹 데이터 파싱 실패:', error);
+
+            // 4. 상태 업데이트
+            dispatch({ type: 'LOGIN_SUCCESS', payload: enhancedUserData });
+
+            // 5. 위치 추적 서비스에 사용자 로그인 알림
+            locationTrackingService.onUserLogin();
+
+            // 6. 백그라운드에서 그룹 데이터 최신화
+            setTimeout(async () => {
+              try {
+                const groups = await groupService.getCurrentUserGroups();
+                if (groups && groups.length > 0) {
+                  dispatch({ type: 'UPDATE_GROUPS', payload: groups as GroupWithMembers[] });
+                  console.log('[AUTH CONTEXT] 그룹 데이터 최신화 완료');
+                }
+              } catch (error) {
+                console.warn('[AUTH CONTEXT] 그룹 데이터 최신화 실패 (무시):', error);
+              }
+            }, 1000);
+
+            return;
+          } else {
+            console.warn('[AUTH CONTEXT] 최신 사용자 데이터 조회 실패');
           }
-          
-          dispatch({ type: 'LOGIN_SUCCESS', payload: enhancedUserData });
-          
-          // 위치 추적 서비스에 사용자 로그인 알림
-          locationTrackingService.onUserLogin();
-          
-          return;
+        } else {
+          console.warn('[AUTH CONTEXT] 토큰 검증 실패');
         }
       }
-      
+
       console.log('[AUTH CONTEXT] 로그인 상태 없음');
       dispatch({ type: 'SET_LOADING', payload: false });
     } catch (error) {
@@ -666,6 +748,35 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setError,
     refreshAuthState,
   };
+
+  // 개발용 디버깅 함수들을 전역에 노출
+  if (typeof window !== 'undefined') {
+    (window as any).SMAP_DEBUG_AUTH = () => {
+      console.log('=== 🚀 SMAP 인증 디버깅 ===');
+      authService.debugAuthState();
+      console.log('현재 AuthContext 상태:', {
+        isLoggedIn: state.isLoggedIn,
+        loading: state.loading,
+        user: state.user ? `${state.user.mt_name} (${state.user.mt_idx})` : null,
+        selectedGroup: state.selectedGroup ? state.selectedGroup.sgt_title : null
+      });
+      console.log('========================');
+    };
+
+    (window as any).SMAP_FORCE_REFRESH_AUTH = () => {
+      console.log('🔄 수동 인증 상태 새로고침 실행...');
+      refreshAuthState().then(() => {
+        console.log('✅ 수동 인증 상태 새로고침 완료');
+      }).catch((error) => {
+        console.error('❌ 수동 인증 상태 새로고침 실패:', error);
+      });
+    };
+
+    // 사용법 출력
+    console.log('🔧 SMAP 디버깅 함수들:');
+    console.log('  - SMAP_DEBUG_AUTH(): 현재 인증 상태 확인');
+    console.log('  - SMAP_FORCE_REFRESH_AUTH(): 강제 인증 상태 새로고침');
+  }
 
   return (
     <AuthContext.Provider value={contextValue}>
