@@ -67,7 +67,7 @@ export const dynamic = 'force-dynamic';
 
 import React, { useState, useEffect, useRef, useCallback, useMemo, Suspense, useLayoutEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+// import Link from 'next/link'; // 사용하지 않음
 import { motion, useMotionValue, AnimatePresence } from 'framer-motion';
 import { useUser } from '@/contexts/UserContext';
 import { useDataCache } from '@/contexts/DataCacheContext';
@@ -75,7 +75,7 @@ import { useDataCache } from '@/contexts/DataCacheContext';
 import axios from 'axios';
 import { format, addDays } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { PageContainer, Card, Button } from '../components/layout';
+// import { PageContainer, Card, Button } from '../components/layout'; // 사용하지 않음
 import { Loader } from '@googlemaps/js-api-loader';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { MapSkeleton } from '@/components/common/MapSkeleton';
