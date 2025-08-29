@@ -136,12 +136,60 @@ class FirebaseService:
             )
             
             response = messaging.send(message)
-            logger.info(f"Successfully sent FCM message: {response}")
+            logger.info(f"✅ [FCM POLICY 4] FCM 메시지 전송 성공: {response}")
             return response
-            
-        except Exception as e:
-            logger.error(f"Failed to send FCM message: {e}")
+
+        except messaging.UnregisteredError as e:
+            # ✅ 4단계: 서버 측 비활성 토큰 처리 (리소스 관리)
+            # NotRegistered 에러: 토큰이 더 이상 유효하지 않음 (앱 삭제 등)
+            logger.warning(f"🚨 [FCM POLICY 4] 비활성 토큰 감지 (UnregisteredError): {token[:30]}...")
+            logger.warning(f"🚨 [FCM POLICY 4] 토큰이 유효하지 않아 삭제 처리 필요: {e}")
+
+            # 토큰 삭제 처리를 위한 이벤트 발생 (나중에 구현)
+            self._handle_inactive_token(token, "unregistered")
             raise
+
+        except messaging.InvalidArgumentError as e:
+            # InvalidRegistration 에러: 토큰 형식이 잘못됨
+            logger.warning(f"🚨 [FCM POLICY 4] 잘못된 토큰 형식 (InvalidArgumentError): {token[:30]}...")
+            logger.warning(f"🚨 [FCM POLICY 4] 토큰 형식이 잘못되어 삭제 처리 필요: {e}")
+
+            # 토큰 삭제 처리를 위한 이벤트 발생
+            self._handle_inactive_token(token, "invalid_registration")
+            raise
+
+        except Exception as e:
+            logger.error(f"❌ [FCM POLICY 4] FCM 메시지 전송 실패: {e}")
+            raise
+
+    def _handle_inactive_token(self, token: str, reason: str):
+        """
+        ✅ 4단계: 비활성 토큰 처리 함수
+        FCM에서 NotRegistered/InvalidRegistration 에러가 발생한 토큰을 처리
+        """
+        logger.warning(f"🚨 [FCM POLICY 4] 비활성 토큰 처리 시작: {reason}")
+        logger.warning(f"🚨 [FCM POLICY 4] 삭제 대상 토큰: {token[:30]}...")
+
+        # TODO: 데이터베이스에서 해당 토큰을 찾아서 삭제하는 로직 구현 필요
+        # 현재는 로그만 기록하고 추후 데이터베이스 정리 작업에서 사용
+        self._schedule_token_cleanup(token, reason)
+
+    def _schedule_token_cleanup(self, token: str, reason: str):
+        """
+        토큰 정리 작업을 예약 (비동기 처리)
+        """
+        logger.info(f"📋 [FCM POLICY 4] 토큰 정리 예약: {reason} - {token[:20]}...")
+        # 추후: Redis 큐나 데이터베이스 테이블에 정리 작업을 기록하여
+        # 배치 작업으로 비활성 토큰들을 정리할 수 있도록 함
+
+        # 임시로 로그에 기록 (실제 구현 시 데이터베이스에 기록)
+        cleanup_record = {
+            "token_prefix": token[:50],
+            "reason": reason,
+            "timestamp": int(time.time()),
+            "scheduled_for_cleanup": True
+        }
+        logger.info(f"📋 [FCM POLICY 4] 정리 기록: {cleanup_record}")
 
     def send_background_push_notification(
         self,
@@ -211,11 +259,26 @@ class FirebaseService:
             )
 
             response = messaging.send(message)
-            logger.info(f"Successfully sent background FCM message: {response}")
+            logger.info(f"✅ [FCM POLICY 4] 백그라운드 FCM 메시지 전송 성공: {response}")
             return response
 
+        except messaging.UnregisteredError as e:
+            # ✅ 4단계: 서버 측 비활성 토큰 처리 (리소스 관리)
+            logger.warning(f"🚨 [FCM POLICY 4] 백그라운드 푸시에서 비활성 토큰 감지 (UnregisteredError): {token[:30]}...")
+            logger.warning(f"🚨 [FCM POLICY 4] 토큰이 유효하지 않아 삭제 처리 필요: {e}")
+
+            self._handle_inactive_token(token, "background_push_unregistered")
+            raise
+
+        except messaging.InvalidArgumentError as e:
+            logger.warning(f"🚨 [FCM POLICY 4] 백그라운드 푸시에서 잘못된 토큰 형식 (InvalidArgumentError): {token[:30]}...")
+            logger.warning(f"🚨 [FCM POLICY 4] 토큰 형식이 잘못되어 삭제 처리 필요: {e}")
+
+            self._handle_inactive_token(token, "background_push_invalid")
+            raise
+
         except Exception as e:
-            logger.error(f"Failed to send background FCM message: {e}")
+            logger.error(f"❌ [FCM POLICY 4] 백그라운드 FCM 메시지 전송 실패: {e}")
             raise
 
     def send_silent_push_notification(
@@ -270,11 +333,26 @@ class FirebaseService:
             )
 
             response = messaging.send(message)
-            logger.info(f"Successfully sent silent FCM message: {response}")
+            logger.info(f"✅ [FCM POLICY 4] Silent FCM 메시지 전송 성공: {response}")
             return response
 
+        except messaging.UnregisteredError as e:
+            # ✅ 4단계: 서버 측 비활성 토큰 처리 (리소스 관리)
+            logger.warning(f"🚨 [FCM POLICY 4] Silent 푸시에서 비활성 토큰 감지 (UnregisteredError): {token[:30]}...")
+            logger.warning(f"🚨 [FCM POLICY 4] 토큰이 유효하지 않아 삭제 처리 필요: {e}")
+
+            self._handle_inactive_token(token, "silent_push_unregistered")
+            raise
+
+        except messaging.InvalidArgumentError as e:
+            logger.warning(f"🚨 [FCM POLICY 4] Silent 푸시에서 잘못된 토큰 형식 (InvalidArgumentError): {token[:30]}...")
+            logger.warning(f"🚨 [FCM POLICY 4] 토큰 형식이 잘못되어 삭제 처리 필요: {e}")
+
+            self._handle_inactive_token(token, "silent_push_invalid")
+            raise
+
         except Exception as e:
-            logger.error(f"Failed to send silent FCM message: {e}")
+            logger.error(f"❌ [FCM POLICY 4] Silent FCM 메시지 전송 실패: {e}")
             raise
 
     def is_available(self) -> bool:

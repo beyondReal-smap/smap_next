@@ -26,14 +26,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     var window: UIWindow?
     private let motionManager = CMMotionActivityManager()
     
-    // MARK: - FCM 자동 토큰 업데이트 관련 프로퍼티
-    private var fcmAutoUpdateTimer: Timer?
-    private var backgroundFCMTimer: Timer?  // 백그라운드용 토큰 검증 타이머
+    // MARK: - FCM 토큰 관리 관련 프로퍼티 (타이머 제거)
     private var lastFCMTokenUpdateTime: Date?
-    private let fcmTokenUpdateInterval: TimeInterval = 60 // 1분 (60초) - 포그라운드용
-    private let backgroundFCMCheckInterval: TimeInterval = 300 // 5분 (300초) - 무조건 푸시 수신을 위한 더 적극적인 체크
     private var isFCMUpdateInProgress = false
-    private var appEnteredBackgroundTime: Date?  // 백그라운드 진입 시간
     
     var title = String()
     var body = String()
@@ -296,13 +291,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                         UserDefaults.standard.string(forKey: "savedMtIdx") != nil
 
         if isLoggedIn {
-            print("✅ [FCM Auto] 로그인 상태 감지됨 - 자동 업데이트 시작")
-            startFCMAutoTokenUpdate()
-
-            // 🚨 앱 시작 시 즉시 FCM 토큰 확인 및 갱신
+            print("✅ [FCM Auto] 로그인 상태 감지됨 - 수동 토큰 검증만 진행")
+            // 🚨 앱 시작 시 즉시 FCM 토큰 확인 및 갱신 (타이머 제거됨)
             performImmediateFCMTokenValidation()
         } else {
-            print("🔒 [FCM Auto] 로그인 상태가 아님 - 자동 업데이트 대기")
+            print("🔒 [FCM Auto] 로그인 상태가 아님 - 토큰 검증 대기")
         }
     }
 
@@ -535,62 +528,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         print("✅ [FCM Auto] 앱 상태 변화 감지기 설정 완료")
     }
     
-    private func startFCMAutoTokenUpdate() {
-        print("🚀 [FCM Auto] 자동 FCM 토큰 업데이트 시작")
-        
-        // 기존 타이머 정리
-        stopFCMAutoTokenUpdate()
-        
-        // 즉시 첫 번째 토큰 업데이트 실행
-        updateFCMTokenIfNeeded()
-        
-        // 5분마다 자동 업데이트 타이머 시작
-        fcmAutoUpdateTimer = Timer.scheduledTimer(withTimeInterval: fcmTokenUpdateInterval, repeats: true) { [weak self] _ in
-            self?.updateFCMTokenIfNeeded()
-        }
-        
-        print("✅ [FCM Auto] 1분마다 자동 FCM 토큰 업데이트 타이머 시작됨")
-    }
-    
-    private func stopFCMAutoTokenUpdate() {
-        print("⏹️ [FCM Auto] 자동 FCM 토큰 업데이트 중지")
+        // 타이머 기반 자동 업데이트 제거됨
 
-        fcmAutoUpdateTimer?.invalidate()
-        fcmAutoUpdateTimer = nil
+    // 백그라운드 타이머 기반 토큰 검증 제거됨
 
-        print("✅ [FCM Auto] 자동 FCM 토큰 업데이트 타이머 중지됨")
-    }
-
-    // MARK: - 백그라운드 FCM 토큰 검증 타이머 관리
-    private func startBackgroundFCMTimer() {
-        print("🚀 [FCM Background] 백그라운드 FCM 토큰 검증 타이머 시작")
-
-        // 기존 타이머 정리
-        stopBackgroundFCMTimer()
-
-        // 백그라운드 진입 시간 기록
-        appEnteredBackgroundTime = Date()
-
-        // 30분마다 백그라운드 토큰 검증
-        backgroundFCMTimer = Timer.scheduledTimer(withTimeInterval: backgroundFCMCheckInterval, repeats: true) { [weak self] _ in
-            self?.performBackgroundFCMTokenCheck()
-        }
-
-        print("✅ [FCM Background] 30분마다 백그라운드 FCM 토큰 검증 타이머 시작됨")
-    }
-
-    private func stopBackgroundFCMTimer() {
-        print("⏹️ [FCM Background] 백그라운드 FCM 토큰 검증 타이머 중지")
-
-        backgroundFCMTimer?.invalidate()
-        backgroundFCMTimer = nil
-        appEnteredBackgroundTime = nil
-
-        print("✅ [FCM Background] 백그라운드 FCM 토큰 검증 타이머 중지됨")
-    }
-
-    // MARK: - 백그라운드 FCM 토큰 검증 실행
-    private func performBackgroundFCMTokenCheck() {
+    // MARK: - 백그라운드 FCM 토큰 검증 실행 (타이머 제거됨)
+    private func performBackgroundFCMTokenCheck() { // 호출되지 않음
         print("🔍 [FCM Background] 백그라운드 FCM 토큰 검증 시작")
 
         // 로그인 상태 확인
@@ -603,15 +546,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             return
         }
 
-        // 백그라운드에 너무 오래 있었는지 확인 (더 엄격하게 - 12시간)
-        if let backgroundTime = appEnteredBackgroundTime {
-            let timeInBackground = Date().timeIntervalSince(backgroundTime)
-            if timeInBackground > (12 * 60 * 60) { // 12시간 (더 엄격하게)
-                print("🚨 [FCM Background] 백그라운드에 12시간 이상 체류 - 강제 토큰 갱신")
-                forceRefreshFCMTokenForBackground()
-                return
-            }
-        }
+        // 백그라운드 시간 체크 제거됨 (타이머 기반 검증 제거)
 
         // 현재 FCM 토큰 확인 및 서버 검증
         Messaging.messaging().token { [weak self] token, error in
@@ -634,8 +569,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         }
     }
 
-    // MARK: - 백그라운드용 강제 토큰 갱신
-    private func forceRefreshFCMTokenForBackground() {
+    // MARK: - 백그라운드용 강제 토큰 갱신 (타이머 제거됨)
+    private func forceRefreshFCMTokenForBackground() { // 호출되지 않음
         print("🔄 [FCM Background] 백그라운드용 강제 FCM 토큰 갱신 시작")
 
         // 기존 토큰 무효화
@@ -662,8 +597,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                 print("✅ [FCM Background] 백그라운드 토큰 갱신 성공: \(token.prefix(30))...")
                 self?.sendFCMTokenToServer(token: token)
 
-                // 백그라운드 진입 시간 리셋
-                self?.appEnteredBackgroundTime = Date()
+                // 백그라운드 시간 리셋 제거됨 (타이머 기반 검증 제거)
             }
         }
     }
@@ -975,9 +909,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                 self?.runPermissionOnboardingIfNeeded()
             }
 
-            // ✅ FCM 자동 토큰 업데이트 시작 (백그라운드 타이머 중지)
-            stopBackgroundFCMTimer()
-            startFCMAutoTokenUpdate()
+            // ✅ FCM 토큰 검증 시작 (타이머 제거됨)
 
             // 🔔 큐에 저장된 FCM 메시지들 처리
             processQueuedFCMMessages()
@@ -1654,37 +1586,62 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         print("🔍 [DEBUG] APNS 등록 실패 - debugPushNotificationStatus()로 상세 진단 가능")
     }
 
+    // ✅ 2단계: 토큰 자동 갱신 감지 및 즉시 전송 (가장 중요)
+    // FCM SDK가 백그라운드에서 자동으로 토큰을 갱신했을 때 호출됨
     func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
-        print("🔥 [FCM] FCM 토큰 업데이트 델리게이트 호출됨")
-        print("🔥 [FCM] 새로운 FCM 토큰: \(fcmToken ?? "nil")")
-        
+        print("🔥 [FCM POLICY 2] FCM 토큰 자동 갱신 감지됨 - 즉시 서버 전송")
+        print("🔥 [FCM POLICY 2] 새로운 FCM 토큰: \(fcmToken ?? "nil")")
+
         guard let token = fcmToken else {
-            print("❌ [FCM] FCM 토큰이 nil입니다")
+            print("❌ [FCM POLICY 2] FCM 토큰이 nil입니다")
             return
         }
-        
+
         Utils.shared.setToken(token: token)
-        print("🔥 [FCM] Firebase registration token: \(token)")
-        print("🔥 [FCM] 토큰 길이: \(token.count) 문자")
-        print("🔥 [FCM] 토큰 미리보기: \(token.prefix(30))...")
-        
+        print("🔥 [FCM POLICY 2] Firebase registration token: \(token)")
+        print("🔥 [FCM POLICY 2] 토큰 길이: \(token.count) 문자")
+        print("🔥 [FCM POLICY 2] 토큰 미리보기: \(token.prefix(30))...")
+
         // 권한 상태 확인 먼저
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             DispatchQueue.main.async {
-                print("🔥 [FCM] 토큰 업데이트 시 권한 상태: \(self.authorizationStatusString(settings.authorizationStatus))")
-                
+                print("🔥 [FCM POLICY 2] 토큰 업데이트 시 권한 상태: \(self.authorizationStatusString(settings.authorizationStatus))")
+
                 if settings.authorizationStatus == .denied {
-                    print("❌ [FCM] 경고: FCM 토큰은 있지만 푸시 알림 권한이 거부됨!")
+                    print("❌ [FCM POLICY 2] 경고: FCM 토큰은 있지만 푸시 알림 권한이 거부됨!")
                     return
                 }
-                
-                // 🔔 중요: FCM 토큰 변경 즉시 서버 업데이트 (무조건 푸시 수신 보장)
-                print("🔥 [FCM] FCM 토큰 변경 즉시 서버 업데이트 시작")
-                self.forceUpdateFCMTokenToServer(token: token, reason: "token_changed")
+
+                // 🚀 즉시 서버로 전송 (가장 중요 - 지연 없이 업데이트)
+                print("🔥 [FCM POLICY 2] FCM 토큰 변경 즉시 서버 업데이트 시작")
+                self.forceUpdateFCMTokenToServer(token: token, reason: "auto_refresh")
+
+                // 토큰 변경 로그 기록
+                self.logTokenChange(reason: "auto_refresh", newToken: token)
             }
         }
     }
     
+    // MARK: - 📝 토큰 변경 로그 기록
+    private func logTokenChange(reason: String, newToken: String) {
+        let oldToken = UserDefaults.standard.string(forKey: "fcm_token")
+
+        switch reason {
+        case "auto_refresh":
+            print("🔄 [FCM POLICY 2] 자동 토큰 갱신: \(oldToken?.prefix(10) ?? "nil")... → \(newToken.prefix(10))...")
+        case "login_register":
+            print("📝 [FCM POLICY 1] 로그인 시 토큰 등록: \(newToken.prefix(10))...")
+        case "app_launch_check":
+            if oldToken != newToken {
+                print("🔍 [FCM POLICY 3] 앱 실행 시 토큰 변경 감지: \(oldToken?.prefix(10) ?? "nil")... → \(newToken.prefix(10))...")
+            } else {
+                print("✅ [FCM POLICY 3] 앱 실행 시 토큰 동일 - 갱신 불필요")
+            }
+        default:
+            print("📝 [FCM LOG] 토큰 변경: \(reason) - \(newToken.prefix(10))...")
+        }
+    }
+
     // MARK: - 🚀 FCM 토큰 강제 업데이트 (무조건 푸시 수신 보장)
 
     private func forceUpdateFCMTokenToServer(token: String, reason: String = "force_update") {
@@ -1886,12 +1843,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     @objc func startFCMAutoUpdateAfterLogin() {
         print("🚀 [FCM Auto] 로그인 완료 - FCM 자동 업데이트 시작")
         
-        // 🚨 로그인 완료 시 FCM 토큰 강제 업데이트
+        // 🚨 로그인 완료 시 FCM 토큰 강제 업데이트 (타이머 제거됨)
         print("🚨 [FCM Auto] 로그인 완료 - FCM 토큰 강제 업데이트 실행")
         forceUpdateFCMToken()
-        
-        // 자동 업데이트 타이머 시작
-        startFCMAutoTokenUpdate()
+
+        // 타이머 기반 자동 업데이트 제거됨
     }
     
     // MARK: - 🔔 사용자 정보 저장 시 FCM 토큰 업데이트 (MainView에서 호출)
@@ -2703,11 +2659,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
         NotificationCenter.default.post(name: Notification.Name("appStateChange"), object: nil, userInfo: userInfo)
 
-        // ✅ 백그라운드 진입 시 포그라운드용 FCM 자동 토큰 업데이트 중지
-        stopFCMAutoTokenUpdate()
+        // ✅ 백그라운드 진입 시 토큰 상태 관리
 
-        // 🚀 백그라운드 진입 시 백그라운드용 FCM 토큰 검증 타이머 시작
-        startBackgroundFCMTimer()
+        // 🚀 백그라운드 진입 시 토큰 상태 준비 (타이머 제거됨)
 
         // 백그라운드 진입 시 FCM 토큰 상태 확인 및 갱신 준비
         print("🔄 [FCM] 백그라운드 진입 - FCM 토큰 상태 준비")
@@ -2725,13 +2679,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         NotificationCenter.default.post(name: Notification.Name("appStateChange"), object: nil, userInfo: userInfo)
         NotificationCenter.default.post(name: Notification.Name("appStateForeground"), object: nil, userInfo: nil)
 
-        // ✅ 포그라운드 진입 시 백그라운드 FCM 타이머 중지
-        stopBackgroundFCMTimer()
+        // ✅ 포그라운드 진입 시 토큰 상태 관리
 
-        // 🚀 포그라운드 진입 시 포그라운드용 FCM 토큰 업데이트 시작
+        // 🚀 포그라운드 진입 시 토큰 검증 (타이머 제거됨)
         if UserDefaults.standard.bool(forKey: "is_logged_in") {
-            print("✅ [FCM] 포그라운드 진입 - FCM 자동 업데이트 재시작")
-            startFCMAutoTokenUpdate()
+            print("✅ [FCM] 포그라운드 진입 - 수동 토큰 검증 진행")
         }
 
         // Called as part of the transition from the background to the active state; here you can undo many of the changes made on entering the background.
@@ -3080,7 +3032,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     }
 
     // MARK: - 🔍 백그라운드 FCM 토큰 유효성 검증
-    private func validateFCMTokenForBackground(token: String) {
+    private func validateFCMTokenForBackground(token: String) { // 호출되지 않음
         print("🔍 [FCM] 백그라운드 FCM 토큰 유효성 검증 시작")
 
         // 사용자 정보 확인
@@ -3161,11 +3113,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     deinit {
         print("🧹 [FCM Auto] AppDelegate 정리 시작")
 
-        // FCM 자동 토큰 업데이트 타이머 정리
-        stopFCMAutoTokenUpdate()
-
-        // 백그라운드 FCM 토큰 검증 타이머 정리
-        stopBackgroundFCMTimer()
+        // FCM 타이머 정리 (제거됨)
 
         // 앱 상태 변화 감지기 제거
         NotificationCenter.default.removeObserver(self)

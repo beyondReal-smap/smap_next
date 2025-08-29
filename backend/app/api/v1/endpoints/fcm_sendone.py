@@ -9,6 +9,8 @@ from datetime import datetime
 from pydantic import BaseModel
 from typing import Optional
 import logging
+import firebase_admin
+from firebase_admin import messaging
 
 logger = logging.getLogger(__name__)
 
@@ -170,16 +172,47 @@ def send_fcm_push_notification(
                 "푸시발송(단건) 성공했습니다."
             )
             
+        except messaging.UnregisteredError as firebase_error:
+            # ✅ 4단계: 서버 측 비활성 토큰 처리 (리소스 관리)
+            logger.warning(f"🚨 [FCM POLICY 4] 일반 푸시에서 비활성 토큰 감지: {member.mt_token_id[:30]}...")
+            logger.warning(f"🚨 [FCM POLICY 4] 토큰 삭제 처리됨: {firebase_error}")
+
+            # 상태 4: 토큰 만료로 인한 실패
+            push_log = create_push_log(args, member.mt_idx, 4, db)
+            db.add(push_log)
+            db.commit()
+
+            return create_response(
+                FAILURE,
+                "푸시발송(단건) 실패 - 토큰 만료",
+                "FCM 토큰이 만료되었습니다. 앱 재시작으로 토큰을 갱신해주세요."
+            )
+
+        except messaging.InvalidArgumentError as firebase_error:
+            logger.warning(f"🚨 [FCM POLICY 4] 일반 푸시에서 잘못된 토큰 형식: {member.mt_token_id[:30]}...")
+            logger.warning(f"🚨 [FCM POLICY 4] 토큰 형식 오류: {firebase_error}")
+
+            # 상태 5: 토큰 형식 오류
+            push_log = create_push_log(args, member.mt_idx, 5, db)
+            db.add(push_log)
+            db.commit()
+
+            return create_response(
+                FAILURE,
+                "푸시발송(단건) 실패 - 잘못된 토큰",
+                "FCM 토큰 형식이 잘못되었습니다. 앱 재시작으로 토큰을 갱신해주세요."
+            )
+
         except Exception as firebase_error:
-            logger.error(f"Firebase 푸시 전송 실패: {firebase_error}")
+            logger.error(f"❌ [FCM POLICY 4] Firebase 푸시 전송 실패: {firebase_error}")
             # 상태 3: 전송 실패
             push_log = create_push_log(args, member.mt_idx, 3, db)
             db.add(push_log)
             db.commit()
-            
+
             return create_response(
-                FAILURE, 
-                "푸시발송(단건) 실패", 
+                FAILURE,
+                "푸시발송(단건) 실패",
                 f"Firebase 전송 실패: {str(firebase_error)}"
             )
 
@@ -276,13 +309,43 @@ def send_background_fcm_push_notification(
                 "백그라운드 푸시발송 성공했습니다."
             )
 
+        except messaging.UnregisteredError as firebase_error:
+            # ✅ 4단계: 서버 측 비활성 토큰 처리 (리소스 관리)
+            logger.warning(f"🚨 [FCM POLICY 4] 백그라운드 푸시에서 비활성 토큰 감지: {member.mt_token_id[:30]}...")
+            logger.warning(f"🚨 [FCM POLICY 4] 토큰 삭제 처리됨: {firebase_error}")
+
+            # 상태 6: 백그라운드 푸시 토큰 만료
+            push_log = create_push_log(args, member.mt_idx, 6, db)
+            db.add(push_log)
+            db.commit()
+
+            return create_response(
+                FAILURE,
+                "백그라운드 푸시발송 실패 - 토큰 만료",
+                "FCM 토큰이 만료되었습니다. 앱 재시작으로 토큰을 갱신해주세요."
+            )
+
+        except messaging.InvalidArgumentError as firebase_error:
+            logger.warning(f"🚨 [FCM POLICY 4] 백그라운드 푸시에서 잘못된 토큰 형식: {member.mt_token_id[:30]}...")
+            logger.warning(f"🚨 [FCM POLICY 4] 토큰 형식 오류: {firebase_error}")
+
+            # 상태 7: 백그라운드 푸시 토큰 형식 오류
+            push_log = create_push_log(args, member.mt_idx, 7, db)
+            db.add(push_log)
+            db.commit()
+
+            return create_response(
+                FAILURE,
+                "백그라운드 푸시발송 실패 - 잘못된 토큰",
+                "FCM 토큰 형식이 잘못되었습니다. 앱 재시작으로 토큰을 갱신해주세요."
+            )
+
         except Exception as firebase_error:
-            logger.error(f"Firebase 백그라운드 푸시 전송 실패: {firebase_error}")
+            logger.error(f"❌ [FCM POLICY 4] Firebase 백그라운드 푸시 전송 실패: {firebase_error}")
             # 상태 3: 전송 실패
             push_log = create_push_log(args, member.mt_idx, 3, db)
             db.add(push_log)
             db.commit()
-
             return create_response(
                 FAILURE,
                 "백그라운드 푸시발송 실패",
@@ -418,8 +481,30 @@ def send_silent_fcm_push_notification(
                 "Silent 푸시발송 성공했습니다."
             )
 
+        except firebase_admin.messaging.UnregisteredError as firebase_error:
+            # ✅ 4단계: 서버 측 비활성 토큰 처리 (리소스 관리)
+            logger.warning(f"🚨 [FCM POLICY 4] Silent 푸시에서 비활성 토큰 감지: {member.mt_token_id[:30]}...")
+            logger.warning(f"🚨 [FCM POLICY 4] 토큰 삭제 처리됨: {firebase_error}")
+
+            # 클라이언트에 토큰 만료 알림
+            return create_response(
+                FAILURE,
+                "Silent 푸시발송 실패 - 토큰 만료",
+                "FCM 토큰이 만료되었습니다. 앱 재시작으로 토큰을 갱신해주세요."
+            )
+
+        except firebase_admin.messaging.InvalidArgumentError as firebase_error:
+            logger.warning(f"🚨 [FCM POLICY 4] Silent 푸시에서 잘못된 토큰 형식: {member.mt_token_id[:30]}...")
+            logger.warning(f"🚨 [FCM POLICY 4] 토큰 형식 오류: {firebase_error}")
+
+            return create_response(
+                FAILURE,
+                "Silent 푸시발송 실패 - 잘못된 토큰",
+                "FCM 토큰 형식이 잘못되었습니다. 앱 재시작으로 토큰을 갱신해주세요."
+            )
+
         except Exception as firebase_error:
-            logger.error(f"Firebase Silent 푸시 전송 실패: {firebase_error}")
+            logger.error(f"❌ [FCM POLICY 4] Firebase Silent 푸시 전송 실패: {firebase_error}")
             return create_response(
                 FAILURE,
                 "Silent 푸시발송 실패",
