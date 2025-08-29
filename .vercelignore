@@ -64,3 +64,57 @@ pids
 
 # TypeScript 캐시
 *.tsbuildinfo
+
+# Next.js 빌드 캐시
+.next/
+.next
+
+# Vercel 캐시
+.vercel/
+
+# ESLint 캐시 (빌드 시 무시)
+.eslintcache
+.eslintignore
+
+# 빌드 아티팩트
+out/
+dist/
+build/
+
+# 로그 및 임시 파일들
+*.log
+logs/
+tmp/
+temp/
+.cache/
+
+# 테스트 파일들
+**/*.test.*
+**/*.spec.*
+coverage/
+
+# 문서 파일들 (빌드에 필요 없음)
+**/*.md
+!README.md
+docs/
+.github/
+
+# IDE 설정 파일들
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 환경 파일들 (보안)
+.env*
+!.env.example
+
+# 패키지 매니저 파일들
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# CI/CD 파일들
+.github/
+.gitlab-ci.yml
+.travis.yml

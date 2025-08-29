@@ -1,34 +1,27 @@
 {
-  "buildCommand": "cd frontend && npm run build",
-  "outputDirectory": "frontend/.next",
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
   "framework": "nextjs",
-  "installCommand": "cd frontend && npm install",
-  "devCommand": "cd frontend && npm run dev",
-  "regions": ["icn1"],
   "functions": {
-    "frontend/app/**": {
-      "maxDuration": 30
+    "pages/api/**/*.js": {
+      "runtime": "nodejs18.x"
     }
   },
+  "regions": ["icn1"],
   "env": {
     "NODE_ENV": "production"
+  },
+  "build": {
+    "env": {
+      "NODE_ENV": "production",
+      "NEXT_PUBLIC_ENVIRONMENT": "production",
+      "NEXT_PUBLIC_DOMAIN": "nextstep.smap.site"
+    }
   },
   "rewrites": [
     {
       "source": "/api/(.*)",
       "destination": "/api/$1"
-    },
-    {
-      "source": "/activelog",
-      "destination": "/activelog"
-    },
-    {
-      "source": "/activelog/(.*)",
-      "destination": "/activelog/$1"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/$1"
     }
   ],
   "headers": [
@@ -36,10 +29,18 @@
       "source": "/(.*)",
       "headers": [
         {
-          "key": "Cache-Control",
-          "value": "public, max-age=0, must-revalidate"
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
         }
       ]
     }
   ]
-} 
+}
