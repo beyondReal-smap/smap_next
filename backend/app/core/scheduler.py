@@ -1034,7 +1034,7 @@ class BackgroundTasks:
 
             # FCM 토큰이 있는 모든 사용자 조회 (토큰 만료 임박 사용자 우선)
             current_time = datetime.now()
-            expired_threshold = current_time + timedelta(days=7)  # 7일 이내 만료 예정인 토큰 우선
+            expired_threshold = current_time + timedelta(days=30)  # 30일 이내 만료 예정인 토큰 우선
 
             # 우선순위 1: 토큰 만료 임박 사용자
             priority_members = Member.get_token_expiring_soon(self.db, expired_threshold)

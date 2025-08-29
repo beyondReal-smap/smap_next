@@ -73,11 +73,19 @@ async def register_member_fcm_token(
         # 기존 토큰과 비교
         old_token = member.mt_token_id
         is_new_token = old_token != request.fcm_token
-        
-        # FCM 토큰 업데이트 (안정적인 푸시 수신을 위해 3일로 설정 - 더 자주 갱신)
+
+        # mt_token_id 삭제 현상 모니터링을 위한 로깅 추가
+        if not old_token and is_new_token:
+            logger.warning(f"⚠️ mt_token_id 삭제 감지: 회원 {request.mt_idx}의 기존 토큰이 없음 (새 토큰: {request.fcm_token[:20]}...)")
+        elif old_token and not is_new_token:
+            logger.info(f"✅ mt_token_id 유지 확인: 회원 {request.mt_idx}의 토큰 동일")
+        elif old_token != request.fcm_token:
+            logger.info(f"🔄 mt_token_id 변경: 회원 {request.mt_idx} 토큰 변경 (기존: {old_token[:20]}... → 새: {request.fcm_token[:20]}...)")
+
+        # FCM 토큰 업데이트 (안정적인 푸시 수신을 위해 30일로 설정)
         member.mt_token_id = request.fcm_token
         member.mt_token_updated_at = datetime.now()  # FCM 토큰 업데이트 일시
-        member.mt_token_expiry_date = datetime.now() + timedelta(days=3)  # 3일 후 만료 예상 (더 적극적인 갱신)
+        member.mt_token_expiry_date = datetime.now() + timedelta(days=30)  # 30일 후 만료 예상
         member.mt_udate = datetime.now()  # 수정일시 업데이트
         
         db.commit()
@@ -136,6 +144,12 @@ async def get_member_fcm_token_status(
         
         has_token = bool(member.mt_token_id)
         token_preview = member.mt_token_id[:20] + "..." if member.mt_token_id else None
+
+        # mt_token_id 상태 모니터링
+        if not member.mt_token_id:
+            logger.warning(f"⚠️ mt_token_id 없음: 회원 {mt_idx}의 FCM 토큰이 데이터베이스에 존재하지 않음")
+        else:
+            logger.info(f"✅ mt_token_id 존재: 회원 {mt_idx}의 토큰 상태 정상 (길이: {len(member.mt_token_id)})")
         
         # 토큰 만료 상태 확인
         is_token_expired = False
@@ -145,7 +159,7 @@ async def get_member_fcm_token_status(
             now = datetime.now()
             if now > member.mt_token_expiry_date:
                 is_token_expired = True
-            elif (member.mt_token_expiry_date - now).days <= 1:  # 만료 1일 전 (더 적극적인 갱신)
+            elif (member.mt_token_expiry_date - now).days <= 7:  # 만료 7일 전 (30일 만료에 맞게 조정)
                 is_token_near_expiry = True
 
         return MemberFCMTokenStatusResponse(
@@ -232,7 +246,7 @@ async def check_and_update_fcm_token(
         if needs_update:
             member.mt_token_id = request.fcm_token
             member.mt_token_updated_at = datetime.now()  # FCM 토큰 업데이트 일시
-            member.mt_token_expiry_date = datetime.now() + timedelta(days=3)  # 3일 후 만료 예상 (더 적극적인 갱신)
+            member.mt_token_expiry_date = datetime.now() + timedelta(days=30)  # 30일 후 만료 예상
             member.mt_udate = datetime.now()
             db.commit()
             db.refresh(member)
@@ -311,8 +325,8 @@ async def validate_and_refresh_fcm_token(
             # 토큰이 만료된 경우
             needs_refresh = True
             reason = "FCM 토큰이 만료되었습니다."
-        elif member.mt_token_expiry_date and (member.mt_token_expiry_date - now).days <= 1:
-            # 토큰 만료 임박 (1일 이내, 더 적극적인 갱신)
+        elif member.mt_token_expiry_date and (member.mt_token_expiry_date - now).days <= 7:
+            # 토큰 만료 임박 (7일 이내, 30일 만료에 맞게 조정)
             needs_refresh = True
             reason = "FCM 토큰이 곧 만료됩니다."
         elif not member.mt_token_updated_at or (now - member.mt_token_updated_at).days >= 2:
@@ -326,7 +340,7 @@ async def validate_and_refresh_fcm_token(
             # 토큰 업데이트 (안정적인 푸시 수신을 위해 3일로 설정)
             member.mt_token_id = request.fcm_token
             member.mt_token_updated_at = now
-            member.mt_token_expiry_date = now + timedelta(days=3)  # 3일 후 만료 예상 (더 적극적인 갱신)
+            member.mt_token_expiry_date = now + timedelta(days=30)  # 30일 후 만료 예상
             member.mt_udate = now
 
             db.commit()
@@ -419,7 +433,7 @@ async def background_token_check(
             reason = "강제 토큰 갱신 요청"
         elif request.check_type == "background" and member.mt_token_expiry_date:
             # 백그라운드 검증의 경우 더 엄격한 만료 기준 적용 (안정적인 푸시 수신)
-            if (member.mt_token_expiry_date - current_time).days <= 1:  # 1일 이내 만료 (더 적극적)
+            if (member.mt_token_expiry_date - current_time).days <= 7:  # 7일 이내 만료 (30일 만료에 맞게 조정)
                 needs_refresh = True
                 reason = "백그라운드 검증: 토큰이 곧 만료됩니다."
         elif member.mt_token_updated_at and (current_time - member.mt_token_updated_at).days >= 2:
@@ -433,7 +447,7 @@ async def background_token_check(
             # 토큰 업데이트 (안정적인 푸시 수신을 위해 3일로 설정)
             member.mt_token_id = request.fcm_token
             member.mt_token_updated_at = current_time
-            member.mt_token_expiry_date = current_time + timedelta(days=3)  # 3일 후 만료 (더 적극적인 갱신)
+            member.mt_token_expiry_date = current_time + timedelta(days=30)  # 30일 후 만료
             member.mt_udate = current_time
 
             db.commit()

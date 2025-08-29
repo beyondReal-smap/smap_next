@@ -126,9 +126,15 @@ def send_fcm_push_notification(
                 "FCM 토큰이 만료되었습니다. 앱을 재시작하여 토큰을 갱신해주세요."
             )
 
-        # FCM 토큰이 3일 이상 업데이트되지 않은 경우 경고 로그
-        if member.mt_token_updated_at and (now - member.mt_token_updated_at).days >= 3:
-            logger.warning(f"FCM 토큰이 3일 이상 업데이트되지 않음 - 회원 ID: {member.mt_idx}, 마지막 업데이트: {member.mt_token_updated_at}")
+        # mt_token_id 상태 모니터링 (삭제 현상 추적)
+        if not member.mt_token_id:
+            logger.error(f"🚨 FCM 전송 시 mt_token_id 없음: 회원 {member.mt_idx}의 토큰이 사라짐")
+        else:
+            logger.info(f"✅ FCM 전송 시 mt_token_id 확인: 회원 {member.mt_idx} 토큰 정상 (길이: {len(member.mt_token_id)})")
+
+        # FCM 토큰이 25일 이상 업데이트되지 않은 경우 경고 로그 (30일 만료에 맞게 조정)
+        if member.mt_token_updated_at and (now - member.mt_token_updated_at).days >= 25:
+            logger.warning(f"FCM 토큰이 25일 이상 업데이트되지 않음 - 회원 ID: {member.mt_idx}, 마지막 업데이트: {member.mt_token_updated_at}")
 
         # Firebase 사용 가능 여부 확인
         if not firebase_service.is_available():
