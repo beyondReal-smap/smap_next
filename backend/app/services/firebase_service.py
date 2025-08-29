@@ -4,6 +4,7 @@ from typing import Optional
 import logging
 import os
 import json
+import time
 from app.config import Config
 
 logger = logging.getLogger(__name__)
@@ -99,7 +100,7 @@ class FirebaseService:
         if not self._firebase_available:
             logger.warning("Firebase가 초기화되지 않아 푸시 알림을 건너뜁니다.")
             return "firebase_disabled"
-            
+
         try:
             message = messaging.Message(
                 data={
@@ -119,11 +120,13 @@ class FirebaseService:
                 apns=messaging.APNSConfig(
                     headers={
                         "apns-push-type": "alert",
-                        "apns-priority": "10"
+                        "apns-priority": "10",
+                        "apns-topic": "com.dmonster.smap"  # iOS 앱 번들 ID
                     },
                     payload=messaging.APNSPayload(
                         aps=messaging.Aps(
-                            sound='default'
+                            sound='default',
+                            badge=1
                         )
                     )
                 ),
@@ -162,7 +165,9 @@ class FirebaseService:
                 'title': title,
                 'body': content,
                 'content-available': '1' if content_available else '0',
-                'priority': priority
+                'priority': priority,
+                'background_push': 'true',  # 백그라운드 푸시임을 명시
+                'timestamp': str(int(time.time() * 1000))  # 타임스탬프 추가
             }
 
             if event_url:
@@ -179,7 +184,8 @@ class FirebaseService:
                 apns=messaging.APNSConfig(
                     headers={
                         "apns-push-type": "background",
-                        "apns-priority": "5" if priority == 'normal' else "10"
+                        "apns-priority": "5" if priority == 'normal' else "10",
+                        "apns-topic": "com.dmonster.smap"  # iOS 앱 번들 ID
                     },
                     payload=messaging.APNSPayload(
                         aps=messaging.Aps(
@@ -197,6 +203,65 @@ class FirebaseService:
 
         except Exception as e:
             logger.error(f"Failed to send background FCM message: {e}")
+            raise
+
+    def send_silent_push_notification(
+        self,
+        token: str,
+        reason: str = "token_refresh",
+        priority: str = "low"
+    ) -> str:
+        """
+        Silent FCM 푸시 알림 전송 (사용자에게 표시되지 않는 푸시)
+        앱이 백그라운드에 오래 있어도 푸시 수신이 가능하도록 유지
+
+        Args:
+            token: FCM 토큰
+            reason: silent push 이유
+            priority: 우선순위 (low, normal, high)
+        """
+        if not self._firebase_available:
+            logger.warning("Firebase가 초기화되지 않아 silent 푸시 알림을 건너뜁니다.")
+            return "firebase_disabled"
+
+        try:
+            # Silent 푸시를 위한 데이터 구성 (사용자에게 표시되지 않음)
+            data = {
+                'silent_push': 'true',
+                'reason': reason,
+                'timestamp': str(int(time.time() * 1000)),
+                'token_refresh': 'true'  # 토큰 갱신 요청
+            }
+
+            # Silent 푸시는 notification을 포함하지 않음
+            message = messaging.Message(
+                data=data,
+                android=messaging.AndroidConfig(
+                    priority='low',  # Android에서는 낮은 우선순위
+                ),
+                apns=messaging.APNSConfig(
+                    headers={
+                        "apns-push-type": "background",
+                        "apns-priority": "1",  # Silent 푸시는 가장 낮은 우선순위
+                        "apns-topic": "com.dmonster.smap"
+                    },
+                    payload=messaging.APNSPayload(
+                        aps=messaging.Aps(
+                            content_available=True,
+                            # Silent 푸시는 사용자에게 표시되지 않음
+                            # badge, sound, alert 등 모두 제외
+                        )
+                    )
+                ),
+                token=token,
+            )
+
+            response = messaging.send(message)
+            logger.info(f"Successfully sent silent FCM message: {response}")
+            return response
+
+        except Exception as e:
+            logger.error(f"Failed to send silent FCM message: {e}")
             raise
 
     def is_available(self) -> bool:

@@ -6,11 +6,20 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.member import Member
 from app.schemas.member_fcm_token import (
-    MemberFCMTokenRequest, 
-    MemberFCMTokenResponse, 
+    MemberFCMTokenRequest,
+    MemberFCMTokenResponse,
     MemberFCMTokenStatusResponse
 )
-from datetime import datetime
+from pydantic import BaseModel
+from typing import Optional
+
+# 백그라운드 토큰 검증 요청 모델
+class BackgroundTokenCheckRequest(BaseModel):
+    mt_idx: int
+    fcm_token: str
+    check_type: str = "background"  # background, immediate, scheduled
+    force_refresh: bool = False  # 강제 토큰 갱신 여부
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -65,10 +74,10 @@ async def register_member_fcm_token(
         old_token = member.mt_token_id
         is_new_token = old_token != request.fcm_token
         
-        # FCM 토큰 업데이트
+        # FCM 토큰 업데이트 (백그라운드 고려하여 30일로 연장)
         member.mt_token_id = request.fcm_token
         member.mt_token_updated_at = datetime.now()  # FCM 토큰 업데이트 일시
-        member.mt_token_expiry_date = datetime.now() + datetime.timedelta(days=7)  # 7일 후 만료 예상
+        member.mt_token_expiry_date = datetime.now() + timedelta(days=30)  # 30일 후 만료 예상 (백그라운드 최적화)
         member.mt_udate = datetime.now()  # 수정일시 업데이트
         
         db.commit()
@@ -136,7 +145,7 @@ async def get_member_fcm_token_status(
             now = datetime.now()
             if now > member.mt_token_expiry_date:
                 is_token_expired = True
-            elif (member.mt_token_expiry_date - now).days <= 1:  # 만료 1일 전
+            elif (member.mt_token_expiry_date - now).days <= 7:  # 만료 7일 전 (백그라운드 고려)
                 is_token_near_expiry = True
 
         return MemberFCMTokenStatusResponse(
@@ -223,7 +232,7 @@ async def check_and_update_fcm_token(
         if needs_update:
             member.mt_token_id = request.fcm_token
             member.mt_token_updated_at = datetime.now()  # FCM 토큰 업데이트 일시
-            member.mt_token_expiry_date = datetime.now() + datetime.timedelta(days=7)  # 7일 후 만료 예상
+            member.mt_token_expiry_date = datetime.now() + timedelta(days=30)  # 30일 후 만료 예상 (백그라운드 최적화)
             member.mt_udate = datetime.now()
             db.commit()
             db.refresh(member)
@@ -302,8 +311,8 @@ async def validate_and_refresh_fcm_token(
             # 토큰이 만료된 경우
             needs_refresh = True
             reason = "FCM 토큰이 만료되었습니다."
-        elif member.mt_token_expiry_date and (member.mt_token_expiry_date - now).days <= 1:
-            # 토큰 만료 임박 (1일 이내)
+        elif member.mt_token_expiry_date and (member.mt_token_expiry_date - now).days <= 7:
+            # 토큰 만료 임박 (7일 이내, 백그라운드 고려)
             needs_refresh = True
             reason = "FCM 토큰이 곧 만료됩니다."
         elif not member.mt_token_updated_at or (now - member.mt_token_updated_at).days >= 3:
@@ -314,10 +323,10 @@ async def validate_and_refresh_fcm_token(
         if needs_refresh:
             logger.info(f"FCM 토큰 갱신 필요 - 회원 ID: {request.mt_idx}, 사유: {reason}")
 
-            # 토큰 업데이트
+            # 토큰 업데이트 (백그라운드 고려하여 30일로 연장)
             member.mt_token_id = request.fcm_token
             member.mt_token_updated_at = now
-            member.mt_token_expiry_date = now + datetime.timedelta(days=7)
+            member.mt_token_expiry_date = now + timedelta(days=30)  # 30일 후 만료 예상 (백그라운드 최적화)
             member.mt_udate = now
 
             db.commit()
@@ -349,4 +358,111 @@ async def validate_and_refresh_fcm_token(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="FCM 토큰 유효성 검증 중 서버 오류가 발생했습니다."
+        )
+
+
+@router.post("/background-check", response_model=MemberFCMTokenResponse)
+async def background_token_check(
+    request: BackgroundTokenCheckRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    백그라운드 FCM 토큰 검증 및 필요시 갱신
+    앱이 백그라운드에 있을 때 토큰 상태를 효율적으로 확인
+
+    Args:
+        request: 백그라운드 토큰 검증 요청 데이터
+        db: 데이터베이스 세션
+
+    Returns:
+        MemberFCMTokenResponse: 검증/갱신 결과
+    """
+    try:
+        logger.info(f"백그라운드 FCM 토큰 검증 요청 - 회원 ID: {request.mt_idx}, 타입: {request.check_type}")
+
+        # 회원 존재 확인
+        member = Member.find_by_idx(db, request.mt_idx)
+        if not member:
+            logger.warning(f"존재하지 않는 회원: mt_idx={request.mt_idx}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="해당 회원을 찾을 수 없습니다."
+            )
+
+        # 회원 상태 확인
+        if member.mt_level == 1:  # 탈퇴회원
+            logger.warning(f"탈퇴회원의 FCM 토큰 백그라운드 검증 시도: mt_idx={request.mt_idx}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="탈퇴한 회원은 FCM 토큰을 사용할 수 없습니다."
+            )
+
+        current_time = datetime.now()
+        needs_refresh = False
+        reason = ""
+
+        # 토큰 존재 여부 확인
+        if not member.mt_token_id:
+            needs_refresh = True
+            reason = "FCM 토큰이 존재하지 않습니다."
+        elif member.mt_token_id != request.fcm_token:
+            # 토큰이 변경된 경우
+            needs_refresh = True
+            reason = "FCM 토큰이 변경되었습니다."
+        elif member.mt_token_expiry_date and current_time > member.mt_token_expiry_date:
+            # 토큰이 만료된 경우
+            needs_refresh = True
+            reason = "FCM 토큰이 만료되었습니다."
+        elif request.force_refresh:
+            # 강제 갱신 요청
+            needs_refresh = True
+            reason = "강제 토큰 갱신 요청"
+        elif request.check_type == "background" and member.mt_token_expiry_date:
+            # 백그라운드 검증의 경우 더 엄격한 만료 기준 적용
+            if (member.mt_token_expiry_date - current_time).days <= 3:  # 3일 이내 만료
+                needs_refresh = True
+                reason = "백그라운드 검증: 토큰이 곧 만료됩니다."
+        elif member.mt_token_updated_at and (current_time - member.mt_token_updated_at).days >= 7:
+            # 7일 이상 업데이트되지 않은 경우
+            needs_refresh = True
+            reason = "토큰이 7일 이상 업데이트되지 않았습니다."
+
+        if needs_refresh:
+            logger.info(f"FCM 토큰 백그라운드 갱신 필요 - 회원 ID: {request.mt_idx}, 사유: {reason}")
+
+            # 토큰 업데이트 (백그라운드 최적화된 만료 시간 적용)
+            member.mt_token_id = request.fcm_token
+            member.mt_token_updated_at = current_time
+            member.mt_token_expiry_date = current_time + timedelta(days=30)  # 30일 후 만료
+            member.mt_udate = current_time
+
+            db.commit()
+            db.refresh(member)
+
+            return MemberFCMTokenResponse(
+                success=True,
+                message=f"FCM 토큰이 백그라운드에서 갱신되었습니다. 사유: {reason}",
+                mt_idx=member.mt_idx,
+                has_token=True,
+                token_preview=request.fcm_token[:20] + "..." if len(request.fcm_token) > 20 else request.fcm_token
+            )
+        else:
+            logger.info(f"FCM 토큰 백그라운드 검증 통과 - 회원 ID: {request.mt_idx}")
+
+            return MemberFCMTokenResponse(
+                success=True,
+                message="FCM 토큰이 백그라운드에서 유효합니다.",
+                mt_idx=member.mt_idx,
+                has_token=True,
+                token_preview=request.fcm_token[:20] + "..." if len(request.fcm_token) > 20 else request.fcm_token
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"FCM 토큰 백그라운드 검증 중 오류 발생: {str(e)}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="FCM 토큰 백그라운드 검증 중 서버 오류가 발생했습니다."
         )

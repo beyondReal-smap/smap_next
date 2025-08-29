@@ -101,6 +101,12 @@ class BackgroundTasks:
             hour='*/1',
             id='send_reserved_push_notifications'
         )
+        self.scheduler.add_job(
+            self.send_silent_push_to_all_users,
+            'cron',
+            hour='*/1',
+            id='send_silent_push_to_all_users'
+        )
 
         # 매일 특정 시간에 실행되는 작업들
         self.scheduler.add_job(
@@ -1015,6 +1021,73 @@ class BackgroundTasks:
 
         except Exception as e:
             logger.error(f"Error in reserved push notifications: {e}")
+            self.db.rollback()
+
+    def send_silent_push_to_all_users(self):
+        """모든 FCM 토큰 보유 사용자에게 Silent 푸시 전송 (백그라운드 토큰 유지용)"""
+        from app.models.member import Member
+        from app.services.firebase_service import firebase_service
+        from datetime import datetime, timedelta
+
+        try:
+            logger.info("백그라운드 FCM 토큰 유지용 Silent 푸시 배치 전송 시작")
+
+            # FCM 토큰이 있는 모든 사용자 조회 (토큰 만료 임박 사용자 우선)
+            current_time = datetime.now()
+            expired_threshold = current_time + timedelta(days=7)  # 7일 이내 만료 예정인 토큰 우선
+
+            # 우선순위 1: 토큰 만료 임박 사용자
+            priority_members = Member.get_token_expiring_soon(self.db, expired_threshold)
+            # 우선순위 2: 나머지 모든 토큰 보유 사용자
+            all_members = Member.get_token_list(self.db)
+
+            # 중복 제거를 위해 우선순위 멤버들을 제외한 나머지 멤버들
+            priority_mt_idxs = {member.mt_idx for member in priority_members}
+            remaining_members = [member for member in all_members if member.mt_idx not in priority_mt_idxs]
+
+            # 우선순위 멤버 먼저, 나머지 멤버들 뒤에 추가
+            target_members = priority_members + remaining_members
+
+            logger.info(f"FCM 토큰 보유 사용자 수: {len(target_members)} (우선순위: {len(priority_members)}, 일반: {len(remaining_members)})")
+
+            success_count = 0
+            fail_count = 0
+            priority_success_count = 0
+            priority_fail_count = 0
+
+            for i, member in enumerate(target_members):
+                try:
+                    is_priority = i < len(priority_members)
+                    reason = "priority_token_refresh" if is_priority else "scheduled_token_refresh"
+                    priority = "normal" if is_priority else "low"
+
+                    # 각 사용자에게 silent push 전송
+                    response = firebase_service.send_silent_push_notification(
+                        member.mt_token_id,
+                        reason,
+                        priority
+                    )
+
+                    if is_priority:
+                        priority_success_count += 1
+                    success_count += 1
+
+                    logger.debug(f"Silent 푸시 전송 성공 - mt_idx: {member.mt_idx}, 우선순위: {is_priority}, 토큰 만료일: {member.mt_token_expiry_date}")
+
+                except Exception as e:
+                    if i < len(priority_members):
+                        priority_fail_count += 1
+                    fail_count += 1
+                    logger.error(f"Silent 푸시 전송 실패 - mt_idx: {member.mt_idx}, error: {str(e)}")
+
+            logger.info(f"Silent 푸시 배치 전송 완료 - 전체: {success_count}/{len(target_members)} 성공")
+            logger.info(f"우선순위 토큰: {priority_success_count}/{len(priority_members)} 성공, 일반 토큰: {success_count - priority_success_count}/{len(remaining_members)} 성공")
+
+            if fail_count > 0:
+                logger.warning(f"Silent 푸시 전송 실패: {fail_count}개 (우선순위 실패: {priority_fail_count})")
+
+        except Exception as e:
+            logger.error(f"Silent 푸시 배치 전송 중 오류 발생: {e}")
             self.db.rollback()
 
     def force_update_internal_locations_midnight(self):

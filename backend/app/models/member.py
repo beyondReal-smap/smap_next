@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, Numeric, Enum, text, Date
 from sqlalchemy.dialects.mysql import DECIMAL, TINYINT
 from app.models.base import BaseModel
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from sqlalchemy.orm import Session
 from typing import Optional, List
 
@@ -87,7 +87,7 @@ class Member(BaseModel):
 
     @classmethod
     def get_not_join_group_11(cls, db: Session) -> List['Member']:
-        before_11 = datetime.now() - datetime.timedelta(days=11)
+        before_11 = datetime.now() - timedelta(days=11)
         before_11_sday = before_11.strftime("%Y-%m-%d 00:00:00")
         before_11_eday = before_11.strftime("%Y-%m-%d 23:59:59")
 
@@ -116,9 +116,21 @@ class Member(BaseModel):
         ).all()
 
     @classmethod
+    def get_token_expiring_soon(cls, db: Session, expiry_threshold: datetime) -> List['Member']:
+        """만료 임박한 FCM 토큰을 가진 사용자 목록 조회"""
+        return db.query(cls).filter(
+            cls.mt_level > 1,
+            cls.mt_token_id.isnot(None),
+            cls.mt_token_id != "",
+            cls.mt_status == 1,
+            cls.mt_token_expiry_date.isnot(None),
+            cls.mt_token_expiry_date <= expiry_threshold
+        ).order_by(cls.mt_token_expiry_date.asc()).all()
+
+    @classmethod
     def get_sign_in_3(cls, db: Session) -> List['Member']:
-        before3h_start = datetime.now() - datetime.timedelta(hours=3)
-        before3h_end = before3h_start + datetime.timedelta(hours=1)
+        before3h_start = datetime.now() - timedelta(hours=3)
+        before3h_end = before3h_start + timedelta(hours=1)
         now_stime = before3h_start.strftime("%Y-%m-%d %H:%M:%S")
         now_etime = before3h_end.strftime("%Y-%m-%d %H:%M:%S")
         
@@ -130,8 +142,8 @@ class Member(BaseModel):
 
     @classmethod
     def get_sign_in_24(cls, db: Session) -> List['Member']:
-        before24h_start = datetime.now() - datetime.timedelta(hours=24)
-        before24h_end = before24h_start + datetime.timedelta(hours=1)
+        before24h_start = datetime.now() - timedelta(hours=24)
+        before24h_end = before24h_start + timedelta(hours=1)
         now_stime = before24h_start.strftime("%Y-%m-%d %H:%M:%S")
         now_etime = before24h_end.strftime("%Y-%m-%d %H:%M:%S")
         

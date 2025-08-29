@@ -32,6 +32,12 @@ class BackgroundPushRequest(BaseModel):
     event_url: Optional[str] = None  # 이벤트 URL
     schedule_id: Optional[str] = None  # 일정 ID
 
+# Silent Push 요청 모델 (FCM 토큰 유지용)
+class SilentPushRequest(BaseModel):
+    mt_idx: int
+    reason: str = "token_refresh"  # silent push 이유
+    priority: str = "low"  # silent push는 낮은 우선순위
+
 def create_response(success: str, title: str, message: str, data=None) -> dict:
     """응답 생성 헬퍼 함수"""
     return {
@@ -284,6 +290,144 @@ def send_background_fcm_push_notification(
             "백그라운드 푸시발송 실패",
             str(e)
         )
+
+@router.post("/silent-batch", response_model=FCMSendResponse)
+def send_silent_push_to_all_users(
+    db: Session = Depends(deps.get_db)
+):
+    """
+    모든 FCM 토큰 보유 사용자에게 Silent 푸시 전송
+    백그라운드 앱이 푸시 수신 상태를 유지하도록 함
+
+    Returns:
+        FCMSendResponse: 전송 결과
+    """
+    try:
+        logger.info("모든 사용자에게 Silent 푸시 발송 시작")
+
+        # FCM 토큰이 있는 모든 사용자 조회
+        members = Member.get_token_list(db)
+        logger.info(f"FCM 토큰 보유 사용자 수: {len(members)}")
+
+        success_count = 0
+        fail_count = 0
+
+        for member in members:
+            try:
+                # 각 사용자에게 silent push 전송
+                response = firebase_service.send_silent_push_notification(
+                    member.mt_token_id,
+                    "batch_token_refresh",
+                    "low"
+                )
+                success_count += 1
+                logger.debug(f"Silent 푸시 전송 성공 - mt_idx: {member.mt_idx}")
+
+            except Exception as e:
+                fail_count += 1
+                logger.error(f"Silent 푸시 전송 실패 - mt_idx: {member.mt_idx}, error: {str(e)}")
+
+        logger.info(f"Silent 푸시 배치 전송 완료 - 성공: {success_count}, 실패: {fail_count}")
+
+        return create_response(
+            SUCCESS,
+            "Silent 푸시 배치 전송",
+            f"총 {len(members)}명 중 {success_count}명에게 성공적으로 전송했습니다."
+        )
+
+    except Exception as e:
+        logger.error(f"Silent 푸시 배치 전송 중 오류 발생: {str(e)}")
+        return create_response(
+            FAILURE,
+            "Silent 푸시 배치 전송 실패",
+            str(e)
+        )
+
+
+@router.post("/silent", response_model=FCMSendResponse)
+def send_silent_fcm_push_notification(
+    request: SilentPushRequest,
+    db: Session = Depends(deps.get_db)
+):
+    """
+    Silent FCM 푸시 알림 전송 (FCM 토큰 유지용)
+    앱이 백그라운드에 오래 있어도 푸시 수신이 가능하도록 유지
+
+    Args:
+        request: Silent FCM 푸시 알림 전송 요청 데이터
+        db: 데이터베이스 세션
+
+    Returns:
+        FCMSendResponse: 전송 결과
+    """
+    try:
+        logger.debug("Silent 푸시 발송 요청 파라미터 파싱 중")
+        args = request.dict()
+        logger.debug(f"파싱된 파라미터: {args}")
+
+        logger.debug("회원 정보 조회 중")
+        # mt_idx로 회원 조회
+        member = Member.find_by_idx(db, args['mt_idx'])
+
+        logger.debug(f"조회된 회원 정보: {member}")
+
+        if not member:
+            logger.debug("존재하지 않는 회원 인덱스로 silent 푸시 발송 실패")
+            return create_response(
+                FAILURE,
+                "Silent 푸시발송 실패",
+                "존재하지 않는 회원입니다."
+            )
+
+        if not member.mt_token_id:
+            logger.debug("앱 토큰이 존재하지 않아 silent 푸시 발송 실패")
+            return create_response(
+                FAILURE,
+                "Silent 푸시발송 실패",
+                "앱토큰이 존재하지 않습니다."
+            )
+
+        # Firebase 사용 가능 여부 확인
+        if not firebase_service.is_available():
+            logger.debug("Firebase가 사용 불가능하여 silent 푸시 발송 실패")
+            return create_response(
+                FAILURE,
+                "Silent 푸시발송 실패",
+                "Firebase 서비스가 사용 불가능합니다. 관리자에게 문의하세요."
+            )
+
+        logger.debug("Silent FCM 메시지 전송 중")
+        try:
+            response = firebase_service.send_silent_push_notification(
+                member.mt_token_id,
+                args.get('reason', 'token_refresh'),
+                args.get('priority', 'low')
+            )
+            logger.debug(f"Firebase Silent 푸시 응답: {response}")
+
+            logger.debug("Silent 푸시 발송 성공")
+            return create_response(
+                SUCCESS,
+                "Silent 푸시발송 성공",
+                "Silent 푸시발송 성공했습니다."
+            )
+
+        except Exception as firebase_error:
+            logger.error(f"Firebase Silent 푸시 전송 실패: {firebase_error}")
+            return create_response(
+                FAILURE,
+                "Silent 푸시발송 실패",
+                f"Firebase 전송 실패: {str(firebase_error)}"
+            )
+
+    except Exception as e:
+        logger.error(f"Silent 푸시 발송 중 오류 발생: {str(e)}")
+        return create_response(
+            FAILURE,
+            "Silent 푸시발송 실패",
+            str(e)
+        )
+
 
 @router.post("/test", response_model=FCMSendResponse)
 def test_fcm_push_notification(
