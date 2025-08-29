@@ -347,14 +347,15 @@ export default function AppLayout({ children }: AppLayoutProps) {
             <button
               onClick={() => {
                 // iOS 푸시 상태 디버그
-                if (typeof window !== 'undefined' && window.webkit?.messageHandlers?.debugPushNotificationStatus) {
-                  window.webkit.messageHandlers.debugPushNotificationStatus.postMessage({});
+                const webkitHandlers = (window as any).webkit?.messageHandlers;
+                if (typeof window !== 'undefined' && webkitHandlers?.debugPushNotificationStatus) {
+                  webkitHandlers.debugPushNotificationStatus.postMessage({});
                   console.log('📱 iOS 푸시 디버그 함수 호출됨');
 
                   // 2초 후 문제 해결 가이드도 표시
                   setTimeout(() => {
-                    if (window.webkit?.messageHandlers?.showFCMTroubleshootingGuide) {
-                      window.webkit.messageHandlers.showFCMTroubleshootingGuide.postMessage({});
+                    if (webkitHandlers?.showFCMTroubleshootingGuide) {
+                      webkitHandlers.showFCMTroubleshootingGuide.postMessage({});
                       console.log('📖 FCM 문제 해결 가이드 표시됨');
                     }
                   }, 2000);
