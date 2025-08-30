@@ -135,6 +135,8 @@ declare global {
         };
       };
     };
+    __NAVER_MAP_INITIALIZING__?: boolean;
+    __LAST_MAP_RENDER_TIME__?: number;
   }
 }
 
@@ -2238,7 +2240,7 @@ export default function HomePage() {
                               console.log('🔧 [fetchAllGroupData] 실시간 GPS 위치 획득:', { latitude, longitude });
                               
                               // 멤버 위치 업데이트
-                              setGroupMembers(prevMembers =>
+                              setGroupMembersLocal(prevMembers =>
                                 prevMembers.map(member => ({
                                   ...member,
                                   location: { lat: latitude, lng: longitude },
@@ -2332,7 +2334,7 @@ export default function HomePage() {
           }
           
           if (isMountedRef.current && currentMembers.length > 0) {
-            setGroupMembers(currentMembers); 
+            setGroupMembersLocal(currentMembers); 
             console.log('[fetchAllGroupData] 멤버 데이터 로딩 완료:', currentMembers.length, '명');
             
             // 멤버 수 업데이트
@@ -2450,7 +2452,7 @@ export default function HomePage() {
             })) : [];
             
             setGroupSchedules(schedulesWithStatus); 
-            setGroupMembers(prevMembers =>
+            setGroupMembersLocal(prevMembers =>
               (prevMembers && safeArrayCheck(prevMembers)) ? prevMembers.map(member => {
                 const memberSchedules = schedulesWithStatus
                   .filter((schedule: Schedule) => 
@@ -2523,7 +2525,7 @@ export default function HomePage() {
               console.log('[fetchAllGroupData] 🎯 첫 번째 멤버 자동 선택 시작:', groupMembers[0]?.name);
               
               // 첫 번째 멤버를 선택된 상태로 설정
-              setGroupMembers(prevMembers => {
+              setGroupMembersLocal(prevMembers => {
                 if (!prevMembers || prevMembers.length === 0) return prevMembers;
                 
                 const updatedMembers = prevMembers.map((member, index) => ({
@@ -5185,7 +5187,7 @@ export default function HomePage() {
     const updatedMembers = (groupMembers && safeArrayCheck(groupMembers)) ? groupMembers.map((member: GroupMember) => 
       member.id === id ? { ...member, isSelected: true } : { ...member, isSelected: false }
     ) : [];
-    setGroupMembers(updatedMembers);
+    setGroupMembersLocal(updatedMembers);
     
     // 즉시 마커 색상 갱신 및 지도 중심 이동 (지연 없이)
     if (
@@ -6418,7 +6420,7 @@ export default function HomePage() {
     // 바텀시트 제거됨
     
     // 기존 데이터 초기화 - location/page.tsx와 동일한 패턴
-    setGroupMembers([]);
+    setGroupMembersLocal([]);
     setGroupSchedules([]);
     setFilteredSchedules([]);
     setFirstMemberSelected(false);
@@ -6488,7 +6490,7 @@ export default function HomePage() {
       isSelected: member.id === firstMember.id
     }));
     
-    setGroupMembers(updatedMembers);
+    setGroupMembersLocal(updatedMembers);
     
     // 첫번째 멤버의 스케줄 필터링 (selectedDate가 빈 문자열이면 오늘 날짜 사용)
     const targetDate = selectedDate || format(new Date(), 'yyyy-MM-dd');
