@@ -31,8 +31,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     private var isFCMUpdateInProgress = false
     private var shouldUpdateFCMToken: Bool = false // 토큰 업데이트 필요 여부
     
-    // 🚫 FCM 토큰 자동 변경 방지 설정
-    private let fcmTokenExpiryDays: Int = 7 // 7일로 단축 (기존 30일)
+    // 🚫 FCM 토큰 자동 변경 방지 설정 - 로그인 시에만 업데이트
+    private let fcmTokenExpiryDays: Int = 3 // 3일로 더 단축 (로그인 시에만 업데이트)
     private var isFCMTokenChangeBlocked: Bool = false // 토큰 변경 차단 플래그
     
     var title = String()
@@ -212,93 +212,77 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     }
 
     // MARK: - 🚀 앱 시작 시 FCM 토큰 즉시 검증
-    private func performAppLaunchFCMTokenCheck() {
-        print("🚀 앱 시작 시 FCM 토큰 즉시 검증 시작")
+        private func performAppLaunchFCMTokenCheck() {
+        print("🚀 앱 시작 시 FCM 토큰 검증 시작 (로그인 시에만 업데이트)")
+
+        // 🚫 로그인 상태가 아니면 FCM 토큰 업데이트를 하지 않음
+        let isLoggedIn = UserDefaults.standard.bool(forKey: "is_logged_in") ||
+                        UserDefaults.standard.string(forKey: "mt_idx") != nil ||
+                        UserDefaults.standard.string(forKey: "savedMtIdx") != nil
+
+        if !isLoggedIn {
+            print("🚫 [FCM] 로그인 상태가 아님 - FCM 토큰 업데이트 건너뜀")
+            return
+        }
+
+        print("👤 로그인 상태 확인됨 - FCM 토큰 검증 진행")
 
         // 마지막 앱 실행 시간 확인
         let lastAppLaunchTime = UserDefaults.standard.double(forKey: "last_app_launch_time")
         let currentTime = Date().timeIntervalSince1970
         let timeSinceLastLaunch = currentTime - lastAppLaunchTime
 
-        // 푸시로 인해 앱이 재시작되었는지 확인
-        let lastAppRestartByPush = UserDefaults.standard.double(forKey: "last_app_restart_by_push")
-        let wasRestartedByPush = (currentTime - lastAppRestartByPush) < 60 // 1분 이내 재시작
-
         print("📊 마지막 앱 실행으로부터 \(String(format: "%.1f", timeSinceLastLaunch / 3600))시간 경과")
-        print("📱 푸시로 인한 재시작: \(wasRestartedByPush ? "✅" : "❌")")
-
-        // 푸시로 인해 재시작되었거나 오랜 시간 경과한 경우 더 철저한 토큰 검증
-        if wasRestartedByPush || timeSinceLastLaunch > (6 * 60 * 60) { // 6시간 이상 경과
-            print("🚨 앱 재시작 또는 장시간 경과로 인한 철저한 토큰 검증 실행")
-        }
 
         // 현재 앱 실행 시간 기록
         UserDefaults.standard.set(currentTime, forKey: "last_app_launch_time")
         UserDefaults.standard.synchronize()
 
-        // FCM 토큰 상태 확인 및 필요시 강제 업데이트
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { // Firebase 초기화 대기
+        // 로그인 상태에서만 FCM 토큰 검증 진행
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { // Firebase 초기화 대기
             Messaging.messaging().token { token, error in
                 DispatchQueue.main.async {
                     if let error = error {
-                        print("❌ 앱 시작 FCM 토큰 확인 실패: \(error.localizedDescription)")
+                        print("❌ 로그인 상태 FCM 토큰 확인 실패: \(error.localizedDescription)")
                         return
                     }
 
                     guard let token = token, !token.isEmpty else {
-                        print("❌ 앱 시작 FCM 토큰 없음 - APNS 토큰 등록 재시도")
-                        // APNS 토큰 재등록 시도
-                        UIApplication.shared.registerForRemoteNotifications()
+                        print("❌ 로그인 상태 FCM 토큰 없음")
                         return
                     }
 
-                    print("✅ 앱 시작 FCM 토큰 확인 성공: \(token.prefix(30))...")
+                    print("✅ 로그인 상태 FCM 토큰 확인 성공: \(token.prefix(30))...")
 
                     // 저장된 토큰과 비교
                     let savedToken = UserDefaults.standard.string(forKey: "last_fcm_token")
                     let lastTokenUpdateTime = UserDefaults.standard.double(forKey: "last_fcm_token_update_time")
 
                     if savedToken != token {
-                        // 🚫 FCM 토큰 변경 감지 시 변경 방지 로직 적용
-                        if self.shouldBlockFCMTokenChange() {
-                            print("🚫 [FCM] FCM 토큰 변경 감지됨 - 변경 방지 로직으로 차단")
-                            print("🚫 [FCM] 기존 토큰 유지: \(savedToken?.prefix(30) ?? "없음")")
-                        } else {
-                            print("🔄 FCM 토큰 변경 감지 - 서버 업데이트 즉시 실행")
+                        // 토큰이 변경되었고 유효기간이 지났을 때만 업데이트
+                        if self.isFCMTokenExpired() {
+                            print("🔄 FCM 토큰 변경 감지 + 유효기간 만료 - 서버 업데이트 실행")
                             self.sendFCMTokenToServer(token: token) { success in
                                 if success {
-                                    print("✅ FCM 토큰 변경 감지 - 서버 업데이트 성공")
+                                    print("✅ FCM 토큰 변경 + 만료 - 서버 업데이트 성공")
                                 } else {
-                                    print("❌ FCM 토큰 변경 감지 - 서버 업데이트 실패")
+                                    print("❌ FCM 토큰 변경 + 만료 - 서버 업데이트 실패")
                                 }
                             }
+                        } else {
+                            print("🚫 FCM 토큰 변경 감지되었으나 유효기간이 남아있음 - 업데이트 건너뜀")
                         }
-                    } else if currentTime - lastTokenUpdateTime > (7 * 24 * 60 * 60) { // 7일 이상 경과
-                        print("⏰ FCM 토큰 7일 이상 업데이트되지 않음 - 서버 재동기화")
+                    } else if self.isFCMTokenExpired() {
+                        print("⏰ FCM 토큰 유효기간 만료 - 서버 재동기화")
                         self.sendFCMTokenToServer(token: token) { success in
                             if success {
-                                print("✅ FCM 토큰 7일 경과 - 서버 재동기화 성공")
+                                print("✅ FCM 토큰 유효기간 만료 - 서버 재동기화 성공")
                             } else {
-                                print("❌ FCM 토큰 7일 경과 - 서버 재동기화 실패")
+                                print("❌ FCM 토큰 유효기간 만료 - 서버 재동기화 실패")
                             }
                         }
                     } else {
-                        print("✅ FCM 토큰 상태 양호 - 추가 작업 불필요")
-                    }
-
-                    // 🚫 로그인 상태 확인 후 토큰 검증 - 보수적 접근
-                    let isLoggedIn = UserDefaults.standard.bool(forKey: "is_logged_in") ||
-                                    UserDefaults.standard.string(forKey: "mt_idx") != nil ||
-                                    UserDefaults.standard.string(forKey: "savedMtIdx") != nil
-
-                    if isLoggedIn {
-                        print("👤 로그인 상태 확인됨 - FCM 토큰 검증 실행 (보수적)")
-                        // 토큰 변경 방지 로직이 적용된 검증만 실행
-                        if !self.shouldBlockFCMTokenChange() {
-                            self.performFCMTokenValidation()
-                        } else {
-                            print("🚫 [FCM] 토큰 변경 방지 로직으로 인한 검증 건너뜀")
-                        }
+                        print("✅ FCM 토큰 상태 양호 (유효기간 내) - 추가 작업 불필요")
                     }
                 }
             }
@@ -1834,27 +1818,34 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     // MARK: - 🚀 FCM 토큰 직접 API 업데이트
 
     private func sendFCMTokenToServer(token: String, completion: @escaping (Bool) -> Void) {
-        print("🚀 [FCM API] FCM 토큰 서버 업데이트 시작")
-        
+        print("🚀 [FCM API] FCM 토큰 서버 업데이트 시작 (로그인 시에만)")
+
+        // 🚫 로그인 상태가 아니면 업데이트하지 않음
+        let isLoggedIn = UserDefaults.standard.bool(forKey: "is_logged_in") ||
+                        UserDefaults.standard.string(forKey: "mt_idx") != nil ||
+                        UserDefaults.standard.string(forKey: "savedMtIdx") != nil
+
+        if !isLoggedIn {
+            print("🚫 [FCM API] 로그인 상태가 아님 - FCM 토큰 업데이트 건너뜀")
+            completion(false)
+            return
+        }
+
         // 🚫 FCM 토큰 변경 방지 로직 적용
         if shouldBlockFCMTokenChange() {
             print("🚫 [FCM API] FCM 토큰 변경이 차단됨 - 서버 업데이트 건너뜀")
             completion(false)
             return
         }
-        
+
         // UserDefaults에서 mt_idx 가져오기 (여러 키에서 시도)
-        let mtIdx = UserDefaults.standard.string(forKey: "mt_idx") ?? 
+        let mtIdx = UserDefaults.standard.string(forKey: "mt_idx") ??
                    UserDefaults.standard.string(forKey: "savedMtIdx") ??
                    UserDefaults.standard.string(forKey: "current_mt_idx")
-        
+
         guard let mtIdx = mtIdx, !mtIdx.isEmpty else {
-            print("⚠️ [FCM API] 로그인 상태이지만 mt_idx를 찾을 수 없음 - 나중에 재시도")
-            print("❌ [FCM API] 현재 사용자 정보를 찾을 수 없음 - 나중에 재시도")
-            // 5초 후 재시도
-            DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
-                self.retryFCMTokenUpdate(token: token, retryCount: 1)
-            }
+            print("❌ [FCM API] 로그인 상태이지만 mt_idx를 찾을 수 없음 - 업데이트 건너뜀")
+            completion(false)
             return
         }
         
@@ -3472,5 +3463,7 @@ extension CLLocationManager {
         print(String(repeating: "=", count: 80))
     }
 }
+
+
 
 
