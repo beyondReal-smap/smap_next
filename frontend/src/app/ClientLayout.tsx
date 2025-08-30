@@ -385,12 +385,8 @@ export default function ClientLayout({
     return () => window.removeEventListener('focus', handleFocus);
   }, [isLoggedIn, handleAppResumed]);
 
-  // 지도 API 프리로딩 및 서비스 워커 등록
-  useMapPreloader();
-  // useServiceWorker(); // 임시 비활성화
-  
-  // 🔥 안드로이드 권한 지속적 체크
-  useAndroidPermissionChecker();
+  // 🔥 안드로이드 권한 지속적 체크 (이미 useMapPreloader에서 처리됨)
+  // useAndroidPermissionChecker(); // 중복 호출 제거됨
   
   // Service Worker 완전 해제 (페이지 새로고침 방지)
   useEffect(() => {

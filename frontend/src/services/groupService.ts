@@ -386,9 +386,11 @@ class GroupService {
         hostname: typeof window !== 'undefined' ? window.location.hostname : 'server'
       });
       
-      // 캐시 무시인 경우 로컬 캐시 정리
+      // 캐시 무시인 경우 로컬 캐시 정리 (최적화된 버전)
       if (ignoreCache) {
-        this.clearGroupCache();
+        // 캐시 무시이지만, 불필요한 캐시 삭제는 피하고 타임스탬프만 업데이트
+        console.log('[GroupService] 캐시 무시 모드 - 캐시 삭제 생략, 타임스탬프만 업데이트');
+        // this.clearGroupCache(); // 주석 처리하여 불필요한 캐시 삭제 방지
       }
       
       // 운영 환경에서는 더 강력한 캐시 무효화

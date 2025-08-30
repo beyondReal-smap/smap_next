@@ -16,10 +16,10 @@ interface GroupInitModalProps {
   onSuccess: () => void;
 }
 
-const GroupInitModal: React.FC<GroupInitModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  onSuccess 
+const GroupInitModal: React.FC<GroupInitModalProps> = React.memo(({
+  isOpen,
+  onClose,
+  onSuccess
 }) => {
   const [activeTab, setActiveTab] = useState<'create' | 'join'>('create');
   const [groupName, setGroupName] = useState('');
@@ -568,6 +568,8 @@ const GroupInitModal: React.FC<GroupInitModalProps> = ({
       />
     </>
   );
-};
+});
+
+GroupInitModal.displayName = 'GroupInitModal';
 
 export default GroupInitModal;
