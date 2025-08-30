@@ -209,6 +209,11 @@ html, body {
   left: 0 !important;
   right: 0 !important;
   z-index: 9999 !important;
+  /* 터치 이벤트 제어 */
+  touch-action: none !important;
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
   background: rgba(255, 255, 255, 0.95) !important;
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
@@ -258,6 +263,38 @@ html, body {
   height: 100vh !important;
   overflow-x: hidden !important;
   position: relative !important;
+  /* 터치 이벤트 제어 */
+  touch-action: manipulation !important;
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  /* 스크롤 바운스 방지 */
+  overscroll-behavior: none !important;
+  -webkit-overscroll-behavior: none !important;
+}
+
+/* 사이드바 Z-Index 강제 설정 */
+.sidebar-overlay-force {
+  z-index: 10000 !important;
+}
+
+.sidebar-force {
+  z-index: 10100 !important;
+}
+
+/* Home 컨테이너 터치 이벤트 제어 */
+.home-content, .main-container, #home-page-container {
+  /* 터치 이벤트 제어 강화 */
+  touch-action: manipulation !important;
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  /* 스크롤 방지 */
+  overscroll-behavior: none !important;
+  -webkit-overscroll-behavior: none !important;
+  /* 추가 터치 제어 */
+  -webkit-tap-highlight-color: transparent !important;
+  tap-highlight-color: transparent !important;
 }
 
 /* iOS 웹뷰 하단 네비게이션 최적화 */
@@ -267,6 +304,14 @@ html, body {
   left: 0 !important;
   right: 0 !important;
   z-index: 120 !important;
+  /* 터치 이벤트 방지 - 드래그 시 화면 움직임 방지 */
+  touch-action: none !important;
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  /* 스크롤 방지 */
+  overscroll-behavior: none !important;
+  -webkit-overscroll-behavior: none !important;
   background: rgba(255, 255, 255, 0.95) !important;
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
@@ -6099,6 +6144,46 @@ export default function HomePage() {
       };
     }, [isSidebarOpen]);
 
+    // 네비게이션 바와 헤더 터치 이벤트 방지 (항상 적용)
+    useEffect(() => {
+      const preventNavigationDrag = (e: TouchEvent) => {
+        // 네비게이션 바 영역에서 터치 이벤트 방지
+        const target = e.target as HTMLElement;
+        if (target.closest('.navigation-fixed') || target.closest('.header-fixed')) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      };
+
+      const preventTouchMove = (e: TouchEvent) => {
+        // 네비게이션 바와 헤더에서 터치 이동 방지
+        const target = e.target as HTMLElement;
+        if (target.closest('.navigation-fixed') || target.closest('.header-fixed')) {
+          e.preventDefault();
+        }
+      };
+
+      const preventTouchStart = (e: TouchEvent) => {
+        // 네비게이션 바와 헤더에서 터치 시작 시 즉시 방지
+        const target = e.target as HTMLElement;
+        if (target.closest('.navigation-fixed') || target.closest('.header-fixed')) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+        }
+      };
+
+      // 터치 이벤트 리스너 등록
+      document.addEventListener('touchstart', preventTouchStart, { passive: false });
+      document.addEventListener('touchmove', preventTouchMove, { passive: false });
+      document.addEventListener('touchend', preventNavigationDrag, { passive: false });
+
+      return () => {
+        document.removeEventListener('touchstart', preventTouchStart as EventListener);
+        document.removeEventListener('touchmove', preventTouchMove as EventListener);
+        document.removeEventListener('touchend', preventNavigationDrag as EventListener);
+      };
+    }, []);
+
     // 사이드바 외부 클릭 시 닫기 (강화된 햅틱 피드백)
     useEffect(() => {
       const handleSidebarClickOutside = (event: MouseEvent) => {
@@ -6468,7 +6553,15 @@ export default function HomePage() {
             top: '0px', // 최상단 고정
             position: 'relative',
             overflow: 'hidden',
-            height: '100vh'
+            height: '100vh',
+            // 터치 이벤트 제어
+            touchAction: 'manipulation',
+            WebkitTouchCallout: 'none',
+            WebkitUserSelect: 'none',
+            userSelect: 'none',
+            // 스크롤 방지
+            overscrollBehavior: 'none',
+            WebkitOverflowScrolling: 'touch'
           }}
           data-react-mount="true"
           data-page="/home"
@@ -6666,7 +6759,12 @@ export default function HomePage() {
             zIndex: 10, // 헤더와 네비게이션 바 사이
             paddingTop: '0px',
             touchAction: 'manipulation',
-            overflow: 'hidden' // 스크롤 방지
+            overflow: 'hidden', // 스크롤 방지
+            // 추가 터치 이벤트 제어
+            WebkitTouchCallout: 'none',
+            WebkitUserSelect: 'none',
+            userSelect: 'none',
+            WebkitOverflowScrolling: 'touch'
           }}
           onLoad={() => {
             // 🗺️ 지도 컨테이너 로드 완료 시 강제 렌더링 실행 (쿨다운 적용)
@@ -6796,7 +6894,15 @@ export default function HomePage() {
                  initial="closed"
                  animate="open"
                  exit="closed"
-                 className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200]"
+                 className="fixed inset-0 bg-black/50 backdrop-blur-sm sidebar-overlay-force"
+                 style={{
+                   zIndex: 10000,
+                   // 모바일 사파리 최적화
+                   transform: 'translateZ(0)',
+                   willChange: 'opacity',
+                   backfaceVisibility: 'hidden',
+                   WebkitBackfaceVisibility: 'hidden'
+                 }}
                  onClick={(e) => {
                    // 플로팅 버튼 영역 클릭 시 사이드바 닫지 않음
                    const target = e.target as HTMLElement;
@@ -6805,13 +6911,6 @@ export default function HomePage() {
                      return;
                    }
                    setIsSidebarOpen(false);
-                 }}
-                 style={{
-                   // 모바일 사파리 최적화
-                   transform: 'translateZ(0)',
-                   willChange: 'opacity',
-                   backfaceVisibility: 'hidden',
-                   WebkitBackfaceVisibility: 'hidden'
                  }}
                />
                
@@ -6822,21 +6921,23 @@ export default function HomePage() {
                    initial="closed"
                    animate="open"
                    exit="closed"
-                   className="fixed left-0 top-0 w-72 shadow-2xl border-r z-[300] flex flex-col"
-                   onClick={(e) => e.stopPropagation()}
-                   style={{ 
-                     background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
-                     borderColor: 'rgba(1, 19, 163, 0.1)',
-                     height: 'calc(100vh - 40px)',
-                     borderRadius: '0 18px 18px 0',
-                     boxShadow: '0 8px 32px rgba(31,41,55,0.18), 0 1.5px 6px rgba(0,0,0,0.08)',
-                     transform: 'translateZ(0)',
-                     willChange: 'transform',
-                     backfaceVisibility: 'hidden',
-                     WebkitBackfaceVisibility: 'hidden',
-                     WebkitPerspective: 1000,
-                     WebkitTransform: 'translateZ(0)'
-                   }}
+                   className="fixed left-0 top-0 w-72 shadow-2xl border-r flex flex-col sidebar-force"
+                  style={{
+                    zIndex: 10100,
+                    background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
+                    borderColor: 'rgba(1, 19, 163, 0.1)',
+                    height: 'calc(100vh - 40px)',
+                    borderRadius: '0 18px 18px 0',
+                    boxShadow: '0 8px 32px rgba(31,41,55,0.18), 0 1.5px 6px rgba(0,0,0,0.08)',
+                    transform: 'translateZ(0)',
+                    willChange: 'transform',
+                    backfaceVisibility: 'hidden',
+                    WebkitBackfaceVisibility: 'hidden',
+                    WebkitPerspective: 1000,
+                    WebkitTransform: 'translateZ(0)',
+                    paddingTop: '1.5rem',
+                    paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)'
+                  }}
                  >
                    <motion.div
                      variants={sidebarContentVariants}
@@ -6845,10 +6946,6 @@ export default function HomePage() {
                      exit="closed"
                     className="p-6 h-full flex flex-col relative z-10 sidebar-content overflow-y-auto"
                      onClick={(e) => e.stopPropagation()}
-                     style={{
-                       paddingTop: '1.5rem',
-                       paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)'
-                     }}
                    >
 
 
