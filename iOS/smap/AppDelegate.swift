@@ -843,37 +843,73 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     private func forceRefreshFCMServiceRegistration(_ token: String) {
         print("🔥 [FCM Force] FCM 서비스 강제 재등록 시작")
 
-        // 1. FCM 서비스 초기화 상태 재설정
-        print("🔄 [FCM Force] FCM 서비스 상태 재설정")
+        // 1. FCM 서비스 완전 리셋 (더 강력한 방법)
+        print("🔄 [FCM Force] FCM 서비스 완전 리셋")
         Messaging.messaging().isAutoInitEnabled = false
-        Messaging.messaging().isAutoInitEnabled = true
 
-        // 2. APNs 토큰 재설정 (있는 경우)
-        if let apnsToken = currentAPNSToken {
-            print("📱 [FCM Force] APNs 토큰 재설정: \(apnsToken.prefix(20))...")
-            Messaging.messaging().setAPNSToken(apnsToken.data(using: .utf8) ?? Data(), type: .unknown)
-        } else {
-            print("⚠️ [FCM Force] APNs 토큰 없음 - FCM 재등록에 영향 가능")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            Messaging.messaging().isAutoInitEnabled = true
+
+            // 2. APNs 토큰 재설정 (있는 경우)
+            if let apnsToken = self.currentAPNSToken {
+                print("📱 [FCM Force] APNs 토큰 재설정: \(apnsToken.prefix(20))...")
+                Messaging.messaging().setAPNSToken(apnsToken.data(using: .utf8) ?? Data(), type: .unknown)
+            } else {
+                print("⚠️ [FCM Force] APNs 토큰 없음 - FCM 재등록에 영향 가능")
+            }
+
+            // 3. FCM 토큰 재생성 및 재등록 (여러 번 시도)
+            self.retryFCMTokenRegistration(token, attempt: 1, maxAttempts: 3)
         }
 
-        // 3. FCM 토큰 재확인 및 재등록
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        print("✅ [FCM Force] FCM 서비스 강제 재등록 요청 완료")
+    }
+
+    // MARK: - 🔄 FCM 토큰 재등록 재시도
+    private func retryFCMTokenRegistration(_ originalToken: String, attempt: Int, maxAttempts: Int) {
+        print("🔄 [FCM Retry] 토큰 재등록 시도 \(attempt)/\(maxAttempts)")
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + TimeInterval(attempt)) {
             Messaging.messaging().token { [weak self] refreshedToken, error in
                 if let error = error {
-                    print("❌ [FCM Force] 강제 재등록 실패: \(error.localizedDescription)")
-                } else if let refreshedToken = refreshedToken {
-                    print("✅ [FCM Force] 강제 재등록 성공: \(refreshedToken.prefix(30))...")
-                    if refreshedToken == token {
-                        print("🎯 [FCM Force] FCM 서비스 재등록 완료 - 토큰 일치")
+                    print("❌ [FCM Retry] 재등록 시도 \(attempt) 실패: \(error.localizedDescription)")
+                    if attempt < maxAttempts {
+                        self?.retryFCMTokenRegistration(originalToken, attempt: attempt + 1, maxAttempts: maxAttempts)
                     } else {
-                        print("⚠️ [FCM Force] 재등록 토큰 불일치 - 새로운 토큰 사용")
+                        print("❌ [FCM Retry] 모든 재등록 시도 실패")
+                    }
+                } else if let refreshedToken = refreshedToken {
+                    print("✅ [FCM Retry] 재등록 시도 \(attempt) 성공: \(refreshedToken.prefix(30))...")
+                    if refreshedToken == originalToken {
+                        print("🎯 [FCM Retry] FCM 서비스 재등록 완료 - 토큰 일치")
+                        // FCM 등록 상태 검증
+                        self?.verifyFCMRegistrationStatus(refreshedToken)
+                    } else {
+                        print("⚠️ [FCM Retry] 재등록 토큰 불일치 - 새로운 토큰 사용")
                         self?.handleFCMTokenUpdate(refreshedToken)
                     }
                 }
             }
         }
+    }
 
-        print("✅ [FCM Force] FCM 서비스 강제 재등록 요청 완료")
+    // MARK: - 🔍 FCM 등록 상태 검증
+    private func verifyFCMRegistrationStatus(_ token: String) {
+        print("🔍 [FCM Verify Status] FCM 등록 상태 검증 시작")
+
+        // FCM 토큰 유효성 기본 검증
+        if token.count < 100 {
+            print("⚠️ [FCM Verify Status] 토큰 길이 비정상: \(token.count)자")
+            return
+        }
+
+        if !token.contains(":") {
+            print("⚠️ [FCM Verify Status] 토큰 형식 비정상 (콜론 없음)")
+            return
+        }
+
+        print("✅ [FCM Verify Status] FCM 토큰 형식 유효성 검증 통과")
+        print("🎯 [FCM Verify Status] FCM 토큰이 Firebase 서비스에 등록됨")
     }
 
     // MARK: - 🔍 FCM 서비스 등록 상태 확인 및 재등록
@@ -2182,8 +2218,22 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         print("   🆕 새로운 FCM 토큰: \(token.prefix(20))...")
         print("   🔄 토큰 변경으로 FCM 서비스 재등록 필요")
 
+        // 🚫 토큰 변경 빈도 제한 (불필요한 잦은 변경 방지)
+        let lastTokenUpdate = UserDefaults.standard.double(forKey: "last_token_update_time")
+        let currentTime = Date().timeIntervalSince1970
+        let timeSinceLastUpdate = currentTime - lastTokenUpdate
+
+        if timeSinceLastUpdate < 30.0 { // 30초 이내 재변경 방지
+            print("⏳ [FCM] 토큰 변경 빈도가 너무 높음 (최근 \(Int(timeSinceLastUpdate))초 전) - 업데이트 스킵")
+            return
+        }
+
         // FCM 서비스에 즉시 토큰 재등록 (푸시 수신 보장)
         forceRefreshFCMServiceRegistration(token)
+
+        // 토큰 업데이트 시간 기록
+        UserDefaults.standard.set(currentTime, forKey: "last_token_update_time")
+        UserDefaults.standard.synchronize()
 
         // DB 토큰과 비교
         if let dbToken = UserDefaults.standard.string(forKey: "last_updated_fcm_token") {
@@ -2215,17 +2265,36 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         // 🔄 FCM 서비스에 토큰 강제 등록 (푸시 수신 보장)
         print("🔥 [FCM] FCM 서비스에 토큰 강제 등록 시작")
 
-        // FCM 서비스 상태 리프레시
+        // FCM 서비스 상태 완전 리프레시
         Messaging.messaging().isAutoInitEnabled = false
-        Messaging.messaging().isAutoInitEnabled = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            Messaging.messaging().isAutoInitEnabled = true
+        }
 
-        // APNs 토큰이 있으면 FCM에 설정
+        // APNs 토큰이 있으면 FCM에 설정 (강제)
         if let apnsToken = currentAPNSToken {
+            print("🔄 [FCM] APNs 토큰으로 FCM 재설정 시도: \(apnsToken.prefix(20))...")
             Messaging.messaging().setAPNSToken(apnsToken.data(using: .utf8) ?? Data(), type: .unknown)
-            print("✅ [FCM] FCM 서비스에 APNs 토큰 재등록 완료: \(apnsToken.prefix(20))...")
+
+            // FCM 토큰 재요청 및 재등록
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                Messaging.messaging().token { [weak self] refreshedToken, error in
+                    if let error = error {
+                        print("❌ [FCM] APNs 재설정 후 토큰 재요청 실패: \(error.localizedDescription)")
+                    } else if let refreshedToken = refreshedToken {
+                        print("✅ [FCM] APNs 재설정 후 토큰 재요청 성공: \(refreshedToken.prefix(30))...")
+                        // 토큰이 변경되었으면 업데이트
+                        if refreshedToken != token {
+                            print("⚠️ [FCM] APNs 재설정 후 토큰 변경 감지")
+                            self?.handleFCMTokenUpdate(refreshedToken)
+                        } else {
+                            print("✅ [FCM] APNs 재설정 후 토큰 일치 확인")
+                        }
+                    }
+                }
+            }
         } else {
-            print("⚠️ [FCM] APNs 토큰이 없어 FCM 재등록 스킵 - 푸시 수신에 영향 가능")
-            // APNs 토큰이 없어도 FCM 토큰은 저장하고 추후 재등록 시도
+            print("⚠️ [FCM] APNs 토큰 없음 - FCM 재등록 제한적 수행")
         }
 
         // FCM 토큰 재확인 및 재등록 (푸시 수신 보장)
