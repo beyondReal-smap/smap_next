@@ -32,7 +32,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     private var shouldUpdateFCMToken: Bool = false // 토큰 업데이트 필요 여부
     
     // 🚫 FCM 토큰 자동 변경 방지 설정 - 로그인 시에만 업데이트
-    private let fcmTokenExpiryDays: Int = 3 // 3일로 더 단축 (로그인 시에만 업데이트)
+    private let fcmTokenExpiryDays: Int = 90 // 90일(3개월)로 설정 (로그인 시에만 업데이트)
     private var isFCMTokenChangeBlocked: Bool = false // 토큰 변경 차단 플래그
     
     var title = String()
