@@ -75,56 +75,109 @@ try:
         else:
             print("❌ Firebase 인증 정보가 없음")
     
-    # 테스트 메시지 전송 (더미 토큰 사용)
-    test_token = "fXqDFxeJ5UD0hDji1DVCHy:APA91bFLXuEpYC6DJ8upACPkHdeYUgFAzotsD7fjBv1F2ZFFyCRRb6K22Jy3JMupQkmlirHrJxhuKAu9MGL7-xv5NHnTrzHqoh1---GsS2vXM6K2EJCjMjE"  # 예시 토큰
+    # 토큰 목록 - DB에 저장된 토큰과 이전 토큰 비교
+    tokens_to_test = [
+        {
+            "name": "현재 DB 토큰 (2025-08-30 20:25:29)",
+            "token": "f7Tc8eXAwkW1s0irB0wpS6:APA91bFRuyzX9HBmoNdFvLmCUrYv1FD2RNm3tIeugFMiIOTeb5aG4Hlwjh0LZhJiXK5jEN8r_xoRVjTPKfS9jiaUM0OrA5HYc9L1n0KHyf0VqUuSBhQxNZk"
+        },
+        {
+            "name": "이전 토큰 (2025-08-30 21:32:06)",
+            "token": "diyqlVHetUAav2L6C2IhMu:APA91bEJxihlN6o9YjQEDYGGT2m74vaB7Z1ey2ZSszSPV-wrVLpYCQbHMUYmJKAeiJTS22N7Gp91UPpUYfQUYTV9m8wPC4FI1v_9_dbuGhuplGactA_GyBM"
+        }
+    ]
     
-    print("\n📤 FCM 테스트 메시지 전송 시도:")
-    print(f"   대상 토큰: {test_token[:30]}...")
-    
+    print("\n📤 FCM 토큰별 테스트 메시지 전송:")
+    print("=" * 60)
+
     import time
     current_time = int(time.time())
-    
-    message = messaging.Message(
-        data={
-            'title': '🧪 FCM 테스트',
-            'body': f'FCM 테스트 메시지 - {current_time}',
-            'custom_data': 'fcm_test_simple',
-            'timestamp': str(current_time * 1000)
-        },
-        notification=messaging.Notification(
-            title='🧪 FCM 테스트',
-            body=f'FCM 테스트 메시지 - {current_time}'
-        ),
-        android=messaging.AndroidConfig(
-            priority='high',
-            notification=messaging.AndroidNotification(
-                sound='default',
-                channel_id='default'
+
+    # 각 토큰별로 메시지 발송
+    for i, token_info in enumerate(tokens_to_test, 1):
+        print(f"\n🔄 토큰 #{i} 테스트: {token_info['name']}")
+        print(f"   토큰: {token_info['token'][:30]}...")
+
+        # 1. 먼저 토큰 유효성 검증 (dry-run)
+        print("   🔍 토큰 유효성 검증 중...")
+        try:
+            test_message = messaging.Message(
+                data={'test_validation': 'true', 'timestamp': str(current_time * 1000)},
+                token=token_info['token'],
             )
-        ),
-        apns=messaging.APNSConfig(
-            headers={
-                "apns-push-type": "alert",
-                "apns-priority": "10",
-                "apns-topic": "com.dmonster.smap",
-                "apns-expiration": str(current_time + 300)
-            },
-            payload=messaging.APNSPayload(
-                aps=messaging.Aps(
-                    alert=messaging.ApsAlert(title='🧪 FCM 테스트', body=f'FCM 테스트 메시지 - {current_time}'),
-                    sound='default',
-                    badge=1,
-                    content_available=True,
-                    mutable_content=True,
-                    category="GENERAL"
-                )
+            # dry_run=True로 실제 발송하지 않고 검증만 수행
+            messaging.send(test_message, dry_run=True)
+            print("   ✅ 토큰 유효성 검증 성공")
+        except messaging.UnregisteredError as e:
+            print(f"   ❌ 토큰 등록 해제됨 (Unregistered): {str(e)}")
+            print("   📝 이 토큰은 더 이상 유효하지 않습니다.")
+        except Exception as e:
+            print(f"   ⚠️ 토큰 검증 중 오류: {str(e)}")
+
+        # 2. 실제 메시지 발송
+        print("   📤 실제 메시지 발송 중...")
+        try:
+            message = messaging.Message(
+                data={
+                    'title': f'🧪 FCM 토큰 테스트 #{i}',
+                    'body': f'FCM 토큰 테스트 메시지 #{i} - {current_time}',
+                    'custom_data': f'fcm_token_test_{i}',
+                    'timestamp': str(current_time * 1000),
+                    'token_info': token_info['name']
+                },
+                notification=messaging.Notification(
+                    title=f'🧪 FCM 토큰 테스트 #{i}',
+                    body=f'FCM 토큰 테스트 메시지 #{i} - {current_time}'
+                ),
+                android=messaging.AndroidConfig(
+                    priority='high',
+                    notification=messaging.AndroidNotification(
+                        sound='default',
+                        channel_id='default'
+                    )
+                ),
+                apns=messaging.APNSConfig(
+                    headers={
+                        "apns-push-type": "alert",
+                        "apns-priority": "10",
+                        "apns-topic": "com.dmonster.smap",
+                        "apns-expiration": str(current_time + 300)
+                    },
+                    payload=messaging.APNSPayload(
+                        aps=messaging.Aps(
+                            alert=messaging.ApsAlert(
+                                title=f'🧪 FCM 토큰 테스트 #{i}',
+                                body=f'FCM 토큰 테스트 메시지 #{i} - {current_time}'
+                            ),
+                            sound='default',
+                            badge=i,
+                            content_available=True,
+                            mutable_content=True,
+                            category="GENERAL"
+                        )
+                    )
+                ),
+                token=token_info['token'],
             )
-        ),
-        token=test_token,
-    )
-    
-    response = messaging.send(message)
-    print(f"✅ FCM 테스트 메시지 전송 성공: {response}")
+
+            response = messaging.send(message)
+            print(f"✅ 토큰 #{i} 메시지 전송 성공: {response}")
+
+        except messaging.UnregisteredError as e:
+            print(f"❌ 토큰 #{i} 등록 해제됨 (Unregistered): {str(e)}")
+            print("   📝 이 토큰은 더 이상 유효하지 않습니다.")
+        except messaging.InvalidArgumentError as e:
+            print(f"❌ 토큰 #{i} 잘못된 형식 (Invalid): {str(e)}")
+            print("   📝 토큰 형식이 올바르지 않습니다.")
+        except Exception as e:
+            print(f"❌ 토큰 #{i} 전송 실패: {str(e)}")
+
+        # 각 토큰별로 잠시 대기
+        if i < len(tokens_to_test):
+            print("   ⏳ 다음 토큰 테스트 준비 중...")
+            time.sleep(2)
+
+    print("\n" + "=" * 60)
     print("📱 iOS Swift 로그에서 다음 메시지들을 확인하세요:")
     print("   📨 [FCM] FCM 메시지 수신 시작")
     print("   📨 [FCM] FCM 메시지 수신 #N")

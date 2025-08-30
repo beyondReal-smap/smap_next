@@ -224,13 +224,18 @@ html, body {
 
 /* 사이드바가 열렸을 때 헤더 z-index 낮추기 */
 body.sidebar-open .header-fixed {
-  z-index: 10 !important;
+  z-index: 100 !important;
 }
 
 /* 사이드바가 열렸을 때 배경 스크롤 완전 차단 */
 body.sidebar-open {
   /* iOS/WebView 안전 스크롤 잠금: 레이아웃은 그대로 두고 스크롤만 차단 */
   overflow: hidden !important;
+  position: fixed !important;
+  width: 100% !important;
+  height: 100vh !important;
+  top: 0 !important;
+  left: 0 !important;
 }
 
 /* 사이드바 내부 컨텐츠는 스크롤 허용 */
@@ -248,13 +253,20 @@ body.sidebar-open .sidebar-content * {
   pointer-events: auto !important;
 }
 
+/* 화면 고정 최적화 - html/body 레벨에서 스크롤 방지 */
+html, body {
+  height: 100vh !important;
+  overflow-x: hidden !important;
+  position: relative !important;
+}
+
 /* iOS 웹뷰 하단 네비게이션 최적화 */
 .navigation-fixed {
   position: fixed !important;
   bottom: 0 !important;
   left: 0 !important;
   right: 0 !important;
-  z-index: 9999 !important;
+  z-index: 120 !important;
   background: rgba(255, 255, 255, 0.95) !important;
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
@@ -6383,15 +6395,31 @@ export default function HomePage() {
             className="full-map-container" 
             style={{ paddingTop: '0px', touchAction: 'manipulation', overflow: 'visible' }}
           >
-            <div 
-              ref={googleMapContainer} 
-              className="w-full h-full absolute top-0 left-0" 
-              style={{ display: false ? 'block' : 'none', zIndex: 6 }}
+            <div
+              ref={googleMapContainer}
+              className="w-full h-full absolute top-0 left-0"
+              style={{
+                display: mapType === 'google' ? 'block' : 'none',
+                zIndex: 5,
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0
+              }}
             ></div>
-            <div 
-              ref={naverMapContainer} 
-              className="w-full h-full absolute top-0 left-0" 
-              style={{ display: mapType === 'naver' ? 'block' : 'none', zIndex: 6 }}
+            <div
+              ref={naverMapContainer}
+              className="w-full h-full absolute top-0 left-0"
+              style={{
+                display: mapType === 'naver' ? 'block' : 'none',
+                zIndex: 5,
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0
+              }}
             ></div>
           </div>
 
@@ -6407,7 +6435,7 @@ export default function HomePage() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              zIndex: 1000
+              zIndex: 400 // 사이드바 오버레이보다 높게
             }}
           >
             <div style={{ textAlign: 'center' }}>
@@ -6432,12 +6460,15 @@ export default function HomePage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
           className="min-h-screen relative home-content main-container"
-                    style={{
+          style={{
             background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
             paddingBottom: '80px', // BottomNavBar 높이만큼 여백 추가 (72px + 8px 여백)
             paddingTop: '0px', // 상단 패딩 강제 제거
             marginTop: '0px', // 상단 마진 강제 제거
-            top: '0px' // 최상단 고정
+            top: '0px', // 최상단 고정
+            position: 'relative',
+            overflow: 'hidden',
+            height: '100vh'
           }}
           data-react-mount="true"
           data-page="/home"
@@ -6447,7 +6478,7 @@ export default function HomePage() {
         {/* 통일된 헤더 애니메이션 */}
         <AnimatedHeader 
           variant="simple"
-          className={`fixed top-0 left-0 right-0 glass-effect header-fixed home-header ${isSidebarOpen ? 'z-40' : 'z-50'}`}
+          className={`fixed top-0 left-0 right-0 glass-effect header-fixed home-header ${isSidebarOpen ? 'z-[150]' : 'z-[250]'}`}
           style={{ 
             paddingTop: '0px',
             marginTop: '0px',
@@ -6624,12 +6655,18 @@ export default function HomePage() {
         )} */}
 
         {/* 지도 영역 (화면 100% 차지, fixed 포지션으로 고정) */}
-        <div 
-          className="full-map-container" 
-          style={{ 
+        <div
+          className="full-map-container"
+          style={{
+            position: 'fixed',
+            top: '0px',
+            left: '0px',
+            right: '0px',
+            bottom: '80px', // 네비게이션 바 높이만큼 제외
+            zIndex: 10, // 헤더와 네비게이션 바 사이
             paddingTop: '0px',
             touchAction: 'manipulation',
-            overflow: 'visible'
+            overflow: 'hidden' // 스크롤 방지
           }}
           onLoad={() => {
             // 🗺️ 지도 컨테이너 로드 완료 시 강제 렌더링 실행 (쿨다운 적용)
@@ -6759,7 +6796,7 @@ export default function HomePage() {
                  initial="closed"
                  animate="open"
                  exit="closed"
-                 className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[99999]"
+                 className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200]"
                  onClick={(e) => {
                    // 플로팅 버튼 영역 클릭 시 사이드바 닫지 않음
                    const target = e.target as HTMLElement;
@@ -6785,7 +6822,7 @@ export default function HomePage() {
                    initial="closed"
                    animate="open"
                    exit="closed"
-                   className="fixed left-0 top-0 w-72 shadow-2xl border-r z-[999999] flex flex-col"
+                   className="fixed left-0 top-0 w-72 shadow-2xl border-r z-[300] flex flex-col"
                    onClick={(e) => e.stopPropagation()}
                    style={{ 
                      background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',

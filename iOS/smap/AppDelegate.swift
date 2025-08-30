@@ -91,7 +91,90 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         // ✅ FCM delegate 설정 활성화 - 토큰 수신을 위해
         Messaging.messaging().delegate = self
         print("✅ [FCM] FCM delegate 설정 활성화 - 토큰 수신 가능")
-        
+
+        // 📱 현재 토큰 상태 확인 및 로깅
+        print("\n╔══════════════════════════════════════════════════════════════╗")
+        print("║ 📊 [토큰 상태] 앱 시작 시 토큰 정보 확인                          ║")
+        print("╚══════════════════════════════════════════════════════════════╝")
+
+        // 저장된 토큰들 확인
+        if let savedFCMToken = UserDefaults.standard.string(forKey: "fcm_token") {
+            print("💾 [저장됨] FCM 토큰: \(savedFCMToken.prefix(30))... (길이: \(savedFCMToken.count))")
+        } else {
+            print("❌ [저장됨] FCM 토큰: 없음")
+        }
+
+        if let dbToken = UserDefaults.standard.string(forKey: "last_updated_fcm_token") {
+            print("💾 [DB] 마지막 업데이트 토큰: \(dbToken.prefix(30))... (길이: \(dbToken.count))")
+        } else {
+            print("❌ [DB] 마지막 업데이트 토큰: 없음")
+        }
+
+        if let apnsToken = UserDefaults.standard.string(forKey: "last_apns_token") {
+            print("📱 [APNS] 저장된 토큰: \(apnsToken.prefix(30))... (길이: \(apnsToken.count))")
+        } else {
+            print("❌ [APNS] 저장된 토큰: 없음")
+        }
+
+        // 현재 FCM 토큰 가져오기 (비동기)
+        Messaging.messaging().token { token, error in
+            if let error = error {
+                print("❌ [실시간] FCM 토큰 가져오기 실패: \(error.localizedDescription)")
+            } else if let token = token {
+                print("🔥 [실시간] 현재 FCM 토큰: \(token.prefix(30))... (길이: \(token.count))")
+
+                // 저장된 토큰과 비교
+                if let savedToken = UserDefaults.standard.string(forKey: "fcm_token") {
+                    if token == savedToken {
+                        print("✅ [토큰 일치] 실시간 토큰과 저장된 토큰이 일치합니다")
+                    } else {
+                        print("⚠️ [토큰 불일치] 실시간 토큰과 저장된 토큰이 다릅니다!")
+                        print("   📱 실시간: \(token.prefix(20))...")
+                        print("   💾 저장됨: \(savedToken.prefix(20))...")
+                    }
+                }
+
+                // DB 토큰과 비교
+                if let dbToken = UserDefaults.standard.string(forKey: "last_updated_fcm_token") {
+                    if token == dbToken {
+                        print("✅ [DB 일치] 실시간 토큰과 DB 토큰이 일치합니다")
+                    } else {
+                        print("⚠️ [DB 불일치] 실시간 토큰과 DB 토큰이 다릅니다!")
+                        print("   📱 실시간: \(token.prefix(20))...")
+                        print("   💾 DB: \(dbToken.prefix(20))...")
+                        print("   🔄 서버 토큰 업데이트 필요!")
+                    }
+                }
+            } else {
+                print("❌ [실시간] FCM 토큰: nil")
+            }
+        }
+
+        // 🔄 Pending FCM 토큰 동기화 (실패했던 토큰 재시도)
+        if let pendingToken = UserDefaults.standard.string(forKey: "pending_fcm_token") {
+            print("🔄 [FCM] Pending 토큰 발견 - 동기화 재시도")
+            print("   📱 Pending 토큰: \(pendingToken.prefix(20))...")
+
+            // 백그라운드에서 자동 동기화 시도
+            DispatchQueue.global(qos: .background).async {
+                self.sendFCMTokenToServer(token: pendingToken) { success in
+                    DispatchQueue.main.async {
+                        if success {
+                            UserDefaults.standard.removeObject(forKey: "pending_fcm_token")
+                            UserDefaults.standard.set(pendingToken, forKey: "fcm_token")
+                            UserDefaults.standard.set(pendingToken, forKey: "last_updated_fcm_token")
+                            UserDefaults.standard.synchronize()
+                            print("✅ [FCM] Pending 토큰 동기화 성공")
+                        } else {
+                            print("❌ [FCM] Pending 토큰 동기화 실패 - 다음 기회에 재시도")
+                        }
+                    }
+                }
+            }
+        }
+
+        print("═══════════════════════════════════════════════════════════════")
+
         if #available(iOS 10.0, *) {
             // For iOS 10 display notification (sent via APNS)
             UNUserNotificationCenter.current().delegate = self
@@ -1593,7 +1676,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     }                                          
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        print("📱 [APNS] APNS 디바이스 토큰 수신 시작")
+        print("╔══════════════════════════════════════════════════════════════╗")
+        print("║ 📱 [APNS] APNS 디바이스 토큰 수신 시작                          ║")
+        print("╚══════════════════════════════════════════════════════════════╝")
 
         // APNS 토큰을 문자열로 변환하여 저장
         let tokenParts = deviceToken.map { data in String(format: "%02.2hhx", data) }
@@ -1601,6 +1686,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         currentAPNSToken = token
 
         print("📱 [APNS] APNS 토큰 변환 성공: \(token.prefix(20))... (길이: \(token.count))")
+        print("📱 [APNS] 전체 APNS 토큰: \(token)")
+        print("📱 [APNS] APNS 토큰 길이: \(token.count)자")
 
         // APNS 토큰을 UserDefaults에 저장 (디버깅용)
         UserDefaults.standard.set(token, forKey: "last_apns_token")
@@ -1610,6 +1697,38 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         // FCM에 APNS 토큰 설정
         Messaging.messaging().setAPNSToken(deviceToken as Data, type: .unknown)
         print("✅ [APNS] APNS 디바이스 토큰 FCM에 등록 완료")
+
+        // 현재 FCM 토큰도 확인해서 비교
+        Messaging.messaging().token { fcmToken, error in
+            if let error = error {
+                print("❌ [FCM] 현재 FCM 토큰 가져오기 실패: \(error.localizedDescription)")
+            } else if let fcmToken = fcmToken {
+                print("🔥 [FCM] 현재 FCM 토큰: \(fcmToken)")
+                print("🔥 [FCM] FCM 토큰 길이: \(fcmToken.count)자")
+                print("🔥 [FCM] FCM 토큰 접두사: \(fcmToken.prefix(30))...")
+
+                // FCM 토큰을 UserDefaults에 저장 (디버깅용)
+                UserDefaults.standard.set(fcmToken, forKey: "current_fcm_token")
+                UserDefaults.standard.synchronize()
+
+                // DB 토큰과 비교 (UserDefaults에서 가져옴)
+                if let dbToken = UserDefaults.standard.string(forKey: "last_updated_fcm_token") {
+                    print("💾 [DB] DB에 저장된 FCM 토큰: \(dbToken.prefix(30))...")
+                    if fcmToken == dbToken {
+                        print("✅ [토큰 일치] FCM 토큰과 DB 토큰이 일치합니다")
+                    } else {
+                        print("⚠️ [토큰 불일치] FCM 토큰과 DB 토큰이 다릅니다!")
+                        print("   📱 현재 디바이스 FCM 토큰: \(fcmToken.prefix(20))...")
+                        print("   💾 DB에 저장된 토큰: \(dbToken.prefix(20))...")
+                        print("   🔄 토큰 동기화 필요!")
+                    }
+                } else {
+                    print("⚠️ [DB] DB에 저장된 FCM 토큰이 없습니다")
+                }
+            }
+        }
+
+        print("═══════════════════════════════════════════════════════════════")
 
         // 🚫 APNS 토큰 변경 시 FCM 토큰 강제 갱신 비활성화 - 토큰 변경 방지
         let currentAPNSTokenKey = token
@@ -1703,7 +1822,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
     // ✅ FCM 토큰 변경 감지 활성화 - 푸시 메시지 수신을 위해
     func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
-        print("🔍 [FCM] FCM 토큰 변경 감지됨")
+        print("╔══════════════════════════════════════════════════════════════╗")
+        print("║ 🔍 [FCM] FCM 토큰 변경 감지됨                                 ║")
+        print("╚══════════════════════════════════════════════════════════════╝")
 
         guard let token = fcmToken else {
             print("❌ [FCM] FCM 토큰이 nil입니다")
@@ -1711,15 +1832,37 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         }
 
         print("🔄 [FCM] FCM 토큰 수신: \(token.prefix(30))...")
+        print("🔥 [FCM] 전체 FCM 토큰: \(token)")
+        print("🔥 [FCM] FCM 토큰 길이: \(token.count)자")
 
         // 기존 토큰과 비교하여 실제 변경되었는지 확인
         let existingToken = UserDefaults.standard.string(forKey: "fcm_token")
         if existingToken == token {
             print("ℹ️ [FCM] FCM 토큰이 변경되지 않음 - 업데이트 건너뜀")
+            print("✅ [토큰 확인] 현재 FCM 토큰: \(token.prefix(20))...")
             return
         }
 
-        print("🔄 [FCM] FCM 토큰 실제 변경됨 - 기존: \(existingToken?.prefix(15) ?? "없음"), 새 토큰: \(token.prefix(15))...")
+        print("🔄 [FCM] FCM 토큰 실제 변경됨")
+        print("   📱 이전 FCM 토큰: \(existingToken?.prefix(20) ?? "없음")...")
+        print("   🆕 새로운 FCM 토큰: \(token.prefix(20))...")
+
+        // DB 토큰과 비교
+        if let dbToken = UserDefaults.standard.string(forKey: "last_updated_fcm_token") {
+            print("💾 [DB] DB에 저장된 FCM 토큰: \(dbToken.prefix(30))...")
+            if token == dbToken {
+                print("✅ [DB 일치] FCM 토큰과 DB 토큰이 일치합니다")
+            } else {
+                print("⚠️ [DB 불일치] FCM 토큰과 DB 토큰이 다릅니다!")
+                print("   📱 현재 FCM 토큰: \(token.prefix(20))...")
+                print("   💾 DB 토큰: \(dbToken.prefix(20))...")
+                print("   🔄 DB 토큰 업데이트 필요!")
+            }
+        } else {
+            print("⚠️ [DB] DB에 저장된 FCM 토큰이 없습니다")
+        }
+
+        print("═══════════════════════════════════════════════════════════════")
 
         // 토큰 저장
         Utils.shared.setToken(token: token)
@@ -1747,7 +1890,31 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
     // ✅ FCM 메시지 수신 처리 활성화
     func messaging(_ messaging: Messaging, didReceive remoteMessage: Any) {
-        print("📨 [FCM] FCM 메시지 수신 시작: \(Date())")
+        print("╔══════════════════════════════════════════════════════════════╗")
+        print("║ 📨 [FCM] FCM 메시지 수신 시작: \(Date())                         ║")
+        print("╚══════════════════════════════════════════════════════════════╝")
+
+        // FCM 메시지 수신 시 현재 토큰 상태 확인
+        Messaging.messaging().token { currentToken, error in
+            if let currentToken = currentToken {
+                print("🔥 [메시지 수신 시] 현재 FCM 토큰: \(currentToken.prefix(30))...")
+
+                // DB 토큰과 비교
+                if let dbToken = UserDefaults.standard.string(forKey: "last_updated_fcm_token") {
+                    if currentToken == dbToken {
+                        print("✅ [메시지 수신] 토큰 일치: FCM ↔ DB")
+                    } else {
+                        print("⚠️ [메시지 수신] 토큰 불일치!")
+                        print("   📱 현재: \(currentToken.prefix(20))...")
+                        print("   💾 DB: \(dbToken.prefix(20))...")
+                    }
+                } else {
+                    print("⚠️ [메시지 수신] DB 토큰 없음")
+                }
+            } else {
+                print("❌ [메시지 수신] FCM 토큰 없음")
+            }
+        }
 
         // FCM 메시지 수신 카운터 증가
         let messageCount = UserDefaults.standard.integer(forKey: "fcm_message_received_count") + 1
@@ -1755,6 +1922,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         UserDefaults.standard.synchronize()
 
         print("📨 [FCM] FCM 메시지 수신 #\(messageCount)")
+        print("═══════════════════════════════════════════════════════════════")
 
         // 메시지 데이터를 Dictionary로 변환
         var messageData: [String: Any] = [:]
@@ -2048,27 +2216,46 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             return
         }
 
-        // ✅ 토큰 변경이 실제로 필요한지 확인 (더 적극적 업데이트)
+        // ✅ 토큰 변경이 실제로 필요한지 확인
         let oldToken = UserDefaults.standard.string(forKey: "fcm_token")
-        if oldToken == token {
-            // 같은 토큰이면 마지막 업데이트 시간만 갱신
-            lastFCMTokenUpdateTime = Date()
-            print("✅ [FCM] 토큰 동일 - 불필요한 서버 업데이트 건너뜀")
+        let hasTokenChanged = oldToken != token
+        let hasNoSavedToken = oldToken == nil
+
+        // 토큰이 변경되었거나 저장된 토큰이 없는 경우에만 업데이트
+        guard hasTokenChanged || hasNoSavedToken else {
+            print("ℹ️ [FCM] FCM 토큰이 변경되지 않음 - 서버 업데이트 스킵")
             return
         }
+
+        print("🔄 [FCM] FCM 토큰 변경 감지")
+        print("   📱 이전 토큰: \(oldToken?.prefix(20) ?? "없음")...")
+        print("   🆕 새 토큰: \(token.prefix(20))...")
+        print("   🔄 변경 이유: \(hasNoSavedToken ? "토큰 없음" : "토큰 변경")")
 
         print("✅ [FCM] FCM 토큰 서버 업데이트 시작: \(token.prefix(20))...")
         isFCMUpdateInProgress = true
 
-        // 서버 업데이트 수행
+        // 🔄 서버 업데이트 수행 (강제 업데이트 모드)
         sendFCMTokenToServer(token: token) { success in
             DispatchQueue.main.async {
                 self.isFCMUpdateInProgress = false
                 if success {
+                    // ✅ 성공 시 로컬 저장
                     self.lastFCMTokenUpdateTime = Date()
+                    UserDefaults.standard.set(token, forKey: "fcm_token")
+                    UserDefaults.standard.set(token, forKey: "last_updated_fcm_token")
+                    UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "fcm_token_updated_time")
+                    UserDefaults.standard.synchronize()
+
                     print("✅ [FCM] FCM 토큰 서버 업데이트 성공")
+                    print("💾 [FCM] 로컬 저장소 업데이트 완료")
                 } else {
                     print("❌ [FCM] FCM 토큰 서버 업데이트 실패")
+                    print("🔄 [FCM] 다음 기회에 다시 시도합니다")
+
+                    // 실패 시에도 로컬에 저장 (다음 성공 시 동기화)
+                    UserDefaults.standard.set(token, forKey: "pending_fcm_token")
+                    UserDefaults.standard.synchronize()
                 }
             }
         }
@@ -2206,12 +2393,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             return
         }
 
-        // 🚫 FCM 토큰 변경 방지 로직 적용
-        if shouldBlockFCMTokenChange() {
-            print("🚫 [FCM API] FCM 토큰 변경이 차단됨 - 서버 업데이트 건너뜀")
-            completion(false)
-            return
-        }
+        // ✅ FCM 토큰 변경 방지 로직 - 자동 동기화를 위해 제거
+        // 토큰 동기화가 우선이므로 변경 방지 로직을 비활성화
+        print("🔄 [FCM API] 토큰 자동 동기화 모드 - 변경 방지 로직 건너뜀")
 
         // UserDefaults에서 mt_idx 가져오기 (여러 키에서 시도)
         let mtIdx = UserDefaults.standard.string(forKey: "mt_idx") ??
@@ -2226,12 +2410,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         
         print("✅ [FCM API] mt_idx 발견: \(mtIdx)")
         
-        // API 요청 데이터 준비
+        // API 요청 데이터 준비 (register 엔드포인트용 - 간단하게)
         let requestData: [String: Any] = [
             "mt_idx": mtIdx,
-            "fcm_token": token,
-            "device_type": "ios",
-            "platform": "ios"
+            "fcm_token": token
         ]
         
         // JSON 데이터로 변환
@@ -3006,12 +3188,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         
         print("✅ [FCM API] 재시도 \(retryCount) - mt_idx 발견: \(mtIdx)")
         
-        // API 요청 데이터 준비
+        // API 요청 데이터 준비 (register 엔드포인트용 - 간단하게)
         let requestData: [String: Any] = [
             "mt_idx": mtIdx,
-            "fcm_token": token,
-            "device_type": "ios",
-            "platform": "ios"
+            "fcm_token": token
         ]
         
         // JSON 데이터로 변환
