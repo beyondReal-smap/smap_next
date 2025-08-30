@@ -3538,12 +3538,27 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             return
         }
 
-        // 새로운 백그라운드 토큰 검증 API 사용
-        let urlString = "\(Http.shared.BASE_URL)\(Http.shared.memberFcmTokenUrl)/background-check"
+        // 백엔드 FCM 토큰 검증 API 사용
+        var baseUrl = Http.shared.BASE_URL
+
+        // BASE_URL에 이미 /api가 포함되어 있는지 확인하고 중복 방지
+        if baseUrl.hasSuffix("/api/") {
+            baseUrl = String(baseUrl.dropLast(5)) // "/api/" 제거
+            print("🔧 [FCM] BASE_URL에서 '/api/' 제거: \(baseUrl)")
+        } else if baseUrl.hasSuffix("/api") {
+            baseUrl = String(baseUrl.dropLast(4)) // "/api" 제거
+            print("🔧 [FCM] BASE_URL에서 '/api' 제거: \(baseUrl)")
+        }
+
+        let urlString = "\(baseUrl)/api/v1/member-fcm-token/background-check"
         guard let url = URL(string: urlString) else {
-            print("❌ [FCM] 백그라운드 검증 실패 - 잘못된 URL")
+            print("❌ [FCM] 백그라운드 검증 실패 - 잘못된 URL: \(urlString)")
             return
         }
+
+        print("🔗 [FCM] 백그라운드 검증 URL: \(urlString)")
+        print("📋 [FCM] BASE_URL 원본: \(Http.shared.BASE_URL)")
+        print("📋 [FCM] BASE_URL 수정 후: \(baseUrl)")
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"

@@ -754,7 +754,7 @@ const SignInPage = () => {
           dataKeys: data ? Object.keys(data) : [],
           userKeys: data?.user ? Object.keys(data.user) : [],
           userMtIdx: data?.user?.mt_idx,
-          userMtName: data?.user?.mt_name,
+          userMtName: data?.user?.mt_name || data?.user?.name,
           userMtEmail: data?.user?.mt_email,
           hasToken: !!data.token,
           isNewUser: data.isNewUser
@@ -827,7 +827,7 @@ const SignInPage = () => {
               console.log('[NATIVE CALLBACK] 백엔드에서 사용자 데이터가 없어 직접 구성 시도');
               backendUserData = {
                 mt_idx: data.mt_idx || data.id,
-                mt_name: data.name || userData.name,
+                mt_name: data.mt_name || data.name || userData.name,
                 mt_email: data.email || userData.email,
                 mt_nickname: data.nickname || userData.name,
                 profile_image: data.profile_image || userData.imageURL || userData.picture,
@@ -846,17 +846,18 @@ const SignInPage = () => {
                 hasMtName: !!backendUserData.mt_name,
                 hasMtEmail: !!backendUserData.mt_email,
                 mtIdx: backendUserData.mt_idx,
-                mtName: backendUserData.mt_name,
+                mtName: backendUserData.mt_name || backendUserData.name,
                 mtEmail: backendUserData.mt_email,
                 dataKeys: Object.keys(backendUserData),
                 fullUserData: backendUserData
               });
 
-              // 필수 필드 검증
-              if (!backendUserData.mt_idx || !backendUserData.mt_name) {
+              // 필수 필드 검증 (mt_name 대신 name 사용)
+              if (!backendUserData.mt_idx || (!backendUserData.mt_name && !backendUserData.name)) {
                 console.error('[NATIVE CALLBACK] ❌ 필수 사용자 데이터 누락:', {
                   hasMtIdx: !!backendUserData.mt_idx,
                   hasMtName: !!backendUserData.mt_name,
+                  hasName: !!backendUserData.name,
                   userData: backendUserData
                 });
                 showError('사용자 정보가 불완전합니다. 다시 시도해주세요.');
@@ -3546,7 +3547,7 @@ const SignInPage = () => {
       try {
         const userData = authService.getUserData();
         if (userData) {
-          console.log('[SIGNIN] AuthContext 상태 동기화 시작:', userData.mt_name);
+          console.log('[SIGNIN] AuthContext 상태 동기화 시작:', userData.mt_name || '사용자');
           // AuthContext의 refreshAuthState 함수를 사용하여 상태 동기화
           await refreshAuthState();
           console.log('[SIGNIN] AuthContext 상태 동기화 완료');
