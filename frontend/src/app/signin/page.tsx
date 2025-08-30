@@ -664,7 +664,16 @@ const SignInPage = () => {
         hasUserInfo: !!userInfo.userInfo,
         userInfoType: typeof userInfo.userInfo,
         userInfoKeys: Object.keys(userInfo),
+        idTokenLength: userInfo.idToken ? userInfo.idToken.length : '없음',
         fullUserInfo: userInfo
+      });
+
+      // 🚨 iOS에서 전달된 원본 데이터 로깅
+      console.log('🚨 [NATIVE CALLBACK] iOS 원본 데이터 상세:', {
+        rawIdToken: userInfo.idToken,
+        rawUserInfo: userInfo.userInfo,
+        rawSource: userInfo.source,
+        rawKeys: Object.keys(userInfo)
       });
 
       try {
@@ -697,20 +706,34 @@ const SignInPage = () => {
           userDataType: typeof userData
         });
 
+        // 🚨 백엔드 API로 전송할 데이터 준비
+        const requestData = {
+          google_id: userData.sub || userData.googleId || userData.id,
+          email: userData.email,
+          name: userData.name,
+          image: userData.imageURL || userData.picture,
+          id_token: idToken,
+          source: 'native'
+        };
+
+        console.log('🚨 [NATIVE CALLBACK] 백엔드 API로 전송할 최종 데이터:', {
+          google_id: requestData.google_id,
+          email: requestData.email,
+          name: requestData.name,
+          image: requestData.image,
+          id_token_length: requestData.id_token ? requestData.id_token.length : '없음',
+          id_token_prefix: requestData.id_token ? requestData.id_token.substring(0, 50) : '없음',
+          source: requestData.source,
+          hasAllRequired: !!(requestData.email && requestData.id_token)
+        });
+
         // 백엔드 API로 ID 토큰 전송
         const response = await fetch('/api/google-auth', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            google_id: userData.sub || userData.googleId || userData.id,  // ✅ 여러 가능한 필드에서 google_id 추출
-            email: userData.email,
-            name: userData.name,
-            image: userData.imageURL || userData.picture,
-            id_token: idToken,  // ✅ iOS 네이티브에서 전달된 idToken 사용
-            source: 'native'
-          }),
+          body: JSON.stringify(requestData),
         });
 
         console.log('📡 [NATIVE CALLBACK] API 요청 데이터:', {

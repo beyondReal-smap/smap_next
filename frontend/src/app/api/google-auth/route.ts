@@ -32,12 +32,17 @@ export async function POST(request: NextRequest) {
       bodyType: typeof body,
       bodyKeys: Object.keys(body || {}),
       hasIdToken: !!body?.idToken,
+      hasId_token: !!body?.id_token,
       idTokenLength: body?.idToken?.length || 0,
+      id_tokenLength: body?.id_token?.length || 0,
       hasUserInfo: !!body?.userInfo,
-      userInfoType: typeof body?.userInfo
+      userInfoType: typeof body?.userInfo,
+      fullBody: body
     });
-    
-    const { idToken, userInfo } = body;
+
+    // 🚨 프론트엔드에서 전송되는 실제 필드 이름 확인
+    const idToken = body.idToken || body.id_token;
+    const userInfo = body.userInfo || body.user_info;
 
     if (!idToken) {
       sendLogToConsole('error', 'ID 토큰이 없음');
