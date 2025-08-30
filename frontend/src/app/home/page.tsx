@@ -6726,7 +6726,7 @@ export default function HomePage() {
                   right: '16px',  // 절대 위치로 오른쪽에서 16px 떨어진 곳에 고정
                   top: '0',
                   bottom: '0',
-                  gap: '12px',  // 아이콘 간격 늘리기
+                  gap: '2px',  // 아이콘 간격 늘리기
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -6763,36 +6763,13 @@ export default function HomePage() {
                  </svg>
                  {/* 읽지 않은 알림이 있을 때만 빨간색 점 표시 */}
                  {hasNewNotifications && (
-                   <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full animate-pulse">
+                   <div className="absolute bottom-[2px] left-[2px] w-2 h-2 bg-red-500 rounded-full animate-pulse">
                  </div>
                  )}
                </button>
                
-               {/* 햅틱 테스트 버튼 (개발 환경에서만 표시) */}
-               {process.env.NODE_ENV === 'development' && (
-                 <button
-                   className="p-0.5 hover:bg-white/50 rounded-xl transition-all duration-200"
-                   onClick={() => {
-                     triggerHapticFeedback(HapticFeedbackType.LIGHT, '햅틱 테스트 페이지 이동', { 
-                       component: 'home', 
-                       action: 'test-page-navigation' 
-                     });
-                     router.push('/test-haptic');
-                   }}
-                   title="햅틱 테스트"
-                 >
-                   <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="gray" strokeWidth="2">
-                     <path d="M9 12l2 2 4-4"/>
-                     <path d="M21 12c.552 0 1-.448 1-1s-.448-1-1-1-1 .448-1 1 .448 1 1 1z"/>
-                     <path d="M3 12c.552 0 1-.448 1-1s-.448-1-1-1-1 .448-1 1 .448 1 1 1z"/>
-                     <path d="M12 21c.552 0 1-.448 1-1s-.448-1-1-1-1 .448-1 1 .448 1 1 1z"/>
-                     <path d="M12 3c.552 0 1-.448 1-1s-.448-1-1-1-1 .448-1 1 .448 1 1 1z"/>
-                   </svg>
-                 </button>
-               )}
-               
                <button
-                 className="p-2 hover:bg-white/50 rounded-xl transition-all duration-200 min-w-[44px] min-h-[44px] flex items-center justify-center"
+                 className="p-1 hover:bg-white/50 rounded-xl transition-all duration-200 min-w-[44px] min-h-[44px] flex items-center justify-center -ml-1"
                  onClick={() => {
                    // 🎮 설정 페이지 이동 햅틱 피드백
                    triggerHapticFeedback(HapticFeedbackType.SELECTION, '설정 페이지 이동', { 
