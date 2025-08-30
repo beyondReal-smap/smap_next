@@ -762,8 +762,13 @@ const SignInPage = () => {
               // 3. 로컬 스토리지에도 직접 저장 (백업)
               localStorage.setItem('user', JSON.stringify(data.user));
               localStorage.setItem('isLoggedIn', 'true');
-              
-              // 4. 세션 스토리지에도 저장
+
+              // 4. 로그인 시간 저장 (세션 유지를 위해 필수!)
+              const loginTime = Date.now();
+              localStorage.setItem('smap_login_time', loginTime.toString());
+              console.log('[NATIVE CALLBACK] 로그인 시간 저장:', loginTime);
+
+              // 5. 세션 스토리지에도 저장
               sessionStorage.setItem('authToken', 'authenticated');
               
               // 5. 저장 상태 확인
@@ -778,27 +783,53 @@ const SignInPage = () => {
             console.log('[NATIVE CALLBACK] 로그인 성공 - AuthContext 상태 동기화 후 home으로 리다이렉션');
             
             // 4. AuthContext 상태를 수동으로 동기화
-            try {
-              await refreshAuthState();
-              console.log('[NATIVE CALLBACK] AuthContext 상태 동기화 완료');
-              
-              // 5. 동기화 후 상태 재확인
-              const isLoggedInAfterRefresh = authService.isLoggedIn();
-              console.log('[NATIVE CALLBACK] 동기화 후 로그인 상태:', isLoggedInAfterRefresh);
-              
-              if (!isLoggedInAfterRefresh) {
-                console.warn('[NATIVE CALLBACK] ⚠️ 동기화 후에도 로그인 상태가 false');
-                
-                // 6. 강제로 AuthContext 상태 설정
-                if (typeof refreshAuthState === 'function') {
-                  console.log('[NATIVE CALLBACK] 강제 AuthContext 재설정 시도');
-                  await refreshAuthState();
+            console.log('[NATIVE CALLBACK] AuthContext 동기화 시작');
+
+            // 약간의 지연 후 동기화 (토큰 저장 완료 보장)
+            setTimeout(async () => {
+              try {
+                console.log('[NATIVE CALLBACK] AuthContext 상태 동기화 실행');
+                await refreshAuthState();
+                console.log('[NATIVE CALLBACK] AuthContext 상태 동기화 완료');
+
+                // 5. 동기화 후 상태 재확인
+                const isLoggedInAfterRefresh = authService.isLoggedIn();
+                console.log('[NATIVE CALLBACK] 동기화 후 로그인 상태:', isLoggedInAfterRefresh);
+                console.log('[NATIVE CALLBACK] 저장된 토큰:', authService.getToken() ? '있음' : '없음');
+                console.log('[NATIVE CALLBACK] 저장된 사용자:', authService.getUserData() ? '있음' : '없음');
+
+                if (!isLoggedInAfterRefresh) {
+                  console.warn('[NATIVE CALLBACK] ⚠️ 동기화 후에도 로그인 상태가 false - 추가 동기화 시도');
+
+                  // 6. 강제로 AuthContext 상태 재설정 (여러 번 시도)
+                  for (let attempt = 1; attempt <= 3; attempt++) {
+                    console.log(`[NATIVE CALLBACK] 강제 AuthContext 재설정 시도 ${attempt}/3`);
+                    try {
+                      await refreshAuthState();
+
+                      // 각 시도 후 상태 확인
+                      const checkLoginState = authService.isLoggedIn();
+                      console.log(`[NATIVE CALLBACK] 시도 ${attempt} 후 로그인 상태:`, checkLoginState);
+
+                      if (checkLoginState) {
+                        console.log(`[NATIVE CALLBACK] ✅ 시도 ${attempt}에서 로그인 상태 설정 성공`);
+                        break;
+                      }
+
+                      // 다음 시도 전 약간의 지연
+                      if (attempt < 3) {
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                      }
+                    } catch (retryError) {
+                      console.error(`[NATIVE CALLBACK] 시도 ${attempt} 실패:`, retryError);
+                    }
+                  }
                 }
+
+              } catch (error) {
+                console.error('[NATIVE CALLBACK] AuthContext 동기화 실패:', error);
               }
-              
-            } catch (error) {
-              console.error('[NATIVE CALLBACK] AuthContext 동기화 실패:', error);
-            }
+            }, 1000); // 1초 지연
             
             // 7. 그룹 가입 처리
             try {
@@ -810,10 +841,39 @@ const SignInPage = () => {
               console.error('[NATIVE CALLBACK] ❌ 그룹 가입 처리 중 오류:', groupJoinError);
               // 그룹 가입 실패해도 로그인은 성공으로 처리
             }
-            
-            // 8. 즉시 리다이렉션 (상태 안정화 완료)
-            console.log('[NATIVE CALLBACK] 홈으로 즉시 리다이렉션 실행');
-            router.replace('/home');
+
+            // 8. 인증 상태 확인 후 리다이렉션
+            console.log('[NATIVE CALLBACK] 인증 상태 확인 후 리다이렉션 준비');
+
+            // 추가 지연 후 최종 상태 확인 및 리다이렉션
+            setTimeout(() => {
+              const finalLoginState = authService.isLoggedIn();
+              const finalToken = authService.getToken();
+              const finalUserData = authService.getUserData();
+
+              console.log('[NATIVE CALLBACK] 최종 상태 확인:');
+              console.log('  - 로그인 상태:', finalLoginState);
+              console.log('  - 토큰 존재:', !!finalToken);
+              console.log('  - 사용자 데이터:', !!finalUserData);
+              console.log('  - 로그인 시간:', localStorage.getItem('smap_login_time'));
+
+              if (finalLoginState && finalToken && finalUserData) {
+                console.log('[NATIVE CALLBACK] ✅ 모든 인증 상태 정상 - home으로 리다이렉션');
+                router.replace('/home');
+              } else {
+                console.error('[NATIVE CALLBACK] ❌ 인증 상태 불완전 - 다시 시도');
+                // 필요한 경우 에러 처리 또는 재시도 로직 추가
+                setTimeout(() => {
+                  if (authService.isLoggedIn()) {
+                    console.log('[NATIVE CALLBACK] 재시도 성공 - home으로 이동');
+                    router.replace('/home');
+                  } else {
+                    console.error('[NATIVE CALLBACK] 최종 실패 - 사용자에게 알림');
+                    showError('로그인 처리 중 문제가 발생했습니다. 다시 시도해주세요.');
+                  }
+                }, 2000);
+              }
+            }, 2000); // 2초 지연
           }
         } else {
           console.error('[NATIVE CALLBACK] 서버 인증 실패:', data.error);
