@@ -23,11 +23,32 @@ interface PreloadResult {
 
 class DataPreloadService {
   private abortController: AbortController | null = null;
+  
+  // 🚫 중복 실행 방지를 위한 상태 관리
+  private isPreloading = false;
+  private lastPreloadTime = 0;
+  private readonly PRELOAD_COOLDOWN = 3 * 1000; // 3초 쿨다운
 
   /**
    * 로그인 시 모든 필요한 데이터를 비동기로 프리로딩
    */
   async preloadAllData(options: PreloadOptions): Promise<PreloadResult> {
+    // 🚫 중복 실행 방지 로직
+    const now = Date.now();
+    if (this.isPreloading) {
+      console.log('[DATA PRELOAD] 🚫 이미 프리로딩이 진행 중 - 중복 실행 방지');
+      throw new Error('프리로딩이 이미 진행 중입니다.');
+    }
+    
+    if (now - this.lastPreloadTime < this.PRELOAD_COOLDOWN) {
+      console.log('[DATA PRELOAD] 🚫 쿨다운 기간 - 중복 실행 방지');
+      throw new Error('프리로딩 쿨다운 기간입니다. 잠시 후 다시 시도해주세요.');
+    }
+    
+    this.isPreloading = true;
+    this.lastPreloadTime = now;
+    console.log('[DATA PRELOAD] 🚀 프리로딩 시작 - 중복 실행 방지 활성화');
+    
     this.abortController = new AbortController();
     const { userId, onProgress, onError } = options;
     
@@ -101,10 +122,19 @@ class DataPreloadService {
       onProgress?.('프리로딩 완료', 100);
       console.log('[DATA PRELOAD] 🎉 모든 데이터 프리로딩 완료');
       
+      // 🚫 프리로딩 상태 리셋
+      this.isPreloading = false;
+      console.log('[DATA PRELOAD] 🔓 프리로딩 상태 리셋 - 중복 실행 방지 해제');
+      
       return result;
 
     } catch (error) {
       console.error('[DATA PRELOAD] ❌ 프리로딩 중 오류:', error);
+      
+      // 🚫 에러 발생 시에도 프리로딩 상태 리셋
+      this.isPreloading = false;
+      console.log('[DATA PRELOAD] 🔓 에러로 인한 프리로딩 상태 리셋');
+      
       throw error;
     }
   }

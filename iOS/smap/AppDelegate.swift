@@ -26,10 +26,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     var window: UIWindow?
     private let motionManager = CMMotionActivityManager()
     
-    // MARK: - FCM 토큰 관리 관련 프로퍼티 (최소화)
+    // MARK: - FCM 토큰 관리 관련 프로퍼티 (토큰 변경 방지)
     private var lastFCMTokenUpdateTime: Date?
     private var isFCMUpdateInProgress = false
     private var shouldUpdateFCMToken: Bool = false // 토큰 업데이트 필요 여부
+    
+    // 🚫 FCM 토큰 자동 변경 방지 설정
+    private let fcmTokenExpiryDays: Int = 7 // 7일로 단축 (기존 30일)
+    private var isFCMTokenChangeBlocked: Bool = false // 토큰 변경 차단 플래그
     
     var title = String()
     var body = String()
@@ -84,9 +88,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         Messaging.messaging().isAutoInitEnabled = false
         print("✅ [FCM] 자동 초기화 비활성화 - 토큰 변경 방지")
         
-        // ✅ FCM delegate 설정 (필요할 때만 토큰 업데이트)
-        Messaging.messaging().delegate = self
-        print("✅ [FCM] FCM delegate 설정 완료 (최소 토큰 업데이트)")
+        // 🚫 FCM delegate 설정 비활성화 - 자동 토큰 변경 방지
+        // Messaging.messaging().delegate = self
+        print("🚫 [FCM] FCM delegate 설정 비활성화 - 자동 토큰 변경 방지")
         
         if #available(iOS 10.0, *) {
             // For iOS 10 display notification (sent via APNS)
@@ -255,35 +259,46 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                     let lastTokenUpdateTime = UserDefaults.standard.double(forKey: "last_fcm_token_update_time")
 
                     if savedToken != token {
-                        print("🔄 FCM 토큰 변경 감지 - 서버 업데이트 즉시 실행")
-                        self.sendFCMTokenToServer(token: token) { success in
-                            if success {
-                                print("✅ FCM 토큰 변경 감지 - 서버 업데이트 성공")
-                            } else {
-                                print("❌ FCM 토큰 변경 감지 - 서버 업데이트 실패")
+                        // 🚫 FCM 토큰 변경 감지 시 변경 방지 로직 적용
+                        if self.shouldBlockFCMTokenChange() {
+                            print("🚫 [FCM] FCM 토큰 변경 감지됨 - 변경 방지 로직으로 차단")
+                            print("🚫 [FCM] 기존 토큰 유지: \(savedToken?.prefix(30) ?? "없음")")
+                        } else {
+                            print("🔄 FCM 토큰 변경 감지 - 서버 업데이트 즉시 실행")
+                            self.sendFCMTokenToServer(token: token) { success in
+                                if success {
+                                    print("✅ FCM 토큰 변경 감지 - 서버 업데이트 성공")
+                                } else {
+                                    print("❌ FCM 토큰 변경 감지 - 서버 업데이트 실패")
+                                }
                             }
                         }
-                    } else if currentTime - lastTokenUpdateTime > (24 * 60 * 60) { // 24시간 이상 경과
-                        print("⏰ FCM 토큰 24시간 이상 업데이트되지 않음 - 서버 재동기화")
+                    } else if currentTime - lastTokenUpdateTime > (7 * 24 * 60 * 60) { // 7일 이상 경과
+                        print("⏰ FCM 토큰 7일 이상 업데이트되지 않음 - 서버 재동기화")
                         self.sendFCMTokenToServer(token: token) { success in
                             if success {
-                                print("✅ FCM 토큰 24시간 경과 - 서버 재동기화 성공")
+                                print("✅ FCM 토큰 7일 경과 - 서버 재동기화 성공")
                             } else {
-                                print("❌ FCM 토큰 24시간 경과 - 서버 재동기화 실패")
+                                print("❌ FCM 토큰 7일 경과 - 서버 재동기화 실패")
                             }
                         }
                     } else {
                         print("✅ FCM 토큰 상태 양호 - 추가 작업 불필요")
                     }
 
-                    // 로그인 상태 확인 후 토큰 검증
+                    // 🚫 로그인 상태 확인 후 토큰 검증 - 보수적 접근
                     let isLoggedIn = UserDefaults.standard.bool(forKey: "is_logged_in") ||
                                     UserDefaults.standard.string(forKey: "mt_idx") != nil ||
                                     UserDefaults.standard.string(forKey: "savedMtIdx") != nil
 
                     if isLoggedIn {
-                        print("👤 로그인 상태 확인됨 - FCM 토큰 검증 실행")
-                        self.performFCMTokenValidation()
+                        print("👤 로그인 상태 확인됨 - FCM 토큰 검증 실행 (보수적)")
+                        // 토큰 변경 방지 로직이 적용된 검증만 실행
+                        if !self.shouldBlockFCMTokenChange() {
+                            self.performFCMTokenValidation()
+                        } else {
+                            print("🚫 [FCM] 토큰 변경 방지 로직으로 인한 검증 건너뜀")
+                        }
                     }
                 }
             }
@@ -1535,72 +1550,66 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         Messaging.messaging().setAPNSToken(deviceToken as Data, type: .unknown)
         print("✅ [APNS] APNS 디바이스 토큰 FCM에 등록 완료")
 
-        // APNS 토큰이 변경되었는지 확인
+        // 🚫 APNS 토큰 변경 시 FCM 토큰 강제 갱신 비활성화 - 토큰 변경 방지
         let currentAPNSTokenKey = token
         let savedAPNSToken = UserDefaults.standard.string(forKey: "last_saved_apns_token")
 
         if savedAPNSToken != currentAPNSTokenKey {
-            print("🔄 [APNS] APNS 토큰 변경 감지 - FCM 토큰 강제 갱신 필요")
+            print("🚫 [APNS] APNS 토큰 변경 감지됨 - FCM 토큰 강제 갱신 비활성화")
             UserDefaults.standard.set(currentAPNSTokenKey, forKey: "last_saved_apns_token")
             UserDefaults.standard.synchronize()
-
-            // APNS 토큰 변경 시 FCM 토큰도 새로 생성되므로 약간의 지연 후 FCM 토큰 확인
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                self.forceRefreshFCMTokenOnAPNSTokenChange()
-            }
+            print("🚫 [APNS] FCM 토큰 강제 갱신 건너뜀 - 기존 토큰 유지")
         }
 
-        // FCM 토큰이 이미 있는지 확인
+        // 🚫 FCM 토큰이 이미 있는 경우 서버 업데이트 건너뛰기 - 토큰 변경 방지
         if let existingFCMToken = Messaging.messaging().fcmToken {
             print("🔥 [FCM] 기존 FCM 토큰 발견: \(existingFCMToken.prefix(30))...")
             currentFCMToken = existingFCMToken
             Utils.shared.setToken(token: existingFCMToken)
-
-            // 기존 토큰으로 서버 업데이트
-            self.sendFCMTokenToServer(token: existingFCMToken) { success in
-                if success {
-                    print("✅ [FCM] 기존 FCM 토큰 서버 업데이트 성공")
-                } else {
-                    print("❌ [FCM] 기존 FCM 토큰 서버 업데이트 실패")
-                }
-            }
+            print("🚫 [FCM] 기존 FCM 토큰 서버 업데이트 건너뜀 - 토큰 변경 방지")
         } else {
             print("🔥 [FCM] FCM 토큰이 아직 없음, 생성 대기")
         }
 
-        // FCM 토큰 생성을 위한 추가 시도 (안전하게)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            Messaging.messaging().token { token, error in
-                DispatchQueue.main.async {
-                    if let error = error {
-                        print("❌ [FCM] FCM 토큰 가져오기 실패: \(error.localizedDescription)")
-                        print("💡 FCM 토큰 생성 실패 원인:")
-                        print("   - 인터넷 연결 확인")
-                        print("   - Firebase 프로젝트 설정 확인")
-                        print("   - APNS 토큰이 올바르게 등록되었는지 확인")
-                    } else if let token = token {
-                        print("✅ [FCM] FCM 토큰 생성 성공: \(token.prefix(30))... (길이: \(token.count))")
-                        self.currentFCMToken = token
-                        Utils.shared.setToken(token: token)
-
-                        // 서버에 업데이트
-                        self.sendFCMTokenToServer(token: token) { success in
-                            if success {
-                                print("✅ [FCM] 새 FCM 토큰 서버 업데이트 성공")
-                            } else {
-                                print("❌ [FCM] 새 FCM 토큰 서버 업데이트 실패")
-                            }
-                        }
-                    } else {
-                        print("❌ [FCM] FCM 토큰이 nil입니다")
-                        print("💡 FCM 토큰이 nil인 경우:")
-                        print("   - APNS 토큰 등록 상태 재확인")
-                        print("   - 앱 재시작 후 다시 시도")
-                        print("   - Firebase Console에서 프로젝트 설정 확인")
-                    }
-                }
-            }
+        // 🚫 FCM 토큰 생성을 위한 추가 시도 비활성화 - 토큰 변경 방지
+        print("🚫 [FCM] FCM 토큰 자동 생성 비활성화 - 기존 토큰 유지")
+    }
+    
+    // MARK: - 🚫 FCM 토큰 변경 방지 로직
+    
+    /// FCM 토큰 만료 여부 확인 (7일 기준)
+    private func isFCMTokenExpired() -> Bool {
+        let lastUpdateTime = UserDefaults.standard.double(forKey: "last_fcm_token_update_time")
+        let currentTime = Date().timeIntervalSince1970
+        let expiryTime = TimeInterval(fcmTokenExpiryDays * 24 * 60 * 60) // 7일을 초로 변환
+        
+        let isExpired = (currentTime - lastUpdateTime) > expiryTime
+        
+        if isExpired {
+            print("⏰ [FCM Expiry] FCM 토큰이 만료되었습니다. 마지막 업데이트: \(Date(timeIntervalSince1970: lastUpdateTime))")
+        } else {
+            let remainingDays = Double(fcmTokenExpiryDays) - ((currentTime - lastUpdateTime) / (24 * 60 * 60))
+            print("✅ [FCM Expiry] FCM 토큰이 유효합니다. 남은 기간: \(String(format: "%.1f", remainingDays))일")
         }
+        
+        return isExpired
+    }
+    
+    /// FCM 토큰 변경 차단 여부 확인
+    private func shouldBlockFCMTokenChange() -> Bool {
+        // 이미 토큰 변경이 차단된 상태라면 true 반환
+        if isFCMTokenChangeBlocked {
+            print("🚫 [FCM Block] FCM 토큰 변경이 이미 차단된 상태")
+            return true
+        }
+        
+        // 토큰이 만료되지 않았다면 변경 차단
+        if !isFCMTokenExpired() {
+            print("🚫 [FCM Block] FCM 토큰이 만료되지 않음 - 변경 차단")
+            return true
+        }
+        
+        return false
     }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
@@ -1629,7 +1638,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         print("🔍 [DEBUG] APNS 등록 실패 - debugPushNotificationStatus()로 상세 진단 가능")
     }
 
-    // ✅ FCM 토큰 변경 감지 - 최소한의 업데이트만 수행
+    // 🚫 FCM 토큰 변경 감지 비활성화 - 자동 토큰 변경 방지
+    /*
     func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
         print("🔍 [FCM] FCM 토큰 변경 감지됨")
         
@@ -1669,6 +1679,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             }
         }
     }
+    */
     
     // MARK: - 🔍 필요한 경우에만 FCM 토큰 업데이트
     private func updateFCMTokenIfNeeded(token: String) {
@@ -1824,6 +1835,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
     private func sendFCMTokenToServer(token: String, completion: @escaping (Bool) -> Void) {
         print("🚀 [FCM API] FCM 토큰 서버 업데이트 시작")
+        
+        // 🚫 FCM 토큰 변경 방지 로직 적용
+        if shouldBlockFCMTokenChange() {
+            print("🚫 [FCM API] FCM 토큰 변경이 차단됨 - 서버 업데이트 건너뜀")
+            completion(false)
+            return
+        }
         
         // UserDefaults에서 mt_idx 가져오기 (여러 키에서 시도)
         let mtIdx = UserDefaults.standard.string(forKey: "mt_idx") ?? 

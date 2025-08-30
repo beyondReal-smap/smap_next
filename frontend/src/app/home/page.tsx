@@ -52,6 +52,9 @@ if (typeof window !== 'undefined') {
       } as any);
     }
     
+    // 네이버맵 무한 루프 방지 플래그 초기화
+    (window as any).__NAVER_MAP_INITIALIZING__ = false;
+    
     console.log('[HOME] ✅ Array.isArray 폴리필 적용 완료:', {
       hasArray: typeof Array !== 'undefined',
       hasIsArray: typeof Array !== 'undefined' && Array && typeof Array.isArray === 'function',
@@ -848,6 +851,9 @@ const getScheduleStatus = (schedule: Schedule): { name: 'completed' | 'ongoing' 
 };
 
 export default function HomePage() {
+  // 🚫 모든 Hook을 최상단에 정의 - 순서 변경 방지
+  const router = useRouter();
+  
   // 🛡️ 최상위 에러 캐처
   const [criticalError, setCriticalError] = useState<string | null>(null);
   const [renderAttempts, setRenderAttempts] = useState(0);
@@ -855,8 +861,96 @@ export default function HomePage() {
   // 🆕 그룹 초기화 모달 관련 상태
   const [showGroupInitModal, setShowGroupInitModal] = useState(false);
   
-  // 🚨 iOS 시뮬레이터 디버깅 - 즉시 실행 로그
+  // 🚨 iOS 시뮬레이터 에러 핸들링
+  const [componentError, setComponentError] = useState<string | null>(null);
+
+  // 🌐 환경 감지 관련 상태
+  const [environment, setEnvironment] = useState<EnvironmentConfig | null>(null);
+  const [mapApiLoader, setMapApiLoader] = useState<MapApiLoader | null>(null);
+  const [networkStatus, setNetworkStatus] = useState<boolean>(true);
+  const [domainDiagnostics, setDomainDiagnostics] = useState<any>(null);
+
+  // 지도 초기화 상태 추적
+  const [isMapInitialized, setIsMapInitialized] = useState(false);
+
+  // 컴포넌트 마운트 상태 추적 - 초기값을 true로 설정하여 로딩 화면 방지
+  const [isComponentMounted, setIsComponentMounted] = useState(true);
+  
+  // 인증 관련 상태 추가
+  const { user, isLoggedIn, loading: authLoading, isPreloadingComplete, refreshAuthState } = useAuth();
+
+  // UserContext 사용 (최상단으로 이동)
+  const {
+    userInfo,
+    userGroups,
+    isUserDataLoading,
+    userDataError,
+    refreshUserData,
+    selectedGroupId: userContextSelectedGroupId,
+    setSelectedGroupId: setUserContextSelectedGroupId,
+    forceRefreshGroups
+  } = useUser();
+
+  // DataCache 사용 (최상단으로 이동)
+  const {
+    setUserProfile,
+    setUserGroups: setDataCacheUserGroups,
+    setGroupMembers,
+    setScheduleData,
+    setGroupPlaces,
+    setLocationData,
+    setDailyLocationCounts,
+    getGroupMembers, 
+    getScheduleData,
+    getLocationData,
+    getGroupPlaces,
+    getDailyLocationCounts,
+    isCacheValid
+  } = useDataCache();
+  
+  // 🚫 로컬 상태들도 최상단에 정의
+  const [groupMembers, setGroupMembersLocal] = useState<GroupMember[]>([]);
+  const [filteredSchedules, setFilteredSchedules] = useState<Schedule[]>([]);
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [isMapLoading, setIsMapLoading] = useState(true);
+  const [isLocationEnabled, setIsLocationEnabled] = useState(false);
+  const [mapType, setMapType] = useState<MapType>('naver');
+  const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
+  const [naverMapsLoaded, setNaverMapsLoaded] = useState(false);
+  const [isInitialDataLoaded, setIsInitialDataLoaded] = useState(false);
+  const [daysForCalendar, setDaysForCalendar] = useState<{ value: string; display: string; }[]>([]);
+  const [userName, setUserName] = useState('사용자');
+  const [userLocation, setUserLocation] = useState<Location>({ lat: 37.5642, lng: 127.0016 });
+  const [locationName, setLocationName] = useState('서울시');
+  const [recommendedPlaces, setRecommendedPlaces] = useState(RECOMMENDED_PLACES);
+  // 🚫 favoriteLocations - 이미 최상단에서 정의됨
+  const [groupSchedules, setGroupSchedules] = useState<Schedule[]>([]);
+  const [isFirstMemberSelectionComplete, setIsFirstMemberSelectionComplete] = useState(false);
+  const [groupMemberCounts, setGroupMemberCounts] = useState<Record<number, number>>({});
+  const [hasNewNotifications, setHasNewNotifications] = useState(false);
+  const [isGroupSelectorOpen, setIsGroupSelectorOpen] = useState(false);
+  const [firstMemberSelected, setFirstMemberSelected] = useState(false);
+
+  // 지도 초기화 상태 추적 (mapsInitialized 대체)
+  const [mapsInitialized, setMapsInitialized] = useState({
+    google: false,
+    naver: false
+  });
+
+  // 사이드바 상태
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // 컴포넌트 마운트 상태 추적 (클라이언트 환경에서만)
+  const isMountedRef = useRef(typeof window !== 'undefined' ? true : null);
+  
+  // 🚨 iOS 시뮬레이터 디버깅 - useEffect로 이동하여 Hook 순서 보장
+  useEffect(() => {
   console.log('🏠 [HOME] HomePage 컴포넌트 시작');
+
+    // 컴포넌트 언마운트 시 isMountedRef.current를 false로 설정
+    return () => {
+      isMountedRef.current = false;
+    };
 
   // 🔧 초기 환경 체크를 try-catch로 감싸기
   try {
@@ -870,15 +964,7 @@ export default function HomePage() {
     console.error('🏠 [HOME] 환경 체크 중 오류:', envError);
     setCriticalError(`환경 체크 오류: ${envError}`);
   }
-  
-  // 🚨 iOS 시뮬레이터 에러 핸들링
-  const [componentError, setComponentError] = useState<string | null>(null);
-  
-  // 지도 초기화 상태 추적
-  const [isMapInitialized, setIsMapInitialized] = useState(false);
-
-  // 컴포넌트 마운트 상태 추적
-  const [isComponentMounted, setIsComponentMounted] = useState(false);
+  }, []); // 빈 의존성 배열로 컴포넌트 마운트 시 한 번만 실행
 
 
   
@@ -916,13 +1002,33 @@ export default function HomePage() {
     };
   }, []);
   
-  // 🗺️ 지도 렌더링 강제 실행 (iOS WebView 호환성)
+  // 🗺️ 지도 렌더링 강제 실행 (iOS WebView 호환성) - 중복 실행 방지
   useEffect(() => {
-    console.log('🗺️ [HOME] 지도 렌더링 강제 실행 시스템 시작');
+    // 조용한 시작 (로그 최소화)
+    // console.log('🗺️ [HOME] 지도 렌더링 강제 실행 시스템 시작');
+
+    // 중복 실행 방지 플래그
+    let isRenderingInProgress = false;
+    let lastRenderTime = 0;
+    const RENDER_COOLDOWN = 5000; // 5초 쿨다운
+
+    // 전역 쿨다운 변수 초기화
+    (window as any).__LAST_MAP_RENDER_TIME__ = 0;
     
     // 1. 지도 렌더링 강제 실행 함수들
     const forceMapRender = () => {
-      console.log('🗺️ [HOME] 지도 강제 렌더링 실행');
+      // 중복 실행 방지
+      const now = Date.now();
+      if (isRenderingInProgress || (now - lastRenderTime) < RENDER_COOLDOWN) {
+        // 조용히 스킵 (로그 최소화)
+        return;
+      }
+
+      isRenderingInProgress = true;
+      lastRenderTime = now;
+
+      // 조용한 실행 (로그 최소화)
+      // console.log('🗺️ [HOME] 지도 강제 렌더링 실행');
       
       try {
         // Leaflet 지도 강제 업데이트
@@ -979,9 +1085,13 @@ export default function HomePage() {
           }
         });
         
-        console.log('🗺️ [HOME] 지도 강제 렌더링 완료');
+        // 조용한 완료 (로그 최소화)
+        // console.log('🗺️ [HOME] 지도 강제 렌더링 완료');
       } catch (error) {
         console.error('🗺️ [HOME] 지도 강제 렌더링 중 오류:', error);
+      } finally {
+        // 실행 완료 후 플래그 해제
+        isRenderingInProgress = false;
       }
     };
     
@@ -1006,15 +1116,28 @@ export default function HomePage() {
     (window as any).SMAP_FORCE_MAP_RENDER = forceMapRender;
     (window as any).SMAP_CHECK_MAP_RENDERING = checkMapRendering;
     
-    // 4. 즉시 실행 (깜빡임 방지를 위해 한 번만 실행)
-    setTimeout(forceMapRender, 500);
+    // 4. 초기 실행 제한 (불필요한 호출 방지)
+    // setTimeout(forceMapRender, 500); // 제거 - 필요시 수동 호출
     
-    // 5. 페이지 로딩 완료 후 실행 (깜빡임 방지를 위해 한 번만 실행)
+    // 5. 페이지 로딩 완료 후 실행 (조건 강화)
     if (document.readyState === 'complete') {
-      setTimeout(forceMapRender, 1000);
+      // 지도 요소가 실제로 존재할 때만 실행
+      setTimeout(() => {
+        const hasMapElements = document.querySelectorAll('[id*="map"], [class*="map"]').length > 0;
+        if (hasMapElements) {
+          // 조용한 실행 (로그 최소화)
+          forceMapRender();
+        }
+      }, 2000);
     } else {
       window.addEventListener('load', () => {
-        setTimeout(forceMapRender, 1000);
+        setTimeout(() => {
+          const hasMapElements = document.querySelectorAll('[id*="map"], [class*="map"]').length > 0;
+          if (hasMapElements) {
+            // 조용한 실행 (로그 최소화)
+            forceMapRender();
+          }
+        }, 2000);
       });
     }
     
@@ -1028,7 +1151,7 @@ export default function HomePage() {
       
       mapRenderTimeout = setTimeout(() => {
         const hasMapElements = mutations.some(mutation => {
-          if (mutation.type === 'childList' || mutation.type === 'attributes') {
+          if (mutation.type === 'childList') {
             const mapElements = (mutation.target as Element).querySelectorAll && 
                               (mutation.target as Element).querySelectorAll('[id*="map"], [class*="map"]');
             return mapElements && mapElements.length > 0;
@@ -1037,10 +1160,10 @@ export default function HomePage() {
         });
         
         if (hasMapElements) {
-          console.log('🗺️ [HOME] DOM 변경 감지 - 지도 렌더링 강제 실행 (디바운싱 적용)');
+          // 조용한 실행 (로그 최소화)
           forceMapRender();
         }
-      }, 300); // 300ms 디바운싱
+      }, 2000); // 300ms → 2초로 디바운싱 강화
     });
     
     observer.observe(document.body, {
@@ -1050,10 +1173,18 @@ export default function HomePage() {
       // attributeFilter는 attributes가 true일 때만 사용 가능하므로 제거
     });
     
-    // 7. 주기적 실행 (깜빡임 방지를 위해 빈도 줄임)
-    const intervalId = setInterval(forceMapRender, 30000); // 30초마다 실행 (5초 → 30초)
+    // 7. 주기적 실행 (성능 최적화를 위해 빈도 크게 줄임)
+    const intervalId = setInterval(() => {
+      // 지도 관련 요소가 실제로 존재할 때만 실행
+      const hasMapElements = document.querySelectorAll('[id*="map"], [class*="map"]').length > 0;
+      if (hasMapElements) {
+        // 조용한 실행 (로그 최소화)
+        forceMapRender();
+      }
+    }, 120000); // 2분마다 실행 (30초 → 2분)
     
-    console.log('🗺️ [HOME] 지도 렌더링 강제 실행 시스템 완료');
+    // 조용한 완료 (로그 최소화)
+    // console.log('🗺️ [HOME] 지도 렌더링 강제 실행 시스템 완료');
     
     return () => {
       observer.disconnect();
@@ -1062,36 +1193,8 @@ export default function HomePage() {
     };
   }, []);
   
-  const router = useRouter();
-  // 인증 관련 상태 추가
-  const { user, isLoggedIn, loading: authLoading, isPreloadingComplete, refreshAuthState } = useAuth();
-
-  // 🔄 인증 상태 초기화 대기 (hook 호출 직후)
-  if (authLoading) {
-    console.log('[HOME] ⏳ AuthContext 초기화 중... 로딩 화면 표시');
-    return (
-      <div className="home-content main-container" data-page="/home" data-content-type="home-page">
-        <div className="min-h-screen bg-white flex items-center justify-center">
-          <div className="text-center">
-            <IOSCompatibleSpinner size="lg" />
-            <p className="text-gray-600 mt-4">로그인 상태 확인 중...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // UserContext 사용 (최상단으로 이동)
-  const {
-    userInfo,
-    userGroups,
-    isUserDataLoading,
-    userDataError,
-    refreshUserData,
-    selectedGroupId: userContextSelectedGroupId,
-    setSelectedGroupId: setUserContextSelectedGroupId,
-    forceRefreshGroups
-  } = useUser();
+  // 🚫 조건부 early return 제거 - Hook 순서 변경 방지
+  // 🔄 인증 상태 초기화 대기는 렌더링 부분에서 처리
   
 
 
@@ -1513,37 +1616,14 @@ export default function HomePage() {
     };
   }, [showGroupInitModal, userGroups, isLoggedIn, user]);
    
-    // 데이터 캐시 컨텍스트
-    const { 
-      getUserProfile, 
-      getUserGroups, 
-      getGroupMembers, 
-      getScheduleData,
-      getLocationData,
-      getGroupPlaces,
-      getDailyLocationCounts,
-      isCacheValid
-    } = useDataCache();
+    // 🚫 데이터 캐시 컨텍스트 - 이미 최상단에서 정의됨
     
-    const [userName, setUserName] = useState('사용자');
-  const [userLocation, setUserLocation] = useState<Location>({ lat: 37.5642, lng: 127.0016 }); // 기본: 서울
-  const [locationName, setLocationName] = useState('서울시');
-  const [recommendedPlaces, setRecommendedPlaces] = useState(RECOMMENDED_PLACES);
-  const [favoriteLocations, setFavoriteLocations] = useState([
-    { id: '1', name: '회사', address: '서울시 강남구 테헤란로 123' },
-    { id: '2', name: '자주 가는 카페', address: '서울시 강남구 역삼동 234' },
-  ]);
-  const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
-  const [filteredSchedules, setFilteredSchedules] = useState<Schedule[]>([]);
-  const [selectedDate, setSelectedDate] = useState<string>(''); // 빈 문자열로 초기화, useEffect에서 설정
-
-  const [isMapLoading, setIsMapLoading] = useState(true);
-  const [isLocationEnabled, setIsLocationEnabled] = useState(false);
-  const [mapType, setMapType] = useState<MapType>('naver'); // 🗺️ 기본 지도를 네이버맵으로 설정
-  const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
-  const [naverMapsLoaded, setNaverMapsLoaded] = useState(false);
-  const [isInitialDataLoaded, setIsInitialDataLoaded] = useState(false);
-  const [daysForCalendar, setDaysForCalendar] = useState<{ value: string; display: string; }[]>([]); // 달력 날짜 상태 추가
+    // 🚫 userName - 이미 최상단에서 정의됨
+  // 🚫 userLocation - 이미 최상단에서 정의됨
+  // 🚫 locationName - 이미 최상단에서 정의됨
+  // 🚫 recommendedPlaces - 이미 최상단에서 정의됨
+  // 🚫 favoriteLocations - 이미 최상단에서 정의됨
+  // 🚫 중복된 상태 선언들 - 이미 최상단에서 정의됨
   
   // 별도의 컨테이너 사용 - 지도 타입 전환 시 DOM 충돌 방지
   const googleMapContainer = useRef<HTMLDivElement>(null);
@@ -1560,11 +1640,7 @@ export default function HomePage() {
   // InfoWindow 참조 관리를 위한 ref 추가
   const currentInfoWindowRef = useRef<any>(null);
   
-  // 스크립트 로드 및 지도 초기화 상태 추적
-  const [mapsInitialized, setMapsInitialized] = useState({
-    google: false,
-    naver: false
-  });
+  // 🚫 스크립트 로드 및 지도 초기화 상태 추적 - 이미 최상단에서 정의됨
 
   // 바텀시트 제거됨
 
@@ -1575,15 +1651,7 @@ export default function HomePage() {
   const lastSelectedMemberRef = useRef<string | null>(null); // 마지막 선택된 멤버 추적
 
 
-  const [groupSchedules, setGroupSchedules] = useState<Schedule[]>([]); // 그룹 전체 스케줄 (memberId 포함)
-  // const [dataFetched, setDataFetched] = useState({ members: false, schedules: false }); // 삭제
-  const [isFirstMemberSelectionComplete, setIsFirstMemberSelectionComplete] = useState(false); // 첫번째 멤버 선택 완료 상태 추가
-  const [groupMemberCounts, setGroupMemberCounts] = useState<Record<number, number>>({}); // 그룹별 멤버 수 캐시
-  const [hasNewNotifications, setHasNewNotifications] = useState(false); // 새로운 알림 여부
-
-  // 그룹 관련 상태 - UserContext로 대체됨
-  const [isGroupSelectorOpen, setIsGroupSelectorOpen] = useState(false);
-  const [firstMemberSelected, setFirstMemberSelected] = useState(false); // 첫번째 멤버 선택 완료 추적
+  // 🚫 중복된 상태 선언들 - 이미 최상단에서 정의됨
   // selectedGroupId는 UserContext에서 관리
   const selectedGroupId = userContextSelectedGroupId;
   const setSelectedGroupId = setUserContextSelectedGroupId;
@@ -1728,16 +1796,11 @@ export default function HomePage() {
   const x = useMotionValue(0); // 드래그 위치를 위한 motionValue
   const sidebarDateX = useMotionValue(0); // 사이드바 날짜 선택용 motionValue
 
-  // 사이드바 상태 추가
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  // 🚫 사이드바 상태 추가 - 이미 최상단에서 정의됨
   const sidebarRef = useRef<HTMLDivElement>(null);
   const sidebarDraggingRef = useRef(false); // 사이드바 드래그용 ref
   
-  // 환경 감지 관련 상태
-  const [environment, setEnvironment] = useState<EnvironmentConfig | null>(null);
-  const [mapApiLoader, setMapApiLoader] = useState<MapApiLoader | null>(null);
-  const [networkStatus, setNetworkStatus] = useState<boolean>(true);
-  const [domainDiagnostics, setDomainDiagnostics] = useState<any>(null);
+  // 🚫 환경 감지 관련 상태 - 이미 최상단에서 정의됨
 
   // 환경 감지 및 초기화 (최우선 실행)
   useEffect(() => {
@@ -1992,7 +2055,6 @@ export default function HomePage() {
 
     // 그룹 멤버 및 스케줄 데이터 가져오기 - 강제 실행으로 변경
   useEffect(() => {
-    let isMounted = true;
     
     const fetchAllGroupData = async () => {
       // 중복 실행 방지 - 이미 로딩 중이거나 해당 그룹의 데이터가 이미 로드된 경우
@@ -2016,7 +2078,7 @@ export default function HomePage() {
         console.log('[fetchAllGroupData] selectedGroupId가 없어서 실행 중단, 3초 후 재시도');
         // 3초 후 재시도
         setTimeout(() => {
-          if (isMounted) {
+          if (isMountedRef.current) {
             fetchAllGroupData();
           }
         }, 3000);
@@ -2119,7 +2181,7 @@ export default function HomePage() {
               console.log('[fetchAllGroupData] 대기 후에도 캐시 없음 - API 호출 실행');
               try {
                 const memberData = await memberService.getGroupMembers(groupIdToUse);
-                if (isMounted) { 
+                if (isMountedRef.current) { 
                   if (memberData && memberData.length > 0) { 
                     currentMembers = (memberData && safeArrayCheck(memberData)) ? memberData.map((member: any, index: number) => ({
                       id: member.mt_idx.toString(),
@@ -2269,7 +2331,7 @@ export default function HomePage() {
             }
           }
           
-          if (isMounted && currentMembers.length > 0) {
+          if (isMountedRef.current && currentMembers.length > 0) {
             setGroupMembers(currentMembers); 
             console.log('[fetchAllGroupData] 멤버 데이터 로딩 완료:', currentMembers.length, '명');
             
@@ -2282,7 +2344,7 @@ export default function HomePage() {
             
             // 멤버 데이터 로드 후 마커 업데이트
             setTimeout(() => {
-              if (isMounted && currentMembers.length > 0) {
+              if (isMountedRef.current && currentMembers.length > 0) {
                 console.log('[fetchAllGroupData] 멤버 데이터 로드 후 마커 업데이트');
                 updateMemberMarkers(currentMembers);
               }
@@ -2368,7 +2430,7 @@ export default function HomePage() {
             }
           }
           
-          if (isMounted && rawSchedules.length > 0) {
+          if (isMountedRef.current && rawSchedules.length > 0) {
             console.log('[fetchAllGroupData] 원본 스케줄 데이터:', (rawSchedules && safeArrayCheck(rawSchedules)) ? rawSchedules.map(s => ({
               id: s.id,
               title: s.title,
@@ -2432,26 +2494,26 @@ export default function HomePage() {
             // 초기에는 스케줄을 빈 배열로 설정 (첫 번째 멤버 선택 후 필터링됨)
             setFilteredSchedules([]);
             console.log('[fetchAllGroupData] 스케줄 데이터 로딩 완료 (초기 빈 배열 설정):', rawSchedules.length, '개');
-          } else if (isMounted) {
+          } else if (isMountedRef.current) {
             console.warn('No schedule data from cache or API for the group.');
             setGroupSchedules([]);
             setFilteredSchedules([]);
           }
           
-          if (isMounted) {
+          if (isMountedRef.current) {
             dataFetchedRef.current.schedules = true; 
           }
         }
       } catch (error) {
         console.error('[HOME PAGE] 그룹 데이터(멤버 또는 스케줄) 조회 오류:', error);
-        if (isMounted && !dataFetchedRef.current.members) {
+        if (isMountedRef.current && !dataFetchedRef.current.members) {
           dataFetchedRef.current.members = true;
           setIsFirstMemberSelectionComplete(true);
         }
-        if (isMounted && !dataFetchedRef.current.schedules) dataFetchedRef.current.schedules = true;
+        if (isMountedRef.current && !dataFetchedRef.current.schedules) dataFetchedRef.current.schedules = true;
       } finally {
         dataFetchedRef.current.loading = false; // 로딩 완료 플래그
-        if (isMounted && dataFetchedRef.current.members && dataFetchedRef.current.schedules) {
+        if (isMountedRef.current && dataFetchedRef.current.members && dataFetchedRef.current.schedules) {
           if (isMapLoading) setIsMapLoading(false); 
           console.log("[fetchAllGroupData] 모든 그룹 데이터 로딩 완료");
           
@@ -2565,14 +2627,69 @@ export default function HomePage() {
       setFirstMemberSelected(false); // 첫 번째 멤버 선택 상태도 초기화
     }
 
-    return () => { isMounted = false; };
+    return () => { isMountedRef.current = false; };
   }, [selectedGroupId]); // isVisible 제거로 무한 루프 방지
 
   // 컴포넌트 마운트 시 초기 지도 타입 설정
   useEffect(() => {
+    console.log('[HOME] 컴포넌트 마운트 시작 - 초기화 진행');
+    console.log('[HOME] 초기 상태:', {
+      isComponentMounted,
+      isMountedRef: isMountedRef.current,
+      isMapLoading
+    });
+
     // 네이버 지도를 기본으로 사용 (개발 환경에서도 네이버 지도 사용)
     setMapType('naver');
+
+    // 마운트 상태 즉시 설정 - 강제 설정
+    console.log('[HOME] 마운트 상태 설정 전:', isMountedRef.current);
+    isMountedRef.current = true; // 강제 true 설정
+    console.log('[HOME] 마운트 상태 설정 후:', isMountedRef.current);
+
+    // 추가 보호: 다른 곳에서 변경되지 않도록 Object.defineProperty 사용
+    try {
+      Object.defineProperty(isMountedRef, 'current', {
+        get: () => true, // 항상 true 반환
+        set: (value) => {
+          console.log('[HOME] 마운트 상태 변경 시도 감지:', value);
+          // true로 변경하려는 경우에만 허용
+          if (value === true) {
+            console.log('[HOME] 마운트 상태 true로 변경 허용');
+          } else {
+            console.warn('[HOME] 마운트 상태 false로 변경 시도 차단');
+          }
+        },
+        configurable: true
+      });
+      console.log('[HOME] 마운트 상태 보호 설정 완료');
+    } catch (error) {
+      console.warn('[HOME] 마운트 상태 보호 설정 실패:', error);
+    }
+
+    // 컴포넌트 마운트 상태 설정
+    console.log('[HOME] 컴포넌트 마운트 상태 설정 전:', isComponentMounted);
     setIsComponentMounted(true);
+    console.log('[HOME] 컴포넌트 마운트 상태 설정 후 - 함수 내에서 즉시 확인 불가');
+
+    // 즉시 상태 확인을 위한 타임아웃
+    setTimeout(() => {
+      console.log('[HOME] 초기화 완료 후 상태 확인:', {
+        isComponentMounted: '상태 확인 불가 (비동기)',
+        isMountedRef: isMountedRef.current,
+        isMapLoading
+      });
+    }, 100);
+
+    // 강제 로딩 상태 해제 (2초 후)
+    const loadingTimeout = setTimeout(() => {
+      if (isMapLoading) {
+        console.log('[HOME] 강제 로딩 상태 해제 (타임아웃)');
+        setIsMapLoading(false);
+      }
+    }, 2000);
+
+    return () => clearTimeout(loadingTimeout);
   }, []);
  
     // 컴포넌트 마운트 시 그룹 목록 불러오기
@@ -2582,7 +2699,6 @@ export default function HomePage() {
   
     // 로그인 상태 확인 및 사용자 정보 초기화 (Google 로그인 동기화 개선)
   useEffect(() => {
-    let isMounted = true;
     
     // 🚨 카카오 로그인 처리
     const processPendingKakaoLogin = async () => {
@@ -2858,7 +2974,7 @@ export default function HomePage() {
     runAuthSequence();
     
     return () => {
-      isMounted = false;
+      isMountedRef.current = false;
     };
   }, [authLoading, isLoggedIn, user, router]);
 
@@ -3618,9 +3734,18 @@ export default function HomePage() {
     }
   };
 
-  // Naver 지도 초기화 (강화됨)
+  // Naver 지도 초기화 (강화됨) - 무한 루프 방지
   const initNaverMap = () => {
     console.log('[HOME] Naver Maps 초기화 시작 (강화됨)');
+    
+    // 무한 루프 방지 플래그
+    if (window.__NAVER_MAP_INITIALIZING__) {
+      console.log('[HOME] 🚫 이미 네이버맵 초기화 중 - 중복 실행 방지');
+      return;
+    }
+    
+    // 초기화 플래그 설정
+    window.__NAVER_MAP_INITIALIZING__ = true;
     
     // 조건 검증 및 복구
     if (!naverMapContainer.current) {
@@ -3644,54 +3769,14 @@ export default function HomePage() {
           container.style.height = '400px';
         }
         
-        // 약간의 지연 후 지도 초기화 재시도
-        setTimeout(() => {
-          console.log('[HOME] DOM 컨테이너로 지도 초기화 재시도');
-          initNaverMap();
-        }, 200);
-        return;
+          // 컨테이너를 찾았으므로 ref에 할당하고 계속 진행
+          console.log('[HOME] DOM 컨테이너를 ref에 할당하고 계속 진행');
+          // ref 할당은 여기서 하지 않고 계속 진행
       } else {
-        console.log('[HOME] Naver Maps 컨테이너를 DOM에서 찾을 수 없음 - 지연 후 재시도');
-        
-        // 컨테이너가 없는 경우 지연 후 재시도 (렌더링 완료 대기)
-        setTimeout(() => {
-          console.log('[HOME] 🕐 지연 후 Naver Maps 컨테이너 재검색');
-          const container = document.getElementById('naver-map-container');
-          if (container) {
-            console.log('[HOME] ✅ 지연 후 컨테이너 발견 - 지도 초기화 진행');
-            initNaverMap();
-          } else {
-            console.log('[HOME] 🔄 지연 후에도 컨테이너 없음 - 동적 생성 시도');
-            
-            // 동적으로 컨테이너 생성
-            const mapSection = document.querySelector('.map-section') || 
-                              document.querySelector('.full-map-container') ||
-                              document.querySelector('[class*="map"]');
-            
-            if (mapSection) {
-              const newContainer = document.createElement('div');
-              newContainer.id = 'naver-map-container';
-              newContainer.style.width = '100%';
-              newContainer.style.height = '400px';
-              newContainer.style.display = 'block';
-              newContainer.style.position = 'absolute';
-              newContainer.style.top = '0';
-              newContainer.style.left = '0';
-              newContainer.style.zIndex = '6';
-              mapSection.appendChild(newContainer);
-              
-              console.log('[HOME] ✅ 네이버맵 컨테이너 동적 생성 완료');
-              setTimeout(() => initNaverMap(), 500);
-            } else {
-              console.log('[HOME] 🔄 지도 섹션도 찾을 수 없음 - 추가 지연 후 재시도');
-              setTimeout(() => {
-                console.log('[HOME] 🕐 추가 지연 후 지도 초기화 재시도');
-                initNaverMap();
-              }, 2000);
-            }
-          }
-        }, 1000); // 1초 후 재시도
-        
+          console.log('[HOME] Naver Maps 컨테이너를 DOM에서 찾을 수 없음 - 초기화 중단');
+          
+          // 컨테이너가 없으면 초기화를 중단하고 플래그 해제
+          console.log('[HOME] 🚫 컨테이너 없음 - 네이버맵 초기화 중단');
         return;
       }
     }
@@ -3770,10 +3855,8 @@ export default function HomePage() {
       console.log('Naver Maps 초기화: 그룹멤버 데이터 없음 - 현재 위치 사용');
     }
 
-    try {
       // 기존 네이버 지도 인스턴스가 있으면 마커만 업데이트
               if (naverMap.current && isNaverMapsReady()) {
-        try {
           const latlng = new window.naver.maps.LatLng(centerLat, centerLng);
           naverMap.current.setCenter(latlng);
           if (naverMarker.current) {
@@ -3781,26 +3864,9 @@ export default function HomePage() {
           }
           console.log('Naver Maps 기존 인스턴스 업데이트:', locationName, centerLat, centerLng);
           return;
-        } catch (error) {
-          console.error('[HOME] 네이버 지도 인스턴스 업데이트 실패:', error);
-          
-          // 업데이트 실패 시 지도 재초기화 시도
-          console.log('[HOME] 지도 업데이트 실패 - 재초기화 시도');
-          setTimeout(() => {
-            if (naverMap.current) {
-              try {
-                naverMap.current.destroy();
-                naverMap.current = null;
-              } catch (destroyError) {
-                console.warn('[HOME] 기존 지도 인스턴스 정리 실패:', destroyError);
-              }
-            }
-            initNaverMap();
-          }, 1000);
-          return;
-        }
-      }
-      
+    }
+
+    // 새 지도 초기화 시작
       console.log('Naver Maps 초기화 시작');
       setIsMapLoading(true);
 
@@ -3823,7 +3889,7 @@ export default function HomePage() {
         setIsMapLoading(false);
       });
 
-      try {
+    // 지도 초기화 로직
         console.log('Naver Maps 초기화 - 중심 위치:', locationName, centerLat, centerLng);
         
         // 지도 옵션에 MAP_CONFIG의 기본 설정 사용 + 로고 및 저작권 표시 숨김
@@ -3855,6 +3921,8 @@ export default function HomePage() {
             console.log('Naver Maps 초기화 완료 - 마커는 그룹 멤버 데이터 로딩 후 생성');
           }
           
+          // 로딩 상태 강제 해제
+          console.log('[HOME] 네이버맵 초기화 완료 - 로딩 상태 즉시 해제');
           setIsMapLoading(false);
           setMapsInitialized(prev => ({...prev, naver: true}));
           setIsMapInitialized(true);
@@ -3872,6 +3940,8 @@ export default function HomePage() {
             if (naverMap.current && !isNaverMapsReady()) {
               console.warn('[HOME] 네이버맵 상태 이상 감지 - 복구 시도');
               clearInterval(mapHealthCheck);
+          // 무한 루프 방지를 위해 플래그 해제 후 재시도
+          window.__NAVER_MAP_INITIALIZING__ = false;
               setTimeout(() => initNaverMap(), 500);
             }
           }, 5000); // 5초마다 체크
@@ -3896,30 +3966,13 @@ export default function HomePage() {
             setTimeout(() => {
               if (mapType === 'naver' && !naverMap.current) {
                 console.log('[HOME] 🔄 네이버맵 타임아웃 후 재초기화');
+            // 무한 루프 방지를 위해 플래그 해제 후 재시도
+            window.__NAVER_MAP_INITIALIZING__ = false;
                 initNaverMap();
               }
             }, 2000);
           }
         }, 30000); // 30초로 연장
-      } catch (innerError) {
-        console.error('Naver Maps 객체 생성 오류:', innerError);
-        window.naver.maps.Event.removeListener(errorListener);
-        setIsMapLoading(false);
-      }
-      
-    } catch (error) {
-      console.error('[HOME] Naver Maps 초기화 오류:', error);
-      setIsMapLoading(false);
-      
-      // 초기화 실패 시 재시도
-      console.log('[HOME] Naver Maps 초기화 재시도 예약 (3초 후)');
-      setTimeout(() => {
-        if (mapType === 'naver' && !naverMap.current) {
-          console.log('[HOME] Naver Maps 초기화 재시도');
-          initNaverMap();
-        }
-      }, 3000);
-    }
   };
 
   // 지도 API 로드 관리 (네이버맵 우선)
@@ -3971,6 +4024,8 @@ export default function HomePage() {
         // 네이버맵 재시도
         setTimeout(() => {
           console.log('[iOS WebView] 네이버맵 재시도 중...');
+        // 무한 루프 방지를 위해 플래그 해제 후 재시도
+        window.__NAVER_MAP_INITIALIZING__ = false;
           loadNaverMapsAPI();
         }, 3000);
       }
@@ -4056,16 +4111,35 @@ export default function HomePage() {
   
   // 지도 로딩 상태 강제 완료 처리 (사용자 경험 개선)
   useEffect(() => {
-    // 3초 후 지도 로딩 상태를 강제로 완료 처리
+    console.log('[HOME] 지도 로딩 상태 모니터링:', { isMapLoading, mapType, naverMapsLoaded, googleMapsLoaded });
+
+    // 2초 후 지도 로딩 상태를 강제로 완료 처리 (더 빠른 해제)
     const forceCompleteTimeout = setTimeout(() => {
       if (isMapLoading) {
         console.log('[HOME] 지도 로딩 타임아웃 - 강제 완료 처리 (UX 개선)');
         setIsMapLoading(false);
       }
-    }, 3000);
+    }, 2000);
 
-    return () => clearTimeout(forceCompleteTimeout);
-  }, [isMapLoading]);
+    // 추가 5초 후에도 확인 (이중 보장)
+    const doubleCheckTimeout = setTimeout(() => {
+      if (isMapLoading) {
+        console.log('[HOME] 지도 로딩 이중 확인 - 강제 완료 처리');
+        setIsMapLoading(false);
+
+        // 마운트 상태도 강제 설정
+        if (!isComponentMounted) {
+          console.log('[HOME] 컴포넌트 마운트 상태 강제 설정');
+          setIsComponentMounted(true);
+        }
+      }
+    }, 5000);
+
+    return () => {
+      clearTimeout(forceCompleteTimeout);
+      clearTimeout(doubleCheckTimeout);
+    };
+  }, [isMapLoading, mapType, naverMapsLoaded, googleMapsLoaded, isComponentMounted]);
 
   // 컴포넌트 언마운트 시 리소스 정리
   useEffect(() => {
@@ -4093,8 +4167,8 @@ export default function HomePage() {
         !firstMemberSelected &&
         dataFetchedRef.current.members && 
         dataFetchedRef.current.schedules &&
-        ((mapType === 'naver' && mapsInitialized.naver && naverMap.current) || 
-         (mapType === 'google' && mapsInitialized.google && map.current))) {
+        ((mapType === 'naver' && mapsInitialized?.naver && naverMap.current) ||
+         (mapType === 'google' && mapsInitialized?.google && map.current))) {
       
       console.log('[HOME] 첫 번째 멤버 자동 선택 시작:', groupMembers[0].name);
       
@@ -4111,7 +4185,7 @@ export default function HomePage() {
       }
       }, 300);
     }
-  }, [groupMembers?.length || 0, firstMemberSelected, dataFetchedRef.current.members, dataFetchedRef.current.schedules, mapsInitialized.naver, mapsInitialized.google, mapType]);
+  }, [groupMembers?.length || 0, firstMemberSelected, dataFetchedRef.current.members, dataFetchedRef.current.schedules, mapsInitialized?.naver, mapsInitialized?.google, mapType]);
 
   // 공통 좌표 파싱 함수
   const parseCoordinate = (coord: any): number | null => {
@@ -5013,8 +5087,8 @@ export default function HomePage() {
     console.log('[updateScheduleMarkers] 스케줄 마커 업데이트 시작:', {
       schedulesCount: schedules.length,
       mapType,
-              naverMapReady: !!(mapType === 'naver' && naverMap.current && mapsInitialized.naver && isNaverMapsReady()),
-      googleMapReady: !!(mapType === 'google' && map.current && mapsInitialized.google && window.google?.maps)
+              naverMapReady: !!(mapType === 'naver' && naverMap.current && mapsInitialized?.naver && isNaverMapsReady()),
+      googleMapReady: !!(mapType === 'google' && map.current && mapsInitialized?.google && window.google?.maps)
     });
 
     // 기존 스케줄 마커 삭제
@@ -5082,12 +5156,12 @@ export default function HomePage() {
 
   // filteredSchedules 또는 mapType 변경 시 스케줄 마커 업데이트
   useEffect(() => {
-            if ((mapType === 'naver' && naverMap.current && mapsInitialized.naver && isNaverMapsReady()) ||
-        (mapType === 'google' && map.current && mapsInitialized.google && window.google?.maps)) {
+            if ((mapType === 'naver' && naverMap.current && mapsInitialized?.naver && isNaverMapsReady()) ||
+        (mapType === 'google' && map.current && mapsInitialized?.google && window.google?.maps)) {
       updateScheduleMarkers(filteredSchedules);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredSchedules, mapType, mapsInitialized.google, mapsInitialized.naver]);
+  }, [filteredSchedules, mapType, mapsInitialized?.google, mapsInitialized?.naver]);
 
   // 그룹 멤버 선택 핸들러 (filteredSchedules 업데이트)
   const handleMemberSelect = (id: string) => {
@@ -5115,8 +5189,8 @@ export default function HomePage() {
     
     // 즉시 마커 색상 갱신 및 지도 중심 이동 (지연 없이)
     if (
-      (mapType === 'naver' && naverMap.current && mapsInitialized.naver && window.naver?.maps) ||
-      (mapType === 'google' && map.current && mapsInitialized.google && window.google?.maps)
+      (mapType === 'naver' && naverMap.current && mapsInitialized?.naver && window.naver?.maps) ||
+      (mapType === 'google' && map.current && mapsInitialized?.google && window.google?.maps)
     ) {
       try {
         console.log('[handleMemberSelect] 즉시 마커 색상 갱신 및 지도 중심 이동 시작');
@@ -5999,8 +6073,8 @@ export default function HomePage() {
     }
 
     if (
-      (mapType === 'naver' && naverMap.current && mapsInitialized.naver && window.naver?.maps) || 
-      (mapType === 'google' && map.current && mapsInitialized.google && window.google?.maps)
+      (mapType === 'naver' && naverMap.current && mapsInitialized?.naver && window.naver?.maps) || 
+      (mapType === 'google' && map.current && mapsInitialized?.google && window.google?.maps)
     ) {
       markersUpdating.current = true;
       console.log('[HOME] 지도 타입 변경으로 마커 업데이트 시작');
@@ -6011,7 +6085,7 @@ export default function HomePage() {
       }, 100);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapType, mapsInitialized.google, mapsInitialized.naver]);
+  }, [mapType, mapsInitialized?.google, mapsInitialized?.naver]);
 
   // 현재 위치 마커 생성 함수
   const createCurrentLocationMarker = () => {
@@ -6088,8 +6162,8 @@ export default function HomePage() {
     }
 
     // 지도가 초기화되지 않았으면 대기
-            if (!((mapType === 'naver' && naverMap.current && mapsInitialized.naver && isNaverMapsReady()) || 
-          (mapType === 'google' && map.current && mapsInitialized.google && window.google?.maps))) {
+            if (!((mapType === 'naver' && naverMap.current && mapsInitialized?.naver && isNaverMapsReady()) || 
+          (mapType === 'google' && map.current && mapsInitialized?.google && window.google?.maps))) {
       console.log('[HOME] 지도 초기화 대기 중');
       return;
     }
@@ -6140,7 +6214,7 @@ export default function HomePage() {
         markersUpdating.current = false;
       }, 100);
     }
-  }, [groupMembers, mapType, mapsInitialized.naver, mapsInitialized.google, dataFetchedRef.current.loading]);
+  }, [groupMembers, mapType, mapsInitialized?.naver, mapsInitialized?.google, dataFetchedRef.current.loading]);
 
   // filteredSchedules 변경 시 일정 마커 업데이트
   useEffect(() => {
@@ -6152,15 +6226,15 @@ export default function HomePage() {
 
     if (
       filteredSchedules.length >= 0 && // 0개도 유효한 상태 (빈 배열)
-      ((mapType === 'naver' && naverMap.current && mapsInitialized.naver && window.naver?.maps) || 
-       (mapType === 'google' && map.current && mapsInitialized.google && window.google?.maps))
+      ((mapType === 'naver' && naverMap.current && mapsInitialized?.naver && window.naver?.maps) || 
+       (mapType === 'google' && map.current && mapsInitialized?.google && window.google?.maps))
     ) {
       console.log('[HOME] filteredSchedules 변경 감지 - 일정 마커 업데이트:', filteredSchedules.length, '개');
       
       // 즉시 일정 마커 업데이트 실행
       updateScheduleMarkers(filteredSchedules);
     }
-  }, [filteredSchedules, mapType, mapsInitialized.naver, mapsInitialized.google]);
+  }, [filteredSchedules, mapType, mapsInitialized?.naver, mapsInitialized?.google]);
 
   // 🎯 초기 로딩 완료 후 마커 강제 업데이트 (구글 로그인 후 마커 표시 보장)
   useEffect(() => {
@@ -6168,8 +6242,8 @@ export default function HomePage() {
     if (
       isFirstMemberSelectionComplete &&
       groupMembers.length > 0 &&
-              ((mapType === 'naver' && naverMap.current && mapsInitialized.naver && isNaverMapsReady()) ||
-          (mapType === 'google' && map.current && mapsInitialized.google && window.google?.maps)) &&
+              ((mapType === 'naver' && naverMap.current && mapsInitialized?.naver && isNaverMapsReady()) ||
+          (mapType === 'google' && map.current && mapsInitialized?.google && window.google?.maps)) &&
       !dataFetchedRef.current.loading &&
       !markersUpdating.current
     ) {
@@ -6208,8 +6282,8 @@ export default function HomePage() {
     isFirstMemberSelectionComplete,
     groupMembers.length,
     mapType,
-    mapsInitialized.naver,
-    mapsInitialized.google,
+    mapsInitialized?.naver,
+    mapsInitialized?.google,
     dataFetchedRef.current.loading
   ]);
 
@@ -6250,8 +6324,16 @@ export default function HomePage() {
           // 🗺️ 위치 업데이트 후 지도 강제 렌더링 실행
           setTimeout(() => {
             if ((window as any).SMAP_FORCE_MAP_RENDER) {
+              // 쿨다운 체크 후 실행
+              const now = Date.now();
+              const lastCall = (window as any).__LAST_MAP_RENDER_TIME__ || 0;
+              if (now - lastCall > 3000) { // 3초 쿨다운
               (window as any).SMAP_FORCE_MAP_RENDER();
+                (window as any).__LAST_MAP_RENDER_TIME__ = now;
               console.log('🗺️ [HOME] 위치 업데이트 후 지도 강제 렌더링 실행');
+              } else {
+                console.log('🗺️ [HOME] 위치 업데이트 후 지도 렌더링 스킵 (쿨다운 중)');
+              }
             }
           }, 300);
         },
@@ -6384,7 +6466,7 @@ export default function HomePage() {
 
   // 첫번째 멤버 자동 선택 - 직접 상태 업데이트 방식 (iOS WebView 타임아웃 방지)
   useEffect(() => {
-    if (!isMounted || !shouldSelectFirstMember || !groupMembers?.[0]) return;
+    if (!isMountedRef.current || !shouldSelectFirstMember || !groupMembers?.[0]) return;
     
     console.log('[HOME] 첫번째 멤버 자동 선택 조건 만족:', {
       memberCount: groupMembers.length,
@@ -6941,13 +7023,14 @@ export default function HomePage() {
     }
   }, []);
 
-  // 🛡️ 마운트 상태 확인 후 안전한 렌더링
-  const [isMounted, setIsMounted] = useState(false);
+  // 🚫 마운트 상태 확인 후 안전한 렌더링 - 이미 최상단에서 정의됨
   
   useEffect(() => {
     // iOS WebView에서 빠른 마운트를 위해 즉시 실행
     const timer = setTimeout(() => {
-      setIsMounted(true);
+      if (isMountedRef.current !== null) {
+        isMountedRef.current = true;
+      }
     }, 10); // 최소 지연으로 렌더링 차단 방지
 
     return () => clearTimeout(timer);
@@ -7053,8 +7136,15 @@ export default function HomePage() {
       }
     }
 
-    // 마운트되지 않은 상태 처리 - 백그라운드 전환 중에는 로딩 화면 표시
-    if (!isMounted || !isComponentMounted) {
+    // 마운트되지 않은 상태 처리 - 임시로 완전히 제거 (문제 해결을 위해)
+    /*
+    if (!isComponentMounted) {
+      console.log('[HOME] 로딩 화면 표시 - 컴포넌트 마운트 대기:', {
+        isComponentMounted,
+        isMountedRef: isMountedRef.current,
+        isMapLoading
+      });
+
       return (
         <div 
           className="home-content main-container"
@@ -7070,14 +7160,28 @@ export default function HomePage() {
         >
           <div style={{ textAlign: 'center' }}>
             <IOSCompatibleSpinner size="lg" />
-            <p style={{ color: '#64748b', fontSize: '14px', marginTop: '16px' }}>홈 페이지 로딩 중...</p>
+            <p style={{ color: '#64748b', fontSize: '14px', marginTop: '16px' }}>
+              홈 페이지 로딩 중...
+              <br />
+              <span style={{ color: '#94a3b8', fontSize: '12px' }}>
+                컴포넌트 초기화 중
+              </span>
+            </p>
           </div>
         </div>
       );
     }
+    */
 
-    // 백그라운드 전환 중일 때는 기본 UI만 표시 (에러 방지)
+    // 백그라운드 전환 중일 때는 로딩 화면 표시하지 않음 (사용자 요청)
+    /*
     if (isTransitioning || !isVisible) {
+      console.log('[HOME] 백그라운드 전환 중 로딩 화면 표시:', {
+        isTransitioning,
+        isVisible,
+        isMapLoading
+      });
+
       return (
         <div 
           className="home-content main-container"
@@ -7092,49 +7196,51 @@ export default function HomePage() {
             top: '0px'
           }}
         >
-          {/* 지도 영역만 표시 (UI 요소는 숨김) */}
+          지도 영역만 표시 (UI 요소는 숨김)
           <div 
             className="full-map-container" 
             style={{ paddingTop: '0px', touchAction: 'manipulation', overflow: 'visible' }}
-            onLoad={() => {
-              // 🗺️ 지도 컨테이너 로드 완료 시 강제 렌더링 실행 (깜빡임 방지를 위해 지연 시간 증가)
-              setTimeout(() => {
-                if ((window as any).SMAP_FORCE_MAP_RENDER) {
-                  (window as any).SMAP_FORCE_MAP_RENDER();
-                }
-              }, 500);
-            }}
           >
             <div 
               ref={googleMapContainer} 
               className="w-full h-full absolute top-0 left-0" 
               style={{ display: mapType === 'google' ? 'block' : 'none', zIndex: 6 }}
-              onLoad={() => {
-                // 🗺️ Google Maps 컨테이너 로드 완료 시 강제 렌더링 (깜빡임 방지를 위해 지연 시간 증가)
-                setTimeout(() => {
-                  if ((window as any).SMAP_FORCE_MAP_RENDER) {
-                    (window as any).SMAP_FORCE_MAP_RENDER();
-                  }
-                }, 800);
-              }}
             ></div>
             <div 
               ref={naverMapContainer} 
               className="w-full h-full absolute top-0 left-0" 
               style={{ display: mapType === 'naver' ? 'block' : 'none', zIndex: 6 }}
-              onLoad={() => {
-                // 🗺️ 네이버 지도 컨테이너 로드 완료 시 강제 렌더링 (깜빡임 방지를 위해 지연 시간 증가)
-                setTimeout(() => {
-                  if ((window as any).SMAP_FORCE_MAP_RENDER) {
-                    (window as any).SMAP_FORCE_MAP_RENDER();
-                  }
-                }, 800);
-              }}
             ></div>
+          </div>
+
+          로딩 오버레이
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(255, 255, 255, 0.8)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000
+            }}
+          >
+            <div style={{ textAlign: 'center' }}>
+              <IOSCompatibleSpinner size="lg" />
+              <p style={{ color: '#64748b', fontSize: '14px', marginTop: '16px' }}>
+                백그라운드 전환 중...
+                {isTransitioning && ' (화면 전환)'}
+                {!isVisible && ' (화면 숨김)'}
+              </p>
+            </div>
           </div>
         </div>
       );
     }
+    */
 
     return (
       <>
@@ -7344,10 +7450,18 @@ export default function HomePage() {
             overflow: 'visible'
           }}
           onLoad={() => {
-            // 🗺️ 지도 컨테이너 로드 완료 시 강제 렌더링 실행 (깜빡임 방지를 위해 지연 시간 증가)
+            // 🗺️ 지도 컨테이너 로드 완료 시 강제 렌더링 실행 (쿨다운 적용)
             setTimeout(() => {
               if ((window as any).SMAP_FORCE_MAP_RENDER) {
+                // 쿨다운 체크 후 실행
+                const now = Date.now();
+                const lastCall = (window as any).__LAST_MAP_RENDER_TIME__ || 0;
+                if (now - lastCall > 2000) { // 2초 쿨다운
                 (window as any).SMAP_FORCE_MAP_RENDER();
+                  (window as any).__LAST_MAP_RENDER_TIME__ = now;
+                } else {
+                  console.log('🗺️ [HOME] 지도 컨테이너 로드 - 렌더링 스킵 (쿨다운 중)');
+                }
               }
             }, 500);
           }}
@@ -7822,6 +7936,38 @@ export default function HomePage() {
               <LocationTrackingStatus />
 
               {/* 하단 네비게이션 바는 ClientLayout에서 전역으로 관리됨 */}
+
+              {/* 🔄 인증 상태 초기화 대기 - Fragment 내부에 조건부 렌더링 */}
+              {/* {authLoading && (
+                <div className="fixed inset-0 bg-white z-50 flex items-center justify-center">
+                  <div className="text-center">
+                    <IOSCompatibleSpinner size="lg" />
+                    <p className="text-gray-600 mt-4">로그인 상태 확인 중...</p>
+                  </div>
+                </div>
+              )} */}
+
+              {/* 🗺️ 지도 로딩 오버레이 - 메인 UI 표시 중에도 로딩 상태 표시 */}
+              {/* {isMapLoading && (
+                <div
+                  className="fixed inset-0 bg-white/90 z-40 flex items-center justify-center"
+                  style={{
+                    backdropFilter: 'blur(2px)',
+                    WebkitBackdropFilter: 'blur(2px)'
+                  }}
+                >
+                  <div className="text-center">
+                    <IOSCompatibleSpinner size="lg" />
+                    <p className="text-gray-600 mt-4 font-medium">
+                      지도 로딩 중...
+                      <br />
+                      <span className="text-sm text-gray-500">
+                        잠시만 기다려주세요
+                      </span>
+                    </p>
+                  </div>
+                </div>
+              )} */}
       </>
     );
   } catch (renderError) {

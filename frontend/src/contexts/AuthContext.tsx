@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useReducer, useEffect, ReactNode, useState, useCallback } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, ReactNode, useState, useCallback, useRef } from 'react';
 import { AuthState, AuthAction, UserProfile, GroupWithMembers, LoginRequest } from '@/types/auth';
 import authService from '@/services/authService';
 // import { getSession } from 'next-auth/react'; // 임시 비활성화
@@ -156,6 +156,9 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
   const [preloadingUsers, setPreloadingUsers] = useState<Set<number>>(new Set()); // 프리로딩 중인 사용자 ID 추적
+
+  // 컴포넌트 마운트 상태 추적 (클라이언트 환경에서만)
+  const isMountedRef = useRef(typeof window !== 'undefined' ? true : null);
   
   // DataCache 사용
   const {
@@ -202,6 +205,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }, 10000);
 
     try {
+      // 🚫 중복 프리로딩 방지를 위한 추가 체크
+      if (globalPreloadingState.completedUsers.has(userId)) {
+        console.log(`[AUTH] 🚫 사용자 ${userId}는 이미 프리로딩 완료 - 중복 실행 방지`);
+        return;
+      }
+      
       const results = await dataPreloadService.preloadAllData({
         userId,
         onProgress: (step: string, progress: number) => {
@@ -279,9 +288,90 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, [setUserProfile, setUserGroups, setGroupMembers, setScheduleData, setGroupPlaces, setLocationData, setDailyLocationCounts]);
 
+  // 🚫 개발용 디버깅 함수들을 한 번만 초기화 (컴포넌트 마운트 시)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !(window as any).SMAP_DEBUG_FUNCTIONS_INITIALIZED) {
+      console.log('🔧 [DEBUG] SMAP 디버깅 함수들 초기화 시작');
+      
+      // SMAP_DEBUG_AUTH 함수 정의
+      (window as any).SMAP_DEBUG_AUTH = () => {
+        console.log('=== 🚀 SMAP 인증 디버깅 ===');
+        authService.debugAuthState();
+        console.log('현재 AuthContext 상태:', {
+          isLoggedIn: state.isLoggedIn,
+          loading: state.loading,
+          user: state.user ? `${state.user.mt_name} (${state.user.mt_idx})` : null,
+          selectedGroup: state.selectedGroup ? state.selectedGroup.sgt_title : null
+        });
+        console.log('========================');
+      };
+
+      // SMAP_FORCE_REFRESH_AUTH 함수 정의
+      (window as any).SMAP_FORCE_REFRESH_AUTH = async () => {
+        console.log('🔄 수동 인증 상태 새로고침 실행...');
+        try {
+          await refreshAuthState();
+          console.log('✅ 수동 인증 상태 새로고침 완료');
+        } catch (error) {
+          console.error('❌ 수동 인증 상태 새로고침 실패:', error);
+        }
+      };
+
+      // SMAP_CHECK_STORAGE 함수 정의
+      (window as any).SMAP_CHECK_STORAGE = () => {
+        console.log('=== 📦 로컬 스토리지 상태 확인 ===');
+        if (typeof window !== 'undefined') {
+          const token = localStorage.getItem('smap_auth_token');
+          const userData = localStorage.getItem('smap_user_data');
+          const loginTime = localStorage.getItem('smap_login_time');
+
+          console.log('토큰 존재:', !!token);
+          console.log('사용자 데이터 존재:', !!userData);
+          console.log('로그인 시간 존재:', !!loginTime);
+
+          if (userData) {
+            try {
+              const user = JSON.parse(userData);
+              console.log('사용자 정보:', user.mt_name, `(${user.mt_idx})`);
+            } catch (e) {
+              console.error('사용자 데이터 파싱 오류:', e);
+            }
+          }
+        }
+        console.log('================================');
+      };
+
+      // SMAP_TEST_LOGIN 함수 정의
+      (window as any).SMAP_TEST_LOGIN = async () => {
+        console.log('=== 🔐 로그인 상태 종합 테스트 ===');
+        const isLoggedIn = authService.isLoggedIn();
+        console.log('authService.isLoggedIn():', isLoggedIn);
+
+        if (isLoggedIn) {
+          const userProfile = await authService.getCurrentUserProfile();
+          console.log('getCurrentUserProfile():', userProfile ? '성공' : '실패');
+          if (userProfile) {
+            console.log('사용자:', userProfile.mt_name, `(${userProfile.mt_idx})`);
+          }
+        }
+        console.log('================================');
+      };
+
+      // 중복 초기화 방지 플래그 설정
+      (window as any).SMAP_DEBUG_FUNCTIONS_INITIALIZED = true;
+      
+      // 사용법 출력 (한 번만)
+      console.log('🔧 SMAP 디버깅 함수들 (한 번만 초기화됨):');
+      console.log('  - SMAP_DEBUG_AUTH(): 현재 인증 상태 확인');
+      console.log('  - SMAP_FORCE_REFRESH_AUTH(): 강제 인증 상태 새로고침');
+      console.log('  - SMAP_CHECK_STORAGE(): 로컬 스토리지 상태 확인');
+      console.log('  - SMAP_TEST_LOGIN(): 로그인 상태 종합 테스트');
+      console.log('🔧 [DEBUG] SMAP 디버깅 함수들 초기화 완료');
+    }
+  }, []); // 빈 의존성 배열로 한 번만 실행
+
   // 초기 인증 상태 확인 (강화된 버전)
   useEffect(() => {
-    let isMounted = true;
 
     const initializeAuth = async () => {
       // 항상 로딩 시작
@@ -303,7 +393,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             // 3. 최신 사용자 데이터 가져오기
             const updatedUserData = await authService.getCurrentUserProfile();
 
-            if (updatedUserData && isMounted) {
+            if (updatedUserData && isMountedRef.current) {
               console.log('[AUTH CONTEXT] 사용자 데이터 최신화 성공:', updatedUserData.mt_name);
               dispatch({ type: 'LOGIN_SUCCESS', payload: updatedUserData });
 
@@ -328,30 +418,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
             } else {
               console.warn('[AUTH CONTEXT] 사용자 데이터 최신화 실패');
-              if (isMounted) {
+              if (isMountedRef.current) {
                 dispatch({ type: 'LOGOUT' });
               }
             }
           } else {
             console.warn('[AUTH CONTEXT] 토큰 검증 실패');
-            if (isMounted) {
+            if (isMountedRef.current) {
               dispatch({ type: 'LOGOUT' });
             }
           }
         } else {
           console.log('[AUTH CONTEXT] 유효한 세션 없음. 로그아웃 상태로 설정.');
-          if (isMounted) {
+          if (isMountedRef.current) {
             dispatch({ type: 'LOGOUT' });
           }
         }
       } catch (error) {
         console.error('[AUTH CONTEXT] 초기 인증 상태 확인 중 오류 발생:', error);
-        if (isMounted) {
+        if (isMountedRef.current) {
           dispatch({ type: 'LOGOUT' }); // 에러 발생 시 안전하게 로그아웃 처리
         }
       } finally {
         // 데이터 확인이 끝나면 로딩 상태 해제
-        if (isMounted) {
+        if (isMountedRef.current) {
           dispatch({ type: 'SET_LOADING', payload: false });
         }
       }
@@ -361,14 +451,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     initializeAuth();
 
     const timeout = setTimeout(() => {
-      if (isMounted) {
+      if (isMountedRef.current) {
         console.log('[AUTH CONTEXT] 로딩 타임아웃 - 강제로 로딩 상태 해제');
         dispatch({ type: 'SET_LOADING', payload: false });
       }
     }, 5000); // 타임아웃 시간을 5초로 증가
 
     return () => {
-      isMounted = false;
+      isMountedRef.current = false;
       clearTimeout(timeout);
     };
   }, [preloadUserData]); // preloadUserData를 의존성 배열에 추가
@@ -732,75 +822,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     refreshAuthState,
   };
 
-  // 개발용 디버깅 함수들을 전역에 노출
-  if (typeof window !== 'undefined') {
-    (window as any).SMAP_DEBUG_AUTH = () => {
-      console.log('=== 🚀 SMAP 인증 디버깅 ===');
-      authService.debugAuthState();
-      console.log('현재 AuthContext 상태:', {
-        isLoggedIn: state.isLoggedIn,
-        loading: state.loading,
-        user: state.user ? `${state.user.mt_name} (${state.user.mt_idx})` : null,
-        selectedGroup: state.selectedGroup ? state.selectedGroup.sgt_title : null
-      });
-      console.log('========================');
-    };
-
-    (window as any).SMAP_FORCE_REFRESH_AUTH = async () => {
-      console.log('🔄 수동 인증 상태 새로고침 실행...');
-      try {
-        await refreshAuthState();
-        console.log('✅ 수동 인증 상태 새로고침 완료');
-      } catch (error) {
-        console.error('❌ 수동 인증 상태 새로고침 실패:', error);
-      }
-    };
-
-    (window as any).SMAP_CHECK_STORAGE = () => {
-      console.log('=== 📦 로컬 스토리지 상태 확인 ===');
-      if (typeof window !== 'undefined') {
-        const token = localStorage.getItem('smap_auth_token');
-        const userData = localStorage.getItem('smap_user_data');
-        const loginTime = localStorage.getItem('smap_login_time');
-
-        console.log('토큰 존재:', !!token);
-        console.log('사용자 데이터 존재:', !!userData);
-        console.log('로그인 시간 존재:', !!loginTime);
-
-        if (userData) {
-          try {
-            const user = JSON.parse(userData);
-            console.log('사용자 정보:', user.mt_name, `(${user.mt_idx})`);
-          } catch (e) {
-            console.error('사용자 데이터 파싱 오류:', e);
-          }
-        }
-      }
-      console.log('================================');
-    };
-
-    (window as any).SMAP_TEST_LOGIN = async () => {
-      console.log('=== 🔐 로그인 상태 종합 테스트 ===');
-      const isLoggedIn = authService.isLoggedIn();
-      console.log('authService.isLoggedIn():', isLoggedIn);
-
-      if (isLoggedIn) {
-        const userProfile = await authService.getCurrentUserProfile();
-        console.log('getCurrentUserProfile():', userProfile ? '성공' : '실패');
-        if (userProfile) {
-          console.log('사용자:', userProfile.mt_name, `(${userProfile.mt_idx})`);
-        }
-      }
-      console.log('================================');
-    };
-
-    // 사용법 출력
-    console.log('🔧 SMAP 디버깅 함수들:');
-    console.log('  - SMAP_DEBUG_AUTH(): 현재 인증 상태 확인');
-    console.log('  - SMAP_FORCE_REFRESH_AUTH(): 강제 인증 상태 새로고침');
-    console.log('  - SMAP_CHECK_STORAGE(): 로컬 스토리지 상태 확인');
-    console.log('  - SMAP_TEST_LOGIN(): 로그인 상태 종합 테스트');
-  }
+  // 🚫 개발용 디버깅 함수들은 useEffect에서 한 번만 초기화
 
   return (
     <AuthContext.Provider value={contextValue}>

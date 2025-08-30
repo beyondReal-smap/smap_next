@@ -57,6 +57,13 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // 초기화 완료 상태 추가
   const [isInitialized, setIsInitialized] = useState(false);
 
+  // 중복 호출 방지 플래그 - 더 강력한 버전
+  const [isDataLoadingInProgress, setIsDataLoadingInProgress] = useState(false);
+  const [lastLoadedUserId, setLastLoadedUserId] = useState<number | null>(null);
+  const [activeLoaderId, setActiveLoaderId] = useState<string | null>(null);
+  const [refreshExecutionId, setRefreshExecutionId] = useState<string | null>(null);
+  const [shouldRefreshData, setShouldRefreshData] = useState(false);
+
   // AuthContext와 DataCache 사용 (빌드 시 안전한 fallback)
   const authContext = useAuth();
   const { user, isLoggedIn, loading: authLoading, isPreloadingComplete } = authContext || {
@@ -69,9 +76,33 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // 사용자 데이터 새로고침 함수 (실시간 데이터 조회)
   const refreshUserData = useCallback(async () => {
+    // 실행 ID 생성 (현재 사용자 + 타임스탬프)
+    const executionId = user ? `${user.mt_idx}_${Date.now()}` : `anonymous_${Date.now()}`;
+
+    // 중복 호출 방지 - 더 강력한 로직
+    if (isDataLoadingInProgress || (user && lastLoadedUserId === user.mt_idx) || refreshExecutionId === executionId) {
+      console.log('[UserContext] 🚫 데이터 로딩 중 또는 이미 로드됨 - 중복 호출 방지', {
+        isLoading: isDataLoadingInProgress,
+        lastUserId: lastLoadedUserId,
+        currentUserId: user?.mt_idx,
+        executionId: executionId,
+        activeExecutionId: refreshExecutionId
+      });
+      return;
+    }
+
     try {
+      setIsDataLoadingInProgress(true);
+      setRefreshExecutionId(executionId);
       setIsUserDataLoading(true);
       setUserDataError(null);
+
+      console.log(`[UserContext] 🔄 데이터 로딩 시작 - 실행 ID: ${executionId}`);
+
+      // 현재 사용자 ID 기록
+      if (user) {
+        setLastLoadedUserId(user.mt_idx);
+      }
 
       // 로그인되지 않은 경우 초기화
       if (!isLoggedIn || !user) {
@@ -152,8 +183,11 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUserDataError(error instanceof Error ? error.message : '데이터 로딩 중 오류가 발생했습니다.');
     } finally {
       setIsUserDataLoading(false);
+      setIsDataLoadingInProgress(false);
+      setActiveLoaderId(null); // 로더 ID 초기화
+      setRefreshExecutionId(null); // 실행 ID 초기화
     }
-  }, [isLoggedIn, user, getUserProfile, getUserGroups]);
+  }, [isLoggedIn, user, getUserProfile, getUserGroups, isDataLoadingInProgress, lastLoadedUserId]);
 
   // 🆕 그룹 데이터 강제 새로고침 함수 (실시간 조회)
   const forceRefreshGroups = useCallback(async () => {
@@ -200,67 +234,62 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [isLoggedIn, user, selectedGroupId]);
 
-  // AuthContext 프리로딩 완료 후 데이터 새로고침
+    // 🚫 AuthContext 로딩 완료 감지 - 데이터 로딩 트리거
   useEffect(() => {
-    // AuthContext 로딩이 완료되고 사용자 정보가 있으면 즉시 실행
-    if (!authLoading && isLoggedIn && user) {
-      console.log('[UserContext] 🚀 AuthContext 사용자 정보 확인, 즉시 데이터 로딩 시작:', user.mt_idx);
-      
-      // 개발 모드에서 앱 시작 시 강제로 그룹 데이터 초기화
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[UserContext] 개발 모드 - 그룹 데이터 강제 초기화');
-        setUserGroups([]);
-        setSelectedGroupId(null);
-      }
-      
-      refreshUserData();
-      return;
+    // AuthContext 로딩이 완료되고 사용자 정보가 있으며, 아직 로드되지 않은 경우
+    if (!authLoading && isLoggedIn && user && user.mt_idx !== lastLoadedUserId) {
+      console.log('[UserContext] 🚀 AuthContext 로딩 완료 - 데이터 로딩 트리거');
+      setShouldRefreshData(true);
     }
-    
+
     // 사용자 정보가 없지만 프리로딩이 완료된 경우 (로그아웃 상태 등)
     if (!authLoading && !isLoggedIn) {
-      console.log('[UserContext] AuthContext 로그아웃 상태, 데이터 초기화');
+      console.log('[UserContext] AuthContext 로그아웃 상태');
       setUserInfo(null);
       setUserGroups([]);
       setIsUserDataLoading(false);
-      return;
+      setIsDataLoadingInProgress(false);
+      setLastLoadedUserId(null);
+      setActiveLoaderId(null);
+      setRefreshExecutionId(null);
+      setShouldRefreshData(false);
     }
-    
-    // 여전히 로딩 중인 경우
-    if (authLoading) {
-      console.log('[UserContext] AuthContext 로딩 중, 대기...');
-      setIsUserDataLoading(true);
-    }
-  }, [authLoading, isLoggedIn, user, refreshUserData]);
+  }, [authLoading, isLoggedIn, user, lastLoadedUserId]);
 
-  // 프리로딩 완료 시 추가 데이터 확인 (백업용)
+  // 🚫 프리로딩 완료 시 데이터 로딩 트리거
   useEffect(() => {
-    // 프리로딩이 완료되었지만 UserContext 데이터가 없는 경우 재시도
-    if (isPreloadingComplete && isLoggedIn && user && !userInfo) {
-      console.log('[UserContext] ⚡ 프리로딩 완료 후 백업 데이터 로딩 시도');
-      refreshUserData();
+    // 프리로딩이 완료되었지만 UserContext 데이터가 없는 경우
+    if (isPreloadingComplete && isLoggedIn && user && !userInfo && user.mt_idx !== lastLoadedUserId) {
+      console.log('[UserContext] ⚡ 프리로딩 완료 - 데이터 로딩 트리거');
+      setShouldRefreshData(true);
     }
-  }, [isPreloadingComplete, isLoggedIn, user, userInfo, refreshUserData]);
+  }, [isPreloadingComplete, isLoggedIn, user, userInfo, lastLoadedUserId]);
 
-  // 사용자 변경 시 완전한 데이터 초기화
+                // 🚫 사용자 변경 시 데이터 로딩 트리거
   useEffect(() => {
-    if (user?.mt_idx) {
-      console.log('[UserContext] 사용자 변경 감지, 실시간 데이터 초기화:', user.mt_idx);
-      
-      // 모든 상태 초기화
+    if (user?.mt_idx && user.mt_idx !== lastLoadedUserId) {
+      console.log('[UserContext] 사용자 변경 감지 - 데이터 로딩 트리거:', user.mt_idx);
+
+      // 상태 초기화
       setIsInitialized(false);
       setSelectedGroupId(null);
       setUserGroups([]);
       setUserInfo(null);
       setUserDataError(null);
-      setIsUserDataLoading(true);
-      
-      // 새로운 사용자 데이터 로딩 시작
-      setTimeout(() => {
-        refreshUserData();
-      }, 100);
+
+      // 데이터 로딩 트리거
+      setShouldRefreshData(true);
     }
-  }, [user?.mt_idx, refreshUserData]);
+  }, [user?.mt_idx, lastLoadedUserId]);
+
+  // 🚀 데이터 로딩 트리거 감지 및 실행 (중앙 집중식)
+  useEffect(() => {
+    if (shouldRefreshData && !isDataLoadingInProgress) {
+      console.log('[UserContext] 🔄 데이터 로딩 트리거 감지 - 실행 시작');
+      setShouldRefreshData(false); // 플래그 초기화
+      refreshUserData();
+    }
+  }, [shouldRefreshData, isDataLoadingInProgress]);
 
   // 그룹 데이터 로딩 완료 후 첫 번째 그룹 자동 선택 (한 번만)
   useEffect(() => {

@@ -11,6 +11,9 @@ export const useTermsPageState = ({ pageName, isEmbed = false }: UseTermsPageSta
   const [isVisible, setIsVisible] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialized, setIsInitialized] = useState(true);
+
+  // 컴포넌트 마운트 상태 추적 (클라이언트 환경에서만)
+  const isMountedRef = useRef(typeof window !== 'undefined' ? true : null);
   
   // 인증 상태 추적을 위한 ref
   const authCheckRef = useRef<boolean>(false);
@@ -204,7 +207,7 @@ export const useTermsPageState = ({ pageName, isEmbed = false }: UseTermsPageSta
 
   // 초기화
   useEffect(() => {
-    let isMounted = true;
+
     
     const initializePage = async () => {
       console.log(`[${pageName}] 약관 페이지 초기화 시작`);
@@ -213,7 +216,7 @@ export const useTermsPageState = ({ pageName, isEmbed = false }: UseTermsPageSta
       applyStyles();
       
       // 약관 페이지는 즉시 초기화 완료 (인증 상태와 관계없이)
-      if (isMounted) {
+      if (isMountedRef.current) {
         console.log(`[${pageName}] 약관 페이지 초기화 완료`);
         setIsInitialized(true);
         setIsLoading(false);
@@ -228,7 +231,7 @@ export const useTermsPageState = ({ pageName, isEmbed = false }: UseTermsPageSta
     initializePage();
 
     return () => {
-      isMounted = false;
+      isMountedRef.current = false;
       // cleanup 시 스타일 복원
       restoreStyles();
     };

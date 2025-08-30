@@ -233,10 +233,57 @@ class GroupService {
         
         console.log('[GroupService] 그룹 캐시 정리 완료:', keysToRemove.length, '개 항목 삭제');
       }
-    } catch (error) {
-      console.error('[GroupService] 캐시 정리 오류:', error);
+          } catch (error) {
+        console.error('[GroupService] 캐시 정리 오류:', error);
+      }
     }
-  }
+    
+    // 🚫 API 호출 중복 방지 헬퍼 메서드들
+    private getLastApiCallTime(key: string): number {
+      if (typeof window !== 'undefined') {
+        return parseInt(localStorage.getItem(`last_api_call_${key}`) || '0');
+      }
+      return 0;
+    }
+    
+    private setLastApiCallTime(key: string, timestamp: number): void {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`last_api_call_${key}`, timestamp.toString());
+      }
+    }
+    
+    private getCachedGroups(): Group[] {
+      if (typeof window !== 'undefined') {
+        const cached = localStorage.getItem('cached_groups');
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            // 캐시 유효성 검사 (1시간)
+            if (Date.now() - parsed.timestamp < 60 * 60 * 1000) {
+              return parsed.data || [];
+            }
+          } catch (e) {
+            console.warn('[GroupService] 캐시된 그룹 데이터 파싱 실패');
+          }
+        }
+      }
+      return [];
+    }
+    
+    private cacheGroups(groups: Group[]): void {
+      if (typeof window !== 'undefined' && groups.length > 0) {
+        try {
+          const cacheData = {
+            data: groups,
+            timestamp: Date.now()
+          };
+          localStorage.setItem('cached_groups', JSON.stringify(cacheData));
+          console.log('[GroupService] 🚫 그룹 데이터 캐시 저장 완료:', groups.length, '개');
+        } catch (e) {
+          console.warn('[GroupService] 그룹 데이터 캐시 저장 실패');
+        }
+      }
+    }
 
   // 그룹 업데이트
   async updateGroup(groupId: number, groupData: GroupUpdate): Promise<Group> {
@@ -304,6 +351,24 @@ class GroupService {
   // 현재 로그인한 사용자의 그룹 목록 조회
   async getCurrentUserGroups(ignoreCache: boolean = false): Promise<Group[]> {
     try {
+      // 🚫 API 호출 중복 방지 - 최근 호출 시간 체크
+      const now = Date.now();
+      const lastCallKey = 'last_group_api_call';
+      const lastCallTime = this.getLastApiCallTime(lastCallKey);
+      
+      if (now - lastCallTime < 2000) { // 2초 내 중복 호출 방지
+        console.log('[GroupService] 🚫 API 호출 중복 방지 - 2초 내 재호출 차단');
+        // 캐시된 데이터가 있으면 반환
+        const cachedGroups = this.getCachedGroups();
+        if (cachedGroups.length > 0) {
+          console.log('[GroupService] 🚫 캐시된 그룹 데이터 반환:', cachedGroups.length, '개');
+          return cachedGroups;
+        }
+      }
+      
+      // API 호출 시간 기록
+      this.setLastApiCallTime(lastCallKey, now);
+      
       // 환경 감지
       const isProduction = typeof window !== 'undefined' && 
         (window.location.hostname.includes('smap.site') || window.location.hostname.includes('vercel.app'));
@@ -357,6 +422,9 @@ class GroupService {
         : [];
       
       console.log('[GroupService] 필터링 후 활성 그룹:', filteredGroups.length, '개');
+      
+      // 🚫 API 응답 결과를 캐시에 저장
+      this.cacheGroups(filteredGroups);
       
       return filteredGroups;
     } catch (error) {
