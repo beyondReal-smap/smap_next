@@ -19,6 +19,7 @@ import { HiSparkles } from 'react-icons/hi2';
 import { useAuth } from '@/contexts/AuthContext';
 import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
 import AnimatedHeader from '../../../components/common/AnimatedHeader';
+import ProfileImageUploader from '../../../components/common/ProfileImageUploader';
 
 // 기본 이미지 가져오기 함수
 const getDefaultImage = (gender: number | null | undefined, index: number): string => {
@@ -265,10 +266,8 @@ export default function AccountSettingsPage() {
   const router = useRouter();
   const { user, logout, refreshUserData } = useAuth();
   const [profileImg, setProfileImg] = useState(getSafeImageUrl(user?.mt_file1 || null, user?.mt_gender, user?.mt_idx || 0));
-  const [showSheet, setShowSheet] = useState(false);
-  const [isClosing, setIsClosing] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showProfileUploader, setShowProfileUploader] = useState(false);
 
   // 페이지 로드 시 사용자 데이터 새로고침
   useEffect(() => {
@@ -396,30 +395,8 @@ export default function AccountSettingsPage() {
       };
       reader.readAsDataURL(file);
     }
-    setShowSheet(false);
-  };
 
-  // 카메라/앨범 선택 트리거
-  const handleSelect = (mode: 'camera' | 'album') => {
-    if (fileInputRef.current) {
-      if (mode === 'camera') {
-        fileInputRef.current.setAttribute('capture', 'environment');
-      } else {
-        fileInputRef.current.removeAttribute('capture');
-      }
-      fileInputRef.current.click();
-    }
-    setShowSheet(false);
-  };
 
-  // 모달 닫기 핸들러
-  const closeModal = () => {
-    setIsClosing(true);
-    setTimeout(() => {
-      setShowSheet(false);
-      setIsClosing(false);
-    }, 300);
-  };
 
   // 로그아웃 처리
   const handleLogout = async () => {
@@ -441,11 +418,61 @@ export default function AccountSettingsPage() {
   // 뒤로가기 핸들러
   const handleBack = () => {
     // 🎮 뒤로가기 햅틱 피드백
-    triggerHapticFeedback(HapticFeedbackType.SELECTION, '계정설정 뒤로가기', { 
-      component: 'account-setting', 
-      action: 'back-navigation' 
+    triggerHapticFeedback(HapticFeedbackType.SELECTION, '계정설정 뒤로가기', {
+      component: 'account-setting',
+      action: 'back-navigation'
     });
     router.push('/setting');
+  };
+
+  // 프로필 사진 업로드 핸들러
+  const handleProfileImageUpload = async (file: File) => {
+    try {
+      console.log('[PROFILE UPLOAD] 프로필 사진 업로드 시작');
+
+      // FormData 생성
+      const formData = new FormData();
+      formData.append('file', file);
+
+      // API 호출
+      const response = await fetch('/api/members/upload-profile-image', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          // Authorization 헤더는 apiClient에서 자동으로 추가됨
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('업로드 실패');
+      }
+
+      const result = await response.json();
+      console.log('[PROFILE UPLOAD] 업로드 성공:', result);
+
+      // 사용자 데이터 새로고침
+      await refreshUserData();
+
+      // 성공 피드백
+      triggerHapticFeedback(HapticFeedbackType.SUCCESS, '프로필 사진 변경 성공', {
+        component: 'profile-upload',
+        action: 'upload-success'
+      });
+
+    } catch (error) {
+      console.error('[PROFILE UPLOAD] 업로드 실패:', error);
+      alert('프로필 사진 업로드에 실패했습니다. 다시 시도해주세요.');
+    }
+  };
+
+  // 프로필 사진 변경 모달 열기
+  const openProfileUploader = () => {
+    setShowProfileUploader(true);
+  };
+
+  // 프로필 사진 변경 모달 닫기
+  const closeProfileUploader = () => {
+    setShowProfileUploader(false);
   };
 
   // 메뉴 아이템 클릭 핸들러
@@ -610,9 +637,9 @@ export default function AccountSettingsPage() {
               <div className="bg-[#3C82F6] rounded-3xl p-6 text-white shadow-xl">
                 <div className="flex items-center space-x-4">
                   <div className="relative">
-                    <button 
-                      type="button" 
-                      onClick={() => setShowSheet(true)} 
+                    <button
+                      type="button"
+                      onClick={openProfileUploader}
                       className="mobile-button group"
                     >
                       <div className="relative">
@@ -635,13 +662,7 @@ export default function AccountSettingsPage() {
                         </div>
                       </div>
                     </button>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleFileChange}
-                    />
+
                   </div>
                   
                   <div className="flex-1">
@@ -722,56 +743,14 @@ export default function AccountSettingsPage() {
           </motion.div>
         </motion.div>
 
-        {/* 프로필 사진 변경 모달 */}
-        {showSheet && (
-                                <div 
-            className="fixed inset-0 flex items-end justify-center bg-black/50 backdrop-blur-sm" 
-            style={{ zIndex: 9999999 }}
-            onClick={closeModal}
-          >
-              <div 
-                className={`w-full max-w-md bg-white rounded-t-3xl p-6 pb-8 shadow-2xl ${
-                  isClosing ? 'animate-slideOutToBottom' : 'animate-slideInFromBottom'
-                }`}
-                style={{ marginBottom: '-1px', borderRadius: '24px 24px 0px 0px' }}
-                onClick={e => e.stopPropagation()}
-              >
-              <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-6"></div>
-              
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <FiCamera className="w-8 h-8 text-indigo-600" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-1">프로필 사진 변경</h3>
-                <p className="text-gray-600 text-sm">새로운 프로필 사진을 선택해주세요</p>
-              </div>
-              
-              <div className="space-y-3">
-                <button
-                  className="w-full py-4 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium shadow-lg mobile-button flex items-center justify-center space-x-2"
-                  onClick={() => handleSelect('camera')}
-                >
-                  <FiCamera className="w-5 h-5" />
-                  <span>카메라로 촬영</span>
-                </button>
-                
-                <button
-                  className="w-full py-4 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-medium shadow-lg mobile-button flex items-center justify-center space-x-2"
-                  onClick={() => handleSelect('album')}
-                >
-                  <FiEdit3 className="w-5 h-5" />
-                  <span>앨범에서 선택</span>
-                </button>
-                
-                <button
-                  className="w-full py-4 rounded-2xl bg-gray-100 text-gray-700 font-medium mobile-button"
-                  onClick={closeModal}
-                >
-                  취소
-                </button>
-              </div>
-            </div>
-          </div>
+        {/* 프로필 사진 업로더 모달 */}
+        {showProfileUploader && (
+          <ProfileImageUploader
+            currentImage={profileImg}
+            onImageChange={handleProfileImageUpload}
+            onClose={closeProfileUploader}
+            mtIdx={user?.mt_idx?.toString() || ''}
+          />
         )}
 
         {/* 로그아웃 확인 모달 - 컴팩트 버전 */}
@@ -818,4 +797,5 @@ export default function AccountSettingsPage() {
       </div>
     </>
   );
-} 
+}
+}

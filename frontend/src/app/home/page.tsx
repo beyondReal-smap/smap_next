@@ -209,16 +209,33 @@ html, body {
   left: 0 !important;
   right: 0 !important;
   z-index: 9999 !important;
-  /* 터치 이벤트 제어 */
-  touch-action: none !important;
-  -webkit-touch-callout: none !important;
-  -webkit-user-select: none !important;
-  user-select: none !important;
+  /* 헤더 전체는 터치 이벤트 제한 없음 - 버튼들은 개별 제어 */
+  touch-action: auto !important;
+  -webkit-touch-callout: auto !important;
+  -webkit-user-select: auto !important;
+  user-select: auto !important;
   background: rgba(255, 255, 255, 0.95) !important;
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
   will-change: transform !important;
   transform: translateZ(0) !important;
+}
+
+/* 헤더 버튼 터치 이벤트 허용 */
+.header-fixed button {
+  touch-action: auto !important;
+  -webkit-touch-callout: auto !important;
+  -webkit-user-select: auto !important;
+  user-select: auto !important;
+  pointer-events: auto !important;
+}
+
+/* 헤더 버튼 호버 효과 강화 */
+.header-fixed button:hover {
+  background: rgba(255, 255, 255, 0.7) !important;
+  transform: scale(1.05) !important;
+  transition: all 0.2s ease !important;
+}
   /* iOS Safari 상단 노치 대응 제거 */
   padding-top: 0px;
   /* iOS 웹뷰에서 고정 요소 최적화 */
@@ -6217,29 +6234,46 @@ export default function HomePage() {
       };
     }, [isSidebarOpen]);
 
-    // 네비게이션 바와 헤더 터치 이벤트 방지 (항상 적용)
+    // 네비게이션 바와 헤더 터치 이벤트 방지 (버튼 제외)
     useEffect(() => {
       const preventNavigationDrag = (e: TouchEvent) => {
-        // 네비게이션 바 영역에서 터치 이벤트 방지
+        // 네비게이션 바 영역에서 터치 이벤트 방지 (항상)
         const target = e.target as HTMLElement;
-        if (target.closest('.navigation-fixed') || target.closest('.header-fixed')) {
+        if (target.closest('.navigation-fixed')) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+
+        // 헤더 영역에서는 버튼이 아닌 경우에만 터치 이벤트 방지
+        if (target.closest('.header-fixed') && !target.closest('button')) {
           e.preventDefault();
           e.stopPropagation();
         }
       };
 
       const preventTouchMove = (e: TouchEvent) => {
-        // 네비게이션 바와 헤더에서 터치 이동 방지
+        // 네비게이션 바에서 터치 이동 방지 (항상)
         const target = e.target as HTMLElement;
-        if (target.closest('.navigation-fixed') || target.closest('.header-fixed')) {
+        if (target.closest('.navigation-fixed')) {
+          e.preventDefault();
+        }
+
+        // 헤더 영역에서는 버튼이 아닌 경우에만 터치 이동 방지
+        if (target.closest('.header-fixed') && !target.closest('button')) {
           e.preventDefault();
         }
       };
 
       const preventTouchStart = (e: TouchEvent) => {
-        // 네비게이션 바와 헤더에서 터치 시작 시 즉시 방지
+        // 네비게이션 바에서 터치 시작 방지 (항상)
         const target = e.target as HTMLElement;
-        if (target.closest('.navigation-fixed') || target.closest('.header-fixed')) {
+        if (target.closest('.navigation-fixed')) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+        }
+
+        // 헤더 영역에서는 버튼이 아닌 경우에만 터치 시작 방지
+        if (target.closest('.header-fixed') && !target.closest('button')) {
           e.preventDefault();
           e.stopImmediatePropagation();
         }
@@ -6706,7 +6740,7 @@ export default function HomePage() {
                 }}
               >
                 <button
-                 className="p-0.5 hover:bg-white/50 rounded-xl transition-all duration-200 relative"
+                 className="p-2 hover:bg-white/50 rounded-xl transition-all duration-200 relative min-w-[44px] min-h-[44px] flex items-center justify-center"
                  onClick={async () => {
                    // 알림 페이지로 이동하면서 모든 알림을 읽음 처리
                    try {
@@ -6758,7 +6792,7 @@ export default function HomePage() {
                )}
                
                <button
-                 className="p-0.5 hover:bg-white/50 rounded-xl transition-all duration-200"
+                 className="p-2 hover:bg-white/50 rounded-xl transition-all duration-200 min-w-[44px] min-h-[44px] flex items-center justify-center"
                  onClick={() => {
                    // 🎮 설정 페이지 이동 햅틱 피드백
                    triggerHapticFeedback(HapticFeedbackType.SELECTION, '설정 페이지 이동', { 

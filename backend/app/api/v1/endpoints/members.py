@@ -1,5 +1,5 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, Header
+from fastapi import APIRouter, Depends, HTTPException, Query, Header, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from jose import JWTError, jwt
@@ -8,10 +8,10 @@ from app.core.config import settings
 from app.models.member import Member
 from app.models.group_detail import GroupDetail
 from app.schemas.member import (
-    MemberCreate, 
-    MemberUpdate, 
-    MemberResponse, 
-    RegisterRequest, 
+    MemberCreate,
+    MemberUpdate,
+    MemberResponse,
+    RegisterRequest,
     RegisterResponse,
     MemberLogin,
     MemberLoginResponse,
@@ -40,6 +40,9 @@ from app.crud.crud_member import crud_member
 from app.models.enums import StatusEnum
 from datetime import datetime
 import logging
+import os
+import shutil
+from pathlib import Path
 
 # 로거 설정
 logger = logging.getLogger(__name__)
@@ -1044,4 +1047,133 @@ async def get_terms_list():
         import traceback
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail="서버 오류가 발생했습니다.")
+
+
+# 프로필 사진 업로드 디렉토리 설정
+UPLOAD_DIR = Path("public/images")
+UPLOAD_DIR.mkdir(exist_ok=True, parents=True)
+
+@router.post("/upload-profile-image")
+async def upload_profile_image(
+    file: UploadFile = File(...),
+    current_user_id: Optional[int] = Depends(get_current_user_id_from_token),
+    db: Session = Depends(deps.get_db)
+):
+    """
+    프로필 사진 업로드 API
+    - 파일을 public/images 폴더에 저장
+    - 파일명을 mt_idx로 변경
+    - member_t.mt_file1에 파일 경로 저장
+    """
+    try:
+        # 사용자 인증 확인
+        if not current_user_id:
+            raise HTTPException(status_code=401, detail="인증이 필요합니다.")
+
+        # 파일 유효성 검사
+        if not file:
+            raise HTTPException(status_code=400, detail="파일이 제공되지 않았습니다.")
+
+        # 파일 타입 검사
+        if not file.content_type.startswith('image/'):
+            raise HTTPException(status_code=400, detail="이미지 파일만 업로드 가능합니다.")
+
+        # 파일 크기 제한 (5MB)
+        file_size = 0
+        content = await file.read()
+        file_size = len(content)
+
+        if file_size > 5 * 1024 * 1024:  # 5MB
+            raise HTTPException(status_code=400, detail="파일 크기는 5MB를 초과할 수 없습니다.")
+
+        # 파일명 생성 (mt_idx.jpg)
+        file_extension = ".jpg"  # 크롭된 이미지는 항상 JPG
+        new_filename = f"{current_user_id}{file_extension}"
+        file_path = UPLOAD_DIR / new_filename
+
+        # 파일 저장
+        with open(file_path, "wb") as buffer:
+            buffer.write(content)
+
+        # DB 업데이트 - mt_file1 필드에 파일 경로 저장
+        file_url = f"/images/{new_filename}"
+
+        # 사용자 정보 업데이트
+        member = db.query(Member).filter(Member.mt_idx == current_user_id).first()
+        if not member:
+            raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+
+        member.mt_file1 = file_url
+        db.commit()
+
+        logger.info(f"[PROFILE_IMAGE] 프로필 사진 업로드 성공 - 사용자: {current_user_id}, 파일: {new_filename}")
+
+        return {
+            "success": True,
+            "message": "프로필 사진이 성공적으로 업로드되었습니다.",
+            "data": {
+                "file_path": file_url,
+                "file_name": new_filename,
+                "file_size": file_size
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[PROFILE_IMAGE] 프로필 사진 업로드 실패: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail="프로필 사진 업로드 중 오류가 발생했습니다.")
+
+
+@router.delete("/delete-profile-image")
+async def delete_profile_image(
+    current_user_id: Optional[int] = Depends(get_current_user_id_from_token),
+    db: Session = Depends(deps.get_db)
+):
+    """
+    프로필 사진 삭제 API
+    - public/images 폴더에서 파일 삭제
+    - member_t.mt_file1 필드 초기화
+    """
+    try:
+        # 사용자 인증 확인
+        if not current_user_id:
+            raise HTTPException(status_code=401, detail="인증이 필요합니다.")
+
+        # 사용자 정보 조회
+        member = db.query(Member).filter(Member.mt_idx == current_user_id).first()
+        if not member:
+            raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+
+        # 기존 파일이 있는지 확인
+        if member.mt_file1:
+            # 파일 경로에서 파일명 추출
+            file_path = member.mt_file1.replace('/images/', '')
+            full_path = UPLOAD_DIR / file_path
+
+            # 파일 삭제
+            if full_path.exists():
+                os.remove(full_path)
+                logger.info(f"[PROFILE_IMAGE] 기존 프로필 사진 파일 삭제: {file_path}")
+
+        # DB 업데이트 - mt_file1 필드 초기화
+        member.mt_file1 = None
+        db.commit()
+
+        logger.info(f"[PROFILE_IMAGE] 프로필 사진 삭제 성공 - 사용자: {current_user_id}")
+
+        return {
+            "success": True,
+            "message": "프로필 사진이 성공적으로 삭제되었습니다."
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[PROFILE_IMAGE] 프로필 사진 삭제 실패: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail="프로필 사진 삭제 중 오류가 발생했습니다.")
 
