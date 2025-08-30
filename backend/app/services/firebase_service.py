@@ -102,10 +102,14 @@ class FirebaseService:
             return "firebase_disabled"
 
         try:
+            logger.info(f"📤 [FCM] 푸시 메시지 전송 시작 - 토큰: {token[:30]}..., 제목: {title}")
+
             message = messaging.Message(
                 data={
                     'title': title,
-                    'body': content
+                    'body': content,
+                    'custom_data': 'ios_push_test',  # iOS 푸시 수신 확인용
+                    'timestamp': str(int(time.time() * 1000))
                 },
                 notification=messaging.Notification(
                     title=title,
@@ -114,26 +118,32 @@ class FirebaseService:
                 android=messaging.AndroidConfig(
                     priority='high',
                     notification=messaging.AndroidNotification(
-                        sound='default'
+                        sound='default',
+                        channel_id='default'
                     )
                 ),
                 apns=messaging.APNSConfig(
                     headers={
                         "apns-push-type": "alert",
                         "apns-priority": "10",
-                        "apns-topic": Config.IOS_BUNDLE_ID  # iOS 앱 번들 ID
+                        "apns-topic": Config.IOS_BUNDLE_ID,  # iOS 앱 번들 ID
+                        "apns-expiration": str(int(time.time()) + 300)  # 5분 후 만료
                     },
                     payload=messaging.APNSPayload(
                         aps=messaging.Aps(
+                            alert=messaging.ApsAlert(title=title, body=content),  # 명시적 알림 표시
                             sound='default',
                             badge=1,
-                            content_available=False,  # 백그라운드 앱에서 데이터 처리 가능하도록 함
-                            mutable_content=True  # iOS에서 콘텐츠 수정 가능하도록 함
+                            content_available=True,  # 백그라운드에서도 앱 깨우기
+                            mutable_content=True,  # iOS에서 콘텐츠 수정 가능
+                            category="GENERAL"  # 알림 카테고리 설정
                         )
                     )
                 ),
                 token=token,
             )
+
+            logger.info(f"📤 [FCM] 메시지 구성 완료 - iOS 푸시 수신을 위한 최적화 적용")
             
             response = messaging.send(message)
             logger.info(f"✅ [FCM POLICY 4] FCM 메시지 전송 성공: {response}")
@@ -144,6 +154,7 @@ class FirebaseService:
             # NotRegistered 에러: 토큰이 더 이상 유효하지 않음 (앱 삭제 등)
             logger.warning(f"🚨 [FCM POLICY 4] 비활성 토큰 감지 (UnregisteredError): {token[:30]}...")
             logger.warning(f"🚨 [FCM POLICY 4] 토큰이 유효하지 않아 삭제 처리 필요: {e}")
+            logger.warning(f"🚨 [FCM POLICY 4] FCM 푸시 메시지 전송 실패 - 토큰이 만료되었거나 앱이 삭제됨")
 
             # 토큰 삭제 처리를 위한 이벤트 발생 (나중에 구현)
             self._handle_inactive_token(token, "unregistered")
@@ -153,6 +164,7 @@ class FirebaseService:
             # InvalidRegistration 에러: 토큰 형식이 잘못됨
             logger.warning(f"🚨 [FCM POLICY 4] 잘못된 토큰 형식 (InvalidArgumentError): {token[:30]}...")
             logger.warning(f"🚨 [FCM POLICY 4] 토큰 형식이 잘못되어 삭제 처리 필요: {e}")
+            logger.warning(f"🚨 [FCM POLICY 4] FCM 푸시 메시지 전송 실패 - 토큰 형식이 잘못됨")
 
             # 토큰 삭제 처리를 위한 이벤트 발생
             self._handle_inactive_token(token, "invalid_registration")
@@ -285,11 +297,12 @@ class FirebaseService:
         self,
         token: str,
         reason: str = "token_refresh",
-        priority: str = "low"
+        priority: str = "high"  # 백그라운드 앱 깨우기 위해 high로 변경
     ) -> str:
         """
         Silent FCM 푸시 알림 전송 (사용자에게 표시되지 않는 푸시)
         앱이 백그라운드에 오래 있어도 푸시 수신이 가능하도록 유지
+        FCM 토큰 변경 시 백그라운드 앱을 깨우기 위해 사용
 
         Args:
             token: FCM 토큰
@@ -301,12 +314,16 @@ class FirebaseService:
             return "firebase_disabled"
 
         try:
+            logger.info(f"🤫 [FCM SILENT] Silent 푸시 전송 시작 - 토큰: {token[:30]}..., 이유: {reason}")
+
             # Silent 푸시를 위한 데이터 구성 (사용자에게 표시되지 않음)
             data = {
                 'silent_push': 'true',
                 'reason': reason,
                 'timestamp': str(int(time.time() * 1000)),
-                'token_refresh': 'true'  # 토큰 갱신 요청
+                'token_refresh': 'true',  # 토큰 갱신 요청
+                'background_wake': 'true',  # 백그라운드 앱 깨우기 플래그
+                'force_token_update': 'true'  # 강제 토큰 업데이트 요청
             }
 
             # Silent 푸시는 notification을 포함하지 않지만, iOS가 무시하지 않도록 priority를 높임
@@ -317,13 +334,14 @@ class FirebaseService:
                 ),
                 apns=messaging.APNSConfig(
                     headers={
-                        "apns-push-type": "background",
+                        "apns-push-type": "background",  # background 타입으로 설정하여 사용자에게 표시하지 않음
                         "apns-priority": "10",  # Silent 푸시라도 최고 우선순위로 설정하여 무시 방지
-                        "apns-topic": "com.dmonster.smap"
+                        "apns-topic": Config.IOS_BUNDLE_ID,  # 올바른 번들 ID 설정
+                        "apns-expiration": str(int(time.time()) + 600)  # 10분 후 만료 (충분한 시간 부여)
                     },
                     payload=messaging.APNSPayload(
                         aps=messaging.Aps(
-                            content_available=True,
+                            content_available=True,  # 백그라운드 앱 깨우기 필수
                             # Silent 푸시는 사용자에게 표시되지 않음
                             # badge, sound, alert 등 모두 제외
                         )
@@ -333,7 +351,7 @@ class FirebaseService:
             )
 
             response = messaging.send(message)
-            logger.info(f"✅ [FCM POLICY 4] Silent FCM 메시지 전송 성공: {response}")
+            logger.info(f"✅ [FCM SILENT] Silent FCM 메시지 전송 성공 - 백그라운드 앱 깨우기 완료: {response}")
             return response
 
         except messaging.UnregisteredError as e:

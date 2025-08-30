@@ -662,11 +662,8 @@ const SignInPage = () => {
       console.log('🎯 [NATIVE CALLBACK] userInfo 구조 확인:', {
         hasIdToken: !!userInfo.idToken,
         hasUserInfo: !!userInfo.userInfo,
-        hasEmail: userInfo.userInfo?.email,
-        hasName: userInfo.userInfo?.name,
-        hasPicture: userInfo.userInfo?.imageURL,
+        userInfoType: typeof userInfo.userInfo,
         userInfoKeys: Object.keys(userInfo),
-        userInfoUserInfoKeys: userInfo.userInfo ? Object.keys(userInfo.userInfo) : [],
         fullUserInfo: userInfo
       });
 
@@ -674,15 +671,30 @@ const SignInPage = () => {
         console.log('🔄 [NATIVE CALLBACK] 백엔드 구글 인증 API 호출 시작');
 
         // iOS 네이티브에서 전달된 데이터 구조 처리
-        const userData = userInfo.userInfo || userInfo;
         const idToken = userInfo.idToken;
+
+        // userInfo.userInfo는 JSON 문자열이므로 파싱
+        let userData;
+        try {
+          if (typeof userInfo.userInfo === 'string') {
+            userData = JSON.parse(userInfo.userInfo);
+            console.log('✅ [NATIVE CALLBACK] userInfo JSON 파싱 성공:', userData);
+          } else {
+            userData = userInfo.userInfo || userInfo;
+            console.log('⚠️ [NATIVE CALLBACK] userInfo가 이미 객체임:', userData);
+          }
+        } catch (parseError) {
+          console.error('❌ [NATIVE CALLBACK] userInfo JSON 파싱 실패:', parseError);
+          userData = userInfo; // 폴백
+        }
 
         console.log('🔍 [NATIVE CALLBACK] 파싱된 데이터:', {
           idToken: idToken ? `${idToken.substring(0, 30)}...` : '없음',
           email: userData.email,
           name: userData.name,
           imageURL: userData.imageURL,
-          source: userInfo.source
+          source: userInfo.source,
+          userDataType: typeof userData
         });
 
         // 백엔드 API로 ID 토큰 전송
@@ -699,6 +711,14 @@ const SignInPage = () => {
             id_token: idToken,  // ✅ iOS 네이티브에서 전달된 idToken 사용
             source: 'native'
           }),
+        });
+
+        console.log('📡 [NATIVE CALLBACK] API 요청 데이터:', {
+          google_id: userData.sub || userData.googleId || userData.id,
+          email: userData.email,
+          name: userData.name,
+          hasIdToken: !!idToken,
+          source: 'native'
         });
 
         const data = await response.json();
@@ -744,7 +764,7 @@ const SignInPage = () => {
               given_name: userData.givenName,
               family_name: userData.familyName,
               profile_image: data.user?.profile_image || userData.imageURL || userData.picture,
-              google_id: data.user?.google_id || userData.sub
+              google_id: data.user?.google_id || userData.sub || userData.googleId
             };
             
             console.log('[NATIVE CALLBACK] 구글 소셜 로그인 데이터 저장:', socialData);
