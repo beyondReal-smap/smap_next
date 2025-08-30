@@ -596,8 +596,8 @@ class AuthService {
         return false;
       }
 
-      // 4. 사용자 데이터 유효성 검증
-      if (!userData.mt_idx || !userData.mt_name) {
+      // 4. 사용자 데이터 유효성 검증 (mt_name 대신 name 사용)
+      if (!userData.mt_idx || (!userData.mt_name && !(userData as any).name)) {
         console.warn('[AUTH SERVICE] 사용자 데이터 불완전');
         this.clearAuthData();
         return false;
