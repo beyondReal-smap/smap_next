@@ -40,6 +40,18 @@ async function fetchWithFallback(url: string, options: RequestInit): Promise<any
 
     if (!response.ok) {
       const errorText = await response.text();
+
+      // 404 오류 처리
+      if (response.status === 404) {
+        console.warn('[Group Get API] 그룹을 찾을 수 없음:', {
+          error: errorText
+        });
+        return NextResponse.json({
+          error: 'Group not found',
+          message: `그룹을 찾을 수 없습니다.`,
+        }, { status: 404 });
+      }
+
       throw new Error(`API error: ${response.status} - ${errorText}`);
     }
 

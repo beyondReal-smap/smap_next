@@ -1050,170 +1050,17 @@ window.TEST_GOOGLE = function() {
     console.log('🔍 [TEST_GOOGLE] Google 로그인 테스트 완료');
 };
 
-// 🆕 사용자 정보 수동 테스트 함수들
-window.SMAP_TEST_USER_INFO = function() {
-    console.log('🧪 [SMAP_TEST_USER_INFO] 사용자 정보 수동 테스트 시작');
-    
-    if (window.SmapApp && window.SmapApp.user) {
-        console.log('🧪 [SMAP_TEST_USER_INFO] SmapApp.user 함수들 실행');
-        
-        // 1. 자동 확인 및 전송
-        console.log('🧪 [SMAP_TEST_USER_INFO] 1. 자동 확인 실행');
-        window.SmapApp.user.checkAndSendUserInfo();
-        
-        // 2. 수동 테스트 데이터 전송
-        setTimeout(() => {
-            console.log('🧪 [SMAP_TEST_USER_INFO] 2. 테스트 데이터 전송');
-            window.SmapApp.user.sendUserInfo({
-                mt_idx: "test_123",
-                mt_id: "test@smap.site",
-                mt_name: "테스트 사용자",
-                mt_email: "test@smap.site"
-            });
-        }, 2000);
-        
-    } else {
-        console.error('❌ [SMAP_TEST_USER_INFO] SmapApp.user를 찾을 수 없음');
-    }
-    
-    console.log('🧪 [SMAP_TEST_USER_INFO] 테스트 완료');
-};
 
-window.SMAP_DEBUG_STORAGE = function() {
-    console.log('🔍 [SMAP_DEBUG_STORAGE] 저장소 디버깅 시작');
-    
-    if (window.SmapApp && window.SmapApp.user && window.SmapApp.user.debugAllStorages) {
-        window.SmapApp.user.debugAllStorages();
-    } else {
-        console.log('🔍 [SMAP_DEBUG_STORAGE] 수동 저장소 검사');
-        
-        // 로컬스토리지
-        console.log('📦 [localStorage] 전체 키:', Object.keys(localStorage));
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            console.log(`📦 [localStorage] ${key}:`, localStorage.getItem(key));
-        }
-        
-        // 세션스토리지
-        console.log('📁 [sessionStorage] 전체 키:', Object.keys(sessionStorage));
-        for (let i = 0; i < sessionStorage.length; i++) {
-            const key = sessionStorage.key(i);
-            console.log(`📁 [sessionStorage] ${key}:`, sessionStorage.getItem(key));
-        }
-        
-        // 쿠키
-        console.log('🍪 [cookies]:', document.cookie);
-    }
-    
-    console.log('🔍 [SMAP_DEBUG_STORAGE] 디버깅 완료');
-};
 
-window.SMAP_FORCE_USER_SEND = function(userData = null) {
-    console.log('🚀 [SMAP_FORCE_USER_SEND] 강제 사용자 정보 전송 시작');
-    
-    const testUserData = userData || {
-        mt_idx: "force_test_456",
-        mt_id: "force@test.com",
-        mt_name: "강제 테스트 사용자",
-        mt_email: "force@test.com"
-    };
-    
-    console.log('🚀 [SMAP_FORCE_USER_SEND] 전송할 데이터:', testUserData);
-    
-    if (window.SmapApp && window.SmapApp.user) {
-        window.SmapApp.user.sendUserInfo(testUserData);
-    } else {
-        console.error('❌ [SMAP_FORCE_USER_SEND] SmapApp.user를 찾을 수 없음');
-    }
-    
-    console.log('🚀 [SMAP_FORCE_USER_SEND] 강제 전송 완료');
-};
 
-// 🔔 FCM 토큰 관련 테스트 함수들
-window.SMAP_TEST_FCM_TOKEN = async function() {
-    try {
-        console.log('🔔 [FCM TEST] FCM 토큰 테스트 시작');
-        
-        // iOS 네이티브 토큰 확인
-        if (window.nativeFCMToken) {
-            console.log('📱 [FCM TEST] iOS 네이티브 토큰 발견:', window.nativeFCMToken.substring(0, 30) + '...');
-            return { success: true, token: window.nativeFCMToken, source: 'native' };
-        }
-        
-        // 웹 FCM 토큰 시도 (전역 testFCMToken 함수 사용)
-        if (window.testFCMToken) {
-            console.log('🌐 [FCM TEST] 웹 FCM 토큰 시도 중...');
-            const token = await window.testFCMToken();
-            
-            if (token) {
-                console.log('✅ [FCM TEST] 웹 FCM 토큰 생성 성공:', token.substring(0, 30) + '...');
-                return { success: true, token, source: 'web' };
-            } else {
-                console.warn('⚠️ [FCM TEST] 웹 FCM 토큰 생성 실패');
-                return { success: false, error: 'Web token generation failed' };
-            }
-        } else {
-            console.warn('⚠️ [FCM TEST] testFCMToken 함수를 찾을 수 없음');
-            return { success: false, error: 'testFCMToken function not available' };
-        }
-    } catch (error) {
-        console.error('❌ [FCM TEST] FCM 토큰 테스트 오류:', error);
-        return { success: false, error: error.message };
-    }
-};
 
-window.SMAP_SET_NATIVE_FCM_TOKEN = function(token) {
-    if (token && typeof token === 'string') {
-        window.nativeFCMToken = token;
-        console.log('📱 [FCM] iOS 네이티브 FCM 토큰 설정 완료:', token.substring(0, 30) + '...');
-        
-        // 설정 후 자동으로 서버 업데이트 시도 (사용자가 로그인된 경우)
-        if (window.SmapApp?.user?.getCurrentUserData) {
-            const userData = window.SmapApp.user.getCurrentUserData();
-            if (userData && userData.mt_idx) {
-                console.log('🔄 [FCM] 사용자 로그인 상태 확인됨 - 자동 FCM 토큰 업데이트 시도');
-                setTimeout(async () => {
-                    try {
-                        // 글로벌 함수로 업데이트 시도
-                        if (window.testFCMUpdate) {
-                            const result = await window.testFCMUpdate(userData.mt_idx);
-                            if (result && result.success) {
-                                console.log('✅ [FCM] 네이티브 토큰 자동 업데이트 완료:', result.message);
-                            } else {
-                                console.warn('⚠️ [FCM] 네이티브 토큰 자동 업데이트 실패:', result ? result.error : 'Unknown error');
-                            }
-                        } else {
-                            console.log('💡 [FCM] testFCMUpdate 함수 없음 - 수동으로 FCM 서비스 호출 필요');
-                        }
-                    } catch (error) {
-                        console.error('❌ [FCM] 네이티브 토큰 자동 업데이트 오류:', error);
-                    }
-                }, 1000);
-            } else {
-                console.log('👤 [FCM] 사용자 미로그인 상태 - 로그인 후 자동 업데이트 예정');
-            }
-        }
-        
-        return { success: true, message: 'Native FCM token set successfully' };
-    } else {
-        console.error('❌ [FCM] 잘못된 토큰 형식:', token);
-        return { success: false, error: 'Invalid token format' };
-    }
-};
 
-window.SMAP_GET_CURRENT_FCM_TOKEN = function() {
-    console.log('🔍 [FCM] 현재 설정된 FCM 토큰 확인');
-    
-    if (window.nativeFCMToken) {
-        console.log('📱 [FCM] iOS 네이티브 토큰:', window.nativeFCMToken.substring(0, 30) + '...');
-        console.log('📱 [FCM] 토큰 전체 길이:', window.nativeFCMToken.length, '문자');
-        return { success: true, token: window.nativeFCMToken, source: 'native' };
-    } else {
-        console.log('❌ [FCM] 설정된 FCM 토큰 없음');
-        console.log('💡 [FCM] iOS 앱에서 SMAP_SET_NATIVE_FCM_TOKEN(token) 호출하여 토큰 설정');
-        return { success: false, error: 'No FCM token set' };
-    }
-};
+
+
+
+
+
+
 
 // 자동 환경 감지 및 디버그 정보 출력
 setTimeout(() => {
@@ -1230,17 +1077,7 @@ setTimeout(() => {
         console.log('   TEST_GOOGLE() - Google 로그인 완전 테스트');
         console.log('   SMAP_HAPTIC_TEST("success") - 고급 햅틱 테스트');
         console.log('   SMAP_DEBUG_INFO() - 상세 디버그 정보');
-                console.log('🆕 👤 [사용자 정보 테스트 함수들]:');
-        console.log('   SMAP_TEST_USER_INFO() - 사용자 정보 자동 감지 및 전송');
-        console.log('   SMAP_DEBUG_STORAGE() - 모든 저장소 내용 확인');
-        console.log('   SMAP_FORCE_USER_SEND() - 테스트 사용자 정보 강제 전송');
-        console.log('🆕 🔔 [FCM 토큰 테스트 함수들]:');
-        console.log('   SMAP_TEST_FCM_TOKEN() - FCM 토큰 생성/확인 테스트');
-        console.log('   SMAP_SET_NATIVE_FCM_TOKEN(token) - iOS 네이티브 FCM 토큰 설정');
-        console.log('   SMAP_GET_CURRENT_FCM_TOKEN() - 현재 설정된 FCM 토큰 확인');
-console.log('🆕 🔔 [FCM 토큰 테스트 함수들]:');
-console.log('   SMAP_TEST_FCM_TOKEN() - FCM 토큰 생성/확인 테스트');
-console.log('   SMAP_SET_NATIVE_FCM_TOKEN(token) - iOS 네이티브 FCM 토큰 설정');
+
         
         // nextstep.smap.site에서 자동 디버그 정보 출력
         if (window.location.hostname === 'nextstep.smap.site') {

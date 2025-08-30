@@ -132,8 +132,14 @@ class GroupService {
     try {
       const response = await apiClient.get(`/groups/${groupId}`);
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Failed to fetch group ${groupId}:`, error);
+
+      // 404 오류인 경우 더 구체적인 에러 메시지 제공
+      if (error.response?.status === 404) {
+        throw new Error(`그룹을 찾을 수 없습니다. (ID: ${groupId})`);
+      }
+
       throw error;
     }
   }
@@ -458,9 +464,9 @@ class GroupService {
     try {
       console.log(`[GroupService] 그룹 멤버 조회 시작 - sgt_idx: ${sgt_idx}`);
       console.log(`[GroupService] API 요청 URL: /group-members/member/${sgt_idx}`);
-      
+
       const response = await apiClient.get(`/group-members/member/${sgt_idx}`);
-      
+
       console.log(`[GroupService] API 응답 상태:`, response.status);
       console.log(`[GroupService] API 응답 데이터:`, response.data);
       
@@ -479,8 +485,14 @@ class GroupService {
       // success가 false인 경우
       throw new Error(response.data.message || '그룹 멤버 조회에 실패했습니다.');
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('그룹 멤버 조회 오류:', error);
+
+      // 404 오류인 경우 더 구체적인 에러 메시지 제공
+      if (error.response?.status === 404) {
+        throw new Error(`그룹을 찾을 수 없어 멤버 정보를 가져올 수 없습니다. (그룹 ID: ${sgt_idx})`);
+      }
+
       throw new Error('그룹 멤버를 가져오는데 실패했습니다.');
     }
   }

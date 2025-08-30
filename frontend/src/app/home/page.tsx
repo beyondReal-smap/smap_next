@@ -2986,7 +2986,7 @@ export default function HomePage() {
       
       // API 로드 상태 재검증
       const isNaverReady = window.naver?.maps && naverMapsLoaded;
-
+      
       console.log('[HOME] API 상태:', {
         isNaverReady,
         naverMapsLoaded
@@ -3058,12 +3058,12 @@ export default function HomePage() {
       // iOS WebView에서는 더 긴 지연 시간으로 DOM 안정화 대기
       const delay = typeof window !== 'undefined' && (window as any).webkit?.messageHandlers?.smapIos ? 2000 : 100;
       console.log(`[HOME] 🍎 iOS WebView 감지: ${delay}ms 지연으로 DOM 안정화 대기`);
-
+      
       setTimeout(() => initNaverMap(), delay);
     }
   }, [naverMapsLoaded, mapType]);
 
-  // 🗺️ 지도 초기화 보장을 위한 강화된 안전장치 (탭 전환 시 지도 복구)
+    // 🗺️ 지도 초기화 보장을 위한 강화된 안전장치 (탭 전환 시 지도 복구)
   useEffect(() => {
     const ensureMapInitialization = () => {
       console.log('[HOME] 지도 초기화 보장 체크 (강화됨)');
@@ -3475,14 +3475,14 @@ export default function HomePage() {
   // Naver 지도 초기화 (강화됨) - 무한 루프 방지
   const initNaverMap = () => {
     console.log('[HOME] Naver Maps 초기화 시작 (강화됨)');
-
+    
     // 더 유연한 중복 실행 방지 (타임아웃 후 재시도 허용)
     const now = Date.now();
     if (window.__NAVER_MAP_INITIALIZING__ && (now - ((window as any).__NAVER_MAP_LAST_INIT__ || 0)) < 3000) {
       console.log('[HOME] 🚫 이미 네이버맵 초기화 중 - 3초 이내 중복 실행 방지');
       return;
     }
-
+    
     // 초기화 플래그 및 타임스탬프 설정
     window.__NAVER_MAP_INITIALIZING__ = true;
     (window as any).__NAVER_MAP_LAST_INIT__ = now;
@@ -3627,12 +3627,12 @@ export default function HomePage() {
       try {
         if (window.naver?.maps?.Event?.addListener) {
           errorListener = window.naver.maps.Event.addListener(window.naver.maps, 'auth_failure', function(error: any) {
-            authFailed = true; // 인증 실패 표시
-            console.error('네이버 지도 인증 실패:', error);
-            console.error(`현재 URL(${window.location.href})이 네이버 지도 API에 등록되어 있는지 확인하세요.`);
-            console.error('네이버 클라우드 플랫폼 콘솔에서 "Application > Maps > Web 호스팅 URL"에 현재 도메인을 추가해야 합니다.');
-            setIsMapLoading(false);
-          });
+        authFailed = true; // 인증 실패 표시
+        console.error('네이버 지도 인증 실패:', error);
+        console.error(`현재 URL(${window.location.href})이 네이버 지도 API에 등록되어 있는지 확인하세요.`);
+        console.error('네이버 클라우드 플랫폼 콘솔에서 "Application > Maps > Web 호스팅 URL"에 현재 도메인을 추가해야 합니다.');
+        setIsMapLoading(false);
+      });
         } else {
           console.warn('[HOME] 네이버 지도 Event 모듈이 로드되지 않아 인증 실패 이벤트 리스너를 추가할 수 없습니다.');
         }
@@ -4478,7 +4478,7 @@ export default function HomePage() {
         return newMarker;
       }
     }
-    
+
     return null;
   };
 
@@ -5783,8 +5783,15 @@ export default function HomePage() {
       console.log(`[getGroupMemberCount] 캐시 없음 - API 호출 - 그룹 ${groupId}`);
       const memberData = await memberService.getGroupMembers(groupId.toString());
       return memberData ? memberData.length : 0;
-    } catch (error) {
+    } catch (error: any) {
       console.error(`그룹 ${groupId} 멤버 수 조회 실패:`, error);
+
+      // 404 오류인 경우 그룹이 존재하지 않는다는 것을 의미
+      if (error.response?.status === 404) {
+        console.warn(`그룹 ${groupId}이(가) 존재하지 않습니다.`);
+        return 0;
+      }
+
       return 0;
     }
   };
