@@ -3017,15 +3017,31 @@ export default function HomePage() {
     };
   }, [authLoading, isLoggedIn, user, router]);
 
-  // 🗺️ 지도 API 로딩 및 초기화 - 컴포넌트 마운트 시 시작 (중복 실행 방지)
+  // 🗺️ 지도 API 로딩 및 초기화 - 그룹 데이터 로드 완료 후 시작 (최적화)
   useEffect(() => {
-    console.log('[HOME] 🗺️ 지도 초기화 시작 - 재방문 시에도 안전하게 처리');
-    
-    // 중복 실행 방지 - 이미 초기화 중이거나 완료된 경우
-    if (isMapLoading && (naverMap.current || map.current)) {
-      console.log('[HOME] 🗺️ 지도 이미 초기화됨 - 중복 실행 방지');
+    // 🚀 그룹 데이터가 로드될 때까지 기다렸다가 지도 초기화
+    const shouldInitMap = userGroups.length > 0 && !isMapLoading && !naverMap.current && !map.current;
+
+    console.log('[HOME] 🗺️ 지도 초기화 조건 체크:', {
+      hasUserGroups: userGroups.length > 0,
+      isMapLoading,
+      hasNaverMap: !!naverMap.current,
+      hasGoogleMap: !!map.current,
+      shouldInitMap
+    });
+
+    if (!shouldInitMap) {
+      if (userGroups.length === 0) {
+        console.log('[HOME] 🗺️ 그룹 데이터 로드 대기 중...');
+      } else if (isMapLoading) {
+        console.log('[HOME] 🗺️ 지도 로딩 중...');
+      } else if (naverMap.current || map.current) {
+        console.log('[HOME] 🗺️ 지도 이미 초기화됨');
+      }
       return;
     }
+
+    console.log('[HOME] 🗺️ 지도 초기화 시작 - 그룹 데이터 로드 완료됨');
     
     // 페이지 재방문 시에도 지도가 제대로 표시되도록 강제 초기화
     const forceMapInitialization = () => {
@@ -3166,7 +3182,7 @@ export default function HomePage() {
     return () => {
       timers.forEach(timer => clearTimeout(timer));
     };
-  }, [mapType, naverMapsLoaded]);
+  }, [mapType, naverMapsLoaded, userGroups, groupMembers, userLocation]);
 
   // 🗺️ 탭 전환 감지 및 지도 상태 복구 (새로 추가)
   useEffect(() => {
@@ -3638,18 +3654,75 @@ export default function HomePage() {
     
     console.log('[HOME] Naver Maps 초기화 조건 충족');
 
-    // 그룹멤버가 있으면 첫 번째 멤버 위치, 없으면 현재 위치로 초기화
+    // 🚀 그룹멤버가 있으면 첫 번째 멤버 위치, 없으면 현재 위치로 초기화
     let centerLat = userLocation.lat;
     let centerLng = userLocation.lng;
     let locationName = '현재 위치';
-    
-    if (groupMembers.length > 0) {
-      const firstMember = groupMembers[0];
-      centerLat = parseCoordinate(firstMember.mlt_lat) || parseCoordinate(firstMember.location?.lat) || userLocation.lat;
-      centerLng = parseCoordinate(firstMember.mlt_long) || parseCoordinate(firstMember.location?.lng) || userLocation.lng;
+
+    // 🚀 그룹멤버 우선 확인 (향상된 로직)
+  if (groupMembers.length > 0) {
+    const firstMember = groupMembers[0];
+    const memberLat = parseCoordinate(firstMember.mlt_lat) || parseCoordinate(firstMember.location?.lat);
+    const memberLng = parseCoordinate(firstMember.mlt_long) || parseCoordinate(firstMember.location?.lng);
+
+    if (memberLat && memberLng) {
+      centerLat = memberLat;
+      centerLng = memberLng;
       locationName = `${firstMember.name} 위치`;
+      console.log('[HOME] 🗺️ 첫 번째 그룹 멤버 위치로 지도 초기화:', { centerLat, centerLng, locationName });
     } else {
-      console.log('Naver Maps 초기화: 그룹멤버 데이터 없음 - 현재 위치 사용');
+      console.log('[HOME] ⚠️ 그룹 멤버 위치 데이터가 유효하지 않음 - 현재 위치 사용');
+    }
+  } else {
+    // 🚀 그룹멤버가 없으면 첫 번째 그룹의 멤버 위치를 미리 로드 시도
+    console.log('[HOME] 📍 그룹멤버 데이터 없음 - 첫 번째 그룹 멤버 위치 미리 로드 시도');
+
+    // UserContext에서 그룹 데이터 확인
+    if (userGroups.length > 0) {
+      const firstGroup = userGroups[0];
+      console.log('[HOME] 🔍 첫 번째 그룹 발견:', firstGroup.sgt_title, '- 멤버 데이터 로드 시도');
+
+      // 그룹 멤버 데이터가 아직 로드되지 않았으면 미리 로드
+      if (groupMembers.length === 0) {
+        console.log('[HOME] ⚡ 그룹 멤버 데이터 미리 로드 시작');
+
+        // 비동기로 그룹 멤버 데이터 로드 (차단하지 않음)
+        setTimeout(async () => {
+          try {
+            const groupService = await import('@/services/groupService');
+            const memberData = await groupService.default.getGroupMembers(firstGroup.sgt_idx);
+
+            if (memberData && memberData.length > 0) {
+              const firstMemberCoord = memberData[0] as any; // 타입 안전을 위해 any로 캐스팅
+              const memberLat = parseCoordinate(firstMemberCoord.mlt_lat) || parseCoordinate((firstMemberCoord as any).location?.lat);
+              const memberLng = parseCoordinate(firstMemberCoord.mlt_long) || parseCoordinate((firstMemberCoord as any).location?.lng);
+
+              if (memberLat && memberLng) {
+                console.log('[HOME] 🎯 미리 로드한 첫 번째 멤버 위치:', { memberLat, memberLng });
+
+                // 지도가 이미 초기화되었다면 중심 이동
+                if (naverMap.current && window.naver?.maps) {
+                  const latlng = new window.naver.maps.LatLng(memberLat, memberLng);
+                  naverMap.current.setCenter(latlng);
+                  console.log('[HOME] 🗺️ 지도 중심을 미리 로드한 멤버 위치로 이동');
+                }
+              }
+            }
+          } catch (error) {
+            console.warn('[HOME] ⚠️ 그룹 멤버 미리 로드 실패:', error);
+          }
+        }, 100); // 아주 짧은 지연으로 비동기 처리
+      }
+    }
+      console.log('[HOME] 📍 그룹멤버 데이터 없음 - 현재 위치 사용');
+
+      // 현재 위치도 없는 경우 기본 좌표 사용 (서울 시청)
+      if (!userLocation.lat || !userLocation.lng || userLocation.lat === 0 || userLocation.lng === 0) {
+        console.log('[HOME] ⚠️ 현재 위치도 없음 - 기본 좌표(서울 시청) 사용');
+        centerLat = 37.5665; // 서울 시청 위도
+        centerLng = 126.9780; // 서울 시청 경도
+        locationName = '서울 시청 (기본 위치)';
+      }
     }
 
       // 기존 네이버 지도 인스턴스가 있으면 마커만 업데이트
