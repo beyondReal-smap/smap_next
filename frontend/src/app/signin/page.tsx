@@ -659,6 +659,15 @@ const SignInPage = () => {
     // 🚨 네이티브 구글 로그인 콜백 함수 등록 (iOS 앱에서 호출 가능)
     (window as any).onNativeGoogleLoginSuccess = async (userInfo: any) => {
       console.log('🎯 [NATIVE CALLBACK] iOS 앱에서 구글 로그인 성공 콜백 수신:', userInfo);
+      console.log('🎯 [NATIVE CALLBACK] userInfo 구조 확인:', {
+        hasSub: !!userInfo.sub,
+        hasIdToken: !!userInfo.idToken,
+        hasEmail: !!userInfo.email,
+        hasName: !!userInfo.name,
+        hasPicture: !!userInfo.picture,
+        userInfoKeys: Object.keys(userInfo),
+        fullUserInfo: userInfo
+      });
       
       try {
         console.log('🔄 [NATIVE CALLBACK] 백엔드 구글 인증 API 호출 시작');
@@ -670,19 +679,29 @@ const SignInPage = () => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            idToken: userInfo.idToken,  // ✅ 백엔드가 기대하는 파라미터 이름으로 수정
-            userInfo: userInfo.userInfo,
+            google_id: userInfo.sub || userInfo.googleId || userInfo.id,  // ✅ 여러 가능한 필드에서 google_id 추출
+            email: userInfo.email,
+            name: userInfo.name,
+            image: userInfo.picture,
+            id_token: userInfo.idToken || userInfo.token,  // ✅ 백엔드가 기대하는 id_token 필드
             source: 'native'
           }),
         });
 
         const data = await response.json();
-        
+
         console.log('📡 [NATIVE CALLBACK] 백엔드 구글 인증 API 응답:', {
           success: data.success,
           hasUser: !!data.user,
           hasError: !!data.error,
-          responseStatus: response.status
+          responseStatus: response.status,
+          dataKeys: data ? Object.keys(data) : [],
+          userKeys: data?.user ? Object.keys(data.user) : [],
+          userMtIdx: data?.user?.mt_idx,
+          userMtName: data?.user?.mt_name,
+          userMtEmail: data?.user?.mt_email,
+          hasToken: !!data.token,
+          isNewUser: data.isNewUser
         });
 
         if (data.success) {
@@ -745,9 +764,49 @@ const SignInPage = () => {
             console.log('[NATIVE CALLBACK] 기존회원 - 홈으로 이동');
             
             // 🚨 강력한 인증 상태 설정
-            if (data.user) {
-              console.log('[NATIVE CALLBACK] 사용자 데이터 설정:', data.user);
-              
+            let userData = data.user || data.member;
+
+            // 백엔드에서 user나 member가 없을 경우 직접 구성
+            if (!userData && data.success) {
+              console.log('[NATIVE CALLBACK] 백엔드에서 사용자 데이터가 없어 직접 구성 시도');
+              userData = {
+                mt_idx: data.mt_idx || data.id,
+                mt_name: data.name || userInfo.name,
+                mt_email: data.email || userInfo.email,
+                mt_nickname: data.nickname || userInfo.name,
+                profile_image: data.profile_image || userInfo.picture,
+                mt_google_id: userInfo.sub || userInfo.googleId || userInfo.id,
+                mt_type: 4, // Google 로그인
+                mt_level: 2, // 일반 회원
+                mt_status: 1 // 정상
+              };
+              console.log('[NATIVE CALLBACK] 직접 구성한 사용자 데이터:', userData);
+            }
+
+            if (userData) {
+              console.log('[NATIVE CALLBACK] 사용자 데이터 설정:', userData);
+              console.log('[NATIVE CALLBACK] 사용자 데이터 구조 확인:', {
+                hasMtIdx: !!userData.mt_idx,
+                hasMtName: !!userData.mt_name,
+                hasMtEmail: !!userData.mt_email,
+                mtIdx: userData.mt_idx,
+                mtName: userData.mt_name,
+                mtEmail: userData.mt_email,
+                dataKeys: Object.keys(userData),
+                fullUserData: userData
+              });
+
+              // 필수 필드 검증
+              if (!userData.mt_idx || !userData.mt_name) {
+                console.error('[NATIVE CALLBACK] ❌ 필수 사용자 데이터 누락:', {
+                  hasMtIdx: !!userData.mt_idx,
+                  hasMtName: !!userData.mt_name,
+                  userData: userData
+                });
+                showError('사용자 정보가 불완전합니다. 다시 시도해주세요.');
+                return;
+              }
+
               // 1. AuthService에 토큰 저장 (가장 중요!)
               if (data.token) {
                 console.log('[NATIVE CALLBACK] JWT 토큰 저장:', data.token ? '토큰 있음' : '토큰 없음');
@@ -755,12 +814,12 @@ const SignInPage = () => {
               } else {
                 console.warn('[NATIVE CALLBACK] ⚠️ 백엔드에서 토큰이 반환되지 않음');
               }
-              
+
               // 2. AuthService에 사용자 데이터 설정
-              authService.setUserData(data.user);
+              authService.setUserData(userData);
               
               // 3. 로컬 스토리지에도 직접 저장 (백업)
-              localStorage.setItem('user', JSON.stringify(data.user));
+              localStorage.setItem('user', JSON.stringify(userData));
               localStorage.setItem('isLoggedIn', 'true');
 
               // 4. 로그인 시간 저장 (세션 유지를 위해 필수!)
@@ -775,6 +834,7 @@ const SignInPage = () => {
               console.log('[NATIVE CALLBACK] 저장 상태 확인:');
               console.log('  - 토큰:', authService.getToken() ? '저장됨' : '없음');
               console.log('  - 사용자 데이터:', authService.getUserData() ? '저장됨' : '없음');
+              console.log('  - 사용자 데이터 구조:', authService.getUserData());
               console.log('  - isLoggedIn():', authService.isLoggedIn());
               
               console.log('[NATIVE CALLBACK] 모든 저장소에 인증 상태 저장 완료');
