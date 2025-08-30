@@ -6763,7 +6763,7 @@ export default function HomePage() {
                  </svg>
                  {/* 읽지 않은 알림이 있을 때만 빨간색 점 표시 */}
                  {hasNewNotifications && (
-                   <div className="absolute bottom-[2px] left-[2px] w-2 h-2 bg-red-500 rounded-full animate-pulse">
+                   <div className="absolute top-[5px] right-[5px] w-2 h-2 bg-red-500 rounded-full animate-pulse">
                  </div>
                  )}
                </button>
