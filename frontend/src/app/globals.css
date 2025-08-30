@@ -452,15 +452,22 @@ nav[style][id="bottom-navigation-bar"],
   z-index: 10000 !important;
 }
 
-/* React 컴포넌트의 동적 스타일까지 강제 적용 */
+/* React 컴포넌트의 동적 스타일까지 강제 적용 - BottomNavBar에만 적용 */
 [data-testid="bottom-navigation"],
-[data-component="BottomNavBar"],
-nav[class*="bottom"],
-div[class*="bottom"][class*="nav"],
-div[class*="navigation"] {
+[data-component="BottomNavBar"] {
   position: fixed !important;
   bottom: 0px !important;
   z-index: 10000 !important;
+}
+
+/* 다른 nav 요소들은 BottomNavBar가 아니면 스타일 적용하지 않음 */
+nav[class*="bottom"]:not(.bottom-navigation-main):not(#bottom-navigation-bar),
+div[class*="bottom"][class*="nav"]:not(.bottom-navigation-main):not(#bottom-navigation-bar),
+div[class*="navigation"]:not(.bottom-navigation-main):not(#bottom-navigation-bar) {
+  /* BottomNavBar가 아닌 다른 요소들은 네비게이션바 스타일 적용하지 않음 */
+  position: static !important;
+  bottom: auto !important;
+  z-index: auto !important;
 }
 
 /* 모든 미디어 쿼리에서 강제 적용 */
@@ -1003,24 +1010,39 @@ div[style*="zIndex: 9999"] * {
   display: inline-block !important;
 }
 
-/* BottomNavBar 전용 스타일 */
-#bottom-navigation-bar {
+/* BottomNavBar 전용 스타일 - 가장 높은 우선순위 */
+.bottom-navigation-main,
+.bottom-navigation-main#bottom-navigation-bar,
+#bottom-navigation-bar.bottom-navigation-main {
   border-top-left-radius: 16px !important;
   border-top-right-radius: 16px !important;
+  border-radius: 16px 16px 0px 0px !important;
   overflow: hidden !important;
-  /* 애니메이션 완전 비활성화 */
+  /* 애니메이션 완전 비활성화 - 충돌 방지 */
   transition: none !important;
   animation: none !important;
-  transform: translateZ(0) !important;
+  transform: none !important;
+  -webkit-transform: none !important;
   will-change: auto !important;
   /* 위치 강제 고정 */
   position: fixed !important;
-  bottom: 40px !important;
-  top: auto !important;
-  left: 0 !important;
-  right: 0 !important;
-  margin: 0 !important;
+  bottom: 0px !important;
+  left: 0px !important;
+  right: 0px !important;
   z-index: 999999 !important;
+  width: 100% !important;
+  min-height: 72px !important;
+  background: white !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* 다른 요소들의 충돌 방지 */
+nav:not(.bottom-navigation-main):not(#bottom-navigation-bar),
+div:not(.bottom-navigation-main):not(#bottom-navigation-bar)[class*="nav"],
+div:not(.bottom-navigation-main):not(#bottom-navigation-bar)[class*="navigation"] {
+  /* BottomNavBar가 아닌 다른 요소들은 이 스타일 적용하지 않음 */
 }
 
 /* 네비게이션 바 높이만큼의 공백을 위한 클래스 */
@@ -1974,6 +1996,7 @@ div[id="bottom-navigation-bar"][style] {
   border-top-right-radius: 16px !important;
   border-bottom-left-radius: 0px !important;
   border-bottom-right-radius: 0px !important;
+  border-radius: 16px 16px 0px 0px !important;
   overflow: hidden !important;
 }
 

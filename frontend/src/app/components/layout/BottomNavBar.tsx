@@ -116,47 +116,47 @@ export default function BottomNavBar() {
   };
 
   return (
-    <div 
-      className="fixed left-0 right-0 bg-white border-t shadow-xl z-[999] rounded-t-2xl m-0 p-0"
+    <div
+      className="fixed left-0 right-0 bg-white border-t shadow-xl z-[999] rounded-t-2xl m-0 p-0 bottom-navigation-main"
       id="bottom-navigation-bar"
       style={{
-        position: 'fixed',
-        bottom: '0px',
-        left: '0px',
-        right: '0px',
-        zIndex: 999999,
-        width: '100%',
-        minHeight: '72px',
-        display: 'block',
-        visibility: 'visible',
-        opacity: 1,
-        transform: 'none',
-        WebkitTransform: 'none',
-        pointerEvents: 'auto',
-        backgroundColor: 'white',
-        borderTop: '1px solid #e5e7eb',
-        boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.1)',
-        borderTopLeftRadius: '16px',
-        borderTopRightRadius: '16px',
-        borderBottomLeftRadius: '0px',
-        borderBottomRightRadius: '0px',
-        overflow: 'hidden',
-        touchAction: 'manipulation',
-        userSelect: 'none',
-        WebkitUserSelect: 'none',
-        WebkitTouchCallout: 'none',
-        WebkitTapHighlightColor: 'transparent'
+        position: 'fixed !important',
+        bottom: '0px !important',
+        left: '0px !important',
+        right: '0px !important',
+        zIndex: '999999 !important',
+        width: '100% !important',
+        minHeight: '72px !important',
+        display: 'block !important',
+        visibility: 'visible !important',
+        opacity: '1 !important',
+        transform: 'none !important',
+        WebkitTransform: 'none !important',
+        pointerEvents: 'auto !important',
+        backgroundColor: 'white !important',
+        borderTop: '1px solid #e5e7eb !important',
+        boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.1) !important',
+        borderTopLeftRadius: '16px !important',
+        borderTopRightRadius: '16px !important',
+        borderBottomLeftRadius: '0px !important',
+        borderBottomRightRadius: '0px !important',
+        overflow: 'hidden !important',
+        touchAction: 'manipulation !important',
+        userSelect: 'none !important',
+        WebkitUserSelect: 'none !important',
+        WebkitTouchCallout: 'none !important',
+        WebkitTapHighlightColor: 'transparent !important'
       }}
     >
       <nav 
         className="flex justify-around items-center px-2 m-0 p-0 h-full" 
-        style={{ 
-          margin: '0 !important', 
+        style={{
+          margin: '0 !important',
           padding: '0 !important',
-          height: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-around'
+          height: '100% !important',
+          display: 'flex !important',
+          alignItems: 'center !important',
+          justifyContent: 'space-around !important'
         }}
       >
         {navItems.map(({ name, path, icon }) => {
@@ -168,26 +168,26 @@ export default function BottomNavBar() {
               href={path}
               onClick={() => handleNavClick({ name, path, icon })}
               className="flex flex-col items-center justify-center transition-colors duration-200 flex-1 min-w-0 m-0 p-0 h-full"
-              style={{ 
-                margin: '0 !important', 
+              style={{
+                margin: '0 !important',
                 padding: '0 !important',
-                height: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center'
+                height: '100% !important',
+                display: 'flex !important',
+                flexDirection: 'column !important',
+                alignItems: 'center !important',
+                justifyContent: 'center !important'
               }}
             >
                 <div 
                   className="relative flex flex-col items-center justify-center m-0 p-0" 
-                  style={{ 
-                    margin: '0 !important', 
+                  style={{
+                    margin: '0 !important',
                     padding: '0 !important',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '2px'
+                    display: 'flex !important',
+                    flexDirection: 'column !important',
+                    alignItems: 'center !important',
+                    justifyContent: 'center !important',
+                    gap: '2px !important'
                   }}
                 >
                 {/* 아이콘 컨테이너 */}
