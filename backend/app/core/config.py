@@ -5,6 +5,7 @@ from pydantic import AnyHttpUrl
 class Settings(BaseSettings):
     PROJECT_NAME: str = "SMAP API"
     VERSION: str = "1.0.0"
+    # API 설정
     API_V1_STR: str = "/api/v1"
     
     # CORS 설정
@@ -36,6 +37,12 @@ class Settings(BaseSettings):
     SQLALCHEMY_DATABASE_URI: str = (
         f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DB}?charset={MYSQL_CHARSET}"
     )
+    
+    # 데이터베이스 연결 풀 설정
+    DB_POOL_SIZE: int = 20
+    DB_MAX_OVERFLOW: int = 30
+    DB_POOL_TIMEOUT: int = 60
+    DB_POOL_RECYCLE: int = 3600
     
     # JWT 설정
     JWT_SECRET_KEY: str = "smap!@super-secret"

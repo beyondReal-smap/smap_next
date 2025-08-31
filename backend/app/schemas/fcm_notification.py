@@ -10,6 +10,7 @@ class FCMSendRequest(BaseModel):
     mt_idx: int    # 회원 인덱스 (mt_id 대신 mt_idx 사용)
     plt_title: str # 제목
     plt_content: str # 내용
+    user_agent: Optional[str] = None  # User-Agent 헤더 (선택적)
 
 class FCMSendResponse(BaseModel):
     """FCM 푸시 알림 전송 응답 스키마"""

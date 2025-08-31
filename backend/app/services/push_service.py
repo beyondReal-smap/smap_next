@@ -8,7 +8,7 @@ from app.services.firebase_service import firebase_service
 
 logger = logging.getLogger(__name__)
 
-def send_push(token_id: str, title: str, content: str, url: Optional[str] = None) -> Dict:
+def send_push(token_id: str, title: str, content: str, url: Optional[str] = None, member_id: Optional[int] = None) -> Dict:
     """
     FCM을 통해 푸시 알림을 전송합니다.
     """
@@ -26,7 +26,8 @@ def send_push(token_id: str, title: str, content: str, url: Optional[str] = None
         response = firebase_service.send_push_notification(
             token=token_id,
             title=title,
-            content=content
+            content=content,
+            member_id=member_id
         )
 
         logger.info(f"✅ 푸시 알림 전송 성공: {response}")

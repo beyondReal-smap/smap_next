@@ -117,6 +117,8 @@ def get_current_user_groups(
     if not user_id:
         raise HTTPException(status_code=401, detail="인증이 필요합니다.")
     
+    logger.info(f"[GET_CURRENT_USER_GROUPS] 사용자 ID: {user_id}")
+    
     # 사용자가 속한 그룹 조회 (sgt_show = 'Y'인 그룹만)
     user_groups = db.query(Group, GroupDetail).join(
         GroupDetail, Group.sgt_idx == GroupDetail.sgt_idx
@@ -125,6 +127,19 @@ def get_current_user_groups(
         GroupDetail.sgdt_exit == 'N',  # 탈퇴하지 않은 그룹
         Group.sgt_show == 'Y'  # 표시되는 그룹만
     ).all()
+    
+    logger.info(f"[GET_CURRENT_USER_GROUPS] 조회된 그룹 수: {len(user_groups)}")
+    
+    # 디버깅을 위해 모든 그룹 정보 로깅
+    all_user_groups = db.query(Group, GroupDetail).join(
+        GroupDetail, Group.sgt_idx == GroupDetail.sgt_idx
+    ).filter(
+        GroupDetail.mt_idx == user_id
+    ).all()
+    
+    logger.info(f"[GET_CURRENT_USER_GROUPS] 필터링 전 모든 그룹 수: {len(all_user_groups)}")
+    for group, group_detail in all_user_groups:
+        logger.info(f"[GET_CURRENT_USER_GROUPS] 그룹 정보 - sgt_idx: {group.sgt_idx}, sgt_title: {group.sgt_title}, sgt_show: {group.sgt_show}, sgdt_exit: {group_detail.sgdt_exit}")
     
     result = []
     for group, group_detail in user_groups:

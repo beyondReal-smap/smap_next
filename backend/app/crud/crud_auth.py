@@ -7,6 +7,11 @@ from app.config import Config  # 설정 파일 import
 from typing import Optional
 import re
 
+# FastAPI 의존성: 현재 회원 조회를 위해 사용
+from fastapi import Depends, Header, HTTPException
+from jose import JWTError, jwt
+from app.api.deps import get_db
+
 def get_user_by_phone(db: Session, phone_number: str) -> Optional[Member]:
     """전화번호(mt_id)로 사용자를 조회합니다."""
     return db.query(Member).filter(Member.mt_id == phone_number).first()
@@ -360,3 +365,34 @@ def update_user_password(db: Session, mt_idx: int, new_password: str) -> bool:
         logger = logging.getLogger(__name__)
         logger.error(f"비밀번호 업데이트 실패: {str(e)}")
         return False 
+
+
+def get_current_member(
+    authorization: str = Header(None),
+    db: Session = Depends(get_db)
+) -> Member:
+    """Authorization Bearer 토큰에서 mt_idx를 추출해 현재 회원 엔터티를 반환합니다.
+
+    - 프론트엔드와 동일한 하드코딩 키/알고리즘을 사용합니다.
+    - 유효하지 않으면 401 오류를 발생시킵니다.
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="인증이 필요합니다.")
+
+    token = authorization.split(" ")[1]
+
+    try:
+        secret_key = 'smap!@super-secret'
+        algorithm = 'HS256'
+        payload = jwt.decode(token, secret_key, algorithms=[algorithm])
+        mt_idx: Optional[int] = payload.get("mt_idx")
+        if not mt_idx:
+            raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다.")
+
+        user = db.query(Member).filter(Member.mt_idx == mt_idx).first()
+        if not user:
+            raise HTTPException(status_code=401, detail="사용자를 찾을 수 없습니다.")
+
+        return user
+    except JWTError:
+        raise HTTPException(status_code=401, detail="토큰 검증에 실패했습니다.")

@@ -139,9 +139,12 @@ class GroupScheduleManager:
             푸시 알림 전송 성공 여부
         """
         try:
-            # 실제 작업자가 없으면 대상자와 동일하다고 가정
+            logger.info(f"🔔 [PUSH_NOTIFICATION] 함수 호출됨 - action: {action}, editor_id: {editor_id}, editor_name: {editor_name}, target_member_id: {target_member_id}")
+            
+            # 실제 작업자가 없으면 알림을 보내지 않음
             if not editor_id:
-                editor_id = target_member_id
+                logger.warning(f"⚠️ [PUSH_NOTIFICATION] editor_id가 없어 알림 전송 생략")
+                return False
             if not editor_name:
                 # 에디터 이름 조회
                 editor_member = Member.find_by_idx(db, str(editor_id))
@@ -201,7 +204,8 @@ class GroupScheduleManager:
             response = firebase_service.send_push_notification(
                 target_member.mt_token_id,
                 message_info['title'],
-                message_info['content']
+                message_info['content'],
+                member_id=target_member.mt_idx
             )
             
             # 푸시 로그 저장
@@ -1046,7 +1050,12 @@ def create_group_schedule(
         if editor_id and editor_name:
             logger.info(f"👤 [CREATE_SCHEDULE] 실제 작업자 정보 - editorId: {editor_id}, editorName: {editor_name}")
         else:
-            logger.info(f"👤 [CREATE_SCHEDULE] 실제 작업자 정보 없음 - current_user_id: {current_user_id} 사용")
+            # editor_id가 없으면 current_user_id를 사용
+            editor_id = current_user_id
+            # 에디터 이름 조회
+            editor_member = Member.find_by_idx(db, str(editor_id))
+            editor_name = editor_member.mt_name if editor_member else "알 수 없음"
+            logger.info(f"👤 [CREATE_SCHEDULE] 실제 작업자 정보 없음 - current_user_id: {current_user_id} 사용, editorName: {editor_name}")
         
         # 그룹 권한 확인
         member_auth = GroupScheduleManager.check_group_permission(db, current_user_id, group_id)
@@ -1253,6 +1262,8 @@ def create_group_schedule(
         
         # 푸시 알림 전송 (생성자와 대상자가 다른 경우에만)
         try:
+            logger.info(f"🔔 [CREATE_SCHEDULE] 푸시 알림 전송 시작 - editor_id: {editor_id}, editor_name: {editor_name}, target_member_id: {target_member_id}")
+            
             GroupScheduleManager.send_schedule_notification(
                 db=db,
                 action='create',
@@ -1309,7 +1320,12 @@ def update_group_schedule_with_repeat_option(
         if editor_id and editor_name:
             logger.info(f"👤 [UPDATE_REPEAT_SCHEDULE] 실제 작업자 정보 - editorId: {editor_id}, editorName: {editor_name}")
         else:
-            logger.info(f"👤 [UPDATE_REPEAT_SCHEDULE] 실제 작업자 정보 없음 - current_user_id: {current_user_id} 사용")
+            # editor_id가 없으면 current_user_id를 사용
+            editor_id = current_user_id
+            # 에디터 이름 조회
+            editor_member = Member.find_by_idx(db, str(editor_id))
+            editor_name = editor_member.mt_name if editor_member else "알 수 없음"
+            logger.info(f"👤 [UPDATE_REPEAT_SCHEDULE] 실제 작업자 정보 없음 - current_user_id: {current_user_id} 사용, editorName: {editor_name}")
         
         # 그룹 권한 확인
         member_auth = GroupScheduleManager.check_group_permission(db, current_user_id, group_id)
@@ -1580,6 +1596,8 @@ def update_group_schedule_with_repeat_option(
         try:
             # 수정된 스케줄의 대상자 ID 조회
             target_member_id = schedule_result.mt_idx
+            
+            logger.info(f"🔔 [UPDATE_REPEAT_SCHEDULE] 푸시 알림 전송 시작 - editor_id: {editor_id}, editor_name: {editor_name}, target_member_id: {target_member_id}")
             
             GroupScheduleManager.send_schedule_notification(
                 db=db,

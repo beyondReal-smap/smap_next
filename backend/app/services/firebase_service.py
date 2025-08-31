@@ -1,10 +1,12 @@
 import firebase_admin
 from firebase_admin import credentials, messaging
-from typing import Optional
+from typing import Optional, Dict, Any
 import logging
 import os
 import json
 import time
+import ssl
+from datetime import datetime
 from app.config import Config
 
 logger = logging.getLogger(__name__)
@@ -23,6 +25,15 @@ class FirebaseService:
         if not self._initialized:
             self._firebase_available = self._initialize_firebase()
             FirebaseService._initialized = True
+
+            # Firebase 프로젝트 정보 디버깅
+            if self._firebase_available:
+                try:
+                    app = firebase_admin.get_app()
+                    logger.info(f"🔍 [FCM DEBUG] Firebase 프로젝트 ID: {app.project_id}")
+                    logger.info(f"🔍 [FCM DEBUG] Firebase 앱 이름: {app.name}")
+                except Exception as e:
+                    logger.warning(f"🔍 [FCM DEBUG] Firebase 프로젝트 정보 조회 실패: {e}")
 
     def _initialize_firebase(self) -> bool:
         """Firebase Admin SDK 초기화"""
@@ -95,84 +106,158 @@ class FirebaseService:
                 logger.warning("Firebase 푸시 알림 기능이 비활성화됩니다.")
                 return False
 
-    def send_push_notification(self, token: str, title: str, content: str) -> str:
-        """FCM 푸시 알림 전송"""
+    def send_push_notification(self, token: str, title: str, content: str, max_retries: int = 2, member_id: int = None, enable_fallback: bool = True) -> str:
+        """FCM 푸시 알림 전송 (iOS 최적화 포함) - 토큰 검증 및 자동 정리 기능 포함
+
+        Args:
+            token: FCM 토큰
+            title: 푸시 제목
+            content: 푸시 내용
+            max_retries: 최대 재시도 횟수
+            member_id: 회원 ID (폴백 알림용)
+            enable_fallback: 폴백 알림 사용 여부
+
+        Returns:
+            str: 전송 결과 또는 실패 사유
+        """
         if not self._firebase_available:
             logger.warning("Firebase가 초기화되지 않아 푸시 알림을 건너뜁니다.")
+            if enable_fallback and member_id:
+                import asyncio
+                asyncio.create_task(self._trigger_fallback_notification(member_id, title, content, "firebase_disabled"))
             return "firebase_disabled"
 
-        try:
-            logger.info(f"📤 [FCM] 푸시 메시지 전송 시작 - 토큰: {token[:30]}..., 제목: {title}")
+        last_error = None
 
-            message = messaging.Message(
-                data={
-                    'title': title,
-                    'body': content,
-                    'custom_data': 'ios_push_test',  # iOS 푸시 수신 확인용
-                    'timestamp': str(int(time.time() * 1000))
-                },
-                notification=messaging.Notification(
-                    title=title,
-                    body=content
-                ),
-                android=messaging.AndroidConfig(
-                    priority='high',
-                    notification=messaging.AndroidNotification(
-                        sound='default',
-                        channel_id='default'
+        # 재시도 로직 적용 (iOS 푸시 수신율 향상)
+        for attempt in range(max_retries + 1):
+            try:
+                if attempt > 0:
+                    logger.info(f"🔄 [FCM] 푸시 재시도 {attempt}/{max_retries} - 토큰: {token[:30]}...")
+
+                logger.info(f"📤 [FCM] 푸시 메시지 전송 시작 - 토큰: {token[:30]}..., 제목: {title}")
+
+                # 메시지 데이터 검증
+                if not token or not title or not content:
+                    raise ValueError(f"필수 FCM 데이터가 누락됨: token={token[:10] if token else None}, title={title[:10] if title else None}, content={content[:10] if content else None}")
+
+                # FCM 토큰 형식 검증
+                logger.info(f"🔍 [FCM] 토큰 형식 검증 시작: {token[:30]}...")
+                if not self._validate_fcm_token(token):
+                    raise ValueError(f"FCM 토큰 형식이 잘못되었습니다: {token[:30]}...")
+
+                # FCM 메시지 구성 (FCM v1 API 형식 준수)
+                logger.info(f"📤 [FCM] 메시지 구성 시작")
+
+                # Firebase Admin SDK의 send() 메소드에 맞게 Message 객체 생성
+                message = messaging.Message(
+                    token=token,
+                    notification=messaging.Notification(
+                        title=title,
+                        body=content
                     )
-                ),
-                apns=messaging.APNSConfig(
-                    headers={
-                        "apns-push-type": "alert",
-                        "apns-priority": "10",
-                        "apns-topic": Config.IOS_BUNDLE_ID,  # iOS 앱 번들 ID
-                        "apns-expiration": str(int(time.time()) + 300)  # 5분 후 만료
-                    },
-                    payload=messaging.APNSPayload(
-                        aps=messaging.Aps(
-                            alert=messaging.ApsAlert(title=title, body=content),  # 명시적 알림 표시
-                            sound='default',
-                            badge=1,
-                            content_available=True,  # 백그라운드에서도 앱 깨우기
-                            mutable_content=True,  # iOS에서 콘텐츠 수정 가능
-                            category="GENERAL"  # 알림 카테고리 설정
-                        )
-                    )
-                ),
-                token=token,
-            )
+                )
 
-            logger.info(f"📤 [FCM] 메시지 구성 완료 - iOS 푸시 수신을 위한 최적화 적용")
-            
-            response = messaging.send(message)
-            logger.info(f"✅ [FCM POLICY 4] FCM 메시지 전송 성공: {response}")
-            return response
+                logger.info(f"📤 [FCM] 메시지 구성 완료 - 토큰: {token[:30]}..., 제목: {title}")
 
-        except messaging.UnregisteredError as e:
-            # ✅ 4단계: 서버 측 비활성 토큰 처리 (리소스 관리)
-            # NotRegistered 에러: 토큰이 더 이상 유효하지 않음 (앱 삭제 등)
-            logger.warning(f"🚨 [FCM POLICY 4] 비활성 토큰 감지 (UnregisteredError): {token[:30]}...")
-            logger.warning(f"🚨 [FCM POLICY 4] 토큰이 유효하지 않아 삭제 처리 필요: {e}")
-            logger.warning(f"🚨 [FCM POLICY 4] FCM 푸시 메시지 전송 실패 - 토큰이 만료되었거나 앱이 삭제됨")
+                # FCM 메시지 전송 시도
+                logger.info(f"🚀 [FCM] FCM 메시지 전송 시작...")
+                logger.info(f"🚀 [FCM] 메시지 데이터: token={token[:20]}..., title={title}, content={content[:20]}...")
 
-            # 토큰 삭제 처리를 위한 이벤트 발생 (나중에 구현)
-            self._handle_inactive_token(token, "unregistered")
-            raise
+                try:
+                    # 메시지 객체 상세 정보 로깅
+                    logger.info(f"🚀 [FCM] 메시지 객체 검증:")
+                    logger.info(f"   - 타입: {type(message)}")
+                    logger.info(f"   - token: {getattr(message, 'token', 'MISSING')}")
+                    logger.info(f"   - notification: {getattr(message, 'notification', 'MISSING')}")
+                    if hasattr(message, 'notification') and message.notification:
+                        logger.info(f"   - title: {getattr(message.notification, 'title', 'MISSING')}")
+                        logger.info(f"   - body: {getattr(message.notification, 'body', 'MISSING')}")
 
-        except messaging.InvalidArgumentError as e:
-            # InvalidRegistration 에러: 토큰 형식이 잘못됨
-            logger.warning(f"🚨 [FCM POLICY 4] 잘못된 토큰 형식 (InvalidArgumentError): {token[:30]}...")
-            logger.warning(f"🚨 [FCM POLICY 4] 토큰 형식이 잘못되어 삭제 처리 필요: {e}")
-            logger.warning(f"🚨 [FCM POLICY 4] FCM 푸시 메시지 전송 실패 - 토큰 형식이 잘못됨")
+                    # 메시지 객체의 전체 구조 로깅 (디버깅용)
+                    try:
+                        import json
+                        message_dict = {
+                            'token': message.token,
+                            'notification': {
+                                'title': message.notification.title if message.notification else None,
+                                'body': message.notification.body if message.notification else None
+                            } if message.notification else None
+                        }
+                        logger.info(f"🔍 [FCM DEBUG] 메시지 구조: {json.dumps(message_dict, ensure_ascii=False, indent=2)}")
+                    except Exception as debug_error:
+                        logger.warning(f"🔍 [FCM DEBUG] 메시지 구조 로깅 실패: {debug_error}")
 
-            # 토큰 삭제 처리를 위한 이벤트 발생
-            self._handle_inactive_token(token, "invalid_registration")
-            raise
+                    # FCM 전송 시도
+                    response = messaging.send(message)
+                    logger.info(f"✅ [FCM] FCM 전송 성공: {response}")
+                except Exception as send_error:
+                    logger.error(f"🚨 [FCM] messaging.send() 호출 실패: {send_error}")
+                    logger.error(f"🚨 [FCM] 오류 타입: {type(send_error)}")
+                    logger.error(f"🚨 [FCM] 오류 상세: {str(send_error)}")
 
-        except Exception as e:
-            logger.error(f"❌ [FCM POLICY 4] FCM 메시지 전송 실패: {e}")
-            raise
+                    # 스택 트레이스 로깅
+                    import traceback
+                    logger.error(f"🚨 [FCM] 스택 트레이스:\n{traceback.format_exc()}")
+
+                    raise send_error
+                logger.info(f"✅ [FCM POLICY 4] FCM 메시지 전송 성공: {response}")
+                logger.info(f"📊 [FCM] 전송 성공 - 메시지 ID: {response}")
+                return response
+
+            except messaging.UnregisteredError as e:
+                # ✅ 4단계: 서버 측 비활성 토큰 처리 (리소스 관리)
+                # NotRegistered 에러: 토큰이 더 이상 유효하지 않음 (앱 삭제 등)
+                logger.warning(f"🚨 [FCM POLICY 4] 비활성 토큰 감지 (UnregisteredError): {token[:30]}...")
+                logger.warning(f"🚨 [FCM POLICY 4] 토큰이 유효하지 않아 삭제 처리 필요: {e}")
+                logger.warning(f"🚨 [FCM POLICY 4] FCM 푸시 메시지 전송 실패 - 토큰이 만료되었거나 앱이 삭제됨")
+
+                # 🔥 FCM 전송 실패 시 DB 토큰 자동 정리
+                if member_id:
+                    self._cleanup_invalid_token_from_db(token, member_id, "fcm_send_failure")
+                    # 폴백 알림 트리거
+                    if enable_fallback:
+                        import asyncio
+                        asyncio.create_task(self._trigger_fallback_notification(member_id, title, content, "token_expired"))
+
+                # 토큰 무효화 처리 - 즉시 DB에서 제거 및 사용자 알림
+                self._handle_token_invalidation(token, "unregistered", title, content)
+                if attempt == max_retries:  # 마지막 시도에서도 실패한 경우
+                    raise
+                last_error = e
+                continue  # 재시도
+
+            except messaging.ThirdPartyAuthError as e:
+                # ThirdPartyAuthError: 토큰 형식이 잘못되었거나 인증 오류
+                logger.warning(f"🚨 [FCM POLICY 4] 잘못된 토큰 형식 (ThirdPartyAuthError): {token[:30]}...")
+                logger.warning(f"🚨 [FCM POLICY 4] 토큰 형식이 잘못되어 삭제 처리 필요: {e}")
+                logger.warning(f"🚨 [FCM POLICY 4] FCM 푸시 메시지 전송 실패 - 토큰 형식이 잘못됨")
+
+                # 토큰 무효화 처리 - 즉시 DB에서 제거 및 사용자 알림
+                self._handle_token_invalidation(token, "invalid_registration", title, content)
+                # 폴백 알림 트리거
+                if enable_fallback and member_id:
+                    import asyncio
+                    asyncio.create_task(self._trigger_fallback_notification(member_id, title, content, "token_invalid"))
+                if attempt == max_retries:  # 마지막 시도에서도 실패한 경우
+                    raise
+                last_error = e
+                continue  # 재시도
+
+            except Exception as e:
+                logger.error(f"❌ [FCM POLICY 4] FCM 메시지 전송 실패 (시도 {attempt + 1}/{max_retries + 1}): {e}")
+                # 일반 오류 발생 시 폴백 알림 (중요한 메시지에만)
+                if enable_fallback and member_id and attempt == max_retries:
+                    import asyncio
+                    asyncio.create_task(self._trigger_fallback_notification(member_id, title, content, "fcm_error"))
+                if attempt == max_retries:  # 마지막 시도에서도 실패한 경우
+                    raise
+                last_error = e
+                continue  # 재시도
+
+        # 모든 재시도가 실패한 경우
+        logger.error(f"❌ [FCM POLICY 4] 모든 재시도 실패 - 최종 에러: {last_error}")
+        raise last_error
 
     def _handle_inactive_token(self, token: str, reason: str):
         """
@@ -255,16 +340,32 @@ class FirebaseService:
                     headers={
                         "apns-push-type": "alert",  # alert로 설정하여 사용자에게 표시
                         "apns-priority": "10",  # 최고 우선순위로 설정
-                        "apns-topic": Config.IOS_BUNDLE_ID  # iOS 앱 번들 ID
+                        "apns-topic": Config.IOS_BUNDLE_ID,  # iOS 앱 번들 ID
+                        "apns-expiration": str(int(time.time()) + 600),  # 10분 후 만료 (충분한 시간)
+                        "apns-collapse-id": f"bg_push_{int(time.time())}",  # 백그라운드 푸시 그룹화 ID
+                        "apns-thread-id": "background"  # 백그라운드 스레드
                     },
                     payload=messaging.APNSPayload(
                         aps=messaging.Aps(
                             sound='default',
                             badge=1,
-                            alert=messaging.ApsAlert(title=title, body=content),  # 알림 표시를 위해 alert 추가
-                            content_available=True,  # 백그라운드에서도 앱이 깨어나도록 설정
-                            mutable_content=True  # iOS에서 콘텐츠 수정 가능하도록 함
-                        )
+                            alert=messaging.ApsAlert(
+                                title=title,
+                                body=content
+                            ),
+                            content_available=True,  # 백그라운드에서도 앱 깨우기 필수
+                            mutable_content=True,  # iOS에서 콘텐츠 수정 가능
+                            category="BACKGROUND",  # 백그라운드 카테고리
+                            thread_id="background"  # 백그라운드 스레드 ID
+                        ),
+                        custom_data={
+                            "background_push": "true",
+                            "ios_background": "true",
+                            "wake_app": "true",  # 앱 깨우기 플래그
+                            "schedule_id": schedule_id if schedule_id else "",
+                            "event_url": event_url if event_url else "",
+                            "push_timestamp": str(int(time.time() * 1000))
+                        }
                     )
                 ),
                 token=token,
@@ -279,11 +380,11 @@ class FirebaseService:
             logger.warning(f"🚨 [FCM POLICY 4] 백그라운드 푸시에서 비활성 토큰 감지 (UnregisteredError): {token[:30]}...")
             logger.warning(f"🚨 [FCM POLICY 4] 토큰이 유효하지 않아 삭제 처리 필요: {e}")
 
-            self._handle_inactive_token(token, "background_push_unregistered")
+            self._handle_token_invalidation(token, "background_push_unregistered", title, content)
             raise
 
-        except messaging.InvalidArgumentError as e:
-            logger.warning(f"🚨 [FCM POLICY 4] 백그라운드 푸시에서 잘못된 토큰 형식 (InvalidArgumentError): {token[:30]}...")
+        except messaging.ThirdPartyAuthError as e:
+            logger.warning(f"🚨 [FCM POLICY 4] 백그라운드 푸시에서 잘못된 토큰 형식 (ThirdPartyAuthError): {token[:30]}...")
             logger.warning(f"🚨 [FCM POLICY 4] 토큰 형식이 잘못되어 삭제 처리 필요: {e}")
 
             self._handle_inactive_token(token, "background_push_invalid")
@@ -337,14 +438,26 @@ class FirebaseService:
                         "apns-push-type": "background",  # background 타입으로 설정하여 사용자에게 표시하지 않음
                         "apns-priority": "10",  # Silent 푸시라도 최고 우선순위로 설정하여 무시 방지
                         "apns-topic": Config.IOS_BUNDLE_ID,  # 올바른 번들 ID 설정
-                        "apns-expiration": str(int(time.time()) + 600)  # 10분 후 만료 (충분한 시간 부여)
+                        "apns-expiration": str(int(time.time()) + 600),  # 10분 후 만료 (충분한 시간 부여)
+                        "apns-collapse-id": f"silent_{reason}_{int(time.time())}",  # Silent 푸시 그룹화 ID
+                        "apns-thread-id": "silent"  # Silent 스레드
                     },
                     payload=messaging.APNSPayload(
                         aps=messaging.Aps(
                             content_available=True,  # 백그라운드 앱 깨우기 필수
                             # Silent 푸시는 사용자에게 표시되지 않음
                             # badge, sound, alert 등 모두 제외
-                        )
+                            thread_id="silent"  # Silent 스레드 ID
+                        ),
+                        custom_data={
+                            "silent_push": "true",
+                            "ios_silent": "true",
+                            "reason": reason,
+                            "token_refresh_required": "true",
+                            "background_wake_only": "true",  # 알림 표시 없이 앱 깨우기만
+                            "timestamp": str(int(time.time() * 1000)),
+                            "silent_id": f"silent_{int(time.time())}"
+                        }
                     )
                 ),
                 token=token,
@@ -359,23 +472,908 @@ class FirebaseService:
             logger.warning(f"🚨 [FCM POLICY 4] Silent 푸시에서 비활성 토큰 감지 (UnregisteredError): {token[:30]}...")
             logger.warning(f"🚨 [FCM POLICY 4] 토큰이 유효하지 않아 삭제 처리 필요: {e}")
 
-            self._handle_inactive_token(token, "silent_push_unregistered")
+            self._handle_token_invalidation(token, "silent_push_unregistered", "", "")
             raise
 
-        except messaging.InvalidArgumentError as e:
-            logger.warning(f"🚨 [FCM POLICY 4] Silent 푸시에서 잘못된 토큰 형식 (InvalidArgumentError): {token[:30]}...")
+        except messaging.ThirdPartyAuthError as e:
+            logger.warning(f"🚨 [FCM POLICY 4] Silent 푸시에서 잘못된 토큰 형식 (ThirdPartyAuthError): {token[:30]}...")
             logger.warning(f"🚨 [FCM POLICY 4] 토큰 형식이 잘못되어 삭제 처리 필요: {e}")
 
-            self._handle_inactive_token(token, "silent_push_invalid")
+            self._handle_token_invalidation(token, "silent_push_invalid", "", "")
             raise
 
         except Exception as e:
             logger.error(f"❌ [FCM POLICY 4] Silent FCM 메시지 전송 실패: {e}")
             raise
 
+    def _cleanup_invalid_token_from_db(self, token: str, member_id: int, reason: str):
+        """
+        FCM 전송 실패 시 DB에서 무효화된 토큰 자동 정리
+        """
+        try:
+            logger.info(f"🧹 [FCM CLEANUP] DB 토큰 정리 시작 - 회원: {member_id}, 이유: {reason}")
+
+            # DB 연결 및 토큰 정리
+            from app.db.session import get_db
+            from app.models.member import Member
+            from sqlalchemy.orm import Session
+
+            db: Session = next(get_db())
+
+            # 회원 조회 및 토큰 초기화
+            member = db.query(Member).filter(Member.mt_idx == member_id).first()
+            if member and member.mt_token_id == token:
+                logger.warning(f"🗑️ [FCM CLEANUP] 무효화된 토큰 DB에서 제거 - 회원: {member_id}")
+
+                # 토큰 정보 초기화
+                member.mt_token_id = None
+                member.mt_token_updated_at = None
+                member.mt_token_expiry_date = None
+                member.mt_udate = datetime.now()
+
+                db.commit()
+                logger.info(f"✅ [FCM CLEANUP] 토큰 정리 완료 - 회원: {member_id}")
+            else:
+                logger.info(f"ℹ️ [FCM CLEANUP] 정리할 토큰 없음 - 회원: {member_id}")
+
+            db.close()
+
+        except Exception as e:
+            logger.error(f"❌ [FCM CLEANUP] 토큰 정리 실패: {e}")
+
+    async def _trigger_fallback_notification(self, member_id: int, title: str, content: str, reason: str):
+        """
+        FCM 전송 실패 시 폴백 알림 트리거
+        SMS 또는 이메일로 중요 알림을 전송
+
+        Args:
+            member_id: 회원 ID
+            title: 원본 푸시 제목
+            content: 원본 푸시 내용
+            reason: 실패 사유 (token_expired, token_invalid, fcm_error, firebase_disabled)
+        """
+        try:
+            logger.info(f"🔄 [FALLBACK] 폴백 알림 트리거 시작 - 회원: {member_id}, 사유: {reason}")
+
+            # DB에서 회원 정보 조회
+            from app.db.session import get_db
+            from app.models.member import Member
+            from sqlalchemy.orm import Session
+
+            db: Session = next(get_db())
+
+            try:
+                member = db.query(Member).filter(Member.mt_idx == member_id).first()
+                if not member:
+                    logger.warning(f"🔄 [FALLBACK] 회원 정보를 찾을 수 없음: {member_id}")
+                    return
+
+                # 폴백 알림이 필요한 중요 메시지인지 확인
+                is_important = self._is_important_notification(title, content)
+
+                if not is_important:
+                    logger.info(f"🔄 [FALLBACK] 중요하지 않은 메시지로 폴백 생략: {title[:20]}...")
+                    return
+
+                # 폴백 알림 내용 구성
+                fallback_title = f"[SMAP 알림] {title}"
+                fallback_content = self._build_fallback_content(content, reason)
+
+                                # EmailService를 활용한 폴백 이메일 발송
+                email_sent = False
+                if member.mt_email and member.mt_push1 == 'Y':
+                    try:
+                        from app.services.email_service import email_service
+
+                        # FCM 폴백용 이메일 발송 메소드 호출
+                        result = await self._send_fcm_fallback_email(
+                            member.mt_email,
+                            title,
+                            content,
+                            reason
+                        )
+
+                        if result.get('success'):
+                            logger.info(f"✅ [FALLBACK] 이메일 폴백 성공: {member.mt_email} (제공자: {result.get('provider', 'unknown')})")
+                            email_sent = True
+                        else:
+                            logger.warning(f"⚠️ [FALLBACK] 이메일 폴백 실패: {result.get('message')}")
+
+                    except Exception as email_error:
+                        logger.error(f"❌ [FALLBACK] 이메일 서비스 호출 실패: {email_error}")
+
+                # 폴백 시도 결과 로깅
+                if email_sent:
+                    logger.info(f"✅ [FALLBACK] 폴백 알림 성공 - 회원: {member_id}")
+                else:
+                    logger.info(f"ℹ️ [FALLBACK] 폴백 알림 시도 완료 - 회원: {member_id}")
+
+            finally:
+                db.close()
+
+        except Exception as e:
+            logger.error(f"❌ [FALLBACK] 폴백 알림 트리거 실패: {e}")
+
+    def _is_important_notification(self, title: str, content: str) -> bool:
+        """
+        중요 알림인지 판단 (폴백 대상 선별)
+        """
+        important_keywords = [
+            '중요', '긴급', '알림', '공지', '예약', '취소', '변경',
+            '결제', '환불', '승인', '거절', '만료', '종료'
+        ]
+
+        title_lower = title.lower()
+        content_lower = content.lower()
+
+        for keyword in important_keywords:
+            if keyword in title_lower or keyword in content_lower:
+                return True
+
+        return False
+
+    async def _send_fcm_fallback_email(self, email: str, title: str, content: str, reason: str) -> Dict[str, Any]:
+        """
+        FCM 폴백용 이메일 발송 (EmailService 구조 참고)
+        네이버웍스 우선, Gmail SMTP 폴백
+        """
+        try:
+            from app.services.email_service import email_service
+            import os
+
+            # FCM 폴백용 이메일 제목
+            subject = f"[SMAP 알림] {title}"
+
+            # 실패 사유에 따른 메시지
+            reason_messages = {
+                'token_expired': '푸시 토큰이 만료되어',
+                'token_invalid': '푸시 토큰이 유효하지 않아',
+                'fcm_error': '푸시 서버 오류로',
+                'firebase_disabled': '푸시 서비스가 일시적으로 중단되어'
+            }
+            reason_text = reason_messages.get(reason, '시스템 오류로')
+
+            # HTML 이메일 템플릿 (EmailService 구조 참고, 향상된 디자인)
+            html_content = f"""
+            <!DOCTYPE html>
+            <html lang="ko">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>SMAP FCM 폴백 알림</title>
+                <style>
+                    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap');
+
+                    * {{
+                        margin: 0;
+                        padding: 0;
+                        box-sizing: border-box;
+                    }}
+
+                    body {{
+                        font-family: 'Noto Sans KR', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                        line-height: 1.6;
+                        color: #2c3e50;
+                        margin: 0;
+                        padding: 0;
+                        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+                        min-height: 100vh;
+                    }}
+
+                    .container {{
+                        max-width: 650px;
+                        margin: 20px auto;
+                        background: #ffffff;
+                        border-radius: 20px;
+                        overflow: hidden;
+                        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+                        border: 1px solid rgba(255, 255, 255, 0.2);
+                    }}
+
+                    .header {{
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+                        color: white;
+                        padding: 50px 40px;
+                        text-align: center;
+                        position: relative;
+                        overflow: hidden;
+                    }}
+
+                    .header::before {{
+                        content: '';
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="75" cy="75" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="50" cy="10" r="0.5" fill="rgba(255,255,255,0.1)"/><circle cx="10" cy="50" r="0.5" fill="rgba(255,255,255,0.1)"/><circle cx="90" cy="50" r="0.5" fill="rgba(255,255,255,0.1)"/><circle cx="50" cy="90" r="0.5" fill="rgba(255,255,255,0.1)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+                        opacity: 0.3;
+                    }}
+
+                    .header-content {{
+                        position: relative;
+                        z-index: 1;
+                    }}
+
+                    .logo {{
+                        font-size: 32px;
+                        font-weight: 700;
+                        margin-bottom: 15px;
+                        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+                        letter-spacing: 2px;
+                    }}
+
+                    .header h1 {{
+                        font-size: 28px;
+                        font-weight: 600;
+                        margin-bottom: 10px;
+                        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+                        letter-spacing: -0.5px;
+                    }}
+
+                    .header .subtitle {{
+                        font-size: 16px;
+                        opacity: 0.95;
+                        font-weight: 300;
+                    }}
+
+                    .content {{
+                        padding: 50px 40px;
+                    }}
+
+                    .status-card {{
+                        background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%);
+                        border: 2px solid #feb2b2;
+                        border-radius: 16px;
+                        padding: 30px;
+                        margin-bottom: 30px;
+                        position: relative;
+                        overflow: hidden;
+                    }}
+
+                    .status-card::before {{
+                        content: '🚨';
+                        position: absolute;
+                        top: 20px;
+                        right: 20px;
+                        font-size: 24px;
+                        opacity: 0.7;
+                    }}
+
+                    .status-title {{
+                        font-size: 18px;
+                        font-weight: 600;
+                        color: #c53030;
+                        margin-bottom: 10px;
+                        display: flex;
+                        align-items: center;
+                    }}
+
+                    .status-title::before {{
+                        content: '⚠️';
+                        margin-right: 10px;
+                    }}
+
+                    .status-message {{
+                        color: #742a2a;
+                        font-size: 15px;
+                        line-height: 1.7;
+                    }}
+
+                    .notification-card {{
+                        background: linear-gradient(135deg, #f0fff4 0%, #c6f6d5 100%);
+                        border: 2px solid #9ae6b4;
+                        border-radius: 16px;
+                        padding: 30px;
+                        margin-bottom: 30px;
+                        position: relative;
+                    }}
+
+                    .notification-card::before {{
+                        content: '📢';
+                        position: absolute;
+                        top: 20px;
+                        right: 20px;
+                        font-size: 24px;
+                        opacity: 0.7;
+                    }}
+
+                    .notification-title {{
+                        font-size: 20px;
+                        font-weight: 600;
+                        color: #2f855a;
+                        margin-bottom: 20px;
+                        display: flex;
+                        align-items: center;
+                    }}
+
+                    .notification-title::before {{
+                        content: '📱';
+                        margin-right: 10px;
+                    }}
+
+                    .notification-content {{
+                        background: rgba(255, 255, 255, 0.7);
+                        border-radius: 12px;
+                        padding: 20px;
+                        margin-bottom: 15px;
+                        border-left: 4px solid #48bb78;
+                    }}
+
+                    .content-label {{
+                        font-weight: 600;
+                        color: #2d3748;
+                        margin-bottom: 8px;
+                        font-size: 14px;
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                    }}
+
+                    .content-text {{
+                        color: #4a5568;
+                        font-size: 16px;
+                        line-height: 1.6;
+                    }}
+
+                    .action-card {{
+                        background: linear-gradient(135deg, #ebf8ff 0%, #bee3f8 100%);
+                        border: 2px solid #90cdf4;
+                        border-radius: 16px;
+                        padding: 25px;
+                        margin-bottom: 30px;
+                        text-align: center;
+                    }}
+
+                    .action-title {{
+                        font-size: 18px;
+                        font-weight: 600;
+                        color: #2b6cb0;
+                        margin-bottom: 15px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                    }}
+
+                    .action-title::before {{
+                        content: '💡';
+                        margin-right: 10px;
+                    }}
+
+                    .action-button {{
+                        display: inline-block;
+                        background: linear-gradient(135deg, #3182ce 0%, #2c5282 100%);
+                        color: white;
+                        padding: 15px 30px;
+                        text-decoration: none;
+                        border-radius: 50px;
+                        font-weight: 600;
+                        font-size: 16px;
+                        box-shadow: 0 4px 15px rgba(49, 130, 206, 0.4);
+                        transition: all 0.3s ease;
+                        margin-top: 10px;
+                    }}
+
+                    .action-button:hover {{
+                        transform: translateY(-2px);
+                        box-shadow: 0 6px 20px rgba(49, 130, 206, 0.6);
+                    }}
+
+                    .footer {{
+                        background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
+                        color: white;
+                        padding: 40px;
+                        text-align: center;
+                        position: relative;
+                    }}
+
+                    .footer::before {{
+                        content: '';
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        height: 4px;
+                        background: linear-gradient(90deg, #667eea, #764ba2, #f093fb);
+                    }}
+
+                    .footer-content {{
+                        position: relative;
+                        z-index: 1;
+                    }}
+
+                    .footer-title {{
+                        font-size: 18px;
+                        font-weight: 600;
+                        margin-bottom: 10px;
+                        opacity: 0.9;
+                    }}
+
+                    .footer-text {{
+                        font-size: 14px;
+                        opacity: 0.8;
+                        line-height: 1.6;
+                        margin-bottom: 20px;
+                    }}
+
+                    .footer-contact {{
+                        background: rgba(255, 255, 255, 0.1);
+                        border-radius: 12px;
+                        padding: 20px;
+                        margin-top: 20px;
+                        border: 1px solid rgba(255, 255, 255, 0.2);
+                    }}
+
+                    .contact-info {{
+                        font-size: 13px;
+                        opacity: 0.9;
+                    }}
+
+                    .divider {{
+                        height: 1px;
+                        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+                        margin: 20px 0;
+                    }}
+
+                    @media only screen and (max-width: 600px) {{
+                        .container {{
+                            margin: 10px;
+                            border-radius: 12px;
+                        }}
+
+                        .header, .content, .footer {{
+                            padding: 30px 20px;
+                        }}
+
+                        .header h1 {{
+                            font-size: 24px;
+                        }}
+
+                        .logo {{
+                            font-size: 28px;
+                        }}
+
+                        .status-card, .notification-card, .action-card {{
+                            padding: 20px;
+                            margin-bottom: 20px;
+                        }}
+
+                        .notification-title {{
+                            font-size: 18px;
+                        }}
+
+                        .action-button {{
+                            padding: 12px 24px;
+                            font-size: 15px;
+                        }}
+                    }}
+
+                    @keyframes pulse {{
+                        0% {{ transform: scale(1); }}
+                        50% {{ transform: scale(1.05); }}
+                        100% {{ transform: scale(1); }}
+                    }}
+
+                    .status-card {{
+                        animation: pulse 2s infinite;
+                    }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <div class="header-content">
+                            <div class="logo">🚀 SMAP</div>
+                            <h1>푸시 알림 실패 안내</h1>
+                            <div class="subtitle">이메일로 안내드립니다</div>
+                        </div>
+                    </div>
+
+                    <div class="content">
+                        <div class="status-card">
+                            <div class="status-title">알림 전송 실패</div>
+                            <div class="status-message">
+                                {reason_text} 푸시 알림을 보내지 못했습니다.<br>
+                                이메일로 대신 안내드립니다.
+                            </div>
+                        </div>
+
+                        <div class="notification-card">
+                            <div class="notification-title">원본 알림 내용</div>
+                            <div class="notification-content">
+                                <div class="content-label">📋 제목</div>
+                                <div class="content-text">{title}</div>
+                            </div>
+                            <div class="notification-content">
+                                <div class="content-label">📝 내용</div>
+                                <div class="content-text">{content}</div>
+                            </div>
+                        </div>
+
+                        <div class="action-card">
+                            <div class="action-title">확인 방법</div>
+                            <div style="color: #2b6cb0; font-size: 15px; margin-bottom: 15px;">
+                                앱을 실행하여 최신 알림을 확인해주세요.
+                            </div>
+                            <a href="#" class="action-button">📱 앱 실행하기</a>
+                        </div>
+
+                        <div style="text-align: center; color: #718096; font-size: 13px; margin-top: 30px;">
+                            이 알림은 SMAP 시스템에서 FCM 전송 실패 시 자동으로 발송되었습니다.
+                        </div>
+                    </div>
+
+                    <div class="footer">
+                        <div class="footer-content">
+                            <div class="footer-title">SMAP 팀</div>
+                            <div class="footer-text">
+                                언제나 최고의 서비스를 제공하기 위해 노력하겠습니다.
+                            </div>
+
+                            <div class="divider"></div>
+
+                            <div class="footer-contact">
+                                <div class="contact-info">
+                                    📞 문의사항이 있으시면 고객센터로 연락해주세요.<br>
+                                    💌 support@smap.site
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </body>
+            </html>
+            """
+
+            # 텍스트 버전 (향상된 디자인)
+            text_content = f"""
+╔══════════════════════════════════════════════╗
+║              🚀 SMAP 알림 시스템              ║
+╠══════════════════════════════════════════════╣
+║                                              ║
+║  🚨   푸시 알림 전송 실패 안내                ║
+║                                              ║
+║  ⚠️  안내사항                                  ║
+║     {reason_text} 푸시 알림을 보내지 못했습니다.    ║
+║     이메일로 대신 안내드립니다.                   ║
+║                                              ║
+╠══════════════════════════════════════════════╣
+║                                              ║
+║  📢   원본 알림 내용                          ║
+║                                              ║
+║  📋 제목:                                     ║
+║     {title}                                   ║
+║                                              ║
+║  📝 내용:                                     ║
+║     {content}                                 ║
+║                                              ║
+╠══════════════════════════════════════════════╣
+║                                              ║
+║  💡   확인 방법                               ║
+║     📱 앱을 실행하여 최신 알림을 확인해주세요.   ║
+║                                              ║
+╠══════════════════════════════════════════════╣
+║                                              ║
+║  📞   문의사항                                ║
+║     고객센터: support@smap.site              ║
+║                                              ║
+║  🔄   이 알림은 SMAP 시스템에서               ║
+║       FCM 전송 실패 시 자동으로 발송됩니다.     ║
+║                                              ║
+╚══════════════════════════════════════════════╝
+
+SMAP 팀 드림 - 언제나 최고의 서비스를 제공하기 위해 노력하겠습니다.
+"""
+
+            # EmailService의 send_password_reset_email 구조를 참고하여 FCM 폴백 이메일 발송
+            result = await self._send_fallback_email_via_service(email, subject, html_content, text_content)
+            return result
+
+        except Exception as e:
+            logger.error(f"❌ FCM 폴백 이메일 발송 실패: {str(e)}")
+            return {
+                "success": False,
+                "message": f"FCM 폴백 이메일 발송 실패: {str(e)}",
+                "email": email
+            }
+
+    async def _send_fallback_email_via_service(self, email: str, subject: str, html_content: str, text_content: str) -> Dict[str, Any]:
+        """
+        EmailService를 활용한 FCM 폴백 이메일 발송
+        EmailService의 구조를 참고하여 네이버웍스 우선, Gmail 폴백 방식 적용
+        """
+        try:
+            from app.services.email_service import email_service
+            import os
+
+            # 네이버웍스 설정 확인 및 우선 사용 (EmailService 구조 참고)
+            if (os.getenv('NAVERWORKS_CLIENT_ID') and
+                os.getenv('NAVERWORKS_CLIENT_SECRET') and
+                os.getenv('NAVERWORKS_DOMAIN')):
+
+                logger.info(f"📧 네이버웍스 이메일 폴백 시도: {email}")
+
+                try:
+                    # 네이버웍스 이메일 발송 시도
+                    result = await email_service.send_naverworks_email(email, subject, html_content, text_content)
+
+                    # 네이버웍스 발송 성공 시
+                    if result.get('success'):
+                        return result
+                    else:
+                        # 네이버웍스 실패 시 Gmail로 폴백
+                        logger.warning(f"⚠️ 네이버웍스 이메일 폴백 실패, Gmail SMTP로 폴백: {email}")
+
+                except Exception as e:
+                    logger.error(f"❌ 네이버웍스 이메일 폴백 중 오류: {str(e)}")
+                    logger.warning(f"⚠️ Gmail SMTP로 폴백: {email}")
+
+            # 개발 환경에서는 Mock 처리
+            if os.getenv('NODE_ENV') == 'development':
+                logger.info(f"📧 [개발환경] FCM 폴백 이메일 Mock: {email}")
+                logger.info(f"📧 [개발환경] 제목: {subject}")
+
+                return {
+                    "success": True,
+                    "message": "FCM 폴백 이메일이 성공적으로 발송되었습니다. (개발환경 Mock)",
+                    "email": email,
+                    "provider": "mock",
+                    "dev": True
+                }
+
+            # 네이버웍스 설정이 없거나 실패했으면 Gmail SMTP 사용
+            logger.info(f"📧 Gmail SMTP FCM 폴백 이메일 발송 시도: {email}")
+
+            # Gmail SMTP 직접 발송 (EmailService 구조 참고)
+            import smtplib
+            from email.mime.text import MIMEText
+            from email.mime.multipart import MIMEMultipart
+            from app.config import settings
+
+            # 이메일 메시지 생성
+            message = MIMEMultipart("alternative")
+            message["Subject"] = subject
+            message["From"] = settings.EMAIL_SENDER
+            message["To"] = email
+
+            # HTML 및 텍스트 버전 추가
+            html_part = MIMEText(html_content, "html")
+            text_part = MIMEText(text_content, "plain")
+
+            message.attach(text_part)
+            message.attach(html_part)
+
+            # Gmail SMTP 연결 및 발송
+            context = ssl.create_default_context()
+
+            with smtplib.SMTP_SSL(settings.EMAIL_SMTP_SERVER or "smtp.gmail.com",
+                                 settings.EMAIL_SMTP_PORT or 465,
+                                 context=context) as server:
+                server.login(settings.EMAIL_SENDER, settings.EMAIL_PASSWORD)
+                server.send_message(message)
+
+            logger.info(f"✅ Gmail FCM 폴백 이메일 발송 성공: {email}")
+
+            return {
+                "success": True,
+                "message": "FCM 폴백 이메일이 성공적으로 발송되었습니다.",
+                "email": email,
+                "provider": "gmail"
+            }
+
+        except Exception as e:
+            logger.error(f"❌ FCM 폴백 이메일 발송 실패: {str(e)}")
+            return {
+                "success": False,
+                "message": f"FCM 폴백 이메일 발송에 실패했습니다: {str(e)}",
+                "email": email
+            }
+
+    def _build_fallback_content(self, original_content: str, reason: str) -> str:
+        """
+        폴백 알림 내용 구성 (텍스트 버전용)
+        """
+        reason_messages = {
+            'token_expired': '푸시 토큰이 만료되어',
+            'token_invalid': '푸시 토큰이 유효하지 않아',
+            'fcm_error': '푸시 서버 오류로',
+            'firebase_disabled': '푸시 서비스가 일시적으로 중단되어'
+        }
+
+        reason_text = reason_messages.get(reason, '시스템 오류로')
+
+        return f"""[SMAP]
+{reason_text} 푸시 알림을 보내지 못했습니다.
+
+📢 알림 내용:
+{original_content}
+
+앱을 실행하여 자세한 내용을 확인해주세요."""
+
+    def _validate_fcm_token(self, token: str) -> bool:
+        """
+        FCM 토큰 형식 검증
+        FCM 토큰은 특정 형식을 따라야 합니다.
+        """
+        if not token or len(token.strip()) == 0:
+            logger.warning("🚨 [FCM TOKEN VALIDATION] 빈 토큰")
+            return False
+
+        # FCM 토큰 길이 검증 (일반적으로 100-200자)
+        if len(token) < 100 or len(token) > 200:
+            logger.warning(f"🚨 [FCM TOKEN VALIDATION] 토큰 길이 이상: {len(token)}자")
+            return False
+
+        # FCM 토큰에 허용되지 않는 문자 검증
+        import re
+        # FCM 토큰은 일반적으로 base64url 문자, 콜론(:), 하이픈(-), 언더스코어(_)로 구성
+        if not re.match(r'^[a-zA-Z0-9_-]+(?::[a-zA-Z0-9_-]+)?$', token):
+            logger.warning(f"🚨 [FCM TOKEN VALIDATION] 토큰 형식이 올바르지 않음: {token[:30]}...")
+            return False
+
+        # 콜론(:)으로 구분된 iOS 토큰 형식 검증
+        if ':' in token:
+            parts = token.split(':')
+            if len(parts) != 2:
+                logger.warning(f"🚨 [FCM TOKEN VALIDATION] iOS 토큰 형식이 잘못됨 (콜론이 여러 개): {token[:30]}...")
+                return False
+
+            # 각 부분의 길이 검증
+            if len(parts[0]) < 10 or len(parts[1]) < 10:
+                logger.warning(f"🚨 [FCM TOKEN VALIDATION] iOS 토큰 부분 길이 이상: part1={len(parts[0])}, part2={len(parts[1])}")
+                return False
+
+        logger.info(f"✅ [FCM TOKEN VALIDATION] 토큰 형식 검증 통과: {token[:30]}...")
+        return True
+
     def is_available(self) -> bool:
         """Firebase 서비스 사용 가능 여부 확인"""
         return self._firebase_available
+
+    def validate_ios_token(self, token: str) -> bool:
+        """
+        iOS FCM 토큰 유효성 검증
+        APNS 토큰 형식 검증 및 기본적인 유효성 확인
+        """
+        if not token or len(token.strip()) == 0:
+            logger.warning("🚨 [FCM iOS] 빈 토큰 감지")
+            return False
+
+        # FCM 토큰은 일반적으로 152자 또는 162자의 base64url 형식
+        if len(token) < 100 or len(token) > 200:
+            logger.warning(f"🚨 [FCM iOS] 토큰 길이 이상: {len(token)}자")
+            return False
+
+        # FCM 토큰에 허용되지 않는 문자 확인 (콜론 허용)
+        import re
+        if not re.match(r'^[a-zA-Z0-9_-]+:[a-zA-Z0-9_-]+$', token):
+            logger.warning(f"🚨 [FCM iOS] 토큰 형식이 올바르지 않음: {token[:20]}...")
+            return False
+
+        logger.info(f"✅ [FCM iOS] 토큰 유효성 검증 통과: {token[:20]}...")
+        return True
+
+    def send_ios_optimized_push(self, token: str, title: str, content: str, is_background: bool = False) -> str:
+        """
+        iOS 최적화된 푸시 전송 메소드
+        iOS 푸시 수신율을 높이기 위한 특화된 설정 적용
+        """
+        logger.info(f"📱 [FCM iOS] iOS 최적화 푸시 시작 - 토큰: {token[:30]}..., 백그라운드: {is_background}")
+
+        # iOS 토큰 검증
+        if not self.validate_ios_token(token):
+            logger.error(f"📱 [FCM iOS] iOS 토큰 검증 실패: {token[:30]}...")
+            raise ValueError("iOS FCM 토큰이 유효하지 않습니다")
+
+        logger.info(f"📱 [FCM iOS] 토큰 검증 통과")
+
+        # iOS 푸시 타입에 따른 전송 메소드 선택
+        if is_background:
+            logger.info(f"📱 [FCM iOS] 백그라운드 푸시 전송")
+            return self.send_background_push_notification(
+                token=token,
+                title=title,
+                content=content,
+                content_available=True,
+                priority="high",
+                event_url=None,
+                schedule_id=None
+            )
+        else:
+            logger.info(f"📱 [FCM iOS] 일반 푸시 전송 (재시도: {Config.IOS_PUSH_RETRY_COUNT})")
+            return self.send_push_notification(
+                token=token,
+                title=title,
+                content=content,
+                max_retries=Config.IOS_PUSH_RETRY_COUNT  # 설정된 재시도 횟수 사용
+            )
+
+    def _handle_token_invalidation(self, token: str, reason: str, title: str = None, content: str = None):
+        """
+        FCM 토큰 무효화 처리 메소드
+        토큰이 무효화된 경우 DB에서 제거하고 사용자 알림 처리
+
+        Args:
+            token: 무효화된 FCM 토큰
+            reason: 무효화 이유 (unregistered, invalid_registration 등)
+            title: 원래 전송하려던 푸시 제목
+            content: 원래 전송하려던 푸시 내용
+        """
+        try:
+            logger.info(f"🔄 [FCM TOKEN MANAGEMENT] 토큰 무효화 처리 시작 - 토큰: {token[:30]}..., 이유: {reason}")
+
+            # 데이터베이스 연결
+            from app.db.session import get_db
+            from app.models.member import Member
+            from sqlalchemy.orm import Session
+
+            db: Session = next(get_db())
+
+            # 토큰으로 사용자 조회
+            member = db.query(Member).filter(Member.mt_token_id == token).first()
+
+            if member:
+                logger.warning(f"🚨 [FCM TOKEN MANAGEMENT] 무효화된 토큰 발견 - 사용자: {member.mt_id} ({member.mt_idx})")
+                logger.info(f"📋 [FCM TOKEN MANAGEMENT] 토큰 제거 전 정보: 업데이트={member.mt_token_updated_at}, 만료={member.mt_token_expiry_date}")
+
+                # FCM 토큰 정보 초기화
+                member.mt_token_id = None
+                member.mt_token_updated_at = None
+                member.mt_token_expiry_date = None
+
+                # 변경사항 저장
+                db.commit()
+
+                logger.info(f"✅ [FCM TOKEN MANAGEMENT] 토큰 제거 완료 - 사용자: {member.mt_idx}")
+                logger.info(f"📊 [FCM TOKEN MANAGEMENT] 정리 기록: 이유={reason}, 토큰_접두사={token[:30]}..., 타임스탬프={int(time.time())}")
+
+                # 사용자에게 토큰 갱신 알림 전송 시도 (가능한 경우)
+                try:
+                    if member.mt_push1 == 'Y':  # 푸시 알림 동의한 경우
+                        logger.info(f"🔔 [FCM TOKEN MANAGEMENT] 토큰 갱신 알림 전송 시도 - 사용자: {member.mt_idx}")
+
+                        # 토큰 갱신 요청 알림 (실제로는 FCM을 통하지 않고 다른 방식으로 전송해야 함)
+                        # 여기서는 로그로 기록만 하고 실제 전송은 생략
+                        logger.info(f"📢 [FCM TOKEN MANAGEMENT] 토큰 갱신 필요 알림: '{member.mt_name}'님의 FCM 토큰이 만료되었습니다. 앱을 재시작해주세요.")
+
+                except Exception as e:
+                    logger.warning(f"⚠️ [FCM TOKEN MANAGEMENT] 토큰 갱신 알림 전송 실패: {e}")
+
+            else:
+                logger.warning(f"⚠️ [FCM TOKEN MANAGEMENT] 무효화된 토큰에 해당하는 사용자를 찾을 수 없음: {token[:30]}...")
+                logger.info(f"📊 [FCM TOKEN MANAGEMENT] 정리 기록 (사용자 미발견): 이유={reason}, 토큰_접두사={token[:30]}..., 타임스탬프={int(time.time())}")
+
+            # 정리 작업 완료
+            logger.info(f"✅ [FCM TOKEN MANAGEMENT] 토큰 무효화 처리 완료 - 이유: {reason}")
+
+        except Exception as e:
+            logger.error(f"❌ [FCM TOKEN MANAGEMENT] 토큰 무효화 처리 중 오류: {e}")
+            logger.error(f"   토큰: {token[:30]}..., 이유: {reason}")
+
+        finally:
+            # 데이터베이스 세션 정리
+            try:
+                if 'db' in locals():
+                    db.close()
+            except:
+                pass
+
+    def _send_token_refresh_notification(self, member_idx: int, reason: str):
+        """
+        토큰 갱신 요청 알림 전송 (토큰이 없는 경우에만 사용)
+
+        Args:
+            member_idx: 사용자 ID
+            reason: 토큰 갱신 필요 이유
+        """
+        try:
+            logger.info(f"🔔 [FCM TOKEN REFRESH] 토큰 갱신 알림 전송 - 사용자: {member_idx}, 이유: {reason}")
+
+            # 여기서는 실제 알림 전송 대신 로그 기록
+            # 실제 구현에서는 SMS, 이메일, 다른 푸시 채널 등을 사용할 수 있음
+            logger.info(f"📢 [FCM TOKEN REFRESH] FCM 토큰 갱신 필요 - 사용자 {member_idx}: {reason}")
+
+        except Exception as e:
+            logger.error(f"❌ [FCM TOKEN REFRESH] 토큰 갱신 알림 전송 실패: {e}")
 
 # 싱글톤 인스턴스 생성
 firebase_service = FirebaseService() 

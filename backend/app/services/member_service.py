@@ -242,7 +242,15 @@ class MemberService:
             lookup_method = "none"
             
             logger.info(f"🔍 Google 로그인 시작 - email: {google_data.email}, google_id: {google_data.google_id}")
-            
+
+            # 필수 데이터 검증
+            if not google_data.google_id and not google_data.email:
+                logger.error("❌ Google 로그인: google_id와 email이 모두 없음")
+                return GoogleLoginResponse(
+                    success=False,
+                    message="Google ID 또는 이메일이 필요합니다."
+                )
+
             # 이메일로 기존 사용자 조회 (우선순위 1)
             if google_data.email:
                 existing_member = self.crud.get_by_email(db, google_data.email)
@@ -250,16 +258,16 @@ class MemberService:
                     logger.info(f"✅ 이메일로 기존 사용자 발견 - mt_idx: {existing_member.mt_idx}, email: {existing_member.mt_email}")
                     is_new_user = False
                     lookup_method = "email"
-                    
+
                     # Google ID가 없는 경우 추가
-                    if not existing_member.mt_google_id:
+                    if google_data.google_id and not existing_member.mt_google_id:
                         existing_member.mt_google_id = google_data.google_id
                         existing_member.mt_type = 4  # Google 로그인 타입
                         db.commit()
                         logger.info(f"🔗 기존 사용자에 Google ID 연결 완료")
-            
+
             # Google ID로 사용자 조회 (우선순위 2)
-            if not existing_member:
+            if not existing_member and google_data.google_id:
                 existing_member = db.query(Member).filter(Member.mt_google_id == google_data.google_id).first()
                 if existing_member:
                     logger.info(f"✅ Google ID로 기존 사용자 발견 - mt_idx: {existing_member.mt_idx}")
@@ -315,7 +323,15 @@ class MemberService:
             else:
                 # 새 사용자 회원가입 처리
                 logger.info(f"👤 새 사용자 회원가입 처리 시작")
-                
+
+                # 필수 데이터 확인
+                if not google_data.google_id:
+                    logger.error("❌ 새 사용자 생성 실패: Google ID가 없음")
+                    return GoogleLoginResponse(
+                        success=False,
+                        message="Google ID가 필요합니다."
+                    )
+
                 # 새 사용자 생성
                 new_member = Member(
                     mt_id=f"google_{google_data.google_id}",  # Google ID 기반 고유 ID

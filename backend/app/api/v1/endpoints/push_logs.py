@@ -44,7 +44,7 @@ def get_member_push_logs(
     """
     # 7일 전 날짜 계산
     seven_days_ago = datetime.now() - timedelta(days=7)
-    
+
     push_logs = db.query(PushLog).filter(
         PushLog.mt_idx == member_id,
         PushLog.plt_show == ShowEnum.Y,
@@ -52,6 +52,18 @@ def get_member_push_logs(
         PushLog.plt_sdate >= seven_days_ago  # 7일 필터링 추가
     ).order_by(PushLog.plt_sdate.desc()).all()
     return push_logs
+
+@router.get("/recent/{member_id}", response_model=List[PushLogResponse])
+def get_recent_member_push_logs(
+    member_id: int,
+    db: Session = Depends(deps.get_db)
+):
+    """
+    특정 회원의 최근 푸시 로그 목록을 조회합니다. (최근 7일)
+    /member/{member_id}와 동일한 기능으로 호환성 유지
+    """
+    # 기존의 get_member_push_logs와 동일한 로직 사용
+    return get_member_push_logs(member_id, db)
 
 @router.get("/schedule/{schedule_id}", response_model=List[PushLogResponse])
 def get_schedule_push_logs(

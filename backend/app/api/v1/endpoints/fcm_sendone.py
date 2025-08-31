@@ -5,7 +5,7 @@ from app.models.member import Member
 from app.models.push_log import PushLog
 from app.schemas.fcm_notification import FCMSendRequest, FCMSendResponse
 from app.services.firebase_service import firebase_service
-from datetime import datetime
+from datetime import datetime, timedelta
 from pydantic import BaseModel
 from typing import Optional
 import logging
@@ -154,14 +154,62 @@ def send_fcm_push_notification(
                 "Firebase 서비스가 사용 불가능합니다. 관리자에게 문의하세요."
             )
 
-        logger.debug("푸시 메시지 전송 중")
-        try:
-            response = firebase_service.send_push_notification(
-                member.mt_token_id,
-                args['plt_title'],
-                args['plt_content']
+        # FCM 토큰 최종 검증
+        if not member.mt_token_id or len(str(member.mt_token_id).strip()) == 0:
+            logger.warning(f"🚨 [FCM] 토큰이 비어있음 - 회원: {member.mt_idx}")
+            push_log = create_push_log(args, member.mt_idx, 4, db)  # 상태 4: 토큰 없음
+            db.add(push_log)
+            db.commit()
+            return create_response(
+                FAILURE,
+                "푸시발송(단건) 실패",
+                "FCM 토큰이 존재하지 않습니다."
             )
-            logger.debug(f"Firebase 응답: {response}")
+
+        logger.info(f"📤 [FCM] 푸시 메시지 전송 시작 - 회원: {member.mt_idx}")
+        logger.debug(f"📤 [FCM] 토큰: {member.mt_token_id[:30]}...")
+        logger.debug(f"📤 [FCM] 제목: {args['plt_title']}")
+        logger.debug(f"📤 [FCM] 내용: {args['plt_content'][:50]}...")
+
+        try:
+            # iOS 기기인지 확인하여 최적화된 전송 방식 선택
+            # 1. 우선 데이터베이스의 OS 정보 사용 (mt_os_check: 0=android, 1=ios)
+            db_os_check = member.mt_os_check if hasattr(member, 'mt_os_check') else None
+            is_ios_from_db = db_os_check == 1
+
+            # 2. User-Agent 정보 확인 (요청에 포함된 경우)
+            user_agent_raw = args.get('user_agent', '')
+            user_agent = user_agent_raw.lower() if user_agent_raw else ''
+            is_ios_from_ua = 'ios' in user_agent or 'iphone' in user_agent or 'ipad' in user_agent
+
+            # 3. 최종 iOS 감지 로직 (DB 우선, UA 보조)
+            is_ios_device = is_ios_from_db or is_ios_from_ua
+
+            logger.info(f"📱 [FCM] DB OS 체크: {db_os_check} (0=Android, 1=iOS)")
+            logger.info(f"📱 [FCM] User-Agent: '{user_agent}'")
+            logger.info(f"📱 [FCM] DB 기반 iOS 감지: {is_ios_from_db}")
+            logger.info(f"📱 [FCM] UA 기반 iOS 감지: {is_ios_from_ua}")
+            logger.info(f"📱 [FCM] 최종 iOS 감지: {is_ios_device}")
+
+            if is_ios_device:
+                logger.info(f"📱 [FCM iOS] iOS 기기로 감지됨 - 최적화된 전송 방식 사용: {member.mt_idx}")
+                response = firebase_service.send_ios_optimized_push(
+                    member.mt_token_id,
+                    args['plt_title'],
+                    args['plt_content'],
+                    is_background=False
+                )
+            else:
+                logger.info(f"🤖 [FCM Android] Android 기기로 감지됨 - 표준 전송 방식 사용: {member.mt_idx}")
+                response = firebase_service.send_push_notification(
+                    member.mt_token_id,
+                    args['plt_title'],
+                    args['plt_content'],
+                    member_id=member.mt_idx
+                )
+
+            logger.info(f"✅ [FCM] Firebase 전송 성공 - 응답: {response}")
+            logger.debug(f"📊 [FCM] 메시지 ID: {response}")
             
             # 상태 2: 전송 성공
             push_log = create_push_log(args, member.mt_idx, 2, db)
@@ -180,6 +228,18 @@ def send_fcm_push_notification(
             logger.warning(f"🚨 [FCM POLICY 4] 일반 푸시에서 비활성 토큰 감지: {member.mt_token_id[:30]}...")
             logger.warning(f"🚨 [FCM POLICY 4] 토큰 삭제 처리됨: {firebase_error}")
 
+            # 토큰 무효화 처리 - 즉시 DB에서 제거
+            try:
+                firebase_service._handle_token_invalidation(
+                    member.mt_token_id,
+                    "unregistered_from_sendone",
+                    args.get('plt_title'),
+                    args.get('plt_content')
+                )
+                logger.info(f"✅ [FCM TOKEN CLEANUP] 토큰 무효화 처리 완료 - 사용자: {member.mt_idx}")
+            except Exception as cleanup_error:
+                logger.error(f"❌ [FCM TOKEN CLEANUP] 토큰 무효화 처리 실패: {cleanup_error}")
+
             # 상태 4: 토큰 만료로 인한 실패
             push_log = create_push_log(args, member.mt_idx, 4, db)
             db.add(push_log)
@@ -188,12 +248,24 @@ def send_fcm_push_notification(
             return create_response(
                 FAILURE,
                 "푸시발송(단건) 실패 - 토큰 만료",
-                "FCM 토큰이 만료되었습니다. 앱 재시작으로 토큰을 갱신해주세요."
+                "FCM 토큰이 만료되었습니다. 앱을 완전히 종료하고 재시작하여 토큰을 갱신해주세요."
             )
 
-        except messaging.InvalidArgumentError as firebase_error:
+        except messaging.ThirdPartyAuthError as firebase_error:
             logger.warning(f"🚨 [FCM POLICY 4] 일반 푸시에서 잘못된 토큰 형식: {member.mt_token_id[:30]}...")
             logger.warning(f"🚨 [FCM POLICY 4] 토큰 형식 오류: {firebase_error}")
+
+            # 토큰 무효화 처리 - 즉시 DB에서 제거
+            try:
+                firebase_service._handle_token_invalidation(
+                    member.mt_token_id,
+                    "third_party_auth_error_from_sendone",
+                    args.get('plt_title'),
+                    args.get('plt_content')
+                )
+                logger.info(f"✅ [FCM TOKEN CLEANUP] ThirdPartyAuthError 토큰 무효화 처리 완료 - 사용자: {member.mt_idx}")
+            except Exception as cleanup_error:
+                logger.error(f"❌ [FCM TOKEN CLEANUP] ThirdPartyAuthError 토큰 무효화 처리 실패: {cleanup_error}")
 
             # 상태 5: 토큰 형식 오류
             push_log = create_push_log(args, member.mt_idx, 5, db)
@@ -203,7 +275,7 @@ def send_fcm_push_notification(
             return create_response(
                 FAILURE,
                 "푸시발송(단건) 실패 - 잘못된 토큰",
-                "FCM 토큰 형식이 잘못되었습니다. 앱 재시작으로 토큰을 갱신해주세요."
+                "FCM 토큰 형식이 잘못되었습니다. 앱을 완전히 종료하고 재시작하여 토큰을 갱신해주세요."
             )
 
         except Exception as firebase_error:
@@ -585,7 +657,8 @@ def test_send_fcm_push_to_user(
         response = firebase_service.send_push_notification(
             member.mt_token_id,
             test_title,
-            test_content
+            test_content,
+            member_id=member.mt_idx
         )
 
         logger.info(f"테스트 푸시 전송 성공 - 회원 ID: {mt_idx}, FCM 응답: {response}")

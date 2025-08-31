@@ -11,6 +11,9 @@ from sqlalchemy.orm import Session
 from typing import Optional, List, Dict
 from datetime import datetime, timedelta
 from app.models.group_detail import GroupDetail
+import logging
+
+logger = logging.getLogger(__name__)
 
 class Schedule(BaseModel):
     __tablename__ = "smap_schedule_t"
@@ -77,7 +80,7 @@ class Schedule(BaseModel):
                 AND sst.sst_show = 'Y'
             """)
             result = db.execute(sql)
-            return [dict(row) for row in result]
+            return [dict(row._mapping) for row in result]
         except Exception as e:
             logger.error(f"Error in get_now_schedule_in_members: {e}")
             return []
@@ -97,7 +100,7 @@ class Schedule(BaseModel):
                 AND sst.sst_show = 'Y'
             """)
             result = db.execute(sql)
-            return [dict(row) for row in result]
+            return [dict(row._mapping) for row in result]
         except Exception as e:
             logger.error(f"Error in get_now_schedule_out_members: {e}")
             return []
@@ -155,4 +158,16 @@ class Schedule(BaseModel):
             schedule_obj.mt_schedule_idx = mt_schedule_idx_val
             processed_schedules.append(schedule_obj)
         
-        return processed_schedules 
+        return processed_schedules
+
+    @classmethod
+    def get_upcoming_schedules(cls, db: Session, hours: int = 24) -> List['Schedule']:
+        """다가오는 일정들을 가져옵니다."""
+        now = datetime.now()
+        upcoming_time = now + timedelta(hours=hours)
+        
+        return db.query(cls).filter(
+            cls.sst_sdate >= now,
+            cls.sst_sdate <= upcoming_time,
+            cls.sst_show == ShowEnum.Y
+        ).order_by(cls.sst_sdate).all() 

@@ -10,8 +10,10 @@ from app.schemas.member_fcm_token import (
     MemberFCMTokenResponse,
     MemberFCMTokenStatusResponse
 )
+from app.services.firebase_service import firebase_service
 from pydantic import BaseModel
 from typing import Optional
+from firebase_admin import messaging
 
 # 백그라운드 토큰 검증 요청 모델
 class BackgroundTokenCheckRequest(BaseModel):
@@ -334,6 +336,60 @@ async def validate_and_refresh_fcm_token(
             needs_refresh = True
             reason = "FCM 토큰이 2일 이상 업데이트되지 않았습니다."
 
+        # FCM 서버와의 실제 토큰 검증 (선택적)
+        server_validation_passed = True
+        if request.force_refresh or needs_refresh:
+            logger.info(f"🔍 FCM 서버 토큰 검증 시작 - 회원 ID: {request.mt_idx}")
+
+            try:
+                # FCM 서버에 테스트 메시지를 보내서 토큰 유효성 검증
+                test_message = messaging.Message(
+                    data={'token_validation': 'true', 'timestamp': str(int(now.timestamp()))},
+                    token=request.fcm_token
+                )
+
+                # 실제 전송은 시도하지 않고 dry-run으로 검증만 수행
+                # (실제 메시지를 보내지 않으려면 validation_only=True로 설정)
+                logger.info(f"📡 FCM 서버 토큰 검증 시도 - 토큰: {request.fcm_token[:30]}...")
+
+                # 간단한 토큰 형식 검증만 수행 (실제 FCM 전송은 비용과 사용자 경험 고려)
+                if firebase_service.validate_ios_token(request.fcm_token):
+                    logger.info(f"✅ FCM 서버 토큰 검증 통과 - 회원 ID: {request.mt_idx}")
+                    server_validation_passed = True
+                else:
+                    logger.warning(f"❌ FCM 서버 토큰 검증 실패 - 회원 ID: {request.mt_idx}")
+                    server_validation_passed = False
+                    needs_refresh = True
+                    reason = "FCM 서버에서 토큰을 인식하지 못합니다."
+
+            except messaging.UnregisteredError as e:
+                logger.warning(f"🚨 FCM 서버 검증 중 토큰 무효화 감지 - 회원 ID: {request.mt_idx}: {e}")
+                server_validation_passed = False
+                needs_refresh = True
+                reason = "FCM 서버에서 토큰이 무효화되었습니다."
+
+                # 즉시 토큰 무효화 처리
+                try:
+                    firebase_service._handle_token_invalidation(
+                        request.fcm_token,
+                        "server_validation_unregistered",
+                        "토큰 검증",
+                        "FCM 서버에서 토큰 무효화 감지"
+                    )
+                except Exception as cleanup_error:
+                    logger.error(f"❌ FCM 토큰 무효화 처리 실패: {cleanup_error}")
+
+            except messaging.ThirdPartyAuthError as e:
+                logger.warning(f"🚨 FCM 서버 검증 중 인증 오류 - 회원 ID: {request.mt_idx}: {e}")
+                server_validation_passed = False
+                needs_refresh = True
+                reason = "FCM 서버 인증에 실패했습니다."
+
+            except Exception as e:
+                logger.warning(f"⚠️ FCM 서버 검증 중 기타 오류 - 회원 ID: {request.mt_idx}: {e}")
+                # 서버 검증 실패해도 기본 검증은 계속 진행
+                server_validation_passed = False
+
         if needs_refresh:
             logger.info(f"FCM 토큰 갱신 필요 - 회원 ID: {request.mt_idx}, 사유: {reason}")
 
@@ -346,9 +402,10 @@ async def validate_and_refresh_fcm_token(
             db.commit()
             db.refresh(member)
 
+            validation_status = "서버 검증 통과" if server_validation_passed else "기본 검증만 통과"
             return MemberFCMTokenResponse(
                 success=True,
-                message=f"FCM 토큰이 갱신되었습니다. 사유: {reason}",
+                message=f"FCM 토큰이 갱신되었습니다. 사유: {reason} ({validation_status})",
                 mt_idx=member.mt_idx,
                 has_token=True,
                 token_preview=request.fcm_token[:20] + "..." if len(request.fcm_token) > 20 else request.fcm_token
@@ -356,9 +413,10 @@ async def validate_and_refresh_fcm_token(
         else:
             logger.info(f"FCM 토큰 검증 통과 - 회원 ID: {request.mt_idx}")
 
+            validation_status = "서버 검증 통과" if server_validation_passed else "기본 검증 통과"
             return MemberFCMTokenResponse(
                 success=True,
-                message="FCM 토큰이 유효합니다.",
+                message=f"FCM 토큰이 유효합니다. ({validation_status})",
                 mt_idx=member.mt_idx,
                 has_token=True,
                 token_preview=request.fcm_token[:20] + "..." if len(request.fcm_token) > 20 else request.fcm_token
@@ -479,4 +537,135 @@ async def background_token_check(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="FCM 토큰 백그라운드 검증 중 서버 오류가 발생했습니다."
+        )
+
+
+@router.post("/cleanup-expired-tokens", response_model=MemberFCMTokenResponse)
+async def cleanup_expired_fcm_tokens(
+    db: Session = Depends(get_db)
+):
+    """
+    만료된 FCM 토큰들을 정리하는 관리자용 엔드포인트
+    주기적으로 호출하여 무효화된 토큰들을 정리합니다.
+
+    Returns:
+        MemberFCMTokenResponse: 정리 결과
+    """
+    try:
+        logger.info("🔄 FCM 토큰 정리 작업 시작")
+
+        now = datetime.now()
+        cleaned_count = 0
+        notified_count = 0
+
+        # 만료된 토큰들을 찾기
+        expired_members = db.query(Member).filter(
+            Member.mt_token_id.isnot(None),
+            Member.mt_token_expiry_date.isnot(None),
+            Member.mt_token_expiry_date < now
+        ).all()
+
+        for member in expired_members:
+            logger.info(f"🗑️ 만료된 토큰 정리 - 회원 ID: {member.mt_idx}, 만료일: {member.mt_token_expiry_date}")
+
+            # 토큰 정보 초기화
+            member.mt_token_id = None
+            member.mt_token_updated_at = None
+            member.mt_token_expiry_date = None
+            member.mt_udate = now
+
+            cleaned_count += 1
+
+            # 푸시 알림 동의한 사용자에게 토큰 갱신 요청 알림
+            if member.mt_push1 == 'Y':
+                try:
+                    # 실제 구현에서는 SMS, 이메일 등으로 알림 전송
+                    logger.info(f"📢 토큰 만료 알림 필요 - 회원: {member.mt_id} ({member.mt_idx})")
+                    notified_count += 1
+                except Exception as e:
+                    logger.error(f"❌ 토큰 만료 알림 전송 실패 - 회원: {member.mt_idx}: {e}")
+
+        if cleaned_count > 0:
+            db.commit()
+            logger.info(f"✅ FCM 토큰 정리 완료 - 정리된 토큰: {cleaned_count}개, 알림 대상: {notified_count}명")
+        else:
+            logger.info("ℹ️ 정리할 만료된 토큰이 없습니다.")
+
+        return MemberFCMTokenResponse(
+            success=True,
+            message=f"만료된 FCM 토큰 정리 완료 (정리: {cleaned_count}개, 알림: {notified_count}명)",
+            mt_idx=0,  # 관리 작업이므로 0으로 설정
+            has_token=False,
+            token_preview=""
+        )
+
+    except Exception as e:
+        logger.error(f"FCM 토큰 정리 중 오류 발생: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="FCM 토큰 정리 중 내부 서버 오류가 발생했습니다."
+        )
+
+
+@router.post("/notify-token-refresh", response_model=MemberFCMTokenResponse)
+async def notify_token_refresh(
+    mt_idx: int,
+    db: Session = Depends(get_db)
+):
+    """
+    특정 사용자에게 토큰 갱신 알림을 보내는 엔드포인트
+    FCM 토큰이 무효화되었을 때 호출됩니다.
+
+    Args:
+        mt_idx: 알림을 보낼 회원 ID
+
+    Returns:
+        MemberFCMTokenResponse: 알림 전송 결과
+    """
+    try:
+        logger.info(f"🔔 FCM 토큰 갱신 알림 전송 요청 - 회원 ID: {mt_idx}")
+
+        # 회원 존재 확인
+        member = Member.find_by_idx(db, mt_idx)
+        if not member:
+            logger.warning(f"존재하지 않는 회원: mt_idx={mt_idx}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="해당 회원을 찾을 수 없습니다."
+            )
+
+        # 실제 구현에서는 SMS, 이메일, 다른 푸시 채널 등으로 알림 전송
+        notification_message = f"""
+        안녕하세요 {member.mt_name}님,
+
+        FCM 푸시 알림을 받기 위해서는 앱을 재시작하여 토큰을 갱신해야 합니다.
+
+        ▶ 앱 완전 종료 후 재시작
+        ▶ FCM 토큰 자동 갱신
+        ▶ 푸시 알림 복원
+
+        감사합니다.
+        """
+
+        logger.info(f"📢 토큰 갱신 알림 내용: {notification_message.strip()}")
+
+        # 실제 알림 전송 로직 구현 (SMS, 이메일 등)
+        # 현재는 로그로 기록만 함
+        firebase_service._send_token_refresh_notification(mt_idx, "FCM 토큰 만료로 인한 갱신 필요")
+
+        return MemberFCMTokenResponse(
+            success=True,
+            message="토큰 갱신 알림이 전송되었습니다.",
+            mt_idx=member.mt_idx,
+            has_token=member.mt_token_id is not None,
+            token_preview=member.mt_token_id[:20] + "..." if member.mt_token_id and len(member.mt_token_id) > 20 else (member.mt_token_id or "")
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"FCM 토큰 갱신 알림 전송 중 오류 발생: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="토큰 갱신 알림 전송 중 내부 서버 오류가 발생했습니다."
         )

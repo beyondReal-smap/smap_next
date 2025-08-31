@@ -52,10 +52,9 @@ async def handle_location_log_request(
     db: Session = Depends(get_db)
 ):
     """위치 로그 관련 요청 처리"""
-    print("==== FastAPI /api/v1/member-location-logs 진입 ====")
+    # print("==== FastAPI /api/v1/member-location-logs 진입 ====")
     try:
         body = await request.json()
-        logger.info(f"Received location log request: {body}")
         act = body.get("act")
         
         if not act:
@@ -79,7 +78,6 @@ async def handle_location_log_request(
                 )
                 
                 result = [log.to_dict() for log in logs]
-                logger.info(f"Retrieved {len(result)} location logs for member {mt_idx}")
                 return {"result": "Y", "data": result}
                 
             except Exception as e:
@@ -101,7 +99,6 @@ async def handle_location_log_request(
                     db, mt_idx, start_date, end_date
                 )
                 
-                logger.info(f"Retrieved location summary for member {mt_idx}")
                 return {"result": "Y", "data": summary.model_dump()}
                 
             except Exception as e:
@@ -123,7 +120,6 @@ async def handle_location_log_request(
                     db, mt_idx, start_date, end_date
                 )
                 
-                logger.info(f"Retrieved location path for member {mt_idx}: {len(path_data.points)} points")
                 return {"result": "Y", "data": path_data.model_dump()}
                 
             except Exception as e:
@@ -134,9 +130,16 @@ async def handle_location_log_request(
         elif act == "create_location_log":
             # 위치 로그 생성 (토큰 기반 사용자 식별 + 배치 전송 지원)
             try:
+                # 토큰이 있으면 토큰 기반, 없으면 body의 mt_idx 사용
                 token_mt_idx, token_err = _get_mt_idx_from_token(request)
-                if token_err:
+                if token_err and not body.get("mt_idx"):
+                    # 토큰도 없고 body에 mt_idx도 없으면 에러
                     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=token_err)
+                
+                # 토큰에서 mt_idx를 가져오거나 body에서 사용
+                final_mt_idx = token_mt_idx if token_mt_idx else body.get("mt_idx")
+                if not final_mt_idx:
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="mt_idx가 필요합니다 (토큰 또는 body)")
 
                 # 동의(옵션): body 또는 헤더로 넘어오는 동의 플래그가 명시적으로 'N'이면 차단
                 consent = (str(body.get("location_consent", "Y")).upper() != "N")
@@ -151,14 +154,14 @@ async def handle_location_log_request(
                         try:
                             single = {
                                 "act": "create_location_log",  # 내부 검증용
-                                "mt_idx": token_mt_idx,
+                                "mt_idx": final_mt_idx,
                                 "mlt_lat": item.get("mlt_lat"),
                                 "mlt_long": item.get("mlt_long"),
-                                "mlt_accuracy": item.get("mlt_accuracy") or item.get("mlt_accuacy"),
+                                "mlt_accuacy": item.get("mlt_accuracy") or item.get("mlt_accuacy"),  # 스키마에 맞게 mlt_accuacy 사용
                                 "mlt_speed": item.get("mlt_speed"),
                                 "mlt_altitude": item.get("mlt_altitude"),
-                                # iOS 배치 필드명 호환: mlt_gps_time → mlt_timestamp
-                                "mlt_timestamp": item.get("mlt_timestamp") or item.get("mlt_gps_time"),
+                                # iOS 배치 필드명 호환: mlt_timestamp → mlt_gps_time (스키마 호환성)
+                                "mlt_gps_time": item.get("mlt_timestamp") or item.get("mlt_gps_time"),
                                 "source": body.get("source", "ios-app"),
                                 "mlt_location_chk": item.get("mlt_location_chk"),
                                 "mlt_fine_location": item.get("mlt_fine_location"),
@@ -174,15 +177,22 @@ async def handle_location_log_request(
                     return {"result": "Y" if created else "N", "created_count": len(created), "errors": errors, "data": created[:10]}
 
                 # 단건 처리
-                print(f"📍 [BACKEND] 위치 로그 생성 요청 수신 (단건):")
-                print(f"   📍 token.mt_idx: {token_mt_idx}")
-                print(f"   📍 위도: {body.get('mlt_lat')}")
-                print(f"   📍 경도: {body.get('mlt_long')}")
+                # print(f"📍 [BACKEND] 위치 로그 생성 요청 수신 (단건):")
+                # print(f"   📍 final_mt_idx: {final_mt_idx}")
+                # print(f"   📍 위도: {body.get('mlt_lat')}")
+                # print(f"   📍 경도: {body.get('mlt_long')}")
                 
-                body["mt_idx"] = token_mt_idx  # 클라이언트 바디의 mt_idx 무시하고 토큰 우선
+                body["mt_idx"] = final_mt_idx  # 토큰 또는 body의 mt_idx 사용
+                
+                # 필드명 매핑: mlt_timestamp -> mlt_gps_time (스키마 호환성)
+                if "mlt_timestamp" in body and "mlt_gps_time" not in body:
+                    body["mlt_gps_time"] = body["mlt_timestamp"]
+                
+                # mlt_accuracy 매핑 (오타 호환성)
+                if "mlt_accuracy" in body and "mlt_accuacy" not in body:
+                    body["mlt_accuacy"] = body["mlt_accuracy"]
                 log_data = MemberLocationLogCreate(**body)
                 result = location_log_crud.create_location_log(db, log_data)
-                logger.info(f"Location log created successfully: {result.mlt_idx}")
                 return {"result": "Y", "data": result.to_dict()}
             except HTTPException:
                 raise
@@ -205,7 +215,6 @@ async def handle_location_log_request(
                 if not result:
                     raise HTTPException(status_code=404, detail="Location log not found")
                 
-                logger.info(f"Location log updated successfully: {result.mlt_idx}")
                 return {"result": "Y", "data": result.to_dict()}
                 
             except Exception as e:
@@ -434,59 +443,59 @@ async def handle_location_log_request(
                 logger.error(traceback.format_exc())
                 raise HTTPException(status_code=500, detail=str(e))
         
-        elif act == "create_location_log":
-            # 새로운 위치 로그 생성 (iOS/Android에서 실시간 위치 전송용)
-            try:
-                logger.info("=== create_location_log 액션 실행 ===")
-                
-                # 필수 파라미터 검증
-                mt_idx = body.get("mt_idx")
-                if not mt_idx:
-                    logger.error("mt_idx is required for create_location_log")
-                    raise HTTPException(status_code=400, detail="mt_idx is required")
-                
-                mlt_lat = body.get("mlt_lat")
-                mlt_long = body.get("mlt_long")
-                if mlt_lat is None or mlt_long is None:
-                    logger.error("mlt_lat and mlt_long are required")
-                    raise HTTPException(status_code=400, detail="mlt_lat and mlt_long are required")
-                
-                # 선택적 파라미터들
-                mlt_accuracy = body.get("mlt_accuracy", 0)
-                mlt_speed = body.get("mlt_speed", 0)
-                mlt_altitude = body.get("mlt_altitude", 0)
-                mlt_timestamp = body.get("mlt_timestamp")
-                source = body.get("source", "unknown")
-                
-                logger.info(f"Creating location log for member {mt_idx}: lat={mlt_lat}, lng={mlt_long}, source={source}")
-                
-                # 위치 로그 생성 (실제 DB 저장 로직은 CRUD에서 구현)
-                # 지금은 성공 응답만 반환 (추후 실제 DB 저장 로직 구현 가능)
-                
-                result_data = {
-                    "mt_idx": mt_idx,
-                    "location_saved": True,
-                    "coordinates": {
-                        "latitude": mlt_lat,
-                        "longitude": mlt_long
-                    },
-                    "metadata": {
-                        "accuracy": mlt_accuracy,
-                        "speed": mlt_speed,
-                        "altitude": mlt_altitude,
-                        "source": source,
-                        "timestamp": mlt_timestamp or "auto-generated"
-                    },
-                    "saved_at": "2025-08-07T20:26:00Z"  # 현재 시간으로 교체 가능
-                }
-                
-                logger.info(f"Location log created successfully for member {mt_idx}")
-                return {"result": "Y", "data": result_data, "message": "위치 로그 생성 성공"}
-                
-            except Exception as e:
-                logger.error(f"Error creating location log: {str(e)}")
-                logger.error(traceback.format_exc())
-                raise HTTPException(status_code=500, detail=str(e))
+        # elif act == "create_location_log":
+        #     # 새로운 위치 로그 생성 (iOS/Android에서 실시간 위치 전송용) - 중복 블록으로 주석 처리
+        #     try:
+        #         logger.info("=== create_location_log 액션 실행 ===")
+        #         
+        #         # 필수 파라미터 검증
+        #         mt_idx = body.get("mt_idx")
+        #         if not mt_idx:
+        #             logger.error("mt_idx is required for create_location_log")
+        #             raise HTTPException(status_code=400, detail="mt_idx is required")
+        #         
+        #         mlt_lat = body.get("mlt_lat")
+        #         mlt_long = body.get("mlt_long")
+        #         if mlt_lat is None or mlt_long is None:
+        #             logger.error("mlt_lat and mlt_long are required")
+        #             raise HTTPException(status_code=400, detail="mlt_lat and mlt_long are required")
+        #         
+        #         # 선택적 파라미터들
+        #         mlt_accuracy = body.get("mlt_accuracy", 0)
+        #         mlt_speed = body.get("mlt_speed", 0)
+        #         mlt_altitude = body.get("mlt_altitude", 0)
+        #         mlt_timestamp = body.get("mlt_timestamp")
+        #         source = body.get("source", "unknown")
+        #         
+        #         logger.info(f"Creating location log for member {mt_idx}: lat={mlt_lat}, lng={mlt_long}, source={source}")
+        #         
+        #         # 위치 로그 생성 (실제 DB 저장 로직은 CRUD에서 구현)
+        #         # 지금은 성공 응답만 반환 (추후 실제 DB 저장 로직 구현 가능)
+        #         
+        #         result_data = {
+        #             "mt_idx": mt_idx,
+        #             "location_saved": True,
+        #             "coordinates": {
+        #                 "latitude": mlt_lat,
+        #                 "longitude": mlt_long
+        #             },
+        #             "metadata": {
+        #                 "accuracy": mlt_accuracy,
+        #                 "speed": mlt_speed,
+        #                 "altitude": mlt_altitude,
+        #                 "source": source,
+        #                 "timestamp": mlt_timestamp or "auto-generated"
+        #             },
+        #             "saved_at": "2025-08-07T20:26:00Z"  # 현재 시간으로 교체 가능
+        #         }
+        #         
+        #         logger.info(f"Location log created successfully for member {mt_idx}")
+        #         return {"result": "Y", "data": result_data, "message": "위치 로그 생성 성공"}
+        #         
+        #     except Exception as e:
+        #         logger.error(f"Error creating location log: {str(e)}")
+        #         logger.error(traceback.format_exc())
+        #         raise HTTPException(status_code=500, detail=str(e))
         
         else:
             logger.error(f"Invalid act value: {act}")
@@ -560,15 +569,11 @@ async def get_daily_location_logs(
 ):
     """특정 회원의 특정 날짜 위치 로그 조회 (GET 방식)"""
     try:
-        logger.info(f"[GET] Daily location logs: mt_idx={mt_idx}, date={date}")
-        
         logs = location_log_crud.get_member_location_logs_by_exact_date(
             db, mt_idx, date, limit, offset
         )
         
         result = [log.to_dict() for log in logs]
-        logger.info(f"Retrieved {len(result)} daily location logs for member {mt_idx} on {date}")
-        
         return result
         
     except Exception as e:
@@ -607,13 +612,9 @@ async def get_daily_location_path(
 ):
     """특정 회원의 특정 날짜 위치 경로 데이터 조회 (GET 방식)"""
     try:
-        logger.info(f"[GET] Daily location path: mt_idx={mt_idx}, date={date}")
-        
         path_data = location_log_crud.get_member_daily_location_path(
             db, mt_idx, date
         )
-        
-        logger.info(f"Retrieved daily location path for member {mt_idx} on {date}: {len(path_data)} points")
         
         return path_data
         

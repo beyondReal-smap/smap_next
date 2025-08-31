@@ -7,6 +7,7 @@ class MemberFCMTokenRequest(BaseModel):
     """회원 FCM 토큰 요청 스키마"""
     mt_idx: int = Field(..., description="회원 고유번호", gt=0)
     fcm_token: str = Field(..., description="Firebase FCM 토큰", min_length=50, max_length=255)
+    force_refresh: bool = Field(False, description="강제 토큰 갱신 여부")
     
     class Config:
         schema_extra = {

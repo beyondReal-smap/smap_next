@@ -4,8 +4,9 @@ import jwt
 import logging
 from datetime import datetime, timedelta
 from typing import Optional
+from pydantic import BaseModel
 from jose import JWTError
-from fastapi import APIRouter, Depends, HTTPException, status, Body
+from fastapi import APIRouter, Depends, HTTPException, status, Body, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from app.db.session import get_db
@@ -61,23 +62,65 @@ class GoogleUserDataResponse(BaseModel):
     message: str
     data: Optional[dict] = None
 
-# Google 로그인 요청 모델
+# Google 로그인 요청 모델 (완전히 유연하게 변경)
 class GoogleLoginRequest(BaseModel):
-    google_id: str
+    google_id: Optional[str] = None
     email: Optional[str] = None
     name: Optional[str] = None
     given_name: Optional[str] = None
     family_name: Optional[str] = None
     image: Optional[str] = None
-    id_token: str
+    id_token: Optional[str] = None
+    # 기타 모든 필드도 옵셔널로 처리
     lookup_strategy: Optional[str] = "email_first"
     search_by_email: Optional[bool] = True
     verify_email_match: Optional[bool] = True
     email_first_lookup: Optional[bool] = True
     lookup_priority: Optional[str] = "email"
 
+    class Config:
+        # 추가 필드도 허용하여 엄격한 검증 방지
+        extra = "allow"
+
 # Google 로그인 응답 모델
 class GoogleLoginResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[dict] = None
+
+# 레거시/공용 로그인 요청/응답 스키마
+class LoginRequest(BaseModel):
+    mt_hp: str
+    mt_pass: str
+    fcm_token: Optional[str] = None
+
+class LoginResponse(BaseModel):
+    access_token: str
+    user: "UserIdentity"
+
+# 비밀번호 관련 요청/응답 스키마
+class ForgotPasswordRequest(BaseModel):
+    type: str  # "phone" | "email"
+    contact: str
+
+class ForgotPasswordResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[dict] = None
+
+class VerifyResetTokenRequest(BaseModel):
+    token: str
+
+class VerifyResetTokenResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[dict] = None
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+class ResetPasswordResponse(BaseModel):
     success: bool
     message: str
     data: Optional[dict] = None
@@ -141,24 +184,12 @@ async def login_for_home_page(
             }
         )
         
-        # 로그인 시간 및 FCM 토큰 업데이트 (로그 포함)
-        incoming_token = getattr(login_request, 'fcm_token', None)
-        old_token = user.mt_token_id
-        logger.info(f"[LOGIN] FCM 토큰 수신 여부: {bool(incoming_token)}, 길이: {len(incoming_token) if incoming_token else 0}")
-        logger.info(f"[LOGIN] 업데이트 전 mt_token_id: {old_token[:20] + '...' if old_token else 'None'}")
-
+        # 로그인 시간 및 FCM 토큰 업데이트
         user.mt_ldate = datetime.utcnow()
-        if incoming_token:
-            if not old_token:
-                logger.info("[LOGIN] 기존 토큰 없음 → 신규 토큰 저장")
-                user.mt_token_id = incoming_token
-            elif old_token != incoming_token:
-                logger.info("[LOGIN] 기존 토큰과 상이 → 토큰 업데이트")
-                user.mt_token_id = incoming_token
-            else:
-                logger.info("[LOGIN] 기존 토큰과 동일 → 업데이트 생략")
+        if getattr(login_request, 'fcm_token', None):
+            if not user.mt_token_id or user.mt_token_id != login_request.fcm_token:
+                user.mt_token_id = login_request.fcm_token
         db.commit()
-        logger.info(f"[LOGIN] 커밋 후 mt_token_id: {user.mt_token_id[:20] + '...' if user.mt_token_id else 'None'}")
 
         # home/page.tsx의 Member 타입에 맞는 사용자 정보 구성
         user_data = {
@@ -284,24 +315,12 @@ async def login_for_access_token_custom(
         data=user_identity.model_dump()
     )
     
-    # 로그인 시간 및 FCM 토큰 업데이트 (로그 포함)
-    incoming_token = getattr(login_request, 'fcm_token', None)
-    old_token = user.mt_token_id
-    logger.info(f"[LOGIN_ORIGINAL] FCM 토큰 수신 여부: {bool(incoming_token)}, 길이: {len(incoming_token) if incoming_token else 0}")
-    logger.info(f"[LOGIN_ORIGINAL] 업데이트 전 mt_token_id: {old_token[:20] + '...' if old_token else 'None'}")
-
+    # 로그인 시간 및 FCM 토큰 업데이트
     user.mt_ldate = datetime.utcnow()
-    if incoming_token:
-        if not old_token:
-            logger.info("[LOGIN_ORIGINAL] 기존 토큰 없음 → 신규 토큰 저장")
-            user.mt_token_id = incoming_token
-        elif old_token != incoming_token:
-            logger.info("[LOGIN_ORIGINAL] 기존 토큰과 상이 → 토큰 업데이트")
-            user.mt_token_id = incoming_token
-        else:
-            logger.info("[LOGIN_ORIGINAL] 기존 토큰과 동일 → 업데이트 생략")
+    if getattr(login_request, 'fcm_token', None):
+        if not user.mt_token_id or user.mt_token_id != login_request.fcm_token:
+            user.mt_token_id = login_request.fcm_token
     db.commit()
-    logger.info(f"[LOGIN_ORIGINAL] 커밋 후 mt_token_id: {user.mt_token_id[:20] + '...' if user.mt_token_id else 'None'}")
 
     return LoginResponse(
         access_token=access_token,
@@ -420,24 +439,12 @@ async def kakao_login(
                 is_new_user = True
                 logger.info(f"[KAKAO LOGIN] 새 카카오 사용자 생성 (이메일 없음): mt_idx={user.mt_idx}")
 
-        # 로그인 시간 및 FCM 토큰 업데이트 (로그 포함)
-        incoming_token = getattr(kakao_request, 'fcm_token', None)
-        old_token = user.mt_token_id
-        logger.info(f"[KAKAO LOGIN] FCM 토큰 수신 여부: {bool(incoming_token)}, 길이: {len(incoming_token) if incoming_token else 0}")
-        logger.info(f"[KAKAO LOGIN] 업데이트 전 mt_token_id: {old_token[:20] + '...' if old_token else 'None'}")
-
+        # 로그인 시간 및 FCM 토큰 업데이트
         user.mt_ldate = datetime.utcnow()
-        if incoming_token:
-            if not old_token:
-                logger.info("[KAKAO LOGIN] 기존 토큰 없음 → 신규 토큰 저장")
-                user.mt_token_id = incoming_token
-            elif old_token != incoming_token:
-                logger.info("[KAKAO LOGIN] 기존 토큰과 상이 → 토큰 업데이트")
-                user.mt_token_id = incoming_token
-            else:
-                logger.info("[KAKAO LOGIN] 기존 토큰과 동일 → 업데이트 생략")
+        if getattr(kakao_request, 'fcm_token', None):
+            if not user.mt_token_id or user.mt_token_id != kakao_request.fcm_token:
+                user.mt_token_id = kakao_request.fcm_token
         db.commit()
-        logger.info(f"[KAKAO LOGIN] 커밋 후 mt_token_id: {user.mt_token_id[:20] + '...' if user.mt_token_id else 'None'}")
 
         # 사용자 정보 구성
         user_data = {
@@ -902,24 +909,70 @@ async def find_user_by_phone(
 
 @router.post("/google-login", response_model=GoogleLoginResponse)
 async def google_login(
-    google_data: GoogleLoginRequest,
+    request: Request,
     db: Session = Depends(get_db)
 ):
     """
-    Google 로그인 처리
+    Google 로그인 처리 (422 에러 방지용으로 request 객체 직접 사용)
     """
     try:
         from app.services.member_service import member_service
-        
-        logger.info(f"🔍 Google 로그인 요청: {google_data.email}")
-        
+
+        # 요청 본문 직접 파싱 (Pydantic 검증 우회)
+        try:
+            body = await request.json()
+            logger.info(f"🔍 Google 로그인 원본 요청 데이터: {body}")
+        except Exception as e:
+            logger.error(f"요청 본문 파싱 실패: {e}")
+            body = {}
+
+        # 필수 필드 검증
+        google_id = body.get('google_id')
+        email = body.get('email')
+        name = body.get('name')
+        id_token = body.get('id_token')
+
+        logger.info("🔍 Google 로그인 요청 데이터 검증:")
+        logger.info(f"   - google_id: {'있음' if google_id else '없음'} ({len(str(google_id)) if google_id else 0}자)")
+        logger.info(f"   - email: {email}")
+        logger.info(f"   - name: {name}")
+        logger.info(f"   - id_token: {'있음' if id_token else '없음'} ({len(str(id_token)) if id_token else 0}자)")
+
+        # 최소한의 필수 데이터 검증
+        if not google_id and not email:
+            logger.error("❌ Google ID와 이메일 모두 누락")
+            return GoogleLoginResponse(
+                success=False,
+                message="Google ID 또는 이메일이 필요합니다."
+            )
+
+        # Pydantic 모델 생성 (안전하게)
+        try:
+            google_data = GoogleLoginRequest(**body)
+            logger.info("✅ Google 로그인 데이터 모델 생성 성공")
+        except Exception as model_error:
+            logger.warning(f"⚠️ 모델 생성 실패 (무시하고 진행): {model_error}")
+            # 모델 생성 실패해도 계속 진행
+            google_data = GoogleLoginRequest(
+                google_id=google_id,
+                email=email,
+                name=name,
+                id_token=id_token
+            )
+
+        logger.info(f"✅ Google 로그인 데이터 검증 통과: {email or '이메일 없음'}")
+
         # MemberService의 google_login 메소드 호출
         result = member_service.google_login(db, google_data)
-        
+
         return result
-        
+
     except Exception as e:
         logger.error(f"Google 로그인 실패: {str(e)}")
+        logger.error(f"에러 타입: {type(e)}")
+        import traceback
+        logger.error(f"스택 트레이스:\n{traceback.format_exc()}")
+
         return GoogleLoginResponse(
             success=False,
             message="Google 로그인 처리 중 오류가 발생했습니다."

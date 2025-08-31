@@ -76,6 +76,26 @@ def delete_location_log(db: Session, log_id: int) -> bool:
     db.commit()
     return True
 
+def get_recent_location_logs(db: Session, mt_idx: int, limit: int = 10) -> List[MemberLocationLog]:
+    """특정 사용자의 최근 위치 로그 조회"""
+    return db.query(MemberLocationLog)\
+             .filter(MemberLocationLog.mt_idx == mt_idx)\
+             .order_by(MemberLocationLog.mlt_gps_time.desc())\
+             .limit(limit)\
+             .all()
+
+def get_location_logs_count(db: Session, mt_idx: int, start_date: str = None, end_date: str = None) -> int:
+    """특정 사용자의 위치 로그 개수 조회"""
+    query = db.query(MemberLocationLog).filter(MemberLocationLog.mt_idx == mt_idx)
+    
+    if start_date:
+        query = query.filter(MemberLocationLog.mlt_gps_time >= f"{start_date} 00:00:00")
+    
+    if end_date:
+        query = query.filter(MemberLocationLog.mlt_gps_time <= f"{end_date} 23:59:59")
+    
+    return query.count()
+
 def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """두 좌표 간의 거리 계산 (km)"""
     if not all([lat1, lon1, lat2, lon2]):
