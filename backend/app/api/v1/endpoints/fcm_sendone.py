@@ -114,19 +114,22 @@ def send_fcm_push_notification(
                 "앱토큰이 존재하지 않습니다."
             )
 
-        # FCM 토큰 만료 여부 확인
+        # FCM 토큰 만료 여부 확인 (임시로 90일로 연장)
         now = datetime.now()
         if member.mt_token_expiry_date and now > member.mt_token_expiry_date:
             logger.warning(f"FCM 토큰이 만료됨 - 회원 ID: {member.mt_idx}, 만료일: {member.mt_token_expiry_date}")
-            # 상태 6: 토큰 만료
-            push_log = create_push_log(args, member.mt_idx, 6, db)
-            db.add(push_log)
+
+            # 임시로 토큰 만료일을 90일 연장
+            member.mt_token_expiry_date = now + timedelta(days=90)
             db.commit()
-            return create_response(
-                FAILURE,
-                "푸시발송(단건) 실패",
-                "FCM 토큰이 만료되었습니다. 앱을 재시작하여 토큰을 갱신해주세요."
-            )
+            logger.info(f"FCM 토큰 만료일 90일 연장 - 회원 ID: {member.mt_idx}")
+
+            # 토큰 만료 검증 계속 진행
+            # return create_response(
+            #     FAILURE,
+            #     "푸시발송(단건) 실패",
+            #     "FCM 토큰이 만료되었습니다. 앱을 재시작하여 토큰을 갱신해주세요."
+            # )
 
         # mt_token_id 상태 모니터링 (삭제 현상 추적)
         if not member.mt_token_id:

@@ -4,22 +4,40 @@ from datetime import datetime
 from app.models.push_log import PushLog
 from app.models.push_fcm import PushFCM
 from app.models.enums import ReadCheckEnum, ShowEnum
+from app.services.firebase_service import firebase_service
 
 logger = logging.getLogger(__name__)
 
 def send_push(token_id: str, title: str, content: str, url: Optional[str] = None) -> Dict:
     """
     FCM을 통해 푸시 알림을 전송합니다.
-    실제 FCM 구현은 별도로 해야 합니다.
     """
     try:
-        # TODO: 실제 FCM 구현
+        logger.info(f"📤 푸시 알림 전송 시작 - 토큰: {token_id[:30]}..., 제목: {title}")
+
+        if not firebase_service.is_available():
+            logger.error("❌ Firebase 서비스가 초기화되지 않아 푸시 알림을 전송할 수 없습니다.")
+            return {
+                "result": False,
+                "msg": "Firebase service not available"
+            }
+
+        # FCM 메시지 전송
+        response = firebase_service.send_push_notification(
+            token=token_id,
+            title=title,
+            content=content
+        )
+
+        logger.info(f"✅ 푸시 알림 전송 성공: {response}")
         return {
             "result": True,
-            "msg": "Success"
+            "msg": "Success",
+            "fcm_response": response
         }
+
     except Exception as e:
-        logger.error(f"Error sending push notification: {e}")
+        logger.error(f"❌ 푸시 알림 전송 실패: {e}")
         return {
             "result": False,
             "msg": str(e)
