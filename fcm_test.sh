@@ -81,15 +81,20 @@ fi
 
 echo ""
 
-# 3. 푸시 로그 확인 (선택사항)
-# echo -e "${BLUE}3️⃣ 최근 푸시 로그 확인...${NC}"
-# echo -e "${YELLOW}최근 푸시 로그:${NC}"
-# PUSH_LOGS=$(curl -s "https://api3.smap.site/api/v1/push-logs/recent/${USER_ID}")
-# if [ $? -eq 0 ] && [ -n "$PUSH_LOGS" ]; then
-#     echo "$PUSH_LOGS" | jq .
-# else
-#     echo -e "${YELLOW}⚠️ 푸시 로그를 가져올 수 없거나 비어있습니다.${NC}"
-# fi
+# 3. FCM 토큰 상태 확인
+echo -e "${BLUE}3️⃣ FCM 토큰 상태 상세 확인...${NC}"
+echo -e "${YELLOW}토큰 검증 요청:${NC}"
+TOKEN_CHECK=$(curl -s -X POST "https://api3.smap.site/api/v1/member-fcm-token/background-check" \
+  -H "Content-Type: application/json" \
+  -d "{\"mt_idx\": ${USER_ID}}")
+
+if [ $? -eq 0 ] && [ -n "$TOKEN_CHECK" ]; then
+    echo "$TOKEN_CHECK" | jq .
+    echo ""
+    echo -e "${GREEN}✅ FCM 백그라운드 검증 완료${NC}"
+else
+    echo -e "${YELLOW}⚠️ FCM 토큰 검증을 수행할 수 없습니다.${NC}"
+fi
 
 echo ""
 echo -e "${GREEN}�� FCM 테스트 완료!${NC}"

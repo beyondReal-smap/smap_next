@@ -1645,44 +1645,63 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
         print("🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨")
         print("👤 [USER INFO MAINVIEW] 사용자 정보 처리 시작")
         print("📨 [USER INFO MAINVIEW] 받은 body: \(body)")
-        
-        guard let param = body["param"] as? [String: Any] else {
-            print("❌ [USER INFO MAINVIEW] param 파싱 실패")
+
+        // 웹뷰에서 보내는 실제 구조: {type: "userInfo", userInfo: {...}}
+        var param: [String: Any]?
+
+        if let userInfo = body["userInfo"] as? [String: Any] {
+            print("✅ [USER INFO MAINVIEW] userInfo 파싱 성공: \(userInfo)")
+            param = userInfo
+        } else if let paramData = body["param"] as? [String: Any] {
+            // 기존 방식도 지원 (하위 호환성)
+            print("✅ [USER INFO MAINVIEW] param 파싱 성공 (기존 방식): \(paramData)")
+            param = paramData
+        } else {
+            print("❌ [USER INFO MAINVIEW] userInfo/param 파싱 실패")
             print("❌ [USER INFO MAINVIEW] body: \(body)")
+            print("❌ [USER INFO MAINVIEW] userInfo 타입: \(type(of: body["userInfo"]))")
+            print("❌ [USER INFO MAINVIEW] param 타입: \(type(of: body["param"]))")
+            print("💡 [USER INFO MAINVIEW] 웹뷰에서 보내는 메시지 구조를 확인해주세요")
+            print("💡 [USER INFO MAINVIEW] 예상 구조: {type: 'userInfo', userInfo: {isLoggedIn: 1, mt_idx: 1186, mt_name: 'jin'}}")
+            return
+        }
+
+        guard let userParam = param else {
+            print("❌ [USER INFO MAINVIEW] param이 nil임")
             return
         }
         
-        print("✅ [USER INFO MAINVIEW] param 파싱 성공: \(param)")
-        
+        print("✅ [USER INFO MAINVIEW] param 파싱 성공: \(userParam)")
+
         // mt_idx를 숫자와 문자열 모두 지원
         var mtIdx: String = ""
-        if let mtIdxString = param["mt_idx"] as? String {
+        if let mtIdxString = userParam["mt_idx"] as? String {
             mtIdx = mtIdxString
-        } else if let mtIdxNumber = param["mt_idx"] as? Int {
+        } else if let mtIdxNumber = userParam["mt_idx"] as? Int {
             mtIdx = String(mtIdxNumber)
-        } else if let mtIdxNumber = param["mt_idx"] as? NSNumber {
+        } else if let mtIdxNumber = userParam["mt_idx"] as? NSNumber {
             mtIdx = mtIdxNumber.stringValue
         }
-        
+
         guard !mtIdx.isEmpty else {
             print("❌ [USER INFO MAINVIEW] mt_idx가 없거나 비어있음")
-            print("❌ [USER INFO MAINVIEW] mt_idx 원본 값: \(param["mt_idx"] ?? "nil")")
-            print("❌ [USER INFO MAINVIEW] mt_idx 원본 타입: \(type(of: param["mt_idx"]))")
+            print("❌ [USER INFO MAINVIEW] mt_idx 원본 값: \(userParam["mt_idx"] ?? "nil")")
+            print("❌ [USER INFO MAINVIEW] mt_idx 원본 타입: \(type(of: userParam["mt_idx"]))")
             return
         }
         
         // mt_id도 숫자와 문자열 모두 지원
         var mtId: String = ""
-        if let mtIdString = param["mt_id"] as? String {
+        if let mtIdString = userParam["mt_id"] as? String {
             mtId = mtIdString
-        } else if let mtIdNumber = param["mt_id"] as? Int {
+        } else if let mtIdNumber = userParam["mt_id"] as? Int {
             mtId = String(mtIdNumber)
-        } else if let mtIdNumber = param["mt_id"] as? NSNumber {
+        } else if let mtIdNumber = userParam["mt_id"] as? NSNumber {
             mtId = mtIdNumber.stringValue
         }
-        
-        let mtName = param["mt_name"] as? String ?? ""
-        let mtEmail = param["mt_email"] as? String ?? ""
+
+        let mtName = userParam["mt_name"] as? String ?? ""
+        let mtEmail = userParam["mt_email"] as? String ?? ""
         
         print("✅ [USER INFO MAINVIEW] 사용자 정보 파싱 성공:")
         print("   👤 mt_idx: \(mtIdx)")
@@ -1746,6 +1765,21 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
             // FCM delegate 설정
             Messaging.messaging().delegate = UIApplication.shared.delegate as? MessagingDelegate
             print("✅ [FCM] 수동 활성화 완료")
+        }
+
+        // 🔑 로그인 성공 시 FCM 토큰 강제 업데이트
+        print("🔑 [LOGIN MAINVIEW] 로그인 성공 감지 - FCM 토큰 강제 업데이트 시작")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            // AppDelegate를 통해 FCM 토큰 업데이트
+            if let appDelegate = UIApplication.shared.delegate as? AppDelegate {
+                appDelegate.forceUpdateFCMTokenOnLogin()
+                print("✅ [LOGIN MAINVIEW] FCM 토큰 강제 업데이트 호출 완료")
+            } else {
+                print("❌ [LOGIN MAINVIEW] AppDelegate를 찾을 수 없음")
+                // 대안: Notification을 통해 FCM 토큰 업데이트 요청
+                NotificationCenter.default.post(name: Notification.Name("ForceUpdateFCMToken"), object: nil)
+                print("📢 [LOGIN MAINVIEW] Notification으로 FCM 토큰 업데이트 요청")
+            }
         }
 
         // 🚨 로그인 완료 후 권한 요청 시작
