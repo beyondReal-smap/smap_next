@@ -191,6 +191,19 @@ def send_fcm_push_notification(
             logger.info(f"📱 [FCM] UA 기반 iOS 감지: {is_ios_from_ua}")
             logger.info(f"📱 [FCM] 최종 iOS 감지: {is_ios_device}")
 
+            # FCM 토큰 존재 여부 확인
+            if not member.mt_token_id or member.mt_token_id.strip() == "":
+                logger.warning(f"🚨 [FCM] FCM 토큰이 없음 - 회원: {member.mt_idx}, 건너뜀")
+                # 상태 4: 토큰 없음
+                push_log = create_push_log(args, member.mt_idx, 4, db)
+                db.add(push_log)
+                db.commit()
+                return create_response(
+                    FAILURE,
+                    "푸시발송(단건) 실패",
+                    "FCM 토큰이 존재하지 않습니다."
+                )
+
             if is_ios_device:
                 logger.info(f"📱 [FCM iOS] iOS 기기로 감지됨 - 최적화된 전송 방식 사용: {member.mt_idx}")
                 response = firebase_service.send_ios_optimized_push(

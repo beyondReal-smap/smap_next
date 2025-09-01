@@ -18,8 +18,13 @@ class Config:
     SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key-here')
     
     # Firebase 설정
-    FIREBASE_CREDENTIALS_PATH = os.getenv('FIREBASE_CREDENTIALS_PATH', 'backend/com-dmonster-smap-firebase-adminsdk-2zx5p-2610556cf5.json')
+    FIREBASE_CREDENTIALS_PATH = os.getenv('FIREBASE_CREDENTIALS_PATH', 'app/com-dmonster-smap-firebase-adminsdk-2zx5p-2610556cf5.json')
     IOS_BUNDLE_ID = os.getenv('IOS_BUNDLE_ID', 'com.dmonster.smap')
+
+    # iOS 푸시 최적화 설정
+    IOS_PUSH_RETRY_COUNT = int(os.getenv('IOS_PUSH_RETRY_COUNT', '3'))  # iOS 푸시 재시도 횟수
+    IOS_PUSH_EXPIRATION_TIME = int(os.getenv('IOS_PUSH_EXPIRATION_TIME', '300'))  # iOS 푸시 만료 시간 (초)
+    IOS_BACKGROUND_WAKE_ENABLED = os.getenv('IOS_BACKGROUND_WAKE_ENABLED', 'true').lower() == 'true'
     
     # 비밀번호 해시화 설정 (PHP PASSWORD_DEFAULT와 유사)
     PASSWORD_DEFAULT = "2y"  # bcrypt 알고리즘 식별자

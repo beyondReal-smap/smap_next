@@ -82,14 +82,14 @@ fi
 echo ""
 
 # 3. 푸시 로그 확인 (선택사항)
-echo -e "${BLUE}3️⃣ 최근 푸시 로그 확인...${NC}"
-echo -e "${YELLOW}최근 푸시 로그:${NC}"
-PUSH_LOGS=$(curl -s "https://api3.smap.site/api/v1/push-logs/recent/${USER_ID}")
-if [ $? -eq 0 ] && [ -n "$PUSH_LOGS" ]; then
-    echo "$PUSH_LOGS" | jq .
-else
-    echo -e "${YELLOW}⚠️ 푸시 로그를 가져올 수 없거나 비어있습니다.${NC}"
-fi
+# echo -e "${BLUE}3️⃣ 최근 푸시 로그 확인...${NC}"
+# echo -e "${YELLOW}최근 푸시 로그:${NC}"
+# PUSH_LOGS=$(curl -s "https://api3.smap.site/api/v1/push-logs/recent/${USER_ID}")
+# if [ $? -eq 0 ] && [ -n "$PUSH_LOGS" ]; then
+#     echo "$PUSH_LOGS" | jq .
+# else
+#     echo -e "${YELLOW}⚠️ 푸시 로그를 가져올 수 없거나 비어있습니다.${NC}"
+# fi
 
 echo ""
 echo -e "${GREEN}�� FCM 테스트 완료!${NC}"

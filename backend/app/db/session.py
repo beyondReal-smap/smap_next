@@ -9,9 +9,15 @@ logger = logging.getLogger(__name__)
 engine = create_engine(
     settings.SQLALCHEMY_DATABASE_URI,
     pool_pre_ping=True,
-    pool_recycle=3600,
+    pool_recycle=settings.DB_POOL_RECYCLE,
+    # 연결 풀 설정 추가
+    pool_size=settings.DB_POOL_SIZE,           # 기본 연결 풀 크기
+    max_overflow=settings.DB_MAX_OVERFLOW,    # 오버플로우 연결 수
+    pool_timeout=settings.DB_POOL_TIMEOUT,    # 연결 대기 시간
+    pool_reset_on_return='commit',  # 연결 반환 시 자동 커밋
 )
 logger.info(f"Engine URL in session.py: {engine.url}")
+logger.info(f"Database pool settings - Size: {settings.DB_POOL_SIZE}, Max Overflow: {settings.DB_MAX_OVERFLOW}, Timeout: {settings.DB_POOL_TIMEOUT}s")
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

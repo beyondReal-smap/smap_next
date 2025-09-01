@@ -199,7 +199,12 @@ class GroupScheduleManager:
             message_info = action_messages[action]
             
             logger.info(f"🔔 [PUSH_NOTIFICATION] {action} 알림 전송 시작 - target: {target_member.mt_name}, editor: {editor_name}")
-            
+
+            # FCM 토큰 존재 여부 확인
+            if not target_member.mt_token_id or target_member.mt_token_id.strip() == "":
+                logger.warning(f"🚨 [FCM] FCM 토큰이 없음 - 회원: {target_member.mt_idx}, FCM 전송 생략")
+                return True
+
             # FCM 푸시 알림 전송
             response = firebase_service.send_push_notification(
                 target_member.mt_token_id,

@@ -2973,11 +2973,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     }
     
     func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable : Any]) {
-        print("🔔 [FCM] 포그라운드에서 푸시 알림 수신")
-        print("📨 [FCM] 알림 데이터: \(userInfo)")
-
-        // 포그라운드에서도 FCM 메시지를 로컬 알림으로 표시
-        showLocalNotificationForFCMMessage(userInfo)
+        print("Push notification received: \(userInfo)")
     }
 
     func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any], fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
@@ -3052,12 +3048,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         // FCM 메시지 수신 시 로컬 알림 표시 (안전장치)
         if hasNotification {
             print("🔔 [FCM] 알림 데이터 포함 - 로컬 알림으로 표시")
-            showLocalNotificationForFCMMessage(userInfo)
+            showLocalNotificationForBackgroundPush(userInfo)
         } else if isBackgroundPush && !isSilentPush {
             print("⚠️ [FCM] 백그라운드 푸시지만 알림 데이터 없음 - 기본 로컬 알림 표시")
-            showLocalNotificationForFCMMessage(userInfo)
+            showLocalNotificationForBackgroundPush(userInfo)
         } else {
-            print("🔇 [FCM] Silent 푸시 - 로컬 알림 표시하지 않음")
+            print("🔇 [FCM] Silent 푸시 또는 포그라운드 - 로컬 알림 표시하지 않음")
         }
 
         // FCM 메시지 기록 및 통계 (진단용)

@@ -150,13 +150,63 @@ class FirebaseService:
                 logger.info(f"📤 [FCM] 메시지 구성 시작")
 
                 # Firebase Admin SDK의 send() 메소드에 맞게 Message 객체 생성
-                message = messaging.Message(
-                    token=token,
-                    notification=messaging.Notification(
-                        title=title,
-                        body=content
+                # iOS 최적화: 토큰에 콜론(:)이 있으면 iOS로 판단하여 APNs 설정 추가
+                is_ios_token = ':' in token
+
+                if is_ios_token:
+                    # iOS 토큰인 경우 APNs 설정 포함
+                    logger.info(f"📱 [FCM iOS] iOS 토큰 감지됨 - APNs 설정 적용: {token[:30]}...")
+                    message = messaging.Message(
+                        token=token,
+                        notification=messaging.Notification(
+                            title=title,
+                            body=content
+                        ),
+                        android=messaging.AndroidConfig(
+                            priority='high',
+                            notification=messaging.AndroidNotification(
+                                sound='default'
+                            )
+                        ),
+                        apns=messaging.APNSConfig(
+                            headers={
+                                "apns-push-type": "alert",
+                                "apns-priority": "10",
+                                "apns-topic": Config.IOS_BUNDLE_ID,
+                                "apns-expiration": str(int(time.time()) + 600),
+                                "apns-collapse-id": f"alert_{int(time.time())}",
+                                "apns-thread-id": "alert"
+                            },
+                            payload=messaging.APNSPayload(
+                                aps=messaging.Aps(
+                                    sound='default',
+                                    badge=1,
+                                    alert=messaging.ApsAlert(
+                                        title=title,
+                                        body=content
+                                    ),
+                                    mutable_content=True,
+                                    thread_id="alert"
+                                )
+                            )
+                        )
                     )
-                )
+                else:
+                    # Android 토큰인 경우 Android 전용 설정만
+                    logger.info(f"🤖 [FCM Android] Android 토큰 감지됨 - Android 설정만 적용: {token[:30]}...")
+                    message = messaging.Message(
+                        token=token,
+                        notification=messaging.Notification(
+                            title=title,
+                            body=content
+                        ),
+                        android=messaging.AndroidConfig(
+                            priority='high',
+                            notification=messaging.AndroidNotification(
+                                sound='default'
+                            )
+                        )
+                    )
 
                 logger.info(f"📤 [FCM] 메시지 구성 완료 - 토큰: {token[:30]}..., 제목: {title}")
 
