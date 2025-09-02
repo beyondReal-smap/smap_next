@@ -1,0 +1,42 @@
+Enhanced FCM Test Log - Tue Sep  2 11:00:52 KST 2025
+[0;35m1️⃣ [11:00:52] FCM 토큰 상태 확인[0m
+[0;34m📡 API 호출: GET /member-fcm-token/status/1186[0m
+[0;34m📈 HTTP 상태 코드: 200[0m
+[0;34m📋 응답 내용:[0m
+{
+  "mt_idx": 1186,
+  "has_token": true,
+  "token_preview": "fWLYBJYTH06ejEjCYVb8...",
+  "mt_level": 5,
+  "mt_status": 1,
+  "last_updated": "2025-09-02T11:00:33",
+  "token_updated_at": "2025-09-02T10:59:34",
+  "token_expiry_date": "2025-12-01T10:59:34",
+  "is_token_expired": false,
+  "is_token_near_expiry": false
+}
+[0;32m✅ [11:00:52] FCM 토큰 상태 조회 성공[0m
+[0;35m2️⃣ [11:00:52] 잘못된 FCM 토큰 정리 테스트[0m
+[0;34m📡 API 호출: POST /member-fcm-token/reset-invalid-tokens[0m
+[0;34m📈 HTTP 상태 코드: 200[0m
+[0;34m📋 응답 내용:[0m
+{
+  "success": true,
+  "message": "잘못된 FCM 토큰 정리 완료 (정리: 0개, 확인: 353개)",
+  "mt_idx": 0,
+  "has_token": false,
+  "token_preview": ""
+}
+[0;32m✅ [11:00:52] 잘못된 FCM 토큰 정리 성공[0m
+[0;35m3️⃣ [11:00:52] 유효한 FCM 토큰 등록 테스트[0m
+[0;34m📡 API 호출: POST /member-fcm-token/register[0m
+[0;34m📊 요청 데이터: {
+    "mt_idx": 1186,
+    "fcm_token": "fWLYBJYTH06ejEjCYVb8TestToken"
+}[0m
+[0;34m📈 HTTP 상태 코드: 400[0m
+[0;34m📋 응답 내용:[0m
+{
+  "detail": "잘못된 FCM 토큰 형식입니다. 앱을 재시작하여 새로운 FCM 토큰을 받은 후 다시 시도해주세요."
+}
+[0;31m❌ [11:00:53] 유효한 FCM 토큰 등록 실패 (HTTP 400)[0m

@@ -154,7 +154,7 @@ def send_fcm_push_notification(
                 "Firebase 서비스가 사용 불가능합니다. 관리자에게 문의하세요."
             )
 
-        # FCM 토큰 최종 검증
+        # FCM 토큰 최종 검증 (개선된 버전)
         if not member.mt_token_id or len(str(member.mt_token_id).strip()) == 0:
             logger.warning(f"🚨 [FCM] 토큰이 비어있음 - 회원: {member.mt_idx}")
             push_log = create_push_log(args, member.mt_idx, 4, db)  # 상태 4: 토큰 없음
@@ -162,8 +162,32 @@ def send_fcm_push_notification(
             db.commit()
             return create_response(
                 FAILURE,
-                "푸시발송(단건) 실패",
-                "FCM 토큰이 존재하지 않습니다."
+                "푸시발송(단건) 실패 - 토큰 없음",
+                "FCM 토큰이 존재하지 않습니다. 앱을 재시작하여 새로운 토큰을 받아주세요."
+            )
+        
+        # FCM 토큰 형식 검증 (서버 레벨에서 한 번 더 검증)
+        if not firebase_service._validate_fcm_token(member.mt_token_id):
+            logger.warning(f"🚨 [FCM] 잘못된 토큰 형식 - 회원: {member.mt_idx}, 토큰: {member.mt_token_id[:50]}...")
+            
+            # 잘못된 토큰 즉시 무효화
+            try:
+                firebase_service._handle_token_invalidation(
+                    member.mt_token_id,
+                    "invalid_token_format_sendone",
+                    args.get('plt_title'),
+                    args.get('plt_content')
+                )
+            except Exception as cleanup_error:
+                logger.error(f"❌ [FCM] 토큰 무효화 처리 실패: {cleanup_error}")
+            
+            push_log = create_push_log(args, member.mt_idx, 4, db)  # 상태 4: 토큰 문제
+            db.add(push_log)
+            db.commit()
+            return create_response(
+                FAILURE,
+                "푸시발송(단건) 실패 - 잘못된 토큰",
+                "FCM 토큰 형식이 올바르지 않습니다. 앱을 재시작하여 새로운 토큰을 받아주세요."
             )
 
         logger.info(f"📤 [FCM] 푸시 메시지 전송 시작 - 회원: {member.mt_idx}")
@@ -261,7 +285,7 @@ def send_fcm_push_notification(
             return create_response(
                 FAILURE,
                 "푸시발송(단건) 실패 - 토큰 만료",
-                "FCM 토큰이 만료되었습니다. 앱을 완전히 종료하고 재시작하여 토큰을 갱신해주세요."
+                "FCM 토큰이 만료되었습니다. 앱을 완전히 종료하고 재시작하여 새로운 토큰을 받아주세요."
             )
 
         except messaging.ThirdPartyAuthError as firebase_error:
@@ -288,20 +312,49 @@ def send_fcm_push_notification(
             return create_response(
                 FAILURE,
                 "푸시발송(단건) 실패 - 잘못된 토큰",
-                "FCM 토큰 형식이 잘못되었습니다. 앱을 완전히 종료하고 재시작하여 토큰을 갱신해주세요."
+                "FCM 토큰 형식이 잘못되었습니다. 앱을 완전히 종료하고 재시작하여 새로운 토큰을 받아주세요."
             )
 
         except Exception as firebase_error:
-            logger.error(f"❌ [FCM POLICY 4] Firebase 푸시 전송 실패: {firebase_error}")
+            logger.error(f"❌ [FCM] Firebase 푸시 전송 실패: {firebase_error}")
+            logger.error(f"❌ [FCM] 에러 타입: {type(firebase_error)}")
+            
+            # 에러 타입에 따른 상세 로깅
+            error_type = type(firebase_error).__name__
+            if "messaging" in str(type(firebase_error)).lower():
+                logger.error(f"❌ [FCM] Firebase Messaging 관련 에러: {firebase_error}")
+                
+                # 토큰 관련 에러인지 확인
+                if any(keyword in str(firebase_error).lower() for keyword in ['token', 'registration', 'unregistered']):
+                    logger.warning(f"🚨 [FCM] 토큰 관련 에러 감지 - 토큰 무효화 고려")
+                    try:
+                        firebase_service._handle_token_invalidation(
+                            member.mt_token_id,
+                            f"firebase_error_{error_type}",
+                            args.get('plt_title'),
+                            args.get('plt_content')
+                        )
+                    except Exception as cleanup_error:
+                        logger.error(f"❌ [FCM] 토큰 무효화 처리 실패: {cleanup_error}")
+            
             # 상태 3: 전송 실패
             push_log = create_push_log(args, member.mt_idx, 3, db)
             db.add(push_log)
             db.commit()
 
+            # 사용자 친화적인 에러 메시지
+            user_message = "푸시 메시지 전송에 실패했습니다."
+            if "token" in str(firebase_error).lower():
+                user_message += " 앱을 재시작하여 새로운 토큰을 받아주세요."
+            elif "network" in str(firebase_error).lower():
+                user_message += " 네트워크 연결을 확인해주세요."
+            else:
+                user_message += " 잠시 후 다시 시도해주세요."
+
             return create_response(
                 FAILURE,
                 "푸시발송(단건) 실패",
-                f"Firebase 전송 실패: {str(firebase_error)}"
+                user_message
             )
 
     except Exception as e:

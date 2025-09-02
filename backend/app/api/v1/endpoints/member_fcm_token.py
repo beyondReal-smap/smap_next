@@ -27,6 +27,68 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def validate_fcm_token_format(token: str) -> bool:
+    """
+    FCM 토큰 형식을 검증하는 함수 (개선된 버전)
+    Firebase 표준에 맞는 토큰 형식인지 더 엄격하게 검증
+
+    Args:
+        token: 검증할 FCM 토큰
+
+    Returns:
+        bool: 토큰이 올바른 형식인지 여부
+    """
+    # FCM 토큰 기본 검증
+    if not token or not isinstance(token, str):
+        logger.warning("❌ FCM 토큰이 비어있거나 문자열이 아님")
+        return False
+
+    # 길이 검증 (현실적인 범위로 조정)
+    # 실제 사용되는 FCM 토큰 길이는 다양함 (20자~500자)
+    if len(token) < 20 or len(token) > 500:
+        logger.warning(f"❌ FCM 토큰 길이가 올바르지 않음: {len(token)}자 (정상 범위: 20-500자)")
+        return False
+
+    # 형식 검증 (현실적이고 유연한 검증)
+    import re
+    
+    # FCM 토큰의 다양한 형식을 지원
+    # 1. 전통적인 형태: 프로젝트ID:APA91b...
+    # 2. 현대적인 형태: 직접적인 토큰 문자열 (콜론 없음)
+    
+    if ":" in token:
+        # 콜론이 있는 경우: 프로젝트ID:토큰 형태
+        parts = token.split(":", 1)
+        if len(parts) == 2:
+            project_id, token_part = parts
+            
+            # 프로젝트 ID 검증
+            if not project_id or len(project_id) == 0 or len(project_id) > 100:
+                logger.warning(f"❌ FCM 토큰 프로젝트 ID가 올바르지 않음: '{project_id}'")
+                return False
+            
+            # 토큰 부분이 APA91b로 시작하는지 확인 (선택사항)
+            if token_part.startswith("APA91b") and len(token_part) < 100:
+                logger.warning(f"❌ FCM 토큰 부분이 너무 짧음: {len(token_part)}자")
+                return False
+                
+        else:
+            logger.warning("❌ FCM 토큰 구조가 올바르지 않음")
+            return False
+    else:
+        # 콜론이 없는 경우: 직접적인 토큰 문자열
+        # 현재 DB에 저장된 토큰 형태 (fR8nxUvlA0znuI4IoO5h... 등)
+        logger.info("✅ FCM 토큰 형식: 직접 토큰 문자열 (콜론 없음)")
+    
+    # 기본 문자 검증 - 영숫자, 하이픈, 언더스코어만 허용
+    if not re.match(r'^[a-zA-Z0-9_-]+$', token.replace(":", "")):
+        logger.warning(f"❌ FCM 토큰에 허용되지 않는 문자 포함: {token[:30]}...")
+        return False
+
+    logger.info("✅ FCM 토큰 형식 검증 통과")
+    return True
+
+
 @router.post("/register", response_model=MemberFCMTokenResponse)
 async def register_member_fcm_token(
     request: MemberFCMTokenRequest,
@@ -84,6 +146,32 @@ async def register_member_fcm_token(
         elif old_token != request.fcm_token:
             logger.info(f"🔄 mt_token_id 변경: 회원 {request.mt_idx} 토큰 변경 (기존: {old_token[:20]}... → 새: {request.fcm_token[:20]}...)")
 
+        # FCM 토큰 형식 검증 (개선된 검증 로직)
+        if not validate_fcm_token_format(request.fcm_token):
+            logger.warning(f"❌ 잘못된 FCM 토큰 형식 감지 - 회원 ID: {request.mt_idx}")
+            logger.warning(f"❌ 토큰: {request.fcm_token[:50]}...")
+            logger.warning(f"❌ 토큰 길이: {len(request.fcm_token)}자")
+            
+            # 기존에 저장된 토큰이 있다면 무효화 처리
+            if old_token and old_token == request.fcm_token:
+                logger.warning(f"⚠️ 기존 저장된 토큰과 동일한 잘못된 토큰 - 무효화 처리")
+                try:
+                    firebase_service._handle_token_invalidation(
+                        old_token, 
+                        "invalid_token_format_register",
+                        "토큰 등록",
+                        "잘못된 형식의 토큰 등록 시도"
+                    )
+                except Exception as cleanup_error:
+                    logger.error(f"❌ 토큰 무효화 처리 실패: {cleanup_error}")
+            
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="잘못된 FCM 토큰 형식입니다. 앱을 재시작하여 새로운 FCM 토큰을 받은 후 다시 시도해주세요."
+            )
+
+        logger.info(f"✅ FCM 토큰 형식 검증 통과 - 회원 ID: {request.mt_idx}")
+
         # FCM 토큰 업데이트 (FCM 토큰은 일반적으로 1년 이상 유효하므로 90일로 설정)
         member.mt_token_id = request.fcm_token
         member.mt_token_updated_at = datetime.now()  # FCM 토큰 업데이트 일시
@@ -92,6 +180,21 @@ async def register_member_fcm_token(
         
         db.commit()
         db.refresh(member)
+        
+        # 토큰 등록 후 간단한 유효성 테스트 (선택적)
+        if is_new_token:
+            try:
+                # Firebase 서비스에서 토큰 검증 (실제 메시지 전송하지 않고 형식만 검증)
+                if firebase_service.is_available():
+                    logger.info(f"🔍 FCM 토큰 등록 후 유효성 검증 - 회원 ID: {request.mt_idx}")
+                    # 실제 푸시 전송은 하지 않고 토큰 형식만 재검증
+                    additional_validation = firebase_service._validate_fcm_token(request.fcm_token)
+                    if not additional_validation:
+                        logger.warning(f"⚠️ Firebase 서비스 레벨 토큰 검증 실패 - 회원 ID: {request.mt_idx}")
+                
+            except Exception as validation_error:
+                logger.warning(f"⚠️ 토큰 등록 후 검증 중 오류: {validation_error}")
+                # 검증 실패해도 등록은 성공으로 처리 (토큰이 나중에 유효해질 수 있음)
         
         if is_new_token:
             logger.info(f"FCM 토큰 업데이트 완료 - 회원 ID: {request.mt_idx} (토큰 변경됨)")
@@ -246,6 +349,18 @@ async def check_and_update_fcm_token(
             logger.info(f"FCM 토큰 업데이트 불필요 - 회원 ID: {request.mt_idx}")
         
         if needs_update:
+            # FCM 토큰 형식 검증 (잘못된 토큰 방지)
+            if not validate_fcm_token_format(request.fcm_token):
+                logger.warning(f"잘못된 FCM 토큰 형식 감지 (check-and-update) - 회원 ID: {request.mt_idx}")
+                logger.warning(f"잘못된 토큰: {request.fcm_token[:50]}...")
+                logger.warning(f"토큰 길이: {len(request.fcm_token)}자")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="잘못된 FCM 토큰 형식입니다. 올바른 FCM 토큰을 제공해주세요."
+                )
+
+            logger.info(f"✅ FCM 토큰 형식 검증 통과 (check-and-update) - 회원 ID: {request.mt_idx}")
+
             member.mt_token_id = request.fcm_token
             member.mt_token_updated_at = datetime.now()  # FCM 토큰 업데이트 일시
             member.mt_token_expiry_date = datetime.now() + timedelta(days=90)  # 90일 후 만료 예상
@@ -393,6 +508,18 @@ async def validate_and_refresh_fcm_token(
         if needs_refresh:
             logger.info(f"FCM 토큰 갱신 필요 - 회원 ID: {request.mt_idx}, 사유: {reason}")
 
+            # FCM 토큰 형식 검증 (잘못된 토큰 방지)
+            if not validate_fcm_token_format(request.fcm_token):
+                logger.warning(f"잘못된 FCM 토큰 형식 감지 (validate-and-refresh) - 회원 ID: {request.mt_idx}")
+                logger.warning(f"잘못된 토큰: {request.fcm_token[:50]}...")
+                logger.warning(f"토큰 길이: {len(request.fcm_token)}자")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="잘못된 FCM 토큰 형식입니다. 올바른 FCM 토큰을 제공해주세요."
+                )
+
+            logger.info(f"✅ FCM 토큰 형식 검증 통과 (validate-and-refresh) - 회원 ID: {request.mt_idx}")
+
             # 토큰 업데이트 (FCM 토큰은 일반적으로 1년 이상 유효하므로 90일로 설정)
             member.mt_token_id = request.fcm_token
             member.mt_token_updated_at = now
@@ -502,6 +629,18 @@ async def background_token_check(
         if needs_refresh:
             logger.info(f"FCM 토큰 백그라운드 갱신 필요 - 회원 ID: {request.mt_idx}, 사유: {reason}")
 
+            # FCM 토큰 형식 검증 (잘못된 토큰 방지)
+            if not validate_fcm_token_format(request.fcm_token):
+                logger.warning(f"잘못된 FCM 토큰 형식 감지 (background-check) - 회원 ID: {request.mt_idx}")
+                logger.warning(f"잘못된 토큰: {request.fcm_token[:50]}...")
+                logger.warning(f"토큰 길이: {len(request.fcm_token)}자")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="잘못된 FCM 토큰 형식입니다. 올바른 FCM 토큰을 제공해주세요."
+                )
+
+            logger.info(f"✅ FCM 토큰 형식 검증 통과 (background-check) - 회원 ID: {request.mt_idx}")
+
             # 토큰 업데이트 (FCM 토큰은 일반적으로 1년 이상 유효하므로 90일로 설정)
             member.mt_token_id = request.fcm_token
             member.mt_token_updated_at = current_time
@@ -604,6 +743,68 @@ async def cleanup_expired_fcm_tokens(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="FCM 토큰 정리 중 내부 서버 오류가 발생했습니다."
+        )
+
+
+@router.post("/reset-invalid-tokens", response_model=MemberFCMTokenResponse)
+async def reset_invalid_fcm_tokens(
+    db: Session = Depends(get_db)
+):
+    """
+    잘못된 FCM 토큰들을 찾아서 삭제하는 관리자용 엔드포인트
+    FCM 토큰 검증 시스템에서 걸러진 잘못된 토큰들을 정리합니다.
+
+    Returns:
+        MemberFCMTokenResponse: 정리 결과
+    """
+    try:
+        logger.info("🔄 잘못된 FCM 토큰 정리 작업 시작")
+
+        # 모든 FCM 토큰 조회
+        members_with_tokens = db.query(Member).filter(
+            Member.mt_token_id.isnot(None)
+        ).all()
+
+        cleaned_count = 0
+        total_checked = 0
+
+        for member in members_with_tokens:
+            total_checked += 1
+
+            # FCM 토큰 형식 검증
+            if not validate_fcm_token_format(member.mt_token_id):
+                logger.warning(f"🚨 잘못된 FCM 토큰 발견 - 회원 ID: {member.mt_idx}")
+                logger.warning(f"   잘못된 토큰: {member.mt_token_id[:50]}...")
+
+                # 잘못된 토큰 삭제
+                member.mt_token_id = None
+                member.mt_token_updated_at = None
+                member.mt_token_expiry_date = None
+                member.mt_udate = datetime.now()
+
+                cleaned_count += 1
+                logger.info(f"✅ 잘못된 FCM 토큰 삭제 완료 - 회원 ID: {member.mt_idx}")
+
+        if cleaned_count > 0:
+            db.commit()
+            logger.info(f"🎉 잘못된 FCM 토큰 정리 완료 - 정리된 토큰: {cleaned_count}개, 총 확인: {total_checked}개")
+        else:
+            logger.info(f"ℹ️ 잘못된 FCM 토큰이 발견되지 않음 - 총 확인: {total_checked}개")
+
+        return MemberFCMTokenResponse(
+            success=True,
+            message=f"잘못된 FCM 토큰 정리 완료 (정리: {cleaned_count}개, 확인: {total_checked}개)",
+            mt_idx=0,  # 관리 작업이므로 0으로 설정
+            has_token=False,
+            token_preview=""
+        )
+
+    except Exception as e:
+        logger.error(f"FCM 토큰 정리 중 오류 발생: {str(e)}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="잘못된 FCM 토큰 정리 중 내부 서버 오류가 발생했습니다."
         )
 
 

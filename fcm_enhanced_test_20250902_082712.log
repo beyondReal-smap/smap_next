@@ -1,0 +1,3 @@
+Enhanced FCM Test Log - Tue Sep  2 08:27:12 KST 2025
+[0;35m1️⃣ [08:27:12] FCM 토큰 상태 확인[0m
+[0;34m📡 API 호출: GET /member-fcm-token/status/1186[0m

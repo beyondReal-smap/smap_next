@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import health, auth, users, groups, group_details, locations, schedules, push_logs, push_fcms, members, group_members, weather, group_schedule_manage, member_location_log, fcm_sendone, notices, orders, fcm_token, member_fcm_token, log_management
+from app.api.v1.endpoints import health, auth, users, groups, group_details, locations, schedules, push_logs, push_fcms, members, group_members, weather, group_schedule_manage, member_location_log, fcm_sendone, notices, orders, fcm_token, member_fcm_token, log_management, fcm_silent_push
 
 api_router = APIRouter()
 
@@ -22,4 +22,5 @@ api_router.include_router(notices.router, prefix="/notices", tags=["notices"])
 api_router.include_router(orders.router, prefix="/orders", tags=["orders"])
 api_router.include_router(fcm_token.router, prefix="/fcm-token", tags=["fcm-token"])
 api_router.include_router(member_fcm_token.router, prefix="/member-fcm-token", tags=["member-fcm-token"])
+api_router.include_router(fcm_silent_push.router, prefix="/fcm-silent-push", tags=["fcm-silent-push"])
 api_router.include_router(log_management.router, prefix="/log-management", tags=["log-management"])
