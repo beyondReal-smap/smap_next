@@ -164,7 +164,7 @@ class FirebaseService:
                                 "apns-push-type": "alert",
                                 "apns-priority": "10",  # 최고 우선순위
                                 "apns-topic": Config.IOS_BUNDLE_ID,
-                                "apns-expiration": str(int(time.time()) + 7200),  # 2시간 유효
+                                "apns-expiration": str(int(time.time()) + 2592000),  # 30일 유효 (백그라운드 푸시 최대 개선)
                                 "apns-collapse-id": f"ios_opt_{member_id}_{int(time.time())}",
                                 "apns-thread-id": "main_notifications"
                             },
@@ -296,7 +296,7 @@ class FirebaseService:
                                 "apns-push-type": "alert",
                                 "apns-priority": "10",
                                 "apns-topic": Config.IOS_BUNDLE_ID,
-                                "apns-expiration": str(int(time.time()) + 3600),  # 1시간 연장
+                                "apns-expiration": str(int(time.time()) + 2592000),  # 30일 유효 (백그라운드 푸시 최대 개선)
                                 "apns-collapse-id": f"reliable_push_{int(time.time())}",
                                 "apns-thread-id": "main_notifications"
                             },
@@ -516,7 +516,7 @@ class FirebaseService:
                         "apns-push-type": "alert",  # alert로 설정하여 사용자에게 표시
                         "apns-priority": "10",  # 최고 우선순위로 설정
                         "apns-topic": Config.IOS_BUNDLE_ID,  # iOS 앱 번들 ID
-                        "apns-expiration": str(int(time.time()) + 600),  # 10분 후 만료 (충분한 시간)
+                        "apns-expiration": str(int(time.time()) + 2592000),  # 30일 유효 (백그라운드 푸시 최대 개선)
                         "apns-collapse-id": f"bg_push_{int(time.time())}",  # 백그라운드 푸시 그룹화 ID
                         "apns-thread-id": "background"  # 백그라운드 스레드
                     },
@@ -613,7 +613,7 @@ class FirebaseService:
                         "apns-push-type": "background",  # background 타입으로 설정하여 사용자에게 표시하지 않음
                         "apns-priority": "10",  # Silent 푸시라도 최고 우선순위로 설정하여 무시 방지
                         "apns-topic": Config.IOS_BUNDLE_ID,  # 올바른 번들 ID 설정
-                        "apns-expiration": str(int(time.time()) + 600),  # 10분 후 만료 (충분한 시간 부여)
+                        "apns-expiration": str(int(time.time()) + 2592000),  # 30일 유효 (백그라운드 푸시 최대 개선)
                         "apns-collapse-id": f"silent_{reason}_{int(time.time())}",  # Silent 푸시 그룹화 ID
                         "apns-thread-id": "silent"  # Silent 스레드
                     },

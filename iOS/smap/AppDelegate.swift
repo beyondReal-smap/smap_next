@@ -34,7 +34,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     private var backgroundTaskIdentifier: UIBackgroundTaskIdentifier = .invalid
 
     // 🔄 FCM 토큰 관리 설정 (백그라운드/포그라운드 모두 지원)
-    private let fcmTokenExpiryDays: Int = 30 // 30일로 단축 - 더 자주 갱신
+    private let fcmTokenExpiryDays: Int = 7 // 7일로 단축 - 백그라운드 푸시 문제 해결
     private let maxTokenRetryAttempts: Int = 10 // 최대 재시도 횟수 증가
     private var isFCMTokenRefreshInProgress: Bool = false // 토큰 갱신 진행 중 플래그
 
