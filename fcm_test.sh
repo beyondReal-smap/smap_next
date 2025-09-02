@@ -154,9 +154,11 @@ echo ""
 STEP3_TIME=$(get_timestamp)
 echo -e "${BLUE}3️⃣ [${STEP3_TIME}] FCM 토큰 상태 상세 확인...${NC}"
 echo -e "${YELLOW}토큰 검증 요청:${NC}"
+# 실제 FCM 토큰을 가져와서 전송 (임시로 테스트용 토큰 사용)
+TEST_FCM_TOKEN="fWLYBJYTH06ejEjCYVb8TestToken"
 TOKEN_CHECK=$(curl -s -X POST "https://api3.smap.site/api/v1/member-fcm-token/background-check" \
   -H "Content-Type: application/json" \
-  -d "{\"mt_idx\": ${USER_ID}}")
+  -d "{\"mt_idx\": ${USER_ID}, \"fcm_token\": \"${TEST_FCM_TOKEN}\"}")
 
 if [ $? -eq 0 ] && [ -n "$TOKEN_CHECK" ]; then
     echo "$TOKEN_CHECK" | jq .

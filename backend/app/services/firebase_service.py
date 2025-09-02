@@ -106,6 +106,115 @@ class FirebaseService:
                 logger.warning("Firebase 푸시 알림 기능이 비활성화됩니다.")
                 return False
 
+    def send_ios_optimized_push(self, token: str, title: str, content: str, member_id: int = None, background_mode: bool = False) -> str:
+        """iOS 최적화된 푸시 알림 전송 - 백그라운드/종료 상태에서도 확실히 수신
+        
+        Args:
+            token: FCM 토큰
+            title: 푸시 제목 
+            content: 푸시 내용
+            member_id: 회원 ID
+            background_mode: 백그라운드 모드 여부
+            
+        Returns:
+            str: 전송 결과 또는 실패 사유
+        """
+        if not self._firebase_available:
+            logger.warning("Firebase가 초기화되지 않아 푸시 알림을 건너뜁니다.")
+            return "firebase_disabled"
+            
+        logger.info(f"📱 [FCM iOS] iOS 최적화 푸시 시작 - 토큰: {token[:30]}..., 백그라운드: {background_mode}")
+        
+        # 토큰 유효성 검증
+        if not self._validate_fcm_token(token):
+            logger.warning(f"⚠️ [FCM iOS] 토큰 유효성 검증 실패: {token[:30]}...")
+            return "invalid_token"
+            
+        logger.info(f"✅ [FCM iOS] 토큰 유효성 검증 통과: {token[:30]}...")
+        
+        try:
+            logger.info(f"📱 [FCM iOS] 토큰 검증 통과")
+            
+            # iOS 푸시 특화 설정으로 메시지 구성
+            retry_count = 5 if background_mode else 3
+            
+            for attempt in range(retry_count):
+                try:
+                    logger.info(f"📱 [FCM iOS] {'백그라운드' if background_mode else '일반'} 푸시 전송 (재시도: {retry_count})")
+                    
+                    # iOS 전용 최적화된 메시지 구성
+                    message = messaging.Message(
+                        token=token,
+                        notification=messaging.Notification(
+                            title=title,
+                            body=content
+                        ),
+                        data={
+                            "title": title,
+                            "body": content,
+                            "click_action": "FLUTTER_NOTIFICATION_CLICK",
+                            "notification_type": "ios_optimized",
+                            "timestamp": str(int(time.time())),
+                            "delivery_mode": "guaranteed",
+                            "background_mode": str(background_mode).lower(),
+                            "member_id": str(member_id) if member_id else "unknown"
+                        },
+                        apns=messaging.APNSConfig(
+                            headers={
+                                "apns-push-type": "alert",
+                                "apns-priority": "10",  # 최고 우선순위
+                                "apns-topic": Config.IOS_BUNDLE_ID,
+                                "apns-expiration": str(int(time.time()) + 7200),  # 2시간 유효
+                                "apns-collapse-id": f"ios_opt_{member_id}_{int(time.time())}",
+                                "apns-thread-id": "main_notifications"
+                            },
+                            payload=messaging.APNSPayload(
+                                aps=messaging.Aps(
+                                    sound='default',
+                                    badge=1,
+                                    alert=messaging.ApsAlert(
+                                        title=title,
+                                        body=content
+                                    ),
+                                    mutable_content=True,
+                                    content_available=True,  # 백그라운드 처리 활성화
+                                    thread_id="main_notifications",
+                                    category="GENERAL_NOTIFICATION"
+                                ),
+
+                            )
+                        )
+                    )
+                    
+                    # FCM 전송 실행
+                    response = messaging.send(message)
+                    logger.info(f"✅ [FCM iOS] iOS 최적화 푸시 전송 성공: {response}")
+                    
+                    return response
+                    
+                except messaging.UnregisteredError:
+                    logger.warning(f"🚨 [FCM iOS] 등록되지 않은 토큰: {token[:30]}...")
+                    self._handle_token_invalidation(token, "unregistered", title, content)
+                    return "unregistered"
+                    
+                except messaging.SenderIdMismatchError:
+                    logger.warning(f"🚨 [FCM iOS] Sender ID 불일치: {token[:30]}...")
+                    self._handle_token_invalidation(token, "sender_mismatch", title, content)
+                    return "sender_mismatch"
+                    
+                except Exception as e:
+                    logger.warning(f"⚠️ [FCM iOS] 전송 시도 {attempt + 1}/{retry_count} 실패: {e}")
+                    if attempt == retry_count - 1:
+                        logger.error(f"❌ [FCM iOS] 모든 재시도 실패: {e}")
+                        return f"send_failed: {e}"
+                    
+                    import time
+                    time.sleep(0.5 * (attempt + 1))  # 지수적 백오프
+                    
+        except Exception as e:
+            logger.error(f"❌ [FCM iOS] iOS 최적화 푸시 전송 실패: {e}")
+            return f"ios_push_failed: {e}"
+
     def send_push_notification(self, token: str, title: str, content: str, max_retries: int = 2, member_id: int = None, enable_fallback: bool = True) -> str:
         """FCM 푸시 알림 전송 (iOS 최적화 포함) - 토큰 검증 및 자동 정리 기능 포함
 
@@ -168,6 +277,14 @@ class FirebaseService:
                             title=title,
                             body=content
                         ),
+                        data={
+                            "title": title,
+                            "body": content,
+                            "click_action": "FLUTTER_NOTIFICATION_CLICK",
+                            "notification_type": "standard_push",
+                            "timestamp": str(int(time.time())),
+                            "ios_delivery_mode": "reliable"
+                        },
                         android=messaging.AndroidConfig(
                             priority='high',
                             notification=messaging.AndroidNotification(
@@ -179,9 +296,9 @@ class FirebaseService:
                                 "apns-push-type": "alert",
                                 "apns-priority": "10",
                                 "apns-topic": Config.IOS_BUNDLE_ID,
-                                "apns-expiration": str(int(time.time()) + 600),
-                                "apns-collapse-id": f"alert_{int(time.time())}",
-                                "apns-thread-id": "alert"
+                                "apns-expiration": str(int(time.time()) + 3600),  # 1시간 연장
+                                "apns-collapse-id": f"reliable_push_{int(time.time())}",
+                                "apns-thread-id": "main_notifications"
                             },
                             payload=messaging.APNSPayload(
                                 aps=messaging.Aps(
@@ -192,7 +309,9 @@ class FirebaseService:
                                         body=content
                                     ),
                                     mutable_content=True,
-                                    thread_id="alert"
+                                    content_available=True,  # iOS 백그라운드 처리를 위해 추가
+                                    thread_id="main_notifications",
+                                    category="GENERAL_NOTIFICATION"
                                 )
                             )
                         )

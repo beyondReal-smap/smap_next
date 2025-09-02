@@ -228,22 +228,12 @@ def send_fcm_push_notification(
                     "FCM 토큰이 존재하지 않습니다."
                 )
 
-            if is_ios_device:
-                logger.info(f"📱 [FCM iOS] iOS 기기로 감지됨 - 최적화된 전송 방식 사용: {member.mt_idx}")
-                response = firebase_service.send_ios_optimized_push(
-                    member.mt_token_id,
-                    args['plt_title'],
-                    args['plt_content'],
-                    is_background=False
-                )
-            else:
-                logger.info(f"🤖 [FCM Android] Android 기기로 감지됨 - 표준 전송 방식 사용: {member.mt_idx}")
-                response = firebase_service.send_push_notification(
-                    member.mt_token_id,
-                    args['plt_title'],
-                    args['plt_content'],
-                    member_id=member.mt_idx
-                )
+            response = firebase_service.send_push_notification(
+                member.mt_token_id,
+                args['plt_title'],
+                args['plt_content'],
+                member_id=member.mt_idx
+            )
 
             logger.info(f"✅ [FCM] Firebase 전송 성공 - 응답: {response}")
             logger.debug(f"📊 [FCM] 메시지 ID: {response}")

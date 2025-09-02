@@ -3908,6 +3908,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         print("Handle push from foreground")
         print("\(userInfo)")
 
+        // FCM 메시지 기록 업데이트
+        UserDefaults.standard.set(userInfo, forKey: "last_fcm_message")
+        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "last_fcm_message_time")
+        UserDefaults.standard.synchronize()
+
         // 🚨 권한 상태 재확인
         center.getNotificationSettings { settings in
             print("🔧 [FCM] 현재 알림 권한 상태:")
@@ -3918,9 +3923,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             print("   • 잠금화면: \(settings.lockScreenSetting.rawValue)")
             print("   • 알림 센터: \(settings.notificationCenterSetting.rawValue)")
         }
-
-        // FCM 메시지 기록 및 통계 (진단용)
-        UserDefaults.standard.set(userInfo, forKey: "last_fcm_message")
 
         // 포그라운드 알림 통계 기록
         let count = UserDefaults.standard.integer(forKey: "foreground_push_count") + 1
@@ -3952,7 +3954,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         UserDefaults.standard.set(self.event_url, forKey: "event_url")
         NotificationCenter.default.post(name: Notification.Name("getPush"), object: nil, userInfo: pushUserInfo)
         
-        completionHandler([.alert, .sound, .badge])
+        // iOS 푸시 확실한 수신을 위한 강화된 표시 옵션
+        if #available(iOS 14.0, *) {
+            completionHandler([.banner, .list, .sound, .badge])
+        } else {
+            completionHandler([.alert, .sound, .badge])
+        }
+        
+        // 추가적인 처리 완료 로깅
+        print("✅ [FCM] 포그라운드 푸시 처리 완료 - 알림 표시함")
     }
     
     //앱은 꺼져있지만 완전히 종료되지 않고 백그라운드에서 실행중일 때
@@ -3985,8 +3995,26 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         print("╔══════════════════════════════════════════════════════════════╗")
         print("║ 🔔 [FCM] 백그라운드에서 원격 알림 수신!                        ║")
         print("╚══════════════════════════════════════════════════════════════╝")
-        print("📱 [FCM] 앱 상태: \(UIApplication.shared.applicationState == .background ? "백그라운드" : "포그라운드")")
+        
+        let appState = UIApplication.shared.applicationState
+        let stateString = appState == .background ? "백그라운드" : appState == .active ? "포그라운드" : "비활성"
+        print("📱 [FCM] 앱 상태: \(stateString)")
         print("📨 [FCM] 백그라운드 메시지 데이터: \(userInfo)")
+        
+        // 푸시 알림 즉시 처리 보장 - 백그라운드 작업 시작
+        var backgroundTaskIdentifier: UIBackgroundTaskIdentifier = .invalid
+        backgroundTaskIdentifier = UIApplication.shared.beginBackgroundTask(withName: "FCM_Message_Processing") {
+            print("⚠️ [FCM] 백그라운드 작업 시간 초과")
+            UIApplication.shared.endBackgroundTask(backgroundTaskIdentifier)
+            backgroundTaskIdentifier = .invalid
+        }
+        
+        defer {
+            if backgroundTaskIdentifier != .invalid {
+                UIApplication.shared.endBackgroundTask(backgroundTaskIdentifier)
+            }
+        }
+        
         // AnyHashable을 String으로 변환하여 정렬
         let sortedKeys = userInfo.keys.compactMap { $0 as? String }.sorted()
         print("🔍 [FCM] 메시지 키들: \(sortedKeys)")
@@ -3998,6 +4026,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             print("📨 [FCM] FCM ID: \(messageId)")
         }
 
+        // FCM SDK에 메시지 수신 알림
         Messaging.messaging().appDidReceiveMessage(userInfo)
 
         // 백그라운드 푸시인지 확인
@@ -4052,15 +4081,23 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             print("   📨 Google Sender ID: \(googleSenderId)")
         }
 
-        // FCM 메시지 수신 시 로컬 알림 표시 (안전장치)
-        if hasNotification {
-            print("🔔 [FCM] 알림 데이터 포함 - 로컬 알림으로 표시")
+        // 백그라운드/종료 상태에서 확실한 푸시 알림 표시
+        if appState == .background || appState == .inactive {
+            print("🔔 [FCM] 백그라운드/비활성 상태 - 강제 로컬 알림 표시")
+            showLocalNotificationForBackgroundPush(userInfo)
+            
+            // 추가적인 시스템 알림도 시도
+            DispatchQueue.main.async {
+                self.scheduleImmediateLocalNotification(userInfo: userInfo)
+            }
+        } else if hasNotification {
+            print("🔔 [FCM] 포그라운드 알림 데이터 포함 - 로컬 알림으로 표시")
             showLocalNotificationForBackgroundPush(userInfo)
         } else if isBackgroundPush && !isSilentPush {
             print("⚠️ [FCM] 백그라운드 푸시지만 알림 데이터 없음 - 기본 로컬 알림 표시")
             showLocalNotificationForBackgroundPush(userInfo)
         } else {
-            print("🔇 [FCM] Silent 푸시 또는 포그라운드 - 로컬 알림 표시하지 않음")
+            print("🔇 [FCM] Silent 푸시 - 로컬 알림 표시하지 않음")
         }
 
         // FCM 메시지 기록 및 통계 (진단용)
@@ -8217,12 +8254,11 @@ extension UNUserNotificationCenter {
         let isLoggedIn = UserDefaults.standard.bool(forKey: "is_logged_in")
         let stack = Thread.callStackSymbols.joined(separator: "\n")
         print("🛑 [SWZ-PUSH] requestAuthorization intercepted. isLoggedIn=\(isLoggedIn). Options=\(options).\n📚 CallStack:\n\(stack)")
-        if !isLoggedIn {
-            print("🛑 [SWZ-PUSH] Blocked push permission before login → returning (false)")
-            DispatchQueue.main.async { completionHandler(false, nil) }
-            return
-        }
-        // Call original (swizzled) implementation
+        
+        // 🔧 [중요] 푸시 알림 확실한 수신을 위해 로그인 여부와 관계없이 권한 허용
+        print("✅ [SWZ-PUSH] 푸시 권한 요청 허용 - iOS 푸시 수신 안정성 향상")
+        
+        // Call original (swizzled) implementation - 로그인 상태와 관계없이 실행
         self.smap_requestAuthorization(options: options, completionHandler: completionHandler)
     }
 }
@@ -8600,92 +8636,31 @@ extension AppDelegate {
         }
     }
     
-    // MARK: - 🔍 푸시 알림 디버깅 메서드들
+    // MARK: - 🔍 푸시 알림 디버깅 메서드들 (Enhanced)
     
-    /// 푸시 알림 상태 종합 진단
-    @objc func debugPushNotificationStatus() {
-        print("\n" + String(repeating: "=", count: 80))
-        print("🔍 [PUSH DEBUG] iOS 푸시 알림 상태 종합 진단")
-        print(String(repeating: "=", count: 80))
+    /// 푸시 권한 강제 재요청 (Enhanced)
+    @objc func forcePushPermissionRequestEnhanced() {
+        print("🔔 [PUSH DEBUG Enhanced] 푸시 권한 강제 재요청 시작")
         
-        // 1. 앱 상태 확인
-        let appState = UIApplication.shared.applicationState
-        print("📱 [PUSH DEBUG] 앱 상태: \(appState == .active ? "활성" : appState == .background ? "백그라운드" : "비활성")")
-        
-        // 2. 푸시 권한 상태 확인
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
             DispatchQueue.main.async {
-                print("🔔 [PUSH DEBUG] 푸시 권한 상태:")
-                print("   - 권한 상태: \(self.authorizationStatusString(settings.authorizationStatus))")
-                print("   - 알림 설정: \(self.notificationSettingString(settings.alertSetting))")
-                print("   - 배지 설정: \(self.notificationSettingString(settings.badgeSetting))")
-                print("   - 소리 설정: \(self.notificationSettingString(settings.soundSetting))")
-                print("   - 잠금화면 설정: \(self.notificationSettingString(settings.lockScreenSetting))")
-                print("   - 알림센터 설정: \(self.notificationSettingString(settings.notificationCenterSetting))")
-            }
-        }
-        
-        // 3. FCM 토큰 상태 확인
-        print("🔑 [PUSH DEBUG] FCM 토큰 상태:")
-        if let savedToken = UserDefaults.standard.string(forKey: "fcm_token") {
-            print("   - 저장된 토큰: \(savedToken.prefix(30))... (길이: \(savedToken.count))")
-        } else {
-            print("   - 저장된 토큰: 없음")
-        }
-        
-        // 4. 현재 FCM 토큰 가져오기
-        Messaging.messaging().token { token, error in
-            if let error = error {
-                print("   - 현재 토큰 오류: \(error.localizedDescription)")
-            } else if let token = token {
-                print("   - 현재 토큰: \(token.prefix(30))... (길이: \(token.count))")
-                
-                // 토큰 비교
-                let savedToken = UserDefaults.standard.string(forKey: "fcm_token")
-                if token == savedToken {
-                    print("   - 토큰 동기화: ✅ 일치")
+                if let error = error {
+                    print("❌ [PUSH DEBUG Enhanced] 푸시 권한 요청 오류: \(error.localizedDescription)")
                 } else {
-                    print("   - 토큰 동기화: ❌ 불일치 - 서버 업데이트 필요")
+                    print("✅ [PUSH DEBUG Enhanced] 푸시 권한 요청 결과: \(granted ? "허용됨" : "거부됨")")
+                    
+                    if granted {
+                        print("📱 [PUSH DEBUG Enhanced] APNs 등록 시작")
+                        UIApplication.shared.registerForRemoteNotifications()
+                    }
                 }
-            } else {
-                print("   - 현재 토큰: nil")
             }
         }
-        
-        // 5. APNs 등록 상태 확인
-        print("📡 [PUSH DEBUG] APNs 등록 상태:")
-        if UIApplication.shared.isRegisteredForRemoteNotifications {
-            print("   - APNs 등록: ✅ 등록됨")
-        } else {
-            print("   - APNs 등록: ❌ 등록되지 않음")
-        }
-        
-        // 6. 백그라운드 앱 새로고침 상태
-        print("🔄 [PUSH DEBUG] 백그라운드 상태:")
-        print("   - 백그라운드 새로고침: \(UIApplication.shared.backgroundRefreshStatus == .available ? "✅ 사용 가능" : "❌ 제한됨")")
-        
-        // 7. 로그인 상태 확인 (푸시 권한 차단 관련)
-        let isLoggedIn = UserDefaults.standard.bool(forKey: "is_logged_in")
-        print("👤 [PUSH DEBUG] 로그인 상태: \(isLoggedIn ? "✅ 로그인됨" : "❌ 로그인 안됨")")
-        
-        print(String(repeating: "=", count: 80))
-        print("")
     }
     
-    /// 권한 상태를 문자열로 변환
-    private func authorizationStatusString(_ status: UNAuthorizationStatus) -> String {
-        switch status {
-        case .notDetermined: return "결정되지 않음"
-        case .denied: return "거부됨"
-        case .authorized: return "허용됨"
-        case .provisional: return "임시 허용"
-        case .ephemeral: return "임시"
-        @unknown default: return "알 수 없음"
-        }
-    }
-    
-    /// 알림 설정을 문자열로 변환
-    private func notificationSettingString(_ setting: UNNotificationSetting) -> String {
+    /// 알림 설정을 문자열로 변환 (Enhanced)
+    private func notificationSettingStringEnhanced(_ setting: UNNotificationSetting) -> String {
         switch setting {
         case .notSupported: return "지원되지 않음"
         case .disabled: return "비활성화"
@@ -8694,61 +8669,76 @@ extension AppDelegate {
         }
     }
     
-    /// 푸시 권한 강제 재요청
-    @objc func forcePushPermissionRequest() {
-        print("🔔 [PUSH DEBUG] 푸시 권한 강제 재요청 시작")
+    /// 즉시 로컬 알림 표시 (백그라운드 상태용)
+    private func scheduleImmediateLocalNotification(userInfo: [AnyHashable: Any]) {
+        print("🔔 [FCM] 즉시 로컬 알림 스케줄링 시작")
         
         let center = UNUserNotificationCenter.current()
-        center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("❌ [PUSH DEBUG] 푸시 권한 요청 오류: \(error.localizedDescription)")
-                } else {
-                    print("✅ [PUSH DEBUG] 푸시 권한 요청 결과: \(granted ? "허용됨" : "거부됨")")
-                    
-                    if granted {
-                        print("📱 [PUSH DEBUG] APNs 등록 시작")
-                        UIApplication.shared.registerForRemoteNotifications()
-                    }
-                }
+        
+        // 제목과 내용 추출
+        var title = "새 알림"
+        var body = "새로운 메시지가 도착했습니다."
+        
+        if let aps = userInfo["aps"] as? [String: Any],
+           let alert = aps["alert"] as? [String: Any] {
+            title = alert["title"] as? String ?? title
+            body = alert["body"] as? String ?? body
+        } else if let dataTitle = userInfo["title"] as? String,
+                  let dataBody = userInfo["body"] as? String {
+            title = dataTitle
+            body = dataBody
+        }
+        
+        print("🔔 [FCM] 로컬 알림 내용 - 제목: \(title), 내용: \(body)")
+        
+        // 알림 내용 구성
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        content.badge = NSNumber(value: UIApplication.shared.applicationIconBadgeNumber + 1)
+        content.categoryIdentifier = "GENERAL_NOTIFICATION"
+        content.userInfo = userInfo
+        
+        // 즉시 트리거 (0.1초 후)
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 0.1, repeats: false)
+        
+        // 고유 식별자 생성
+        let identifier = "fcm_immediate_\(Int(Date().timeIntervalSince1970))"
+        
+        // 알림 요청 생성
+        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+        
+        // 알림 스케줄링
+        center.add(request) { error in
+            if let error = error {
+                print("❌ [FCM] 즉시 로컬 알림 스케줄링 실패: \(error.localizedDescription)")
+            } else {
+                print("✅ [FCM] 즉시 로컬 알림 스케줄링 성공: \(identifier)")
             }
         }
     }
     
-    /// FCM 토큰 강제 갱신
-    @objc func forceRefreshFCMToken() {
-        print("🔄 [PUSH DEBUG] FCM 토큰 강제 갱신 시작")
+    /// 강제 로컬 알림 테스트 (시각적 확인용)
+    @objc func testLocalNotification() {
+        print("🔔 [LOCAL TEST] 강제 로컬 알림 테스트 시작")
         
-        // 기존 토큰 삭제
-        Messaging.messaging().deleteToken { error in
+        let center = UNUserNotificationCenter.current()
+        let content = UNMutableNotificationContent()
+        content.title = "🧪 로컬 알림 테스트"
+        content.body = "이 알림이 보인다면 iOS 알림 시스템이 정상 작동 중입니다 - \(Date().description)"
+        content.sound = .default
+        content.badge = NSNumber(value: UIApplication.shared.applicationIconBadgeNumber + 1)
+        
+        // 즉시 트리거
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 0.1, repeats: false)
+        let request = UNNotificationRequest(identifier: "local_test_\(Int(Date().timeIntervalSince1970))", content: content, trigger: trigger)
+        
+        center.add(request) { error in
             if let error = error {
-                print("⚠️ [PUSH DEBUG] 기존 토큰 삭제 실패: \(error.localizedDescription)")
+                print("❌ [LOCAL TEST] 로컬 알림 실패: \(error.localizedDescription)")
             } else {
-                print("✅ [PUSH DEBUG] 기존 토큰 삭제 성공")
-            }
-            
-            // 새 토큰 요청 (삭제 성공 여부와 관계없이)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                Messaging.messaging().token { token, error in
-                    if let error = error {
-                        print("❌ [PUSH DEBUG] 새 토큰 생성 실패: \(error.localizedDescription)")
-                    } else if let token = token {
-                        print("✅ [PUSH DEBUG] 새 토큰 생성 성공: \(token.prefix(30))... (길이: \(token.count))")
-                        
-                        // 서버에 새 토큰 전송
-                        self.sendFCMTokenToServer(token: token) { success in
-                            if success {
-                                print("✅ [PUSH DEBUG] 새 토큰 서버 전송 성공")
-                                UserDefaults.standard.set(token, forKey: "fcm_token")
-                                UserDefaults.standard.synchronize()
-                            } else {
-                                print("❌ [PUSH DEBUG] 새 토큰 서버 전송 실패")
-                            }
-                        }
-                    } else {
-                        print("❌ [PUSH DEBUG] 새 토큰이 nil")
-                    }
-                }
+                print("✅ [LOCAL TEST] 로컬 알림 스케줄됨 - 화면에 표시되는지 확인하세요")
             }
         }
     }
