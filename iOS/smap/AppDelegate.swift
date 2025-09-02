@@ -8599,4 +8599,220 @@ extension AppDelegate {
             }
         }
     }
+    
+    // MARK: - 🔍 푸시 알림 디버깅 메서드들
+    
+    /// 푸시 알림 상태 종합 진단
+    @objc func debugPushNotificationStatus() {
+        print("\n" + String(repeating: "=", count: 80))
+        print("🔍 [PUSH DEBUG] iOS 푸시 알림 상태 종합 진단")
+        print(String(repeating: "=", count: 80))
+        
+        // 1. 앱 상태 확인
+        let appState = UIApplication.shared.applicationState
+        print("📱 [PUSH DEBUG] 앱 상태: \(appState == .active ? "활성" : appState == .background ? "백그라운드" : "비활성")")
+        
+        // 2. 푸시 권한 상태 확인
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            DispatchQueue.main.async {
+                print("🔔 [PUSH DEBUG] 푸시 권한 상태:")
+                print("   - 권한 상태: \(self.authorizationStatusString(settings.authorizationStatus))")
+                print("   - 알림 설정: \(self.notificationSettingString(settings.alertSetting))")
+                print("   - 배지 설정: \(self.notificationSettingString(settings.badgeSetting))")
+                print("   - 소리 설정: \(self.notificationSettingString(settings.soundSetting))")
+                print("   - 잠금화면 설정: \(self.notificationSettingString(settings.lockScreenSetting))")
+                print("   - 알림센터 설정: \(self.notificationSettingString(settings.notificationCenterSetting))")
+            }
+        }
+        
+        // 3. FCM 토큰 상태 확인
+        print("🔑 [PUSH DEBUG] FCM 토큰 상태:")
+        if let savedToken = UserDefaults.standard.string(forKey: "fcm_token") {
+            print("   - 저장된 토큰: \(savedToken.prefix(30))... (길이: \(savedToken.count))")
+        } else {
+            print("   - 저장된 토큰: 없음")
+        }
+        
+        // 4. 현재 FCM 토큰 가져오기
+        Messaging.messaging().token { token, error in
+            if let error = error {
+                print("   - 현재 토큰 오류: \(error.localizedDescription)")
+            } else if let token = token {
+                print("   - 현재 토큰: \(token.prefix(30))... (길이: \(token.count))")
+                
+                // 토큰 비교
+                let savedToken = UserDefaults.standard.string(forKey: "fcm_token")
+                if token == savedToken {
+                    print("   - 토큰 동기화: ✅ 일치")
+                } else {
+                    print("   - 토큰 동기화: ❌ 불일치 - 서버 업데이트 필요")
+                }
+            } else {
+                print("   - 현재 토큰: nil")
+            }
+        }
+        
+        // 5. APNs 등록 상태 확인
+        print("📡 [PUSH DEBUG] APNs 등록 상태:")
+        if UIApplication.shared.isRegisteredForRemoteNotifications {
+            print("   - APNs 등록: ✅ 등록됨")
+        } else {
+            print("   - APNs 등록: ❌ 등록되지 않음")
+        }
+        
+        // 6. 백그라운드 앱 새로고침 상태
+        print("🔄 [PUSH DEBUG] 백그라운드 상태:")
+        print("   - 백그라운드 새로고침: \(UIApplication.shared.backgroundRefreshStatus == .available ? "✅ 사용 가능" : "❌ 제한됨")")
+        
+        // 7. 로그인 상태 확인 (푸시 권한 차단 관련)
+        let isLoggedIn = UserDefaults.standard.bool(forKey: "is_logged_in")
+        print("👤 [PUSH DEBUG] 로그인 상태: \(isLoggedIn ? "✅ 로그인됨" : "❌ 로그인 안됨")")
+        
+        print(String(repeating: "=", count: 80))
+        print("")
+    }
+    
+    /// 권한 상태를 문자열로 변환
+    private func authorizationStatusString(_ status: UNAuthorizationStatus) -> String {
+        switch status {
+        case .notDetermined: return "결정되지 않음"
+        case .denied: return "거부됨"
+        case .authorized: return "허용됨"
+        case .provisional: return "임시 허용"
+        case .ephemeral: return "임시"
+        @unknown default: return "알 수 없음"
+        }
+    }
+    
+    /// 알림 설정을 문자열로 변환
+    private func notificationSettingString(_ setting: UNNotificationSetting) -> String {
+        switch setting {
+        case .notSupported: return "지원되지 않음"
+        case .disabled: return "비활성화"
+        case .enabled: return "활성화"
+        @unknown default: return "알 수 없음"
+        }
+    }
+    
+    /// 푸시 권한 강제 재요청
+    @objc func forcePushPermissionRequest() {
+        print("🔔 [PUSH DEBUG] 푸시 권한 강제 재요청 시작")
+        
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("❌ [PUSH DEBUG] 푸시 권한 요청 오류: \(error.localizedDescription)")
+                } else {
+                    print("✅ [PUSH DEBUG] 푸시 권한 요청 결과: \(granted ? "허용됨" : "거부됨")")
+                    
+                    if granted {
+                        print("📱 [PUSH DEBUG] APNs 등록 시작")
+                        UIApplication.shared.registerForRemoteNotifications()
+                    }
+                }
+            }
+        }
+    }
+    
+    /// FCM 토큰 강제 갱신
+    @objc func forceRefreshFCMToken() {
+        print("🔄 [PUSH DEBUG] FCM 토큰 강제 갱신 시작")
+        
+        // 기존 토큰 삭제
+        Messaging.messaging().deleteToken { error in
+            if let error = error {
+                print("⚠️ [PUSH DEBUG] 기존 토큰 삭제 실패: \(error.localizedDescription)")
+            } else {
+                print("✅ [PUSH DEBUG] 기존 토큰 삭제 성공")
+            }
+            
+            // 새 토큰 요청 (삭제 성공 여부와 관계없이)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                Messaging.messaging().token { token, error in
+                    if let error = error {
+                        print("❌ [PUSH DEBUG] 새 토큰 생성 실패: \(error.localizedDescription)")
+                    } else if let token = token {
+                        print("✅ [PUSH DEBUG] 새 토큰 생성 성공: \(token.prefix(30))... (길이: \(token.count))")
+                        
+                        // 서버에 새 토큰 전송
+                        self.sendFCMTokenToServer(token: token) { success in
+                            if success {
+                                print("✅ [PUSH DEBUG] 새 토큰 서버 전송 성공")
+                                UserDefaults.standard.set(token, forKey: "fcm_token")
+                                UserDefaults.standard.synchronize()
+                            } else {
+                                print("❌ [PUSH DEBUG] 새 토큰 서버 전송 실패")
+                            }
+                        }
+                    } else {
+                        print("❌ [PUSH DEBUG] 새 토큰이 nil")
+                    }
+                }
+            }
+        }
+    }
+    
+    /// 테스트 푸시 전송 요청
+    @objc func sendTestPushNotification() {
+        print("📤 [PUSH DEBUG] 테스트 푸시 전송 요청")
+        
+        guard let savedToken = UserDefaults.standard.string(forKey: "fcm_token"), !savedToken.isEmpty else {
+            print("❌ [PUSH DEBUG] FCM 토큰이 없음 - 토큰 갱신 후 다시 시도")
+            forceRefreshFCMToken()
+            return
+        }
+        
+        // 현재 시간으로 테스트 메시지 생성
+        let timestamp = DateFormatter().string(from: Date())
+        let testMessage = "테스트 푸시 - \(timestamp)"
+        
+        print("📤 [PUSH DEBUG] 테스트 푸시 전송 중...")
+        print("   - 토큰: \(savedToken.prefix(30))...")
+        print("   - 메시지: \(testMessage)")
+        
+        // 실제 서버 API 호출 (fcm_sendone 엔드포인트 사용)
+        let url = URL(string: "https://api3.smap.site/api/v1/fcm_sendone")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let requestBody: [String: Any] = [
+            "plt_type": "TEST_DEBUG",
+            "sst_idx": "0",
+            "plt_condition": "iOS Debug Test",
+            "plt_memo": testMessage,
+            "mt_idx": 1186, // 실제 사용자 ID
+            "plt_title": "🔍 iOS 푸시 디버그",
+            "plt_content": testMessage
+        ]
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+        } catch {
+            print("❌ [PUSH DEBUG] JSON 직렬화 오류: \(error)")
+            return
+        }
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("❌ [PUSH DEBUG] 테스트 푸시 전송 오류: \(error.localizedDescription)")
+                } else if let httpResponse = response as? HTTPURLResponse {
+                    print("📱 [PUSH DEBUG] 테스트 푸시 응답: HTTP \(httpResponse.statusCode)")
+                    
+                    if let data = data,
+                       let responseString = String(data: data, encoding: .utf8) {
+                        print("📝 [PUSH DEBUG] 응답 내용: \(responseString)")
+                    }
+                    
+                    if httpResponse.statusCode == 200 {
+                        print("✅ [PUSH DEBUG] 테스트 푸시 전송 성공 - 5초 후 수신 여부 확인하세요")
+                    } else {
+                        print("❌ [PUSH DEBUG] 테스트 푸시 전송 실패 - HTTP \(httpResponse.statusCode)")
+                    }
+                }
+            }
+        }.resume()
+    }
 }
