@@ -34,8 +34,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     private var backgroundTaskIdentifier: UIBackgroundTaskIdentifier = .invalid
 
     // 🔄 FCM 토큰 관리 설정 (백그라운드/포그라운드 모두 지원)
-    private let fcmTokenExpiryDays: Int = 7 // 7일로 단축 - 백그라운드 푸시 문제 해결
-    private let maxTokenRetryAttempts: Int = 10 // 최대 재시도 횟수 증가
+    private let fcmTokenExpiryDays: Int = 3 // 3일로 더 단축 - 백그라운드 푸시 오래 유지
+    private let maxTokenRetryAttempts: Int = 15 // 최대 재시도 횟수 더 증가
     private var isFCMTokenRefreshInProgress: Bool = false // 토큰 갱신 진행 중 플래그
 
     // 🔑 FCM 토큰 강제 업데이트 플래그 (모든 상황에서 업데이트 허용)
@@ -46,9 +46,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     // 🚀 백그라운드 푸시 최적화 설정
     private var lastBackgroundFetchTime: Date?
     private var backgroundTokenRefreshTimer: Timer?
-    private let backgroundTokenRefreshInterval: TimeInterval = 3600 // 1시간마다 토큰 상태 확인
+    private let backgroundTokenRefreshInterval: TimeInterval = 1800 // 30분마다 토큰 상태 확인 (더 자주)
     private var isAppInBackground: Bool = false
     private var backgroundSessionStartTime: Date?
+    private var backgroundKeepAliveTimer: Timer? // 백그라운드 연결 유지용 타이머
+    private let backgroundKeepAliveInterval: TimeInterval = 600 // 10분마다 연결 유지
     
     var title = String()
     var body = String()
@@ -1077,9 +1079,28 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         }
     }
 
-    // MARK: - 🔄 FCM 토큰 업데이트 핸들러 (재등록용)
+    // MARK: - 🔄 FCM 토큰 업데이트 핸들러 (백그라운드 제어 포함)
     private func handleFCMTokenUpdate(_ token: String) {
         print("🔄 [FCM Handler] FCM 토큰 업데이트 핸들러 호출: \(token.prefix(30))...")
+        
+        // 백그라운드에서는 토큰 변경을 제한
+        if isAppInBackground {
+            print("🌙 [FCM Handler] 백그라운드 상태 - 토큰 변경 제한")
+            
+            // 마지막 토큰 업데이트로부터 충분한 시간이 지났는지 확인
+            let lastUpdateTime = UserDefaults.standard.double(forKey: "last_background_token_update")
+            let currentTime = Date().timeIntervalSince1970
+            let timeSinceLastUpdate = currentTime - lastUpdateTime
+            
+            // 백그라운드에서는 최소 1시간 간격으로만 토큰 업데이트 허용
+            if timeSinceLastUpdate < 3600 {
+                print("⏳ [FCM Handler] 백그라운드 토큰 업데이트 쿨다운 중 - 스킵")
+                return
+            }
+            
+            print("✅ [FCM Handler] 백그라운드 토큰 업데이트 허용 (1시간 경과)")
+            UserDefaults.standard.set(currentTime, forKey: "last_background_token_update")
+        }
 
         // 기존 토큰과 비교
         let existingToken = UserDefaults.standard.string(forKey: "fcm_token")
@@ -6951,15 +6972,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     }
     
     func applicationDidEnterBackground(_ application: UIApplication) {
+        print("🌙 [APP STATE] 백그라운드 진입")
+        
+        // 백그라운드 상태로 설정
+        isAppInBackground = true
+        
         let userInfo: [AnyHashable: Any] = ["state": "background"]
-
         NotificationCenter.default.post(name: Notification.Name("appStateChange"), object: nil, userInfo: userInfo)
 
-        // ✅ 백그라운드 진입 시 토큰 상태 관리
-
-        // 🚀 백그라운드 진입 시 토큰 상태 준비 (타이머 제거됨)
-
-        // 백그라운드 진입 시 FCM 토큰 상태 확인
+        // 로그인 상태일 때만 FCM 토큰 관리
         if UserDefaults.standard.bool(forKey: "is_logged_in") {
             print("🔍 [FCM] 백그라운드 진입 - FCM 토큰 DB 확인")
             checkAndUpdateFCMTokenFromDB()
@@ -6967,7 +6988,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
         // 백그라운드 진입 시 FCM 토큰 상태 확인 및 갱신 준비
         print("🔄 [FCM] 백그라운드 진입 - FCM 토큰 상태 준비")
-        prepareFCMTokenForBackground()
+        setupBackgroundFCMTokenManagement()
+        
+        // 백그라운드 연결 유지 시작
+        startBackgroundKeepAlive()
 
         // Use this method to release shared resources, save user data, invalidate timers, and store enough application state information to restore your application to its current state in case it is terminated later.
         // If your application supports background execution, this method is called instead of applicationWillTerminate: when the user quits.
@@ -6983,6 +7007,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
         // ✅ 포그라운드 진입 시 토큰 상태 관리
 
+        // 백그라운드 연결 유지 중단
+        stopBackgroundKeepAlive()
+        isAppInBackground = false
+        
         // 포그라운드 진입 시 FCM 토큰 상태 확인
         if UserDefaults.standard.bool(forKey: "is_logged_in") {
             print("🔍 [FCM] 포그라운드 진입 - FCM 토큰 DB 확인")
@@ -8804,5 +8832,159 @@ extension AppDelegate {
                 }
             }
         }.resume()
+    }
+    
+    // MARK: - 백그라운드 FCM 토큰 관리 및 연결 유지
+    
+    private func setupBackgroundFCMTokenManagement() {
+        isAppInBackground = true
+        backgroundSessionStartTime = Date()
+        
+        print("🌙 [FCM BACKGROUND] 백그라운드 토큰 관리 준비 시작")
+        
+        // 백그라운드 작업 시작
+        backgroundTaskIdentifier = UIApplication.shared.beginBackgroundTask(withName: "FCMTokenBackgroundTask") {
+            print("⏰ [FCM BACKGROUND] 백그라운드 작업 시간 만료")
+            UIApplication.shared.endBackgroundTask(self.backgroundTaskIdentifier)
+            self.backgroundTaskIdentifier = .invalid
+        }
+        
+        // 백그라운드에서 토큰 갱신 타이머 시작
+        startBackgroundTokenRefreshTimer()
+        
+        // 현재 토큰 상태를 서버에 한 번 더 전송
+        if let currentToken = currentFCMToken {
+            updateFCMTokenToServerSilently(token: currentToken, reason: "background_entry")
+        }
+    }
+    
+    private func startBackgroundKeepAlive() {
+        print("💚 [FCM BACKGROUND] 백그라운드 연결 유지 시작")
+        
+        backgroundKeepAliveTimer?.invalidate()
+        backgroundKeepAliveTimer = Timer.scheduledTimer(withTimeInterval: backgroundKeepAliveInterval, repeats: true) { [weak self] _ in
+            self?.performBackgroundKeepAlive()
+        }
+    }
+    
+    private func stopBackgroundKeepAlive() {
+        print("💛 [FCM BACKGROUND] 백그라운드 연결 유지 중단")
+        
+        backgroundKeepAliveTimer?.invalidate()
+        backgroundKeepAliveTimer = nil
+        backgroundTokenRefreshTimer?.invalidate()
+        backgroundTokenRefreshTimer = nil
+        
+        if backgroundTaskIdentifier != .invalid {
+            UIApplication.shared.endBackgroundTask(backgroundTaskIdentifier)
+            backgroundTaskIdentifier = .invalid
+        }
+    }
+    
+    private func startBackgroundTokenRefreshTimer() {
+        backgroundTokenRefreshTimer?.invalidate()
+        backgroundTokenRefreshTimer = Timer.scheduledTimer(withTimeInterval: backgroundTokenRefreshInterval, repeats: true) { [weak self] _ in
+            self?.handleBackgroundTokenRefresh()
+        }
+    }
+    
+    private func performBackgroundKeepAlive() {
+        guard isAppInBackground else { return }
+        
+        print("🔄 [FCM BACKGROUND] 백그라운드 연결 유지 수행")
+        
+        // 마지막 백그라운드 토큰 업데이트 시간 확인
+        let lastBackgroundUpdate = UserDefaults.standard.double(forKey: "last_background_keepalive_update")
+        let currentTime = Date().timeIntervalSince1970
+        let timeSinceLastUpdate = currentTime - lastBackgroundUpdate
+        
+        // 백그라운드에서는 최소 30분 간격으로만 토큰 상태 확인
+        if timeSinceLastUpdate < 1800 { // 30분
+            print("⏳ [FCM BACKGROUND] 백그라운드 토큰 상태 확인 쿨다운 중 - 스킵")
+            return
+        }
+        
+        // FCM 토큰 상태 확인 (서버 업데이트 없이)
+        if let token = currentFCMToken {
+            print("📊 [FCM BACKGROUND] 백그라운드 토큰 상태만 확인 (업데이트 없음)")
+            // 토큰 상태 확인만 하고 서버 업데이트는 하지 않음
+            UserDefaults.standard.set(currentTime, forKey: "last_background_keepalive_update")
+        }
+        
+        // 백그라운드 시간이 매우 길면 (3시간 이상) 토큰 검증만 수행
+        if let startTime = backgroundSessionStartTime,
+           Date().timeIntervalSince(startTime) > 10800 { // 3시간 이상
+            print("⚠️ [FCM BACKGROUND] 장시간 백그라운드 감지 - 토큰 검증만 수행")
+            // 토큰 유효성만 검증하고 변경은 하지 않음
+            validateCurrentFCMToken()
+        }
+    }
+    
+    private func handleBackgroundTokenRefresh() {
+        guard isAppInBackground,
+              UserDefaults.standard.bool(forKey: "is_logged_in") else { return }
+        
+        print("🔄 [FCM BACKGROUND] 백그라운드 토큰 갱신 수행")
+        
+        // 토큰 만료 시간 확인
+        if let lastUpdate = lastFCMTokenUpdateTime,
+           Date().timeIntervalSince(lastUpdate) > TimeInterval(fcmTokenExpiryDays * 24 * 3600) {
+            print("⚠️ [FCM BACKGROUND] 토큰 만료 감지 - 토큰 재전송")
+            // 기존 토큰 재전송으로 대체
+            if let token = currentFCMToken {
+                updateFCMTokenToServerSilently(token: token, reason: "background_token_expired")
+            }
+        } else {
+            // 기존 토큰 재전송
+            if let token = currentFCMToken {
+                updateFCMTokenToServerSilently(token: token, reason: "background_refresh")
+            }
+        }
+    }
+    
+    private func updateFCMTokenToServerSilently(token: String, reason: String) {
+        // 조용한 백그라운드 업데이트 (로그 최소화)
+        guard let url = URL(string: "https://api3.smap.site/api/v1/member-fcm-token/update") else { return }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let body = [
+            "fcm_token": token,
+            "reason": reason,
+            "background_update": true
+        ] as [String: Any]
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            URLSession.shared.dataTask(with: request) { _, response, error in
+                if let error = error {
+                    print("❌ [FCM BACKGROUND] 조용한 토큰 업데이트 실패: \(error.localizedDescription)")
+                } else if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                    print("✅ [FCM BACKGROUND] 조용한 토큰 업데이트 성공")
+                }
+            }.resume()
+        } catch {
+            print("❌ [FCM BACKGROUND] 요청 생성 실패: \(error.localizedDescription)")
+        }
+    }
+    
+    // MARK: - FCM 토큰 검증 (업데이트 없이)
+    
+    private func validateCurrentFCMToken() {
+        guard let token = currentFCMToken else {
+            print("❌ [FCM VALIDATE] 현재 FCM 토큰이 없음")
+            return
+        }
+        
+        print("🔍 [FCM VALIDATE] FCM 토큰 유효성 검증 (업데이트 없음)")
+        
+        // 토큰 형식만 검증하고 서버에는 전송하지 않음
+        if validateTokenFormat(token) {
+            print("✅ [FCM VALIDATE] 토큰 형식 유효")
+        } else {
+            print("❌ [FCM VALIDATE] 토큰 형식 무효 - 포그라운드 복귀 시 갱신 예정")
+        }
     }
 }

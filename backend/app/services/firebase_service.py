@@ -164,7 +164,7 @@ class FirebaseService:
                                 "apns-push-type": "alert",
                                 "apns-priority": "10",  # 최고 우선순위
                                 "apns-topic": Config.IOS_BUNDLE_ID,
-                                "apns-expiration": str(int(time.time()) + 2592000),  # 30일 유효 (백그라운드 푸시 최대 개선)
+                                "apns-expiration": str(int(time.time()) + 7776000),  # 90일 유효 (백그라운드 푸시 최대 개선)
                                 # "apns-collapse-id": 제거 - 각 알림을 개별 전송하여 배치 방지
                                 "apns-thread-id": f"notification_{member_id}_{int(time.time())}"  # 개별 스레드로 즉시 알림
                             },
@@ -296,7 +296,7 @@ class FirebaseService:
                                 "apns-push-type": "alert",
                                 "apns-priority": "10",
                                 "apns-topic": Config.IOS_BUNDLE_ID,
-                                "apns-expiration": str(int(time.time()) + 2592000),  # 30일 유효 (백그라운드 푸시 최대 개선)
+                                "apns-expiration": str(int(time.time()) + 7776000),  # 90일 유효 (백그라운드 푸시 최대 개선)
                                 # "apns-collapse-id": 제거 - 각 알림을 개별 전송하여 배치 방지  
                                 "apns-thread-id": f"reliable_{member_id}_{int(time.time())}"  # 개별 스레드로 즉시 알림
                             },
@@ -516,7 +516,7 @@ class FirebaseService:
                         "apns-push-type": "alert",  # alert로 설정하여 사용자에게 표시
                         "apns-priority": "10",  # 최고 우선순위로 설정
                         "apns-topic": Config.IOS_BUNDLE_ID,  # iOS 앱 번들 ID
-                        "apns-expiration": str(int(time.time()) + 2592000),  # 30일 유효 (백그라운드 푸시 최대 개선)
+                        "apns-expiration": str(int(time.time()) + 7776000),  # 90일 유효 (백그라운드 푸시 최대 개선)
                         # "apns-collapse-id": 제거 - 각 알림을 개별 전송하여 배치 방지
                         "apns-thread-id": f"background_{int(time.time())}"  # 개별 백그라운드 스레드로 즉시 알림
                     },
@@ -613,7 +613,7 @@ class FirebaseService:
                         "apns-push-type": "background",  # background 타입으로 설정하여 사용자에게 표시하지 않음
                         "apns-priority": "10",  # Silent 푸시라도 최고 우선순위로 설정하여 무시 방지
                         "apns-topic": Config.IOS_BUNDLE_ID,  # 올바른 번들 ID 설정
-                        "apns-expiration": str(int(time.time()) + 2592000),  # 30일 유효 (백그라운드 푸시 최대 개선)
+                        "apns-expiration": str(int(time.time()) + 7776000),  # 90일 유효 (백그라운드 푸시 최대 개선)
                         # "apns-collapse-id": 제거 - 각 알림을 개별 전송하여 배치 방지
                         "apns-thread-id": f"silent_{reason}_{int(time.time())}"  # 개별 Silent 스레드로 즉시 처리
                     },
