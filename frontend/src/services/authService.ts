@@ -314,45 +314,66 @@ class AuthService {
   }
 
   /**
-   * 사용자 데이터 조회 (호환성 개선)
+   * 사용자 데이터 조회 (호환성 개선 + 자동 로그인 지원)
    */
   getUserData(): UserProfile | null {
     if (typeof window !== 'undefined') {
       try {
-        // 1. 기본 키로 시도
-        let data = localStorage.getItem(this.USER_KEY);
+        // 1. 다양한 키에서 사용자 데이터 검색 (호환성 확장)
+        const possibleKeys = [
+          this.USER_KEY, // 기본 키
+          'user_data', 
+          'user_profile', 
+          'smap_user_profile',
+          'user',
+          'userData'
+        ];
 
-        // 2. 기본 키에 없으면 이전 버전 키들로 시도 (호환성)
-        if (!data) {
-          const legacyKeys = ['user_data', 'user_profile', 'smap_user_profile'];
-          for (const key of legacyKeys) {
-            data = localStorage.getItem(key);
-            if (data) {
-              console.log('[AUTH SERVICE] 이전 버전 키에서 사용자 데이터 발견:', key);
-              // 발견된 데이터를 새 키로 마이그레이션
-              localStorage.setItem(this.USER_KEY, data);
-              localStorage.removeItem(key);
-              console.log('[AUTH SERVICE] 사용자 데이터 마이그레이션 완료');
-              break;
+        let data = null;
+        let foundKey = null;
+
+        for (const key of possibleKeys) {
+          const keyData = localStorage.getItem(key);
+          if (keyData && keyData !== 'null') {
+            try {
+              const parsedData = JSON.parse(keyData);
+              if (parsedData?.mt_idx) {
+                data = keyData;
+                foundKey = key;
+                console.log(`[AUTH SERVICE] 사용자 데이터 발견 (키: ${key}):`, parsedData.mt_name);
+                break;
+              }
+            } catch (e) {
+              console.warn(`[AUTH SERVICE] 데이터 파싱 실패 (키: ${key}):`, e);
             }
           }
         }
 
         if (!data) {
-          console.log('[AUTH SERVICE] localStorage에 사용자 데이터 없음 (키:', this.USER_KEY, ')');
+          console.log('[AUTH SERVICE] localStorage에 사용자 데이터 없음');
           return null;
         }
 
         const parsedData = JSON.parse(data);
+        
+        // 2. 발견된 데이터를 표준 키로 마이그레이션 (foundKey가 기본 키가 아닌 경우)
+        if (foundKey !== this.USER_KEY) {
+          console.log(`[AUTH SERVICE] 사용자 데이터 마이그레이션: ${foundKey} → ${this.USER_KEY}`);
+          localStorage.setItem(this.USER_KEY, data);
+          // 이전 키는 제거하지 않음 (호환성 유지)
+        }
+
+        // 3. 자동 로그인을 위한 인증 상태 복원
+        if (parsedData?.mt_idx) {
+          localStorage.setItem('isLoggedIn', 'true');
+          sessionStorage.setItem('authToken', 'authenticated');
+          console.log('[AUTH SERVICE] 자동 로그인을 위한 인증 상태 복원 완료');
+        }
+
         console.log('[AUTH SERVICE] 사용자 데이터 조회 성공:', parsedData.mt_name, `(${parsedData.mt_idx})`);
         return parsedData;
       } catch (error) {
-        console.error('[AUTH SERVICE] 사용자 데이터 파싱 실패:', error);
-        console.error('[AUTH SERVICE] 원본 데이터:', localStorage.getItem(this.USER_KEY));
-
-        // 파싱 실패 시 데이터 삭제
-        localStorage.removeItem(this.USER_KEY);
-        console.log('[AUTH SERVICE] 손상된 사용자 데이터 삭제됨');
+        console.error('[AUTH SERVICE] 사용자 데이터 처리 실패:', error);
         return null;
       }
     }

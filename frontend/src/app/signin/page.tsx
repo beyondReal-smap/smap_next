@@ -38,6 +38,7 @@ enum HapticFeedbackType {
 }
 
 const SignInPage = () => {
+  const router = useRouter();
 
   // 플랫폼 감지 (컴포넌트 상단에 정의)
   const isAndroid = React.useMemo(() => {
@@ -621,7 +622,66 @@ const SignInPage = () => {
   const componentMountedRef = useRef(false);
   const preventRemountRef = useRef(false);
 
-  // 🔍 핸들러 모니터링 useEffect (최우선)
+  // 🔄 앱 시작 시 자동 로그인 확인 (최우선)
+  useEffect(() => {
+    const checkAutoLogin = async () => {
+      try {
+        console.log('🔍 [SIGNIN AUTO-LOGIN] 자동 로그인 확인 시작');
+        
+        // 로컬 스토리지에서 사용자 데이터 확인
+        const possibleUserKeys = [
+          'smap_user_data', 
+          'user', 
+          'userData', 
+          'user_data',
+          'smap_user_profile'
+        ];
+        
+        let savedUserData = null;
+        for (const key of possibleUserKeys) {
+          try {
+            const data = localStorage.getItem(key);
+            if (data && data !== 'null') {
+              const parsedData = JSON.parse(data);
+              if (parsedData?.mt_idx) {
+                savedUserData = parsedData;
+                console.log(`[SIGNIN AUTO-LOGIN] 로컬 스토리지에서 사용자 데이터 발견 (키: ${key}):`, parsedData.mt_name);
+                break;
+              }
+            }
+          } catch (e) {
+            console.warn(`[SIGNIN AUTO-LOGIN] 사용자 데이터 파싱 실패 (키: ${key}):`, e);
+          }
+        }
+        
+        if (savedUserData?.mt_idx) {
+          console.log('[SIGNIN AUTO-LOGIN] 🚀 자동 로그인 가능 - 홈페이지로 리다이렉트');
+          
+          // AuthService에 사용자 데이터 설정
+          const { default: authService } = await import('@/services/authService');
+          authService.setUserData(savedUserData);
+          authService.setLoggedIn(true);
+          
+          // 표준화된 키로 데이터 저장
+          localStorage.setItem('smap_user_data', JSON.stringify(savedUserData));
+          localStorage.setItem('isLoggedIn', 'true');
+          sessionStorage.setItem('authToken', 'authenticated');
+          
+          // 홈페이지로 리다이렉트
+          router.replace('/home');
+          return;
+        } else {
+          console.log('[SIGNIN AUTO-LOGIN] 자동 로그인 불가 - 로그인 페이지 유지');
+        }
+      } catch (error) {
+        console.error('[SIGNIN AUTO-LOGIN] 자동 로그인 확인 실패:', error);
+      }
+    };
+
+    checkAutoLogin();
+  }, [router]);
+
+  // 🔍 핸들러 모니터링 useEffect (두 번째 우선순위)
   useEffect(() => {
     console.log('🔍 [HANDLER MONITOR] 핸들러 모니터링 시작');
     

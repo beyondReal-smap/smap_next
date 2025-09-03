@@ -165,8 +165,8 @@ class FirebaseService:
                                 "apns-priority": "10",  # 최고 우선순위
                                 "apns-topic": Config.IOS_BUNDLE_ID,
                                 "apns-expiration": str(int(time.time()) + 2592000),  # 30일 유효 (백그라운드 푸시 최대 개선)
-                                "apns-collapse-id": f"ios_opt_{member_id}_{int(time.time())}",
-                                "apns-thread-id": "main_notifications"
+                                # "apns-collapse-id": 제거 - 각 알림을 개별 전송하여 배치 방지
+                                "apns-thread-id": f"notification_{member_id}_{int(time.time())}"  # 개별 스레드로 즉시 알림
                             },
                             payload=messaging.APNSPayload(
                                 aps=messaging.Aps(
@@ -178,7 +178,7 @@ class FirebaseService:
                                     ),
                                     mutable_content=True,
                                     content_available=True,  # 백그라운드 처리 활성화
-                                    thread_id="main_notifications",
+                                    thread_id=f"notification_{member_id}_{int(time.time())}",  # 개별 스레드 ID
                                     category="GENERAL_NOTIFICATION"
                                 ),
 
@@ -297,8 +297,8 @@ class FirebaseService:
                                 "apns-priority": "10",
                                 "apns-topic": Config.IOS_BUNDLE_ID,
                                 "apns-expiration": str(int(time.time()) + 2592000),  # 30일 유효 (백그라운드 푸시 최대 개선)
-                                "apns-collapse-id": f"reliable_push_{int(time.time())}",
-                                "apns-thread-id": "main_notifications"
+                                # "apns-collapse-id": 제거 - 각 알림을 개별 전송하여 배치 방지  
+                                "apns-thread-id": f"reliable_{member_id}_{int(time.time())}"  # 개별 스레드로 즉시 알림
                             },
                             payload=messaging.APNSPayload(
                                 aps=messaging.Aps(
@@ -310,7 +310,7 @@ class FirebaseService:
                                     ),
                                     mutable_content=True,
                                     content_available=True,  # iOS 백그라운드 처리를 위해 추가
-                                    thread_id="main_notifications",
+                                    thread_id=f"reliable_{member_id}_{int(time.time())}",  # 개별 스레드 ID
                                     category="GENERAL_NOTIFICATION"
                                 )
                             )
@@ -517,8 +517,8 @@ class FirebaseService:
                         "apns-priority": "10",  # 최고 우선순위로 설정
                         "apns-topic": Config.IOS_BUNDLE_ID,  # iOS 앱 번들 ID
                         "apns-expiration": str(int(time.time()) + 2592000),  # 30일 유효 (백그라운드 푸시 최대 개선)
-                        "apns-collapse-id": f"bg_push_{int(time.time())}",  # 백그라운드 푸시 그룹화 ID
-                        "apns-thread-id": "background"  # 백그라운드 스레드
+                        # "apns-collapse-id": 제거 - 각 알림을 개별 전송하여 배치 방지
+                        "apns-thread-id": f"background_{int(time.time())}"  # 개별 백그라운드 스레드로 즉시 알림
                     },
                     payload=messaging.APNSPayload(
                         aps=messaging.Aps(
@@ -614,8 +614,8 @@ class FirebaseService:
                         "apns-priority": "10",  # Silent 푸시라도 최고 우선순위로 설정하여 무시 방지
                         "apns-topic": Config.IOS_BUNDLE_ID,  # 올바른 번들 ID 설정
                         "apns-expiration": str(int(time.time()) + 2592000),  # 30일 유효 (백그라운드 푸시 최대 개선)
-                        "apns-collapse-id": f"silent_{reason}_{int(time.time())}",  # Silent 푸시 그룹화 ID
-                        "apns-thread-id": "silent"  # Silent 스레드
+                        # "apns-collapse-id": 제거 - 각 알림을 개별 전송하여 배치 방지
+                        "apns-thread-id": f"silent_{reason}_{int(time.time())}"  # 개별 Silent 스레드로 즉시 처리
                     },
                     payload=messaging.APNSPayload(
                         aps=messaging.Aps(

@@ -331,37 +331,143 @@ export default function ClientLayout({
   const { preloadNaverMaps, preloadGoogleMaps } = useMapPreloader();
   const { handleAppResumed } = useAndroidPermissionChecker();
 
-  // 로컬 스토리지에서 로그인 상태 확인
+  // 로컬 스토리지에서 로그인 상태 확인 및 자동 로그인 처리
   useEffect(() => {
-    try {
-      const token = localStorage.getItem('smap_auth_token');
-      const userData = localStorage.getItem('smap_user_data');
-      const loginTime = localStorage.getItem('smap_login_time');
-      
-      // 로그인 시간 유효성 확인 (7일)
-      let isValidSession = false;
-      if (token && userData && loginTime) {
-        const currentTime = Date.now();
-        const timeSinceLogin = currentTime - parseInt(loginTime, 10);
-        const sessionDuration = 7 * 24 * 60 * 60 * 1000; // 7일
+    const performAutoLogin = async () => {
+      try {
+        console.log('🔍 [AUTO-LOGIN] 자동 로그인 검사 시작');
         
-        if (timeSinceLogin < sessionDuration) {
-          isValidSession = true;
-          console.log('[ClientLayout] 유효한 로그인 세션 발견, 자동 로그인 유지');
-        } else {
-          console.log('[ClientLayout] 로그인 세션 만료, 데이터 정리');
-          localStorage.removeItem('smap_auth_token');
-          localStorage.removeItem('smap_user_data');
-          localStorage.removeItem('smap_login_time');
+        // 다양한 키에서 사용자 데이터 확인 (호환성 개선)
+        const possibleUserKeys = [
+          'smap_user_data', 
+          'user', 
+          'userData', 
+          'user_data',
+          'smap_user_profile'
+        ];
+        
+        const possibleTokenKeys = [
+          'smap_auth_token',
+          'authToken', 
+          'auth_token',
+          'token'
+        ];
+        
+        const possibleTimeKeys = [
+          'smap_login_time',
+          'loginTime',
+          'login_time'
+        ];
+        
+        let userData = null;
+        let token = null;
+        let loginTime = null;
+        
+        // 사용자 데이터 찾기
+        for (const key of possibleUserKeys) {
+          const data = localStorage.getItem(key);
+          if (data) {
+            try {
+              userData = JSON.parse(data);
+              if (userData?.mt_idx) {
+                console.log(`✅ [AUTO-LOGIN] 사용자 데이터 발견 (키: ${key}):`, userData.mt_name);
+                break;
+              }
+            } catch (e) {
+              console.warn(`⚠️ [AUTO-LOGIN] 사용자 데이터 파싱 실패 (키: ${key}):`, e);
+            }
+          }
         }
+        
+        // 토큰 찾기
+        for (const key of possibleTokenKeys) {
+          const tokenData = localStorage.getItem(key);
+          if (tokenData && tokenData !== 'null' && tokenData !== '') {
+            token = tokenData;
+            console.log(`✅ [AUTO-LOGIN] 인증 토큰 발견 (키: ${key})`);
+            break;
+          }
+        }
+        
+        // 로그인 시간 찾기
+        for (const key of possibleTimeKeys) {
+          const timeData = localStorage.getItem(key);
+          if (timeData && timeData !== 'null' && timeData !== '') {
+            loginTime = timeData;
+            console.log(`✅ [AUTO-LOGIN] 로그인 시간 발견 (키: ${key})`);
+            break;
+          }
+        }
+        
+        // mt_idx만 있어도 자동 로그인 시도 (최소 요구사항)
+        if (userData?.mt_idx) {
+          console.log('🔄 [AUTO-LOGIN] mt_idx 기반 자동 로그인 시작:', userData.mt_idx);
+          
+          // 로그인 시간 유효성 확인 (7일)
+          let isValidSession = true; // 기본값 true (시간 정보가 없어도 허용)
+          
+          if (loginTime) {
+            const currentTime = Date.now();
+            const timeSinceLogin = currentTime - parseInt(loginTime, 10);
+            const sessionDuration = 7 * 24 * 60 * 60 * 1000; // 7일
+            
+            if (timeSinceLogin >= sessionDuration) {
+              isValidSession = false;
+              console.log('⏰ [AUTO-LOGIN] 로그인 세션 만료 (7일 초과)');
+            } else {
+              console.log(`⏰ [AUTO-LOGIN] 로그인 세션 유효 (${Math.floor(timeSinceLogin / (1000 * 60 * 60))}시간 경과)`);
+            }
+          } else {
+            console.log('⏰ [AUTO-LOGIN] 로그인 시간 정보 없음 - 자동 로그인 허용');
+          }
+          
+          if (isValidSession) {
+            // AuthService에 사용자 데이터 설정
+            if (typeof window !== 'undefined') {
+              const authService = (await import('@/services/authService')).default;
+              authService.setUserData(userData);
+              authService.setLoggedIn(true);
+              
+              // 표준화된 키로 데이터 저장
+              localStorage.setItem('smap_user_data', JSON.stringify(userData));
+              localStorage.setItem('smap_auth_token', token || 'auto_login_token');
+              localStorage.setItem('smap_login_time', loginTime || Date.now().toString());
+              localStorage.setItem('isLoggedIn', 'true');
+              sessionStorage.setItem('authToken', 'authenticated');
+              
+              console.log('✅ [AUTO-LOGIN] 자동 로그인 성공 - 인증 상태 복원 완료');
+              setIsLoggedIn(true);
+              
+              // 현재 페이지가 로그인/회원가입 페이지면 홈으로 리다이렉트
+              if (pathname === '/signin' || pathname === '/register' || pathname === '/') {
+                console.log('🏠 [AUTO-LOGIN] 홈페이지로 자동 리다이렉트');
+                window.location.href = '/home';
+              }
+              
+              return;
+            }
+          } else {
+            // 세션 만료 시 데이터 정리
+            console.log('🧹 [AUTO-LOGIN] 만료된 세션 데이터 정리');
+            possibleUserKeys.concat(possibleTokenKeys, possibleTimeKeys).forEach(key => {
+              localStorage.removeItem(key);
+            });
+            localStorage.removeItem('isLoggedIn');
+            sessionStorage.removeItem('authToken');
+          }
+        } else {
+          console.log('❌ [AUTO-LOGIN] 유효한 사용자 데이터 없음 (mt_idx 필요)');
+        }
+        
+        setIsLoggedIn(false);
+      } catch (error) {
+        console.error('❌ [AUTO-LOGIN] 자동 로그인 처리 실패:', error);
+        setIsLoggedIn(false);
       }
-      
-      setIsLoggedIn(isValidSession);
-    } catch (error) {
-      console.warn('[ClientLayout] 로컬 스토리지 접근 실패:', error);
-      setIsLoggedIn(false);
-    }
-  }, []);
+    };
+
+    performAutoLogin();
+  }, [pathname]);
   
   // 🔥 앱 시작 시 권한 상태 초기화
   useEffect(() => {

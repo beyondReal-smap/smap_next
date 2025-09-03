@@ -1296,9 +1296,63 @@ export default function HomePage() {
       userName: user?.mt_name
     });
 
-    // 로그인되지 않은 경우에만 signin으로 리다이렉트
+    // 로그인되지 않은 경우 로컬 스토리지 자동 로그인 시도
     if (!isLoggedIn && !authLoading) {
-      console.log('[HOME] ❌ 로그인되지 않음 - signin 페이지로 리다이렉트');
+      console.log('[HOME] ❌ 로그인되지 않음 - 로컬 스토리지 자동 로그인 시도');
+      
+      // 로컬 스토리지에서 사용자 데이터 확인
+      const possibleUserKeys = [
+        'smap_user_data', 
+        'user', 
+        'userData', 
+        'user_data',
+        'smap_user_profile'
+      ];
+      
+      let savedUserData = null;
+      for (const key of possibleUserKeys) {
+        try {
+          const data = localStorage.getItem(key);
+          if (data && data !== 'null') {
+            const parsedData = JSON.parse(data);
+            if (parsedData?.mt_idx) {
+              savedUserData = parsedData;
+              console.log(`[HOME] 로컬 스토리지에서 사용자 데이터 발견 (키: ${key}):`, parsedData.mt_name);
+              break;
+            }
+          }
+        } catch (e) {
+          console.warn(`[HOME] 사용자 데이터 파싱 실패 (키: ${key}):`, e);
+        }
+      }
+      
+      if (savedUserData?.mt_idx) {
+        console.log('[HOME] 🔄 로컬 스토리지 기반 자동 로그인 실행');
+        
+        try {
+          // AuthService 동적 import
+          const { default: authService } = await import('@/services/authService');
+          authService.setUserData(savedUserData);
+          authService.setLoggedIn(true);
+          
+          // 표준화된 키로 데이터 저장
+          localStorage.setItem('smap_user_data', JSON.stringify(savedUserData));
+          localStorage.setItem('isLoggedIn', 'true');
+          sessionStorage.setItem('authToken', 'authenticated');
+          
+          console.log('[HOME] ✅ 자동 로그인 성공 - 페이지 새로고침');
+          
+          // 상태 업데이트를 위해 페이지 새로고침
+          setTimeout(() => {
+            window.location.reload();
+          }, 100);
+          return;
+        } catch (error) {
+          console.error('[HOME] 자동 로그인 실패:', error);
+        }
+      }
+      
+      console.log('[HOME] 로컬 스토리지에 유효한 사용자 데이터 없음 - signin 페이지로 리다이렉트');
       router.replace('/signin');
       return;
     }

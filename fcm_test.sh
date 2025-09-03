@@ -31,11 +31,22 @@ echo -e "${BLUE}1️⃣ [${STEP1_TIME}] 현재 FCM 토큰 상태 확인...${NC}"
 TOKEN_STATUS=$(curl -s "https://api3.smap.site/api/v1/member-fcm-token/status/${USER_ID}")
 echo "$TOKEN_STATUS" | jq .
 
-# 토큰 추출
+# 토큰 추출 (미리보기와 전체 토큰 모두)
 CURRENT_TOKEN=$(echo "$TOKEN_STATUS" | jq -r '.token_preview // empty')
+FULL_TOKEN=$(echo "$TOKEN_STATUS" | jq -r '.full_token // empty')
+
 if [ -n "$CURRENT_TOKEN" ]; then
     STEP1_SUCCESS_TIME=$(get_timestamp)
     echo -e "${GREEN}✅ [${STEP1_SUCCESS_TIME}] 토큰 발견: ${CURRENT_TOKEN}${NC}"
+    
+    # 전체 토큰 확인 (FCM 발송용)
+    if [ -n "$FULL_TOKEN" ] && [ "$FULL_TOKEN" != "null" ]; then
+        echo -e "${GREEN}📋 [전체 토큰] 발송용 토큰 준비됨: ${FULL_TOKEN:0:30}...${NC}"
+        USED_TOKEN="$FULL_TOKEN"
+    else
+        echo -e "${YELLOW}⚠️  [전체 토큰] 전체 토큰을 가져올 수 없음 - 미리보기 토큰으로 시도${NC}"
+        USED_TOKEN="$CURRENT_TOKEN"
+    fi
 
     # FCM 토큰 상태 확인 (전체 토큰 검증은 API 제한으로 미리보기만 확인)
     VALIDATE_TIME=$(get_timestamp)
@@ -154,11 +165,31 @@ echo ""
 STEP3_TIME=$(get_timestamp)
 echo -e "${BLUE}3️⃣ [${STEP3_TIME}] FCM 토큰 상태 상세 확인...${NC}"
 echo -e "${YELLOW}토큰 검증 요청:${NC}"
-# 실제 FCM 토큰을 가져와서 전송 (임시로 테스트용 토큰 사용)
-TEST_FCM_TOKEN="fWLYBJYTH06ejEjCYVb8TestToken"
+
+# 실제 FCM 토큰을 DB에서 가져오기
+echo -e "${CYAN}📡 [실제 토큰 조회] DB에서 현재 FCM 토큰 가져오는 중...${NC}"
+REAL_TOKEN_DATA=$(curl -s -X GET "https://api3.smap.site/api/v1/member-fcm-token/status/${USER_ID}")
+
+if [ $? -eq 0 ] && [ -n "$REAL_TOKEN_DATA" ]; then
+    # 실제 토큰 추출
+    REAL_FCM_TOKEN=$(echo "$REAL_TOKEN_DATA" | jq -r '.full_token // .token_preview // ""')
+    
+    if [ -n "$REAL_FCM_TOKEN" ] && [ "$REAL_FCM_TOKEN" != "null" ] && [ "$REAL_FCM_TOKEN" != "" ]; then
+        echo -e "${GREEN}✅ [실제 토큰] DB에서 토큰 가져오기 성공: ${REAL_FCM_TOKEN:0:30}...${NC}"
+        USED_TOKEN="$REAL_FCM_TOKEN"
+    else
+        echo -e "${RED}❌ [실제 토큰] DB에서 유효한 토큰을 찾을 수 없음${NC}"
+        echo -e "${YELLOW}⚠️  [대체] 테스트를 건너뛰거나 새로운 토큰 등록이 필요합니다${NC}"
+        exit 1
+    fi
+else
+    echo -e "${RED}❌ [실제 토큰] 토큰 조회 API 호출 실패${NC}"
+    exit 1
+fi
+
 TOKEN_CHECK=$(curl -s -X POST "https://api3.smap.site/api/v1/member-fcm-token/background-check" \
   -H "Content-Type: application/json" \
-  -d "{\"mt_idx\": ${USER_ID}, \"fcm_token\": \"${TEST_FCM_TOKEN}\"}")
+  -d "{\"mt_idx\": ${USER_ID}, \"fcm_token\": \"${USED_TOKEN}\"}")
 
 if [ $? -eq 0 ] && [ -n "$TOKEN_CHECK" ]; then
     echo "$TOKEN_CHECK" | jq .
@@ -279,3 +310,33 @@ echo "   • APNs 만료 시간: 2시간 → 30일로 최대 연장 ✅"
 echo "   • 백그라운드 모드: remote-notification 활성화 ✅"
 echo ""
 echo "📖 상세 가이드: ios_background_push_fix_guide.md 참조"
+echo ""
+echo "⚡ 배치 처리 문제 해결:"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "🔧 적용된 개선사항:"
+echo "   • APNs collapse-id 제거 → 개별 알림 전송 ✅"
+echo "   • thread-id 개별화 → 각 알림 고유 스레드 ✅"
+echo "   • 즉시 전달 최적화 → 백그라운드 배치 방지 ✅"
+echo ""
+echo "🧪 테스트 방법:"
+echo "   1. 앱을 백그라운드로 전환"
+echo "   2. 5분 간격으로 3번 푸시 테스트 실행"
+echo "   3. 각각 즉시 수신되는지 확인 (배치 안됨)"
+echo ""
+echo "📋 상세 내용: ios_push_batching_fix_guide.md 참조"
+echo ""
+echo "🚨 테스트 토큰 문제 해결:"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "❌ 문제: DB에 저장된 가짜 테스트 토큰 (fWLYBJYTH06ejEjCYVb8TestToken)"
+echo "✅ 해결: iOS 앱 재설치 → 로그인 → 실제 FCM 토큰 자동 등록"
+echo ""
+echo "📱 즉시 해결 방법:"
+echo "   1. iOS에서 SMAP 앱 완전 삭제"
+echo "   2. App Store에서 재설치"
+echo "   3. 로그인 진행"
+echo "   4. 실제 FCM 토큰 자동 등록됨"
+echo "   5. 다시 FCM 테스트 실행"
+echo ""
+echo "📋 상세 가이드: fix_test_token_issue.md 참조"
