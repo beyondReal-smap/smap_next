@@ -573,7 +573,6 @@ const SignInPage = () => {
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [showSplash, setShowSplash] = useState(true);
-  const router = useRouter();
   const searchParams = useSearchParams();
   // 안전한 useAuth 접근
   let authContextData;
@@ -658,17 +657,19 @@ const SignInPage = () => {
           console.log('[SIGNIN AUTO-LOGIN] 🚀 자동 로그인 가능 - 홈페이지로 리다이렉트');
           
           // AuthService에 사용자 데이터 설정
-          const { default: authService } = await import('@/services/authService');
-          authService.setUserData(savedUserData);
-          authService.setLoggedIn(true);
-          
-          // 표준화된 키로 데이터 저장
-          localStorage.setItem('smap_user_data', JSON.stringify(savedUserData));
-          localStorage.setItem('isLoggedIn', 'true');
-          sessionStorage.setItem('authToken', 'authenticated');
-          
-          // 홈페이지로 리다이렉트
-          router.replace('/home');
+          import('@/services/authService').then(({ default: authService }) => {
+            authService.setUserData(savedUserData);
+            
+            // 표준화된 키로 데이터 저장
+            localStorage.setItem('smap_user_data', JSON.stringify(savedUserData));
+            localStorage.setItem('isLoggedIn', 'true');
+            sessionStorage.setItem('authToken', 'authenticated');
+            
+            // 홈페이지로 리다이렉트
+            router.replace('/home');
+          }).catch(error => {
+            console.error('[SIGNIN AUTO-LOGIN] AuthService import 실패:', error);
+          });
           return;
         } else {
           console.log('[SIGNIN AUTO-LOGIN] 자동 로그인 불가 - 로그인 페이지 유지');

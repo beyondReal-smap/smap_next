@@ -424,25 +424,28 @@ export default function ClientLayout({
           if (isValidSession) {
             // AuthService에 사용자 데이터 설정
             if (typeof window !== 'undefined') {
-              const authService = (await import('@/services/authService')).default;
-              authService.setUserData(userData);
-              authService.setLoggedIn(true);
-              
-              // 표준화된 키로 데이터 저장
-              localStorage.setItem('smap_user_data', JSON.stringify(userData));
-              localStorage.setItem('smap_auth_token', token || 'auto_login_token');
-              localStorage.setItem('smap_login_time', loginTime || Date.now().toString());
-              localStorage.setItem('isLoggedIn', 'true');
-              sessionStorage.setItem('authToken', 'authenticated');
-              
-              console.log('✅ [AUTO-LOGIN] 자동 로그인 성공 - 인증 상태 복원 완료');
-              setIsLoggedIn(true);
-              
-              // 현재 페이지가 로그인/회원가입 페이지면 홈으로 리다이렉트
-              if (pathname === '/signin' || pathname === '/register' || pathname === '/') {
-                console.log('🏠 [AUTO-LOGIN] 홈페이지로 자동 리다이렉트');
-                window.location.href = '/home';
-              }
+              import('@/services/authService').then(({ default: authService }) => {
+                authService.setUserData(userData);
+                
+                // 표준화된 키로 데이터 저장
+                localStorage.setItem('smap_user_data', JSON.stringify(userData));
+                localStorage.setItem('smap_auth_token', token || 'auto_login_token');
+                localStorage.setItem('smap_login_time', loginTime || Date.now().toString());
+                localStorage.setItem('isLoggedIn', 'true');
+                sessionStorage.setItem('authToken', 'authenticated');
+                
+                console.log('✅ [AUTO-LOGIN] 자동 로그인 성공 - 인증 상태 복원 완료');
+                setIsLoggedIn(true);
+                
+                // 현재 페이지가 로그인/회원가입 페이지면 홈으로 리다이렉트
+                if (pathname === '/signin' || pathname === '/register' || pathname === '/') {
+                  console.log('🏠 [AUTO-LOGIN] 홈페이지로 자동 리다이렉트');
+                  window.location.href = '/home';
+                }
+              }).catch(error => {
+                console.error('❌ [AUTO-LOGIN] AuthService import 실패:', error);
+                setIsLoggedIn(false);
+              });
               
               return;
             }

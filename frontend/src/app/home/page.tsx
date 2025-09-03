@@ -1330,22 +1330,24 @@ export default function HomePage() {
         console.log('[HOME] 🔄 로컬 스토리지 기반 자동 로그인 실행');
         
         try {
-          // AuthService 동적 import
-          const { default: authService } = await import('@/services/authService');
-          authService.setUserData(savedUserData);
-          authService.setLoggedIn(true);
-          
-          // 표준화된 키로 데이터 저장
-          localStorage.setItem('smap_user_data', JSON.stringify(savedUserData));
-          localStorage.setItem('isLoggedIn', 'true');
-          sessionStorage.setItem('authToken', 'authenticated');
-          
-          console.log('[HOME] ✅ 자동 로그인 성공 - 페이지 새로고침');
-          
-          // 상태 업데이트를 위해 페이지 새로고침
-          setTimeout(() => {
-            window.location.reload();
-          }, 100);
+          // AuthService 정적 import 사용
+          import('@/services/authService').then(({ default: authService }) => {
+            authService.setUserData(savedUserData);
+            
+            // 표준화된 키로 데이터 저장
+            localStorage.setItem('smap_user_data', JSON.stringify(savedUserData));
+            localStorage.setItem('isLoggedIn', 'true');
+            sessionStorage.setItem('authToken', 'authenticated');
+            
+            console.log('[HOME] ✅ 자동 로그인 성공 - 페이지 새로고침');
+            
+            // 상태 업데이트를 위해 페이지 새로고침
+            setTimeout(() => {
+              window.location.reload();
+            }, 100);
+          }).catch(error => {
+            console.error('[HOME] AuthService import 실패:', error);
+          });
           return;
         } catch (error) {
           console.error('[HOME] 자동 로그인 실패:', error);

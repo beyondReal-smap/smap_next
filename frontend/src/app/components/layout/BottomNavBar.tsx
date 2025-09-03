@@ -120,19 +120,19 @@ export default function BottomNavBar() {
       className="fixed left-0 right-0 bg-white border-t shadow-xl z-[999] rounded-t-2xl m-0 p-0 bottom-navigation-main"
       id="bottom-navigation-bar"
       style={{
-        position: 'fixed !important',
-        bottom: '0px !important',
-        left: '0px !important',
-        right: '0px !important',
+        position: 'fixed' as const,
+        bottom: '0px',
+        left: '0px',
+        right: '0px',
         zIndex: '999999 !important',
         width: '100% !important',
         minHeight: '72px !important',
         display: 'block !important',
-        visibility: 'visible !important',
+        visibility: 'visible' as const,
         opacity: '1 !important',
         transform: 'none !important',
         WebkitTransform: 'none !important',
-        pointerEvents: 'auto !important',
+        pointerEvents: 'auto' as const,
         backgroundColor: 'white !important',
         borderTop: '1px solid #e5e7eb !important',
         boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.1) !important',
@@ -141,11 +141,11 @@ export default function BottomNavBar() {
         borderBottomLeftRadius: '0px !important',
         borderBottomRightRadius: '0px !important',
         overflow: 'hidden !important',
-        touchAction: 'manipulation !important',
-        userSelect: 'none !important',
-        WebkitUserSelect: 'none !important',
-        WebkitTouchCallout: 'none !important',
-        WebkitTapHighlightColor: 'transparent !important'
+        touchAction: 'manipulation' as const,
+        userSelect: 'none' as const,
+        WebkitUserSelect: 'none' as any,
+        WebkitTouchCallout: 'none' as any,
+        WebkitTapHighlightColor: 'transparent' as any
       }}
     >
       <nav 
@@ -173,7 +173,7 @@ export default function BottomNavBar() {
                 padding: '0 !important',
                 height: '100% !important',
                 display: 'flex !important',
-                flexDirection: 'column !important',
+                flexDirection: 'column' as const,
                 alignItems: 'center !important',
                 justifyContent: 'center !important'
               }}
@@ -184,7 +184,7 @@ export default function BottomNavBar() {
                     margin: '0 !important',
                     padding: '0 !important',
                     display: 'flex !important',
-                    flexDirection: 'column !important',
+                    flexDirection: 'column' as const,
                     alignItems: 'center !important',
                     justifyContent: 'center !important',
                     gap: '2px !important'
