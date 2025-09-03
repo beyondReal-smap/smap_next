@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FCM 푸시 테스트 - 웹브라우저</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input[type="text"], input[type="number"], textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        input[type="text"]:focus, input[type="number"]:focus, textarea:focus {
+            border-color: #007AFF;
+            outline: none;
+        }
+        button {
+            background-color: #007AFF;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 14px;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .loading {
+            text-align: center;
+            color: #666;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+        }
+        .button-group button {
+            flex: 1;
+        }
+        .api-info {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border-left: 4px solid #007AFF;
+        }
+        .json-output {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            padding: 15px;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔔 FCM 푸시 테스트</h1>
+        
+        <div class="api-info">
+            <strong>📍 API 엔드포인트:</strong><br>
+            • 토큰 상태: <code>GET https://api3.smap.site/api/v1/member-fcm-token/status/{USER_ID}</code><br>
+            • FCM 발송: <code>POST https://api3.smap.site/api/v1/fcm_sendone/</code>
+        </div>
+
+        <div class="form-group">
+            <label for="userId">사용자 ID:</label>
+            <input type="number" id="userId" value="1186" placeholder="예: 1186">
+        </div>
+
+        <div class="form-group">
+            <label for="title">푸시 제목:</label>
+            <input type="text" id="title" value="🔔 FCM 테스트" placeholder="푸시 알림 제목">
+        </div>
+
+        <div class="form-group">
+            <label for="message">푸시 메시지:</label>
+            <textarea id="message" rows="3" placeholder="푸시 알림 내용"></textarea>
+        </div>
+
+        <div class="button-group">
+            <button onclick="checkTokenStatus()">1️⃣ FCM 토큰 상태 확인</button>
+            <button onclick="sendFCMTest()">2️⃣ FCM 푸시 발송</button>
+        </div>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        // 현재 시간으로 메시지 초기화
+        document.getElementById('message').value = `FCM 테스트 메시지 - ${new Date().toLocaleString('ko-KR')}`;
+
+        function showResult(content, type) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = `result ${type}`;
+            resultDiv.textContent = content;
+        }
+
+        function showLoading(message) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = 'result loading';
+            resultDiv.textContent = `⏳ ${message}`;
+        }
+
+        async function checkTokenStatus() {
+            const userId = document.getElementById('userId').value;
+            
+            if (!userId) {
+                showResult('❌ 사용자 ID를 입력해주세요.', 'error');
+                return;
+            }
+
+            showLoading('FCM 토큰 상태 확인 중...');
+
+            try {
+                const response = await fetch(`https://api3.smap.site/api/v1/member-fcm-token/status/${userId}`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    let resultText = `✅ FCM 토큰 상태 확인 성공\n\n`;
+                    resultText += `📊 토큰 정보:\n`;
+                    resultText += `  • 토큰 미리보기: ${data.token_preview || '없음'}\n`;
+                    resultText += `  • 토큰 길이: ${data.token_length || 0}자\n`;
+                    resultText += `  • 만료 상태: ${data.is_token_expired ? '만료됨' : '정상'}\n`;
+                    resultText += `  • 곧 만료: ${data.is_token_near_expiry ? '예' : '아니오'}\n`;
+                    resultText += `  • 마지막 업데이트: ${data.token_updated_at || '알 수 없음'}\n\n`;
+                    resultText += `🔍 상세 응답:\n${JSON.stringify(data, null, 2)}`;
+                    
+                    showResult(resultText, 'success');
+                } else {
+                    showResult(`❌ API 호출 실패\n상태 코드: ${response.status}\n응답: ${JSON.stringify(data, null, 2)}`, 'error');
+                }
+            } catch (error) {
+                showResult(`❌ 네트워크 오류\n${error.message}`, 'error');
+            }
+        }
+
+        async function sendFCMTest() {
+            const userId = document.getElementById('userId').value;
+            const title = document.getElementById('title').value;
+            const message = document.getElementById('message').value;
+            
+            if (!userId || !title || !message) {
+                showResult('❌ 모든 필드를 입력해주세요.', 'error');
+                return;
+            }
+
+            showLoading('FCM 푸시 발송 중...');
+
+            const fcmData = {
+                plt_type: "TEST",
+                sst_idx: "0", 
+                plt_condition: "웹브라우저 테스트",
+                plt_memo: message,
+                mt_idx: parseInt(userId),
+                plt_title: title,
+                plt_content: message
+            };
+
+            try {
+                const response = await fetch('https://api3.smap.site/api/v1/fcm_sendone/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(fcmData)
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    let resultText = `✅ FCM 푸시 발송 성공!\n\n`;
+                    resultText += `📤 발송 정보:\n`;
+                    resultText += `  • 사용자 ID: ${userId}\n`;
+                    resultText += `  • 제목: ${title}\n`;
+                    resultText += `  • 메시지: ${message}\n\n`;
+                    resultText += `📱 기기에서 푸시 알림을 확인하세요!\n\n`;
+                    resultText += `🔍 서버 응답:\n${JSON.stringify(data, null, 2)}`;
+                    
+                    showResult(resultText, 'success');
+                } else {
+                    let resultText = `❌ FCM 푸시 발송 실패\n\n`;
+                    resultText += `상태 코드: ${response.status}\n`;
+                    resultText += `응답: ${JSON.stringify(data, null, 2)}`;
+                    
+                    showResult(resultText, 'error');
+                }
+            } catch (error) {
+                showResult(`❌ 네트워크 오류\n${error.message}`, 'error');
+            }
+        }
+
+        // 페이지 로드 시 안내 메시지
+        showResult('👋 FCM 푸시 테스트 도구입니다.\n\n1️⃣ 먼저 "FCM 토큰 상태 확인"을 클릭하여 토큰 상태를 확인하세요.\n2️⃣ 그 다음 "FCM 푸시 발송"을 클릭하여 실제 푸시를 테스트하세요.\n\n📱 iOS 기기에서 SMAP 앱이 로그인된 상태여야 합니다.', 'info');
+    </script>
+</body>
+</html>
