@@ -1069,14 +1069,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
         let request = UNNotificationRequest(identifier: "fcm_message_\(Date().timeIntervalSince1970)", content: content, trigger: nil)
 
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error = error {
-                print("❌ [FCM-LOCAL] FCM 메시지를 로컬 알림으로 표시 실패: \(error.localizedDescription)")
-            } else {
-                print("✅ [FCM-LOCAL] FCM 메시지를 로컬 알림으로 표시 성공")
-                print("🔔 [FCM-LOCAL] Notification Center에서 FCM 메시지를 확인하세요")
-            }
-        }
+        // 중복 알림 방지 - FCM 로컬 알림 생성 비활성화
+        print("🚫 [FCM-LOCAL] 중복 방지를 위해 FCM 로컬 알림 생성 건너뛰기")
+        print("📝 [FCM-LOCAL] 원본 FCM 알림만 사용하여 중복 방지")
     }
 
     // MARK: - 🔄 FCM 토큰 업데이트 핸들러 (백그라운드 제어 포함)
@@ -2646,16 +2641,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                                           content: content,
                                           trigger: nil)
 
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error = error {
-                print("❌ [Notification Test] 로컬 알림 표시 실패: \(error.localizedDescription)")
-                print("💡 [Notification Test] 이는 FCM 푸시 권한 문제일 수 있습니다")
-            } else {
-                print("✅ [Notification Test] 로컬 알림 표시 성공")
-                print("💡 [Notification Test] 로컬 알림이 표시되면 FCM 권한은 정상입니다")
-                print("💡 [Notification Test] 서버 FCM 메시지가 표시되지 않는다면 토큰 문제가 있을 수 있습니다")
-            }
-        }
+        // 중복 알림 방지 - 테스트 로컬 알림 생성 비활성화
+        print("🚫 [Notification Test] 중복 방지를 위해 테스트 로컬 알림 생성 건너뛰기")
+        print("📝 [Notification Test] 원본 FCM 알림만 사용하여 권한 테스트")
     }
 
     // FCM 푸시 알림 강제 표시 메소드
@@ -2937,13 +2925,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     private func monitorFCMServiceConnection() {
         print("🔗 [FCM Monitor] FCM 서비스 연결 상태 모니터링 시작")
 
-        let monitorTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] timer in
+        let monitorTimer = Timer.scheduledTimer(withTimeInterval: 300.0, repeats: true) { [weak self] timer in
             guard let self = self else {
                 timer.invalidate()
                 return
             }
+            
+            // 백그라운드에서는 모니터링 건너뛰기 (배터리 절약)
+            if self.isAppInBackground {
+                print("💤 [FCM Monitor] 백그라운드 상태 - 모니터링 건너뛰기 (배터리 절약)")
+                return
+            }
 
-            // FCM 서비스 상태 주기적 확인
+            // FCM 서비스 상태 주기적 확인 (포그라운드에서만)
             Messaging.messaging().token { token, error in
                 if let error = error {
                     print("⚠️ [FCM Monitor] FCM 서비스 연결 오류: \(error.localizedDescription)")
@@ -2974,7 +2968,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "fcm_monitor_start_time")
         UserDefaults.standard.synchronize()
 
-        print("✅ [FCM Monitor] FCM 서비스 모니터링 시작됨 (30초 간격)")
+        print("✅ [FCM Monitor] FCM 서비스 모니터링 시작됨 (5분 간격)")
     }
 
     // 로컬 알림 표시 테스트 메소드 (FCM 수신 시 강제 표시용)
@@ -5031,21 +5025,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         content.sound = .default
         content.badge = 1
         
-        let request = UNNotificationRequest(
-            identifier: messageId,
-            content: content,
-            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 0.1, repeats: false)
-        )
+        // 중복 알림 방지 - 백그라운드 로컬 알림 생성 비활성화
+        print("🚫 [Local Notification] 중복 방지를 위해 백그라운드 로컬 알림 생성 건너뛰기")
+        print("📝 [Local Notification] 메시지 ID: \(messageId) - 원본 FCM 알림만 사용")
         
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error = error {
-                print("❌ [Local Notification] 표시 실패: \(error.localizedDescription)")
-            } else {
-                print("✅ [Local Notification] 백그라운드 푸시 로컬 알림 표시 성공")
-                self.lastProcessedFCMMessageId = messageId
-                self.lastFCMNotificationTime = Date()
-            }
-        }
+        // 중복 방지를 위한 메시지 ID 추적은 유지
+        self.lastProcessedFCMMessageId = messageId
+        self.lastFCMNotificationTime = Date()
     }
 
 
