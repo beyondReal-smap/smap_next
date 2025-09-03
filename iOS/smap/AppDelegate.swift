@@ -8808,19 +8808,32 @@ extension AppDelegate {
         
         print("🌙 [FCM BACKGROUND] 백그라운드 토큰 관리 준비 시작")
         
-        // 백그라운드 작업 시작
+        // 백그라운드 작업 시작 (25초 제한으로 안전하게)
         backgroundTaskIdentifier = UIApplication.shared.beginBackgroundTask(withName: "FCMTokenBackgroundTask") {
             print("⏰ [FCM BACKGROUND] 백그라운드 작업 시간 만료")
             UIApplication.shared.endBackgroundTask(self.backgroundTaskIdentifier)
             self.backgroundTaskIdentifier = .invalid
         }
         
+        // 25초 후 자동 종료 (iOS 30초 제한 전에 안전하게)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 25.0) { [weak self] in
+            self?.stopBackgroundKeepAlive()
+        }
+        
         // 백그라운드에서 토큰 갱신 타이머 시작
         startBackgroundTokenRefreshTimer()
         
-        // 현재 토큰 상태를 서버에 한 번 더 전송
-        if let currentToken = currentFCMToken {
-            updateFCMTokenToServerSilently(token: currentToken, reason: "background_entry")
+        // 토큰 만료일 확인 후 필요한 경우에만 서버 전송
+        checkTokenExpiryDateFromServer { [weak self] isExpired in
+            guard let self = self, isExpired else {
+                print("✅ [Background] 토큰 아직 유효함 - 백그라운드 진입 시 전송 건너뛰기")
+                return
+            }
+            
+            print("⚠️ [Background] 토큰 만료됨 - 백그라운드 진입 시 토큰 전송")
+            if let currentToken = self.currentFCMToken {
+                self.updateFCMTokenToServerSilently(token: currentToken, reason: "background_entry_expired")
+            }
         }
     }
     
@@ -8890,22 +8903,91 @@ extension AppDelegate {
         guard isAppInBackground,
               UserDefaults.standard.bool(forKey: "is_logged_in") else { return }
         
-        print("🔄 [FCM BACKGROUND] 백그라운드 토큰 갱신 수행")
+        print("🔄 [Background] 백그라운드 토큰 갱신 시작")
         
-        // 토큰 만료 시간 확인
-        if let lastUpdate = lastFCMTokenUpdateTime,
-           Date().timeIntervalSince(lastUpdate) > TimeInterval(fcmTokenExpiryDays * 24 * 3600) {
-            print("⚠️ [FCM BACKGROUND] 토큰 만료 감지 - 토큰 재전송")
-            // 기존 토큰 재전송으로 대체
-            if let token = currentFCMToken {
-                updateFCMTokenToServerSilently(token: token, reason: "background_token_expired")
+        // 먼저 서버에서 현재 토큰 만료일 확인
+        checkTokenExpiryDateFromServer { [weak self] isExpired in
+            guard let self = self, isExpired else {
+                print("✅ [Background] 토큰 아직 만료되지 않음 - 업데이트 건너뛰기")
+                return
             }
-        } else {
-            // 기존 토큰 재전송
-            if let token = currentFCMToken {
-                updateFCMTokenToServerSilently(token: token, reason: "background_refresh")
+            
+            print("⚠️ [Background] 토큰 만료 확인됨 - 토큰 재전송 필요")
+            // 기존 토큰 재전송으로 대체
+            if let token = self.currentFCMToken {
+                self.updateFCMTokenToServerSilently(token: token, reason: "background_token_expired")
             }
         }
+    }
+    
+    /// 서버에서 토큰 만료일 확인
+    private func checkTokenExpiryDateFromServer(completion: @escaping (Bool) -> Void) {
+        guard let userIdx = UserDefaults.standard.object(forKey: "user_id") ?? UserDefaults.standard.object(forKey: "mt_idx") else {
+            print("❌ [Background] 사용자 ID를 찾을 수 없음")
+            completion(false)
+            return
+        }
+        
+        let urlString = "https://api3.smap.site/api/v1/member-fcm-token/status/\(userIdx)"
+        guard let url = URL(string: urlString) else {
+            print("❌ [Background] 토큰 상태 확인 URL 생성 실패")
+            completion(false)
+            return
+        }
+        
+        print("🔍 [Background] 서버에서 토큰 만료일 확인 중...")
+        
+        let task = URLSession.shared.dataTask(with: url) { data, response, error in
+            if let error = error {
+                print("❌ [Background] 토큰 상태 확인 요청 실패: \(error.localizedDescription)")
+                completion(false)
+                return
+            }
+            
+            guard let data = data else {
+                print("❌ [Background] 토큰 상태 확인 응답 데이터 없음")
+                completion(false)
+                return
+            }
+            
+            do {
+                if let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
+                    if let tokenExpiryDateString = json["token_expiry_date"] as? String {
+                        let dateFormatter = ISO8601DateFormatter()
+                        if let expiryDate = dateFormatter.date(from: tokenExpiryDateString) {
+                            let isExpired = Date() > expiryDate
+                            print("📅 [Background] 토큰 만료일: \(tokenExpiryDateString), 만료됨: \(isExpired)")
+                            DispatchQueue.main.async {
+                                completion(isExpired)
+                            }
+                            return
+                        }
+                    }
+                    
+                    // token_expiry_date가 없거나 파싱 실패 시 is_token_expired 확인
+                    if let isExpired = json["is_token_expired"] as? Bool {
+                        print("🏷️ [Background] 서버 토큰 만료 상태: \(isExpired)")
+                        DispatchQueue.main.async {
+                            completion(isExpired)
+                        }
+                        return
+                    }
+                }
+                
+                print("⚠️ [Background] 토큰 만료 정보 파싱 실패 - 안전하게 만료되지 않음으로 처리")
+                DispatchQueue.main.async {
+                    completion(false)
+                }
+                
+            } catch {
+                print("❌ [Background] 토큰 상태 응답 JSON 파싱 실패: \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    completion(false)
+                }
+            }
+        }
+        
+        task.resume()
     }
     
     private func updateFCMTokenToServerSilently(token: String, reason: String) {

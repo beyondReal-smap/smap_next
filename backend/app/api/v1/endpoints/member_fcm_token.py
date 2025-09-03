@@ -137,6 +137,23 @@ async def register_member_fcm_token(
         # 기존 토큰과 비교
         old_token = member.mt_token_id
         is_new_token = old_token != request.fcm_token
+        
+        # 동일한 토큰인 경우 중복 업데이트 방지 (시간 기반 체크 추가)
+        if not is_new_token and old_token:
+            # 최근 업데이트 시간 확인 (5분 이내 중복 업데이트 방지)
+            if member.mt_token_updated_at:
+                time_since_update = datetime.now() - member.mt_token_updated_at
+                if time_since_update.total_seconds() < 300:  # 5분
+                    logger.info(f"🚫 중복 업데이트 방지: 회원 ID {request.mt_idx} (마지막 업데이트: {time_since_update.total_seconds():.1f}초 전)")
+                    return MemberFCMTokenResponse(
+                        success=True,
+                        message="FCM 토큰이 이미 최신 상태입니다. (중복 업데이트 방지)",
+                        mt_idx=member.mt_idx,
+                        has_token=True,
+                        token_preview=request.fcm_token[:20] + "..." if len(request.fcm_token) > 20 else request.fcm_token
+                    )
+            
+            logger.info(f"✅ 동일 토큰 재등록 허용: 회원 ID {request.mt_idx} (5분 이상 경과)")
 
         # mt_token_id 삭제 현상 모니터링을 위한 로깅 추가
         if not old_token and is_new_token:
@@ -344,9 +361,18 @@ async def check_and_update_fcm_token(
             message = "FCM 토큰이 업데이트되었습니다."
             logger.info(f"FCM 토큰 업데이트 필요 - 회원 ID: {request.mt_idx}")
         else:
-            # 동일한 토큰 - 업데이트 불필요
-            message = "FCM 토큰이 이미 최신 상태입니다."
-            logger.info(f"FCM 토큰 업데이트 불필요 - 회원 ID: {request.mt_idx}")
+            # 동일한 토큰 - 시간 기반 중복 체크
+            if member.mt_token_updated_at:
+                time_since_update = datetime.now() - member.mt_token_updated_at
+                if time_since_update.total_seconds() < 300:  # 5분
+                    message = "FCM 토큰이 이미 최신 상태입니다. (중복 체크 방지)"
+                    logger.info(f"🚫 중복 체크 방지: 회원 ID {request.mt_idx} (마지막 업데이트: {time_since_update.total_seconds():.1f}초 전)")
+                else:
+                    message = "FCM 토큰이 이미 최신 상태입니다."
+                    logger.info(f"✅ 동일 토큰 체크 허용: 회원 ID {request.mt_idx} (5분 이상 경과)")
+            else:
+                message = "FCM 토큰이 이미 최신 상태입니다."
+                logger.info(f"FCM 토큰 업데이트 불필요 - 회원 ID: {request.mt_idx}")
         
         if needs_update:
             # FCM 토큰 형식 검증 (잘못된 토큰 방지)
@@ -446,10 +472,14 @@ async def validate_and_refresh_fcm_token(
             # 토큰 만료 임박 (7일 이내, 90일 만료에 맞게 조정)
             needs_refresh = True
             reason = "FCM 토큰이 곧 만료됩니다."
-        elif not member.mt_token_updated_at or (now - member.mt_token_updated_at).days >= 2:
-            # 2일 이상 업데이트되지 않은 경우 (더 적극적인 갱신)
+        elif member.mt_token_expiry_date and now < member.mt_token_expiry_date and not member.mt_token_updated_at:
+            # 토큰이 아직 유효하지만 업데이트 일시가 없는 경우만 업데이트
             needs_refresh = True
-            reason = "FCM 토큰이 2일 이상 업데이트되지 않았습니다."
+            reason = "FCM 토큰 업데이트 일시가 없습니다."
+        elif member.mt_token_expiry_date and now < member.mt_token_expiry_date and member.mt_token_updated_at and (now - member.mt_token_updated_at).days >= 30:
+            # 토큰이 아직 유효하고 30일 이상 업데이트되지 않은 경우만 (기존 2일에서 30일로 변경)
+            needs_refresh = True
+            reason = "FCM 토큰이 30일 이상 업데이트되지 않았습니다."
 
         # FCM 서버와의 실제 토큰 검증 (선택적)
         server_validation_passed = True
@@ -628,6 +658,19 @@ async def background_token_check(
             # 전체 토큰이 전달되고 DB 토큰과 다른 경우에만 변경으로 판단
             needs_refresh = True
             reason = "FCM 토큰이 변경되었습니다."
+        elif not is_preview_token and member.mt_token_id == request.fcm_token:
+            # 동일한 토큰인 경우 최근 체크 시간 확인 (백그라운드 중복 체크 방지)
+            if member.mt_token_updated_at:
+                time_since_update = datetime.now() - member.mt_token_updated_at
+                if time_since_update.total_seconds() < 1800:  # 30분 (백그라운드는 더 긴 간격)
+                    logger.info(f"🚫 백그라운드 중복 체크 방지: 회원 ID {request.mt_idx} (마지막 업데이트: {time_since_update.total_seconds():.0f}초 전)")
+                    return MemberFCMTokenResponse(
+                        success=True,
+                        message="백그라운드 토큰 체크 건너뛰기 (중복 방지)",
+                        mt_idx=member.mt_idx,
+                        has_token=True,
+                        token_preview=request.fcm_token[:20] + "..." if len(request.fcm_token) > 20 else request.fcm_token
+                    )
         elif member.mt_token_expiry_date and current_time > member.mt_token_expiry_date:
             # 토큰이 만료된 경우
             needs_refresh = True
@@ -641,10 +684,10 @@ async def background_token_check(
             if (member.mt_token_expiry_date - current_time).days <= 7:  # 7일 이내 만료 (90일 만료에 맞게 조정)
                 needs_refresh = True
                 reason = "백그라운드 검증: 토큰이 곧 만료됩니다."
-        elif member.mt_token_updated_at and (current_time - member.mt_token_updated_at).days >= 85:
-            # 85일 이상 업데이트되지 않은 경우 (90일 만료 5일 전)
+        elif member.mt_token_expiry_date and current_time < member.mt_token_expiry_date and member.mt_token_updated_at and (current_time - member.mt_token_updated_at).days >= 85:
+            # 토큰이 아직 유효하고 85일 이상 업데이트되지 않은 경우만 (90일 만료 5일 전)
             needs_refresh = True
-            reason = "토큰이 85일 이상 업데이트되지 않았습니다. (만료 5일 전)"
+            reason = "토큰이 아직 유효하지만 85일 이상 업데이트되지 않았습니다. (만료 5일 전)"
 
         if needs_refresh:
             logger.info(f"FCM 토큰 백그라운드 갱신 필요 - 회원 ID: {request.mt_idx}, 사유: {reason}")
@@ -895,4 +938,99 @@ async def notify_token_refresh(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="토큰 갱신 알림 전송 중 내부 서버 오류가 발생했습니다."
+        )
+
+
+class TestIOSPushRequest(BaseModel):
+    mt_idx: int
+    test_type: str = "simple"  # simple, direct, complex
+
+@router.post("/test-ios-push")
+async def test_ios_push_delivery(
+    request: TestIOSPushRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    iOS 푸시 알림 전송 테스트 엔드포인트
+    다양한 설정으로 테스트하여 수신 문제 진단
+    """
+    try:
+        logger.info(f"🧪 [TEST] iOS 푸시 테스트 시작 - 회원: {request.mt_idx}, 타입: {request.test_type}")
+        
+        # 회원 정보 조회
+        member = Member.find_by_idx(db, request.mt_idx)
+        if not member or not member.mt_token_id:
+            raise HTTPException(
+                status_code=404,
+                detail="회원 또는 FCM 토큰을 찾을 수 없습니다."
+            )
+        
+        # iOS 토큰 검증
+        if ':' not in member.mt_token_id:
+            raise HTTPException(
+                status_code=400,
+                detail="iOS FCM 토큰이 아닙니다."
+            )
+        
+        title = f"🧪 iOS 푸시 테스트 ({request.test_type})"
+        content = f"테스트 시간: {datetime.now().strftime('%H:%M:%S')}"
+        
+        # 테스트 타입에 따른 전송 방식 선택
+        if request.test_type == "simple":
+            # 단순화된 설정으로 테스트 (개선된 APNs 설정 사용)
+            response = firebase_service.send_push_notification(
+                token=member.mt_token_id,
+                title=title,
+                content=content,
+                member_id=request.mt_idx
+            )
+        elif request.test_type == "direct":
+            # Firebase Console과 동일한 최소 설정으로 테스트
+            from firebase_admin import messaging
+            
+            message = messaging.Message(
+                token=member.mt_token_id,
+                notification=messaging.Notification(
+                    title=title,
+                    body=content
+                ),
+                apns=messaging.APNSConfig(
+                    payload=messaging.APNSPayload(
+                        aps=messaging.Aps(
+                            alert=messaging.ApsAlert(title=title, body=content),
+                            sound='default'
+                        )
+                    )
+                )
+            )
+            
+            response = messaging.send(message)
+            logger.info(f"✅ [TEST DIRECT] Firebase Console 방식 테스트 완료: {response}")
+        else:
+            # 기존 복잡한 설정으로 테스트 (비교용)
+            response = firebase_service.send_push_notification(
+                token=member.mt_token_id,
+                title=title,
+                content=content,
+                member_id=request.mt_idx,
+                max_retries=0
+            )
+        
+        logger.info(f"✅ [TEST] iOS 푸시 테스트 완료 - 응답: {response}")
+        
+        return {
+            "success": True,
+            "message": f"iOS 푸시 테스트 완료 ({request.test_type})",
+            "response": response,
+            "token_length": len(member.mt_token_id),
+            "token_preview": f"{member.mt_token_id[:30]}...",
+            "test_time": datetime.now().isoformat(),
+            "member_id": request.mt_idx
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ [TEST] iOS 푸시 테스트 실패: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"iOS 푸시 테스트 실패: {str(e)}"
         )

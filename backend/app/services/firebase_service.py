@@ -286,11 +286,9 @@ class FirebaseService:
                         apns=messaging.APNSConfig(
                             headers={
                                 "apns-push-type": "alert",
-                                "apns-priority": "10",
+                                "apns-priority": "5",  # 10에서 5로 변경 (일반 우선순위)
                                 "apns-topic": Config.IOS_BUNDLE_ID,
-                                "apns-expiration": str(int(time.time()) + 7776000),  # 90일 유효 (백그라운드 푸시 최대 개선)
-                                # "apns-collapse-id": 제거 - 각 알림을 개별 전송하여 배치 방지  
-                                "apns-thread-id": f"reliable_{member_id}_{int(time.time())}"  # 개별 스레드로 즉시 알림
+                                # expiration과 thread-id 제거로 단순화
                             },
                             payload=messaging.APNSPayload(
                                 aps=messaging.Aps(
@@ -299,11 +297,8 @@ class FirebaseService:
                                     alert=messaging.ApsAlert(
                                         title=title,
                                         body=content
-                                    ),
-                                    mutable_content=True,
-                                    content_available=True,  # iOS 백그라운드 처리를 위해 추가
-                                    thread_id=f"reliable_{member_id}_{int(time.time())}",  # 개별 스레드 ID
-                                    category="GENERAL_NOTIFICATION"
+                                    )
+                                    # mutable_content, content_available, category 제거로 단순화
                                 )
                             )
                         )
