@@ -841,6 +841,9 @@ let globalComponentInstances = 0;
 
 export default function ActivelogPage() {
   const router = useRouter();
+
+  // 컴포넌트 마운트 상태 추적 (클라이언트 환경에서만)
+  const isMountedRef = useRef(typeof window !== 'undefined' ? true : null);
   
   // Vercel 환경 감지
   const isVercel = typeof window !== 'undefined' && 
@@ -848,9 +851,9 @@ export default function ActivelogPage() {
                    window.location.hostname.includes('nextstep.smap.site'));
   
   // 인증 관련 상태 추가 (home/page.tsx와 동일)
-  const { user, isLoggedIn = false, loading: authLoading = false } = useAuth() || {};
+  const { user, isLoggedIn, loading: authLoading } = useAuth();
   // UserContext 사용
-  const { userInfo, userGroups, isUserDataLoading = false, userDataError, refreshUserData } = useUser() || {};
+  const { userInfo, userGroups, isUserDataLoading, userDataError, refreshUserData } = useUser();
     // DataCacheContext 사용 - ACTIVELOG 페이지에서는 캐시 비활성화
   const {
     getGroupMembers: getCachedGroupMembers,
@@ -5294,10 +5297,10 @@ export default function ActivelogPage() {
       return;
     }
 
-    let isMounted = true;
+
     
     const fetchAllGroupData = async () => {
-      if (!isMounted || !isMainInstance.current) return;
+      if (!isMountedRef.current || !isMainInstance.current) return;
 
       // selectedGroupId가 없으면 실행하지 않음
       if (!selectedGroupId) {
@@ -5386,7 +5389,7 @@ export default function ActivelogPage() {
               );
               
               if (memberData && memberData.length > 0) {
-                if (isMounted) setGroupMembers(currentMembers);
+                if (isMountedRef.current) setGroupMembers(currentMembers);
                 // 캐시에 저장 (타입 변환)
                 const cacheMembers = memberData.map((member: any) => ({
                   ...member,
@@ -5460,7 +5463,7 @@ export default function ActivelogPage() {
                 }
               } else {
                 console.warn('❌ No member data from API, or API call failed.');
-                if (isMounted) setGroupMembers([]);
+                if (isMountedRef.current) setGroupMembers([]);
                 
                 console.log('[LOGS] 멤버 데이터 없음 - 초기 로딩 실패 처리');
                 setHasInitialLoadFailed(true);
@@ -5480,7 +5483,7 @@ export default function ActivelogPage() {
             console.log('[LOGS] 그룹 멤버 조회 완료 - 기본 데이터 로딩 완료 (추가 API는 지연 로딩)');
             
             // 지연 로딩 최적화: 초기 진입 시 필수가 아닌 API들은 나중에 호출
-            if (isMounted) {
+            if (isMountedRef.current) {
               // 캐시에서 일별 카운트 데이터 즉시 복원 (사이드바 표시용) - LOGS 페이지에서는 캐시 비활성화
               if (!DISABLE_CACHE) {
                 const cachedCounts = getCachedDailyLocationCounts(selectedGroupId);
@@ -5496,7 +5499,7 @@ export default function ActivelogPage() {
               }
 
               // 🚨 iOS 시뮬레이터 최적화: 즉시 로딩으로 변경 (지연 시간 제거)
-              if (isMounted) {
+              if (isMountedRef.current) {
                 console.log('🚀 [LOGS] iOS 시뮬레이터 최적화 - 사이드바 캘린더 데이터 즉시 로딩');
                 const immediatePromises = [];
                 
@@ -5539,7 +5542,7 @@ export default function ActivelogPage() {
         console.error('[LOGS PAGE] 그룹 데이터(멤버 또는 스케줄) 조회 오류:', error);
         handleDataError(error, 'fetchAllGroupData');
         
-        if (isMounted && !dataFetchedRef.current.members) {
+        if (isMountedRef.current && !dataFetchedRef.current.members) {
           dataFetchedRef.current.members = true;
         }
       } finally {
@@ -5551,7 +5554,7 @@ export default function ActivelogPage() {
     fetchAllGroupData();
 
     return () => { 
-      isMounted = false; 
+      isMountedRef.current = false; 
       fetchDataExecutingRef.current = false;
     };
   }, [selectedGroupId, isUserDataLoading, userGroups]);

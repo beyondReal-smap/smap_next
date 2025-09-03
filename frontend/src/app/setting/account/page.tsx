@@ -18,8 +18,8 @@ import {
 import { HiSparkles } from 'react-icons/hi2';
 import { useAuth } from '@/contexts/AuthContext';
 import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
-import AnimatedHeader from '../../../components/common/AnimatedHeader';
-import ProfileImageUploader from '../../../components/common/ProfileImageUploader';
+import AnimatedHeader from '@/components/common/AnimatedHeader';
+import ProfileImageUploader from '@/components/common/ProfileImageUploader';
 
 // 기본 이미지 가져오기 함수
 const getDefaultImage = (gender: number | null | undefined, index: number): string => {
@@ -395,8 +395,7 @@ export default function AccountSettingsPage() {
       };
       reader.readAsDataURL(file);
     }
-
-
+  };
 
   // 로그아웃 처리
   const handleLogout = async () => {
@@ -797,5 +796,4 @@ export default function AccountSettingsPage() {
       </div>
     </>
   );
-}
 }
