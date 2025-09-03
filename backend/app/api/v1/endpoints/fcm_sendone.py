@@ -137,9 +137,9 @@ def send_fcm_push_notification(
         else:
             logger.info(f"✅ FCM 전송 시 mt_token_id 확인: 회원 {member.mt_idx} 토큰 정상 (길이: {len(member.mt_token_id)})")
 
-        # FCM 토큰이 25일 이상 업데이트되지 않은 경우 경고 로그 (30일 만료에 맞게 조정)
-        if member.mt_token_updated_at and (now - member.mt_token_updated_at).days >= 25:
-            logger.warning(f"FCM 토큰이 25일 이상 업데이트되지 않음 - 회원 ID: {member.mt_idx}, 마지막 업데이트: {member.mt_token_updated_at}")
+        # FCM 토큰이 80일 이상 업데이트되지 않은 경우 경고 로그 (90일 만료에 맞게 조정)
+        if member.mt_token_updated_at and (now - member.mt_token_updated_at).days >= 80:
+            logger.warning(f"FCM 토큰이 80일 이상 업데이트되지 않음 - 회원 ID: {member.mt_idx}, 마지막 업데이트: {member.mt_token_updated_at}")
 
         # Firebase 사용 가능 여부 확인
         if not firebase_service.is_available():

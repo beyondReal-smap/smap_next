@@ -34,7 +34,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     private var backgroundTaskIdentifier: UIBackgroundTaskIdentifier = .invalid
 
     // 🔄 FCM 토큰 관리 설정 (백그라운드/포그라운드 모두 지원)
-    private let fcmTokenExpiryDays: Int = 3 // 3일로 더 단축 - 백그라운드 푸시 오래 유지
+    private let fcmTokenExpiryDays: Int = 90 // 90일로 연장 - APNs 만료 시간과 일치
     private let maxTokenRetryAttempts: Int = 15 // 최대 재시도 횟수 더 증가
     private var isFCMTokenRefreshInProgress: Bool = false // 토큰 갱신 진행 중 플래그
 
@@ -3005,18 +3005,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             trigger: nil // 즉시 표시
         )
 
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error = error {
-                print("❌ [FCM Local Test] 로컬 알림 표시 실패: \(error.localizedDescription)")
-            } else {
-                print("✅ [FCM Local Test] 로컬 알림 표시 성공")
-
-                // 3초 후 Notification Center 상태 확인
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                    print("📱 [FCM Local Test] 로컬 알림 표시 후 Notification Center 상태 확인")
-                    self.checkNotificationCenterStatus()
-                }
-            }
+        // 중복 알림 방지 - 테스트 로컬 알림 생성 비활성화
+        print("🚫 [FCM Local Test] 중복 방지를 위해 테스트 로컬 알림 생성 건너뛰기")
+        print("📝 [FCM Local Test] 테스트 알림 생성하지 않음 - 원본 FCM만 사용")
+        
+        // Notification Center 상태는 여전히 확인
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            print("📱 [FCM Local Test] Notification Center 상태 확인")
+            self.checkNotificationCenterStatus()
         }
     }
 
@@ -7640,17 +7636,9 @@ extension AppDelegate {
                        userInfo["google.c.fid"] as? String ??
                        UUID().uuidString
 
-        let request = UNNotificationRequest(identifier: "fcm_local_\(messageId)",
-                                          content: content,
-                                          trigger: nil)
-
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error = error {
-                print("❌ [FCM Local] FCM 로컬 알림 표시 실패: \(error.localizedDescription)")
-            } else {
-                print("✅ [FCM Local] FCM 로컬 알림 표시 성공 - ID: \(messageId)")
-            }
-        }
+        // 중복 로컬 알림 방지 - 이미 FCM이 자동으로 알림을 표시하므로 로컬 알림 생성 비활성화
+        print("🚫 [FCM Local] 중복 방지를 위해 로컬 알림 생성 건너뛰기 - 원본 FCM 알림 사용")
+        print("📝 [FCM Local] 메시지 ID: \(messageId) - 로컬 알림 생성하지 않음")
     }
 
     // MARK: - 🔄 FCM 토큰 DB 확인 및 업데이트
@@ -8734,17 +8722,9 @@ extension AppDelegate {
         // 고유 식별자 생성
         let identifier = "fcm_immediate_\(Int(Date().timeIntervalSince1970))"
         
-        // 알림 요청 생성
-        let request = UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
-        
-        // 알림 스케줄링
-        center.add(request) { error in
-            if let error = error {
-                print("❌ [FCM] 즉시 로컬 알림 스케줄링 실패: \(error.localizedDescription)")
-            } else {
-                print("✅ [FCM] 즉시 로컬 알림 스케줄링 성공: \(identifier)")
-            }
-        }
+        // 중복 알림 방지 - 즉시 로컬 알림 생성 비활성화 
+        print("🚫 [FCM] 중복 방지를 위해 즉시 로컬 알림 생성 건너뛰기")
+        print("📝 [FCM] 식별자: \(identifier) - 즉시 알림 생성하지 않음")
     }
     
     /// 강제 로컬 알림 테스트 (시각적 확인용)

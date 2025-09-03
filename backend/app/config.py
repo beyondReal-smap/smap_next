@@ -22,7 +22,7 @@ class Config:
     IOS_BUNDLE_ID = os.getenv('IOS_BUNDLE_ID', 'com.dmonster.smap')
 
     # iOS 푸시 최적화 설정
-    IOS_PUSH_RETRY_COUNT = int(os.getenv('IOS_PUSH_RETRY_COUNT', '3'))  # iOS 푸시 재시도 횟수
+    IOS_PUSH_RETRY_COUNT = int(os.getenv('IOS_PUSH_RETRY_COUNT', '0'))  # iOS 푸시 재시도 횟수 (0 = 1번만 시도)
     IOS_PUSH_EXPIRATION_TIME = int(os.getenv('IOS_PUSH_EXPIRATION_TIME', '300'))  # iOS 푸시 만료 시간 (초)
     IOS_BACKGROUND_WAKE_ENABLED = os.getenv('IOS_BACKGROUND_WAKE_ENABLED', 'true').lower() == 'true'
     

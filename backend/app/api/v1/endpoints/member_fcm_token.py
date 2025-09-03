@@ -599,13 +599,33 @@ async def background_token_check(
         current_time = datetime.now()
         needs_refresh = False
         reason = ""
+        
+        # 요청된 토큰이 미리보기 토큰인지 확인 (보안상 전체 토큰을 직접 전달할 수 없는 경우)
+        is_preview_token = (
+            len(request.fcm_token) < 100 or  # 미리보기 토큰은 일반적으로 짧음
+            request.fcm_token.endswith("...") or  # 미리보기 토큰 형식
+            not validate_fcm_token_format(request.fcm_token)  # 완전한 토큰 형식이 아님
+        )
+        
+        if is_preview_token:
+            logger.info(f"미리보기 토큰 감지 - DB의 실제 토큰과 비교 건너뛰기: {request.fcm_token[:20]}...")
+            # 미리보기 토큰인 경우 DB의 실제 토큰과 비교하지 않음
+            actual_token = member.mt_token_id
+            if not actual_token:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="DB에 저장된 FCM 토큰이 없습니다. 앱에서 새로운 토큰을 등록해주세요."
+                )
+        else:
+            # 전체 토큰이 전달된 경우 해당 토큰 사용
+            actual_token = request.fcm_token
 
         # 토큰 존재 여부 확인
         if not member.mt_token_id:
             needs_refresh = True
             reason = "FCM 토큰이 존재하지 않습니다."
-        elif member.mt_token_id != request.fcm_token:
-            # 토큰이 변경된 경우
+        elif not is_preview_token and member.mt_token_id != request.fcm_token:
+            # 전체 토큰이 전달되고 DB 토큰과 다른 경우에만 변경으로 판단
             needs_refresh = True
             reason = "FCM 토큰이 변경되었습니다."
         elif member.mt_token_expiry_date and current_time > member.mt_token_expiry_date:
@@ -621,28 +641,34 @@ async def background_token_check(
             if (member.mt_token_expiry_date - current_time).days <= 7:  # 7일 이내 만료 (90일 만료에 맞게 조정)
                 needs_refresh = True
                 reason = "백그라운드 검증: 토큰이 곧 만료됩니다."
-        elif member.mt_token_updated_at and (current_time - member.mt_token_updated_at).days >= 2:
-            # 2일 이상 업데이트되지 않은 경우 (더 적극적)
+        elif member.mt_token_updated_at and (current_time - member.mt_token_updated_at).days >= 85:
+            # 85일 이상 업데이트되지 않은 경우 (90일 만료 5일 전)
             needs_refresh = True
-            reason = "토큰이 2일 이상 업데이트되지 않았습니다."
+            reason = "토큰이 85일 이상 업데이트되지 않았습니다. (만료 5일 전)"
 
         if needs_refresh:
             logger.info(f"FCM 토큰 백그라운드 갱신 필요 - 회원 ID: {request.mt_idx}, 사유: {reason}")
 
-            # FCM 토큰 형식 검증 (잘못된 토큰 방지)
-            if not validate_fcm_token_format(request.fcm_token):
+            # FCM 토큰 형식 검증 (미리보기 토큰이 아닌 경우에만)
+            if not is_preview_token and not validate_fcm_token_format(actual_token):
                 logger.warning(f"잘못된 FCM 토큰 형식 감지 (background-check) - 회원 ID: {request.mt_idx}")
-                logger.warning(f"잘못된 토큰: {request.fcm_token[:50]}...")
-                logger.warning(f"토큰 길이: {len(request.fcm_token)}자")
+                logger.warning(f"잘못된 토큰: {actual_token[:50]}...")
+                logger.warning(f"토큰 길이: {len(actual_token)}자")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="잘못된 FCM 토큰 형식입니다. 올바른 FCM 토큰을 제공해주세요."
                 )
+            elif is_preview_token:
+                logger.info(f"미리보기 토큰이므로 형식 검증 건너뛰기 - 회원 ID: {request.mt_idx}")
+            else:
+                logger.info(f"✅ FCM 토큰 형식 검증 통과 (background-check) - 회원 ID: {request.mt_idx}")
 
-            logger.info(f"✅ FCM 토큰 형식 검증 통과 (background-check) - 회원 ID: {request.mt_idx}")
-
-            # 토큰 업데이트 (FCM 토큰은 일반적으로 1년 이상 유효하므로 90일로 설정)
-            member.mt_token_id = request.fcm_token
+            # 토큰 업데이트 (미리보기 토큰인 경우 실제 토큰은 업데이트하지 않음)
+            if not is_preview_token:
+                member.mt_token_id = actual_token
+                logger.info(f"FCM 토큰 업데이트 완료 - 회원 ID: {request.mt_idx}")
+            else:
+                logger.info(f"미리보기 토큰이므로 DB 토큰 업데이트 건너뛰기 - 회원 ID: {request.mt_idx}")
             member.mt_token_updated_at = current_time
             member.mt_token_expiry_date = current_time + timedelta(days=90)  # 90일 후 만료
             member.mt_udate = current_time
@@ -655,7 +681,7 @@ async def background_token_check(
                 message=f"FCM 토큰이 백그라운드에서 갱신되었습니다. 사유: {reason}",
                 mt_idx=member.mt_idx,
                 has_token=True,
-                token_preview=request.fcm_token[:20] + "..." if len(request.fcm_token) > 20 else request.fcm_token
+                token_preview=(actual_token[:20] + "..." if len(actual_token) > 20 else actual_token) if actual_token else None
             )
         else:
             logger.info(f"FCM 토큰 백그라운드 검증 통과 - 회원 ID: {request.mt_idx}")
@@ -665,7 +691,7 @@ async def background_token_check(
                 message="FCM 토큰이 백그라운드에서 유효합니다.",
                 mt_idx=member.mt_idx,
                 has_token=True,
-                token_preview=request.fcm_token[:20] + "..." if len(request.fcm_token) > 20 else request.fcm_token
+                token_preview=(actual_token[:20] + "..." if len(actual_token) > 20 else actual_token) if actual_token else None
             )
 
     except HTTPException:

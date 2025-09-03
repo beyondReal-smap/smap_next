@@ -135,30 +135,27 @@ class FirebaseService:
         try:
             logger.info(f"📱 [FCM iOS] 토큰 검증 통과")
             
-            # iOS 푸시 특화 설정으로 메시지 구성
-            retry_count = 5 if background_mode else 3
-            
-            for attempt in range(retry_count):
-                try:
-                    logger.info(f"📱 [FCM iOS] {'백그라운드' if background_mode else '일반'} 푸시 전송 (재시도: {retry_count})")
-                    
-                    # iOS 전용 최적화된 메시지 구성
-                    message = messaging.Message(
-                        token=token,
-                        notification=messaging.Notification(
-                            title=title,
-                            body=content
-                        ),
-                        data={
-                            "title": title,
-                            "body": content,
-                            "click_action": "FLUTTER_NOTIFICATION_CLICK",
-                            "notification_type": "ios_optimized",
-                            "timestamp": str(int(time.time())),
-                            "delivery_mode": "guaranteed",
-                            "background_mode": str(background_mode).lower(),
-                            "member_id": str(member_id) if member_id else "unknown"
-                        },
+            # iOS 푸시 특화 설정으로 메시지 구성 (단일 시도로 중복 방지)
+            try:
+                logger.info(f"📱 [FCM iOS] {'백그라운드' if background_mode else '일반'} 푸시 전송 (단일 시도)")
+                
+                # iOS 전용 최적화된 메시지 구성
+                message = messaging.Message(
+                    token=token,
+                    notification=messaging.Notification(
+                        title=title,
+                        body=content
+                    ),
+                    data={
+                        "title": title,
+                        "body": content,
+                        "click_action": "FLUTTER_NOTIFICATION_CLICK",
+                        "notification_type": "ios_optimized",
+                        "timestamp": str(int(time.time())),
+                        "delivery_mode": "guaranteed",
+                        "background_mode": str(background_mode).lower(),
+                        "member_id": str(member_id) if member_id else "unknown"
+                    },
                         apns=messaging.APNSConfig(
                             headers={
                                 "apns-push-type": "alert",
@@ -186,36 +183,31 @@ class FirebaseService:
                         )
                     )
                     
-                    # FCM 전송 실행
-                    response = messaging.send(message)
-                    logger.info(f"✅ [FCM iOS] iOS 최적화 푸시 전송 성공: {response}")
+                # FCM 전송 실행
+                response = messaging.send(message)
+                logger.info(f"✅ [FCM iOS] iOS 최적화 푸시 전송 성공: {response}")
+                
+                return response
+                
+            except messaging.UnregisteredError:
+                logger.warning(f"🚨 [FCM iOS] 등록되지 않은 토큰: {token[:30]}...")
+                self._handle_token_invalidation(token, "unregistered", title, content)
+                return "unregistered"
+                
+            except messaging.SenderIdMismatchError:
+                logger.warning(f"🚨 [FCM iOS] Sender ID 불일치: {token[:30]}...")
+                self._handle_token_invalidation(token, "sender_mismatch", title, content)
+                return "sender_mismatch"
                     
-                    return response
-                    
-                except messaging.UnregisteredError:
-                    logger.warning(f"🚨 [FCM iOS] 등록되지 않은 토큰: {token[:30]}...")
-                    self._handle_token_invalidation(token, "unregistered", title, content)
-                    return "unregistered"
-                    
-                except messaging.SenderIdMismatchError:
-                    logger.warning(f"🚨 [FCM iOS] Sender ID 불일치: {token[:30]}...")
-                    self._handle_token_invalidation(token, "sender_mismatch", title, content)
-                    return "sender_mismatch"
-                    
-                except Exception as e:
-                    logger.warning(f"⚠️ [FCM iOS] 전송 시도 {attempt + 1}/{retry_count} 실패: {e}")
-                    if attempt == retry_count - 1:
-                        logger.error(f"❌ [FCM iOS] 모든 재시도 실패: {e}")
-                        return f"send_failed: {e}"
-                    
-                    import time
-                    time.sleep(0.5 * (attempt + 1))  # 지수적 백오프
+            except Exception as e:
+                logger.error(f"❌ [FCM iOS] 푸시 전송 실패: {e}")
+                return f"send_failed: {e}"
                     
         except Exception as e:
             logger.error(f"❌ [FCM iOS] iOS 최적화 푸시 전송 실패: {e}")
             return f"ios_push_failed: {e}"
 
-    def send_push_notification(self, token: str, title: str, content: str, max_retries: int = 2, member_id: int = None, enable_fallback: bool = True) -> str:
+    def send_push_notification(self, token: str, title: str, content: str, max_retries: int = 0, member_id: int = None, enable_fallback: bool = True) -> str:
         """FCM 푸시 알림 전송 (iOS 최적화 포함) - 토큰 검증 및 자동 정리 기능 포함
 
         Args:
