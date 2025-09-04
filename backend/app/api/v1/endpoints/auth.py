@@ -184,11 +184,12 @@ async def login_for_home_page(
             }
         )
         
-        # 로그인 시간 및 FCM 토큰 업데이트
+        # 로그인 시간 업데이트 (FCM 토큰은 별도 API에서만 업데이트)
         user.mt_ldate = datetime.utcnow()
-        if getattr(login_request, 'fcm_token', None):
-            if not user.mt_token_id or user.mt_token_id != login_request.fcm_token:
-                user.mt_token_id = login_request.fcm_token
+        # FCM 토큰 자동 업데이트 제거 - Swift에서 명시적 요청 시에만 업데이트
+        # if getattr(login_request, 'fcm_token', None):
+        #     if not user.mt_token_id or user.mt_token_id != login_request.fcm_token:
+        #         user.mt_token_id = login_request.fcm_token
         db.commit()
 
         # home/page.tsx의 Member 타입에 맞는 사용자 정보 구성
@@ -315,11 +316,12 @@ async def login_for_access_token_custom(
         data=user_identity.model_dump()
     )
     
-    # 로그인 시간 및 FCM 토큰 업데이트
+    # 로그인 시간 업데이트 (FCM 토큰은 별도 API에서만 업데이트)
     user.mt_ldate = datetime.utcnow()
-    if getattr(login_request, 'fcm_token', None):
-        if not user.mt_token_id or user.mt_token_id != login_request.fcm_token:
-            user.mt_token_id = login_request.fcm_token
+    # FCM 토큰 자동 업데이트 제거 - Swift에서 명시적 요청 시에만 업데이트
+    # if getattr(login_request, 'fcm_token', None):
+    #     if not user.mt_token_id or user.mt_token_id != login_request.fcm_token:
+    #         user.mt_token_id = login_request.fcm_token
     db.commit()
 
     return LoginResponse(
@@ -439,11 +441,12 @@ async def kakao_login(
                 is_new_user = True
                 logger.info(f"[KAKAO LOGIN] 새 카카오 사용자 생성 (이메일 없음): mt_idx={user.mt_idx}")
 
-        # 로그인 시간 및 FCM 토큰 업데이트
+        # 로그인 시간 업데이트 (FCM 토큰은 별도 API에서만 업데이트)
         user.mt_ldate = datetime.utcnow()
-        if getattr(kakao_request, 'fcm_token', None):
-            if not user.mt_token_id or user.mt_token_id != kakao_request.fcm_token:
-                user.mt_token_id = kakao_request.fcm_token
+        # FCM 토큰 자동 업데이트 제거 - Swift에서 명시적 요청 시에만 업데이트
+        # if getattr(kakao_request, 'fcm_token', None):
+        #     if not user.mt_token_id or user.mt_token_id != kakao_request.fcm_token:
+        #         user.mt_token_id = kakao_request.fcm_token
         db.commit()
 
         # 사용자 정보 구성

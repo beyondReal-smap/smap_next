@@ -169,22 +169,18 @@ def send_fcm_push_notification(
         # FCM 토큰 형식 검증 (서버 레벨에서 한 번 더 검증)
         if not firebase_service._validate_fcm_token(member.mt_token_id):
             logger.warning(f"🚨 [FCM] 잘못된 토큰 형식 - 회원: {member.mt_idx}, 토큰: {member.mt_token_id[:50]}...")
-
-            # 토큰 검증 실패 시 무효화 여부 결정 (일반 전송에서는 무효화하지 않음)
-            if firebase_service._should_invalidate_token(member.mt_token_id, "invalid_token_format"):
-                logger.warning(f"🚨 [FCM] 토큰 형식 검증 실패로 무효화 진행")
-                try:
-                    firebase_service._handle_token_invalidation(
-                        member.mt_token_id,
-                        "invalid_token_format_sendone",
-                        args.get('plt_title'),
-                        args.get('plt_content')
-                    )
-                except Exception as cleanup_error:
-                    logger.error(f"❌ [FCM] 토큰 무효화 처리 실패: {cleanup_error}")
-            else:
-                logger.warning(f"⚠️ [FCM] 토큰 형식 검증 실패했지만 무효화 생략 (재시도 권장)")
-
+            
+            # 잘못된 토큰 즉시 무효화
+            try:
+                firebase_service._handle_token_invalidation(
+                    member.mt_token_id,
+                    "invalid_token_format_sendone",
+                    args.get('plt_title'),
+                    args.get('plt_content')
+                )
+            except Exception as cleanup_error:
+                logger.error(f"❌ [FCM] 토큰 무효화 처리 실패: {cleanup_error}")
+            
             push_log = create_push_log(args, member.mt_idx, 4, db)  # 상태 4: 토큰 문제
             db.add(push_log)
             db.commit()
@@ -259,21 +255,17 @@ def send_fcm_push_notification(
             logger.warning(f"🚨 [FCM POLICY 4] 일반 푸시에서 비활성 토큰 감지: {member.mt_token_id[:30]}...")
             logger.warning(f"🚨 [FCM POLICY 4] 토큰 삭제 처리됨: {firebase_error}")
 
-            # 토큰 무효화 여부 결정 (일반 전송에서는 무효화하지 않음)
-            if firebase_service._should_invalidate_token(member.mt_token_id, "unregistered"):
-                logger.warning(f"🚨 [FCM POLICY 4] 토큰 무효화 진행")
-                try:
-                    firebase_service._handle_token_invalidation(
-                        member.mt_token_id,
-                        "unregistered_from_sendone",
-                        args.get('plt_title'),
-                        args.get('plt_content')
-                    )
-                    logger.info(f"✅ [FCM TOKEN CLEANUP] 토큰 무효화 처리 완료 - 사용자: {member.mt_idx}")
-                except Exception as cleanup_error:
-                    logger.error(f"❌ [FCM TOKEN CLEANUP] 토큰 무효화 처리 실패: {cleanup_error}")
-            else:
-                logger.warning(f"⚠️ [FCM POLICY 4] 토큰 무효화 생략 (재시도 권장) - 사용자: {member.mt_idx}")
+            # 토큰 무효화 처리 - 즉시 DB에서 제거
+            try:
+                firebase_service._handle_token_invalidation(
+                    member.mt_token_id,
+                    "unregistered_from_sendone",
+                    args.get('plt_title'),
+                    args.get('plt_content')
+                )
+                logger.info(f"✅ [FCM TOKEN CLEANUP] 토큰 무효화 처리 완료 - 사용자: {member.mt_idx}")
+            except Exception as cleanup_error:
+                logger.error(f"❌ [FCM TOKEN CLEANUP] 토큰 무효화 처리 실패: {cleanup_error}")
 
             # 상태 4: 토큰 만료로 인한 실패
             push_log = create_push_log(args, member.mt_idx, 4, db)
@@ -290,21 +282,17 @@ def send_fcm_push_notification(
             logger.warning(f"🚨 [FCM POLICY 4] 일반 푸시에서 잘못된 토큰 형식: {member.mt_token_id[:30]}...")
             logger.warning(f"🚨 [FCM POLICY 4] 토큰 형식 오류: {firebase_error}")
 
-            # 토큰 무효화 여부 결정
-            if firebase_service._should_invalidate_token(member.mt_token_id, "third_party_auth_error"):
-                logger.warning(f"🚨 [FCM POLICY 4] ThirdPartyAuthError 토큰 무효화 진행")
-                try:
-                    firebase_service._handle_token_invalidation(
-                        member.mt_token_id,
-                        "third_party_auth_error_from_sendone",
-                        args.get('plt_title'),
-                        args.get('plt_content')
-                    )
-                    logger.info(f"✅ [FCM TOKEN CLEANUP] ThirdPartyAuthError 토큰 무효화 처리 완료 - 사용자: {member.mt_idx}")
-                except Exception as cleanup_error:
-                    logger.error(f"❌ [FCM TOKEN CLEANUP] ThirdPartyAuthError 토큰 무효화 처리 실패: {cleanup_error}")
-            else:
-                logger.warning(f"⚠️ [FCM POLICY 4] ThirdPartyAuthError 토큰 무효화 생략 (재시도 권장) - 사용자: {member.mt_idx}")
+            # 토큰 무효화 처리 - 즉시 DB에서 제거
+            try:
+                firebase_service._handle_token_invalidation(
+                    member.mt_token_id,
+                    "third_party_auth_error_from_sendone",
+                    args.get('plt_title'),
+                    args.get('plt_content')
+                )
+                logger.info(f"✅ [FCM TOKEN CLEANUP] ThirdPartyAuthError 토큰 무효화 처리 완료 - 사용자: {member.mt_idx}")
+            except Exception as cleanup_error:
+                logger.error(f"❌ [FCM TOKEN CLEANUP] ThirdPartyAuthError 토큰 무효화 처리 실패: {cleanup_error}")
 
             # 상태 5: 토큰 형식 오류
             push_log = create_push_log(args, member.mt_idx, 5, db)

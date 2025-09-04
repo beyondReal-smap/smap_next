@@ -1165,11 +1165,13 @@ async def test_ios_push_delivery(
         if request.test_type == "simple":
             # 단순화된 설정으로 테스트 (개선된 APNs 설정 사용)
             # 테스트 목적이므로 토큰 무효화하지 않음
+            logger.info(f"🧪 [TEST] Simple 테스트 모드로 푸시 전송 - 토큰 무효화 방지")
             response = firebase_service.send_push_notification(
                 token=member.mt_token_id,
                 title=title,
                 content=content,
                 member_id=request.mt_idx,
+                enable_fallback=False,  # 테스트에서는 폴백 비활성화
                 is_test=True  # 테스트 모드로 설정
             )
         elif request.test_type == "direct":
@@ -1209,12 +1211,14 @@ async def test_ios_push_delivery(
                 response = f"test_failed: {e}"
         else:
             # 기존 복잡한 설정으로 테스트 (비교용)
+            logger.info(f"🧪 [TEST] Complex 테스트 모드로 푸시 전송 - 토큰 무효화 방지")
             response = firebase_service.send_push_notification(
                 token=member.mt_token_id,
                 title=title,
                 content=content,
                 member_id=request.mt_idx,
                 max_retries=0,
+                enable_fallback=False,  # 테스트에서는 폴백 비활성화
                 is_test=True  # 테스트 모드로 설정
             )
         

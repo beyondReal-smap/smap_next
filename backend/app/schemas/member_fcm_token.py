@@ -6,10 +6,12 @@ from typing import Optional
 class MemberFCMTokenRequest(BaseModel):
     """회원 FCM 토큰 요청 스키마"""
     mt_idx: int = Field(..., description="회원 고유번호", gt=0)
-    fcm_token: str = Field(..., description="Firebase FCM 토큰", min_length=50, max_length=255)
+    fcm_token: str = Field(..., description="Firebase FCM 토큰", min_length=20, max_length=500)
     force_refresh: bool = Field(False, description="강제 토큰 갱신 여부")
-    
+
     class Config:
+        # 더 유연한 타입 변환 허용
+        arbitrary_types_allowed = True
         schema_extra = {
             "example": {
                 "mt_idx": 1186,
