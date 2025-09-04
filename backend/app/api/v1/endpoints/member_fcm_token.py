@@ -1,7 +1,7 @@
 """회원 FCM 토큰 관리 엔드포인트."""
 
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.member import Member
@@ -41,6 +41,20 @@ def validate_fcm_token_format(token: str) -> bool:
     # FCM 토큰 기본 검증
     if not token or not isinstance(token, str):
         logger.warning("❌ FCM 토큰이 비어있거나 문자열이 아님")
+        logger.warning(f"   토큰 값: {repr(token)}")
+        logger.warning(f"   토큰 타입: {type(token)}")
+        return False
+
+    # 공백 토큰 검증
+    token = token.strip()
+    if not token:
+        logger.warning("❌ FCM 토큰이 공백 문자만으로 구성됨")
+        return False
+
+    # null, None, undefined 등의 문자열 검증
+    lower_token = token.lower()
+    if lower_token in ['null', 'none', 'undefined', 'nan', '']:
+        logger.warning(f"❌ FCM 토큰이 유효하지 않은 값: '{token}'")
         return False
 
     # 길이 검증 (현실적인 범위로 조정)
@@ -92,7 +106,8 @@ def validate_fcm_token_format(token: str) -> bool:
 @router.post("/register", response_model=MemberFCMTokenResponse)
 async def register_member_fcm_token(
     request: MemberFCMTokenRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    http_request: Request = None
 ):
     """
     회원 FCM 토큰 등록/업데이트
@@ -137,23 +152,102 @@ async def register_member_fcm_token(
         # 기존 토큰과 비교
         old_token = member.mt_token_id
         is_new_token = old_token != request.fcm_token
+
+        # 토큰 변경의 타당성 검증 (불필요한 토큰 변경 방지)
+        if is_new_token and old_token:
+            logger.info(f"🔍 [TOKEN CHANGE ANALYSIS] 토큰 변경 감지 - 타당성 검증 시작: 회원 ID {request.mt_idx}")
+
+            # 최근 토큰 업데이트 시간 확인
+            if member.mt_token_updated_at:
+                time_since_last_update = datetime.now() - member.mt_token_updated_at
+                hours_since_update = time_since_last_update.total_seconds() / 3600
+
+                # 너무 잦은 토큰 변경 경고 (1시간 이내)
+                if hours_since_update < 1:
+                    logger.warning(f"⚠️ [TOKEN CHANGE ANALYSIS] 매우 잦은 토큰 변경 감지!")
+                    logger.warning(f"⚠️ [TOKEN CHANGE ANALYSIS] 마지막 업데이트: {hours_since_update:.2f}시간 전")
+                    logger.warning(f"⚠️ [TOKEN CHANGE ANALYSIS] 기존 토큰: {old_token[:30]}...")
+                    logger.warning(f"⚠️ [TOKEN CHANGE ANALYSIS] 새 토큰: {request.fcm_token[:30]}...")
+
+                    # FCM 토큰 변경의 일반적인 원인 분석
+                    if len(old_token) != len(request.fcm_token):
+                        logger.info(f"📊 [TOKEN CHANGE ANALYSIS] 토큰 길이 변경: {len(old_token)} → {len(request.fcm_token)}")
+                    elif old_token[:20] == request.fcm_token[:20]:
+                        logger.info(f"📊 [TOKEN CHANGE ANALYSIS] 토큰 접두사 동일 - 부분 변경")
+                    else:
+                        logger.info(f"📊 [TOKEN CHANGE ANALYSIS] 완전 다른 토큰 - FCM 서비스 변경 가능성")
+
+                elif hours_since_update < 24:
+                    logger.info(f"ℹ️ [TOKEN CHANGE ANALYSIS] 24시간 이내 토큰 변경: {hours_since_update:.1f}시간 전")
+                else:
+                    logger.info(f"✅ [TOKEN CHANGE ANALYSIS] 정상적인 토큰 변경: {hours_since_update:.1f}시간 전")
+
+            # 토큰 변경 빈도 모니터링을 위한 추가 정보
+            logger.info(f"📈 [TOKEN CHANGE ANALYSIS] 토큰 변경 통계:")
+            logger.info(f"   - 기존 토큰 길이: {len(old_token) if old_token else 0}")
+            logger.info(f"   - 새 토큰 길이: {len(request.fcm_token)}")
+            logger.info(f"   - 토큰 형식: {'iOS' if ':' in request.fcm_token else 'Android'}")
+
+            # FCM 토큰 변경의 타당성 추가 검증
+            if hours_since_update < 1:
+                logger.warning(f"🚨 [TOKEN VALIDATION] 비정상적으로 잦은 토큰 변경 감지!")
+                logger.warning(f"🚨 [TOKEN VALIDATION] 이는 다음 중 하나의 원인일 수 있음:")
+                logger.warning(f"   1. 앱이 백그라운드에서 불필요하게 토큰 전송")
+                logger.warning(f"   2. FCM 서비스 불안정으로 인한 잦은 토큰 재발급")
+                logger.warning(f"   3. 네트워크 문제로 인한 재전송")
+                logger.warning(f"   4. 앱 버그로 인한 중복 토큰 등록")
+
+                # 추가 검증: 토큰이 실제로 유효한지 확인
+                try:
+                    if firebase_service.is_available():
+                        token_validation = firebase_service.validate_ios_token(request.fcm_token)
+                        logger.info(f"🔍 [TOKEN VALIDATION] 새 토큰 유효성 검증: {'✅ 통과' if token_validation else '❌ 실패'}")
+
+                        if not token_validation:
+                            logger.error(f"🚨 [TOKEN VALIDATION] 새 토큰이 유효하지 않음 - 등록 거부")
+                            raise HTTPException(
+                                status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="새 FCM 토큰이 유효하지 않습니다. 잠시 후 다시 시도해주세요."
+                            )
+                except Exception as validation_error:
+                    logger.warning(f"⚠️ [TOKEN VALIDATION] 토큰 검증 중 오류: {validation_error}")
+                    logger.warning(f"⚠️ [TOKEN VALIDATION] 검증 오류 무시하고 진행")
         
         # 동일한 토큰인 경우 중복 업데이트 방지 (시간 기반 체크 추가)
         if not is_new_token and old_token:
-            # 최근 업데이트 시간 확인 (5분 이내 중복 업데이트 방지)
+            logger.info(f"🔄 [TOKEN CHECK] 동일 토큰 감지 - 중복 방지 체크 시작: 회원 ID {request.mt_idx}")
+            print(f"🔄 [TOKEN CHECK] 동일 토큰 감지 - 중복 방지 체크 시작: 회원 ID {request.mt_idx}")
+
+            # 최근 업데이트 시간 확인 (2시간 이내 중복 업데이트 방지)
             if member.mt_token_updated_at:
                 time_since_update = datetime.now() - member.mt_token_updated_at
-                if time_since_update.total_seconds() < 300:  # 5분
-                    logger.info(f"🚫 중복 업데이트 방지: 회원 ID {request.mt_idx} (마지막 업데이트: {time_since_update.total_seconds():.1f}초 전)")
+                time_seconds = time_since_update.total_seconds()
+                logger.info(f"🔄 [TOKEN CHECK] 마지막 업데이트 시간: {member.mt_token_updated_at}")
+                logger.info(f"🔄 [TOKEN CHECK] 경과 시간: {time_seconds:.1f}초")
+                logger.info(f"🔄 [TOKEN CHECK] 2시간 이내 여부: {time_seconds < 7200}")
+                print(f"🔄 [TOKEN CHECK] 경과 시간: {time_seconds:.1f}초")
+
+                if time_seconds < 7200:  # 2시간 이내 (매우 엄격)
+                    logger.warning(f"🚫 중복 업데이트 방지: 회원 ID {request.mt_idx} (마지막 업데이트: {time_seconds:.1f}초 전)")
+                    print(f"🚫 중복 업데이트 방지: 회원 ID {request.mt_idx}")
+
+                    # 캐시 히트 카운트 증가 (추후 모니터링용)
+                    logger.info(f"📊 [CACHE HIT] 동일 토큰 캐시 히트: 회원 ID {request.mt_idx}")
+
+                    # 동일 토큰이므로 DB 업데이트 없이 바로 리턴
                     return MemberFCMTokenResponse(
                         success=True,
-                        message="FCM 토큰이 이미 최신 상태입니다. (중복 업데이트 방지)",
+                        message=f"FCM 토큰이 이미 최신 상태입니다. (중복 업데이트 방지 - {time_seconds:.1f}초 전 업데이트)",
                         mt_idx=member.mt_idx,
                         has_token=True,
                         token_preview=request.fcm_token[:20] + "..." if len(request.fcm_token) > 20 else request.fcm_token
                     )
-            
-            logger.info(f"✅ 동일 토큰 재등록 허용: 회원 ID {request.mt_idx} (5분 이상 경과)")
+            else:
+                logger.info(f"🔄 [TOKEN CHECK] mt_token_updated_at이 None입니다")
+                print(f"🔄 [TOKEN CHECK] mt_token_updated_at이 None입니다")
+
+            logger.info(f"✅ 동일 토큰 재등록 허용: 회원 ID {request.mt_idx} (2시간 이상 경과)")
+            print(f"✅ 동일 토큰 재등록 허용: 회원 ID {request.mt_idx}")
 
         # mt_token_id 삭제 현상 모니터링을 위한 로깅 추가
         if not old_token and is_new_token:
@@ -168,36 +262,79 @@ async def register_member_fcm_token(
             logger.warning(f"❌ 잘못된 FCM 토큰 형식 감지 - 회원 ID: {request.mt_idx}")
             logger.warning(f"❌ 토큰: {request.fcm_token[:50]}...")
             logger.warning(f"❌ 토큰 길이: {len(request.fcm_token)}자")
-            
-            # 기존에 저장된 토큰이 있다면 무효화 처리
+
+            # 기존에 저장된 토큰이 있다면 무효화 처리하지 않음
+            # 토큰 형식 검증 실패는 클라이언트 측 문제일 수 있음
             if old_token and old_token == request.fcm_token:
-                logger.warning(f"⚠️ 기존 저장된 토큰과 동일한 잘못된 토큰 - 무효화 처리")
-                try:
-                    firebase_service._handle_token_invalidation(
-                        old_token, 
-                        "invalid_token_format_register",
-                        "토큰 등록",
-                        "잘못된 형식의 토큰 등록 시도"
-                    )
-                except Exception as cleanup_error:
-                    logger.error(f"❌ 토큰 무효화 처리 실패: {cleanup_error}")
-            
+                logger.warning(f"⚠️ 기존 저장된 토큰과 동일한 잘못된 토큰 감지")
+                logger.warning(f"⚠️ 형식이 잘못되었지만 기존 토큰 유지 (클라이언트 재전송 대기)")
+                # 무효화 처리 제거 - 클라이언트가 올바른 토큰으로 재시도할 수 있도록 함
+
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="잘못된 FCM 토큰 형식입니다. 앱을 재시작하여 새로운 FCM 토큰을 받은 후 다시 시도해주세요."
             )
 
+        # FCM 토큰 실제 유효성 검증 (Firebase 서비스 사용 가능 시)
+        if firebase_service.is_available():
+            logger.info(f"🔍 [TOKEN VALIDATION] FCM 토큰 실제 유효성 검증 시작 - 회원 ID: {request.mt_idx}")
+            try:
+                if not firebase_service.validate_ios_token(request.fcm_token):
+                    logger.warning(f"🚨 [TOKEN VALIDATION] FCM 토큰 유효성 검증 실패 - 회원 ID: {request.mt_idx}")
+                    logger.warning(f"🚨 [TOKEN VALIDATION] 문제 토큰: {request.fcm_token[:30]}...")
+
+                    # Firebase 검증 실패 시에도 일단 수용하되 경고 로그 남김
+                    logger.warning(f"⚠️ [TOKEN VALIDATION] Firebase 검증 실패했지만 토큰 등록 허용 (네트워크 문제 가능성)")
+
+                else:
+                    logger.info(f"✅ [TOKEN VALIDATION] FCM 토큰 유효성 검증 통과 - 회원 ID: {request.mt_idx}")
+
+            except Exception as validation_error:
+                logger.warning(f"⚠️ [TOKEN VALIDATION] FCM 토큰 검증 중 오류: {validation_error}")
+                logger.warning(f"⚠️ [TOKEN VALIDATION] 검증 오류 무시하고 토큰 등록 진행")
+
         logger.info(f"✅ FCM 토큰 형식 검증 통과 - 회원 ID: {request.mt_idx}")
 
-        # FCM 토큰 업데이트 (FCM 토큰은 일반적으로 1년 이상 유효하므로 90일로 설정)
+        # FCM 토큰 업데이트 (토큰이 실제로 변경된 경우에만 시간 값 업데이트)
+        update_time = datetime.now()
+
+        # HTTP 요청 정보 수집
+        client_ip = "unknown"
+        user_agent = "unknown"
+        if http_request:
+            client_ip = getattr(http_request.client, 'host', 'unknown') if http_request.client else 'unknown'
+            user_agent = http_request.headers.get('user-agent', 'unknown')
+
+        # 상세 로깅 - 토큰 업데이트 추적
+        logger.info(f"🔄 [TOKEN UPDATE] 토큰 업데이트 시작 - 회원 ID: {request.mt_idx}")
+        logger.info(f"🔄 [TOKEN UPDATE] 엔드포인트: /register")
+        logger.info(f"🔄 [TOKEN UPDATE] 클라이언트 IP: {client_ip}")
+        logger.info(f"🔄 [TOKEN UPDATE] User-Agent: {user_agent}")
+        logger.info(f"🔄 [TOKEN UPDATE] 기존 토큰: {old_token[:30] + '...' if old_token else 'None'}")
+        logger.info(f"🔄 [TOKEN UPDATE] 새 토큰: {request.fcm_token[:30]}...")
+        logger.info(f"🔄 [TOKEN UPDATE] 토큰 변경 여부: {is_new_token}")
+
+        # 토큰 값 설정 (항상 수행)
         member.mt_token_id = request.fcm_token
-        member.mt_token_updated_at = datetime.now()  # FCM 토큰 업데이트 일시
-        member.mt_token_expiry_date = datetime.now() + timedelta(days=90)  # 90일 후 만료 예상
-        member.mt_udate = datetime.now()  # 수정일시 업데이트
+
+        # 시간 값 업데이트는 토큰이 실제로 변경된 경우에만 수행
+        if is_new_token:
+            logger.info(f"🔄 [TOKEN UPDATE] 토큰 변경 감지 - 시간 값 업데이트: {update_time.strftime('%Y-%m-%d %H:%M:%S')}")
+            member.mt_token_updated_at = update_time  # FCM 토큰 업데이트 일시
+            member.mt_token_expiry_date = update_time + timedelta(days=90)  # 90일 후 만료 예상
+        else:
+            logger.info(f"🔄 [TOKEN UPDATE] 동일 토큰 - 시간 값 유지 (DB 업데이트 최소화)")
+
+        member.mt_udate = update_time  # 수정일시는 항상 업데이트
         
         db.commit()
         db.refresh(member)
         
+        # 업데이트 완료 로깅
+        logger.info(f"✅ [TOKEN UPDATE] 토큰 업데이트 완료 - 회원 ID: {request.mt_idx}")
+        if is_new_token:
+            logger.info(f"✅ [TOKEN UPDATE] 새 만료일: {member.mt_token_expiry_date.strftime('%Y-%m-%d %H:%M:%S')}")
+
         # 토큰 등록 후 간단한 유효성 테스트 (선택적)
         if is_new_token:
             try:
@@ -218,9 +355,15 @@ async def register_member_fcm_token(
         else:
             logger.info(f"FCM 토큰 재등록 완료 - 회원 ID: {request.mt_idx} (동일 토큰)")
         
+        # 응답 메시지 설정
+        if is_new_token:
+            message = "FCM 토큰이 성공적으로 등록/업데이트되었습니다."
+        else:
+            message = "FCM 토큰이 확인되었습니다. (동일 토큰)"
+
         return MemberFCMTokenResponse(
             success=True,
-            message="FCM 토큰이 성공적으로 등록/업데이트되었습니다.",
+            message=message,
             mt_idx=member.mt_idx,
             has_token=True,
             token_preview=request.fcm_token[:20] + "..." if len(request.fcm_token) > 20 else request.fcm_token
@@ -387,12 +530,33 @@ async def check_and_update_fcm_token(
 
             logger.info(f"✅ FCM 토큰 형식 검증 통과 (check-and-update) - 회원 ID: {request.mt_idx}")
 
+            update_time = datetime.now()
+
+            # 상세 로깅 - 토큰 업데이트 추적
+            logger.info(f"🔄 [TOKEN UPDATE] 토큰 업데이트 시작 - 회원 ID: {request.mt_idx}")
+            logger.info(f"🔄 [TOKEN UPDATE] 엔드포인트: /check-and-update")
+            logger.info(f"🔄 [TOKEN UPDATE] 기존 토큰: {current_token[:30] + '...' if current_token else 'None'}")
+            logger.info(f"🔄 [TOKEN UPDATE] 새 토큰: {request.fcm_token[:30]}...")
+            logger.info(f"🔄 [TOKEN UPDATE] 업데이트 사유: {message}")
+
+            # 토큰 값 설정 (항상 수행)
             member.mt_token_id = request.fcm_token
-            member.mt_token_updated_at = datetime.now()  # FCM 토큰 업데이트 일시
-            member.mt_token_expiry_date = datetime.now() + timedelta(days=90)  # 90일 후 만료 예상
-            member.mt_udate = datetime.now()
+
+            # 시간 값 업데이트는 토큰이 실제로 변경된 경우에만 수행
+            if current_token != request.fcm_token:
+                logger.info(f"🔄 [TOKEN UPDATE] 토큰 변경 감지 - 시간 값 업데이트: {update_time.strftime('%Y-%m-%d %H:%M:%S')}")
+                member.mt_token_updated_at = update_time  # FCM 토큰 업데이트 일시
+                member.mt_token_expiry_date = update_time + timedelta(days=90)  # 90일 후 만료 예상
+            else:
+                logger.info(f"🔄 [TOKEN UPDATE] 동일 토큰 - 시간 값 유지 (DB 업데이트 최소화)")
+
+            member.mt_udate = update_time  # 수정일시는 항상 업데이트
             db.commit()
             db.refresh(member)
+            
+            # 업데이트 완료 로깅
+            logger.info(f"✅ [TOKEN UPDATE] 토큰 업데이트 완료 - 회원 ID: {request.mt_idx}")
+            logger.info(f"✅ [TOKEN UPDATE] 새 만료일: {member.mt_token_expiry_date.strftime('%Y-%m-%d %H:%M:%S')}")
         
         return MemberFCMTokenResponse(
             success=True,
@@ -550,14 +714,36 @@ async def validate_and_refresh_fcm_token(
 
             logger.info(f"✅ FCM 토큰 형식 검증 통과 (validate-and-refresh) - 회원 ID: {request.mt_idx}")
 
-            # 토큰 업데이트 (FCM 토큰은 일반적으로 1년 이상 유효하므로 90일로 설정)
+            # 상세 로깅 - 토큰 업데이트 추적
+            logger.info(f"🔄 [TOKEN UPDATE] 토큰 업데이트 시작 - 회원 ID: {request.mt_idx}")
+            logger.info(f"🔄 [TOKEN UPDATE] 엔드포인트: /validate-and-refresh")
+            logger.info(f"🔄 [TOKEN UPDATE] 기존 토큰: {member.mt_token_id[:30] + '...' if member.mt_token_id else 'None'}")
+            logger.info(f"🔄 [TOKEN UPDATE] 새 토큰: {request.fcm_token[:30]}...")
+            logger.info(f"🔄 [TOKEN UPDATE] 업데이트 사유: {reason}")
+            logger.info(f"🔄 [TOKEN UPDATE] 서버 검증 통과: {server_validation_passed}")
+
+            # 기존 토큰 저장 (시간 값 업데이트 비교용)
+            original_token = member.mt_token_id
+
+            # 토큰 값 설정 (항상 수행)
             member.mt_token_id = request.fcm_token
-            member.mt_token_updated_at = now
-            member.mt_token_expiry_date = now + timedelta(days=90)  # 90일 후 만료 예상
-            member.mt_udate = now
+
+            # 시간 값 업데이트는 토큰이 실제로 변경된 경우에만 수행
+            if original_token != request.fcm_token:
+                logger.info(f"🔄 [TOKEN UPDATE] 토큰 변경 감지 - 시간 값 업데이트: {now.strftime('%Y-%m-%d %H:%M:%S')}")
+                member.mt_token_updated_at = now
+                member.mt_token_expiry_date = now + timedelta(days=90)  # 90일 후 만료 예상
+            else:
+                logger.info(f"🔄 [TOKEN UPDATE] 동일 토큰 - 시간 값 유지 (DB 업데이트 최소화)")
+
+            member.mt_udate = now  # 수정일시는 항상 업데이트
 
             db.commit()
             db.refresh(member)
+            
+            # 업데이트 완료 로깅
+            logger.info(f"✅ [TOKEN UPDATE] 토큰 업데이트 완료 - 회원 ID: {request.mt_idx}")
+            logger.info(f"✅ [TOKEN UPDATE] 새 만료일: {member.mt_token_expiry_date.strftime('%Y-%m-%d %H:%M:%S')}")
 
             validation_status = "서버 검증 통과" if server_validation_passed else "기본 검증만 통과"
             return MemberFCMTokenResponse(
@@ -662,7 +848,7 @@ async def background_token_check(
             # 동일한 토큰인 경우 최근 체크 시간 확인 (백그라운드 중복 체크 방지)
             if member.mt_token_updated_at:
                 time_since_update = datetime.now() - member.mt_token_updated_at
-                if time_since_update.total_seconds() < 1800:  # 30분 (백그라운드는 더 긴 간격)
+                if time_since_update.total_seconds() < 7200:  # 2시간 (매우 엄격)
                     logger.info(f"🚫 백그라운드 중복 체크 방지: 회원 ID {request.mt_idx} (마지막 업데이트: {time_since_update.total_seconds():.0f}초 전)")
                     return MemberFCMTokenResponse(
                         success=True,
@@ -978,34 +1164,49 @@ async def test_ios_push_delivery(
         # 테스트 타입에 따른 전송 방식 선택
         if request.test_type == "simple":
             # 단순화된 설정으로 테스트 (개선된 APNs 설정 사용)
+            # 테스트 목적이므로 토큰 무효화하지 않음
             response = firebase_service.send_push_notification(
                 token=member.mt_token_id,
                 title=title,
                 content=content,
-                member_id=request.mt_idx
+                member_id=request.mt_idx,
+                is_test=True  # 테스트 모드로 설정
             )
         elif request.test_type == "direct":
             # Firebase Console과 동일한 최소 설정으로 테스트
             from firebase_admin import messaging
-            
-            message = messaging.Message(
-                token=member.mt_token_id,
-                notification=messaging.Notification(
-                    title=title,
-                    body=content
-                ),
-                apns=messaging.APNSConfig(
-                    payload=messaging.APNSPayload(
-                        aps=messaging.Aps(
-                            alert=messaging.ApsAlert(title=title, body=content),
-                            sound='default'
+
+            try:
+                message = messaging.Message(
+                    token=member.mt_token_id,
+                    notification=messaging.Notification(
+                        title=title,
+                        body=content
+                    ),
+                    apns=messaging.APNSConfig(
+                        payload=messaging.APNSPayload(
+                            aps=messaging.Aps(
+                                alert=messaging.ApsAlert(title=title, body=content),
+                                sound='default'
+                            )
                         )
                     )
                 )
-            )
-            
-            response = messaging.send(message)
-            logger.info(f"✅ [TEST DIRECT] Firebase Console 방식 테스트 완료: {response}")
+
+                response = messaging.send(message)
+                logger.info(f"✅ [TEST DIRECT] Firebase Console 방식 테스트 완료: {response}")
+            except messaging.UnregisteredError:
+                logger.warning(f"🚨 [TEST DIRECT] 토큰이 등록되지 않음: {member.mt_token_id[:30]}...")
+                # 테스트 목적이므로 토큰 무효화하지 않음
+                response = "test_unregistered_but_not_invalidated"
+            except messaging.SenderIdMismatchError:
+                logger.warning(f"🚨 [TEST DIRECT] Sender ID 불일치: {member.mt_token_id[:30]}...")
+                # 테스트 목적이므로 토큰 무효화하지 않음
+                response = "test_sender_mismatch_but_not_invalidated"
+            except Exception as e:
+                logger.error(f"❌ [TEST DIRECT] FCM 전송 실패: {e}")
+                # 테스트 목적이므로 토큰 무효화하지 않음
+                response = f"test_failed: {e}"
         else:
             # 기존 복잡한 설정으로 테스트 (비교용)
             response = firebase_service.send_push_notification(
@@ -1013,7 +1214,8 @@ async def test_ios_push_delivery(
                 title=title,
                 content=content,
                 member_id=request.mt_idx,
-                max_retries=0
+                max_retries=0,
+                is_test=True  # 테스트 모드로 설정
             )
         
         logger.info(f"✅ [TEST] iOS 푸시 테스트 완료 - 응답: {response}")
@@ -1034,3 +1236,160 @@ async def test_ios_push_delivery(
             status_code=500,
             detail=f"iOS 푸시 테스트 실패: {str(e)}"
         )
+
+
+@router.get("/full-token/{mt_idx}")
+async def get_full_fcm_token_for_test(
+    mt_idx: int,
+    db: Session = Depends(get_db)
+):
+    """
+    테스트용 전체 FCM 토큰 조회 (보안 주의 - 개발/테스트 환경에서만 사용)
+    """
+    try:
+        logger.info(f"🧪 [TEST] 전체 FCM 토큰 조회 요청 - 회원 ID: {mt_idx}")
+        
+        # 회원 조회
+        member = Member.find_by_idx(db, mt_idx)
+        if not member:
+            logger.warning(f"존재하지 않는 회원: mt_idx={mt_idx}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="해당 회원을 찾을 수 없습니다."
+            )
+        
+        if not member.mt_token_id:
+            logger.warning(f"FCM 토큰이 없음: mt_idx={mt_idx}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="FCM 토큰이 존재하지 않습니다."
+            )
+        
+        logger.info(f"✅ [TEST] 전체 FCM 토큰 조회 성공 - 회원 ID: {mt_idx}, 토큰 길이: {len(member.mt_token_id)}")
+        
+        return {
+            "success": True,
+            "mt_idx": member.mt_idx,
+            "full_token": member.mt_token_id,
+            "token_length": len(member.mt_token_id),
+            "token_updated_at": member.mt_token_updated_at.isoformat() if member.mt_token_updated_at else None,
+            "token_expiry_date": member.mt_token_expiry_date.isoformat() if member.mt_token_expiry_date else None,
+            "warning": "⚠️ 이 엔드포인트는 테스트용입니다. 프로덕션에서는 사용하지 마세요."
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ [TEST] 전체 FCM 토큰 조회 실패: {e}")
+        raise HTTPException(status_code=500, detail=f"전체 FCM 토큰 조회 실패: {str(e)}")
+
+
+@router.get("/update-logs/{mt_idx}")
+async def get_token_update_logs(
+    mt_idx: int,
+    limit: int = 50
+):
+    """
+    FCM 토큰 업데이트 로그 조회 (최근 N개)
+    서버 로그 파일에서 해당 회원의 토큰 업데이트 기록을 검색합니다.
+    """
+    try:
+        import subprocess
+        import os
+        
+        logger.info(f"🔍 [LOG SEARCH] 토큰 업데이트 로그 검색 - 회원 ID: {mt_idx}")
+        
+        # Docker 환경에서 로그 검색
+        log_commands = [
+            # 현재 실행 중인 컨테이너 로그
+            f"docker logs $(docker ps -q --filter ancestor=smap_backend:latest) 2>&1 | grep 'TOKEN UPDATE.*회원 ID: {mt_idx}' | tail -{limit}",
+            # 시스템 로그 (fallback)
+            f"journalctl -u docker -n 1000 --no-pager | grep 'TOKEN UPDATE.*회원 ID: {mt_idx}' | tail -{limit}"
+        ]
+        
+        logs = []
+        for cmd in log_commands:
+            try:
+                result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10)
+                if result.stdout.strip():
+                    logs.extend(result.stdout.strip().split('\n'))
+                    break  # 첫 번째 성공한 명령어 결과 사용
+            except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as e:
+                logger.warning(f"로그 검색 명령어 실행 실패: {cmd}, 오류: {e}")
+                continue
+        
+        if not logs:
+            # 로컬 개발 환경용 대체 방법
+            logger.info(f"📋 [LOG SEARCH] Docker 로그에서 결과 없음 - 회원 ID: {mt_idx}")
+            logs = [f"🔍 최근 로그 검색 결과 없음 (회원 ID: {mt_idx})"]
+            logs.append("💡 토큰 업데이트 시 실시간 로그가 콘솔에 출력됩니다:")
+            logs.append("   🔄 [TOKEN UPDATE] 토큰 업데이트 시작")
+            logs.append("   🔄 [TOKEN UPDATE] 엔드포인트: /register 또는 /check-and-update")
+            logs.append("   🔄 [TOKEN UPDATE] 클라이언트 IP, User-Agent")
+            logs.append("   ✅ [TOKEN UPDATE] 토큰 업데이트 완료")
+        
+        return {
+            "success": True,
+            "mt_idx": mt_idx,
+            "log_count": len(logs),
+            "logs": logs,
+            "search_time": datetime.now().isoformat(),
+            "note": "토큰 업데이트 시 실시간으로 서버 콘솔에 상세 로그가 출력됩니다."
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ [LOG SEARCH] 토큰 업데이트 로그 검색 실패: {e}")
+        return {
+            "success": False,
+            "mt_idx": mt_idx,
+            "error": str(e),
+            "note": "로그 검색 실패 - 서버 콘솔에서 실시간 로그 확인 가능"
+        }
+
+
+@router.post("/trigger-update/{mt_idx}")
+async def trigger_token_update_test(
+    mt_idx: int,
+    db: Session = Depends(get_db),
+    http_request: Request = None
+):
+    """
+    테스트용 토큰 업데이트 트리거 (기존 토큰을 다시 등록하여 로그 확인)
+    """
+    try:
+        logger.info(f"🧪 [TEST TRIGGER] 토큰 업데이트 테스트 트리거 - 회원 ID: {mt_idx}")
+        
+        # 회원 조회
+        member = Member.find_by_idx(db, mt_idx)
+        if not member or not member.mt_token_id:
+            raise HTTPException(
+                status_code=404,
+                detail="회원 또는 FCM 토큰을 찾을 수 없습니다."
+            )
+        
+        # 기존 토큰으로 register 엔드포인트 호출 (로그 트리거용)
+        test_request = MemberFCMTokenRequest(
+            mt_idx=mt_idx,
+            fcm_token=member.mt_token_id + "_TEST_TRIGGER"  # 약간 변경하여 업데이트 트리거
+        )
+        
+        # 실제 register 함수 호출
+        result = await register_member_fcm_token(test_request, db, http_request)
+        
+        # 원래 토큰으로 복원
+        member.mt_token_id = member.mt_token_id.replace("_TEST_TRIGGER", "")
+        db.commit()
+        
+        logger.info(f"✅ [TEST TRIGGER] 토큰 업데이트 테스트 완료 - 회원 ID: {mt_idx}")
+        
+        return {
+            "success": True,
+            "message": "토큰 업데이트 로그 트리거 완료",
+            "mt_idx": mt_idx,
+            "trigger_time": datetime.now().isoformat(),
+            "note": "서버 콘솔에서 🔄 [TOKEN UPDATE] 로그를 확인하세요"
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ [TEST TRIGGER] 토큰 업데이트 테스트 실패: {e}")
+        raise HTTPException(status_code=500, detail=f"토큰 업데이트 테스트 실패: {str(e)}")

@@ -191,23 +191,45 @@ class FirebaseService:
                 
             except messaging.UnregisteredError:
                 logger.warning(f"🚨 [FCM iOS] 등록되지 않은 토큰: {token[:30]}...")
-                self._handle_token_invalidation(token, "unregistered", title, content)
+                # 테스트 모드에서는 토큰 무효화하지 않음
+                if is_test:
+                    logger.info(f"🧪 [FCM iOS] 테스트 모드 - 토큰 무효화 생략: {token[:30]}...")
+                    return "test_unregistered_but_not_invalidated"
+                elif self._should_invalidate_token(token, "unregistered"):
+                    self._handle_token_invalidation(token, "unregistered", title, content)
+                else:
+                    logger.info(f"ℹ️ [FCM iOS] 토큰 무효화 보류 (재시도 권장): {token[:30]}...")
                 return "unregistered"
-                
+
             except messaging.SenderIdMismatchError:
                 logger.warning(f"🚨 [FCM iOS] Sender ID 불일치: {token[:30]}...")
-                self._handle_token_invalidation(token, "sender_mismatch", title, content)
+                # 테스트 모드에서는 토큰 무효화하지 않음
+                if is_test:
+                    logger.info(f"🧪 [FCM iOS] 테스트 모드 - 토큰 무효화 생략: {token[:30]}...")
+                    return "test_sender_mismatch_but_not_invalidated"
+                elif self._should_invalidate_token(token, "sender_mismatch"):
+                    self._handle_token_invalidation(token, "sender_mismatch", title, content)
+                else:
+                    logger.info(f"ℹ️ [FCM iOS] 토큰 무효화 보류 (재시도 권장): {token[:30]}...")
                 return "sender_mismatch"
                     
             except Exception as e:
                 logger.error(f"❌ [FCM iOS] 푸시 전송 실패: {e}")
+                # 테스트 모드에서는 토큰 무효화하지 않음
+                if is_test:
+                    logger.info(f"🧪 [FCM iOS] 테스트 모드 - 전송 실패 무효화 생략: {token[:30]}...")
+                    return f"test_failed: {e}"
+                elif self._should_invalidate_token(token, "send_failed"):
+                    logger.warning(f"⚠️ [FCM iOS] 전송 실패로 토큰 무효화 고려: {token[:30]}...")
+                    # 필요시 무효화 처리 (현재는 보류)
+                    # self._handle_token_invalidation(token, "send_failed", title, content)
                 return f"send_failed: {e}"
                     
         except Exception as e:
             logger.error(f"❌ [FCM iOS] iOS 최적화 푸시 전송 실패: {e}")
             return f"ios_push_failed: {e}"
 
-    def send_push_notification(self, token: str, title: str, content: str, max_retries: int = 0, member_id: int = None, enable_fallback: bool = True) -> str:
+    def send_push_notification(self, token: str, title: str, content: str, max_retries: int = 0, member_id: int = None, enable_fallback: bool = True, is_test: bool = False) -> str:
         """FCM 푸시 알림 전송 (iOS 최적화 포함) - 토큰 검증 및 자동 정리 기능 포함
 
         Args:
@@ -246,12 +268,11 @@ class FirebaseService:
                 logger.info(f"🔍 [FCM] 토큰 형식 검증 시작: {token[:30]}...")
                 if not self._validate_fcm_token(token):
                     logger.error(f"❌ [FCM] 토큰 형식 검증 실패: {token[:50]}...")
-                    
-                    # 토큰 무효화 처리
-                    if member_id:
-                        self._handle_token_invalidation(token, "invalid_token_format", title, content)
-                    
-                    raise ValueError(f"FCM 토큰 형식이 잘못되었습니다. 새로운 토큰을 요청해주세요.")
+
+                    # 토큰 형식 검증 실패 시 무효화하지 않음 (FCM 서버에서 실제 검증)
+                    # 형식 검증은 클라이언트 측에서 이미 수행되어야 함
+                    logger.warning(f"⚠️ [FCM] 토큰 형식이 올바르지 않지만, FCM 서버에서 재시도")
+                    # raise ValueError(f"FCM 토큰 형식이 잘못되었습니다. 새로운 토큰을 요청해주세요.")
 
                 # FCM 메시지 구성 (FCM v1 API 형식 준수)
                 logger.info(f"📤 [FCM] 메시지 구성 시작")
@@ -533,24 +554,34 @@ class FirebaseService:
                 token=token,
             )
 
-            response = messaging.send(message)
-            logger.info(f"✅ [FCM POLICY 4] 백그라운드 FCM 메시지 전송 성공: {response}")
-            return response
+            try:
+                response = messaging.send(message)
+                logger.info(f"✅ [FCM POLICY 4] 백그라운드 FCM 메시지 전송 성공: {response}")
+                return response
+            except messaging.UnregisteredError as e:
+                # ✅ 4단계: 서버 측 비활성 토큰 처리 (리소스 관리)
+                logger.warning(f"🚨 [FCM POLICY 4] 백그라운드 푸시에서 비활성 토큰 감지 (UnregisteredError): {token[:30]}...")
+                logger.warning(f"🚨 [FCM POLICY 4] 토큰이 유효하지 않아 삭제 처리 필요: {e}")
 
-        except messaging.UnregisteredError as e:
-            # ✅ 4단계: 서버 측 비활성 토큰 처리 (리소스 관리)
-            logger.warning(f"🚨 [FCM POLICY 4] 백그라운드 푸시에서 비활성 토큰 감지 (UnregisteredError): {token[:30]}...")
-            logger.warning(f"🚨 [FCM POLICY 4] 토큰이 유효하지 않아 삭제 처리 필요: {e}")
+                # 토큰 무효화 여부 결정
+                if self._should_invalidate_token(token, "background_push_unregistered"):
+                    self._handle_token_invalidation(token, "background_push_unregistered", title, content)
+                else:
+                    logger.warning(f"⚠️ [FCM POLICY 4] 백그라운드 푸시 UnregisteredError 무효화 생략")
+                raise
+            except messaging.ThirdPartyAuthError as e:
+                logger.warning(f"🚨 [FCM POLICY 4] 백그라운드 푸시에서 잘못된 토큰 형식 (ThirdPartyAuthError): {token[:30]}...")
+                logger.warning(f"🚨 [FCM POLICY 4] 토큰 형식이 잘못되어 삭제 처리 필요: {e}")
 
-            self._handle_token_invalidation(token, "background_push_unregistered", title, content)
-            raise
-
-        except messaging.ThirdPartyAuthError as e:
-            logger.warning(f"🚨 [FCM POLICY 4] 백그라운드 푸시에서 잘못된 토큰 형식 (ThirdPartyAuthError): {token[:30]}...")
-            logger.warning(f"🚨 [FCM POLICY 4] 토큰 형식이 잘못되어 삭제 처리 필요: {e}")
-
-            self._handle_inactive_token(token, "background_push_invalid")
-            raise
+                # 토큰 무효화 여부 결정
+                if self._should_invalidate_token(token, "background_push_invalid"):
+                    self._handle_inactive_token(token, "background_push_invalid")
+                else:
+                    logger.warning(f"⚠️ [FCM POLICY 4] 백그라운드 푸시 ThirdPartyAuthError 무효화 생략")
+                raise
+            except Exception as e:
+                logger.error(f"❌ [FCM POLICY 4] 백그라운드 FCM 메시지 전송 실패: {e}")
+                raise
 
         except Exception as e:
             logger.error(f"❌ [FCM POLICY 4] 백그라운드 FCM 메시지 전송 실패: {e}")
@@ -625,24 +656,34 @@ class FirebaseService:
                 token=token,
             )
 
-            response = messaging.send(message)
-            logger.info(f"✅ [FCM SILENT] Silent FCM 메시지 전송 성공 - 백그라운드 앱 깨우기 완료: {response}")
-            return response
+            try:
+                response = messaging.send(message)
+                logger.info(f"✅ [FCM SILENT] Silent FCM 메시지 전송 성공 - 백그라운드 앱 깨우기 완료: {response}")
+                return response
+            except messaging.UnregisteredError as e:
+                # ✅ 4단계: 서버 측 비활성 토큰 처리 (리소스 관리)
+                logger.warning(f"🚨 [FCM POLICY 4] Silent 푸시에서 비활성 토큰 감지 (UnregisteredError): {token[:30]}...")
+                logger.warning(f"🚨 [FCM POLICY 4] 토큰이 유효하지 않아 삭제 처리 필요: {e}")
 
-        except messaging.UnregisteredError as e:
-            # ✅ 4단계: 서버 측 비활성 토큰 처리 (리소스 관리)
-            logger.warning(f"🚨 [FCM POLICY 4] Silent 푸시에서 비활성 토큰 감지 (UnregisteredError): {token[:30]}...")
-            logger.warning(f"🚨 [FCM POLICY 4] 토큰이 유효하지 않아 삭제 처리 필요: {e}")
+                # 토큰 무효화 여부 결정
+                if self._should_invalidate_token(token, "silent_push_unregistered"):
+                    self._handle_token_invalidation(token, "silent_push_unregistered", "", "")
+                else:
+                    logger.warning(f"⚠️ [FCM POLICY 4] Silent 푸시 UnregisteredError 무효화 생략")
+                raise
+            except messaging.ThirdPartyAuthError as e:
+                logger.warning(f"🚨 [FCM POLICY 4] Silent 푸시에서 잘못된 토큰 형식 (ThirdPartyAuthError): {token[:30]}...")
+                logger.warning(f"🚨 [FCM POLICY 4] 토큰 형식이 잘못되어 삭제 처리 필요: {e}")
 
-            self._handle_token_invalidation(token, "silent_push_unregistered", "", "")
-            raise
-
-        except messaging.ThirdPartyAuthError as e:
-            logger.warning(f"🚨 [FCM POLICY 4] Silent 푸시에서 잘못된 토큰 형식 (ThirdPartyAuthError): {token[:30]}...")
-            logger.warning(f"🚨 [FCM POLICY 4] 토큰 형식이 잘못되어 삭제 처리 필요: {e}")
-
-            self._handle_token_invalidation(token, "silent_push_invalid", "", "")
-            raise
+                # 토큰 무효화 여부 결정
+                if self._should_invalidate_token(token, "silent_push_invalid"):
+                    self._handle_token_invalidation(token, "silent_push_invalid", "", "")
+                else:
+                    logger.warning(f"⚠️ [FCM POLICY 4] Silent 푸시 ThirdPartyAuthError 무효화 생략")
+                raise
+            except Exception as e:
+                logger.error(f"❌ [FCM SILENT] Silent FCM 메시지 전송 실패: {e}")
+                raise
 
         except Exception as e:
             logger.error(f"❌ [FCM POLICY 4] Silent FCM 메시지 전송 실패: {e}")
@@ -1471,18 +1512,27 @@ SMAP 팀 드림 - 언제나 최고의 서비스를 제공하기 위해 노력하
             )
             
             # Silent Push 전송
-            response = messaging.send(message)
-            logger.info(f"✅ [Silent Push] 토큰 갱신용 Silent Push 전송 성공 - 응답: {response}")
-            
-            # 성공 기록
-            self._log_token_refresh_attempt(token, member_id, "silent_push_sent", True)
-            
-            return "silent_push_sent"
-            
-        except messaging.UnregisteredError:
-            logger.warning(f"🚨 [Silent Push] 토큰이 등록되지 않음 - 토큰 무효화 처리: {token[:30]}...")
-            self._handle_token_invalidation(token, "unregistered_silent_push")
-            return "token_unregistered"
+            try:
+                response = messaging.send(message)
+                logger.info(f"✅ [Silent Push] 토큰 갱신용 Silent Push 전송 성공 - 응답: {response}")
+
+                # 성공 기록
+                self._log_token_refresh_attempt(token, member_id, "silent_push_sent", True)
+
+                return "silent_push_sent"
+            except messaging.UnregisteredError:
+                logger.warning(f"🚨 [Silent Push] 토큰이 등록되지 않음: {token[:30]}...")
+
+                # 토큰 무효화 여부 결정
+                if self._should_invalidate_token(token, "unregistered_silent_push"):
+                    self._handle_token_invalidation(token, "unregistered_silent_push")
+                    return "token_unregistered"
+                else:
+                    logger.warning(f"⚠️ [Silent Push] UnregisteredError 무효화 생략")
+                    return "token_unregistered_but_not_invalidated"
+            except Exception as e:
+                logger.error(f"❌ [Silent Push] FCM 전송 실패: {e}")
+                return f"silent_push_failed: {e}"
             
         except messaging.ThirdPartyAuthError as e:
             logger.error(f"🚨 [Silent Push] 인증 오류: {e}")
@@ -1578,6 +1628,65 @@ SMAP 팀 드림 - 언제나 최고의 서비스를 제공하기 위해 노력하
                 content=content,
                 max_retries=Config.IOS_PUSH_RETRY_COUNT  # 설정된 재시도 횟수 사용
             )
+
+    def _should_invalidate_token(self, token: str, reason: str) -> bool:
+        """
+        FCM 토큰을 실제로 무효화할지 결정하는 메소드
+        불필요한 토큰 무효화를 방지하기 위한 검증 로직
+
+        Args:
+            token: 검증할 FCM 토큰
+            reason: 무효화 이유
+
+        Returns:
+            bool: 토큰을 무효화할지 여부
+        """
+        try:
+            from app.db.session import get_db
+            from app.models.member import Member
+            from sqlalchemy.orm import Session
+            from datetime import datetime, timedelta
+
+            db: Session = next(get_db())
+
+            # 토큰으로 사용자 조회
+            member = db.query(Member).filter(Member.mt_token_id == token).first()
+            if not member:
+                logger.warning(f"⚠️ [TOKEN INVALIDATION] 토큰에 해당하는 사용자를 찾을 수 없음: {token[:30]}...")
+                return False
+
+            current_time = datetime.now()
+
+            # 최근 토큰 업데이트 확인 (1시간 이내 업데이트된 토큰은 무효화하지 않음)
+            if member.mt_token_updated_at and (current_time - member.mt_token_updated_at) < timedelta(hours=1):
+                logger.warning(f"⚠️ [TOKEN INVALIDATION] 최근 업데이트된 토큰 무효화 보류")
+                logger.warning(f"⚠️ [TOKEN INVALIDATION] 마지막 업데이트: {member.mt_token_updated_at}")
+                logger.warning(f"⚠️ [TOKEN INVALIDATION] 경과 시간: {(current_time - member.mt_token_updated_at).total_seconds() / 3600:.2f}시간")
+                return False
+
+            # 토큰이 아직 유효한 기간인지 확인 (만료 전 토큰은 무효화하지 않음)
+            if member.mt_token_expiry_date and current_time < member.mt_token_expiry_date:
+                remaining_days = (member.mt_token_expiry_date - current_time).days
+                if remaining_days > 7:  # 만료 7일 전 토큰은 무효화하지 않음
+                    logger.warning(f"⚠️ [TOKEN INVALIDATION] 아직 유효한 토큰 무효화 보류")
+                    logger.warning(f"⚠️ [TOKEN INVALIDATION] 만료까지 남은 기간: {remaining_days}일")
+                    return False
+
+            # 등록 해제(unregistered)의 경우에만 무효화 허용
+            # 다른 오류(sender_mismatch 등)는 재시도 가능성이 있으므로 무효화하지 않음
+            if reason == "unregistered":
+                logger.info(f"✅ [TOKEN INVALIDATION] 등록 해제 토큰 무효화 승인")
+                return True
+            else:
+                logger.warning(f"⚠️ [TOKEN INVALIDATION] {reason} 오류로 인한 무효화 보류 (재시도 권장)")
+                return False
+
+        except Exception as e:
+            logger.error(f"❌ [TOKEN INVALIDATION] 토큰 무효화 결정 실패: {e}")
+            # 오류 발생 시 보수적으로 무효화하지 않음
+            return False
+        finally:
+            db.close()
 
     def _handle_token_invalidation(self, token: str, reason: str, title: str = None, content: str = None):
         """
