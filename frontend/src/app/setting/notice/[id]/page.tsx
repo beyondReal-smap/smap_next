@@ -200,8 +200,8 @@ export default function NoticeDetailPage() {
       </motion.header>
       
       {/* 메인 컨텐츠 */}
-      <main 
-        className="absolute inset-0 pt-14 overflow-y-auto hide-scrollbar"
+      <main
+        className="absolute inset-0 pt-14 overflow-y-auto hide-scrollbar safe-area-all"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
         <div className="p-4">

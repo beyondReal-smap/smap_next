@@ -4447,7 +4447,7 @@ export default function SchedulePage() {
             animate="in"
             exit="out"
             variants={pageVariants}
-            className="absolute inset-0 px-4 space-y-5 pb-24 overflow-y-auto content-area pt-4"
+            className="absolute inset-0 px-4 space-y-5 pb-24 overflow-y-auto content-area pt-4 safe-area-all"
             style={{
               top: '64px', // 새로운 헤더 높이만큼 아래로
               bottom: '0', // 화면 끝까지 확장

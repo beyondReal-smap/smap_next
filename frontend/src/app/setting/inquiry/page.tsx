@@ -402,8 +402,8 @@ ${message}
           initial="initial"
           animate="in"
           exit="out"
-          className="absolute inset-0 px-4 space-y-6 overflow-y-auto content-area"
-          style={{ 
+          className="absolute inset-0 px-4 space-y-6 overflow-y-auto content-area safe-area-all"
+          style={{
             top: '0px',
             bottom: '0px',
             left: '0',

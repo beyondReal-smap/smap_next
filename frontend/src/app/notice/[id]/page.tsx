@@ -169,7 +169,7 @@ export default function NoticeDetailPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-        className="px-4 pt-20 space-y-6 pb-24"
+        className="px-4 pt-20 space-y-6 pb-24 safe-area-all"
       >
         <motion.div
           initial={{ opacity: 0, y: 20 }}

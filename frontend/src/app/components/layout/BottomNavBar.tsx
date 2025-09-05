@@ -161,7 +161,7 @@ export default function BottomNavBar() {
   return (
     <div
       ref={navBarRef}
-      className="fixed left-0 right-0 bg-white border-t shadow-xl z-[999] rounded-t-2xl m-0 p-0 bottom-navigation-main"
+      className="fixed left-0 right-0 bg-white border-t shadow-xl z-[999] rounded-t-2xl m-0 p-0 bottom-navigation-main safe-area-bottom"
       id="bottom-navigation-bar"
       style={{
         position: 'fixed' as const,

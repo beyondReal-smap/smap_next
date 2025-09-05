@@ -7683,8 +7683,8 @@ export default function ActivelogPage() {
           variants={mapContainerVariants}
           initial="initial"
           animate="animate"
-          className="absolute inset-0 hardware-accelerated" 
-          style={{ 
+          className="absolute inset-0 hardware-accelerated safe-area-all"
+          style={{
             top: '0px', // 헤더 패딩 제거
             bottom: '0px', // 네비게이션 바 아래 패딩 제거
             left: '0',

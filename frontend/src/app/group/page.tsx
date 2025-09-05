@@ -1739,7 +1739,7 @@ function GroupPageContent() {
           </AnimatedHeader>
 
         {/* 메인 컨텐츠 - 고정 위치 */}
-          <div className="absolute inset-0 flex flex-col overflow-hidden" style={{ 
+          <div className="absolute inset-0 flex flex-col overflow-hidden safe-area-all" style={{
             top: '56px', // 헤더 높이만큼 상단 패딩 추가
                          bottom: '48px', // 네비게이션 바 높이만큼 위로
             left: '0',

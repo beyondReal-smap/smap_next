@@ -6707,7 +6707,7 @@ export default function HomePage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="min-h-screen relative home-content main-container"
+          className="min-h-screen relative home-content main-container safe-area-all"
           style={{
             background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
             paddingBottom: '80px', // BottomNavBar 높이만큼 여백 추가 (72px + 8px 여백)

@@ -6718,9 +6718,9 @@ export default function LocationPage() {
           </AnimatedHeader>
         
         {/* 지도 영역 - 고정 위치 */}
-        <div 
-          className="absolute inset-0" 
-          style={{ 
+        <div
+          className="absolute inset-0 safe-area-all"
+          style={{
             top: '56px', // 헤더 높이만큼 아래로
             bottom: '48px', // 네비게이션 바 높이만큼 위로
             left: '0',

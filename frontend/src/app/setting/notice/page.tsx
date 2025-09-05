@@ -129,8 +129,8 @@ export default function NoticePage() {
         </motion.div>
       </AnimatedHeader>
         
-      <main 
-        className="absolute inset-0 px-4 pb-6 space-y-6 overflow-y-auto"
+      <main
+        className="absolute inset-0 px-4 pb-6 space-y-6 overflow-y-auto safe-area-all"
         style={{ paddingTop: '72px' }}
       >
           <motion.div 

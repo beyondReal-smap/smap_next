@@ -444,8 +444,8 @@ export default function SettingsPage() {
     <>
       <style jsx global>{pageAnimations}</style>
 
-        <div 
-          className="fixed inset-0 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 main-container setting-content"
+        <div
+          className="fixed inset-0 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 main-container setting-content safe-area-all"
           id="setting-page-container"
           data-page="/setting"
           data-content-type="setting-page"

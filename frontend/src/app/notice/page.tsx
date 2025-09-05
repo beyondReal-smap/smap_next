@@ -212,9 +212,9 @@ function groupByDate(list: PushLog[]): Record<string, PushLog[]> {
 
 
   return (
-    <div 
-      className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 notice-page-active" 
-      style={{ 
+    <div
+      className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 notice-page-active safe-area-all"
+      style={{
         WebkitOverflowScrolling: 'touch',
         paddingTop: '0px',
         marginTop: '0px',
