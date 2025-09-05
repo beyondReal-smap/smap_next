@@ -30,13 +30,13 @@ const WEEKDAYS = [
 
 // 요일별 색상 클래스 정의 (선택 시 오버라이드용)
 const weekdaySelectedOverrideClasses = [
-  '!bg-red-500 !hover:bg-red-600 !focus:ring-red-300',        // 일
-  '!bg-orange-500 !hover:bg-orange-600 !focus:ring-orange-300', // 월
-  '!bg-yellow-500 !hover:bg-yellow-600 !focus:ring-yellow-400', // 화
-  '!bg-green-500 !hover:bg-green-600 !focus:ring-green-300',     // 수
-  '!bg-blue-500 !hover:bg-blue-600 !focus:ring-blue-300',       // 목
-  '!bg-indigo-500 !hover:bg-indigo-600 !focus:ring-indigo-300',    // 금
-  '!bg-violet-500 !hover:bg-violet-600 !focus:ring-violet-300'   // 토
+  'bg-red-500 text-white hover:bg-red-600 focus:ring-red-300 border-red-500',        // 일
+  'bg-orange-500 text-white hover:bg-orange-600 focus:ring-orange-300 border-orange-500', // 월
+  'bg-yellow-500 text-white hover:bg-yellow-600 focus:ring-yellow-400 border-yellow-500', // 화
+  'bg-green-500 text-white hover:bg-green-600 focus:ring-green-300 border-green-500',     // 수
+  'bg-blue-500 text-white hover:bg-blue-600 focus:ring-blue-300 border-blue-500',       // 목
+  'bg-indigo-500 text-white hover:bg-indigo-600 focus:ring-indigo-300 border-indigo-500',    // 금
+  'bg-violet-500 text-white hover:bg-violet-600 focus:ring-violet-300 border-violet-500'   // 토
 ];
 
 // 그룹 멤버 관련 인터페이스 추가
@@ -575,25 +575,55 @@ export default function AddSchedulePage() {
 
   // 반복 설정 모달 열기 핸들러 (종료 일자 초기화)
   const handleOpenRepeatModal = () => {
-    const currentRepeat = scheduleForm.repeat;
+    const currentRepeat = scheduleForm.repeat || '안함';
     const basicOptions = ['안함', '매일', '매주', '매월', '매년'];
     let initialType = '안함';
     let initialDays = new Set<number>();
 
+    // 기본 옵션 확인
     if (basicOptions.includes(currentRepeat)) {
       initialType = currentRepeat;
-    } else if (currentRepeat.startsWith('매주')) {
+    }
+    // 매주 패턴 파싱 (더 견고하게)
+    else if (currentRepeat.includes('매주')) {
       initialType = '매주';
-      const matches = currentRepeat.match(/\((.*?)\)/);
-      if (matches && matches[1]) {
-        const dayShortNames = matches[1].split(', ');
-        dayShortNames.forEach(shortName => {
+
+      // 다양한 형식 지원: "매주 (수)", "매주(수)", "매주 수요일" 등
+      let dayPart = '';
+      const parenMatch = currentRepeat.match(/\((.*?)\)/);
+      if (parenMatch && parenMatch[1]) {
+        dayPart = parenMatch[1];
+      } else {
+        // 괄호 없는 경우 (예: "매주 수요일")
+        const parts = currentRepeat.split(' ');
+        if (parts.length > 1) {
+          dayPart = parts.slice(1).join(' ');
+        }
+      }
+
+      if (dayPart) {
+        // 여러 요일 처리 (쉼표로 구분)
+        const dayNames = dayPart.split(',').map(name => name.trim());
+
+        dayNames.forEach(dayName => {
+          // 단일 글자 요일명으로 변환 (예: "수요일" -> "수")
+          let shortName = dayName;
+          if (dayName.length > 1) {
+            // "수요일" -> "수" 변환
+            const dayMapping: { [key: string]: string } = {
+              '일요일': '일', '월요일': '월', '화요일': '화', '수요일': '수',
+              '목요일': '목', '금요일': '금', '토요일': '토'
+            };
+            shortName = dayMapping[dayName] || dayName.charAt(0);
+          }
+
           const day = WEEKDAYS.find(d => d.short === shortName);
-          if (day) initialDays.add(day.index);
+          if (day) {
+            initialDays.add(day.index);
+          }
         });
       }
     }
-    // TODO: 다른 사용자 정의 형식 파싱
 
     setModalRepeatType(initialType);
     setModalSelectedWeekdays(initialDays);
@@ -1258,45 +1288,71 @@ export default function AddSchedulePage() {
                   <div className="space-y-3 border-t border-gray-200 pt-4">
                     <label className="block text-sm font-medium text-gray-700">반복 요일 <span className="text-xs text-gray-500">(요일 미선택 시 매주 반복)</span></label>
                     <div className="p-3 bg-gray-50 rounded-lg space-y-2">
-                      {/* 첫 줄: 일월화수 */} 
+                      {/* 첫 줄: 일월화수 */}
                       <div className="flex justify-start gap-2">
                         {WEEKDAYS.slice(0, 4).map(day => {
                           const isSelected = modalSelectedWeekdays.has(day.index);
                           return (
-                            <Button
-                              key={day.index}
-                              variant={isSelected ? 'primary' : 'outline'}
-                              onClick={() => handleModalWeekdayToggle(day.index)}
-                              size="sm"
-                              className={`w-10 h-10 flex items-center justify-center p-0 rounded-full ${ 
-                                isSelected 
-                                  ? weekdaySelectedOverrideClasses[day.index] 
-                                  : '!text-gray-800' 
-                              }`}
-                            >
-                              {day.short}
-                            </Button>
+                            <div key={day.index} className="relative">
+                              <button
+                                onClick={() => handleModalWeekdayToggle(day.index)}
+                                className={`w-10 h-10 flex items-center justify-center text-sm font-medium rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 ${
+                                  isSelected
+                                    ? weekdaySelectedOverrideClasses[day.index]
+                                    : 'bg-white border-gray-300 hover:bg-gray-50 focus:ring-gray-300'
+                                }`}
+                              >
+                                <span
+                                  className="block font-medium text-center"
+                                  style={{
+                                    color: isSelected ? '#ffffff' : '#1f2937'
+                                  }}
+                                >
+                                  {day.short}
+                                </span>
+                              </button>
+                              {isSelected && (
+                                <div className="absolute -top-4 -right-3 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center border-2 border-white z-10">
+                                  <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                  </svg>
+                                </div>
+                              )}
+                            </div>
                           )
                         })}
                       </div>
-                      {/* 둘째 줄: 목금토 */} 
+                      {/* 둘째 줄: 목금토 */}
                       <div className="flex justify-start gap-2">
                         {WEEKDAYS.slice(4, 7).map(day => {
                           const isSelected = modalSelectedWeekdays.has(day.index);
                           return (
-                            <Button
-                              key={day.index}
-                              variant={isSelected ? 'primary' : 'outline'}
-                              onClick={() => handleModalWeekdayToggle(day.index)}
-                              size="sm"
-                              className={`w-10 h-10 flex items-center justify-center p-0 rounded-full ${ 
-                                isSelected 
-                                  ? weekdaySelectedOverrideClasses[day.index] 
-                                  : '!text-gray-800' 
-                              }`}
-                            >
-                              {day.short}
-                            </Button>
+                            <div key={day.index} className="relative">
+                              <button
+                                onClick={() => handleModalWeekdayToggle(day.index)}
+                                className={`w-10 h-10 flex items-center justify-center text-sm font-medium rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 ${
+                                  isSelected
+                                    ? weekdaySelectedOverrideClasses[day.index]
+                                    : 'bg-white border-gray-300 hover:bg-gray-50 focus:ring-gray-300'
+                                }`}
+                              >
+                                <span
+                                  className="block font-medium text-center"
+                                  style={{
+                                    color: isSelected ? '#ffffff' : '#1f2937'
+                                  }}
+                                >
+                                  {day.short}
+                                </span>
+                              </button>
+                              {isSelected && (
+                                <div className="absolute -top-4 -right-3 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center border-2 border-white z-10">
+                                  <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                  </svg>
+                                </div>
+                              )}
+                            </div>
                           )
                         })}
                       </div>

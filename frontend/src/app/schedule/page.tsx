@@ -2413,20 +2413,51 @@ export default function SchedulePage() {
       
       // 매주 다중 요일 선택이 된 경우 요일 선택기 상태 설정
       const repeatText = selectedEventDetails.repeatText || '';
-      if (repeatText.includes('매주 ') && repeatText !== '매주') {
+      if (repeatText.includes('매주') && repeatText !== '매주') {
         setShowWeekdaySelector(true);
-        const selectedDays = repeatText.replace('매주 ', '');
-        const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
-        const weekdayIndices = new Set<number>();
-        
-        selectedDays.split(',').forEach(dayName => {
-          const index = dayNames.indexOf(dayName.trim());
-          if (index !== -1) {
-            weekdayIndices.add(index);
+
+        // 다양한 형식 지원: "매주 (수)", "매주(수)", "매주 수요일", "매주 월,화,수" 등
+        let dayPart = '';
+        const parenMatch = repeatText.match(/\((.*?)\)/);
+        if (parenMatch && parenMatch[1]) {
+          dayPart = parenMatch[1];
+        } else {
+          // 괄호 없는 경우 (예: "매주 수요일")
+          const parts = repeatText.split(' ');
+          if (parts.length > 1) {
+            dayPart = parts.slice(1).join(' ');
           }
-        });
-        
-        setSelectedWeekdays(weekdayIndices);
+        }
+
+        if (dayPart) {
+          const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+          const weekdayIndices = new Set<number>();
+
+          // 여러 요일 처리 (쉼표로 구분)
+          const dayNamesToProcess = dayPart.split(',').map(name => name.trim());
+
+          dayNamesToProcess.forEach(dayName => {
+            // 단일 글자 요일명으로 변환 (예: "수요일" -> "수")
+            let shortName = dayName;
+            if (dayName.length > 1) {
+              // "수요일" -> "수" 변환
+              const dayMapping: { [key: string]: string } = {
+                '일요일': '일', '월요일': '월', '화요일': '화', '수요일': '수',
+                '목요일': '목', '금요일': '금', '토요일': '토'
+              };
+              shortName = dayMapping[dayName] || dayName.charAt(0);
+            }
+
+            const index = dayNames.indexOf(shortName);
+            if (index !== -1) {
+              weekdayIndices.add(index);
+            }
+          });
+
+          setSelectedWeekdays(weekdayIndices);
+        } else {
+          setSelectedWeekdays(new Set());
+        }
       } else {
         setShowWeekdaySelector(false);
         setSelectedWeekdays(new Set());
@@ -4149,51 +4180,88 @@ export default function SchedulePage() {
     console.log('[handleOpenRepeatModal] 시작 - 현재 newEvent.repeat:', newEvent.repeat);
     console.log('[handleOpenRepeatModal] 현재 selectedWeekdays:', Array.from(selectedWeekdays));
     console.log('[handleOpenRepeatModal] 현재 showWeekdaySelector:', showWeekdaySelector);
-    
+
     // 현재 반복 설정을 임시 변수에 저장 (복원용)
     setTempRepeatValue(newEvent.repeat);
     setTempSelectedWeekdays(new Set(selectedWeekdays));
     setTempShowWeekdaySelector(showWeekdaySelector);
-    
+
     // 모달 임시 상태 초기화 - 현재 설정값으로 세팅
-    const currentRepeat = newEvent.repeat;
+    const currentRepeat = newEvent.repeat || '안함';
     let modalRepeatValue = '안함'; // 기본값을 명시적으로 설정
     let modalShowWeekdaySelector = false;
     let modalSelectedWeekdays = new Set<number>();
 
     console.log('[handleOpenRepeatModal] currentRepeat 분석:', currentRepeat);
 
-    if (currentRepeat === '매주 월,화,수,목,금') {
-      console.log('[handleOpenRepeatModal] 매주 월,화,수,목,금 패턴 매치');
-      modalRepeatValue = '매주';
-      modalShowWeekdaySelector = true;
-      modalSelectedWeekdays = new Set([1, 2, 3, 4, 5]);
-    } else if (currentRepeat.startsWith('매주 ') && currentRepeat.includes(',')) {
-      console.log('[handleOpenRepeatModal] 매주 + 요일들 패턴 매치');
-      modalRepeatValue = '매주';
-      modalShowWeekdaySelector = true;
-      const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
-      const selectedDays = currentRepeat.replace('매주 ', '');
-      console.log('[handleOpenRepeatModal] 파싱할 요일들:', selectedDays);
-      selectedDays.split(',').forEach(dayName => {
-        const trimmedDayName = dayName.trim();
-        const index = dayNames.indexOf(trimmedDayName);
-        console.log('[handleOpenRepeatModal] 요일 매칭:', trimmedDayName, '-> 인덱스:', index);
-        if (index !== -1) {
-          modalSelectedWeekdays.add(index);
-        }
-      });
-    } else if (currentRepeat === '매주') {
-      console.log('[handleOpenRepeatModal] 매주 패턴 매치');
-      modalRepeatValue = '매주';
-      modalShowWeekdaySelector = true;
-      modalSelectedWeekdays = new Set(selectedWeekdays);
-    } else if (['안함', '매일', '매월', '매년'].includes(currentRepeat)) {
+    // 기본 옵션 확인
+    if (['안함', '매일', '매월', '매년'].includes(currentRepeat)) {
       console.log('[handleOpenRepeatModal] 기본 반복 패턴 매치:', currentRepeat);
       modalRepeatValue = currentRepeat;
       modalShowWeekdaySelector = false;
       modalSelectedWeekdays = new Set();
-    } else {
+    }
+    // 매주 패턴 파싱 (더 견고하게)
+    else if (currentRepeat.includes('매주')) {
+      modalRepeatValue = '매주';
+      modalShowWeekdaySelector = true;
+
+      // 다양한 형식 지원: "매주 (수)", "매주(수)", "매주 수요일", "매주 월,화,수" 등
+      let dayPart = '';
+      const parenMatch = currentRepeat.match(/\((.*?)\)/);
+      if (parenMatch && parenMatch[1]) {
+        dayPart = parenMatch[1];
+      } else {
+        // 괄호 없는 경우 (예: "매주 수요일")
+        const parts = currentRepeat.split(' ');
+        if (parts.length > 1) {
+          dayPart = parts.slice(1).join(' ');
+        }
+      }
+
+      console.log('[handleOpenRepeatModal] 추출된 요일 부분:', dayPart);
+
+      if (dayPart) {
+        // 여러 요일 처리 (쉼표로 구분)
+        const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+        const dayNamesToProcess = dayPart.split(',').map(name => name.trim());
+        console.log('[handleOpenRepeatModal] 처리할 요일들:', dayNamesToProcess);
+
+        dayNamesToProcess.forEach(dayName => {
+          // 단일 글자 요일명으로 변환 (예: "수요일" -> "수")
+          let shortName = dayName;
+          if (dayName.length > 1) {
+            // "수요일" -> "수" 변환
+            const dayMapping: { [key: string]: string } = {
+              '일요일': '일', '월요일': '월', '화요일': '화', '수요일': '수',
+              '목요일': '목', '금요일': '금', '토요일': '토'
+            };
+            shortName = dayMapping[dayName] || dayName.charAt(0);
+          }
+
+          console.log('[handleOpenRepeatModal] 변환된 요일명:', shortName);
+
+          const index = dayNames.indexOf(shortName);
+          console.log('[handleOpenRepeatModal] 요일 매칭:', shortName, '-> 인덱스:', index);
+          if (index !== -1) {
+            modalSelectedWeekdays.add(index);
+          }
+        });
+      }
+
+      // 요일이 선택되지 않은 경우 기존 선택된 요일 사용
+      if (modalSelectedWeekdays.size === 0) {
+        modalSelectedWeekdays = new Set(selectedWeekdays);
+      }
+    }
+    // 기존 특수 케이스들
+    else if (currentRepeat === '매주 월,화,수,목,금') {
+      console.log('[handleOpenRepeatModal] 매주 월,화,수,목,금 패턴 매치');
+      modalRepeatValue = '매주';
+      modalShowWeekdaySelector = true;
+      modalSelectedWeekdays = new Set([1, 2, 3, 4, 5]);
+    }
+    else {
       console.log('[handleOpenRepeatModal] 알 수 없는 패턴, 기본값 사용');
       modalRepeatValue = '안함';
       modalShowWeekdaySelector = false;
@@ -4210,10 +4278,10 @@ export default function SchedulePage() {
     setTempModalRepeatValue(modalRepeatValue);
     setTempModalShowWeekdaySelector(modalShowWeekdaySelector);
     setTempModalSelectedWeekdays(modalSelectedWeekdays);
-    
+
     // 상태 설정 후 로그
     console.log('[handleOpenRepeatModal] 상태 설정 완료');
-    
+
     setIsRepeatModalOpen(true);
   };
 
@@ -4901,10 +4969,10 @@ export default function SchedulePage() {
                             </div>
                             <h4 className="text-sm font-semibold text-gray-900">반복할 요일 선택</h4>
                           </div>
-                          <p className="text-xs text-gray-600 mb-5 leading-relaxed" style={{ wordBreak: 'keep-all' }}>
+                          <p className="text-xs text-gray-600 leading-relaxed" style={{ wordBreak: 'keep-all' }}>
                             매주 반복할 요일을 선택하세요. 여러 요일을 선택할 수 있습니다.
                           </p>
-                          <div className="grid grid-cols-7 gap-2.5 p-2">
+                          <div className="grid grid-cols-7 gap-3 p-2">
                             {[
                               { day: 1, label: '월', color: 'from-red-400 to-red-500' },
                               { day: 2, label: '화', color: 'from-orange-400 to-orange-500' },
@@ -4927,7 +4995,6 @@ export default function SchedulePage() {
                               >
                                 <motion.button
                                   whileTap={{ scale: 0.92 }}
-                                  whileHover={{ scale: 1.05 }}
                                   onClick={() => {
                                     const newSelectedWeekdays = new Set(tempModalSelectedWeekdays);
                                     if (newSelectedWeekdays.has(weekday.day)) {
@@ -4937,18 +5004,33 @@ export default function SchedulePage() {
                                     }
                                     setTempModalSelectedWeekdays(newSelectedWeekdays);
                                   }}
-                                  className={`aspect-square rounded-xl text-sm font-bold transition-all duration-300 transform overflow-visible w-full relative ${
+                                  className={`w-8 h-8 rounded-xl text-sm font-bold transition-all duration-300 transform overflow-visible relative grid place-items-center justify-center ${
                                     tempModalSelectedWeekdays.has(weekday.day)
-                                      ? `bg-gradient-to-br ${weekday.color} text-white shadow-lg border-2 border-white`
-                                      : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50 shadow-sm'
+                                      ? `bg-gradient-to-br ${weekday.color} shadow-lg border-2 border-white`
+                                      : 'bg-white border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50 shadow-sm'
                                   }`}
+                                  style={{ padding: 0 }}
                                 >
-                                  <span>{weekday.label}</span>
+                                  <span
+                                    className="font-bold text-center w-full"
+                                    style={{
+                                      color: tempModalSelectedWeekdays.has(weekday.day) ? '#ffffff' : '#374151',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      width: '100%',
+                                      height: '100%',
+                                      transition: 'transform 0.2s',
+                                      transform: tempModalSelectedWeekdays.has(weekday.day) ? 'translateY(3px)' : 'none'
+                                    }}
+                                  >
+                                    {weekday.label}
+                                  </span>
                                   
                                   {/* 체크박스를 요일 버튼 오른쪽 위에 위치 */}
                                   {tempModalSelectedWeekdays.has(weekday.day) && (
                                     <motion.div
-                                      className="absolute -top-3 -right-3 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center border-2 border-white z-10"
+                                      className="absolute -top-7 -right-4 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center border-2 border-white z-10"
                                       initial={{ scale: 0, rotate: -180 }}
                                       animate={{ scale: 1, rotate: 0 }}
                                       transition={{ duration: 0.3 }}
@@ -4964,7 +5046,7 @@ export default function SchedulePage() {
                           </div>
                           {tempModalSelectedWeekdays.size === 0 && (
                             <motion.div 
-                              className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xl"
+                              className="p-3 bg-red-50 border border-red-200 rounded-xl"
                               initial={{ opacity: 0, y: 10 }}
                               animate={{ opacity: 1, y: 0 }}
                               transition={{ delay: 0.6 }}
@@ -4981,7 +5063,7 @@ export default function SchedulePage() {
                           )}
                           {tempModalSelectedWeekdays.size > 0 && (
                             <motion.div 
-                              className="mt-4 p-3 bg-green-50 border border-green-200 rounded-xl"
+                              className="p-3 bg-green-50 border border-green-200 rounded-xl"
                               initial={{ opacity: 0, y: 10 }}
                               animate={{ opacity: 1, y: 0 }}
                               transition={{ delay: 0.3 }}

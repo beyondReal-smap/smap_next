@@ -4893,7 +4893,7 @@ const SignInPage = () => {
             type="submit"
             disabled={isLoading}
             className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-base font-medium rounded-lg text-white disabled:opacity-70 transition-all shadow-md"
-            style={{backgroundColor: '#0113A3'}}
+            style={{backgroundColor: '#0113A3', height: '52px'}}
             onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#001f87'}
             onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#0113A3'}
             onFocus={(e) => (e.target as HTMLButtonElement).style.boxShadow = '0 0 0 2px #0113A3, 0 0 0 4px rgba(1, 19, 163, 0.1)'}
@@ -4931,11 +4931,11 @@ const SignInPage = () => {
                   // 캡처링 단계에서 먼저 처리
                   console.log('🔥 [GOOGLE LOGIN] React 버튼 클릭 캡처됨!');
                   (e.nativeEvent as any).stopImmediatePropagation?.(); // 즉시 전파 중단
-                  
+
                   // 이벤트 전파 중단
                   e.preventDefault();
                   e.stopPropagation();
-                  
+
                   console.log('🔥 [GOOGLE LOGIN] 버튼 클릭됨!');
                   console.log('🔍 [GOOGLE LOGIN] 클릭 이벤트 상세:', {
                     target: e.target,
@@ -4944,26 +4944,26 @@ const SignInPage = () => {
                     disabled: e.currentTarget.disabled,
                     timestamp: Date.now()
                   });
-                  
+
                   // 버튼이 비활성화되어 있으면 함수 종료
                   if (isLoading || e.currentTarget.disabled) {
                     console.log('🚫 [GOOGLE LOGIN] 버튼이 비활성화되어 있어 클릭 무시');
                     return;
                   }
-                  
+
                   sendLogToiOS('info', '🔥 Google 로그인 버튼 클릭됨', {
                     timestamp: new Date().toISOString(),
                     event: 'button_click',
                     isLoading: isLoading,
                     buttonDisabled: isLoading
                   });
-                  
+
                   // 햅틱 피드백 (버튼 클릭 시)
                   triggerHapticFeedback(HapticFeedbackType.LIGHT);
-                  
+
                   // 실제 핸들러 호출 (동기 방식으로 변경)
                   console.log('🚀 [GOOGLE LOGIN] handleGoogleLogin 함수 호출 시작');
-                  
+
                   // Promise 형태로 호출하고 에러 처리
                   handleGoogleLogin()
                     .then(() => {
@@ -4978,10 +4978,11 @@ const SignInPage = () => {
                 }}
                 disabled={isLoading}
                 className="w-full inline-flex items-center justify-center py-2.5 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none disabled:opacity-70 transition-all"
-                style={{ 
-                  zIndex: 100, 
+                style={{
+                  zIndex: 100,
                   position: 'relative',
-                  pointerEvents: isLoading ? 'none' : 'auto'
+                  pointerEvents: isLoading ? 'none' : 'auto',
+                  height: '44px'
                 }}
                 onFocus={(e) => (e.target as HTMLButtonElement).style.boxShadow = '0 0 0 2px #0113A3'}
                 onBlur={(e) => (e.target as HTMLButtonElement).style.boxShadow = ''}
@@ -5094,10 +5095,11 @@ const SignInPage = () => {
                   onClick={handleAppleSignIn}
                   disabled={isLoading}
                   className="w-full inline-flex items-center justify-center py-2.5 px-4 border border-gray-900 rounded-lg shadow-sm bg-black text-sm font-medium text-white hover:bg-gray-900 focus:outline-none disabled:opacity-70 transition-all"
-                  style={{ 
-                    zIndex: 100, 
+                  style={{
+                    zIndex: 100,
                     position: 'relative',
-                    pointerEvents: isLoading ? 'none' : 'auto'
+                    pointerEvents: isLoading ? 'none' : 'auto',
+                    height: '44px'
                   }}
                   onFocus={(e) => (e.target as HTMLButtonElement).style.boxShadow = '0 0 0 2px #0113A3'}
                   onBlur={(e) => (e.target as HTMLButtonElement).style.boxShadow = ''}
