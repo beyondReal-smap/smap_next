@@ -47,10 +47,28 @@ export default function WithdrawPage() {
   const [isClosing, setIsClosing] = useState(false);
   const [stepDirection, setStepDirection] = useState<'forward' | 'backward'>('forward');
 
-  // 페이지 마운트 시 스크롤 설정
+  // 사용자 로그인 타입 확인
+  const [isGoogleLogin, setIsGoogleLogin] = useState(false);
+  const [isAppleLogin, setIsAppleLogin] = useState(false);
+
+  // 페이지 마운트 시 스크롤 설정 및 사용자 로그인 타입 확인
   useEffect(() => {
     document.body.style.overflowY = 'auto';
     document.documentElement.style.overflowY = 'auto';
+
+    // 사용자 로그인 타입 확인
+    try {
+      const userData = localStorage.getItem('user-data') || localStorage.getItem('smap_user_data');
+      if (userData) {
+        const user = JSON.parse(userData);
+        // mt_type: 1: 일반, 2: 구글, 3: 애플, 4: 카카오 등
+        setIsGoogleLogin(user.mt_type === 2);
+        setIsAppleLogin(user.mt_type === 3);
+      }
+    } catch (error) {
+      console.error('사용자 정보 파싱 오류:', error);
+    }
+
     return () => {
       document.body.style.overflowY = '';
       document.documentElement.style.overflowY = '';
@@ -100,6 +118,15 @@ export default function WithdrawPage() {
   };
 
   const handlePasswordNext = async () => {
+    // 구글/애플 로그인 사용자는 비밀번호 확인 생략
+    if (isGoogleLogin || isAppleLogin) {
+      console.log('[WITHDRAW] 소셜 로그인 사용자 - 비밀번호 확인 생략');
+      setError('');
+      setStepDirection('forward');
+      setCurrentStep(2);
+      return;
+    }
+
     if (!password) {
       setError('비밀번호를 입력해주세요');
       return;
@@ -112,7 +139,7 @@ export default function WithdrawPage() {
       // JWT 토큰 확인
       const token = localStorage.getItem('auth-token');
       console.log('[WITHDRAW] JWT 토큰 확인:', token);
-      
+
       if (!token || token === 'null' || token === 'undefined') {
         setError('로그인이 필요합니다. 다시 로그인해주세요.');
         setIsLoading(false);
@@ -607,75 +634,116 @@ export default function WithdrawPage() {
           transition={{ duration: 0.3 }}
         >
           {currentStep === 1 && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5, duration: 0.6 }}
               className="space-y-3"
             >
-              {/* 비밀번호 입력 - password 페이지 스타일 적용 */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      현재 비밀번호
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <FiLock className="h-4 w-4 text-gray-400" />
+              {/* 구글/애플 로그인 사용자는 비밀번호 입력 생략 */}
+              {!isGoogleLogin && !isAppleLogin ? (
+                <>
+                  {/* 비밀번호 입력 - password 페이지 스타일 적용 */}
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          현재 비밀번호
+                        </label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <FiLock className="h-4 w-4 text-gray-400" />
+                          </div>
+                          <input
+                            type={showPassword ? 'text' : 'password'}
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            className={`block w-full pl-9 pr-10 py-3 border ${
+                              error && !password ? 'border-red-300' : 'border-gray-300'
+                            } rounded-lg focus:ring-2 transition-all duration-200`}
+                            style={{
+                              '--tw-ring-color': '#DC2626',
+                              '--tw-border-opacity': '1'
+                            } as any}
+                            onFocus={(e) => {
+                              e.target.style.borderColor = '#DC2626';
+                              e.target.style.boxShadow = '0 0 0 2px rgba(220, 38, 38, 0.2)';
+                            }}
+                            onBlur={(e) => {
+                              if (!(error && !password)) {
+                                e.target.style.borderColor = '#D1D5DB';
+                              }
+                              e.target.style.boxShadow = 'none';
+                            }}
+                            placeholder="현재 비밀번호를 입력하세요"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                          >
+                            {showPassword ?
+                              <FiEyeOff className="h-4 w-4 text-gray-400" /> :
+                              <FiEye className="h-4 w-4 text-gray-400" />
+                            }
+                          </button>
+                        </div>
                       </div>
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className={`block w-full pl-9 pr-10 py-3 border ${
-                          error && !password ? 'border-red-300' : 'border-gray-300'
-                        } rounded-lg focus:ring-2 transition-all duration-200`}
-                        style={{ 
-                          '--tw-ring-color': '#DC2626',
-                          '--tw-border-opacity': '1'
-                        } as any}
-                        onFocus={(e) => {
-                          e.target.style.borderColor = '#DC2626';
-                          e.target.style.boxShadow = '0 0 0 2px rgba(220, 38, 38, 0.2)';
-                        }}
-                        onBlur={(e) => {
-                          if (!(error && !password)) {
-                            e.target.style.borderColor = '#D1D5DB';
-                          }
-                          e.target.style.boxShadow = 'none';
-                        }}
-                        placeholder="현재 비밀번호를 입력하세요"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                      >
-                        {showPassword ? 
-                          <FiEyeOff className="h-4 w-4 text-gray-400" /> : 
-                          <FiEye className="h-4 w-4 text-gray-400" />
-                        }
-                      </button>
                     </div>
                   </div>
-                </div>
-              </div>
 
-              {/* 보안 안내 */}
-              <div className="bg-orange-50 border border-orange-200 rounded-xl p-3"
-                   style={{ backgroundColor: '#FFF7ED', borderColor: '#FDBA74' }}>
-                <div className="flex items-start space-x-2">
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
-                       style={{ backgroundColor: '#FED7AA' }}>
-                    <FiShield className="w-4 h-4" style={{ color: '#F97315' }} />
+                  {/* 보안 안내 */}
+                  <div className="bg-orange-50 border border-orange-200 rounded-xl p-3"
+                       style={{ backgroundColor: '#FFF7ED', borderColor: '#FDBA74' }}>
+                    <div className="flex items-start space-x-2">
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                           style={{ backgroundColor: '#FED7AA' }}>
+                        <FiShield className="w-4 h-4" style={{ color: '#F97315' }} />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-semibold mb-1" style={{ color: '#9A3412' }}>보안 확인</h4>
+                        <p className="text-sm" style={{ color: '#C2410C' }}>계정 보안을 위해 본인 확인이 필요합니다.</p>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="text-sm font-semibold mb-1" style={{ color: '#9A3412' }}>보안 확인</h4>
-                    <p className="text-sm" style={{ color: '#C2410C' }}>계정 보안을 위해 본인 확인이 필요합니다.</p>
+                </>
+              ) : (
+                /* 소셜 로그인 사용자 안내 */
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+                  <div className="text-center space-y-3">
+                    {isGoogleLogin ? (
+                      <>
+                        <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
+                          <svg className="w-6 h-6 text-blue-600" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                          </svg>
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900">구글 로그인 확인</h3>
+                        <p className="text-sm text-gray-600">
+                          구글 계정으로 로그인한 사용자입니다.<br/>
+                          아래 다음 버튼을 눌러 계속 진행해주세요.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="w-12 h-12 bg-black rounded-full flex items-center justify-center mx-auto">
+                          <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+                          </svg>
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900">애플 로그인 확인</h3>
+                        <p className="text-sm text-gray-600">
+                          애플 계정으로 로그인한 사용자입니다.<br/>
+                          아래 다음 버튼을 눌러 계속 진행해주세요.
+                        </p>
+                      </>
+                    )}
                   </div>
                 </div>
-              </div>
+              )}
             </motion.div>
           )}
 
