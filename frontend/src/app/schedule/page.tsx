@@ -5408,8 +5408,18 @@ export default function SchedulePage() {
                     transition={{ duration: 0.3 }}
                   >
                     <div className="p-6 flex-shrink-0">
-                      <div className="flex items-center space-x-2 mb-6">
+                      <div className="flex items-center justify-between mb-6">
                         <h3 className="text-lg font-bold text-gray-900">장소 검색</h3>
+                        {/* 상단 닫기 버튼 */}
+                        <button
+                          onClick={handleCloseLocationSearchModal}
+                          className="p-2 hover:bg-gray-100 rounded-full transition-colors mobile-button"
+                          title="닫기"
+                        >
+                          <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
                       </div>
                       
                       {/* 장소 검색 입력 */}
