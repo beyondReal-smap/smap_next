@@ -553,6 +553,10 @@ html, body, #__next, main {
   user-drag: none !important;
   touch-action: manipulation !important;
   -webkit-touch-callout: none !important;
+  /* 추가 드래그 방지 */
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  pointer-events: auto !important;
 }
 
 /* 하단 네비게이션 바 내부 요소들도 패딩 제거 */

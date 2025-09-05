@@ -132,9 +132,12 @@ export default function BottomNavBar() {
       onTouchMove={shouldApplyHomeAction ? (e) => {
         if (touchStartY !== null) {
           const deltaY = Math.abs(e.touches[0].clientY - touchStartY);
-          // 10px 이상 움직이면 드래그로 간주하고 방지
-          if (deltaY > 10) {
+          // 3px 이상 움직이면 드래그로 간주하고 즉시 방지
+          if (deltaY > 3) {
             e.preventDefault();
+            e.stopPropagation();
+            // 한 번 방지하면 더 이상 처리하지 않음
+            setTouchStartY(null);
           }
         }
       } : undefined}
