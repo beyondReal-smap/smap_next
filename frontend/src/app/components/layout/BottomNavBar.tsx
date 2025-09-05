@@ -8,13 +8,16 @@ import { cubicBezier } from 'framer-motion';
 
 export default function BottomNavBar() {
   const pathname = usePathname();
-  
+
   // home 페이지 여부 확인
   const isHomePage = pathname === '/home';
 
   // 다른 페이지들도 home과 동일한 액션 적용
   const isOtherPagesLikeHome = ['/group', '/schedule', '/location', '/activelog'].includes(pathname);
   const shouldApplyHomeAction = isHomePage || isOtherPagesLikeHome;
+
+  // 드래그 방지를 위한 터치 상태 관리
+  const [touchStartY, setTouchStartY] = useState<number | null>(null);
   
   // 랜덤 깜빡임을 위한 상태
   const [randomDelays, setRandomDelays] = useState([0, 0, 0]);
@@ -123,9 +126,21 @@ export default function BottomNavBar() {
     <div
       className="fixed left-0 right-0 bg-white border-t shadow-xl z-[999] rounded-t-2xl m-0 p-0 bottom-navigation-main"
       id="bottom-navigation-bar"
-      onTouchStart={shouldApplyHomeAction ? (e) => e.preventDefault() : undefined}
-      onTouchMove={shouldApplyHomeAction ? (e) => e.preventDefault() : undefined}
-      onTouchEnd={shouldApplyHomeAction ? (e) => e.preventDefault() : undefined}
+      onTouchStart={shouldApplyHomeAction ? (e) => {
+        setTouchStartY(e.touches[0].clientY);
+      } : undefined}
+      onTouchMove={shouldApplyHomeAction ? (e) => {
+        if (touchStartY !== null) {
+          const deltaY = Math.abs(e.touches[0].clientY - touchStartY);
+          // 10px 이상 움직이면 드래그로 간주하고 방지
+          if (deltaY > 10) {
+            e.preventDefault();
+          }
+        }
+      } : undefined}
+      onTouchEnd={shouldApplyHomeAction ? (e) => {
+        setTouchStartY(null);
+      } : undefined}
       style={{
         position: 'fixed' as const,
         bottom: '0px',
@@ -139,7 +154,7 @@ export default function BottomNavBar() {
         opacity: '1 !important',
         transform: 'none !important',
         WebkitTransform: 'none !important',
-        pointerEvents: shouldApplyHomeAction ? 'none' : 'auto',
+        pointerEvents: 'auto' as const,
         backgroundColor: 'white !important',
         borderTop: '1px solid #e5e7eb !important',
         boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.1) !important',
@@ -148,7 +163,7 @@ export default function BottomNavBar() {
         borderBottomLeftRadius: '0px !important',
         borderBottomRightRadius: '0px !important',
         overflow: 'hidden !important',
-        touchAction: shouldApplyHomeAction ? 'none' : 'manipulation',
+        touchAction: 'manipulation' as const,
         userSelect: 'none' as const,
         WebkitUserSelect: 'none' as any,
         WebkitTouchCallout: 'none' as any,
