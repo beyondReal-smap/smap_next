@@ -182,19 +182,19 @@ class GroupScheduleManager:
             action_messages = {
                 'create': {
                     'title': '🆕 새 일정이 생성되었습니다',
-                    'content': f'{editor_name}님이 회원님의 일정 "{schedule_title}"을(를) 생성했습니다.',
+                    'content': f'{editor_name}님이 일정 "{schedule_title}"을(를) 생성했습니다.',
                     'condition': '일정 생성 알림',
                     'memo': '다른 멤버가 회원의 일정을 생성했을 때 전송'
                 },
                 'update': {
                     'title': '✏️ 일정이 수정되었습니다',
-                    'content': f'{editor_name}님이 회원님의 일정 "{schedule_title}"을(를) 수정했습니다.',
+                    'content': f'{editor_name}님이 일정 "{schedule_title}"을(를) 수정했습니다.',
                     'condition': '일정 수정 알림',
                     'memo': '다른 멤버가 회원의 일정을 수정했을 때 전송'
                 },
                 'delete': {
                     'title': '🗑️ 일정이 삭제되었습니다',
-                    'content': f'{editor_name}님이 회원님의 일정 "{schedule_title}"을(를) 삭제했습니다.',
+                    'content': f'{editor_name}님이 일정 "{schedule_title}"을(를) 삭제했습니다.',
                     'condition': '일정 삭제 알림',
                     'memo': '다른 멤버가 회원의 일정을 삭제했을 때 전송'
                 }
