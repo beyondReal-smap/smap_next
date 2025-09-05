@@ -4721,53 +4721,46 @@ export default function SchedulePage() {
                                           </p>
                                         )}
                                         
-                                        {/* 거리와 GPS 시간 정보 */}
+                                        {/* 거리와 GPS 시간 정보 - 컴팩트 디자인 */}
                                         {(event.distanceText || event.memberGpsTime) && (
-                                          <div className="space-y-2 mt-3">
+                                          <div className="space-y-1 mt-2">
                                             {/* 거리 정보 */}
                                             {event.distanceText && (
-                                              <div className="flex items-center space-x-2 bg-blue-50 px-3 py-2 rounded-lg border border-blue-100">
-                                                <div className="flex items-center space-x-1">
-                                                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                  </svg>
-                                                  <span className="text-xs font-semibold text-blue-700">목적지까지</span>
-                                                </div>
-                                                <span className="text-sm font-bold text-blue-800 bg-blue-200 px-2 py-1 rounded-md">
+                                              <div className="flex items-center space-x-1.5 bg-blue-50 px-2 py-1.5 rounded-md border border-blue-100">
+                                                <svg className="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                </svg>
+                                                <span className="text-xs font-medium text-blue-700">까지</span>
+                                                <span className="text-xs font-bold text-blue-800 bg-blue-200 px-1.5 py-0.5 rounded">
                                                   {event.distanceText}
                                                 </span>
                                               </div>
                                             )}
 
-                                            {/* GPS 시간 정보 */}
+                                            {/* GPS 시간 정보 - 컴팩트 가로 배치 */}
                                             {event.memberGpsTime && (
-                                              <div className="flex items-center justify-between bg-green-50 px-3 py-2 rounded-lg border border-green-100">
-                                                <div className="flex items-center space-x-2">
-                                                  <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <div className="flex items-center justify-between bg-green-50 px-2 py-1.5 rounded-md border border-green-100">
+                                                <div className="flex items-center space-x-1.5">
+                                                  <svg className="w-3.5 h-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                   </svg>
-                                                  <div className="flex flex-col">
-                                                    <span className="text-xs font-semibold text-green-700">위치 업데이트</span>
-                                                    <span className="text-xs text-green-600">
-                                                      {dayjs(event.memberGpsTime).format('MM/DD HH:mm')}
-                                                    </span>
-                                                  </div>
-                                                </div>
-                                                <div className="text-right">
                                                   <span className="text-xs font-medium text-green-700">
-                                                    {(() => {
-                                                      const now = dayjs();
-                                                      const gpsTime = dayjs(event.memberGpsTime);
-                                                      const diffMinutes = now.diff(gpsTime, 'minute');
-
-                                                      if (diffMinutes < 1) return '방금 전';
-                                                      if (diffMinutes < 60) return `${diffMinutes}분 전`;
-                                                      if (diffMinutes < 1440) return `${Math.floor(diffMinutes / 60)}시간 전`;
-                                                      return `${Math.floor(diffMinutes / 1440)}일 전`;
-                                                    })()}
+                                                    {dayjs(event.memberGpsTime).format('MM/DD HH:mm')}
                                                   </span>
                                                 </div>
+                                                <span className="text-xs font-medium text-green-700">
+                                                  {(() => {
+                                                    const now = dayjs();
+                                                    const gpsTime = dayjs(event.memberGpsTime);
+                                                    const diffMinutes = now.diff(gpsTime, 'minute');
+
+                                                    if (diffMinutes < 1) return '방금';
+                                                    if (diffMinutes < 60) return `${diffMinutes}분`;
+                                                    if (diffMinutes < 1440) return `${Math.floor(diffMinutes / 60)}시간`;
+                                                    return `${Math.floor(diffMinutes / 1440)}일`;
+                                                  })()}
+                                                </span>
                                               </div>
                                             )}
                                           </div>
