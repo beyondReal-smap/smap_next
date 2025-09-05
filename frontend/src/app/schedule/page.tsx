@@ -4740,19 +4740,19 @@ export default function SchedulePage() {
 
                                             {/* GPS 시간 정보 - 컴팩트 가로 배치 */}
                                             {event.memberGpsTime && (
-                                              <div className="flex items-center justify-between bg-green-50 px-2 py-1.5 rounded-md border border-green-100">
-                                                <div className="flex items-center space-x-1">
-                                                  <svg className="w-3.5 h-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <div className="flex items-start justify-between bg-green-50 px-2 py-1.5 rounded-md border border-green-100">
+                                                <div className="flex items-start space-x-1 flex-1">
+                                                  <svg className="w-3.5 h-3.5 text-green-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                   </svg>
-                                                  <div className="flex flex-col">
-                                                    <span className="text-xs font-medium text-green-700 leading-none">위치 업데이트</span>
-                                                    <span className="text-xs text-green-600 leading-none">
+                                                  <div className="flex flex-col min-w-0">
+                                                    <span className="text-xs font-medium text-green-700 leading-tight">위치 업데이트</span>
+                                                    <span className="text-xs text-green-600 leading-tight">
                                                       {dayjs(event.memberGpsTime).format('MM/DD HH:mm')}
                                                     </span>
                                                   </div>
                                                 </div>
-                                                <span className="text-xs font-medium text-green-700">
+                                                <span className="text-xs font-medium text-green-700 flex-shrink-0">
                                                   {(() => {
                                                     const now = dayjs();
                                                     const gpsTime = dayjs(event.memberGpsTime);
