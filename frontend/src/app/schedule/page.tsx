@@ -2103,14 +2103,8 @@ export default function SchedulePage() {
           clearCacheFromStorage();
           console.log('[handleSaveEvent] 🗑️ 수정 후 로컬 스토리지 캐시 완전 초기화');
           
-          // 푸시 알림 전송 (모달 닫기 전에 실행)
-          const eventSstIdx = originalEventDetails.sst_idx || parseInt(newEvent.id!);
-          if (eventSstIdx) {
-            console.log('[handleSaveEvent] 📤 푸시 알림 전송:', { eventSstIdx, title: newEvent.title, targetMember: selectedMember?.mt_idx });
-            await handlePushNotification('update', eventSstIdx, newEvent.title, selectedMember?.mt_idx);
-          } else {
-            console.warn('[handleSaveEvent] ⚠️ sst_idx를 찾을 수 없어 푸시 알림 전송 생략');
-          }
+          // 푸시 알림은 백엔드에서 자동으로 처리됨 (중복 전송 방지)
+          console.log('[handleSaveEvent] ℹ️ 푸시 알림은 백엔드에서 자동 처리됨 (수정 시)');
           
           // 성공적으로 완료되었을 때만 모달 닫기
           setIsAddEventModalOpen(false);
@@ -2243,8 +2237,8 @@ export default function SchedulePage() {
           // 캐시에 새 이벤트 추가
           updateCacheForEvent(newEventForCache, 'add');
           
-          // 푸시 알림 전송 (모달 닫기 전에 실행)
-          await handlePushNotification('create', response.data.sst_idx, newEvent.title, selectedMember?.mt_idx);
+          // 푸시 알림은 백엔드에서 자동으로 처리됨 (중복 전송 방지)
+          console.log('[handleSaveEvent] ℹ️ 푸시 알림은 백엔드에서 자동 처리됨 (생성 시)');
           
           // 성공적으로 완료되었을 때만 모달 닫기
           setIsAddEventModalOpen(false);
@@ -3731,11 +3725,8 @@ export default function SchedulePage() {
         // 스케줄 목록 새로 고침
         await loadAllGroupSchedules(undefined, undefined, true, true);
         
-        // 푸시 알림 전송
-        if (event.sst_idx) {
-          const targetMemberId = event.tgtMtIdx && event.tgtMtIdx > 0 ? event.tgtMtIdx : undefined;
-          await handlePushNotification('delete', event.sst_idx, event.title, targetMemberId);
-        }
+        // 푸시 알림은 백엔드에서 자동으로 처리됨 (중복 전송 방지)
+        console.log('[deleteSchedule] ℹ️ 푸시 알림은 백엔드에서 자동 처리됨 (삭제 시)');
         
         // 성공 토스트 모달 표시 (3초 후 자동 닫기)
         const deleteMessage = option === 'single' || option === 'this' 
