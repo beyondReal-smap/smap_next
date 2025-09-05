@@ -1809,10 +1809,16 @@ def delete_group_schedule_with_repeat_option(
         if delete_data:
             editor_id = delete_data.get('editorId')
             editor_name = delete_data.get('editorName')
-            if editor_id and editor_name:
-                logger.info(f"👤 [DELETE_REPEAT_SCHEDULE] 실제 작업자 정보 - editorId: {editor_id}, editorName: {editor_name}")
-            else:
-                logger.info(f"👤 [DELETE_REPEAT_SCHEDULE] 실제 작업자 정보 없음 - current_user_id: {current_user_id} 사용")
+
+        if editor_id and editor_name:
+            logger.info(f"👤 [DELETE_REPEAT_SCHEDULE] 실제 작업자 정보 - editorId: {editor_id}, editorName: {editor_name}")
+        else:
+            # editor_id가 없으면 current_user_id를 사용
+            editor_id = current_user_id
+            # 에디터 이름 조회
+            editor_member = Member.find_by_idx(db, str(editor_id))
+            editor_name = editor_member.mt_name if editor_member else "알 수 없음"
+            logger.info(f"👤 [DELETE_REPEAT_SCHEDULE] 실제 작업자 정보 없음 - current_user_id: {current_user_id} 사용, editorName: {editor_name}")
         
         # 그룹 권한 확인
         member_auth = GroupScheduleManager.check_group_permission(db, current_user_id, group_id)
