@@ -4740,12 +4740,12 @@ export default function SchedulePage() {
 
                                             {/* GPS 시간 정보 - 거리 정보와 동일한 스타일 */}
                                             {event.memberGpsTime && (
-                                              <div className="flex items-center space-x-1.5 bg-green-50 px-2 py-1.5 rounded-md border border-green-100">
-                                                <svg className="w-3.5 h-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <div className="flex items-center space-x-1.5 bg-red-50 px-2 py-1.5 rounded-md border border-red-100">
+                                                <svg className="w-3.5 h-3.5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                 </svg>
-                                                <span className="text-xs font-medium text-green-700">위치 업데이트</span>
-                                                <span className="text-xs font-bold text-green-800 bg-green-200 px-1.5 py-0.5 rounded">
+                                                <span className="text-xs font-medium text-red-700">위치 업데이트</span>
+                                                <span className="text-xs font-bold text-red-800 bg-red-200 px-1.5 py-0.5 rounded">
                                                   {dayjs(event.memberGpsTime).format('MM/DD HH:mm')}
                                                 </span>
                                               </div>
