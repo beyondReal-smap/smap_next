@@ -5526,15 +5526,6 @@ export default function SchedulePage() {
                       )}
                     </div>
 
-                    {/* 닫기 버튼 */}
-                    <div className="px-6 pb-6 flex-shrink-0">
-                      <button
-                        onClick={handleCloseLocationSearchModal}
-                              className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
-                      >
-                        닫기
-                      </button>
-                    </div>
                   </motion.div>
                 </motion.div>
                 </Portal>
