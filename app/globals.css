@@ -495,6 +495,30 @@ html, body, #__next, main {
   user-drag: none !important;
   -webkit-touch-callout: none !important;
   -webkit-text-size-adjust: none !important;
+  touch-action: manipulation !important;
+  /* 드래그 이벤트 방지 */
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
+/* 바텀 네비게이션 바를 제외한 모든 영역에서 드래그 방지 */
+body:not(#bottom-navigation-bar),
+#__next:not(#bottom-navigation-bar),
+main:not(#bottom-navigation-bar) {
+  touch-action: manipulation !important;
+  -webkit-touch-callout: none !important;
+}
+
+/* 모든 페이지에서 body 드래그 방지 - 페이지별 차이 제거 */
+html, body, #__next, main {
+  /* 드래그 및 터치 이벤트 방지 */
+  touch-action: manipulation !important;
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  /* 스크롤은 허용하되 드래그는 방지 */
+  overscroll-behavior: none !important;
+  -webkit-overscroll-behavior: none !important;
 } 
 
 /* 경로따라가기 컨트롤 위치 강제 설정 */
