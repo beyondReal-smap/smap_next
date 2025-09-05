@@ -521,12 +521,28 @@ html, body, #__next, main {
   margin-bottom: 0px !important;
   /* iOS Safe Area 무시하고 화면 최하단에 붙이기 */
   bottom: calc(-1 * env(safe-area-inset-bottom)) !important;
+  /* 드래그 액션 무시 */
+  -webkit-user-drag: none !important;
+  -khtml-user-drag: none !important;
+  -moz-user-drag: none !important;
+  -o-user-drag: none !important;
+  user-drag: none !important;
+  touch-action: manipulation !important;
+  -webkit-touch-callout: none !important;
 }
 
 /* 하단 네비게이션 바 내부 요소들도 패딩 제거 */
 #bottom-navigation-bar * {
   padding-bottom: 0px !important;
   margin-bottom: 0px !important;
+  /* 드래그 액션 무시 (버튼은 클릭 가능) */
+  -webkit-user-drag: none !important;
+  -khtml-user-drag: none !important;
+  -moz-user-drag: none !important;
+  -o-user-drag: none !important;
+  user-drag: none !important;
+  touch-action: manipulation !important;
+  -webkit-touch-callout: none !important;
 }
 
 /* notice 상세 페이지 헤더 패딩 강제 제거 - 모든 가능한 선택자 조합 */
