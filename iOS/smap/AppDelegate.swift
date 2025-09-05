@@ -4605,22 +4605,43 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     
     // MARK: - 🚫 FCM 토큰 변경 방지 로직
     
-    /// FCM 토큰 만료 여부 확인 (7일 기준)
+    /// FCM 토큰 만료 여부 확인 (서버 mt_token_expiry_date 기준으로 매우 보수적)
     private func isFCMTokenExpired() -> Bool {
-        let lastUpdateTime = UserDefaults.standard.double(forKey: "last_fcm_token_update_time")
-        let currentTime = Date().timeIntervalSince1970
-        let expiryTime = TimeInterval(fcmTokenExpiryDays * 24 * 60 * 60) // 7일을 초로 변환
-        
-        let isExpired = (currentTime - lastUpdateTime) > expiryTime
-        
-        if isExpired {
-            print("⏰ [FCM Expiry] FCM 토큰이 만료되었습니다. 마지막 업데이트: \(Date(timeIntervalSince1970: lastUpdateTime))")
-        } else {
-            let remainingDays = Double(fcmTokenExpiryDays) - ((currentTime - lastUpdateTime) / (24 * 60 * 60))
-            print("✅ [FCM Expiry] FCM 토큰이 유효합니다. 남은 기간: \(String(format: "%.1f", remainingDays))일")
+        // 1. 먼저 저장된 서버 만료 시간 확인
+        if let expiryDateString = UserDefaults.standard.string(forKey: "server_token_expiry_date") {
+            let dateFormatter = ISO8601DateFormatter()
+            if let expiryDate = dateFormatter.date(from: expiryDateString) {
+                let isExpired = Date() > expiryDate
+                if isExpired {
+                    print("⏰ [FCM Expiry] 서버 기준 FCM 토큰이 만료됨: \(expiryDateString)")
+                } else {
+                    let remainingTime = expiryDate.timeIntervalSinceNow
+                    let remainingDays = remainingTime / (24 * 60 * 60)
+                    print("✅ [FCM Expiry] 서버 기준 FCM 토큰이 유효함. 남은 기간: \(String(format: "%.1f", remainingDays))일")
+                }
+                return isExpired
+            }
         }
         
-        return isExpired
+        // 2. 서버 만료 시간이 없으면 매우 보수적으로 처리 - 만료되지 않았다고 가정
+        print("⚠️ [FCM Expiry] 서버 만료 시간 정보 없음 - 매우 보수적으로 만료되지 않음으로 처리")
+        print("⚠️ [FCM Expiry] 토큰 업데이트를 방지하여 기존 작동하는 토큰 보호")
+        
+        // 백업: 로컬 기준으로만 90일 이상된 경우만 만료로 처리
+        let lastUpdateTime = UserDefaults.standard.double(forKey: "last_fcm_token_update_time")
+        let currentTime = Date().timeIntervalSince1970
+        let conservativeExpiryTime = TimeInterval(90 * 24 * 60 * 60) // 90일
+        
+        let isExpiredLocal = (currentTime - lastUpdateTime) > conservativeExpiryTime
+        
+        if isExpiredLocal {
+            print("⏰ [FCM Expiry] 로컬 기준(90일) FCM 토큰 만료")
+        } else {
+            let remainingDays = 90.0 - ((currentTime - lastUpdateTime) / (24 * 60 * 60))
+            print("✅ [FCM Expiry] 로컬 기준 FCM 토큰 유효. 남은 기간: \(String(format: "%.1f", remainingDays))일")
+        }
+        
+        return isExpiredLocal
     }
     
     /// FCM 토큰 변경 차단 여부 확인
@@ -8193,6 +8214,29 @@ extension AppDelegate {
 
                 if httpResponse.statusCode == 200 || httpResponse.statusCode == 201 {
                     print("✅ [FCM Request] FCM 토큰 서버 업데이트 성공!")
+                    
+                    // 서버 응답에서 만료 시간 추출 및 저장
+                    if let data = data {
+                        do {
+                            if let json = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
+                                // token_expiry_date 추출 및 저장
+                                if let tokenExpiryDate = json["token_expiry_date"] as? String {
+                                    UserDefaults.standard.set(tokenExpiryDate, forKey: "server_token_expiry_date")
+                                    print("📅 [FCM Request] 서버 토큰 만료 시간 저장: \(tokenExpiryDate)")
+                                }
+                                
+                                // 추가 정보도 저장
+                                if let tokenUpdatedAt = json["token_updated_at"] as? String {
+                                    UserDefaults.standard.set(tokenUpdatedAt, forKey: "server_token_updated_at")
+                                }
+                                
+                                UserDefaults.standard.synchronize()
+                            }
+                        } catch {
+                            print("⚠️ [FCM Request] 서버 응답 파싱 실패: \(error)")
+                        }
+                    }
+                    
                     completion(true)
                 } else {
                     print("❌ [FCM Request] FCM 토큰 서버 업데이트 실패 - 상태 코드: \(httpResponse.statusCode)")

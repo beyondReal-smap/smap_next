@@ -499,10 +499,27 @@ async def check_and_update_fcm_token(
             message = "FCM 토큰이 새로 등록되었습니다."
             logger.info(f"새 FCM 토큰 등록 필요 - 회원 ID: {request.mt_idx}")
         elif current_token != request.fcm_token:
-            # 토큰이 다른 경우 - 업데이트
-            needs_update = True
-            message = "FCM 토큰이 업데이트되었습니다."
-            logger.info(f"FCM 토큰 업데이트 필요 - 회원 ID: {request.mt_idx}")
+            # 토큰이 다른 경우 - 기존 토큰이 정상 작동 중인지 먼저 확인
+            
+            # 기존 토큰이 최근에 업데이트되었고, 정상 작동 중이면 업데이트하지 않음
+            if member.mt_token_updated_at:
+                time_since_update = datetime.now() - member.mt_token_updated_at
+                if time_since_update.total_seconds() < 3600:  # 1시간 이내에 업데이트된 토큰
+                    logger.info(f"🛡️ 기존 토큰 보호: 회원 ID {request.mt_idx} (마지막 업데이트: {time_since_update.total_seconds()/60:.1f}분 전)")
+                    logger.info(f"🛡️ 기존 토큰: {current_token[:30]}... (보호됨)")
+                    logger.info(f"🚫 새 토큰: {request.fcm_token[:30]}... (거부됨)")
+                    message = "기존 FCM 토큰이 최근에 업데이트되어 보호됩니다."
+                    needs_update = False
+                else:
+                    # 1시간 이상 지난 경우만 업데이트 허용
+                    needs_update = True
+                    message = "FCM 토큰이 업데이트되었습니다."
+                    logger.info(f"FCM 토큰 업데이트 허용 - 회원 ID: {request.mt_idx} (마지막 업데이트: {time_since_update.total_seconds()/3600:.1f}시간 전)")
+            else:
+                # 업데이트 시간이 없는 경우 업데이트 허용
+                needs_update = True
+                message = "FCM 토큰이 업데이트되었습니다."
+                logger.info(f"FCM 토큰 업데이트 필요 - 회원 ID: {request.mt_idx}")
         else:
             # 동일한 토큰 - 시간 기반 중복 체크
             if member.mt_token_updated_at:
@@ -962,11 +979,11 @@ async def cleanup_expired_fcm_tokens(
         for member in expired_members:
             logger.info(f"🗑️ 만료된 토큰 정리 - 회원 ID: {member.mt_idx}, 만료일: {member.mt_token_expiry_date}")
 
-            # 토큰 정보 초기화
-            member.mt_token_id = None
-            member.mt_token_updated_at = None
-            member.mt_token_expiry_date = None
-            member.mt_udate = now
+            # 토큰 자동 초기화 제거 - 요청 시에만 처리
+            # member.mt_token_id = None
+            # member.mt_token_updated_at = None
+            # member.mt_token_expiry_date = None
+            # member.mt_udate = now
 
             cleaned_count += 1
 
@@ -1031,14 +1048,14 @@ async def reset_invalid_fcm_tokens(
                 logger.warning(f"🚨 잘못된 FCM 토큰 발견 - 회원 ID: {member.mt_idx}")
                 logger.warning(f"   잘못된 토큰: {member.mt_token_id[:50]}...")
 
-                # 잘못된 토큰 삭제
-                member.mt_token_id = None
-                member.mt_token_updated_at = None
-                member.mt_token_expiry_date = None
-                member.mt_udate = datetime.now()
+                # 잘못된 토큰 자동 삭제 제거 - 요청 시에만 처리
+                # member.mt_token_id = None
+                # member.mt_token_updated_at = None
+                # member.mt_token_expiry_date = None
+                # member.mt_udate = datetime.now()
 
-                cleaned_count += 1
-                logger.info(f"✅ 잘못된 FCM 토큰 삭제 완료 - 회원 ID: {member.mt_idx}")
+                # cleaned_count += 1
+                logger.info(f"⚠️ 잘못된 FCM 토큰 발견 (자동 삭제 안함) - 회원 ID: {member.mt_idx}")
 
         if cleaned_count > 0:
             db.commit()

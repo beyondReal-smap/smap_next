@@ -1389,10 +1389,10 @@ export default function AddSchedulePage() {
         </div>
       )}
 
-      {/* 주소 검색 모달 (Portal 사용) - 기본 구조 */} 
+      {/* 주소 검색 모달 (Portal 사용) - 기본 구조 */}
       {isLocationSearchModalOpen && renderModal(
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-[60] transition-opacity duration-300 ease-in-out" onClick={handleCloseLocationSearchModal}> {/* z-index 조정 */} 
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full animate-scaleIn flex flex-col max-h-[calc(100vh-8rem)]" onClick={(e) => e.stopPropagation()}> 
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-[60] transition-opacity duration-300 ease-in-out" onClick={handleCloseLocationSearchModal}> {/* z-index 조정 */}
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full animate-scaleIn flex flex-col h-[70vh] min-h-[400px]" onClick={(e) => e.stopPropagation()}> 
             {/* 모달 헤더 */} 
             <div className="flex justify-between items-center p-6 border-b border-gray-200 flex-shrink-0">
               <h3 className="text-xl font-semibold text-gray-900">주소 검색</h3>
@@ -1400,8 +1400,8 @@ export default function AddSchedulePage() {
                 <svg className="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
-            {/* 모달 본문 */} 
-            <div className="p-6 flex flex-col flex-grow"> {/* overflow-hidden 제거 */} 
+            {/* 모달 본문 */}
+            <div className="p-6 flex flex-col flex-grow min-h-[200px]"> {/* overflow-hidden 제거 */} 
               {/* 검색 입력 */} 
               <div className="flex items-center space-x-2 mb-4 flex-shrink-0">
                 <input
@@ -1416,39 +1416,44 @@ export default function AddSchedulePage() {
                 <Button
                   type="button"
                   variant="primary"
+                  size="md"
                   onClick={() => handleSearchLocation(locationSearchQuery)} // locationSearchQuery 전달
                   disabled={isSearchingLocation}
                   className="flex-shrink-0"
                 >
-                  {isSearchingLocation ? '검색중...' : '검색'}
+                  {isSearchingLocation ? '검색중' : '검색'}
                 </Button>
               </div>
-              {/* 검색 결과 목록 (스크롤 가능 영역) */} 
-              <div className="overflow-y-auto flex-grow">
+              {/* 검색 결과 목록 (스크롤 가능 영역) */}
+              <div className="overflow-y-auto flex-grow min-h-[150px]">
                 {isSearchingLocation && <p className="text-center text-gray-500 py-4">검색 중...</p>}
                 {!isSearchingLocation && locationSearchResults.length === 0 && (
                   <p className="text-center text-gray-500 py-4">검색 결과가 없습니다.</p>
                 )}
                 {!isSearchingLocation && locationSearchResults.length > 0 && (
-                  <ul className="divide-y divide-gray-200">
+                  <div className="space-y-2">
                     {locationSearchResults.map((place) => (
-                      <li key={place.temp_id} className="py-3 flex items-center justify-between">
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-gray-900 truncate">{place.place_name}</p>
-                          <p className="text-xs text-gray-500 truncate">{place.road_address_name || place.address_name}</p>
+                      <div key={place.temp_id} className="bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors">
+                        <div className="p-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900 truncate">{place.place_name}</p>
+                              <p className="text-xs text-gray-500 truncate mt-1">{place.road_address_name || place.address_name}</p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleSelectLocation(place)}
+                              className="ml-3 flex-shrink-0"
+                            >
+                              선택
+                            </Button>
+                          </div>
                         </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleSelectLocation(place)}
-                          className="ml-3 flex-shrink-0"
-                        >
-                          선택
-                        </Button>
-                      </li>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 )}
               </div>
             </div>

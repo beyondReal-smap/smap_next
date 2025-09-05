@@ -5372,7 +5372,7 @@ export default function SchedulePage() {
                   transition={{ duration: 0.2 }}
                 >
                   <motion.div 
-                    className="modal-content-top w-full max-w-md bg-white rounded-3xl shadow-2xl mx-4 max-h-[80vh] flex flex-col"
+                    className="modal-content-top w-full max-w-md bg-white rounded-3xl shadow-2xl mx-4 h-[70vh] min-h-[400px] flex flex-col"
                     onClick={e => e.stopPropagation()}
                     onWheel={e => e.stopPropagation()}
                     onTouchStart={e => e.stopPropagation()}
@@ -5415,17 +5415,9 @@ export default function SchedulePage() {
                         className="w-full py-3 bg-amber-600 text-white rounded-xl font-medium mobile-button hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
                       >
                         {isSearchingLocation ? (
-                          <>
-                            <IOSCompatibleSpinner size="sm" />
-                            <span>검색 중...</span>
-                          </>
+                          <span>검색중</span>
                         ) : (
-                          <>
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
-                            <span>검색</span>
-                          </>
+                          <span>검색</span>
                         )}
                       </button>
                     </div>
@@ -5446,42 +5438,45 @@ export default function SchedulePage() {
                     )}
 
                     {/* 검색 결과 영역 - 스크롤 가능 */}
-                    <div className="modal-scroll-area flex-1 overflow-y-auto scroll-container">
+                    <div className="modal-scroll-area flex-1 overflow-y-auto scroll-container min-h-[200px]">
                       {isSearchingLocation ? (
                         <div className="text-center py-8 px-6">
-                          <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <IOSCompatibleSpinner size="md" />
+                          <div className="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <div className="w-5 h-5 border-2 border-amber-200 border-t-amber-600 rounded-full animate-spin"></div>
                           </div>
                           <p className="text-gray-600 font-medium">장소를 검색하는 중입니다...</p>
                           <p className="text-xs text-gray-500 mt-1">잠시만 기다려주세요</p>
                         </div>
                       ) : locationSearchResults.length > 0 ? (
-                        <div className="px-6 py-4 space-y-3">
+                        <div className="px-6 py-3 space-y-2">
                           {locationSearchResults.map((place, index) => (
-                            <motion.button
+                            <motion.div
                               key={place.temp_id}
-                              onClick={() => handleSelectLocation(place)}
-                              className="w-full bg-amber-50 hover:bg-amber-100 border border-amber-200 hover:border-amber-300 rounded-xl p-4 text-left transition-all duration-200 mobile-button"
-                              initial={{ opacity: 0, y: 20 }}
+                              className="w-full bg-amber-50 hover:bg-amber-100 border border-amber-200 hover:border-amber-300 rounded-lg transition-all duration-200"
+                              initial={{ opacity: 0, y: 10 }}
                               animate={{ opacity: 1, y: 0 }}
-                              transition={{ delay: index * 0.1 }}
-                              whileHover={{ scale: 1.02 }}
-                              whileTap={{ scale: 0.98 }}
+                              transition={{ delay: index * 0.05 }}
+                              whileHover={{ scale: 1.01 }}
                             >
-                              <div className="flex items-start space-x-3">
-                                <div className="flex-1 min-w-0">
-                                  <h5 className="font-semibold text-gray-900 mb-1 truncate">{place.place_name}</h5>
-                                  <p className="text-sm text-gray-600 line-clamp-2" style={{ wordBreak: 'keep-all' }}>
-                                    {place.road_address_name || place.address_name}
-                                  </p>
-                                  <div className="flex items-center mt-2 space-x-2">
-                                    <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full font-medium">
-                                      선택하기
+                              <button
+                                onClick={() => handleSelectLocation(place)}
+                                className="w-full p-3 text-left"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex-1 min-w-0">
+                                    <h5 className="font-semibold text-gray-900 truncate text-sm">{place.place_name}</h5>
+                                    <p className="text-xs text-gray-600 truncate mt-1" style={{ wordBreak: 'keep-all' }}>
+                                      {place.road_address_name || place.address_name}
+                                    </p>
+                                  </div>
+                                  <div className="flex-shrink-0 ml-3">
+                                    <span className="inline-flex items-center px-2 py-1 text-xs bg-amber-100 text-amber-700 rounded-full font-medium hover:bg-amber-200 transition-colors">
+                                      선택
                                     </span>
                                   </div>
                                 </div>
-                              </div>
-                            </motion.button>
+                              </button>
+                            </motion.div>
                           ))}
                         </div>
                       ) : hasSearched && !isSearchingLocation ? (

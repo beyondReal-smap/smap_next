@@ -1702,14 +1702,14 @@ SMAP 팀 드림 - 언제나 최고의 서비스를 제공하기 위해 노력하
                         'invalidated_at': datetime.now().isoformat()
                     }
 
-                    # FCM 토큰 정보 초기화
-                    member.mt_token_id = None
-                    member.mt_token_updated_at = None
-                    member.mt_token_expiry_date = None
-                    member.mt_udate = datetime.now()
+                    # FCM 토큰 자동 초기화 제거 - 요청 시에만 처리
+                    # member.mt_token_id = None
+                    # member.mt_token_updated_at = None
+                    # member.mt_token_expiry_date = None
+                    # member.mt_udate = datetime.now()
 
-                    # 변경사항 저장
-                    db.commit()
+                    # 변경사항 저장 - 토큰 초기화하지 않으므로 commit 제거
+                    # db.commit()
 
                     logger.info(f"✅ [FCM TOKEN MANAGEMENT] 토큰 제거 완료 - 사용자: {member.mt_idx}")
                     logger.info(f"📊 [FCM TOKEN MANAGEMENT] 정리 기록: 이유={reason}, 토큰_접두사={token[:30]}..., 타임스탬프={int(time.time())}")

@@ -140,7 +140,7 @@ class GroupScheduleManager:
         """
         try:
             logger.info(f"🔔 [PUSH_NOTIFICATION] 함수 호출됨 - action: {action}, editor_id: {editor_id}, editor_name: {editor_name}, target_member_id: {target_member_id}")
-            
+
             # 실제 작업자가 없으면 알림을 보내지 않음
             if not editor_id:
                 logger.warning(f"⚠️ [PUSH_NOTIFICATION] editor_id가 없어 알림 전송 생략")
@@ -149,11 +149,19 @@ class GroupScheduleManager:
                 # 에디터 이름 조회
                 editor_member = Member.find_by_idx(db, str(editor_id))
                 editor_name = editor_member.mt_name if editor_member else "알 수 없음"
+
+            logger.info(f"🔔 [PUSH_NOTIFICATION] 알림 전송 준비 완료 - editor: {editor_name}({editor_id}), target: {target_member_id}, action: {action}")
             
-            # 본인이 본인 일정을 수정하는 경우에는 알림을 보내지 않음
+            # 본인이 본인 일정을 작업하는 경우에도 알림을 보냄 (사용자 요청에 따라 수정)
             if editor_id == target_member_id:
-                logger.info(f"🔔 [PUSH_NOTIFICATION] 본인 일정 {action} - 알림 전송 생략")
-                return True
+                logger.info(f"🔔 [PUSH_NOTIFICATION] 본인 일정 {action} - 알림 전송 진행 (editor_id: {editor_id}, target_member_id: {target_member_id})")
+                # 본인 작업인 경우 메시지를 약간 다르게 구성
+                if action == 'update':
+                    action_messages[action]['content'] = f'회원님의 일정 "{schedule_title}"이(가) 수정되었습니다.'
+                elif action == 'create':
+                    action_messages[action]['content'] = f'회원님의 일정 "{schedule_title}"이(가) 생성되었습니다.'
+                elif action == 'delete':
+                    action_messages[action]['content'] = f'회원님의 일정 "{schedule_title}"이(가) 삭제되었습니다.'
             
             # 대상 멤버 정보 조회
             target_member = Member.find_by_idx(db, str(target_member_id))
@@ -202,16 +210,18 @@ class GroupScheduleManager:
 
             # FCM 토큰 존재 여부 확인
             if not target_member.mt_token_id or target_member.mt_token_id.strip() == "":
-                logger.warning(f"🚨 [FCM] FCM 토큰이 없음 - 회원: {target_member.mt_idx}, FCM 전송 생략")
+                logger.warning(f"🚨 [FCM] FCM 토큰이 없음 - 회원: {target_member.mt_idx}({target_member.mt_name}), 토큰: '{target_member.mt_token_id}', FCM 전송 생략")
                 return True
 
             # FCM 푸시 알림 전송
+            logger.info(f"📤 [FCM] 푸시 알림 전송 시도 - 토큰: {target_member.mt_token_id[:20]}..., 제목: {message_info['title']}")
             response = firebase_service.send_push_notification(
                 target_member.mt_token_id,
                 message_info['title'],
                 message_info['content'],
                 member_id=target_member.mt_idx
             )
+            logger.info(f"📥 [FCM] 푸시 알림 전송 결과 - response: {response}")
             
             # 푸시 로그 저장
             push_log = PushLog(
