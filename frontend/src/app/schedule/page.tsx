@@ -4448,14 +4448,15 @@ export default function SchedulePage() {
             exit="out"
             variants={pageVariants}
             className="absolute inset-0 px-4 space-y-5 pb-24 overflow-y-auto content-area pt-4"
-            style={{ 
+            style={{
               top: '64px', // 새로운 헤더 높이만큼 아래로
               bottom: '0', // 화면 끝까지 확장
               left: '0',
               right: '0',
               height: 'calc(100vh - 64px)', // 전체 높이에서 헤더만 제외
               overflowY: 'auto',
-              WebkitOverflowScrolling: 'touch'
+              WebkitOverflowScrolling: 'touch',
+              overscrollBehavior: 'contain'
             }}
           >
             {/* 캘린더 섹션 */}
