@@ -12,6 +12,17 @@ import navigationManager from '@/utils/navigationManager';
 import locationTrackingService from '@/services/locationTrackingService';
 // FCM 관련 서비스 제거됨 - 네이티브에서 FCM 토큰 관리
 
+// Android 인터페이스 타입 정의
+declare global {
+  interface Window {
+    AndroidStorage?: {
+      saveUserDataToPrefs: (userDataJson: string) => void;
+      saveMtIdxToPrefs: (mtIdx: string) => void;
+      saveAuthTokenToPrefs: (authToken: string) => void;
+    };
+  }
+}
+
 // 전역 상태로 중복 실행 방지
 let globalPreloadingState = {
   isPreloading: false,
@@ -40,6 +51,24 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
       };
 
     case 'LOGIN_SUCCESS':
+      // Android 환경에서 사용자 데이터를 SharedPreferences에 저장
+      if (typeof window !== 'undefined' && window.AndroidStorage) {
+        try {
+          const userData = action.payload;
+          if (userData && userData.mt_idx) {
+            // 사용자 데이터를 JSON으로 변환하여 Android에 저장
+            window.AndroidStorage.saveUserDataToPrefs(JSON.stringify(userData));
+
+            // 개별 필드도 저장
+            window.AndroidStorage.saveMtIdxToPrefs(userData.mt_idx.toString());
+
+            console.log('[AUTH CONTEXT] ✅ Android SharedPreferences에 사용자 데이터 저장 완료');
+          }
+        } catch (error) {
+          console.warn('[AUTH CONTEXT] ⚠️ Android 데이터 저장 실패 (무시 가능):', error);
+        }
+      }
+
       return {
         ...state,
         isLoggedIn: true,
