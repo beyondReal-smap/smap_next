@@ -1334,6 +1334,9 @@ export default function SchedulePage() {
   }), [selectedDay]);
 
   const [newEvent, setNewEvent] = useState<NewEvent>(initialNewEventState);
+
+  // 일정 저장 로딩 상태
+  const [isSaving, setIsSaving] = useState(false);
   
   // tempDateTime을 newEvent와 동기화
   useEffect(() => {
@@ -1654,9 +1657,18 @@ export default function SchedulePage() {
 
   // 일정 저장 - 실제 백엔드 API 사용
   const handleSaveEvent = useCallback(async () => {
+    // 이미 저장 중이면 중복 실행 방지
+    if (isSaving) {
+      console.log('[handleSaveEvent] ⚠️ 이미 저장 중입니다. 중복 실행 방지');
+      return;
+    }
+
+    // 로딩 상태 시작
+    setIsSaving(true);
+
     // selectedEventDetails를 함수 시작 부분에서 미리 저장 (안전성 확보)
     const currentEventDetails = selectedEventDetails;
-    
+
     console.log('[handleSaveEvent] 🔥 스케줄 저장 시작');
     console.log('[handleSaveEvent] 📝 현재 newEvent 상태:', newEvent);
     console.log('[handleSaveEvent] 📝 현재 selectedEventDetails 상태:', currentEventDetails);
@@ -1665,24 +1677,28 @@ export default function SchedulePage() {
     if (!newEvent.title || !newEvent.date) {
       console.log('[handleSaveEvent] ❌ 유효성 검사 실패: 제목 또는 날짜 없음');
       openSuccessModal('입력 오류', '제목과 날짜는 필수 입력 항목입니다.', 'error');
-            return;
+      setIsSaving(false); // 유효성 검사 실패 시 로딩 해제
+      return;
         }
 
     if (dateTimeError) {
       console.log('[handleSaveEvent] ❌ 날짜/시간 오류:', dateTimeError);
       openSuccessModal('날짜/시간 오류', '날짜/시간 설정에 오류가 있습니다. 확인 후 다시 시도해주세요.', 'error');
+      setIsSaving(false); // 날짜/시간 오류 시 로딩 해제
       return;
     }
 
     if (!newEvent.allDay && (!newEvent.startTime || !newEvent.endTime)) {
       console.log('[handleSaveEvent] ❌ 시간 입력 오류: 시작/종료 시간 없음');
       openSuccessModal('시간 입력 오류', '시작 시간과 종료 시간을 설정해주세요.', 'error');
+      setIsSaving(false); // 시간 입력 오류 시 로딩 해제
       return;
     }
 
     if (!selectedGroupId) {
       console.log('[handleSaveEvent] ❌ 그룹 선택 오류: selectedGroupId 없음');
       openSuccessModal('그룹 선택 오류', '그룹을 선택해주세요.', 'error');
+      setIsSaving(false); // 그룹 선택 오류 시 로딩 해제
       return;
     }
 
@@ -1703,6 +1719,7 @@ export default function SchedulePage() {
     if (selectedMemberId && selectedMemberId !== currentUser?.id && !isOwnerOrLeader) {
       console.log('[handleSaveEvent] ❌ 권한 없음: 다른 멤버 스케줄 관리 권한 없음');
       openSuccessModal('권한 오류', '다른 멤버의 스케줄을 관리할 권한이 없습니다.', 'error');
+      setIsSaving(false); // 권한 오류 시 로딩 해제
       return;
     }
 
@@ -2102,15 +2119,18 @@ export default function SchedulePage() {
           // 수정 성공 시 로컬 스토리지 캐시 완전 초기화
           clearCacheFromStorage();
           console.log('[handleSaveEvent] 🗑️ 수정 후 로컬 스토리지 캐시 완전 초기화');
-          
+
           // 푸시 알림은 백엔드에서 자동으로 처리됨 (중복 전송 방지)
           console.log('[handleSaveEvent] ℹ️ 푸시 알림은 백엔드에서 자동 처리됨 (수정 시)');
-          
+
           // 성공적으로 완료되었을 때만 모달 닫기
           setIsAddEventModalOpen(false);
           setNewEvent(initialNewEventState);
           setSelectedEventDetails(null);
           setDateTimeError(null);
+
+          // 로딩 상태 해제
+          setIsSaving(false);
           
           // 일정 수정 후 캐시 무효화 및 강제 새로고침
           const currentDate = dayjs();
@@ -2155,6 +2175,7 @@ export default function SchedulePage() {
         } else {
           console.log('[handleSaveEvent] ❌ 스케줄 수정 실패:', response.error);
           openSuccessModal('일정 수정 실패', response.error || '일정 수정에 실패했습니다.', 'error');
+          setIsSaving(false); // 수정 실패 시 로딩 해제
           return;
         }
       } else {
@@ -2239,11 +2260,14 @@ export default function SchedulePage() {
           
           // 푸시 알림은 백엔드에서 자동으로 처리됨 (중복 전송 방지)
           console.log('[handleSaveEvent] ℹ️ 푸시 알림은 백엔드에서 자동 처리됨 (생성 시)');
-          
+
           // 성공적으로 완료되었을 때만 모달 닫기
           setIsAddEventModalOpen(false);
           setNewEvent(initialNewEventState);
           setSelectedEventDetails(null);
+
+          // 로딩 상태 해제
+          setIsSaving(false);
           setDateTimeError(null);
           
           // 새 일정 추가 후에는 전체 새로고침 대신 캐시 업데이트만 수행
@@ -2260,12 +2284,17 @@ export default function SchedulePage() {
         } else {
           console.log('[handleSaveEvent] ❌ 스케줄 생성 실패:', response.error);
           openSuccessModal('일정 등록 실패', response.error || '일정 등록에 실패했습니다.', 'error');
+          setIsSaving(false); // 생성 실패 시 로딩 해제
           return;
         }
       }
       
     } catch (error) {
       console.error('[handleSaveEvent] 💥 스케줄 저장 중 예외 발생:', error);
+
+      // 로딩 상태 해제
+      setIsSaving(false);
+
       openSuccessModal('일정 저장 실패', '일정 저장 중 오류가 발생했습니다.', 'error');
     }
   }, [selectedEventDetails, newEvent, selectedGroupId, scheduleGroupMembers, invalidateCache, selectedMemberId]);
@@ -6522,14 +6551,22 @@ export default function SchedulePage() {
                     <button
                       type="submit"
                       disabled={
-                        !newEvent.title || 
-                        !newEvent.date || 
+                        isSaving ||
+                        !newEvent.title ||
+                        !newEvent.date ||
                         !!dateTimeError ||
                         (!newEvent.allDay && (!newEvent.startTime || !newEvent.endTime))
                       }
-                      className="w-full py-4 bg-gradient-to-r from-[#0113A3] to-[#001a8a] text-white rounded-xl font-semibold mobile-button disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transition-all duration-200"
+                      className="w-full py-4 bg-gradient-to-r from-[#0113A3] to-[#001a8a] text-white rounded-xl font-semibold mobile-button disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transition-all duration-200 relative"
                     >
-                      {newEvent.id ? '일정 수정' : '일정 추가'}
+                      {isSaving ? (
+                        <div className="flex items-center justify-center space-x-2">
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          <span>처리 중...</span>
+                        </div>
+                      ) : (
+                        newEvent.id ? '일정 수정' : '일정 추가'
+                      )}
                     </button>
                     
                     <button
