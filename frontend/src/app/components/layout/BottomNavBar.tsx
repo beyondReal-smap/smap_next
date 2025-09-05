@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { hapticFeedback } from '../../../utils/haptic';
@@ -8,16 +8,13 @@ import { cubicBezier } from 'framer-motion';
 
 export default function BottomNavBar() {
   const pathname = usePathname();
+  const navBarRef = useRef<HTMLDivElement>(null);
 
-  // home 페이지 여부 확인
-  const isHomePage = pathname === '/home';
+  // 모든 페이지에 드래그 방지 적용 (더 간단한 방법)
+  const shouldApplyHomeAction = true;
 
-  // 다른 페이지들도 home과 동일한 액션 적용
-  const isOtherPagesLikeHome = ['/group', '/schedule', '/location', '/activelog'].includes(pathname);
-  const shouldApplyHomeAction = isHomePage || isOtherPagesLikeHome;
 
-  // 드래그 방지를 위한 터치 상태 관리
-  const [touchStartY, setTouchStartY] = useState<number | null>(null);
+  // 드래그 방지용 상태는 useEffect에서 로컬 변수로 관리
   
   // 랜덤 깜빡임을 위한 상태
   const [randomDelays, setRandomDelays] = useState([0, 0, 0]);
@@ -31,17 +28,56 @@ export default function BottomNavBar() {
         Math.random() * 1.8
       ]);
     };
-    
+
     // 초기 설정
     updateRandomDelays();
-    
+
     // 3-5초마다 랜덤하게 업데이트
     const interval = setInterval(() => {
       updateRandomDelays();
     }, 3000 + Math.random() * 2000);
-    
+
     return () => clearInterval(interval);
   }, []);
+
+  // 드래그 방지를 위한 이벤트 리스너 추가
+  useEffect(() => {
+    const navBar = navBarRef.current;
+    if (!navBar || !shouldApplyHomeAction) return;
+
+    let startY: number | null = null;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      startY = e.touches[0].clientY;
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (startY === null) return;
+
+      const deltaY = Math.abs(e.touches[0].clientY - startY);
+
+      if (deltaY > 3) {
+        e.preventDefault();
+        e.stopPropagation();
+        startY = null; // 한 번 방지하면 리셋
+      }
+    };
+
+    const handleTouchEnd = () => {
+      startY = null;
+    };
+
+    // passive: false 옵션으로 이벤트 리스너 추가
+    navBar.addEventListener('touchstart', handleTouchStart, { passive: false });
+    navBar.addEventListener('touchmove', handleTouchMove, { passive: false });
+    navBar.addEventListener('touchend', handleTouchEnd, { passive: false });
+
+    return () => {
+      navBar.removeEventListener('touchstart', handleTouchStart);
+      navBar.removeEventListener('touchmove', handleTouchMove);
+      navBar.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [shouldApplyHomeAction]);
   
   // iOS 감지 및 body에 클래스 추가
   useEffect(() => {
@@ -124,26 +160,9 @@ export default function BottomNavBar() {
 
   return (
     <div
+      ref={navBarRef}
       className="fixed left-0 right-0 bg-white border-t shadow-xl z-[999] rounded-t-2xl m-0 p-0 bottom-navigation-main"
       id="bottom-navigation-bar"
-      onTouchStart={shouldApplyHomeAction ? (e) => {
-        setTouchStartY(e.touches[0].clientY);
-      } : undefined}
-      onTouchMove={shouldApplyHomeAction ? (e) => {
-        if (touchStartY !== null) {
-          const deltaY = Math.abs(e.touches[0].clientY - touchStartY);
-          // 3px 이상 움직이면 드래그로 간주하고 즉시 방지
-          if (deltaY > 3) {
-            e.preventDefault();
-            e.stopPropagation();
-            // 한 번 방지하면 더 이상 처리하지 않음
-            setTouchStartY(null);
-          }
-        }
-      } : undefined}
-      onTouchEnd={shouldApplyHomeAction ? (e) => {
-        setTouchStartY(null);
-      } : undefined}
       style={{
         position: 'fixed' as const,
         bottom: '0px',

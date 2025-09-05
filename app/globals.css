@@ -33,7 +33,7 @@ html {
   overscroll-behavior: none !important;
   -webkit-overscroll-behavior: none !important;
   /* iOS WebView 터치 스크롤 완전 차단 */
-  touch-action: none !important;
+  touch-action: manipulation !important;
   -webkit-overflow-scrolling: auto !important;
 }
 
@@ -50,7 +50,7 @@ body {
   overscroll-behavior: none !important;
   -webkit-overscroll-behavior: none !important;
   /* iOS WebView 터치 스크롤 완전 차단 */
-  touch-action: none !important;
+  touch-action: manipulation !important;
   -webkit-overflow-scrolling: auto !important;
   /* 추가 보안 설정 */
   margin: 0 !important;
@@ -415,7 +415,7 @@ body {
   width: 100% !important;
   top: 0 !important;
   left: 0 !important;
-  touch-action: none !important;
+  touch-action: manipulation !important;
 }
 
 /* 메인 앱 컨테이너 스크롤 차단 */
@@ -429,7 +429,7 @@ main,
   width: 100% !important;
   top: 0 !important;
   left: 0 !important;
-  touch-action: none !important;
+  touch-action: manipulation !important;
 }
 
 /* 스크롤이 필요한 컨테이너만 허용 (지도 제외) */
@@ -545,7 +545,7 @@ html, body, #__next, main {
   margin-bottom: 0px !important;
   /* iOS Safe Area 무시하고 화면 최하단에 붙이기 */
   bottom: calc(-1 * env(safe-area-inset-bottom)) !important;
-  /* 드래그 액션 무시 */
+  /* 드래그 액션 무시 - 모든 페이지에서 적용 */
   -webkit-user-drag: none !important;
   -khtml-user-drag: none !important;
   -moz-user-drag: none !important;
