@@ -234,25 +234,31 @@ export async function POST(request: NextRequest) {
         image: googleUser.picture, // 백엔드에서 image 필드를 기대함
         id_token: idToken,
         
-      // 🔧 사용자 조회 우선순위 설정
-      lookup_strategy: 'comprehensive', // 종합적 조회
-      search_by_email: true, // 이메일로 기존 사용자 검색
-      search_by_google_id: true, // 구글 ID로도 검색
-      verify_email_match: true, // 이메일 일치 확인
-      force_db_lookup: true // DB 강제 조회
+        // 🔧 member_t 테이블 이메일 검색 설정
+        lookup_strategy: 'member_t_email_search', // member_t 테이블 이메일 검색
+        search_by_email: true, // 이메일로 기존 사용자 검색
+        search_by_google_id: true, // 구글 ID로도 검색
+        verify_email_match: true, // 이메일 일치 확인
+        force_db_lookup: true, // DB 강제 조회
+        table_name: 'member_t', // 검색할 테이블 명시
+        email_field: 'mt_email', // 검색할 이메일 필드 명시
+        search_priority: 'email_first' // 이메일 우선 검색
       };
       
-      // 🔧 모든 구글 로그인에 대해 종합적 DB 조회 요청
-      sendLogToConsole('info', '🔧 종합적 DB 조회 설정', {
+      // 🔧 member_t 테이블 이메일 검색 요청
+      sendLogToConsole('info', '🔧 member_t 테이블 이메일 검색 설정', {
         email: googleUser.email,
         googleId: googleUser.googleId,
-        action: 'comprehensive_db_lookup'
+        table: 'member_t',
+        emailField: 'mt_email',
+        action: 'member_t_email_lookup'
       });
       
-      // 백엔드에 종합적 조회 요청
-      requestBody.comprehensive_lookup = true;
-      requestBody.lookup_priority = 'both'; // 이메일과 구글 ID 모두로 조회
+      // 백엔드에 member_t 테이블 이메일 검색 요청
+      requestBody.member_t_email_lookup = true;
+      requestBody.lookup_priority = 'email_first'; // 이메일 우선 조회
       requestBody.debug_mode = true; // 디버그 모드 활성화
+      requestBody.sql_query_hint = 'SELECT * FROM member_t WHERE mt_email = ?'; // SQL 힌트
       
       sendLogToConsole('info', '백엔드 요청 본문', requestBody);
       
@@ -457,9 +463,13 @@ export async function POST(request: NextRequest) {
           action: 'trying_direct_email_lookup'
         });
         
-        // 🔧 이메일로 직접 사용자 조회 시도
+        // 🔧 member_t 테이블에서 이메일로 직접 사용자 조회 시도
         try {
-          sendLogToConsole('info', '🔍 이메일 기반 직접 사용자 조회 시도');
+          sendLogToConsole('info', '🔍 member_t 테이블 이메일 기반 직접 사용자 조회 시도', {
+            email: googleUser.email,
+            table: 'member_t',
+            field: 'mt_email'
+          });
           
           const emailLookupResponse = await fetch(`https://api3.smap.site/api/v1/auth/find-user-by-email`, {
             method: 'POST',
@@ -472,7 +482,11 @@ export async function POST(request: NextRequest) {
               email: googleUser.email,
               provider: 'google',
               force_lookup: true,
-              debug_mode: true
+              debug_mode: true,
+              table_name: 'member_t',
+              email_field: 'mt_email',
+              sql_query: 'SELECT * FROM member_t WHERE mt_email = ?',
+              search_method: 'direct_email_lookup'
             })
           });
           
@@ -481,9 +495,13 @@ export async function POST(request: NextRequest) {
             sendLogToConsole('info', '✅ 이메일 기반 조회 성공', emailLookupData);
             
             if (emailLookupData.success && emailLookupData.data?.user) {
-              sendLogToConsole('info', '🔄 이메일 기반 조회로 올바른 사용자 발견, 교체');
+              sendLogToConsole('info', '🔄 member_t 테이블 이메일 기반 조회로 올바른 사용자 발견, 교체', {
+                foundUser: emailLookupData.data.user.mt_name,
+                mt_idx: emailLookupData.data.user.mt_idx,
+                mt_email: emailLookupData.data.user.mt_email
+              });
               user = emailLookupData.data.user;
-              isNewUser = false; // 이메일로 찾았으므로 기존 사용자
+              isNewUser = false; // member_t에서 이메일로 찾았으므로 기존 사용자
             }
           } else {
             sendLogToConsole('warning', '❌ 이메일 기반 조회 실패', {
