@@ -99,19 +99,20 @@ export default function AppLayout({ children }: AppLayoutProps) {
     console.log('❌ [FCM] 토큰 등록 실패 이벤트 처리:', data);
 
     let displayMessage = data.message || '푸시 알림 설정에 실패했습니다.';
-    let displayTime = 5000; // 기본 5초
 
-    // 타임아웃 상황인 경우 더 짧게 표시
-    if (data.action === 'wait') {
-      displayTime = 3000; // 3초
+    // 404 에러인 경우 더 구체적인 메시지 표시
+    if (data.reason === 'user_not_found') {
+      displayMessage = '사용자 정보 동기화 중입니다. 잠시 후 다시 시도해주세요.';
     }
+
+    let displayTime = 3000; // 타임아웃 상황에서는 짧게 표시
 
     setFcmNotification({
       type: 'error',
       message: displayMessage
     });
 
-    // 상황에 맞는 표시 시간 후 알림 제거
+    // 짧은 표시 시간 후 알림 제거
     setTimeout(() => {
       setFcmNotification({ type: null, message: '' });
     }, displayTime);
