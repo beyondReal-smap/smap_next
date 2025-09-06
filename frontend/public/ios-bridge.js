@@ -5,6 +5,81 @@ console.log('🌉 [iOS Bridge] 완전 강화된 초기화 시작');
 console.log('🌉 [iOS Bridge] 현재 URL:', window.location.href);
 console.log('🌉 [iOS Bridge] User Agent:', navigator.userAgent);
 
+// 🔄 FCM 토큰 등록 상태 관리
+window.__FCM_TOKEN_STATUS__ = {
+    isRegistered: false,
+    lastAttemptTime: 0,
+    failureCount: 0,
+    isBlocked: false,
+    blockUntil: 0
+};
+
+// FCM 토큰 등록 상태 확인 함수
+window.__checkFCMTokenStatus__ = function() {
+    const now = Date.now();
+    const status = window.__FCM_TOKEN_STATUS__;
+
+    // 차단 상태 확인
+    if (status.isBlocked && now < status.blockUntil) {
+        console.log('🚫 [iOS Bridge] FCM 토큰 등록이 차단된 상태 - 메시지 전송 건너뜀');
+        console.log('⏰ [iOS Bridge] 차단 해제까지:', Math.ceil((status.blockUntil - now) / 1000), '초 남음');
+        return false;
+    }
+
+    // 최근 실패가 있었고 아직 타임아웃이 지나지 않은 경우
+    if (!status.isRegistered && status.failureCount > 0 && (now - status.lastAttemptTime) < 300000) { // 5분
+        console.log('⏳ [iOS Bridge] FCM 토큰 등록 실패 후 쿨다운 중 - 메시지 전송 건너뜀');
+        return false;
+    }
+
+    return true;
+};
+
+// FCM 토큰 등록 상태 업데이트 함수
+window.__updateFCMTokenStatus__ = function(isRegistered, isError = false) {
+    const status = window.__FCM_TOKEN_STATUS__;
+    const now = Date.now();
+
+    if (isRegistered) {
+        status.isRegistered = true;
+        status.failureCount = 0;
+        status.isBlocked = false;
+        console.log('✅ [iOS Bridge] FCM 토큰 등록 성공 - 상태 업데이트');
+    } else if (isError) {
+        status.lastAttemptTime = now;
+        status.failureCount++;
+
+        // 3회 이상 실패 시 5분간 차단
+        if (status.failureCount >= 3) {
+            status.isBlocked = true;
+            status.blockUntil = now + (5 * 60 * 1000); // 5분
+            console.log('🚨 [iOS Bridge] FCM 토큰 등록 3회 실패 - 5분간 메시지 전송 차단');
+        }
+    }
+};
+
+// 🔄 FCM 토큰 등록 이벤트 리스너 설정
+(function setupFCMTokenEventListeners() {
+    console.log('🎧 [iOS Bridge] FCM 토큰 이벤트 리스너 설정 시작');
+
+    // FCM 토큰 등록 성공 이벤트 리스너
+    window.addEventListener('fcmTokenRegistrationSuccess', function(event) {
+        console.log('✅ [iOS Bridge] FCM 토큰 등록 성공 이벤트 수신');
+        window.__updateFCMTokenStatus__(true, false);
+    });
+
+    // FCM 토큰 등록 실패 이벤트 리스너
+    window.addEventListener('fcmTokenRegistrationFailed', function(event) {
+        console.log('❌ [iOS Bridge] FCM 토큰 등록 실패 이벤트 수신:', event.detail);
+        window.__updateFCMTokenStatus__(false, true);
+    });
+
+    console.log('✅ [iOS Bridge] FCM 토큰 이벤트 리스너 설정 완료');
+})();
+
+// 🔄 FCM 토큰 이벤트 리스너 즉시 설정
+setupFCMTokenEventListeners();
+
 // 🔧 WebKit MessageHandler 환경 감지 및 강제 초기화 (대폭 강화)
 (function initializeWebKitHandlers() {
     const currentURL = window.location.href;
@@ -174,9 +249,18 @@ console.log('🌉 [iOS Bridge] User Agent:', navigator.userAgent);
 window.SmapApp = {
     // iOS 네이티브 앱으로 메시지 전송 (강화된 버전)
     sendMessage: function(action, data = {}) {
+        // 🔄 FCM 토큰 등록 상태 확인 (중요 메시지에 대해서만)
+        const importantMessages = ['userInfo', 'routeChange', 'pageLoaded'];
+        if (importantMessages.includes(action)) {
+            if (!window.__checkFCMTokenStatus__()) {
+                console.log(`🚫 [iOS Bridge] FCM 토큰 상태 문제로 ${action} 메시지 전송 건너뜀`);
+                return false;
+            }
+        }
+
         const hasIOSHandler = window.webkit?.messageHandlers?.iosHandler;
         const hasSmapIos = window.webkit?.messageHandlers?.smapIos;
-        
+
         console.log('📤 [iOS Bridge] 메시지 전송 시도:', {
             action,
             data,
@@ -184,7 +268,7 @@ window.SmapApp = {
             hasSmapIos,
             url: window.location.href
         });
-        
+
         // smapIos 핸들러 우선 사용
         if (hasSmapIos) {
             try {
@@ -200,7 +284,7 @@ window.SmapApp = {
                 console.error(`❌ [iOS Bridge] smapIos 메시지 전송 실패: ${action}`, error);
             }
         }
-        
+
         // iosHandler 백업 사용
         if (hasIOSHandler) {
             try {
@@ -216,10 +300,10 @@ window.SmapApp = {
                 console.error(`❌ [iOS Bridge] iosHandler 메시지 전송 실패: ${action}`, error);
             }
         }
-        
+
         console.warn('⚠️ [iOS Bridge] iOS 네이티브 앱 연결이 없습니다.');
         console.warn('⚠️ [iOS Bridge] 사용 가능한 핸들러:', window.webkit?.messageHandlers ? Object.keys(window.webkit.messageHandlers) : 'none');
-        
+
         return false;
     },
 
@@ -362,7 +446,13 @@ window.SmapApp = {
         // 로그인된 사용자 정보를 iOS로 전송
         sendUserInfo: function(userInfo) {
             console.log('👤 [iOS Bridge] 사용자 정보 iOS로 전송:', userInfo);
-            
+
+            // 🔄 FCM 토큰 등록 상태 확인 - 문제가 있으면 사용자 정보 전송 건너뜀
+            if (!window.__checkFCMTokenStatus__()) {
+                console.log('🚫 [iOS Bridge] FCM 토큰 상태 문제로 사용자 정보 전송 건너뜀');
+                return false;
+            }
+
             const userData = {
                 mt_idx: userInfo.mt_idx,
                 mt_id: userInfo.mt_id,
@@ -377,14 +467,14 @@ window.SmapApp = {
                 return false;
             }
             this.__sendInProgress = true;
-            
+
             window.SmapApp.sendMessage('userInfo', userData);
             this.__lastSentUserId = userData.mt_idx;
             this.__lastSentAt = Date.now();
             try {
                 sessionStorage.setItem('smap_user_info_sent', JSON.stringify({ mt_idx: userData.mt_idx, timestamp: this.__lastSentAt }));
             } catch (_) {}
-            
+
             // 💾 로컬스토리지에도 저장 (iOS에서 필요시 접근)
             try {
                 localStorage.setItem('smap_user_info', JSON.stringify(userData));
@@ -801,16 +891,22 @@ if (typeof window !== 'undefined') {
     
     const sendRouteChangeIfNeeded = (url, method) => {
         const now = Date.now();
-        
+
         // 같은 URL이고 1초 이내라면 무시
         if (url === lastSentURL && (now - lastSentTime) < ROUTE_CHANGE_THROTTLE) {
             console.log('🚫 [iOS Bridge] routeChange 중복 방지:', { url, method, timeSinceLastSent: now - lastSentTime });
             return;
         }
-        
+
+        // 🔄 FCM 토큰 등록 상태 확인 - 문제가 있으면 routeChange 전송 건너뜀
+        if (!window.__checkFCMTokenStatus__()) {
+            console.log('🚫 [iOS Bridge] FCM 토큰 상태 문제로 routeChange 전송 건너뜀:', { url, method });
+            return;
+        }
+
         lastSentURL = url;
         lastSentTime = now;
-        
+
         if (window.SmapApp.isIOSApp()) {
             console.log('📤 [iOS Bridge] routeChange 전송:', { url, method, timestamp: now });
             window.SmapApp.sendMessage('routeChange', {
@@ -835,6 +931,41 @@ if (typeof window !== 'undefined') {
         sendRouteChangeIfNeeded(window.location.href, 'pop');
     });
 }
+
+// 🔍 FCM 토큰 상태 디버그 함수
+window.DEBUG_FCM_STATUS = function() {
+    const status = window.__FCM_TOKEN_STATUS__ || {};
+    const now = Date.now();
+
+    console.log('🔍 [DEBUG] FCM 토큰 등록 상태:');
+    console.log('  ✅ 등록됨:', status.isRegistered ? '예' : '아니오');
+    console.log('  ❌ 실패 횟수:', status.failureCount || 0);
+    console.log('  🚫 차단됨:', status.isBlocked ? '예' : '아니오');
+    console.log('  ⏰ 마지막 시도:', status.lastAttemptTime ? new Date(status.lastAttemptTime).toLocaleString() : '없음');
+    console.log('  🕐 차단 해제:', status.blockUntil ? new Date(status.blockUntil).toLocaleString() : '없음');
+
+    if (status.isBlocked && status.blockUntil) {
+        const remaining = Math.ceil((status.blockUntil - now) / 1000);
+        console.log('  ⏳ 차단 해제까지:', remaining > 0 ? `${remaining}초` : '만료됨');
+    }
+
+    console.log('  🔄 상태 확인:', window.__checkFCMTokenStatus__() ? '정상' : '문제 있음');
+
+    return status;
+};
+
+// 🔄 FCM 토큰 상태 리셋 함수 (개발용)
+window.RESET_FCM_STATUS = function() {
+    window.__FCM_TOKEN_STATUS__ = {
+        isRegistered: false,
+        lastAttemptTime: 0,
+        failureCount: 0,
+        isBlocked: false,
+        blockUntil: 0
+    };
+    console.log('🔄 [DEBUG] FCM 토큰 상태 초기화됨');
+    return window.__FCM_TOKEN_STATUS__;
+};
 
 // 전역 오류 처리
 window.addEventListener('error', function(event) {
@@ -1089,6 +1220,7 @@ setTimeout(() => {
     } else {
         console.log('🌐 [iOS Bridge] 비-iOS 환경, 테스트 함수만 등록');
         console.log('💡 [iOS Bridge] 테스트 함수: TEST_ENV(), TEST_HAPTIC(), TEST_GOOGLE()');
+        console.log('💡 [iOS Bridge] FCM 디버그 함수: DEBUG_FCM_STATUS(), RESET_FCM_STATUS()');
     }
 }, 1000);
 
