@@ -995,26 +995,12 @@ export default function RegisterPage() {
     // 소셜 로그인 시 전화번호 인증 단계 건너뛰기
     if (registerData.isSocialLogin) {
       if (currentStep === REGISTER_STEPS.TERMS) {
-        // 애플 로그인 시 기본정보 단계 건너뛰기
-        if (registerData.socialProvider === 'apple') {
-          if (isIOS) {
-            setTimeout(() => {
-              setCurrentStep(REGISTER_STEPS.PROFILE);
-            }, 50);
-          } else {
-            setCurrentStep(REGISTER_STEPS.PROFILE);
-          }
-        } else {
-          // 구글 로그인 등 다른 소셜 로그인은 기본정보 단계로
-          if (isIOS) {
-            setTimeout(() => {
-              setCurrentStep(REGISTER_STEPS.BASIC_INFO);
-            }, 50);
-          } else {
-            setCurrentStep(REGISTER_STEPS.BASIC_INFO);
-          }
+        // 애플/구글 로그인 시 약관 동의 후 바로 회원가입 완료
+        if (registerData.socialProvider === 'apple' || registerData.socialProvider === 'google') {
+          console.log('🔥 [REGISTER] 애플/구글 로그인 - 약관 동의 후 바로 회원가입 완료');
+          handleRegister();
+          return;
         }
-        return;
       }
     }
     
@@ -2772,6 +2758,9 @@ export default function RegisterPage() {
                 } else if (currentStep === REGISTER_STEPS.PROFILE) {
                   console.log('회원가입 완료 함수 호출');
                   handleRegister();
+                } else if (currentStep === REGISTER_STEPS.TERMS && registerData.isSocialLogin && (registerData.socialProvider === 'apple' || registerData.socialProvider === 'google')) {
+                  console.log('애플/구글 로그인 약관 동의 완료 - 회원가입 진행');
+                  handleRegister();
                 } else {
                   console.log('다음 단계 함수 호출');
                   handleNext();
@@ -2791,11 +2780,12 @@ export default function RegisterPage() {
             >
               {isInitializing ? '초기화 중...' :
                !isDataLoaded ? '데이터 로딩 중...' :
-               isLoading ? '처리 중...' : 
+               isLoading ? '처리 중...' :
                locationLoading ? '위치 정보 가져오는 중...' :
                currentStep === REGISTER_STEPS.PHONE ? '인증번호 발송' :
                currentStep === REGISTER_STEPS.VERIFICATION ? '인증번호 확인' :
-               currentStep === REGISTER_STEPS.PROFILE ? '회원가입 완료' : '다음'}
+               currentStep === REGISTER_STEPS.PROFILE ? '회원가입 완료' :
+               (currentStep === REGISTER_STEPS.TERMS && registerData.isSocialLogin && (registerData.socialProvider === 'apple' || registerData.socialProvider === 'google')) ? '회원가입 완료' : '다음'}
             </motion.button>
           </motion.div>
         </div>

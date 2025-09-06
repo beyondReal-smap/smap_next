@@ -79,14 +79,9 @@ export function RegisterProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const getCurrentStepNumber = () => {
-    if (isAppleLogin) {
-      // 애플 로그인: 약관동의 → 프로필 → 완료 (2단계)
-      const steps = [REGISTER_STEPS.TERMS, REGISTER_STEPS.PROFILE, REGISTER_STEPS.COMPLETE];
-      const currentIndex = steps.indexOf(currentStep);
-      return currentIndex >= 0 ? currentIndex + 1 : 1;
-    } else if (isGoogleLogin) {
-      // 구글 로그인: 약관동의 → 기본정보 → 프로필 → 완료 (3단계)
-      const steps = [REGISTER_STEPS.TERMS, REGISTER_STEPS.BASIC_INFO, REGISTER_STEPS.PROFILE, REGISTER_STEPS.COMPLETE];
+    if (isAppleLogin || isGoogleLogin) {
+      // 애플/구글 로그인: 약관동의 → 완료 (1단계)
+      const steps = [REGISTER_STEPS.TERMS, REGISTER_STEPS.COMPLETE];
       const currentIndex = steps.indexOf(currentStep);
       return currentIndex >= 0 ? currentIndex + 1 : 1;
     } else {
@@ -98,12 +93,9 @@ export function RegisterProvider({ children }: { children: ReactNode }) {
   };
 
   const getTotalSteps = () => {
-    if (isAppleLogin) {
-      // 애플 로그인: 2단계 (COMPLETE 제외)
-      return 2;
-    } else if (isGoogleLogin) {
-      // 구글 로그인: 3단계 (COMPLETE 제외)
-      return 3;
+    if (isAppleLogin || isGoogleLogin) {
+      // 애플/구글 로그인: 1단계 (약관 동의만)
+      return 1;
     } else {
       // 일반 회원가입: COMPLETE 단계는 제외하고 실제 진행 단계만 카운트
       return Object.values(REGISTER_STEPS).length - 1;

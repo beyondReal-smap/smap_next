@@ -121,7 +121,7 @@ import LogParser from '../components/layout/LogParser';
 import AnimatedHeader from '../../components/common/AnimatedHeader';
 import GroupSelector from '@/components/location/GroupSelector';
 import FloatingButton from '../../components/common/FloatingButton';
-import { setFirstLogin, isAndroid, hasAllPermissions } from '@/utils/androidPermissions';
+import { setFirstLogin, isAndroid, hasAllPermissions, hasLocationAndActivityPermissions } from '@/utils/androidPermissions';
 // BottomNavBar는 ClientLayout에서 전역으로 관리됨
 
 declare global {
@@ -1016,7 +1016,7 @@ export default function HomePage() {
 
   // 컴포넌트 마운트 상태 추적 (클라이언트 환경에서만)
   const isMountedRef = useRef(typeof window !== 'undefined' ? true : null);
-  
+
   // 🚨 iOS 시뮬레이터 디버깅 - useEffect로 이동하여 Hook 순서 보장
   useEffect(() => {
   console.log('🏠 [HOME] HomePage 컴포넌트 시작');
@@ -1041,7 +1041,7 @@ export default function HomePage() {
   }, []); // 빈 의존성 배열로 컴포넌트 마운트 시 한 번만 실행
 
 
-  
+
   useEffect(() => {
     // home 페이지 식별을 위한 data-page 속성 설정
     document.body.setAttribute('data-page', '/home');
@@ -1455,7 +1455,11 @@ export default function HomePage() {
           }
           
           const hasPermissions = hasAllPermissions();
-          console.log('🔥 [HOME] 권한 체크 결과:', { hasPermissions });
+          const hasLocationPermissions = hasLocationAndActivityPermissions();
+          console.log('🔥 [HOME] 권한 체크 결과:', {
+            hasAllPermissions: hasPermissions,
+            hasLocationPermissions: hasLocationPermissions
+          });
           
           if (!hasPermissions) {
             console.log('🔥 [HOME] 안드로이드 권한 요청 시작');
@@ -1464,6 +1468,9 @@ export default function HomePage() {
             setFirstLogin(true).then((success) => {
               if (success) {
                 console.log('✅ [HOME] setFirstLogin을 통한 권한 요청 완료');
+
+                // 🔥 권한 요청 성공 - 네이티브에서 자동으로 위치 서비스 시작됨
+                console.log('✅ [HOME] 권한 요청 성공 - 네이티브에서 위치 서비스 자동 시작');
               } else {
                 console.log('⚠️ [HOME] setFirstLogin을 통한 권한 요청 실패');
                 
@@ -1528,6 +1535,7 @@ export default function HomePage() {
             });
           } else {
             console.log('✅ [HOME] 안드로이드 권한이 이미 모두 허용됨');
+            console.log('🔄 [HOME] 네이티브에서 위치 서비스 자동 시작 중...');
           }
         };
         
@@ -4263,10 +4271,10 @@ export default function HomePage() {
         const borderColor = isSelected ? '#EC4899' : '#4F46E5'; // 선택시 핑크, 기본은 인디고
         
         const newMarker = new window.naver.maps.Marker({
-          position: naverPos,
-          map: naverMap.current,
-          title: memberData.name,
-          icon: {
+            position: naverPos,
+            map: naverMap.current,
+            title: memberData.name,
+            icon: {
             content: `
               <div style="position: relative; text-align: center;">
                 <div style="width: 32px; height: 32px; background-color: white; border: 2px solid ${borderColor}; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: ${isSelected ? '0 0 8px rgba(236, 72, 153, 0.5)' : '0 1px 3px rgba(0,0,0,0.2)'};">
@@ -4365,7 +4373,7 @@ export default function HomePage() {
           
           // 속도 정보
           const speed = memberData.mlt_speed || 0;
-          
+
           const memberInfoWindow = new window.naver.maps.InfoWindow({
             content: `
               <style>
@@ -4463,7 +4471,7 @@ export default function HomePage() {
             try {
               memberInfoWindow.open(naverMap.current, newMarker);
               console.log('[네이버맵] InfoWindow 열기 성공');
-              
+
               // InfoWindow가 열린 후 멤버 선택 처리 (바텀시트 연동) - location 페이지에서는 건너뛰기
               if (memberData && memberData.id && !window.location.pathname.includes('/location')) {
                 setTimeout(() => {
@@ -7322,35 +7330,35 @@ export default function HomePage() {
                                      )}
                                    </div>
                                    <div className="flex-1 min-w-0">
-                                                                            <div className="flex items-center justify-between">
-                                         <h4 className={`font-normal text-sm ${member.isSelected ? 'text-gray-900' : 'text-gray-900'} truncate`}>
-                                           {member.name}
-                                         </h4>
-                                         {/* 오늘 총 스케줄 수 */}
-                                         <div className="flex items-center space-x-1">
-                                           <span className="text-xs text-gray-500">📅</span>
-                                           <span className={`text-xs font-normal ${
-                                             member.isSelected ? 'text-gray-700' : 'text-gray-700'
-                                           }`}>
-                                             {stats.completed + stats.ongoing + stats.upcoming}개
-                                           </span>
-                                         </div>
+                                     <div className="flex items-center justify-between">
+                                       <h4 className={`font-normal text-sm ${member.isSelected ? 'text-gray-900' : 'text-gray-900'} truncate`}>
+                                         {member.name}
+                                       </h4>
+                                       {/* 오늘 총 스케줄 수 */}
+                                       <div className="flex items-center space-x-1">
+                                         <span className="text-xs text-gray-500">📅</span>
+                                         <span className={`text-xs font-normal ${
+                                           member.isSelected ? 'text-gray-700' : 'text-gray-700'
+                                         }`}>
+                                           {stats.completed + stats.ongoing + stats.upcoming}개
+                                         </span>
                                        </div>
-                                       {/* 스케줄 통계 표시 */}
-                                       <div className="flex items-center space-x-3">
-                                         <div className="flex items-center space-x-1" title="완료된 스케줄">
-                                           <span className="text-xs text-gray-500">완료</span>
-                                           <span className="text-xs font-medium text-green-600">{stats.completed}</span>
-                                         </div>
-                                         <div className="flex items-center space-x-1" title="진행 중인 스케줄">
-                                           <span className="text-xs text-gray-500">진행중</span>
-                                           <span className="text-xs font-medium text-orange-600">{stats.ongoing}</span>
-                                         </div>
-                                         <div className="flex items-center space-x-1" title="예정된 스케줄">
-                                           <span className="text-xs text-gray-500">예정</span>
-                                           <span className="text-xs font-medium text-blue-600">{stats.upcoming}</span>
-                                         </div>
+                                     </div>
+                                     {/* 스케줄 통계 표시 */}
+                                     <div className="flex items-center space-x-3">
+                                       <div className="flex items-center space-x-1" title="완료된 스케줄">
+                                         <span className="text-xs text-gray-500">완료</span>
+                                         <span className="text-xs font-medium text-green-600">{stats.completed}</span>
                                        </div>
+                                       <div className="flex items-center space-x-1" title="진행 중인 스케줄">
+                                         <span className="text-xs text-gray-500">진행중</span>
+                                         <span className="text-xs font-medium text-orange-600">{stats.ongoing}</span>
+                                       </div>
+                                       <div className="flex items-center space-x-1" title="예정된 스케줄">
+                                         <span className="text-xs text-gray-500">예정</span>
+                                         <span className="text-xs font-medium text-blue-600">{stats.upcoming}</span>
+                                       </div>
+                                     </div>
 
                                    </div>
                                    {/* {member.isSelected && (
@@ -7428,7 +7436,7 @@ export default function HomePage() {
     );
   } catch (renderError) {
     console.error('🏠 [HOME] 렌더링 오류:', renderError);
-    
+
     // 백그라운드 전환 중일 때는 에러 페이지를 표시하지 않고 기본 UI 유지
     if (isTransitioning || !isVisible) {
       console.log('[HOME] 🛡️ 백그라운드 전환 중 렌더링 에러 - 기본 UI 유지');
@@ -7443,7 +7451,7 @@ export default function HomePage() {
         </div>
       );
     }
-    
+
     // 일반적인 렌더링 오류일 때만 에러 페이지 표시
     return (
       <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 flex items-center justify-center p-4">
@@ -7461,13 +7469,13 @@ export default function HomePage() {
             <p className="text-xs text-gray-500 mb-4">
               브라우저 콘솔을 확인해주세요.
             </p>
-            <button 
+            <button
               onClick={() => window.location.reload()}
               className="w-full bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-600 transition-colors"
             >
               페이지 새로고침
             </button>
-            <button 
+            <button
               onClick={() => window.location.href = '/signin'}
               className="w-full mt-2 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors"
             >
