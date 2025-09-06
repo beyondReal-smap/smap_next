@@ -401,6 +401,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // 초기 인증 상태 확인 (강화된 버전)
   useEffect(() => {
+    // 자동 로그인 이벤트 리스너 등록 (무한 루프 방지)
+    const handleAuthStateChanged = (event: CustomEvent) => {
+      const { type, userData } = event.detail;
+
+      if (type === 'autoLogin' && userData && isMountedRef.current) {
+        console.log('[AUTH CONTEXT] 🔄 자동 로그인 이벤트 수신:', userData.mt_name);
+
+        // 상태 업데이트
+        dispatch({ type: 'LOGIN_SUCCESS', payload: userData });
+
+        // 위치 추적 서비스에 사용자 로그인 알림
+        locationTrackingService.onUserLogin();
+
+        console.log('[AUTH CONTEXT] ✅ 자동 로그인 상태 업데이트 완료');
+      }
+    };
+
+    // 이벤트 리스너 등록
+    if (typeof window !== 'undefined') {
+      window.addEventListener('authStateChanged', handleAuthStateChanged as EventListener);
+    }
 
     const initializeAuth = async () => {
       // 항상 로딩 시작
@@ -489,6 +510,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return () => {
       isMountedRef.current = false;
       clearTimeout(timeout);
+
+      // 이벤트 리스너 제거
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('authStateChanged', handleAuthStateChanged as EventListener);
+      }
     };
   }, [preloadUserData]); // preloadUserData를 의존성 배열에 추가
 
@@ -618,7 +644,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       // 4. 상태 초기화
       dispatch({ type: 'LOGOUT' });
-      
+
+      // 로그아웃 시간 저장 (무한 루프 방지)
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('last_logout_time', Date.now().toString());
+      }
+
       // 전역 상태 초기화
       globalPreloadingState.completedUsers.clear();
       globalPreloadingState.lastPreloadTime = 0;

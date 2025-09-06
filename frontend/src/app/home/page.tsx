@@ -1296,8 +1296,17 @@ export default function HomePage() {
       userName: user?.mt_name
     });
 
-    // 로그인되지 않은 경우 로컬 스토리지 자동 로그인 시도
+    // 로그인되지 않은 경우 로컬 스토리지 자동 로그인 시도 (로그아웃 직후에는 제외)
     if (!isLoggedIn && !authLoading) {
+      // 로그아웃 직후인지 확인 (최근 10초 이내 로그아웃)
+      const lastLogoutTime = localStorage.getItem('last_logout_time');
+      const currentTime = Date.now();
+
+      if (lastLogoutTime && (currentTime - parseInt(lastLogoutTime)) < 10000) {
+        console.log('[HOME] 최근 로그아웃 감지 - 자동 로그인 생략');
+        router.replace('/signin');
+        return;
+      }
       console.log('[HOME] ❌ 로그인되지 않음 - 로컬 스토리지 자동 로그인 시도');
       
       // 로컬 스토리지에서 사용자 데이터 확인
@@ -1328,23 +1337,48 @@ export default function HomePage() {
       
       if (savedUserData?.mt_idx) {
         console.log('[HOME] 🔄 로컬 스토리지 기반 자동 로그인 실행');
-        
+
         try {
           // AuthService 정적 import 사용
           import('@/services/authService').then(({ default: authService }) => {
+            // 자동 로그인 플래그 확인 (무한 루프 방지)
+            const autoLoginFlag = localStorage.getItem('auto_login_executed');
+            const currentTime = Date.now();
+
+            if (autoLoginFlag) {
+              const flagTime = parseInt(autoLoginFlag);
+              // 5분 이내에 실행된 경우 무한 루프 방지
+              if (currentTime - flagTime < 300000) {
+                console.log('[HOME] ⏸️ 자동 로그인 최근 실행됨 - 건너뜀 (무한 루프 방지)');
+                return;
+              }
+            }
+
             authService.setUserData(savedUserData);
-            
+
             // 표준화된 키로 데이터 저장
             localStorage.setItem('smap_user_data', JSON.stringify(savedUserData));
             localStorage.setItem('isLoggedIn', 'true');
             sessionStorage.setItem('authToken', 'authenticated');
-            
-            console.log('[HOME] ✅ 자동 로그인 성공 - 페이지 새로고침');
-            
-            // 상태 업데이트를 위해 페이지 새로고침
-            setTimeout(() => {
-              window.location.reload();
-            }, 100);
+
+            // 자동 로그인 실행 플래그 저장 (무한 루프 방지)
+            localStorage.setItem('auto_login_executed', currentTime.toString());
+
+            console.log('[HOME] ✅ 자동 로그인 성공 - AuthContext 업데이트');
+
+            // AuthContext 상태 업데이트를 위한 이벤트 발생
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('authStateChanged', {
+                detail: { type: 'autoLogin', userData: savedUserData }
+              }));
+
+              // 자동 로그인 플래그 정리 (다음 실행 시 다시 실행 가능하도록)
+              setTimeout(() => {
+                localStorage.removeItem('auto_login_executed');
+                console.log('[HOME] 🔄 자동 로그인 플래그 정리 완료');
+              }, 10000); // 10초 후 정리
+            }
+
           }).catch(error => {
             console.error('[HOME] AuthService import 실패:', error);
           });
@@ -1363,7 +1397,7 @@ export default function HomePage() {
       console.log('[HOME] ✅ 로그인 상태 확인됨:', user.mt_name);
     }
 
-  }, [router, isLoggedIn, authLoading, user]);
+  }, [router, isLoggedIn, user]); // authLoading 제거하여 불필요한 재실행 방지
   
   // 🚫 FCM 토큰 자동 업데이트 비활성화 - 네이티브에서 관리
   useEffect(() => {
