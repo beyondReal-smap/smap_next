@@ -5844,17 +5844,32 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         print("🔄 [FCM API] 토큰 자동 동기화 모드 - 변경 방지 로직 건너뜀")
 
         // UserDefaults에서 mt_idx 가져오기 (여러 키에서 시도)
-        let mtIdx = UserDefaults.standard.string(forKey: "mt_idx") ??
+        var mtIdx = UserDefaults.standard.string(forKey: "mt_idx") ??
                    UserDefaults.standard.string(forKey: "savedMtIdx") ??
                    UserDefaults.standard.string(forKey: "current_mt_idx")
 
-        guard let mtIdx = mtIdx, !mtIdx.isEmpty else {
+        guard let foundMtIdx = mtIdx, !foundMtIdx.isEmpty else {
             print("❌ [FCM API] 로그인 상태이지만 mt_idx를 찾을 수 없음 - 업데이트 건너뜀")
             completion(false)
             return
         }
-        
-        print("✅ [FCM API] mt_idx 발견: \(mtIdx)")
+
+        // mt_idx 값 검증 - 숫자형식인지 확인
+        guard let mtIdxInt = Int(foundMtIdx), mtIdxInt > 0 else {
+            print("❌ [FCM API] 잘못된 mt_idx 형식: \(foundMtIdx) - 업데이트 건너뜀")
+            completion(false)
+            return
+        }
+
+        // mt_idx 값이 기본값(1186)인지 확인 - 기본값이면 업데이트하지 않음
+        if mtIdxInt == 1186 {
+            print("⚠️ [FCM API] 기본 mt_idx 값(1186) 사용됨 - 실제 사용자 정보 기다림")
+            completion(false)
+            return
+        }
+
+        mtIdx = foundMtIdx
+        print("✅ [FCM API] mt_idx 검증 통과: \(mtIdx)")
         
         // 🔗 APNs 토큰도 함께 전송 (필수)
         var requestData: [String: Any] = [
@@ -5962,6 +5977,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                     UserDefaults.standard.synchronize()
                     self.fcmLog("🔓 FCM 토큰 업데이트 완료로 인한 플래그 해제됨")
 
+                    // 웹뷰에 FCM 토큰 등록 성공 알림 전송
+                    DispatchQueue.main.async {
+                        self.notifyWebViewFCMTokenRegistrationSuccess()
+                    }
+
                     // 성공 completion 호출
                     completion(true)
                 } else {
@@ -5972,6 +5992,16 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                     UserDefaults.standard.synchronize()
                     self.fcmLog("🔓 FCM 토큰 업데이트 실패로 인한 플래그 해제됨")
 
+                    // 404 에러 특별 처리 - 사용자에게 앱 재시작 유도
+                    if httpResponse.statusCode == 404 {
+                        self.fcmLog("🚨 404 에러 감지 - FCM 토큰 등록 실패로 인한 사용자 안내 필요")
+
+                        // 웹뷰에 FCM 토큰 등록 실패 알림 전송
+                        DispatchQueue.main.async {
+                            self.notifyWebViewFCMTokenRegistrationFailed(reason: "user_not_found")
+                        }
+                    }
+
                     // 실패 completion 호출
                     completion(false)
                 }
@@ -5980,9 +6010,72 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         
         task.resume()
     }
-    
 
-    
+    /**
+     * 웹뷰에 FCM 토큰 등록 실패 알림 전송
+     */
+    private func notifyWebViewFCMTokenRegistrationFailed(reason: String) {
+        print("🚨 [FCM] 웹뷰에 FCM 토큰 등록 실패 알림 전송 - 이유: \(reason)")
+
+        guard let webView = findWebViewInHierarchy() else {
+            print("❌ [FCM] WebView를 찾을 수 없음 - FCM 토큰 등록 실패 알림 전송 건너뜀")
+            return
+        }
+
+        DispatchQueue.main.async {
+            let messageData = [
+                "type": "fcm_token_registration_failed",
+                "reason": reason,
+                "message": "FCM 토큰 등록에 실패했습니다. 앱을 재시작해주세요.",
+                "timestamp": Date().timeIntervalSince1970
+            ] as [String: Any]
+
+            if let jsonData = try? JSONSerialization.data(withJSONObject: messageData),
+               let jsonString = String(data: jsonData, encoding: .utf8) {
+                let jsCode = "window.dispatchEvent(new CustomEvent('fcmTokenRegistrationFailed', { detail: \(jsonString) }));"
+                webView.evaluateJavaScript(jsCode) { result, error in
+                    if let error = error {
+                        print("❌ [FCM] FCM 토큰 등록 실패 알림 WebView 전달 실패: \(error.localizedDescription)")
+                    } else {
+                        print("✅ [FCM] FCM 토큰 등록 실패 알림 WebView 전달 성공")
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * 웹뷰에 FCM 토큰 등록 성공 알림 전송
+     */
+    private func notifyWebViewFCMTokenRegistrationSuccess() {
+        print("✅ [FCM] 웹뷰에 FCM 토큰 등록 성공 알림 전송")
+
+        guard let webView = findWebViewInHierarchy() else {
+            print("❌ [FCM] WebView를 찾을 수 없음 - FCM 토큰 등록 성공 알림 전송 건너뜀")
+            return
+        }
+
+        DispatchQueue.main.async {
+            let messageData = [
+                "type": "fcm_token_registration_success",
+                "message": "FCM 토큰이 성공적으로 등록되었습니다.",
+                "timestamp": Date().timeIntervalSince1970
+            ] as [String: Any]
+
+            if let jsonData = try? JSONSerialization.data(withJSONObject: messageData),
+               let jsonString = String(data: jsonData, encoding: .utf8) {
+                let jsCode = "window.dispatchEvent(new CustomEvent('fcmTokenRegistrationSuccess', { detail: \(jsonString) }));"
+                webView.evaluateJavaScript(jsCode) { result, error in
+                    if let error = error {
+                        print("❌ [FCM] FCM 토큰 등록 성공 알림 WebView 전달 실패: \(error.localizedDescription)")
+                    } else {
+                        print("✅ [FCM] FCM 토큰 등록 성공 알림 WebView 전달 성공")
+                    }
+                }
+            }
+        }
+    }
+
     // MARK: - 🔄 임시 저장된 FCM 토큰 서버 전송
     private func sendPendingFCMTokenToServer(pendingToken: String) {
         print("📤 [FCM Pending] 임시 저장된 FCM 토큰 서버 전송 시작")

@@ -251,4 +251,40 @@ export const useAppStateChange = (callback: (state: any) => void) => {
       delete window.onAppStateChange
     }
   }, [callback])
+}
+
+// FCM 토큰 등록 성공 이벤트 훅
+export const useFCMTokenRegistrationSuccess = (callback: (data: any) => void) => {
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleFCMTokenRegistrationSuccess = (event: CustomEvent) => {
+      console.log('✅ [FCM] 토큰 등록 성공 이벤트 수신:', event.detail)
+      callback(event.detail)
+    }
+
+    window.addEventListener('fcmTokenRegistrationSuccess', handleFCMTokenRegistrationSuccess as EventListener)
+
+    return () => {
+      window.removeEventListener('fcmTokenRegistrationSuccess', handleFCMTokenRegistrationSuccess as EventListener)
+    }
+  }, [callback])
+}
+
+// FCM 토큰 등록 실패 이벤트 훅
+export const useFCMTokenRegistrationFailed = (callback: (data: any) => void) => {
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleFCMTokenRegistrationFailed = (event: CustomEvent) => {
+      console.log('❌ [FCM] 토큰 등록 실패 이벤트 수신:', event.detail)
+      callback(event.detail)
+    }
+
+    window.addEventListener('fcmTokenRegistrationFailed', handleFCMTokenRegistrationFailed as EventListener)
+
+    return () => {
+      window.removeEventListener('fcmTokenRegistrationFailed', handleFCMTokenRegistrationFailed as EventListener)
+    }
+  }, [callback])
 } 
