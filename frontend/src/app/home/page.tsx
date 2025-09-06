@@ -7459,7 +7459,7 @@ export default function HomePage() {
                                      )}
                                    </div>
                                    <div className="flex-1 min-w-0">
-                                     <div className="flex items-center justify-between">
+                                   <div className="flex items-center justify-between">
                                          <h4 className={`font-normal text-sm ${member.isSelected ? 'text-gray-900' : 'text-gray-900'} truncate`}>
                                            {member.name}
                                          </h4>
@@ -7565,7 +7565,7 @@ export default function HomePage() {
     );
   } catch (renderError) {
     console.error('🏠 [HOME] 렌더링 오류:', renderError);
-    
+
     // 백그라운드 전환 중일 때는 에러 페이지를 표시하지 않고 기본 UI 유지
     if (isTransitioning || !isVisible) {
       console.log('[HOME] 🛡️ 백그라운드 전환 중 렌더링 에러 - 기본 UI 유지');
@@ -7580,7 +7580,7 @@ export default function HomePage() {
         </div>
       );
     }
-    
+
     // 일반적인 렌더링 오류일 때만 에러 페이지 표시
     return (
       <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 flex items-center justify-center p-4">
@@ -7598,13 +7598,13 @@ export default function HomePage() {
             <p className="text-xs text-gray-500 mb-4">
               브라우저 콘솔을 확인해주세요.
             </p>
-            <button 
+            <button
               onClick={() => window.location.reload()}
               className="w-full bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-600 transition-colors"
             >
               페이지 새로고침
             </button>
-            <button 
+            <button
               onClick={() => window.location.href = '/signin'}
               className="w-full mt-2 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors"
             >
@@ -7614,5 +7614,5 @@ export default function HomePage() {
         </div>
       </div>
     );
-  }
+}
 }
