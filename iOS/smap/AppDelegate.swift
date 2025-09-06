@@ -875,6 +875,26 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             return
         }
 
+        // 로그인 전 저장된 pending FCM 토큰 처리
+        if let pendingToken = UserDefaults.standard.string(forKey: "pending_fcm_token_after_login") {
+            print("📋 [LOGIN] 로그인 전 저장된 FCM 토큰 발견 - 서버 등록 진행")
+            print("   📱 토큰: \(pendingToken.prefix(30))...")
+
+            sendFCMTokenToServer(token: pendingToken) { success in
+                if success {
+                    print("✅ [LOGIN] Pending FCM 토큰 서버 등록 성공")
+                    // 성공 시 pending 토큰 제거
+                    UserDefaults.standard.removeObject(forKey: "pending_fcm_token_after_login")
+                    UserDefaults.standard.set(pendingToken, forKey: "fcm_token")
+                    UserDefaults.standard.set(pendingToken, forKey: "last_updated_fcm_token")
+                    UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "fcm_token_updated_time")
+                    UserDefaults.standard.synchronize()
+                } else {
+                    print("❌ [LOGIN] Pending FCM 토큰 서버 등록 실패")
+                }
+            }
+        }
+
         // 현재 FCM 토큰 상태 확인
         let currentToken = UserDefaults.standard.string(forKey: "fcm_token")
 
@@ -5611,6 +5631,25 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
     // MARK: - 🔍 FCM 토큰 서버 업데이트 (푸시 메시지 수신을 위해 개선)
     private func updateFCMTokenIfNeededWithCheck(token: String) {
+        // 로그인 상태 확인 - 로그인 전에는 FCM 토큰 서버 등록하지 않음
+        let isLoggedIn = UserDefaults.standard.bool(forKey: "is_logged_in")
+        let mtIdx = UserDefaults.standard.string(forKey: "mt_idx")
+
+        if !isLoggedIn || mtIdx == nil || mtIdx!.isEmpty {
+            print("⚠️ [FCM] 로그인 상태가 아님 - FCM 토큰 서버 등록 건너뜀")
+            print("   - isLoggedIn: \(isLoggedIn)")
+            print("   - mtIdx: \(mtIdx ?? "nil")")
+            print("   - 토큰은 로컬에 저장됨: \(token.prefix(20))...")
+
+            // 토큰은 로컬에 저장해두고 로그인 후 등록할 수 있도록 함
+            UserDefaults.standard.set(token, forKey: "pending_fcm_token_after_login")
+            UserDefaults.standard.synchronize()
+            return
+        }
+
+        print("✅ [FCM] 로그인 상태 확인 통과 - 서버 업데이트 진행")
+        print("   - mtIdx: \(mtIdx!)")
+
         // 업데이트 진행 중이면 건너뜀
         if isFCMUpdateInProgress {
             print("⏳ [FCM] 이미 업데이트가 진행 중 - 건너뜀")

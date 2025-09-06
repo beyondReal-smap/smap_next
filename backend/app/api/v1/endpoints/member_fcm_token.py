@@ -124,14 +124,16 @@ async def register_member_fcm_token(
     """
     try:
         logger.info(f"FCM 토큰 등록/업데이트 요청 - 회원 ID: {request.mt_idx}, 토큰 길이: {len(request.fcm_token)}")
-        
+
         # 회원 존재 확인
         member = Member.find_by_idx(db, request.mt_idx)
         if not member:
             logger.warning(f"존재하지 않는 회원: mt_idx={request.mt_idx}")
+            logger.warning(f"FCM 토큰 등록 실패 - 존재하지 않는 회원 ID: {request.mt_idx}")
+            logger.warning(f"클라이언트에서 잘못된 mt_idx 사용 가능성 높음")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="해당 회원을 찾을 수 없습니다."
+                detail=f"회원 ID {request.mt_idx}을 찾을 수 없습니다. 앱을 재시작하여 최신 회원 정보를 동기화해주세요."
             )
         
         # 회원 상태 확인
@@ -397,14 +399,16 @@ async def get_member_fcm_token_status(
     """
     try:
         logger.info(f"FCM 토큰 상태 조회 요청 - 회원 ID: {mt_idx}")
-        
+
         # 회원 조회
         member = Member.find_by_idx(db, mt_idx)
         if not member:
             logger.warning(f"존재하지 않는 회원: mt_idx={mt_idx}")
+            logger.warning(f"FCM 토큰 상태 조회 실패 - 존재하지 않는 회원 ID: {mt_idx}")
+            logger.warning(f"클라이언트에서 잘못된 mt_idx 사용 가능성 높음")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="해당 회원을 찾을 수 없습니다."
+                detail=f"회원 ID {mt_idx}을 찾을 수 없습니다. 앱을 재시작하여 최신 회원 정보를 동기화해주세요."
             )
         
         has_token = bool(member.mt_token_id)
@@ -470,14 +474,16 @@ async def check_and_update_fcm_token(
     """
     try:
         logger.info(f"FCM 토큰 체크 요청 - 회원 ID: {request.mt_idx}")
-        
+
         # 회원 존재 확인
         member = Member.find_by_idx(db, request.mt_idx)
         if not member:
             logger.warning(f"존재하지 않는 회원: mt_idx={request.mt_idx}")
+            logger.warning(f"FCM 토큰 체크 실패 - 존재하지 않는 회원 ID: {request.mt_idx}")
+            logger.warning(f"클라이언트에서 잘못된 mt_idx 사용 가능성 높음")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="해당 회원을 찾을 수 없습니다."
+                detail=f"회원 ID {request.mt_idx}을 찾을 수 없습니다. 앱을 재시작하여 최신 회원 정보를 동기화해주세요."
             )
         
         # 회원 상태 확인
@@ -617,9 +623,11 @@ async def validate_and_refresh_fcm_token(
         member = Member.find_by_idx(db, request.mt_idx)
         if not member:
             logger.warning(f"존재하지 않는 회원: mt_idx={request.mt_idx}")
+            logger.warning(f"FCM 토큰 검증 실패 - 존재하지 않는 회원 ID: {request.mt_idx}")
+            logger.warning(f"클라이언트에서 잘못된 mt_idx 사용 가능성 높음")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="해당 회원을 찾을 수 없습니다."
+                detail=f"회원 ID {request.mt_idx}을 찾을 수 없습니다. 앱을 재시작하여 최신 회원 정보를 동기화해주세요."
             )
 
         # 회원 상태 확인
@@ -816,9 +824,11 @@ async def background_token_check(
         member = Member.find_by_idx(db, request.mt_idx)
         if not member:
             logger.warning(f"존재하지 않는 회원: mt_idx={request.mt_idx}")
+            logger.warning(f"백그라운드 FCM 토큰 검증 실패 - 존재하지 않는 회원 ID: {request.mt_idx}")
+            logger.warning(f"클라이언트에서 잘못된 mt_idx 사용 가능성 높음")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="해당 회원을 찾을 수 없습니다."
+                detail=f"회원 ID {request.mt_idx}을 찾을 수 없습니다. 앱을 재시작하여 최신 회원 정보를 동기화해주세요."
             )
 
         # 회원 상태 확인
@@ -1102,9 +1112,11 @@ async def notify_token_refresh(
         member = Member.find_by_idx(db, mt_idx)
         if not member:
             logger.warning(f"존재하지 않는 회원: mt_idx={mt_idx}")
+            logger.warning(f"FCM 토큰 갱신 알림 전송 실패 - 존재하지 않는 회원 ID: {mt_idx}")
+            logger.warning(f"클라이언트에서 잘못된 mt_idx 사용 가능성 높음")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="해당 회원을 찾을 수 없습니다."
+                detail=f"회원 ID {mt_idx}을 찾을 수 없습니다. 앱을 재시작하여 최신 회원 정보를 동기화해주세요."
             )
 
         # 실제 구현에서는 SMS, 이메일, 다른 푸시 채널 등으로 알림 전송
@@ -1162,10 +1174,18 @@ async def test_ios_push_delivery(
         
         # 회원 정보 조회
         member = Member.find_by_idx(db, request.mt_idx)
-        if not member or not member.mt_token_id:
+        if not member:
+            logger.warning(f"존재하지 않는 회원: mt_idx={request.mt_idx}")
+            logger.warning(f"iOS 푸시 테스트 실패 - 존재하지 않는 회원 ID: {request.mt_idx}")
+            logger.warning(f"클라이언트에서 잘못된 mt_idx 사용 가능성 높음")
             raise HTTPException(
                 status_code=404,
-                detail="회원 또는 FCM 토큰을 찾을 수 없습니다."
+                detail=f"회원 ID {request.mt_idx}을 찾을 수 없습니다. 앱을 재시작하여 최신 회원 정보를 동기화해주세요."
+            )
+        if not member.mt_token_id:
+            raise HTTPException(
+                status_code=404,
+                detail="회원의 FCM 토큰을 찾을 수 없습니다."
             )
         
         # iOS 토큰 검증
@@ -1274,9 +1294,11 @@ async def get_full_fcm_token_for_test(
         member = Member.find_by_idx(db, mt_idx)
         if not member:
             logger.warning(f"존재하지 않는 회원: mt_idx={mt_idx}")
+            logger.warning(f"전체 FCM 토큰 조회 실패 - 존재하지 않는 회원 ID: {mt_idx}")
+            logger.warning(f"클라이언트에서 잘못된 mt_idx 사용 가능성 높음")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="해당 회원을 찾을 수 없습니다."
+                detail=f"회원 ID {mt_idx}을 찾을 수 없습니다. 앱을 재시작하여 최신 회원 정보를 동기화해주세요."
             )
         
         if not member.mt_token_id:
@@ -1382,10 +1404,18 @@ async def trigger_token_update_test(
         
         # 회원 조회
         member = Member.find_by_idx(db, mt_idx)
-        if not member or not member.mt_token_id:
+        if not member:
+            logger.warning(f"존재하지 않는 회원: mt_idx={mt_idx}")
+            logger.warning(f"토큰 업데이트 테스트 트리거 실패 - 존재하지 않는 회원 ID: {mt_idx}")
+            logger.warning(f"클라이언트에서 잘못된 mt_idx 사용 가능성 높음")
             raise HTTPException(
                 status_code=404,
-                detail="회원 또는 FCM 토큰을 찾을 수 없습니다."
+                detail=f"회원 ID {mt_idx}을 찾을 수 없습니다. 앱을 재시작하여 최신 회원 정보를 동기화해주세요."
+            )
+        if not member.mt_token_id:
+            raise HTTPException(
+                status_code=404,
+                detail="회원의 FCM 토큰을 찾을 수 없습니다."
             )
         
         # 기존 토큰으로 register 엔드포인트 호출 (로그 트리거용)
