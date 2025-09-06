@@ -5,7 +5,7 @@ console.log('🌉 [iOS Bridge] 완전 강화된 초기화 시작');
 console.log('🌉 [iOS Bridge] 현재 URL:', window.location.href);
 console.log('🌉 [iOS Bridge] User Agent:', navigator.userAgent);
 
-// 🔄 FCM 토큰 등록 상태 관리 (mt_idx 2416 확인됨)
+// 🔄 FCM 토큰 등록 상태 관리
 window.__FCM_TOKEN_STATUS__ = {
     isRegistered: false,
     lastAttemptTime: 0,
@@ -16,7 +16,7 @@ window.__FCM_TOKEN_STATUS__ = {
 
 // FCM 토큰 등록 상태 초기화 함수 추가
 window.__resetFCMTokenStatus__ = function() {
-    console.log('🔄 [iOS Bridge] FCM 토큰 상태 초기화 - mt_idx 2416 재확인');
+    console.log('🔄 [iOS Bridge] FCM 토큰 상태 초기화');
     window.__FCM_TOKEN_STATUS__ = {
         isRegistered: false,
         lastAttemptTime: 0,
@@ -30,9 +30,6 @@ window.__resetFCMTokenStatus__ = function() {
 window.__checkFCMTokenStatus__ = function() {
     const now = Date.now();
     const status = window.__FCM_TOKEN_STATUS__;
-
-    // ✅ FCM 토큰 등록 재활성화 (mt_idx 2416 확인됨)
-    console.log('✅ [iOS Bridge] FCM 토큰 등록 재활성화됨 - mt_idx 2416 확인');
 
     // 차단 상태 확인
     if (status.isBlocked && now < status.blockUntil) {
@@ -91,13 +88,6 @@ window.__updateFCMTokenStatus__ = function(isRegistered, isError = false) {
 
     console.log('✅ [iOS Bridge] FCM 토큰 이벤트 리스너 설정 완료');
 })();
-
-// 🔄 FCM 토큰 이벤트 리스너 즉시 설정
-if (typeof setupFCMTokenEventListeners === 'function') {
-    setupFCMTokenEventListeners();
-} else {
-    console.error('❌ [iOS Bridge] setupFCMTokenEventListeners 함수를 찾을 수 없음');
-}
 
 // 🔧 WebKit MessageHandler 환경 감지 및 강제 초기화 (대폭 강화)
 (function initializeWebKitHandlers() {
@@ -268,7 +258,6 @@ if (typeof setupFCMTokenEventListeners === 'function') {
 window.SmapApp = {
     // iOS 네이티브 앱으로 메시지 전송 (강화된 버전)
     sendMessage: function(action, data = {}) {
-        // ✅ FCM 토큰 등록 재활성화 (mt_idx 2416 확인됨)
         const importantMessages = ['userInfo', 'routeChange', 'pageLoaded'];
         if (importantMessages.includes(action)) {
             if (!window.__checkFCMTokenStatus__()) {
@@ -466,8 +455,6 @@ window.SmapApp = {
         sendUserInfo: function(userInfo) {
             console.log('👤 [iOS Bridge] 사용자 정보 iOS로 전송:', userInfo);
 
-            // ✅ FCM 토큰 등록 재활성화됨
-            console.log('✅ [iOS Bridge] FCM 토큰 등록 재활성화됨 - mt_idx 2416 확인');
 
             const userData = {
                 mt_idx: userInfo.mt_idx,

@@ -596,7 +596,35 @@ class AuthService {
 
       // 3. JWT 토큰 유효성 검증
       try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
+        // JWT 토큰 형식 검증
+        if (!token || typeof token !== 'string' || token.split('.').length !== 3) {
+          console.warn('[AUTH SERVICE] JWT 토큰 형식이 올바르지 않음');
+          this.clearAuthData();
+          return false;
+        }
+
+        // Base64 URL 디코딩 (표준 atob 대신 더 안전한 방법 사용)
+        const payloadBase64 = token.split('.')[1];
+        if (!payloadBase64) {
+          console.warn('[AUTH SERVICE] JWT 토큰 payload가 없음');
+          this.clearAuthData();
+          return false;
+        }
+
+        // Base64 URL 디코딩 (padding 추가)
+        const payloadBase64Padded = payloadBase64.replace(/-/g, '+').replace(/_/g, '/') +
+                                   '='.repeat((4 - payloadBase64.length % 4) % 4);
+
+        let payload;
+        try {
+          const decodedPayload = atob(payloadBase64Padded);
+          payload = JSON.parse(decodedPayload);
+        } catch (decodeError) {
+          console.error('[AUTH SERVICE] JWT 토큰 Base64 디코딩 실패:', decodeError);
+          this.clearAuthData();
+          return false;
+        }
+
         const currentTimestamp = Math.floor(currentTime / 1000);
 
         if (payload.exp && payload.exp < currentTimestamp) {
@@ -663,7 +691,30 @@ class AuthService {
       }
 
       // JWT 토큰 디코딩하여 만료 시간 확인
-      const payload = JSON.parse(atob(token.split('.')[1]));
+      let payload;
+      try {
+        // JWT 토큰 형식 검증
+        if (!token || typeof token !== 'string' || token.split('.').length !== 3) {
+          throw new Error('Invalid JWT token format');
+        }
+
+        const payloadBase64 = token.split('.')[1];
+        if (!payloadBase64) {
+          throw new Error('JWT token payload missing');
+        }
+
+        // Base64 URL 디코딩 (padding 추가)
+        const payloadBase64Padded = payloadBase64.replace(/-/g, '+').replace(/_/g, '/') +
+                                   '='.repeat((4 - payloadBase64.length % 4) % 4);
+
+        const decodedPayload = atob(payloadBase64Padded);
+        payload = JSON.parse(decodedPayload);
+      } catch (decodeError) {
+        console.error('[AUTH SERVICE] JWT 토큰 디코딩 실패:', decodeError);
+        this.clearAuthData();
+        return false;
+      }
+
       const currentTime = Math.floor(Date.now() / 1000);
       const timeUntilExpiry = payload.exp - currentTime;
 

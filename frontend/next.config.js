@@ -220,8 +220,8 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' *.map.naver.com *.googleapis.com *.gstatic.com *.google.com *.navercorp.com *.naver.net *.pstatic.net *.vercel-scripts.com *.vercel.com",
-              "connect-src 'self' *.map.naver.com *.apigw.ntruss.com dapi.kakao.com *.googleapis.com *.google.com *.firebaseapp.com *.navercorp.com *.naver.net *.pstatic.net *.vercel-scripts.com *.vercel.com https://api3.smap.site wss: ws: data: blob:",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' *.map.naver.com *.googleapis.com *.gstatic.com *.google.com *.navercorp.com *.naver.net *.pstatic.net *.vercel-scripts.com *.vercel.com appleid.cdn-apple.com",
+              "connect-src 'self' *.map.naver.com *.apigw.ntruss.com dapi.kakao.com *.googleapis.com *.google.com *.firebaseapp.com *.navercorp.com *.naver.net *.pstatic.net kr-col-ext.nelo.navercorp.com *.vercel-scripts.com *.vercel.com https://api3.smap.site https://nextstep.smap.site wss: ws: data: blob:",
               "img-src 'self' data: blob: api3.smap.site https://api3.smap.site *.map.naver.com *.googleapis.com *.gstatic.com *.google.com *.navercorp.com *.naver.net *.pstatic.net *.vercel-scripts.com *.vercel.com",
               "style-src 'self' 'unsafe-inline' *.googleapis.com *.gstatic.com *.google.com accounts.google.com *.navercorp.com *.naver.net *.pstatic.net *.vercel-scripts.com *.vercel.com",
               "font-src 'self' *.gstatic.com *.googleapis.com *.navercorp.com *.naver.net *.pstatic.net *.vercel-scripts.com *.vercel.com",
