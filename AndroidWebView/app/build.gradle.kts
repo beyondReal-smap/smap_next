@@ -38,6 +38,8 @@ android {
             isMinifyEnabled = false
             isJniDebuggable = true
             buildConfigField("String", "BASE_URL", baseUrlDebug)
+            // Debug 빌드에도 서명 적용 (테스트용)
+            signingConfig = signingConfigs.getByName("release")
         }
 
         getByName("release") {

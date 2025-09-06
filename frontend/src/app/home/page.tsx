@@ -7459,7 +7459,7 @@ export default function HomePage() {
                                      )}
                                    </div>
                                    <div className="flex-1 min-w-0">
-                                                                            <div className="flex items-center justify-between">
+                                     <div className="flex items-center justify-between">
                                          <h4 className={`font-normal text-sm ${member.isSelected ? 'text-gray-900' : 'text-gray-900'} truncate`}>
                                            {member.name}
                                          </h4>
