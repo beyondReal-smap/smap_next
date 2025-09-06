@@ -234,22 +234,25 @@ export async function POST(request: NextRequest) {
         image: googleUser.picture, // 백엔드에서 image 필드를 기대함
         id_token: idToken,
         
-        // 🔧 사용자 조회 우선순위 설정
-        lookup_strategy: 'email_first', // 이메일 우선 조회
-        search_by_email: true, // 이메일로 기존 사용자 검색
-        verify_email_match: true // 이메일 일치 확인
+      // 🔧 사용자 조회 우선순위 설정
+      lookup_strategy: 'comprehensive', // 종합적 조회
+      search_by_email: true, // 이메일로 기존 사용자 검색
+      search_by_google_id: true, // 구글 ID로도 검색
+      verify_email_match: true, // 이메일 일치 확인
+      force_db_lookup: true // DB 강제 조회
       };
       
-      // 🔧 모든 구글 로그인에 대해 이메일 기반 조회 우선 사용
-      sendLogToConsole('info', '🔧 이메일 기반 사용자 조회 설정', {
+      // 🔧 모든 구글 로그인에 대해 종합적 DB 조회 요청
+      sendLogToConsole('info', '🔧 종합적 DB 조회 설정', {
         email: googleUser.email,
         googleId: googleUser.googleId,
-        action: 'email_first_lookup'
+        action: 'comprehensive_db_lookup'
       });
       
-      // 백엔드에 이메일 우선 조회 요청
-      requestBody.email_first_lookup = true;
-      requestBody.lookup_priority = 'email'; // 이메일을 우선으로 사용자 조회
+      // 백엔드에 종합적 조회 요청
+      requestBody.comprehensive_lookup = true;
+      requestBody.lookup_priority = 'both'; // 이메일과 구글 ID 모두로 조회
+      requestBody.debug_mode = true; // 디버그 모드 활성화
       
       sendLogToConsole('info', '백엔드 요청 본문', requestBody);
       
@@ -381,11 +384,27 @@ export async function POST(request: NextRequest) {
         userMtIdx: user?.mt_idx
       });
       
-      // 🔧 신규 사용자 판별 로직 강화
-      if (user && user.mt_idx && user.mt_idx > 0) {
+      // 🔧 백엔드 응답에 따른 신규/기존 사용자 판별 (백엔드 신뢰)
+      if (backendData.data?.isNewUser !== undefined) {
+        // 백엔드에서 명시적으로 isNewUser를 반환한 경우
+        isNewUser = backendData.data.isNewUser;
+        sendLogToConsole('info', '🔧 백엔드 isNewUser 값 사용', {
+          backendIsNewUser: backendData.data.isNewUser,
+          finalIsNewUser: isNewUser,
+          reason: 'backend_explicit_value'
+        });
+      } else if (backendData.data?.is_new_user !== undefined) {
+        // 백엔드에서 is_new_user로 반환한 경우
+        isNewUser = backendData.data.is_new_user;
+        sendLogToConsole('info', '🔧 백엔드 is_new_user 값 사용', {
+          backendIsNewUser: backendData.data.is_new_user,
+          finalIsNewUser: isNewUser,
+          reason: 'backend_alt_field'
+        });
+      } else if (user && user.mt_idx && user.mt_idx > 0) {
         // 백엔드에서 유효한 사용자 데이터를 반환한 경우 = 기존 사용자
         isNewUser = false;
-        sendLogToConsole('info', '🔧 기존 사용자 확인됨', {
+        sendLogToConsole('info', '🔧 기존 사용자 확인됨 (mt_idx 기반)', {
           mt_idx: user.mt_idx,
           mt_email: user.mt_email,
           mt_google_id: user.mt_google_id,
@@ -398,8 +417,6 @@ export async function POST(request: NextRequest) {
           email: googleUser.email,
           googleId: googleUser.googleId,
           reason: user ? 'no_valid_mt_idx' : 'no_user_data',
-          originalIsNewUser: backendData.data?.isNewUser,
-          originalIsNewUserAlt: backendData.data?.is_new_user,
           userMtIdx: user?.mt_idx,
           hasUser: !!user
         });
@@ -414,6 +431,7 @@ export async function POST(request: NextRequest) {
           profile_image: googleUser.picture
         };
       }
+
       
       // 🔧 백엔드 응답 검증 및 로깅
       sendLogToConsole('info', '🔧 백엔드 응답 사용자 정보 확인', {
@@ -429,28 +447,6 @@ export async function POST(request: NextRequest) {
         googleIdMatch: user?.mt_google_id === googleUser.googleId
       });
       
-      // 🚨 임시 해결책: beyondrealsmap@gmail.com에 대한 강제 수정
-      if (googleUser.email === 'beyondrealsmap@gmail.com' && user) {
-        sendLogToConsole('warning', '🚨 beyondrealsmap@gmail.com 임시 강제 수정', {
-          originalMtIdx: user.mt_idx,
-          originalIsNewUser: isNewUser,
-          correctedMtIdx: 1186,
-          correctedIsNewUser: false,
-          reason: 'backend_returning_wrong_user'
-        });
-        
-        // 사용자 정보 강제 수정
-        user = {
-          ...user,
-          mt_idx: 1186,
-          id: 1186,
-          mt_email: 'beyondrealsmap@gmail.com',
-          mt_name: user.mt_name || 'Beyond Real'
-        };
-        
-        // 기존 사용자로 강제 설정
-        isNewUser = false;
-      }
       
       // 이메일이 일치하지 않는 경우 경고 및 추가 조회 시도
       if (user && user.mt_email !== googleUser.email) {
@@ -474,7 +470,9 @@ export async function POST(request: NextRequest) {
             },
             body: JSON.stringify({
               email: googleUser.email,
-              provider: 'google'
+              provider: 'google',
+              force_lookup: true,
+              debug_mode: true
             })
           });
           
@@ -561,7 +559,8 @@ export async function POST(request: NextRequest) {
         mt_idx: user.mt_idx,
         email: user.mt_email,
         name: user.mt_name,
-        isNewUser: isNewUser
+        isNewUser: isNewUser,
+        finalDecision: isNewUser ? 'REGISTER_PAGE' : 'LOGIN_SUCCESS'
       });
 
       const response = NextResponse.json({
