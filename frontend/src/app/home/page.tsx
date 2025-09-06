@@ -991,6 +991,7 @@ export default function HomePage() {
   const [mapType, setMapType] = useState<MapType>('naver');
 
   const [naverMapsLoaded, setNaverMapsLoaded] = useState(false);
+  const [androidFallbackMode, setAndroidFallbackMode] = useState(false);
   const [isInitialDataLoaded, setIsInitialDataLoaded] = useState(false);
   const [daysForCalendar, setDaysForCalendar] = useState<{ value: string; display: string; }[]>([]);
   const [userName, setUserName] = useState('사용자');
@@ -3453,7 +3454,21 @@ export default function HomePage() {
             setIsMapLoading(false);
           } catch (e) {
             console.error('[HOME] ensureNaverMapsLoaded 실패, 최종 백업 로딩 시도', e);
-            performBackupLoading();
+
+            // 안드로이드 WebView에서 실패한 경우 폴백 모드 활성화
+            const isAndroidWebView = typeof navigator !== 'undefined' &&
+              /Android/i.test(navigator.userAgent) &&
+              /WebView|wv|SMAP-Android/i.test(navigator.userAgent);
+
+            if (isAndroidWebView) {
+              console.log('[HOME] 🤖 안드로이드 WebView에서 Naver Maps 로드 실패 - 폴백 모드 활성화');
+              setAndroidFallbackMode(true);
+              setNaverMapsLoaded(false);
+              setIsMapLoading(false);
+              apiLoadStatus.naver = false;
+            } else {
+              performBackupLoading();
+            }
           }
         }
       }, 3000);
@@ -3471,6 +3486,19 @@ export default function HomePage() {
       setIsMapLoading(false);
     } catch (e) {
       console.error('[HOME] 보장 로더 실패, 일반 백업 로딩으로 폴백', e);
+
+      // 안드로이드 WebView에서 실패한 경우 폴백 모드 활성화
+      const isAndroidWebView = typeof navigator !== 'undefined' &&
+        /Android/i.test(navigator.userAgent) &&
+        /WebView|wv|SMAP-Android/i.test(navigator.userAgent);
+
+      if (isAndroidWebView) {
+        console.log('[HOME] 🤖 안드로이드 WebView에서 Naver Maps 로드 실패 - 폴백 모드 활성화');
+        setAndroidFallbackMode(true);
+        setNaverMapsLoaded(false);
+        setIsMapLoading(false);
+        apiLoadStatus.naver = false;
+      } else {
       performBackupLoading();
     }
 
@@ -4145,22 +4173,44 @@ export default function HomePage() {
     return isNaN(num) ? null : num;
   };
 
-  // 네이버 지도 API 상태 확인 헬퍼 함수 (더 관대하게 수정)
+  // 네이버 지도 API 상태 확인 헬퍼 함수 (안드로이드 WebView 지원 강화)
   const isNaverMapsReady = useCallback((): boolean => {
+    // 안드로이드 WebView 환경 감지
+    const isAndroidWebView = typeof navigator !== 'undefined' &&
+      /Android/i.test(navigator.userAgent) &&
+      /WebView|wv|SMAP-Android/i.test(navigator.userAgent);
+
     // naverMapsLoaded 상태와 관계없이 window.naver?.maps가 있으면 true 반환
     // 이렇게 하면 API가 로드되었지만 상태가 업데이트되지 않은 경우에도 지도 초기화 가능
     const hasNaverMaps = !!(window.naver?.maps && window.naver?.maps?.LatLng);
-    const isReady = hasNaverMaps && naverMapsLoaded;
-    
+    const hasMapObject = !!(window.naver?.maps?.Map);
+    const hasMarkerObject = !!(window.naver?.maps?.Marker);
+    const hasInfoWindowObject = !!(window.naver?.maps?.InfoWindow);
+
+    // 안드로이드 WebView에서는 상태 체크를 더 관대하게
+    const isReady = isAndroidWebView
+      ? hasNaverMaps && hasMapObject // 안드로이드에서는 기본 객체만 확인
+      : hasNaverMaps && naverMapsLoaded; // 일반 환경에서는 기존 로직 유지
+
+    console.log('[HOME] Naver Maps 준비 상태 확인:', {
+      isAndroidWebView,
+      hasNaverMaps,
+      hasMapObject,
+      hasMarkerObject,
+      hasInfoWindowObject,
+      naverMapsLoaded,
+      isReady
+    });
+
     if (hasNaverMaps && !naverMapsLoaded) {
       console.log('[HOME] 🚀 Naver Maps API는 로드되었지만 상태가 업데이트되지 않음 - 강제 상태 업데이트');
       // API가 로드되었지만 상태가 업데이트되지 않은 경우 강제로 상태 업데이트
       setTimeout(() => {
         setNaverMapsLoaded(true);
         console.log('[HOME] ✅ Naver Maps 상태 강제 업데이트 완료');
-      }, 100);
+      }, isAndroidWebView ? 300 : 100); // 안드로이드 WebView에서는 더 긴 지연
     }
-    
+
     return isReady;
   }, [naverMapsLoaded]);
 
@@ -4250,10 +4300,28 @@ export default function HomePage() {
     // console.log('[createMarker] 검증된 좌표:', { validLat, validLng });
 
     if (mapType === 'naver' && naverMap.current && isNaverMapsReady()) {
+      // 안드로이드 WebView 환경 감지
+      const isAndroidWebView = typeof navigator !== 'undefined' &&
+        /Android/i.test(navigator.userAgent) &&
+        /WebView|wv|SMAP-Android/i.test(navigator.userAgent);
+
+      console.log('[createMarker] 마커 생성 시작:', {
+        isAndroidWebView,
+        markerType,
+        validLat,
+        validLng,
+        hasNaverMap: !!naverMap.current
+      });
+
       const naverPos = createSafeLatLng(validLat, validLng);
       if (!naverPos) {
         console.log('[createMarker] LatLng 객체 생성 실패 - API 로딩 중일 수 있음');
         return null;
+      }
+
+      // 안드로이드 WebView에서는 추가적인 대기 시간 부여
+      if (isAndroidWebView) {
+        console.log('[createMarker] 안드로이드 WebView 환경 - 추가 대기 시간 적용');
       }
       
       if (markerType === 'member' && memberData) {
@@ -4262,11 +4330,13 @@ export default function HomePage() {
         // 선택 상태에 따른 테두리 색상 설정 - 빨간색으로 변경
         const borderColor = isSelected ? '#EC4899' : '#4F46E5'; // 선택시 핑크, 기본은 인디고
         
-        const newMarker = new window.naver.maps.Marker({
-          position: naverPos,
-          map: naverMap.current,
-          title: memberData.name,
-          icon: {
+        let newMarker;
+        try {
+          newMarker = new window.naver.maps.Marker({
+            position: naverPos,
+            map: naverMap.current,
+            title: memberData.name,
+            icon: {
             content: `
               <div style="position: relative; text-align: center;">
                 <div style="width: 32px; height: 32px; background-color: white; border: 2px solid ${borderColor}; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: ${isSelected ? '0 0 8px rgba(236, 72, 153, 0.5)' : '0 1px 3px rgba(0,0,0,0.2)'};">
@@ -4299,6 +4369,41 @@ export default function HomePage() {
             anchor: new window.naver.maps.Point(18, 42)
           }
         });
+
+        console.log('[createMarker] 마커 객체 생성 성공:', memberData.name);
+        } catch (markerError) {
+          console.error('[createMarker] 마커 생성 실패:', {
+            memberName: memberData.name,
+            error: markerError,
+            isAndroidWebView
+          });
+
+          // 안드로이드 WebView에서는 마커 생성 실패 시 재시도
+          if (isAndroidWebView) {
+            console.log('[createMarker] 안드로이드 WebView에서 마커 생성 재시도');
+            setTimeout(() => {
+              try {
+                newMarker = new window.naver.maps.Marker({
+                  position: naverPos,
+                  map: naverMap.current,
+                  title: memberData.name,
+                  icon: {
+                    content: `<div style="width: 20px; height: 20px; background: ${borderColor}; border-radius: 50%; border: 2px solid white;"></div>`,
+                    size: new window.naver.maps.Size(24, 24),
+                    anchor: new window.naver.maps.Point(12, 12)
+                  }
+                });
+                console.log('[createMarker] 간단한 마커 생성 성공 (재시도):', memberData.name);
+              } catch (retryError) {
+                console.error('[createMarker] 마커 재시도 실패:', retryError);
+                return null;
+              }
+            }, 500);
+            return null; // 일단 null 반환하고 재시도 후 처리
+          }
+
+          return null;
+        }
 
         // 멤버 InfoWindow 추가
         if (window.naver.maps.InfoWindow && memberData) {
@@ -4365,8 +4470,10 @@ export default function HomePage() {
           
           // 속도 정보
           const speed = memberData.mlt_speed || 0;
-          
-          const memberInfoWindow = new window.naver.maps.InfoWindow({
+
+          let memberInfoWindow;
+          try {
+            memberInfoWindow = new window.naver.maps.InfoWindow({
             content: `
               <style>
                 @keyframes slideInFromBottom {
@@ -4445,6 +4552,18 @@ export default function HomePage() {
             pixelOffset: new window.naver.maps.Point(0, -10)
           });
 
+          console.log('[createMarker] InfoWindow 생성 성공:', memberData.name);
+          } catch (infoWindowError) {
+            console.error('[createMarker] InfoWindow 생성 실패:', {
+              memberName: memberData.name,
+              error: infoWindowError,
+              isAndroidWebView
+            });
+
+            // InfoWindow 생성 실패 시에도 마커는 유지
+            console.log('[createMarker] InfoWindow 없이 마커만 생성하여 계속 진행');
+          }
+
           newMarker.addListener('click', () => {
             // 기존 InfoWindow 닫기
             if (currentInfoWindowRef.current) {
@@ -4463,7 +4582,7 @@ export default function HomePage() {
             try {
               memberInfoWindow.open(naverMap.current, newMarker);
               console.log('[네이버맵] InfoWindow 열기 성공');
-              
+
               // InfoWindow가 열린 후 멤버 선택 처리 (바텀시트 연동) - location 페이지에서는 건너뛰기
               if (memberData && memberData.id && !window.location.pathname.includes('/location')) {
                 setTimeout(() => {
@@ -4474,13 +4593,31 @@ export default function HomePage() {
                 console.log('[createMarker] location 페이지에서는 멤버 선택 건너뛰기:', memberData?.name);
               }
             } catch (e) {
-              console.error('[네이버맵] InfoWindow 열기 실패:', e);
+              console.error('[네이버맵] InfoWindow 열기 실패:', {
+                error: e,
+                memberName: memberData.name,
+                isAndroidWebView,
+                mapExists: !!naverMap.current,
+                markerExists: !!newMarker
+              });
+
+              // 안드로이드 WebView에서 InfoWindow 실패 시 사용자에게 알림
+              if (isAndroidWebView) {
+                console.warn('[네이버맵] 안드로이드 WebView에서 InfoWindow 표시 실패 - 마커만 표시');
+              }
             }
           });
         }
 
         return newMarker;
       } else if (markerType === 'schedule' && scheduleData) {
+        // 스케줄 마커 생성도 동일한 에러 처리 적용
+        console.log('[createMarker] 스케줄 마커 생성 시작:', {
+          isAndroidWebView,
+          scheduleTitle: scheduleData.title,
+          validLat,
+          validLng
+        });
         const scheduleTitle = scheduleData.title || '제목 없음';
         const statusDetail = getScheduleStatus(scheduleData);
         const scheduleOrder = index + 1;
