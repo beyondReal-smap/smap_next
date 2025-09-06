@@ -6,14 +6,19 @@
 declare global {
   interface Window {
     AndroidPermissions?: {
+      checkPermission: (permission: string) => string;
       requestPermissions(): void;
       hasAllPermissions(): boolean;
       getMissingPermissions(): string;
       setFirstLogin(isFirst: boolean): void;
+      resetPermissionState?: () => void;
       hasLocationAndActivityPermissions(): boolean;
+      requestPermission: (permission: string) => string;
       requestLocationAndActivityPermissions(): void;
       getMissingLocationAndActivityPermissions(): string;
-      resetPermissionState?(): void; // 권한 상태 초기화 메서드 추가
+      startLocationService: () => void;
+      stopLocationService: () => void;
+      isLocationServiceRunning: () => boolean;
     };
   }
 }
