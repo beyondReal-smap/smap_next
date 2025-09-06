@@ -278,7 +278,18 @@ export const useFCMTokenRegistrationFailed = (callback: (data: any) => void) => 
 
     const handleFCMTokenRegistrationFailed = (event: CustomEvent) => {
       console.log('❌ [FCM] 토큰 등록 실패 이벤트 수신:', event.detail)
-      callback(event.detail)
+
+      // 타임아웃 상황 구분하여 메시지 조정
+      const detail = event.detail
+      if (detail.reason === 'timeout_active') {
+        detail.message = '푸시 알림 설정이 일시적으로 중단되었습니다. 잠시 후 다시 시도해주세요.'
+        detail.action = 'wait'
+      } else if (detail.reason === 'user_not_found') {
+        detail.message = '푸시 알림 설정에 실패했습니다. 앱을 재시작해주세요.'
+        detail.action = 'restart'
+      }
+
+      callback(detail)
     }
 
     window.addEventListener('fcmTokenRegistrationFailed', handleFCMTokenRegistrationFailed as EventListener)

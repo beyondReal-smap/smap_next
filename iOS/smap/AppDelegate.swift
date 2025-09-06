@@ -864,6 +864,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     @objc public func forceUpdateFCMTokenOnLogin() {
         print("🔑 [LOGIN] 로그인 시 FCM 토큰 강제 업데이트 시작")
 
+        // 로그인 성공 시 FCM 실패 기록 및 재시도 횟수 초기화
+        UserDefaults.standard.removeObject(forKey: "fcm_last_failed_update")
+        UserDefaults.standard.set(0, forKey: "fcm_retry_count")
+        UserDefaults.standard.synchronize()
+        print("🧹 [LOGIN] 로그인 성공 - FCM 실패 기록 및 재시도 횟수 초기화")
+
         // 로그인 상태 확인
         let hasUserIdentified = UserDefaults.standard.string(forKey: "mt_idx") != nil ||
                                UserDefaults.standard.string(forKey: "savedMtIdx") != nil
@@ -917,6 +923,24 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     // 로그인 시 FCM 토큰 강제 새로고침
     private func forceRefreshFCMTokenOnLogin() {
         print("🔄 [LOGIN] 로그인 시 FCM 토큰 강제 새로고침 시작")
+
+        // FCM 토큰 재시도 횟수 체크 (무한 반복 방지)
+        let retryCount = UserDefaults.standard.integer(forKey: "fcm_retry_count")
+        if retryCount >= 3 {
+            print("⏰ [LOGIN] FCM 토큰 재시도 횟수 초과 (3회) - 재시도 중단")
+            print("💡 [LOGIN] 잠시 후 앱을 재시작하거나 나중에 다시 시도해주세요")
+
+            // 재시도 횟수 초기화 (다음 로그인 시를 위해)
+            UserDefaults.standard.set(0, forKey: "fcm_retry_count")
+            UserDefaults.standard.synchronize()
+
+            return
+        }
+
+        // 재시도 횟수 증가
+        UserDefaults.standard.set(retryCount + 1, forKey: "fcm_retry_count")
+        UserDefaults.standard.synchronize()
+        print("🔢 [LOGIN] FCM 토큰 재시도 횟수: \(retryCount + 1)/3")
 
         // APNs 토큰이 있는지 확인
         let apnsToken = currentAPNSToken ?? UserDefaults.standard.string(forKey: "last_apns_token")
@@ -5835,6 +5859,25 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
         if !hasUserIdentified {
             self.fcmLog("🚫 사용자가 식별되지 않음(mt_idx 없음) - FCM 토큰 업데이트 건너뜀")
+
+            // 무한 반복 방지를 위한 타임아웃 체크
+            let lastFailedUpdate = UserDefaults.standard.double(forKey: "fcm_last_failed_update")
+            let currentTime = Date().timeIntervalSince1970
+            let timeSinceLastFailure = currentTime - lastFailedUpdate
+
+            // 5분 이내에 실패한 기록이 있으면 더 이상 시도하지 않음
+            if lastFailedUpdate > 0 && timeSinceLastFailure < 300 {
+                self.fcmLog("⏰ 최근 FCM 업데이트 실패 기록 존재 - 5분 타임아웃 적용")
+                self.fcmLog("📅 마지막 실패: \(Date(timeIntervalSince1970: lastFailedUpdate))")
+                self.fcmLog("⏱️  경과 시간: \(Int(timeSinceLastFailure))초")
+                completion(false)
+                return
+            }
+
+            // 실패 시간 기록
+            UserDefaults.standard.set(currentTime, forKey: "fcm_last_failed_update")
+            UserDefaults.standard.synchronize()
+
             completion(false)
             return
         }
@@ -5977,6 +6020,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                     UserDefaults.standard.synchronize()
                     self.fcmLog("🔓 FCM 토큰 업데이트 완료로 인한 플래그 해제됨")
 
+                    // FCM 토큰 등록 성공 시 실패 기록 및 재시도 횟수 초기화
+                    UserDefaults.standard.removeObject(forKey: "fcm_last_failed_update")
+                    UserDefaults.standard.set(0, forKey: "fcm_retry_count")
+                    UserDefaults.standard.synchronize()
+                    self.fcmLog("🧹 FCM 토큰 등록 성공 - 실패 기록 및 재시도 횟수 초기화")
+
                     // 웹뷰에 FCM 토큰 등록 성공 알림 전송
                     DispatchQueue.main.async {
                         self.notifyWebViewFCMTokenRegistrationSuccess()
@@ -5999,6 +6048,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                         // 웹뷰에 FCM 토큰 등록 실패 알림 전송
                         DispatchQueue.main.async {
                             self.notifyWebViewFCMTokenRegistrationFailed(reason: "user_not_found")
+                        }
+                    }
+
+                    // 타임아웃 적용 중인 경우 사용자 안내
+                    let lastFailedUpdate = UserDefaults.standard.double(forKey: "fcm_last_failed_update")
+                    let currentTime = Date().timeIntervalSince1970
+                    let timeSinceLastFailure = currentTime - lastFailedUpdate
+
+                    if lastFailedUpdate > 0 && timeSinceLastFailure < 300 {
+                        self.fcmLog("⏰ FCM 업데이트 타임아웃 적용 중 - 사용자에게 안내 필요")
+
+                        DispatchQueue.main.async {
+                            self.notifyWebViewFCMTokenRegistrationFailed(reason: "timeout_active")
                         }
                     }
 

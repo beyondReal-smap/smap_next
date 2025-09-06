@@ -97,15 +97,24 @@ export default function AppLayout({ children }: AppLayoutProps) {
   // FCM 토큰 등록 실패 처리
   useFCMTokenRegistrationFailed((data) => {
     console.log('❌ [FCM] 토큰 등록 실패 이벤트 처리:', data);
+
+    let displayMessage = data.message || '푸시 알림 설정에 실패했습니다.';
+    let displayTime = 5000; // 기본 5초
+
+    // 타임아웃 상황인 경우 더 짧게 표시
+    if (data.action === 'wait') {
+      displayTime = 3000; // 3초
+    }
+
     setFcmNotification({
       type: 'error',
-      message: '푸시 알림 설정에 실패했습니다. 앱을 재시작해주세요.'
+      message: displayMessage
     });
 
-    // 5초 후 알림 제거 (에러는 더 오래 표시)
+    // 상황에 맞는 표시 시간 후 알림 제거
     setTimeout(() => {
       setFcmNotification({ type: null, message: '' });
-    }, 5000);
+    }, displayTime);
   });
 
   return (
