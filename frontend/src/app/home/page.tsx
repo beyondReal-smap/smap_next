@@ -5496,8 +5496,7 @@ export default function HomePage() {
     }
 
     if (
-      (mapType === 'naver' && naverMap.current && mapsInitialized?.naver && window.naver?.maps) || 
-      (false && map.current && mapsInitialized?.google && window.google?.maps)
+      (mapType === 'naver' && naverMap.current && mapsInitialized?.naver && window.naver?.maps)
     ) {
       markersUpdating.current = true;
       console.log('[HOME] 지도 타입 변경으로 마커 업데이트 시작');
@@ -5508,7 +5507,7 @@ export default function HomePage() {
       }, 100);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapType, mapsInitialized?.google, mapsInitialized?.naver]);
+  }, [mapType, mapsInitialized?.naver]);
 
   // 현재 위치 마커 생성 함수
   const createCurrentLocationMarker = () => {
@@ -5585,8 +5584,7 @@ export default function HomePage() {
     }
 
     // 지도가 초기화되지 않았으면 대기
-            if (!((mapType === 'naver' && naverMap.current && mapsInitialized?.naver && isNaverMapsReady()) || 
-          (false && map.current && mapsInitialized?.google && window.google?.maps))) {
+            if (!((mapType === 'naver' && naverMap.current && mapsInitialized?.naver && isNaverMapsReady()))) {
       console.log('[HOME] 지도 초기화 대기 중');
       return;
     }
@@ -5637,7 +5635,7 @@ export default function HomePage() {
         markersUpdating.current = false;
       }, 100);
     }
-  }, [groupMembers, mapType, mapsInitialized?.naver, mapsInitialized?.google, dataFetchedRef.current.loading]);
+  }, [groupMembers, mapType, mapsInitialized?.naver, dataFetchedRef.current.loading]);
 
   // filteredSchedules 변경 시 일정 마커 업데이트
   useEffect(() => {
@@ -5649,15 +5647,14 @@ export default function HomePage() {
 
     if (
       filteredSchedules.length >= 0 && // 0개도 유효한 상태 (빈 배열)
-      ((mapType === 'naver' && naverMap.current && mapsInitialized?.naver && window.naver?.maps) || 
-       (false && map.current && mapsInitialized?.google && window.google?.maps))
+      ((mapType === 'naver' && naverMap.current && mapsInitialized?.naver && window.naver?.maps))
     ) {
       console.log('[HOME] filteredSchedules 변경 감지 - 일정 마커 업데이트:', filteredSchedules.length, '개');
       
       // 즉시 일정 마커 업데이트 실행
       updateScheduleMarkers(filteredSchedules);
     }
-  }, [filteredSchedules, mapType, mapsInitialized?.naver, mapsInitialized?.google]);
+  }, [filteredSchedules, mapType, mapsInitialized?.naver]);
 
   // 🎯 초기 로딩 완료 후 마커 강제 업데이트 (구글 로그인 후 마커 표시 보장)
   useEffect(() => {
@@ -5665,8 +5662,7 @@ export default function HomePage() {
     if (
       isFirstMemberSelectionComplete &&
       groupMembers.length > 0 &&
-              ((mapType === 'naver' && naverMap.current && mapsInitialized?.naver && isNaverMapsReady()) ||
-          (false && map.current && mapsInitialized?.google && window.google?.maps)) &&
+              ((mapType === 'naver' && naverMap.current && mapsInitialized?.naver && isNaverMapsReady())) &&
       !dataFetchedRef.current.loading &&
       !markersUpdating.current
     ) {
@@ -5706,13 +5702,13 @@ export default function HomePage() {
     groupMembers.length,
     mapType,
     mapsInitialized?.naver,
-    mapsInitialized?.google,
     dataFetchedRef.current.loading
   ]);
 
-  // 지도 타입 변경 핸들러
+  // 지도 타입 변경 핸들러 (Google Maps 제거로 인해 단순화)
   const handleMapTypeChange = () => {
-    setMapType(prevType => prevType === 'google' ? 'naver' : 'google');
+    // Google Maps를 사용하지 않으므로 항상 'naver'로 설정
+    setMapType('naver');
   };
 
   // 위치 정보를 지도에 업데이트
@@ -6685,7 +6681,7 @@ export default function HomePage() {
               ref={googleMapContainer}
               className="w-full h-full absolute top-0 left-0"
               style={{
-                display: mapType === 'google' ? 'block' : 'none',
+                display: 'none', // Google Maps를 사용하지 않으므로 항상 숨김
                 zIndex: 5,
                 position: 'absolute',
                 top: 0,
