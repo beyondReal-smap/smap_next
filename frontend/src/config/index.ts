@@ -46,8 +46,7 @@ export const getLocalizedAppInfo = (language: string = 'ko') => {
 
 // API 키
 export const API_KEYS = {
-  // 지도 API 키 - 환경변수 우선, 없으면 하드코딩된 값 사용
-  GOOGLE_MAPS_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || 'AIzaSyBkWlND5fvW4tmxaj11y24XNs_LQfplwpw', // com.dmonster.smap
+  // Google Maps API 키 제거됨 (사용하지 않음)
   // 동적 네이버 지도 Client ID (도메인별 자동 선택)
   get NAVER_MAPS_CLIENT_ID() {
     if (typeof window !== 'undefined') {
@@ -134,15 +133,7 @@ export const MAP_CONFIG = {
       zoom: 16
     }
   },
-  // Google Maps 설정
-  GOOGLE: {
-    DEFAULT_OPTIONS: {
-      mapTypeControl: false,
-      fullscreenControl: false,
-      streetViewControl: false,
-      zoom: 16
-    }
-  },
+  // Google Maps 설정 제거됨 (사용하지 않음)
 };
 
 // Google 서비스 관련 설정

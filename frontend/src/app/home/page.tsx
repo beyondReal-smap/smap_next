@@ -92,7 +92,6 @@ import mapService, {
   MapType as MapTypeService, 
   MAP_API_KEYS, 
   Location, 
-  cleanupGoogleMap, 
   cleanupNaverMap 
 } from '../../services/mapService';
 import { 
@@ -4136,9 +4135,6 @@ export default function HomePage() {
     return () => {
       // 네이버 맵 리소스 정리
       cleanupNaverMap(naverMap, naverMarker);
-      
-      // 구글 맵 리소스 정리
-      cleanupGoogleMap(map, marker);
       
       // 네이버 지도 스크립트 제거
       const naverScript = document.getElementById('naver-maps-script');

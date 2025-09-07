@@ -328,7 +328,7 @@ export default function ClientLayout({
   const [isMounted, setIsMounted] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const pathname = usePathname();
-  const { preloadNaverMaps, preloadGoogleMaps } = useMapPreloader();
+  const { preloadNaverMaps } = useMapPreloader();
   const { handleAppResumed } = useAndroidPermissionChecker();
 
   // 로컬 스토리지에서 로그인 상태 확인 및 자동 로그인 처리
