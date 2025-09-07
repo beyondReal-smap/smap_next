@@ -3,17 +3,15 @@ import { ensureNaverMapsLoaded } from './ensureNaverMaps';
 import React from 'react';
 
 // 지도 API 타입 정의
-export type MapType = 'google' | 'naver';
+export type MapType = 'naver';
 
 // 지도 API 키 상수
 export const MAP_API_KEYS = {
-  GOOGLE: API_KEYS.GOOGLE_MAPS_API_KEY,
   NAVER_CLIENT_ID: API_KEYS.NAVER_MAPS_CLIENT_ID
 };
 
 // 지도 초기화 상태 관리 인터페이스
 export interface MapInitState {
-  googleMapsLoaded: boolean;
   naverMapsLoaded: boolean;
 }
 
@@ -23,21 +21,7 @@ export interface Location {
   lng: number;
 }
 
-// Google Maps API 로드 유틸리티
-export const loadGoogleMapsAPI = (callback: () => void): void => {
-  if (typeof window === 'undefined' || window.google?.maps) {
-    callback();
-    return;
-  }
-
-  // 스크립트 요소 생성 (만약 Next.js Script 컴포넌트를 사용하지 않을 경우)
-  const script = document.createElement('script');
-  script.src = `https://maps.googleapis.com/maps/api/js?key=${MAP_API_KEYS.GOOGLE}&libraries=places`;
-  script.async = true;
-  script.defer = true;
-  script.onload = callback;
-  document.head.appendChild(script);
-};
+// Google Maps API 관련 코드 제거됨 (사용하지 않음)
 
 // Naver Maps API 로드 유틸리티
 export const loadNaverMapsAPI = (callback: () => void): void => {
@@ -46,15 +30,7 @@ export const loadNaverMapsAPI = (callback: () => void): void => {
     .catch(() => callback()); // 실패해도 페이지 동작을 막지 않음
 };
 
-// Google 지도 인스턴스 정리 유틸리티
-export const cleanupGoogleMap = (map: React.MutableRefObject<any>, marker: React.MutableRefObject<any>): void => {
-  if (marker.current) {
-    marker.current.setMap(null);
-    marker.current = null;
-  }
-  map.current = null;
-  // Google Maps는 명시적 제거 메서드가 없음
-};
+// Google Maps 관련 코드 제거됨 (사용하지 않음)
 
 // Naver 지도 인스턴스 정리 유틸리티
 export const cleanupNaverMap = (map: React.MutableRefObject<any>, marker: React.MutableRefObject<any>): void => {
@@ -70,8 +46,6 @@ export const cleanupNaverMap = (map: React.MutableRefObject<any>, marker: React.
 
 export default {
   MAP_API_KEYS,
-  loadGoogleMapsAPI,
   loadNaverMapsAPI,
-  cleanupGoogleMap,
   cleanupNaverMap
 }; 

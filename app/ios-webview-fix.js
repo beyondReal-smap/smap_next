@@ -277,18 +277,7 @@
         }
       }
       
-      // 구글 지도 API 최적화
-      function optimizeGoogleMaps() {
-        if (window.google && window.google.maps) {
-          console.log('Google Maps API already loaded in iOS WebView');
-          
-          // 구글 지도 준비 완료 이벤트
-          const readyEvent = new CustomEvent('googleMapsReady', {
-            detail: { source: 'ios-webview-fix' }
-          });
-          document.dispatchEvent(readyEvent);
-        }
-      }
+      // Google Maps 관련 코드 제거됨 (사용하지 않음)
       
       // 지도 컨테이너 최적화
       function optimizeMapContainers() {
@@ -373,9 +362,33 @@
             clearTimeout(timeoutId);
             console.error('Fetch error:', error);
             
-            // 네트워크 오류 시 재시도
-            if (error.name === 'AbortError' || error.message.includes('network')) {
-              console.log('Retrying fetch request...');
+            // iOS WebView 특화 에러 처리
+            if (error.name === 'AbortError' || 
+                error.message.includes('network') || 
+                error.message.includes('Load failed') ||
+                error.message.includes('access control checks') ||
+                error.message.includes('ChunkLoadError')) {
+              
+              console.log('🔄 iOS WebView 네트워크 에러 감지 - 재시도 중...');
+              
+              // RSC 페이로드 에러인 경우 브라우저 네비게이션으로 폴백
+              if (url.includes('_rsc=')) {
+                console.log('📄 RSC 페이로드 에러 - 브라우저 네비게이션으로 폴백');
+                const baseUrl = url.split('?')[0];
+                window.location.href = baseUrl;
+                return Promise.reject(new Error('RSC fallback to browser navigation'));
+              }
+              
+              // 청크 로딩 에러인 경우 재시도
+              if (error.message.includes('ChunkLoadError')) {
+                console.log('📦 청크 로딩 에러 - 페이지 새로고침');
+                setTimeout(() => {
+                  window.location.reload();
+                }, 2000);
+                return Promise.reject(new Error('ChunkLoadError - page reload'));
+              }
+              
+              // 일반적인 네트워크 에러는 재시도
               return new Promise(resolve => {
                 setTimeout(() => {
                   resolve(originalFetch(url, options));
@@ -397,6 +410,25 @@
         google: false
       };
       
+      // 스크립트 로딩 에러 처리 (Google Maps 제외)
+      const originalCreateElement = document.createElement;
+      document.createElement = function(tagName) {
+        const element = originalCreateElement.call(this, tagName);
+        
+        if (tagName.toLowerCase() === 'script') {
+          element.addEventListener('error', function(event) {
+            console.log('🔄 스크립트 로딩 에러 감지');
+            // Google Maps 관련 에러는 무시
+            if (this.src && this.src.includes('maps.googleapis.com')) {
+              console.log('🗺️ Google Maps API 에러 - 무시 (사용하지 않음)');
+              return;
+            }
+          });
+        }
+        
+        return element;
+      };
+      
       // 네이버 지도 스크립트 로딩 감지
       const checkNaverMaps = setInterval(() => {
         if (window.naver && window.naver.maps && !window.mapScriptLoadStatus.naver) {
@@ -410,32 +442,54 @@
         }
       }, 100);
       
-      // 구글 지도 스크립트 로딩 감지
-      const checkGoogleMaps = setInterval(() => {
-        if (window.google && window.google.maps && !window.mapScriptLoadStatus.google) {
-          console.log('Google Maps API detected and ready');
-          window.mapScriptLoadStatus.google = true;
-          clearInterval(checkGoogleMaps);
-          
-          // 지도 준비 완료 이벤트 발생
-          const event = new CustomEvent('googleMapsReady');
-          document.dispatchEvent(event);
-        }
-      }, 100);
+      // Google Maps 관련 코드 제거됨 (사용하지 않음)
       
       // 10초 후 체크 중단
       setTimeout(() => {
         clearInterval(checkNaverMaps);
-        clearInterval(checkGoogleMaps);
       }, 10000);
     }
     
+    // 9. 전역 에러 핸들러 추가
+    function setupGlobalErrorHandlers() {
+      console.log('🛡️ iOS WebView 전역 에러 핸들러 설정');
+      
+      // ChunkLoadError 전역 핸들러
+      window.addEventListener('error', function(event) {
+        if (event.error && event.error.message && event.error.message.includes('ChunkLoadError')) {
+          console.log('📦 전역 ChunkLoadError 감지 - 페이지 새로고침');
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
+        }
+      });
+      
+      // Promise rejection 핸들러
+      window.addEventListener('unhandledrejection', function(event) {
+        if (event.reason && event.reason.message) {
+          const message = event.reason.message;
+          
+          if (message.includes('ChunkLoadError')) {
+            console.log('📦 Promise ChunkLoadError 감지 - 페이지 새로고침');
+            event.preventDefault();
+            setTimeout(() => {
+              window.location.reload();
+            }, 1000);
+          } else if (message.includes('Load failed')) {
+            console.log('🔄 Promise Load failed 감지 - 재시도');
+            event.preventDefault();
+          }
+        }
+      });
+    }
+
     // iOS WebView 최적화 함수들 실행
     document.addEventListener('DOMContentLoaded', function() {
       setTimeout(() => {
         fixMapLoadingForIOS();
         optimizeNetworkForIOS();
         optimizeMapScriptLoading();
+        setupGlobalErrorHandlers();
       }, 1000);
     });
     
@@ -729,15 +783,10 @@
         naverScriptExists: !!document.querySelector('script[src*="oapi.map.naver.com"]'),
         naverScriptSrc: document.querySelector('script[src*="oapi.map.naver.com"]')?.src || 'none',
         
-        // 구글 지도 상태
-        googleMapsAvailable: !!(window.google && window.google.maps),
-        googleMapsVersion: window.google?.maps?.version || 'unknown',
-        googleScriptExists: !!document.querySelector('script[src*="maps.googleapis.com"]'),
-        googleScriptSrc: document.querySelector('script[src*="maps.googleapis.com"]')?.src || 'none',
+        // Google Maps 관련 코드 제거됨 (사용하지 않음)
         
         // DOM 상태
         naverMapContainer: !!document.getElementById('naverMapContainer'),
-        googleMapContainer: !!document.getElementById('googleMapContainer'),
         mapContainers: document.querySelectorAll('[id*="map"], .map-container').length,
         mapContainersList: Array.from(document.querySelectorAll('[id*="map"], .map-container')).map(el => ({
           id: el.id,

@@ -37,12 +37,12 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' *.map.naver.com *.googleapis.com *.gstatic.com *.google.com",
-              "connect-src 'self' *.map.naver.com dapi.kakao.com *.googleapis.com *.google.com wss: ws: data: blob:",
-              "img-src 'self' data: blob: *.map.naver.com *.googleapis.com *.gstatic.com *.google.com",
-              "style-src 'self' 'unsafe-inline' *.googleapis.com *.gstatic.com",
-              "font-src 'self' *.gstatic.com *.googleapis.com",
-              "frame-src 'self' *.google.com smap:",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' *.map.naver.com",
+              "connect-src 'self' *.map.naver.com dapi.kakao.com wss: ws: data: blob:",
+              "img-src 'self' data: blob: *.map.naver.com",
+              "style-src 'self' 'unsafe-inline'",
+              "font-src 'self'",
+              "frame-src 'self' smap:",
               "worker-src 'self' blob:",
               "object-src 'none'",
               "base-uri 'self'"
@@ -106,6 +106,8 @@ const nextConfig = {
         ...config.optimization,
         splitChunks: {
           chunks: 'all',
+          maxInitialRequests: 30,
+          maxAsyncRequests: 30,
           cacheGroups: {
             default: {
               minChunks: 1,
@@ -118,8 +120,19 @@ const nextConfig = {
               priority: -10,
               chunks: 'all',
             },
+            // iOS WebView 최적화 - 작은 청크로 분할
+            common: {
+              name: 'common',
+              minChunks: 2,
+              priority: -5,
+              reuseExistingChunk: true,
+              enforce: true,
+            },
           },
         },
+        // iOS WebView에서 청크 로딩 실패 방지
+        moduleIds: 'deterministic',
+        chunkIds: 'deterministic',
       };
     }
     
@@ -132,7 +145,6 @@ const nextConfig = {
       config.externals = {
         ...config.externals,
         'naver-maps': 'naver',
-        'google-maps': 'google',
       };
     }
     
@@ -141,6 +153,9 @@ const nextConfig = {
   experimental: {
     // optimizeCss: true, // CSS 최적화 비활성화
     scrollRestoration: true,
+    // iOS WebView 최적화
+    esmExternals: false,
+    serverComponentsExternalPackages: [],
   },
   trailingSlash: false,
   compress: true,

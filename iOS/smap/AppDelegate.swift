@@ -5904,12 +5904,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             return
         }
 
-        // mt_idx 값이 기본값(1186)인지 확인 - 기본값이면 업데이트하지 않음
-        if mtIdxInt == 1186 {
-            print("⚠️ [FCM API] 기본 mt_idx 값(1186) 사용됨 - 실제 사용자 정보 기다림")
-            completion(false)
-            return
-        }
+        // mt_idx 값 검증 완료 - 유효한 숫자형식이면 FCM 토큰 업데이트 진행
 
         mtIdx = foundMtIdx
         print("✅ [FCM API] mt_idx 검증 통과: \(mtIdx)")
@@ -6977,9 +6972,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             return nil
         }
         
-        // 방법 4: 하드코딩된 테스트 사용자 (개발/테스트용)
-        print("⚠️ [FCM API] 사용자 정보 없음 - 테스트 사용자(1186) 사용")
-        return 1186
+        // 방법 4: 사용자 정보 없음 - FCM 토큰 업데이트 불가
+        print("⚠️ [FCM API] 사용자 정보 없음 - FCM 토큰 업데이트 불가")
+        return nil
     }
     
 
@@ -8999,12 +8994,17 @@ extension AppDelegate {
         request.httpMethod = "POST"
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         
+        // 실제 사용자 ID 가져오기
+        let mtIdx = UserDefaults.standard.string(forKey: "mt_idx") ??
+                   UserDefaults.standard.string(forKey: "savedMtIdx") ??
+                   UserDefaults.standard.string(forKey: "current_mt_idx") ?? "0"
+        
         let requestBody: [String: Any] = [
             "plt_type": "TEST_DEBUG",
             "sst_idx": "0",
             "plt_condition": "iOS Debug Test",
             "plt_memo": testMessage,
-            "mt_idx": 1186, // 실제 사용자 ID
+            "mt_idx": mtIdx, // 실제 사용자 ID
             "plt_title": "🔍 iOS 푸시 디버그",
             "plt_content": testMessage
         ]
