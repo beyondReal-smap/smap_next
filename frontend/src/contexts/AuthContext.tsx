@@ -51,6 +51,12 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
       };
 
     case 'LOGIN_SUCCESS':
+      // 🔥 로그인 성공 시 force_stay_on_signin 플래그 제거
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('force_stay_on_signin');
+        console.log('[AUTH CONTEXT] 🔥 로그인 성공 - force_stay_on_signin 플래그 제거');
+      }
+      
       // Android 환경에서 사용자 데이터를 SharedPreferences에 저장
       if (typeof window !== 'undefined' && window.AndroidStorage) {
         try {
@@ -648,6 +654,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // 로그아웃 시간 저장 (무한 루프 방지)
       if (typeof window !== 'undefined') {
         localStorage.setItem('last_logout_time', Date.now().toString());
+        
+        // 🔥 로그아웃 후 signin 페이지에 머물기 위한 플래그 설정
+        localStorage.setItem('force_stay_on_signin', 'true');
+        
+        // 🔥 추가적인 전역 상태 정리
+        (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__ = false;
+        (window as any).__GOOGLE_LOGIN_IN_PROGRESS__ = false;
+        (window as any).__BLOCK_ALL_REDIRECTS__ = false;
+        (window as any).__REDIRECT_TO_SIGNIN__ = false;
+        (window as any).__REDIRECT_TO_HOME__ = false;
+        (window as any).__FORCE_NATIVE_GOOGLE_LOGIN__ = false;
+        (window as any).__SMAP_EMERGENCY_GOOGLE_LOGIN__ = false;
+        (window as any).__SMAP_DEBUG_AUTH__ = false;
+        (window as any).__SMAP_FORCE_REFRESH_AUTH__ = false;
+        (window as any).__SMAP_TEST_LOGIN__ = false;
       }
 
       // 전역 상태 초기화

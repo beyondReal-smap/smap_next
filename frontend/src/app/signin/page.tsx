@@ -2153,10 +2153,17 @@ const SignInPage = () => {
       if (lastLogoutTime) {
         const currentTime = Date.now();
         const timeSinceLogout = currentTime - parseInt(lastLogoutTime);
-        if (timeSinceLogout < 10000) { // 10초 이내
+        if (timeSinceLogout < 30000) { // 30초 이내 (시간 연장)
           console.log('[SIGNIN] 🚫 최근 로그아웃 감지 - 홈 리다이렉트 차단 (무한 루프 방지)');
           return undefined;
         }
+      }
+      
+      // 🚫 로그아웃 후 강제로 signin 페이지에 머물기 위한 추가 체크
+      const forceStayOnSignin = localStorage.getItem('force_stay_on_signin');
+      if (forceStayOnSignin === 'true') {
+        console.log('[SIGNIN] 🚫 force_stay_on_signin 플래그 감지 - signin 페이지에 머물기');
+        return undefined;
       }
       
       // 🚫 URL에 'stay' 파라미터가 있거나 localStorage에 'force_stay_on_signin' 플래그가 있으면 signin 페이지에 머물기

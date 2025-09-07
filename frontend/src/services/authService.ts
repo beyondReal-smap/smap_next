@@ -385,13 +385,32 @@ class AuthService {
    */
   clearAuthData(): void {
     if (typeof window !== 'undefined') {
+      console.log('[AUTH SERVICE] 🔥 로그아웃 시 모든 인증 데이터 강제 삭제 시작');
+      
+      // 기본 인증 데이터 삭제
       localStorage.removeItem(this.TOKEN_KEY);
       localStorage.removeItem(this.USER_KEY);
-      localStorage.removeItem(this.LOGIN_TIME_KEY); // 로그인 시간 삭제
+      localStorage.removeItem(this.LOGIN_TIME_KEY);
+      
+      // 추가 사용자 관련 데이터 삭제
+      localStorage.removeItem('isLoggedIn');
+      localStorage.removeItem('user');
+      localStorage.removeItem('smap_user_data');
+      localStorage.removeItem('cached_groups');
+      localStorage.removeItem('last_api_call_last_group_api_call');
+      localStorage.removeItem('smap_last_permission_check');
+      localStorage.removeItem('auto_login_executed');
+      localStorage.removeItem('last_logout_time');
+      
+      // sessionStorage 정리
+      sessionStorage.removeItem('authToken');
+      sessionStorage.removeItem('signin_error_modal_active');
+      sessionStorage.removeItem('block_all_redirects');
       
       // 쿠키에서도 토큰 삭제
       const isSecure = window.location.protocol === 'https:' ? '; Secure' : '';
       document.cookie = `auth-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax${isSecure}`;
+      document.cookie = `client-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax${isSecure}`;
       
       // 🔥 Google SDK 토큰 캐시 정리 (로그아웃 후 재시도 문제 해결)
       try {
@@ -422,7 +441,7 @@ class AuthService {
         console.warn('[AUTH SERVICE] Google SDK 캐시 정리 중 오류 (무시):', googleError);
       }
       
-      console.log('[AUTH SERVICE] 로컬스토리지, 쿠키, Google SDK 캐시 삭제 완료');
+      console.log('[AUTH SERVICE] 🔥 모든 인증 데이터 강제 삭제 완료');
     }
   }
 
