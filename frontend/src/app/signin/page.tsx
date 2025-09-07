@@ -2159,6 +2159,30 @@ const SignInPage = () => {
         }
       }
       
+      // 🚫 URL에 'stay' 파라미터가 있거나 localStorage에 'force_stay_on_signin' 플래그가 있으면 signin 페이지에 머물기
+      const urlParams = new URLSearchParams(window.location.search);
+      const shouldStay = urlParams.get('stay') === 'true' || localStorage.getItem('force_stay_on_signin') === 'true';
+      if (shouldStay) {
+        console.log('[SIGNIN] 🚫 stay 파라미터 또는 force_stay_on_signin 플래그 감지 - signin 페이지에 머물기');
+        // URL에서 stay 파라미터 제거
+        if (urlParams.get('stay') === 'true') {
+          const newUrl = new URL(window.location.href);
+          newUrl.searchParams.delete('stay');
+          window.history.replaceState({}, '', newUrl.toString());
+        }
+        return undefined;
+      }
+      
+      // 🚫 사용자가 명시적으로 signin 페이지를 방문한 경우 (직접 URL 입력, 북마크 등) 자동 리다이렉트 방지
+      const referrer = document.referrer;
+      const isDirectVisit = !referrer || referrer === window.location.href;
+      const isFromExternal = referrer && !referrer.includes('nextstep.smap.site');
+      
+      if (isDirectVisit || isFromExternal) {
+        console.log('[SIGNIN] 🚫 직접 방문 또는 외부에서 접근 - signin 페이지에 머물기');
+        return undefined;
+      }
+      
       console.log('[SIGNIN] 로그인된 사용자 감지, /home으로 리다이렉트');
       isRedirectingRef.current = true;
       router.replace('/home');
