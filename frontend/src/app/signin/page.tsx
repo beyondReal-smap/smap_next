@@ -2148,6 +2148,17 @@ const SignInPage = () => {
         return undefined;
       }
       
+      // 🚫 최근 로그아웃 감지 시 리다이렉트 방지 (무한 루프 방지)
+      const lastLogoutTime = localStorage.getItem('last_logout_time');
+      if (lastLogoutTime) {
+        const currentTime = Date.now();
+        const timeSinceLogout = currentTime - parseInt(lastLogoutTime);
+        if (timeSinceLogout < 10000) { // 10초 이내
+          console.log('[SIGNIN] 🚫 최근 로그아웃 감지 - 홈 리다이렉트 차단 (무한 루프 방지)');
+          return undefined;
+        }
+      }
+      
       console.log('[SIGNIN] 로그인된 사용자 감지, /home으로 리다이렉트');
       isRedirectingRef.current = true;
       router.replace('/home');
