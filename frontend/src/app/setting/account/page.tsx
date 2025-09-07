@@ -405,12 +405,14 @@ export default function AccountSettingsPage() {
       // AuthContext의 logout 호출
       await logout();
       
-      console.log('[LOGOUT] 로그아웃 완료, signin으로 이동');
-      router.push('/signin');
+      console.log('[LOGOUT] 로그아웃 완료, signin으로 강제 이동');
+      // 무조건 signin 페이지로 이동 (window.location.replace 사용)
+      window.location.replace('/signin');
     } catch (error) {
       console.error('[LOGOUT] 로그아웃 실패:', error);
-      // 실패해도 signin으로 이동
-      router.push('/signin');
+      // 실패해도 signin으로 강제 이동
+      console.log('[LOGOUT] 로그아웃 실패 시에도 signin으로 강제 이동');
+      window.location.replace('/signin');
     }
   };
 
