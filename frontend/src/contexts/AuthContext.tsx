@@ -681,7 +681,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
         
         console.log('[AUTH] 즉시 signin 페이지로 리다이렉트');
-        navigationManager.redirectToSignin();
+        
+        // 직접적인 리다이렉트 추가 (NavigationManager와 병행)
+        try {
+          window.location.replace('/signin');
+        } catch (directRedirectError) {
+          console.log('[AUTH] 직접 리다이렉트 실패, NavigationManager 사용:', directRedirectError);
+          navigationManager.redirectToSignin();
+        }
       }
     } catch (error) {
       console.error('[AUTH CONTEXT] 로그아웃 실패:', error);
@@ -724,7 +731,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
         
         console.log('[AUTH] 에러 발생 시에도 signin 페이지로 리다이렉트');
-        navigationManager.redirectToSignin();
+        
+        // 직접적인 리다이렉트 추가 (NavigationManager와 병행)
+        try {
+          window.location.replace('/signin');
+        } catch (directRedirectError) {
+          console.log('[AUTH] 직접 리다이렉트 실패, NavigationManager 사용:', directRedirectError);
+          navigationManager.redirectToSignin();
+        }
       }
     }
   };

@@ -57,6 +57,17 @@ class NavigationManagerImpl implements NavigationManager {
     this._isRedirecting = true;
     console.log('[NAVIGATION] signin 페이지로 리다이렉트 시작');
 
+    // 직접적인 리다이렉트 시도
+    if (typeof window !== 'undefined') {
+      try {
+        console.log('[NAVIGATION] 직접 리다이렉트 시도: window.location.replace("/signin")');
+        window.location.replace('/signin');
+        return; // 직접 리다이렉트 성공 시 플래그 설정 생략
+      } catch (error) {
+        console.log('[NAVIGATION] 직접 리다이렉트 실패, 플래그 방식 사용:', error);
+      }
+    }
+
     // 전역 플래그 설정 (컴포넌트에서 감지하여 처리)
     if (typeof window !== 'undefined') {
       (window as any).__REDIRECT_TO_SIGNIN__ = true;
