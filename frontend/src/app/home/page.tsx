@@ -139,7 +139,7 @@ declare global {
   }
 }
 
-const GOOGLE_MAPS_API_KEY = MAP_API_KEYS.GOOGLE;
+// Google Maps API 키 제거됨 (사용하지 않음)
 const NAVER_MAPS_CLIENT_ID = MAP_API_KEYS.NAVER_CLIENT_ID;
 
 const BOTTOM_SHEET_POSITIONS = {
