@@ -456,13 +456,13 @@ const GroupInitModal: React.FC<GroupInitModalProps> = React.memo(({
                         그룹명
                       </label>
                       <div className="relative">
-                        <FiUsers className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                        <FiUsers className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                         <input
                           type="text"
                           value={groupName}
                           onChange={(e) => setGroupName(e.target.value)}
                           placeholder="예: 우리 가족, 직장 동료들"
-                          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0113A3] focus:border-[#0113A3] outline-none transition-colors bg-white"
+                          className="w-full pl-6 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#0113A3] focus:border-[#0113A3] outline-none transition-colors bg-white"
                           maxLength={20}
                         />
                       </div>
