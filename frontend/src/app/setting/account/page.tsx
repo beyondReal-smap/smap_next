@@ -298,10 +298,28 @@ export default function AccountSettingsPage() {
   console.log('[ACCOUNT SETTING] 사용자 데이터 전체:', {
     mt_type: user?.mt_type,
     mt_wdate: user?.mt_wdate,
+    mt_wdate_type: typeof user?.mt_wdate,
     mt_name: user?.mt_name,
     mt_nickname: user?.mt_nickname,
     mt_email: user?.mt_email
   });
+  
+  // 가입일 파싱 테스트
+  if (user?.mt_wdate) {
+    try {
+      const wdate = new Date(user.mt_wdate);
+      console.log('[ACCOUNT SETTING] 가입일 파싱 성공:', {
+        원본: user.mt_wdate,
+        파싱된_날짜: wdate,
+        년도: wdate.getFullYear(),
+        월: wdate.getMonth() + 1
+      });
+    } catch (error) {
+      console.error('[ACCOUNT SETTING] 가입일 파싱 실패:', error);
+    }
+  } else {
+    console.log('[ACCOUNT SETTING] mt_wdate가 없음 또는 falsy 값');
+  }
   
   const loginInfo = getLoginMethod(user?.mt_type);
   

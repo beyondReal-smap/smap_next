@@ -350,7 +350,8 @@ async def get_user_profile(
             "mt_birth": user.mt_birth.strftime('%Y-%m-%d') if user.mt_birth else None,
             "mt_gender": user.mt_gender,
             "mt_type": user.mt_type,
-            "mt_level": user.mt_level
+            "mt_level": user.mt_level,
+            "mt_wdate": user.mt_wdate.isoformat() if user.mt_wdate else None
         }
         
         logger.info(f"[GET_PROFILE] 프로필 조회 성공 - user_id: {user_id}")
@@ -412,6 +413,7 @@ def get_member(
         "mt_weather_tmn": member.mt_weather_tmn or 18,
         "mt_weather_tmx": member.mt_weather_tmx or 25,
         "mt_weather_date": member.mt_weather_date.isoformat() if member.mt_weather_date else datetime.utcnow().isoformat(),
+        "mt_wdate": member.mt_wdate.isoformat() if member.mt_wdate else datetime.utcnow().isoformat(),
         "mt_ldate": member.mt_ldate.isoformat() if member.mt_ldate else datetime.utcnow().isoformat(),
         "mt_adate": member.mt_adate.isoformat() if member.mt_adate else datetime.utcnow().isoformat()
     }
