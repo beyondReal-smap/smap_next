@@ -53,6 +53,8 @@ const getUserPlan = (mtLevel: number | null | undefined): string => {
 
 // 로그인 타입에 따른 로그인 방법 반환 함수
 const getLoginMethod = (mtType: number | null | undefined): { method: string; icon: string } => {
+  console.log('[LOGIN METHOD] mt_type:', mtType);
+  
   switch (mtType) {
     case 1:
       return { method: '일반 로그인', icon: '🔐' };
@@ -63,7 +65,8 @@ const getLoginMethod = (mtType: number | null | undefined): { method: string; ic
     case 4:
       return { method: '구글 로그인', icon: '🌐' };
     default:
-      return { method: '일반 로그인', icon: '🔐' };
+      console.log('[LOGIN METHOD] 알 수 없는 mt_type, 기본값 사용');
+      return { method: '로그인 방식 확인 중', icon: '🔐' };
   }
 };
 
@@ -292,6 +295,14 @@ export default function AccountSettingsPage() {
   }, [user]);
 
   // 프로필 데이터
+  console.log('[ACCOUNT SETTING] 사용자 데이터 전체:', {
+    mt_type: user?.mt_type,
+    mt_wdate: user?.mt_wdate,
+    mt_name: user?.mt_name,
+    mt_nickname: user?.mt_nickname,
+    mt_email: user?.mt_email
+  });
+  
   const loginInfo = getLoginMethod(user?.mt_type);
   
   // 사용자 이름 결정 로직 개선 (목업 데이터 필터링)
@@ -337,7 +348,9 @@ export default function AccountSettingsPage() {
     plan: getUserPlan(user?.mt_level),
     loginMethod: loginInfo.method,
     loginIcon: loginInfo.icon,
-    memberSince: user?.mt_wdate ? new Date(user.mt_wdate).getFullYear() + '년 ' + (new Date(user.mt_wdate).getMonth() + 1) + '월' : '2024년 1월',
+    memberSince: user?.mt_wdate ? 
+      new Date(user.mt_wdate).getFullYear() + '년 ' + (new Date(user.mt_wdate).getMonth() + 1) + '월' : 
+      '가입일 정보 없음',
     level: getUserLevel(user?.mt_level)
   };
 

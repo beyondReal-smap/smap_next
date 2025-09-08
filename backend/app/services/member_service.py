@@ -128,6 +128,7 @@ class MemberService:
                 "mt_weather_tmn": user.mt_weather_tmn or 18,
                 "mt_weather_tmx": user.mt_weather_tmx or 25,
                 "mt_weather_date": user.mt_weather_date.isoformat() if user.mt_weather_date else datetime.utcnow().isoformat(),
+                "mt_wdate": user.mt_wdate.isoformat() if user.mt_wdate else datetime.utcnow().isoformat(),
                 "mt_ldate": user.mt_ldate.isoformat() if user.mt_ldate else datetime.utcnow().isoformat(),
                 "mt_adate": user.mt_adate.isoformat() if user.mt_adate else datetime.utcnow().isoformat()
             }
@@ -539,6 +540,7 @@ class MemberService:
             "mt_weather_tmn": member.mt_weather_tmn or 18,
             "mt_weather_tmx": member.mt_weather_tmx or 25,
             "mt_weather_date": member.mt_weather_date.isoformat() if member.mt_weather_date else datetime.utcnow().isoformat(),
+            "mt_wdate": member.mt_wdate.isoformat() if member.mt_wdate else datetime.utcnow().isoformat(),
             "mt_ldate": member.mt_ldate.isoformat() if member.mt_ldate else datetime.utcnow().isoformat(),
             "mt_adate": member.mt_adate.isoformat() if member.mt_adate else datetime.utcnow().isoformat(),
             "mt_google_id": member.mt_google_id
