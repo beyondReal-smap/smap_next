@@ -112,6 +112,7 @@ interface RegisterData {
   isSocialLogin?: boolean;
   socialProvider?: string;
   socialId?: string;
+  profile_image?: string | null;  // 소셜 로그인 프로필 이미지
 }
 
 export default function RegisterPage() {
@@ -591,7 +592,8 @@ export default function RegisterPage() {
               : (parsedData.provider === 'apple' ? 'apple_auto_password_123' : ''),
             isSocialLogin: true,
             socialProvider: parsedData.provider,
-            socialId: parsedData.kakao_id || parsedData.google_id || parsedData.apple_id || ''
+            socialId: parsedData.kakao_id || parsedData.google_id || parsedData.apple_id || '',
+            profile_image: parsedData.profile_image || null  // 소셜 로그인 프로필 이미지
           }));
           
           // 소셜 로그인 시 약관 동의 단계로 시작 (소셜 로그인이므로 전화번호 인증은 생략)
@@ -1278,6 +1280,12 @@ export default function RegisterPage() {
           requestData.mt_google_id = registerData.socialId;
         } else if (registerData.socialProvider === 'kakao') {
           requestData.mt_kakao_id = registerData.socialId;
+        }
+        
+        // 소셜 로그인 프로필 이미지 추가
+        if (registerData.profile_image) {
+          requestData.mt_file1 = registerData.profile_image;
+          requestData.profile_image = registerData.profile_image;  // 애플 API 호환
         }
       }
       

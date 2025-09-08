@@ -11,6 +11,8 @@ interface RegisterRequest {
   mt_email?: string;
   mt_birth?: string;
   mt_gender?: number;
+  mt_file1?: string;  // 프로필 이미지 경로
+  profile_image?: string;  // 애플에서 제공하는 프로필 이미지
   mt_onboarding: string;
   mt_show: string;
   mt_agree1: boolean;
@@ -39,6 +41,9 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // 프로필 이미지 처리 - 애플에서 제공된 이미지가 있으면 사용, 없으면 백엔드에서 랜덤 아바타 선택
+      const profileImage = body.profile_image || body.mt_file1 || null;
+
       const memberData = {
         mt_type: body.mt_type || 3, // 애플
         mt_level: body.mt_level || 2,
@@ -52,6 +57,7 @@ export async function POST(request: NextRequest) {
         mt_email: body.mt_email || null,
         mt_birth: body.mt_birth || null,
         mt_gender: body.mt_gender || null,
+        mt_file1: profileImage,  // 프로필 이미지 경로
         mt_onboarding: body.mt_onboarding || 'N',
         mt_show: body.mt_show || 'Y',
         mt_agree1: body.mt_agree1 ? 'Y' : 'N',

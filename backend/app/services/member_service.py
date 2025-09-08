@@ -332,6 +332,9 @@ class MemberService:
                         message="Google ID가 필요합니다."
                     )
 
+                # 프로필 이미지 처리 - 구글에서 제공된 이미지가 있으면 사용, 없으면 랜덤 아바타
+                profile_image = google_data.image if google_data.image else self.crud.get_random_avatar()
+                
                 # 새 사용자 생성
                 new_member = Member(
                     mt_id=f"google_{google_data.google_id}",  # Google ID 기반 고유 ID
@@ -344,7 +347,7 @@ class MemberService:
                     mt_status=1,  # 정상
                     mt_show='Y',  # 노출
                     mt_map='Y',  # Google 지도 사용
-                    mt_file1=google_data.image,  # 프로필 이미지
+                    mt_file1=profile_image,  # 프로필 이미지 (구글 이미지 또는 랜덤 아바타)
                     mt_wdate=datetime.utcnow(),
                     mt_ldate=datetime.utcnow(),
                     mt_adate=datetime.utcnow(),

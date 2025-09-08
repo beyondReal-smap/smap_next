@@ -194,13 +194,17 @@ def create_kakao_user(db: Session, kakao_data) -> Member:
     # 카카오 ID를 기반으로 임시 mt_id 생성
     temp_id = f"kakao_{kakao_data.kakao_id}"
     
+    # 프로필 이미지 처리 - 카카오에서 제공된 이미지가 있으면 사용, 없으면 랜덤 아바타
+    from app.crud.crud_member import crud_member
+    profile_image = kakao_data.profile_image if kakao_data.profile_image else crud_member.get_random_avatar()
+    
     db_user = Member(
         mt_id=temp_id,
         mt_kakao_id=kakao_data.kakao_id,
         mt_name=kakao_data.nickname,
         mt_nickname=kakao_data.nickname,
         mt_email=kakao_data.email,
-        mt_file1=kakao_data.profile_image,
+        mt_file1=profile_image,  # 프로필 이미지 (카카오 이미지 또는 랜덤 아바타)
         mt_type=2,  # 카카오 로그인
         mt_level=2, # 기본값: 일반(무료)
         mt_status=1, # 기본값: 정상

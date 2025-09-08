@@ -90,6 +90,7 @@ class RegisterRequest(BaseModel):
     mt_email: Optional[str] = None
     mt_birth: Optional[str] = None  # YYYY-MM-DD 형식
     mt_gender: Optional[int] = None
+    mt_file1: Optional[str] = None  # 프로필 이미지 경로
     mt_onboarding: Optional[str] = "N"
     mt_show: Optional[str] = "Y"
     mt_agree1: bool

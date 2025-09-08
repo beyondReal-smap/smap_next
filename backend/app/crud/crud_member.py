@@ -5,10 +5,16 @@ from app.schemas.member import MemberCreate, MemberUpdate, RegisterRequest
 from typing import Optional, List
 from datetime import datetime, date
 import bcrypt
+import random
 
 class CRUDMember:
     def __init__(self, model: type[Member]):
         self.model = model
+    
+    def get_random_avatar(self) -> str:
+        """랜덤 아바타 이미지 경로 반환"""
+        avatar_number = random.randint(1, 7)  # avatar1.png ~ avatar7.png
+        return f"/images/avatar{avatar_number}.png"
 
     def get(self, db: Session, id: int) -> Optional[Member]:
         """ID로 회원 조회"""
@@ -113,6 +119,15 @@ class CRUDMember:
         print(f"   📍 경도: {obj_in.mt_long}")
         print(f"   📍 위치 정보 타입: {type(obj_in.mt_lat)}, {type(obj_in.mt_long)}")
         
+        # 프로필 이미지 처리
+        profile_image = None
+        if hasattr(obj_in, 'mt_file1') and obj_in.mt_file1:
+            # 소셜 로그인에서 프로필 이미지가 제공된 경우
+            profile_image = obj_in.mt_file1
+        else:
+            # 프로필 이미지가 없는 경우 랜덤 아바타 선택
+            profile_image = self.get_random_avatar()
+        
         db_obj = self.model(
             mt_type=obj_in.mt_type,
             mt_level=obj_in.mt_level,
@@ -125,6 +140,7 @@ class CRUDMember:
             mt_email=obj_in.mt_email,
             mt_birth=birth_date,
             mt_gender=obj_in.mt_gender,
+            mt_file1=profile_image,  # 프로필 이미지 설정
             mt_show=obj_in.mt_show,
             mt_agree1='Y' if obj_in.mt_agree1 else 'N',
             mt_agree2='Y' if obj_in.mt_agree2 else 'N',
