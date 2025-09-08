@@ -294,7 +294,7 @@ export default function AccountSettingsPage() {
   // 프로필 데이터
   const loginInfo = getLoginMethod(user?.mt_type);
   
-  // 사용자 이름 결정 로직 개선
+  // 사용자 이름 결정 로직 개선 (목업 데이터 필터링)
   const getUserDisplayName = () => {
     console.log('[ACCOUNT SETTING] 사용자 데이터 확인:', {
       mt_name: user?.mt_name,
@@ -303,20 +303,30 @@ export default function AccountSettingsPage() {
       mt_idx: user?.mt_idx
     });
     
-    // 우선순위: mt_nickname > mt_name > mt_id > 기본값
-    if (user?.mt_nickname && user.mt_nickname !== '테스트 사용자' && user.mt_nickname.trim() !== '') {
+    // 목업 데이터 필터링
+    const isMockData = (name: string) => {
+      return name === '김철수' || name === '테스트 사용자' || name.includes('목업') || name.includes('mock');
+    };
+    
+    // 우선순위: mt_nickname > mt_name > mt_id > 기본값 (목업 데이터 제외)
+    if (user?.mt_nickname && user.mt_nickname.trim() !== '' && !isMockData(user.mt_nickname)) {
       return user.mt_nickname;
     }
-    if (user?.mt_name && user.mt_name !== '테스트 사용자' && user.mt_name.trim() !== '') {
+    if (user?.mt_name && user.mt_name.trim() !== '' && !isMockData(user.mt_name)) {
       return user.mt_name;
     }
     if (user?.mt_id && user.mt_id.trim() !== '') {
       // 이메일 형태인 경우 @ 앞부분 사용
       if (user.mt_id.includes('@')) {
-        return user.mt_id.split('@')[0];
+        const emailPrefix = user.mt_id.split('@')[0];
+        // 목업 이메일 패턴 확인
+        if (!emailPrefix.includes('demo') && !emailPrefix.includes('temp') && !emailPrefix.includes('user')) {
+          return emailPrefix;
+        }
+      } else {
+        // 전화번호 형태인 경우 그대로 표시
+        return user.mt_id;
       }
-      // 전화번호 형태인 경우 그대로 표시
-      return user.mt_id;
     }
     return '사용자';
   };

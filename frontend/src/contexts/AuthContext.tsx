@@ -790,16 +790,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (!state.user) return;
 
     try {
+      console.log('[AUTH CONTEXT] 🔄 사용자 데이터 새로고침 시작:', state.user.mt_name);
+      
       // 그룹 조회 없이 사용자 기본 정보만 가져오기
       const userProfile = await authService.getUserBasicProfile(state.user.mt_idx);
-      authService.setUserData(userProfile);
-      dispatch({ type: 'LOGIN_SUCCESS', payload: userProfile });
+      
+      console.log('[AUTH CONTEXT] 📄 새로고침된 사용자 데이터:', {
+        mt_name: userProfile.mt_name,
+        mt_email: userProfile.mt_email,
+        mt_nickname: userProfile.mt_nickname
+      });
+      
+      // 새로운 데이터가 기존 데이터와 다르고 실제 데이터인 경우에만 업데이트
+      if (userProfile && 
+          userProfile.mt_name !== '김철수' && // 목업 데이터가 아닌 경우
+          userProfile.mt_name !== '테스트 사용자' &&
+          (!userProfile.mt_email || (!userProfile.mt_email.includes('@example.com') && !userProfile.mt_email.includes('temp@')))) {
+        
+        console.log('[AUTH CONTEXT] ✅ 실제 사용자 데이터로 업데이트 진행');
+        authService.setUserData(userProfile);
+        dispatch({ type: 'LOGIN_SUCCESS', payload: userProfile });
+      } else {
+        console.log('[AUTH CONTEXT] ⚠️ 목업 데이터 감지 - 기존 데이터 유지');
+        console.log('[AUTH CONTEXT] 목업 데이터 상세:', userProfile);
+      }
       
       // 위치 추적 서비스에 사용자 로그인 알림
       locationTrackingService.onUserLogin();
     } catch (error: any) {
       console.error('[AUTH CONTEXT] 사용자 데이터 새로고침 실패:', error);
-      dispatch({ type: 'SET_ERROR', payload: '사용자 정보를 새로고침할 수 없습니다.' });
+      console.log('[AUTH CONTEXT] 🛡️ API 실패 시 기존 사용자 데이터 유지');
+      // API 실패 시 에러를 설정하지 않고 기존 데이터 유지
+      // dispatch({ type: 'SET_ERROR', payload: '사용자 정보를 새로고침할 수 없습니다.' });
     }
   };
 
