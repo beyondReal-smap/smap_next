@@ -2528,7 +2528,7 @@ export default function RegisterPage() {
                 ease: [0.4, 0.0, 0.2, 1], // iOS 최적화된 이징
                 type: "tween"
               }}
-              className="w-full h-full flex flex-col justify-center items-center text-center"
+              className="fixed inset-0 flex flex-col justify-center items-center text-center bg-white z-50"
               style={{
                 // iOS 애니메이션 최적화
                 willChange: 'transform, opacity',

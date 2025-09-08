@@ -303,17 +303,20 @@ export default function AccountSettingsPage() {
       mt_idx: user?.mt_idx
     });
     
-    // 우선순위: mt_nickname > mt_name > mt_id의 앞 3자리 > '사용자'
-    if (user?.mt_nickname && user.mt_nickname !== '테스트 사용자') {
+    // 우선순위: mt_nickname > mt_name > mt_id > 기본값
+    if (user?.mt_nickname && user.mt_nickname !== '테스트 사용자' && user.mt_nickname.trim() !== '') {
       return user.mt_nickname;
     }
-    if (user?.mt_name && user.mt_name !== '테스트 사용자') {
+    if (user?.mt_name && user.mt_name !== '테스트 사용자' && user.mt_name.trim() !== '') {
       return user.mt_name;
     }
-    if (user?.mt_id) {
-      // 전화번호에서 앞 3자리를 사용자명으로 사용 (예: 01012345678 -> user123)
-      const phonePrefix = user.mt_id.replace(/[^0-9]/g, '').slice(-4); // 뒤 4자리
-      return `user${phonePrefix}`;
+    if (user?.mt_id && user.mt_id.trim() !== '') {
+      // 이메일 형태인 경우 @ 앞부분 사용
+      if (user.mt_id.includes('@')) {
+        return user.mt_id.split('@')[0];
+      }
+      // 전화번호 형태인 경우 그대로 표시
+      return user.mt_id;
     }
     return '사용자';
   };
@@ -675,7 +678,16 @@ export default function AccountSettingsPage() {
                       </div>
                     </div>
                     <p className="text-blue-100 text-sm mb-1">{profile.name || '사용자'}</p>
-                    <p className="text-blue-200 text-xs">{user?.mt_email || '이메일 정보 없음'}</p>
+                    <p className="text-blue-200 text-xs">{
+                      // 목업 이메일인지 확인 후 표시
+                      user?.mt_email && 
+                      !user.mt_email.includes('@example.com') && 
+                      !user.mt_email.includes('demo') && 
+                      !user.mt_email.includes('temp@') && 
+                      user.mt_email.trim() !== '' 
+                        ? user.mt_email 
+                        : '이메일 정보 없음'
+                    }</p>
                     <p className="text-blue-200 text-xs">{user?.mt_id ? user.mt_id.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3') : '전화번호 정보 없음'}</p>
                   </div>
                 </div>
