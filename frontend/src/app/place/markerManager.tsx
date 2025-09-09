@@ -62,7 +62,7 @@ const getDefaultImage = (gender: number | null | undefined, index: number): stri
   return defaultImages[index % defaultImages.length];
 };
 
-const getSafeImageUrl = (photo: string | null, gender: number | null | undefined, index: number): string => {
+const getSafeImageUrl = (photo: string | null | undefined, gender: number | null | undefined, index: number): string => {
   if (photo && photo.trim() !== '') {
     return photo;
   }
