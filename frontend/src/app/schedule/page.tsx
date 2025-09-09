@@ -84,17 +84,6 @@ const MemberSelector = dynamic(() => import('../../components/schedule/MemberSel
 dayjs.extend(isBetween);
 dayjs.locale('ko');
 
-// 기본 이미지 가져오기 함수 (location/page.tsx에서 가져옴)
-const getDefaultImage = (gender: number | null | undefined, index: number): string => {
-  // frontend/public/images/ 폴더의 기본 이미지 사용
-  if (gender === 2) { // 여성
-    const femaleImages = ['/images/female_1.png', '/images/female_2.png', '/images/female_3.png'];
-    return femaleImages[index % femaleImages.length];
-  } else { // 남성 또는 미정
-    const maleImages = ['/images/male_1.png', '/images/male_2.png', '/images/male_3.png'];
-    return maleImages[index % maleImages.length];
-  }
-};
 
 
 // GroupDropdownPortal 컴포넌트 (activelog의 GroupSelector에서 가져옴)
