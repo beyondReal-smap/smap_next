@@ -445,7 +445,7 @@ interface ScheduleGroupMember {
   mt_idx: number;
   mt_name: string;
   mt_nickname?: string;
-  mt_file1?: string;
+  mt_file1?: string | null;
   sgdt_owner_chk?: string;
   sgdt_leader_chk?: string;
   sgdt_idx?: number;
