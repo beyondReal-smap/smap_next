@@ -171,17 +171,6 @@ body {
 // 백엔드 이미지 저장 경로의 기본 URL
 const BACKEND_STORAGE_BASE_URL = 'https://api3.smap.site/storage/';
 
-// 기본 이미지 생성 함수
-const getDefaultImage = (gender: number | null | undefined, index: number): string => {
-  const imageNumber = (index % 4) + 1;
-  if (gender === 1) {
-    return `/images/male_${imageNumber}.png`;
-  } else if (gender === 2) {
-    return `/images/female_${imageNumber}.png`;
-  }
-  return `/images/avatar${(index % 3) + 1}.png`;
-};
-
 // 초대 코드 입력 컴포넌트 메모이제이션
 const InviteCodeSection = memo<{
   inviteCode: string;
