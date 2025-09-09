@@ -10,6 +10,7 @@ interface GroupMember {
   id: string;
   name: string;
   photo: string | null;
+  mt_file1?: string | null;
   isSelected: boolean;
   location: {
     lat: number;
@@ -75,6 +76,7 @@ export const useLocationData = () => {
         id: member.mt_idx.toString(),
         name: member.mt_name || member.mt_nickname || '이름 없음',
         photo: member.mt_file1 || null,
+        mt_file1: member.mt_file1 || null,
         isSelected: index === 0,
         location: {
           lat: parseFloat(String(member.mlt_lat || '37.5665')) || 37.5665,
