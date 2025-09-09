@@ -44,6 +44,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { hapticFeedback } from '../../utils/haptic';
 import FloatingButton from '../../components/common/FloatingButton';
 import IOSCompatibleSpinner from '../../components/common/IOSCompatibleSpinner';
+import { getSafeImageUrl, getDefaultImage, handleImageError } from '@/lib/imageUtils';
 
 // Dynamic Imports for better code splitting
 const AnimatedHeader = dynamic(() => import('../../components/common/AnimatedHeader'), {
@@ -95,19 +96,6 @@ const getDefaultImage = (gender: number | null | undefined, index: number): stri
   }
 };
 
-// 안전한 이미지 URL 가져오기 함수 - location/home과 동일한 로직
-const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefined, index: number): string => {
-  // 실제 사진이 있으면 사용하고, 없으면 기본 이미지 사용
-  if (photoUrl) {
-    // 이미 전체 경로인 경우 그대로 사용, 파일명만 있는 경우 avatars 경로 추가
-    if (photoUrl.startsWith('/') || photoUrl.startsWith('http')) {
-      return photoUrl;
-    } else {
-      return `/images/avatars/${photoUrl}`;
-    }
-  }
-  return getDefaultImage(gender, index);
-};
 
 // GroupDropdownPortal 컴포넌트 (activelog의 GroupSelector에서 가져옴)
 const GroupDropdownPortal = ({
