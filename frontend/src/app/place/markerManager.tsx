@@ -117,7 +117,7 @@ export default function MarkerManager({
         if (!position) return;
 
         const borderColor = member.isSelected ? '#ef4444' : '#0113A3';
-        const photoUrl = getSafeImageUrl(member.photo, member.mt_gender, member.original_index);
+        const photoUrl = getSafeImageUrl(member.mt_file1, member.mt_gender, member.original_index);
         
         const marker = new window.naver.maps.Marker({
           position,
@@ -296,7 +296,7 @@ export default function MarkerManager({
         border: 1px solid rgba(0,0,0,0.1);
       ">
         <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-          <img src="${getSafeImageUrl(member.photo, member.mt_gender, member.original_index)}" 
+          <img src="${getSafeImageUrl(member.mt_file1, member.mt_gender, member.original_index)}" 
                alt="${member.name}" 
                style="
                  width: 48px; 

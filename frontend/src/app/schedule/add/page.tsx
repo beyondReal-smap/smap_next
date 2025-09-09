@@ -194,7 +194,7 @@ export default function AddSchedulePage() {
       const transformedMembers: GroupMember[] = membersData.map((member: any) => ({
         id: member.mt_idx?.toString() || member.id || '',
         name: member.mt_name || member.name || '',
-        photo: member.mt_file1 ? `/images/avatars/${member.mt_file1}` : member.photo || '/images/avatar1.png',
+        photo: member.mt_file1 || '/images/avatar1.png',
         isSelected: false,
         location: {
           lat: member.mt_lat || 37.5642,
@@ -877,7 +877,7 @@ export default function AddSchedulePage() {
                               member.isSelected ? 'border-indigo-500 ring-2 ring-indigo-300 scale-110' : 'border-transparent'
                             } ${!canSelect ? 'grayscale' : ''}`}>
                               <img 
-                                src={member.photo} 
+                                src={member.mt_file1 || member.photo} 
                                 alt={member.name} 
                                 className="w-full h-full object-cover"
                                 draggable="false"

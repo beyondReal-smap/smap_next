@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { format, addDays, subDays } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { motion, useMotionValue, AnimatePresence } from 'framer-motion';
+// 공통 이미지 처리 유틸리티 import
+import { getSafeImageUrl, getDefaultImage, handleImageError } from '@/lib/imageUtils';
 import { PageContainer, Button } from '../components/layout';
 import { FiPlus, FiTrendingUp, FiClock, FiZap, FiPlayCircle, FiSettings, FiUser, FiLoader, FiChevronDown, FiActivity } from 'react-icons/fi';
 import { FaCrown } from 'react-icons/fa';
@@ -115,7 +117,7 @@ interface Location { // home/page.tsx의 Location 인터페이스 (필요시 act
 
 
 interface GroupMember {
-  id: string; name: string; photo: string | null; isSelected: boolean; location: Location;
+  id: string; name: string; photo: string | null; mt_file1?: string | null; isSelected: boolean; location: Location;
   mt_gender?: number | null; original_index: number;
   mt_weather_sky?: string | number | null; mt_weather_tmx?: string | number | null;
   mt_weather_tmn?: string | number | null; mt_weather_date?: string | null;
@@ -773,22 +775,7 @@ const loadingTextVariants = {
   }
 };
 
-// 기본 이미지 생성 함수 - home/page.tsx와 동일한 로직
-const getDefaultImage = (gender: number | null | undefined, index: number): string => {
-  const maleImages = ['/images/male_1.png', '/images/male_2.png', '/images/male_3.png', '/images/male_4.png'];
-  const femaleImages = ['/images/female_1.png', '/images/female_2.png', '/images/female_3.png', '/images/female_4.png'];
-  const defaultImages = ['/images/avatar1.png', '/images/avatar2.png', '/images/avatar3.png', '/images/avatar4.png'];
-  
-  if (gender === 1) return maleImages[index % maleImages.length];
-  if (gender === 2) return femaleImages[index % femaleImages.length];
-  return defaultImages[index % defaultImages.length];
-};
-
-// 안전한 이미지 URL을 반환하는 함수 - home/page.tsx와 동일한 로직
-const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefined, index: number): string => {
-  // 실제 사진이 있으면 사용하고, 없으면 기본 이미지 사용
-  return photoUrl ?? getDefaultImage(gender, index);
-};
+// 이미지 처리 함수들은 @/lib/imageUtils에서 import하여 사용
 
 // 색상 보간 함수
 const interpolateColor = (color1: string, color2: string, factor: number): string => {
@@ -5421,6 +5408,7 @@ export default function ActivelogPage() {
                     id: member.mt_idx.toString(),
                     name: member.mt_name || `멤버 ${index + 1}`,
                     photo: member.mt_file1,
+                    mt_file1: member.mt_file1,
                     isSelected: index === 0, // 첫 번째 멤버만 자동 선택
                     location: { lat, lng },
                     schedules: [], 
@@ -7781,7 +7769,7 @@ export default function ActivelogPage() {
                           <Image 
                             src={(() => {
                               const member = groupMembers.find(m => m.isSelected);
-                              return member ? getSafeImageUrl(member.photo, member.mt_gender, member.original_index) : '';
+                              return member ? getSafeImageUrl(member.mt_file1, member.mt_gender, member.original_index) : '';
                             })()}
                             alt={groupMembers.find(m => m.isSelected)?.name || ''} 
                             width={32}
@@ -8264,7 +8252,7 @@ export default function ActivelogPage() {
                                 }
                               >
                                 <Image 
-                                  src={getSafeImageUrl(member.photo, member.mt_gender, member.original_index)}
+                                  src={getSafeImageUrl(member.mt_file1, member.mt_gender, member.original_index)}
                                   alt={member.name} 
                                   width={48}
                                   height={48}

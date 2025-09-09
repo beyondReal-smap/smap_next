@@ -4,6 +4,8 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
+// 공통 이미지 처리 유틸리티 import
+import { getSafeImageUrl, getDefaultImage, handleImageError } from '@/lib/imageUtils';
 import { 
   FiSearch, 
   FiTrash2, 
@@ -595,15 +597,7 @@ declare global {
   }
 }
 
-const getDefaultImage = (gender: number | null | undefined, index: number): string => {
-  const maleImages = ['/images/male_1.png', '/images/male_2.png', '/images/male_3.png', '/images/male_4.png'];
-  const femaleImages = ['/images/female_1.png', '/images/female_2.png', '/images/female_3.png', '/images/female_4.png'];
-  const defaultImages = ['/images/avatar1.png', '/images/avatar2.png', '/images/avatar3.png', '/images/avatar4.png'];
-  
-  if (gender === 1) return maleImages[index % maleImages.length];
-  if (gender === 2) return femaleImages[index % femaleImages.length];
-  return defaultImages[index % defaultImages.length];
-};
+// 이미지 처리 함수들은 @/lib/imageUtils에서 import하여 사용
 
 interface LocationData {
   id: string; 
@@ -643,6 +637,7 @@ interface GroupMember {
   id: string;
   name: string;
   photo: string | null;
+  mt_file1?: string | null;
   isSelected: boolean;
   location: HomeLocation;
   schedules: HomeSchedule[];
@@ -742,6 +737,7 @@ export default function LocationPage() {
     
     return () => clearTimeout(timeoutId);
   }, []);
+
 
   // 헤더 상단 패딩 강제 제거 (런타임)
   useEffect(() => {
@@ -862,6 +858,27 @@ export default function LocationPage() {
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
   const [selectedMemberIdRef, setSelectedMemberIdRef] = useState<React.MutableRefObject<string | null>>({ current: null });
+  
+  // 🖼️ 사용자 프로필 이미지 변경 감지 및 마커 업데이트
+  useEffect(() => {
+    if (user && user.mt_file1 && groupMembers.length > 0) {
+      console.log('[LOCATION] 사용자 프로필 이미지 변경 감지 - 마커 업데이트');
+      
+      // 현재 사용자의 마커 찾아서 업데이트
+      const currentUserMember = groupMembers.find(member => member.id === user.mt_idx?.toString());
+      if (currentUserMember) {
+        console.log('[LOCATION] 현재 사용자 마커 업데이트:', {
+          memberId: currentUserMember.id,
+          oldPhoto: currentUserMember.photo,
+          newPhoto: user.mt_file1
+        });
+        
+        // 마커 업데이트
+        updateAllMarkers(groupMembers, null, true);
+      }
+    }
+  }, [user?.mt_file1, groupMembers]);
+  
   // 사이드바 멤버 선택 시에만 자동 InfoWindow 표시를 허용하는 플래그
   const shouldAutoOpenInfoWindowRef = useRef<boolean>(false);
   // 자동 InfoWindow 재생성 방지용 타이머와 시그니처
@@ -2013,6 +2030,7 @@ export default function LocationPage() {
             id: memberId,
             name: member.mt_name || member.mt_nickname || '이름 없음',
             photo: member.mt_file1,
+            mt_file1: member.mt_file1,
             isSelected: index === 0, // 첫 번째 멤버를 선택
             location: {
               lat: parseFloat(String(member.mlt_lat || '37.5665')) || 37.5665,
@@ -2305,7 +2323,7 @@ export default function LocationPage() {
             }
             
             const borderColor = member.id === memberId ? '#ef4444' : '#0113A3'; // 선택된 멤버는 빨간색, 나머지는 파란색
-            const photoForMarker = getSafeImageUrl(member.photo, member.mt_gender, member.original_index);
+            const photoForMarker = getSafeImageUrl(member.mt_file1, member.mt_gender, member.original_index);
             
             console.log(`[handleMemberSelect] 🚨 마커 ${index} 색상 업데이트: ${member.name} (선택됨: ${member.id === memberId}, 색상: ${borderColor})`);
             
@@ -2643,7 +2661,7 @@ export default function LocationPage() {
           
           // 마커가 있고 지도와 네이버 맵스가 로드되었을 때만 InfoWindow 표시
             if (selectedMarker && map && window.naver?.maps) {
-            const photoForMarker = getSafeImageUrl(newlySelectedMember?.photo, newlySelectedMember?.mt_gender, newlySelectedMember?.original_index);
+            const photoForMarker = getSafeImageUrl(newlySelectedMember?.mt_file1, newlySelectedMember?.mt_gender, newlySelectedMember?.original_index);
             const borderColor = '#f59e0b'; // 선택된 멤버 색상
 
             const memberInfoWindow = new window.naver.maps.InfoWindow({
@@ -2737,7 +2755,7 @@ export default function LocationPage() {
             
             // 마커를 찾을 수 없을 때 좌표로 직접 InfoWindow 표시
             if (map && window.naver?.maps && lat && lng) {
-              const photoForMarker = getSafeImageUrl(newlySelectedMember?.photo, newlySelectedMember?.mt_gender, newlySelectedMember?.original_index);
+              const photoForMarker = getSafeImageUrl(newlySelectedMember?.mt_file1, newlySelectedMember?.mt_gender, newlySelectedMember?.original_index);
               const borderColor = '#f59e0b'; // 선택된 멤버 색상
               const memberPosition = createSafeLatLng(lat, lng);
               if (!memberPosition) {
@@ -3632,11 +3650,7 @@ export default function LocationPage() {
     }
   };
 
-  // 안전한 이미지 URL 가져오기 헬퍼 함수
-  const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefined, index: number): string => {
-    // 그룹멤버 리스트와 동일한 로직: 실제 사진이 있으면 사용하고, 없으면 기본 이미지 사용
-    return photoUrl ?? getDefaultImage(gender, index);
-  };
+  // 이미지 처리 함수들은 @/lib/imageUtils에서 import하여 사용
 
   // 시간을 월/일 hh:mm 형식으로 변환하는 함수
   const formatTimeToMMDDHHMM = (dateString: string): string => {
@@ -4055,7 +4069,7 @@ export default function LocationPage() {
         const lng = parseCoordinate(member.mlt_long) || parseCoordinate(member.location?.lng);
 
         if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
-          const photoForMarker = getSafeImageUrl(member.photo, member.mt_gender, member.original_index);
+          const photoForMarker = getSafeImageUrl(member.mt_file1, member.mt_gender, member.original_index);
           
           // 안전한 LatLng 생성
           const position = createSafeLatLng(lat, lng);
@@ -5468,7 +5482,7 @@ export default function LocationPage() {
     });
     
     // 🚨 getSafeImageUrl 호출 수정 - 올바른 파라미터 전달
-    const photoUrl = getSafeImageUrl(member.photo, member.mt_gender, member.original_index);
+    const photoUrl = getSafeImageUrl(member.mt_file1, member.mt_gender, member.original_index);
     const lat = member.mlt_lat || 0;
     const lng = member.mlt_long || 0;
     
@@ -5627,7 +5641,7 @@ export default function LocationPage() {
     // 주소 변환 제거
     
     console.log('[createMemberInfoWindow] 멤버 InfoWindow 생성 완료:', member.name);
-  };
+                                                                                                                                                                                                                                                                        };                                                                                                                                                                                                      
 
   // 통일된 정보창 생성 함수 - home/page.tsx 스타일 적용 + 삭제 버튼 추가
   const createLocationInfoWindow = (locationName: string, locationAddress: string, locationData?: OtherMemberLocationRaw | LocationData) => {
@@ -7264,7 +7278,7 @@ export default function LocationPage() {
                           <div className="flex items-center space-x-3">
                             <div className="relative">
                                                              <img
-                                 src={getSafeImageUrl(member.photo, member.mt_gender, member.original_index)}
+                                 src={getSafeImageUrl(member.mt_file1, member.mt_gender, member.original_index)}
                                  alt={member.name}
                                  className={`w-10 h-10 rounded-full object-cover transition-all duration-200 ${
                                    member.isSelected ? 'ring-2 ring-blue-600' : ''
@@ -7772,7 +7786,7 @@ export default function LocationPage() {
                                                                            transition={{ type: "spring", stiffness: 300 }}
                                 >
                                   <img 
-                                    src={member.photo || getDefaultImage(member.mt_gender, member.original_index)}
+                                    src={member.mt_file1 || getDefaultImage(member.mt_gender, member.original_index)}
                                     alt={member.name} 
                                     className="w-full h-full object-cover"
                                     onError={(e) => {

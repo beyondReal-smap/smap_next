@@ -112,7 +112,7 @@ export const LocationMarkers: React.FC<LocationMarkersProps> = ({
                 width: 40px;
                 height: 40px;
                 border-radius: 50%;
-                background: ${member.photo ? 'url(' + member.photo + ')' : '#E5E7EB'};
+                background: ${member.mt_file1 ? 'url(' + member.mt_file1 + ')' : '#E5E7EB'};
                 background-size: cover;
                 background-position: center;
                 margin-right: 12px;
@@ -122,7 +122,7 @@ export const LocationMarkers: React.FC<LocationMarkersProps> = ({
                 color: #6B7280;
                 font-weight: 600;
               ">
-                ${member.photo ? '' : member.name.charAt(0)}
+                ${member.mt_file1 ? '' : member.name.charAt(0)}
               </div>
               <div>
                 <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #111827;">

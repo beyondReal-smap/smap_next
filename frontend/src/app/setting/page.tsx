@@ -8,6 +8,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
+// 공통 이미지 처리 유틸리티 import
+import { getSafeImageUrl, getDefaultImage, handleImageError } from '@/lib/imageUtils';
 import { 
   FiUser, 
   FiSettings, 
@@ -30,23 +32,7 @@ import AnimatedHeader from '../../components/common/AnimatedHeader';
 // import AdvancedScreenGuard from '@/components/common/AdvancedScreenGuard';
 
 
-// 기본 이미지 가져오기 함수 (schedule/page.tsx에서 가져옴)
-const getDefaultImage = (gender: number | null | undefined, index: number): string => {
-  // frontend/public/images/ 폴더의 기본 이미지 사용
-  if (gender === 2) { // 여성
-    const femaleImages = ['/images/female_1.png', '/images/female_2.png', '/images/female_3.png'];
-    return femaleImages[index % femaleImages.length];
-  } else { // 남성 또는 미정
-    const maleImages = ['/images/male_1.png', '/images/male_2.png', '/images/male_3.png'];
-    return maleImages[index % maleImages.length];
-  }
-};
-
-// 안전한 이미지 URL 가져오기 함수
-const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefined, index: number): string => {
-  // 실제 사진이 있으면 사용하고, 없으면 기본 이미지 사용
-  return photoUrl ?? getDefaultImage(gender, index);
-};
+// 이미지 처리 함수들은 @/lib/imageUtils에서 import하여 사용
 
 // 이메일 형식 확인 함수
 const isEmail = (str: string): boolean => {

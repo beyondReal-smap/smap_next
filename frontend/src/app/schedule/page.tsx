@@ -6443,7 +6443,7 @@ export default function SchedulePage() {
                                     member.isSelected ? 'ring-4 ring-indigo-500 ring-offset-2' : ''
                                   }`}>
                                     <Image 
-                                      src={getSafeImageUrl(member.photo, member.mt_gender, member.sgdt_idx || member.mt_idx || 0)}
+                                      src={getSafeImageUrl(member.mt_file1, member.mt_gender, member.sgdt_idx || member.mt_idx || 0)}
                                       alt={member.name}
                                       width={40}
                                       height={40}
@@ -6458,7 +6458,7 @@ export default function SchedulePage() {
                                         target.onerror = null; // 무한 루프 방지
                                       }}
                                       onLoad={() => {
-                                        console.log(`[이미지 성공] ${member.name}의 이미지 로딩 완료:`, member.photo);
+                                        console.log(`[이미지 성공] ${member.name}의 이미지 로딩 완료:`, member.mt_file1);
                                       }}
                                     />
                         </div>

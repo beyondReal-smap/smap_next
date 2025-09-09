@@ -120,7 +120,7 @@ export class InfoWindowManager {
       member.coordinates[1]
     );
     
-    const photoUrl = member.photo || getDefaultImage(member.mt_gender, member.original_index);
+    const photoUrl = member.mt_file1 || getDefaultImage(member.mt_gender, member.original_index);
     
     const content = `
       <div style="

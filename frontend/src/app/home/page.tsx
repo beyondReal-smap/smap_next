@@ -77,6 +77,8 @@ import { useDataCache } from '@/contexts/DataCacheContext';
 // FCM 관련 서비스 제거됨 - 네이티브에서 FCM 토큰 관리
 import axios from 'axios';
 import { format, addDays } from 'date-fns';
+// 공통 이미지 처리 유틸리티 import
+import { getSafeImageUrl, getDefaultImage, handleImageError } from '@/lib/imageUtils';
 import { ko } from 'date-fns/locale';
 // import { PageContainer, Card, Button } from '../components/layout'; // 사용하지 않음
 
@@ -159,7 +161,7 @@ const RECOMMENDED_PLACES = [
 type MapType = MapTypeService;
 
 interface GroupMember {
-  id: string; name: string; photo: string | null; isSelected: boolean; location: Location;
+  id: string; name: string; photo: string | null; mt_file1?: string | null; isSelected: boolean; location: Location;
   schedules: Schedule[]; mt_gender?: number | null; original_index: number;
   mlt_lat?: number | null; mlt_long?: number | null; mlt_speed?: number | null;
   mlt_battery?: number | null; mlt_gps_time?: string | null;
@@ -825,21 +827,7 @@ const safeArrayCheck = (value: any): value is any[] => {
   return safeIsArray(value);
 };
 
-const getDefaultImage = (gender: number | null | undefined, index: number): string => {
-  const maleImages = ['/images/male_1.png', '/images/male_2.png', '/images/male_3.png', '/images/male_4.png'];
-  const femaleImages = ['/images/female_1.png', '/images/female_2.png', '/images/female_3.png', '/images/female_4.png'];
-  const defaultImages = ['/images/avatar1.png', '/images/avatar2.png', '/images/avatar3.png', '/images/avatar4.png'];
-  
-  if (gender === 1) return maleImages[index % maleImages.length];
-  if (gender === 2) return femaleImages[index % femaleImages.length];
-  return defaultImages[index % defaultImages.length];
-};
-
-// 안전한 이미지 URL을 반환하는 함수
-const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefined, index: number): string => {
-  // location/page.tsx와 동일한 로직: 실제 사진이 있으면 사용하고, 없으면 기본 이미지 사용
-  return photoUrl ?? getDefaultImage(gender, index);
-};
+// 이미지 처리 함수들은 @/lib/imageUtils에서 import하여 사용
 
 
 
@@ -1622,12 +1610,33 @@ export default function HomePage() {
         mt_idx: user.mt_idx,
         mt_name: user.mt_name,
         mt_email: user.mt_email,
+        mt_file1: user.mt_file1,
         isLoggedIn,
         authLoading,
         isPreloadingComplete
       });
     }
   }, [user, isLoggedIn, authLoading, isPreloadingComplete]);
+
+  // 🖼️ 사용자 프로필 이미지 변경 감지 및 마커 업데이트
+  useEffect(() => {
+    if (user && user.mt_file1 && groupMembers.length > 0) {
+      console.log('[HOME] 사용자 프로필 이미지 변경 감지 - 마커 업데이트');
+      
+      // 현재 사용자의 마커 찾아서 업데이트
+      const currentUserMember = groupMembers.find(member => member.id === user.mt_idx?.toString());
+      if (currentUserMember) {
+        console.log('[HOME] 현재 사용자 마커 업데이트:', {
+          memberId: currentUserMember.id,
+          oldPhoto: currentUserMember.photo,
+          newPhoto: user.mt_file1
+        });
+        
+        // 마커 업데이트
+        updateMemberMarkers(groupMembers, true);
+      }
+    }
+  }, [user?.mt_file1, groupMembers]);
   
   // 🆕 그룹 체크 및 초기화 모달 표시 로직
   useEffect(() => {
@@ -2273,6 +2282,7 @@ export default function HomePage() {
               id: member.mt_idx.toString(),
               name: member.mt_name || `멤버 ${index + 1}`,
               photo: getSafeImageUrl(member.mt_file1, member.mt_gender, index),
+              mt_file1: member.mt_file1 || null,
               isSelected: false,
               location: { 
                 lat: member.mlt_lat !== null && member.mlt_lat !== undefined 
@@ -2311,6 +2321,7 @@ export default function HomePage() {
                 id: member.mt_idx.toString(),
                 name: member.mt_name || `멤버 ${index + 1}`,
                 photo: getSafeImageUrl(member.mt_file1, member.mt_gender, index),
+              mt_file1: member.mt_file1 || null,
                 isSelected: false,
                 location: { 
                   lat: member.mlt_lat !== null && member.mlt_lat !== undefined 
@@ -2343,6 +2354,7 @@ export default function HomePage() {
                       id: member.mt_idx.toString(),
                       name: member.mt_name || `멤버 ${index + 1}`,
                       photo: getSafeImageUrl(member.mt_file1, member.mt_gender, index),
+              mt_file1: member.mt_file1 || null,
                       isSelected: false,
                       location: { 
                         lat: member.mlt_lat !== null && member.mlt_lat !== undefined 
@@ -2415,6 +2427,7 @@ export default function HomePage() {
                         id: user.mt_idx.toString(),
                         name: user.mt_name || '나',
                         photo: getSafeImageUrl(user.mt_file1 || null, user.mt_gender, 0),
+                        mt_file1: user.mt_file1 || null,
                         isSelected: false,
                         location: { 
                           lat: memberLat, 
@@ -4319,10 +4332,7 @@ export default function HomePage() {
                       const indexStr = this.getAttribute('data-index');
                       const gender = genderStr ? parseInt(genderStr, 10) : null;
                       const idx = indexStr ? parseInt(indexStr, 10) : 0;
-                      const imgNum = (idx % 4) + 1;
-                      let fallbackSrc = '/images/avatar' + ((idx % 3) + 1) + '.png';
-                      if (gender === 1) { fallbackSrc = '/images/male_' + imgNum + '.png'; }
-                      else if (gender === 2) { fallbackSrc = '/images/female_' + imgNum + '.png'; }
+                      const fallbackSrc = getDefaultImage(gender, idx);
                       this.src = fallbackSrc;
                       this.onerror = null;
                     "
@@ -5179,7 +5189,7 @@ export default function HomePage() {
             }
             // 선택 상태에 따른 아이콘 갱신 (네이버 지도)
             if (mapType === 'naver' && existingMarker.setIcon) {
-              const photoForMarker = getSafeImageUrl(member.photo, member.mt_gender, member.original_index);
+              const photoForMarker = getSafeImageUrl(member.mt_file1, member.mt_gender, member.original_index);
               const borderColor = member.isSelected ? '#EC4899' : '#4F46E5';
               const boxShadow = member.isSelected ? '0 0 8px rgba(236, 72, 153, 0.5)' : '0 1px 3px rgba(0,0,0,0.2)';
               existingMarker.setIcon({
@@ -5197,10 +5207,7 @@ export default function HomePage() {
                           const indexStr = this.getAttribute('data-index');
                           const gender = genderStr ? parseInt(genderStr, 10) : null;
                           const idx = indexStr ? parseInt(indexStr, 10) : 0;
-                          const imgNum = (idx % 4) + 1;
-                          let fallbackSrc = '/images/avatar' + ((idx % 3) + 1) + '.png';
-                          if (gender === 1) { fallbackSrc = '/images/male_' + imgNum + '.png'; }
-                          else if (gender === 2) { fallbackSrc = '/images/female_' + imgNum + '.png'; }
+                          const fallbackSrc = getDefaultImage(gender, idx);
                           this.src = fallbackSrc;
                           this.onerror = null;
                         "
@@ -7334,7 +7341,7 @@ export default function HomePage() {
                                                                                 transition={{ type: "spring", stiffness: 300 }}
                                      >
                                      <img 
-                                       src={getSafeImageUrl(member.photo, member.mt_gender, member.original_index)}
+                                       src={getSafeImageUrl(member.mt_file1, member.mt_gender, member.original_index)}
                                        alt={member.name} 
                                        className="w-full h-full object-cover" 
                                        onError={(e) => {

@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
+// 공통 이미지 처리 유틸리티 import
+import { getSafeImageUrl, getDefaultImage, handleImageError } from '@/lib/imageUtils';
 import { 
   FiUser, 
   FiMail, 
@@ -17,25 +19,12 @@ import {
 } from 'react-icons/fi';
 import { HiSparkles } from 'react-icons/hi2';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDataCache } from '@/contexts/DataCacheContext';
 import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
 import AnimatedHeader from '@/components/common/AnimatedHeader';
 import ProfileImageUploader from '@/components/common/ProfileImageUploader';
 
-// 기본 이미지 가져오기 함수
-const getDefaultImage = (gender: number | null | undefined, index: number): string => {
-  if (gender === 2) { // 여성
-    const femaleImages = ['/images/female_1.png', '/images/female_2.png', '/images/female_3.png'];
-    return femaleImages[index % femaleImages.length];
-  } else { // 남성 또는 미정
-    const maleImages = ['/images/male_1.png', '/images/male_2.png', '/images/male_3.png'];
-    return maleImages[index % maleImages.length];
-  }
-};
-
-// 안전한 이미지 URL 가져오기 함수
-const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefined, index: number): string => {
-  return photoUrl ?? getDefaultImage(gender, index);
-};
+// 이미지 처리 함수들은 @/lib/imageUtils에서 import하여 사용
 
 // 사용자 레벨에 따른 등급 반환 함수
 const getUserLevel = (mtLevel: number | null | undefined): string => {
@@ -268,6 +257,7 @@ html, body {
 export default function AccountSettingsPage() {
   const router = useRouter();
   const { user, logout, refreshUserData } = useAuth();
+  const { invalidateCache } = useDataCache();
   const [profileImg, setProfileImg] = useState(getSafeImageUrl(user?.mt_file1 || null, user?.mt_gender, user?.mt_idx || 0));
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showProfileUploader, setShowProfileUploader] = useState(false);
@@ -497,6 +487,12 @@ export default function AccountSettingsPage() {
 
       // 사용자 데이터 새로고침
       await refreshUserData();
+
+      // 관련 캐시 무효화 (프로필 이미지 변경으로 인한 마커 업데이트를 위해)
+      invalidateCache('userProfile');
+      invalidateCache('groupMembers'); // 모든 그룹의 멤버 캐시 무효화
+      
+      console.log('[PROFILE UPLOAD] 캐시 무효화 완료 - userProfile, groupMembers');
 
       // 성공 피드백
       triggerHapticFeedback(HapticFeedbackType.SUCCESS, '프로필 사진 변경 성공', {

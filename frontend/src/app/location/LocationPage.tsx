@@ -320,8 +320,8 @@ export default function LocationPage() {
               >
                 <div className="flex items-center space-x-3">
                   <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-                    {member.photo ? (
-                      <img src={member.photo} alt={member.name} className="w-8 h-8 rounded-full" />
+                    {member.mt_file1 ? (
+                      <img src={member.mt_file1} alt={member.name} className="w-8 h-8 rounded-full" />
                     ) : (
                       <span className="text-sm text-gray-600">{member.name.charAt(0)}</span>
                     )}

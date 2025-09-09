@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import dynamicImport from 'next/dynamic';
 import Image from 'next/image';
 import { motion, AnimatePresence, useMotionValue } from 'framer-motion';
+// 공통 이미지 처리 유틸리티 import
+import { getSafeImageUrl, getDefaultImage, handleImageError } from '@/lib/imageUtils';
 import { 
   FaUsers, 
   FaLayerGroup, 
@@ -385,12 +387,7 @@ const GroupCard = memo<{
   </div>
 ));
 
-// SSL 인증서 오류가 있는 URL인지 확인하는 함수
-// 안전한 이미지 URL을 반환하는 함수 - location/home과 동일한 로직
-const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefined, index: number): string => {
-  // 실제 사진이 있으면 사용하고, 없으면 기본 이미지 사용
-  return photoUrl ?? getDefaultImage(gender, index);
-};
+// 이미지 처리 함수들은 @/lib/imageUtils에서 import하여 사용
 
 // Framer Motion 애니메이션 variants - schedule/page.tsx 스타일로 변경
 const pageVariants = {
@@ -2121,7 +2118,7 @@ function GroupPageContent() {
                                   <div className="relative mr-3">
                                     <div className="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center border-3" style={{ borderColor: 'rgba(1, 19, 163, 0.2)' }}>
                                       <img
-                                        src={getSafeImageUrl(member.photo || null, member.mt_gender, member.original_index)}
+                                        src={getSafeImageUrl(member.mt_file1 || null, member.mt_gender, member.original_index)}
                                         alt={member.mt_name}
                                         className="w-full h-full object-cover"
                                         onError={(e) => {
