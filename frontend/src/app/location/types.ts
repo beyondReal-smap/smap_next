@@ -30,6 +30,7 @@ export interface GroupMember {
   id: string;
   name: string;
   photo?: string;
+  mt_file1?: string | null;
   coordinates: [number, number];
   savedLocationCount: number;
   isSelected?: boolean;
