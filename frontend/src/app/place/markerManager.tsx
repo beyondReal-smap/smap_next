@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
+import { getSafeImageUrl, getDefaultImage, handleImageError } from '@/lib/imageUtils';
 
 // 타입 정의
 interface LocationData {
@@ -52,22 +53,6 @@ const createSafeLatLng = (lat: number, lng: number): any => {
   }
 };
 
-const getDefaultImage = (gender: number | null | undefined, index: number): string => {
-  const maleImages = ['/images/male_1.png', '/images/male_2.png', '/images/male_3.png', '/images/male_4.png'];
-  const femaleImages = ['/images/female_1.png', '/images/female_2.png', '/images/female_3.png', '/images/female_4.png'];
-  const defaultImages = ['/images/avatar1.png', '/images/avatar2.png', '/images/avatar3.png', '/images/avatar4.png'];
-  
-  if (gender === 1) return maleImages[index % maleImages.length];
-  if (gender === 2) return femaleImages[index % femaleImages.length];
-  return defaultImages[index % defaultImages.length];
-};
-
-const getSafeImageUrl = (photo: string | null | undefined, gender: number | null | undefined, index: number): string => {
-  if (photo && photo.trim() !== '') {
-    return photo;
-  }
-  return getDefaultImage(gender, index);
-};
 
 interface MarkerManagerProps {
   map: NaverMap | null;
