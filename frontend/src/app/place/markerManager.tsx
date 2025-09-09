@@ -19,6 +19,7 @@ interface GroupMember {
   id: string;
   name: string;
   photo: string | null;
+  mt_file1?: string | null;
   isSelected: boolean;
   location: { lat: number; lng: number };
   schedules: any[];
