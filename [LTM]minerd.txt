@@ -1,0 +1,1 @@
+./minerd --algo=sha256d --url=http://ltm-miner.gnc.ne.kr:50013 --user=ltmuser --pass=ltmpassword --coinbase-addr=bc1qjevl6dcvz4h6m25qp508c863s7f4ly6x7df36h --no-stratum

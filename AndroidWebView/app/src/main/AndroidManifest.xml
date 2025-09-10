@@ -11,12 +11,15 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.VIBRATE" />
     
-    <!-- 🔥 ORB 차단 우회를 위한 추가 권한 -->
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- 위치 정보 권한 - 선택적 기능으로 필요할 때만 요청 -->
+    <!-- 이 앱은 사용자가 원할 때만 위치 정보를 수집하는 선택적 기능을 제공합니다 -->
+    <!-- <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" /> -->
+    <!-- <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" /> -->
+    <!-- <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" /> -->
     
-    <!-- 위치 권한 -->
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <!-- 위치 기능이 필요하지 않을 때를 위한 조건부 권한 -->
+    <uses-feature android:name="android.hardware.location" android:required="false" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
     
     <!-- 포그라운드 서비스 권한 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />

@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'NCP credentials not configured' }, { status: 500 });
     }
 
-    const endpoint = 'https://maps.apigw.ntruss.com/map-geocode/v2/geocode';
+    const endpoint = 'https://maps.apigw.ntruss.com/map-geocode/v2/geocode/gc';
     const url = `${endpoint}?query=${encodeURIComponent(query)}`;
 
     const res = await fetch(url, {

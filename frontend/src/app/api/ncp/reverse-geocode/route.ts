@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
 
     // NCP Maps Reverse Geocoding
     // docs: https://api.ncloud-docs.com/docs/application-maps-overview
-    const endpoint = 'https://maps.apigw.ntruss.com/map-reversegeocode/v2';
+    const endpoint = 'https://maps.apigw.ntruss.com/map-reversegeocode/v2/gc';
     const url = `${endpoint}?request=coordsToaddr&sourcecrs=epsg:4326&coords=${encodeURIComponent(`${lng},${lat}`)}&output=json&orders=roadaddr,addr`;
 
     const res = await fetch(url, {
