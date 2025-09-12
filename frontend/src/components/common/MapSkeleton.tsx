@@ -9,15 +9,17 @@ interface MapSkeletonProps {
   showControls?: boolean;
   showMemberList?: boolean;
   className?: string;
+  style?: React.CSSProperties;
 }
 
 export const MapSkeleton: React.FC<MapSkeletonProps> = ({ 
   showControls = true, 
   showMemberList = false,
-  className = ''
+  className = '',
+  style = {}
 }) => {
   return (
-    <div className={`${styles.mapSkeleton} ${className}`}>
+    <div className={`${styles.mapSkeleton} ${className}`} style={style}>
       {/* 지도 메인 영역 */}
       <div className={styles.mapContainer}>
         {/* 지도 영역 */}
