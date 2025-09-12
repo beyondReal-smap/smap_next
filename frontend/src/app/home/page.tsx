@@ -451,20 +451,39 @@ html, body {
   box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
 }
 
-/* 지도 화면 전체 차지하기 위한 스타일 */
+/* 지도 화면 전체 차지하기 위한 스타일 - CLS 개선 */
 .full-map-container {
-  position: absolute !important;
+  position: fixed !important;
   top: 0 !important;
   left: 0 !important;
   right: 0 !important;
-  bottom: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
+  bottom: 80px !important; /* 네비게이션 바 높이만큼 제외 */
+  width: 100vw !important;
+  height: calc(100vh - 80px) !important; /* 고정 높이로 CLS 방지 */
   margin: 0 !important;
   padding: 0 !important;
-  overflow: visible !important; /* 지도 터치 이벤트를 위해 visible로 변경 */
+  overflow: hidden !important; /* 스크롤 방지로 레이아웃 안정화 */
   touch-action: manipulation !important; /* 지도 조작을 위한 터치 이벤트 허용 */
   z-index: 1 !important; /* 헤더와 네비게이션보다 낮게 설정 */
+  /* CLS 방지를 위한 추가 속성 */
+  contain: layout style paint !important;
+  will-change: transform !important;
+  transform: translateZ(0) !important; /* GPU 가속으로 렌더링 최적화 */
+}
+
+/* 지도 컨테이너 내부 요소들 CLS 방지 */
+.full-map-container > div,
+.full-map-container > div > div {
+  width: 100% !important;
+  height: 100% !important;
+  position: relative !important;
+  /* 레이아웃 시프트 방지 */
+  contain: layout style paint !important;
+  will-change: auto !important;
+  transform: none !important;
+  /* 지도 로딩 중 크기 고정 */
+  min-height: calc(100vh - 80px) !important;
+  min-width: 100vw !important;
 }
 
 /* 지도 헤더 스타일 */
@@ -6928,7 +6947,7 @@ export default function HomePage() {
           </motion.div>
         )} */}
 
-        {/* 지도 영역 (화면 100% 차지, fixed 포지션으로 고정) */}
+        {/* 지도 영역 (화면 100% 차지, fixed 포지션으로 고정) - CLS 개선 */}
         <div
           className="full-map-container"
           style={{
@@ -6941,6 +6960,12 @@ export default function HomePage() {
             paddingTop: '0px',
             touchAction: 'manipulation',
             overflow: 'hidden', // 스크롤 방지
+            // CLS 방지를 위한 추가 속성
+            width: '100vw',
+            height: 'calc(100vh - 80px)',
+            contain: 'layout style paint',
+            willChange: 'transform',
+            transform: 'translateZ(0)',
             // 추가 터치 이벤트 제어
             WebkitTouchCallout: 'none',
             WebkitUserSelect: 'none',
@@ -6964,19 +6989,37 @@ export default function HomePage() {
             }, 500);
           }}
         >
-          {/* 스켈레톤 UI - 지도 로딩 중일 때 표시 */}
+          {/* 스켈레톤 UI - 지도 로딩 중일 때 표시 (CLS 개선) */}
           {isMapLoading && (
             <MapSkeleton 
               showControls={true} 
               showMemberList={false}
-              className="absolute top-0 left-0 w-full h-full z-5" 
+              className="absolute top-0 left-0 w-full h-full z-5"
+              style={{
+                width: '100%',
+                height: '100%',
+                minHeight: 'calc(100vh - 80px)',
+                minWidth: '100vw',
+                contain: 'layout style paint',
+                willChange: 'auto'
+              }}
             />
           )}
 
           <div 
             ref={googleMapContainer} 
             className="w-full h-full absolute top-0 left-0" 
-            style={{ display: false ? 'block' : 'none', zIndex: 6 }}
+            style={{ 
+              display: false ? 'block' : 'none', 
+              zIndex: 6,
+              // CLS 방지를 위한 고정 크기
+              width: '100%',
+              height: '100%',
+              minHeight: 'calc(100vh - 80px)',
+              minWidth: '100vw',
+              contain: 'layout style paint',
+              willChange: 'auto'
+            }}
             onLoad={() => {
               // 🗺️ Google Maps 컨테이너 로드 완료 시 강제 렌더링 (깜빡임 방지를 위해 지연 시간 증가)
               setTimeout(() => {
@@ -6989,7 +7032,17 @@ export default function HomePage() {
           <div 
             ref={naverMapContainer} 
             className="w-full h-full absolute top-0 left-0" 
-            style={{ display: mapType === 'naver' ? 'block' : 'none', zIndex: 6 }}
+            style={{ 
+              display: mapType === 'naver' ? 'block' : 'none', 
+              zIndex: 6,
+              // CLS 방지를 위한 고정 크기
+              width: '100%',
+              height: '100%',
+              minHeight: 'calc(100vh - 80px)',
+              minWidth: '100vw',
+              contain: 'layout style paint',
+              willChange: 'auto'
+            }}
             onLoad={() => {
               // 🗺️ 네이버 지도 컨테이너 로드 완료 시 강제 렌더링 (깜빡임 방지를 위해 지연 시간 증가)
               setTimeout(() => {
