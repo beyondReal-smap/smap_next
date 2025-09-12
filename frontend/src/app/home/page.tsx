@@ -464,7 +464,7 @@ html, body {
   padding: 0 !important;
   overflow: hidden !important; /* 스크롤 방지로 레이아웃 안정화 */
   touch-action: manipulation !important; /* 지도 조작을 위한 터치 이벤트 허용 */
-  z-index: 1 !important; /* 헤더와 네비게이션보다 낮게 설정 */
+  z-index: 10 !important; /* 헤더와 네비게이션보다 낮게 설정 */
   /* CLS 방지를 위한 추가 속성 */
   contain: layout style paint !important;
   will-change: transform !important;
@@ -473,6 +473,9 @@ html, body {
   box-sizing: border-box !important;
   border: none !important;
   outline: none !important;
+  /* 강제 위치 고정 */
+  transform: translate3d(0, 0, 0) !important;
+  -webkit-transform: translate3d(0, 0, 0) !important;
 }
 
 /* 지도 컨테이너 내부 요소들 CLS 방지 */
@@ -4001,6 +4004,18 @@ export default function HomePage() {
               container.style.right = '0px';
               container.style.bottom = '80px';
               
+              // 부모 컨테이너도 강제 조정
+              const parentContainer = container.parentElement;
+              if (parentContainer) {
+                parentContainer.style.top = '20px';
+                parentContainer.style.height = `${mapHeight}px`;
+                parentContainer.style.position = 'fixed';
+                parentContainer.style.left = '0px';
+                parentContainer.style.right = '0px';
+                parentContainer.style.bottom = '80px';
+                console.log('[HOME] 부모 컨테이너 위치 조정 완료');
+              }
+              
               // 네이버 지도 크기 강제 조정
               try {
                 naverMap.current.setSize(new window.naver.maps.Size(mapWidth, mapHeight));
@@ -4025,6 +4040,19 @@ export default function HomePage() {
                   const finalMapHeight = window.innerHeight - 100; // 헤더(20px) + 네비게이션 바(80px) 제외
                   const finalMapWidth = window.innerWidth;
                   
+                  // 부모 컨테이너 강제 위치 조정
+                  const parentContainer = naverMapContainer.current.parentElement;
+                  if (parentContainer) {
+                    parentContainer.style.top = '20px';
+                    parentContainer.style.height = `${finalMapHeight}px`;
+                    parentContainer.style.position = 'fixed';
+                    parentContainer.style.left = '0px';
+                    parentContainer.style.right = '0px';
+                    parentContainer.style.bottom = '80px';
+                    parentContainer.style.zIndex = '10';
+                    console.log('[HOME] 부모 컨테이너 최종 위치 조정 완료');
+                  }
+                  
                   try {
                     naverMap.current.setSize(new window.naver.maps.Size(finalMapWidth, finalMapHeight));
                     console.log('[HOME] ✅ 네이버맵 최종 크기 조정 완료');
@@ -4033,6 +4061,37 @@ export default function HomePage() {
                   }
                 }
               }, 500);
+              
+              // 추가 지연 후 한 번 더 강제 조정
+              setTimeout(() => {
+                if (naverMap.current && naverMapContainer.current) {
+                  const finalMapHeight = window.innerHeight - 100;
+                  const finalMapWidth = window.innerWidth;
+                  
+                  // DOM 강제 조정
+                  const parentContainer = naverMapContainer.current.parentElement;
+                  if (parentContainer) {
+                    parentContainer.style.cssText = `
+                      position: fixed !important;
+                      top: 20px !important;
+                      left: 0px !important;
+                      right: 0px !important;
+                      bottom: 80px !important;
+                      width: 100vw !important;
+                      height: ${finalMapHeight}px !important;
+                      z-index: 10 !important;
+                    `;
+                    console.log('[HOME] DOM 강제 조정 완료');
+                  }
+                  
+                  try {
+                    naverMap.current.setSize(new window.naver.maps.Size(finalMapWidth, finalMapHeight));
+                    console.log('[HOME] ✅ 네이버맵 DOM 강제 조정 후 크기 설정 완료');
+                  } catch (domError) {
+                    console.warn('[HOME] DOM 강제 조정 후 크기 설정 실패:', domError);
+                  }
+                }
+              }, 1000);
             }
           }, 100);
           
