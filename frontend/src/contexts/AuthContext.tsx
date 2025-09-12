@@ -503,7 +503,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           return;
         }
 
-        // 4. 사용자 데이터가 없으면 최종적으로 authService를 통해 로그인 상태 종합 검증
+        // 4. 사용자 데이터가 없으면 최종적으로 한 번 더 확인 후 authService 검증
+        const finalFallbackUserData = authService.getUserData();
+        if (finalFallbackUserData && finalFallbackUserData.mt_idx && isMountedRef.current) {
+          console.log('[AUTH CONTEXT] 📦 최종 fallback 사용자 데이터 발견 - 강제 로그인 상태 복원:', finalFallbackUserData.mt_name);
+          dispatch({ type: 'LOGIN_SUCCESS', payload: finalFallbackUserData });
+          locationTrackingService.onUserLogin();
+          
+          // 백그라운드에서 사용자 데이터 프리로딩
+          preloadUserData(finalFallbackUserData.mt_idx, 'final-fallback-load').catch(error => {
+            console.warn('[AUTH] final fallback 프리로딩 실패 (무시):', error);
+          });
+          
+          return; // 성공적으로 복원했으므로 리턴
+        }
+
+        // 5. authService를 통해 로그인 상태 종합 검증 (사용자 데이터 최우선)
         const isLoggedIn = authService.isLoggedIn();
         console.log('[AUTH CONTEXT] authService.isLoggedIn() 결과:', isLoggedIn);
 
@@ -527,12 +542,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             return; // 성공적으로 복원했으므로 리턴
           }
 
-          // 5. 토큰 유효성 및 갱신 확인 (실패해도 로그인 상태 유지)
+          // 6. 토큰 유효성 및 갱신 확인 (실패해도 로그인 상태 유지)
           try {
             const tokenValid = await authService.checkAndRefreshToken();
 
             if (tokenValid) {
-              // 6. 최신 사용자 데이터 가져오기
+              // 7. 최신 사용자 데이터 가져오기
               const updatedUserData = await authService.getCurrentUserProfile();
 
               if (updatedUserData && isMountedRef.current) {
@@ -567,8 +582,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       } catch (error) {
         console.error('[AUTH CONTEXT] 초기 인증 상태 확인 중 오류 발생:', error);
-        if (isMountedRef.current) {
-          dispatch({ type: 'LOGOUT' }); // 에러 발생 시 안전하게 로그아웃 처리
+        
+        // 🔥 오류 발생 시에도 사용자 데이터가 있으면 로그인 상태 유지
+        const errorFallbackUserData = authService.getUserData();
+        if (errorFallbackUserData && errorFallbackUserData.mt_idx && isMountedRef.current) {
+          console.log('[AUTH CONTEXT] 🔥 오류 발생했지만 사용자 데이터 있으므로 로그인 상태 유지:', errorFallbackUserData.mt_name);
+          dispatch({ type: 'LOGIN_SUCCESS', payload: errorFallbackUserData });
+          locationTrackingService.onUserLogin();
+        } else if (isMountedRef.current) {
+          console.log('[AUTH CONTEXT] 오류 발생 및 사용자 데이터 없음 - 로그아웃 처리');
+          dispatch({ type: 'LOGOUT' });
         }
       } finally {
         // 데이터 확인이 끝나면 로딩 상태 해제
@@ -744,6 +767,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = async (): Promise<void> => {
     try {
       console.log('[AUTH] 로그아웃 시작');
+      
+      // 🔥 사용자 데이터가 있으면 로그아웃 방지 (강제 로그인 상태 유지)
+      const userData = authService.getUserData();
+      if (userData && userData.mt_idx) {
+        console.log('[AUTH] 🔥 사용자 데이터 존재 - 로그아웃 방지 및 강제 로그인 상태 유지:', userData.mt_name);
+        dispatch({ type: 'LOGIN_SUCCESS', payload: userData });
+        locationTrackingService.onUserLogin();
+        return;
+      }
       
       // 🚫 에러 모달이 표시 중이면 로그아웃 중단
       if (typeof window !== 'undefined' && (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
@@ -978,6 +1010,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const refreshAuthState = async (): Promise<void> => {
     try {
       console.log('[AUTH CONTEXT] 수동 상태 새로고침 시작');
+
+      // 🔥 먼저 사용자 데이터가 있는지 확인하고 있으면 즉시 복원
+      const userData = authService.getUserData();
+      if (userData && userData.mt_idx) {
+        console.log('[AUTH CONTEXT] 🔥 사용자 데이터 존재 - 즉시 로그인 상태 복원:', userData.mt_name);
+        dispatch({ type: 'LOGIN_SUCCESS', payload: userData });
+        locationTrackingService.onUserLogin();
+        
+        // 백그라운드에서 데이터 최신화 시도 (실패해도 무시)
+        setTimeout(async () => {
+          try {
+            const updatedUserData = await authService.getCurrentUserProfile();
+            if (updatedUserData) {
+              dispatch({ type: 'LOGIN_SUCCESS', payload: updatedUserData });
+              console.log('[AUTH CONTEXT] 백그라운드 데이터 최신화 완료');
+            }
+          } catch (error) {
+            console.warn('[AUTH CONTEXT] 백그라운드 데이터 최신화 실패 (무시):', error);
+          }
+        }, 1000);
+        
+        return;
+      }
 
       const isLoggedInFromService = authService.isLoggedIn();
       console.log('[AUTH CONTEXT] authService.isLoggedIn():', isLoggedInFromService);
