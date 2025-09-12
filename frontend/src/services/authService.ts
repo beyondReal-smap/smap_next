@@ -258,15 +258,35 @@ class AuthService {
   }
 
   /**
-   * 토큰 저장
+   * 토큰 저장 (로그인 유지 강화)
    */
   setToken(token: string): void {
     if (typeof window !== 'undefined') {
-      localStorage.setItem(this.TOKEN_KEY, token);
-      
-      // 쿠키에도 토큰 저장 (middleware에서 사용)
-      const isSecure = window.location.protocol === 'https:' ? '; Secure' : '';
-      document.cookie = `auth-token=${token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax${isSecure}`;
+      try {
+        // 1. 표준 키에 저장
+        localStorage.setItem(this.TOKEN_KEY, token);
+        
+        // 2. 호환성을 위한 추가 키에도 저장
+        localStorage.setItem('smap_auth_token', token);
+        localStorage.setItem('auth_token', token);
+        
+        // 3. 로그인 시간 저장 (7일 세션 관리용)
+        const loginTime = Date.now();
+        localStorage.setItem('smap_login_time', loginTime.toString());
+        localStorage.setItem('login_time', loginTime.toString());
+        
+        // 4. 로그인 상태 플래그 저장
+        localStorage.setItem('isLoggedIn', 'true');
+        sessionStorage.setItem('authToken', 'authenticated');
+        
+        // 5. 쿠키에도 토큰 저장 (middleware에서 사용)
+        const isSecure = window.location.protocol === 'https:' ? '; Secure' : '';
+        document.cookie = `auth-token=${token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax${isSecure}`;
+        
+        console.log('[AUTH SERVICE] ✅ 토큰 저장 완료 - 모든 저장소에 백업');
+      } catch (error) {
+        console.error('[AUTH SERVICE] 토큰 저장 실패:', error);
+      }
     }
   }
 
@@ -305,11 +325,38 @@ class AuthService {
   }
 
   /**
-   * 사용자 데이터 저장
+   * 사용자 데이터 저장 (로그인 유지 강화)
    */
   setUserData(userData: UserProfile): void {
     if (typeof window !== 'undefined') {
-      localStorage.setItem(this.USER_KEY, JSON.stringify(userData));
+      try {
+        const userDataJson = JSON.stringify(userData);
+        
+        // 1. 표준 키에 저장
+        localStorage.setItem(this.USER_KEY, userDataJson);
+        
+        // 2. 호환성을 위한 추가 키에도 저장
+        localStorage.setItem('smap_user_data', userDataJson);
+        localStorage.setItem('user_data', userDataJson);
+        localStorage.setItem('user_profile', userDataJson);
+        
+        // 3. Android 환경에서 SharedPreferences에 저장
+        if (window.AndroidStorage) {
+          try {
+            window.AndroidStorage.saveUserDataToPrefs(userDataJson);
+            if (userData.mt_idx) {
+              window.AndroidStorage.saveMtIdxToPrefs(userData.mt_idx.toString());
+            }
+            console.log('[AUTH SERVICE] ✅ Android SharedPreferences에 사용자 데이터 저장 완료');
+          } catch (error) {
+            console.warn('[AUTH SERVICE] Android 데이터 저장 실패 (무시 가능):', error);
+          }
+        }
+        
+        console.log('[AUTH SERVICE] ✅ 사용자 데이터 저장 완료 - 모든 저장소에 백업');
+      } catch (error) {
+        console.error('[AUTH SERVICE] 사용자 데이터 저장 실패:', error);
+      }
     }
   }
 
@@ -580,6 +627,12 @@ class AuthService {
       const userData = this.getUserData();
       const loginTime = this.getLoginTime();
 
+      console.log('[AUTH SERVICE] 🔍 로그인 상태 확인 시작', {
+        hasToken: !!token,
+        hasUserData: !!userData,
+        hasLoginTime: !!loginTime
+      });
+
       // 1. 기본 데이터 존재 여부 확인
       if (!token || !userData) {
         // 쿠키에서 토큰 확인
@@ -589,11 +642,19 @@ class AuthService {
             .find(row => row.startsWith('auth-token='))
             ?.split('=')[1];
 
-          if (cookieToken && userData) {
-            console.log('[AUTH SERVICE] 쿠키에서 토큰 발견, 자동 로그인 유지');
+          // sessionStorage에서도 확인
+          const sessionAuth = sessionStorage.getItem('authToken');
+          
+          if ((cookieToken || sessionAuth) && userData) {
+            console.log('[AUTH SERVICE] ✅ 쿠키/sessionStorage에서 토큰 발견, 자동 로그인 유지');
+            // 토큰이 없으면 쿠키에서 복원
+            if (!token && cookieToken) {
+              this.setToken(cookieToken);
+            }
             return true;
           }
         }
+        console.log('[AUTH SERVICE] ❌ 토큰 또는 사용자 데이터 없음');
         return false;
       }
 

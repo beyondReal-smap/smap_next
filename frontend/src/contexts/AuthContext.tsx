@@ -434,19 +434,53 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       dispatch({ type: 'SET_LOADING', payload: true });
 
       try {
-        console.log('[AUTH CONTEXT] 초기 인증 상태 확인 시작');
+        console.log('[AUTH CONTEXT] 🔍 초기 인증 상태 확인 시작');
 
-        // 1. authService를 통해 로그인 상태 종합 검증
+        // 1. authService를 통해 로그인 상태 종합 검증 (강화된 버전)
         const isLoggedIn = authService.isLoggedIn();
+        console.log('[AUTH CONTEXT] authService.isLoggedIn() 결과:', isLoggedIn);
 
         if (isLoggedIn) {
-          console.log('[AUTH CONTEXT] 로그인 상태 유효함');
+          console.log('[AUTH CONTEXT] ✅ 로그인 상태 유효함');
 
-          // 2. 토큰 유효성 및 갱신 확인
+          // 2. 저장된 사용자 데이터 직접 확인
+          const storedUserData = authService.getUserData();
+          if (storedUserData && isMountedRef.current) {
+            console.log('[AUTH CONTEXT] 📦 저장된 사용자 데이터로 즉시 복원:', storedUserData.mt_name);
+            dispatch({ type: 'LOGIN_SUCCESS', payload: storedUserData });
+
+            // 위치 추적 서비스에 사용자 로그인 알림
+            locationTrackingService.onUserLogin();
+
+            // 백그라운드에서 사용자 데이터 프리로딩
+            preloadUserData(storedUserData.mt_idx, 'initial-load').catch(error => {
+              console.warn('[AUTH] 초기 프리로딩 실패 (무시):', error);
+            });
+
+            // 백그라운드에서 토큰 검증 및 사용자 데이터 최신화
+            setTimeout(async () => {
+              try {
+                const tokenValid = await authService.checkAndRefreshToken();
+                if (tokenValid) {
+                  const updatedUserData = await authService.getCurrentUserProfile();
+                  if (updatedUserData && isMountedRef.current) {
+                    console.log('[AUTH CONTEXT] 🔄 백그라운드에서 사용자 데이터 최신화 성공:', updatedUserData.mt_name);
+                    dispatch({ type: 'LOGIN_SUCCESS', payload: updatedUserData });
+                  }
+                }
+              } catch (error) {
+                console.warn('[AUTH CONTEXT] 백그라운드 토큰 검증 실패 (무시):', error);
+              }
+            }, 1000);
+
+            return;
+          }
+
+          // 3. 토큰 유효성 및 갱신 확인
           const tokenValid = await authService.checkAndRefreshToken();
 
           if (tokenValid) {
-            // 3. 최신 사용자 데이터 가져오기
+            // 4. 최신 사용자 데이터 가져오기
             const updatedUserData = await authService.getCurrentUserProfile();
 
             if (updatedUserData && isMountedRef.current) {
@@ -455,17 +489,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
               // 위치 추적 서비스에 사용자 로그인 알림
               locationTrackingService.onUserLogin();
-
-              // FCM 토큰 처리 (기존 로직 유지)
-              setTimeout(async () => {
-                try {
-                  console.log('[AUTH] 🚨 FCM 토큰 생성 로직 제거됨 - 네이티브에서 관리');
-                  console.log('[AUTH] 📱 네이티브에서는 window.updateFCMToken() 함수를 사용하여 FCM 토큰 업데이트를 수행하세요');
-                  console.log('[AUTH] FCM 관련 로직 제거됨 - 네이티브에서 관리');
-                } catch (e) {
-                  console.warn('[AUTH] FCM 처리 중 예외(무시):', e);
-                }
-              }, 1000);
 
               // 백그라운드에서 사용자 데이터 프리로딩
               preloadUserData(updatedUserData.mt_idx, 'initial-load').catch(error => {
