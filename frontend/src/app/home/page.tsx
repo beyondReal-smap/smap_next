@@ -7831,4 +7831,3 @@ export default function HomePage() {
     );
   }
 }
-}
