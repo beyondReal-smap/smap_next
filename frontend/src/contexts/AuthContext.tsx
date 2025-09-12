@@ -503,12 +503,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           return;
         }
 
-        // 4. 사용자 데이터가 없으면 authService를 통해 로그인 상태 종합 검증
+        // 4. 사용자 데이터가 없으면 최종적으로 authService를 통해 로그인 상태 종합 검증
         const isLoggedIn = authService.isLoggedIn();
         console.log('[AUTH CONTEXT] authService.isLoggedIn() 결과:', isLoggedIn);
 
         if (isLoggedIn) {
           console.log('[AUTH CONTEXT] ✅ 로그인 상태 유효함');
+
+          // 저장된 사용자 데이터가 있는지 다시 한 번 확인
+          const fallbackUserData = authService.getUserData();
+          if (fallbackUserData && isMountedRef.current) {
+            console.log('[AUTH CONTEXT] 📦 fallback 사용자 데이터 발견 - 즉시 복원:', fallbackUserData.mt_name);
+            dispatch({ type: 'LOGIN_SUCCESS', payload: fallbackUserData });
+
+            // 위치 추적 서비스에 사용자 로그인 알림
+            locationTrackingService.onUserLogin();
+
+            // 백그라운드에서 사용자 데이터 프리로딩
+            preloadUserData(fallbackUserData.mt_idx, 'fallback-load').catch(error => {
+              console.warn('[AUTH] fallback 프리로딩 실패 (무시):', error);
+            });
+
+            return; // 성공적으로 복원했으므로 리턴
+          }
 
           // 5. 토큰 유효성 및 갱신 확인 (실패해도 로그인 상태 유지)
           try {
@@ -526,8 +543,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 locationTrackingService.onUserLogin();
 
                 // 백그라운드에서 사용자 데이터 프리로딩
-                preloadUserData(updatedUserData.mt_idx, 'initial-load').catch(error => {
-                  console.warn('[AUTH] 초기 프리로딩 실패 (무시):', error);
+                preloadUserData(updatedUserData.mt_idx, 'updated-load').catch(error => {
+                  console.warn('[AUTH] updated 프리로딩 실패 (무시):', error);
                 });
 
               } else {
@@ -564,10 +581,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // 즉시 실행하고 5초 후에도 강제로 로딩 상태 해제 (시간 증가)
     initializeAuth();
 
-    // 🔥 추가 자동 로그인 시도 (앱 시작 후 2초 뒤)
+    // 🔥 추가 자동 로그인 시도 (앱 시작 후 2초 뒤 + 5초 뒤)
     const autoLoginTimeout = setTimeout(() => {
       if (isMountedRef.current && !state.isLoggedIn) {
-        console.log('[AUTH CONTEXT] 🔄 추가 자동 로그인 시도');
+        console.log('[AUTH CONTEXT] 🔄 추가 자동 로그인 시도 (2초 후)');
         
         // 저장된 사용자 데이터가 있으면 강제로 로그인 상태 복원
         const storedUserData = authService.getUserData();
@@ -599,6 +616,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     }, 2000);
 
+    // 🔥 마지막 자동 로그인 시도 (앱 시작 후 5초 뒤)
+    const finalAutoLoginTimeout = setTimeout(() => {
+      if (isMountedRef.current && !state.isLoggedIn) {
+        console.log('[AUTH CONTEXT] 🔄 최종 자동 로그인 시도 (5초 후)');
+        
+        // 저장된 사용자 데이터가 있으면 강제로 로그인 상태 복원
+        const storedUserData = authService.getUserData();
+        if (storedUserData && storedUserData.mt_idx) {
+          console.log('[AUTH CONTEXT] 📦 최종 시도에서 사용자 데이터 발견 - 강제 복원:', storedUserData.mt_name);
+          dispatch({ type: 'LOGIN_SUCCESS', payload: storedUserData });
+          locationTrackingService.onUserLogin();
+          
+          console.log('[AUTH CONTEXT] ✅ 최종 자동 로그인 복원 완료');
+        } else {
+          console.warn('[AUTH CONTEXT] ⚠️ 최종 시도에서도 사용자 데이터 없음 - 실제 로그아웃 상태');
+        }
+      }
+    }, 5000);
+
     const timeout = setTimeout(() => {
       if (isMountedRef.current) {
         console.log('[AUTH CONTEXT] 로딩 타임아웃 - 강제로 로딩 상태 해제');
@@ -610,6 +646,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       isMountedRef.current = false;
       clearTimeout(timeout);
       clearTimeout(autoLoginTimeout);
+      clearTimeout(finalAutoLoginTimeout);
 
       // 이벤트 리스너 제거
       if (typeof window !== 'undefined') {

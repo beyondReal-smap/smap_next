@@ -774,8 +774,16 @@ class AuthService {
       return response.data.token;
     } catch (error) {
       console.error('[AUTH SERVICE] 토큰 갱신 실패:', error);
-      this.clearAuthData();
-      throw new Error('인증이 만료되었습니다. 다시 로그인해주세요.');
+      
+      // 🔥 사용자 데이터가 있으면 토큰 갱신 실패해도 데이터를 지우지 않음
+      const userData = this.getUserData();
+      if (userData && userData.mt_idx) {
+        console.log('[AUTH SERVICE] 토큰 갱신 실패했지만 사용자 데이터 있으므로 데이터 유지');
+        throw new Error('토큰 갱신 실패 - 사용자 데이터 유지');
+      } else {
+        this.clearAuthData();
+        throw new Error('인증이 만료되었습니다. 다시 로그인해주세요.');
+      }
     }
   }
 
@@ -787,22 +795,30 @@ class AuthService {
       const token = this.getToken();
       const userData = this.getUserData();
 
-      if (!token || !userData) {
-        console.warn('[AUTH SERVICE] 토큰 또는 사용자 데이터 없음');
+      // 🔥 사용자 데이터가 있으면 토큰 없어도 유효한 상태로 간주
+      if (!userData) {
+        console.warn('[AUTH SERVICE] 사용자 데이터 없음');
         return false;
       }
 
-      // JWT 토큰 디코딩하여 만료 시간 확인
+      if (!token) {
+        console.warn('[AUTH SERVICE] 토큰 없음 - 사용자 데이터 있으므로 유효한 상태로 처리');
+        return true; // 사용자 데이터가 있으면 토큰 없어도 유효
+      }
+
+      // JWT 토큰 디코딩하여 만료 시간 확인 (실패해도 사용자 데이터가 있으면 유효)
       let payload;
       try {
         // JWT 토큰 형식 검증
         if (!token || typeof token !== 'string' || token.split('.').length !== 3) {
-          throw new Error('Invalid JWT token format');
+          console.warn('[AUTH SERVICE] JWT 토큰 형식 오류 - 사용자 데이터 있으므로 유효한 상태로 처리');
+          return true; // 사용자 데이터가 있으면 토큰 형식 오류여도 유효
         }
 
         const payloadBase64 = token.split('.')[1];
         if (!payloadBase64) {
-          throw new Error('JWT token payload missing');
+          console.warn('[AUTH SERVICE] JWT 토큰 payload 없음 - 사용자 데이터 있으므로 유효한 상태로 처리');
+          return true; // 사용자 데이터가 있으면 payload 없어도 유효
         }
 
         // Base64 URL 디코딩 (padding 추가)
@@ -812,22 +828,20 @@ class AuthService {
         const decodedPayload = atob(payloadBase64Padded);
         payload = JSON.parse(decodedPayload);
       } catch (decodeError) {
-        console.error('[AUTH SERVICE] JWT 토큰 디코딩 실패:', decodeError);
-        this.clearAuthData();
-        return false;
+        console.warn('[AUTH SERVICE] JWT 토큰 디코딩 실패 - 사용자 데이터 있으므로 유효한 상태로 처리:', decodeError);
+        return true; // 사용자 데이터가 있으면 디코딩 실패해도 유효
       }
 
       const currentTime = Math.floor(Date.now() / 1000);
       const timeUntilExpiry = payload.exp - currentTime;
 
-      // 토큰이 이미 만료됨
+      // 토큰이 이미 만료됨 (사용자 데이터가 있으면 유효 상태 유지)
       if (timeUntilExpiry <= 0) {
-        console.warn('[AUTH SERVICE] 토큰이 이미 만료됨');
-        this.clearAuthData();
-        return false;
+        console.warn('[AUTH SERVICE] 토큰이 이미 만료됨 - 사용자 데이터 있으므로 유효한 상태로 처리');
+        return true; // 사용자 데이터가 있으면 토큰 만료되어도 유효
       }
 
-      // 토큰이 1일 이내에 만료되면 갱신 (더 적극적)
+      // 토큰이 1일 이내에 만료되면 갱신 시도 (실패해도 유효 상태 유지)
       if (timeUntilExpiry < 60 * 60 * 24) {
         console.log('[AUTH SERVICE] 토큰 만료 임박 (24시간 이내), 자동 갱신 시도');
 
@@ -835,23 +849,34 @@ class AuthService {
           const newToken = await this.refreshToken();
           console.log('[AUTH SERVICE] 토큰 갱신 성공');
 
-          // 사용자 정보도 최신 상태로 업데이트
-          const updatedProfile = await this.getCurrentUserProfile();
-          if (updatedProfile) {
-            console.log('[AUTH SERVICE] 사용자 정보 최신화 완료');
+          // 사용자 정보도 최신 상태로 업데이트 (실패해도 무시)
+          try {
+            const updatedProfile = await this.getCurrentUserProfile();
+            if (updatedProfile) {
+              console.log('[AUTH SERVICE] 사용자 정보 최신화 완료');
+            }
+          } catch (profileError) {
+            console.warn('[AUTH SERVICE] 사용자 정보 최신화 실패 (무시):', profileError);
           }
 
           return true;
         } catch (refreshError) {
-          console.error('[AUTH SERVICE] 토큰 갱신 실패:', refreshError);
-          this.clearAuthData();
-          return false;
+          console.warn('[AUTH SERVICE] 토큰 갱신 실패 - 사용자 데이터 있으므로 유효한 상태로 처리:', refreshError);
+          return true; // 사용자 데이터가 있으면 토큰 갱신 실패해도 유효
         }
       }
 
       return true;
     } catch (error) {
       console.error('[AUTH SERVICE] 토큰 확인 실패:', error);
+      
+      // 사용자 데이터가 있으면 오류 발생해도 유효한 상태로 처리
+      const userData = this.getUserData();
+      if (userData && userData.mt_idx) {
+        console.log('[AUTH SERVICE] 오류 발생했지만 사용자 데이터 있으므로 유효한 상태로 처리');
+        return true;
+      }
+      
       this.clearAuthData();
       return false;
     }
