@@ -460,7 +460,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             console.warn('[AUTH] 초기 프리로딩 실패 (무시):', error);
           });
 
-          // 3. 백그라운드에서 토큰 검증 및 사용자 데이터 최신화
+          // 3. 백그라운드에서 토큰 검증 및 사용자 데이터 최신화 (실패해도 로그인 상태 유지)
           setTimeout(async () => {
             try {
               // 토큰이 없으면 먼저 토큰 복원 시도
@@ -477,19 +477,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 }
               }
 
-              // 토큰 유효성 검증
-              const tokenValid = await authService.checkAndRefreshToken();
-              if (tokenValid) {
-                const updatedUserData = await authService.getCurrentUserProfile();
-                if (updatedUserData && isMountedRef.current) {
-                  console.log('[AUTH CONTEXT] 🔄 백그라운드에서 사용자 데이터 최신화 성공:', updatedUserData.mt_name);
-                  dispatch({ type: 'LOGIN_SUCCESS', payload: updatedUserData });
+              // 토큰 유효성 검증 (실패해도 로그인 상태 유지)
+              try {
+                const tokenValid = await authService.checkAndRefreshToken();
+                if (tokenValid) {
+                  const updatedUserData = await authService.getCurrentUserProfile();
+                  if (updatedUserData && isMountedRef.current) {
+                    console.log('[AUTH CONTEXT] 🔄 백그라운드에서 사용자 데이터 최신화 성공:', updatedUserData.mt_name);
+                    dispatch({ type: 'LOGIN_SUCCESS', payload: updatedUserData });
+                  }
+                } else {
+                  console.warn('[AUTH CONTEXT] 백그라운드 토큰 검증 실패 - 기존 데이터 유지 (로그인 상태 유지)');
+                  // 토큰 검증 실패해도 로그인 상태는 유지
                 }
-              } else {
-                console.warn('[AUTH CONTEXT] 백그라운드 토큰 검증 실패 - 기존 데이터 유지');
+              } catch (tokenError) {
+                console.warn('[AUTH CONTEXT] 백그라운드 토큰 검증 중 오류 - 기존 데이터 유지 (로그인 상태 유지):', tokenError);
+                // 토큰 검증 오류 발생해도 로그인 상태는 유지
               }
             } catch (error) {
-              console.warn('[AUTH CONTEXT] 백그라운드 토큰 검증 실패 (무시):', error);
+              console.warn('[AUTH CONTEXT] 백그라운드 처리 중 오류 - 기존 데이터 유지 (로그인 상태 유지):', error);
+              // 모든 오류 발생해도 로그인 상태는 유지
             }
           }, 1000);
 
@@ -503,36 +510,37 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (isLoggedIn) {
           console.log('[AUTH CONTEXT] ✅ 로그인 상태 유효함');
 
-          // 5. 토큰 유효성 및 갱신 확인
-          const tokenValid = await authService.checkAndRefreshToken();
+          // 5. 토큰 유효성 및 갱신 확인 (실패해도 로그인 상태 유지)
+          try {
+            const tokenValid = await authService.checkAndRefreshToken();
 
-          if (tokenValid) {
-            // 6. 최신 사용자 데이터 가져오기
-            const updatedUserData = await authService.getCurrentUserProfile();
+            if (tokenValid) {
+              // 6. 최신 사용자 데이터 가져오기
+              const updatedUserData = await authService.getCurrentUserProfile();
 
-            if (updatedUserData && isMountedRef.current) {
-              console.log('[AUTH CONTEXT] 사용자 데이터 최신화 성공:', updatedUserData.mt_name);
-              dispatch({ type: 'LOGIN_SUCCESS', payload: updatedUserData });
+              if (updatedUserData && isMountedRef.current) {
+                console.log('[AUTH CONTEXT] 사용자 데이터 최신화 성공:', updatedUserData.mt_name);
+                dispatch({ type: 'LOGIN_SUCCESS', payload: updatedUserData });
 
-              // 위치 추적 서비스에 사용자 로그인 알림
-              locationTrackingService.onUserLogin();
+                // 위치 추적 서비스에 사용자 로그인 알림
+                locationTrackingService.onUserLogin();
 
-              // 백그라운드에서 사용자 데이터 프리로딩
-              preloadUserData(updatedUserData.mt_idx, 'initial-load').catch(error => {
-                console.warn('[AUTH] 초기 프리로딩 실패 (무시):', error);
-              });
+                // 백그라운드에서 사용자 데이터 프리로딩
+                preloadUserData(updatedUserData.mt_idx, 'initial-load').catch(error => {
+                  console.warn('[AUTH] 초기 프리로딩 실패 (무시):', error);
+                });
 
-            } else {
-              console.warn('[AUTH CONTEXT] 사용자 데이터 최신화 실패');
-              if (isMountedRef.current) {
-                dispatch({ type: 'LOGOUT' });
+              } else {
+                console.warn('[AUTH CONTEXT] 사용자 데이터 최신화 실패 - 기존 데이터 유지 (로그인 상태 유지)');
+                // 사용자 데이터 최신화 실패해도 로그인 상태는 유지
               }
+            } else {
+              console.warn('[AUTH CONTEXT] 토큰 검증 실패 - 기존 데이터 유지 (로그인 상태 유지)');
+              // 토큰 검증 실패해도 로그인 상태는 유지
             }
-          } else {
-            console.warn('[AUTH CONTEXT] 토큰 검증 실패');
-            if (isMountedRef.current) {
-              dispatch({ type: 'LOGOUT' });
-            }
+          } catch (tokenError) {
+            console.warn('[AUTH CONTEXT] 토큰 검증 중 오류 - 기존 데이터 유지 (로그인 상태 유지):', tokenError);
+            // 토큰 검증 오류 발생해도 로그인 상태는 유지
           }
         } else {
           console.log('[AUTH CONTEXT] 유효한 세션 없음. 로그아웃 상태로 설정.');
@@ -567,6 +575,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           console.log('[AUTH CONTEXT] 📦 추가 시도에서 사용자 데이터 발견 - 강제 복원:', storedUserData.mt_name);
           dispatch({ type: 'LOGIN_SUCCESS', payload: storedUserData });
           locationTrackingService.onUserLogin();
+          
+          // 백그라운드에서 토큰 복원 시도 (실패해도 로그인 상태 유지)
+          setTimeout(async () => {
+            try {
+              const token = authService.getToken();
+              if (!token) {
+                const cookieToken = document.cookie
+                  .split('; ')
+                  .find(row => row.startsWith('auth-token='))
+                  ?.split('=')[1];
+                
+                if (cookieToken) {
+                  authService.setToken(cookieToken);
+                  console.log('[AUTH CONTEXT] 추가 시도에서 쿠키 토큰 복원 성공');
+                }
+              }
+            } catch (error) {
+              console.warn('[AUTH CONTEXT] 추가 시도에서 토큰 복원 실패 (무시):', error);
+            }
+          }, 500);
         }
       }
     }, 2000);
@@ -978,10 +1006,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
             return;
           } else {
-            console.warn('[AUTH CONTEXT] 최신 사용자 데이터 조회 실패');
+            console.warn('[AUTH CONTEXT] 최신 사용자 데이터 조회 실패 - 기존 데이터 유지 (로그인 상태 유지)');
+            // 사용자 데이터 조회 실패해도 로그인 상태는 유지
           }
         } else {
-          console.warn('[AUTH CONTEXT] 토큰 검증 실패');
+          console.warn('[AUTH CONTEXT] 토큰 검증 실패 - 기존 데이터 유지 (로그인 상태 유지)');
+          // 토큰 검증 실패해도 로그인 상태는 유지
         }
       }
 
