@@ -469,6 +469,10 @@ html, body {
   contain: layout style paint !important;
   will-change: transform !important;
   transform: translateZ(0) !important; /* GPU 가속으로 렌더링 최적화 */
+  /* 지도 컨테이너 정확한 크기 보장 */
+  box-sizing: border-box !important;
+  border: none !important;
+  outline: none !important;
 }
 
 /* 지도 컨테이너 내부 요소들 CLS 방지 */
@@ -484,6 +488,15 @@ html, body {
   /* 지도 로딩 중 크기 고정 */
   min-height: calc(100vh - 80px) !important;
   min-width: 100vw !important;
+  /* 정확한 크기 보장 */
+  box-sizing: border-box !important;
+  border: none !important;
+  outline: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  /* 네이버 지도 캔버스 크기 강제 설정 */
+  max-height: calc(100vh - 80px) !important;
+  max-width: 100vw !important;
 }
 
 /* 지도 헤더 스타일 */
@@ -1652,7 +1665,7 @@ export default function HomePage() {
         });
         
         // 마커 업데이트
-        updateMemberMarkers(groupMembers, true);
+        updateMemberMarkers(groupMembers, true, 0);
       }
     }
   }, [user?.mt_file1, groupMembers]);
@@ -1869,7 +1882,7 @@ export default function HomePage() {
         
         // 네이버 지도 API가 준비된 경우에만 마커 업데이트 실행
         if (mapType === 'naver' && isNaverMapsReady()) {
-          updateMemberMarkers(groupMembers, true);
+          updateMemberMarkers(groupMembers, true, 0);
         } else if (mapType === 'naver') {
           console.log('[HOME] 🗺️ 네이버 지도 API가 아직 준비되지 않음 - 마커 업데이트 건너뛰기');
         }
@@ -2534,7 +2547,7 @@ export default function HomePage() {
             setTimeout(() => {
               if (isMountedRef.current && currentMembers.length > 0) {
                 console.log('[fetchAllGroupData] 멤버 데이터 로드 후 마커 업데이트');
-                updateMemberMarkers(currentMembers);
+                updateMemberMarkers(currentMembers, false, 0);
               }
             }, 500);
             
@@ -2758,7 +2771,7 @@ export default function HomePage() {
           // 마커 업데이트
           if (groupMembers.length > 0) {
             console.log('[fetchAllGroupData] 마커 업데이트 시작');
-            updateMemberMarkers(groupMembers);
+            updateMemberMarkers(groupMembers, false, 0);
           }
           
           // 데이터 로딩 완료 햅틱 피드백
@@ -3960,6 +3973,69 @@ export default function HomePage() {
           setIsMapInitialized(true);
           console.log('Naver Maps 초기화 완료');
           
+          // 지도 크기 강제 조정 (네비게이션 바와의 간격 제거)
+          setTimeout(() => {
+            if (naverMap.current && naverMapContainer.current) {
+              console.log('[HOME] 네이버맵 크기 강제 조정 시작');
+              
+              // 지도 컨테이너 크기 강제 설정
+              const container = naverMapContainer.current;
+              const containerRect = container.getBoundingClientRect();
+              
+              // 정확한 크기 계산 (네비게이션 바 높이 제외)
+              const mapHeight = window.innerHeight - 80; // 네비게이션 바 높이 80px 제외
+              const mapWidth = window.innerWidth;
+              
+              console.log('[HOME] 지도 크기 조정:', {
+                containerRect: { width: containerRect.width, height: containerRect.height },
+                calculatedSize: { width: mapWidth, height: mapHeight },
+                windowSize: { width: window.innerWidth, height: window.innerHeight }
+              });
+              
+              // 컨테이너 크기 강제 설정
+              container.style.width = `${mapWidth}px`;
+              container.style.height = `${mapHeight}px`;
+              container.style.position = 'absolute';
+              container.style.top = '0px';
+              container.style.left = '0px';
+              container.style.right = '0px';
+              container.style.bottom = '80px';
+              
+              // 네이버 지도 크기 강제 조정
+              try {
+                naverMap.current.setSize(new window.naver.maps.Size(mapWidth, mapHeight));
+                console.log('[HOME] ✅ 네이버맵 크기 조정 성공');
+              } catch (sizeError) {
+                console.warn('[HOME] 네이버맵 크기 조정 실패:', sizeError);
+              }
+              
+              // 지도 리프레시 강제 실행
+              try {
+                if (naverMap.current.refresh) {
+                  naverMap.current.refresh();
+                }
+                console.log('[HOME] ✅ 네이버맵 리프레시 완료');
+              } catch (refreshError) {
+                console.warn('[HOME] 네이버맵 리프레시 실패:', refreshError);
+              }
+              
+              // 추가 크기 조정 (지연 후 한 번 더)
+              setTimeout(() => {
+                if (naverMap.current && naverMapContainer.current) {
+                  const finalMapHeight = window.innerHeight - 80;
+                  const finalMapWidth = window.innerWidth;
+                  
+                  try {
+                    naverMap.current.setSize(new window.naver.maps.Size(finalMapWidth, finalMapHeight));
+                    console.log('[HOME] ✅ 네이버맵 최종 크기 조정 완료');
+                  } catch (finalSizeError) {
+                    console.warn('[HOME] 네이버맵 최종 크기 조정 실패:', finalSizeError);
+                  }
+                }
+              }, 500);
+            }
+          }, 100);
+          
           // 인증 오류 리스너 제거
           try {
             if (window.naver?.maps?.Event?.removeListener) {
@@ -4828,7 +4904,7 @@ export default function HomePage() {
           }
         }
         
-        updateMemberMarkers(updatedMembers);
+        updateMemberMarkers(updatedMembers, false, 0);
         console.log('[handleMemberSelect] 즉시 마커 색상 갱신 및 지도 중심 이동 완료');
       } catch (e) {
         console.warn('[handleMemberSelect] 즉시 마커 갱신 실패:', e);
@@ -5097,8 +5173,11 @@ export default function HomePage() {
     }
   };
 
-  // 멤버 마커 업데이트 함수 - 모든 그룹멤버 표시
-  const updateMemberMarkers = (members: GroupMember[], forceRefresh = false) => {
+  // 멤버 마커 업데이트 함수 - 모든 그룹멤버 표시 (강화된 버전)
+  const updateMemberMarkers = (members: GroupMember[], forceRefresh = false, retryCount = 0) => {
+    const maxRetries = 5;
+    const retryDelay = 1000;
+
     // 안전성 체크
     if (!members || members.length === 0) {
       console.warn('[updateMemberMarkers] members가 비어있음');
@@ -5108,26 +5187,40 @@ export default function HomePage() {
         // 사용자 위치에 기본 마커 표시
         setTimeout(() => {
           if (groupMembers.length > 0) {
-            updateMemberMarkers(groupMembers, true);
+            updateMemberMarkers(groupMembers, true, 0);
           }
         }, 2000);
       }
       return;
     }
 
-    // 지도가 초기화되지 않은 경우 대기
-    if (!isMapInitialized) {
-      console.log('[updateMemberMarkers] 지도가 아직 초기화되지 않음 - 대기');
-      return;
-    }
-    
-    if (mapType === 'naver' && !naverMap.current) {
-      console.log('[updateMemberMarkers] Naver 지도가 아직 초기화되지 않음 - 대기');
-      return;
-    }
-    
-    if (false && !map.current) {
-      console.log('[updateMemberMarkers] Google 지도가 아직 초기화되지 않음 - 대기');
+    // 지도 초기화 상태 강화된 체크
+    const isMapReady = () => {
+      if (mapType === 'naver') {
+        return naverMap.current && 
+               isMapInitialized && 
+               mapsInitialized?.naver && 
+               window.naver?.maps &&
+               isNaverMapsReady();
+      }
+      return false;
+    };
+
+    if (!isMapReady()) {
+      console.log('[updateMemberMarkers] 지도가 아직 준비되지 않음 - 재시도:', retryCount + 1, '/', maxRetries);
+      
+      if (retryCount < maxRetries) {
+        setTimeout(() => {
+          updateMemberMarkers(members, forceRefresh, retryCount + 1);
+        }, retryDelay);
+      } else {
+        console.error('[updateMemberMarkers] 최대 재시도 횟수 초과 - 마커 업데이트 실패');
+        // 강제로 마커 생성 시도
+        console.log('[updateMemberMarkers] 강제 마커 생성 시도');
+        setTimeout(() => {
+          forceCreateMarkers(members);
+        }, 500);
+      }
       return;
     }
     
@@ -5140,8 +5233,129 @@ export default function HomePage() {
         currentInfoWindowRef.current = null;
       }
     }
+
+    // 마커 생성 실행
+    executeMarkerCreation(members);
+  };
+
+  // 강제 마커 생성 함수 (지도 상태와 관계없이 마커 생성 시도)
+  const forceCreateMarkers = (members: GroupMember[]) => {
+    console.log('[forceCreateMarkers] 🚀 강제 마커 생성 시작');
     
-    console.log('[updateMemberMarkers] 🎯 마커 업데이트 시작:', {
+    if (!members || members.length === 0) {
+      console.warn('[forceCreateMarkers] 멤버 데이터 없음');
+      return;
+    }
+
+    // 기존 마커 모두 삭제
+    memberMarkerMapRef.current.clear();
+    
+    // 각 멤버에 대해 마커 생성 시도
+    members.forEach((member, index) => {
+      try {
+        const realTimeLat = parseCoordinate(member.mlt_lat);
+        const realTimeLng = parseCoordinate(member.mlt_long);
+        const defaultLat = parseCoordinate(member.location.lat);
+        const defaultLng = parseCoordinate(member.location.lng);
+        
+        const lat = (realTimeLat !== null && realTimeLat !== 0) ? realTimeLat : defaultLat;
+        const lng = (realTimeLng !== null && realTimeLng !== 0) ? realTimeLng : defaultLng;
+
+        if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
+          // 네이버 지도가 있으면 마커 생성
+          if (window.naver?.maps && naverMap.current) {
+            const key = String(member.id || member.name || index);
+            const position = new window.naver.maps.LatLng(lat, lng);
+            
+            const marker = new window.naver.maps.Marker({
+              position: position,
+              map: naverMap.current,
+              icon: {
+                content: `
+                  <div style="position: relative; text-align: center;">
+                    <div style="width: 32px; height: 32px; background-color: white; border: 2px solid #4F46E5; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.2);">
+                      <img 
+                        src="${getSafeImageUrl(member.mt_file1, member.mt_gender, member.original_index)}" 
+                        alt="${member.name}" 
+                        style="width: 100%; height: 100%; object-fit: cover;" 
+                      />
+                    </div>
+                    <div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.7); color: white; padding: 2px 5px; border-radius: 3px; white-space: nowrap; font-size: 10px;">
+                      ${member.name}
+                    </div>
+                  </div>
+                `,
+                size: new window.naver.maps.Size(36, 48),
+                anchor: new window.naver.maps.Point(18, 42)
+              },
+              zIndex: member.isSelected ? 200 : 150
+            });
+
+            memberMarkerMapRef.current.set(key, marker);
+            console.log('[forceCreateMarkers] ✅ 강제 마커 생성 성공:', member.name);
+          }
+        }
+      } catch (error) {
+        console.error('[forceCreateMarkers] 마커 생성 실패:', member.name, error);
+      }
+    });
+  };
+
+  // 단일 마커 강제 생성 함수
+  const forceCreateSingleMarker = (member: GroupMember, index: number) => {
+    console.log('[forceCreateSingleMarker] 🚀 단일 마커 강제 생성:', member.name);
+    
+    try {
+      const realTimeLat = parseCoordinate(member.mlt_lat);
+      const realTimeLng = parseCoordinate(member.mlt_long);
+      const defaultLat = parseCoordinate(member.location.lat);
+      const defaultLng = parseCoordinate(member.location.lng);
+      
+      const lat = (realTimeLat !== null && realTimeLat !== 0) ? realTimeLat : defaultLat;
+      const lng = (realTimeLng !== null && realTimeLng !== 0) ? realTimeLng : defaultLng;
+
+      if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
+        // 네이버 지도가 있으면 마커 생성
+        if (window.naver?.maps && naverMap.current) {
+          const key = String(member.id || member.name || index);
+          const position = new window.naver.maps.LatLng(lat, lng);
+          
+          const marker = new window.naver.maps.Marker({
+            position: position,
+            map: naverMap.current,
+            icon: {
+              content: `
+                <div style="position: relative; text-align: center;">
+                  <div style="width: 32px; height: 32px; background-color: white; border: 2px solid ${member.isSelected ? '#EC4899' : '#4F46E5'}; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: ${member.isSelected ? '0 0 8px rgba(236, 72, 153, 0.5)' : '0 1px 3px rgba(0,0,0,0.2)'};">
+                    <img 
+                      src="${getSafeImageUrl(member.mt_file1, member.mt_gender, member.original_index)}" 
+                      alt="${member.name}" 
+                      style="width: 100%; height: 100%; object-fit: cover;" 
+                    />
+                  </div>
+                  <div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.7); color: white; padding: 2px 5px; border-radius: 3px; white-space: nowrap; font-size: 10px;">
+                    ${member.name}
+                  </div>
+                </div>
+              `,
+              size: new window.naver.maps.Size(36, 48),
+              anchor: new window.naver.maps.Point(18, 42)
+            },
+            zIndex: member.isSelected ? 200 : 150
+          });
+
+          memberMarkerMapRef.current.set(key, marker);
+          console.log('[forceCreateSingleMarker] ✅ 단일 마커 강제 생성 성공:', member.name);
+        }
+      }
+    } catch (error) {
+      console.error('[forceCreateSingleMarker] 단일 마커 생성 실패:', member.name, error);
+    }
+  };
+
+  // 마커 생성 실행 함수
+  const executeMarkerCreation = (members: GroupMember[]) => {
+    console.log('[executeMarkerCreation] 🎯 마커 생성 실행 시작:', {
       membersCount: members.length,
       selectedMember: (members && safeArrayCheck(members)) ? members.find(m => m.isSelected)?.name || 'none' : 'none',
       currentInfoWindow: currentInfoWindowRef.current ? 'exists' : 'none',
@@ -5158,6 +5372,10 @@ export default function HomePage() {
         return lat !== null && lng !== null && lat !== 0 && lng !== 0;
       }).length
     });
+
+    // 마커 생성 시도 횟수
+    let successCount = 0;
+    let failCount = 0;
     
     // 선택된 멤버 확인
     const currentSelectedMember = (members && safeArrayCheck(members)) ? members.find(member => member.isSelected) : null;
@@ -5258,13 +5476,42 @@ export default function HomePage() {
                 newMarker.setZIndex(member.isSelected ? 200 : 150);
               }
               nextMarkerMap.set(key, newMarker);
+              successCount++;
+              console.log('[executeMarkerCreation] ✅ 마커 생성 성공:', member.name);
+            } else {
+              failCount++;
+              console.warn('[executeMarkerCreation] ❌ 마커 생성 실패:', member.name);
+              // 실패 시 강제 생성 시도
+              setTimeout(() => {
+                forceCreateSingleMarker(member, index);
+              }, 100);
             }
           }
         } else {
-          console.warn('유효하지 않은 멤버 좌표:', member.name, member.location);
+          failCount++;
+          console.warn('[executeMarkerCreation] ❌ 유효하지 않은 멤버 좌표:', member.name, member.location);
         }
       });
     }
+
+    // 마커 생성 결과 로깅
+    console.log('[executeMarkerCreation] 마커 생성 완료:', {
+      total: members.length,
+      success: successCount,
+      failed: failCount,
+      successRate: `${Math.round((successCount / members.length) * 100)}%`
+    });
+
+    // 실패한 마커가 있으면 강제 생성 시도
+    if (failCount > 0) {
+      console.log('[executeMarkerCreation] 실패한 마커 강제 생성 시도');
+      setTimeout(() => {
+        forceCreateMarkers(members);
+      }, 500);
+    }
+
+    // 마커 맵 업데이트
+    memberMarkerMapRef.current = nextMarkerMap;
     
     // 선택된 멤버가 있으면 해당 위치로 지도 이동 및 InfoWindow 표시
     const selectedMember = (members && safeArrayCheck(members)) ? members.find(member => member.isSelected) : null;
@@ -5526,7 +5773,7 @@ export default function HomePage() {
     ) {
       markersUpdating.current = true;
       console.log('[HOME] 지도 타입 변경으로 마커 업데이트 시작');
-      updateMemberMarkers(groupMembers);
+      updateMemberMarkers(groupMembers, false, 0);
       updateScheduleMarkers(filteredSchedules); 
       setTimeout(() => {
         markersUpdating.current = false;
@@ -5638,7 +5885,7 @@ export default function HomePage() {
 
       // 300ms 지연으로 멤버 마커 업데이트 실행 (깜빡임 방지)
       const updateTimer = setTimeout(() => {
-        updateMemberMarkers(groupMembers);
+        updateMemberMarkers(groupMembers, false, 0);
         
         // 마커 업데이트 완료 후 플래그 해제
         setTimeout(() => {
@@ -7040,8 +7287,19 @@ export default function HomePage() {
               height: '100%',
               minHeight: 'calc(100vh - 80px)',
               minWidth: '100vw',
+              maxHeight: 'calc(100vh - 80px)',
+              maxWidth: '100vw',
               contain: 'layout style paint',
-              willChange: 'auto'
+              willChange: 'auto',
+              // 정확한 크기 보장
+              boxSizing: 'border-box',
+              border: 'none',
+              outline: 'none',
+              margin: 0,
+              padding: 0,
+              // 네비게이션 바와의 간격 완전 제거
+              bottom: '80px',
+              right: '0px'
             }}
             onLoad={() => {
               // 🗺️ 네이버 지도 컨테이너 로드 완료 시 강제 렌더링 (깜빡임 방지를 위해 지연 시간 증가)
@@ -7572,4 +7830,5 @@ export default function HomePage() {
       </div>
     );
   }
+}
 }
