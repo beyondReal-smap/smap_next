@@ -436,51 +436,78 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       try {
         console.log('[AUTH CONTEXT] 🔍 초기 인증 상태 확인 시작');
 
-        // 1. authService를 통해 로그인 상태 종합 검증 (강화된 버전)
+        // 🔥 강화된 로그인 상태 복원 로직
+        // 1. 먼저 저장된 사용자 데이터 확인 (즉시 복원)
+        const storedUserData = authService.getUserData();
+        const storedToken = authService.getToken();
+        
+        console.log('[AUTH CONTEXT] 저장된 데이터 확인:', {
+          hasUserData: !!storedUserData,
+          hasToken: !!storedToken,
+          userData: storedUserData ? `${storedUserData.mt_name} (${storedUserData.mt_idx})` : null
+        });
+
+        // 2. 사용자 데이터가 있으면 즉시 복원 (토큰 유무와 관계없이)
+        if (storedUserData && isMountedRef.current) {
+          console.log('[AUTH CONTEXT] 📦 저장된 사용자 데이터로 즉시 복원:', storedUserData.mt_name);
+          dispatch({ type: 'LOGIN_SUCCESS', payload: storedUserData });
+
+          // 위치 추적 서비스에 사용자 로그인 알림
+          locationTrackingService.onUserLogin();
+
+          // 백그라운드에서 사용자 데이터 프리로딩
+          preloadUserData(storedUserData.mt_idx, 'initial-load').catch(error => {
+            console.warn('[AUTH] 초기 프리로딩 실패 (무시):', error);
+          });
+
+          // 3. 백그라운드에서 토큰 검증 및 사용자 데이터 최신화
+          setTimeout(async () => {
+            try {
+              // 토큰이 없으면 먼저 토큰 복원 시도
+              if (!storedToken) {
+                console.log('[AUTH CONTEXT] 토큰 없음 - 쿠키에서 복원 시도');
+                const cookieToken = document.cookie
+                  .split('; ')
+                  .find(row => row.startsWith('auth-token='))
+                  ?.split('=')[1];
+                
+                if (cookieToken) {
+                  authService.setToken(cookieToken);
+                  console.log('[AUTH CONTEXT] 쿠키에서 토큰 복원 성공');
+                }
+              }
+
+              // 토큰 유효성 검증
+              const tokenValid = await authService.checkAndRefreshToken();
+              if (tokenValid) {
+                const updatedUserData = await authService.getCurrentUserProfile();
+                if (updatedUserData && isMountedRef.current) {
+                  console.log('[AUTH CONTEXT] 🔄 백그라운드에서 사용자 데이터 최신화 성공:', updatedUserData.mt_name);
+                  dispatch({ type: 'LOGIN_SUCCESS', payload: updatedUserData });
+                }
+              } else {
+                console.warn('[AUTH CONTEXT] 백그라운드 토큰 검증 실패 - 기존 데이터 유지');
+              }
+            } catch (error) {
+              console.warn('[AUTH CONTEXT] 백그라운드 토큰 검증 실패 (무시):', error);
+            }
+          }, 1000);
+
+          return;
+        }
+
+        // 4. 사용자 데이터가 없으면 authService를 통해 로그인 상태 종합 검증
         const isLoggedIn = authService.isLoggedIn();
         console.log('[AUTH CONTEXT] authService.isLoggedIn() 결과:', isLoggedIn);
 
         if (isLoggedIn) {
           console.log('[AUTH CONTEXT] ✅ 로그인 상태 유효함');
 
-          // 2. 저장된 사용자 데이터 직접 확인
-          const storedUserData = authService.getUserData();
-          if (storedUserData && isMountedRef.current) {
-            console.log('[AUTH CONTEXT] 📦 저장된 사용자 데이터로 즉시 복원:', storedUserData.mt_name);
-            dispatch({ type: 'LOGIN_SUCCESS', payload: storedUserData });
-
-            // 위치 추적 서비스에 사용자 로그인 알림
-            locationTrackingService.onUserLogin();
-
-            // 백그라운드에서 사용자 데이터 프리로딩
-            preloadUserData(storedUserData.mt_idx, 'initial-load').catch(error => {
-              console.warn('[AUTH] 초기 프리로딩 실패 (무시):', error);
-            });
-
-            // 백그라운드에서 토큰 검증 및 사용자 데이터 최신화
-            setTimeout(async () => {
-              try {
-                const tokenValid = await authService.checkAndRefreshToken();
-                if (tokenValid) {
-                  const updatedUserData = await authService.getCurrentUserProfile();
-                  if (updatedUserData && isMountedRef.current) {
-                    console.log('[AUTH CONTEXT] 🔄 백그라운드에서 사용자 데이터 최신화 성공:', updatedUserData.mt_name);
-                    dispatch({ type: 'LOGIN_SUCCESS', payload: updatedUserData });
-                  }
-                }
-              } catch (error) {
-                console.warn('[AUTH CONTEXT] 백그라운드 토큰 검증 실패 (무시):', error);
-              }
-            }, 1000);
-
-            return;
-          }
-
-          // 3. 토큰 유효성 및 갱신 확인
+          // 5. 토큰 유효성 및 갱신 확인
           const tokenValid = await authService.checkAndRefreshToken();
 
           if (tokenValid) {
-            // 4. 최신 사용자 데이터 가져오기
+            // 6. 최신 사용자 데이터 가져오기
             const updatedUserData = await authService.getCurrentUserProfile();
 
             if (updatedUserData && isMountedRef.current) {
@@ -529,6 +556,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // 즉시 실행하고 5초 후에도 강제로 로딩 상태 해제 (시간 증가)
     initializeAuth();
 
+    // 🔥 추가 자동 로그인 시도 (앱 시작 후 2초 뒤)
+    const autoLoginTimeout = setTimeout(() => {
+      if (isMountedRef.current && !state.isLoggedIn) {
+        console.log('[AUTH CONTEXT] 🔄 추가 자동 로그인 시도');
+        
+        // 저장된 사용자 데이터가 있으면 강제로 로그인 상태 복원
+        const storedUserData = authService.getUserData();
+        if (storedUserData && storedUserData.mt_idx) {
+          console.log('[AUTH CONTEXT] 📦 추가 시도에서 사용자 데이터 발견 - 강제 복원:', storedUserData.mt_name);
+          dispatch({ type: 'LOGIN_SUCCESS', payload: storedUserData });
+          locationTrackingService.onUserLogin();
+        }
+      }
+    }, 2000);
+
     const timeout = setTimeout(() => {
       if (isMountedRef.current) {
         console.log('[AUTH CONTEXT] 로딩 타임아웃 - 강제로 로딩 상태 해제');
@@ -539,6 +581,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return () => {
       isMountedRef.current = false;
       clearTimeout(timeout);
+      clearTimeout(autoLoginTimeout);
 
       // 이벤트 리스너 제거
       if (typeof window !== 'undefined') {

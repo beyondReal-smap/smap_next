@@ -633,8 +633,29 @@ class AuthService {
         hasLoginTime: !!loginTime
       });
 
-      // 1. 기본 데이터 존재 여부 확인
-      if (!token || !userData) {
+      // 🔥 강화된 로그인 상태 확인 로직
+      // 1. 사용자 데이터가 있으면 토큰 유무와 관계없이 로그인 상태로 간주
+      if (userData && userData.mt_idx) {
+        console.log('[AUTH SERVICE] ✅ 사용자 데이터 존재 - 로그인 상태 유지');
+        
+        // 토큰이 없으면 쿠키에서 복원 시도
+        if (!token && typeof window !== 'undefined') {
+          const cookieToken = document.cookie
+            .split('; ')
+            .find(row => row.startsWith('auth-token='))
+            ?.split('=')[1];
+
+          if (cookieToken) {
+            console.log('[AUTH SERVICE] 쿠키에서 토큰 복원 시도');
+            this.setToken(cookieToken);
+          }
+        }
+        
+        return true;
+      }
+
+      // 2. 사용자 데이터가 없으면 토큰과 기타 저장소 확인
+      if (!userData) {
         // 쿠키에서 토큰 확인
         if (typeof window !== 'undefined') {
           const cookieToken = document.cookie
@@ -645,7 +666,7 @@ class AuthService {
           // sessionStorage에서도 확인
           const sessionAuth = sessionStorage.getItem('authToken');
           
-          if ((cookieToken || sessionAuth) && userData) {
+          if (cookieToken || sessionAuth) {
             console.log('[AUTH SERVICE] ✅ 쿠키/sessionStorage에서 토큰 발견, 자동 로그인 유지');
             // 토큰이 없으면 쿠키에서 복원
             if (!token && cookieToken) {
@@ -658,74 +679,69 @@ class AuthService {
         return false;
       }
 
-      // 2. 로그인 시간 검증
-      if (!loginTime) {
-        console.warn('[AUTH SERVICE] 로그인 시간 정보 없음, 세션 만료로 처리');
-        this.clearAuthData();
-        return false;
-      }
+      // 3. 로그인 시간 검증 (사용자 데이터가 있는 경우에만)
+      if (loginTime) {
+        const currentTime = Date.now();
+        const timeSinceLogin = currentTime - loginTime;
 
-      const currentTime = Date.now();
-      const timeSinceLogin = currentTime - loginTime;
-
-      if (timeSinceLogin > this.SESSION_DURATION) {
-        console.warn('[AUTH SERVICE] 세션 만료 (로그인 후 7일 경과)');
-        this.clearAuthData();
-        return false;
-      }
-
-      // 3. JWT 토큰 유효성 검증
-      try {
-        // JWT 토큰 형식 검증
-        if (!token || typeof token !== 'string' || token.split('.').length !== 3) {
-          console.warn('[AUTH SERVICE] JWT 토큰 형식이 올바르지 않음');
+        if (timeSinceLogin > this.SESSION_DURATION) {
+          console.warn('[AUTH SERVICE] 세션 만료 (로그인 후 7일 경과)');
           this.clearAuthData();
           return false;
         }
+      }
 
-        // Base64 URL 디코딩 (표준 atob 대신 더 안전한 방법 사용)
-        const payloadBase64 = token.split('.')[1];
-        if (!payloadBase64) {
-          console.warn('[AUTH SERVICE] JWT 토큰 payload가 없음');
-          this.clearAuthData();
-          return false;
-        }
-
-        // Base64 URL 디코딩 (padding 추가)
-        const payloadBase64Padded = payloadBase64.replace(/-/g, '+').replace(/_/g, '/') +
-                                   '='.repeat((4 - payloadBase64.length % 4) % 4);
-
-        let payload;
+      // 4. JWT 토큰 유효성 검증 (토큰이 있는 경우에만)
+      if (token) {
         try {
-          const decodedPayload = atob(payloadBase64Padded);
-          payload = JSON.parse(decodedPayload);
-        } catch (decodeError) {
-          console.error('[AUTH SERVICE] JWT 토큰 Base64 디코딩 실패:', decodeError);
-          this.clearAuthData();
-          return false;
+          // JWT 토큰 형식 검증
+          if (typeof token !== 'string' || token.split('.').length !== 3) {
+            console.warn('[AUTH SERVICE] JWT 토큰 형식이 올바르지 않음');
+            // 토큰 형식이 잘못되어도 사용자 데이터가 있으면 로그인 상태 유지
+            return true;
+          }
+
+          // Base64 URL 디코딩 (표준 atob 대신 더 안전한 방법 사용)
+          const payloadBase64 = token.split('.')[1];
+          if (!payloadBase64) {
+            console.warn('[AUTH SERVICE] JWT 토큰 payload가 없음');
+            return true; // 사용자 데이터가 있으면 로그인 상태 유지
+          }
+
+          // Base64 URL 디코딩 (padding 추가)
+          const payloadBase64Padded = payloadBase64.replace(/-/g, '+').replace(/_/g, '/') +
+                                     '='.repeat((4 - payloadBase64.length % 4) % 4);
+
+          let payload;
+          try {
+            const decodedPayload = atob(payloadBase64Padded);
+            payload = JSON.parse(decodedPayload);
+          } catch (decodeError) {
+            console.error('[AUTH SERVICE] JWT 토큰 Base64 디코딩 실패:', decodeError);
+            return true; // 사용자 데이터가 있으면 로그인 상태 유지
+          }
+
+          const currentTimestamp = Math.floor(Date.now() / 1000);
+
+          if (payload.exp && payload.exp < currentTimestamp) {
+            console.warn('[AUTH SERVICE] JWT 토큰 만료됨');
+            // 토큰이 만료되어도 사용자 데이터가 있으면 로그인 상태 유지
+            return true;
+          }
+
+          // 토큰이 유효하지만 만료가 임박한 경우 (1일 이내)
+          if (payload.exp && (payload.exp - currentTimestamp) < (24 * 60 * 60)) {
+            console.log('[AUTH SERVICE] 토큰 만료 임박, 자동 갱신 필요');
+            // 토큰 갱신은 AuthContext에서 처리
+          }
+
+        } catch (tokenError) {
+          console.error('[AUTH SERVICE] JWT 토큰 파싱 실패:', tokenError);
+          return true; // 사용자 데이터가 있으면 로그인 상태 유지
         }
-
-        const currentTimestamp = Math.floor(currentTime / 1000);
-
-        if (payload.exp && payload.exp < currentTimestamp) {
-          console.warn('[AUTH SERVICE] JWT 토큰 만료됨');
-          this.clearAuthData();
-          return false;
-        }
-
-        // 토큰이 유효하지만 만료가 임박한 경우 (1일 이내)
-        if (payload.exp && (payload.exp - currentTimestamp) < (24 * 60 * 60)) {
-          console.log('[AUTH SERVICE] 토큰 만료 임박, 자동 갱신 필요');
-          // 토큰 갱신은 AuthContext에서 처리
-        }
-
-      } catch (tokenError) {
-        console.error('[AUTH SERVICE] JWT 토큰 파싱 실패:', tokenError);
-        this.clearAuthData();
-        return false;
       }
 
-      // 4. 사용자 데이터 유효성 검증 (mt_name 대신 name 사용)
+      // 5. 사용자 데이터 유효성 검증
       if (!userData.mt_idx || (!userData.mt_name && !(userData as any).name)) {
         console.warn('[AUTH SERVICE] 사용자 데이터 불완전');
         this.clearAuthData();
@@ -737,6 +753,12 @@ class AuthService {
 
     } catch (error) {
       console.error('[AUTH SERVICE] 로그인 상태 확인 중 오류:', error);
+      // 오류 발생 시에도 사용자 데이터가 있으면 로그인 상태 유지
+      const userData = this.getUserData();
+      if (userData && userData.mt_idx) {
+        console.log('[AUTH SERVICE] 오류 발생했지만 사용자 데이터 존재 - 로그인 상태 유지');
+        return true;
+      }
       this.clearAuthData();
       return false;
     }

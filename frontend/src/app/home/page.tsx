@@ -454,12 +454,12 @@ html, body {
 /* 지도 화면 전체 차지하기 위한 스타일 - CLS 개선 */
 .full-map-container {
   position: fixed !important;
-  top: 40px !important; /* 헤더 높이만큼 아래에서 시작 */
+  top: 60px !important; /* 헤더 높이만큼 아래에서 시작 */
   left: 0 !important;
   right: 0 !important;
   bottom: 80px !important; /* 네비게이션 바 높이만큼 제외 */
   width: 100vw !important;
-  height: calc(100vh - 120px) !important; /* 헤더(40px) + 네비게이션(80px) 제외 */
+  height: calc(100vh - 140px) !important; /* 헤더(60px) + 네비게이션(80px) 제외 */
   margin: 0 !important;
   padding: 0 !important;
   overflow: hidden !important; /* 스크롤 방지로 레이아웃 안정화 */
@@ -489,7 +489,7 @@ html, body {
   will-change: auto !important;
   transform: none !important;
   /* 지도 로딩 중 크기 고정 */
-  min-height: calc(100vh - 120px) !important; /* 헤더(40px) + 네비게이션(80px) 제외 */
+  min-height: calc(100vh - 140px) !important; /* 헤더(60px) + 네비게이션(80px) 제외 */
   min-width: 100vw !important;
   /* 정확한 크기 보장 */
   box-sizing: border-box !important;
@@ -498,7 +498,7 @@ html, body {
   margin: 0 !important;
   padding: 0 !important;
   /* 네이버 지도 캔버스 크기 강제 설정 */
-  max-height: calc(100vh - 120px) !important; /* 헤더(40px) + 네비게이션(80px) 제외 */
+  max-height: calc(100vh - 140px) !important; /* 헤더(60px) + 네비게이션(80px) 제외 */
   max-width: 100vw !important;
 }
 
@@ -3986,7 +3986,7 @@ export default function HomePage() {
               const containerRect = container.getBoundingClientRect();
               
               // 정확한 크기 계산 (헤더 + 네비게이션 바 높이 제외)
-              const mapHeight = window.innerHeight - 120; // 헤더(40px) + 네비게이션 바(80px) 제외
+              const mapHeight = window.innerHeight - 140; // 헤더(60px) + 네비게이션 바(80px) 제외
               const mapWidth = window.innerWidth;
               
               console.log('[HOME] 지도 크기 조정:', {
@@ -4007,7 +4007,7 @@ export default function HomePage() {
               // 부모 컨테이너도 강제 조정
               const parentContainer = container.parentElement;
               if (parentContainer) {
-                parentContainer.style.top = '40px';
+                parentContainer.style.top = '60px';
                 parentContainer.style.height = `${mapHeight}px`;
                 parentContainer.style.position = 'fixed';
                 parentContainer.style.left = '0px';
@@ -4037,13 +4037,13 @@ export default function HomePage() {
               // 추가 크기 조정 (지연 후 한 번 더)
               setTimeout(() => {
                 if (naverMap.current && naverMapContainer.current) {
-                  const finalMapHeight = window.innerHeight - 120; // 헤더(40px) + 네비게이션 바(80px) 제외
+                  const finalMapHeight = window.innerHeight - 140; // 헤더(60px) + 네비게이션 바(80px) 제외
                   const finalMapWidth = window.innerWidth;
                   
                   // 부모 컨테이너 강제 위치 조정
                   const parentContainer = naverMapContainer.current.parentElement;
                   if (parentContainer) {
-                    parentContainer.style.top = '40px';
+                    parentContainer.style.top = '60px';
                     parentContainer.style.height = `${finalMapHeight}px`;
                     parentContainer.style.position = 'fixed';
                     parentContainer.style.left = '0px';
@@ -4065,7 +4065,7 @@ export default function HomePage() {
               // 추가 지연 후 한 번 더 강제 조정
               setTimeout(() => {
                 if (naverMap.current && naverMapContainer.current) {
-                  const finalMapHeight = window.innerHeight - 120;
+                  const finalMapHeight = window.innerHeight - 140;
                   const finalMapWidth = window.innerWidth;
                   
                   // DOM 강제 조정
@@ -4073,7 +4073,7 @@ export default function HomePage() {
                   if (parentContainer) {
                     parentContainer.style.cssText = `
                       position: fixed !important;
-                      top: 40px !important;
+                      top: 60px !important;
                       left: 0px !important;
                       right: 0px !important;
                       bottom: 80px !important;
@@ -7258,7 +7258,7 @@ export default function HomePage() {
           className="full-map-container"
           style={{
             position: 'fixed',
-            top: '40px', // 헤더 높이만큼 아래에서 시작
+            top: '60px', // 헤더 높이만큼 아래에서 시작
             left: '0px',
             right: '0px',
             bottom: '80px', // 네비게이션 바 높이만큼 제외
@@ -7268,7 +7268,7 @@ export default function HomePage() {
             overflow: 'hidden', // 스크롤 방지
             // CLS 방지를 위한 추가 속성
             width: '100vw',
-            height: 'calc(100vh - 120px)', // 헤더(40px) + 네비게이션(80px) 제외
+            height: 'calc(100vh - 140px)', // 헤더(60px) + 네비게이션(80px) 제외
             contain: 'layout style paint',
             willChange: 'transform',
             transform: 'translateZ(0)',
@@ -7344,9 +7344,9 @@ export default function HomePage() {
               // CLS 방지를 위한 고정 크기
               width: '100%',
               height: '100%',
-              minHeight: 'calc(100vh - 120px)', // 헤더(40px) + 네비게이션(80px) 제외
+              minHeight: 'calc(100vh - 140px)', // 헤더(60px) + 네비게이션(80px) 제외
               minWidth: '100vw',
-              maxHeight: 'calc(100vh - 120px)', // 헤더(40px) + 네비게이션(80px) 제외
+              maxHeight: 'calc(100vh - 140px)', // 헤더(60px) + 네비게이션(80px) 제외
               maxWidth: '100vw',
               contain: 'layout style paint',
               willChange: 'auto',
