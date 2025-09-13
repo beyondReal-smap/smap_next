@@ -2555,11 +2555,88 @@ export default function HomePage() {
             }, 500);
             
             dataFetchedRef.current.members = true;
+            
+            // 멤버 데이터 로딩 완료 후 스케줄 로딩 강제 시작
+            console.log('[fetchAllGroupData] 🚀 멤버 데이터 로딩 완료 - 스케줄 로딩 강제 시작');
+            setTimeout(() => {
+              if (!dataFetchedRef.current.schedules && isMountedRef.current) {
+                console.log('[fetchAllGroupData] 🚀 스케줄 로딩 강제 실행');
+                // 스케줄 로딩 로직을 여기서 직접 실행
+                const loadSchedulesDirectly = async () => {
+                  try {
+                    const today = new Date().toISOString().split('T')[0];
+                    const cachedSchedules: any = getScheduleData(parseInt(groupIdToUse), today);
+                    const isScheduleCacheValid = isCacheValid('scheduleData', parseInt(groupIdToUse), today);
+                    
+                    let rawSchedules: any[] = [];
+                    
+                    if (cachedSchedules && isScheduleCacheValid) {
+                      if (cachedSchedules && safeArrayCheck(cachedSchedules)) {
+                        console.log('[fetchAllGroupData] 🚀 강제 로딩 - 캐시된 스케줄 데이터 사용 (배열):', cachedSchedules.length, '개');
+                        rawSchedules = cachedSchedules;
+                      } else if (cachedSchedules.data && cachedSchedules.data.schedules) {
+                        console.log('[fetchAllGroupData] 🚀 강제 로딩 - 캐시된 스케줄 데이터 사용 (객체):', cachedSchedules.data.schedules.length, '개');
+                        rawSchedules = cachedSchedules.data.schedules;
+                      }
+                    } else {
+                      console.log('[fetchAllGroupData] 🚀 강제 로딩 - 캐시 없음, API 호출 실행');
+                      const scheduleResponse = await scheduleService.getGroupSchedules(parseInt(groupIdToUse));
+                      if (scheduleResponse && scheduleResponse.data && scheduleResponse.data.schedules) {
+                        rawSchedules = scheduleResponse.data.schedules;
+                        console.log('[fetchAllGroupData] 🚀 강제 로딩 - API에서 스케줄 데이터 로드:', rawSchedules.length, '개');
+                      }
+                    }
+                    
+                    if (isMountedRef.current && rawSchedules.length > 0) {
+                      console.log('[fetchAllGroupData] 🚀 강제 로딩 - 스케줄 데이터 처리 시작:', rawSchedules.length, '개');
+                      
+                      // 스케줄에 statusDetail 추가
+                      const schedulesWithStatus = rawSchedules.map((schedule: Schedule) => ({
+                        ...schedule,
+                        statusDetail: getScheduleStatus(schedule)
+                      }));
+                      
+                      setGroupSchedules(schedulesWithStatus);
+                      
+                      // 첫 번째 멤버의 오늘 스케줄로 초기화
+                      if (groupMembers.length > 0) {
+                        const firstMember = groupMembers[0];
+                        const firstMemberSchedules = schedulesWithStatus.filter((schedule: Schedule) => 
+                          schedule.sgdt_idx !== null && 
+                          schedule.sgdt_idx !== undefined && 
+                          Number(schedule.sgdt_idx) === Number(firstMember.sgdt_idx) &&
+                          typeof schedule.date === 'string' && 
+                          schedule.date.startsWith(today)
+                        );
+                        
+                        console.log('[fetchAllGroupData] 🚀 강제 로딩 - 첫 번째 멤버 스케줄:', firstMemberSchedules.length, '개');
+                        setFilteredSchedules(firstMemberSchedules);
+                      }
+                      
+                      dataFetchedRef.current.schedules = true;
+                    }
+                  } catch (error) {
+                    console.error('[fetchAllGroupData] 🚀 강제 로딩 실패:', error);
+                  }
+                };
+                
+                loadSchedulesDirectly();
+              }
+            }, 1000);
           }
         }
 
-        if (dataFetchedRef.current.members && !dataFetchedRef.current.schedules) {
-          console.log('[fetchAllGroupData] 스케줄 데이터 로딩 시작');
+        // 멤버 데이터 로딩이 완료되었는지 확인하고 스케줄 로딩 시작
+        console.log('[fetchAllGroupData] 🔍 스케줄 로딩 조건 체크:', {
+          membersFetched: dataFetchedRef.current.members,
+          schedulesFetched: dataFetchedRef.current.schedules,
+          shouldLoadSchedules: dataFetchedRef.current.members && !dataFetchedRef.current.schedules,
+          groupIdToUse: groupIdToUse
+        });
+
+        // 멤버 데이터가 로드되었거나, 멤버 데이터가 없어도 스케줄은 로드할 수 있도록 조건 완화
+        if ((dataFetchedRef.current.members || groupMembers.length > 0) && !dataFetchedRef.current.schedules) {
+          console.log('[fetchAllGroupData] 🎯 스케줄 데이터 로딩 시작');
           
           // 🔥 캐시된 스케줄 데이터 먼저 확인
           const today = new Date().toISOString().split('T')[0];
@@ -2695,9 +2772,46 @@ export default function HomePage() {
               statusDetails: (todaySchedules && safeArrayCheck(todaySchedules)) ? todaySchedules.map((s: any) => ({ id: s.id, title: s.title, status: s.statusDetail?.name })) : []
             });
             
-            // 초기에는 스케줄을 빈 배열로 설정 (첫 번째 멤버 선택 후 필터링됨)
-            setFilteredSchedules([]);
-            console.log('[fetchAllGroupData] 스케줄 데이터 로딩 완료 (초기 빈 배열 설정):', rawSchedules.length, '개');
+            // 스케줄 데이터 로딩 완료 후 첫 번째 멤버의 스케줄로 초기화
+            console.log('[fetchAllGroupData] 스케줄 데이터 로딩 완료:', rawSchedules.length, '개');
+            
+            // 첫 번째 멤버가 있으면 해당 멤버의 오늘 스케줄로 초기화
+            if (groupMembers && safeArrayCheck(groupMembers) && groupMembers.length > 0) {
+              const firstMember = groupMembers[0];
+              const today = format(new Date(), 'yyyy-MM-dd');
+              const firstMemberSchedules = (schedulesWithStatus && safeArrayCheck(schedulesWithStatus)) 
+                ? schedulesWithStatus.filter((schedule: Schedule) => 
+                    schedule.sgdt_idx !== null && 
+                    schedule.sgdt_idx !== undefined && 
+                    Number(schedule.sgdt_idx) === Number(firstMember.sgdt_idx) &&
+                    typeof schedule.date === 'string' && 
+                    schedule.date!.startsWith(today)
+                  )
+                : [];
+              
+              console.log('[fetchAllGroupData] 🔍 첫 번째 멤버 스케줄 필터링 상세:', {
+                firstMemberName: firstMember.name,
+                firstMemberSgdtIdx: firstMember.sgdt_idx,
+                today: today,
+                totalSchedules: schedulesWithStatus?.length || 0,
+                filteredSchedules: firstMemberSchedules.length,
+                schedulesWithLocation: firstMemberSchedules.filter(s => s.sst_location_lat && s.sst_location_long).length,
+                scheduleDetails: firstMemberSchedules.map(s => ({
+                  id: s.id,
+                  title: s.title,
+                  date: s.date,
+                  sst_location_lat: s.sst_location_lat,
+                  sst_location_long: s.sst_location_long,
+                  hasLocation: !!(s.sst_location_lat && s.sst_location_long)
+                }))
+              });
+              
+              setFilteredSchedules(firstMemberSchedules);
+              console.log('[fetchAllGroupData] 첫 번째 멤버 스케줄로 초기화:', firstMember.name, firstMemberSchedules.length, '개');
+            } else {
+              setFilteredSchedules([]);
+              console.log('[fetchAllGroupData] 멤버가 없어 빈 배열로 초기화');
+            }
           } else if (isMountedRef.current) {
             console.warn('No schedule data from cache or API for the group.');
             setGroupSchedules([]);
@@ -4422,12 +4536,17 @@ export default function HomePage() {
         timeSinceLastGPS: memberData.mlt_gps_time ? Math.floor((new Date().getTime() - new Date(memberData.mlt_gps_time).getTime()) / 60000) + '분' : 'unknown'
       });
     } else if (markerType === 'schedule' && scheduleData) {
-      // console.log('[createMarker] 스케줄 좌표 처리:', { 
-      //   'scheduleData.sst_location_lat': scheduleData.sst_location_lat, 
-      //   'scheduleData.sst_location_long': scheduleData.sst_location_long 
-      // });
+      console.log('[createMarker] 🎯 스케줄 좌표 처리:', { 
+        scheduleTitle: scheduleData.title,
+        scheduleId: scheduleData.id,
+        'sst_location_lat': scheduleData.sst_location_lat, 
+        'sst_location_long': scheduleData.sst_location_long,
+        'date': scheduleData.date,
+        'sgdt_idx': scheduleData.sgdt_idx
+      });
       lat = parseCoordinate(scheduleData.sst_location_lat);
       lng = parseCoordinate(scheduleData.sst_location_long);
+      console.log('[createMarker] 🎯 스케줄 좌표 파싱 결과:', { lat, lng });
     } else if (location) {
       // console.log('[createMarker] location 객체 좌표 처리:', { 
       //   'location.lat': location.lat, 
@@ -5025,11 +5144,30 @@ export default function HomePage() {
 
   // 스케줄 마커 업데이트 함수
   const updateScheduleMarkers = (schedules: Schedule[]) => {
-    console.log(`[updateScheduleMarkers] 마커 업데이트 시작: ${schedules.length}개 스케줄`);
+    console.log(`[updateScheduleMarkers] 🎯 마커 업데이트 시작: ${schedules.length}개 스케줄`);
+    console.log('[updateScheduleMarkers] 🔍 스케줄 상세 정보:', schedules.map(s => ({
+      id: s.id,
+      title: s.title,
+      date: s.date,
+      sst_location_lat: s.sst_location_lat,
+      sst_location_long: s.sst_location_long,
+      hasLocation: !!(s.sst_location_lat && s.sst_location_long),
+      sgdt_idx: s.sgdt_idx
+    })));
     console.log('[updateScheduleMarkers] 지도 상태:', {
       mapType,
       naverMapReady: !!(mapType === 'naver' && naverMap.current && mapsInitialized?.naver && isNaverMapsReady()),
+      naverMapExists: !!naverMap.current,
+      mapsInitialized: mapsInitialized?.naver,
+      isNaverMapsReady: isNaverMapsReady(),
+      windowNaverMaps: !!window.naver?.maps
     });
+
+    // 지도가 준비되지 않은 경우 경고만 출력하고 종료
+    if (mapType === 'naver' && (!naverMap.current || !mapsInitialized?.naver || !isNaverMapsReady())) {
+      console.warn('[updateScheduleMarkers] ❌ 지도가 준비되지 않음 - 마커 업데이트 건너뛰기');
+      return;
+    }
 
     // 기존 스케줄 마커 삭제
     if (scheduleMarkersRef.current.length > 0) {
@@ -5044,8 +5182,11 @@ export default function HomePage() {
 
     // 새 스케줄 마커 추가
     let markersCreated = 0;
+    let locationInfoCount = 0;
+    
     schedules.forEach((schedule, index) => {
       if (schedule.sst_location_lat && schedule.sst_location_long) {
+        locationInfoCount++;
         const newMarker = createMarker(
           null,
           index,
@@ -5058,16 +5199,16 @@ export default function HomePage() {
         if (newMarker) {
           scheduleMarkersRef.current.push(newMarker);
           markersCreated++;
-          console.log(`[updateScheduleMarkers] 마커 생성 성공 - 스케줄: ${schedule.title}`);
+          console.log(`[updateScheduleMarkers] ✅ 마커 생성 성공 - 스케줄: ${schedule.title} (위치: ${schedule.sst_location_lat}, ${schedule.sst_location_long})`);
         } else {
-          console.warn(`[updateScheduleMarkers] 마커 생성 실패 - 스케줄: ${schedule.title}`);
+          console.warn(`[updateScheduleMarkers] ❌ 마커 생성 실패 - 스케줄: ${schedule.title} (위치: ${schedule.sst_location_lat}, ${schedule.sst_location_long})`);
         }
       } else {
         console.log(`[updateScheduleMarkers] 위치 정보 없음 - 스케줄: ${schedule.title}`);
       }
     });
 
-    console.log(`[updateScheduleMarkers] 마커 업데이트 완료: ${markersCreated}개 생성됨`);
+    console.log(`[updateScheduleMarkers] 마커 업데이트 완료: ${markersCreated}개 생성됨 (위치 정보 있는 스케줄: ${locationInfoCount}개)`);
   };
 
   // 선택된 날짜 변경 핸들러 (filteredSchedules 업데이트)
@@ -5977,11 +6118,19 @@ export default function HomePage() {
       return;
     }
 
-    if (
-      filteredSchedules.length >= 0 && // 0개도 유효한 상태 (빈 배열)
-      ((mapType === 'naver' && naverMap.current && mapsInitialized?.naver && window.naver?.maps))
-    ) {
+    if (filteredSchedules.length >= 0) { // 0개도 유효한 상태 (빈 배열)
       console.log('[HOME] filteredSchedules 변경 감지 - 일정 마커 업데이트:', filteredSchedules.length, '개');
+      
+      // 지도가 준비되지 않은 경우 잠시 후 재시도
+      if (mapType === 'naver' && (!naverMap.current || !mapsInitialized?.naver || !window.naver?.maps)) {
+        console.log('[HOME] 지도가 아직 준비되지 않음 - 500ms 후 재시도');
+        setTimeout(() => {
+          if (naverMap.current && mapsInitialized?.naver && window.naver?.maps) {
+            updateScheduleMarkers(filteredSchedules);
+          }
+        }, 500);
+        return;
+      }
       
       // 즉시 일정 마커 업데이트 실행
       updateScheduleMarkers(filteredSchedules);
@@ -6015,11 +6164,24 @@ export default function HomePage() {
         
         // 선택된 멤버의 일정 마커도 업데이트
         const selectedMember = groupMembers.find(m => m.isSelected);
-        if (selectedMember && selectedMember.schedules) {
+        if (selectedMember) {
           const today = new Date().toISOString().split('T')[0];
-          const todaySchedules = selectedMember.schedules.filter(schedule => 
-            schedule.date && schedule.date.startsWith(today)
-          );
+          const todaySchedules = (groupSchedules && safeArrayCheck(groupSchedules)) 
+            ? groupSchedules.filter(schedule => 
+                schedule.sgdt_idx !== null && 
+                schedule.sgdt_idx !== undefined && 
+                Number(schedule.sgdt_idx) === Number(selectedMember.sgdt_idx) &&
+                typeof schedule.date === 'string' && 
+                schedule.date.startsWith(today)
+              )
+            : [];
+          
+          console.log('[HOME] 강제 업데이트 - 선택된 멤버 스케줄:', {
+            memberName: selectedMember.name,
+            scheduleCount: todaySchedules.length,
+            schedulesWithLocation: todaySchedules.filter(s => s.sst_location_lat && s.sst_location_long).length
+          });
+          
           setFilteredSchedules(todaySchedules);
           updateScheduleMarkers(todaySchedules);
         }
@@ -6036,6 +6198,157 @@ export default function HomePage() {
     mapsInitialized?.naver,
     dataFetchedRef.current.loading
   ]);
+
+  // 🎯 지도 완전 로드 후 스케줄 마커 재확인 (추가 안전장치)
+  useEffect(() => {
+    if (
+      mapType === 'naver' && 
+      naverMap.current && 
+      mapsInitialized?.naver && 
+      isNaverMapsReady() &&
+      filteredSchedules.length > 0 &&
+      scheduleMarkersRef.current.length === 0
+    ) {
+      console.log('[HOME] 🎯 지도 완전 로드 후 스케줄 마커 재확인 - 마커가 없어서 재생성');
+      setTimeout(() => {
+        updateScheduleMarkers(filteredSchedules);
+      }, 1000);
+    }
+  }, [mapType, mapsInitialized?.naver, filteredSchedules.length, scheduleMarkersRef.current.length]);
+
+  // 🚨 스케줄 마커 강제 생성 (디버깅용)
+  const createTestScheduleMarkers = () => {
+    if (mapType === 'naver' && naverMap.current && mapsInitialized?.naver && isNaverMapsReady()) {
+      console.log('[HOME] 🚨 테스트 스케줄 마커 생성 시작');
+      
+      // 테스트용 스케줄 데이터 생성
+      const testSchedules: Schedule[] = [
+        {
+          id: 'test-1',
+          title: '테스트 스케줄 1',
+          date: new Date().toISOString(),
+          sst_location_lat: 37.5665,
+          sst_location_long: 126.9780,
+          sst_location_add: '서울시 중구',
+          sgdt_idx: groupMembers[0]?.sgdt_idx || 1
+        },
+        {
+          id: 'test-2', 
+          title: '테스트 스케줄 2',
+          date: new Date().toISOString(),
+          sst_location_lat: 37.5675,
+          sst_location_long: 126.9790,
+          sst_location_add: '서울시 중구',
+          sgdt_idx: groupMembers[0]?.sgdt_idx || 1
+        }
+      ];
+      
+      console.log('[HOME] 🚨 테스트 스케줄 데이터:', testSchedules);
+      updateScheduleMarkers(testSchedules);
+    }
+  };
+
+  // 🚨 스케줄 마커가 없는 경우 테스트 마커 생성 (5초 후) - 임시 비활성화
+  useEffect(() => {
+    // 테스트 마커 생성을 임시로 비활성화하여 실제 데이터에 집중
+    /*
+    if (
+      mapType === 'naver' && 
+      naverMap.current && 
+      mapsInitialized?.naver && 
+      isNaverMapsReady() &&
+      groupMembers.length > 0 &&
+      scheduleMarkersRef.current.length === 0
+    ) {
+      console.log('[HOME] 🚨 스케줄 마커가 없음 - 5초 후 테스트 마커 생성');
+      setTimeout(() => {
+        if (scheduleMarkersRef.current.length === 0) {
+          createTestScheduleMarkers();
+        }
+      }, 5000);
+    }
+    */
+  }, [mapType, mapsInitialized?.naver, groupMembers.length, scheduleMarkersRef.current.length]);
+
+  // 🚨 실제 스케줄 데이터가 있지만 마커가 없는 경우 강제 생성 (3초 후)
+  useEffect(() => {
+    if (
+      mapType === 'naver' && 
+      naverMap.current && 
+      mapsInitialized?.naver && 
+      isNaverMapsReady() &&
+      filteredSchedules.length > 0 &&
+      scheduleMarkersRef.current.length === 0
+    ) {
+      console.log('[HOME] 🚨 실제 스케줄 데이터 있지만 마커 없음 - 3초 후 강제 생성');
+      setTimeout(() => {
+        if (scheduleMarkersRef.current.length === 0) {
+          console.log('[HOME] 🚨 실제 스케줄 데이터로 마커 강제 생성:', filteredSchedules);
+          updateScheduleMarkers(filteredSchedules);
+        }
+      }, 3000);
+    }
+  }, [mapType, mapsInitialized?.naver, filteredSchedules.length, scheduleMarkersRef.current.length]);
+
+  // 🚨 스케줄 데이터가 로드되지 않은 경우 강제 로드 (5초 후)
+  useEffect(() => {
+    if (
+      groupMembers.length > 0 &&
+      selectedGroupId &&
+      !dataFetchedRef.current.schedules &&
+      !dataFetchedRef.current.loading
+    ) {
+      console.log('[HOME] 🚨 스케줄 데이터가 로드되지 않음 - 5초 후 강제 로드');
+      setTimeout(() => {
+        if (!dataFetchedRef.current.schedules && !dataFetchedRef.current.loading) {
+          console.log('[HOME] 🚨 스케줄 데이터 강제 로드 실행');
+          // 스케줄 데이터 강제 로드
+          const loadSchedulesManually = async () => {
+            try {
+              console.log('[HOME] 🚨 수동 스케줄 로드 시작:', selectedGroupId);
+              const scheduleResponse = await scheduleService.getGroupSchedules(parseInt(selectedGroupId.toString()));
+              console.log('[HOME] 🚨 수동 스케줄 로드 응답:', scheduleResponse);
+              
+              if (scheduleResponse && scheduleResponse.data && scheduleResponse.data.schedules) {
+                const rawSchedules = scheduleResponse.data.schedules;
+                console.log('[HOME] 🚨 수동 로드된 스케줄:', rawSchedules.length, '개');
+                
+                // 스케줄에 statusDetail 추가
+                const schedulesWithStatus = rawSchedules.map((schedule: Schedule) => ({
+                  ...schedule,
+                  statusDetail: getScheduleStatus(schedule)
+                }));
+                
+                setGroupSchedules(schedulesWithStatus);
+                
+                // 첫 번째 멤버의 오늘 스케줄로 설정
+                if (groupMembers.length > 0) {
+                  const firstMember = groupMembers[0];
+                  const today = format(new Date(), 'yyyy-MM-dd');
+                  const firstMemberSchedules = schedulesWithStatus.filter((schedule: Schedule) => 
+                    schedule.sgdt_idx !== null && 
+                    schedule.sgdt_idx !== undefined && 
+                    Number(schedule.sgdt_idx) === Number(firstMember.sgdt_idx) &&
+                    typeof schedule.date === 'string' && 
+                    schedule.date.startsWith(today)
+                  );
+                  
+                  console.log('[HOME] 🚨 수동 로드 후 첫 번째 멤버 스케줄:', firstMemberSchedules.length, '개');
+                  setFilteredSchedules(firstMemberSchedules);
+                }
+                
+                dataFetchedRef.current.schedules = true;
+              }
+            } catch (error) {
+              console.error('[HOME] 🚨 수동 스케줄 로드 실패:', error);
+            }
+          };
+          
+          loadSchedulesManually();
+        }
+      }, 5000);
+    }
+  }, [groupMembers.length, selectedGroupId, dataFetchedRef.current.schedules, dataFetchedRef.current.loading]);
 
   // 지도 타입 변경 핸들러 (Google Maps 제거로 인해 단순화)
   const handleMapTypeChange = () => {
@@ -6244,8 +6557,13 @@ export default function HomePage() {
       schedule.date!.startsWith(targetDate)
     ) : [];
     
-    setFilteredSchedules(memberSchedules);
-    console.log('[HOME] 첫번째 멤버 자동 선택 완료:', firstMember.name, '스케줄:', memberSchedules.length, '개');
+    // 스케줄이 이미 설정되어 있지 않은 경우에만 업데이트
+    if (filteredSchedules.length === 0 || filteredSchedules.length !== memberSchedules.length) {
+      setFilteredSchedules(memberSchedules);
+      console.log('[HOME] 첫번째 멤버 자동 선택 완료:', firstMember.name, '스케줄:', memberSchedules.length, '개');
+    } else {
+      console.log('[HOME] 첫번째 멤버 자동 선택 - 스케줄 이미 설정됨:', memberSchedules.length, '개');
+    }
   }, [shouldSelectFirstMember, groupMembers, groupSchedules, selectedDate]);
 
   // 컴포넌트 마운트 시 초기 상태 체크 (안전장치)
