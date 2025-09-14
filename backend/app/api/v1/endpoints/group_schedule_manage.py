@@ -1764,8 +1764,17 @@ def update_single_schedule(db: Session, schedule_id: int, schedule_data: Dict[st
             "sst_adate": schedule_data.get("sst_adate")
         }
         
+        # 대상 멤버 관련 필드들 (수정 시 대상 그룹원 유지)
+        member_fields = {}
+        if schedule_data.get('targetMemberId'):
+            member_fields["mt_idx"] = schedule_data.get('targetMemberId')
+            logger.info(f"📝 [UPDATE_SINGLE] 대상 멤버 ID 업데이트: {schedule_data.get('targetMemberId')}")
+        if schedule_data.get('sgdt_idx'):
+            member_fields["sgdt_idx"] = schedule_data.get('sgdt_idx')
+            logger.info(f"📝 [UPDATE_SINGLE] 그룹 세부 ID 업데이트: {schedule_data.get('sgdt_idx')}")
+        
         # 모든 필드 병합
-        all_fields = {**basic_fields, **location_fields, **alarm_fields, **repeat_fields, **other_fields}
+        all_fields = {**basic_fields, **location_fields, **alarm_fields, **repeat_fields, **other_fields, **member_fields}
         
         # None이 아닌 값만 업데이트에 포함
         for field, value in all_fields.items():
