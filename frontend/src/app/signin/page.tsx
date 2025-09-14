@@ -573,6 +573,17 @@ const SignInPage = () => {
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [showSplash, setShowSplash] = useState(true);
+  
+  // 로그아웃 후 스플래시 화면 표시 로직
+  useEffect(() => {
+    const showSplashOnLogout = localStorage.getItem('show_splash_on_logout');
+    if (showSplashOnLogout === 'true') {
+      console.log('[SIGNIN] 로그아웃 후 스플래시 화면 표시');
+      setShowSplash(true);
+      // 플래그 제거
+      localStorage.removeItem('show_splash_on_logout');
+    }
+  }, []);
   const searchParams = useSearchParams();
   // 안전한 useAuth 접근
   let authContextData;

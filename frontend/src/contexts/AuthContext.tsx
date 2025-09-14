@@ -768,32 +768,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       console.log('[AUTH] 로그아웃 시작');
       
-      // 🔥 사용자 데이터가 있으면 로그아웃 방지 (강제 로그인 상태 유지)
-      const userData = authService.getUserData();
-      if (userData && userData.mt_idx) {
-        console.log('[AUTH] 🔥 사용자 데이터 존재 - 로그아웃 방지 및 강제 로그인 상태 유지:', userData.mt_name);
-        dispatch({ type: 'LOGIN_SUCCESS', payload: userData });
-        locationTrackingService.onUserLogin();
-        return;
-      }
-      
-      // 🚫 에러 모달이 표시 중이면 로그아웃 중단
-      if (typeof window !== 'undefined' && (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
-        console.log('[AUTH] 🚫 에러 모달 표시 중 - 로그아웃 중단');
-        return;
-      }
-      
-      // 🚫 구글 로그인 중일 때는 로그아웃 중단
-      if (typeof window !== 'undefined' && (window as any).__GOOGLE_LOGIN_IN_PROGRESS__) {
-        console.log('[AUTH] 🚫 구글 로그인 중 - 로그아웃 중단');
-        return;
-      }
-      
-      // 🚫 모든 리다이렉트가 차단된 상태라면 로그아웃 중단
-      if (typeof window !== 'undefined' && (window as any).__BLOCK_ALL_REDIRECTS__) {
-        console.log('[AUTH] 🚫 리다이렉트 차단 상태 - 로그아웃 중단');
-        return;
-      }
+      // 로그아웃 시에는 모든 방지 조건을 무시하고 강제 로그아웃 진행
+      console.log('[AUTH] 🔥 강제 로그아웃 진행 - 모든 방지 조건 무시');
       
       // 1. authService 로그아웃 (localStorage, 쿠키 정리)
       await authService.logout();
@@ -841,33 +817,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       console.log('[AUTH] 로그아웃 완료');
       
-      // 5. 즉시 signin 페이지로 리다이렉트 (강화된 네비게이션 방지 플래그 확인)
+      // 5. 로그아웃 후 스플래시 화면 표시 및 signin 페이지로 리다이렉트
       if (typeof window !== 'undefined') {
-        // 🔥 로그아웃 후 에러 상태 완전 정리
+        console.log('[AUTH] 🔥 로그아웃 완료 - 스플래시 화면 표시 후 signin으로 이동');
+        
+        // 스플래시 화면 표시를 위한 플래그 설정
+        localStorage.setItem('show_splash_on_logout', 'true');
+        
+        // 모든 전역 상태 정리
         (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__ = false;
+        (window as any).__GOOGLE_LOGIN_IN_PROGRESS__ = false;
+        (window as any).__BLOCK_ALL_REDIRECTS__ = false;
         
-        // 🚫 에러 모달이 표시 중이면 리다이렉트 방지
-        if ((window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
-          console.log('[AUTH] 🚫 에러 모달 표시 중 - signin 페이지 리다이렉트 방지');
-          return;
-        }
-        
-        // 🚫 구글 로그인 중일 때는 리다이렉트 방지
-        if ((window as any).__GOOGLE_LOGIN_IN_PROGRESS__) {
-          console.log('[AUTH] 구글 로그인 중 - signin 페이지 리다이렉트 방지');
-          return;
-        }
-        
-        // 🚫 모든 리다이렉트가 차단된 상태라면 리다이렉트 방지
-        if ((window as any).__BLOCK_ALL_REDIRECTS__) {
-          console.log('[AUTH] 🚫 리다이렉트 차단 상태 - signin 페이지 리다이렉트 방지');
-          return;
-        }
-        
-        console.log('[AUTH] 즉시 signin 페이지로 리다이렉트');
-        
-        // 직접적인 리다이렉트 추가 (NavigationManager와 병행)
+        // 강제로 signin 페이지로 리다이렉트 (모든 방지 조건 무시)
         try {
+          console.log('[AUTH] 🔥 강제 리다이렉트 - signin 페이지로 이동');
           window.location.replace('/signin');
         } catch (directRedirectError) {
           console.log('[AUTH] 직접 리다이렉트 실패, NavigationManager 사용:', directRedirectError);
