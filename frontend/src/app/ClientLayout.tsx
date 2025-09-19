@@ -150,7 +150,10 @@ function PermissionGuard() {
               const name = (descriptor && (descriptor.name || descriptor)) || '';
               if (!(window as any).__SMAP_PERM_ALLOW__ && (name === 'notifications' || name === 'camera' || name === 'microphone' || name === 'geolocation')) {
                 console.warn('🚨 [SMAP-PERM] CRITICAL BLOCK: permissions.query DENIED UNTIL LOGIN for:', name);
-                return Promise.resolve({ state: 'denied' });
+                return Promise.resolve({ 
+                  state: 'denied',
+                  onchange: null
+                });
               }
             } catch(_) {}
             return originalQuery(descriptor);
@@ -158,7 +161,24 @@ function PermissionGuard() {
         }
         ;(window as any).SMAP_ENABLE_PERMISSIONS = function(){
           (window as any).__SMAP_PERM_ALLOW__ = true;
-          console.log('[SMAP-PERM] Permissions enabled after login');
+          (window as any).__SMAP_EMERGENCY_BLOCK__ = false;
+          (window as any).__SMAP_EMERGENCY_PERMISSION_BLOCK__ = false;
+          console.log('🔓 [SMAP-PERM] 모든 권한 해제 완료 - 로그인 후 정상 사용 가능');
+          
+          // geolocation 함수들 복원
+          const geo: any = navigator.geolocation as any;
+          if (geo && (window as any).__SMAP_ORIG_GETCURRENT__) {
+            geo.getCurrentPosition = (window as any).__SMAP_ORIG_GETCURRENT__;
+            console.log('🔓 [SMAP-PERM] geolocation.getCurrentPosition 복원 완료');
+          }
+          if (geo && (window as any).__SMAP_ORIG_WATCH__) {
+            geo.watchPosition = (window as any).__SMAP_ORIG_WATCH__;
+            console.log('🔓 [SMAP-PERM] geolocation.watchPosition 복원 완료');
+          }
+          if (geo && (window as any).__SMAP_ORIG_CLEARWATCH__) {
+            geo.clearWatch = (window as any).__SMAP_ORIG_CLEARWATCH__;
+            console.log('🔓 [SMAP-PERM] geolocation.clearWatch 복원 완료');
+          }
         };
         console.log('[SMAP-PERM] Permission guard installed (web)');
 
@@ -230,37 +250,62 @@ function PermissionGuard() {
           console.log('[SMAP-PERM] Global permission guards installed');
         }
 
-        // geolocation 가드: 로그인 전 위치 권한 요청 차단
+        // geolocation 가드: 로그인 전 위치 권한 요청 차단 (강화)
         if (!w.__SMAP_GEO_GUARD_INSTALLED__ && 'geolocation' in navigator) {
           w.__SMAP_GEO_GUARD_INSTALLED__ = true;
           const geo: any = navigator.geolocation as any;
+          
+          // getCurrentPosition 차단
           if (typeof geo.getCurrentPosition === 'function') {
             w.__SMAP_ORIG_GETCURRENT__ = geo.getCurrentPosition.bind(geo);
             geo.getCurrentPosition = function(success: any, error?: any, options?: any) {
               if (!w.__SMAP_PERM_ALLOW__) {
-                console.warn('[SMAP-PERM] geolocation.getCurrentPosition blocked until login');
+                console.warn('🚨 [SMAP-PERM] geolocation.getCurrentPosition BLOCKED - 로그인 후 사용 가능');
                 if (typeof error === 'function') {
-                  try { error({ code: 1, message: 'SMAP: blocked until login', PERMISSION_DENIED: 1 }); } catch(_) {}
+                  try { 
+                    error({ 
+                      code: 1, 
+                      message: 'SMAP: 위치 권한이 로그인 전에 차단되었습니다', 
+                      PERMISSION_DENIED: 1 
+                    }); 
+                  } catch(_) {}
                 }
                 return;
               }
               return w.__SMAP_ORIG_GETCURRENT__(success, error, options);
             };
           }
+          
+          // watchPosition 차단
           if (typeof geo.watchPosition === 'function') {
             w.__SMAP_ORIG_WATCH__ = geo.watchPosition.bind(geo);
             geo.watchPosition = function(success: any, error?: any, options?: any) {
               if (!w.__SMAP_PERM_ALLOW__) {
-                console.warn('[SMAP-PERM] geolocation.watchPosition blocked until login');
+                console.warn('🚨 [SMAP-PERM] geolocation.watchPosition BLOCKED - 로그인 후 사용 가능');
                 if (typeof error === 'function') {
-                  try { error({ code: 1, message: 'SMAP: blocked until login', PERMISSION_DENIED: 1 }); } catch(_) {}
+                  try { 
+                    error({ 
+                      code: 1, 
+                      message: 'SMAP: 위치 추적이 로그인 전에 차단되었습니다', 
+                      PERMISSION_DENIED: 1 
+                    }); 
+                  } catch(_) {}
                 }
                 return -1;
               }
               return w.__SMAP_ORIG_WATCH__(success, error, options);
             };
           }
-          console.log('[SMAP-PERM] geolocation guard installed');
+          
+          // clearWatch도 원본 함수로 복원
+          if (typeof geo.clearWatch === 'function') {
+            w.__SMAP_ORIG_CLEARWATCH__ = geo.clearWatch.bind(geo);
+            geo.clearWatch = function(watchId: any) {
+              return w.__SMAP_ORIG_CLEARWATCH__(watchId);
+            };
+          }
+          
+          console.log('🚨 [SMAP-PERM] geolocation guard 강화 설치 완료');
         }
 
         // 🚨 웹뷰 페이지 로드 시 자동 권한 체크/요청 차단
@@ -436,6 +481,12 @@ export default function ClientLayout({
                 
                 console.log('✅ [AUTO-LOGIN] 자동 로그인 성공 - 인증 상태 복원 완료');
                 setIsLoggedIn(true);
+                
+                // 🔥 자동 로그인 성공 시 권한 해제
+                if (typeof (window as any).SMAP_ENABLE_PERMISSIONS === 'function') {
+                  (window as any).SMAP_ENABLE_PERMISSIONS();
+                  console.log('🔓 [AUTO-LOGIN] 위치 권한 등 모든 권한 해제 완료');
+                }
                 
                 // 현재 페이지가 로그인/회원가입 페이지면 홈으로 리다이렉트
                 if (pathname === '/signin' || pathname === '/register' || pathname === '/') {

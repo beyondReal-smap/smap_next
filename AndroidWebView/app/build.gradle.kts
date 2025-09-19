@@ -12,7 +12,7 @@ android {
         applicationId = "com.dmonster.smap"
         minSdk = 24
         targetSdk = 35
-        versionCode = 25
+        versionCode = 26
         versionName = "2.2.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
