@@ -125,6 +125,11 @@ const createApiClientConfig = (): AxiosRequestConfig => {
 // Axios 인스턴스 생성
 const apiClient: CustomApiClient = axios.create(createApiClientConfig()) as CustomApiClient;
 
+// 무한 루프 방지를 위한 401 에러 카운터
+let consecutiveUnauthorizedCount = 0;
+const MAX_UNAUTHORIZED_RETRIES = 3;
+let lastUnauthorizedTime = 0;
+
 // 토큰 관리 유틸리티
 const getToken = (): string | null => {
   if (typeof window !== 'undefined') {
@@ -154,8 +159,27 @@ const getToken = (): string | null => {
 
 const removeToken = (): void => {
   if (typeof window !== 'undefined') {
-    localStorage.removeItem('auth-token'); // 실제 사용하는 키로 변경
+    console.log('[API CLIENT] 🧹 모든 인증 관련 localStorage 삭제 시작');
+    
+    // 모든 인증 관련 토큰 삭제
+    localStorage.removeItem('auth-token');
+    localStorage.removeItem('smap_auth_token');
+    
+    // 모든 사용자 정보 삭제
     localStorage.removeItem('smap_user_data');
+    localStorage.removeItem('smap_user_info');
+    localStorage.removeItem('user_data');
+    localStorage.removeItem('user_profile');
+    localStorage.removeItem('recentUserInfo');
+    
+    // 로그인 상태 플래그 삭제
+    localStorage.removeItem('isLoggedIn');
+    
+    // 기타 인증 관련 데이터 삭제
+    localStorage.removeItem('smap_last_login_time');
+    localStorage.removeItem('last_logout_time');
+    
+    console.log('[API CLIENT] ✅ 모든 인증 데이터 삭제 완료');
   }
 };
 
@@ -242,6 +266,11 @@ apiClient.interceptors.response.use(
   (response) => {
     const isWebKitEnv = isWebKit();
     const isIOSWebViewEnv = isIOSWebView();
+    
+    // 정상 응답 시 401 카운터 리셋
+    if (response.status >= 200 && response.status < 300) {
+      consecutiveUnauthorizedCount = 0;
+    }
     
     // WebKit 환경에서 응답 시간 측정
     if (isWebKitEnv && (response.config as any)._requestStartTime) {
@@ -335,6 +364,32 @@ apiClient.interceptors.response.use(
     
     // 401 오류 처리 (토큰 만료 또는 인증 실패)
     if (error.response?.status === 401 && !originalRequest._retry) {
+      // 무한 루프 방지: 연속된 401 에러 카운트 증가
+      const now = Date.now();
+      if (now - lastUnauthorizedTime < 5000) {
+        // 5초 이내 연속 401 에러
+        consecutiveUnauthorizedCount++;
+      } else {
+        // 5초 이상 지났으면 카운터 리셋
+        consecutiveUnauthorizedCount = 1;
+      }
+      lastUnauthorizedTime = now;
+
+      console.log(`[API CLIENT] 401 에러 발생 (연속 ${consecutiveUnauthorizedCount}회)`);
+
+      // 무한 루프 감지: 3회 이상 연속 401 에러 발생 시
+      if (consecutiveUnauthorizedCount >= MAX_UNAUTHORIZED_RETRIES) {
+        console.error('[API CLIENT] 🚨 무한 루프 감지! 연속 401 에러로 인한 강제 로그아웃');
+        removeToken();
+        consecutiveUnauthorizedCount = 0; // 카운터 리셋
+        
+        // 로그인 페이지로 단 한 번만 리다이렉트
+        if (typeof window !== 'undefined' && window.location.pathname !== '/signin') {
+          navigationManager.redirectToSignin();
+        }
+        return Promise.reject(error);
+      }
+
       originalRequest._retry = true;
 
       const hasToken = !!getToken();
@@ -349,6 +404,7 @@ apiClient.interceptors.response.use(
       // ✅ 초기 비로그인 상태(토큰 없음)에서는 리다이렉트/토큰갱신 시도하지 않고 조용히 실패 반환
       if (!hasToken) {
         console.log('[API CLIENT] 401 (초기 비로그인) - 리다이렉트/리프레시 생략');
+        consecutiveUnauthorizedCount = 0; // 카운터 리셋 (정상적인 비로그인 상태)
         return Promise.reject(error);
       }
 
@@ -356,6 +412,7 @@ apiClient.interceptors.response.use(
       if (originalRequest.url?.includes('/auth/refresh')) {
         console.log('[API CLIENT] 토큰 갱신 요청이 401 - 무효한 토큰으로 판단하여 로그아웃 처리');
         removeToken();
+        consecutiveUnauthorizedCount = 0; // 카운터 리셋
 
         // 🚫 에러 모달이 표시 중이면 리다이렉트 방지
         if (typeof window !== 'undefined' && (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
@@ -364,7 +421,9 @@ apiClient.interceptors.response.use(
         }
 
         // 로그인 페이지로 리다이렉트 (NavigationManager 사용)
-        navigationManager.redirectToSignin();
+        if (typeof window !== 'undefined' && window.location.pathname !== '/signin') {
+          navigationManager.redirectToSignin();
+        }
         return Promise.reject(error);
       }
 
@@ -376,8 +435,10 @@ apiClient.interceptors.response.use(
 
         if (newToken) {
           console.log('[API CLIENT] 토큰 갱신 성공');
-          localStorage.setItem('auth-token', newToken);
+          localStorage.setItem('smap_auth_token', newToken);
+          localStorage.setItem('auth-token', newToken); // 하위 호환성
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
+          consecutiveUnauthorizedCount = 0; // 성공 시 카운터 리셋
           return apiClient(originalRequest);
         }
       } catch (refreshError) {
@@ -386,6 +447,7 @@ apiClient.interceptors.response.use(
         // 토큰 갱신 실패 시 로그아웃 처리
         console.log('[API CLIENT] 토큰 갱신 실패 - 로그아웃 처리');
         removeToken();
+        consecutiveUnauthorizedCount = 0; // 카운터 리셋
 
         // 🚫 에러 모달이 표시 중이면 리다이렉트 방지
         if (typeof window !== 'undefined' && (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
@@ -394,8 +456,13 @@ apiClient.interceptors.response.use(
         }
 
         // 토큰이 있었던 사용자가 401이면 로그인 페이지로 리다이렉트 (초기 비로그인은 위에서 return됨)
-        navigationManager.redirectToSignin();
+        if (typeof window !== 'undefined' && window.location.pathname !== '/signin') {
+          navigationManager.redirectToSignin();
+        }
       }
+    } else if (error.response?.status !== 401) {
+      // 401이 아닌 경우 카운터 리셋
+      consecutiveUnauthorizedCount = 0;
     }
     
     return Promise.reject(error);

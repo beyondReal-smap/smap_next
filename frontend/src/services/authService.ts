@@ -439,14 +439,29 @@ class AuthService {
       localStorage.removeItem(this.USER_KEY);
       localStorage.removeItem(this.LOGIN_TIME_KEY);
       
-      // 추가 사용자 관련 데이터 삭제
+      // 모든 토큰 키 삭제 (하위 호환성)
+      localStorage.removeItem('auth-token');
+      localStorage.removeItem('smap_auth_token');
+      
+      // 모든 사용자 정보 키 삭제
       localStorage.removeItem('isLoggedIn');
       localStorage.removeItem('user');
+      localStorage.removeItem('user_data');
+      localStorage.removeItem('user_profile');
       localStorage.removeItem('smap_user_data');
+      localStorage.removeItem('smap_user_info');
+      localStorage.removeItem('recentUserInfo');
+      
+      // 그룹 및 캐시 데이터 삭제
       localStorage.removeItem('cached_groups');
       localStorage.removeItem('last_api_call_last_group_api_call');
+      
+      // 권한 및 설정 데이터 삭제
       localStorage.removeItem('smap_last_permission_check');
       localStorage.removeItem('auto_login_executed');
+      
+      // 로그인/로그아웃 타임스탬프
+      localStorage.removeItem('smap_last_login_time');
       localStorage.removeItem('last_logout_time');
       
       // sessionStorage 정리

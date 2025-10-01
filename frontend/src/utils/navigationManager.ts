@@ -32,6 +32,12 @@ class NavigationManagerImpl implements NavigationManager {
   }
 
   redirectToSignin(): void {
+    // 🚫 이미 signin 페이지에 있으면 리다이렉트하지 않음
+    if (typeof window !== 'undefined' && window.location.pathname === '/signin') {
+      console.log('[NAVIGATION] 🚫 이미 signin 페이지에 있음 - 리다이렉트 불필요');
+      return;
+    }
+
     if (this._isRedirecting) {
       console.log('[NAVIGATION] 이미 리다이렉트 중 - 중복 요청 무시');
       return;
@@ -62,9 +68,14 @@ class NavigationManagerImpl implements NavigationManager {
       try {
         console.log('[NAVIGATION] 직접 리다이렉트 시도: window.location.replace("/signin")');
         window.location.replace('/signin');
-        return; // 직접 리다이렉트 성공 시 플래그 설정 생략
+        // 리다이렉트 성공 시 플래그는 3초 후 자동 정리
+        setTimeout(() => {
+          this._isRedirecting = false;
+        }, 3000);
+        return;
       } catch (error) {
         console.log('[NAVIGATION] 직접 리다이렉트 실패, 플래그 방식 사용:', error);
+        this._isRedirecting = false; // 실패 시 즉시 리셋
       }
     }
 
