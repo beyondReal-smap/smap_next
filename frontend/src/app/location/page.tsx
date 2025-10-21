@@ -608,6 +608,7 @@ interface LocationData {
   memo: string;
   favorite: boolean;
   notifications?: boolean;
+  slt_idx?: string | number;
 }
 
 interface NewLocationInput {
