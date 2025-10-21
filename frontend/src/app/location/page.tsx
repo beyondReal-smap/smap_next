@@ -609,6 +609,7 @@ interface LocationData {
   favorite: boolean;
   notifications?: boolean;
   slt_idx?: string | number;
+  slt_title?: string;
 }
 
 interface NewLocationInput {
