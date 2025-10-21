@@ -4155,7 +4155,7 @@ export default function LocationPage() {
           window.naver.maps.Event.clearListeners(marker, 'click');
 
           // 멤버 마커 클릭 이벤트 - 멤버 InfoWindow 생성 및 표시
-          window.naver.maps.Event.addListener(marker, 'click', (e) => {
+          window.naver.maps.Event.addListener(marker, 'click', (e: any) => {
             console.log('[멤버 마커 클릭] 멤버 선택 시작:', member.name);
             
             // 🚨 이벤트 전파 방지 (중복 처리 방지)
