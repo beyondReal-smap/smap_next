@@ -2769,21 +2769,24 @@ export default function LocationPage() {
 
             // 주소 변환 제거
         } else {
-            const coords = { lat, lng };
+            const coords = {
+              lat: parseCoordinate(newlySelectedMember?.mlt_lat) || parseCoordinate(newlySelectedMember?.location?.lat) || 0,
+              lng: parseCoordinate(newlySelectedMember?.mlt_long) || parseCoordinate(newlySelectedMember?.location?.lng) || 0
+            };
             console.warn('[handleMemberSelect] 멤버 마커를 찾을 수 없음 - 좌표로 직접 InfoWindow 표시 시도:', {
               memberIndex,
               hasSelectedMarker: !!selectedMarker,
               totalMarkers: memberMarkers.length,
               memberName: newlySelectedMember?.name || '알 수 없음',
-              hasValidCoords: lat && lng,
+              hasValidCoords: coords.lat && coords.lng,
               coordinates: coords
             });
             
             // 마커를 찾을 수 없을 때 좌표로 직접 InfoWindow 표시
-            if (map && window.naver?.maps && lat && lng) {
+            if (map && window.naver?.maps && coords.lat && coords.lng) {
               const photoForMarker = getSafeImageUrl(newlySelectedMember?.mt_file1, newlySelectedMember?.mt_gender, newlySelectedMember?.original_index);
               const borderColor = '#f59e0b'; // 선택된 멤버 색상
-              const memberPosition = createSafeLatLng(lat, lng);
+              const memberPosition = createSafeLatLng(coords.lat, coords.lng);
               if (!memberPosition) {
                 console.warn('[handleMemberSelect] 멤버 InfoWindow LatLng 생성 실패');
                 return;
@@ -2893,10 +2896,14 @@ export default function LocationPage() {
 
               // 주소 변환 제거
             } else {
+              const fallbackCoords = {
+                lat: parseCoordinate(newlySelectedMember?.mlt_lat) || parseCoordinate(newlySelectedMember?.location?.lat) || 0,
+                lng: parseCoordinate(newlySelectedMember?.mlt_long) || parseCoordinate(newlySelectedMember?.location?.lng) || 0
+              };
               console.error('[handleMemberSelect] InfoWindow 표시 완전 실패 - 지도나 좌표 없음:', {
                 hasMap: !!map,
                 hasNaverMaps: !!window.naver?.maps,
-                hasCoords: !!(lat && lng)
+                hasCoords: !!(fallbackCoords.lat && fallbackCoords.lng)
               });
             }
           }
@@ -2904,7 +2911,11 @@ export default function LocationPage() {
         
         console.log('[handleMemberSelect] 멤버 선택 완료 - InfoWindow 표시 예정');
       } else {
-        console.warn('[handleMemberSelect] 유효하지 않은 좌표 또는 한국 범위 밖:', { lat, lng });
+        const invalidCoords = {
+          lat: parseCoordinate(newlySelectedMember?.mlt_lat) || parseCoordinate(newlySelectedMember?.location?.lat) || 0,
+          lng: parseCoordinate(newlySelectedMember?.mlt_long) || parseCoordinate(newlySelectedMember?.location?.lng) || 0
+        };
+        console.warn('[handleMemberSelect] 유효하지 않은 좌표 또는 한국 범위 밖:', invalidCoords);
           // 사이드바는 닫기
           setTimeout(() => {
             setIsSidebarOpen(false);

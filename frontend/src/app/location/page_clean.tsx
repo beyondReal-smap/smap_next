@@ -4374,3 +4374,443 @@ export default function LocationPage() {
       }
     };
   }, [groupMembers.find(m => m.isSelected)?.id, map, isMapReady]); // 선택된 멤버 변경 시 마커 업데이트
+
+  // 🚨 멤버 InfoWindow 생성 함수 - 강화된 버전
+  const createMemberInfoWindow = (member: GroupMember, marker: NaverMarker) => {
+    if (!map || !window.naver?.maps) {
+      console.warn('[createMemberInfoWindow] 맵 또는 네이버 맵스 API 없음');
+      return;
+    }
+
+    // 🚨 InfoWindow 생성 (위치 정보가 없어도 생성하되, 내용에서 처리)
+    console.log('[createMemberInfoWindow] 🚨 InfoWindow 생성 시작:', member.name);
+
+    console.log('[createMemberInfoWindow] 🚨 시작:', {
+      memberName: member.name,
+      memberId: member.id,
+      hasMarker: !!marker,
+      markerOnMap: marker?.getMap ? !!marker.getMap() : false,
+      mapReady: !!map,
+      battery: member.mlt_battery
+    });
+
+    // 🚨 getSafeImageUrl 호출 수정 - 올바른 파라미터 전달
+    const photoUrl = getSafeImageUrl(member.mt_file1, member.mt_gender, member.original_index);
+    const lat = member.mlt_lat || 0;
+    const lng = member.mlt_long || 0;
+
+    const memberInfoWindow = new window.naver.maps.InfoWindow({
+      content: `
+        <style>
+          @keyframes slideInFromBottom {
+            0% {
+              opacity: 0;
+              transform: translateY(20px) scale(0.95);
+            }
+            100% {
+              opacity: 1;
+              transform: translateY(0) scale(1);
+            }
+          }
+          .member-info-window-container {
+            animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+          }
+          .close-button {
+            transition: all 0.2s ease;
+          }
+          .close-button:hover {
+            background: rgba(0, 0, 0, 0.2) !important;
+            transform: scale(1.1);
+          }
+        </style>
+        <div class="member-info-window-container" style="
+          padding: 12px 16px;
+          min-width: 200px;
+          max-width: 280px;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          background: white;
+          border-radius: 12px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+          position: relative;
+        ">
+          <!-- 닫기 버튼 -->
+          <button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(0, 0, 0, 0.1);
+            border: none;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+          ">×</button>
+
+          <div style="
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+          ">
+            <div style="
+              width: 40px;
+              height: 40px;
+              border-radius: 50%;
+              overflow: hidden;
+              margin-right: 12px;
+              border: 2px solid #f59e0b;
+              flex-shrink: 0;
+            ">
+              <img src="${photoUrl}"
+                   style="width: 100%; height: 100%; object-fit: cover;"
+                   alt="${member.name}" />
+            </div>
+            <div style="padding-right: 25px;">
+              <h3 style="
+                margin: 0;
+                font-size: 14px;
+                font-weight: 600;
+                color: #111827;
+              ">${member.name}</h3>
+              <p style="
+                margin: 2px 0 0 0;
+                font-size: 12px;
+                color: #64748b;
+              ">그룹 멤버</p>
+            </div>
+          </div>
+
+
+          <div style="margin-bottom: 4px;">
+            <div style="display: flex; align-items: center; font-size: 11px; color: #9ca3af;">
+              <span style="flex-shrink: 0;">🕐 </span>
+              <span style="margin-left: 2px;">
+                마지막 업데이트: ${member.mlt_gps_time ? formatTimeToMMDDHHMM(member.mlt_gps_time) : '알 수 없음'}
+              </span>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 4px;">
+            <div style="display: flex; align-items: center; font-size: 11px; color: #9ca3af;">
+              <span style="flex-shrink: 0;">🔋 </span>
+              <span style="margin-left: 2px;">
+                배터리: ${member.mlt_battery !== null && member.mlt_battery !== undefined ? `${member.mlt_battery}%` : '정보 없음'}
+              </span>
+            </div>
+          </div>
+        </div>
+      `,
+      borderWidth: 0,
+      backgroundColor: 'transparent',
+      disableAnchor: true,
+      pixelOffset: new window.naver.maps.Point(0, -20)
+    });
+
+    // InfoWindow 열기 (단순화된 로직)
+    try {
+      console.log('[createMemberInfoWindow] InfoWindow 열기 시도:', {
+        markerExists: !!marker,
+        markerOnMap: marker?.getMap ? !!marker.getMap() : false
+      });
+
+      // 마커가 있으면 마커 위치에, 없으면 기본 위치에 InfoWindow 표시
+      if (marker && marker.getMap && marker.getMap() === map) {
+        // 마커가 지도에 정상적으로 표시되어 있으면 마커 위치에 표시
+        memberInfoWindow.open(map, marker);
+        setInfoWindow(memberInfoWindow);
+        console.log('[createMemberInfoWindow] InfoWindow 마커 위치에 표시 완료');
+      } else {
+        // 마커가 없거나 지도에 없으면 기본 위치(서울 중심)에 표시
+        const defaultPos = createSafeLatLng(37.5665, 126.9780);
+        if (defaultPos) {
+          memberInfoWindow.open(map, defaultPos as any);
+          setInfoWindow(memberInfoWindow);
+          console.log('[createMemberInfoWindow] InfoWindow 기본 위치에 표시 완료');
+        }
+      }
+    } catch (e) {
+      console.error('[createMemberInfoWindow] InfoWindow 열기 실패:', e);
+    }
+
+    // 주소 변환 제거
+
+    console.log('[createMemberInfoWindow] 멤버 InfoWindow 생성 완료:', member.name);
+  };
+
+  // 장소 삭제 모달 열기
+  const openLocationDeleteModal = (location: LocationData | OtherMemberLocationRaw) => {
+    setLocationToDelete(location);
+    setIsLocationDeleteModalOpen(true);
+  };
+
+  // 장소 삭제 모달 닫기
+  const closeLocationDeleteModal = () => {
+    if (!isDeletingLocation) {
+      setLocationToDelete(null);
+      setIsLocationDeleteModalOpen(false);
+    }
+  };
+
+  // 통일된 정보창 생성 함수 - home/page.tsx 스타일 적용 + 삭제 버튼 추가
+  const createLocationInfoWindow = (locationName: string, locationAddress: string, locationData?: OtherMemberLocationRaw | LocationData) => {
+    // 🚨 강화된 locationId 추출 로직
+    const getLocationId = (data: OtherMemberLocationRaw | LocationData) => {
+      // slt_idx가 있으면 우선 사용 (DB의 실제 ID)
+      if ('slt_idx' in data && data.slt_idx) {
+        return data.slt_idx.toString();
+      }
+      // 그 다음 id 사용
+      if (data.id) {
+        // temp_ 접두사 제거
+        const cleanId = data.id.toString().replace(/^temp_/, '');
+        return cleanId;
+      }
+      return '';
+    };
+
+    const locationId = locationData ? getLocationId(locationData) : '';
+    console.log('[createLocationInfoWindow] locationId 추출:', {
+      locationData,
+      extractedId: locationId,
+      slt_idx: locationData && 'slt_idx' in locationData ? locationData.slt_idx : null,
+      id: locationData?.id
+    });
+
+    // 🆕 slt_title을 고려한 장소명 처리
+    const displayName = locationData && 'slt_title' in locationData && locationData.slt_title
+      ? locationData.slt_title
+      : locationName;
+
+    const newInfoWindow = new window.naver.maps.InfoWindow({
+      content: `
+        <style>
+          @keyframes slideInFromBottom {
+            0% {
+              opacity: 0;
+              transform: translateY(20px) scale(0.95);
+            }
+            100% {
+              opacity: 1;
+              transform: translateY(0) scale(1);
+            }
+          }
+          .location-info-window-container {
+            animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+          }
+          .info-button {
+            transition: all 0.2s ease;
+            border: none;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+            font-size: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: absolute;
+            top: 8px;
+          }
+          .close-button {
+            background: rgba(0, 0, 0, 0.1) !important;
+            color: #666 !important;
+            right: 8px;
+            z-index: 999999 !important;
+            pointer-events: auto !important;
+            position: absolute !important;
+            user-select: none !important;
+            -webkit-user-select: none !important;
+            touch-action: manipulation !important;
+          }
+          .close-button:hover {
+            background: rgba(0, 0, 0, 0.2) !important;
+            color: #333 !important;
+            transform: scale(1.1) !important;
+          }
+          .close-button:active {
+            background: rgba(0, 0, 0, 0.3) !important;
+            transform: scale(1.05) !important;
+          }
+          .delete-button {
+            background: rgba(153, 27, 27, 0.1);
+            color: #991b1b;
+            right: 38px;
+            z-index: 10000 !important;
+            pointer-events: auto !important;
+            position: absolute !important;
+          }
+          .delete-button:hover {
+            background: rgba(153, 27, 27, 0.2) !important;
+            transform: scale(1.1);
+          }
+        </style>
+        <div class="location-info-window-container" style="
+          padding: 12px 16px;
+          min-width: 200px;
+          max-width: 280px;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          background: white;
+          border-radius: 12px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+          position: relative;
+        ">
+          <!-- 삭제 버튼 -->
+          ${locationData ? `
+          <button class="info-button delete-button"
+            onclick="
+              console.log('=== 삭제 버튼 onclick 실행 ===');
+              console.log('삭제 버튼 클릭:', '${locationId}');
+              window.ignoreInfoWindowClick = true;
+              if(window.handleLocationDeleteFromInfoWindow) {
+                console.log('삭제 함수 호출 시작');
+                window.handleLocationDeleteFromInfoWindow('${locationId}');
+                console.log('삭제 함수 호출 완료');
+              } else {
+                console.error('삭제 함수가 정의되지 않음');
+              }
+            "
+            onmousedown="console.log('삭제 버튼 mousedown'); window.ignoreInfoWindowClick = true;"
+            onmouseup="console.log('삭제 버튼 mouseup');"
+            style="z-index: 9999; pointer-events: auto;"
+            title="장소 삭제">
+            <svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M7 4V2C7 1.45 7.45 1 8 1H16C16.55 1 17 1.45 17 2V4H20C20.55 4 21 4.45 21 5S20.55 6 20 6H19V19C19 20.1 18.1 21 17 21H7C5.9 21 5 20.1 5 19V6H4C3.45 6 3 5.55 3 5S3.45 4 4 4H7ZM9 3V4H15V3H9ZM7 6V19H17V6H7Z"/>
+              <path d="M9 8V17H11V8H9ZM13 8V17H15V8H13Z"/>
+            </svg>
+          </button>
+          ` : ''}
+
+          <!-- 닫기 버튼 -->
+          <button class="info-button close-button location-close-btn"
+                  data-action="close"
+                  style="z-index: 999999 !important; pointer-events: auto !important;"
+                  title="닫기">
+            ×
+          </button>
+
+          <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #111827; padding-right: ${locationData ? '60px' : '30px'};">
+            📍 ${displayName}
+          </h3>
+          <div style="margin-bottom: 6px;">
+            <p style="margin: 0; font-size: 12px; color: #64748b;">
+              <span style="color: #64748b; font-weight: 500; word-break: keep-all;">${locationAddress}</span>
+            </p>
+          </div>
+        </div>
+      `,
+      borderWidth: 0,
+      backgroundColor: 'transparent',
+      disableAnchor: true,
+      pixelOffset: new window.naver.maps.Point(0, -10) // InfoWindow를 마커 위로 더 띄움 (간격 개선)
+    });
+
+    // InfoWindow가 닫힐 때 상태 업데이트
+    window.naver.maps.Event.addListener(newInfoWindow, 'close', () => {
+      console.log('[InfoWindow] 닫힘 이벤트 발생');
+      setInfoWindow(null);
+    });
+
+    // 대안적 접근법: InfoWindow 자체에 클릭 이벤트 리스너 추가
+    window.naver.maps.Event.addListener(newInfoWindow, 'domready', () => {
+      console.log('[InfoWindow] DOM 준비 완료 - 클릭 이벤트 추가');
+      try {
+        // 네이버 지도 InfoWindow의 DOM 요소 직접 접근
+        const iwContent = newInfoWindow.getContentElement ? newInfoWindow.getContentElement() : null;
+        if (iwContent) {
+          console.log('[InfoWindow] InfoWindow 컨텐트 요소 발견');
+
+          // 이벤트 위임을 사용하여 닫기 버튼 클릭 감지
+          iwContent.addEventListener('click', (e: Event) => {
+            const target = e.target as HTMLElement;
+            console.log('[InfoWindow] 컨텐트 클릭:', target.className, target.getAttribute('data-action'));
+
+            if (target.matches('.location-close-btn') ||
+                target.closest('.location-close-btn') ||
+                target.getAttribute('data-action') === 'close') {
+              console.log('[InfoWindow] 닫기 버튼 클릭 감지 - InfoWindow 닫기');
+              e.stopPropagation();
+              e.preventDefault();
+
+              newInfoWindow.close();
+              setInfoWindow(null);
+            }
+          });
+
+          console.log('[InfoWindow] 이벤트 위임 추가 완료');
+        }
+      } catch (domReadyError) {
+        console.warn('[InfoWindow] DOM ready 이벤트 처리 실패:', domReadyError);
+      }
+    });
+
+    // InfoWindow 열린 후 DOM 요소에 직접 닫기 이벤트 연결 (개선된 접근법)
+    setTimeout(() => {
+      try {
+        // 더 구체적인 선택자로 장소 InfoWindow의 닫기 버튼만 선택
+        const locationCloseButtons = document.querySelectorAll('.location-close-btn[data-action="close"]');
+        console.log('[DOM 이벤트] 찾은 장소 닫기 버튼 수:', locationCloseButtons.length);
+
+        locationCloseButtons.forEach((button, index) => {
+          // 기존 이벤트 리스너가 없는 경우에만 추가
+          if (!button.hasAttribute('data-close-attached')) {
+            // 여러 이벤트 타입으로 확실하게 잡기
+            ['click', 'mousedown', 'touchstart'].forEach(eventType => {
+              button.addEventListener(eventType, (e) => {
+                console.log(`[DOM 이벤트] 장소 InfoWindow 닫기 버튼 ${eventType} 이벤트 감지`);
+                e.stopPropagation();
+                e.preventDefault();
+
+                // 1차: 전역 함수 시도
+                if ((window as any).closeInfoWindow) {
+                  console.log('[DOM 이벤트] 전역 함수로 닫기 시도');
+                  (window as any).closeInfoWindow();
+                }
+                // 2차: 직접 InfoWindow API 사용
+                else if (newInfoWindow) {
+                  console.log('[DOM 이벤트] 직접 InfoWindow API로 닫기');
+                  newInfoWindow.close();
+                  setInfoWindow(null);
+                }
+                // 3차: DOM 조작으로 강제 숨김
+                else {
+                  console.log('[DOM 이벤트] DOM 조작으로 강제 숨김');
+                  try {
+                    // 네이버 지도 InfoWindow 구조에 맞게 부모 요소들 탐색
+                    let targetElement = button.closest('.location-info-window-container');
+                    if (!targetElement) {
+                      targetElement = button.parentElement;
+                    }
+
+                    // 여러 레벨 위로 올라가면서 InfoWindow 컨테이너 찾기
+                    let current = targetElement;
+                    for (let i = 0; i < 5 && current; i++) {
+                      if (current instanceof HTMLElement) {
+                        current.style.display = 'none';
+                        current.style.visibility = 'hidden';
+                        current.style.opacity = '0';
+                      }
+                      current = current.parentElement;
+                    }
+                    console.log('[DOM 이벤트] InfoWindow 강제 숨김 완료');
+                  } catch (hideError) {
+                    console.error('[DOM 이벤트] InfoWindow 강제 숨김 실패:', hideError);
+                  }
+                }
+              }, { capture: true }); // 캡처링 단계에서 이벤트 잡기
+            });
+
+            button.setAttribute('data-close-attached', 'true');
+            console.log(`[DOM 이벤트] 장소 닫기 버튼 ${index + 1} 이벤트 리스너 추가됨`);
+          }
+        });
+      } catch (domError) {
+        console.warn('[DOM 이벤트] 장소 닫기 버튼 이벤트 추가 실패:', domError);
+      }
+    }, 200); // 시간을 더 늘려서 DOM이 완전히 렌더링되도록
+
+    return newInfoWindow;
+  };
