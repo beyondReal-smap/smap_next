@@ -4337,11 +4337,14 @@ export default function LocationPage() {
     if (selectedMember.savedLocations && selectedMember.savedLocations.length > 0) {
       console.log('[NEW] 선택된 멤버 장소 데이터로 마커 생성:', selectedMember.name);
       createMarkersForMember(selectedMember, selectedMember.savedLocations);
-          } else {
+    } else {
       console.log('[NEW] 선택된 멤버에 장소 데이터 없음 - 멤버 마커만 생성:', selectedMember.name);
       createMarkersForMember(selectedMember, []);
     }
   }, [groupMembers.find(m => m.isSelected)?.id, map, isMapReady]); // 선택된 멤버 변경 시 마커 업데이트
+
+  // 🚀 InfoWindow 자동 오픈 관리
+  useEffect(() => {
     // 장소 선택 중에는 자동 표시 방지
     if (isLocationSelectingRef.current) return;
 
@@ -4373,7 +4376,7 @@ export default function LocationPage() {
         autoInfoWindowTimeoutRef.current = null;
       }
     };
-  }, [groupMembers.find(m => m.isSelected)?.id, map, isMapReady]); // 선택된 멤버 변경 시 마커 업데이트
+  }, [groupMembers.find(m => m.isSelected)?.id, map, isMapReady]); // 선택된 멤버 변경 시 InfoWindow 자동 오픈
 
   // 🚨 멤버 InfoWindow 생성 함수 - 강화된 버전
   const createMemberInfoWindow = (member: GroupMember, marker: NaverMarker) => {
