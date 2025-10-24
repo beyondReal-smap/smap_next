@@ -4817,3 +4817,37 @@ export default function LocationPage() {
 
     return newInfoWindow;
   };
+
+  // 🎯 메인 렌더링
+  return (
+    <div className="flex flex-col h-screen bg-gray-50">
+      {/* 헤더 */}
+      <div className="flex-shrink-0 bg-white shadow-sm border-b border-gray-200 z-10">
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between">
+            <h1 className="text-lg font-semibold text-gray-900">위치</h1>
+            <div className="flex items-center space-x-2">
+              {/* 추가 헤더 버튼들이 필요하면 여기에 */}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 메인 컨텐츠 */}
+      <div className="flex-1 relative">
+        {/* 지도 컨테이너 */}
+        <div id="map" className="w-full h-full"></div>
+        
+        {/* 로딩 상태 */}
+        {!isMapReady && (
+          <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-20">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+              <p className="text-sm text-gray-600">지도를 불러오는 중...</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
