@@ -173,4 +173,4 @@ To add more models based on `db_info.csv`:
 1.  Create a new file in the `models/` directory (e.g., `models/coupon.js` for `coupon_t`).
 2.  Define the Sequelize model in that file, similar to `models/member.js`, mapping the columns and data types from the CSV.
 3.  Sequelize will automatically pick up the new model file.
-4.  You might need to run `db.sequelize.sync({ alter: true })` again (or use migrations) to create/update the corresponding table in the database. 
+4.  You might need to run `db.sequelize.sync({ alter: true })` again (or use migrations) to create/update the corresponding table in the database. # Build fix Fri Oct 24 10:09:52 KST 2025
