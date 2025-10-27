@@ -1,52 +1,44 @@
-// Aligo SMS 설정
-const ALIGO_USER_ID = process.env.ALIGO_USER_ID || 'smap2023';
-const ALIGO_KEY = process.env.ALIGO_KEY || '6uvw7alcd1v1u6dx5thv31lzic8mxfrt';
-const ALIGO_SENDER = process.env.ALIGO_SENDER || '070-8065-2207';
+// Fixie 프록시를 통한 고정 IP SMS 발송
+// 백엔드 API를 통해 SMS 발송 (Fixie 프록시 사용)
 
-interface AligoResponse {
-  result_code: string;
-  message: string;
+const BACKEND_API_URL = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'https://api3.smap.site/api/v1';
+
+interface SMSResponse {
+  success: boolean;
+  code?: string;
+  message?: string;
+  error?: string;
   msg_id?: string;
-  success_cnt?: number;
-  error_cnt?: number;
-  msg_type?: string;
 }
 
-// 인증번호 생성 함수
+// 인증번호 생성 함수 (백엔드에서 생성하므로 더 이상 필요 없음)
 export function generateVerificationCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-// 인증번호 발송을 위한 함수
+// 인증번호 발송을 위한 함수 (백엔드 API 호출)
 export async function sendVerificationCode(phoneNumber: string): Promise<{ success: boolean; code?: string; error?: string }> {
   try {
-    const code = generateVerificationCode();
-    const message = `[SMAP] 인증번호는 ${code}입니다. 3분 이내에 입력해주세요.`;
+    console.log('[SMS] 백엔드 API를 통한 인증번호 발송 요청:', phoneNumber.substring(0, 3) + '***');
 
-    const formData = new FormData();
-    formData.append('user_id', ALIGO_USER_ID);
-    formData.append('key', ALIGO_KEY);
-    formData.append('msg', message);
-    formData.append('receiver', phoneNumber.replace(/[^0-9]/g, ''));
-    formData.append('destination', '');
-    formData.append('sender', ALIGO_SENDER);
-    formData.append('rdate', '');
-    formData.append('rtime', '');
-    formData.append('testmode_yn', 'N');
-    formData.append('title', 'SMAP 인증번호');
-    formData.append('msg_type', 'SMS');
-
-    const response = await fetch('https://apis.aligo.in/send/', {
+    const response = await fetch(`${BACKEND_API_URL}/sms/send-verification-code`, {
       method: 'POST',
-      body: formData,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        phone_number: phoneNumber
+      }),
     });
 
-    const result: AligoResponse = await response.json();
+    const result: SMSResponse = await response.json();
 
-    if (result.result_code === '1') {
-      return { success: true, code };
+    if (result.success) {
+      console.log('[SMS] 인증번호 발송 성공');
+      return { success: true, code: result.code };
     } else {
-      return { success: false, error: result.message };
+      console.error('[SMS] 인증번호 발송 실패:', result.error);
+      return { success: false, error: result.error };
     }
 
   } catch (error) {
@@ -55,33 +47,31 @@ export async function sendVerificationCode(phoneNumber: string): Promise<{ succe
   }
 }
 
-// 일반 SMS 발송 함수
+// 일반 SMS 발송 함수 (백엔드 API 호출)
 export async function sendSMS(phoneNumber: string, message: string, subject?: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const formData = new FormData();
-    formData.append('user_id', ALIGO_USER_ID);
-    formData.append('key', ALIGO_KEY);
-    formData.append('msg', message);
-    formData.append('receiver', phoneNumber.replace(/[^0-9]/g, ''));
-    formData.append('destination', '');
-    formData.append('sender', ALIGO_SENDER);
-    formData.append('rdate', '');
-    formData.append('rtime', '');
-    formData.append('testmode_yn', 'N');
-    formData.append('title', subject || '');
-    formData.append('msg_type', 'SMS');
+    console.log('[SMS] 백엔드 API를 통한 SMS 발송 요청:', phoneNumber.substring(0, 3) + '***');
 
-    const response = await fetch('https://apis.aligo.in/send/', {
+    const response = await fetch(`${BACKEND_API_URL}/sms/send`, {
       method: 'POST',
-      body: formData,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        phone_number: phoneNumber,
+        message: message,
+        subject: subject || 'SMAP'
+      }),
     });
 
-    const result: AligoResponse = await response.json();
+    const result: SMSResponse = await response.json();
 
-    if (result.result_code === '1') {
+    if (result.success) {
+      console.log('[SMS] SMS 발송 성공');
       return { success: true };
     } else {
-      return { success: false, error: result.message };
+      console.error('[SMS] SMS 발송 실패:', result.error);
+      return { success: false, error: result.error };
     }
 
   } catch (error) {
@@ -90,35 +80,33 @@ export async function sendSMS(phoneNumber: string, message: string, subject?: st
   }
 }
 
-// 비밀번호 재설정 링크 발송 함수
+// 비밀번호 재설정 링크 발송 함수 (백엔드 API 호출)
 export async function sendPasswordResetLink(phoneNumber: string, resetUrl: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const message = `[SMAP] 비밀번호 재설정 링크입니다.${resetUrl}`;
+    const message = `[SMAP] 비밀번호 재설정 링크입니다.\n${resetUrl}`;
 
-    const formData = new FormData();
-    formData.append('user_id', ALIGO_USER_ID);
-    formData.append('key', ALIGO_KEY);
-    formData.append('msg', message);
-    formData.append('receiver', phoneNumber.replace(/[^0-9]/g, ''));
-    formData.append('destination', '');
-    formData.append('sender', ALIGO_SENDER);
-    formData.append('rdate', '');
-    formData.append('rtime', '');
-    formData.append('testmode_yn', 'N');
-    formData.append('title', 'SMAP 비밀번호 재설정');
-    formData.append('msg_type', 'SMS');
+    console.log('[SMS] 백엔드 API를 통한 비밀번호 재설정 SMS 발송 요청:', phoneNumber.substring(0, 3) + '***');
 
-    const response = await fetch('https://apis.aligo.in/send/', {
+    const response = await fetch(`${BACKEND_API_URL}/sms/send`, {
       method: 'POST',
-      body: formData,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        phone_number: phoneNumber,
+        message: message,
+        subject: 'SMAP 비밀번호 재설정'
+      }),
     });
 
-    const result: AligoResponse = await response.json();
+    const result: SMSResponse = await response.json();
 
-    if (result.result_code === '1') {
+    if (result.success) {
+      console.log('[SMS] 비밀번호 재설정 SMS 발송 성공');
       return { success: true };
     } else {
-      return { success: false, error: result.message };
+      console.error('[SMS] 비밀번호 재설정 SMS 발송 실패:', result.error);
+      return { success: false, error: result.error };
     }
 
   } catch (error) {

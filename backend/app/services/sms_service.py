@@ -12,6 +12,13 @@ class SMSService:
         self.aligo_key = os.getenv('ALIGO_KEY', '6uvw7alcd1v1u6dx5thv31lzic8mxfrt')
         self.aligo_sender = os.getenv('ALIGO_SENDER', '070-8065-2207')
         self.aligo_url = 'https://apis.aligo.in/send/'
+        
+        # Fixie 프록시 설정 (고정 IP 사용)
+        self.fixie_url = os.getenv('FIXIE_URL')  # 예: http://fixie:PASSWORD@velodrome.usefixie.com:80
+        self.use_proxy = bool(self.fixie_url)
+        
+        if self.use_proxy:
+            logger.info(f"🔒 Fixie 프록시 사용: {self.fixie_url.split('@')[1] if '@' in self.fixie_url else 'enabled'}")
 
     async def send_sms(self, phone_number: str, message: str, subject: str = "SMAP") -> dict:
         """
@@ -39,8 +46,19 @@ class SMSService:
             logger.info(f"📱 SMS 발송 시도: {clean_phone[:3]}***")
             logger.info(f"📱 SMS API URL: {self.aligo_url}")
 
-            async with aiohttp.ClientSession() as session:
-                async with session.post(self.aligo_url, data=data) as response:
+            # 프록시 설정
+            connector = None
+            if self.use_proxy:
+                connector = aiohttp.TCPConnector()
+                logger.info(f"🔒 프록시를 통해 SMS 발송")
+
+            async with aiohttp.ClientSession(connector=connector) as session:
+                # 프록시 URL 설정
+                request_kwargs = {'data': data}
+                if self.use_proxy:
+                    request_kwargs['proxy'] = self.fixie_url
+                
+                async with session.post(self.aligo_url, **request_kwargs) as response:
                     # 응답 상태 코드 확인
                     logger.info(f"📱 SMS API 응답 상태: {response.status}")
                     

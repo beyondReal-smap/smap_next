@@ -854,6 +854,7 @@ export default function LocationPage() {
   // 중복 마커 생성으로 인한 깜빡임 방지용 시그니처
   const lastMarkersSignatureRef = useRef<string>('');
   const lastMarkerUpdateTimeRef = useRef<number>(0); // 🚨 중복 실행 방지를 위한 마지막 업데이트 시간
+  const isMarkerClickingRef = useRef<boolean>(false); // 🚨 마커 클릭 중인지 확인하는 플래그
   const [infoWindow, setInfoWindow] = useState<NaverInfoWindow | null>(null);
   const mapContainer = useRef<HTMLDivElement>(null);
   const tempMarker = useRef<NaverMarker | null>(null);
@@ -3288,6 +3289,12 @@ export default function LocationPage() {
 
       // 지도 클릭 이벤트
       window.naver.maps.Event.addListener(newMap, 'click', (e: any) => {
+        // 🚨 마커 클릭 중이면 지도 클릭 이벤트 무시 (이벤트 버블링 방지)
+        if (isMarkerClickingRef.current) {
+          console.log('[지도 클릭] 마커 클릭 중 - 지도 클릭 이벤트 무시');
+          return;
+        }
+        
         // 열려있는 InfoWindow가 있으면 닫기
         if (infoWindow) {
           console.log('[지도 클릭] InfoWindow 닫기');
@@ -4648,22 +4655,14 @@ export default function LocationPage() {
          window.naver.maps.Event.addListener(marker, 'click', () => {
            console.log(`[updateAllMarkers] 🎯 장소 마커 클릭: ${location.name} (${location.id})`);
            
+           // 🚨 마커 클릭 플래그 설정 (지도 클릭 이벤트 무시용)
+           isMarkerClickingRef.current = true;
+           
            // 🚨 기존 InfoWindow 닫기
            if (infoWindow) {
              console.log('[장소 마커 클릭] 기존 InfoWindow 닫기');
              infoWindow.close();
            }
-
-           // 🚨 선택 상태 즉시 업데이트 (색깔 변경)
-           const previousSelectedId = selectedLocationIdRef.current;
-           setSelectedLocationId(location.id);
-           selectedLocationIdRef.current = location.id;
-           
-           console.log('[장소 마커 클릭] 선택 상태 즉시 업데이트:', {
-             이전선택: previousSelectedId,
-             현재선택: location.id,
-             장소명: location.name
-           });
 
            // 🚨 장소 위치로 지도 중심 이동
            const [lng, lat] = location.coordinates;
@@ -4675,7 +4674,7 @@ export default function LocationPage() {
            
           map.setCenter(position);
 
-           // 🚨 InfoWindow 즉시 생성 및 표시
+           // 🚨 1단계: InfoWindow 즉시 생성 및 표시 (마커 스타일 업데이트 전에!)
            const newInfoWindow = createLocationInfoWindow(
              location.name || (location as any).slt_title || '제목 없음', 
              location.address || (location as any).slt_add || '주소 정보 없음', 
@@ -4684,11 +4683,39 @@ export default function LocationPage() {
            newInfoWindow.open(map, marker);
            setInfoWindow(newInfoWindow);
            
-           console.log('[장소 마커 클릭] InfoWindow 즉시 생성 및 표시 완료:', {
+           console.log('[장소 마커 클릭] InfoWindow 즉시 생성 및 표시 완료 (최우선):', {
              장소명: location.name,
              InfoWindow: !!newInfoWindow,
              마커: !!marker
            });
+
+           // 🚨 2단계: ref 업데이트
+           const previousSelectedId = selectedLocationIdRef.current;
+           selectedLocationIdRef.current = location.id;
+           
+           console.log('[장소 마커 클릭] ref 업데이트:', {
+             이전선택: previousSelectedId,
+             현재선택: location.id,
+             장소명: location.name
+           });
+
+           // 🚨 3단계: 마커 스타일 업데이트 (InfoWindow 표시 후)
+           // setTimeout을 사용하여 InfoWindow가 완전히 표시된 후 마커 스타일 업데이트
+           setTimeout(() => {
+             updateAllLocationMarkerStyles(location.id);
+             console.log('[장소 마커 클릭] 마커 스타일 업데이트 완료 (InfoWindow 표시 후)');
+           }, 10);
+
+           // 🚨 4단계: 선택 상태 업데이트 (React 상태 동기화)
+           setTimeout(() => {
+             setSelectedLocationId(location.id);
+             console.log('[장소 마커 클릭] 선택 상태 업데이트 완료');
+             
+             // 🚨 마커 클릭 플래그 리셋 (약간의 지연 후 - 지도 클릭 이벤트가 처리된 후)
+             setTimeout(() => {
+               isMarkerClickingRef.current = false;
+             }, 100);
+           }, 20);
          });
         
         // 🚨 마커 생성 직후 지도 표시 상태 강제 확인 및 설정
@@ -5115,7 +5142,94 @@ export default function LocationPage() {
       }
     });
   };
+  // 🚨 모든 장소 마커의 스타일을 업데이트하는 헬퍼 함수 (이벤트 리스너 제거 방지)
+  const updateAllLocationMarkerStyles = useCallback((selectedId: string | null) => {
+    if (!selectedMemberSavedLocations || !locationMarkersRef.current || locationMarkersRef.current.length === 0) {
+      return;
+    }
+    
+    console.log('[updateAllLocationMarkerStyles] 모든 장소 마커 스타일 업데이트 시작:', selectedId);
+    
+    locationMarkersRef.current.forEach((m, idx) => {
+      const loc = selectedMemberSavedLocations[idx];
+      if (loc && m) {
+        const isSelected = loc.id === selectedId || loc.slt_idx?.toString() === selectedId;
+        const markerColor = isSelected ? '#ef4444' : '#3b82f6';
+        
+        m.setIcon({
+          content: `
+            <div style="position: relative; text-align: center;">
+              <div style="
+                width: 28px;
+                height: 28px;
+                background-color: white;
+                border: 2px solid ${markerColor};
+                border-radius: 50%;
+                overflow: hidden;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+                position: relative;
+                z-index: ${isSelected ? '200' : '150'};
+                transition: all 0.3s ease;
+              ">
+                <svg width="16" height="16" fill="${markerColor}" viewBox="0 0 24 24">
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"/>
+                </svg>
+              </div>
+              
+              ${isSelected ? `
+                <div style="
+                  position: absolute;
+                  top: 50%;
+                  left: 50%;
+                  transform: translate(-50%, -50%);
+                  width: 40px;
+                  height: 40px;
+                  background: rgba(245, 158, 11, 0.2);
+                  border-radius: 50%;
+                  animation: selectedGlow 2s ease-in-out infinite;
+                  z-index: 140;
+                "></div>
+              ` : ''}
+              
+              <div style="
+                position: absolute;
+                bottom: -18px;
+                left: 50%;
+                transform: translateX(-50%);
+                background-color: rgba(0,0,0,0.7);
+                color: white;
+                padding: 2px 5px;
+                border-radius: 3px;
+                white-space: nowrap;
+                font-size: 10px;
+                font-weight: 500;
+                pointer-events: none;
+              ">${loc.name || (loc as any).slt_title || '제목 없음'}</div>
+            </div>
+          `,
+          anchor: new window.naver.maps.Point(14, 14)
+        });
+        m.setZIndex(isSelected ? 200 : 150);
+      }
+    });
+    
+    console.log('[updateAllLocationMarkerStyles] 모든 장소 마커 스타일 업데이트 완료');
+  }, [selectedMemberSavedLocations]);
+
   // 선택된 장소가 변경될 때만 마커 스타일 업데이트 (무한 루프 방지)
+  // 🚨 완전히 비활성화 - 마커 클릭 시 updateAllLocationMarkerStyles()로 이미 스타일 업데이트하므로 중복 실행 방지
+  // 이 useEffect가 실행되면 setIcon으로 인해 이벤트 리스너가 사라질 수 있음
+  useEffect(() => {
+    // 🚨 마커 클릭으로 인한 업데이트는 이미 완료되었으므로 건너뜀
+    console.log('[useEffect] 선택된 장소 변경 감지 - updateAllLocationMarkerStyles()로 이미 업데이트됨, 건너뜀');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLocationId]); // selectedLocationId가 변경될 때만 실행
+  
+  // 🚨 아래 코드는 비활성화됨 (주석 처리)
+  /*
   useEffect(() => {
     if (selectedMemberSavedLocations && selectedMemberSavedLocations.length > 0 && markers.length > 0) {
       console.log('[useEffect] 선택된 장소 변경으로 마커 스타일 업데이트:', selectedLocationIdRef.current);
@@ -5206,7 +5320,8 @@ export default function LocationPage() {
         }
       });
     }
-  }, [selectedLocationId]); // selectedLocationId가 변경될 때만 실행
+  }, [selectedLocationId]);
+  */
 
 
   // 🚨 멤버 InfoWindow 생성 함수 - 강화된 버전
@@ -5646,8 +5761,12 @@ export default function LocationPage() {
     const previousSelectedId = selectedLocationIdRef.current;
     
     // 상태 업데이트
-    setSelectedLocationId(locationId);
     selectedLocationIdRef.current = locationId;
+    
+    // 🚨 마커 스타일 업데이트 (이벤트 리스너 제거 방지)
+    updateAllLocationMarkerStyles(locationId);
+    
+    setSelectedLocationId(locationId);
     
     console.log('[handleLocationCardClick] 장소 선택됨:', locationId, location.name || location.slt_title, '이전 선택:', previousSelectedId);
     
@@ -5895,6 +6014,10 @@ export default function LocationPage() {
         // 1. 선택 상태 업데이트 (즉시 ref와 state 모두 업데이트)
         const previousSelectedId = selectedLocationIdRef.current;
         selectedLocationIdRef.current = location.id;
+        
+        // 🚨 마커 스타일 업데이트 (이벤트 리스너 제거 방지)
+        updateAllLocationMarkerStyles(location.id);
+        
         setSelectedLocationId(location.id); // 🚨 state도 즉시 업데이트
         
         console.log('[handleLocationSelect] 장소 선택됨:', location.id, location.name, '이전 선택:', previousSelectedId);
