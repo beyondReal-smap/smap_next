@@ -2211,13 +2211,76 @@ export default function LocationPage() {
         // 첫번째 멤버 자동 선택 완료 (InfoWindow도 표시)
         if (convertedMembers.length > 0) {
           const firstSelectedMember = convertedMembers.find(m => m.isSelected) || convertedMembers[0];
-          console.log('[fetchGroupMembersData] 첫번째 멤버 자동 선택 처리 완료:', firstSelectedMember.name, '- InfoWindow도 표시');
+          console.log('[fetchGroupMembersData] 첫번째 멤버 자동 선택 처리 완료:', firstSelectedMember.name, '- 장소 데이터 미리 로드');
 
-          // handleMemberSelectCore 호출로 마커 업데이트 포함 (InfoWindow도 표시)
-          setTimeout(() => {
-            console.log('[fetchGroupMembersData] 첫 번째 멤버 handleMemberSelectCore 호출:', firstSelectedMember.name);
-            handleMemberSelectCore(firstSelectedMember.id, false, convertedMembers, false, null, false); // InfoWindow도 표시
-          }, 500); // 지도와 마커 생성 완료를 위한 충분한 지연
+          // 🚨 첫 번째 멤버의 장소 데이터 미리 로드하여 마커 표시 보장
+          (async () => {
+            try {
+              console.log('[fetchGroupMembersData] 첫 번째 멤버 장소 데이터 로드 시작:', firstSelectedMember.id);
+              const memberLocationsRaw = await locationService.getOtherMembersLocations(firstSelectedMember.id);
+              
+              if (memberLocationsRaw && memberLocationsRaw.length > 0) {
+                console.log('[fetchGroupMembersData] 첫 번째 멤버 장소 데이터 로드 완료:', memberLocationsRaw.length, '개');
+                
+                // LocationData 형식으로 변환
+                const convertedLocations: LocationData[] = memberLocationsRaw.map(loc => ({
+                  id: loc.slt_idx?.toString() || '',
+                  name: loc.slt_title || '',
+                  address: loc.slt_add || '',
+                  coordinates: [
+                    parseFloat(String(loc.slt_long || '0')) || 0,
+                    parseFloat(String(loc.slt_lat || '0')) || 0
+                  ] as [number, number],
+                  notifications: loc.slt_enter_alarm === 'Y',
+                  favorite: true, // 기본값
+                  category: '', // 기본값
+                  memo: '', // 기본값
+                  slt_idx: loc.slt_idx,
+                  slt_title: loc.slt_title || undefined,
+                  slt_add: loc.slt_add || undefined,
+                  slt_long: loc.slt_long || undefined,
+                  slt_lat: loc.slt_lat || undefined,
+                  slt_enter_alarm: loc.slt_enter_alarm
+                }));
+                
+                // 첫 번째 멤버 정보에 장소 데이터 추가
+                const updatedMembers = convertedMembers.map(member => {
+                  if (member.id === firstSelectedMember.id) {
+                    return {
+                      ...member,
+                      savedLocations: convertedLocations,
+                      savedLocationCount: convertedLocations.length
+                    };
+                  }
+                  return member;
+                });
+                
+                // 상태 업데이트
+                setGroupMembers(updatedMembers);
+                setSelectedMemberSavedLocations(convertedLocations);
+                
+                console.log('[fetchGroupMembersData] 첫 번째 멤버 장소 데이터 상태 업데이트 완료');
+                
+                // handleMemberSelectCore 호출로 마커 업데이트 포함 (InfoWindow도 표시)
+                setTimeout(() => {
+                  console.log('[fetchGroupMembersData] 첫 번째 멤버 handleMemberSelectCore 호출:', firstSelectedMember.name);
+                  handleMemberSelectCore(firstSelectedMember.id, false, updatedMembers, false, null, false); // InfoWindow도 표시
+                }, 300); // 상태 업데이트 완료를 위한 짧은 지연
+              } else {
+                console.log('[fetchGroupMembersData] 첫 번째 멤버에 장소 데이터 없음');
+                // 장소 데이터가 없어도 handleMemberSelectCore 호출
+                setTimeout(() => {
+                  handleMemberSelectCore(firstSelectedMember.id, false, convertedMembers, false, null, false);
+                }, 300);
+              }
+            } catch (error) {
+              console.error('[fetchGroupMembersData] 첫 번째 멤버 장소 데이터 로드 실패:', error);
+              // 실패해도 handleMemberSelectCore 호출
+              setTimeout(() => {
+                handleMemberSelectCore(firstSelectedMember.id, false, convertedMembers, false, null, false);
+              }, 300);
+            }
+          })();
         }
       } else {
         console.warn('[fetchGroupMembersData] 그룹멤버 데이터가 없거나 비어있습니다.');
