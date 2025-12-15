@@ -694,12 +694,18 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
         let currentStatus = LocationService.sharedInstance.locationAuthStatus
         print("현재 위치 권한 상태: \(currentStatus?.rawValue ?? -1)")
         
+        // ✅ authorizedWhenInUse 또는 authorizedAlways면 충분한 권한으로 간주 - 다이얼로그 표시 안함
         if currentStatus == .authorizedWhenInUse {
-            print("✅ 위치 권한이 '앱 사용 중'으로 허용되어 있음 (기본적으로 충분함)")
+            print("✅ 위치 권한이 '앱 사용 중'으로 허용되어 있음 (충분함)")
+            return
         } else if currentStatus == .authorizedAlways {
             print("✅ 위치 권한이 '항상 허용'으로 설정되어 있음")
-        } else if currentStatus != .authorizedAlways {
-            print("⚠️ 위치 권한이 '항상 허용'으로 설정되지 않음 (현재: \(currentStatus?.rawValue ?? -1))")
+            return
+        }
+        
+        // 권한이 denied 또는 restricted인 경우에만 다이얼로그 표시
+        if currentStatus == .denied || currentStatus == .restricted {
+            print("⚠️ 위치 권한이 거부되어 있음 (현재: \(currentStatus?.rawValue ?? -1))")
             let mt_idx = Utils.shared.getMtIdx()
             if !mt_idx.isEmpty {
                 print("mt_idx가 비어있지 않음: \(mt_idx)")
@@ -709,7 +715,7 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
 
                 let alert = UIAlertController(title: title,
                                             message: message, preferredStyle: .alert)
-                let confirm = UIAlertAction(title: NSLocalizedString("LOCATION_PERMISSION_SETTINGS_BUTTON", comment: ""), style: .default) { action in
+                let confirm = UIAlertAction(title: NSLocalizedString("LOCATION_PERMISSION_SETTINGS", comment: ""), style: .default) { action in
                     guard let url = URL(string: UIApplication.openSettingsURLString) else { 
                         print("설정 URL을 생성할 수 없음")
                         return 
@@ -722,7 +728,7 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
                         print("설정 URL을 열 수 없음")
                     }
                 }
-                let cancel = UIAlertAction(title: NSLocalizedString("LOCATION_PERMISSION_CANCEL_BUTTON", comment: ""), style: .cancel)
+                let cancel = UIAlertAction(title: NSLocalizedString("LOCATION_PERMISSION_CANCEL", comment: ""), style: .cancel)
                 
                 alert.addAction(confirm)
                 alert.addAction(cancel)
@@ -732,11 +738,8 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
             } else {
                 print("mt_idx가 비어있음")
             }
-        }
-        
-        // Always 권한 또는 WhenInUse 권한이 있으면 정상으로 간주
-        if currentStatus == .authorizedAlways || currentStatus == .authorizedWhenInUse {
-            print("✅ 위치 권한이 적절히 설정되어 있음")
+        } else {
+            print("📍 위치 권한 상태가 notDetermined 또는 기타 - 다이얼로그 표시 안함")
         }
     }
     
