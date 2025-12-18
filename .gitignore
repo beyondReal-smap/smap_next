@@ -153,6 +153,19 @@ cover/
 !iOS_next/
 !iOS_next/**
 
+# iOS Pods (CocoaPods dependencies - should be installed via `pod install`)
+iOS/Pods/
+
+# iOS Xcode user data (not needed in version control)
+iOS/**/*.xcuserstate
+iOS/**/*.xcuserdatad/
+iOS/**/xcuserdata/
+*.xcuserstate
+
+# iOS build outputs
+iOS/build/
+iOS/DerivedData/
+
 # Android 프로젝트 관련 제외
 AndroidWebView/.gradle/
 AndroidWebView/app/build/
