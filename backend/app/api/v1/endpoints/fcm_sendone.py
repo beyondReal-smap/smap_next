@@ -104,10 +104,8 @@ def send_fcm_push_notification(
 
         if not member.mt_token_id:
             logger.debug("앱 토큰이 존재하지 않아 푸시 발송 실패")
-            # 상태 4: 토큰 없음
-            push_log = create_push_log(args, member.mt_idx, 4, db)
-            db.add(push_log)
-            db.commit()
+            # 푸시 로그는 호출하는 쪽에서 저장하므로 여기서는 저장하지 않음 (중복 방지)
+            # push_log는 호출하는 쪽에서 push_log_add를 통해 저장됨
             return create_response(
                 FAILURE,
                 "푸시발송(단건) 실패",
@@ -144,10 +142,8 @@ def send_fcm_push_notification(
         # Firebase 사용 가능 여부 확인
         if not firebase_service.is_available():
             logger.debug("Firebase가 사용 불가능하여 푸시 발송 실패")
-            # 상태 5: Firebase 사용 불가
-            push_log = create_push_log(args, member.mt_idx, 5, db)
-            db.add(push_log)
-            db.commit()
+            # 푸시 로그는 호출하는 쪽에서 저장하므로 여기서는 저장하지 않음 (중복 방지)
+            # push_log는 호출하는 쪽에서 push_log_add를 통해 저장됨
             return create_response(
                 FAILURE, 
                 "푸시발송(단건) 실패", 
@@ -157,15 +153,14 @@ def send_fcm_push_notification(
         # FCM 토큰 최종 검증 (개선된 버전)
         if not member.mt_token_id or len(str(member.mt_token_id).strip()) == 0:
             logger.warning(f"🚨 [FCM] 토큰이 비어있음 - 회원: {member.mt_idx}")
-            push_log = create_push_log(args, member.mt_idx, 4, db)  # 상태 4: 토큰 없음
-            db.add(push_log)
-            db.commit()
+            # 푸시 로그는 호출하는 쪽에서 저장하므로 여기서는 저장하지 않음 (중복 방지)
+            # push_log는 호출하는 쪽에서 push_log_add를 통해 저장됨
             return create_response(
                 FAILURE,
                 "푸시발송(단건) 실패 - 토큰 없음",
                 "FCM 토큰이 존재하지 않습니다. 앱을 재시작하여 새로운 토큰을 받아주세요."
             )
-        
+    
         # FCM 토큰 형식 검증 (서버 레벨에서 한 번 더 검증)
         if not firebase_service._validate_fcm_token(member.mt_token_id):
             logger.warning(f"🚨 [FCM] 잘못된 토큰 형식 - 회원: {member.mt_idx}, 토큰: {member.mt_token_id[:50]}...")
@@ -181,9 +176,8 @@ def send_fcm_push_notification(
             except Exception as cleanup_error:
                 logger.error(f"❌ [FCM] 토큰 무효화 처리 실패: {cleanup_error}")
             
-            push_log = create_push_log(args, member.mt_idx, 4, db)  # 상태 4: 토큰 문제
-            db.add(push_log)
-            db.commit()
+            # 푸시 로그는 호출하는 쪽에서 저장하므로 여기서는 저장하지 않음 (중복 방지)
+            # push_log는 호출하는 쪽에서 push_log_add를 통해 저장됨
             return create_response(
                 FAILURE,
                 "푸시발송(단건) 실패 - 잘못된 토큰",
@@ -218,10 +212,8 @@ def send_fcm_push_notification(
             # FCM 토큰 존재 여부 확인
             if not member.mt_token_id or member.mt_token_id.strip() == "":
                 logger.warning(f"🚨 [FCM] FCM 토큰이 없음 - 회원: {member.mt_idx}, 건너뜀")
-                # 상태 4: 토큰 없음
-                push_log = create_push_log(args, member.mt_idx, 4, db)
-                db.add(push_log)
-                db.commit()
+                # 푸시 로그는 호출하는 쪽에서 저장하므로 여기서는 저장하지 않음 (중복 방지)
+                # push_log는 호출하는 쪽에서 push_log_add를 통해 저장됨
                 return create_response(
                     FAILURE,
                     "푸시발송(단건) 실패",
@@ -238,10 +230,8 @@ def send_fcm_push_notification(
             logger.info(f"✅ [FCM] Firebase 전송 성공 - 응답: {response}")
             logger.debug(f"📊 [FCM] 메시지 ID: {response}")
             
-            # 상태 2: 전송 성공
-            push_log = create_push_log(args, member.mt_idx, 2, db)
-            db.add(push_log)
-            db.commit()
+            # 푸시 로그는 호출하는 쪽에서 저장하므로 여기서는 저장하지 않음 (중복 방지)
+            # push_log는 호출하는 쪽에서 push_log_add를 통해 저장됨
 
             logger.debug("푸시 발송 성공")
             return create_response(
@@ -267,10 +257,8 @@ def send_fcm_push_notification(
             except Exception as cleanup_error:
                 logger.error(f"❌ [FCM TOKEN CLEANUP] 토큰 무효화 처리 실패: {cleanup_error}")
 
-            # 상태 4: 토큰 만료로 인한 실패
-            push_log = create_push_log(args, member.mt_idx, 4, db)
-            db.add(push_log)
-            db.commit()
+            # 푸시 로그는 호출하는 쪽에서 저장하므로 여기서는 저장하지 않음 (중복 방지)
+            # push_log는 호출하는 쪽에서 push_log_add를 통해 저장됨
 
             return create_response(
                 FAILURE,
@@ -294,10 +282,8 @@ def send_fcm_push_notification(
             except Exception as cleanup_error:
                 logger.error(f"❌ [FCM TOKEN CLEANUP] ThirdPartyAuthError 토큰 무효화 처리 실패: {cleanup_error}")
 
-            # 상태 5: 토큰 형식 오류
-            push_log = create_push_log(args, member.mt_idx, 5, db)
-            db.add(push_log)
-            db.commit()
+            # 푸시 로그는 호출하는 쪽에서 저장하므로 여기서는 저장하지 않음 (중복 방지)
+            # push_log는 호출하는 쪽에서 push_log_add를 통해 저장됨
 
             return create_response(
                 FAILURE,
@@ -327,10 +313,8 @@ def send_fcm_push_notification(
                     except Exception as cleanup_error:
                         logger.error(f"❌ [FCM] 토큰 무효화 처리 실패: {cleanup_error}")
             
-            # 상태 3: 전송 실패
-            push_log = create_push_log(args, member.mt_idx, 3, db)
-            db.add(push_log)
-            db.commit()
+            # 푸시 로그는 호출하는 쪽에서 저장하므로 여기서는 저장하지 않음 (중복 방지)
+            # push_log는 호출하는 쪽에서 push_log_add를 통해 저장됨
 
             # 사용자 친화적인 에러 메시지
             user_message = "푸시 메시지 전송에 실패했습니다."

@@ -1,0 +1,84 @@
+# Uncomment the next line to define a global platform for your project
+platform :ios, '13.0'
+inhibit_all_warnings!
+
+target 'smap' do
+  # Comment the next line if you don't want to use dynamic frameworks
+  use_frameworks!
+
+  # 네트워킹
+  pod 'Alamofire', '~> 5.5'
+  
+  # 키보드 관리
+  pod 'IQKeyboardManagerSwift'
+  
+  # Firebase (푸시 알림 등)
+  pod 'Firebase/Auth'
+  pod 'Firebase/Core'
+  pod 'Firebase/Messaging'
+  
+  # Google Sign-In SDK
+  pod 'GoogleSignIn', '~> 7.0'
+  # AppAuth 최신 버전 명시(경고 개선 및 호환성)
+  pod 'AppAuth', '~> 1.7'
+  
+  # Kakao SDK (네이티브 로그인)
+  pod 'KakaoSDKCommon', '~> 2.22'
+  pod 'KakaoSDKAuth', '~> 2.22'
+  pod 'KakaoSDKUser', '~> 2.22'
+  
+  # UI 컴포넌트
+  pod 'SnackBar.swift'
+  
+  # 인앱 결제 (필요한 경우)
+  pod 'SwiftyStoreKit'
+  
+  # 웹뷰 최적화를 위한 추가 라이브러리
+  pod 'SDWebImage', '~> 5.0'  # 이미지 캐싱
+  
+  # 광고 (필요한 경우 - 배포시 주석 해제)
+  # pod 'Google-Mobile-Ads-SDK'
+
+  # Pods for smap
+
+end
+
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+      # Swift 6 언어 모드로 인한 Pods 빌드 오류 방지: Swift 5 모드 강제
+      config.build_settings['SWIFT_VERSION'] = '5.9'
+      # 엄격 동시성 수준 완화(서드파티 라이브러리 호환 목적)
+      config.build_settings['SWIFT_STRICT_CONCURRENCY'] = 'minimal'
+    end
+
+    # Xcode 15+/16에서 .xcprivacy가 Compile Sources에 들어간 경우 Resources로 이동
+    if target.respond_to?(:source_build_phase) && target.respond_to?(:resources_build_phase)
+      begin
+        source_phase = target.source_build_phase
+        resources_phase = target.resources_build_phase
+        if source_phase && resources_phase
+          files_to_move = []
+          source_phase.files.each do |build_file|
+            ref = build_file.file_ref
+            next unless ref && ref.path && ref.path.end_with?('.xcprivacy')
+            files_to_move << build_file
+          end
+          files_to_move.each do |build_file|
+            ref = build_file.file_ref
+            source_phase.remove_build_file(build_file)
+            unless resources_phase.files.any? { |f| f.file_ref == ref }
+              resources_phase.add_file_reference(ref, true)
+            end
+            if ref.last_known_file_type.nil? && ref.explicit_file_type.nil?
+              ref.last_known_file_type = 'text.xml'
+            end
+          end
+        end
+      rescue => e
+        puts "[post_install] xcprivacy 처리 중 예외: #{e}"
+      end
+    end
+  end
+end

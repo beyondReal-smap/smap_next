@@ -3616,11 +3616,21 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             object: nil,
             queue: .main
         ) { _ in
-            print("⚠️ [SMAP-iOS] 메모리 경고 수신, 캐시 정리 수행")
-            // WebView 캐시 정리
+            print("⚠️ [SMAP-iOS] 메모리 경고 수신, 캐시 정리 수행 (쿠키/세션 보존)")
+            // URL 캐시만 정리 (쿠키/세션은 보존하여 로그인 유지)
             URLCache.shared.removeAllCachedResponses()
-            WKWebsiteDataStore.default().removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: Date.distantPast) { 
-                print("✅ [SMAP-iOS] WebView 데이터 정리 완료")
+            
+            // ⚠️ 로그인 세션 유지를 위해 쿠키/세션은 삭제하지 않음
+            // 캐시만 삭제 (diskCache, memoryCache, fetchCache)
+            let cacheDataTypes: Set<String> = [
+                WKWebsiteDataTypeDiskCache,
+                WKWebsiteDataTypeMemoryCache,
+                WKWebsiteDataTypeFetchCache,
+                WKWebsiteDataTypeOfflineWebApplicationCache
+            ]
+            
+            WKWebsiteDataStore.default().removeData(ofTypes: cacheDataTypes, modifiedSince: Date.distantPast) {
+                print("✅ [SMAP-iOS] WebView 캐시 정리 완료 (쿠키/세션 보존됨)")
             }
         }
         

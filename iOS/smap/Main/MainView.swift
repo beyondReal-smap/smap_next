@@ -293,15 +293,174 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
         let permGuardUserScript = WKUserScript(source: permissionGuardScript, injectionTime: .atDocumentStart, forMainFrameOnly: false)
         self.web_view.configuration.userContentController.addUserScript(permGuardUserScript)
         
+        // 🌍 Geolocation 오버라이드 스크립트: 웹의 위치 요청을 네이티브로 가로채서 시스템 alert 반복 방지
+        let geolocationOverrideScript = """
+            (function(){
+                try {
+                    if (window.__SMAP_GEOLOCATION_OVERRIDE_INSTALLED__) return;
+                    window.__SMAP_GEOLOCATION_OVERRIDE_INSTALLED__ = true;
+                    
+                    console.log('[SMAP-GEO] Geolocation override 설치 시작');
+                    
+                    // 위치 정보 캐시 (네이티브에서 주입)
+                    window.__SMAP_CACHED_POSITION__ = null;
+                    window.__SMAP_GEO_PERMISSION_GRANTED__ = false;
+                    
+                    // 콜백 저장소
+                    window.__SMAP_GEO_CALLBACKS__ = [];
+                    window.__SMAP_GEO_WATCH_CALLBACKS__ = {};
+                    window.__SMAP_GEO_WATCH_ID__ = 0;
+                    
+                    // 네이티브에서 위치 정보 수신 함수
+                    window.SMAP_SET_LOCATION = function(latitude, longitude, accuracy, timestamp) {
+                        console.log('[SMAP-GEO] 네이티브 위치 수신:', latitude, longitude);
+                        window.__SMAP_CACHED_POSITION__ = {
+                            coords: {
+                                latitude: latitude,
+                                longitude: longitude,
+                                accuracy: accuracy || 10,
+                                altitude: null,
+                                altitudeAccuracy: null,
+                                heading: null,
+                                speed: null
+                            },
+                            timestamp: timestamp || Date.now()
+                        };
+                        window.__SMAP_GEO_PERMISSION_GRANTED__ = true;
+                        
+                        // 대기 중인 콜백 실행
+                        while (window.__SMAP_GEO_CALLBACKS__.length > 0) {
+                            var cb = window.__SMAP_GEO_CALLBACKS__.shift();
+                            try {
+                                cb.success(window.__SMAP_CACHED_POSITION__);
+                            } catch(e) {
+                                console.error('[SMAP-GEO] 콜백 실행 오류:', e);
+                            }
+                        }
+                        
+                        // watch 콜백 실행
+                        for (var watchId in window.__SMAP_GEO_WATCH_CALLBACKS__) {
+                            try {
+                                window.__SMAP_GEO_WATCH_CALLBACKS__[watchId](window.__SMAP_CACHED_POSITION__);
+                            } catch(e) {
+                                console.error('[SMAP-GEO] watch 콜백 실행 오류:', e);
+                            }
+                        }
+                    };
+                    
+                    // 위치 권한 거부 처리 함수
+                    window.SMAP_GEO_DENIED = function() {
+                        console.log('[SMAP-GEO] 위치 권한 거부됨');
+                        var error = {
+                            code: 1, // PERMISSION_DENIED
+                            message: '위치 권한이 거부되었습니다'
+                        };
+                        
+                        while (window.__SMAP_GEO_CALLBACKS__.length > 0) {
+                            var cb = window.__SMAP_GEO_CALLBACKS__.shift();
+                            if (cb.error) {
+                                try { cb.error(error); } catch(e) {}
+                            }
+                        }
+                    };
+                    
+                    // navigator.geolocation.getCurrentPosition 오버라이드
+                    var originalGetCurrentPosition = navigator.geolocation.getCurrentPosition.bind(navigator.geolocation);
+                    navigator.geolocation.getCurrentPosition = function(successCallback, errorCallback, options) {
+                        console.log('[SMAP-GEO] getCurrentPosition 호출됨');
+                        
+                        // 이미 권한이 부여되고 캐시된 위치가 있으면 바로 반환
+                        if (window.__SMAP_GEO_PERMISSION_GRANTED__ && window.__SMAP_CACHED_POSITION__) {
+                            console.log('[SMAP-GEO] 캐시된 위치 사용');
+                            setTimeout(function() {
+                                successCallback(window.__SMAP_CACHED_POSITION__);
+                            }, 0);
+                            return;
+                        }
+                        
+                        // 콜백 저장
+                        window.__SMAP_GEO_CALLBACKS__.push({
+                            success: successCallback,
+                            error: errorCallback
+                        });
+                        
+                        // 네이티브에 위치 요청
+                        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.smapIos) {
+                            console.log('[SMAP-GEO] 네이티브에 위치 요청');
+                            window.webkit.messageHandlers.smapIos.postMessage({
+                                type: 'requestGeolocation',
+                                timestamp: Date.now()
+                            });
+                        } else {
+                            console.warn('[SMAP-GEO] smapIos 핸들러 없음, 원본 사용');
+                            originalGetCurrentPosition(successCallback, errorCallback, options);
+                        }
+                    };
+                    
+                    // navigator.geolocation.watchPosition 오버라이드
+                    var originalWatchPosition = navigator.geolocation.watchPosition.bind(navigator.geolocation);
+                    navigator.geolocation.watchPosition = function(successCallback, errorCallback, options) {
+                        console.log('[SMAP-GEO] watchPosition 호출됨');
+                        
+                        var watchId = ++window.__SMAP_GEO_WATCH_ID__;
+                        window.__SMAP_GEO_WATCH_CALLBACKS__[watchId] = successCallback;
+                        
+                        // 캐시된 위치가 있으면 바로 반환
+                        if (window.__SMAP_GEO_PERMISSION_GRANTED__ && window.__SMAP_CACHED_POSITION__) {
+                            setTimeout(function() {
+                                successCallback(window.__SMAP_CACHED_POSITION__);
+                            }, 0);
+                        }
+                        
+                        // 네이티브에 위치 구독 요청
+                        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.smapIos) {
+                            window.webkit.messageHandlers.smapIos.postMessage({
+                                type: 'watchGeolocation',
+                                watchId: watchId,
+                                timestamp: Date.now()
+                            });
+                        }
+                        
+                        return watchId;
+                    };
+                    
+                    // navigator.geolocation.clearWatch 오버라이드
+                    var originalClearWatch = navigator.geolocation.clearWatch.bind(navigator.geolocation);
+                    navigator.geolocation.clearWatch = function(watchId) {
+                        console.log('[SMAP-GEO] clearWatch 호출됨:', watchId);
+                        delete window.__SMAP_GEO_WATCH_CALLBACKS__[watchId];
+                        
+                        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.smapIos) {
+                            window.webkit.messageHandlers.smapIos.postMessage({
+                                type: 'clearGeolocationWatch',
+                                watchId: watchId
+                            });
+                        }
+                    };
+                    
+                    console.log('[SMAP-GEO] Geolocation override 설치 완료');
+                } catch(e) {
+                    console.error('[SMAP-GEO] 설치 오류:', e);
+                }
+            })();
+        """
+        let geolocationUserScript = WKUserScript(source: geolocationOverrideScript, injectionTime: .atDocumentStart, forMainFrameOnly: false)
+        self.web_view.configuration.userContentController.addUserScript(geolocationUserScript)
+        
         self.web_view.navigationDelegate = self
         self.web_view.uiDelegate = self
         self.web_view.allowsBackForwardNavigationGestures = false
         self.web_view.setKeyboardRequiresUserInteraction(false)
     
+        // ⚠️ 로그인 세션 유지를 위해 웹사이트 데이터 삭제 비활성화
+        // 이전에는 앱 시작 시 모든 쿠키/세션을 삭제하여 로그인이 유지되지 않았음
+        // 아래 코드를 주석 처리하여 쿠키/세션이 유지되도록 함 (2주 이상 로그인 유지)
+        /*
         WKWebsiteDataStore.default().fetchDataRecords(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), completionHandler: {
             records -> Void in
             records.forEach { WKWebsiteDataStore.default().removeData(ofTypes: $0.dataTypes, for: [$0], completionHandler: {}) }
         })
+        */
     
         let location = LocationService.sharedInstance.getLastLocation()
         var urlString = Http.shared.getWebBaseURL() + "auth?mt_token_id=%@"
@@ -2023,6 +2182,15 @@ extension MainView {
             }
         }
         
+        // 🌍 Geolocation 사전 주입: 위치 권한이 있다면 미리 위치 정보를 웹에 주입하여 alert 방지
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            let status = LocationService.sharedInstance.locationAuthStatus
+            if status == .authorizedWhenInUse || status == .authorizedAlways {
+                print("🌍 [GEOLOCATION] 페이지 로드 완료 - 위치 정보 사전 주입")
+                self.preInjectLocationToWeb()
+            }
+        }
+        
         // 로딩 인디케이터 숨김
         DispatchQueue.main.async {
             self.hideLoading()
@@ -2535,6 +2703,27 @@ extension MainView {
                 // 광고 기능 비활성화됨 (웹뷰 앱에서는 사용하지 않음)
                 print("광고 기능이 비활성화되었습니다.")
                 break
+                
+            // 🌍 Geolocation 요청 처리 (웹 위치 권한 alert 반복 방지)
+            case "requestGeolocation":
+                print("🌍 [GEOLOCATION] 웹에서 위치 요청 수신")
+                self.handleGeolocationRequest()
+                break
+                
+            case "watchGeolocation":
+                print("🌍 [GEOLOCATION] 웹에서 위치 구독 요청 수신")
+                if let watchId = body["watchId"] as? Int {
+                    self.handleWatchGeolocation(watchId: watchId)
+                }
+                break
+                
+            case "clearGeolocationWatch":
+                print("🌍 [GEOLOCATION] 웹에서 위치 구독 해제 요청 수신")
+                if let watchId = body["watchId"] as? Int {
+                    self.handleClearGeolocationWatch(watchId: watchId)
+                }
+                break
+                
             default:
                 break
             }
@@ -3020,6 +3209,203 @@ extension MainView: ASAuthorizationControllerDelegate, ASAuthorizationController
             }
         } catch {
             print("❌ [PERMISSION] JSON 직렬화 실패: \(error)")
+        }
+    }
+}
+
+// MARK: - 🌍 Geolocation 처리 (웹 위치 권한 alert 반복 방지)
+extension MainView {
+    
+    // Geolocation watch IDs 저장
+    private static var activeWatchIds: Set<Int> = []
+    
+    /// 웹에서 위치 요청 시 처리
+    func handleGeolocationRequest() {
+        print("🌍 [GEOLOCATION] 위치 요청 처리 시작")
+        
+        // 네이티브 앱의 위치 권한 상태 확인
+        let status = LocationService.sharedInstance.locationAuthStatus
+        
+        if status == .authorizedWhenInUse || status == .authorizedAlways {
+            // 이미 위치 권한이 있으면 바로 위치 정보 제공
+            print("🌍 [GEOLOCATION] 위치 권한 있음 - 위치 정보 바로 제공")
+            
+            // UserDefaults에 웹 위치 권한 동의 저장
+            UserDefaults.standard.set(true, forKey: "smap_web_geolocation_granted")
+            
+            sendLocationToWeb()
+        } else if status == .notDetermined {
+            // 위치 권한이 아직 결정되지 않은 경우
+            print("🌍 [GEOLOCATION] 위치 권한 미결정 - 권한 요청")
+            
+            // 위치 권한 요청 후 위치 제공
+            LocationService.sharedInstance.requestWhenInUseAuthorization { [weak self] in
+                DispatchQueue.main.async {
+                    let updatedStatus = LocationService.sharedInstance.locationAuthStatus
+                    if updatedStatus == .authorizedWhenInUse || updatedStatus == .authorizedAlways {
+                        UserDefaults.standard.set(true, forKey: "smap_web_geolocation_granted")
+                        self?.sendLocationToWeb()
+                    } else {
+                        self?.sendGeolocationDeniedToWeb()
+                    }
+                }
+            }
+        } else {
+            // 위치 권한이 거부된 경우
+            print("🌍 [GEOLOCATION] 위치 권한 거부됨")
+            sendGeolocationDeniedToWeb()
+        }
+    }
+    
+    /// 위치 구독 요청 처리
+    func handleWatchGeolocation(watchId: Int) {
+        print("🌍 [GEOLOCATION] 위치 구독 추가: \(watchId)")
+        MainView.activeWatchIds.insert(watchId)
+        
+        // 초기 위치 전송
+        if LocationService.sharedInstance.locationAuthStatus == .authorizedWhenInUse ||
+           LocationService.sharedInstance.locationAuthStatus == .authorizedAlways {
+            sendLocationToWeb()
+        }
+    }
+    
+    /// 위치 구독 해제 처리
+    func handleClearGeolocationWatch(watchId: Int) {
+        print("🌍 [GEOLOCATION] 위치 구독 해제: \(watchId)")
+        MainView.activeWatchIds.remove(watchId)
+    }
+    
+    /// 네이티브 위치 정보를 웹으로 전송
+    private func sendLocationToWeb() {
+        let location = LocationService.sharedInstance.getLastLocation()
+        let latitude = location.coordinate.latitude
+        let longitude = location.coordinate.longitude
+        let accuracy = location.horizontalAccuracy
+        let timestamp = Int64(location.timestamp.timeIntervalSince1970 * 1000)
+        
+        // 위치 정보가 유효한지 확인
+        if latitude == 0 && longitude == 0 {
+            print("🌍 [GEOLOCATION] 위치 정보 없음 - 현재 위치 요청")
+            
+            // 현재 위치 가져오기 시도
+            LocationService.sharedInstance.startLocationUpdatesWithPermissionCheck { [weak self] in
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    let updatedLocation = LocationService.sharedInstance.getLastLocation()
+                    self?.injectLocationToWeb(
+                        latitude: updatedLocation.coordinate.latitude,
+                        longitude: updatedLocation.coordinate.longitude,
+                        accuracy: updatedLocation.horizontalAccuracy,
+                        timestamp: Int64(updatedLocation.timestamp.timeIntervalSince1970 * 1000)
+                    )
+                }
+            }
+        } else {
+            print("🌍 [GEOLOCATION] 캐시된 위치 사용: \(latitude), \(longitude)")
+            injectLocationToWeb(latitude: latitude, longitude: longitude, accuracy: accuracy, timestamp: timestamp)
+        }
+    }
+    
+    /// 위치 정보를 JavaScript로 주입
+    private func injectLocationToWeb(latitude: Double, longitude: Double, accuracy: Double, timestamp: Int64) {
+        let script = """
+            if (typeof window.SMAP_SET_LOCATION === 'function') {
+                window.SMAP_SET_LOCATION(\(latitude), \(longitude), \(accuracy), \(timestamp));
+                console.log('[SMAP-GEO] 네이티브에서 위치 주입 완료:', \(latitude), \(longitude));
+            } else {
+                console.error('[SMAP-GEO] SMAP_SET_LOCATION 함수 없음');
+            }
+        """
+        
+        DispatchQueue.main.async {
+            self.web_view.evaluateJavaScript(script) { (result, error) in
+                if let error = error {
+                    print("❌ [GEOLOCATION] 위치 주입 실패: \(error)")
+                } else {
+                    print("✅ [GEOLOCATION] 위치 주입 성공: \(latitude), \(longitude)")
+                }
+            }
+        }
+    }
+    
+    /// 위치 권한 거부를 웹으로 전송
+    private func sendGeolocationDeniedToWeb() {
+        let script = """
+            if (typeof window.SMAP_GEO_DENIED === 'function') {
+                window.SMAP_GEO_DENIED();
+                console.log('[SMAP-GEO] 네이티브에서 위치 권한 거부 전달');
+            } else {
+                console.error('[SMAP-GEO] SMAP_GEO_DENIED 함수 없음');
+            }
+        """
+        
+        DispatchQueue.main.async {
+            self.web_view.evaluateJavaScript(script) { (result, error) in
+                if let error = error {
+                    print("❌ [GEOLOCATION] 권한 거부 전달 실패: \(error)")
+                } else {
+                    print("✅ [GEOLOCATION] 권한 거부 전달 완료")
+                }
+            }
+        }
+    }
+    
+    /// 위치가 업데이트되면 웹에 자동 전송 (watchPosition용)
+    func notifyLocationUpdateToWeb() {
+        guard !MainView.activeWatchIds.isEmpty else { return }
+        
+        let location = LocationService.sharedInstance.getLastLocation()
+        if location.coordinate.latitude != 0 || location.coordinate.longitude != 0 {
+            injectLocationToWeb(
+                latitude: location.coordinate.latitude,
+                longitude: location.coordinate.longitude,
+                accuracy: location.horizontalAccuracy,
+                timestamp: Int64(location.timestamp.timeIntervalSince1970 * 1000)
+            )
+        }
+    }
+    
+    /// 페이지 로드 시 위치 정보를 사전 주입 (웹 위치 권한 alert 방지)
+    func preInjectLocationToWeb() {
+        let location = LocationService.sharedInstance.getLastLocation()
+        let latitude = location.coordinate.latitude
+        let longitude = location.coordinate.longitude
+        
+        // 유효한 위치 정보가 있으면 주입
+        if latitude != 0 || longitude != 0 {
+            let accuracy = location.horizontalAccuracy
+            let timestamp = Int64(location.timestamp.timeIntervalSince1970 * 1000)
+            
+            let script = """
+                (function() {
+                    // 위치 캐시 설정
+                    window.__SMAP_CACHED_POSITION__ = {
+                        coords: {
+                            latitude: \(latitude),
+                            longitude: \(longitude),
+                            accuracy: \(accuracy),
+                            altitude: null,
+                            altitudeAccuracy: null,
+                            heading: null,
+                            speed: null
+                        },
+                        timestamp: \(timestamp)
+                    };
+                    window.__SMAP_GEO_PERMISSION_GRANTED__ = true;
+                    console.log('[SMAP-GEO] 위치 정보 사전 주입 완료:', \(latitude), \(longitude));
+                })();
+            """
+            
+            DispatchQueue.main.async {
+                self.web_view.evaluateJavaScript(script) { (result, error) in
+                    if let error = error {
+                        print("❌ [GEOLOCATION] 위치 사전 주입 실패: \(error)")
+                    } else {
+                        print("✅ [GEOLOCATION] 위치 사전 주입 성공: \(latitude), \(longitude)")
+                    }
+                }
+            }
+        } else {
+            print("🌍 [GEOLOCATION] 캐시된 위치 없음 - 사전 주입 생략")
         }
     }
 }
