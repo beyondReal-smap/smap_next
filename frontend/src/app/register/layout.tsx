@@ -118,6 +118,7 @@ header.register-header-fixed {
   -webkit-overflow-scrolling: touch !important;
   overscroll-behavior: contain !important;
   padding: 0 16px !important;
+  padding-bottom: 100px !important; /* 하단 고정 버튼 영역 확보 */
   max-height: 100% !important;
 }
 
@@ -314,9 +315,9 @@ function RegisterLayoutContent({
       return false;
     }
   }, []);
-  
 
-  
+
+
   // 소셜 로그인 상태 확인을 위해 registerData가 필요하지만 
   // layout에서는 직접 접근할 수 없으므로 sessionStorage에서 확인
   const isSocialLogin = React.useMemo(() => {
@@ -339,7 +340,7 @@ function RegisterLayoutContent({
       document.documentElement.style.setProperty('top', '0', 'important');
       document.documentElement.style.setProperty('left', '0', 'important');
       document.documentElement.style.setProperty('width', '100vw', 'important');
-      
+
       document.body.style.setProperty('padding', '0', 'important');
       document.body.style.setProperty('margin', '0', 'important');
       document.body.style.setProperty('padding-top', '0', 'important');
@@ -352,7 +353,7 @@ function RegisterLayoutContent({
       document.body.style.setProperty('right', '0', 'important');
       document.body.style.setProperty('bottom', '0', 'important');
       document.body.style.setProperty('width', '100vw', 'important');
-      
+
       // 페이지 컨테이너 강제 설정
       const pageContainer = document.getElementById('register-page-container');
       if (pageContainer) {
@@ -366,7 +367,7 @@ function RegisterLayoutContent({
         pageContainer.style.setProperty('height', '100vh', 'important');
         pageContainer.style.setProperty('overflow', 'hidden', 'important');
       }
-      
+
       // 헤더 강제 설정
       const headers = document.querySelectorAll('header, .register-header-fixed');
       headers.forEach(header => {
@@ -380,7 +381,7 @@ function RegisterLayoutContent({
         (header as HTMLElement).style.setProperty('width', '100vw', 'important');
         (header as HTMLElement).style.setProperty('height', '64px', 'important');
       });
-      
+
       // 메인 컨텐츠 강제 설정
       const mainContent = document.getElementById('register-main-content');
       if (mainContent) {
@@ -390,7 +391,7 @@ function RegisterLayoutContent({
         mainContent.style.setProperty('height', 'calc(100vh - 64px)', 'important');
         mainContent.style.setProperty('overflow', 'hidden', 'important');
       }
-      
+
       // 스크롤 방지 강화
       document.addEventListener('touchmove', (e) => {
         // 특정 스크롤 영역이 아닌 경우 스크롤 방지
@@ -399,34 +400,34 @@ function RegisterLayoutContent({
           e.preventDefault();
         }
       }, { passive: false });
-      
+
       // 키보드 이벤트 최적화
       const handleKeyboardShow = () => {
         document.body.classList.add('keyboard-open');
       };
-      
+
       const handleKeyboardHide = () => {
         document.body.classList.remove('keyboard-open');
       };
-      
+
       // iOS 키보드 감지
       if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
         window.addEventListener('focusin', handleKeyboardShow);
         window.addEventListener('focusout', handleKeyboardHide);
       }
-      
+
       console.log('🔧 [FORCE] Register 페이지 스크롤 방지 및 고정 레이아웃 적용 완료');
     };
-    
+
     // 즉시 실행
     forceRemoveTopSpacing();
-    
+
     // 100ms 후 다시 실행 (DOM 로딩 완료 후)
     setTimeout(forceRemoveTopSpacing, 100);
-    
+
     // 500ms 후 다시 실행 (모든 스타일 로딩 완료 후)
     setTimeout(forceRemoveTopSpacing, 500);
-    
+
     // viewport 설정
     let viewportMeta = document.querySelector('meta[name="viewport"]');
     if (!viewportMeta) {
@@ -434,35 +435,35 @@ function RegisterLayoutContent({
       viewportMeta.setAttribute('name', 'viewport');
       document.head.appendChild(viewportMeta);
     }
-    
-    viewportMeta.setAttribute('content', 
+
+    viewportMeta.setAttribute('content',
       'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover'
     );
-    
+
     // 페이지 가시성 변경 시에도 재적용
     const handleVisibilityChange = () => {
       if (!document.hidden) {
         setTimeout(forceRemoveTopSpacing, 100);
       }
     };
-    
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    
+
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       // 키보드 이벤트 리스너 제거
       if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
-        window.removeEventListener('focusin', () => {});
-        window.removeEventListener('focusout', () => {});
+        window.removeEventListener('focusin', () => { });
+        window.removeEventListener('focusout', () => { });
       }
     };
   }, []);
 
   const handleBack = () => {
     // 뒤로가기 햅틱 피드백
-    triggerHapticFeedback(HapticFeedbackType.SELECTION, '회원가입 페이지 뒤로가기', { 
-      component: 'register', 
-      action: 'back-navigation' 
+    triggerHapticFeedback(HapticFeedbackType.SELECTION, '회원가입 페이지 뒤로가기', {
+      component: 'register',
+      action: 'back-navigation'
     });
 
     // 모달이 열려있으면 모달을 닫기
@@ -473,14 +474,14 @@ function RegisterLayoutContent({
     // 회원가입 단계별 뒤로가기 로직
     const steps = Object.values(REGISTER_STEPS);
     const currentIndex = steps.indexOf(currentStep);
-    
+
     if (currentIndex > 0) {
       // 소셜 로그인 시 전화번호 인증 단계 건너뛰기
       if (isSocialLogin && currentStep === REGISTER_STEPS.BASIC_INFO) {
         setCurrentStep(REGISTER_STEPS.TERMS);
         return;
       }
-      
+
       // 이전 단계로 이동
       const previousStep = steps[currentIndex - 1] as string;
       setCurrentStep(previousStep);
@@ -493,10 +494,10 @@ function RegisterLayoutContent({
   return (
     <>
       <style jsx global>{pageStyles}</style>
-      <div 
+      <div
         className="fixed inset-0 overflow-hidden"
         id="register-page-container"
-        style={{ 
+        style={{
           background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
           padding: '0',
           margin: '0',
@@ -504,10 +505,10 @@ function RegisterLayoutContent({
         }}
       >
         {/* 통일된 헤더 애니메이션 */}
-        <AnimatedHeader 
+        <AnimatedHeader
           variant="simple"
           className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed register-header-fixed"
-          style={{ 
+          style={{
             padding: '0',
             margin: '0',
             paddingTop: '0',
@@ -522,7 +523,7 @@ function RegisterLayoutContent({
             padding: '0'
           }}>
             <div className="flex items-center space-x-3">
-              <motion.button 
+              <motion.button
                 onClick={handleBack}
                 className="hover:bg-gray-100 rounded-full transition-all duration-200"
                 whileHover={{ scale: 1.05 }}
@@ -537,7 +538,7 @@ function RegisterLayoutContent({
                   {!isComplete && (
                     <div className="flex items-center space-x-2">
                       <div className="flex items-center space-x-1">
-                        <span className="text-xs font-semibold" style={{color: '#0114a2'}}>
+                        <span className="text-xs font-semibold" style={{ color: '#0114a2' }}>
                           {getCurrentStepNumber()}
                         </span>
                         <span className="text-xs text-gray-400">/</span>
@@ -553,7 +554,7 @@ function RegisterLayoutContent({
                 </div>
               </div>
             </div>
-            
+
             <div className="flex items-center space-x-2">
               {/* 필요시 추가 버튼들을 여기에 배치 */}
             </div>
@@ -561,9 +562,9 @@ function RegisterLayoutContent({
         </AnimatedHeader>
 
         {/* 메인 컨텐츠 - 고정 위치 */}
-        <div 
+        <div
           className="register-content-area"
-          style={{ 
+          style={{
             top: '64px', // 헤더 높이만큼 아래로
             left: '0',
             right: '0',

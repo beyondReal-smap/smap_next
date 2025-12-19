@@ -5,7 +5,7 @@ import React, { createContext, useContext, useState, ReactNode } from 'react';
 // 회원가입 단계 정의
 export const REGISTER_STEPS = {
   TERMS: 'terms',
-  PHONE: 'phone', 
+  PHONE: 'phone',
   VERIFICATION: 'verification',
   BASIC_INFO: 'basic_info',
   PROFILE: 'profile',
@@ -80,8 +80,8 @@ export function RegisterProvider({ children }: { children: ReactNode }) {
 
   const getCurrentStepNumber = () => {
     if (isAppleLogin || isGoogleLogin) {
-      // 애플/구글 로그인: 약관동의 → 완료 (1단계)
-      const steps = [REGISTER_STEPS.TERMS, REGISTER_STEPS.COMPLETE];
+      // 애플/구글 로그인: 약관동의 → 기본 정보 → 완료 (2단계)
+      const steps = [REGISTER_STEPS.TERMS, REGISTER_STEPS.BASIC_INFO, REGISTER_STEPS.COMPLETE];
       const currentIndex = steps.indexOf(currentStep);
       return currentIndex >= 0 ? currentIndex + 1 : 1;
     } else {
@@ -94,8 +94,8 @@ export function RegisterProvider({ children }: { children: ReactNode }) {
 
   const getTotalSteps = () => {
     if (isAppleLogin || isGoogleLogin) {
-      // 애플/구글 로그인: 1단계 (약관 동의만)
-      return 1;
+      // 애플/구글 로그인: 2단계 (약관 동의 + 기본 정보)
+      return 2;
     } else {
       // 일반 회원가입: COMPLETE 단계는 제외하고 실제 진행 단계만 카운트
       return Object.values(REGISTER_STEPS).length - 1;

@@ -2493,8 +2493,8 @@ export default function RegisterPage() {
                           type="button"
                           onClick={() => setRegisterData(prev => ({ ...prev, mt_gender: 1 }))}
                           className={`py-3 rounded-xl border-2 font-medium transition-all ${registerData.mt_gender === 1
-                              ? 'border-gray-200 text-gray-700'
-                              : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                            ? 'border-gray-200 text-gray-700'
+                            : 'border-gray-200 text-gray-700 hover:border-gray-300'
                             }`}
                           style={registerData.mt_gender === 1
                             ? { borderColor: '#0114a2', backgroundColor: '#eff6ff', color: '#1e40af' }
@@ -2506,8 +2506,8 @@ export default function RegisterPage() {
                           type="button"
                           onClick={() => setRegisterData(prev => ({ ...prev, mt_gender: 2 }))}
                           className={`py-3 rounded-xl border-2 font-medium transition-all ${registerData.mt_gender === 2
-                              ? 'border-purple-500 bg-purple-50 text-purple-700'
-                              : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                            ? 'border-purple-500 bg-purple-50 text-purple-700'
+                            : 'border-gray-200 text-gray-700 hover:border-gray-300'
                             }`}
                         >
                           여성
@@ -2752,10 +2752,8 @@ export default function RegisterPage() {
                 } else if (currentStep === REGISTER_STEPS.PROFILE) {
                   console.log('회원가입 완료 함수 호출');
                   handleRegister();
-                } else if (currentStep === REGISTER_STEPS.TERMS && registerData.isSocialLogin && (registerData.socialProvider === 'apple' || registerData.socialProvider === 'google')) {
-                  console.log('애플/구글 로그인 약관 동의 완료 - 회원가입 진행');
-                  handleRegister();
                 } else {
+                  // 모든 다른 경우 (TERMS, BASIC_INFO 등)는 handleNext()를 통해 흐름 처리
                   console.log('다음 단계 함수 호출');
                   handleNext();
                 }
@@ -2764,8 +2762,8 @@ export default function RegisterPage() {
               whileHover={{ scale: (isStepValid() && !locationLoading && !isInitializing && isDataLoaded) ? 1.02 : 1 }}
               whileTap={{ scale: (isStepValid() && !locationLoading && !isInitializing && isDataLoaded) ? 0.98 : 1 }}
               className={`w-full py-4 rounded-xl font-semibold text-lg transition-all register-button ${(isStepValid() && !locationLoading && !isInitializing && isDataLoaded)
-                  ? 'text-white shadow-lg'
-                  : 'bg-gray-100 text-gray-300 cursor-not-allowed opacity-60'
+                ? 'text-white shadow-lg'
+                : 'bg-gray-100 text-gray-300 cursor-not-allowed opacity-60'
                 }`}
               style={(isStepValid() && !locationLoading && !isInitializing && isDataLoaded)
                 ? { backgroundColor: '#0114a2' }
@@ -2784,7 +2782,7 @@ export default function RegisterPage() {
                           currentStep === REGISTER_STEPS.PHONE ? '인증번호 발송' :
                             currentStep === REGISTER_STEPS.VERIFICATION ? '인증번호 확인' :
                               currentStep === REGISTER_STEPS.PROFILE ? '회원가입 완료' :
-                                (currentStep === REGISTER_STEPS.TERMS && registerData.isSocialLogin && (registerData.socialProvider === 'apple' || registerData.socialProvider === 'google')) ? '회원가입 완료' : '다음'}
+                                (currentStep === REGISTER_STEPS.BASIC_INFO && registerData.isSocialLogin && (registerData.socialProvider === 'apple' || registerData.socialProvider === 'google')) ? '회원가입 완료' : '다음'}
                 </span>
               </div>
             </motion.button>
@@ -2999,8 +2997,8 @@ export default function RegisterPage() {
                     onClick={handleBirthConfirm}
                     disabled={!selectedDate}
                     className={`flex-1 py-3 rounded-xl font-medium transition-colors ${selectedDate
-                        ? 'text-white'
-                        : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      ? 'text-white'
+                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                       }`}
                     style={selectedDate
                       ? { backgroundColor: '#0114a2' }
