@@ -2552,7 +2552,7 @@ export default function ActivelogPage() {
           console.log(`[🔄 FORCE REGEN] 일별 카운트 조회 시도 ${retryCount + 1}/${maxRetries}`);
           dailyCountsResponse = await memberLocationLogService.getDailyLocationCounts(selectedGroupId, 14);
 
-          if (dailyCountsResponse?.member_daily_counts?.length > 0) {
+          if (dailyCountsResponse?.member_daily_counts && dailyCountsResponse.member_daily_counts.length > 0) {
             console.log(`[🔄 FORCE REGEN] 일별 카운트 조회 성공 (${retryCount + 1}번째 시도):`, dailyCountsResponse.member_daily_counts.length, '명');
             break;
           }
@@ -8216,8 +8216,8 @@ export default function ActivelogPage() {
                             // 멤버 선택 시 사이드바는 자동으로 닫힘 (handleMemberSelect에서 처리)
                           }}
                           className={`p-4 rounded-xl cursor-pointer transition-colors duration-200 backdrop-blur-sm touch-optimized ${member.isSelected
-                              ? 'border-2 shadow-lg'
-                              : 'bg-white/60 hover:bg-white/90 border hover:shadow-md'
+                            ? 'border-2 shadow-lg'
+                            : 'bg-white/60 hover:bg-white/90 border hover:shadow-md'
                             }`}
                           style={{
                             ...(member.isSelected
@@ -8236,8 +8236,8 @@ export default function ActivelogPage() {
                             <div className="relative">
                               <div
                                 className={`w-12 h-12 rounded-full overflow-hidden ${member.isSelected
-                                    ? 'ring-3 shadow-lg'
-                                    : 'ring-2 ring-white/50'
+                                  ? 'ring-3 shadow-lg'
+                                  : 'ring-2 ring-white/50'
                                   }`}
                                 style={member.isSelected
                                   ? {
