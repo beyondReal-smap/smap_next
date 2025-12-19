@@ -2157,36 +2157,12 @@ export default function RegisterPage() {
                       </div>
                     )}
                     <p className="text-sm text-gray-600" style={{ wordBreak: 'keep-all' }}>
-                      {registerData.isSocialLogin && (registerData.socialProvider === 'google' || registerData.socialProvider === 'apple')
-                        ? `${registerData.socialProvider === 'google' ? '구글' : '애플'} 계정 정보가 자동으로 입력되었습니다. 필요시 수정해주세요`
-                        : '서비스 이용을 위한 기본 정보를 입력해주세요'}
+                      서비스 이용을 위한 기본 정보를 확인해주세요
                     </p>
                   </div>
 
                   <div className="flex-1 overflow-y-auto space-y-3 pb-4 register-form">
-                    {/* 소셜 로그인 안내 메시지 */}
-                    {registerData.isSocialLogin && (registerData.socialProvider === 'google' || registerData.socialProvider === 'apple') && (
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-                        <div className="flex items-start">
-                          <svg className="w-4 h-4 text-blue-600 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          <div className="text-sm text-blue-800">
-                            {registerData.socialProvider === 'google' ? (
-                              <>
-                                <p className="font-medium mb-1">구글 계정 정보가 자동으로 입력되었습니다</p>
-                                <p className="text-xs">이름, 닉네임, 이메일이 구글 계정에서 가져와져 미리 입력되었습니다. 비밀번호는 구글 계정으로 자동 설정되므로 입력이 필요하지 않습니다.</p>
-                              </>
-                            ) : (
-                              <>
-                                <p className="font-medium mb-1">애플 계정 정보가 자동으로 입력되었습니다</p>
-                                <p className="text-xs">이름, 닉네임, 이메일이 애플 계정에서 가져와져 미리 입력되었습니다.</p>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
+
 
                     {/* 비밀번호 - 소셜 로그인(구글/애플) 시 숨김 */}
                     {(!registerData.isSocialLogin || (registerData.socialProvider !== 'google' && registerData.socialProvider !== 'apple')) && (
@@ -2322,11 +2298,7 @@ export default function RegisterPage() {
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         이름
                       </label>
-                      {registerData.isSocialLogin && (registerData.socialProvider === 'google' || registerData.socialProvider === 'apple') && (
-                        <p className="text-xs text-[#0114a2] mb-2" style={{ wordBreak: 'keep-all' }}>
-                          {(registerData.socialProvider === 'google' ? '구글' : '애플')} 계정에서 가져온 이름이 자동으로 입력되었습니다
-                        </p>
-                      )}
+
                       <input
                         type="text"
                         value={registerData.mt_name}
