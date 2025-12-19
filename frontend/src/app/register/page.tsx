@@ -1299,18 +1299,20 @@ export default function RegisterPage() {
 
       console.log('API 요청 데이터:', requestData);
 
-      // 소셜 로그인의 경우 소셜 회원가입 API 사용
-      const apiEndpoint = registerData.isSocialLogin ?
-        `/api/${registerData.socialProvider}-auth` :
-        '/api/auth/register';
+      // 회원가입은 모두 일반 회원가입 API 사용 (소셜 로그인 포함)
+      // 구글/애플 로그인 시에는 idToken이 없으므로 /api/google-auth, /api/apple-auth 사용 불가
+      // 카카오는 기존 방식 유지
+      const apiEndpoint = (registerData.isSocialLogin && registerData.socialProvider === 'kakao')
+        ? '/api/kakao-auth'
+        : '/api/auth/register';
 
       let response;
 
-      if (registerData.isSocialLogin) {
-        // 소셜 로그인 회원가입
+      if (registerData.isSocialLogin && registerData.socialProvider === 'kakao') {
+        // 카카오 로그인 회원가입 (기존 방식)
         const socialRegisterData = {
           ...requestData,
-          action: 'register', // 회원가입 액션 지정
+          action: 'register',
           isRegister: true
         };
 
@@ -1322,7 +1324,8 @@ export default function RegisterPage() {
           body: JSON.stringify(socialRegisterData),
         });
       } else {
-        // 일반 회원가입
+        // 일반 회원가입 및 구글/애플 소셜 로그인 회원가입
+        // 구글/애플은 mt_google_id 또는 mt_apple_id를 함께 전달
         response = await fetch(apiEndpoint, {
           method: 'POST',
           headers: {
