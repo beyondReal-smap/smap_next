@@ -107,8 +107,57 @@ interface GroupMember {
   original_index: number;   // original_index 필드 추가
 }
 
-const MOCK_GROUP_MEMBERS: GroupMember[] = [];
-
+// MOCK_GROUP_MEMBERS 정의 (필요한 필드 추가)
+const MOCK_GROUP_MEMBERS: GroupMember[] = [
+  {
+    id: '1',
+    name: '김철수',
+    photo: '/images/avatar3.png',
+    isSelected: false,
+    location: { lat: 37.5012 + 0.005, lng: 127.0381 + 0.002 },
+    schedules: [
+      { id: 'm1-1', title: '팀 회의', date: '오늘 14:00', location: '강남 사무실' },
+    ],
+    savedLocations: [
+      { id: 'loc1-1', name: '철수네 회사', address: '서울시 강남구 테헤란로 100', category: '회사', coordinates: [127.0350, 37.5000], memo: '철수 회사', favorite: true, notifications: false },
+      { id: 'loc1-2', name: '철수 단골식당', address: '서울시 강남구 역삼동 101', category: '식당', coordinates: [127.0380, 37.5015], memo: '점심 맛집', favorite: false, notifications: true },
+    ],
+    mt_gender: 1, // 예시 성별
+    original_index: 0 // 예시 인덱스
+  },
+  {
+    id: '2',
+    name: '이영희',
+    photo: '/images/avatar1.png',
+    isSelected: false,
+    location: { lat: 37.4982 - 0.003, lng: 127.0281 - 0.005 },
+    schedules: [
+      { id: 'm2-1', title: '프로젝트 발표', date: '내일 10:00', location: '회의실 A' }
+    ],
+    savedLocations: [
+      { id: 'loc2-1', name: '영희네 집', address: '서울시 서초구 반포동 200', category: '집', coordinates: [127.0010, 37.5100], memo: '영희 집', favorite: true, notifications: false },
+      { id: 'loc2-2', name: '영희 헬스장', address: '서울시 서초구 잠원동 202', category: '운동', coordinates: [127.0090, 37.5120], memo: '운동하는 곳', favorite: false, notifications: false },
+      { id: 'loc2-3', name: '영희 자주가는 카페', address: '서울시 강남구 신사동 203', category: '카페', coordinates: [127.0220, 37.5220], memo: '분위기 좋은 곳', favorite: false, notifications: true },
+    ],
+    mt_gender: 2,
+    original_index: 1
+  },
+  {
+    id: '3',
+    name: '박민수',
+    photo: '/images/avatar2.png',
+    isSelected: false,
+    location: { lat: 37.5662 + 0.002, lng: 126.9981 - 0.003 },
+    schedules: [
+      { id: 'm3-1', title: '주간 회의', date: '수요일 11:00', location: '본사 대회의실' },
+    ],
+    savedLocations: [
+      { id: 'loc3-1', name: '민수 스터디룸', address: '서울시 종로구 관철동 300', category: '스터디', coordinates: [126.9850, 37.5690], memo: '그룹 스터디 장소', favorite: false, notifications: false },
+    ],
+    mt_gender: 1,
+    original_index: 2
+  }
+];
 // --- END: home/page.tsx에서 가져온 인터페이스 및 데이터 ---
 
 const CATEGORY_OPTIONS = [
@@ -2306,8 +2355,8 @@ export default function LocationPage() {
                                   key={group.sgt_idx}
                                   onClick={() => handleGroupSelect(group.sgt_idx)}
                                   className={`w-full px-3 py-2 text-left text-sm hover:bg-indigo-50 focus:outline-none focus:bg-indigo-50 ${selectedGroupId === group.sgt_idx
-                                    ? 'bg-indigo-50 text-indigo-700 font-medium'
-                                    : 'text-gray-900'
+                                      ? 'bg-indigo-50 text-indigo-700 font-medium'
+                                      : 'text-gray-900'
                                     }`}
                                 >
                                   <div className="flex items-center justify-between">
@@ -2426,9 +2475,9 @@ export default function LocationPage() {
                             <div
                               key={location.slt_idx}
                               className={`flex-shrink-0 w-48 bg-white rounded-lg p-3.5 cursor-pointer transition-all duration-200 ease-in-out transform hover:-translate-y-0.5 ${(selectedLocationId === (location.slt_idx ? location.slt_idx.toString() : location.id) ||
-                                selectedLocationIdRef.current === (location.slt_idx ? location.slt_idx.toString() : location.id))
-                                ? 'shadow-xl ring-1 ring-indigo-300 ring-opacity-20 scale-105'
-                                : 'shadow hover:shadow-lg'
+                                  selectedLocationIdRef.current === (location.slt_idx ? location.slt_idx.toString() : location.id))
+                                  ? 'shadow-xl ring-1 ring-indigo-300 ring-opacity-20 scale-105'
+                                  : 'shadow hover:shadow-lg'
                                 }`}
                               style={{
                                 // 인라인 스타일로도 선택 효과 강화

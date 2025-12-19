@@ -197,8 +197,32 @@ const MOCK_REFERRAL_STATS: ReferralStats = {
   currentMonthInvites: 3
 };
 
-const MOCK_FRIENDS: Friend[] = [];
-
+const MOCK_FRIENDS: Friend[] = [
+  {
+    id: '1',
+    name: '김민수',
+    phone: '010-1234-5678',
+    joinDate: '2024-03-15',
+    status: 'active',
+    reward: 5000
+  },
+  {
+    id: '2',
+    name: '이영희',
+    phone: '010-2345-6789',
+    joinDate: '2024-03-10',
+    status: 'joined',
+    reward: 5000
+  },
+  {
+    id: '3',
+    name: '박철수',
+    phone: '010-3456-7890',
+    joinDate: '2024-03-05',
+    status: 'pending',
+    reward: 0
+  }
+];
 
 const REWARD_TIERS = [
   { friends: 1, reward: '5,000원', bonus: '첫 친구 초대' },

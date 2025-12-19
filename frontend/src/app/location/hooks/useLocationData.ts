@@ -65,11 +65,11 @@ export const useLocationData = () => {
   // 데이터 새로고침
   const refreshData = useCallback(async () => {
     if (!currentGroupId) return;
-    
+
     try {
       setIsLoading(true);
       setError(null);
-      
+
       // 그룹 멤버 정보 가져오기
       const members = await retryDataFetch(() => memberService.getGroupMembers(currentGroupId), 'GROUP_MEMBERS');
       const convertedMembers: GroupMember[] = members.map((member: ServiceMember, index: number) => ({
@@ -96,17 +96,17 @@ export const useLocationData = () => {
         sgdt_leader_chk: member.sgdt_leader_chk,
       }));
       setGroupMembers(convertedMembers);
-      
+
       // 다른 멤버들의 위치 정보 가져오기
       const otherLocations = await retryDataFetch(() => locationService.getOtherMembersLocations(currentGroupId), 'OTHER_LOCATIONS');
       setOtherMembersLocations(otherLocations);
-      
+
       // 선택된 멤버의 저장된 위치 정보 가져오기
       if (selectedMember) {
         const savedLocations = await retryDataFetch(() => locationService.getOtherMembersLocations(selectedMember.id), 'MEMBER_LOCATIONS');
         setSelectedMemberLocations(savedLocations);
       }
-      
+
     } catch (err) {
       console.error('데이터 새로고침 실패:', err);
       setError(err instanceof Error ? err.message : '데이터를 불러오는 중 오류가 발생했습니다.');
@@ -121,10 +121,10 @@ export const useLocationData = () => {
       setCurrentGroupId(groupId);
       setSelectedMember(null);
       setSelectedMemberLocations([]);
-      
+
       // 새 그룹의 데이터 로드
       await refreshData();
-      
+
     } catch (err) {
       console.error('그룹 변경 실패:', err);
       setError(err instanceof Error ? err.message : '그룹을 변경하는 중 오류가 발생했습니다.');
@@ -136,13 +136,13 @@ export const useLocationData = () => {
     try {
       const member = groupMembers.find(m => m.id === memberId);
       if (!member) return;
-      
+
       setSelectedMember(member);
-      
+
       // 선택된 멤버의 저장된 위치 정보 가져오기
       const savedLocations = await retryDataFetch(() => locationService.getOtherMembersLocations(memberId), 'SELECTED_MEMBER_LOCATIONS');
       setSelectedMemberLocations(savedLocations);
-      
+
     } catch (err) {
       console.error('멤버 선택 실패:', err);
       setError(err instanceof Error ? err.message : '멤버를 선택하는 중 오류가 발생했습니다.');
@@ -155,17 +155,17 @@ export const useLocationData = () => {
       if (!selectedMember) {
         throw new Error('멤버를 먼저 선택해주세요.');
       }
-      
+
       const savedLocation = await locationService.createLocation({
         ...locationData,
         memberId: selectedMember.id
       });
-      
+
       // 저장된 위치를 목록에 추가
       setSelectedMemberLocations(prev => [...prev, savedLocation]);
-      
+
       return savedLocation;
-      
+
     } catch (err) {
       console.error('위치 저장 실패:', err);
       throw err;
@@ -176,14 +176,14 @@ export const useLocationData = () => {
   const updateLocation = useCallback(async (locationId: string, updateData: Partial<LocationData>) => {
     try {
       const updatedLocation = await locationService.updateLocationNotification(parseInt(locationId), updateData.notifications || false);
-      
+
       // 목록에서 위치 업데이트
-      setSelectedMemberLocations(prev => 
+      setSelectedMemberLocations(prev =>
         prev.map(loc => loc.id === locationId ? { ...loc, ...updateData } : loc)
       );
-      
+
       return updatedLocation;
-      
+
     } catch (err) {
       console.error('위치 업데이트 실패:', err);
       throw err;
@@ -194,10 +194,10 @@ export const useLocationData = () => {
   const deleteLocation = useCallback(async (locationId: string) => {
     try {
       await locationService.deleteLocation(parseInt(locationId));
-      
+
       // 목록에서 위치 제거
       setSelectedMemberLocations(prev => prev.filter(loc => loc.id !== locationId));
-      
+
     } catch (err) {
       console.error('위치 삭제 실패:', err);
       throw err;
@@ -231,7 +231,7 @@ export const useLocationData = () => {
     isLoading,
     error,
     currentGroupId,
-    
+
     // 함수
     refreshData,
     changeGroup,

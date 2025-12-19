@@ -144,8 +144,72 @@ const DEFAULT_LOCATION_SUMMARY: LocationSummary = {
   steps: '0 걸음',
 };
 
-// MOCK_LOGS 정의 (개발 및 테스트용)
-const MOCK_LOGS: any[] = [];
+// 모의 로그 데이터 - 날짜를 최근으로 업데이트
+const MOCK_LOGS = [
+  {
+    id: '1',
+    type: 'schedule',
+    action: 'create',
+    title: '팀 미팅 일정이 생성되었습니다.',
+    description: '오늘 오후 2시 - 강남 사무실',
+    user: '김철수',
+    timestamp: format(new Date(), 'yyyy-MM-dd') + 'T14:32:00',
+  },
+  {
+    id: '2',
+    type: 'location',
+    action: 'update',
+    title: '장소 정보가 업데이트되었습니다.',
+    description: '강남 사무실 - 주소 변경',
+    user: '이영희',
+    timestamp: format(subDays(new Date(), 1), 'yyyy-MM-dd') + 'T11:15:00',
+  },
+  {
+    id: '3',
+    type: 'group',
+    action: 'add_member',
+    title: '그룹원이 추가되었습니다.',
+    description: '개발팀 - 박지민 추가',
+    user: '김철수',
+    timestamp: format(subDays(new Date(), 2), 'yyyy-MM-dd') + 'T16:45:00',
+  },
+  {
+    id: '4',
+    type: 'schedule',
+    action: 'delete',
+    title: '일정이 취소되었습니다.',
+    description: '프로젝트 중간점검 - 취소',
+    user: '이영희',
+    timestamp: format(subDays(new Date(), 3), 'yyyy-MM-dd') + 'T09:20:00',
+  },
+  {
+    id: '5',
+    type: 'location',
+    action: 'create',
+    title: '새 장소가 등록되었습니다.',
+    description: '을지로 오피스 - 추가됨',
+    user: '김철수',
+    timestamp: format(subDays(new Date(), 5), 'yyyy-MM-dd') + 'T13:10:00',
+  },
+  {
+    id: '6',
+    type: 'group',
+    action: 'remove_member',
+    title: '그룹원이 제거되었습니다.',
+    description: '마케팅팀 - 홍길동 제거',
+    user: '정민지',
+    timestamp: format(subDays(new Date(), 7), 'yyyy-MM-dd') + 'T15:30:00',
+  },
+  {
+    id: '7',
+    type: 'schedule',
+    action: 'update',
+    title: '일정이 수정되었습니다.',
+    description: '고객 미팅 - 시간 변경',
+    user: '이영희',
+    timestamp: format(subDays(new Date(), 10), 'yyyy-MM-dd') + 'T10:25:00',
+  }
+];
 
 // 최적화된 애니메이션 variants - 순차적이고 부드러운 애니메이션 (location/group과 동일한 패턴)
 const pageVariants = {
@@ -168,8 +232,6 @@ const pageVariants = {
     }
   }
 };
-
-
 
 // 지도 컨테이너 애니메이션
 const mapContainerVariants = {
@@ -2489,7 +2551,8 @@ export default function ActivelogPage() {
         try {
           console.log(`[🔄 FORCE REGEN] 일별 카운트 조회 시도 ${retryCount + 1}/${maxRetries}`);
           dailyCountsResponse = await memberLocationLogService.getDailyLocationCounts(selectedGroupId, 14);
-          if (dailyCountsResponse && dailyCountsResponse.member_daily_counts && dailyCountsResponse.member_daily_counts.length > 0) {
+
+          if (dailyCountsResponse?.member_daily_counts?.length > 0) {
             console.log(`[🔄 FORCE REGEN] 일별 카운트 조회 성공 (${retryCount + 1}번째 시도):`, dailyCountsResponse.member_daily_counts.length, '명');
             break;
           }
@@ -2514,7 +2577,7 @@ export default function ActivelogPage() {
         }
       }
 
-      if (!dailyCountsResponse || !dailyCountsResponse.member_daily_counts || dailyCountsResponse.member_daily_counts.length === 0) {
+      if (!dailyCountsResponse?.member_daily_counts?.length) {
         console.error('[🔄 FORCE REGEN] 일별 카운트 데이터 재조회 실패');
         return false;
       }
@@ -8153,8 +8216,8 @@ export default function ActivelogPage() {
                             // 멤버 선택 시 사이드바는 자동으로 닫힘 (handleMemberSelect에서 처리)
                           }}
                           className={`p-4 rounded-xl cursor-pointer transition-colors duration-200 backdrop-blur-sm touch-optimized ${member.isSelected
-                            ? 'border-2 shadow-lg'
-                            : 'bg-white/60 hover:bg-white/90 border hover:shadow-md'
+                              ? 'border-2 shadow-lg'
+                              : 'bg-white/60 hover:bg-white/90 border hover:shadow-md'
                             }`}
                           style={{
                             ...(member.isSelected
@@ -8173,8 +8236,8 @@ export default function ActivelogPage() {
                             <div className="relative">
                               <div
                                 className={`w-12 h-12 rounded-full overflow-hidden ${member.isSelected
-                                  ? 'ring-3 shadow-lg'
-                                  : 'ring-2 ring-white/50'
+                                    ? 'ring-3 shadow-lg'
+                                    : 'ring-2 ring-white/50'
                                   }`}
                                 style={member.isSelected
                                   ? {

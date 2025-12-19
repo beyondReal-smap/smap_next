@@ -65,8 +65,33 @@ interface GroupMember {
   mt_file1?: string;
 }
 
-const MOCK_GROUP_MEMBERS_HOME: GroupMember[] = [];
-
+// 목업 데이터 추가
+const MOCK_GROUP_MEMBERS_HOME: GroupMember[] = [
+  {
+    id: '1',
+    name: '김철수',
+    photo: '/images/avatar3.png',
+    isSelected: false,
+    location: { lat: 37.5642 + 0.005, lng: 127.0016 + 0.002 },
+    schedules: []
+  },
+  {
+    id: '2',
+    name: '이영희',
+    photo: '/images/avatar1.png',
+    isSelected: false,
+    location: { lat: 37.5642 - 0.003, lng: 127.0016 - 0.005 },
+    schedules: []
+  },
+  {
+    id: '3',
+    name: '박민수',
+    photo: '/images/avatar2.png',
+    isSelected: false,
+    location: { lat: 37.5642 + 0.002, lng: 127.0016 - 0.003 },
+    schedules: []
+  }
+];
 
 // 폼 데이터 타입 정의
 interface ScheduleForm {
