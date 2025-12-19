@@ -326,8 +326,8 @@ async def get_user_profile(
     
     try:
         # 기본 사용자 ID (1186번 사용자)
-        user_id = 1186
-        logger.info(f"[GET_PROFILE] 기본 사용자 정보 사용 - user_id: {user_id}")
+        # user_id = 1186
+        # logger.info(f"[GET_PROFILE] 기본 사용자 정보 사용 - user_id: {user_id}")
         
         # 데이터베이스에서 최신 사용자 정보 조회
         user = crud_auth.get_user_by_idx(db, user_id)
