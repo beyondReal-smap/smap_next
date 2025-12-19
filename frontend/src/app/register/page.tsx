@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import dayjs, { Dayjs } from 'dayjs';
@@ -2488,24 +2489,29 @@ export default function RegisterPage() {
 
 
 
-              {/* 완료 단계 */}
-              {currentStep === REGISTER_STEPS.COMPLETE && (
+              {/* 완료 단계 - Portal을 사용하여 body 레벨에서 렌더링 */}
+              {currentStep === REGISTER_STEPS.COMPLETE && typeof document !== 'undefined' && ReactDOM.createPortal(
                 <motion.div
                   key="complete"
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
                   transition={{ duration: 0.3, ease: "easeOut" }}
-                  className="fixed inset-0 flex flex-col justify-center items-center p-4"
                   style={{
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    zIndex: 9999,
+                    position: 'fixed',
                     top: 0,
                     left: 0,
                     right: 0,
                     bottom: 0,
                     width: '100vw',
-                    height: '100vh'
+                    height: '100vh',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    zIndex: 99999,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    padding: '16px'
                   }}
                 >
                   <motion.div
@@ -2671,7 +2677,8 @@ export default function RegisterPage() {
                       )}
                     </motion.div>
                   </motion.div>
-                </motion.div>
+                </motion.div>,
+                document.body
               )}
             </AnimatePresence>
           </div>
