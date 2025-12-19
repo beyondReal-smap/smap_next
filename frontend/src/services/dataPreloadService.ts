@@ -23,7 +23,7 @@ interface PreloadResult {
 
 class DataPreloadService {
   private abortController: AbortController | null = null;
-  
+
   // 🚫 중복 실행 방지를 위한 상태 관리
   private isPreloading = false;
   private lastPreloadTime = 0;
@@ -39,19 +39,19 @@ class DataPreloadService {
       console.log('[DATA PRELOAD] 🚫 이미 프리로딩이 진행 중 - 중복 실행 방지');
       throw new Error('프리로딩이 이미 진행 중입니다.');
     }
-    
+
     if (now - this.lastPreloadTime < this.PRELOAD_COOLDOWN) {
       console.log('[DATA PRELOAD] 🚫 쿨다운 기간 - 중복 실행 방지');
       throw new Error('프리로딩 쿨다운 기간입니다. 잠시 후 다시 시도해주세요.');
     }
-    
+
     this.isPreloading = true;
     this.lastPreloadTime = now;
     console.log('[DATA PRELOAD] 🚀 프리로딩 시작 - 중복 실행 방지 활성화');
-    
+
     this.abortController = new AbortController();
     const { userId, onProgress, onError } = options;
-    
+
     const result: PreloadResult = {
       userProfile: null,
       userGroups: [],
@@ -64,7 +64,7 @@ class DataPreloadService {
 
     try {
       console.log('[DATA PRELOAD] 🚀 데이터 프리로딩 시작:', userId);
-      
+
       // 1. 사용자 프로필 조회 (가장 우선)
       onProgress?.('사용자 정보 조회', 10);
       try {
@@ -96,7 +96,7 @@ class DataPreloadService {
       console.log('[DATA PRELOAD] 그룹별 데이터 조회 시작:', groupIds);
 
       // 병렬 처리를 위한 Promise 배열
-      const groupDataPromises = groupIds.map(groupId => 
+      const groupDataPromises = groupIds.map(groupId =>
         this.loadGroupData(groupId, onProgress, onError)
       );
 
@@ -121,20 +121,20 @@ class DataPreloadService {
 
       onProgress?.('프리로딩 완료', 100);
       console.log('[DATA PRELOAD] 🎉 모든 데이터 프리로딩 완료');
-      
+
       // 🚫 프리로딩 상태 리셋
       this.isPreloading = false;
       console.log('[DATA PRELOAD] 🔓 프리로딩 상태 리셋 - 중복 실행 방지 해제');
-      
+
       return result;
 
     } catch (error) {
       console.error('[DATA PRELOAD] ❌ 프리로딩 중 오류:', error);
-      
+
       // 🚫 에러 발생 시에도 프리로딩 상태 리셋
       this.isPreloading = false;
       console.log('[DATA PRELOAD] 🔓 에러로 인한 프리로딩 상태 리셋');
-      
+
       throw error;
     }
   }
@@ -158,7 +158,7 @@ class DataPreloadService {
    * 특정 그룹의 모든 데이터 조회
    */
   private async loadGroupData(
-    groupId: number, 
+    groupId: number,
     onProgress?: (step: string, progress: number) => void,
     onError?: (error: Error, step: string) => void
   ) {
@@ -224,7 +224,7 @@ class DataPreloadService {
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth() + 1;
-    
+
     try {
       return await scheduleService.getGroupSchedules(groupId);
     } catch (error) {
@@ -252,14 +252,14 @@ class DataPreloadService {
    */
   private async loadTodayLocationData(groupId: number) {
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-    
+
     try {
       // 멤버 활동 데이터 조회
       const memberActivity = await memberLocationLogService.getMemberActivityByDate(groupId, today);
-      
+
       // 활성 멤버가 있는 경우 위치 데이터도 조회
-      const activeMembers = memberActivity.member_activities?.filter((m: any) => m.is_active) || [];
-      
+      const activeMembers = memberActivity?.member_activities?.filter((m: any) => m.is_active) || [];
+
       if (activeMembers.length > 0) {
         // 첫 번째 활성 멤버의 위치 데이터 조회 (예시)
         const firstActiveMember = activeMembers[0];
@@ -275,7 +275,7 @@ class DataPreloadService {
           return { memberActivity, activeMembers };
         }
       }
-      
+
       return { memberActivity, activeMembers: [] };
     } catch (error) {
       console.warn(`[DATA PRELOAD] 그룹 ${groupId} 오늘 데이터 조회 실패:`, error);
@@ -310,7 +310,7 @@ class DataPreloadService {
    */
   async refreshData(type: string, groupId?: number, userId?: number) {
     console.log(`[DATA PRELOAD] 데이터 새로고침: ${type}`, { groupId, userId });
-    
+
     try {
       switch (type) {
         case 'userProfile':
@@ -350,7 +350,7 @@ export default dataPreloadService;
 // 🆕 로그인 성공 시 모든 데이터 일괄 프리로딩
 export const comprehensivePreloadData = async (userId: number) => {
   console.log(`[COMPREHENSIVE PRELOAD] 🚀 전체 데이터 프리로딩 시작: ${userId}`);
-  
+
   const startTime = Date.now();
   const results: {
     userProfile: any;
@@ -396,11 +396,11 @@ export const comprehensivePreloadData = async (userId: number) => {
     // 3. 각 그룹별 멤버 및 데이터 조회
     if (results.userGroups.length > 0) {
       console.log(`[COMPREHENSIVE PRELOAD] 3️⃣ 그룹별 멤버 및 데이터 조회 시작`);
-      
+
       for (const group of results.userGroups) {
         const groupId = group.sgt_idx;
         console.log(`[COMPREHENSIVE PRELOAD] 📋 그룹 처리 중: ${group.sgt_title} (${groupId})`);
-        
+
         try {
           // 3-1. 그룹 멤버 조회
           const groupMembers = await memberService.getGroupMembers(groupId.toString());
@@ -415,7 +415,7 @@ export const comprehensivePreloadData = async (userId: number) => {
           // 3-3. 오늘 위치 데이터만 조회 (성능 최적화)
           const today = new Date().toISOString().split('T')[0];
           console.log(`[COMPREHENSIVE PRELOAD] 📍 오늘(${today}) 위치 데이터만 조회 (성능 최적화)`);
-          
+
           // 오늘 위치 데이터는 필요할 때 개별 조회하도록 변경
           // 백그라운드 프리로딩에서는 기본 데이터만 로드
 
@@ -428,7 +428,7 @@ export const comprehensivePreloadData = async (userId: number) => {
 
     const endTime = Date.now();
     const duration = endTime - startTime;
-    
+
     console.log(`[COMPREHENSIVE PRELOAD] 🎉 전체 프리로딩 완료 (${duration}ms):`, {
       userProfile: !!results.userProfile,
       userGroups: results.userGroups.length,
