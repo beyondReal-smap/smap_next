@@ -180,6 +180,24 @@ header {
   overflow: hidden !important;
 }
 
+/* 회원가입 완료 페이지 오버레이 */
+.register-complete-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 999999 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: center !important;
+  padding: 16px !important;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+}
+
 .calendar-modal-backdrop {
   position: fixed !important;
   top: 0 !important;
