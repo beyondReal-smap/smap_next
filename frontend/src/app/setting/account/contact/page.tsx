@@ -428,7 +428,7 @@ export default function ContactPage() {
                 {/* 전화번호 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2" >
-                    전화번호 *
+                    전화번호 <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -460,7 +460,7 @@ export default function ContactPage() {
                 {/* 이메일 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2" >
-                    이메일 *
+                    이메일 <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -494,8 +494,8 @@ export default function ContactPage() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     className={`p-4 rounded-xl text-sm flex items-center space-x-2 ${message.includes('성공')
-                        ? 'bg-green-50 text-green-700 border border-green-200'
-                        : 'bg-red-50 text-red-700 border border-red-200'
+                      ? 'bg-green-50 text-green-700 border border-green-200'
+                      : 'bg-red-50 text-red-700 border border-red-200'
                       }`}
                   >
                     {message.includes('성공') ? (
