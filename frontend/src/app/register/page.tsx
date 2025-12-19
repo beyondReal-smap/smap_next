@@ -1636,6 +1636,52 @@ export default function RegisterPage() {
     );
   }
 
+  // 회원가입 완료 단계 - 별도 UI로 렌더링 (레이아웃 제약 우회)
+  if (currentStep === REGISTER_STEPS.COMPLETE) {
+    return (
+      <div className="register-complete-overlay">
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.4 }}
+          className="w-full max-w-md bg-white rounded-3xl p-8 shadow-2xl text-center"
+        >
+          {/* 체크 아이콘 */}
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.1, type: "spring", stiffness: 200, damping: 15 }}
+            className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6"
+          >
+            <FiCheck className="w-10 h-10 text-white" strokeWidth={3} />
+          </motion.div>
+
+          {/* 텍스트 */}
+          <h2 className="text-2xl font-bold text-gray-900 mb-3">회원가입 완료!</h2>
+          <p className="text-gray-600 mb-8 leading-relaxed" style={{ wordBreak: 'keep-all' }}>
+            SMAP에 오신 것을 환영합니다.<br />
+            친구들과 소중한 추억을 공유해보세요.
+          </p>
+
+          {/* 버튼 */}
+          <motion.button
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            onClick={() => {
+              router.push('/signin');
+            }}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="w-full py-4 bg-[#0114a2] text-white rounded-xl font-semibold text-lg shadow-lg hover:bg-[#010f7a] transition-colors"
+          >
+            로그인하러 가기
+          </motion.button>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={`register-content-area ${isIOSReady ? 'ios-ready' : ''}`}
