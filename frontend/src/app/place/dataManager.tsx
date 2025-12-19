@@ -83,8 +83,8 @@ export default function DataManager({
       // 4. UI 타입에 맞게 변환
       const uiMembers: GroupMember[] = members.map((m, index) => {
         // 위치 정보 파싱 (문자열인 경우 숫자로 변환)
-        const lat = m.mlt_lat || (typeof m.mt_lat === 'string' ? parseFloat(m.mt_lat) : m.mt_lat) || 37.5665;
-        const lng = m.mlt_long || (typeof m.mt_long === 'string' ? parseFloat(m.mt_long) : m.mt_long) || 126.9780;
+        const lat = (typeof m.mt_lat === 'string' ? parseFloat(m.mt_lat) : m.mt_lat) || 37.5665;
+        const lng = (typeof m.mt_long === 'string' ? parseFloat(m.mt_long) : m.mt_long) || 126.9780;
 
         return {
           id: String(m.mt_idx),
@@ -97,8 +97,8 @@ export default function DataManager({
           savedLocationCount: 0,
           mt_gender: m.mt_gender,
           original_index: index,
-          mlt_lat: m.mlt_lat,
-          mlt_long: m.mlt_long
+          mlt_lat: lat,
+          mlt_long: lng
         };
       });
 
