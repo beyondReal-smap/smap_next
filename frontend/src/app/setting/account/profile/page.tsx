@@ -64,98 +64,111 @@ export default function ProfilePage() {
 
       console.log('🔄 사용자 프로필 정보 로드 시작');
 
-      // JWT 토큰 내용 확인 (디버깅용)
+      // JWT 토큰에서 사용자 정보 추출 (폴백용)
+      let tokenPayload: any = null;
       try {
         const tokenParts = token.split('.');
         if (tokenParts.length === 3) {
-          const payload = JSON.parse(atob(tokenParts[1]));
-          console.log('🔍 JWT 토큰 내용:', payload);
-          console.log('🔍 JWT 토큰에 mt_birth 있는지:', payload.mt_birth);
-          console.log('🔍 JWT 토큰에 mt_gender 있는지:', payload.mt_gender);
-          console.log('🔍 JWT 토큰에 mt_hp 있는지:', payload.mt_hp);
-          console.log('🔍 JWT 토큰에 mt_email 있는지:', payload.mt_email);
+          tokenPayload = JSON.parse(atob(tokenParts[1]));
+          console.log('🔍 JWT 토큰 내용:', tokenPayload);
+          console.log('🔍 JWT 토큰 필드 - mt_name:', tokenPayload.mt_name, 'mt_nickname:', tokenPayload.mt_nickname);
         }
       } catch (jwtError) {
         console.error('❌ JWT 토큰 파싱 오류:', jwtError);
       }
 
       // JWT 기반 profile API 사용 (백엔드 폴백 기능 포함)
-      const response = await fetch('/api/auth/profile', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      console.log('📡 /api/auth/profile 응답 상태:', response.status);
+      let userData: any = null;
 
-      if (response.ok) {
-        const data = await response.json();
-        console.log('📄 프로필 데이터 수신:', data);
-        console.log('📄 원본 userData 객체:', data.data);
+      try {
+        const response = await fetch('/api/auth/profile', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        console.log('📡 /api/auth/profile 응답 상태:', response.status);
 
-        if (data.success && data.data) {
-          const userData = data.data;
+        if (response.ok) {
+          const data = await response.json();
+          console.log('📄 프로필 데이터 수신:', data);
 
-          // 모든 필드 값을 개별적으로 로깅
-          console.log('🔍 개별 필드 확인:');
-          console.log('- mt_name:', userData.mt_name);
-          console.log('- mt_nickname:', userData.mt_nickname);
-          console.log('- mt_birth:', userData.mt_birth);
-          console.log('- mt_gender:', userData.mt_gender);
-          console.log('- mt_hp:', userData.mt_hp);
-          console.log('- mt_email:', userData.mt_email);
-
-          // 데이터 타입과 값 상세 확인
-          console.log('🔍 데이터 타입 확인:');
-          console.log('- mt_birth type:', typeof userData.mt_birth, 'value:', userData.mt_birth);
-          console.log('- mt_gender type:', typeof userData.mt_gender, 'value:', userData.mt_gender);
-
-          // 생년월일 처리 (null, undefined, 빈 문자열 체크)
-          let birthDate = '';
-          if (userData.mt_birth && userData.mt_birth !== 'null' && userData.mt_birth !== '') {
-            birthDate = userData.mt_birth;
-            console.log('✅ 생년월일 데이터 있음:', birthDate);
-          } else {
-            console.log('⚠️ 생년월일 데이터 없음 또는 빈 값');
+          if (data.success && data.data) {
+            userData = data.data;
           }
+        } else {
+          console.error('❌ 프로필 조회 실패:', response.status);
+        }
+      } catch (apiError) {
+        console.error('❌ API 호출 오류:', apiError);
+      }
 
-          // 성별 처리 (null, undefined 체크)
-          let genderValue = 0; // 기본값: 선택 안함
-          if (userData.mt_gender !== null && userData.mt_gender !== undefined) {
-            genderValue = Number(userData.mt_gender);
-            console.log('✅ 성별 데이터 있음:', genderValue);
-          } else {
-            console.log('⚠️ 성별 데이터 없음, 기본값 0 사용');
-          }
+      // API 응답이 없으면 JWT 토큰에서 폴백 데이터 사용
+      if (!userData && tokenPayload) {
+        console.log('⚠️ API 응답 없음, JWT 토큰에서 폴백 데이터 사용');
+        userData = {
+          mt_name: tokenPayload.mt_name || '',
+          mt_nickname: tokenPayload.mt_nickname || '',
+          mt_birth: tokenPayload.mt_birth || '',
+          mt_gender: tokenPayload.mt_gender,
+          mt_hp: tokenPayload.mt_hp || '',
+          mt_email: tokenPayload.mt_email || ''
+        };
+        console.log('📄 JWT 토큰에서 추출한 폴백 데이터:', userData);
+      }
 
-          const newProfile = {
-            mt_name: userData.mt_name || '',
-            mt_nickname: userData.mt_nickname || '',
-            mt_birth: birthDate,
-            mt_gender: genderValue
-          };
+      if (userData) {
+        // 모든 필드 값을 개별적으로 로깅
+        console.log('🔍 개별 필드 확인:');
+        console.log('- mt_name:', userData.mt_name);
+        console.log('- mt_nickname:', userData.mt_nickname);
+        console.log('- mt_birth:', userData.mt_birth);
+        console.log('- mt_gender:', userData.mt_gender);
+        console.log('- mt_hp:', userData.mt_hp);
+        console.log('- mt_email:', userData.mt_email);
 
-          console.log('🎯 설정할 프로필 데이터:', newProfile);
+        // 생년월일 처리 (null, undefined, 빈 문자열 체크)
+        let birthDate = '';
+        if (userData.mt_birth && userData.mt_birth !== 'null' && userData.mt_birth !== '') {
+          birthDate = userData.mt_birth;
+          console.log('✅ 생년월일 데이터 있음:', birthDate);
+        } else {
+          console.log('⚠️ 생년월일 데이터 없음 또는 빈 값');
+        }
 
-          setProfile(newProfile);
+        // 성별 처리 (null, undefined 체크)
+        let genderValue = 0; // 기본값: 선택 안함
+        if (userData.mt_gender !== null && userData.mt_gender !== undefined) {
+          genderValue = Number(userData.mt_gender);
+          console.log('✅ 성별 데이터 있음:', genderValue);
+        } else {
+          console.log('⚠️ 성별 데이터 없음, 기본값 0 사용');
+        }
 
-          console.log('✅ 프로필 상태 업데이트 완료');
+        const newProfile = {
+          mt_name: userData.mt_name || '',
+          mt_nickname: userData.mt_nickname || '',
+          mt_birth: birthDate,
+          mt_gender: genderValue
+        };
 
-          // 생년월일이 있으면 캘린더 현재 월도 설정
-          if (birthDate) {
-            try {
-              setCalendarCurrentMonth(dayjs(birthDate));
-              console.log('📅 생년월일 기반으로 캘린더 월 설정:', birthDate);
-            } catch (dateError) {
-              console.warn('⚠️ 생년월일 날짜 파싱 오류:', dateError);
-            }
+        console.log('🎯 설정할 프로필 데이터:', newProfile);
+
+        setProfile(newProfile);
+
+        console.log('✅ 프로필 상태 업데이트 완료');
+
+        // 생년월일이 있으면 캘린더 현재 월도 설정
+        if (birthDate) {
+          try {
+            setCalendarCurrentMonth(dayjs(birthDate));
+            console.log('📅 생년월일 기반으로 캘린더 월 설정:', birthDate);
+          } catch (dateError) {
+            console.warn('⚠️ 생년월일 날짜 파싱 오류:', dateError);
           }
         }
       } else {
-        console.error('❌ 프로필 조회 실패:', response.status);
-        // 401 오류가 발생해도 즉시 리디렉션하지 않고 기본값으로 진행
-        // 사용자가 직접 로그인 상태를 확인할 수 있도록 함
-        console.log('⚠️ API 호출 실패, 기본값으로 진행');
+        console.log('⚠️ 프로필 데이터를 가져올 수 없음 (API와 JWT 토큰 모두 실패)');
       }
     } catch (error) {
       console.error('❌ 사용자 정보 로드 실패:', error);
@@ -569,8 +582,8 @@ export default function ProfilePage() {
                       type="button"
                       onClick={() => handleInputChange('mt_gender', option.value)}
                       className={`py-3 px-4 rounded-xl border-2 text-sm font-medium transition-all duration-200 ${profile.mt_gender === option.value
-                          ? 'border-blue-500 text-white'
-                          : 'border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                        ? 'border-blue-500 text-white'
+                        : 'border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50'
                         }`}
                       style={profile.mt_gender === option.value ? {
                         backgroundColor: '#3C82F6',
@@ -586,8 +599,8 @@ export default function ProfilePage() {
               {/* 메시지 표시 */}
               {message && (
                 <div className={`p-4 rounded-xl border ${message.includes('성공')
-                    ? 'bg-green-50 border-green-200 text-green-700'
-                    : 'bg-red-50 border-red-200 text-red-700'
+                  ? 'bg-green-50 border-green-200 text-green-700'
+                  : 'bg-red-50 border-red-200 text-red-700'
                   }`}>
                   <div className="flex items-center">
                     {message.includes('성공') ? (

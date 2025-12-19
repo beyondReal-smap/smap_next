@@ -323,11 +323,20 @@ async def get_user_profile(
     현재 로그인한 사용자의 프로필 정보를 조회합니다.
     """
     logger.info("[GET_PROFILE] 사용자 프로필 조회 요청 시작")
+    logger.info(f"[GET_PROFILE] Authorization 헤더: {authorization[:50] if authorization else 'None'}...")
     
     try:
-        # 기본 사용자 ID (1186번 사용자)
-        # user_id = 1186
-        # logger.info(f"[GET_PROFILE] 기본 사용자 정보 사용 - user_id: {user_id}")
+        # JWT 토큰에서 사용자 ID 추출
+        user_id = get_current_user_id_from_token(authorization)
+        if not user_id:
+            logger.warning("[GET_PROFILE] 인증 토큰이 없거나 유효하지 않음")
+            return {
+                "result": "N",
+                "message": "인증이 필요합니다.",
+                "success": False
+            }
+        
+        logger.info(f"[GET_PROFILE] 토큰에서 추출한 user_id: {user_id}")
         
         # 데이터베이스에서 최신 사용자 정보 조회
         user = crud_auth.get_user_by_idx(db, user_id)
@@ -354,7 +363,7 @@ async def get_user_profile(
             "mt_wdate": user.mt_wdate.isoformat() if user.mt_wdate else None
         }
         
-        logger.info(f"[GET_PROFILE] 프로필 조회 성공 - user_id: {user_id}")
+        logger.info(f"[GET_PROFILE] 프로필 조회 성공 - user_id: {user_id}, name: {user.mt_name}, nickname: {user.mt_nickname}")
         return {
             "result": "Y",
             "data": profile_data,
