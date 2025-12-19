@@ -65,33 +65,8 @@ interface GroupMember {
   mt_file1?: string;
 }
 
-// 목업 데이터 추가
-const MOCK_GROUP_MEMBERS_HOME: GroupMember[] = [
-  { 
-    id: '1', 
-    name: '김철수', 
-    photo: '/images/avatar3.png', 
-    isSelected: false,
-    location: { lat: 37.5642 + 0.005, lng: 127.0016 + 0.002 },
-    schedules: []
-  },
-  { 
-    id: '2', 
-    name: '이영희', 
-    photo: '/images/avatar1.png', 
-    isSelected: false,
-    location: { lat: 37.5642 - 0.003, lng: 127.0016 - 0.005 },
-    schedules: []
-  },
-  { 
-    id: '3', 
-    name: '박민수', 
-    photo: '/images/avatar2.png', 
-    isSelected: false,
-    location: { lat: 37.5642 + 0.002, lng: 127.0016 - 0.003 },
-    schedules: []
-  }
-];
+const MOCK_GROUP_MEMBERS_HOME: GroupMember[] = [];
+
 
 // 폼 데이터 타입 정의
 interface ScheduleForm {
@@ -166,11 +141,11 @@ export default function AddSchedulePage() {
       // 관리자 우선
       if (a.sgdt_owner_chk === 'Y' && b.sgdt_owner_chk !== 'Y') return -1;
       if (a.sgdt_owner_chk !== 'Y' && b.sgdt_owner_chk === 'Y') return 1;
-      
+
       // 리더 우선
       if (a.sgdt_leader_chk === 'Y' && b.sgdt_leader_chk !== 'Y') return -1;
       if (a.sgdt_leader_chk !== 'Y' && b.sgdt_leader_chk === 'Y') return 1;
-      
+
       // 이름 순
       return a.name.localeCompare(b.name);
     });
@@ -181,15 +156,15 @@ export default function AddSchedulePage() {
     try {
       setIsLoadingMembers(true);
       console.log('[SCHEDULE ADD] 그룹 멤버 데이터 가져오기 시작:', groupId);
-      
+
       const response = await fetch(`/api/groups/${groupId}/members`);
       if (!response.ok) {
         throw new Error('그룹 멤버 데이터를 가져올 수 없습니다.');
       }
-      
+
       const membersData = await response.json();
       console.log('[SCHEDULE ADD] 그룹 멤버 데이터:', membersData);
-      
+
       // 멤버 데이터를 GroupMember 형식으로 변환
       const transformedMembers: GroupMember[] = membersData.map((member: any) => ({
         id: member.mt_idx?.toString() || member.id || '',
@@ -206,7 +181,7 @@ export default function AddSchedulePage() {
         sgdt_leader_chk: member.sgdt_leader_chk,
         mt_file1: member.mt_file1
       }));
-      
+
       // 현재 사용자의 역할 확인 (로그인된 사용자 정보 사용)
       const currentUserId = user?.mt_idx?.toString();
       const currentUser = transformedMembers.find(m => m.id === currentUserId);
@@ -226,10 +201,10 @@ export default function AddSchedulePage() {
       } else {
         console.warn('[SCHEDULE ADD] 현재 사용자를 찾을 수 없음:', currentUserId);
       }
-      
+
       setGroupMembers(transformedMembers);
       console.log('[SCHEDULE ADD] 그룹 멤버 데이터 변환 완료:', transformedMembers.length, '명');
-      
+
     } catch (error) {
       console.error('[SCHEDULE ADD] 그룹 멤버 데이터 가져오기 실패:', error);
       // 에러 시 목업 데이터 사용
@@ -284,9 +259,9 @@ export default function AddSchedulePage() {
       selectedMemberName,
       currentUserRole,
       currentUserId: user?.mt_idx,
-      groupMembers: groupMembers.map(m => ({ 
-        id: m.id, 
-        name: m.name, 
+      groupMembers: groupMembers.map(m => ({
+        id: m.id,
+        name: m.name,
         isSelected: m.isSelected,
         owner: m.sgdt_owner_chk,
         leader: m.sgdt_leader_chk
@@ -298,14 +273,14 @@ export default function AddSchedulePage() {
   const handleMemberSelect = (memberId: string) => {
     const member = sortedGroupMembers.find(m => m.id === memberId);
     const currentUserId = user?.mt_idx?.toString();
-    
+
     console.log('[SCHEDULE ADD] 멤버 선택 시도:', {
       selectedMemberId: memberId,
       currentUserId: currentUserId,
       currentUserRole: currentUserRole,
       memberName: member?.name
     });
-    
+
     // 역할에 따른 권한 확인
     if (currentUserRole === 'member') {
       // 일반 멤버는 자신만 선택 가능
@@ -315,12 +290,12 @@ export default function AddSchedulePage() {
         return;
       }
     }
-    
+
     setSelectedMemberId(memberId);
     if (member) {
       setSelectedMemberName(member.name);
     }
-    
+
     // 멤버 리스트 정렬 유지하면서 선택 상태만 업데이트
     setGroupMembers(prev => prev.map(m => ({
       ...m,
@@ -353,7 +328,7 @@ export default function AddSchedulePage() {
 
     // 현재 시간
     const now = dayjs();
-    
+
     // 기본 필수 필드 검사
     if (!scheduleForm.startDate) {
       // 시작 날짜가 없으면 에러 표시하지 않음 (초기 상태)
@@ -386,7 +361,7 @@ export default function AddSchedulePage() {
     if (scheduleForm.allDay) {
       if (scheduleForm.endDate) {
         const endDate = dayjs(scheduleForm.endDate);
-        
+
         if (!endDate.isValid()) {
           setDateTimeError('종료 날짜 형식이 올바르지 않습니다.');
           focusTarget = endDateRef;
@@ -401,7 +376,7 @@ export default function AddSchedulePage() {
           hasError = true;
         }
       }
-    } 
+    }
     // 시간이 설정된 일정인 경우
     else {
       if (!scheduleForm.startTime) {
@@ -510,12 +485,12 @@ export default function AddSchedulePage() {
   // 입력 변경 핸들러 (글자 수 제한 수정)
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
-    
+
     if (type === 'checkbox') {
       const { checked } = e.target as HTMLInputElement;
       setScheduleForm(prev => ({ ...prev, [name]: checked }));
     } else {
-      let maxLength = -1; 
+      let maxLength = -1;
       if ('maxLength' in e.target) {
         maxLength = (e.target as HTMLInputElement | HTMLTextAreaElement).maxLength;
       }
@@ -527,7 +502,7 @@ export default function AddSchedulePage() {
       setScheduleForm(prev => ({ ...prev, [name]: value }));
     }
   };
-  
+
   // 하루 종일 토글 핸들러
   const handleAllDayToggle = () => {
     setScheduleForm(prev => ({
@@ -640,12 +615,12 @@ export default function AddSchedulePage() {
   };
 
   // 모달: 반복 유형 변경
-  const handleModalRepeatTypeChange = (type: string) => { 
+  const handleModalRepeatTypeChange = (type: string) => {
     setModalRepeatType(type);
     if (type !== '매주') {
       setModalSelectedWeekdays(new Set());
     }
-  }; 
+  };
   // 모달: 요일 선택 토글
   const handleModalWeekdayToggle = (dayIndex: number) => {
     setModalSelectedWeekdays(prev => {
@@ -666,12 +641,12 @@ export default function AddSchedulePage() {
   // 모달: 설정 저장 핸들러 (종료 조건 로직 간소화)
   const handleConfirmRepeatSettings = () => {
     let finalRepeatString = modalRepeatType;
-    if (modalRepeatType === '매주' && modalSelectedWeekdays.size > 0) { 
+    if (modalRepeatType === '매주' && modalSelectedWeekdays.size > 0) {
       const sortedDays = Array.from(modalSelectedWeekdays).sort();
       const dayShortNames = sortedDays.map(index => WEEKDAYS[index].short);
       finalRepeatString = `매주 (${dayShortNames.join(', ')})`;
     } else if (modalRepeatType === '매주' && modalSelectedWeekdays.size === 0) {
-      finalRepeatString = '매주'; 
+      finalRepeatString = '매주';
     }
 
     // 종료 조건 처리 (예시: 로그 출력)
@@ -820,11 +795,11 @@ export default function AddSchedulePage() {
   };
 
   return (
-    <PageContainer 
-      title={selectedMemberName && isFromHome ? 
-        `${selectedMemberName}의 일정 입력` : 
-        "새 일정 입력"} 
-      description="" 
+    <PageContainer
+      title={selectedMemberName && isFromHome ?
+        `${selectedMemberName}의 일정 입력` :
+        "새 일정 입력"}
+      description=""
       showHeader={false}
       showBackButton={false}
       showTitle={false}
@@ -848,7 +823,7 @@ export default function AddSchedulePage() {
                     {currentUserRole === 'member' && '일반 멤버: 자신의 스케줄만 등록할 수 있습니다.'}
                   </p>
                 </div>
-                
+
                 {isLoadingMembers ? (
                   <div className="flex flex-col items-center justify-center py-4">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-500 mb-2"></div>
@@ -859,33 +834,30 @@ export default function AddSchedulePage() {
                     {sortedGroupMembers.map((member) => {
                       // 역할에 따른 선택 가능 여부 확인
                       const currentUserId = user?.mt_idx?.toString();
-                      const canSelect = currentUserRole === 'owner' || 
-                                      currentUserRole === 'leader' || 
-                                      member.id === currentUserId;
-                      
+                      const canSelect = currentUserRole === 'owner' ||
+                        currentUserRole === 'leader' ||
+                        member.id === currentUserId;
+
                       return (
                         <div key={member.id} className="flex flex-col items-center p-0 flex-shrink-0">
                           <button
                             type="button"
                             onClick={() => handleMemberSelect(member.id)}
                             disabled={!canSelect}
-                            className={`flex flex-col items-center focus:outline-none ${
-                              !canSelect ? 'opacity-50 cursor-not-allowed' : ''
-                            }`}
+                            className={`flex flex-col items-center focus:outline-none ${!canSelect ? 'opacity-50 cursor-not-allowed' : ''
+                              }`}
                           >
-                            <div className={`w-12 h-12 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden border-2 transition-all duration-200 transform hover:scale-105 ${
-                              member.isSelected ? 'border-indigo-500 ring-2 ring-indigo-300 scale-110' : 'border-transparent'
-                            } ${!canSelect ? 'grayscale' : ''}`}>
-                              <img 
-                                src={member.mt_file1 || member.photo} 
-                                alt={member.name} 
+                            <div className={`w-12 h-12 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden border-2 transition-all duration-200 transform hover:scale-105 ${member.isSelected ? 'border-indigo-500 ring-2 ring-indigo-300 scale-110' : 'border-transparent'
+                              } ${!canSelect ? 'grayscale' : ''}`}>
+                              <img
+                                src={member.mt_file1 || member.photo}
+                                alt={member.name}
                                 className="w-full h-full object-cover"
                                 draggable="false"
                               />
                             </div>
-                            <span className={`block text-xs font-medium mt-1.5 ${
-                              member.isSelected ? 'text-indigo-700' : 'text-gray-700'
-                            } ${!canSelect ? 'text-gray-400' : ''}`}>
+                            <span className={`block text-xs font-medium mt-1.5 ${member.isSelected ? 'text-indigo-700' : 'text-gray-700'
+                              } ${!canSelect ? 'text-gray-400' : ''}`}>
                               {member.name}
                             </span>
                             {/* 역할 표시 */}
@@ -909,7 +881,7 @@ export default function AddSchedulePage() {
               </div>
             </div>
           )}
-          
+
           {/* 일정 내용 (제목) 카드 */}
           <div className="bg-white rounded-lg shadow-lg p-5 border-t-4 border-indigo-200">
             <div className="flex items-center mb-4">
@@ -935,16 +907,16 @@ export default function AddSchedulePage() {
             </div>
           </div>
 
-          {/* 날짜 및 시간 카드 */} 
+          {/* 날짜 및 시간 카드 */}
           <div className="bg-white rounded-lg shadow-lg p-5 space-y-4 border-t-4 border-indigo-200">
             {/* 카드 제목 및 아이콘 추가 */}
-            <div className="flex items-center mb-4"> 
-              <FaClock className="w-6 h-6 text-green-500 mr-3 flex-shrink-0" /> {/* 아이콘 및 색상 조정 */} 
+            <div className="flex items-center mb-4">
+              <FaClock className="w-6 h-6 text-green-500 mr-3 flex-shrink-0" /> {/* 아이콘 및 색상 조정 */}
               <h3 className="text-lg font-semibold text-gray-800">날짜 및 시간</h3>
             </div>
 
             {/* 하루 종일 토글 */}
-            <div className="flex justify-between items-center border-t border-gray-100 pt-4"> {/* 구분선 및 패딩 추가 */} 
+            <div className="flex justify-between items-center border-t border-gray-100 pt-4"> {/* 구분선 및 패딩 추가 */}
               <label htmlFor="allDay" className="text-sm font-medium text-gray-700">하루 종일</label>
               <button
                 type="button"
@@ -959,7 +931,7 @@ export default function AddSchedulePage() {
                   className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${scheduleForm.allDay ? 'translate-x-5' : 'translate-x-0'}`}
                 />
               </button>
-              <input type="checkbox" name="allDay" id="allDay" checked={scheduleForm.allDay} onChange={() => {}} className="sr-only" /> 
+              <input type="checkbox" name="allDay" id="allDay" checked={scheduleForm.allDay} onChange={() => { }} className="sr-only" />
             </div>
 
             {/* 날짜 및 시간 선택 영역 (상하 배치로 변경) */}
@@ -968,9 +940,9 @@ export default function AddSchedulePage() {
               <div className="space-y-2"> {/* mb-4 추가하여 아래 섹션과 간격 부여 */}
                 <label className="block text-sm font-medium text-gray-500">시작</label>
                 {/* 날짜와 시간을 좌우로 배치하기 위한 flex 컨테이너 */}
-                <div className="flex items-center space-x-2"> 
+                <div className="flex items-center space-x-2">
                   {/* 시작 날짜 */}
-                  <div className="flex-1 flex items-center p-2 rounded-md border border-gray-300"> {/* flex-1 추가 */} 
+                  <div className="flex-1 flex items-center p-2 rounded-md border border-gray-300"> {/* flex-1 추가 */}
                     <FaCalendarDays className="w-4 h-4 text-gray-500 mr-2 flex-shrink-0" />
                     <DatePicker
                       ref={startDateRef}
@@ -994,9 +966,9 @@ export default function AddSchedulePage() {
                       calendarClassName="font-sans"
                     />
                   </div>
-                  {/* 시작 시간 (flex-1 추가 및 조건부 렌더링) */} 
+                  {/* 시작 시간 (flex-1 추가 및 조건부 렌더링) */}
                   {!scheduleForm.allDay && (
-                    <div className="flex-1 flex items-center p-2 rounded-md border border-gray-300"> {/* flex-1 추가 */} 
+                    <div className="flex-1 flex items-center p-2 rounded-md border border-gray-300"> {/* flex-1 추가 */}
                       <FaClock className="w-4 h-4 text-gray-500 mr-2 flex-shrink-0" />
                       <DatePicker
                         ref={startTimeRef}
@@ -1022,53 +994,53 @@ export default function AddSchedulePage() {
 
               {/* 종료 섹션 */}
               <div className="space-y-2"> {/* mt-4 추가하여 위 섹션과 간격 부여 */}
-                 <label className="block text-sm font-medium text-gray-500">종료</label>
-                 {/* 날짜와 시간을 좌우로 배치하기 위한 flex 컨테이너 */}
-                 <div className="flex items-center space-x-2">
-                   {/* 종료 일자 */}
-                   <div className="flex-1 flex items-center p-2 rounded-md border border-gray-300"> {/* flex-1 추가 */} 
-                     <FaCalendarDays className="w-4 h-4 text-gray-500 mr-2 flex-shrink-0" />
-                     <DatePicker
-                       ref={endDateRef}
-                       selected={scheduleForm.endDate ? dayjs(scheduleForm.endDate).toDate() : null}
-                       onChange={(date: Date | null) => handleDateChange(date, 'endDate')}
-                       dateFormat="yyyy-MM-dd"
-                       locale={ko}
-                       className="block w-full border-none p-0 text-left text-sm font-medium focus:ring-0 bg-transparent cursor-pointer"
-                       wrapperClassName="flex-grow"
-                       portalId="root-portal"
-                       closeOnScroll={false}
-                       calendarClassName="font-sans"
-                     />
-                   </div>
-                    {/* 종료 시간 (flex-1 추가 및 조건부 렌더링) */}
-                    {!scheduleForm.allDay && (
-                     <div className="flex-1 flex items-center p-2 rounded-md border border-gray-300"> {/* flex-1 추가 */} 
-                       <FaClock className="w-4 h-4 text-gray-500 mr-2 flex-shrink-0" />
-                       <DatePicker
-                         ref={endTimeRef}
-                         selected={scheduleForm.endTime ? dayjs(`1970-01-01T${scheduleForm.endTime}:00`).toDate() : null}
-                         onChange={(date: Date | null) => handleTimeChange(date, 'endTime')}
-                         showTimeSelect
-                         showTimeSelectOnly
-                         timeIntervals={5}
-                         timeCaption="시간"
-                         timeFormat="HH:mm"
-                         dateFormat="HH:mm"
-                         locale={ko}
-                         className="block w-full border-none p-0 text-left text-sm text-gray-600 focus:ring-0 bg-transparent cursor-pointer"
-                         wrapperClassName="flex-grow"
-                         portalId="root-portal"
-                         closeOnScroll={false}
-                         calendarClassName="font-sans"
-                       />
-                     </div>
-                    )}
-                 </div>
+                <label className="block text-sm font-medium text-gray-500">종료</label>
+                {/* 날짜와 시간을 좌우로 배치하기 위한 flex 컨테이너 */}
+                <div className="flex items-center space-x-2">
+                  {/* 종료 일자 */}
+                  <div className="flex-1 flex items-center p-2 rounded-md border border-gray-300"> {/* flex-1 추가 */}
+                    <FaCalendarDays className="w-4 h-4 text-gray-500 mr-2 flex-shrink-0" />
+                    <DatePicker
+                      ref={endDateRef}
+                      selected={scheduleForm.endDate ? dayjs(scheduleForm.endDate).toDate() : null}
+                      onChange={(date: Date | null) => handleDateChange(date, 'endDate')}
+                      dateFormat="yyyy-MM-dd"
+                      locale={ko}
+                      className="block w-full border-none p-0 text-left text-sm font-medium focus:ring-0 bg-transparent cursor-pointer"
+                      wrapperClassName="flex-grow"
+                      portalId="root-portal"
+                      closeOnScroll={false}
+                      calendarClassName="font-sans"
+                    />
+                  </div>
+                  {/* 종료 시간 (flex-1 추가 및 조건부 렌더링) */}
+                  {!scheduleForm.allDay && (
+                    <div className="flex-1 flex items-center p-2 rounded-md border border-gray-300"> {/* flex-1 추가 */}
+                      <FaClock className="w-4 h-4 text-gray-500 mr-2 flex-shrink-0" />
+                      <DatePicker
+                        ref={endTimeRef}
+                        selected={scheduleForm.endTime ? dayjs(`1970-01-01T${scheduleForm.endTime}:00`).toDate() : null}
+                        onChange={(date: Date | null) => handleTimeChange(date, 'endTime')}
+                        showTimeSelect
+                        showTimeSelectOnly
+                        timeIntervals={5}
+                        timeCaption="시간"
+                        timeFormat="HH:mm"
+                        dateFormat="HH:mm"
+                        locale={ko}
+                        className="block w-full border-none p-0 text-left text-sm text-gray-600 focus:ring-0 bg-transparent cursor-pointer"
+                        wrapperClassName="flex-grow"
+                        portalId="root-portal"
+                        closeOnScroll={false}
+                        calendarClassName="font-sans"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* 오류 메시지 표시 영역 추가 */} 
+            {/* 오류 메시지 표시 영역 추가 */}
             {dateTimeError && (
               <div className="mt-2 flex items-center text-sm text-red-600 bg-red-50 p-3 rounded-md border border-red-200">
                 <FaExclamationTriangle className="w-4 h-4 mr-2 flex-shrink-0" />
@@ -1082,8 +1054,8 @@ export default function AddSchedulePage() {
                 <FaArrowsRotate className="w-5 h-5 text-teal-500 mr-2 flex-shrink-0" />
                 <span className="font-medium">반복</span>
               </div>
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={handleOpenRepeatModal} // 모달 열기 핸들러 연결
                 className="text-indigo-600 hover:underline flex items-center cursor-pointer"
               >
@@ -1094,26 +1066,26 @@ export default function AddSchedulePage() {
               </button>
             </div>
           </div>
-          
-          {/* 알림 카드 */} 
+
+          {/* 알림 카드 */}
           <div className="bg-white rounded-lg shadow-lg p-5 border-t-4 border-indigo-200">
-            {/* 카드 제목 및 아이콘 추가 */} 
+            {/* 카드 제목 및 아이콘 추가 */}
             <div className="flex items-center mb-4">
-              <FaBell className="w-6 h-6 text-amber-500 mr-3 flex-shrink-0" /> 
+              <FaBell className="w-6 h-6 text-amber-500 mr-3 flex-shrink-0" />
               <h3 className="text-lg font-semibold text-gray-800">알림</h3>
             </div>
-            {/* 내용 영역 - 구분선 및 패딩 추가 */} 
+            {/* 내용 영역 - 구분선 및 패딩 추가 */}
             <div className="border-t border-gray-100 pt-4 flex items-center justify-between">
-              <div> {/* 설명 텍스트 */} 
-                <p className="text-sm text-gray-600">알림 설정을 선택해주세요.</p> 
+              <div> {/* 설명 텍스트 */}
+                <p className="text-sm text-gray-600">알림 설정을 선택해주세요.</p>
               </div>
-              {/* 알림 설정 버튼 (모달 트리거로 변경) */} 
-              <button 
-                type="button" 
+              {/* 알림 설정 버튼 (모달 트리거로 변경) */}
+              <button
+                type="button"
                 onClick={handleOpenAlarmModal} // 모달 열기 핸들러 연결
                 className="text-sm text-indigo-600 hover:underline flex items-center cursor-pointer"
               >
-                <span>{scheduleForm.alarm}</span> 
+                <span>{scheduleForm.alarm}</span>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                 </svg>
@@ -1124,9 +1096,9 @@ export default function AddSchedulePage() {
           {/* 장소 카드 */}
           <div className="bg-white rounded-lg shadow-lg p-5 border-t-4 border-indigo-200">
             <div className="flex items-center mb-4">
-              <FaMapPin className="w-6 h-6 text-red-500 mr-3 flex-shrink-0" /> 
+              <FaMapPin className="w-6 h-6 text-red-500 mr-3 flex-shrink-0" />
               <h3 className="text-lg font-semibold text-gray-800">장소</h3>
-              {/* 검색 버튼을 헤더 오른쪽으로 이동 */} 
+              {/* 검색 버튼을 헤더 오른쪽으로 이동 */}
               <Button
                 type="button"
                 variant="outline"
@@ -1137,9 +1109,9 @@ export default function AddSchedulePage() {
                 <FaSearch className="w-4 h-4" />
               </Button>
             </div>
-            {/* 내용 영역 수정 */} 
+            {/* 내용 영역 수정 */}
             <div className="border-t border-gray-100 pt-4 space-y-3">
-              {/* 장소 이름 입력 (편집 가능) */} 
+              {/* 장소 이름 입력 (편집 가능) */}
               <div>
                 <label htmlFor="locationName" className="sr-only">장소 이름</label>
                 <input
@@ -1153,7 +1125,7 @@ export default function AddSchedulePage() {
                 />
 
               </div>
-              {/* 주소 표시 (읽기 전용) */} 
+              {/* 주소 표시 (읽기 전용) */}
               {scheduleForm.locationAddress && ( // 주소가 있을 때만 표시
                 <div className="p-2 bg-gray-50 rounded-md text-sm text-gray-700 border border-gray-200">
                   {scheduleForm.locationAddress}
@@ -1162,14 +1134,14 @@ export default function AddSchedulePage() {
             </div>
           </div>
 
-          {/* 준비물 카드 */} 
+          {/* 준비물 카드 */}
           <div className="bg-white rounded-lg shadow-lg p-5 border-t-4 border-indigo-200">
-             {/* 카드 제목 및 아이콘 추가 */} 
+            {/* 카드 제목 및 아이콘 추가 */}
             <div className="flex items-center mb-4">
-              <FaBriefcase className="w-6 h-6 text-purple-500 mr-3 flex-shrink-0" /> 
+              <FaBriefcase className="w-6 h-6 text-purple-500 mr-3 flex-shrink-0" />
               <h3 className="text-lg font-semibold text-gray-800">준비물</h3>
             </div>
-            {/* 내용 영역 - 구분선 및 패딩 추가 */} 
+            {/* 내용 영역 - 구분선 및 패딩 추가 */}
             <div className="border-t border-gray-100 pt-4">
               <label htmlFor="supplies" className="sr-only">준비물</label>
               <input
@@ -1185,15 +1157,15 @@ export default function AddSchedulePage() {
               <p className="text-xs text-gray-500 text-right mt-1">({scheduleForm.supplies.length}/100)</p>
             </div>
           </div>
-          
-          {/* 메모 카드 */} 
+
+          {/* 메모 카드 */}
           <div className="bg-white rounded-lg shadow-lg p-5 border-t-4 border-indigo-200">
-            {/* 카드 제목 및 아이콘 추가 */} 
+            {/* 카드 제목 및 아이콘 추가 */}
             <div className="flex items-center mb-4">
-              <FaFileLines className="w-6 h-6 text-sky-500 mr-3 flex-shrink-0" /> 
+              <FaFileLines className="w-6 h-6 text-sky-500 mr-3 flex-shrink-0" />
               <h3 className="text-lg font-semibold text-gray-800">메모</h3>
             </div>
-            {/* 내용 영역 - 구분선 및 패딩 추가 */} 
+            {/* 내용 영역 - 구분선 및 패딩 추가 */}
             <div className="border-t border-gray-100 pt-4">
               <label htmlFor="description" className="sr-only">메모</label>
               <textarea
@@ -1210,7 +1182,7 @@ export default function AddSchedulePage() {
             </div>
           </div>
 
-          {/* 저장 및 취소 버튼 (카드 밖에 위치) */} 
+          {/* 저장 및 취소 버튼 (카드 밖에 위치) */}
           <div className="pt-5 flex justify-end space-x-3">
             <Button type="button" variant="secondary" onClick={handleCancel} disabled={isSaving}>
               취소
@@ -1222,15 +1194,15 @@ export default function AddSchedulePage() {
         </form>
       </div>
 
-      {/* 반복 설정 모달 (Portal 사용) */} 
+      {/* 반복 설정 모달 (Portal 사용) */}
       {isRepeatModalOpen && renderModal(
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50 transition-opacity duration-300 ease-in-out" onClick={handleCloseRepeatModal}> 
-           {/* 모달 컨텐츠 (max-h, flex, flex-col 추가, 내부 패딩 제거) */} 
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full animate-scaleIn flex flex-col max-h-[calc(100vh-8rem)]" onClick={(e) => e.stopPropagation()}> 
-             {/* 모달 헤더 (패딩 p-6, border-b 추가) */} 
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50 transition-opacity duration-300 ease-in-out" onClick={handleCloseRepeatModal}>
+          {/* 모달 컨텐츠 (max-h, flex, flex-col 추가, 내부 패딩 제거) */}
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full animate-scaleIn flex flex-col max-h-[calc(100vh-8rem)]" onClick={(e) => e.stopPropagation()}>
+            {/* 모달 헤더 (패딩 p-6, border-b 추가) */}
             <div className="flex justify-between items-center p-6 border-b border-gray-200 flex-shrink-0">
               <h3 className="text-xl font-semibold text-gray-900">반복 설정</h3>
-              <button 
+              <button
                 onClick={handleCloseRepeatModal}
                 className="text-gray-400 hover:text-gray-500"
               >
@@ -1239,51 +1211,49 @@ export default function AddSchedulePage() {
                 </svg>
               </button>
             </div>
-            
-            {/* 모달 본문 (스크롤 및 패딩 적용, flex-grow 추가) */} 
+
+            {/* 모달 본문 (스크롤 및 패딩 적용, flex-grow 추가) */}
             <div className="p-6 overflow-y-auto flex-grow">
-              {/* --- 반복 설정 UI --- */} 
+              {/* --- 반복 설정 UI --- */}
               <div className="space-y-4">
-                {/* 1. 반복 유형 선택 */} 
-                <div className="space-y-3"> 
+                {/* 1. 반복 유형 선택 */}
+                <div className="space-y-3">
                   <label className="block text-sm font-medium text-gray-700">반복 유형</label>
-                  <div className="p-3 bg-gray-50 rounded-lg space-y-2"> 
-                    {/* 상단 4개 버튼 (그리드) */} 
+                  <div className="p-3 bg-gray-50 rounded-lg space-y-2">
+                    {/* 상단 4개 버튼 (그리드) */}
                     <div className="grid grid-cols-4 gap-2">
                       {['매일', '매주', '매월', '매년'].map(option => (
                         <Button
                           key={option}
-                          variant={modalRepeatType === option ? 'primary' : 'outline'} 
+                          variant={modalRepeatType === option ? 'primary' : 'outline'}
                           onClick={() => handleModalRepeatTypeChange(option)}
                           size="sm"
-                          className={`justify-center ${ 
-                            modalRepeatType === option 
-                              ? '!bg-gray-900 !hover:bg-gray-800 !focus:ring-gray-500' 
-                              : '!text-gray-800' 
-                          }`}
+                          className={`justify-center ${modalRepeatType === option
+                              ? '!bg-gray-900 !hover:bg-gray-800 !focus:ring-gray-500'
+                              : '!text-gray-800'
+                            }`}
                         >
                           {option}
                         </Button>
                       ))}
                     </div>
-                    {/* 하단 '안함' 버튼 (가로 전체) */} 
+                    {/* 하단 '안함' 버튼 (가로 전체) */}
                     <Button
                       key="안함"
-                      variant={modalRepeatType === '안함' ? 'primary' : 'outline'} 
+                      variant={modalRepeatType === '안함' ? 'primary' : 'outline'}
                       onClick={() => handleModalRepeatTypeChange('안함')}
                       size="sm"
-                      className={`w-full justify-center ${ 
-                        modalRepeatType === '안함' 
-                          ? '!bg-gray-900 !hover:bg-gray-800 !focus:ring-gray-500' 
-                          : '!text-gray-800' 
-                      }`}
+                      className={`w-full justify-center ${modalRepeatType === '안함'
+                          ? '!bg-gray-900 !hover:bg-gray-800 !focus:ring-gray-500'
+                          : '!text-gray-800'
+                        }`}
                     >
                       안함
                     </Button>
                   </div>
                 </div>
 
-                {/* 2. 요일 선택 (modalRepeatType === '매주' 일 때만 표시) */} 
+                {/* 2. 요일 선택 (modalRepeatType === '매주' 일 때만 표시) */}
                 {modalRepeatType === '매주' && (
                   <div className="space-y-3 border-t border-gray-200 pt-4">
                     <label className="block text-sm font-medium text-gray-700">반복 요일 <span className="text-xs text-gray-500">(요일 미선택 시 매주 반복)</span></label>
@@ -1296,11 +1266,10 @@ export default function AddSchedulePage() {
                             <div key={day.index} className="relative">
                               <button
                                 onClick={() => handleModalWeekdayToggle(day.index)}
-                                className={`w-10 h-10 flex items-center justify-center text-sm font-medium rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 ${
-                                  isSelected
+                                className={`w-10 h-10 flex items-center justify-center text-sm font-medium rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 ${isSelected
                                     ? weekdaySelectedOverrideClasses[day.index]
                                     : 'bg-white border-gray-300 hover:bg-gray-50 focus:ring-gray-300'
-                                }`}
+                                  }`}
                               >
                                 <span
                                   className="block font-medium text-center"
@@ -1330,11 +1299,10 @@ export default function AddSchedulePage() {
                             <div key={day.index} className="relative">
                               <button
                                 onClick={() => handleModalWeekdayToggle(day.index)}
-                                className={`w-10 h-10 flex items-center justify-center text-sm font-medium rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 ${
-                                  isSelected
+                                className={`w-10 h-10 flex items-center justify-center text-sm font-medium rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 ${isSelected
                                     ? weekdaySelectedOverrideClasses[day.index]
                                     : 'bg-white border-gray-300 hover:bg-gray-50 focus:ring-gray-300'
-                                }`}
+                                  }`}
                               >
                                 <span
                                   className="block font-medium text-center"
@@ -1360,47 +1328,47 @@ export default function AddSchedulePage() {
                   </div>
                 )}
 
-                 {/* 3. 종료 조건 (날짜만) */} 
-                 {modalRepeatType !== '안함' && (
-                   <div className="space-y-3 border-t border-gray-200 pt-4">
-                      <label className="block text-sm font-medium text-gray-700">종료 일자</label> 
-                      {/* 종료 일자 선택 */} 
-                      <div className="flex items-center p-2 rounded-md border border-gray-300">
-                        <FaCalendarDays className="w-4 h-4 text-gray-500 mr-2 flex-shrink-0" /> 
-                        <DatePicker
-                          selected={modalEndDate}
-                          onChange={handleModalEndDateChange}
-                          dateFormat="yyyy-MM-dd"
-                          locale={ko}
-                          isClearable 
-                          placeholderText="설정 안함 (계속 반복)"
-                          className="block w-full border-none p-0 text-left text-sm font-medium focus:ring-0 bg-transparent cursor-pointer"
-                          wrapperClassName="flex-grow"
-                          portalId="root-portal"
-                          closeOnScroll={false}
-                        />
-                      </div>
-                   </div>
-                 )}
+                {/* 3. 종료 조건 (날짜만) */}
+                {modalRepeatType !== '안함' && (
+                  <div className="space-y-3 border-t border-gray-200 pt-4">
+                    <label className="block text-sm font-medium text-gray-700">종료 일자</label>
+                    {/* 종료 일자 선택 */}
+                    <div className="flex items-center p-2 rounded-md border border-gray-300">
+                      <FaCalendarDays className="w-4 h-4 text-gray-500 mr-2 flex-shrink-0" />
+                      <DatePicker
+                        selected={modalEndDate}
+                        onChange={handleModalEndDateChange}
+                        dateFormat="yyyy-MM-dd"
+                        locale={ko}
+                        isClearable
+                        placeholderText="설정 안함 (계속 반복)"
+                        className="block w-full border-none p-0 text-left text-sm font-medium focus:ring-0 bg-transparent cursor-pointer"
+                        wrapperClassName="flex-grow"
+                        portalId="root-portal"
+                        closeOnScroll={false}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
-              {/* --- 반복 설정 UI 끝 --- */} 
+              {/* --- 반복 설정 UI 끝 --- */}
             </div>
 
-             {/* 모달 푸터 (패딩 p-6, border-t 추가) */} 
-             <div className="flex justify-end space-x-3 p-6 border-t border-gray-200 flex-shrink-0">
-                <Button variant="secondary" onClick={handleCloseRepeatModal}>취소</Button>
-                <Button variant="primary" onClick={handleConfirmRepeatSettings}>설정 저장</Button>
-              </div>
+            {/* 모달 푸터 (패딩 p-6, border-t 추가) */}
+            <div className="flex justify-end space-x-3 p-6 border-t border-gray-200 flex-shrink-0">
+              <Button variant="secondary" onClick={handleCloseRepeatModal}>취소</Button>
+              <Button variant="primary" onClick={handleConfirmRepeatSettings}>설정 저장</Button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* 알림 설정 모달 (Portal 사용) */} 
+      {/* 알림 설정 모달 (Portal 사용) */}
       {isAlarmModalOpen && renderModal(
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50 transition-opacity duration-300 ease-in-out" onClick={handleCloseAlarmModal}> 
-           {/* 모달 컨텐츠 (max-h, flex, flex-col 추가, 내부 패딩 제거) */} 
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full animate-scaleIn flex flex-col max-h-[calc(100vh-8rem)]" onClick={(e) => e.stopPropagation()}> 
-             {/* 모달 헤더 (패딩 p-6, border-b 추가) */} 
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50 transition-opacity duration-300 ease-in-out" onClick={handleCloseAlarmModal}>
+          {/* 모달 컨텐츠 (max-h, flex, flex-col 추가, 내부 패딩 제거) */}
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full animate-scaleIn flex flex-col max-h-[calc(100vh-8rem)]" onClick={(e) => e.stopPropagation()}>
+            {/* 모달 헤더 (패딩 p-6, border-b 추가) */}
             <div className="flex justify-between items-center p-6 border-b border-gray-200 flex-shrink-0">
               <h3 className="text-xl font-semibold text-gray-900">알림 설정</h3>
               <button onClick={handleCloseAlarmModal} className="text-gray-400 hover:text-gray-500">
@@ -1408,9 +1376,9 @@ export default function AddSchedulePage() {
               </button>
             </div>
 
-             {/* 모달 본문 (스크롤 및 패딩 적용, flex-grow 추가) */} 
+            {/* 모달 본문 (스크롤 및 패딩 적용, flex-grow 추가) */}
             <div className="p-6 overflow-y-auto flex-grow">
-              {/* --- 알림 설정 UI --- */} 
+              {/* --- 알림 설정 UI --- */}
               <div className="space-y-4">
                 <label className="block text-sm font-medium text-gray-700">알림 시간</label>
                 <div className="grid grid-cols-3 gap-2 p-3 bg-gray-50 rounded-lg">
@@ -1420,23 +1388,22 @@ export default function AddSchedulePage() {
                       variant={modalAlarmSetting === option ? 'primary' : 'outline'}
                       onClick={() => handleModalAlarmChange(option)}
                       size="sm"
-                      className={`justify-center ${ 
-                        modalAlarmSetting === option 
-                          ? '!bg-gray-900 !hover:bg-gray-800 !focus:ring-gray-500' 
+                      className={`justify-center ${modalAlarmSetting === option
+                          ? '!bg-gray-900 !hover:bg-gray-800 !focus:ring-gray-500'
                           : '!text-gray-800'
-                      }`}
+                        }`}
                     >
                       {option}
                     </Button>
                   ))}
-                  {/* TODO: 사용자 지정 알림 시간 추가 */} 
+                  {/* TODO: 사용자 지정 알림 시간 추가 */}
                 </div>
-                {/* TODO: 그룹원 위치 변동 알림 설정 추가 */} 
+                {/* TODO: 그룹원 위치 변동 알림 설정 추가 */}
               </div>
-              {/* --- 알림 설정 UI 끝 --- */} 
+              {/* --- 알림 설정 UI 끝 --- */}
             </div>
 
-            {/* 모달 푸터 (패딩 p-6, border-t 추가) */} 
+            {/* 모달 푸터 (패딩 p-6, border-t 추가) */}
             <div className="flex justify-end space-x-3 p-6 border-t border-gray-200 flex-shrink-0">
               <Button variant="secondary" onClick={handleCloseAlarmModal}>취소</Button>
               <Button variant="primary" onClick={handleConfirmAlarmSettings}>설정 저장</Button>
@@ -1448,8 +1415,8 @@ export default function AddSchedulePage() {
       {/* 주소 검색 모달 (Portal 사용) - 기본 구조 */}
       {isLocationSearchModalOpen && renderModal(
         <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-[60] transition-opacity duration-300 ease-in-out" onClick={handleCloseLocationSearchModal}> {/* z-index 조정 */}
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full animate-scaleIn flex flex-col h-[70vh] min-h-[400px]" onClick={(e) => e.stopPropagation()}> 
-            {/* 모달 헤더 */} 
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full animate-scaleIn flex flex-col h-[70vh] min-h-[400px]" onClick={(e) => e.stopPropagation()}>
+            {/* 모달 헤더 */}
             <div className="flex justify-between items-center p-6 border-b border-gray-200 flex-shrink-0">
               <h3 className="text-xl font-semibold text-gray-900">주소 검색</h3>
               <button onClick={handleCloseLocationSearchModal} className="text-gray-400 hover:text-gray-500">
@@ -1457,8 +1424,8 @@ export default function AddSchedulePage() {
               </button>
             </div>
             {/* 모달 본문 */}
-            <div className="p-6 flex flex-col flex-grow min-h-[200px]"> {/* overflow-hidden 제거 */} 
-              {/* 검색 입력 */} 
+            <div className="p-6 flex flex-col flex-grow min-h-[200px]"> {/* overflow-hidden 제거 */}
+              {/* 검색 입력 */}
               <div className="flex items-center space-x-2 mb-4 flex-shrink-0">
                 <input
                   type="search"

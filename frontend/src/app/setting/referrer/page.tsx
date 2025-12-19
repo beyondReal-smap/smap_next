@@ -3,10 +3,10 @@
 import React, { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  FiUserPlus, 
-  FiShare2, 
-  FiCopy, 
+import {
+  FiUserPlus,
+  FiShare2,
+  FiCopy,
   FiGift,
   FiUsers,
   FiStar,
@@ -197,32 +197,8 @@ const MOCK_REFERRAL_STATS: ReferralStats = {
   currentMonthInvites: 3
 };
 
-const MOCK_FRIENDS: Friend[] = [
-  {
-    id: '1',
-    name: '김민수',
-    phone: '010-1234-5678',
-    joinDate: '2024-03-15',
-    status: 'active',
-    reward: 5000
-  },
-  {
-    id: '2',
-    name: '이영희',
-    phone: '010-2345-6789',
-    joinDate: '2024-03-10',
-    status: 'joined',
-    reward: 5000
-  },
-  {
-    id: '3',
-    name: '박철수',
-    phone: '010-3456-7890',
-    joinDate: '2024-03-05',
-    status: 'pending',
-    reward: 0
-  }
-];
+const MOCK_FRIENDS: Friend[] = [];
+
 
 const REWARD_TIERS = [
   { friends: 1, reward: '5,000원', bonus: '첫 친구 초대' },
@@ -256,7 +232,7 @@ export default function ReferrerPage() {
   const handleReferralCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/[^0-9]/g, '');
     if (value.length > 11) return;
-    
+
     if (value.length > 0 && value.length < 10) {
       setError('올바른 휴대전화번호를 입력해주세요.');
     } else {
@@ -276,7 +252,7 @@ export default function ReferrerPage() {
     try {
       // 모의 API 호출
       await new Promise(resolve => setTimeout(resolve, 1500));
-      
+
       setShowReferralModal(false);
       setReferralCode('');
       setError('');
@@ -303,7 +279,7 @@ export default function ReferrerPage() {
   // 공유하기
   const handleShare = async (platform: string) => {
     const shareText = `SMAP에서 함께해요! 내 추천 코드: ${myReferralCode}\n${myReferralLink}`;
-    
+
     try {
       if (platform === 'native' && navigator.share) {
         await navigator.share({
@@ -319,7 +295,7 @@ export default function ReferrerPage() {
           twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`,
           instagram: myReferralLink // Instagram은 직접 링크 복사
         };
-        
+
         if (shareUrls[platform as keyof typeof shareUrls]) {
           window.open(shareUrls[platform as keyof typeof shareUrls], '_blank');
         }
@@ -365,17 +341,17 @@ export default function ReferrerPage() {
         className="bg-gradient-to-br from-indigo-50 via-white to-purple-50 min-h-screen pb-10"
       >
         {/* 통일된 헤더 애니메이션 */}
-        <AnimatedHeader 
+        <AnimatedHeader
           variant="enhanced"
           className="setting-header"
         >
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, x: -40 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
             className="setting-header-content motion-div"
           >
-            <motion.button 
+            <motion.button
               onClick={handleBack}
               className="setting-back-button"
               whileHover={{ scale: 1.05 }}
@@ -393,7 +369,7 @@ export default function ReferrerPage() {
         </AnimatedHeader>
 
         {/* 내 추천 코드 카드 */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2, duration: 0.6 }}
@@ -412,7 +388,7 @@ export default function ReferrerPage() {
                   <HiSparkles className="w-8 h-8" />
                 </motion.div>
               </div>
-              
+
               <div className="bg-white/20 rounded-2xl p-4 backdrop-blur-sm mb-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -459,7 +435,7 @@ export default function ReferrerPage() {
         </motion.div>
 
         {/* 통계 카드들 */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3, duration: 0.6 }}
@@ -484,7 +460,7 @@ export default function ReferrerPage() {
         </motion.div>
 
         {/* 탭 메뉴 */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4, duration: 0.6 }}
@@ -509,9 +485,8 @@ export default function ReferrerPage() {
                 <button
                   key={key}
                   onClick={() => setActiveTab(key as any)}
-                  className={`relative z-10 py-3 px-4 rounded-xl text-sm font-medium transition-colors ${
-                    activeTab === key ? 'text-white' : 'text-gray-600'
-                  }`}
+                  className={`relative z-10 py-3 px-4 rounded-xl text-sm font-medium transition-colors ${activeTab === key ? 'text-white' : 'text-gray-600'
+                    }`}
                 >
                   <div className="flex items-center justify-center space-x-2">
                     <Icon className="w-4 h-4" />
@@ -669,7 +644,7 @@ export default function ReferrerPage() {
                     <span className="text-2xl font-bold text-indigo-600">{MOCK_REFERRAL_STATS.successfulSignups}명</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
-                    <div 
+                    <div
                       className="bg-gradient-to-r from-indigo-500 to-purple-500 h-3 rounded-full transition-all duration-500"
                       style={{ width: `${Math.min((MOCK_REFERRAL_STATS.successfulSignups / 10) * 100, 100)}%` }}
                     ></div>
@@ -682,26 +657,24 @@ export default function ReferrerPage() {
                   {REWARD_TIERS.map((tier, index) => {
                     const isCompleted = MOCK_REFERRAL_STATS.successfulSignups >= tier.friends;
                     const isCurrent = !isCompleted && MOCK_REFERRAL_STATS.successfulSignups >= (REWARD_TIERS[index - 1]?.friends || 0);
-                    
+
                     return (
                       <motion.div
                         key={tier.friends}
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.1 }}
-                        className={`bg-white rounded-2xl p-4 shadow-sm border-2 ${
-                          isCompleted ? 'border-green-200 bg-green-50' :
-                          isCurrent ? 'border-indigo-200 bg-indigo-50' :
-                          'border-gray-100'
-                        }`}
+                        className={`bg-white rounded-2xl p-4 shadow-sm border-2 ${isCompleted ? 'border-green-200 bg-green-50' :
+                            isCurrent ? 'border-indigo-200 bg-indigo-50' :
+                              'border-gray-100'
+                          }`}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-3">
-                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                              isCompleted ? 'bg-green-500' :
-                              isCurrent ? 'bg-indigo-500' :
-                              'bg-gray-300'
-                            }`}>
+                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isCompleted ? 'bg-green-500' :
+                                isCurrent ? 'bg-indigo-500' :
+                                  'bg-gray-300'
+                              }`}>
                               {isCompleted ? (
                                 <HiCheckCircle className="w-6 h-6 text-white" />
                               ) : (
@@ -732,14 +705,14 @@ export default function ReferrerPage() {
         {/* 추천인 입력 모달 */}
         <AnimatePresence>
           {showReferralModal && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end justify-center z-50 p-4"
               onClick={() => setShowReferralModal(false)}
             >
-              <motion.div 
+              <motion.div
                 initial={{ y: "100%", opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: "100%", opacity: 0 }}
@@ -748,9 +721,9 @@ export default function ReferrerPage() {
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-6"></div>
-                
+
                 <div className="text-center mb-8">
-                  <motion.div 
+                  <motion.div
                     className="w-20 h-20 bg-gradient-to-r from-green-500 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg"
                     animate={{ rotate: [0, 5, -5, 0] }}
                     transition={{ duration: 2, repeat: Infinity }}
@@ -760,7 +733,7 @@ export default function ReferrerPage() {
                   <h3 className="text-2xl font-bold text-gray-900 mb-2">추천인 코드 입력</h3>
                   <p className="text-gray-600">추천인의 휴대전화번호를 입력하세요</p>
                 </div>
-                
+
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -777,7 +750,7 @@ export default function ReferrerPage() {
                       maxLength={11}
                     />
                     {error && (
-                      <motion.p 
+                      <motion.p
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
                         className="text-red-500 text-sm mt-2 flex items-center"
@@ -790,7 +763,7 @@ export default function ReferrerPage() {
                       하이픈(-) 없이 숫자만 입력해주세요
                     </p>
                   </div>
-                  
+
                   <div className="space-y-3 pt-4">
                     <motion.button
                       onClick={handleSubmitReferral}
@@ -811,7 +784,7 @@ export default function ReferrerPage() {
                         </>
                       )}
                     </motion.button>
-                    
+
                     <motion.button
                       onClick={() => setShowReferralModal(false)}
                       whileHover={{ scale: 1.02 }}
@@ -830,14 +803,14 @@ export default function ReferrerPage() {
         {/* 공유 모달 */}
         <AnimatePresence>
           {showShareModal && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end justify-center z-50 p-4"
               onClick={() => setShowShareModal(false)}
             >
-              <motion.div 
+              <motion.div
                 initial={{ y: "100%", opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: "100%", opacity: 0 }}
@@ -846,9 +819,9 @@ export default function ReferrerPage() {
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-6"></div>
-                
+
                 <div className="text-center mb-8">
-                  <motion.div 
+                  <motion.div
                     className="w-20 h-20 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg"
                     animate={{ scale: [1, 1.1, 1] }}
                     transition={{ duration: 2, repeat: Infinity }}
@@ -858,7 +831,7 @@ export default function ReferrerPage() {
                   <h3 className="text-2xl font-bold text-gray-900 mb-2">친구 초대하기</h3>
                   <p className="text-gray-600">어떤 방법으로 공유하시겠어요?</p>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4 mb-6">
                   {[
                     { platform: 'kakao', label: '카카오톡', icon: FiMessageSquare, color: 'bg-yellow-500' },
@@ -895,13 +868,13 @@ export default function ReferrerPage() {
         {/* 성공 토스트 */}
         <AnimatePresence>
           {showSuccessToast && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: -50, scale: 0.9 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -50, scale: 0.9 }}
               className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50"
             >
-              <motion.div 
+              <motion.div
                 className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center space-x-3"
                 animate={{ scale: [1, 1.05, 1] }}
                 transition={{ duration: 0.3 }}
@@ -916,7 +889,7 @@ export default function ReferrerPage() {
         {/* 복사 완료 토스트 */}
         <AnimatePresence>
           {copiedText && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 50 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 50 }}

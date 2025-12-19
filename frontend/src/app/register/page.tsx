@@ -2488,190 +2488,196 @@ export default function RegisterPage() {
 
 
 
-              {/* 완료 단계 */}
+              {/* 완료 단계 - 리디자인 */}
               {currentStep === REGISTER_STEPS.COMPLETE && (
                 <motion.div
                   key="complete"
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{
-                    duration: 0.4,
-                    ease: [0.4, 0.0, 0.2, 1], // iOS 최적화된 이징
-                    type: "tween"
-                  }}
-                  className="fixed inset-0 flex flex-col justify-center items-center text-center bg-white z-50"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 flex flex-col justify-center items-center z-[100] overflow-hidden"
                   style={{
-                    // iOS 애니메이션 최적화
-                    willChange: 'transform, opacity',
-                    transform: 'translateZ(0)', // 하드웨어 가속 활성화
-                    backfaceVisibility: 'hidden'
+                    background: 'linear-gradient(135deg, #6ef7da 0%, #0114a2 50%, #7c3aed 100%)',
+                    willChange: 'opacity',
                   }}
                 >
+                  {/* 장식용 요소들 */}
                   <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-                    className="w-24 h-24 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6"
-                  >
-                    <FiCheck className="w-10 h-10 text-white" />
-                  </motion.div>
+                    animate={{
+                      scale: [1, 1.2, 1],
+                      rotate: [0, 90, 0],
+                      x: [0, 50, 0],
+                      y: [0, 30, 0]
+                    }}
+                    transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                    className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full opacity-20 bg-white blur-3xl"
+                  />
+                  <motion.div
+                    animate={{
+                      scale: [1, 1.3, 1],
+                      rotate: [0, -120, 0],
+                      x: [0, -30, 0],
+                      y: [0, -50, 0]
+                    }}
+                    transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+                    className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full opacity-20 bg-cyan-300 blur-3xl"
+                  />
 
                   <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.4 }}
+                    initial={{ opacity: 0, scale: 0.9, y: 30 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    transition={{
+                      duration: 0.6,
+                      delay: 0.1,
+                      ease: [0.34, 1.56, 0.64, 1] // Spring-like easing
+                    }}
+                    className="w-[90%] max-w-md bg-white/10 backdrop-blur-2xl border border-white/20 rounded-[40px] p-8 md:p-12 shadow-2xl text-center relative z-10"
+                    style={{
+                      boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                    }}
                   >
-                    <h2 className="text-3xl font-bold text-gray-900 mb-4">회원가입 완료!</h2>
-                    <p className="text-gray-600 mb-8" style={{ wordBreak: 'keep-all' }}>
-                      {isJoiningGroup ? (
-                        <>
-                          그룹에 자동 가입 중입니다...<br />
-                          잠시만 기다려주세요!
-                        </>
-                      ) : isOpeningApp ? (
-                        <>
-                          앱으로 이동 중입니다...<br />
-                          {isMobile() ? '앱이 열리지 않으면 스토어로 이동합니다' : '로그인 페이지로 이동합니다'}
-                        </>
-                      ) : (
-                        <>
-                          SMAP에 오신 것을 환영합니다.<br />
-                          이제 그룹을 만들고 친구들과 함께 활동해보세요!
-                        </>
-                      )}
-                    </p>
+                    <motion.div
+                      initial={{ scale: 0, rotate: -45 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 260,
+                        damping: 20,
+                        delay: 0.4
+                      }}
+                      className="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-8 shadow-xl"
+                    >
+                      <FiCheck className="w-12 h-12 text-[#0114a2]" />
+                    </motion.div>
 
-                    {!isJoiningGroup && !isOpeningApp && (
-                      <motion.button
-                        onClick={async () => {
-                          console.log('🚀 [REGISTER] 로그인하러가기 버튼 클릭됨');
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.6 }}
+                    >
+                      <h2 className="text-3xl md:text-4xl font-black text-white mb-4 tracking-tight">회원가입 완료!</h2>
+                      <p className="text-white/80 text-lg mb-10 leading-relaxed" style={{ wordBreak: 'keep-all' }}>
+                        {isJoiningGroup ? (
+                          <>
+                            그룹에 자동 가입 중입니다...<br />
+                            잠시만 기다려주세요!
+                          </>
+                        ) : isOpeningApp ? (
+                          <>
+                            앱으로 이동 중입니다...<br />
+                            {isMobile() ? '앱이 열리지 않으면 스토어로 이동합니다' : '로그인 페이지로 이동합니다'}
+                          </>
+                        ) : (
+                          <>
+                            SMAP에 오신 것을 환영합니다.<br />
+                            친구들과 소중한 추억을 공유해보세요.
+                          </>
+                        )}
+                      </p>
 
-                          // 사용자 입력 정보를 localStorage에 저장
-                          const userInfo = {
-                            phone: registerData.mt_id,
-                            name: registerData.mt_name,
-                            nickname: registerData.mt_nickname,
-                            email: registerData.mt_email,
-                            birth: registerData.mt_birth,
-                            gender: registerData.mt_gender,
-                            registeredAt: new Date().toISOString()
-                          };
+                      {!isJoiningGroup && !isOpeningApp && (
+                        <motion.button
+                          onClick={async () => {
+                            console.log('🚀 [REGISTER] 로그인하러가기 버튼 클릭됨');
 
-                          try {
-                            localStorage.setItem('recentUserInfo', JSON.stringify(userInfo));
-                            // 로그인 페이지에서 사용할 전화번호도 별도 저장
-                            localStorage.setItem('lastRegisteredPhone', registerData.mt_id);
-                            console.log('✅ [REGISTER] 사용자 정보 localStorage 저장 완료');
-                          } catch (error) {
-                            console.error('❌ [REGISTER] 사용자 정보 저장 실패:', error);
-                          }
+                            // 사용자 입력 정보를 localStorage에 저장
+                            const userInfo = {
+                              phone: registerData.mt_id,
+                              name: registerData.mt_name,
+                              nickname: registerData.mt_nickname,
+                              email: registerData.mt_email,
+                              birth: registerData.mt_birth,
+                              gender: registerData.mt_gender,
+                              registeredAt: new Date().toISOString()
+                            };
 
-                          // 가입 완료된 mt_idx를 사용하여 자동 로그인 처리
-                          const newMemberMtIdx = localStorage.getItem('newMemberMtIdx');
-                          console.log('🔍 [REGISTER] localStorage에서 newMemberMtIdx 확인:', newMemberMtIdx);
-
-                          if (newMemberMtIdx) {
                             try {
-                              console.log('🔄 [REGISTER] 새로 가입된 회원 자동 로그인 시도:', newMemberMtIdx);
-
-                              // localStorage에서 socialLoginData 가져오기
-                              const socialLoginDataStr = localStorage.getItem('socialLoginData');
-                              let socialLoginData = null;
-                              if (socialLoginDataStr) {
-                                try {
-                                  socialLoginData = JSON.parse(socialLoginDataStr);
-                                } catch (e) {
-                                  console.warn('⚠️ [REGISTER] socialLoginData 파싱 실패:', e);
-                                }
-                              }
-
-                              // 사용자 정보 구성 (안전한 방식)
-                              const userInfo = {
-                                mt_idx: parseInt(newMemberMtIdx),
-                                mt_id: registerData.mt_id || socialLoginData?.apple_id || '',
-                                mt_name: registerData.mt_name || socialLoginData?.name || '',
-                                mt_nickname: registerData.mt_nickname || socialLoginData?.name || '',
-                                mt_hp: registerData.mt_id || socialLoginData?.apple_id || '',
-                                mt_email: registerData.mt_email || socialLoginData?.email || '',
-                                mt_birth: registerData.mt_birth || '',
-                                mt_gender: registerData.mt_gender || '',
-                                mt_type: registerData.isSocialLogin ?
-                                  (registerData.socialProvider === 'google' ? 4 : registerData.socialProvider === 'apple' ? 3 : 2) : 1,
-                                mt_level: 2,
-                                mt_file1: ''
-                              };
-
-                              console.log('🔍 [REGISTER] 자동 로그인용 사용자 정보:', userInfo);
-
-                              // 자동 로그인 API 호출 (사용자 정보 포함)
-                              const loginResponse = await fetch('/api/auth/auto-login', {
-                                method: 'POST',
-                                headers: {
-                                  'Content-Type': 'application/json',
-                                },
-                                body: JSON.stringify({
-                                  mt_idx: newMemberMtIdx,
-                                  action: 'auto-login',
-                                  userInfo: userInfo
-                                }),
-                              });
-
-                              console.log('📡 [REGISTER] 자동 로그인 API 응답 상태:', loginResponse.status);
-                              const loginData = await loginResponse.json();
-                              console.log('📡 [REGISTER] 자동 로그인 API 응답 데이터:', loginData);
-
-                              if (loginResponse.ok && loginData.success) {
-                                console.log('✅ [REGISTER] 자동 로그인 성공:', loginData);
-
-                                // 로그인 성공 시 토큰과 사용자 정보 저장
-                                if (loginData.data && loginData.data.token) {
-                                  localStorage.setItem('auth_token', loginData.data.token);
-                                  localStorage.setItem('user_data', JSON.stringify(loginData.data.user));
-                                  console.log('💾 [REGISTER] 로그인 정보 localStorage 저장 완료');
-
-                                  // newMemberMtIdx는 더 이상 필요하지 않으므로 제거
-                                  localStorage.removeItem('newMemberMtIdx');
-
-                                  // home 페이지로 이동
-                                  console.log('🏠 [REGISTER] home 페이지로 이동');
-                                  router.push('/home');
-                                  return;
-                                }
-                              } else {
-                                console.warn('⚠️ [REGISTER] 자동 로그인 실패:', loginData);
-                              }
-                            } catch (loginError) {
-                              console.error('❌ [REGISTER] 자동 로그인 중 오류:', loginError);
+                              localStorage.setItem('recentUserInfo', JSON.stringify(userInfo));
+                              localStorage.setItem('lastRegisteredPhone', registerData.mt_id);
+                              console.log('✅ [REGISTER] 사용자 정보 localStorage 저장 완료');
+                            } catch (error) {
+                              console.error('❌ [REGISTER] 사용자 정보 저장 실패:', error);
                             }
-                          } else {
-                            console.log('❌ [REGISTER] newMemberMtIdx가 localStorage에 없음');
-                          }
 
-                          // 자동 로그인 실패 시 signin 페이지로 이동
-                          console.log('🔀 [REGISTER] 자동 로그인 실패 또는 mt_idx 없음, signin 페이지로 이동');
-                          router.push('/signin');
-                        }}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        className="w-full py-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl font-semibold text-lg"
-                      >
-                        로그인하러 가기
-                      </motion.button>
-                    )}
+                            const newMemberMtIdx = localStorage.getItem('newMemberMtIdx');
+                            if (newMemberMtIdx) {
+                              try {
+                                const socialLoginDataStr = localStorage.getItem('socialLoginData');
+                                let socialLoginData = null;
+                                if (socialLoginDataStr) {
+                                  try {
+                                    socialLoginData = JSON.parse(socialLoginDataStr);
+                                  } catch (e) {
+                                    console.warn('⚠️ [REGISTER] socialLoginData 파싱 실패:', e);
+                                  }
+                                }
 
-                    {isJoiningGroup && (
-                      <div className="flex items-center justify-center space-x-2 text-gray-600">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600"></div>
-                        <span>그룹 가입 중...</span>
-                      </div>
-                    )}
+                                const userInfo = {
+                                  mt_idx: parseInt(newMemberMtIdx),
+                                  mt_id: registerData.mt_id || socialLoginData?.apple_id || '',
+                                  mt_name: registerData.mt_name || socialLoginData?.name || '',
+                                  mt_nickname: registerData.mt_nickname || socialLoginData?.name || '',
+                                  mt_hp: registerData.mt_id || socialLoginData?.apple_id || '',
+                                  mt_email: registerData.mt_email || socialLoginData?.email || '',
+                                  mt_birth: registerData.mt_birth || '',
+                                  mt_gender: registerData.mt_gender || '',
+                                  mt_type: registerData.isSocialLogin ?
+                                    (registerData.socialProvider === 'google' ? 4 : registerData.socialProvider === 'apple' ? 3 : 2) : 1,
+                                  mt_level: 2,
+                                  mt_file1: ''
+                                };
 
-                    {isOpeningApp && (
-                      <div className="flex items-center justify-center space-x-2 text-gray-600">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600"></div>
-                        <span>앱으로 이동 중...</span>
-                      </div>
-                    )}
+                                const loginResponse = await fetch('/api/auth/auto-login', {
+                                  method: 'POST',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                  },
+                                  body: JSON.stringify({
+                                    mt_idx: newMemberMtIdx,
+                                    action: 'auto-login',
+                                    userInfo: userInfo
+                                  }),
+                                });
+
+                                const loginData = await loginResponse.json();
+
+                                if (loginResponse.ok && loginData.success) {
+                                  if (loginData.data && loginData.data.token) {
+                                    localStorage.setItem('auth_token', loginData.data.token);
+                                    localStorage.setItem('user_data', JSON.stringify(loginData.data.user));
+                                    localStorage.removeItem('newMemberMtIdx');
+                                    router.push('/home');
+                                    return;
+                                  }
+                                }
+                              } catch (loginError) {
+                                console.error('❌ [REGISTER] 자동 로그인 중 오류:', loginError);
+                              }
+                            }
+                            router.push('/signin');
+                          }}
+                          whileHover={{ scale: 1.05, boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)' }}
+                          whileTap={{ scale: 0.95 }}
+                          className="w-full py-5 bg-white text-[#0114a2] rounded-2xl font-bold text-xl shadow-lg transition-all"
+                        >
+                          로그인하러 가기
+                        </motion.button>
+                      )}
+
+                      {isJoiningGroup && (
+                        <div className="flex items-center justify-center space-x-2 text-white/80 mt-4">
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                          <span>그룹 가입 중...</span>
+                        </div>
+                      )}
+
+                      {isOpeningApp && (
+                        <div className="flex items-center justify-center space-x-2 text-white/80 mt-4">
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                          <span>앱으로 이동 중...</span>
+                        </div>
+                      )}
+                    </motion.div>
                   </motion.div>
                 </motion.div>
               )}

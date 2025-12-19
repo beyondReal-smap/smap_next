@@ -12,6 +12,13 @@ export interface Member {
   mt_regdate?: string;
   mt_wdate?: string;
   mt_status?: string;
+  // 최신 위치 정보
+  mlt_lat?: number | null;
+  mlt_long?: number | null;
+  mlt_speed?: number | null;
+  mlt_battery?: number | null;
+  mlt_gps_time?: string | null;
+
   // 추가 멤버 정보
   mt_nickname?: string;
   mt_id?: string;
@@ -32,7 +39,7 @@ export interface Member {
   mt_weather_sky?: string;
   mt_weather_tmn?: number;
   mt_weather_tmx?: number;
-  
+
   // smap_group_detail_t 필드들
   sgdt_idx?: number;
   sgt_idx?: number;
@@ -55,29 +62,12 @@ class MemberService {
    * 모든 멤버 조회
    */
   async getAllMembers(): Promise<Member[]> {
-    const mockData: Member[] = [
-      {
-        mt_idx: 1,
-        mt_name: '김철수',
-        mt_file1: '/images/avatar1.png',
-        mt_lat: '37.5692',
-        mt_long: '127.0036'
-      },
-      {
-        mt_idx: 2,
-        mt_name: '이영희',
-        mt_file1: '/images/avatar2.png',
-        mt_lat: '37.5612',
-        mt_long: '126.9966'
-      },
-    ];
-    
     try {
       const response = await apiClient.get<Member[]>('/members');
-      return response.data;
+      return response.data || [];
     } catch (error) {
-      console.log('서버 API 호출 실패, 목 데이터 반환:', error);
-      return mockData;
+      console.error('[MEMBER SERVICE] 모든 멤버 조회 실패:', error);
+      return [];
     }
   }
 
@@ -85,20 +75,12 @@ class MemberService {
    * ID로 멤버 조회
    */
   async getMemberById(id: number | string): Promise<Member> {
-    const mockData: Member = {
-      mt_idx: 1,
-      mt_name: '김철수',
-      mt_file1: '/images/avatar1.png',
-      mt_lat: '37.5692',
-      mt_long: '127.0036'
-    };
-    
     try {
       const response = await apiClient.get<Member>(`/members/${id}`);
       return response.data;
     } catch (error) {
-      console.log('서버 API 호출 실패, 목 데이터 반환:', error);
-      return mockData;
+      console.error(`[MEMBER SERVICE] 멤버 조회 실패 (ID: ${id}):`, error);
+      throw error;
     }
   }
 
@@ -106,92 +88,17 @@ class MemberService {
    * 그룹 멤버 조회
    */
   async getGroupMembers(groupId: number | string): Promise<Member[]> {
-    const mockData: Member[] = [
-      {
-        mt_idx: 2001,
-        mt_name: '김철수',
-        mt_file1: '/images/avatar3.png',
-        mt_lat: '37.5692',
-        mt_long: '127.0036',
-        mt_gender: 1,
-        sgdt_idx: 1,
-        sgt_idx: Number(groupId),
-        sgdt_owner_chk: 'Y', // 첫 번째 멤버는 그룹장
-        sgdt_leader_chk: 'N',
-        sgdt_group_chk: 1,
-        sgdt_show: 1
-      },
-      {
-        mt_idx: 2002,
-        mt_name: '이영희',
-        mt_file1: '/images/avatar1.png',
-        mt_lat: '37.5612',
-        mt_long: '126.9966',
-        mt_gender: 2,
-        sgdt_idx: 2,
-        sgt_idx: Number(groupId),
-        sgdt_owner_chk: 'N',
-        sgdt_leader_chk: 'Y', // 두 번째 멤버는 리더
-        sgdt_group_chk: 1,
-        sgdt_show: 1
-      },
-      {
-        mt_idx: 2003,
-        mt_name: '박민수',
-        mt_file1: '/images/avatar2.png',
-        mt_lat: '37.5662',
-        mt_long: '126.9986',
-        mt_gender: 1,
-        sgdt_idx: 3,
-        sgt_idx: Number(groupId),
-        sgdt_owner_chk: 'N',
-        sgdt_leader_chk: 'N', // 일반 멤버
-        sgdt_group_chk: 1,
-        sgdt_show: 1
-      }
-    ];
-    
     try {
       console.log('[MEMBER SERVICE] 그룹 멤버 조회 시작:', groupId);
-      // 올바른 엔드포인트 사용: /group-members/member/{groupId}
       const response = await apiClient.get<Member[]>(`/group-members/member/${groupId}`);
-      console.log('[MEMBER SERVICE] 그룹 멤버 조회 응답:', {
-        status: response.status,
-        dataLength: response.data?.length || 0,
-        firstMember: response.data?.[0] ? {
-          name: response.data[0].mt_name,
-          mt_idx: response.data[0].mt_idx,
-          owner: response.data[0].sgdt_owner_chk,
-          leader: response.data[0].sgdt_leader_chk
-        } : null
-      });
-      
-      // 응답 데이터가 배열이고 길이가 0보다 큰 경우에만 반환
-      if (Array.isArray(response.data) && response.data.length > 0) {
-        console.log('[MEMBER SERVICE] ✅ 실제 백엔드 데이터 사용:', response.data.length, '명');
+
+      if (Array.isArray(response.data)) {
         return response.data;
-      } else {
-        console.warn('[MEMBER SERVICE] ⚠️ 백엔드에서 빈 배열 반환, mock 데이터 사용');
-        return mockData;
       }
+      return [];
     } catch (error: any) {
-      console.error('[MEMBER SERVICE] ❌ 백엔드 API 호출 실패:', error);
-      
-      // 404 에러인 경우 빈 배열 반환 (그룹이 존재하지 않음)
-      if (error?.response?.status === 404) {
-        console.warn('[MEMBER SERVICE] 404 에러: 그룹을 찾을 수 없어 빈 배열 반환');
-        return [];
-      } else if (error?.response?.status) {
-        console.error('[MEMBER SERVICE] HTTP 에러:', error.response.status);
-        // 다른 HTTP 에러는 빈 배열로 처리
-        console.warn('[MEMBER SERVICE] HTTP 에러로 인한 빈 배열 반환');
-        return [];
-      } else {
-        console.error('[MEMBER SERVICE] 네트워크 에러 또는 기타 오류');
-        // 네트워크 오류도 빈 배열로 처리
-        console.warn('[MEMBER SERVICE] 네트워크 에러로 인한 빈 배열 반환');
-        return [];
-      }
+      console.error('[MEMBER SERVICE] 그룹 멤버 조회 실패:', error);
+      return [];
     }
   }
 
@@ -285,4 +192,4 @@ class MemberService {
 
 // 싱글톤 인스턴스 생성
 const memberService = new MemberService();
-export default memberService; 
+export default memberService;
