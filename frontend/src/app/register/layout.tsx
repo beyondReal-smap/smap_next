@@ -84,16 +84,29 @@ header.register-header-fixed {
 /* 메인 컨텐츠 고정 */
 #register-main-content {
   position: fixed !important;
-  top: 64px !important;
+  /* top은 인라인 스타일이나 별도 클래스로 제어 */
   left: 0 !important;
   right: 0 !important;
   bottom: 0 !important;
   width: 100vw !important;
-  height: calc(100vh - 64px) !important;
+  /* height는 동적으로 계산되므로 여기서 강제하지 않음 */
   overflow: hidden !important;
   margin: 0 !important;
   padding: 0 !important;
   z-index: 10 !important;
+}
+
+/* 완료 페이지일 때 메인 컨텐츠 스타일 */
+#register-main-content.complete-mode {
+  top: 0 !important;
+  height: 100vh !important;
+  z-index: 99999 !important;
+}
+
+/* 일반 페이지일 때 메인 컨텐츠 스타일 */
+#register-main-content:not(.complete-mode) {
+  top: 64px !important;
+  height: calc(100vh - 64px) !important;
 }
 
 /* 페이지 내부 컨텐츠 영역 고정 */
@@ -120,6 +133,11 @@ header.register-header-fixed {
   padding: 0 16px !important;
   padding-bottom: 100px !important; /* 하단 고정 버튼 영역 확보 */
   max-height: 100% !important;
+}
+
+/* 완료 페이지 배경 그라디언트 강제 적용 */
+.register-complete-bg {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
 }
 
 /* 하단 고정 버튼 영역 */
@@ -513,10 +531,10 @@ function RegisterLayoutContent({
     <>
       <style jsx global>{pageStyles}</style>
       <div
-        className="fixed inset-0 overflow-hidden"
+        className={`fixed inset-0 overflow-hidden ${isComplete ? 'register-complete-bg' : ''}`}
         id="register-page-container"
         style={{
-          background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
+          background: isComplete ? undefined : 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
           padding: '0',
           margin: '0',
           top: '0'
@@ -554,20 +572,22 @@ function RegisterLayoutContent({
                 <div className="flex items-center">
                   <div>
                     <h1 className="text-lg font-bold text-gray-900">회원가입</h1>
-                    <div className="flex items-center space-x-2">
-                      <div className="flex items-center space-x-1">
-                        <span className="text-xs font-semibold" style={{ color: '#0114a2' }}>
-                          {getCurrentStepNumber()}
-                        </span>
-                        <span className="text-xs text-gray-400">/</span>
-                        <span className="text-xs text-gray-500">
-                          {getTotalSteps()}
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          • {getStepName(currentStep)}
-                        </span>
+                    {!isComplete && (
+                      <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-1">
+                          <span className="text-xs font-semibold" style={{ color: '#0114a2' }}>
+                            {getCurrentStepNumber()}
+                          </span>
+                          <span className="text-xs text-gray-400">/</span>
+                          <span className="text-xs text-gray-500">
+                            {getTotalSteps()}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            • {getStepName(currentStep)}
+                          </span>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -581,7 +601,7 @@ function RegisterLayoutContent({
 
         {/* 메인 컨텐츠 - 고정 위치 */}
         <div
-          className="register-content-area"
+          className={`register-content-area ${isComplete ? 'complete-mode' : ''}`}
           style={{
             top: isComplete ? '0' : '64px', // 완료 화면이면 헤더 공간 제거
             left: '0',
