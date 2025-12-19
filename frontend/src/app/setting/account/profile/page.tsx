@@ -55,12 +55,18 @@ export default function ProfilePage() {
 
   const loadUserProfile = async () => {
     try {
-      const token = localStorage.getItem('auth-token');
+      // 여러 키에서 토큰 찾기 (auth-token, smap_auth_token 등)
+      const token = localStorage.getItem('auth-token') ||
+        localStorage.getItem('smap_auth_token') ||
+        localStorage.getItem('authToken');
+
       if (!token) {
-        console.log('⚠️ 토큰이 없지만 페이지 로드 계속 진행');
+        console.log('⚠️ 토큰이 없음 - 확인한 키: auth-token, smap_auth_token, authToken');
         setIsLoadingProfile(false);
         return;
       }
+
+      console.log('✅ 토큰 발견, 길이:', token.length);
 
       console.log('🔄 사용자 프로필 정보 로드 시작');
 
@@ -194,7 +200,9 @@ export default function ProfilePage() {
     setMessage('');
 
     try {
-      const token = localStorage.getItem('auth-token');
+      const token = localStorage.getItem('auth-token') ||
+        localStorage.getItem('smap_auth_token') ||
+        localStorage.getItem('authToken');
       const response = await fetch('/api/auth/update-profile', {
         method: 'POST',
         headers: {
