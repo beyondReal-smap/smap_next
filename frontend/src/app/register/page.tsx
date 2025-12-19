@@ -2344,11 +2344,7 @@ export default function RegisterPage() {
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         닉네임
                       </label>
-                      {registerData.isSocialLogin && (registerData.socialProvider === 'google' || registerData.socialProvider === 'apple') && (
-                        <p className="text-xs text-[#0114a2] mb-2" style={{ wordBreak: 'keep-all' }}>
-                          {(registerData.socialProvider === 'google' ? '구글' : '애플')} 계정에서 가져온 닉네임이 자동으로 입력되었습니다
-                        </p>
-                      )}
+
                       <input
                         type="text"
                         value={registerData.mt_nickname}
@@ -2726,7 +2722,7 @@ export default function RegisterPage() {
             className="p-4"
             data-bottom-button
             style={{
-              paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
+              paddingBottom: '1rem',
               // iOS 애니메이션 최적화
               willChange: 'transform',
               transform: 'translateZ(0)', // 하드웨어 가속 활성화
