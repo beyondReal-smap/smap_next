@@ -522,38 +522,38 @@ function RegisterLayoutContent({
           top: '0'
         }}
       >
-        {/* 통일된 헤더 애니메이션 */}
-        <AnimatedHeader
-          variant="simple"
-          className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed register-header-fixed"
-          style={{
-            padding: '0',
-            margin: '0',
-            paddingTop: '0',
-            marginTop: '0',
-            top: '0',
-            position: 'fixed'
-          }}
-        >
-          <div className="flex items-center justify-between w-full" style={{
-            height: '64px',
-            minHeight: '64px',
-            padding: '0'
-          }}>
-            <div className="flex items-center space-x-3">
-              <motion.button
-                onClick={handleBack}
-                className="hover:bg-gray-100 rounded-full transition-all duration-200"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                style={{ padding: '8px', marginLeft: '8px' }}
-              >
-                <HiOutlineChevronLeft className="w-5 h-5 text-gray-700" />
-              </motion.button>
-              <div className="flex items-center">
-                <div>
-                  <h1 className="text-lg font-bold text-gray-900">회원가입</h1>
-                  {!isComplete && (
+        {/* 통일된 헤더 애니메이션 - 완료 화면이 아닐 때만 표시 */}
+        {!isComplete && (
+          <AnimatedHeader
+            variant="simple"
+            className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed register-header-fixed"
+            style={{
+              padding: '0',
+              margin: '0',
+              paddingTop: '0',
+              marginTop: '0',
+              top: '0',
+              position: 'fixed'
+            }}
+          >
+            <div className="flex items-center justify-between w-full" style={{
+              height: '64px',
+              minHeight: '64px',
+              padding: '0'
+            }}>
+              <div className="flex items-center space-x-3">
+                <motion.button
+                  onClick={handleBack}
+                  className="hover:bg-gray-100 rounded-full transition-all duration-200"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  style={{ padding: '8px', marginLeft: '8px' }}
+                >
+                  <HiOutlineChevronLeft className="w-5 h-5 text-gray-700" />
+                </motion.button>
+                <div className="flex items-center">
+                  <div>
+                    <h1 className="text-lg font-bold text-gray-900">회원가입</h1>
                     <div className="flex items-center space-x-2">
                       <div className="flex items-center space-x-1">
                         <span className="text-xs font-semibold" style={{ color: '#0114a2' }}>
@@ -568,22 +568,22 @@ function RegisterLayoutContent({
                         </span>
                       </div>
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="flex items-center space-x-2">
-              {/* 필요시 추가 버튼들을 여기에 배치 */}
+              <div className="flex items-center space-x-2">
+                {/* 필요시 추가 버튼들을 여기에 배치 */}
+              </div>
             </div>
-          </div>
-        </AnimatedHeader>
+          </AnimatedHeader>
+        )}
 
         {/* 메인 컨텐츠 - 고정 위치 */}
         <div
           className="register-content-area"
           style={{
-            top: '64px', // 헤더 높이만큼 아래로
+            top: isComplete ? '0' : '64px', // 완료 화면이면 헤더 공간 제거
             left: '0',
             right: '0',
             bottom: '0'

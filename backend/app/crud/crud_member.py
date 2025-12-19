@@ -99,8 +99,10 @@ class CRUDMember:
 
     def create_from_register(self, db: Session, *, obj_in: RegisterRequest) -> Member:
         """회원가입 요청으로부터 회원 생성"""
-        # 비밀번호 해싱
-        hashed_password = self.hash_password(obj_in.mt_pwd)
+        # 비밀번호 해싱 (비밀번호가 있는 경우만)
+        hashed_password = None
+        if obj_in.mt_pwd:
+            hashed_password = self.hash_password(obj_in.mt_pwd)
         
         # 전화번호 정리 (하이픈 제거)
         clean_phone = obj_in.mt_id.replace('-', '')
@@ -128,6 +130,12 @@ class CRUDMember:
             # 프로필 이미지가 없는 경우 랜덤 아바타 선택
             profile_image = self.get_random_avatar()
         
+        # mt_id가 이메일 형식이 아닌 경우에만 mt_hp에 설정 (이메일은 20자 넘을 수 있음)
+        # 소셜 로그인의 경우 mt_id에 이메일이 들어올 수 있음
+        hp_value = clean_phone
+        if '@' in clean_phone:
+             hp_value = None
+             
         db_obj = self.model(
             mt_type=obj_in.mt_type,
             mt_level=obj_in.mt_level,
@@ -136,7 +144,7 @@ class CRUDMember:
             mt_pwd=hashed_password,
             mt_name=obj_in.mt_name,
             mt_nickname=obj_in.mt_nickname,
-            mt_hp=clean_phone,
+            mt_hp=hp_value,
             mt_email=obj_in.mt_email,
             mt_birth=birth_date,
             mt_gender=obj_in.mt_gender,

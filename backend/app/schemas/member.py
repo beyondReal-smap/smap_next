@@ -83,8 +83,8 @@ class RegisterRequest(BaseModel):
     mt_type: Optional[int] = 1
     mt_level: Optional[int] = 2
     mt_status: Optional[int] = 1
-    mt_id: str  # 전화번호
-    mt_pwd: str
+    mt_id: str  # 전화번호 (소셜 로그인은 이메일 또는 ID)
+    mt_pwd: Optional[str] = None  # 소셜 로그인은 비밀번호 없음
     mt_name: str
     mt_nickname: str
     mt_email: Optional[str] = None
