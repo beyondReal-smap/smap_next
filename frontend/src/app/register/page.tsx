@@ -2723,14 +2723,10 @@ export default function RegisterPage() {
               ease: [0.4, 0.0, 0.2, 1], // iOS 최적화된 이징
               type: "tween"
             }}
-            className="p-4 safe-area-bottom"
+            className="p-4"
             data-bottom-button
             style={{
               paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
-              background: 'linear-gradient(to bottom right, rgba(240, 249, 255, 0.95), rgba(253, 244, 255, 0.95))',
-              backdropFilter: 'blur(10px)',
-              WebkitBackdropFilter: 'blur(10px)',
-              borderTop: '1px solid rgba(229, 231, 235, 0.3)',
               // iOS 애니메이션 최적화
               willChange: 'transform',
               transform: 'translateZ(0)', // 하드웨어 가속 활성화
