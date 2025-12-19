@@ -65,20 +65,22 @@ export async function POST(request: NextRequest) {
     // if (existingUser) {
     //   return NextResponse.json(
     //     { error: '이미 가입된 전화번호입니다.' },
-    //     { status: 409 }
-    //   );
+    //     { status: 409 }\n    //   );
     // }
 
-    // 비밀번호 해싱 (PHP의 PASSWORD_DEFAULT는 bcrypt)
-    const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(body.mt_pwd, saltRounds);
+    // 비밀번호 해싱 (소셜 로그인은 건너뜀)
+    let hashedPassword = null;
+    if (!isSocialLogin && body.mt_pwd) {
+      const saltRounds = 10;
+      hashedPassword = await bcrypt.hash(body.mt_pwd, saltRounds);
+    }
 
     // 회원 정보 구성
-    const memberData = {
+    const memberData: any = {
       mt_type: body.mt_type || 1, // 일반 회원
       mt_level: body.mt_level || 2, // 일반(무료)
       mt_status: body.mt_status || 1, // 정상
-      mt_id: body.mt_id,
+      mt_id: body.mt_id || body.mt_email || '', // 소셜 로그인은 이메일을 ID로 사용
       mt_pwd: hashedPassword,
       mt_name: body.mt_name,
       mt_nickname: body.mt_nickname,
@@ -97,6 +99,29 @@ export async function POST(request: NextRequest) {
       mt_long: body.mt_long || null,
       mt_wdate: new Date().toISOString(),
     };
+
+    // 소셜 로그인인 경우 추가 필드
+    if (isSocialLogin) {
+      // 구글 로그인
+      if (body.mt_type === 4 && (body as any).mt_google_id) {
+        memberData.mt_google_id = (body as any).mt_google_id;
+      }
+      // 애플 로그인
+      if (body.mt_type === 3 && (body as any).mt_apple_id) {
+        memberData.mt_apple_id = (body as any).mt_apple_id;
+      }
+      // 카카오 로그인
+      if (body.mt_type === 2 && (body as any).mt_kakao_id) {
+        memberData.mt_kakao_id = (body as any).mt_kakao_id;
+      }
+      // 프로필 이미지
+      if ((body as any).profile_image || (body as any).mt_file1) {
+        memberData.mt_file1 = (body as any).profile_image || (body as any).mt_file1;
+      }
+    }
+
+    console.log('소셜 로그인 여부:', isSocialLogin);
+    console.log('최종 memberData:', JSON.stringify(memberData, null, 2));
 
     try {
       // 백엔드 API 호출 (직접 URL 설정)
