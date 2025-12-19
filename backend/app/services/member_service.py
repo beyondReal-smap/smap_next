@@ -322,61 +322,34 @@ class MemberService:
                 )
             
             else:
-                # 새 사용자 회원가입 처리
-                logger.info(f"👤 새 사용자 회원가입 처리 시작")
+                # 새 사용자 - 회원가입 필요 (DB에 저장하지 않고 isNewUser=true만 반환)
+                # 실제 사용자 생성은 회원가입 완료 API(/api/auth/register)에서 처리
+                logger.info(f"👤 새 사용자 발견 - 회원가입 필요 (아직 DB에 저장하지 않음)")
 
-                # 필수 데이터 확인
-                if not google_data.google_id:
-                    logger.error("❌ 새 사용자 생성 실패: Google ID가 없음")
-                    return GoogleLoginResponse(
-                        success=False,
-                        message="Google ID가 필요합니다."
-                    )
-
-                # 프로필 이미지 처리 - 구글에서 제공된 이미지가 있으면 사용, 없으면 랜덤 아바타
-                profile_image = google_data.image if google_data.image else self.crud.get_random_avatar()
+                # 프론트엔드에서 사용할 임시 사용자 정보 (DB 저장 없음)
+                temp_user_data = {
+                    "mt_idx": None,  # 아직 생성되지 않음
+                    "mt_id": f"google_{google_data.google_id}",
+                    "mt_name": google_data.name or google_data.given_name or "",
+                    "mt_nickname": google_data.given_name or google_data.name or "",
+                    "mt_email": google_data.email,
+                    "mt_google_id": google_data.google_id,
+                    "mt_type": 4,  # Google 로그인
+                    "mt_level": 2,  # 일반 회원
+                    "mt_file1": google_data.image or "",
+                }
                 
-                # 새 사용자 생성
-                new_member = Member(
-                    mt_id=f"google_{google_data.google_id}",  # Google ID 기반 고유 ID
-                    mt_name=google_data.name or google_data.given_name or "Google User",
-                    mt_nickname=google_data.given_name or google_data.name or "Google User",
-                    mt_email=google_data.email,
-                    mt_google_id=google_data.google_id,
-                    mt_type=4,  # Google 로그인
-                    mt_level=2,  # 일반 회원
-                    mt_status=1,  # 정상
-                    mt_show='Y',  # 노출
-                    mt_map='Y',  # Google 지도 사용
-                    mt_file1=profile_image,  # 프로필 이미지 (구글 이미지 또는 랜덤 아바타)
-                    mt_wdate=datetime.utcnow(),
-                    mt_ldate=datetime.utcnow(),
-                    mt_adate=datetime.utcnow(),
-                    # 기본 동의 처리 (Google 로그인의 경우 기본 동의로 처리)
-                    mt_agree1='Y',  # 서비스 이용약관
-                    mt_agree2='Y',  # 개인정보 처리방침
-                    mt_agree3='Y',  # 위치기반서비스
-                    mt_onboarding='N'  # 온보딩 필요
-                )
-                
-                db.add(new_member)
-                db.commit()
-                db.refresh(new_member)
-                
-                logger.info(f"✅ 새 사용자 생성 완료 - mt_idx: {new_member.mt_idx}")
-                
-                # 새 사용자 데이터 구성
-                user_data = self._build_user_data(new_member)
+                logger.info(f"✅ 신규 사용자 정보 반환 (DB 저장 없음) - email: {google_data.email}")
                 
                 return GoogleLoginResponse(
                     success=True,
-                    message="Google 회원가입 및 로그인 성공",
+                    message="신규 사용자입니다. 회원가입이 필요합니다.",
                     data={
-                        "member": user_data,
-                        "user": user_data,  # 호환성을 위해 추가
-                        "token": f"google_token_{new_member.mt_idx}",
+                        "member": temp_user_data,
+                        "user": temp_user_data,
+                        "token": None,  # 신규 사용자는 토큰 없음
                         "is_new_user": True,
-                        "isNewUser": True,  # 호환성을 위해 추가
+                        "isNewUser": True,
                         "lookup_method": "new_user",
                         # 새 사용자는 빈 데이터
                         "groups": [],

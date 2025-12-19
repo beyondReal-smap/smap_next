@@ -29,14 +29,25 @@ interface RegisterRequest {
 export async function POST(request: NextRequest) {
   try {
     const body: RegisterRequest = await request.json();
-    
+
     console.log('=== 프론트엔드 API 라우터 호출됨 ===');
     console.log('받은 요청 데이터:', JSON.stringify(body, null, 2));
 
-    // 필수 필드 검증
-    if (!body.mt_id || !body.mt_pwd || !body.mt_name || !body.mt_nickname) {
+    // 필수 필드 검증 (소셜 로그인의 경우 비밀번호 제외)
+    // mt_type: 1=일반, 2=카카오, 3=애플, 4=구글
+    const isSocialLogin = body.mt_type === 2 || body.mt_type === 3 || body.mt_type === 4;
+
+    if (!body.mt_name || !body.mt_nickname) {
       return NextResponse.json(
-        { error: '필수 정보가 누락되었습니다.' },
+        { error: '이름과 닉네임은 필수입니다.' },
+        { status: 400 }
+      );
+    }
+
+    // 일반 회원가입은 mt_id(전화번호)와 mt_pwd(비밀번호) 필수
+    if (!isSocialLogin && (!body.mt_id || !body.mt_pwd)) {
+      return NextResponse.json(
+        { error: '전화번호와 비밀번호는 필수입니다.' },
         { status: 400 }
       );
     }
@@ -93,7 +104,7 @@ export async function POST(request: NextRequest) {
       console.log('=== 백엔드 API 호출 시작 ===');
       console.log('백엔드 URL:', backendUrl.toString());
       console.log('전송할 데이터:', JSON.stringify(memberData, null, 2));
-      
+
       const backendResponse = await fetch(backendUrl.toString(), {
         method: 'POST',
         headers: {
@@ -118,7 +129,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(backendData);
     } catch (fetchError) {
       console.error('백엔드 연결 실패, 임시 처리:', fetchError);
-      
+
       // 백엔드 연결 실패 시 임시 성공 응답 (개발용)
       const tempMemberData = {
         mt_idx: Math.floor(Math.random() * 10000) + 1000,
@@ -166,14 +177,14 @@ export async function PUT(request: NextRequest) {
 
       // 실제 SMS 발송
       const result = await sendVerificationCode(phone);
-      
+
       if (result.success && result.code) {
         // 인증번호를 메모리에 저장 (3분 후 만료)
         const expires = Date.now() + (3 * 60 * 1000); // 3분
         verificationCodes.set(phone, { code: result.code, expires });
-        
+
         console.log(`인증번호 발송 성공: ${phone}, 코드: ${result.code}`);
-        
+
         return NextResponse.json({
           success: true,
           message: '인증번호가 발송되었습니다.'
@@ -197,7 +208,7 @@ export async function PUT(request: NextRequest) {
 
       // 저장된 인증번호 확인
       const storedData = verificationCodes.get(phone);
-      
+
       if (!storedData) {
         return NextResponse.json(
           { error: '인증번호를 먼저 요청해주세요.' },
@@ -218,7 +229,7 @@ export async function PUT(request: NextRequest) {
       if (storedData.code === code) {
         verificationCodes.delete(phone); // 사용된 인증번호 삭제
         console.log(`인증번호 확인 성공: ${phone}`);
-        
+
         return NextResponse.json({
           success: true,
           message: '인증이 완료되었습니다.'
