@@ -7,11 +7,11 @@ import dayjs, { Dayjs } from 'dayjs';
 import 'dayjs/locale/ko';
 
 dayjs.locale('ko');
-import { 
-  FiUser, 
-  FiPhone, 
-  FiMail, 
-  FiLock, 
+import {
+  FiUser,
+  FiPhone,
+  FiMail,
+  FiLock,
   FiCalendar,
   FiMapPin,
   FiCheck,
@@ -40,7 +40,7 @@ const TERMS_DATA = [
     link: '/setting/service'
   },
   {
-    id: 'mt_agree2', 
+    id: 'mt_agree2',
     title: '개인정보 처리방침',
     required: true,
     content: '개인정보 수집, 이용, 보관에 관한 정책입니다.',
@@ -90,7 +90,7 @@ interface RegisterData {
   mt_agree3: boolean;
   mt_agree4: boolean;
   mt_agree5: boolean;
-  
+
   // 기본 정보
   mt_id: string; // 전화번호 또는 이메일 (소셜 로그인 시)
   mt_pwd: string;
@@ -99,15 +99,15 @@ interface RegisterData {
   mt_email: string;
   mt_birth: string;
   mt_gender: number | null;
-  
+
   // 위치 정보
   mt_lat: number | null;
   mt_long: number | null;
-  
+
   // 기타
   mt_push1: boolean;
   verification_code: string;
-  
+
   // 소셜 로그인 관련
   isSocialLogin?: boolean;
   socialProvider?: string;
@@ -120,31 +120,31 @@ export default function RegisterPage() {
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   const [initError, setInitError] = useState<string | null>(null);
-  
+
   // iOS 초기 렌더링 제어 및 데이터 로딩 상태 관리
   React.useEffect(() => {
     console.log('🔥 [REGISTER] 페이지 초기화 시작');
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    
+
     const handlePageReady = () => {
       console.log('🔥 [REGISTER] 페이지 준비 완료');
       setIsIOSReady(true);
-      
+
       // 데이터 로딩 대기 (소셜 로그인 데이터 확인)
       setTimeout(() => {
         console.log('🔥 [REGISTER] 데이터 로딩 체크 시작');
         const urlParams = new URLSearchParams(window.location.search);
         const socialProvider = urlParams.get('social');
-        
+
         if (socialProvider) {
           // 소셜 로그인인 경우 localStorage 데이터 대기
           let attempts = 0;
           const maxAttempts = 10; // 최대 2초 대기
-          
+
           const checkData = () => {
             const socialData = localStorage.getItem('socialLoginData');
             console.log(`🔥 [REGISTER] 데이터 체크 시도 ${attempts + 1}/${maxAttempts}:`, socialData ? '데이터 있음' : '데이터 없음');
-            
+
             if (socialData) {
               console.log('🔥 [REGISTER] 소셜 로그인 데이터 확인됨');
               setIsDataLoaded(true);
@@ -159,7 +159,7 @@ export default function RegisterPage() {
               setIsInitializing(false);
             }
           };
-          
+
           checkData();
         } else {
           // 일반 회원가입인 경우 바로 로딩 완료
@@ -169,7 +169,7 @@ export default function RegisterPage() {
         }
       }, isIOS ? 500 : 100); // iOS에서는 더 긴 대기 시간
     };
-    
+
     if (isIOS) {
       console.log('📱 [REGISTER] iOS 환경 감지 - DOM 로딩 대기');
       if (document.readyState === 'loading') {
@@ -184,7 +184,7 @@ export default function RegisterPage() {
       handlePageReady();
     }
   }, []);
-  
+
   // 모바일 키보드 대응을 위한 간단한 스타일
   React.useEffect(() => {
     const style = document.createElement('style');
@@ -354,7 +354,7 @@ export default function RegisterPage() {
       }
     `;
     document.head.appendChild(style);
-    
+
     return () => {
       document.head.removeChild(style);
     };
@@ -362,8 +362,8 @@ export default function RegisterPage() {
 
   const router = useRouter();
   // Context에서 단계 관리
-  const { 
-    currentStep, 
+  const {
+    currentStep,
     setCurrentStep,
     birthModalOpen,
     setBirthModalOpen,
@@ -392,14 +392,14 @@ export default function RegisterPage() {
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [calendarCurrentMonth, setCalendarCurrentMonth] = useState(dayjs());
   const [selectedDate, setSelectedDate] = useState<Dayjs | null>(null);
-  
+
   // 포커스 상태 관리
   const [focusedField, setFocusedField] = useState<string | null>(null);
-  
+
   // 위치 정보 관련 상태
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState('');
-  
+
   const [registerData, setRegisterData] = useState<RegisterData>({
     mt_agree1: false,
     mt_agree2: false,
@@ -428,7 +428,7 @@ export default function RegisterPage() {
   // 웹 API를 사용한 위치 정보 요청
   const requestLocationWithWebAPI = React.useCallback(() => {
     console.log('🌐 [LOCATION] 웹 API로 위치 정보 요청 시작');
-    
+
     const options = {
       enableHighAccuracy: true, // 높은 정확도 요청
       timeout: 10000, // 10초 타임아웃
@@ -449,7 +449,7 @@ export default function RegisterPage() {
       (error) => {
         console.error('❌ [LOCATION] 위치 정보 가져오기 실패:', error);
         setLocationLoading(false);
-        
+
         let errorMessage = '';
         switch (error.code) {
           case error.PERMISSION_DENIED:
@@ -482,7 +482,7 @@ export default function RegisterPage() {
       console.log('   📍 정확도:', locationData?.accuracy);
       console.log('   📍 타임스탬프:', locationData?.timestamp);
       console.log('   📍 소스:', locationData?.source);
-      
+
       if (locationData && locationData.latitude && locationData.longitude) {
         console.log('✅ [LOCATION CALLBACK] 유효한 GPS 데이터 확인됨');
         setRegisterData(prev => ({
@@ -516,7 +516,7 @@ export default function RegisterPage() {
     // Android 위치 권한 요청 성공 콜백
     (window as any).onAndroidLocationSuccess = (locationData: any) => {
       console.log('🎯 [LOCATION CALLBACK] Android 위치 정보 수신:', locationData);
-      
+
       if (locationData && locationData.latitude && locationData.longitude) {
         setRegisterData(prev => ({
           ...prev,
@@ -557,25 +557,25 @@ export default function RegisterPage() {
       console.log('🔥 [REGISTER] 데이터 로딩 대기 중... 소셜 로그인 데이터 초기화 건너뛰기');
       return;
     }
-    
+
     console.log('🔥 [REGISTER] 소셜 로그인 데이터 초기화 시작');
-    
+
     const urlParams = new URLSearchParams(window.location.search);
     const socialProvider = urlParams.get('social');
-    
+
     console.log('🔥 [REGISTER] URL 파라미터 social:', socialProvider);
-    
+
     if (socialProvider) {
       // localStorage에서 소셜 로그인 데이터 확인 (signin 페이지에서 localStorage에 저장함)
       const socialData = localStorage.getItem('socialLoginData');
       console.log('🔥 [REGISTER] localStorage에서 가져온 socialData:', socialData);
-      
+
       if (socialData) {
         try {
           const parsedData: SocialLoginData = JSON.parse(socialData);
-          
+
           console.log(`🔥 [REGISTER] ${parsedData.provider} 소셜 로그인 데이터 로드:`, parsedData);
-          
+
           setRegisterData(prev => ({
             ...prev,
             mt_id: parsedData.email || '', // 이메일을 아이디로 사용
@@ -587,24 +587,24 @@ export default function RegisterPage() {
               ? (parsedData.nickname || parsedData.given_name || parsedData.name || '')
               : (parsedData.nickname || parsedData.given_name || parsedData.name || 'Google User'),
             // 구글/애플 로그인 시 임시 비밀번호 자동설정 (회원가입 API 검증 통과용)
-            mt_pwd: parsedData.provider === 'google' 
-              ? 'google_auto_password_123' 
+            mt_pwd: parsedData.provider === 'google'
+              ? 'google_auto_password_123'
               : (parsedData.provider === 'apple' ? 'apple_auto_password_123' : ''),
             isSocialLogin: true,
             socialProvider: parsedData.provider,
             socialId: parsedData.kakao_id || parsedData.google_id || parsedData.apple_id || '',
             profile_image: parsedData.profile_image || null  // 소셜 로그인 프로필 이미지
           }));
-          
+
           // 소셜 로그인 시 약관 동의 단계로 시작 (소셜 로그인이므로 전화번호 인증은 생략)
           setCurrentStep(REGISTER_STEPS.TERMS);
-          
+
           console.log(`🔥 [REGISTER] ${parsedData.provider} 소셜 로그인 데이터 로드 완료`);
           console.log('🔥 [REGISTER] 현재 스텝을 TERMS로 설정');
-          
+
           // 소셜 로그인 데이터는 회원가입 완료 후에 제거하도록 변경
           // localStorage.removeItem('socialLoginData'); // 여기서 제거하지 않음
-          
+
         } catch (error) {
           console.error('🔥 [REGISTER] 소셜 로그인 데이터 파싱 오류:', error);
           // 파싱 오류 시에는 데이터 제거
@@ -649,15 +649,15 @@ export default function RegisterPage() {
       setEmailError('');
       return true; // 선택사항이므로 빈 값은 유효
     }
-    
+
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     const isValid = emailRegex.test(email);
-    
+
     if (!isValid) {
       setEmailError('올바른 이메일 형식을 입력해주세요');
       return false;
     }
-    
+
     setEmailError('');
     return true;
   };
@@ -671,16 +671,16 @@ export default function RegisterPage() {
       hasNumber: /[0-9]/.test(password),
       hasSpecialChar: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)
     };
-    
+
     setPasswordStrength(strength);
-    
+
     const allValid = Object.values(strength).every(Boolean);
-    
+
     if (!password) {
       setPasswordError('');
       return false;
     }
-    
+
     if (!allValid) {
       const missingRequirements = [];
       if (!strength.minLength) missingRequirements.push('8자 이상');
@@ -688,11 +688,11 @@ export default function RegisterPage() {
       if (!strength.hasLowercase) missingRequirements.push('소문자');
       if (!strength.hasNumber) missingRequirements.push('숫자');
       if (!strength.hasSpecialChar) missingRequirements.push('특수문자');
-      
+
       setPasswordError(`다음 조건이 필요합니다: ${missingRequirements.join(', ')}`);
       return false;
     }
-    
+
     setPasswordError('');
     return true;
   };
@@ -701,14 +701,14 @@ export default function RegisterPage() {
   const handlePhoneNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value;
     const formatted = formatPhoneNumber(rawValue);
-    
+
     // 전화번호가 변경되면 쿨다운 리셋
     if (formatted !== registerData.mt_id) {
       setLastSentTime(null);
       setVerificationSent(false);
       setVerificationTimer(0);
     }
-    
+
     setRegisterData(prev => ({ ...prev, mt_id: formatted }));
   };
 
@@ -718,8 +718,8 @@ export default function RegisterPage() {
     setTimeout(() => {
       const bottomButton = document.querySelector('[data-bottom-button]');
       if (bottomButton) {
-        bottomButton.scrollIntoView({ 
-          behavior: 'smooth', 
+        bottomButton.scrollIntoView({
+          behavior: 'smooth',
           block: 'end',
           inline: 'nearest'
         });
@@ -734,7 +734,7 @@ export default function RegisterPage() {
       const birthDate = dayjs(registerData.mt_birth);
       setSelectedDate(birthDate);
       setCalendarCurrentMonth(birthDate);
-      } else {
+    } else {
       // 기본값: 현재 년도에서 30년 전
       const defaultDate = dayjs().subtract(30, 'year');
       setSelectedDate(null);
@@ -797,7 +797,7 @@ export default function RegisterPage() {
             setErrorModal({ isOpen: false, title: '', message: '', isCountdown: false });
             return 0;
           }
-          
+
           // 모달 메시지 업데이트
           const minutes = Math.floor(newTime / 60);
           const seconds = newTime % 60;
@@ -805,7 +805,7 @@ export default function RegisterPage() {
             ...prev,
             message: `같은 번호로는 ${minutes}분 ${seconds}초 후에 재발송이 가능합니다.`
           }));
-          
+
           return newTime;
         });
       }, 1000);
@@ -813,52 +813,52 @@ export default function RegisterPage() {
     return () => clearInterval(interval);
   }, [countdownTime, errorModal.isOpen, errorModal.isCountdown]);
 
-    // 약관 단계에서 스크롤 위치 초기화 (데이터 로딩 완료 후에만)
+  // 약관 단계에서 스크롤 위치 초기화 (데이터 로딩 완료 후에만)
   useEffect(() => {
     if (currentStep === REGISTER_STEPS.TERMS && isDataLoaded && !isInitializing) {
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-      
+
       console.log('🔧 [REGISTER] 약관 단계 스크롤 초기화 - 데이터 로딩 완료');
-      
+
       // iOS 전용 강력한 위치 고정
       const forceFixPosition = () => {
         // 올바른 스크롤 영역 선택자 사용
         const scrollArea = document.querySelector('.register-scroll-area') as HTMLElement;
         const contentArea = document.querySelector('.register-content-area') as HTMLElement;
-        
+
         if (scrollArea) {
           // 스크롤 초기화
           scrollArea.scrollTop = 0;
           scrollArea.scrollTo({ top: 0, behavior: 'auto' });
           console.log('🔧 [iOS FIX] register-scroll-area 스크롤 위치 초기화 완료');
         }
-        
+
         if (contentArea) {
           // 전체 컨텐츠 영역도 초기화
           contentArea.scrollTop = 0;
           contentArea.scrollTo({ top: 0, behavior: 'auto' });
           console.log('🔧 [iOS FIX] register-content-area 스크롤 위치 초기화 완료');
         }
-        
+
         // 추가로 window 스크롤도 초기화
         window.scrollTo({ top: 0, behavior: 'auto' });
         document.documentElement.scrollTop = 0;
         document.body.scrollTop = 0;
-        
+
         console.log('🔧 [iOS FIX] 모든 스크롤 위치 초기화 완료');
       };
-      
+
       if (isIOS) {
         console.log('📱 [iOS] 약관 단계 진입 - 강화된 스크롤 위치 초기화');
-        
+
         // 즉시 실행
         forceFixPosition();
-        
+
         // 추가로 약간의 지연 후 다시 실행 (iOS 렌더링 지연 대응)
         setTimeout(() => {
           forceFixPosition();
         }, 100);
-        
+
         // 더 긴 지연 후 한 번 더 실행
         setTimeout(() => {
           forceFixPosition();
@@ -878,31 +878,31 @@ export default function RegisterPage() {
   useEffect(() => {
     if (currentStep === REGISTER_STEPS.TERMS && isDataLoaded && !isInitializing) {
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-      
+
       if (isIOS) {
         console.log('📱 [iOS] 약관동의 페이지 강제 표시 보장');
-        
+
         // 즉시 실행
         const forceShowTerms = () => {
           // 모든 스크롤 영역 초기화
           const scrollArea = document.querySelector('.register-scroll-area') as HTMLElement;
           const contentArea = document.querySelector('.register-content-area') as HTMLElement;
-          
+
           if (scrollArea) {
             scrollArea.scrollTop = 0;
             scrollArea.scrollTo({ top: 0, behavior: 'auto' });
           }
-          
+
           if (contentArea) {
             contentArea.scrollTop = 0;
             contentArea.scrollTo({ top: 0, behavior: 'auto' });
           }
-          
+
           // window 스크롤도 초기화
           window.scrollTo({ top: 0, behavior: 'auto' });
           document.documentElement.scrollTop = 0;
           document.body.scrollTop = 0;
-          
+
           // 약관동의 콘텐츠 강제 표시
           const termsContent = document.querySelector('[data-step="terms"]');
           if (termsContent) {
@@ -912,7 +912,7 @@ export default function RegisterPage() {
             (termsContent as HTMLElement).style.position = 'relative';
             (termsContent as HTMLElement).style.zIndex = '1';
           }
-          
+
           // 추가로 모든 약관 관련 요소 강제 표시
           const allTermsElements = document.querySelectorAll('.space-y-3, .terms-agreement-section, .terms-card');
           allTermsElements.forEach((element) => {
@@ -920,22 +920,22 @@ export default function RegisterPage() {
             (element as HTMLElement).style.opacity = '1';
             (element as HTMLElement).style.display = 'block';
           });
-          
+
           console.log('📱 [iOS] 약관동의 페이지 강제 표시 완료');
         };
-        
+
         // 즉시 실행
         forceShowTerms();
-        
+
         // 약간의 지연 후 다시 실행
         setTimeout(forceShowTerms, 100);
-        
+
         // 더 긴 지연 후 한 번 더 실행
         setTimeout(forceShowTerms, 500);
-        
+
         // 최종 보장을 위한 실행
         const timer = setTimeout(forceShowTerms, 1000);
-        
+
         return () => clearTimeout(timer);
       }
     }
@@ -956,13 +956,13 @@ export default function RegisterPage() {
     } else {
       const steps = Object.values(REGISTER_STEPS);
       const currentIndex = steps.indexOf(currentStep);
-      
+
       // 소셜 로그인 시 전화번호 인증 단계 건너뛰기
       if (registerData.isSocialLogin && currentStep === REGISTER_STEPS.BASIC_INFO) {
         setCurrentStep(REGISTER_STEPS.TERMS);
         return;
       }
-      
+
       if (currentIndex > 0) {
         setCurrentStep(steps[currentIndex - 1]);
       }
@@ -973,22 +973,29 @@ export default function RegisterPage() {
   const handleNext = () => {
     const steps = Object.values(REGISTER_STEPS);
     const currentIndex = steps.indexOf(currentStep);
-    
+
     // iOS에서 애니메이션 전환 최적화
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    
+
     // 소셜 로그인 시 전화번호 인증 단계 건너뛰기
     if (registerData.isSocialLogin) {
       if (currentStep === REGISTER_STEPS.TERMS) {
-        // 애플/구글 로그인 시 약관 동의 후 바로 회원가입 완료
+        // 애플/구글 로그인도 기본 정보(닉네임) 입력 단계로 이동 (App Store 리젝션 수정)
+        console.log('🔥 [REGISTER] 소셜 로그인 - 약관 동의 후 기본 정보 입력 단계로 이동');
+        setCurrentStep(REGISTER_STEPS.BASIC_INFO);
+        return;
+      }
+
+      // 애플/구글 로그인 시 BASIC_INFO 단계에서 프로필 단계 건너뛰고 바로 회원가입 완료
+      if (currentStep === REGISTER_STEPS.BASIC_INFO) {
         if (registerData.socialProvider === 'apple' || registerData.socialProvider === 'google') {
-          console.log('🔥 [REGISTER] 애플/구글 로그인 - 약관 동의 후 바로 회원가입 완료');
+          console.log('🔥 [REGISTER] 애플/구글 로그인 - 기본 정보 입력 후 회원가입 완료');
           handleRegister();
           return;
         }
       }
     }
-    
+
     if (currentIndex < steps.length - 1) {
       // 애플 ID 로그인 시 프로필 단계에서 회원가입 완료
       if (registerData.isSocialLogin && registerData.socialProvider === 'apple' && currentStep === REGISTER_STEPS.PROFILE) {
@@ -996,7 +1003,7 @@ export default function RegisterPage() {
         handleRegister();
         return;
       }
-      
+
       // iOS에서는 약간의 지연을 두어 애니메이션 완료된 후 전환
       if (isIOS) {
         setTimeout(() => {
@@ -1036,12 +1043,12 @@ export default function RegisterPage() {
   // 전화번호 인증 요청
   const handleSendVerification = async () => {
     if (!registerData.mt_id) return;
-    
+
     setIsLoading(true);
     try {
       const now = Date.now();
       const cleanPhone = registerData.mt_id.replace(/-/g, '');
-      
+
       // 테스트용 전화번호 처리
       if (cleanPhone === '01011111111') {
         setVerificationSent(true);
@@ -1051,7 +1058,7 @@ export default function RegisterPage() {
         handleNext();
         return;
       }
-    
+
       const response = await fetch('/api/auth/register', {
         method: 'PUT',
         headers: {
@@ -1075,12 +1082,12 @@ export default function RegisterPage() {
       }
     } catch (error) {
       console.error('인증번호 발송 실패:', error);
-              setErrorModal({
-          isOpen: true,
-          title: '발송 실패',
-          message: error instanceof Error ? error.message : '인증번호 발송에 실패했습니다.',
-          isCountdown: false
-        });
+      setErrorModal({
+        isOpen: true,
+        title: '발송 실패',
+        message: error instanceof Error ? error.message : '인증번호 발송에 실패했습니다.',
+        isCountdown: false
+      });
     } finally {
       setIsLoading(false);
     }
@@ -1089,7 +1096,7 @@ export default function RegisterPage() {
   // 인증번호 확인
   const handleVerifyCode = async () => {
     if (!registerData.verification_code) return;
-    
+
     // 인증번호 발송 여부 확인
     if (!verificationSent) {
       setErrorModal({
@@ -1100,11 +1107,11 @@ export default function RegisterPage() {
       });
       return;
     }
-    
+
     setIsLoading(true);
     try {
       const cleanPhone = registerData.mt_id.replace(/-/g, '');
-      
+
       // 테스트용 전화번호 처리
       if (cleanPhone === '01011111111') {
         if (registerData.verification_code === '111111') {
@@ -1133,7 +1140,7 @@ export default function RegisterPage() {
           code: registerData.verification_code
         }),
       });
-      
+
       const data = await response.json();
       if (response.ok) {
         handleNext();
@@ -1176,7 +1183,7 @@ export default function RegisterPage() {
     // 네이티브 앱 환경에서 네이티브 위치 권한 요청
     if (isIOS() && (window as any).webkit?.messageHandlers?.smapIos) {
       console.log('🍎 [LOCATION] iOS 네이티브 위치 권한 요청');
-      
+
       try {
         // iOS 네이티브 위치 권한 요청
         (window as any).webkit.messageHandlers.smapIos.postMessage({
@@ -1211,7 +1218,7 @@ export default function RegisterPage() {
     // Android 네이티브 위치 권한 요청
     if (isAndroid() && (window as any).SmapApp?.requestLocationPermission) {
       console.log('🤖 [LOCATION] Android 네이티브 위치 권한 요청');
-      
+
       try {
         (window as any).SmapApp.requestLocationPermission();
         console.log('📱 [LOCATION] Android 네이티브 위치 권한 요청 호출 완료');
@@ -1242,12 +1249,12 @@ export default function RegisterPage() {
   const handleRegister = async () => {
     console.log('회원가입 시작 - handleRegister 호출됨');
     console.log('현재 registerData:', registerData);
-    
+
     setIsLoading(true);
     try {
       let requestData: any = {
         ...registerData,
-        mt_type: registerData.isSocialLogin ? 
+        mt_type: registerData.isSocialLogin ?
           (registerData.socialProvider === 'google' ? 4 : registerData.socialProvider === 'apple' ? 3 : 2) : 1, // 구글:4, 애플:3, 카카오:2
         mt_level: 2, // 일반(무료)
         mt_status: 1, // 정상
@@ -1261,7 +1268,7 @@ export default function RegisterPage() {
         requestData.mt_name = requestData.mt_name || 'Apple User';
         requestData.mt_nickname = requestData.mt_nickname || 'Apple User';
         requestData.mt_email = requestData.mt_email || '';
-        
+
         // 애플 ID 로그인 시 비밀번호 제거
         delete requestData.mt_pwd;
       } else if (registerData.isSocialLogin && registerData.socialProvider === 'google') {
@@ -1281,23 +1288,23 @@ export default function RegisterPage() {
         } else if (registerData.socialProvider === 'kakao') {
           requestData.mt_kakao_id = registerData.socialId;
         }
-        
+
         // 소셜 로그인 프로필 이미지 추가
         if (registerData.profile_image) {
           requestData.mt_file1 = registerData.profile_image;
           requestData.profile_image = registerData.profile_image;  // 애플 API 호환
         }
       }
-      
+
       console.log('API 요청 데이터:', requestData);
-      
+
       // 소셜 로그인의 경우 소셜 회원가입 API 사용
-      const apiEndpoint = registerData.isSocialLogin ? 
-        `/api/${registerData.socialProvider}-auth` : 
+      const apiEndpoint = registerData.isSocialLogin ?
+        `/api/${registerData.socialProvider}-auth` :
         '/api/auth/register';
-      
+
       let response;
-      
+
       if (registerData.isSocialLogin) {
         // 소셜 로그인 회원가입
         const socialRegisterData = {
@@ -1305,7 +1312,7 @@ export default function RegisterPage() {
           action: 'register', // 회원가입 액션 지정
           isRegister: true
         };
-        
+
         response = await fetch(apiEndpoint, {
           method: 'POST',
           headers: {
@@ -1325,20 +1332,20 @@ export default function RegisterPage() {
       }
 
       console.log('API 응답 상태:', response.status);
-      
+
       const data = await response.json();
       console.log('API 응답 데이터:', data);
-      
+
       if (response.ok && data.success) {
         console.log('회원가입 성공:', data);
-        
+
         // 회원가입 성공 시 mt_idx를 localStorage에 저장
         console.log('🔍 [REGISTER] API 응답에서 mt_idx 확인:', data.data);
-        
+
         if (data.data && data.data.mt_idx) {
           localStorage.setItem('newMemberMtIdx', data.data.mt_idx.toString());
           console.log('✅ [REGISTER] 새 회원 mt_idx 저장 완료:', data.data.mt_idx);
-          
+
           // FCM 토큰 등록 (백그라운드에서 실행)
           setTimeout(async () => {
             try {
@@ -1354,11 +1361,11 @@ export default function RegisterPage() {
           console.error('❌ [REGISTER] data.data:', data.data);
           console.error('❌ [REGISTER] data.data.mt_idx:', data.data?.mt_idx);
         }
-        
+
         // 소셜 로그인 데이터 정리 (회원가입 성공 시에만)
         localStorage.removeItem('socialLoginData');
         console.log('🔥 [REGISTER] 회원가입 성공 후 socialLoginData 제거');
-        
+
         setCurrentStep(REGISTER_STEPS.COMPLETE);
       } else {
         throw new Error(data.error || data.message || '회원가입에 실패했습니다.');
@@ -1392,9 +1399,9 @@ export default function RegisterPage() {
         console.log('앱이 설치되어 있지 않은 것으로 판단됩니다.');
         resolve(false);
       }, 2500);
-      
+
       const startTime = Date.now();
-      
+
       // 앱이 열리면 페이지가 숨겨지거나 blur 이벤트 발생
       const handleVisibilityChange = () => {
         if (document.hidden) {
@@ -1406,7 +1413,7 @@ export default function RegisterPage() {
           }
         }
       };
-      
+
       const handleBlur = () => {
         const timeDiff = Date.now() - startTime;
         if (timeDiff < 2000) {
@@ -1415,10 +1422,10 @@ export default function RegisterPage() {
           resolve(true);
         }
       };
-      
+
       document.addEventListener('visibilitychange', handleVisibilityChange);
       window.addEventListener('blur', handleBlur);
-      
+
       // 앱 스키마 실행 (딥링크)
       try {
         if (isIOS()) {
@@ -1437,7 +1444,7 @@ export default function RegisterPage() {
         clearTimeout(timeout);
         resolve(false);
       }
-      
+
       // 정리 함수
       setTimeout(() => {
         document.removeEventListener('visibilitychange', handleVisibilityChange);
@@ -1450,7 +1457,7 @@ export default function RegisterPage() {
   const handleOpenApp = async () => {
     console.log('앱 열기 시도 중...');
     const appInstalled = await checkAppInstalled();
-    
+
     if (!appInstalled) {
       console.log('앱이 설치되어 있지 않음, 스토어로 이동');
       // 앱이 설치되어 있지 않으면 스토어로 이동
@@ -1472,47 +1479,47 @@ export default function RegisterPage() {
     try {
       const pendingGroupJoin = localStorage.getItem('pendingGroupJoin');
       const redirectAfterRegister = localStorage.getItem('redirectAfterRegister');
-      
+
       if (pendingGroupJoin && redirectAfterRegister) {
         const groupData = JSON.parse(pendingGroupJoin);
         const groupId = groupData.groupId;
-        
+
         console.log('자동 그룹 가입 시도:', groupId);
-        
+
         setIsJoiningGroup(true);
-        
+
         // 새로 가입한 회원의 mt_idx를 가져오기
         const newMemberMtIdx = localStorage.getItem('newMemberMtIdx');
-        
+
         if (!newMemberMtIdx) {
           console.error('새 회원의 mt_idx를 찾을 수 없음');
           throw new Error('회원 정보를 찾을 수 없습니다.');
         }
-        
+
         const mt_idx = parseInt(newMemberMtIdx);
         console.log('새 회원 mt_idx:', mt_idx);
-        
+
         // 새로 가입한 회원을 위한 그룹 가입 API 호출
         await groupService.joinNewMemberToGroup(parseInt(groupId), mt_idx);
-        
+
         // 성공 시 localStorage 정리
         localStorage.removeItem('pendingGroupJoin');
         localStorage.removeItem('redirectAfterRegister');
         localStorage.removeItem('newMemberMtIdx');
-        
+
         console.log('자동 그룹 가입 성공');
-        
+
         // 그룹 가입 성공 후 앱으로 이동 시도
         setIsJoiningGroup(false);
         setIsOpeningApp(true);
-        
+
         if (isMobile()) {
           await handleOpenApp();
         } else {
           // 데스크탑에서는 signin 페이지로 이동
           router.push('/signin');
         }
-        
+
         return true;
       }
       return false;
@@ -1542,28 +1549,28 @@ export default function RegisterPage() {
         return registerData.verification_code.length === 6;
       case REGISTER_STEPS.BASIC_INFO:
         // 이메일 유효성 검사 (상태 업데이트 없이)
-        const isEmailValid = !registerData.mt_email || 
+        const isEmailValid = !registerData.mt_email ||
           /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(registerData.mt_email);
-        
+
         // 구글 로그인 시 비밀번호 검사 건너뛰기
         if (registerData.isSocialLogin && (registerData.socialProvider === 'google' || registerData.socialProvider === 'apple')) {
-          return registerData.mt_name && 
-                 registerData.mt_nickname &&
-                 !emailError && // 이메일 에러가 없어야 함
-                 isEmailValid; // 빈 값이거나 유효한 이메일
+          return registerData.mt_name &&
+            registerData.mt_nickname &&
+            !emailError && // 이메일 에러가 없어야 함
+            isEmailValid; // 빈 값이거나 유효한 이메일
         }
-        
+
         // 일반 회원가입 시 비밀번호 검사
         const isPasswordStrong = Object.values(passwordStrength).every(Boolean);
-        
-        return registerData.mt_pwd && 
-               registerData.mt_name && 
-               registerData.mt_nickname &&
-               passwordConfirm === registerData.mt_pwd &&
-               !passwordError && // 비밀번호 에러가 없어야 함
-               isPasswordStrong && // 모든 비밀번호 조건 만족
-               !emailError && // 이메일 에러가 없어야 함
-               isEmailValid; // 빈 값이거나 유효한 이메일
+
+        return registerData.mt_pwd &&
+          registerData.mt_name &&
+          registerData.mt_nickname &&
+          passwordConfirm === registerData.mt_pwd &&
+          !passwordError && // 비밀번호 에러가 없어야 함
+          isPasswordStrong && // 모든 비밀번호 조건 만족
+          !emailError && // 이메일 에러가 없어야 함
+          isEmailValid; // 빈 값이거나 유효한 이메일
       case REGISTER_STEPS.PROFILE:
         // 애플 ID 로그인 시에는 애플에서 제공한 기본 정보가 이미 있으므로, 생년월일과 성별만 확인
         if (registerData.isSocialLogin && registerData.socialProvider === 'apple') {
@@ -1588,7 +1595,7 @@ export default function RegisterPage() {
       </div>
     );
   }
-  
+
   // 에러가 발생한 경우 에러 화면 표시
   if (initError) {
     return (
@@ -1629,7 +1636,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div 
+    <div
       className={`register-content-area ${isIOSReady ? 'ios-ready' : ''}`}
       style={{
         // iOS 애니메이션 최적화
@@ -1643,7 +1650,7 @@ export default function RegisterPage() {
       {/* 진행률 바 - 상단 고정 */}
       {currentStep !== REGISTER_STEPS.COMPLETE && (
         <div className="absolute top-0 left-0 right-0 h-1 bg-gray-200 z-40">
-          <motion.div 
+          <motion.div
             className="h-full"
             style={{
               backgroundColor: '#0114a2',
@@ -1660,9 +1667,9 @@ export default function RegisterPage() {
       )}
 
       {/* 스크롤 가능한 메인 콘텐츠 영역 */}
-      <div 
-        className="register-scroll-area" 
-        style={{ 
+      <div
+        className="register-scroll-area"
+        style={{
           paddingTop: currentStep !== REGISTER_STEPS.COMPLETE ? '24px' : '20px', // 진행률 바 공간
           paddingBottom: currentStep !== REGISTER_STEPS.COMPLETE ? '100px' : '20px', // 하단 버튼 공간
           // iOS 애니메이션 최적화
@@ -1675,7 +1682,7 @@ export default function RegisterPage() {
       >
         <div className="flex-1 flex items-center justify-center min-h-0">
           <div className="w-full max-w-md mx-auto py-4 register-content">
-            <AnimatePresence 
+            <AnimatePresence
               mode="wait"
               initial={false}
               onExitComplete={() => {
@@ -1690,1020 +1697,1016 @@ export default function RegisterPage() {
                 }
               }}
             >
-          {/* 약관 동의 단계 */}
-          {currentStep === REGISTER_STEPS.TERMS && (
-            <motion.div
-              key="terms"
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -50 }}
-              transition={{ 
-                duration: 0.3,
-                ease: [0.4, 0.0, 0.2, 1], // iOS 최적화된 이징
-                type: "tween"
-              }}
-              className="space-y-3"
-              data-step="terms"
-              style={{
-                // iOS에서 강제로 가시성 보장
-                visibility: 'visible',
-                opacity: 1,
-                display: 'block',
-                position: 'relative',
-                zIndex: 1,
-                // iOS 애니메이션 최적화
-                willChange: 'transform, opacity',
-                transform: 'translateZ(0)', // 하드웨어 가속 활성화
-                backfaceVisibility: 'hidden'
-              }}
-            >
-              <div className="text-center mb-4">
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0114a2'}}>
-                  <FiFileText className="w-5 h-5 text-white" />
-                </div>
-                <h2 className="text-lg font-bold text-gray-900 mb-1">
-                  {registerData.isSocialLogin ? 
-                    `${registerData.socialProvider === 'google' ? '구글' : registerData.socialProvider === 'apple' ? '애플' : '카카오'} 회원가입` : 
-                    '서비스 이용약관'
-                  }
-                </h2>
-                <p className="text-xs text-gray-600">
-                  {registerData.isSocialLogin ? 
-                    `${registerData.socialProvider === 'google' ? '구글' : registerData.socialProvider === 'apple' ? '애플' : '카카오'} 계정으로 간편 회원가입을 진행합니다` :
-                    'SMAP 서비스 이용을 위해 약관에 동의해주세요'
-                  }
-                </p>
-                {registerData.isSocialLogin && (
-                  <div className="mt-3 p-3 bg-[#0114a2]/10 rounded-lg border border-[#0114a2]/20">
-                    <p className="text-xs text-[#0114a2]">
-                      📧 <strong>{registerData.mt_email}</strong><br/>
-                      전화번호 인증 없이 간편하게 가입할 수 있습니다
+              {/* 약관 동의 단계 */}
+              {currentStep === REGISTER_STEPS.TERMS && (
+                <motion.div
+                  key="terms"
+                  initial={{ opacity: 0, x: 50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -50 }}
+                  transition={{
+                    duration: 0.3,
+                    ease: [0.4, 0.0, 0.2, 1], // iOS 최적화된 이징
+                    type: "tween"
+                  }}
+                  className="space-y-3"
+                  data-step="terms"
+                  style={{
+                    // iOS에서 강제로 가시성 보장
+                    visibility: 'visible',
+                    opacity: 1,
+                    display: 'block',
+                    position: 'relative',
+                    zIndex: 1,
+                    // iOS 애니메이션 최적화
+                    willChange: 'transform, opacity',
+                    transform: 'translateZ(0)', // 하드웨어 가속 활성화
+                    backfaceVisibility: 'hidden'
+                  }}
+                >
+                  <div className="text-center mb-4">
+                    <div className="w-10 h-10 rounded-lg flex items-center justify-center mx-auto mb-2" style={{ backgroundColor: '#0114a2' }}>
+                      <FiFileText className="w-5 h-5 text-white" />
+                    </div>
+                    <h2 className="text-lg font-bold text-gray-900 mb-1">
+                      {registerData.isSocialLogin ?
+                        `${registerData.socialProvider === 'google' ? '구글' : registerData.socialProvider === 'apple' ? '애플' : '카카오'} 회원가입` :
+                        '서비스 이용약관'
+                      }
+                    </h2>
+                    <p className="text-xs text-gray-600">
+                      {registerData.isSocialLogin ?
+                        `${registerData.socialProvider === 'google' ? '구글' : registerData.socialProvider === 'apple' ? '애플' : '카카오'} 계정으로 간편 회원가입을 진행합니다` :
+                        'SMAP 서비스 이용을 위해 약관에 동의해주세요'
+                      }
                     </p>
+                    {registerData.isSocialLogin && (
+                      <div className="mt-3 p-3 bg-[#0114a2]/10 rounded-lg border border-[#0114a2]/20">
+                        <p className="text-xs text-[#0114a2]">
+                          📧 <strong>{registerData.mt_email}</strong><br />
+                          전화번호 인증 없이 간편하게 가입할 수 있습니다
+                        </p>
+                      </div>
+                    )}
+                    {/* 디버깅용 - 개발 환경에서만 표시 */}
+                    {process.env.NODE_ENV === 'development' && registerData.isSocialLogin && (
+                      <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
+                        <strong>DEBUG:</strong> Provider: {registerData.socialProvider},
+                        Email: {registerData.mt_email},
+                        Name: {registerData.mt_name}
+                      </div>
+                    )}
                   </div>
-                )}
-                {/* 디버깅용 - 개발 환경에서만 표시 */}
-                {process.env.NODE_ENV === 'development' && registerData.isSocialLogin && (
-                  <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
-                    <strong>DEBUG:</strong> Provider: {registerData.socialProvider}, 
-                    Email: {registerData.mt_email}, 
-                    Name: {registerData.mt_name}
+
+                  {/* 전체 동의 */}
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={TERMS_DATA.every(term => registerData[term.id as keyof RegisterData] as boolean)}
+                        onChange={(e) => handleAllAgree(e.target.checked)}
+                        className="w-4 h-4 rounded"
+                        style={{
+                          WebkitAppearance: 'none',
+                          appearance: 'none',
+                          backgroundColor: TERMS_DATA.every(term => registerData[term.id as keyof RegisterData] as boolean) ? '#0114a2' : '#fff',
+                          border: `2px solid ${TERMS_DATA.every(term => registerData[term.id as keyof RegisterData] as boolean) ? '#0114a2' : '#d1d5db'}`,
+                          borderRadius: '4px',
+                          position: 'relative',
+                          width: '16px',
+                          height: '16px',
+                          flexShrink: 0
+                        }}
+                      />
+                      <span className="font-medium text-gray-900 text-sm">전체 동의</span>
+                    </label>
                   </div>
-                )}
-              </div>
 
-              {/* 전체 동의 */}
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={TERMS_DATA.every(term => registerData[term.id as keyof RegisterData] as boolean)}
-                    onChange={(e) => handleAllAgree(e.target.checked)}
-                    className="w-4 h-4 rounded"
-                    style={{
-                      WebkitAppearance: 'none',
-                      appearance: 'none',
-                      backgroundColor: TERMS_DATA.every(term => registerData[term.id as keyof RegisterData] as boolean) ? '#0114a2' : '#fff',
-                      border: `2px solid ${TERMS_DATA.every(term => registerData[term.id as keyof RegisterData] as boolean) ? '#0114a2' : '#d1d5db'}`,
-                      borderRadius: '4px',
-                      position: 'relative',
-                      width: '16px',
-                      height: '16px',
-                      flexShrink: 0
-                    }}
-                  />
-                  <span className="font-medium text-gray-900 text-sm">전체 동의</span>
-                </label>
-              </div>
+                  {/* 개별 약관 */}
+                  <div className="space-y-2">
+                    {TERMS_DATA.map((term) => (
+                      <div key={term.id} className="bg-white border border-gray-200 rounded-lg p-3">
+                        <div className="flex items-center space-x-2">
+                          <label className="flex items-center space-x-2 cursor-pointer flex-1">
+                            <input
+                              type="checkbox"
+                              checked={registerData[term.id as keyof RegisterData] as boolean}
+                              onChange={(e) => handleTermAgree(term.id, e.target.checked)}
+                              className="w-4 h-4 rounded flex-shrink-0"
+                              style={{
+                                WebkitAppearance: 'none',
+                                appearance: 'none',
+                                backgroundColor: (registerData[term.id as keyof RegisterData] as boolean) ? '#0114a2' : '#fff',
+                                border: `2px solid ${(registerData[term.id as keyof RegisterData] as boolean) ? '#0114a2' : '#d1d5db'}`,
+                                borderRadius: '4px',
+                                position: 'relative',
+                                width: '16px',
+                                height: '16px',
+                                flexShrink: 0
+                              }}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center space-x-2">
+                                <span className="text-sm font-medium text-gray-900 truncate">{term.title}</span>
+                                {term.required && (
+                                  <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full flex-shrink-0">필수</span>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{term.content}</p>
+                            </div>
+                          </label>
 
-              {/* 개별 약관 */}
-              <div className="space-y-2">
-                {TERMS_DATA.map((term) => (
-                  <div key={term.id} className="bg-white border border-gray-200 rounded-lg p-3">
-                    <div className="flex items-center space-x-2">
-                      <label className="flex items-center space-x-2 cursor-pointer flex-1">
-                        <input
-                          type="checkbox"
-                          checked={registerData[term.id as keyof RegisterData] as boolean}
-                          onChange={(e) => handleTermAgree(term.id, e.target.checked)}
-                          className="w-4 h-4 rounded flex-shrink-0"
-                          style={{
-                            WebkitAppearance: 'none',
-                            appearance: 'none',
-                            backgroundColor: (registerData[term.id as keyof RegisterData] as boolean) ? '#0114a2' : '#fff',
-                            border: `2px solid ${(registerData[term.id as keyof RegisterData] as boolean) ? '#0114a2' : '#d1d5db'}`,
-                            borderRadius: '4px',
-                            position: 'relative',
-                            width: '16px',
-                            height: '16px',
-                            flexShrink: 0
-                          }}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center space-x-2">
-                            <span className="text-sm font-medium text-gray-900 truncate">{term.title}</span>
-                            {term.required && (
-                              <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full flex-shrink-0">필수</span>
-                            )}
-                          </div>
-                          <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{term.content}</p>
-                        </div>
-                      </label>
-                      
-                      {/* 오른쪽 화살표 - 약관 링크로 이동 */}
-                      <div 
-                        className="flex-shrink-0 p-2 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          // 내부 라우트로 이동 (현재 탭) + 약관 페이지는 일반 모드로 열기 (헤더 표시)
-                          try {
-                            const isInternal = term.link && term.link.startsWith('/');
-                            if (isInternal) {
-                              let target = term.link as string;
-                              // embed 파라미터 제거하여 헤더가 표시되도록 함
-                              if (target.includes('?embed=')) {
-                                target = target.replace(/[?&]embed=[^&]*/, '');
-                                if (target.includes('?') && target.endsWith('?')) {
-                                  target = target.slice(0, -1);
+                          {/* 오른쪽 화살표 - 약관 링크로 이동 */}
+                          <div
+                            className="flex-shrink-0 p-2 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              // 내부 라우트로 이동 (현재 탭) + 약관 페이지는 일반 모드로 열기 (헤더 표시)
+                              try {
+                                const isInternal = term.link && term.link.startsWith('/');
+                                if (isInternal) {
+                                  let target = term.link as string;
+                                  // embed 파라미터 제거하여 헤더가 표시되도록 함
+                                  if (target.includes('?embed=')) {
+                                    target = target.replace(/[?&]embed=[^&]*/, '');
+                                    if (target.includes('?') && target.endsWith('?')) {
+                                      target = target.slice(0, -1);
+                                    }
+                                  }
+
+                                  // 현재 소셜 로그인 정보와 단계 정보를 약관 페이지 URL에 추가
+                                  const urlParams = new URLSearchParams(window.location.search);
+                                  const social = urlParams.get('social');
+                                  const currentStepValue = currentStep; // 현재 단계
+
+                                  if (social) {
+                                    target += (target.includes('?') ? '&' : '?') + `social=${social}`;
+                                  }
+                                  if (currentStepValue) {
+                                    target += (target.includes('?') ? '&' : '?') + `step=${currentStepValue}`;
+                                  }
+
+                                  // Next.js Router 사용
+                                  try {
+                                    const { push } = require('next/navigation');
+                                    // require 사용 시 훅과 충돌하므로 안전하게 window.location로 폴백
+                                    (push && typeof push === 'function') ? push(target) : (window.location.href = target);
+                                  } catch {
+                                    window.location.href = target;
+                                  }
+                                } else if (term.link) {
+                                  window.open(term.link, '_blank');
+                                }
+                              } catch {
+                                if (term.link) {
+                                  window.open(term.link, '_blank');
                                 }
                               }
-                              
-                              // 현재 소셜 로그인 정보와 단계 정보를 약관 페이지 URL에 추가
-                              const urlParams = new URLSearchParams(window.location.search);
-                              const social = urlParams.get('social');
-                              const currentStepValue = currentStep; // 현재 단계
-                              
-                              if (social) {
-                                target += (target.includes('?') ? '&' : '?') + `social=${social}`;
-                              }
-                              if (currentStepValue) {
-                                target += (target.includes('?') ? '&' : '?') + `step=${currentStepValue}`;
-                              }
-                              
-                              // Next.js Router 사용
-                              try {
-                                const { push } = require('next/navigation');
-                                // require 사용 시 훅과 충돌하므로 안전하게 window.location로 폴백
-                                (push && typeof push === 'function') ? push(target) : (window.location.href = target);
-                              } catch {
-                                window.location.href = target;
-                              }
-                            } else if (term.link) {
-                              window.open(term.link, '_blank');
+                            }}
+                          >
+                            <FiChevronRight className="w-4 h-4 text-gray-400" />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+
+              {/* 전화번호 입력 단계 */}
+              {currentStep === REGISTER_STEPS.PHONE && (
+                <motion.div
+                  key="phone"
+                  initial={{ opacity: 0, x: 50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -50 }}
+                  transition={{
+                    duration: 0.3,
+                    ease: [0.4, 0.0, 0.2, 1], // iOS 최적화된 이징
+                    type: "tween"
+                  }}
+                  className="w-full h-full flex flex-col justify-center"
+                  style={{
+                    // iOS 애니메이션 최적화
+                    willChange: 'transform, opacity',
+                    transform: 'translateZ(0)', // 하드웨어 가속 활성화
+                    backfaceVisibility: 'hidden'
+                  }}
+                >
+                  <div className="text-center mb-6">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{ backgroundColor: '#0114a2' }}>
+                      <FiPhone className="w-6 h-6 text-white" />
+                    </div>
+                    <h2 className="text-xl font-bold text-gray-900 mb-1">전화번호 인증</h2>
+                    <p className="text-sm text-gray-600" style={{ wordBreak: 'keep-all' }}>본인 확인을 위해 전화번호를 입력해주세요</p>
+                  </div>
+
+                  <div className="space-y-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        전화번호
+                      </label>
+                      <div className="relative register-input-container">
+                        <div className="absolute left-6 z-10 pointer-events-none" style={{ top: '50%', transform: 'translateY(-50%)' }}>
+                          <FiPhone className="w-4 h-4 transition-colors duration-200"
+                            style={{ color: focusedField === 'phone' ? '#0114a2' : '#9CA3AF' }} />
+                        </div>
+                        <input
+                          type="tel"
+                          value={registerData.mt_id}
+                          onChange={handlePhoneNumberChange}
+                          onFocus={(e) => {
+                            setFocusedField('phone');
+                            handlePhoneInputFocus();
+                            e.target.style.boxShadow = '0 0 0 2px #0114a2';
+                          }}
+                          onBlur={(e) => {
+                            setFocusedField(null);
+                            e.target.style.boxShadow = '';
+                          }}
+                          placeholder="010-1234-5678"
+                          maxLength={13}
+                          className="w-full pl-12 pr-6 py-4 px-1 border border-gray-200 rounded-xl focus:ring-2 focus:border-transparent register-input"
+                          style={{ outlineOffset: '2px' }}
+                        />
+                      </div>
+                    </div>
+
+                    {verificationSent && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="rounded-xl p-4"
+                        style={{ backgroundColor: '#eff6ff', border: '1px solid #c7d2fe' }}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <FiCheck className="w-5 h-5" style={{ color: '#0114a2' }} />
+                          <span className="font-medium" style={{ color: '#1e40af' }}>인증번호가 발송되었습니다</span>
+                        </div>
+                        <p className="text-sm mt-1" style={{ wordBreak: 'keep-all', color: '#0114a2' }}>
+                          {registerData.mt_id}로 인증번호를 발송했습니다
+                        </p>
+                      </motion.div>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+
+              {/* 인증번호 확인 단계 */}
+              {currentStep === REGISTER_STEPS.VERIFICATION && (
+                <motion.div
+                  key="verification"
+                  initial={{ opacity: 0, x: 50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -50 }}
+                  transition={{
+                    duration: 0.3,
+                    ease: [0.4, 0.0, 0.2, 1], // iOS 최적화된 이징
+                    type: "tween"
+                  }}
+                  className="w-full h-full flex flex-col justify-center"
+                  style={{
+                    // iOS 애니메이션 최적화
+                    willChange: 'transform, opacity',
+                    transform: 'translateZ(0)', // 하드웨어 가속 활성화
+                    backfaceVisibility: 'hidden'
+                  }}
+                >
+                  <div className="text-center mb-6">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{ backgroundColor: '#0114a2' }}>
+                      <FiShield className="w-6 h-6 text-white" />
+                    </div>
+                    <h2 className="text-xl font-bold text-gray-900 mb-1">인증번호 입력</h2>
+                    <p className="text-sm text-gray-600" style={{ wordBreak: 'keep-all' }}>
+                      {registerData.mt_id}로 발송된<br />
+                      인증번호 6자리를 입력해주세요
+                    </p>
+                  </div>
+
+                  <div className="space-y-6">
+                    {/* 인증번호 미발송 상태 안내 */}
+                    {!verificationSent && (
+                      <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-4">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                          </svg>
+                          <span className="text-orange-700 font-medium">인증번호가 발송되지 않았습니다</span>
+                        </div>
+                        <p className="text-orange-600 text-sm" style={{ wordBreak: 'keep-all' }}>
+                          먼저 이전 단계에서 인증번호를 요청해주세요.
+                        </p>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        인증번호
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={registerData.verification_code}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^0-9]/g, ''); // 숫자만 허용
+                          setRegisterData(prev => ({ ...prev, verification_code: value }));
+                        }}
+                        placeholder="123456"
+                        maxLength={6}
+                        className="w-full px-5 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent text-center text-2xl font-mono tracking-widest register-input"
+                        onFocus={(e) => e.target.style.boxShadow = '0 0 0 2px #0114a2'}
+                        onBlur={(e) => e.target.style.boxShadow = ''}
+                        style={{ outline: 'none' }}
+                      />
+                      {verificationTimer > 0 && (
+                        <p className="text-sm text-gray-500 mt-2 text-center">
+                          {Math.floor(verificationTimer / 60)}:{(verificationTimer % 60).toString().padStart(2, '0')} 후 만료
+                        </p>
+                      )}
+
+                      {/* 재발송 텍스트 버튼 */}
+                      <div className="text-center mt-4">
+                        <button
+                          onClick={() => {
+                            // 인증번호가 발송되지 않은 경우 이전 단계로 이동
+                            if (!verificationSent) {
+                              setCurrentStep(REGISTER_STEPS.PHONE);
+                              setRegisterData(prev => ({ ...prev, verification_code: '' }));
+                              return;
                             }
-                          } catch {
-                            if (term.link) {
-                              window.open(term.link, '_blank');
+
+                            // 3분 쿨다운 체크
+                            const now = Date.now();
+                            if (lastSentTime && (now - lastSentTime) < 180000) {
+                              const remainingTime = Math.ceil((180000 - (now - lastSentTime)) / 1000);
+                              const minutes = Math.floor(remainingTime / 60);
+                              const seconds = remainingTime % 60;
+                              setErrorModal({
+                                isOpen: true,
+                                title: '재발송 제한',
+                                message: `같은 번호로는 ${minutes}분 ${seconds}초 후에 재발송이 가능합니다.`,
+                                isCountdown: true,
+                                style: { wordBreak: 'keep-all' }
+                              });
+                              setCountdownTime(remainingTime);
+                              return;
                             }
+
+                            // 인증번호 재발송
+                            handleSendVerification();
+                          }}
+                          disabled={isLoading}
+                          className="text-sm text-gray-600 hover:text-gray-800 underline disabled:opacity-50"
+                        >
+                          {!verificationSent ? '이전 단계로' : '인증번호 재발송'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex space-x-3">
+                      <button
+                        onClick={() => {
+                          // 인증번호가 발송되지 않은 경우 이전 단계로 이동
+                          if (!verificationSent) {
+                            setCurrentStep(REGISTER_STEPS.PHONE);
+                            setRegisterData(prev => ({ ...prev, verification_code: '' }));
+                            return;
                           }
+
+                          // 3분 쿨다운 체크
+                          const now = Date.now();
+                          if (lastSentTime && (now - lastSentTime) < 180000) {
+                            const remainingTime = Math.ceil((180000 - (now - lastSentTime)) / 1000);
+                            const minutes = Math.floor(remainingTime / 60);
+                            const seconds = remainingTime % 60;
+                            setErrorModal({
+                              isOpen: true,
+                              title: '재발송 제한',
+                              message: `같은 번호로는 ${minutes}분 ${seconds}초 후에 재발송이 가능합니다.`,
+                              isCountdown: true,
+                              style: { wordBreak: 'keep-all' }
+                            });
+                            setCountdownTime(remainingTime);
+                            return;
+                          }
+
+                          // 인증번호 재발송
+                          handleSendVerification();
+                        }}
+                        disabled={isLoading}
+                        className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        {!verificationSent ? '이전 단계로' : '재발송'}
+                      </button>
+                      <motion.button
+                        onClick={handleVerifyCode}
+                        disabled={!registerData.verification_code || isLoading}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        className="flex-1 py-3 text-white rounded-xl font-semibold disabled:opacity-50"
+                        style={{ backgroundColor: '#0114a2' }}
+                      >
+                        {isLoading ? '확인 중...' : '확인'}
+                      </motion.button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* 기본 정보 입력 단계 */}
+              {currentStep === REGISTER_STEPS.BASIC_INFO && (
+                <motion.div
+                  key="basic_info"
+                  initial={{ opacity: 0, x: 50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -50 }}
+                  transition={{
+                    duration: 0.3,
+                    ease: [0.4, 0.0, 0.2, 1], // iOS 최적화된 이징
+                    type: "tween"
+                  }}
+                  className="w-full h-full flex flex-col"
+                  style={{
+                    // iOS 애니메이션 최적화
+                    willChange: 'transform, opacity',
+                    transform: 'translateZ(0)', // 하드웨어 가속 활성화
+                    backfaceVisibility: 'hidden'
+                  }}
+                >
+                  <div className="text-center mb-4">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{ backgroundColor: '#0114a2' }}>
+                      <FiUser className="w-6 h-6 text-white" />
+                    </div>
+                    <h2 className="text-xl font-bold text-gray-900 mb-1">기본 정보</h2>
+                    {registerData.isSocialLogin && (registerData.socialProvider === 'google' || registerData.socialProvider === 'apple') && (
+                      <div className="flex items-center justify-center mb-2">
+                        <div className="bg-[#0114a2] text-white text-xs px-3 py-1 rounded-full flex items-center">
+                          {registerData.socialProvider === 'google' ? (
+                            <svg className="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                            </svg>
+                          ) : (
+                            <FaApple className="w-3 h-3 mr-1" />
+                          )}
+                          {registerData.socialProvider === 'google' ? '구글' : '애플'} 계정 연동
+                        </div>
+                      </div>
+                    )}
+                    <p className="text-sm text-gray-600" style={{ wordBreak: 'keep-all' }}>
+                      {registerData.isSocialLogin && (registerData.socialProvider === 'google' || registerData.socialProvider === 'apple')
+                        ? `${registerData.socialProvider === 'google' ? '구글' : '애플'} 계정 정보가 자동으로 입력되었습니다. 필요시 수정해주세요`
+                        : '서비스 이용을 위한 기본 정보를 입력해주세요'}
+                    </p>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto space-y-3 pb-4 register-form">
+                    {/* 소셜 로그인 안내 메시지 */}
+                    {registerData.isSocialLogin && (registerData.socialProvider === 'google' || registerData.socialProvider === 'apple') && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                        <div className="flex items-start">
+                          <svg className="w-4 h-4 text-blue-600 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <div className="text-sm text-blue-800">
+                            {registerData.socialProvider === 'google' ? (
+                              <>
+                                <p className="font-medium mb-1">구글 계정 정보가 자동으로 입력되었습니다</p>
+                                <p className="text-xs">이름, 닉네임, 이메일이 구글 계정에서 가져와져 미리 입력되었습니다. 비밀번호는 구글 계정으로 자동 설정되므로 입력이 필요하지 않습니다.</p>
+                              </>
+                            ) : (
+                              <>
+                                <p className="font-medium mb-1">애플 계정 정보가 자동으로 입력되었습니다</p>
+                                <p className="text-xs">이름, 닉네임, 이메일이 애플 계정에서 가져와져 미리 입력되었습니다.</p>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 비밀번호 - 소셜 로그인(구글/애플) 시 숨김 */}
+                    {(!registerData.isSocialLogin || (registerData.socialProvider !== 'google' && registerData.socialProvider !== 'apple')) && (
+                      <>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            비밀번호
+                          </label>
+                          <div className="relative register-input-container px-0.5">
+                            <div className="absolute left-5 z-10 pointer-events-none" style={{ top: '50%', transform: 'translateY(-50%)' }}>
+                              <FiLock className="w-4 h-4 transition-colors duration-200"
+                                style={{ color: focusedField === 'password' ? '#0114a2' : '#9CA3AF' }} />
+                            </div>
+                            <input
+                              type={showPassword ? 'text' : 'password'}
+                              value={registerData.mt_pwd}
+                              onChange={(e) => {
+                                const password = e.target.value;
+                                setRegisterData(prev => ({ ...prev, mt_pwd: password }));
+                                validatePassword(password);
+                              }}
+                              onFocus={(e) => {
+                                setFocusedField('password');
+                                e.target.style.boxShadow = '0 0 0 2px #0114a2';
+                              }}
+                              onBlur={(e) => {
+                                setFocusedField(null);
+                                e.target.style.boxShadow = '';
+                              }}
+                              placeholder="8자 이상, 대소문자, 숫자, 특수문자 포함"
+                              className="w-full pl-11 pr-10 py-2.5 px-1 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input"
+                              style={{ outline: 'none' }}
+                            />
+                            <div className="absolute right-2.5" style={{ top: '50%', transform: 'translateY(-50%)' }}>
+                              <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="text-gray-400 hover:text-gray-600 transition-colors"
+                              >
+                                {showPassword ? <FiEyeOff className="w-4 h-4" /> : <FiEye className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* 비밀번호 강도 표시기 */}
+                          {registerData.mt_pwd && (
+                            <div className="mt-2 space-y-1.5">
+                              <div className="flex space-x-1">
+                                {Object.values(passwordStrength).map((isValid, index) => (
+                                  <div
+                                    key={index}
+                                    className={`h-1 flex-1 rounded-full transition-colors ${isValid ? 'bg-green-500' : 'bg-gray-200'
+                                      }`}
+                                  />
+                                ))}
+                              </div>
+
+                              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                                {[
+                                  { key: 'minLength', label: '8자+', valid: passwordStrength.minLength },
+                                  { key: 'hasUppercase', label: '대문자', valid: passwordStrength.hasUppercase },
+                                  { key: 'hasLowercase', label: '소문자', valid: passwordStrength.hasLowercase },
+                                  { key: 'hasNumber', label: '숫자', valid: passwordStrength.hasNumber },
+                                  { key: 'hasSpecialChar', label: '특수문자', valid: passwordStrength.hasSpecialChar }
+                                ].map(({ key, label, valid }) => (
+                                  <div key={key} className={`flex items-center space-x-1 ${valid ? 'text-green-600' : 'text-gray-500'}`}>
+                                    <div className={`w-1.5 h-1.5 rounded-full ${valid ? 'bg-green-500' : 'bg-gray-300'}`} />
+                                    <span>{label}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {passwordError && (
+                            <p className="text-red-500 text-sm mt-2" style={{ wordBreak: 'keep-all' }}>{passwordError}</p>
+                          )}
+                        </div>
+
+                        {/* 비밀번호 확인 */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            비밀번호 확인
+                          </label>
+                          <div className="relative register-input-container px-0.5">
+                            <div className="absolute left-5 z-10 pointer-events-none" style={{ top: '50%', transform: 'translateY(-50%)' }}>
+                              <FiLock className="w-4 h-4 transition-colors duration-200"
+                                style={{ color: focusedField === 'passwordConfirm' ? '#0114a2' : '#9CA3AF' }} />
+                            </div>
+                            <input
+                              type={showPasswordConfirm ? 'text' : 'password'}
+                              value={passwordConfirm}
+                              onChange={(e) => {
+                                setPasswordConfirm(e.target.value);
+                              }}
+                              onFocus={(e) => {
+                                setFocusedField('passwordConfirm');
+                                e.target.style.boxShadow = '0 0 0 2px #0114a2';
+                              }}
+                              onBlur={(e) => {
+                                setFocusedField(null);
+                                e.target.style.boxShadow = '';
+                              }}
+                              placeholder="비밀번호를 다시 입력해주세요"
+                              className="w-full pl-11 pr-12 py-2.5 px-1 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input"
+                              style={{ outline: 'none' }}
+                            />
+                            <div className="absolute right-2.5" style={{ top: '50%', transform: 'translateY(-50%)' }}>
+                              <button
+                                type="button"
+                                onClick={() => setShowPasswordConfirm(!showPasswordConfirm)}
+                                className="text-gray-400 hover:text-gray-600 transition-colors"
+                              >
+                                {showPasswordConfirm ? <FiEyeOff className="w-4 h-4" /> : <FiEye className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </div>
+                          {passwordConfirm && passwordConfirm !== registerData.mt_pwd && (
+                            <p className="text-red-500 text-sm mt-1" style={{ wordBreak: 'keep-all' }}>비밀번호가 일치하지 않습니다</p>
+                          )}
+                          {passwordConfirm && passwordConfirm === registerData.mt_pwd && registerData.mt_pwd && (
+                            <p className="text-green-500 text-sm mt-1 flex items-center" style={{ wordBreak: 'keep-all' }}>
+                              <FiCheck className="w-4 h-4 mr-1" />
+                              비밀번호가 일치합니다
+                            </p>
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    {/* 이름 */}
+                    <div className="px-0.5">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        이름
+                      </label>
+                      {registerData.isSocialLogin && (registerData.socialProvider === 'google' || registerData.socialProvider === 'apple') && (
+                        <p className="text-xs text-[#0114a2] mb-2" style={{ wordBreak: 'keep-all' }}>
+                          {(registerData.socialProvider === 'google' ? '구글' : '애플')} 계정에서 가져온 이름이 자동으로 입력되었습니다
+                        </p>
+                      )}
+                      <input
+                        type="text"
+                        value={registerData.mt_name}
+                        onChange={(e) => setRegisterData(prev => ({ ...prev, mt_name: e.target.value }))}
+                        placeholder="실명을 입력해주세요"
+                        className="w-full px-5 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input"
+                        onFocus={(e) => e.target.style.boxShadow = '0 0 0 2px #0114a2'}
+                        onBlur={(e) => e.target.style.boxShadow = ''}
+                        style={{ outline: 'none' }}
+                      />
+                    </div>
+
+                    {/* 닉네임 */}
+                    <div className="px-0.5">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        닉네임
+                      </label>
+                      {registerData.isSocialLogin && (registerData.socialProvider === 'google' || registerData.socialProvider === 'apple') && (
+                        <p className="text-xs text-[#0114a2] mb-2" style={{ wordBreak: 'keep-all' }}>
+                          {(registerData.socialProvider === 'google' ? '구글' : '애플')} 계정에서 가져온 닉네임이 자동으로 입력되었습니다
+                        </p>
+                      )}
+                      <input
+                        type="text"
+                        value={registerData.mt_nickname}
+                        onChange={(e) => setRegisterData(prev => ({ ...prev, mt_nickname: e.target.value }))}
+                        placeholder="다른 사용자에게 표시될 닉네임"
+                        className="w-full px-5 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input"
+                        onFocus={(e) => e.target.style.boxShadow = '0 0 0 2px #0114a2'}
+                        onBlur={(e) => e.target.style.boxShadow = ''}
+                        style={{ outline: 'none' }}
+                      />
+                    </div>
+
+                    {/* 이메일 */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        {registerData.isSocialLogin ? 'ID (이메일)' : '이메일 (선택)'}
+                      </label>
+                      {registerData.isSocialLogin && (
+                        <p className="text-xs text-[#0114a2] mb-2" style={{ wordBreak: 'keep-all' }}>
+                          {registerData.socialProvider === 'google' ? '구글' : registerData.socialProvider === 'apple' ? '애플' : '카카오'} 계정의 이메일이 ID로 사용됩니다
+                        </p>
+                      )}
+                      <div className="relative register-input-container px-0.5">
+                        <div className="absolute left-5 z-10 pointer-events-none" style={{ top: '50%', transform: 'translateY(-50%)' }}>
+                          <FiMail className="w-4 h-4 transition-colors duration-200"
+                            style={{ color: focusedField === 'email' ? '#0114a2' : '#9CA3AF' }} />
+                        </div>
+                        <input
+                          type="email"
+                          value={registerData.mt_email}
+                          onChange={(e) => {
+                            if (registerData.isSocialLogin) return; // 소셜 로그인 시 변경 불가
+                            const email = e.target.value;
+                            setRegisterData(prev => ({ ...prev, mt_email: email }));
+                            validateEmail(email);
+                          }}
+                          onFocus={(e) => {
+                            if (!registerData.isSocialLogin) {
+                              setFocusedField('email');
+                              e.target.style.boxShadow = '0 0 0 2px #0114a2';
+                            }
+                          }}
+                          onBlur={(e) => {
+                            setFocusedField(null);
+                            e.target.style.boxShadow = '';
+                          }}
+                          placeholder={registerData.isSocialLogin ? '' : 'example@email.com'}
+                          disabled={registerData.isSocialLogin}
+                          className={`w-full pl-11 pr-12 py-2.5 px-1 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input ${registerData.isSocialLogin ? 'bg-gray-50 cursor-not-allowed' : ''
+                            }`}
+                          style={{ outline: 'none' }}
+                        />
+                        {registerData.mt_email && !emailError && (
+                          <div className="absolute right-2.5" style={{ top: '50%', transform: 'translateY(-50%)' }}>
+                            <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                        )}
+                        {emailError && !registerData.isSocialLogin && (
+                          <div className="absolute right-2.5" style={{ top: '50%', transform: 'translateY(-50%)' }}>
+                            <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+                      {emailError && !registerData.isSocialLogin && (
+                        <p className="text-red-500 text-sm mt-1" style={{ wordBreak: 'keep-all' }}>{emailError}</p>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* 프로필 정보 단계 */}
+              {currentStep === REGISTER_STEPS.PROFILE && (
+                <motion.div
+                  key="profile"
+                  initial={{ opacity: 0, x: 50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -50 }}
+                  transition={{
+                    duration: 0.3,
+                    ease: [0.4, 0.0, 0.2, 1], // iOS 최적화된 이징
+                    type: "tween"
+                  }}
+                  className="w-full h-full flex flex-col justify-center"
+                  style={{
+                    // iOS 애니메이션 최적화
+                    willChange: 'transform, opacity',
+                    transform: 'translateZ(0)', // 하드웨어 가속 활성화
+                    backfaceVisibility: 'hidden'
+                  }}
+                >
+                  <div className="text-center mb-6">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{ backgroundColor: '#0114a2' }}>
+                      <FiHeart className="w-6 h-6 text-white" />
+                    </div>
+                    <h2 className="text-xl font-bold text-gray-900 mb-1">프로필 정보</h2>
+                    <p className="text-sm text-gray-600" style={{ wordBreak: 'keep-all' }}>추가 정보를 입력해주세요</p>
+                  </div>
+
+                  <div className="space-y-6">
+                    {/* 생년월일 */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        생년월일
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleBirthModalOpen}
+                        className="w-full flex items-center px-4 py-3 border border-gray-200 rounded-xl transition-colors text-left hover:border-[#0114a2]/30"
+                        onFocus={(e) => {
+                          setFocusedField('birth');
+                          (e.target as HTMLButtonElement).style.boxShadow = '0 0 0 2px #0114a2';
+                        }}
+                        onBlur={(e) => {
+                          setFocusedField(null);
+                          (e.target as HTMLButtonElement).style.boxShadow = '';
                         }}
                       >
-                        <FiChevronRight className="w-4 h-4 text-gray-400" />
+                        <FiCalendar className="w-5 h-5 mr-3 transition-colors duration-200"
+                          style={{ color: focusedField === 'birth' ? '#0114a2' : '#9CA3AF' }} />
+                        <span className={registerData.mt_birth ? 'text-gray-900' : 'text-gray-500'}>
+                          {registerData.mt_birth
+                            ? dayjs(registerData.mt_birth).format('YYYY년 MM월 DD일')
+                            : '생년월일을 선택해주세요'
+                          }
+                        </span>
+                        <FiChevronDown className="w-5 h-5 text-gray-400 ml-auto" />
+                      </button>
+                    </div>
+
+                    {/* 성별 */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                        성별
+                      </label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setRegisterData(prev => ({ ...prev, mt_gender: 1 }))}
+                          className={`py-3 rounded-xl border-2 font-medium transition-all ${registerData.mt_gender === 1
+                              ? 'border-gray-200 text-gray-700'
+                              : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                            }`}
+                          style={registerData.mt_gender === 1
+                            ? { borderColor: '#0114a2', backgroundColor: '#eff6ff', color: '#1e40af' }
+                            : {}}
+                        >
+                          남성
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRegisterData(prev => ({ ...prev, mt_gender: 2 }))}
+                          className={`py-3 rounded-xl border-2 font-medium transition-all ${registerData.mt_gender === 2
+                              ? 'border-purple-500 bg-purple-50 text-purple-700'
+                              : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                            }`}
+                        >
+                          여성
+                        </button>
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            </motion.div>
-          )}
+                </motion.div>
+              )}
 
-          {/* 전화번호 입력 단계 */}
-          {currentStep === REGISTER_STEPS.PHONE && (
-            <motion.div
-              key="phone"
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -50 }}
-              transition={{ 
-                duration: 0.3,
-                ease: [0.4, 0.0, 0.2, 1], // iOS 최적화된 이징
-                type: "tween"
-              }}
-              className="w-full h-full flex flex-col justify-center"
-              style={{
-                // iOS 애니메이션 최적화
-                willChange: 'transform, opacity',
-                transform: 'translateZ(0)', // 하드웨어 가속 활성화
-                backfaceVisibility: 'hidden'
-              }}
-            >
-              <div className="text-center mb-6">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0114a2'}}>
-                  <FiPhone className="w-6 h-6 text-white" />
-                </div>
-                <h2 className="text-xl font-bold text-gray-900 mb-1">전화번호 인증</h2>
-                <p className="text-sm text-gray-600" style={{ wordBreak: 'keep-all' }}>본인 확인을 위해 전화번호를 입력해주세요</p>
-              </div>
 
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    전화번호
-                  </label>
-                  <div className="relative register-input-container">
-                    <div className="absolute left-6 z-10 pointer-events-none" style={{top: '50%', transform: 'translateY(-50%)'}}>
-                      <FiPhone className="w-4 h-4 transition-colors duration-200" 
-                        style={{color: focusedField === 'phone' ? '#0114a2' : '#9CA3AF'}} />
-                    </div>
-              <input
-                      type="tel"
-                      value={registerData.mt_id}
-                      onChange={handlePhoneNumberChange}
-                      onFocus={(e) => {
-                        setFocusedField('phone');
-                        handlePhoneInputFocus();
-                        e.target.style.boxShadow = '0 0 0 2px #0114a2';
-                      }}
-                      onBlur={(e) => {
-                        setFocusedField(null);
-                        e.target.style.boxShadow = '';
-                      }}
-                      placeholder="010-1234-5678"
-                      maxLength={13}
-                      className="w-full pl-12 pr-6 py-4 px-1 border border-gray-200 rounded-xl focus:ring-2 focus:border-transparent register-input"
-                      style={{outlineOffset: '2px'}}
-                    />
-                  </div>
-                </div>
 
-                {verificationSent && (
+              {/* 완료 단계 */}
+              {currentStep === REGISTER_STEPS.COMPLETE && (
+                <motion.div
+                  key="complete"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{
+                    duration: 0.4,
+                    ease: [0.4, 0.0, 0.2, 1], // iOS 최적화된 이징
+                    type: "tween"
+                  }}
+                  className="fixed inset-0 flex flex-col justify-center items-center text-center bg-white z-50"
+                  style={{
+                    // iOS 애니메이션 최적화
+                    willChange: 'transform, opacity',
+                    transform: 'translateZ(0)', // 하드웨어 가속 활성화
+                    backfaceVisibility: 'hidden'
+                  }}
+                >
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+                    className="w-24 h-24 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6"
+                  >
+                    <FiCheck className="w-10 h-10 text-white" />
+                  </motion.div>
+
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="rounded-xl p-4"
-                    style={{backgroundColor: '#eff6ff', border: '1px solid #c7d2fe'}}
+                    transition={{ delay: 0.4 }}
                   >
-                    <div className="flex items-center space-x-2">
-                      <FiCheck className="w-5 h-5" style={{color: '#0114a2'}} />
-                      <span className="font-medium" style={{color: '#1e40af'}}>인증번호가 발송되었습니다</span>
-                    </div>
-                    <p className="text-sm mt-1" style={{ wordBreak: 'keep-all', color: '#0114a2' }}>
-                      {registerData.mt_id}로 인증번호를 발송했습니다
-                    </p>
-                  </motion.div>
-              )}
-            </div>
-            </motion.div>
-          )}
-
-          {/* 인증번호 확인 단계 */}
-          {currentStep === REGISTER_STEPS.VERIFICATION && (
-            <motion.div
-              key="verification"
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -50 }}
-              transition={{ 
-                duration: 0.3,
-                ease: [0.4, 0.0, 0.2, 1], // iOS 최적화된 이징
-                type: "tween"
-              }}
-              className="w-full h-full flex flex-col justify-center"
-              style={{
-                // iOS 애니메이션 최적화
-                willChange: 'transform, opacity',
-                transform: 'translateZ(0)', // 하드웨어 가속 활성화
-                backfaceVisibility: 'hidden'
-              }}
-            >
-              <div className="text-center mb-6">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0114a2'}}>
-                  <FiShield className="w-6 h-6 text-white" />
-                </div>
-                <h2 className="text-xl font-bold text-gray-900 mb-1">인증번호 입력</h2>
-                <p className="text-sm text-gray-600" style={{ wordBreak: 'keep-all' }}>
-                  {registerData.mt_id}로 발송된<br />
-                  인증번호 6자리를 입력해주세요
-                </p>
-              </div>
-
-              <div className="space-y-6">
-                {/* 인증번호 미발송 상태 안내 */}
-                {!verificationSent && (
-                  <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-4">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                      </svg>
-                      <span className="text-orange-700 font-medium">인증번호가 발송되지 않았습니다</span>
-                    </div>
-                    <p className="text-orange-600 text-sm" style={{ wordBreak: 'keep-all' }}>
-                      먼저 이전 단계에서 인증번호를 요청해주세요.
-                    </p>
-                  </div>
-                )}
-
-            <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    인증번호
-              </label>
-              <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    value={registerData.verification_code}
-                    onChange={(e) => {
-                      const value = e.target.value.replace(/[^0-9]/g, ''); // 숫자만 허용
-                      setRegisterData(prev => ({ ...prev, verification_code: value }));
-                    }}
-                    placeholder="123456"
-                    maxLength={6}
-                    className="w-full px-5 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent text-center text-2xl font-mono tracking-widest register-input"
-                    onFocus={(e) => e.target.style.boxShadow = '0 0 0 2px #0114a2'}
-                    onBlur={(e) => e.target.style.boxShadow = ''}
-                    style={{ outline: 'none' }}
-                  />
-                  {verificationTimer > 0 && (
-                    <p className="text-sm text-gray-500 mt-2 text-center">
-                      {Math.floor(verificationTimer / 60)}:{(verificationTimer % 60).toString().padStart(2, '0')} 후 만료
-                    </p>
-                  )}
-                  
-                  {/* 재발송 텍스트 버튼 */}
-                  <div className="text-center mt-4">
-                    <button
-                      onClick={() => {
-                        // 인증번호가 발송되지 않은 경우 이전 단계로 이동
-                        if (!verificationSent) {
-                          setCurrentStep(REGISTER_STEPS.PHONE);
-                          setRegisterData(prev => ({ ...prev, verification_code: '' }));
-                          return;
-                        }
-                        
-                        // 3분 쿨다운 체크
-                        const now = Date.now();
-                        if (lastSentTime && (now - lastSentTime) < 180000) {
-                          const remainingTime = Math.ceil((180000 - (now - lastSentTime)) / 1000);
-                          const minutes = Math.floor(remainingTime / 60);
-                          const seconds = remainingTime % 60;
-                          setErrorModal({
-                            isOpen: true,
-                            title: '재발송 제한',
-                            message: `같은 번호로는 ${minutes}분 ${seconds}초 후에 재발송이 가능합니다.`,
-                            isCountdown: true,
-                            style: { wordBreak: 'keep-all' }
-                          });
-                          setCountdownTime(remainingTime);
-                          return;
-                        }
-                        
-                        // 인증번호 재발송
-                        handleSendVerification();
-                      }}
-                      disabled={isLoading}
-                      className="text-sm text-gray-600 hover:text-gray-800 underline disabled:opacity-50"
-                    >
-                      {!verificationSent ? '이전 단계로' : '인증번호 재발송'}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex space-x-3">
-                  <button
-                    onClick={() => {
-                      // 인증번호가 발송되지 않은 경우 이전 단계로 이동
-                      if (!verificationSent) {
-                        setCurrentStep(REGISTER_STEPS.PHONE);
-                        setRegisterData(prev => ({ ...prev, verification_code: '' }));
-                        return;
-                      }
-                      
-                      // 3분 쿨다운 체크
-                      const now = Date.now();
-                      if (lastSentTime && (now - lastSentTime) < 180000) {
-                        const remainingTime = Math.ceil((180000 - (now - lastSentTime)) / 1000);
-                        const minutes = Math.floor(remainingTime / 60);
-                        const seconds = remainingTime % 60;
-                        setErrorModal({
-                          isOpen: true,
-                          title: '재발송 제한',
-                          message: `같은 번호로는 ${minutes}분 ${seconds}초 후에 재발송이 가능합니다.`,
-                          isCountdown: true,
-                          style: { wordBreak: 'keep-all' }
-                        });
-                        setCountdownTime(remainingTime);
-                        return;
-                      }
-                      
-                      // 인증번호 재발송
-                      handleSendVerification();
-                    }}
-                    disabled={isLoading}
-                    className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    {!verificationSent ? '이전 단계로' : '재발송'}
-                  </button>
-                  <motion.button
-                    onClick={handleVerifyCode}
-                    disabled={!registerData.verification_code || isLoading}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="flex-1 py-3 text-white rounded-xl font-semibold disabled:opacity-50"
-                    style={{backgroundColor: '#0114a2'}}
-                  >
-                    {isLoading ? '확인 중...' : '확인'}
-                  </motion.button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* 기본 정보 입력 단계 */}
-          {currentStep === REGISTER_STEPS.BASIC_INFO && (
-            <motion.div
-              key="basic_info"
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -50 }}
-              transition={{ 
-                duration: 0.3,
-                ease: [0.4, 0.0, 0.2, 1], // iOS 최적화된 이징
-                type: "tween"
-              }}
-              className="w-full h-full flex flex-col"
-              style={{
-                // iOS 애니메이션 최적화
-                willChange: 'transform, opacity',
-                transform: 'translateZ(0)', // 하드웨어 가속 활성화
-                backfaceVisibility: 'hidden'
-              }}
-            >
-              <div className="text-center mb-4">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0114a2'}}>
-                  <FiUser className="w-6 h-6 text-white" />
-                </div>
-                <h2 className="text-xl font-bold text-gray-900 mb-1">기본 정보</h2>
-                  {registerData.isSocialLogin && (registerData.socialProvider === 'google' || registerData.socialProvider === 'apple') && (
-                    <div className="flex items-center justify-center mb-2">
-                      <div className="bg-[#0114a2] text-white text-xs px-3 py-1 rounded-full flex items-center">
-                        {registerData.socialProvider === 'google' ? (
-                          <svg className="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                          </svg>
-                        ) : (
-                          <FaApple className="w-3 h-3 mr-1" />
-                        )}
-                        {registerData.socialProvider === 'google' ? '구글' : '애플'} 계정 연동
-                      </div>
-                    </div>
-                  )}
-                <p className="text-sm text-gray-600" style={{ wordBreak: 'keep-all' }}>
-                  {registerData.isSocialLogin && (registerData.socialProvider === 'google' || registerData.socialProvider === 'apple') 
-                    ? `${registerData.socialProvider === 'google' ? '구글' : '애플'} 계정 정보가 자동으로 입력되었습니다. 필요시 수정해주세요` 
-                    : '서비스 이용을 위한 기본 정보를 입력해주세요'}
-                </p>
-              </div>
-
-              <div className="flex-1 overflow-y-auto space-y-3 pb-4 register-form">
-                {/* 소셜 로그인 안내 메시지 */}
-                {registerData.isSocialLogin && (registerData.socialProvider === 'google' || registerData.socialProvider === 'apple') && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-                    <div className="flex items-start">
-                      <svg className="w-4 h-4 text-blue-600 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <div className="text-sm text-blue-800">
-                        {registerData.socialProvider === 'google' ? (
-                          <>
-                            <p className="font-medium mb-1">구글 계정 정보가 자동으로 입력되었습니다</p>
-                            <p className="text-xs">이름, 닉네임, 이메일이 구글 계정에서 가져와져 미리 입력되었습니다. 비밀번호는 구글 계정으로 자동 설정되므로 입력이 필요하지 않습니다.</p>
-                          </>
-                        ) : (
-                          <>
-                            <p className="font-medium mb-1">애플 계정 정보가 자동으로 입력되었습니다</p>
-                            <p className="text-xs">이름, 닉네임, 이메일이 애플 계정에서 가져와져 미리 입력되었습니다.</p>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
-                {/* 비밀번호 - 소셜 로그인(구글/애플) 시 숨김 */}
-                {(!registerData.isSocialLogin || (registerData.socialProvider !== 'google' && registerData.socialProvider !== 'apple')) && (
-                  <>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        비밀번호
-                      </label>
-                      <div className="relative register-input-container px-0.5">
-                        <div className="absolute left-5 z-10 pointer-events-none" style={{top: '50%', transform: 'translateY(-50%)'}}>
-                          <FiLock className="w-4 h-4 transition-colors duration-200" 
-                            style={{color: focusedField === 'password' ? '#0114a2' : '#9CA3AF'}} />
-                        </div>
-                        <input
-                          type={showPassword ? 'text' : 'password'}
-                          value={registerData.mt_pwd}
-                          onChange={(e) => {
-                            const password = e.target.value;
-                            setRegisterData(prev => ({ ...prev, mt_pwd: password }));
-                            validatePassword(password);
-                          }}
-                          onFocus={(e) => {
-                            setFocusedField('password');
-                            e.target.style.boxShadow = '0 0 0 2px #0114a2';
-                          }}
-                          onBlur={(e) => {
-                            setFocusedField(null);
-                            e.target.style.boxShadow = '';
-                          }}
-                          placeholder="8자 이상, 대소문자, 숫자, 특수문자 포함"
-                          className="w-full pl-11 pr-10 py-2.5 px-1 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input"
-                          style={{ outline: 'none' }}
-                        />
-                        <div className="absolute right-2.5" style={{top: '50%', transform: 'translateY(-50%)'}}>
-                          <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="text-gray-400 hover:text-gray-600 transition-colors"
-                          >
-                            {showPassword ? <FiEyeOff className="w-4 h-4" /> : <FiEye className="w-4 h-4" />}
-                          </button>
-                        </div>
-                      </div>
-                      
-                      {/* 비밀번호 강도 표시기 */}
-                      {registerData.mt_pwd && (
-                        <div className="mt-2 space-y-1.5">
-                          <div className="flex space-x-1">
-                            {Object.values(passwordStrength).map((isValid, index) => (
-                              <div
-                                key={index}
-                                className={`h-1 flex-1 rounded-full transition-colors ${
-                                  isValid ? 'bg-green-500' : 'bg-gray-200'
-                                }`}
-                              />
-                            ))}
-                          </div>
-                          
-                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-                            {[
-                              { key: 'minLength', label: '8자+', valid: passwordStrength.minLength },
-                              { key: 'hasUppercase', label: '대문자', valid: passwordStrength.hasUppercase },
-                              { key: 'hasLowercase', label: '소문자', valid: passwordStrength.hasLowercase },
-                              { key: 'hasNumber', label: '숫자', valid: passwordStrength.hasNumber },
-                              { key: 'hasSpecialChar', label: '특수문자', valid: passwordStrength.hasSpecialChar }
-                            ].map(({ key, label, valid }) => (
-                              <div key={key} className={`flex items-center space-x-1 ${valid ? 'text-green-600' : 'text-gray-500'}`}>
-                                <div className={`w-1.5 h-1.5 rounded-full ${valid ? 'bg-green-500' : 'bg-gray-300'}`} />
-                                <span>{label}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
+                    <h2 className="text-3xl font-bold text-gray-900 mb-4">회원가입 완료!</h2>
+                    <p className="text-gray-600 mb-8" style={{ wordBreak: 'keep-all' }}>
+                      {isJoiningGroup ? (
+                        <>
+                          그룹에 자동 가입 중입니다...<br />
+                          잠시만 기다려주세요!
+                        </>
+                      ) : isOpeningApp ? (
+                        <>
+                          앱으로 이동 중입니다...<br />
+                          {isMobile() ? '앱이 열리지 않으면 스토어로 이동합니다' : '로그인 페이지로 이동합니다'}
+                        </>
+                      ) : (
+                        <>
+                          SMAP에 오신 것을 환영합니다.<br />
+                          이제 그룹을 만들고 친구들과 함께 활동해보세요!
+                        </>
                       )}
-                      
-                      {passwordError && (
-                        <p className="text-red-500 text-sm mt-2" style={{ wordBreak: 'keep-all' }}>{passwordError}</p>
-                      )}
-                    </div>
-
-                    {/* 비밀번호 확인 */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        비밀번호 확인
-                      </label>
-                      <div className="relative register-input-container px-0.5">
-                        <div className="absolute left-5 z-10 pointer-events-none" style={{top: '50%', transform: 'translateY(-50%)'}}>
-                          <FiLock className="w-4 h-4 transition-colors duration-200" 
-                            style={{color: focusedField === 'passwordConfirm' ? '#0114a2' : '#9CA3AF'}} />
-                        </div>
-                        <input
-                          type={showPasswordConfirm ? 'text' : 'password'}
-                          value={passwordConfirm}
-                          onChange={(e) => {
-                            setPasswordConfirm(e.target.value);
-                          }}
-                          onFocus={(e) => {
-                            setFocusedField('passwordConfirm');
-                            e.target.style.boxShadow = '0 0 0 2px #0114a2';
-                          }}
-                          onBlur={(e) => {
-                            setFocusedField(null);
-                            e.target.style.boxShadow = '';
-                          }}
-                          placeholder="비밀번호를 다시 입력해주세요"
-                          className="w-full pl-11 pr-12 py-2.5 px-1 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input"
-                          style={{ outline: 'none' }}
-                        />
-                        <div className="absolute right-2.5" style={{top: '50%', transform: 'translateY(-50%)'}}>
-                          <button
-                            type="button"
-                            onClick={() => setShowPasswordConfirm(!showPasswordConfirm)}
-                            className="text-gray-400 hover:text-gray-600 transition-colors"
-                          >
-                            {showPasswordConfirm ? <FiEyeOff className="w-4 h-4" /> : <FiEye className="w-4 h-4" />}
-                          </button>
-                        </div>
-                      </div>
-                      {passwordConfirm && passwordConfirm !== registerData.mt_pwd && (
-                        <p className="text-red-500 text-sm mt-1" style={{ wordBreak: 'keep-all' }}>비밀번호가 일치하지 않습니다</p>
-                      )}
-                      {passwordConfirm && passwordConfirm === registerData.mt_pwd && registerData.mt_pwd && (
-                        <p className="text-green-500 text-sm mt-1 flex items-center" style={{ wordBreak: 'keep-all' }}>
-                          <FiCheck className="w-4 h-4 mr-1" />
-                          비밀번호가 일치합니다
-                        </p>
-                      )}
-                    </div>
-                  </>
-                )}
-
-                {/* 이름 */}
-                <div className="px-0.5">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    이름
-                  </label>
-                  {registerData.isSocialLogin && (registerData.socialProvider === 'google' || registerData.socialProvider === 'apple') && (
-                    <p className="text-xs text-[#0114a2] mb-2" style={{ wordBreak: 'keep-all' }}>
-                      {(registerData.socialProvider === 'google' ? '구글' : '애플')} 계정에서 가져온 이름이 자동으로 입력되었습니다
                     </p>
-                  )}
-                  <input
-                    type="text"
-                    value={registerData.mt_name}
-                    onChange={(e) => setRegisterData(prev => ({ ...prev, mt_name: e.target.value }))}
-                    placeholder="실명을 입력해주세요"
-                    className="w-full px-5 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input"
-                    onFocus={(e) => e.target.style.boxShadow = '0 0 0 2px #0114a2'}
-                    onBlur={(e) => e.target.style.boxShadow = ''}
-                    style={{ outline: 'none' }}
-                  />
-                </div>
 
-                {/* 닉네임 */}
-                <div className="px-0.5">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    닉네임
-                  </label>
-                  {registerData.isSocialLogin && (registerData.socialProvider === 'google' || registerData.socialProvider === 'apple') && (
-                    <p className="text-xs text-[#0114a2] mb-2" style={{ wordBreak: 'keep-all' }}>
-                      {(registerData.socialProvider === 'google' ? '구글' : '애플')} 계정에서 가져온 닉네임이 자동으로 입력되었습니다
-                    </p>
-                  )}
-                  <input
-                    type="text"
-                    value={registerData.mt_nickname}
-                    onChange={(e) => setRegisterData(prev => ({ ...prev, mt_nickname: e.target.value }))}
-                    placeholder="다른 사용자에게 표시될 닉네임"
-                    className="w-full px-5 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input"
-                    onFocus={(e) => e.target.style.boxShadow = '0 0 0 2px #0114a2'}
-                    onBlur={(e) => e.target.style.boxShadow = ''}
-                    style={{ outline: 'none' }}
-                  />
-                </div>
+                    {!isJoiningGroup && !isOpeningApp && (
+                      <motion.button
+                        onClick={async () => {
+                          console.log('🚀 [REGISTER] 로그인하러가기 버튼 클릭됨');
 
-                {/* 이메일 */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {registerData.isSocialLogin ? 'ID (이메일)' : '이메일 (선택)'}
-                  </label>
-                  {registerData.isSocialLogin && (
-                    <p className="text-xs text-[#0114a2] mb-2" style={{ wordBreak: 'keep-all' }}>
-                      {registerData.socialProvider === 'google' ? '구글' : registerData.socialProvider === 'apple' ? '애플' : '카카오'} 계정의 이메일이 ID로 사용됩니다
-                    </p>
-                  )}
-                  <div className="relative register-input-container px-0.5">
-                    <div className="absolute left-5 z-10 pointer-events-none" style={{top: '50%', transform: 'translateY(-50%)'}}>
-                      <FiMail className="w-4 h-4 transition-colors duration-200" 
-                        style={{color: focusedField === 'email' ? '#0114a2' : '#9CA3AF'}} />
-                    </div>
-                    <input
-                      type="email"
-                      value={registerData.mt_email}
-                      onChange={(e) => {
-                        if (registerData.isSocialLogin) return; // 소셜 로그인 시 변경 불가
-                        const email = e.target.value;
-                        setRegisterData(prev => ({ ...prev, mt_email: email }));
-                        validateEmail(email);
-                      }}
-                      onFocus={(e) => {
-                        if (!registerData.isSocialLogin) {
-                          setFocusedField('email');
-                          e.target.style.boxShadow = '0 0 0 2px #0114a2';
-                        }
-                      }}
-                      onBlur={(e) => {
-                        setFocusedField(null);
-                        e.target.style.boxShadow = '';
-                      }}
-                      placeholder={registerData.isSocialLogin ? '' : 'example@email.com'}
-                      disabled={registerData.isSocialLogin}
-                      className={`w-full pl-11 pr-12 py-2.5 px-1 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input ${
-                        registerData.isSocialLogin ? 'bg-gray-50 cursor-not-allowed' : ''
-                      }`}
-                      style={{ outline: 'none' }}
-                    />
-                    {registerData.mt_email && !emailError && (
-                      <div className="absolute right-2.5" style={{top: '50%', transform: 'translateY(-50%)'}}>
-                        <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      </div>
-                    )}
-                    {emailError && !registerData.isSocialLogin && (
-                      <div className="absolute right-2.5" style={{top: '50%', transform: 'translateY(-50%)'}}>
-                        <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </div>
-                    )}
-                  </div>
-                  {emailError && !registerData.isSocialLogin && (
-                    <p className="text-red-500 text-sm mt-1" style={{ wordBreak: 'keep-all' }}>{emailError}</p>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* 프로필 정보 단계 */}
-          {currentStep === REGISTER_STEPS.PROFILE && (
-            <motion.div
-              key="profile"
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -50 }}
-              transition={{ 
-                duration: 0.3,
-                ease: [0.4, 0.0, 0.2, 1], // iOS 최적화된 이징
-                type: "tween"
-              }}
-              className="w-full h-full flex flex-col justify-center"
-              style={{
-                // iOS 애니메이션 최적화
-                willChange: 'transform, opacity',
-                transform: 'translateZ(0)', // 하드웨어 가속 활성화
-                backfaceVisibility: 'hidden'
-              }}
-            >
-              <div className="text-center mb-6">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0114a2'}}>
-                  <FiHeart className="w-6 h-6 text-white" />
-                </div>
-                <h2 className="text-xl font-bold text-gray-900 mb-1">프로필 정보</h2>
-                <p className="text-sm text-gray-600" style={{ wordBreak: 'keep-all' }}>추가 정보를 입력해주세요</p>
-              </div>
-
-              <div className="space-y-6">
-                {/* 생년월일 */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    생년월일
-                  </label>
-                  <button
-                    type="button"
-                    onClick={handleBirthModalOpen}
-                    className="w-full flex items-center px-4 py-3 border border-gray-200 rounded-xl transition-colors text-left hover:border-[#0114a2]/30"
-                    onFocus={(e) => {
-                      setFocusedField('birth');
-                      (e.target as HTMLButtonElement).style.boxShadow = '0 0 0 2px #0114a2';
-                    }}
-                    onBlur={(e) => {
-                      setFocusedField(null);
-                      (e.target as HTMLButtonElement).style.boxShadow = '';
-                    }}
-                  >
-                    <FiCalendar className="w-5 h-5 mr-3 transition-colors duration-200" 
-                      style={{color: focusedField === 'birth' ? '#0114a2' : '#9CA3AF'}} />
-                    <span className={registerData.mt_birth ? 'text-gray-900' : 'text-gray-500'}>
-                      {registerData.mt_birth 
-                        ? dayjs(registerData.mt_birth).format('YYYY년 MM월 DD일')
-                        : '생년월일을 선택해주세요'
-                      }
-                    </span>
-                    <FiChevronDown className="w-5 h-5 text-gray-400 ml-auto" />
-                  </button>
-                </div>
-
-                {/* 성별 */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
-                    성별
-                  </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setRegisterData(prev => ({ ...prev, mt_gender: 1 }))}
-                      className={`py-3 rounded-xl border-2 font-medium transition-all ${
-                        registerData.mt_gender === 1
-                          ? 'border-gray-200 text-gray-700'
-                          : 'border-gray-200 text-gray-700 hover:border-gray-300'
-                      }`}
-                      style={registerData.mt_gender === 1 
-                        ? {borderColor: '#0114a2', backgroundColor: '#eff6ff', color: '#1e40af'} 
-                        : {}}
-                    >
-                      남성
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRegisterData(prev => ({ ...prev, mt_gender: 2 }))}
-                      className={`py-3 rounded-xl border-2 font-medium transition-all ${
-                        registerData.mt_gender === 2
-                          ? 'border-purple-500 bg-purple-50 text-purple-700'
-                          : 'border-gray-200 text-gray-700 hover:border-gray-300'
-                      }`}
-                    >
-                      여성
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          
-
-          {/* 완료 단계 */}
-          {currentStep === REGISTER_STEPS.COMPLETE && (
-            <motion.div
-              key="complete"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ 
-                duration: 0.4,
-                ease: [0.4, 0.0, 0.2, 1], // iOS 최적화된 이징
-                type: "tween"
-              }}
-              className="fixed inset-0 flex flex-col justify-center items-center text-center bg-white z-50"
-              style={{
-                // iOS 애니메이션 최적화
-                willChange: 'transform, opacity',
-                transform: 'translateZ(0)', // 하드웨어 가속 활성화
-                backfaceVisibility: 'hidden'
-              }}
-            >
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-                className="w-24 h-24 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6"
-              >
-                <FiCheck className="w-10 h-10 text-white" />
-              </motion.div>
-              
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-              >
-                <h2 className="text-3xl font-bold text-gray-900 mb-4">회원가입 완료!</h2>
-                <p className="text-gray-600 mb-8" style={{ wordBreak: 'keep-all' }}>
-                  {isJoiningGroup ? (
-                    <>
-                      그룹에 자동 가입 중입니다...<br />
-                      잠시만 기다려주세요!
-                    </>
-                  ) : isOpeningApp ? (
-                    <>
-                      앱으로 이동 중입니다...<br />
-                      {isMobile() ? '앱이 열리지 않으면 스토어로 이동합니다' : '로그인 페이지로 이동합니다'}
-                    </>
-                  ) : (
-                    <>
-                      SMAP에 오신 것을 환영합니다.<br />
-                      이제 그룹을 만들고 친구들과 함께 활동해보세요!
-                    </>
-                  )}
-                </p>
-                
-                {!isJoiningGroup && !isOpeningApp && (
-                  <motion.button
-                    onClick={async () => {
-                      console.log('🚀 [REGISTER] 로그인하러가기 버튼 클릭됨');
-                      
-                      // 사용자 입력 정보를 localStorage에 저장
-                      const userInfo = {
-                        phone: registerData.mt_id,
-                        name: registerData.mt_name,
-                        nickname: registerData.mt_nickname,
-                        email: registerData.mt_email,
-                        birth: registerData.mt_birth,
-                        gender: registerData.mt_gender,
-                        registeredAt: new Date().toISOString()
-                      };
-                      
-                      try {
-                        localStorage.setItem('recentUserInfo', JSON.stringify(userInfo));
-                        // 로그인 페이지에서 사용할 전화번호도 별도 저장
-                        localStorage.setItem('lastRegisteredPhone', registerData.mt_id);
-                        console.log('✅ [REGISTER] 사용자 정보 localStorage 저장 완료');
-                      } catch (error) {
-                        console.error('❌ [REGISTER] 사용자 정보 저장 실패:', error);
-                      }
-                      
-                      // 가입 완료된 mt_idx를 사용하여 자동 로그인 처리
-                      const newMemberMtIdx = localStorage.getItem('newMemberMtIdx');
-                      console.log('🔍 [REGISTER] localStorage에서 newMemberMtIdx 확인:', newMemberMtIdx);
-                      
-                      if (newMemberMtIdx) {
-                        try {
-                          console.log('🔄 [REGISTER] 새로 가입된 회원 자동 로그인 시도:', newMemberMtIdx);
-                          
-                          // localStorage에서 socialLoginData 가져오기
-                          const socialLoginDataStr = localStorage.getItem('socialLoginData');
-                          let socialLoginData = null;
-                          if (socialLoginDataStr) {
-                            try {
-                              socialLoginData = JSON.parse(socialLoginDataStr);
-                            } catch (e) {
-                              console.warn('⚠️ [REGISTER] socialLoginData 파싱 실패:', e);
-                            }
-                          }
-
-                          // 사용자 정보 구성 (안전한 방식)
+                          // 사용자 입력 정보를 localStorage에 저장
                           const userInfo = {
-                            mt_idx: parseInt(newMemberMtIdx),
-                            mt_id: registerData.mt_id || socialLoginData?.apple_id || '',
-                            mt_name: registerData.mt_name || socialLoginData?.name || '',
-                            mt_nickname: registerData.mt_nickname || socialLoginData?.name || '',
-                            mt_hp: registerData.mt_id || socialLoginData?.apple_id || '',
-                            mt_email: registerData.mt_email || socialLoginData?.email || '',
-                            mt_birth: registerData.mt_birth || '',
-                            mt_gender: registerData.mt_gender || '',
-                            mt_type: registerData.isSocialLogin ? 
-                              (registerData.socialProvider === 'google' ? 4 : registerData.socialProvider === 'apple' ? 3 : 2) : 1,
-                            mt_level: 2,
-                            mt_file1: ''
+                            phone: registerData.mt_id,
+                            name: registerData.mt_name,
+                            nickname: registerData.mt_nickname,
+                            email: registerData.mt_email,
+                            birth: registerData.mt_birth,
+                            gender: registerData.mt_gender,
+                            registeredAt: new Date().toISOString()
                           };
 
-                          console.log('🔍 [REGISTER] 자동 로그인용 사용자 정보:', userInfo);
+                          try {
+                            localStorage.setItem('recentUserInfo', JSON.stringify(userInfo));
+                            // 로그인 페이지에서 사용할 전화번호도 별도 저장
+                            localStorage.setItem('lastRegisteredPhone', registerData.mt_id);
+                            console.log('✅ [REGISTER] 사용자 정보 localStorage 저장 완료');
+                          } catch (error) {
+                            console.error('❌ [REGISTER] 사용자 정보 저장 실패:', error);
+                          }
 
-                          // 자동 로그인 API 호출 (사용자 정보 포함)
-                          const loginResponse = await fetch('/api/auth/auto-login', {
-                            method: 'POST',
-                            headers: {
-                              'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({
-                              mt_idx: newMemberMtIdx,
-                              action: 'auto-login',
-                              userInfo: userInfo
-                            }),
-                          });
-                          
-                          console.log('📡 [REGISTER] 자동 로그인 API 응답 상태:', loginResponse.status);
-                          const loginData = await loginResponse.json();
-                          console.log('📡 [REGISTER] 자동 로그인 API 응답 데이터:', loginData);
-                          
-                          if (loginResponse.ok && loginData.success) {
-                            console.log('✅ [REGISTER] 자동 로그인 성공:', loginData);
-                            
-                            // 로그인 성공 시 토큰과 사용자 정보 저장
-                            if (loginData.data && loginData.data.token) {
-                              localStorage.setItem('auth_token', loginData.data.token);
-                              localStorage.setItem('user_data', JSON.stringify(loginData.data.user));
-                              console.log('💾 [REGISTER] 로그인 정보 localStorage 저장 완료');
-                              
-                              // newMemberMtIdx는 더 이상 필요하지 않으므로 제거
-                              localStorage.removeItem('newMemberMtIdx');
-                              
-                              // home 페이지로 이동
-                              console.log('🏠 [REGISTER] home 페이지로 이동');
-                              router.push('/home');
-                              return;
+                          // 가입 완료된 mt_idx를 사용하여 자동 로그인 처리
+                          const newMemberMtIdx = localStorage.getItem('newMemberMtIdx');
+                          console.log('🔍 [REGISTER] localStorage에서 newMemberMtIdx 확인:', newMemberMtIdx);
+
+                          if (newMemberMtIdx) {
+                            try {
+                              console.log('🔄 [REGISTER] 새로 가입된 회원 자동 로그인 시도:', newMemberMtIdx);
+
+                              // localStorage에서 socialLoginData 가져오기
+                              const socialLoginDataStr = localStorage.getItem('socialLoginData');
+                              let socialLoginData = null;
+                              if (socialLoginDataStr) {
+                                try {
+                                  socialLoginData = JSON.parse(socialLoginDataStr);
+                                } catch (e) {
+                                  console.warn('⚠️ [REGISTER] socialLoginData 파싱 실패:', e);
+                                }
+                              }
+
+                              // 사용자 정보 구성 (안전한 방식)
+                              const userInfo = {
+                                mt_idx: parseInt(newMemberMtIdx),
+                                mt_id: registerData.mt_id || socialLoginData?.apple_id || '',
+                                mt_name: registerData.mt_name || socialLoginData?.name || '',
+                                mt_nickname: registerData.mt_nickname || socialLoginData?.name || '',
+                                mt_hp: registerData.mt_id || socialLoginData?.apple_id || '',
+                                mt_email: registerData.mt_email || socialLoginData?.email || '',
+                                mt_birth: registerData.mt_birth || '',
+                                mt_gender: registerData.mt_gender || '',
+                                mt_type: registerData.isSocialLogin ?
+                                  (registerData.socialProvider === 'google' ? 4 : registerData.socialProvider === 'apple' ? 3 : 2) : 1,
+                                mt_level: 2,
+                                mt_file1: ''
+                              };
+
+                              console.log('🔍 [REGISTER] 자동 로그인용 사용자 정보:', userInfo);
+
+                              // 자동 로그인 API 호출 (사용자 정보 포함)
+                              const loginResponse = await fetch('/api/auth/auto-login', {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                  mt_idx: newMemberMtIdx,
+                                  action: 'auto-login',
+                                  userInfo: userInfo
+                                }),
+                              });
+
+                              console.log('📡 [REGISTER] 자동 로그인 API 응답 상태:', loginResponse.status);
+                              const loginData = await loginResponse.json();
+                              console.log('📡 [REGISTER] 자동 로그인 API 응답 데이터:', loginData);
+
+                              if (loginResponse.ok && loginData.success) {
+                                console.log('✅ [REGISTER] 자동 로그인 성공:', loginData);
+
+                                // 로그인 성공 시 토큰과 사용자 정보 저장
+                                if (loginData.data && loginData.data.token) {
+                                  localStorage.setItem('auth_token', loginData.data.token);
+                                  localStorage.setItem('user_data', JSON.stringify(loginData.data.user));
+                                  console.log('💾 [REGISTER] 로그인 정보 localStorage 저장 완료');
+
+                                  // newMemberMtIdx는 더 이상 필요하지 않으므로 제거
+                                  localStorage.removeItem('newMemberMtIdx');
+
+                                  // home 페이지로 이동
+                                  console.log('🏠 [REGISTER] home 페이지로 이동');
+                                  router.push('/home');
+                                  return;
+                                }
+                              } else {
+                                console.warn('⚠️ [REGISTER] 자동 로그인 실패:', loginData);
+                              }
+                            } catch (loginError) {
+                              console.error('❌ [REGISTER] 자동 로그인 중 오류:', loginError);
                             }
                           } else {
-                            console.warn('⚠️ [REGISTER] 자동 로그인 실패:', loginData);
+                            console.log('❌ [REGISTER] newMemberMtIdx가 localStorage에 없음');
                           }
-                        } catch (loginError) {
-                          console.error('❌ [REGISTER] 자동 로그인 중 오류:', loginError);
-                        }
-                      } else {
-                        console.log('❌ [REGISTER] newMemberMtIdx가 localStorage에 없음');
-                      }
-                      
-                      // 자동 로그인 실패 시 signin 페이지로 이동
-                      console.log('🔀 [REGISTER] 자동 로그인 실패 또는 mt_idx 없음, signin 페이지로 이동');
-                      router.push('/signin');
-                    }}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="w-full py-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl font-semibold text-lg"
-                  >
-                    로그인하러 가기
-                  </motion.button>
-                )}
-                
-                {isJoiningGroup && (
-                  <div className="flex items-center justify-center space-x-2 text-gray-600">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600"></div>
-                    <span>그룹 가입 중...</span>
-                  </div>
-                )}
-                
-                {isOpeningApp && (
-                  <div className="flex items-center justify-center space-x-2 text-gray-600">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600"></div>
-                    <span>앱으로 이동 중...</span>
-                  </div>
-                )}
-              </motion.div>
-            </motion.div>
-          )}
+
+                          // 자동 로그인 실패 시 signin 페이지로 이동
+                          console.log('🔀 [REGISTER] 자동 로그인 실패 또는 mt_idx 없음, signin 페이지로 이동');
+                          router.push('/signin');
+                        }}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        className="w-full py-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl font-semibold text-lg"
+                      >
+                        로그인하러 가기
+                      </motion.button>
+                    )}
+
+                    {isJoiningGroup && (
+                      <div className="flex items-center justify-center space-x-2 text-gray-600">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600"></div>
+                        <span>그룹 가입 중...</span>
+                      </div>
+                    )}
+
+                    {isOpeningApp && (
+                      <div className="flex items-center justify-center space-x-2 text-gray-600">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600"></div>
+                        <span>앱으로 이동 중...</span>
+                      </div>
+                    )}
+                  </motion.div>
+                </motion.div>
+              )}
             </AnimatePresence>
           </div>
         </div>
@@ -2712,17 +2715,17 @@ export default function RegisterPage() {
       {/* 하단 고정 버튼 */}
       {currentStep !== REGISTER_STEPS.COMPLETE && (
         <div className="register-bottom-fixed">
-          <motion.div 
+          <motion.div
             initial={{ y: 100 }}
             animate={{ y: 0 }}
-            transition={{ 
+            transition={{
               duration: 0.4,
               ease: [0.4, 0.0, 0.2, 1], // iOS 최적화된 이징
               type: "tween"
             }}
             className="p-4 safe-area-bottom"
             data-bottom-button
-            style={{ 
+            style={{
               paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
               background: 'linear-gradient(to bottom right, rgba(240, 249, 255, 0.95), rgba(253, 244, 255, 0.95))',
               backdropFilter: 'blur(10px)',
@@ -2760,13 +2763,12 @@ export default function RegisterPage() {
               disabled={!isStepValid() || isLoading || locationLoading || isInitializing || !isDataLoaded}
               whileHover={{ scale: (isStepValid() && !locationLoading && !isInitializing && isDataLoaded) ? 1.02 : 1 }}
               whileTap={{ scale: (isStepValid() && !locationLoading && !isInitializing && isDataLoaded) ? 0.98 : 1 }}
-              className={`w-full py-4 rounded-xl font-semibold text-lg transition-all register-button ${
-                (isStepValid() && !locationLoading && !isInitializing && isDataLoaded)
+              className={`w-full py-4 rounded-xl font-semibold text-lg transition-all register-button ${(isStepValid() && !locationLoading && !isInitializing && isDataLoaded)
                   ? 'text-white shadow-lg'
                   : 'bg-gray-100 text-gray-300 cursor-not-allowed opacity-60'
-              }`}
+                }`}
               style={(isStepValid() && !locationLoading && !isInitializing && isDataLoaded)
-                ? {backgroundColor: '#0114a2'}
+                ? { backgroundColor: '#0114a2' }
                 : {}}
             >
               <div className="flex items-center justify-center gap-2">
@@ -2776,13 +2778,13 @@ export default function RegisterPage() {
                 )}
                 <span>
                   {isInitializing ? '초기화 중...' :
-                   !isDataLoaded ? '데이터 로딩 중...' :
-                   isLoading ? '처리 중...' :
-                   locationLoading ? '위치 정보 가져오는 중...' :
-                   currentStep === REGISTER_STEPS.PHONE ? '인증번호 발송' :
-                   currentStep === REGISTER_STEPS.VERIFICATION ? '인증번호 확인' :
-                   currentStep === REGISTER_STEPS.PROFILE ? '회원가입 완료' :
-                   (currentStep === REGISTER_STEPS.TERMS && registerData.isSocialLogin && (registerData.socialProvider === 'apple' || registerData.socialProvider === 'google')) ? '회원가입 완료' : '다음'}
+                    !isDataLoaded ? '데이터 로딩 중...' :
+                      isLoading ? '처리 중...' :
+                        locationLoading ? '위치 정보 가져오는 중...' :
+                          currentStep === REGISTER_STEPS.PHONE ? '인증번호 발송' :
+                            currentStep === REGISTER_STEPS.VERIFICATION ? '인증번호 확인' :
+                              currentStep === REGISTER_STEPS.PROFILE ? '회원가입 완료' :
+                                (currentStep === REGISTER_STEPS.TERMS && registerData.isSocialLogin && (registerData.socialProvider === 'apple' || registerData.socialProvider === 'google')) ? '회원가입 완료' : '다음'}
                 </span>
               </div>
             </motion.button>
@@ -2792,11 +2794,11 @@ export default function RegisterPage() {
 
       {/* 오류 모달 */}
       {errorModal.isOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
           onClick={() => setErrorModal({ isOpen: false, title: '', message: '', isCountdown: false })}
         >
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -2808,14 +2810,14 @@ export default function RegisterPage() {
                 <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                    </svg>
+                  </svg>
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-2">{errorModal.title}</h3>
                 <p className="text-gray-600 leading-relaxed" style={{ wordBreak: 'keep-all' }}>
                   {errorModal.message}
                 </p>
               </div>
-              
+
               <motion.button
                 onClick={() => setErrorModal({ isOpen: false, title: '', message: '', isCountdown: false })}
                 whileHover={{ scale: 1.02 }}
@@ -2832,15 +2834,15 @@ export default function RegisterPage() {
       {/* 생년월일 캘린더 모달 */}
       <AnimatePresence>
         {birthModalOpen && (
-          <motion.div 
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
             onClick={() => setBirthModalOpen(false)}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
           >
-            <motion.div 
+            <motion.div
               className="w-full max-w-md bg-white rounded-3xl shadow-2xl mx-4"
               onClick={e => e.stopPropagation()}
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -2849,14 +2851,14 @@ export default function RegisterPage() {
               transition={{ duration: 0.3 }}
             >
               <div className="p-6">
-                                  {/* 헤더 */}
-                  <div className="text-center mb-4">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0114a2'}}>
-                      <FiCalendar className="w-6 h-6 text-white" />
-                    </div>
-                    <h3 className="text-lg font-bold text-gray-900 mb-1">생년월일 선택</h3>
-                    <p className="text-sm text-gray-600" style={{ wordBreak: 'keep-all' }}>생년월일을 선택해주세요</p>
+                {/* 헤더 */}
+                <div className="text-center mb-4">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{ backgroundColor: '#0114a2' }}>
+                    <FiCalendar className="w-6 h-6 text-white" />
                   </div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-1">생년월일 선택</h3>
+                  <p className="text-sm text-gray-600" style={{ wordBreak: 'keep-all' }}>생년월일을 선택해주세요</p>
+                </div>
 
                 {/* 캘린더 헤더 */}
                 <div className="flex items-center justify-between mb-6">
@@ -2868,7 +2870,7 @@ export default function RegisterPage() {
                   >
                     <FiChevronLeft className="w-5 h-5 text-gray-600" />
                   </motion.button>
-                  
+
                   <div className="text-center">
                     <div className="flex items-center justify-center space-x-0 mb-2">
                       <select
@@ -2900,14 +2902,14 @@ export default function RegisterPage() {
                     <button
                       onClick={handleCalendarToday}
                       className="text-sm transition-colors"
-                      style={{color: '#0114a2'}}
+                      style={{ color: '#0114a2' }}
                       onMouseEnter={(e) => (e.target as HTMLButtonElement).style.color = '#1e40af'}
                       onMouseLeave={(e) => (e.target as HTMLButtonElement).style.color = '#0114a2'}
                     >
                       오늘로 이동
-              </button>
-            </div>
-                  
+                    </button>
+                  </div>
+
                   <motion.button
                     onClick={handleCalendarNextMonth}
                     className="p-2 hover:bg-gray-100 rounded-full transition-colors"
@@ -2921,9 +2923,8 @@ export default function RegisterPage() {
                 {/* 요일 헤더 */}
                 <div className="grid grid-cols-7 gap-1 mb-3">
                   {['일', '월', '화', '수', '목', '금', '토'].map((day, index) => (
-                    <div key={day} className={`h-8 flex items-center justify-center text-xs font-bold ${
-                      index === 0 ? 'text-red-600' : index === 6 ? 'text-[#0114a2]' : 'text-gray-700'
-                    }`}>
+                    <div key={day} className={`h-8 flex items-center justify-center text-xs font-bold ${index === 0 ? 'text-red-600' : index === 6 ? 'text-[#0114a2]' : 'text-gray-700'
+                      }`}>
                       {day}
                     </div>
                   ))}
@@ -2936,19 +2937,19 @@ export default function RegisterPage() {
                     const daysInMonth = calendarCurrentMonth.daysInMonth();
                     const firstDayOfMonth = calendarCurrentMonth.startOf('month').day();
                     const today = dayjs();
-                    
+
                     // 빈 칸 추가 (이전 달 마지막 날들)
                     for (let i = 0; i < firstDayOfMonth; i++) {
                       days.push(<div key={`empty-${i}`} className="h-10"></div>);
                     }
-                    
+
                     // 현재 달의 날짜들
                     for (let day = 1; day <= daysInMonth; day++) {
                       const currentDate = calendarCurrentMonth.date(day);
                       const isSelected = selectedDate?.isSame(currentDate, 'day');
                       const isToday = today.isSame(currentDate, 'day');
                       const isFuture = currentDate.isAfter(today, 'day');
-                      
+
                       days.push(
                         <button
                           key={day}
@@ -2961,29 +2962,29 @@ export default function RegisterPage() {
                             ${!isSelected && !isToday && !isFuture ? 'hover:bg-gray-100 text-gray-800' : ''}
                             ${isFuture ? 'text-gray-300 cursor-not-allowed' : ''}
                           `}
-                          style={isSelected 
-                            ? {backgroundColor: '#0114a2'} 
-                            : isToday && !isSelected 
-                              ? {backgroundColor: '#eff6ff', color: '#1e40af'}
+                          style={isSelected
+                            ? { backgroundColor: '#0114a2' }
+                            : isToday && !isSelected
+                              ? { backgroundColor: '#eff6ff', color: '#1e40af' }
                               : {}}
                         >
                           {day}
                         </button>
                       );
                     }
-                    
+
                     return days;
                   })()}
                 </div>
 
                 {/* 선택된 날짜 표시 */}
                 {selectedDate && (
-                  <div className="text-center mb-6 p-4 rounded-xl" style={{backgroundColor: '#eff6ff', border: '1px solid #e0e7ff'}}>
+                  <div className="text-center mb-6 p-4 rounded-xl" style={{ backgroundColor: '#eff6ff', border: '1px solid #e0e7ff' }}>
                     <p className="text-sm text-gray-600">선택된 날짜</p>
                     <p className="text-lg font-bold" style={{ wordBreak: 'keep-all', color: '#1e40af' }}>
                       {selectedDate.format('YYYY년 MM월 DD일 (ddd)')}
-            </p>
-          </div>
+                    </p>
+                  </div>
                 )}
 
                 {/* 액션 버튼 */}
@@ -2997,19 +2998,18 @@ export default function RegisterPage() {
                   <button
                     onClick={handleBirthConfirm}
                     disabled={!selectedDate}
-                    className={`flex-1 py-3 rounded-xl font-medium transition-colors ${
-                      selectedDate
+                    className={`flex-1 py-3 rounded-xl font-medium transition-colors ${selectedDate
                         ? 'text-white'
                         : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                    }`}
-                    style={selectedDate 
-                      ? {backgroundColor: '#0114a2'}
+                      }`}
+                    style={selectedDate
+                      ? { backgroundColor: '#0114a2' }
                       : {}}
                   >
                     확인
                   </button>
-        </div>
-      </div>
+                </div>
+              </div>
             </motion.div>
           </motion.div>
         )}
