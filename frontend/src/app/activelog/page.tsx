@@ -2489,8 +2489,7 @@ export default function ActivelogPage() {
         try {
           console.log(`[🔄 FORCE REGEN] 일별 카운트 조회 시도 ${retryCount + 1}/${maxRetries}`);
           dailyCountsResponse = await memberLocationLogService.getDailyLocationCounts(selectedGroupId, 14);
-
-          if (dailyCountsResponse?.member_daily_counts?.length > 0) {
+          if (dailyCountsResponse && dailyCountsResponse.member_daily_counts && dailyCountsResponse.member_daily_counts.length > 0) {
             console.log(`[🔄 FORCE REGEN] 일별 카운트 조회 성공 (${retryCount + 1}번째 시도):`, dailyCountsResponse.member_daily_counts.length, '명');
             break;
           }
@@ -2515,7 +2514,7 @@ export default function ActivelogPage() {
         }
       }
 
-      if (!dailyCountsResponse?.member_daily_counts?.length) {
+      if (!dailyCountsResponse || !dailyCountsResponse.member_daily_counts || dailyCountsResponse.member_daily_counts.length === 0) {
         console.error('[🔄 FORCE REGEN] 일별 카운트 데이터 재조회 실패');
         return false;
       }
