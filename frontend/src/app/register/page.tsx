@@ -1284,8 +1284,10 @@ export default function RegisterPage() {
 
       // 소셜 로그인 관련 데이터 추가
       if (registerData.isSocialLogin) {
-        if (registerData.socialProvider === 'google' || registerData.socialProvider === 'apple') {
+        if (registerData.socialProvider === 'google') {
           requestData.mt_google_id = registerData.socialId;
+        } else if (registerData.socialProvider === 'apple') {
+          requestData.mt_apple_id = registerData.socialId;
         } else if (registerData.socialProvider === 'kakao') {
           requestData.mt_kakao_id = registerData.socialId;
         }
@@ -1369,6 +1371,40 @@ export default function RegisterPage() {
         // 소셜 로그인 데이터 정리 (회원가입 성공 시에만)
         localStorage.removeItem('socialLoginData');
         console.log('🔥 [REGISTER] 회원가입 성공 후 socialLoginData 제거');
+
+        // 🍎 소셜 로그인 회원가입 시 자동 로그인 처리
+        if (registerData.isSocialLogin && data.data?.token) {
+          console.log('🍎 [REGISTER] 소셜 로그인 회원가입 - 자동 로그인 처리 시작');
+
+          try {
+            const authService = await import('@/services/authService');
+
+            // 토큰 저장
+            authService.default.setToken(data.data.token);
+            console.log('🍎 [REGISTER] JWT 토큰 저장 완료');
+
+            // 사용자 정보 저장
+            const userData = {
+              mt_idx: data.data.mt_idx,
+              mt_id: data.data.mt_id,
+              mt_name: data.data.mt_name || registerData.mt_name,
+              mt_nickname: data.data.mt_nickname || registerData.mt_nickname,
+              mt_email: data.data.mt_email || registerData.mt_email,
+              mt_type: registerData.socialProvider === 'apple' ? 3 : registerData.socialProvider === 'google' ? 4 : 2,
+              mt_file1: data.data.mt_file1 || registerData.profile_image || ''
+            };
+            authService.default.setUserData(userData);
+            console.log('🍎 [REGISTER] 사용자 정보 저장 완료:', userData);
+
+            // 홈으로 바로 이동 (완료 화면 생략)
+            console.log('🍎 [REGISTER] 소셜 로그인 회원가입 완료 - 홈으로 이동');
+            router.push('/home');
+            return; // 완료 화면으로 이동하지 않음
+          } catch (authError) {
+            console.error('❌ [REGISTER] 자동 로그인 처리 중 오류:', authError);
+            // 오류 발생 시 완료 화면으로 이동
+          }
+        }
 
         setCurrentStep(REGISTER_STEPS.COMPLETE);
       } else {

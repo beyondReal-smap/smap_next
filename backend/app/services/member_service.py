@@ -41,15 +41,15 @@ class MemberService:
                         message="이미 가입된 이메일입니다."
                     )
 
-            # 3. 닉네임 중복 확인
-            existing_nickname = db.query(Member).filter(
-                Member.mt_nickname == register_data.mt_nickname
-            ).first()
-            if existing_nickname:
-                return RegisterResponse(
-                    success=False,
-                    message="이미 사용 중인 닉네임입니다."
-                )
+            # 3. 닉네임 중복 확인 (비활성화 - 중복 닉네임 허용)
+            # existing_nickname = db.query(Member).filter(
+            #     Member.mt_nickname == register_data.mt_nickname
+            # ).first()
+            # if existing_nickname:
+            #     return RegisterResponse(
+            #         success=False,
+            #         message="이미 사용 중인 닉네임입니다."
+            #     )
 
             # 4. 회원 생성
             new_member = self.crud.create_from_register(db, obj_in=register_data)

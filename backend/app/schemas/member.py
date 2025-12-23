@@ -101,6 +101,10 @@ class RegisterRequest(BaseModel):
     mt_push1: Optional[bool] = True
     mt_lat: Optional[float] = None
     mt_long: Optional[float] = None
+    # 소셜 로그인 ID 필드
+    mt_google_id: Optional[str] = None
+    mt_kakao_id: Optional[str] = None
+    mt_apple_id: Optional[str] = None
 
 class RegisterResponse(BaseModel):
     success: bool

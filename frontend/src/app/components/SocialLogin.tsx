@@ -14,13 +14,13 @@ interface SocialLoginButtonProps {
   onClick: () => void;
 }
 
-const SocialLoginButton = ({ 
-  provider, 
-  bgColor, 
-  hoverColor, 
-  textColor, 
-  icon, 
-  onClick 
+const SocialLoginButton = ({
+  provider,
+  bgColor,
+  hoverColor,
+  textColor,
+  icon,
+  onClick
 }: SocialLoginButtonProps) => {
   return (
     <button
@@ -49,7 +49,7 @@ export default function SocialLogin() {
 
     try {
       console.log(`${provider} 로그인 시도 중...`);
-      
+
       // 🔄 소셜 로그인 전에 이전 계정의 모든 데이터 완전 정리
       console.log('[SOCIAL_LOGIN] 🔄 소셜 로그인 전 이전 계정 데이터 정리 시작');
       try {
@@ -59,7 +59,7 @@ export default function SocialLogin() {
       } catch (clearError) {
         console.warn('[SOCIAL_LOGIN] ⚠️ 이전 계정 데이터 정리 중 오류 (계속 진행):', clearError);
       }
-      
+
       if (provider === '구글' || provider === 'google') {
         // 구글 로그인 처리
         try {
@@ -74,17 +74,17 @@ export default function SocialLogin() {
           });
 
           const data = await response.json();
-          
+
           if (!response.ok) {
             throw new Error(data.message || '구글 로그인에 실패했습니다.');
           }
 
           if (data.success) {
             console.log('🔥 [SOCIAL_LOGIN] Google 로그인 응답:', data);
-            
+
             // 🚨 임시: 모든 구글 로그인을 신규 사용자로 처리 (테스트용)
             const isNewUser = true;
-            
+
             if (isNewUser) {
               // 신규 회원 - register 페이지로 이동하면서 구글 정보 전달
               const socialData = {
@@ -95,7 +95,7 @@ export default function SocialLogin() {
                 profile_image: data.user.profile_image,
                 google_id: data.user.google_id
               };
-              
+
               console.log('🔥 [SOCIAL_LOGIN] 신규 사용자 - localStorage에 저장:', socialData);
               localStorage.setItem('socialLoginData', JSON.stringify(socialData));
               router.push('/register?social=google');
@@ -106,7 +106,7 @@ export default function SocialLogin() {
                 authService.default.setToken(data.token);
               }
               authService.default.setUserData(data.user);
-              
+
               // 🚫 FCM 토큰 생성 로직 비활성화됨 - 네이티브에서 관리
               setTimeout(async () => {
                 try {
@@ -116,7 +116,7 @@ export default function SocialLogin() {
                   console.error('[SOCIAL_LOGIN] ❌ FCM 처리 중 오류:', fcmError);
                 }
               }, 1000); // Google 로그인 후 1초 지연
-              
+
               console.log('구글 로그인 성공:', data.user);
               router.push('/home');
             }
@@ -142,7 +142,7 @@ export default function SocialLogin() {
           });
 
           const data = await response.json();
-          
+
           if (!response.ok) {
             throw new Error(data.message || '카카오 로그인에 실패했습니다.');
           }
@@ -158,7 +158,7 @@ export default function SocialLogin() {
                 profile_image: data.data.user.profile_image,
                 kakao_id: data.data.user.kakao_id
               };
-              
+
               localStorage.setItem('socialLoginData', JSON.stringify(socialData));
               router.push('/register?social=kakao');
             } else {
@@ -168,7 +168,7 @@ export default function SocialLogin() {
                 authService.default.setToken(data.data.token);
               }
               authService.default.setUserData(data.data.user);
-              
+
               // 🚫 FCM 토큰 생성 로직 비활성화됨 - 네이티브에서 관리
               setTimeout(async () => {
                 try {
@@ -178,7 +178,7 @@ export default function SocialLogin() {
                   console.error('[SOCIAL_LOGIN] ❌ FCM 처리 중 오류:', fcmError);
                 }
               }, 1000); // Kakao 로그인 후 1초 지연
-              
+
               console.log('카카오 로그인 성공:', data.data.user);
               router.push('/home');
             }
@@ -189,6 +189,82 @@ export default function SocialLogin() {
           console.error('카카오 로그인 API 오류:', err);
           // 실제 카카오 로그인 실패 시 안내 메시지
           setError('카카오 로그인은 실제 카카오 SDK 구현이 필요합니다. 데모 모드를 위해 네이버나 애플을 사용해주세요.');
+        }
+      } else if (provider === '애플' || provider === 'apple') {
+        // 애플 로그인 처리 (iOS/Android 네이티브 대응)
+        try {
+          // iOS 네이티브 핸들러 확인
+          if ((window as any).webkit?.messageHandlers?.smapIos) {
+            console.log('🍎 [SOCIAL_LOGIN] iOS 네이티브 애플 로그인 호출');
+            (window as any).webkit.messageHandlers.smapIos.postMessage({
+              type: 'appleSignIn',
+              action: 'appleSignIn'
+            });
+
+            // 결과 처리 콜백 등록
+            (window as any).handleAppleSignInResult = async (result: any) => {
+              console.log('🍎 [SOCIAL_LOGIN] Apple 로그인 결과 수신:', result);
+              if (result.success) {
+                const response = await fetch('/api/auth/apple-login', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    userIdentifier: result.userIdentifier,
+                    userName: result.userName,
+                    email: result.email,
+                    identityToken: result.identityToken,
+                    authorizationCode: result.authorizationCode
+                  }),
+                });
+
+                const data = await response.json();
+                if (data.success && data.data) {
+                  if (data.data.isNewUser) {
+                    const socialData = {
+                      provider: 'apple',
+                      email: result.email || `apple_${result.userIdentifier.slice(0, 8)}@privaterelay.appleid.com`,
+                      name: result.userName || '',
+                      nickname: result.userName || '',
+                      apple_id: result.userIdentifier
+                    };
+                    localStorage.setItem('socialLoginData', JSON.stringify(socialData));
+                    router.push('/register?social=apple');
+                  } else {
+                    const authService = await import('@/services/authService');
+                    if (data.data.token) authService.default.setToken(data.data.token);
+                    authService.default.setUserData(data.data.user);
+                    router.push('/home');
+                  }
+                } else {
+                  setError(data.message || '애플 로그인에 실패했습니다.');
+                }
+              } else {
+                setError(result.error || '애플 로그인이 취소되었습니다.');
+              }
+              delete (window as any).handleAppleSignInResult;
+            };
+          } else {
+            // 웹 환경 (데모 처리)
+            console.log('🍎 [SOCIAL_LOGIN] 웹 데모 애플 로그인 호출');
+            const response = await fetch('/api/auth/social-login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                provider: 'apple',
+                token: `demo-apple-token-${Date.now()}`
+              }),
+            });
+            const data = await response.json();
+            if (data.success && data.data) {
+              const authService = await import('@/services/authService');
+              if (data.data.token) authService.default.setToken(data.data.token);
+              authService.default.setUserData(data.data.member);
+              router.push('/home');
+            }
+          }
+        } catch (err: any) {
+          console.error('애플 로그인 오류:', err);
+          setError(`애플 로그인 중 오류가 발생했습니다: ${err.message}`);
         }
       } else {
         // 기타 소셜 로그인은 데모 모드로 처리
@@ -204,7 +280,7 @@ export default function SocialLogin() {
         });
 
         const data = await response.json();
-        
+
         if (!response.ok) {
           throw new Error(data.message || `${provider} 로그인에 실패했습니다.`);
         }
@@ -216,7 +292,7 @@ export default function SocialLogin() {
             authService.default.setToken(data.data.token);
           }
           authService.default.setUserData(data.data.member);
-          
+
           // FCM 관련 로직 제거됨 - 네이티브에서 관리
           console.log('[SOCIAL_LOGIN] FCM 관련 로직 제거됨 - 네이티브에서 관리');
 
@@ -226,7 +302,7 @@ export default function SocialLogin() {
           throw new Error(data.message || `${provider} 로그인에 실패했습니다.`);
         }
       }
-      
+
     } catch (err: any) {
       console.error(`${provider} 로그인 오류:`, err);
       setError(`${provider} 로그인 중 오류가 발생했습니다: ${err.message}`);
@@ -238,31 +314,31 @@ export default function SocialLogin() {
   // SVG 아이콘들
   const kakaoIcon = (
     <svg width="18" height="18" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
-      <path fill="#3A1D1D" d="M128 36C70.562 36 24 72.713 24 118.875c0 29.09 19.361 54.647 48.736 69.285c-2.063 7.629-7.436 27.737-8.542 32.007c-1.339 5.3 1.956 5.225 4.099 3.803c1.675-1.114 26.56-18.03 37.084-25.306c7.322 1.38 14.917 2.086 22.623 2.086c57.438 0 104-36.713 104-82.875S185.438 36 128 36"/>
-      <path fill="#FFFFFF" d="M70.828 113.75l-14.777 19.099c-1.391 1.795-4.508 1.365-5.096-.703l-7.496-26.548c-.502-1.776.962-3.469 2.77-3.177l22.23 3.567c2.193.352 2.964 2.998 1.37 4.742L70.828 113.75zm69.427 17.135c-.762.803-1.783 1.211-2.801 1.211c-.914 0-1.832-.337-2.549-.994l-1.442-1.329c-3.437 1.559-7.244 2.429-11.262 2.429c-14.943 0-27.09-11.582-27.09-25.852S107.258 80.5 122.2 80.5c14.943 0 27.09 11.582 27.09 25.852c0 5.748-2.051 11.059-5.486 15.404l2.773 2.55c1.398 1.286 1.498 3.466.233 4.879l-2.822 3.061c-.948 1.03-2.447 1.282-3.65.634c-.016-.009-.032-.018-.047-.027l-.036-.019zm70.332-28.061l-7.496 26.548c-.588 2.068-3.705 2.498-5.096.703l-14.777-19.1c-1.593-1.744-.823-4.39 1.37-4.742l22.23-3.567c1.807-.292 3.271 1.401 2.769 3.177v-.019z"/>
+      <path fill="#3A1D1D" d="M128 36C70.562 36 24 72.713 24 118.875c0 29.09 19.361 54.647 48.736 69.285c-2.063 7.629-7.436 27.737-8.542 32.007c-1.339 5.3 1.956 5.225 4.099 3.803c1.675-1.114 26.56-18.03 37.084-25.306c7.322 1.38 14.917 2.086 22.623 2.086c57.438 0 104-36.713 104-82.875S185.438 36 128 36" />
+      <path fill="#FFFFFF" d="M70.828 113.75l-14.777 19.099c-1.391 1.795-4.508 1.365-5.096-.703l-7.496-26.548c-.502-1.776.962-3.469 2.77-3.177l22.23 3.567c2.193.352 2.964 2.998 1.37 4.742L70.828 113.75zm69.427 17.135c-.762.803-1.783 1.211-2.801 1.211c-.914 0-1.832-.337-2.549-.994l-1.442-1.329c-3.437 1.559-7.244 2.429-11.262 2.429c-14.943 0-27.09-11.582-27.09-25.852S107.258 80.5 122.2 80.5c14.943 0 27.09 11.582 27.09 25.852c0 5.748-2.051 11.059-5.486 15.404l2.773 2.55c1.398 1.286 1.498 3.466.233 4.879l-2.822 3.061c-.948 1.03-2.447 1.282-3.65.634c-.016-.009-.032-.018-.047-.027l-.036-.019zm70.332-28.061l-7.496 26.548c-.588 2.068-3.705 2.498-5.096.703l-14.777-19.1c-1.593-1.744-.823-4.39 1.37-4.742l22.23-3.567c1.807-.292 3.271 1.401 2.769 3.177v-.019z" />
     </svg>
   );
-  
+
   const naverIcon = (
     <svg width="18" height="18" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-      <path fill="#FFFFFF" d="M13.5285 10.824L6.47152 0.75H0.75V19.25H6.97152V9.176L14.0285 19.25H19.75V0.75H13.5285V10.824Z"/>
+      <path fill="#FFFFFF" d="M13.5285 10.824L6.47152 0.75H0.75V19.25H6.97152V9.176L14.0285 19.25H19.75V0.75H13.5285V10.824Z" />
     </svg>
   );
-  
+
   const googleIcon = (
     <svg width="18" height="18" viewBox="0 0 24 24">
       <g transform="matrix(1, 0, 0, 1, 27.009001, -39.238998)">
-        <path fill="#4285F4" d="M -3.264 51.509 C -3.264 50.719 -3.334 49.969 -3.454 49.239 L -14.754 49.239 L -14.754 53.749 L -8.284 53.749 C -8.574 55.229 -9.424 56.479 -10.684 57.329 L -10.684 60.329 L -6.824 60.329 C -4.564 58.239 -3.264 55.159 -3.264 51.509 Z"/>
-        <path fill="#34A853" d="M -14.754 63.239 C -11.514 63.239 -8.804 62.159 -6.824 60.329 L -10.684 57.329 C -11.764 58.049 -13.134 58.489 -14.754 58.489 C -17.884 58.489 -20.534 56.379 -21.484 53.529 L -25.464 53.529 L -25.464 56.619 C -23.494 60.539 -19.444 63.239 -14.754 63.239 Z"/>
-        <path fill="#FBBC05" d="M -21.484 53.529 C -21.734 52.809 -21.864 52.039 -21.864 51.239 C -21.864 50.439 -21.724 49.669 -21.484 48.949 L -21.484 45.859 L -25.464 45.859 C -26.284 47.479 -26.754 49.299 -26.754 51.239 C -26.754 53.179 -26.284 54.999 -25.464 56.619 L -21.484 53.529 Z"/>
-        <path fill="#EA4335" d="M -14.754 43.989 C -12.984 43.989 -11.404 44.599 -10.154 45.789 L -6.734 42.369 C -8.804 40.429 -11.514 39.239 -14.754 39.239 C -19.444 39.239 -23.494 41.939 -25.464 45.859 L -21.484 48.949 C -20.534 46.099 -17.884 43.989 -14.754 43.989 Z"/>
+        <path fill="#4285F4" d="M -3.264 51.509 C -3.264 50.719 -3.334 49.969 -3.454 49.239 L -14.754 49.239 L -14.754 53.749 L -8.284 53.749 C -8.574 55.229 -9.424 56.479 -10.684 57.329 L -10.684 60.329 L -6.824 60.329 C -4.564 58.239 -3.264 55.159 -3.264 51.509 Z" />
+        <path fill="#34A853" d="M -14.754 63.239 C -11.514 63.239 -8.804 62.159 -6.824 60.329 L -10.684 57.329 C -11.764 58.049 -13.134 58.489 -14.754 58.489 C -17.884 58.489 -20.534 56.379 -21.484 53.529 L -25.464 53.529 L -25.464 56.619 C -23.494 60.539 -19.444 63.239 -14.754 63.239 Z" />
+        <path fill="#FBBC05" d="M -21.484 53.529 C -21.734 52.809 -21.864 52.039 -21.864 51.239 C -21.864 50.439 -21.724 49.669 -21.484 48.949 L -21.484 45.859 L -25.464 45.859 C -26.284 47.479 -26.754 49.299 -26.754 51.239 C -26.754 53.179 -26.284 54.999 -25.464 56.619 L -21.484 53.529 Z" />
+        <path fill="#EA4335" d="M -14.754 43.989 C -12.984 43.989 -11.404 44.599 -10.154 45.789 L -6.734 42.369 C -8.804 40.429 -11.514 39.239 -14.754 39.239 C -19.444 39.239 -23.494 41.939 -25.464 45.859 L -21.484 48.949 C -20.534 46.099 -17.884 43.989 -14.754 43.989 Z" />
       </g>
     </svg>
   );
-  
+
   const appleIcon = (
     <svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-      <path fill="currentColor" d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.19 2.33-.88 3.69-.73 1.58.23 2.76.89 3.53 2.24-3.2 2.1-2.69 6.11.48 7.65-.61 1.34-1.39 2.65-2.78 4.01m-6.89-15C10.29 2.68 12.7.75 15.29 1c.3 2.5-1.86 5.13-4.24 5.28-.3-2.5.42-3.5.11-4Z"/>
+      <path fill="currentColor" d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.19 2.33-.88 3.69-.73 1.58.23 2.76.89 3.53 2.24-3.2 2.1-2.69 6.11.48 7.65-.61 1.34-1.39 2.65-2.78 4.01m-6.89-15C10.29 2.68 12.7.75 15.29 1c.3 2.5-1.86 5.13-4.24 5.28-.3-2.5.42-3.5.11-4Z" />
     </svg>
   );
 
@@ -304,6 +380,16 @@ export default function SocialLogin() {
           textColor="gray-700"
           icon={googleIcon}
           onClick={() => handleSocialLogin('구글')}
+        />
+
+        {/* 애플 로그인 */}
+        <SocialLoginButton
+          provider="애플"
+          bgColor="bg-black"
+          hoverColor="bg-gray-900"
+          textColor="white"
+          icon={appleIcon}
+          onClick={() => handleSocialLogin('애플')}
         />
 
 

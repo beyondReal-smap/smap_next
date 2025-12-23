@@ -151,6 +151,51 @@ export async function POST(request: NextRequest) {
       }
 
       console.log('백엔드 API 호출 성공');
+
+      // 소셜 로그인 사용자의 경우 JWT 토큰 생성하여 자동 로그인 처리
+      if (isSocialLogin && backendData.success && backendData.data?.mt_idx) {
+        const jwt = require('jsonwebtoken');
+        const userData = backendData.data;
+
+        // JWT 토큰 생성
+        const token = jwt.sign(
+          {
+            mt_idx: userData.mt_idx,
+            userId: userData.mt_idx,
+            mt_id: userData.mt_id,
+            mt_name: userData.mt_name,
+            mt_nickname: userData.mt_nickname,
+            mt_email: userData.mt_email,
+            mt_type: body.mt_type,
+            provider: body.mt_type === 3 ? 'apple' : body.mt_type === 4 ? 'google' : 'kakao'
+          },
+          process.env.NEXTAUTH_SECRET || 'smap!@super-secret',
+          { expiresIn: '7d' }
+        );
+
+        console.log('🍎 [REGISTER] 소셜 로그인 회원가입 성공 - JWT 토큰 생성 완료');
+
+        // 토큰을 포함한 응답 반환
+        const response = NextResponse.json({
+          ...backendData,
+          data: {
+            ...backendData.data,
+            token: token
+          }
+        });
+
+        // 쿠키에도 토큰 설정
+        response.cookies.set('auth-token', token, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 7, // 7일
+          path: '/',
+        });
+
+        return response;
+      }
+
       return NextResponse.json(backendData);
     } catch (fetchError) {
       console.error('백엔드 연결 실패, 임시 처리:', fetchError);
