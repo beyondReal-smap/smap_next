@@ -6,13 +6,13 @@ import { motion } from 'framer-motion';
 import Image from 'next/image';
 // 공통 이미지 처리 유틸리티 import
 import { getSafeImageUrl, getDefaultImage, handleImageError } from '@/lib/imageUtils';
-import { 
-  FiUser, 
-  FiMail, 
-  FiLock, 
-  FiLogOut, 
-  FiTrash2, 
-  FiCamera, 
+import {
+  FiUser,
+  FiMail,
+  FiLock,
+  FiLogOut,
+  FiTrash2,
+  FiCamera,
   FiEdit3,
   FiChevronRight,
   FiShield
@@ -43,7 +43,7 @@ const getUserPlan = (mtLevel: number | null | undefined): string => {
 // 로그인 타입에 따른 로그인 방법 반환 함수
 const getLoginMethod = (mtType: number | null | undefined): { method: string; icon: string } => {
   console.log('[LOGIN METHOD] mt_type:', mtType);
-  
+
   switch (mtType) {
     case 1:
       return { method: '일반 로그인', icon: '🔐' };
@@ -262,15 +262,80 @@ export default function AccountSettingsPage() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showProfileUploader, setShowProfileUploader] = useState(false);
 
-  // 페이지 로드 시 사용자 데이터 새로고침
+  // 페이지 로드 시 사용자 데이터 새로고침 - 직접 API 호출로 최신 데이터 가져오기
   useEffect(() => {
     const refreshData = async () => {
       try {
         console.log('[ACCOUNT SETTING] 사용자 데이터 새로고침 시작');
-        await refreshUserData();
+
+        // 토큰 가져오기
+        const token = localStorage.getItem('smap_auth_token') ||
+          localStorage.getItem('auth-token') ||
+          localStorage.getItem('authToken');
+
+        if (!token) {
+          console.log('[ACCOUNT SETTING] 토큰 없음 - refreshUserData만 호출');
+          await refreshUserData();
+          return;
+        }
+
+        // /api/auth/profile 직접 호출하여 최신 데이터 가져오기
+        console.log('[ACCOUNT SETTING] /api/auth/profile API 직접 호출');
+        const response = await fetch('/api/auth/profile', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log('[ACCOUNT SETTING] API 응답:', data);
+
+          if (data.success && data.data) {
+            const profileData = data.data;
+            console.log('[ACCOUNT SETTING] 프로필 데이터 수신:', {
+              mt_type: profileData.mt_type,
+              mt_wdate: profileData.mt_wdate,
+              mt_email: profileData.mt_email
+            });
+
+            // localStorage에 저장된 기존 사용자 데이터 가져오기
+            const existingUserData = localStorage.getItem('smap_user_data');
+            let mergedUserData = profileData;
+
+            if (existingUserData) {
+              try {
+                const existingData = JSON.parse(existingUserData);
+                // 기존 데이터와 새 데이터 병합 (새 데이터 우선)
+                mergedUserData = { ...existingData, ...profileData };
+              } catch (e) {
+                console.warn('[ACCOUNT SETTING] 기존 데이터 파싱 실패:', e);
+              }
+            }
+
+            // localStorage에 업데이트된 데이터 저장
+            localStorage.setItem('smap_user_data', JSON.stringify(mergedUserData));
+            localStorage.setItem('user_data', JSON.stringify(mergedUserData));
+            console.log('[ACCOUNT SETTING] localStorage 업데이트 완료');
+
+            // AuthContext도 새로고침
+            await refreshUserData();
+          }
+        } else {
+          console.warn('[ACCOUNT SETTING] API 호출 실패, 기존 refreshUserData 사용:', response.status);
+          await refreshUserData();
+        }
+
         console.log('[ACCOUNT SETTING] 사용자 데이터 새로고침 완료');
       } catch (error) {
         console.error('[ACCOUNT SETTING] 사용자 데이터 새로고침 실패:', error);
+        // 실패 시에도 기본 refreshUserData 시도
+        try {
+          await refreshUserData();
+        } catch (e) {
+          console.error('[ACCOUNT SETTING] refreshUserData도 실패:', e);
+        }
       }
     };
 
@@ -293,7 +358,7 @@ export default function AccountSettingsPage() {
     mt_nickname: user?.mt_nickname,
     mt_email: user?.mt_email
   });
-  
+
   // 가입일 파싱 테스트
   if (user?.mt_wdate) {
     try {
@@ -310,9 +375,9 @@ export default function AccountSettingsPage() {
   } else {
     console.log('[ACCOUNT SETTING] mt_wdate가 없음 또는 falsy 값');
   }
-  
+
   const loginInfo = getLoginMethod(user?.mt_type);
-  
+
   // 사용자 이름 결정 로직 개선 (목업 데이터 필터링)
   const getUserDisplayName = () => {
     console.log('[ACCOUNT SETTING] 사용자 데이터 확인:', {
@@ -321,12 +386,12 @@ export default function AccountSettingsPage() {
       mt_id: user?.mt_id,
       mt_idx: user?.mt_idx
     });
-    
+
     // 목업 데이터 필터링
     const isMockData = (name: string) => {
       return name === '김철수' || name === '테스트 사용자' || name.includes('목업') || name.includes('mock');
     };
-    
+
     // 우선순위: mt_nickname > mt_name > mt_id > 기본값 (목업 데이터 제외)
     if (user?.mt_nickname && user.mt_nickname.trim() !== '' && !isMockData(user.mt_nickname)) {
       return user.mt_nickname;
@@ -349,15 +414,15 @@ export default function AccountSettingsPage() {
     }
     return '사용자';
   };
-  
+
   const profile = {
     avatar: getSafeImageUrl(user?.mt_file1 || null, user?.mt_gender, user?.mt_idx || 0),
     name: getUserDisplayName(),
     plan: getUserPlan(user?.mt_level),
     loginMethod: loginInfo.method,
     loginIcon: loginInfo.icon,
-    memberSince: user?.mt_wdate ? 
-      new Date(user.mt_wdate).getFullYear() + '년 ' + (new Date(user.mt_wdate).getMonth() + 1) + '월' : 
+    memberSince: user?.mt_wdate ?
+      new Date(user.mt_wdate).getFullYear() + '년 ' + (new Date(user.mt_wdate).getMonth() + 1) + '월' :
       '가입일 정보 없음',
     level: getUserLevel(user?.mt_level)
   };
@@ -367,16 +432,16 @@ export default function AccountSettingsPage() {
     {
       title: '개인정보 관리',
       items: [
-        { 
-          label: '프로필 편집', 
-          href: '/setting/account/profile', 
+        {
+          label: '프로필 편집',
+          href: '/setting/account/profile',
           icon: FiUser,
           color: 'bg-blue-500',
           description: '이름, 닉네임, 생년월일, 성별 변경'
         },
-        { 
-          label: '연락처 정보', 
-          href: '/setting/account/contact', 
+        {
+          label: '연락처 정보',
+          href: '/setting/account/contact',
           icon: FiMail,
           color: 'bg-green-500',
           description: '이메일, 전화번호 관리'
@@ -386,9 +451,9 @@ export default function AccountSettingsPage() {
     {
       title: '보안 설정',
       items: [
-        { 
-          label: '비밀번호 변경', 
-          href: '/setting/account/password', 
+        {
+          label: '비밀번호 변경',
+          href: '/setting/account/password',
           icon: FiLock,
           color: 'bg-orange-500',
           description: '계정 비밀번호 변경'
@@ -398,17 +463,17 @@ export default function AccountSettingsPage() {
     {
       title: '계정 관리',
       items: [
-        { 
-          label: '로그아웃', 
-          href: '#', 
+        {
+          label: '로그아웃',
+          href: '#',
           icon: FiLogOut,
           color: 'bg-yellow-500',
           description: '현재 계정에서 로그아웃',
           onClick: () => setShowLogoutModal(true)
         },
-        { 
-          label: '회원탈퇴', 
-          href: '/setting/account/withdraw', 
+        {
+          label: '회원탈퇴',
+          href: '/setting/account/withdraw',
           icon: FiTrash2,
           color: 'bg-red-500',
           description: '계정 영구 삭제'
@@ -435,10 +500,10 @@ export default function AccountSettingsPage() {
   const handleLogout = async () => {
     try {
       setShowLogoutModal(false);
-      
+
       // AuthContext의 logout 호출
       await logout();
-      
+
       console.log('[LOGOUT] 로그아웃 완료, signin으로 강제 이동');
       // 무조건 signin 페이지로 이동 (window.location.replace 사용)
       window.location.replace('/signin');
@@ -491,7 +556,7 @@ export default function AccountSettingsPage() {
       // 관련 캐시 무효화 (프로필 이미지 변경으로 인한 마커 업데이트를 위해)
       invalidateCache('userProfile');
       invalidateCache('groupMembers'); // 모든 그룹의 멤버 캐시 무효화
-      
+
       console.log('[PROFILE UPLOAD] 캐시 무효화 완료 - userProfile, groupMembers');
 
       // 성공 피드백
@@ -519,12 +584,12 @@ export default function AccountSettingsPage() {
   // 메뉴 아이템 클릭 핸들러
   const handleMenuClick = (item: any) => {
     // 🎮 계정 메뉴 클릭 햅틱 피드백
-    triggerHapticFeedback(HapticFeedbackType.SELECTION, `${item.label} 메뉴 클릭`, { 
-      component: 'account-setting', 
+    triggerHapticFeedback(HapticFeedbackType.SELECTION, `${item.label} 메뉴 클릭`, {
+      component: 'account-setting',
       action: 'menu-click',
-      menu: item.label 
+      menu: item.label
     });
-    
+
     if (item.onClick) {
       item.onClick();
     } else {
@@ -608,10 +673,10 @@ export default function AccountSettingsPage() {
       `}</style>
       <div className="fixed inset-0 bg-gradient-to-br from-indigo-50 via-white to-purple-50" data-page="/setting/account">
         {/* 통일된 헤더 애니메이션 */}
-        <AnimatedHeader 
+        <AnimatedHeader
           variant="simple"
           className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed setting-header"
-          style={{ 
+          style={{
             paddingTop: '0px',
             marginTop: '0px',
             top: '0px',
@@ -619,13 +684,13 @@ export default function AccountSettingsPage() {
           }}
         >
           <div className="flex items-center justify-between h-14">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, x: -40 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
               className="flex items-center space-x-3 motion-div"
             >
-              <motion.button 
+              <motion.button
                 onClick={handleBack}
                 className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
                 whileHover={{ scale: 1.05 }}
@@ -670,7 +735,7 @@ export default function AccountSettingsPage() {
             className="space-y-6"
           >
             {/* 계정 정보 카드 - 파란색 테마 */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2, duration: 0.6 }}
@@ -705,7 +770,7 @@ export default function AccountSettingsPage() {
                     </button>
 
                   </div>
-                  
+
                   <div className="flex-1">
                     <div className="flex items-center space-x-2 mb-1">
                       <h2 className="text-xl font-bold">계정 정보</h2>
@@ -717,18 +782,18 @@ export default function AccountSettingsPage() {
                     <p className="text-blue-100 text-sm mb-1">{profile.name || '사용자'}</p>
                     <p className="text-blue-200 text-xs">{
                       // 목업 이메일인지 확인 후 표시
-                      user?.mt_email && 
-                      !user.mt_email.includes('@example.com') && 
-                      !user.mt_email.includes('demo') && 
-                      !user.mt_email.includes('temp@') && 
-                      user.mt_email.trim() !== '' 
-                        ? user.mt_email 
+                      user?.mt_email &&
+                        !user.mt_email.includes('@example.com') &&
+                        !user.mt_email.includes('demo') &&
+                        !user.mt_email.includes('temp@') &&
+                        user.mt_email.trim() !== ''
+                        ? user.mt_email
                         : '이메일 정보 없음'
                     }</p>
                     <p className="text-blue-200 text-xs">{user?.mt_id ? user.mt_id.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3') : '전화번호 정보 없음'}</p>
                   </div>
                 </div>
-                
+
                 <div className="mt-4 pt-4 border-t border-white/20">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="text-center">
@@ -753,7 +818,7 @@ export default function AccountSettingsPage() {
             {/* 메뉴 섹션들 */}
             <div className="space-y-6">
               {menuSections.map((section, sectionIdx) => (
-                <motion.div 
+                <motion.div
                   key={sectionIdx}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -763,7 +828,7 @@ export default function AccountSettingsPage() {
                     <span>{section.title}</span>
                     <div className="flex-1 h-px bg-gradient-to-r from-gray-300 to-transparent ml-3"></div>
                   </h3>
-                  
+
                   <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                     {section.items.map((item, itemIdx) => {
                       const IconComponent = item.icon;
@@ -776,12 +841,12 @@ export default function AccountSettingsPage() {
                           <div className={`w-10 h-10 ${item.color} rounded-xl flex items-center justify-center mr-4 shadow-sm`}>
                             <IconComponent className="w-5 h-5 text-white" />
                           </div>
-                          
+
                           <div className="flex-1 text-left">
                             <h4 className="font-medium text-gray-900 mb-0.5">{item.label}</h4>
                             <p className="text-xs text-gray-500">{item.description}</p>
                           </div>
-                          
+
                           <FiChevronRight className="w-5 h-5 text-gray-400" />
                         </button>
                       );
@@ -805,11 +870,11 @@ export default function AccountSettingsPage() {
 
         {/* 로그아웃 확인 모달 - 컴팩트 버전 */}
         {showLogoutModal && (
-          <div 
+          <div
             className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
             onClick={() => setShowLogoutModal(false)}
           >
-            <div 
+            <div
               className="bg-white rounded-2xl w-full max-w-xs mx-auto animate-slideInFromBottom"
               onClick={(e) => e.stopPropagation()}
             >
@@ -823,7 +888,7 @@ export default function AccountSettingsPage() {
                     정말 로그아웃 하시겠습니까?
                   </p>
                 </div>
-                
+
                 <div className="flex space-x-2">
                   <button
                     type="button"
