@@ -104,11 +104,32 @@ export default function PasswordChangePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showSocialLoginModal, setShowSocialLoginModal] = useState(false);
+  const [socialLoginType, setSocialLoginType] = useState<'google' | 'apple' | null>(null);
 
-  // 페이지 마운트 시 스크롤 설정
+  // 페이지 마운트 시 스크롤 설정 및 소셜 로그인 확인
   useEffect(() => {
     document.body.style.overflowY = 'auto';
     document.documentElement.style.overflowY = 'auto';
+
+    // 사용자 로그인 타입 확인
+    try {
+      const userData = localStorage.getItem('user-data') || localStorage.getItem('smap_user_data');
+      if (userData) {
+        const user = JSON.parse(userData);
+        // mt_type: 1: 일반, 2: 카카오, 3: 애플, 4: 구글
+        if (user.mt_type === 4) {
+          setSocialLoginType('google');
+          setShowSocialLoginModal(true);
+        } else if (user.mt_type === 3) {
+          setSocialLoginType('apple');
+          setShowSocialLoginModal(true);
+        }
+      }
+    } catch (error) {
+      console.error('사용자 정보 파싱 오류:', error);
+    }
+
     return () => {
       document.body.style.overflowY = '';
       document.documentElement.style.overflowY = '';
@@ -599,8 +620,8 @@ export default function PasswordChangePage() {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     className={`block w-full pl-10 pr-12 py-3 border ${errors.confirmPassword ? 'border-red-300' :
-                        confirmPassword && newPassword === confirmPassword ? 'border-green-300' :
-                          'border-gray-300'
+                      confirmPassword && newPassword === confirmPassword ? 'border-green-300' :
+                        'border-gray-300'
                       } rounded-xl focus:ring-2 transition-all duration-200`}
                     onFocus={(e) => {
                       if (!errors.confirmPassword && !(confirmPassword && newPassword === confirmPassword)) {
@@ -696,6 +717,27 @@ export default function PasswordChangePage() {
           buttonText="확인"
           onConfirm={handleSuccessConfirm}
           type="success"
+        />
+
+        {/* 소셜 로그인 사용자 안내 모달 */}
+        <AlertModal
+          isOpen={showSocialLoginModal}
+          onClose={() => {
+            setShowSocialLoginModal(false);
+            router.push('/setting/account');
+          }}
+          message={socialLoginType === 'google' ? '구글 로그인 사용자' : '애플 로그인 사용자'}
+          description={
+            socialLoginType === 'google'
+              ? '구글 계정으로 로그인한 사용자는 비밀번호를 변경할 수 없습니다.\n\n구글 계정의 비밀번호는 Google 계정 관리에서 변경해주세요.'
+              : '애플 계정으로 로그인한 사용자는 비밀번호를 변경할 수 없습니다.\n\nApple ID 비밀번호는 애플 기기의 설정에서 변경해주세요.'
+          }
+          buttonText="확인"
+          onConfirm={() => {
+            setShowSocialLoginModal(false);
+            router.push('/setting/account');
+          }}
+          type="info"
         />
       </div>
     </>
