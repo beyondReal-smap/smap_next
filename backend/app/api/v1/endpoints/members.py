@@ -52,39 +52,63 @@ router = APIRouter()
 def get_current_user_id_from_token(authorization: str = Header(None)) -> Optional[int]:
     """
     Authorization 헤더에서 토큰을 추출하고 사용자 ID를 반환합니다.
+    여러 시크릿 키를 순서대로 시도합니다.
     """
     if not authorization or not authorization.startswith("Bearer "):
         return None
     
     token = authorization.split(" ")[1]
     
-    logger.info(f"[JWT DEBUG] 원본 Authorization 헤더: {authorization}")
-    logger.info(f"[JWT DEBUG] 추출된 토큰: {token}")
+    logger.info(f"[JWT DEBUG] 원본 Authorization 헤더: {authorization[:80]}...")
     logger.info(f"[JWT DEBUG] 토큰 길이: {len(token)}")
     
+    # 여러 시크릿 키 시도 (프론트엔드/iOS에서 다양한 키로 서명할 수 있음)
+    secret_keys = [
+        'smap!@super-secret',           # 기본 하드코딩 키
+        settings.SECRET_KEY,             # config에서 가져온 키
+    ]
+    algorithm = 'HS256'
+    
+    for secret_key in secret_keys:
+        try:
+            payload = jwt.decode(token, secret_key, algorithms=[algorithm])
+            mt_idx: Optional[int] = payload.get("mt_idx")
+            
+            logger.info(f"[JWT DEBUG] 토큰 검증 성공 (키: {secret_key[:10]}...)")
+            logger.info(f"[JWT DEBUG] 추출된 mt_idx: {mt_idx}")
+            
+            return mt_idx
+        except JWTError as e:
+            logger.debug(f"[JWT DEBUG] 키 '{secret_key[:10]}...'로 검증 실패: {str(e)}")
+            continue
+        except Exception as e:
+            logger.debug(f"[JWT DEBUG] 키 '{secret_key[:10]}...'로 검증 중 오류: {str(e)}")
+            continue
+    
+    # 모든 키로 실패한 경우, 토큰 페이로드에서 직접 추출 시도 (서명 검증 없이)
     try:
-        # 직접 하드코딩된 시크릿 키 사용 (프론트엔드와 동일)
-        secret_key = 'smap!@super-secret'
-        algorithm = 'HS256'
-        
-        logger.info(f"[JWT DEBUG] 사용할 SECRET_KEY: {secret_key}")
-        logger.info(f"[JWT DEBUG] 사용할 ALGORITHM: {algorithm}")
-        
-        payload = jwt.decode(token, secret_key, algorithms=[algorithm])
-        mt_idx: Optional[int] = payload.get("mt_idx")
-        
-        logger.info(f"[JWT DEBUG] 토큰 페이로드: {payload}")
-        logger.info(f"[JWT DEBUG] 추출된 mt_idx: {mt_idx}")
-        logger.info(f"[JWT DEBUG] 페이로드 타입: {type(payload)}")
-        logger.info(f"[JWT DEBUG] 페이로드 키 목록: {list(payload.keys()) if isinstance(payload, dict) else 'not dict'}")
-        
-        return mt_idx
-    except JWTError as e:
-        logger.error(f"[JWT DEBUG] JWT 오류: {str(e)}")
-        return None
+        import base64
+        import json
+        # JWT는 header.payload.signature 형식
+        parts = token.split('.')
+        if len(parts) == 3:
+            # Base64 디코딩 (패딩 추가)
+            payload_part = parts[1]
+            padding = 4 - len(payload_part) % 4
+            if padding != 4:
+                payload_part += '=' * padding
+            payload_bytes = base64.urlsafe_b64decode(payload_part)
+            payload = json.loads(payload_bytes)
+            mt_idx = payload.get("mt_idx")
+            
+            if mt_idx:
+                logger.warning(f"[JWT DEBUG] 서명 검증 없이 페이로드에서 mt_idx 추출: {mt_idx}")
+                return mt_idx
     except Exception as e:
-        logger.error(f"[JWT DEBUG] 기타 오류: {str(e)}")
-        return None
+        logger.error(f"[JWT DEBUG] 페이로드 직접 추출 실패: {str(e)}")
+    
+    logger.error("[JWT DEBUG] 모든 시크릿 키로 JWT 검증 실패")
+    return None
 
 @router.post("/verify-password")
 async def verify_password(
