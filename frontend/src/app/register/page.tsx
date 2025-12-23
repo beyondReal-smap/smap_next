@@ -1401,13 +1401,12 @@ export default function RegisterPage() {
             authService.default.setUserData(userData);
             console.log('🍎 [REGISTER] 사용자 정보 저장 완료:', userData);
 
-            // 홈으로 바로 이동 (완료 화면 생략)
-            console.log('🍎 [REGISTER] 소셜 로그인 회원가입 완료 - 홈으로 이동');
-            router.push('/home');
-            return; // 완료 화면으로 이동하지 않음
+            // 완료 화면을 보여준 후 홈으로 이동하도록 변경
+            console.log('🍎 [REGISTER] 소셜 로그인 회원가입 완료 - 완료 화면으로 이동');
+            // 홈으로 바로 이동하지 않고 완료 단계로 이동 (아래 setCurrentStep으로 처리됨)
           } catch (authError) {
             console.error('❌ [REGISTER] 자동 로그인 처리 중 오류:', authError);
-            // 오류 발생 시 완료 화면으로 이동
+            // 오류 발생 시에도 완료 화면으로 이동
           }
         }
 
@@ -1719,13 +1718,18 @@ export default function RegisterPage() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2 }}
             onClick={() => {
-              router.push('/signin');
+              // 소셜 로그인 사용자는 이미 로그인되어 있으므로 홈으로 이동
+              if (registerData.isSocialLogin) {
+                router.push('/home');
+              } else {
+                router.push('/signin');
+              }
             }}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             className="w-full py-4 bg-[#0114a2] text-white rounded-xl font-semibold text-lg shadow-lg hover:bg-[#010f7a] transition-colors"
           >
-            로그인하러 가기
+            {registerData.isSocialLogin ? '시작하기' : '로그인하러 가기'}
           </motion.button>
         </motion.div>
       </div>
