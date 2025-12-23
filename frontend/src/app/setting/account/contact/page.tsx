@@ -63,13 +63,21 @@ export default function ContactPage() {
           // 전화번호에 하이픈 포맷팅 적용
           const formattedPhone = userData.mt_hp ? formatPhoneNumber(userData.mt_hp) : '';
 
+          // 이메일 폴백 로직: mt_email이 없으면 mt_id에서 이메일 형식인지 확인
+          let emailValue = userData.mt_email || '';
+          if (!emailValue && userData.mt_id && userData.mt_id.includes('@')) {
+            // 소셜 로그인 사용자의 경우 mt_id에 이메일이 저장되어 있을 수 있음
+            emailValue = userData.mt_id;
+            console.log('📧 [CONTACT] mt_email이 없어 mt_id에서 이메일 가져옴:', emailValue);
+          }
+
           setContact({
             mt_hp: formattedPhone,
-            mt_email: userData.mt_email || ''
+            mt_email: emailValue
           });
           console.log('✅ 연락처 데이터 설정 완료:', {
             phone: formattedPhone,
-            email: userData.mt_email
+            email: emailValue
           });
         }
       } else {

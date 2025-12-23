@@ -25,7 +25,7 @@ def get_user_by_kakao_id(db: Session, kakao_id: str) -> Optional[Member]:
     return db.query(Member).filter(
         Member.mt_kakao_id == kakao_id,
         Member.mt_level >= 2, # 정상회원 레벨 이상 (탈퇴회원 mt_level=1 제외)
-        Member.mt_status == '1', # 정상상태
+        Member.mt_status == 1, # 정상상태
         Member.mt_show == 'Y' # 노출여부
     ).first()
 
@@ -34,7 +34,7 @@ def get_user_by_idx(db: Session, mt_idx: int) -> Optional[Member]:
     return db.query(Member).filter(
         Member.mt_idx == mt_idx,
         Member.mt_level >= 2, # 정상회원 레벨 이상 (탈퇴회원 mt_level=1 제외)
-        Member.mt_status == '1', # 정상상태
+        Member.mt_status == 1, # 정상상태
         Member.mt_show == 'Y' # 노출여부
     ).first()
 
@@ -318,7 +318,7 @@ def check_phone_duplicate(db: Session, mt_idx: int, phone: str) -> bool:
     existing_user = db.query(Member).filter(
         Member.mt_hp == clean_phone,
         Member.mt_idx != mt_idx,
-        Member.mt_status == '1',
+        Member.mt_status == 1,
         Member.mt_show == 'Y'
     ).first()
     return existing_user is not None
@@ -328,7 +328,7 @@ def check_email_duplicate(db: Session, mt_idx: int, email: str) -> bool:
     existing_user = db.query(Member).filter(
         Member.mt_email == email,
         Member.mt_idx != mt_idx,
-        Member.mt_status == '1',
+        Member.mt_status == 1,
         Member.mt_show == 'Y'
     ).first()
     return existing_user is not None
@@ -338,7 +338,7 @@ def check_nickname_duplicate(db: Session, mt_idx: int, nickname: str) -> bool:
     existing_user = db.query(Member).filter(
         Member.mt_nickname == nickname,
         Member.mt_idx != mt_idx,
-        Member.mt_status == '1',
+        Member.mt_status == 1,
         Member.mt_show == 'Y'
     ).first()
     return existing_user is not None
