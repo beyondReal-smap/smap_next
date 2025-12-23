@@ -351,10 +351,10 @@ export default function WithdrawPage() {
         <div key={step} className="flex items-center">
           <div
             className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 ${step < currentStep
-                ? 'bg-gradient-to-br from-green-500 to-green-600 text-white shadow-lg'
-                : step === currentStep
-                  ? 'bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg'
-                  : 'bg-gray-200 text-gray-500'
+              ? 'bg-gradient-to-br from-green-500 to-green-600 text-white shadow-lg'
+              : step === currentStep
+                ? 'bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg'
+                : 'bg-gray-200 text-gray-500'
               }`}
           >
             {step < currentStep ? <FiCheck className="w-5 h-5" /> : step}
@@ -768,8 +768,8 @@ export default function WithdrawPage() {
                         key={reason.id}
                         onClick={() => handleReasonChange(reason.text)}
                         className={`p-3 rounded-lg border-2 text-left transition-all duration-200 ${reasons.includes(reason.text)
-                            ? 'border-red-300 bg-red-50'
-                            : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+                          ? 'border-red-300 bg-red-50'
+                          : 'border-gray-200 bg-gray-50 hover:border-gray-300'
                           }`}
                       >
                         <div className="flex items-center space-x-2">
@@ -895,7 +895,7 @@ export default function WithdrawPage() {
                 onClick={currentStep === 1 ? handlePasswordNext : handleReasonNext}
                 disabled={
                   isLoading ||
-                  (currentStep === 1 && !password) ||
+                  (currentStep === 1 && !password && !isGoogleLogin && !isAppleLogin) ||
                   (currentStep === 2 && reasons.length === 0) ||
                   (currentStep === 2 && reasons.includes('기타 이유') && !etcReason.trim())
                 }
