@@ -3,14 +3,17 @@ import { Member } from '@/types/auth';
 
 // 실제 백엔드 API 호출 함수
 async function fetchWithFallback(url: string): Promise<any> {
+  // Node.js 환경에서 SSL 검증 비활성화
+  (process as any).env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
   const response = await fetch(url, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'User-Agent': 'SMAP-NextJS/1.0'
     },
-    // SSL 인증서 문제 해결을 위한 설정
-    // @ts-ignore
-    rejectUnauthorized: false
+    cache: 'no-store'  // 캐시 비활성화
   });
 
   if (!response.ok) {
@@ -151,21 +154,21 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    
+
     console.log('[Members API] 멤버 조회 요청:', { id });
 
     // 실제 백엔드 API 호출 시도
     try {
       const backendUrl = `https://api3.smap.site/api/v1/members/${id}`;
       console.log('[Members API] 백엔드 API 호출:', backendUrl);
-      
+
       const memberData = await fetchWithFallback(backendUrl);
-      console.log('[Members API] 백엔드 응답 성공:', { 
+      console.log('[Members API] 백엔드 응답 성공:', {
         mt_idx: memberData.mt_idx,
         mt_name: memberData.mt_name,
         mt_birth: memberData.mt_birth
       });
-      
+
       return NextResponse.json(memberData, {
         headers: {
           'X-Data-Source': 'backend-real',
@@ -174,10 +177,10 @@ export async function GET(
       });
     } catch (backendError) {
       console.warn('[Members API] 백엔드 API 호출 실패, Mock 데이터 사용:', backendError);
-      
+
       // Mock 데이터에서 해당 ID의 사용자 찾기
       const mockMember = mockMembers[id];
-      
+
       if (!mockMember) {
         // 해당 ID의 사용자가 없으면 기본 사용자 반환
         const defaultMember: Member = {
@@ -241,23 +244,26 @@ export async function PUT(
   try {
     const { id } = await params;
     const updateData = await request.json();
-    
+
     console.log('[Members API] 멤버 업데이트 요청:', { id, updateData });
 
     // 실제 백엔드 API 호출 시도
     try {
       const backendUrl = `https://api3.smap.site/api/v1/members/${id}`;
       console.log('[Members API] 백엔드 업데이트 API 호출:', backendUrl);
-      
+
+      // Node.js 환경에서 SSL 검증 비활성화
+      (process as any).env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
       const response = await fetch(backendUrl, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'User-Agent': 'SMAP-NextJS/1.0'
         },
         body: JSON.stringify(updateData),
-        // SSL 인증서 문제 해결을 위한 설정
-        // @ts-ignore
-        rejectUnauthorized: false
+        cache: 'no-store'
       });
 
       if (!response.ok) {
@@ -265,11 +271,11 @@ export async function PUT(
       }
 
       const updatedMemberData = await response.json();
-      console.log('[Members API] 백엔드 업데이트 응답 성공:', { 
+      console.log('[Members API] 백엔드 업데이트 응답 성공:', {
         mt_idx: updatedMemberData.mt_idx,
         mt_name: updatedMemberData.mt_name
       });
-      
+
       return NextResponse.json(updatedMemberData, {
         headers: {
           'X-Data-Source': 'backend-real',
@@ -278,10 +284,10 @@ export async function PUT(
       });
     } catch (backendError) {
       console.warn('[Members API] 백엔드 업데이트 API 호출 실패, Mock 데이터 사용:', backendError);
-      
+
       // 기존 사용자 데이터 가져오기
       const existingMember = mockMembers[id];
-      
+
       // 임시 로직 - 업데이트된 데이터 반환
       const updatedMember: Member = {
         ...(existingMember || {
