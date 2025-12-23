@@ -422,9 +422,11 @@ export default function WithdrawPage() {
             overflow: hidden !important;
           }
           
-          .content-area {
+          .content-area, .withdraw-content-area {
             overflow-y: auto !important;
             -webkit-overflow-scrolling: touch !important;
+            height: calc(100vh - 62px) !important;
+            padding-bottom: 120px !important;
           }
           
           /* iOS 헤더 강제 표시 */
@@ -582,7 +584,12 @@ export default function WithdrawPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="px-4 pt-20 space-y-4 pb-24"
+          className="px-4 pt-20 space-y-4 pb-32 withdraw-content-area"
+          style={{
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            minHeight: '100vh'
+          }}
         >
           {/* 경고 안내 카드 - password 페이지 스타일과 유사하게 */}
           <motion.div
