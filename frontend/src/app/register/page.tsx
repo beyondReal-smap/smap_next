@@ -1390,8 +1390,13 @@ export default function RegisterPage() {
               mt_name: data.data.mt_name || registerData.mt_name,
               mt_nickname: data.data.mt_nickname || registerData.mt_nickname,
               mt_email: data.data.mt_email || registerData.mt_email,
+              mt_hp: data.data.mt_hp || registerData.mt_id?.replace(/-/g, '') || '',
+              mt_birth: data.data.mt_birth || registerData.mt_birth || '',
+              mt_gender: data.data.mt_gender || registerData.mt_gender || null,
               mt_type: registerData.socialProvider === 'apple' ? 3 : registerData.socialProvider === 'google' ? 4 : 2,
-              mt_file1: data.data.mt_file1 || registerData.profile_image || ''
+              mt_level: data.data.mt_level || 2,
+              mt_file1: data.data.mt_file1 || registerData.profile_image || '',
+              mt_wdate: data.data.mt_wdate || new Date().toISOString()
             };
             authService.default.setUserData(userData);
             console.log('🍎 [REGISTER] 사용자 정보 저장 완료:', userData);
