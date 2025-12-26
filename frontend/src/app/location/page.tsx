@@ -2729,6 +2729,75 @@ export default function LocationPage() {
     );
     console.log('[handleMemberSelect] 선택 상태 업데이트 완료:', memberId);
 
+    // 🚨 디버깅: 지도 이동 조건 확인
+    console.log('[handleMemberSelect] 🚨 지도 이동 조건 확인 (await 이전):', {
+      hasMap: !!map,
+      hasNaverMaps: !!window.naver?.maps,
+      fromMarkerClick,
+      willExecute: !!(map && window.naver?.maps && !fromMarkerClick)
+    });
+
+    // 🚨 핵심 수정: 지도 이동 및 InfoWindow를 await 이전에 즉시 실행 (컴포넌트 리렌더링 전)
+    if (map && window.naver?.maps && !fromMarkerClick) {
+      console.log('[handleMemberSelect] 🚨 지도 이동 및 InfoWindow 즉시 실행 (await 이전)');
+
+      // 좌표 파싱 및 검증 - 실시간 위치(mlt_lat, mlt_long) 우선 사용
+      const lat = parseCoordinate(newlySelectedMember?.mlt_lat) || parseCoordinate(newlySelectedMember?.location?.lat);
+      const lng = parseCoordinate(newlySelectedMember?.mlt_long) || parseCoordinate(newlySelectedMember?.location?.lng);
+
+      console.log('[handleMemberSelect] 좌표 파싱 결과:', { lat, lng, memberName: newlySelectedMember?.name });
+
+      // 지도 이동
+      let targetLat: number = 37.5665; // 기본값
+      let targetLng: number = 126.9780;
+
+      if (lat !== null && lng !== null && lat !== 0 && lng !== 0 &&
+        lat >= 33 && lat <= 43 && lng >= 124 && lng <= 132) {
+        targetLat = lat;
+        targetLng = lng;
+      }
+
+      const position = createSafeLatLng(targetLat, targetLng);
+      if (position) {
+        console.log('[handleMemberSelect] 🚨 지도 중심 이동 실행:', { targetLat, targetLng });
+        map.setCenter(position);
+
+        const currentZoom = map.getZoom();
+        if (currentZoom < 14) {
+          map.setZoom(15);
+        }
+      }
+
+      // InfoWindow 생성 (마커가 지도에 표시될 때까지 대기)
+      const createInfoWindowWhenReady = (retryCount: number = 0) => {
+        const key = String(memberId);
+        let selectedMarker = memberMarkers.find((marker: any) => marker.__key === key);
+
+        if (!selectedMarker && memberMarkersRef.current?.length > 0) {
+          selectedMarker = memberMarkersRef.current.find((marker: any) => marker.__key === key);
+        }
+
+        // 마커가 지도에 표시되었는지 확인
+        const markerOnMap = selectedMarker && selectedMarker.getMap && selectedMarker.getMap() === map;
+
+        if (selectedMarker && newlySelectedMember && markerOnMap) {
+          console.log('[handleMemberSelect] 🚨 InfoWindow 생성 (마커 지도에 표시됨):', newlySelectedMember.name);
+          createMemberInfoWindow(newlySelectedMember, selectedMarker);
+        } else if (retryCount < 5) {
+          // 마커가 아직 지도에 표시되지 않았으면 재시도 (최대 5회, 총 1.5초)
+          console.log('[handleMemberSelect] 🚨 마커 지도 표시 대기 중 - 재시도:', retryCount + 1, { hasMarker: !!selectedMarker, markerOnMap });
+          setTimeout(() => createInfoWindowWhenReady(retryCount + 1), 300);
+        } else if (selectedMarker && newlySelectedMember) {
+          // 5회 재시도 후에도 지도에 없으면 그냥 생성 (기본 위치에 표시될 수 있음)
+          console.log('[handleMemberSelect] 🚨 InfoWindow 강제 생성 (재시도 초과):', newlySelectedMember.name);
+          createMemberInfoWindow(newlySelectedMember, selectedMarker);
+        }
+      };
+
+      // 500ms 후 시작 (마커 생성 완료 대기)
+      setTimeout(() => createInfoWindowWhenReady(0), 500);
+    }
+
     // 🚨 멤버 선택 상태 변경 후 마커 색상 업데이트
     setTimeout(() => {
       if (memberMarkers.length > 0) {
@@ -2904,7 +2973,22 @@ export default function LocationPage() {
       console.log('[handleMemberSelect] 마커 클릭 - InfoWindow 이미 생성됨, openInfoWindowForSelectedMember 건너뜀');
     }
 
+    // 🚨 디버깅: map 및 naver?.maps 상태 확인
+    console.log('[handleMemberSelect] 🚨 지도 상태 확인:', {
+      hasMap: !!map,
+      hasNaverMaps: !!window.naver?.maps,
+      mapInstance: map ? 'exists' : 'null'
+    });
+
     if (map && window.naver?.maps) {
+      // 🚨 디버깅: 지도 이동 조건 분석
+      console.log('[handleMemberSelect] 🚨 지도 이동 조건 분석:', {
+        fromMarkerClick,
+        isLocationSelectingRef: isLocationSelectingRef.current,
+        openLocationPanel,
+        willMoveMap: !fromMarkerClick && !(isLocationSelectingRef.current && !openLocationPanel)
+      });
+
       // 🚨 마커 클릭 시 지도 이동 없이 InfoWindow만 표시, 사이드바 선택 시 지도 이동 (사용자 요구사항)
       if (fromMarkerClick) {
         console.log('[handleMemberSelect] 마커 클릭 - 지도 이동 건너뜀, InfoWindow만 표시');
@@ -2951,31 +3035,32 @@ export default function LocationPage() {
 
           const position = createSafeLatLng(targetLat, targetLng);
           if (!position) {
-            console.warn('[handleMemberSelect] LatLng 생성 실패');
-            return;
-          }
+            console.warn('[handleMemberSelect] LatLng 생성 실패 - 지도 이동 건너뛰고 진행');
+            // 🚨 return 제거 - 인포윈도우 생성은 계속 진행
+          } else {
 
-          console.log('[handleMemberSelect] 지도 중심 이동 실행 (사이드바 선택):', {
-            member: newlySelectedMember?.name || '알 수 없음',
-            originalPosition: { lat, lng },
-            targetPosition: { lat: targetLat, lng: targetLng },
-            mapInstance: !!map
-          });
+            console.log('[handleMemberSelect] 지도 중심 이동 실행 (사이드바 선택):', {
+              member: newlySelectedMember?.name || '알 수 없음',
+              originalPosition: { lat, lng },
+              targetPosition: { lat: targetLat, lng: targetLng },
+              mapInstance: !!map
+            });
 
-          // 즉시 지도 중심 이동 (애니메이션 없이 바로 이동)
-          map.setCenter(position);
+            // 즉시 지도 중심 이동 (애니메이션 없이 바로 이동)
+            map.setCenter(position);
 
-          // 적절한 줌 레벨 설정 (즉시)
-          const currentZoom = map.getZoom();
-          if (currentZoom < 14) {
-            map.setZoom(15);
-          }
+            // 적절한 줌 레벨 설정 (즉시)
+            const currentZoom = map.getZoom();
+            if (currentZoom < 14) {
+              map.setZoom(15);
+            }
 
-          console.log('[handleMemberSelect] 지도 중심 이동 완료');
+            console.log('[handleMemberSelect] 지도 중심 이동 완료');
 
-          // 사이드바는 유지하여 사용자가 장소 리스트를 볼 수 있도록 함
-          // 멤버 선택 시 사이드바 자동 닫기 비활성화
-          console.log('[handleMemberSelect] 사이드바 유지 - 장소 리스트 표시를 위해');
+            // 사이드바는 유지하여 사용자가 장소 리스트를 볼 수 있도록 함
+            // 멤버 선택 시 사이드바 자동 닫기 비활성화
+            console.log('[handleMemberSelect] 사이드바 유지 - 장소 리스트 표시를 위해');
+          } // 🚨 else 블록 닫기 (position 존재 시)
         }
       }
 
@@ -3002,18 +3087,30 @@ export default function LocationPage() {
       // 멤버 InfoWindow 생성 및 표시 (사이드바 선택 시에만 생성)
       // 마커 클릭 시에는 createMemberInfoWindow에서 이미 InfoWindow가 생성되었으므로 건너뜀
       if (!onlyShowInfoWindow && !fromMarkerClick) {
-        // 마커 업데이트가 완료된 후 InfoWindow 생성하도록 약간의 지연 추가
-        setTimeout(() => {
+        // 🚨 마커 찾기 및 InfoWindow 생성 함수 (재시도 지원)
+        const findMarkerAndShowInfoWindow = (retryCount: number = 0) => {
           // 클릭된 마커가 전달되면 사용하고, 아니면 배열에서 찾기
           let selectedMarker = clickedMarker;
           let memberIndex = -1;
 
           // 클릭된 마커가 없을 경우에만 배열에서 찾기
           if (!selectedMarker) {
-            memberIndex = groupMembers.findIndex(m => m.id === memberId);
-            // memberMarkers 상태가 업데이트되기 전일 수 있으므로 실패할 수 있음
-            if (memberIndex >= 0 && memberMarkers.length > memberIndex) {
-              selectedMarker = memberMarkers[memberIndex];
+            const key = String(memberId);
+
+            // 🚨 1. __key로 마커 찾기 (가장 정확)
+            selectedMarker = memberMarkers.find((marker: any) => marker.__key === key);
+
+            // 🚨 2. __key로 못 찾으면 인덱스로 시도
+            if (!selectedMarker) {
+              memberIndex = groupMembers.findIndex(m => m.id === memberId);
+              if (memberIndex >= 0 && memberMarkers.length > memberIndex) {
+                selectedMarker = memberMarkers[memberIndex];
+              }
+            }
+
+            // 🚨 3. 그래도 못 찾으면 memberMarkersRef에서 시도
+            if (!selectedMarker && memberMarkersRef.current?.length > 0) {
+              selectedMarker = memberMarkersRef.current.find((marker: any) => marker.__key === key);
             }
           }
 
@@ -3023,7 +3120,8 @@ export default function LocationPage() {
             hasSelectedMarker: !!selectedMarker,
             memberIndex,
             totalMarkers: memberMarkers.length,
-            memberId
+            memberId,
+            retryCount
           });
 
           // 마커가 있고 지도와 네이버 맵스가 로드되었을 때 createMemberInfoWindow 호출
@@ -3031,15 +3129,22 @@ export default function LocationPage() {
             // 전체 정보가 있는 InfoWindow 생성 (이름, 업데이트 시간, 배터리 정보 포함)
             createMemberInfoWindow(newlySelectedMember, selectedMarker);
             console.log('[handleMemberSelect] 사이드바 멤버 선택 - createMemberInfoWindow로 InfoWindow 표시 완료:', newlySelectedMember?.name || '알 수 없음');
+          } else if (retryCount < 3) {
+            // 🚨 마커를 못 찾으면 재시도 (최대 3회)
+            console.log('[handleMemberSelect] 사이드바 멤버 선택 - 마커 찾기 재시도 예정:', retryCount + 1);
+            setTimeout(() => findMarkerAndShowInfoWindow(retryCount + 1), 300);
           } else {
-            console.warn('[handleMemberSelect] 사이드바 멤버 선택 - 마커를 찾을 수 없음:', {
+            console.warn('[handleMemberSelect] 사이드바 멤버 선택 - 마커를 찾을 수 없음 (재시도 초과):', {
               memberIndex,
               hasSelectedMarker: !!selectedMarker,
               totalMarkers: memberMarkers.length,
               memberName: newlySelectedMember?.name || '알 수 없음'
             });
           }
-        }, 300); // 사이드바 선택인 경우 마커 업데이트 대기
+        };
+
+        // 🚨 마커 업데이트가 완료된 후 InfoWindow 생성하도록 약간의 지연 추가
+        setTimeout(() => findMarkerAndShowInfoWindow(0), 300);
 
         console.log('[handleMemberSelect] 멤버 선택 완료 - InfoWindow 표시 예정');
       } else {
@@ -5757,24 +5862,38 @@ export default function LocationPage() {
       borderWidth: 0,
       backgroundColor: 'transparent',
       disableAnchor: true,
-      pixelOffset: new window.naver.maps.Point(0, -20)
+      pixelOffset: new window.naver.maps.Point(0, -50) // 🚨 마커 위쪽으로 위치 조정
     });
 
     // InfoWindow 열기 (단순화된 로직)
     try {
+      // 🚨 핵심 수정: 마커의 getPosition()으로 위치를 직접 가져옴
+      const markerPosition = marker?.getPosition?.();
+      const markerOnMap = marker?.getMap ? !!marker.getMap() : false;
+
       console.log('[createMemberInfoWindow] InfoWindow 열기 시도:', {
         markerExists: !!marker,
-        markerOnMap: marker?.getMap ? !!marker.getMap() : false
+        markerOnMap,
+        hasPosition: !!markerPosition,
+        position: markerPosition ? `${markerPosition.lat()}, ${markerPosition.lng()}` : 'null'
       });
 
-      // 마커가 있으면 마커 위치에, 없으면 기본 위치에 InfoWindow 표시
-      if (marker && marker.getMap && marker.getMap() === map) {
-        // 마커가 지도에 정상적으로 표시되어 있으면 마커 위치에 표시
+      // 🚨 마커 위치가 있으면 해당 위치에 InfoWindow 표시 (getMap() 비교 제거)
+      if (marker && markerPosition) {
+        // 마커 위치를 직접 사용하여 InfoWindow 열기
+        memberInfoWindow.open(map, markerPosition as any);
+        setInfoWindow(memberInfoWindow);
+        console.log('[createMemberInfoWindow] InfoWindow 마커 위치에 표시 완료:', {
+          lat: markerPosition.lat(),
+          lng: markerPosition.lng()
+        });
+      } else if (marker && marker.getMap && marker.getMap()) {
+        // 위치를 못 가져왔지만 마커가 지도에 있으면 마커에 직접 연결
         memberInfoWindow.open(map, marker);
         setInfoWindow(memberInfoWindow);
-        console.log('[createMemberInfoWindow] InfoWindow 마커 위치에 표시 완료');
+        console.log('[createMemberInfoWindow] InfoWindow 마커에 직접 연결 표시 완료');
       } else {
-        // 마커가 없거나 지도에 없으면 기본 위치(서울 중심)에 표시
+        // 마커가 없거나 위치가 없으면 기본 위치(서울 중심)에 표시
         const defaultPos = createSafeLatLng(37.5665, 126.9780);
         if (defaultPos) {
           memberInfoWindow.open(map, defaultPos as any);
@@ -6683,7 +6802,35 @@ export default function LocationPage() {
 
       const target = e.target as HTMLElement;
 
-      console.log('[InfoWindow 외부 클릭] 클릭 감지:', target.tagName, target.className, target.textContent);
+      console.log('[InfoWindow 외부 클릭] 클릭 감지:', target.tagName, target.className);
+
+      // 🚨 사이드바 관련 요소 클릭은 무시 (사이드바 닫기 시 InfoWindow가 닫히지 않도록)
+      const isSidebarElement = target.closest('.sidebar') ||
+        target.closest('[class*="sidebar"]') ||
+        target.closest('.glass-effect') ||
+        target.closest('motion.div') ||
+        target.closest('[data-sidebar]') ||
+        target.classList.contains('sidebar') ||
+        target.closest('.member-avatar') ||
+        target.closest('.group-selector') ||
+        target.tagName === 'svg' ||
+        target.tagName === 'path' ||
+        target.tagName === 'IMG' ||
+        target.closest('svg') ||
+        // 🚨 추가: 사이드바 내부의 DIV 요소들
+        (target.tagName === 'DIV' && (
+          target.classList.contains('flex') ||
+          target.classList.contains('items-center') ||
+          target.classList.contains('justify-between') ||
+          target.closest('[class*="flex"]')
+        )) ||
+        // 🚨 추가: motion.div의 자식 요소들
+        target.closest('[style*="transform"]');
+
+      if (isSidebarElement) {
+        console.log('[InfoWindow 외부 클릭] 사이드바 요소 클릭 - 무시');
+        return;
+      }
 
       // 삭제 버튼 클릭인지 먼저 확인 (가장 우선순위)
       const isDeleteButton = target.classList.contains('delete-button') ||
