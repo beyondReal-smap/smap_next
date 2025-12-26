@@ -7,10 +7,10 @@ import Image from 'next/image';
 import { motion, AnimatePresence, useMotionValue } from 'framer-motion';
 // 공통 이미지 처리 유틸리티 import
 import { getSafeImageUrl, getDefaultImage, handleImageError } from '@/lib/imageUtils';
-import { 
-  FaUsers, 
-  FaLayerGroup, 
-  FaUserPlus, 
+import {
+  FaUsers,
+  FaLayerGroup,
+  FaUserPlus,
   FaCrown,
   FaSearch,
   FaCog,
@@ -25,9 +25,9 @@ import {
   FaCheckCircle,
   FaQrcode
 } from 'react-icons/fa';
-import { 
-  HiSparkles, 
-  HiUserGroup, 
+import {
+  HiSparkles,
+  HiUserGroup,
   HiChatBubbleLeftEllipsis,
   HiEllipsisVertical,
   HiOutlineChevronLeft
@@ -179,7 +179,7 @@ const InviteCodeSection = memo<{
   isJoiningGroup: boolean;
 }>(({ inviteCode, onInviteCodeChange, onJoinGroup, isJoiningGroup }) => (
   <div className="px-4 pb-4 mt-5">
-    <motion.div 
+    <motion.div
       className="relative"
       whileFocus={{ scale: 1.02 }}
       transition={{ duration: 0.2 }}
@@ -193,7 +193,7 @@ const InviteCodeSection = memo<{
             value={inviteCode}
             onChange={onInviteCodeChange}
             className="w-full pl-4 pr-4 py-4 bg-white border rounded-2xl focus:outline-none focus:ring-2 focus:border-yellow-500 placeholder-gray-400 text-base shadow-sm"
-            style={{ 
+            style={{
               borderColor: 'rgba(245, 158, 11, 0.2)',
               '--tw-ring-color': '#f59e0b'
             } as React.CSSProperties}
@@ -229,96 +229,96 @@ const StatsCards = memo<{
   return (
     <div className="px-4 mb-4">
       <div className="grid grid-cols-2 gap-3">
-                          <motion.div 
-           className="rounded-2xl p-4 text-white shadow-lg"
-           style={{ background: 'linear-gradient(to right, #0113A3, #001a8a)' }}
-           initial={{ opacity: 0, y: 20, scale: 0.9 }}
-           animate={{ opacity: 1, y: 0, scale: 1 }}
-           transition={{ 
-             duration: 0.6, 
-             ease: [0.25, 0.46, 0.45, 0.94],
-             delay: 0.1
-           }}
-           whileHover={{ 
-             scale: 1.02,
-             transition: { duration: 0.2 }
-           }}
-         >
-           <div className="flex items-center justify-between">
-             <div>
-               <motion.p 
-                 className="text-blue-100 text-sm"
-                 initial={{ opacity: 0, x: -10 }}
-                 animate={{ opacity: 1, x: 0 }}
-                 transition={{ delay: 0.3, duration: 0.4 }}
-               >
-                 총 그룹
-               </motion.p>
-               <motion.p 
-                 className="text-2xl font-bold"
-                 initial={{ opacity: 0, scale: 0.8 }}
-                 animate={{ 
-                   opacity: 1, 
-                   scale: 1,
-                   color: "#ffffff"
-                 }}
-                 transition={{ delay: 0.4, duration: 0.5 }}
-                 key={`groups-${groupsCount}`}
-                 whileHover={{ scale: 1.05 }}
-               >
-                 {groupsCount}개
-               </motion.p>
-             </div>
-             <div>
-               <FaLayerGroup className="w-8 h-8 text-blue-200" />
-             </div>
-           </div>
-         </motion.div>
-        
-                          <motion.div 
-           className="bg-gradient-to-r from-pink-600 to-pink-700 rounded-2xl p-4 text-white shadow-lg"
-           initial={{ opacity: 0, y: 20, scale: 0.9 }}
-           animate={{ opacity: 1, y: 0, scale: 1 }}
-           transition={{ 
-             duration: 0.6, 
-             ease: [0.25, 0.46, 0.45, 0.94],
-             delay: 0.1
-           }}
-           whileHover={{ 
-             scale: 1.02,
-             transition: { duration: 0.2 }
-           }}
-         >
-           <div className="flex items-center justify-between">
-             <div>
-               <motion.p 
-                 className="text-pink-100 text-sm"
-                 initial={{ opacity: 0, x: -10 }}
-                 animate={{ opacity: 1, x: 0 }}
-                 transition={{ delay: 0.3, duration: 0.4 }}
-               >
-                 총 멤버
-               </motion.p>
-               <motion.p 
-                 className="text-2xl font-bold"
-                 initial={{ opacity: 0, scale: 0.8 }}
-                 animate={{ 
-                   opacity: 1, 
-                   scale: 1,
-                   color: "#ffffff"
-                 }}
-                 transition={{ delay: 0.4, duration: 0.5 }}
-                 key={`members-${totalMembers}`}
-                 whileHover={{ scale: 1.05 }}
-               >
-                 {totalMembers}명
-               </motion.p>
-             </div>
-             <div>
-               <FaUsers className="w-8 h-8 text-pink-200" />
-             </div>
-           </div>
-         </motion.div>
+        <motion.div
+          className="rounded-2xl p-4 text-white shadow-lg"
+          style={{ background: 'linear-gradient(to right, #0113A3, #001a8a)' }}
+          initial={{ opacity: 0, y: 20, scale: 0.9 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{
+            duration: 0.6,
+            ease: [0.25, 0.46, 0.45, 0.94],
+            delay: 0.1
+          }}
+          whileHover={{
+            scale: 1.02,
+            transition: { duration: 0.2 }
+          }}
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <motion.p
+                className="text-blue-100 text-sm"
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.3, duration: 0.4 }}
+              >
+                총 그룹
+              </motion.p>
+              <motion.p
+                className="text-2xl font-bold"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{
+                  opacity: 1,
+                  scale: 1,
+                  color: "#ffffff"
+                }}
+                transition={{ delay: 0.4, duration: 0.5 }}
+                key={`groups-${groupsCount}`}
+                whileHover={{ scale: 1.05 }}
+              >
+                {groupsCount}개
+              </motion.p>
+            </div>
+            <div>
+              <FaLayerGroup className="w-8 h-8 text-blue-200" />
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          className="bg-gradient-to-r from-pink-600 to-pink-700 rounded-2xl p-4 text-white shadow-lg"
+          initial={{ opacity: 0, y: 20, scale: 0.9 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{
+            duration: 0.6,
+            ease: [0.25, 0.46, 0.45, 0.94],
+            delay: 0.1
+          }}
+          whileHover={{
+            scale: 1.02,
+            transition: { duration: 0.2 }
+          }}
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <motion.p
+                className="text-pink-100 text-sm"
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.3, duration: 0.4 }}
+              >
+                총 멤버
+              </motion.p>
+              <motion.p
+                className="text-2xl font-bold"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{
+                  opacity: 1,
+                  scale: 1,
+                  color: "#ffffff"
+                }}
+                transition={{ delay: 0.4, duration: 0.5 }}
+                key={`members-${totalMembers}`}
+                whileHover={{ scale: 1.05 }}
+              >
+                {totalMembers}명
+              </motion.p>
+            </div>
+            <div>
+              <FaUsers className="w-8 h-8 text-pink-200" />
+            </div>
+          </div>
+        </motion.div>
       </div>
     </div>
   );
@@ -340,7 +340,7 @@ const GroupCard = memo<{
     <div className="flex items-center justify-between">
       <div className="flex items-center flex-1 mr-3">
         <div className="p-2 bg-white rounded-xl mr-4">
-          <Image 
+          <Image
             src={`/images/group${(index % 2) + 1}.webp`}
             alt="그룹 아이콘"
             width={48}
@@ -380,19 +380,19 @@ const GroupCard = memo<{
 
 // Framer Motion 애니메이션 variants - schedule/page.tsx 스타일로 변경
 const pageVariants = {
-  initial: { 
-    opacity: 0, 
-    y: 20 
+  initial: {
+    opacity: 0,
+    y: 20
   },
-  in: { 
-    opacity: 1, 
+  in: {
+    opacity: 1,
     y: 0,
     transition: {
       duration: 0.6
     }
   },
-  out: { 
-    opacity: 0, 
+  out: {
+    opacity: 0,
     y: -20,
     transition: {
       duration: 0.4
@@ -403,7 +403,7 @@ const pageVariants = {
 
 
 const cardVariants = {
-  hidden: { 
+  hidden: {
     opacity: 0
   },
   visible: {
@@ -416,9 +416,9 @@ const cardVariants = {
 
 const floatingButtonVariants = {
   initial: { y: 100, opacity: 0, scale: 0.8 },
-  animate: { 
-    y: -80, 
-    opacity: 1, 
+  animate: {
+    y: -80,
+    opacity: 1,
     scale: 1,
     transition: {
       delay: 0.2,
@@ -428,7 +428,7 @@ const floatingButtonVariants = {
       duration: 1.0
     }
   },
-  hover: { 
+  hover: {
     scale: 1.1,
     y: -2,
     transition: { duration: 0.2 }
@@ -438,10 +438,10 @@ const floatingButtonVariants = {
 
 // 그룹 목록 컨테이너 애니메이션 - schedule 스타일로 변경
 const groupListContainerVariants = {
-  hidden: { 
+  hidden: {
     opacity: 0
   },
-  visible: { 
+  visible: {
     opacity: 1,
     transition: {
       duration: 0.6,
@@ -453,11 +453,11 @@ const groupListContainerVariants = {
 
 // 개별 그룹 카드 애니메이션 - schedule 스타일로 변경
 const groupCardVariants = {
-  hidden: { 
+  hidden: {
     opacity: 0
   },
-  visible: { 
-    opacity: 1, 
+  visible: {
+    opacity: 1,
     transition: {
       duration: 0.5
     }
@@ -528,7 +528,7 @@ interface GroupMember {
   sgdt_adate?: string;
   photo?: string | null;
   original_index: number;
-  
+
   // 새로 추가된 위치 정보
   mlt_lat?: number | null;
   mlt_long?: number | null;
@@ -570,21 +570,21 @@ function GroupPageContent() {
   const router = useRouter();
   const { user, isLoggedIn } = useAuth();
   const { forceRefreshGroups } = useUser();
-  const { 
-    getUserProfile, 
-    getUserGroups, 
-    getGroupMembers, 
+  const {
+    getUserProfile,
+    getUserGroups,
+    getGroupMembers,
     getLocationData,
     getDailyLocationCounts,
     isCacheValid,
     loadFromLocalStorage
   } = useDataCache();
-  
+
   // 상태 관리
   const [groups, setGroups] = useState<Group[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<ExtendedGroup | null>(null);
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
-  const [groupMemberCounts, setGroupMemberCounts] = useState<{[key: number]: number}>({});
+  const [groupMemberCounts, setGroupMemberCounts] = useState<{ [key: number]: number }>({});
   const [groupStats, setGroupStats] = useState<GroupStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [membersLoading, setMembersLoading] = useState(false);
@@ -596,24 +596,24 @@ function GroupPageContent() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isMemberManageModalOpen, setIsMemberManageModalOpen] = useState(false);
-  
+
   // 폼 상태
   const [newGroup, setNewGroup] = useState<GroupForm>({ name: '', description: '' });
   const [editGroup, setEditGroup] = useState<GroupForm>({ name: '', description: '' });
   const [selectedMember, setSelectedMember] = useState<GroupMember | null>(null);
-  
+
   // UI 상태
   const [currentView, setCurrentView] = useState<'list' | 'detail'>('list');
   const [showGroupActions, setShowGroupActions] = useState(false);
-  
+
   // 초대 코드 관련 상태
   const [inviteCode, setInviteCode] = useState('');
   const [isJoiningGroup, setIsJoiningGroup] = useState(false);
-  
+
   // QR코드 관련 상태
   const [showQRCode, setShowQRCode] = useState(false);
   const [qrCodeData, setQrCodeData] = useState('');
-  
+
   // 로딩 상태
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
   const [isUpdatingGroup, setIsUpdatingGroup] = useState(false);
@@ -637,8 +637,8 @@ function GroupPageContent() {
       console.log('[GROUP PAGE] 조회된 그룹 수:', data.length);
       setGroups(data);
 
-      const memberCounts: {[key: number]: number} = {};
-      
+      const memberCounts: { [key: number]: number } = {};
+
       for (const group of data) {
         try {
           const members = await memberService.getGroupMembers(group.sgt_idx.toString());
@@ -648,7 +648,7 @@ function GroupPageContent() {
           memberCounts[group.sgt_idx] = 0;
         }
       }
-      
+
       setGroupMemberCounts(memberCounts);
     } catch (error) {
       console.error('그룹 목록 조회 오류:', error);
@@ -664,9 +664,9 @@ function GroupPageContent() {
       setMembersLoading(true);
       setGroupMembers([]);
       setGroupStats(null);
-      
+
       const memberData = await memberService.getGroupMembers(group.sgt_idx.toString());
-      
+
       const transformedMembers: GroupMember[] = (memberData && Array.isArray(memberData)) ? memberData.map((member: any, index: number) => ({
         mt_idx: member.mt_idx,
         mt_type: member.mt_type || 1,
@@ -718,7 +718,7 @@ function GroupPageContent() {
         mlt_battery: member.mlt_battery,
         mlt_gps_time: member.mlt_gps_time,
       })) : [];
-      
+
       setGroupMembers(transformedMembers);
       setGroupMemberCounts(prev => ({
         ...prev,
@@ -727,7 +727,7 @@ function GroupPageContent() {
     } catch (error) {
       console.error('그룹 멤버 조회 오류:', error);
       setGroupMembers([]);
-      
+
       // 오류 발생 시에도 최소한의 기본 멤버 데이터 생성 (그룹 소유자 본인)
       if (user) {
         const defaultMember: GroupMember = {
@@ -781,7 +781,7 @@ function GroupPageContent() {
           mlt_battery: null,
           mlt_gps_time: null,
         };
-        
+
         console.log('[GROUP] 오류 발생으로 기본 멤버 데이터 생성:', defaultMember.mt_name);
         setGroupMembers([defaultMember]);
         setGroupMemberCounts(prev => ({
@@ -800,11 +800,11 @@ function GroupPageContent() {
   const fetchGroupStats = async (group: ExtendedGroup, members: GroupMember[]) => {
     try {
       setStatsLoading(true);
-      
+
       const memberCount = members.length;
       let weeklySchedules = 0;
       let totalLocations = 0;
-      
+
       // 올바른 스케줄 API 호출
       try {
         const allGroupSchedules = await scheduleService.getGroupSchedules(group.sgt_idx);
@@ -815,7 +815,7 @@ function GroupPageContent() {
         console.error('그룹 스케줄 조회 오류:', error);
         weeklySchedules = 0; // 오류 시 기본값
       }
-      
+
       // 위치 정보는 오류가 발생해도 계속 진행
       for (const member of members) {
         try {
@@ -826,7 +826,7 @@ function GroupPageContent() {
           // 오류가 발생해도 계속 진행
         }
       }
-      
+
       const statsData = {
         group_id: group.sgt_idx,
         group_title: group.sgt_title,
@@ -840,7 +840,7 @@ function GroupPageContent() {
         },
         member_stats: []
       };
-      
+
       setGroupStats(statsData);
     } catch (error) {
       console.error('그룹 통계 조회 오류:', error);
@@ -870,7 +870,7 @@ function GroupPageContent() {
   useEffect(() => {
     const forceRemoveHeaderPadding = () => {
       if (typeof document === 'undefined') return;
-      
+
       // 모든 헤더 관련 요소 선택
       const selectors = [
         'header',
@@ -885,7 +885,7 @@ function GroupPageContent() {
         '[role="banner"]',
         '#group-page-container'
       ];
-      
+
       selectors.forEach(selector => {
         const elements = document.querySelectorAll(selector);
         elements.forEach((element: Element) => {
@@ -900,14 +900,14 @@ function GroupPageContent() {
           }
         });
       });
-      
+
       // body와 html 요소도 확인
       document.body.style.setProperty('padding-top', '0px', 'important');
       document.body.style.setProperty('margin-top', '0px', 'important');
       document.documentElement.style.setProperty('padding-top', '0px', 'important');
       document.documentElement.style.setProperty('margin-top', '0px', 'important');
     };
-    
+
     // 즉시 실행 (애니메이션 간섭 방지)
     forceRemoveHeaderPadding();
   }, []);
@@ -981,7 +981,7 @@ function GroupPageContent() {
   // 새 그룹 생성
   const handleSaveGroup = async () => {
     if (newGroup.name.trim() === '') return;
-    
+
     setIsCreatingGroup(true);
     try {
       const groupData = {
@@ -991,9 +991,9 @@ function GroupPageContent() {
         sgt_code: null,
         sgt_show: 'Y' as const
       };
-      
+
       const createdGroup = await groupService.createGroup(groupData);
-      
+
       // 즉시 로컬 상태에 새 그룹 추가 (UI 즉시 반영)
       const newGroupItem: ExtendedGroup = {
         ...createdGroup,
@@ -1003,18 +1003,18 @@ function GroupPageContent() {
       };
       setGroups(prevGroups => [...prevGroups, newGroupItem]);
       console.log('[GROUP PAGE] 로컬 상태에 새 그룹 즉시 추가:', createdGroup.sgt_idx);
-      
+
       // 그룹 생성 후 강제로 모든 캐시 무효화 및 최신 그룹 목록 조회
       await fetchGroups(true);
-      
+
       // UserContext 그룹 데이터 강제 새로고침 (캐시 무시)
       console.log('[GROUP PAGE] 그룹 생성 후 UserContext 데이터 강제 새로고침');
       await forceRefreshGroups();
-      
+
       // 생성된 그룹을 선택된 그룹으로 설정 (최신 정보 포함, 캐시 무시)
       const updatedGroups = await groupService.getCurrentUserGroups(true); // 캐시 무시
       const freshGroup = (updatedGroups && Array.isArray(updatedGroups)) ? updatedGroups.find(g => g.sgt_idx === createdGroup.sgt_idx) : null;
-      
+
       if (freshGroup) {
         const newGroupItem: ExtendedGroup = {
           ...freshGroup,
@@ -1024,16 +1024,16 @@ function GroupPageContent() {
         };
         setSelectedGroup(newGroupItem);
       }
-      
+
       setGroupMemberCounts(prev => ({
         ...prev,
         [createdGroup.sgt_idx]: 1
       }));
       setIsAddModalOpen(false);
       setNewGroup({ name: '', description: '' });
-      
+
       showToastModal('success', '그룹 생성 완료', '새 그룹이 성공적으로 생성되었습니다.');
-      
+
       // 초대 코드가 있는 경우 별도로 표시
       if ((freshGroup as any)?.sgt_code) {
         setTimeout(() => {
@@ -1051,35 +1051,35 @@ function GroupPageContent() {
   // 그룹 수정
   const handleUpdateGroup = async () => {
     if (!selectedGroup || editGroup.name.trim() === '') return;
-    
+
     setIsUpdatingGroup(true);
     try {
       const updateData = {
         sgt_title: editGroup.name.trim(),
         sgt_memo: editGroup.description.trim() || null
       };
-      
+
       const updatedGroup = await groupService.updateGroup(selectedGroup.sgt_idx, updateData);
-      
+
       const updatedGroupExtended: ExtendedGroup = {
         ...selectedGroup,
         sgt_title: updatedGroup.sgt_title,
         sgt_memo: updatedGroup.sgt_memo,
         sgt_content: updatedGroup.sgt_memo || updatedGroup.sgt_content || ''
       };
-      
+
       setSelectedGroup(updatedGroupExtended);
-      setGroups(prev => 
-        (prev && Array.isArray(prev)) ? prev.map(group => 
-          group.sgt_idx === selectedGroup.sgt_idx 
-            ? updatedGroupExtended 
+      setGroups(prev =>
+        (prev && Array.isArray(prev)) ? prev.map(group =>
+          group.sgt_idx === selectedGroup.sgt_idx
+            ? updatedGroupExtended
             : group
         ) : []
       );
-      
+
       setIsEditModalOpen(false);
       setEditGroup({ name: '', description: '' });
-      
+
       showToastModal('success', '그룹 수정 완료', '그룹이 성공적으로 수정되었습니다.');
     } catch (error) {
       console.error('그룹 수정 오류:', error);
@@ -1092,34 +1092,34 @@ function GroupPageContent() {
   // 그룹 삭제
   const handleDeleteGroup = async () => {
     if (!selectedGroup) return;
-    
+
     setIsDeleting(true);
     try {
       console.log('[GROUP PAGE] 그룹 삭제 시작:', selectedGroup.sgt_idx);
-      
+
       // 그룹 삭제 실행
       await groupService.deleteGroup(selectedGroup.sgt_idx);
-      
+
       // 즉시 로컬 상태에서 삭제된 그룹 제거
       setGroups(prevGroups => prevGroups.filter(group => group.sgt_idx !== selectedGroup.sgt_idx));
       console.log('[GROUP PAGE] 로컬 상태에서 삭제된 그룹 즉시 제거:', selectedGroup.sgt_idx);
-      
+
       // UserContext 그룹 데이터 강제 새로고침 (실시간 데이터)
       console.log('[GROUP PAGE] UserContext 그룹 데이터 강제 새로고침 시작');
       await forceRefreshGroups();
-      
+
       // 추가적인 데이터 새로고침을 위한 지연 실행
       setTimeout(async () => {
         console.log('[GROUP PAGE] 그룹 삭제 후 추가 데이터 새로고침');
         await forceRefreshGroups();
-        
+
         // 로컬 스토리지 캐시 완전 정리
         if (typeof window !== 'undefined') {
           const keysToRemove: string[] = [];
           for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
             if (key && (
-              key.startsWith('user_groups') || 
+              key.startsWith('user_groups') ||
               key.startsWith('group_') ||
               key.includes('group') ||
               key.startsWith('schedule_') ||
@@ -1132,24 +1132,24 @@ function GroupPageContent() {
           console.log('[GROUP PAGE] 그룹 삭제 후 로컬 캐시 완전 정리:', keysToRemove.length, '개 항목 삭제');
         }
       }, 300);
-      
+
       // 로컬 상태 업데이트
       setSelectedGroup(null);
       setGroupMembers([]);
       setShowGroupActions(false);
       setIsDeleteModalOpen(false);
       setCurrentView('list');
-      
+
       // 그룹 삭제 후 최신 상태로 fetchGroups도 호출
       await fetchGroups(true);
-      
+
       // 그룹이 0개가 되면 홈으로 이동
       const updatedGroups = await forceRefreshGroups();
       if (!updatedGroups || updatedGroups.length === 0) {
         console.log('[GROUP PAGE] 그룹이 0개 - 홈으로 이동');
         router.push('/home');
       }
-      
+
       showToastModal('success', '그룹 삭제 완료', '그룹이 삭제되었습니다.');
     } catch (error) {
       console.error('그룹 삭제 오류:', error);
@@ -1182,7 +1182,7 @@ function GroupPageContent() {
   // 초대 링크 복사 함수
   const handleCopyLink = () => {
     const inviteLink = `${window.location.origin}/group/${selectedGroup?.sgt_idx}/join`;
-    
+
     if (navigator.clipboard) {
       navigator.clipboard.writeText(inviteLink)
         .then(() => {
@@ -1210,7 +1210,7 @@ function GroupPageContent() {
     document.body.appendChild(textArea);
     textArea.focus();
     textArea.select();
-    
+
     try {
       document.execCommand('copy');
       setIsShareModalOpen(false);
@@ -1226,15 +1226,15 @@ function GroupPageContent() {
   // 문자(SMS) 공유 함수
   const handleSMSShare = () => {
     if (!selectedGroup) return;
-    
+
     const inviteLink = `${window.location.origin}/group/${selectedGroup.sgt_idx}/join`;
-    
+
     // 초대 코드가 있는 경우 메시지에 포함
     const inviteCode = (selectedGroup as any).sgt_code;
-    const message = inviteCode 
+    const message = inviteCode
       ? `[SMAP] ${selectedGroup.sgt_title} 그룹에 초대되었습니다!\n\n초대 코드: ${inviteCode}\n\n링크: ${inviteLink}`
       : `[SMAP] ${selectedGroup.sgt_title} 그룹에 초대되었습니다! 링크: ${inviteLink}`;
-    
+
     if (isMobile()) {
       if (isIOS()) {
         // iOS: SMS 앱 스키마
@@ -1255,7 +1255,7 @@ function GroupPageContent() {
         fallbackCopyText(message);
       }
     }
-    
+
     setIsShareModalOpen(false);
     showToastModal('success', '문자 공유', '문자 앱으로 초대 메시지를 전송합니다.');
   };
@@ -1263,22 +1263,22 @@ function GroupPageContent() {
   // Web Share API를 사용한 네이티브 공유 함수
   const handleNativeShare = async () => {
     if (!selectedGroup || !supportsWebShare()) return;
-    
+
     const inviteLink = `${window.location.origin}/group/${selectedGroup.sgt_idx}/join`;
-    
+
     try {
       // 초대 코드가 있는 경우 메시지에 포함
       const inviteCode = (selectedGroup as any).sgt_code;
-      const shareText = inviteCode 
+      const shareText = inviteCode
         ? `[SMAP] ${selectedGroup.sgt_title} 그룹에 초대되었습니다!\n\n초대 코드: ${inviteCode}\n\n함께 참여해보세요.`
         : `[SMAP] ${selectedGroup.sgt_title} 그룹에 초대되었습니다! 함께 참여해보세요.`;
-      
+
       await navigator.share({
         title: `${selectedGroup.sgt_title} 그룹 초대`,
         text: shareText,
         url: inviteLink
       });
-      
+
       setIsShareModalOpen(false);
       showToastModal('success', '공유 완료', '그룹 초대 링크가 공유되었습니다.');
     } catch (error) {
@@ -1294,7 +1294,7 @@ function GroupPageContent() {
   const handleMemberClick = (member: GroupMember) => {
     if (!isCurrentUserGroupOwner()) return;
     if (member.sgdt_owner_chk === 'Y') return;
-    
+
     setSelectedMember(member);
     setIsMemberManageModalOpen(true);
   };
@@ -1308,7 +1308,7 @@ function GroupPageContent() {
 
   const handleChangeMemberRole = async (newRole: 'member' | 'leader') => {
     if (!selectedMember || !selectedGroup) return;
-    
+
     setIsUpdatingMember(true);
     try {
       const result = await memberService.updateMemberRole(
@@ -1316,15 +1316,15 @@ function GroupPageContent() {
         selectedMember.mt_idx,
         newRole === 'leader'
       );
-      
-      setGroupMembers(prev => 
-        (prev && Array.isArray(prev)) ? prev.map(member => 
-          member.mt_idx === selectedMember.mt_idx 
+
+      setGroupMembers(prev =>
+        (prev && Array.isArray(prev)) ? prev.map(member =>
+          member.mt_idx === selectedMember.mt_idx
             ? { ...member, sgdt_leader_chk: newRole === 'leader' ? 'Y' : 'N' }
             : member
         ) : []
       );
-      
+
       setIsMemberManageModalOpen(false);
       setSelectedMember(null);
       showToastModal('success', '역할 변경 완료', result.message);
@@ -1339,17 +1339,17 @@ function GroupPageContent() {
 
   const handleRemoveMember = async () => {
     if (!selectedMember || !selectedGroup) return;
-    
+
     setIsUpdatingMember(true);
     try {
       const result = await memberService.removeMemberFromGroup(
         selectedGroup.sgt_idx,
         selectedMember.mt_idx
       );
-      
+
       // 멤버 목록을 다시 불러와서 최신 상태로 업데이트
       await fetchGroupMembers(selectedGroup);
-      
+
       setIsMemberManageModalOpen(false);
       setSelectedMember(null);
       showToastModal('success', '멤버 탈퇴 완료', result.message);
@@ -1421,11 +1421,11 @@ function GroupPageContent() {
   const toggleSidebar = () => {
     const newState = !isSidebarOpen;
     setIsSidebarOpen(newState);
-    
+
     // 햅틱 피드백
     if (newState) {
       hapticFeedback.homeSidebarOpen();
-      
+
       // 사이드바가 열릴 때 기본적으로 첫 번째 그룹을 선택
       if (groups.length > 0 && !selectedGroupId) {
         const firstGroup = groups[0];
@@ -1440,13 +1440,13 @@ function GroupPageContent() {
   const handleSidebarGroupSelect = async (groupId: number) => {
     if (selectedGroupId !== groupId) {
       setSelectedGroupId(groupId);
-      
+
       // 선택된 그룹의 멤버들을 로드
       const selectedGroup = groups.find(g => g.sgt_idx === groupId);
       if (selectedGroup) {
         await fetchGroupMembers(selectedGroup);
       }
-      
+
       // 그룹 선택 시 사이드바 닫기
       setIsSidebarOpen(false);
     }
@@ -1475,15 +1475,15 @@ function GroupPageContent() {
     setIsJoiningGroup(true);
     try {
       console.log('[GROUP] 초대 코드로 그룹 가입 시도:', inviteCode.trim());
-      
+
       // 백엔드 API 호출하여 초대 코드로 그룹 정보 조회
       const response = await fetch(`/api/groups/code/${inviteCode.trim()}`);
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || '유효하지 않은 초대 코드입니다.');
       }
-      
+
       const data = await response.json();
       console.log('[GROUP] 그룹 정보 조회 성공:', data);
 
@@ -1501,11 +1501,11 @@ function GroupPageContent() {
 
       if (!joinResponse.ok) {
         const joinErrorData = await joinResponse.json().catch(() => ({}));
-        
+
         if (joinResponse.status === 409) {
           throw new Error('이미 가입된 그룹입니다.');
         }
-        
+
         throw new Error(joinErrorData.error || '그룹 가입에 실패했습니다.');
       }
 
@@ -1514,10 +1514,10 @@ function GroupPageContent() {
 
       showToastModal('success', '가입 완료', `${data.sgt_title} 그룹에 성공적으로 가입되었습니다!`);
       setInviteCode('');
-      
+
       // 그룹 목록 새로고침
       await fetchGroups();
-      
+
     } catch (error) {
       console.error('그룹 가입 오류:', error);
       const errorMessage = error instanceof Error ? error.message : '그룹 가입 중 오류가 발생했습니다.';
@@ -1539,15 +1539,15 @@ function GroupPageContent() {
   };
 
   const sidebarContentVariants = {
-    closed: { 
-      opacity: 0, 
+    closed: {
+      opacity: 0,
       x: -20,
       transition: {
         duration: 0.2 // 사이드바와 완전히 동일한 duration
       }
     },
-    open: { 
-      opacity: 1, 
+    open: {
+      opacity: 1,
       x: 0,
       transition: {
         duration: 0.2, // 사이드바와 완전히 동일한 duration
@@ -1564,7 +1564,7 @@ function GroupPageContent() {
   // 🆕 캐시 데이터 확인 로그
   useEffect(() => {
     console.log('👥 [GROUP] 캐시 데이터 확인 시작');
-    
+
     // 사용자 프로필 캐시 확인
     const userProfile = getUserProfile();
     console.log('👥 [GROUP] 사용자 프로필 캐시:', {
@@ -1576,7 +1576,7 @@ function GroupPageContent() {
       } : null,
       isValid: isCacheValid('userProfile')
     });
-    
+
     // 사용자 그룹 캐시 확인
     const userGroupsCache = getUserGroups();
     console.log('👥 [GROUP] 사용자 그룹 캐시:', {
@@ -1585,7 +1585,7 @@ function GroupPageContent() {
       groups: userGroupsCache?.map(g => ({ id: g.sgt_idx, name: g.sgt_title })) || [],
       isValid: isCacheValid('userGroups')
     });
-    
+
     // 각 그룹의 멤버 캐시 확인
     if (userGroupsCache && userGroupsCache.length > 0) {
       userGroupsCache.forEach(group => {
@@ -1598,7 +1598,7 @@ function GroupPageContent() {
           members: groupMembers?.map(m => ({ id: m.mt_idx, name: m.mt_name })) || [],
           isValid: isCacheValid('groupMembers', group.sgt_idx)
         });
-        
+
         // 위치 데이터 캐시 확인
         const today = new Date().toISOString().split('T')[0];
         const locationData = getLocationData(group.sgt_idx, today);
@@ -1609,7 +1609,7 @@ function GroupPageContent() {
           dataCount: locationData ? Object.keys(locationData).length : 0,
           isValid: isCacheValid('locationData', group.sgt_idx)
         });
-        
+
         // 일별 카운트 캐시 확인
         const dailyCounts = getDailyLocationCounts(group.sgt_idx);
         console.log(`👥 [GROUP] 그룹 ${group.sgt_title} 일별 카운트 캐시:`, {
@@ -1620,7 +1620,7 @@ function GroupPageContent() {
         });
       });
     }
-    
+
     // localStorage에서 직접 확인
     try {
       const localStorageKeys = Object.keys(localStorage).filter(key => key.startsWith('smap_cache_'));
@@ -1628,7 +1628,7 @@ function GroupPageContent() {
         totalKeys: localStorageKeys.length,
         keys: localStorageKeys.map(key => key.replace('smap_cache_', ''))
       });
-      
+
       // 각 캐시 키의 데이터 확인
       localStorageKeys.forEach(key => {
         const data = loadFromLocalStorage(key.replace('smap_cache_', ''));
@@ -1642,205 +1642,219 @@ function GroupPageContent() {
     } catch (error) {
       console.warn('👥 [GROUP] localStorage 접근 실패:', error);
     }
-    
+
     console.log('👥 [GROUP] 캐시 데이터 확인 완료');
   }, [getUserProfile, getUserGroups, getGroupMembers, getLocationData, getDailyLocationCounts, isCacheValid, loadFromLocalStorage]);
 
   return (
     <>
-              <style jsx global>{pageStyles}</style>
-      <div 
-        className="fixed inset-0 overflow-hidden" 
+      <style jsx global>{pageStyles}</style>
+      <div
+        className="fixed inset-0 overflow-hidden"
         id="group-page-container"
-        style={{ 
+        style={{
           background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
           paddingTop: '0px',
           marginTop: '0px',
           top: '0px'
         }}
       >
-        
+
 
 
         {/* 통일된 헤더 애니메이션 */}
-        <AnimatedHeader 
-            variant="simple"
-            className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed group-header"
-            style={{ 
-              paddingTop: '0px',
-              marginTop: '0px',
-              top: '0px',
-              position: 'fixed'
-            }}
-          >
-            <div className="flex items-center justify-between h-14 px-4">
-              <AnimatePresence mode="wait">
-                {currentView === 'list' ? (
-                  <motion.div 
-                    key="list-header"
-                    initial={{ opacity: 0, x: -40 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -40 }}
-                    transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
-                    className="flex items-center space-x-3 motion-div"
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div>
-                        <h1 className="text-lg font-bold text-gray-900">그룹</h1>
-                        <p className="text-xs text-gray-500">나의 소중한 그룹을 관리해보세요</p>
-                      </div>
+        <AnimatedHeader
+          variant="simple"
+          className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed group-header"
+          style={{
+            paddingTop: '0px',
+            marginTop: '0px',
+            top: '0px',
+            position: 'fixed'
+          }}
+        >
+          <div className="flex items-center justify-between h-14 px-4">
+            <AnimatePresence mode="wait">
+              {currentView === 'list' ? (
+                <motion.div
+                  key="list-header"
+                  initial={{ opacity: 0, x: -40 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -40 }}
+                  transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
+                  className="flex items-center space-x-3 motion-div"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div>
+                      <h1 className="text-lg font-bold text-gray-900">그룹</h1>
+                      <p className="text-xs text-gray-500">나의 소중한 그룹을 관리해보세요</p>
                     </div>
-                  </motion.div>
-                                 ) : (
-                   <motion.div 
-                     key="detail-header"
-                     initial={{ opacity: 0, x: -40 }}
-                     animate={{ opacity: 1, x: 0 }}
-                     exit={{ opacity: 0, x: 40 }}
-                     transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
-                     className="flex items-center space-x-3"
-                   >
-                     <motion.button 
-                       onClick={handleBackToList}
-                       className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
-                       whileHover={{ scale: 1.05 }}
-                       whileTap={{ scale: 0.95 }}
-                     >
-                       <HiOutlineChevronLeft className="w-5 h-5 text-gray-700" />
-                     </motion.button>
-                     <div className="flex items-center space-x-3">
-                       <div>
-                         <h1 className="text-lg font-bold text-gray-900">그룹 상세</h1>
-                         <p className="text-xs text-gray-500">멤버들과 함께하는 즐거운 공간</p>
-                       </div>
-                       </div>
-                   </motion.div>
-                 )}
-              </AnimatePresence>
-              
-              <div className="flex items-center space-x-2">
-                {/* 필요시 추가 버튼들을 여기에 배치 */}
-              </div>
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="detail-header"
+                  initial={{ opacity: 0, x: -40 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 40 }}
+                  transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
+                  className="flex items-center space-x-3"
+                >
+                  <motion.button
+                    onClick={handleBackToList}
+                    className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <HiOutlineChevronLeft className="w-5 h-5 text-gray-700" />
+                  </motion.button>
+                  <div className="flex items-center space-x-3">
+                    <div>
+                      <h1 className="text-lg font-bold text-gray-900">그룹 상세</h1>
+                      <p className="text-xs text-gray-500">멤버들과 함께하는 즐거운 공간</p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className="flex items-center space-x-2">
+              {/* 필요시 추가 버튼들을 여기에 배치 */}
             </div>
-          </AnimatedHeader>
+          </div>
+        </AnimatedHeader>
 
         {/* 메인 컨텐츠 - 고정 위치 */}
-          <div className="absolute inset-0 flex flex-col overflow-hidden safe-area-all" style={{
-            top: '56px', // 헤더 높이만큼 상단 패딩 추가
-                         bottom: '48px', // 네비게이션 바 높이만큼 위로
-            left: '0',
-            right: '0'
-          }}>
-            <div>
-              {currentView === 'list' ? (
-                <div>
-                  {/* 검색 섹션 */}
-                  <div className="group-content">
+        <div className="absolute inset-0 flex flex-col overflow-hidden safe-area-all" style={{
+          top: '56px', // 헤더 높이만큼 상단 패딩 추가
+          bottom: '48px', // 네비게이션 바 높이만큼 위로
+          left: '0',
+          right: '0'
+        }}>
+          <div>
+            {currentView === 'list' ? (
+              <div>
+                {/* 검색 섹션 */}
+                <div className="group-content">
                   <InviteCodeSection
                     inviteCode={inviteCode}
                     onInviteCodeChange={(e) => setInviteCode(e.target.value)}
                     onJoinGroup={handleJoinGroupByCode}
                     isJoiningGroup={isJoiningGroup}
                   />
-                  </div>
+                </div>
 
-                  {/* 통계 카드 */}
-                  <div className="group-content">
-                    {!loading && (
-                      <StatsCards
-                        groupsCount={groups.length}
-                        totalMembers={Object.values(groupMemberCounts).reduce((a, b) => a + b, 0)}
-                      />
-                    )}
-                  </div>
+                {/* 통계 카드 - 고정 높이로 레이아웃 shift 방지 */}
+                <div className="group-content" style={{ minHeight: '100px' }}>
+                  {loading ? (
+                    /* 통계 카드 스켈레톤 UI */
+                    <div className="px-4 grid grid-cols-2 gap-3">
+                      <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-4 animate-pulse" style={{ minHeight: '80px' }}>
+                        <div className="w-8 h-8 bg-blue-200 rounded-full mb-2"></div>
+                        <div className="h-6 bg-blue-200 rounded w-12 mb-1"></div>
+                        <div className="h-4 bg-blue-200 rounded w-16"></div>
+                      </div>
+                      <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-4 animate-pulse" style={{ minHeight: '80px' }}>
+                        <div className="w-8 h-8 bg-purple-200 rounded-full mb-2"></div>
+                        <div className="h-6 bg-purple-200 rounded w-12 mb-1"></div>
+                        <div className="h-4 bg-purple-200 rounded w-16"></div>
+                      </div>
+                    </div>
+                  ) : (
+                    <StatsCards
+                      groupsCount={groups.length}
+                      totalMembers={Object.values(groupMemberCounts).reduce((a, b) => a + b, 0)}
+                    />
+                  )}
+                </div>
 
-                  {/* 그룹 목록 */}
-                  <div className="px-4 space-y-3 group-content">
-                      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                        <div className="px-4 py-3 border-b border-gray-100">
-                          <h3 className="text-lg font-bold text-gray-900">내 그룹 목록</h3>
-                        </div>
-                        <div className="p-4 space-y-3 min-h-[300px]">
-                          {loading ? (
-                            <div className="space-y-3">
-                              {/* 향상된 스켈레톤 그룹 카드들 */}
-                              {[1, 2].map((index) => (
-                                <div 
-                                  key={index} 
-                                  className="rounded-xl p-4 cursor-pointer relative overflow-hidden"
-                                  style={{ 
-                                    background: 'linear-gradient(to right, rgba(240, 249, 255, 0.8), rgba(219, 234, 254, 0.8))',
-                                    animation: `shimmer 1.5s infinite linear ${index * 0.2}s`
-                                  }}
-                                >
-                                  {/* 시머 효과 오버레이 */}
-                                  <div 
-                                    className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                                    style={{
-                                      animation: `shimmerMove 1.5s infinite linear ${index * 0.2}s`
-                                    }}
-                                  />
-                                  
-                                  <div className="flex items-center justify-between relative">
-                                    <div className="flex items-center flex-1 mr-3">
-                                      {/* 그룹 아이콘 스켈레톤 */}
-                                      <div className="p-2 bg-white rounded-xl mr-4">
-                                        <div className="w-12 h-12 bg-gray-200 rounded-lg animate-pulse"></div>
-                                      </div>
-                                      
-                                      {/* 그룹 정보 스켈레톤 */}
-                                      <div className="flex-1">
-                                        {/* 그룹 이름 */}
-                                        <div className="h-5 bg-gray-200 rounded mb-2 animate-pulse" style={{ width: `${70 + Math.random() * 20}%` }}></div>
-                                        
-                                        {/* 그룹 설명 */}
-                                        <div className="space-y-1 mb-2">
-                                          <div className="h-4 bg-gray-200 rounded animate-pulse" style={{ width: `${80 + Math.random() * 15}%` }}></div>
-                                          <div className="h-4 bg-gray-200 rounded animate-pulse" style={{ width: `${40 + Math.random() * 30}%` }}></div>
-                                        </div>
-                                        
-                                        {/* 멤버 수와 날짜 */}
-                                        <div className="flex items-center space-x-4">
-                                          <div className="flex items-center">
-                                            <div className="w-3 h-3 bg-blue-200 rounded-full mr-1 animate-pulse"></div>
-                                            <div className="h-3 bg-blue-200 rounded animate-pulse w-8"></div>
-                                          </div>
-                                          <div className="h-3 bg-blue-200 rounded animate-pulse w-16"></div>
-                                        </div>
-                                      </div>
+                {/* 그룹 목록 */}
+                <div className="px-4 space-y-3 group-content">
+                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-gray-100">
+                      <h3 className="text-lg font-bold text-gray-900">내 그룹 목록</h3>
+                    </div>
+                    <div className="p-4 space-y-3 min-h-[300px]">
+                      {loading ? (
+                        <div className="space-y-3">
+                          {/* 향상된 스켈레톤 그룹 카드들 */}
+                          {[1, 2].map((index) => (
+                            <div
+                              key={index}
+                              className="rounded-xl p-4 cursor-pointer relative overflow-hidden"
+                              style={{
+                                background: 'linear-gradient(to right, rgba(240, 249, 255, 0.8), rgba(219, 234, 254, 0.8))',
+                                animation: `shimmer 1.5s infinite linear ${index * 0.2}s`
+                              }}
+                            >
+                              {/* 시머 효과 오버레이 */}
+                              <div
+                                className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                                style={{
+                                  animation: `shimmerMove 1.5s infinite linear ${index * 0.2}s`
+                                }}
+                              />
+
+                              <div className="flex items-center justify-between relative">
+                                <div className="flex items-center flex-1 mr-3">
+                                  {/* 그룹 아이콘 스켈레톤 */}
+                                  <div className="p-2 bg-white rounded-xl mr-4">
+                                    <div className="w-12 h-12 bg-gray-200 rounded-lg animate-pulse"></div>
+                                  </div>
+
+                                  {/* 그룹 정보 스켈레톤 */}
+                                  <div className="flex-1">
+                                    {/* 그룹 이름 */}
+                                    <div className="h-5 bg-gray-200 rounded mb-2 animate-pulse" style={{ width: `${70 + Math.random() * 20}%` }}></div>
+
+                                    {/* 그룹 설명 */}
+                                    <div className="space-y-1 mb-2">
+                                      <div className="h-4 bg-gray-200 rounded animate-pulse" style={{ width: `${80 + Math.random() * 15}%` }}></div>
+                                      <div className="h-4 bg-gray-200 rounded animate-pulse" style={{ width: `${40 + Math.random() * 30}%` }}></div>
                                     </div>
-                                    
-                                    {/* 화살표 아이콘 스켈레톤 */}
-                                    <div className="w-5 h-5 bg-blue-200 rounded animate-pulse"></div>
+
+                                    {/* 멤버 수와 날짜 */}
+                                    <div className="flex items-center space-x-4">
+                                      <div className="flex items-center">
+                                        <div className="w-3 h-3 bg-blue-200 rounded-full mr-1 animate-pulse"></div>
+                                        <div className="h-3 bg-blue-200 rounded animate-pulse w-8"></div>
+                                      </div>
+                                      <div className="h-3 bg-blue-200 rounded animate-pulse w-16"></div>
+                                    </div>
                                   </div>
                                 </div>
-                              ))}
-                            </div>
-                          ) : (groups && Array.isArray(groups)) && groups.map((group, index) => {
-                            const memberCount = groupMemberCounts[group.sgt_idx] || 0;
-                            
-                            return (
-                              <GroupCard
-                                key={group.sgt_idx}
-                                group={group as ExtendedGroup}
-                                index={index}
-                                memberCount={memberCount}
-                                onSelect={handleGroupSelect}
-                              />
-                            );
-                          })}
-                        </div>
-                      </div>
-                  </div>
 
+                                {/* 화살표 아이콘 스켈레톤 */}
+                                <div className="w-5 h-5 bg-blue-200 rounded animate-pulse"></div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (groups && Array.isArray(groups)) && groups.map((group, index) => {
+                        const memberCount = groupMemberCounts[group.sgt_idx] || 0;
+
+                        return (
+                          <GroupCard
+                            key={group.sgt_idx}
+                            group={group as ExtendedGroup}
+                            index={index}
+                            memberCount={memberCount}
+                            onSelect={handleGroupSelect}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
-              ) : selectedGroup ? (
-                <div className="flex flex-col flex-1 min-h-0">
-                  {/* 고정 영역: 그룹 헤더 카드 + 통계 카드들 */}
-                  <div className="flex-shrink-0">
-                    {/* 그룹 헤더 카드 */}
-                    <div className="mx-4 mb-4 mt-5">
-                    <motion.div 
+
+              </div>
+            ) : selectedGroup ? (
+              <div className="flex flex-col flex-1 min-h-0">
+                {/* 고정 영역: 그룹 헤더 카드 + 통계 카드들 */}
+                <div className="flex-shrink-0">
+                  {/* 그룹 헤더 카드 */}
+                  <div className="mx-4 mb-4 mt-5">
+                    <motion.div
                       className="rounded-2xl p-6 text-white shadow-lg relative"
                       style={{ background: 'linear-gradient(to right, #0113A3, #001a8a)' }}
                       initial={{ y: 20, opacity: 0 }}
@@ -1864,18 +1878,18 @@ function GroupPageContent() {
                         <AnimatePresence>
                           {showGroupActions && (
                             <>
-                              <div 
-                                className="fixed inset-0 z-[200]" 
+                              <div
+                                className="fixed inset-0 z-[200]"
                                 onClick={() => setShowGroupActions(false)}
                               />
-                              <motion.div 
+                              <motion.div
                                 className="absolute right-0 top-full mt-1 w-32 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-[210]"
                                 initial={{ opacity: 0, scale: 0.95, y: -5 }}
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.95, y: -5 }}
                                 transition={{ duration: 0.12 }}
                               >
-                                <button 
+                                <button
                                   onClick={() => {
                                     setEditGroup({
                                       name: selectedGroup.sgt_title,
@@ -1889,7 +1903,7 @@ function GroupPageContent() {
                                   <FaEdit className="w-3 h-3 mr-2" />
                                   수정
                                 </button>
-                                <button 
+                                <button
                                   onClick={() => {
                                     setIsDeleteModalOpen(true);
                                     setShowGroupActions(false);
@@ -1904,11 +1918,11 @@ function GroupPageContent() {
                           )}
                         </AnimatePresence>
                       </div>
-                      
+
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex items-center flex-1 pr-12">
                           <div className="p-2 bg-white rounded-xl mr-4">
-                            <img 
+                            <img
                               src={`/images/group${(((groups && Array.isArray(groups)) ? groups.findIndex(g => g.sgt_idx === selectedGroup.sgt_idx) : -1) % 2) + 1}.webp`}
                               alt="그룹 아이콘"
                               className="w-12 h-12 object-cover"
@@ -1949,7 +1963,7 @@ function GroupPageContent() {
                   {/* 통계 카드들 */}
                   <div className="px-4 mb-4">
                     <div className="grid grid-cols-3 gap-3">
-                      <motion.div 
+                      <motion.div
                         className="bg-gradient-to-r from-red-300 to-red-300 rounded-xl text-white text-center shadow-md flex flex-col justify-between"
                         initial={{ y: 20, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
@@ -1958,19 +1972,19 @@ function GroupPageContent() {
                       >
                         <FaUsers className="w-6 h-6 text-red-800 mx-auto mb-1" />
                         <div className="flex items-center justify-center flex-1">
-                        {membersLoading ? (
+                          {membersLoading ? (
                             <div className="flex flex-col items-center justify-center">
                               <IOSCompatibleSpinner size="sm" />
-                          </div>
-                        ) : (
-                          <div className="text-lg font-bold">
+                            </div>
+                          ) : (
+                            <div className="text-lg font-bold">
                               {groupStats?.member_count ?? groupMembers.filter(member => member.sgdt_show !== 'N').length ?? 0}
-                          </div>
-                        )}
+                            </div>
+                          )}
                         </div>
                         <p className="text-red-800 text-xs">멤버</p>
                       </motion.div>
-                      <motion.div 
+                      <motion.div
                         className="bg-gradient-to-r from-yellow-300 to-yellow-300 rounded-xl text-white text-center shadow-md flex flex-col justify-between"
                         initial={{ y: 20, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
@@ -1979,20 +1993,20 @@ function GroupPageContent() {
                       >
                         <FaCalendarAlt className="w-6 h-6 text-yellow-800 mx-auto mb-1" />
                         <div className="flex items-center justify-center flex-1">
-                        {statsLoading ? (
+                          {statsLoading ? (
                             <div className="flex flex-col items-center justify-center">
                               <IOSCompatibleSpinner size="sm" />
                               {/* <div className="text-xs text-yellow-800">로딩중...</div> */}
-                          </div>
-                        ) : (
-                          <div className="text-lg font-bold">
-                            {groupStats?.weekly_schedules ?? 0}
-                          </div>
-                        )}
+                            </div>
+                          ) : (
+                            <div className="text-lg font-bold">
+                              {groupStats?.weekly_schedules ?? 0}
+                            </div>
+                          )}
                         </div>
                         <p className="text-yellow-800 text-xs">주간 일정</p>
                       </motion.div>
-                      <motion.div 
+                      <motion.div
                         className="bg-gradient-to-r from-blue-300 to-blue-300 rounded-xl text-white text-center shadow-md flex flex-col justify-between"
                         initial={{ y: 20, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
@@ -2001,32 +2015,32 @@ function GroupPageContent() {
                       >
                         <FaMapMarkerAlt className="w-6 h-6 text-blue-600 mx-auto mb-1" />
                         <div className="flex items-center justify-center flex-1">
-                        {statsLoading ? (
+                          {statsLoading ? (
                             <div className="flex flex-col items-center justify-center">
                               <IOSCompatibleSpinner size="sm" />
                               {/* <div className="text-xs text-blue-800">로딩중...</div> */}
-                          </div>
-                        ) : (
-                          <div className="text-lg font-bold">
-                            {groupStats?.total_locations ?? 0}
-                          </div>
-                        )}
+                            </div>
+                          ) : (
+                            <div className="text-lg font-bold">
+                              {groupStats?.total_locations ?? 0}
+                            </div>
+                          )}
                         </div>
                         <p className="text-blue-800 text-xs">총 위치</p>
                       </motion.div>
                     </div>
                   </div>
-                  </div>
+                </div>
 
-                                      {/* 스크롤 영역: 그룹 멤버 섹션 */}
-                    <div className="flex-auto min-h-0 overflow-y-auto">
-                     <div className="px-4 pb-2" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-                    <motion.div 
+                {/* 스크롤 영역: 그룹 멤버 섹션 */}
+                <div className="flex-auto min-h-0 overflow-y-auto">
+                  <div className="px-4 pb-2" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+                    <motion.div
                       className="bg-white rounded-2xl shadow-sm border overflow-hidden"
                       style={{ borderColor: 'rgba(1, 19, 163, 0.1)' }}
                       initial={{ y: 20, opacity: 0 }}
                       animate={{ y: 0, opacity: 1 }}
-                                              transition={{ delay: 0.5, duration: 0.5 }}
+                      transition={{ delay: 0.5, duration: 0.5 }}
                     >
                       <div className="p-4 border-b sticky top-0 z-10 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80" style={{ borderColor: 'rgba(1, 19, 163, 0.1)' }}>
                         <div className="flex items-center justify-between">
@@ -2034,7 +2048,7 @@ function GroupPageContent() {
                           <motion.button
                             onClick={() => setIsShareModalOpen(true)}
                             className="px-3 py-2 bg-green-600 text-white rounded-lg text-xs font-medium flex items-center space-x-1.5 shadow-md relative overflow-hidden"
-                            whileHover={{ 
+                            whileHover={{
                               scale: 1.05,
                               backgroundColor: "#16a34a"
                             }}
@@ -2071,7 +2085,7 @@ function GroupPageContent() {
                           </motion.button>
                         </div>
                       </div>
-                      
+
                       <div className="p-4">
                         {membersLoading ? (
                           <div className="flex items-center justify-center py-8">
@@ -2086,69 +2100,68 @@ function GroupPageContent() {
                               (groupMembers && Array.isArray(groupMembers)) && groupMembers
                                 .filter(member => member.sgdt_show !== 'N')
                                 .map((member, index) => (
-                                <motion.div 
-                                  key={member.mt_idx} 
-                                  onClick={() => handleMemberClick(member)}
-                                  className={`flex items-center p-3 rounded-xl ${
-                                    isCurrentUserGroupOwner() && member.sgdt_owner_chk !== 'Y' 
-                                      ? 'cursor-pointer hover:shadow-md' 
-                                      : ''
-                                  }`}
-                                  style={{ 
-                                    backgroundColor: 'rgba(1, 19, 163, 0.05)',
-                                    '--hover-bg': 'rgba(1, 19, 163, 0.1)'
-                                  } as React.CSSProperties}
-                                  initial={{ x: -20, opacity: 0 }}
-                                  animate={{ x: 0, opacity: 1 }}
-                                  transition={{ delay: 0.6 + index * 0.1 }}
-                                  whileHover={isCurrentUserGroupOwner() && member.sgdt_owner_chk !== 'Y' ? { scale: 1.02 } : {}}
-                                  whileTap={isCurrentUserGroupOwner() && member.sgdt_owner_chk !== 'Y' ? { scale: 0.98 } : {}}
-                                >
-                                  <div className="relative mr-3">
-                                    <div className="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center border-3" style={{ borderColor: 'rgba(1, 19, 163, 0.2)' }}>
-                                      <img
-                                        src={getSafeImageUrl(member.mt_file1 || null, member.mt_gender, member.original_index)}
-                                        alt={member.mt_name}
-                                        className="w-full h-full object-cover"
-                                        onError={(e) => {
-                                          e.currentTarget.src = getDefaultImage(member.mt_gender, member.original_index);
-                                        }}
-                                      />
+                                  <motion.div
+                                    key={member.mt_idx}
+                                    onClick={() => handleMemberClick(member)}
+                                    className={`flex items-center p-3 rounded-xl ${isCurrentUserGroupOwner() && member.sgdt_owner_chk !== 'Y'
+                                        ? 'cursor-pointer hover:shadow-md'
+                                        : ''
+                                      }`}
+                                    style={{
+                                      backgroundColor: 'rgba(1, 19, 163, 0.05)',
+                                      '--hover-bg': 'rgba(1, 19, 163, 0.1)'
+                                    } as React.CSSProperties}
+                                    initial={{ x: -20, opacity: 0 }}
+                                    animate={{ x: 0, opacity: 1 }}
+                                    transition={{ delay: 0.6 + index * 0.1 }}
+                                    whileHover={isCurrentUserGroupOwner() && member.sgdt_owner_chk !== 'Y' ? { scale: 1.02 } : {}}
+                                    whileTap={isCurrentUserGroupOwner() && member.sgdt_owner_chk !== 'Y' ? { scale: 0.98 } : {}}
+                                  >
+                                    <div className="relative mr-3">
+                                      <div className="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center border-3" style={{ borderColor: 'rgba(1, 19, 163, 0.2)' }}>
+                                        <img
+                                          src={getSafeImageUrl(member.mt_file1 || null, member.mt_gender, member.original_index)}
+                                          alt={member.mt_name}
+                                          className="w-full h-full object-cover"
+                                          onError={(e) => {
+                                            e.currentTarget.src = getDefaultImage(member.mt_gender, member.original_index);
+                                          }}
+                                        />
+                                      </div>
+                                      {member.sgdt_owner_chk === 'Y' && (
+                                        <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center shadow-lg">
+                                          <FaCrown className="w-2.5 h-2.5 text-white" />
+                                        </div>
+                                      )}
+                                      {member.sgdt_owner_chk !== 'Y' && member.sgdt_leader_chk === 'Y' && (
+                                        <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-gray-300 to-gray-500 rounded-full flex items-center justify-center shadow-lg">
+                                          <FaCrown className="w-2.5 h-2.5 text-white" />
+                                        </div>
+                                      )}
                                     </div>
-                                    {member.sgdt_owner_chk === 'Y' && (
-                                      <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center shadow-lg">
-                                        <FaCrown className="w-2.5 h-2.5 text-white" />
+                                    <div className="flex-1">
+                                      <div className="flex items-center justify-between">
+                                        <h4 className="font-normal text-gray-900">
+                                          {member.mt_nickname || member.mt_name || '이름 없음'}
+                                        </h4>
+                                        <div className="flex items-center space-x-2">
+                                          {member.sgdt_owner_chk === 'Y' && (
+                                            <span className="px-2 py-1 bg-amber-100 text-amber-800 text-xs rounded-full font-medium">
+                                              그룹장
+                                            </span>
+                                          )}
+                                          {isCurrentUserGroupOwner() && member.sgdt_owner_chk !== 'Y' && (
+                                            <FaCog className="w-4 h-4 text-gray-400" />
+                                          )}
+                                        </div>
                                       </div>
-                                    )}
-                                    {member.sgdt_owner_chk !== 'Y' && member.sgdt_leader_chk === 'Y' && (
-                                      <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-gray-300 to-gray-500 rounded-full flex items-center justify-center shadow-lg">
-                                        <FaCrown className="w-2.5 h-2.5 text-white" />
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div className="flex-1">
-                                    <div className="flex items-center justify-between">
-                                      <h4 className="font-normal text-gray-900">
-                                        {member.mt_nickname || member.mt_name || '이름 없음'}
-                                      </h4>
-                                      <div className="flex items-center space-x-2">
-                                        {member.sgdt_owner_chk === 'Y' && (
-                                          <span className="px-2 py-1 bg-amber-100 text-amber-800 text-xs rounded-full font-medium">
-                                            그룹장
-                                          </span>
-                                        )}
-                                        {isCurrentUserGroupOwner() && member.sgdt_owner_chk !== 'Y' && (
-                                          <FaCog className="w-4 h-4 text-gray-400" />
-                                        )}
-                                      </div>
+                                      <p className="text-sm mt-1" style={{ color: '#0113A3' }}>
+                                        {member.sgdt_owner_chk === 'Y' ? '그룹 관리자' :
+                                          member.sgdt_leader_chk === 'Y' ? '리더' : '멤버'}
+                                      </p>
                                     </div>
-                                    <p className="text-sm mt-1" style={{ color: '#0113A3' }}>
-                                      {member.sgdt_owner_chk === 'Y' ? '그룹 관리자' : 
-                                       member.sgdt_leader_chk === 'Y' ? '리더' : '멤버'}
-                                    </p>
-                                  </div>
-                                </motion.div>
-                              ))
+                                  </motion.div>
+                                ))
                             ) : (
                               <div className="text-center py-8">
                                 <div className="p-4 rounded-full w-fit mx-auto mb-3" style={{ backgroundColor: 'rgba(1, 19, 163, 0.1)' }}>
@@ -2159,7 +2172,7 @@ function GroupPageContent() {
                                 <motion.button
                                   onClick={() => setIsShareModalOpen(true)}
                                   className="px-4 py-2.5 bg-green-600 text-white rounded-lg font-medium flex items-center space-x-2 mx-auto shadow-md relative overflow-hidden text-sm"
-                                  whileHover={{ 
+                                  whileHover={{
                                     scale: 1.05,
                                     backgroundColor: "#16a34a"
                                   }}
@@ -2218,12 +2231,12 @@ function GroupPageContent() {
                         )}
                       </div>
                     </motion.div>
-                    </div>
                   </div>
                 </div>
-              ) : null}
-            </div>
+              </div>
+            ) : null}
           </div>
+        </div>
 
         {/* 플로팅 추가 버튼 - 전체 페이지 기준 */}
         {currentView === 'list' && (
@@ -2237,8 +2250,8 @@ function GroupPageContent() {
         <AnimatePresence>
           {/* 새 그룹 추가 모달 */}
           {isAddModalOpen && (
-            <motion.div 
-              className="add-group-modal fixed inset-0 flex items-end justify-center bg-black/50 backdrop-blur-sm" 
+            <motion.div
+              className="add-group-modal fixed inset-0 flex items-end justify-center bg-black/50 backdrop-blur-sm"
               onClick={() => setIsAddModalOpen(false)}
               style={{ zIndex: 50 }}
               initial={{ opacity: 0 }}
@@ -2246,7 +2259,7 @@ function GroupPageContent() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
             >
-              <motion.div 
+              <motion.div
                 className="w-full max-w-md bg-white rounded-t-3xl shadow-2xl max-h-[60vh] flex flex-col mb-12"
                 onClick={e => e.stopPropagation()}
                 onWheel={e => e.stopPropagation()}
@@ -2256,7 +2269,7 @@ function GroupPageContent() {
                 exit="exit"
               >
                 {/* 모달 핸들 - 고정 영역 (드래그 가능) */}
-                <motion.div 
+                <motion.div
                   className="w-12 h-1 bg-gray-300 rounded-full mx-auto mt-3 mb-4 flex-shrink-0 cursor-grab active:cursor-grabbing"
                   drag="y"
                   dragElastic={0.1}
@@ -2280,7 +2293,7 @@ function GroupPageContent() {
                     const target = event.currentTarget as HTMLElement;
                     if (target) {
                       const modalElement = target.closest('.add-group-modal') as HTMLElement;
-                      
+
                       if (info.offset.y > 50 || info.velocity.y > 200) {
                         // 바텀시트 닫기
                         setIsAddModalOpen(false);
@@ -2293,15 +2306,15 @@ function GroupPageContent() {
                       }
                     }
                   }}
-                  whileDrag={{ 
+                  whileDrag={{
                     scale: 1.2,
                     backgroundColor: '#9CA3AF',
                     transition: { duration: 0.1 }
                   }}
                 />
-                
+
                 {/* 모달 헤더 - 고정 영역 (드래그 가능) */}
-                <motion.div 
+                <motion.div
                   className="px-6 pb-3 border-b border-gray-100 flex-shrink-0 cursor-grab active:cursor-grabbing"
                   drag="y"
                   dragElastic={0.1}
@@ -2325,7 +2338,7 @@ function GroupPageContent() {
                     const target = event.currentTarget as HTMLElement;
                     if (target) {
                       const modalElement = target.closest('.add-group-modal') as HTMLElement;
-                      
+
                       if (info.offset.y > 50 || info.velocity.y > 200) {
                         // 바텀시트 닫기
                         setIsAddModalOpen(false);
@@ -2361,7 +2374,7 @@ function GroupPageContent() {
                 </motion.div>
 
                 {/* 스크롤 가능한 폼 영역 */}
-                <div 
+                <div
                   className="flex-1 overflow-y-auto"
                   onTouchStart={(e) => {
                     // 터치 시작점 기록 (스크롤과 드래그 구분용)
@@ -2376,19 +2389,19 @@ function GroupPageContent() {
                     const startX = (e.currentTarget as any).touchStartX;
                     const startScrollTop = (e.currentTarget as any).scrollTop;
                     const currentScrollTop = (e.currentTarget as HTMLElement).scrollTop;
-                    
+
                     if (startY && startX) {
                       const deltaY = touch.clientY - startY;
                       const deltaX = touch.clientX - startX;
-                      
+
                       // 수직 스크롤인지 확인 (수직 이동이 수평 이동보다 큰 경우)
                       const isVerticalScroll = Math.abs(deltaY) > Math.abs(deltaX);
-                      
+
                       // 스크롤 가능한 상태인지 확인
                       const element = e.currentTarget as HTMLElement;
                       const canScrollUp = currentScrollTop > 0;
                       const canScrollDown = currentScrollTop < (element.scrollHeight - element.clientHeight);
-                      
+
                       // 수직 스크롤이고 스크롤 가능한 상태라면 스크롤 허용
                       if (isVerticalScroll && (canScrollUp || canScrollDown)) {
                         // 스크롤 영역에서의 정상적인 스크롤 - 이벤트 전파 중지
@@ -2414,7 +2427,7 @@ function GroupPageContent() {
                         />
                         <p className="text-xs text-gray-500 mt-1">{newGroup.name.length}/50</p>
                       </div>
-                      
+
                       <div>
                         <label className="block text-sm font-medium mb-2" style={{ color: '#0113A3' }}>
                           그룹 설명
@@ -2431,7 +2444,7 @@ function GroupPageContent() {
                         <p className="text-xs text-gray-500 mt-1">{newGroup.description.length}/100</p>
                       </div>
                     </div>
-                    
+
                     {/* 그룹 만들기 버튼만 남기고 취소 버튼 제거 */}
                     <div className="pt-2">
                       <motion.button
@@ -2471,79 +2484,79 @@ function GroupPageContent() {
               size="sm"
               className="rounded-2xl max-w-xs"
             >
-            <div className="p-4">
-              <div className="text-center mb-4">
-                <FaShare className="w-8 h-8 text-gray-700 mx-auto mb-2" />
-                <p className="text-gray-600 text-sm">{selectedGroup?.sgt_title}</p>
-                
-                {/* 초대 코드 표시 */}
-                {selectedGroup?.sgt_code && (
-                  <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                    <p className="text-xs text-gray-500 mb-1 text-center">초대 코드</p>
-                    <div className="flex items-center justify-center">
-                      <code className="text-lg font-mono font-bold text-blue-600 bg-white px-3 py-2 rounded border text-center">
-                        {selectedGroup.sgt_code}
-                      </code>
+              <div className="p-4">
+                <div className="text-center mb-4">
+                  <FaShare className="w-8 h-8 text-gray-700 mx-auto mb-2" />
+                  <p className="text-gray-600 text-sm">{selectedGroup?.sgt_title}</p>
+
+                  {/* 초대 코드 표시 */}
+                  {selectedGroup?.sgt_code && (
+                    <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <p className="text-xs text-gray-500 mb-1 text-center">초대 코드</p>
+                      <div className="flex items-center justify-center">
+                        <code className="text-lg font-mono font-bold text-blue-600 bg-white px-3 py-2 rounded border text-center">
+                          {selectedGroup.sgt_code}
+                        </code>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
-              
-              <div className="space-y-2">
-                {/* Web Share API 지원 시 네이티브 공유 버튼 */}
-                {supportsWebShare() && (
-                  <motion.button 
-                    onClick={handleNativeShare} 
-                    className="w-full flex items-center justify-center p-3 rounded-lg bg-orange-200 text-orange-800 shadow-sm hover:bg-orange-300 hover:text-orange-900 transition-all"
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  {/* Web Share API 지원 시 네이티브 공유 버튼 */}
+                  {supportsWebShare() && (
+                    <motion.button
+                      onClick={handleNativeShare}
+                      className="w-full flex items-center justify-center p-3 rounded-lg bg-orange-200 text-orange-800 shadow-sm hover:bg-orange-300 hover:text-orange-900 transition-all"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      <FaShare className="w-4 h-4 mr-2" />
+                      <span className="font-medium text-sm">다른 앱으로 공유</span>
+                    </motion.button>
+                  )}
+                  <motion.button
+                    onClick={handleCopyLink}
+                    className="w-full flex items-center justify-center p-3 rounded-lg bg-blue-200 text-blue-800 shadow-sm hover:bg-blue-300 hover:text-blue-900 transition-all"
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >
-                    <FaShare className="w-4 h-4 mr-2" />
-                    <span className="font-medium text-sm">다른 앱으로 공유</span>
+                    <FiCopy className="w-4 h-4 mr-2" />
+                    <span className="font-medium text-sm">초대 링크 복사</span>
                   </motion.button>
-                )}
-                <motion.button 
-                  onClick={handleCopyLink} 
-                  className="w-full flex items-center justify-center p-3 rounded-lg bg-blue-200 text-blue-800 shadow-sm hover:bg-blue-300 hover:text-blue-900 transition-all"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <FiCopy className="w-4 h-4 mr-2" />
-                  <span className="font-medium text-sm">초대 링크 복사</span>
-                </motion.button>
-                
-                <motion.button 
-                  onClick={handleSMSShare} 
-                  className="w-full flex items-center justify-center p-3 rounded-lg bg-green-200 text-green-800 shadow-sm hover:bg-green-300 hover:text-green-900 transition-all"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <MdOutlineMessage className="w-4 h-4 mr-2" />
-                  <span className="font-medium text-sm">
-                    {isMobile() ? '문자로 공유' : '문자 메시지 복사'}
-                  </span>
-                </motion.button>
-                
-                <motion.button 
-                  onClick={() => generateQRCode(selectedGroup!)}
-                  className="w-full flex items-center justify-center p-3 rounded-lg bg-purple-200 text-purple-800 shadow-sm hover:bg-purple-300 hover:text-purple-900 transition-all"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <FaQrcode className="w-4 h-4 mr-2" />
-                  <span className="font-medium text-sm">QR코드 보기</span>
-                </motion.button>
-                
-                <motion.button
-                  onClick={() => setIsShareModalOpen(false)}
-                  className="w-full py-2 mt-3 text-gray-600 font-medium text-sm"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  닫기
-                </motion.button>
+
+                  <motion.button
+                    onClick={handleSMSShare}
+                    className="w-full flex items-center justify-center p-3 rounded-lg bg-green-200 text-green-800 shadow-sm hover:bg-green-300 hover:text-green-900 transition-all"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <MdOutlineMessage className="w-4 h-4 mr-2" />
+                    <span className="font-medium text-sm">
+                      {isMobile() ? '문자로 공유' : '문자 메시지 복사'}
+                    </span>
+                  </motion.button>
+
+                  <motion.button
+                    onClick={() => generateQRCode(selectedGroup!)}
+                    className="w-full flex items-center justify-center p-3 rounded-lg bg-purple-200 text-purple-800 shadow-sm hover:bg-purple-300 hover:text-purple-900 transition-all"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <FaQrcode className="w-4 h-4 mr-2" />
+                    <span className="font-medium text-sm">QR코드 보기</span>
+                  </motion.button>
+
+                  <motion.button
+                    onClick={() => setIsShareModalOpen(false)}
+                    className="w-full py-2 mt-3 text-gray-600 font-medium text-sm"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    닫기
+                  </motion.button>
+                </div>
               </div>
-            </div>
             </Modal>
           )}
 
@@ -2557,75 +2570,75 @@ function GroupPageContent() {
               size="sm"
               className="rounded-2xl max-w-xs"
             >
-            <div className="p-4">
-              <div className="text-center mb-4">
-                <FaEdit className="w-8 h-8 text-gray-700 mx-auto mb-2" />
-                <p className="text-gray-600 text-sm">{selectedGroup?.sgt_title}</p>
-              </div>
-              
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: '#0113A3' }}>
-                    그룹명 <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={editGroup.name}
-                    onChange={(e) => setEditGroup(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="예: 가족, 친구, 직장"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:border-gray-500 text-sm"
-                    style={{ '--tw-ring-color': '#0113A3' } as React.CSSProperties}
-                    maxLength={50}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">{editGroup.name.length}/50</p>
+              <div className="p-4">
+                <div className="text-center mb-4">
+                  <FaEdit className="w-8 h-8 text-gray-700 mx-auto mb-2" />
+                  <p className="text-gray-600 text-sm">{selectedGroup?.sgt_title}</p>
                 </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: '#0113A3' }}>
-                    그룹 설명
-                  </label>
-                  <textarea
-                    value={editGroup.description}
-                    onChange={(e) => setEditGroup(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="그룹에 대한 간단한 설명을 입력해주세요"
-                    rows={2}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:border-gray-500 resize-none text-sm"
-                    style={{ '--tw-ring-color': '#0113A3' } as React.CSSProperties}
-                    maxLength={100}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">{editGroup.description.length}/100</p>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium mb-1" style={{ color: '#0113A3' }}>
+                      그룹명 <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={editGroup.name}
+                      onChange={(e) => setEditGroup(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="예: 가족, 친구, 직장"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:border-gray-500 text-sm"
+                      style={{ '--tw-ring-color': '#0113A3' } as React.CSSProperties}
+                      maxLength={50}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">{editGroup.name.length}/50</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1" style={{ color: '#0113A3' }}>
+                      그룹 설명
+                    </label>
+                    <textarea
+                      value={editGroup.description}
+                      onChange={(e) => setEditGroup(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder="그룹에 대한 간단한 설명을 입력해주세요"
+                      rows={2}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:border-gray-500 resize-none text-sm"
+                      style={{ '--tw-ring-color': '#0113A3' } as React.CSSProperties}
+                      maxLength={100}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">{editGroup.description.length}/100</p>
+                  </div>
+                </div>
+
+                <div className="flex space-x-2 mt-4">
+                  <motion.button
+                    onClick={() => setIsEditModalOpen(false)}
+                    disabled={isUpdatingGroup}
+                    className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium disabled:opacity-50 text-sm"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    취소
+                  </motion.button>
+                  <motion.button
+                    onClick={handleUpdateGroup}
+                    disabled={editGroup.name.trim() === '' || isUpdatingGroup}
+                    className="flex-1 py-2 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-sm"
+                    style={{ background: 'linear-gradient(to right, #0113A3, #001a8a)' }}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    {isUpdatingGroup ? (
+                      <>
+                        <IOSCompatibleSpinner size="sm" />
+                        수정 중...
+                      </>
+                    ) : (
+                      '수정 완료'
+                    )}
+                  </motion.button>
                 </div>
               </div>
-              
-              <div className="flex space-x-2 mt-4">
-                <motion.button
-                  onClick={() => setIsEditModalOpen(false)}
-                  disabled={isUpdatingGroup}
-                  className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium disabled:opacity-50 text-sm"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  취소
-                </motion.button>
-                <motion.button
-                  onClick={handleUpdateGroup}
-                  disabled={editGroup.name.trim() === '' || isUpdatingGroup}
-                  className="flex-1 py-2 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-sm"
-                  style={{ background: 'linear-gradient(to right, #0113A3, #001a8a)' }}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  {isUpdatingGroup ? (
-                    <>
-                      <IOSCompatibleSpinner size="sm" />
-                      수정 중...
-                    </>
-                  ) : (
-                    '수정 완료'
-                  )}
-                </motion.button>
-              </div>
-            </div>
             </Modal>
           )}
 
@@ -2639,43 +2652,43 @@ function GroupPageContent() {
               size="sm"
               className="rounded-2xl max-w-xs"
             >
-            <div className="p-4">
-              <div className="text-center mb-4">
-                <FaTrash className="w-8 h-8 text-red-500 mx-auto mb-2" />
-                <p className="text-gray-600 text-sm">
-                  <span className="font-medium text-red-600">"{selectedGroup?.sgt_title}"</span><br />
-                  그룹을 삭제하시겠습니까?
-                </p>
+              <div className="p-4">
+                <div className="text-center mb-4">
+                  <FaTrash className="w-8 h-8 text-red-500 mx-auto mb-2" />
+                  <p className="text-gray-600 text-sm">
+                    <span className="font-medium text-red-600">"{selectedGroup?.sgt_title}"</span><br />
+                    그룹을 삭제하시겠습니까?
+                  </p>
+                </div>
+
+                <div className="flex space-x-2">
+                  <motion.button
+                    onClick={() => setIsDeleteModalOpen(false)}
+                    disabled={isDeleting}
+                    className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium disabled:opacity-50 text-sm"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    취소
+                  </motion.button>
+                  <motion.button
+                    onClick={handleDeleteGroup}
+                    disabled={isDeleting}
+                    className="flex-1 py-2 bg-red-500 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-sm"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    {isDeleting ? (
+                      <>
+                        <IOSCompatibleSpinner size="sm" />
+                        삭제중
+                      </>
+                    ) : (
+                      '삭제'
+                    )}
+                  </motion.button>
+                </div>
               </div>
-              
-              <div className="flex space-x-2">
-                <motion.button
-                  onClick={() => setIsDeleteModalOpen(false)}
-                  disabled={isDeleting}
-                  className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium disabled:opacity-50 text-sm"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  취소
-                </motion.button>
-                <motion.button
-                  onClick={handleDeleteGroup}
-                  disabled={isDeleting}
-                  className="flex-1 py-2 bg-red-500 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-sm"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  {isDeleting ? (
-                    <>
-                      <IOSCompatibleSpinner size="sm" />
-                      삭제중
-                    </>
-                  ) : (
-                    '삭제'
-                  )}
-                </motion.button>
-              </div>
-            </div>
             </Modal>
           )}
 
@@ -2689,103 +2702,102 @@ function GroupPageContent() {
               size="sm"
               className="rounded-2xl max-w-xs"
             >
-            <div className="p-4">
-              <div className="text-center mb-4">
-                <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-2" style={{ backgroundColor: 'rgba(1, 19, 163, 0.1)' }}>
-                  <img
-                    src={getSafeImageUrl(selectedMember?.photo || null, selectedMember?.mt_gender, selectedMember?.original_index || 0)}
-                    alt={selectedMember?.mt_name}
-                    className="w-full h-full object-cover rounded-full"
-                    onError={(e) => {
-                      e.currentTarget.src = getDefaultImage(selectedMember?.mt_gender, selectedMember?.original_index || 0);
-                    }}
-                  />
+              <div className="p-4">
+                <div className="text-center mb-4">
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-2" style={{ backgroundColor: 'rgba(1, 19, 163, 0.1)' }}>
+                    <img
+                      src={getSafeImageUrl(selectedMember?.photo || null, selectedMember?.mt_gender, selectedMember?.original_index || 0)}
+                      alt={selectedMember?.mt_name}
+                      className="w-full h-full object-cover rounded-full"
+                      onError={(e) => {
+                        e.currentTarget.src = getDefaultImage(selectedMember?.mt_gender, selectedMember?.original_index || 0);
+                      }}
+                    />
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-1">{selectedMember?.mt_nickname || selectedMember?.mt_name}</h3>
+                  <p className="text-gray-600 text-sm">
+                    현재: {selectedMember?.sgdt_leader_chk === 'Y' ? '리더' : '멤버'}
+                  </p>
                 </div>
-                <h3 className="text-lg font-bold text-gray-900 mb-1">{selectedMember?.mt_nickname || selectedMember?.mt_name}</h3>
-                <p className="text-gray-600 text-sm">
-                  현재: {selectedMember?.sgdt_leader_chk === 'Y' ? '리더' : '멤버'}
-                </p>
-              </div>
-              
-              <div className="space-y-2">
-                {selectedMember?.sgdt_leader_chk === 'Y' ? (
-                  <motion.button 
-                    onClick={() => handleChangeMemberRole('member')}
-                    disabled={isUpdatingMember}
-                    className="w-full flex items-center justify-center p-3 rounded-lg bg-blue-500 text-white disabled:opacity-50"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    {isUpdatingMember ? (
-                      <IOSCompatibleSpinner size="sm" />
-                    ) : (
-                      <FaUsers className="w-4 h-4 mr-2" />
-                    )}
-                    <span className="text-sm">멤버로 변경</span>
-                  </motion.button>
-                ) : (
-                  <motion.button 
-                    onClick={() => handleChangeMemberRole('leader')}
-                    disabled={isUpdatingMember}
-                    className="w-full flex items-center justify-center p-3 rounded-lg bg-gradient-to-r from-gray-400 to-gray-500 text-white disabled:opacity-50"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    {isUpdatingMember ? (
-                      <IOSCompatibleSpinner size="sm" />
-                    ) : (
-                      <FaCrown className="w-4 h-4 mr-2" />
-                    )}
-                    <span className="text-sm">리더로 승격</span>
-                  </motion.button>
-                )}
-                
-                <motion.button 
-                  onClick={handleRemoveMember}
-                  disabled={isUpdatingMember}
-                  className="w-full flex items-center justify-center p-3 rounded-lg bg-red-500 text-white disabled:opacity-50"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  {isUpdatingMember ? (
-                    <IOSCompatibleSpinner size="sm" />
+
+                <div className="space-y-2">
+                  {selectedMember?.sgdt_leader_chk === 'Y' ? (
+                    <motion.button
+                      onClick={() => handleChangeMemberRole('member')}
+                      disabled={isUpdatingMember}
+                      className="w-full flex items-center justify-center p-3 rounded-lg bg-blue-500 text-white disabled:opacity-50"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      {isUpdatingMember ? (
+                        <IOSCompatibleSpinner size="sm" />
+                      ) : (
+                        <FaUsers className="w-4 h-4 mr-2" />
+                      )}
+                      <span className="text-sm">멤버로 변경</span>
+                    </motion.button>
                   ) : (
-                    <FaTrash className="w-4 h-4 mr-2" />
+                    <motion.button
+                      onClick={() => handleChangeMemberRole('leader')}
+                      disabled={isUpdatingMember}
+                      className="w-full flex items-center justify-center p-3 rounded-lg bg-gradient-to-r from-gray-400 to-gray-500 text-white disabled:opacity-50"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      {isUpdatingMember ? (
+                        <IOSCompatibleSpinner size="sm" />
+                      ) : (
+                        <FaCrown className="w-4 h-4 mr-2" />
+                      )}
+                      <span className="text-sm">리더로 승격</span>
+                    </motion.button>
                   )}
-                  <span className="text-sm">그룹에서 탈퇴</span>
-                </motion.button>
-                
-                <motion.button
-                  onClick={() => setIsMemberManageModalOpen(false)}
-                  disabled={isUpdatingMember}
-                  className="w-full py-2 text-gray-600 font-medium disabled:opacity-50 text-sm"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  취소
-                </motion.button>
+
+                  <motion.button
+                    onClick={handleRemoveMember}
+                    disabled={isUpdatingMember}
+                    className="w-full flex items-center justify-center p-3 rounded-lg bg-red-500 text-white disabled:opacity-50"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    {isUpdatingMember ? (
+                      <IOSCompatibleSpinner size="sm" />
+                    ) : (
+                      <FaTrash className="w-4 h-4 mr-2" />
+                    )}
+                    <span className="text-sm">그룹에서 탈퇴</span>
+                  </motion.button>
+
+                  <motion.button
+                    onClick={() => setIsMemberManageModalOpen(false)}
+                    disabled={isUpdatingMember}
+                    className="w-full py-2 text-gray-600 font-medium disabled:opacity-50 text-sm"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    취소
+                  </motion.button>
+                </div>
               </div>
-            </div>
             </Modal>
           )}
 
           {/* 컴팩트 토스트 모달 */}
           {toastModal.isOpen && (
-            <motion.div 
+            <motion.div
               className="fixed left-4 z-[130] w-3/4 max-w-sm"
               style={{ bottom: '67px' }} // 네비게이션바(64px) + 7px
               initial={{ opacity: 0, y: 50, scale: 0.9 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 50, scale: 0.9 }}
-                              transition={{ duration: 0.3 }}
+              transition={{ duration: 0.3 }}
             >
               <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden w-full">
                 <div className="p-4">
                   <div className="flex items-center space-x-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                      toastModal.type === 'success' ? 'bg-green-100' :
-                      toastModal.type === 'error' ? 'bg-red-100' : 'bg-blue-100'
-                    }`}>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${toastModal.type === 'success' ? 'bg-green-100' :
+                        toastModal.type === 'error' ? 'bg-red-100' : 'bg-blue-100'
+                      }`}>
                       {toastModal.type === 'success' && (
                         <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -2816,15 +2828,14 @@ function GroupPageContent() {
                     )}
                   </div>
                 </div>
-                
+
                 {/* 프로그레스 바 */}
                 {toastModal.autoClose && toastModal.type !== 'loading' && (
                   <div className="h-1 bg-gray-100">
-                    <motion.div 
-                      className={`h-full ${
-                        toastModal.type === 'success' ? 'bg-green-500' :
-                        toastModal.type === 'error' ? 'bg-red-500' : 'bg-blue-500'
-                      }`}
+                    <motion.div
+                      className={`h-full ${toastModal.type === 'success' ? 'bg-green-500' :
+                          toastModal.type === 'error' ? 'bg-red-500' : 'bg-blue-500'
+                        }`}
                       initial={{ width: '100%' }}
                       animate={{ width: `${100 - (toastModal.progress || 0)}%` }}
                       transition={{ duration: 0.1 }}
@@ -2848,7 +2859,7 @@ function GroupPageContent() {
               <div className="p-2">
                 <div className="text-center mb-2">
                   <p className="text-gray-600 text-sm">{selectedGroup?.sgt_title}</p>
-                  
+
                   {/* QR코드 표시 */}
                   <div className="mt-2 p-2 bg-white rounded-lg border border-gray-200">
                     <div className="flex justify-center">
@@ -2872,7 +2883,7 @@ function GroupPageContent() {
                         </div>
                       </div>
                     </div>
-                    
+
                     {/* 초대 코드 표시 */}
                     {selectedGroup?.sgt_code && (
                       <div className="mt-3 p-2 bg-gray-50 rounded border">
@@ -2886,9 +2897,9 @@ function GroupPageContent() {
                     )}
                   </div>
                 </div>
-                
+
                 <div className="space-y-1 mt-2">
-                  <motion.button 
+                  <motion.button
                     onClick={() => {
                       if (selectedGroup?.sgt_code) {
                         fallbackCopyText(selectedGroup.sgt_code);
@@ -2902,8 +2913,8 @@ function GroupPageContent() {
                     <FiCopy className="w-4 h-4 mr-2" />
                     <span className="font-medium text-sm">초대 코드 복사</span>
                   </motion.button>
-                  
-                  <motion.button 
+
+                  <motion.button
                     onClick={() => {
                       if (qrCodeData) {
                         fallbackCopyText(qrCodeData);
@@ -2917,7 +2928,7 @@ function GroupPageContent() {
                     <FaQrcode className="w-4 h-4 mr-2" />
                     <span className="font-medium text-sm">QR코드 데이터 복사</span>
                   </motion.button>
-                  
+
                   <motion.button
                     onClick={() => setShowQRCode(false)}
                     className="w-full py-1.5 mt-1 text-gray-600 font-medium text-sm"
