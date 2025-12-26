@@ -2230,6 +2230,10 @@ export default function LocationPage() {
     setIsFirstMemberSelectionComplete(false);
     selectedMemberIdRef.current = null;
 
+    // 🚨 그룹 변경 시 인포윈도우 초기화 플래그 리셋 (새 그룹에서 인포윈도우가 제대로 생성되도록)
+    initialMarkerSetupDoneRef.current = false;
+    shouldAutoOpenInfoWindowRef.current = true;
+
     // 데이터 로딩 상태 초기화
     dataFetchedRef.current = {
       groups: dataFetchedRef.current.groups, // 그룹 데이터는 유지
@@ -3609,6 +3613,12 @@ export default function LocationPage() {
     const firstMember = groupMembers[0];
     console.log('[LOCATION] 첫번째 멤버 자동 선택 실행:', firstMember.name, firstMember.id);
 
+    // 🚨 인포윈도우 자동 열기 플래그 활성화 (핵심 수정)
+    shouldAutoOpenInfoWindowRef.current = true;
+
+    // 🚨 initialMarkerSetupDoneRef 리셋 (새 그룹 선택 시 인포윈도우 다시 생성할 수 있도록)
+    initialMarkerSetupDoneRef.current = false;
+
     // 업데이트된 멤버 정보 생성 (선택 상태 반영)
     const updatedMembersForSelection = groupMembers.map(member => ({
       ...member,
@@ -3623,11 +3633,10 @@ export default function LocationPage() {
 
     console.log('[LOCATION] 첫번째 멤버 자동 선택 완료:', firstMember.name);
 
-    // 🚨 ensureInitialMemberInfoWindow 호출 비활성화 - 새 useEffect에서 인포윈도우 생성
-    // setTimeout(() => {
-    //   ensureInitialMemberInfoWindow();
-    // }, 800);
-    console.log('[LOCATION] 🚨 ensureInitialMemberInfoWindow 비활성화 - memberMarkers useEffect에서 처리');
+    // 🚨 ensureInitialMemberInfoWindow를 폴백으로 재활성화 (memberMarkers useEffect가 실패할 경우 대비)
+    setTimeout(() => {
+      ensureInitialMemberInfoWindow();
+    }, 1000);
   }, [shouldSelectFirstMember]); // 🚨 groupMembers 제거 - 매번 재실행 방지
 
   // 첫번째 멤버 선택 완료 (InfoWindow는 표시하지 않음)
@@ -3715,6 +3724,17 @@ export default function LocationPage() {
     const selectedMember = groupMembers.find(m => m.isSelected);
     if (!selectedMember) return;
 
+    // 🚨 인포윈도우가 이미 열려있는지 확인 (이미 열려있으면 스킵)
+    try {
+      if (infoWindow && infoWindow.getMap && infoWindow.getMap()) {
+        console.log('[memberMarkers useEffect] 🚨 인포윈도우 이미 표시됨 - 스킵');
+        initialMarkerSetupDoneRef.current = true;
+        return;
+      }
+    } catch (e) {
+      // 무시
+    }
+
     console.log('[memberMarkers useEffect] 🚨 멤버 마커 생성 완료 - 인포윈도우 표시:', {
       memberMarkersCount: memberMarkers.length,
       selectedMember: selectedMember.name
@@ -3730,7 +3750,7 @@ export default function LocationPage() {
     const selectedMarker = memberMarkers[selectedMarkerIndex];
 
     if (selectedMarker && map) {
-      console.log('[memberMarkers useEffect] 🚨 선택된 멤버 마커 발견, 인포윈도우만 생성 (장소 마커는 updateAllMarkers에서 처리)');
+      console.log('[memberMarkers useEffect] 🚨 선택된 멤버 마커 발견, 인포윈도우 생성 시작');
 
       // 🚨 기존 타이머 취소
       if (initialInfoWindowTimerRef.current) {
@@ -3740,8 +3760,7 @@ export default function LocationPage() {
       // 🚨 멤버 ID 캡처 - 타이머 실행 시 현재 선택된 멤버와 비교용
       const capturedMemberId = selectedMember.id;
 
-      // 인포윈도우만 생성 (장소 마커는 updateAllMarkers에서 이미 처리됨)
-      // 타이밍: updateAllMarkers 완료 후 인포윈도우 생성
+      // 🚨 인포윈도우 즉시 생성 (타이밍을 300ms로 단축)
       initialInfoWindowTimerRef.current = setTimeout(() => {
         // 🚨 타이머 실행 시 현재 선택된 멤버 확인 - ref를 사용해 최신 상태 확인
         const currentSelectedMemberId = selectedMemberIdRef.current;
@@ -3753,9 +3772,19 @@ export default function LocationPage() {
           return;
         }
 
+        // 🚨 인포윈도우가 이미 열려있는지 다시 확인
+        try {
+          if (infoWindow && infoWindow.getMap && infoWindow.getMap()) {
+            console.log('[memberMarkers useEffect] 🚨 인포윈도우 이미 표시됨 (타이머 내) - 스킵');
+            return;
+          }
+        } catch (e) {
+          // 무시
+        }
+
         console.log('[memberMarkers useEffect] 🚨 인포윈도우 생성 실행');
         createMemberInfoWindow(selectedMember, selectedMarker);
-      }, 500); // 🚨 1000ms에서 500ms로 단축
+      }, 300); // 🚨 500ms에서 300ms로 단축하여 더 빠르게 표시
     }
 
     // 클린업: 타이머 정리
