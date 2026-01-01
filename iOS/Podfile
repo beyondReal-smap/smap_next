@@ -52,6 +52,11 @@ post_install do |installer|
       config.build_settings['SWIFT_VERSION'] = '5.9'
       # 엄격 동시성 수준 완화(서드파티 라이브러리 호환 목적)
       config.build_settings['SWIFT_STRICT_CONCURRENCY'] = 'minimal'
+      
+      # NMapsMap: 바이너리 프레임워크의 dSYM 누락 오류 방지 (dwarf 로 설정하여 dSYM 생성/검증 건너뜀)
+      if target.name == 'NMapsMap' || target.name == 'NMapsGeometry'
+        config.build_settings['DEBUG_INFORMATION_FORMAT'] = 'dwarf'
+      end
     end
 
     # Xcode 15+/16에서 .xcprivacy가 Compile Sources에 들어간 경우 Resources로 이동
