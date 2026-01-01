@@ -112,7 +112,37 @@ async def root():
     }
 
 # 정적 파일 서빙
-app.mount("/static", StaticFiles(directory="storage"), name="static")
+from pathlib import Path
+BASE_DIR = Path(__file__).resolve().parent.parent  # backend 디렉토리
+STORAGE_DIR = BASE_DIR / "storage"
+IMAGES_DIR = BASE_DIR / "public" / "images"
+
+# 디렉토리가 없으면 생성
+STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+
+# 로그 출력 (시작 시 경로 확인)
+logger.info(f"📁 BASE_DIR: {BASE_DIR}")
+logger.info(f"📁 IMAGES_DIR: {IMAGES_DIR}")
+logger.info(f"📁 IMAGES_DIR exists: {IMAGES_DIR.exists()}")
+
+app.mount("/static", StaticFiles(directory=str(STORAGE_DIR)), name="static")
+app.mount("/images", StaticFiles(directory=str(IMAGES_DIR)), name="images")  # 프로필 이미지
+
+# 이미지 경로 디버깅 엔드포인트
+@app.get("/debug/images", tags=["debug"])
+async def debug_images():
+    """이미지 디렉토리 경로와 파일 목록을 확인합니다."""
+    files = []
+    if IMAGES_DIR.exists():
+        files = [f.name for f in IMAGES_DIR.glob("*")]
+    return {
+        "base_dir": str(BASE_DIR),
+        "images_dir": str(IMAGES_DIR),
+        "images_dir_exists": IMAGES_DIR.exists(),
+        "files": files[:20],  # 최대 20개만 표시
+        "file_count": len(files)
+    }
 
 # 데이터베이스 연결 풀 상태 확인
 @app.get("/health/db-pool", tags=["healthcheck"])
@@ -187,6 +217,13 @@ async def startup_event():
     애플리케이션 시작 시 실행되는 이벤트
     """
     scheduler.start()
+    # 정적 파일 경로 로그
+    logger.info(f"📁 [STARTUP] BASE_DIR: {BASE_DIR}")
+    logger.info(f"📁 [STARTUP] IMAGES_DIR: {IMAGES_DIR}")
+    logger.info(f"📁 [STARTUP] IMAGES_DIR exists: {IMAGES_DIR.exists()}")
+    if IMAGES_DIR.exists():
+        files = list(IMAGES_DIR.glob("*"))
+        logger.info(f"📁 [STARTUP] Files in IMAGES_DIR: {[f.name for f in files[:10]]}")
 
 @app.on_event("shutdown")
 async def shutdown_event():

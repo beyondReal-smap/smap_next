@@ -38,3 +38,8 @@ Podfile.lock
 ## Security / Secret files (based on ls output)
 AuthKey_*.p8
 GoogleService-Info.plist
+
+## Images
+*.jpg
+*.png
+*.webp

@@ -241,6 +241,22 @@ def update_location(
         params = {"location_id": location_id}
         
         # 업데이트할 필드들 처리
+        if 'slt_title' in location_data:
+            update_fields.append("slt_title = :slt_title")
+            params['slt_title'] = str(location_data['slt_title']).strip()[:50]
+            
+        if 'slt_add' in location_data:
+            update_fields.append("slt_add = :slt_add")
+            params['slt_add'] = str(location_data['slt_add']).strip()[:100]
+            
+        if 'slt_lat' in location_data:
+            update_fields.append("slt_lat = :slt_lat")
+            params['slt_lat'] = float(location_data['slt_lat'])
+            
+        if 'slt_long' in location_data:
+            update_fields.append("slt_long = :slt_long")
+            params['slt_long'] = float(location_data['slt_long'])
+
         if 'slt_enter_alarm' in location_data:
             update_fields.append("slt_enter_alarm = :slt_enter_alarm")
             params['slt_enter_alarm'] = location_data['slt_enter_alarm']

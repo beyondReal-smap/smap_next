@@ -125,6 +125,20 @@ class GoogleLoginResponse(BaseModel):
     message: str
     data: Optional[dict] = None
 
+# Apple 로그인 요청 스키마
+class AppleLoginRequest(BaseModel):
+    userIdentifier: str
+    email: Optional[str] = None
+    userName: Optional[str] = None
+    identityToken: Optional[str] = None
+    authorizationCode: Optional[str] = None
+
+# Apple 로그인 응답 스키마
+class AppleLoginResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[dict] = None
+
 # 비밀번호 확인 요청 스키마
 class VerifyPasswordRequest(BaseModel):
     currentPassword: str

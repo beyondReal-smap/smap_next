@@ -67,41 +67,54 @@ def get_hidden_groups(
     
     return hidden_groups
 
-@router.get("/{group_id}", response_model=GroupResponse)
-def get_group(
-    group_id: int,
-    db: Session = Depends(deps.get_db)
-):
-    """
-    특정 그룹을 조회합니다.
-    """
-    group = db.query(Group).filter(Group.sgt_idx == group_id).first()
-    if not group:
-        raise HTTPException(status_code=404, detail="Group not found")
-    return group
-
-@router.get("/", response_model=List[GroupResponse])
-def get_groups(
+@router.get("/current-user/summary")
+def get_group_summary(
     db: Session = Depends(deps.get_db),
-    skip: int = 0,
-    limit: int = 100,
-    show_hidden: bool = False
+    authorization: str = Header(None)
 ):
     """
-    그룹 목록을 조회합니다. (sgt_show = 'Y'인 그룹만, show_hidden=True면 숨겨진 그룹도 포함)
+    현재 사용자의 그룹 정보를 요약하여 반환합니다.
+    - 총 그룹 수
+    - 총 멤버 수 (중복 제거)
     """
-    if show_hidden:
-        logger.info("[GET_GROUPS] 숨겨진 그룹 포함하여 조회")
-        groups = db.query(Group).offset(skip).limit(limit).all()
-    else:
-        logger.info("[GET_GROUPS] 표시되는 그룹만 조회")
-        groups = db.query(Group).filter(Group.sgt_show == 'Y').offset(skip).limit(limit).all()
+    user_id = get_current_user_id_from_token(authorization)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="인증이 필요합니다.")
     
-    logger.info(f"[GET_GROUPS] 조회된 그룹 수: {len(groups)}")
-    for group in groups:
-        logger.info(f"[GET_GROUPS] 그룹 - sgt_idx: {group.sgt_idx}, sgt_title: {group.sgt_title}, sgt_show: {group.sgt_show}")
+    logger.info(f"[GET_GROUP_SUMMARY] 그룹 요약 정보 조회 - user_id: {user_id}")
     
-    return groups
+    # 사용자가 속한 유효한 그룹 ID 목록 조회
+    user_groups_subquery = db.query(GroupDetail.sgt_idx).filter(
+        GroupDetail.mt_idx == user_id,
+        GroupDetail.sgdt_exit == 'N',
+        GroupDetail.sgdt_show == 'Y'
+    ).subquery()
+    
+    # 총 그룹 수 (sgt_show='Y'인 그룹만)
+    group_count = db.query(Group).filter(
+        Group.sgt_idx.in_(user_groups_subquery),
+        Group.sgt_show == 'Y'
+    ).count()
+    
+    # 총 멤버 수 (중복 제거, 유효한 그룹의 멤버만)
+    # 1. 사용자가 속한 그룹들 중(user_groups_subquery)
+    # 2. 보여지는 그룹(sgt_show='Y')의
+    # 3. 유효한 멤버(sgdt_exit='N')들의 ID를 중복 제거하여 카운트
+    distinct_member_count = db.query(func.count(func.distinct(GroupDetail.mt_idx))).join(
+        Group, Group.sgt_idx == GroupDetail.sgt_idx
+    ).filter(
+        GroupDetail.sgt_idx.in_(user_groups_subquery),
+        Group.sgt_show == 'Y',
+        GroupDetail.sgdt_exit == 'N',
+        GroupDetail.sgdt_show == 'Y'
+    ).scalar() or 0
+    
+    logger.info(f"[GET_GROUP_SUMMARY] 조회 결과 - 그룹: {group_count}, 멤버: {distinct_member_count}")
+    
+    return {
+        "group_count": group_count,
+        "total_members": distinct_member_count
+    }
 
 @router.get("/current-user", response_model=List[dict])
 def get_current_user_groups(
@@ -143,6 +156,13 @@ def get_current_user_groups(
     
     result = []
     for group, group_detail in user_groups:
+        # 멤버 수 계산
+        member_count = db.query(func.count(GroupDetail.sgdt_idx)).filter(
+            GroupDetail.sgt_idx == group.sgt_idx,
+            GroupDetail.sgdt_exit == 'N',
+            GroupDetail.sgdt_show == 'Y'
+        ).scalar() or 0
+        
         group_data = {
             "sgt_idx": group.sgt_idx,
             "mt_idx": group.mt_idx,  # 그룹 오너 ID
@@ -152,6 +172,7 @@ def get_current_user_groups(
             "sgt_show": group.sgt_show or 'Y',
             "sgt_wdate": group.sgt_wdate.isoformat() if group.sgt_wdate else datetime.utcnow().isoformat(),
             "sgt_udate": group.sgt_udate.isoformat() if group.sgt_udate else datetime.utcnow().isoformat(),
+            "member_count": member_count,
             # 현재 사용자의 그룹 내 역할 정보
             "is_owner": group_detail.sgdt_owner_chk == 'Y',
             "is_leader": group_detail.sgdt_leader_chk == 'Y',
@@ -163,6 +184,44 @@ def get_current_user_groups(
     result.sort(key=lambda x: x["sgt_title"])
     
     return result
+
+@router.get("/{group_id}", response_model=GroupResponse)
+def get_group(
+    group_id: int,
+    db: Session = Depends(deps.get_db)
+):
+    """
+    특정 그룹을 조회합니다.
+    """
+    group = db.query(Group).filter(Group.sgt_idx == group_id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+    return group
+
+@router.get("/", response_model=List[GroupResponse])
+def get_groups(
+    db: Session = Depends(deps.get_db),
+    skip: int = 0,
+    limit: int = 100,
+    show_hidden: bool = False
+):
+    """
+    그룹 목록을 조회합니다. (sgt_show = 'Y'인 그룹만, show_hidden=True면 숨겨진 그룹도 포함)
+    """
+    if show_hidden:
+        logger.info("[GET_GROUPS] 숨겨진 그룹 포함하여 조회")
+        groups = db.query(Group).offset(skip).limit(limit).all()
+    else:
+        logger.info("[GET_GROUPS] 표시되는 그룹만 조회")
+        groups = db.query(Group).filter(Group.sgt_show == 'Y').offset(skip).limit(limit).all()
+    
+    logger.info(f"[GET_GROUPS] 조회된 그룹 수: {len(groups)}")
+    for group in groups:
+        logger.info(f"[GET_GROUPS] 그룹 - sgt_idx: {group.sgt_idx}, sgt_title: {group.sgt_title}, sgt_show: {group.sgt_show}")
+    
+    return groups
+
+
 
 @router.get("/member/{member_id}", response_model=List[GroupResponse])
 def get_member_groups(

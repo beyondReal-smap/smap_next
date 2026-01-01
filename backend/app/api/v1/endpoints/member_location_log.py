@@ -418,7 +418,7 @@ async def handle_location_log_request(
                 logger.error(traceback.format_exc())
                 raise HTTPException(status_code=500, detail=str(e))
         
-        elif act == "get_location_summary":
+        elif act == "get_location_log_summary":
             # 특정 회원의 위치 로그 요약 정보 조회 (PHP 로직 기반)
             try:
                 mt_idx = body.get("mt_idx")
@@ -841,6 +841,7 @@ async def get_daily_location_counts(
             member_daily_counts.append({
                 "member_id": member.mt_idx,
                 "member_name": member.mt_name,
+                "mt_nickname": getattr(member, 'mt_nickname', None), # Unified nickname field
                 "member_photo": getattr(member, 'mt_file1', None),  # Member 모델에는 mt_file1이 실제 photo 필드
                 "member_gender": getattr(member, 'mt_gender', None),
                 "daily_counts": member_counts
@@ -1048,6 +1049,7 @@ async def get_member_activity_by_date(
             member_activities.append({
                 "member_id": member.mt_idx,
                 "member_name": member.mt_name,
+                "mt_nickname": getattr(member, 'mt_nickname', None), # Unified nickname field
                 "member_photo": getattr(member, 'mt_file1', None),
                 "member_gender": getattr(member, 'mt_gender', None),
                 "log_count": count,

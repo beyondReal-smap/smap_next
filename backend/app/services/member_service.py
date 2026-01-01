@@ -8,7 +8,9 @@ from app.schemas.member import (
     RegisterResponse,
     MemberLoginResponse,
     GoogleLoginRequest,
-    GoogleLoginResponse
+    GoogleLoginResponse,
+    AppleLoginRequest,
+    AppleLoginResponse
 )
 from app.models.member import Member
 from typing import Optional, List, Dict, Any
@@ -366,6 +368,116 @@ class MemberService:
             return GoogleLoginResponse(
                 success=False,
                 message="Google 로그인 처리 중 오류가 발생했습니다."
+            )
+
+    def apple_login(self, db: Session, apple_data: AppleLoginRequest) -> AppleLoginResponse:
+        """Apple 로그인 처리"""
+        try:
+            # 1. Apple ID로 기존 사용자 우선 확인
+            existing_member = None
+            is_new_user = True
+            lookup_method = "none"
+            
+            logger.info(f"🔍 Apple 로그인 시작 - userIdentifier: {apple_data.userIdentifier}, email: {apple_data.email}")
+
+            # Apple ID로 사용자 조회 (우선순위 1)
+            existing_member = db.query(Member).filter(Member.mt_apple_id == apple_data.userIdentifier).first()
+            if existing_member:
+                logger.info(f"✅ Apple ID로 기존 사용자 발견 - mt_idx: {existing_member.mt_idx}")
+                is_new_user = False
+                lookup_method = "apple_id"
+            
+            # 이메일로 기존 사용자 조회 (우선순위 2)
+            if not existing_member and apple_data.email:
+                existing_member = self.crud.get_by_email(db, apple_data.email)
+                if existing_member:
+                    logger.info(f"✅ 이메일로 기존 사용자 발견 - mt_idx: {existing_member.mt_idx}, email: {existing_member.mt_email}")
+                    is_new_user = False
+                    lookup_method = "email"
+
+                    # Apple ID 연결
+                    existing_member.mt_apple_id = apple_data.userIdentifier
+                    existing_member.mt_type = 5  # Apple 로그인 타입 (임의 지정, 프로젝트 규칙에 따라 조정 가능)
+                    db.commit()
+                    logger.info(f"🔗 기존 사용자에 Apple ID 연결 완료")
+
+            if existing_member:
+                # 기존 사용자 로그인 처리
+                if not self.crud.is_active(existing_member):
+                    return AppleLoginResponse(
+                        success=False,
+                        message="비활성화된 계정입니다. 고객센터에 문의해주세요."
+                    )
+
+                # 로그인 시간 업데이트
+                self.crud.update_login_time(db, user=existing_member)
+                
+                # 추가 데이터 조회
+                additional_data = self._get_user_additional_data(db, existing_member.mt_idx)
+                
+                # 사용자 기본 정보 구성
+                user_data = self._build_user_data(existing_member)
+                # mt_type 업데이트 (반환용)
+                user_data["mt_type"] = existing_member.mt_type or 5
+                
+                logger.info(f"✅ 기존 사용자 로그인 성공 - mt_idx: {existing_member.mt_idx}")
+
+                return AppleLoginResponse(
+                    success=True,
+                    message="Apple 로그인 성공",
+                    data={
+                        "member": user_data,
+                        "user": user_data,
+                        "token": f"apple_token_{existing_member.mt_idx}",
+                        "is_new_user": False,
+                        "isNewUser": False,
+                        "lookup_method": lookup_method,
+                        "groups": additional_data.get("groups", []),
+                        "recent_schedules": additional_data.get("recent_schedules", []),
+                        "group_count": additional_data.get("group_count", 0),
+                        "schedule_count": additional_data.get("schedule_count", 0),
+                        "has_data": additional_data.get("has_data", False)
+                    }
+                )
+            
+            else:
+                # 새 사용자 - 회원가입 필요
+                logger.info(f"👤 새 사용자 발견 - 회원가입 필요")
+
+                temp_user_data = {
+                    "mt_idx": None,
+                    "mt_id": f"apple_{apple_data.userIdentifier[:10]}",
+                    "mt_name": apple_data.userName or "",
+                    "mt_nickname": apple_data.userName or "",
+                    "mt_email": apple_data.email,
+                    "mt_apple_id": apple_data.userIdentifier,
+                    "mt_type": 5,
+                }
+                
+                return AppleLoginResponse(
+                    success=True,
+                    message="신규 사용자입니다. 회원가입이 필요합니다.",
+                    data={
+                        "member": temp_user_data,
+                        "user": temp_user_data,
+                        "token": None,
+                        "is_new_user": True,
+                        "isNewUser": True,
+                        "lookup_method": "new_user",
+                        "groups": [],
+                        "recent_schedules": [],
+                        "group_count": 0,
+                        "schedule_count": 0,
+                        "has_data": False,
+                        "needs_onboarding": True
+                    }
+                )
+
+        except Exception as e:
+            logger.error(f"Apple 로그인 실패: {str(e)}")
+            return AppleLoginResponse(
+                success=False,
+                message="Apple 로그인 처리 중 오류가 발생했습니다."
             )
 
     def _get_user_additional_data(self, db: Session, mt_idx: int) -> dict:

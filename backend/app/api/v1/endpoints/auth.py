@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.crud import crud_auth
 from app.schemas.auth import *
+from app.schemas.member import AppleLoginRequest, AppleLoginResponse
 from app.core.config import settings
 from app.models.member import Member
 
@@ -107,6 +108,11 @@ class ForgotPasswordResponse(BaseModel):
     success: bool
     message: str
     data: Optional[dict] = None
+
+# 전화번호 기반 비밀번호 재설정 요청 (네이티브 앱용)
+class ResetPasswordByPhoneRequest(BaseModel):
+    phone: str  # 전화번호 (하이픈 포함 가능)
+    new_password: str  # 새 비밀번호
 
 class VerifyResetTokenRequest(BaseModel):
     token: str
@@ -983,6 +989,28 @@ async def google_login(
             message="Google 로그인 처리 중 오류가 발생했습니다."
         )
 
+@router.post("/apple-login", response_model=AppleLoginResponse)
+async def apple_login(
+    apple_request: AppleLoginRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Apple 로그인 처리
+    """
+    try:
+        from app.services.member_service import member_service
+        logger.info(f"🔍 Apple 로그인 요청 수신: {apple_request.userIdentifier}")
+        
+        result = member_service.apple_login(db, apple_request)
+        return result
+
+    except Exception as e:
+        logger.error(f"Apple 로그인 실패: {str(e)}")
+        return AppleLoginResponse(
+            success=False,
+            message="Apple 로그인 처리 중 오류가 발생했습니다."
+        )
+
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)
 async def forgot_password(
     forgot_data: ForgotPasswordRequest,
@@ -1211,3 +1239,76 @@ async def reset_password(
             success=False,
             message="요청 처리 중 오류가 발생했습니다."
         ) 
+
+@router.post("/reset-password-by-phone", response_model=ResetPasswordResponse)
+async def reset_password_by_phone(
+    reset_data: ResetPasswordByPhoneRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    전화번호 기반 비밀번호 재설정 (네이티브 앱용)
+    SMS 인증이 완료된 후 호출됨
+    """
+    try:
+        import re
+        
+        # 전화번호 정리
+        clean_phone = reset_data.phone.replace('-', '').replace(' ', '')
+        
+        logger.info(f"🔄 전화번호 기반 비밀번호 재설정 요청: {clean_phone[:3]}***")
+        
+        # 전화번호로 사용자 조회
+        user = crud_auth.get_user_by_phone(db, clean_phone)
+        
+        if not user:
+            logger.warning(f"비밀번호 재설정: 존재하지 않는 사용자 {clean_phone[:3]}***")
+            return ResetPasswordResponse(
+                success=False,
+                message="등록되지 않은 전화번호입니다."
+            )
+        
+        # 새 비밀번호 검증
+        if len(reset_data.new_password) < 8:
+            return ResetPasswordResponse(
+                success=False,
+                message="비밀번호는 8자 이상이어야 합니다."
+            )
+        
+        # 비밀번호 강도 검증
+        has_letter = bool(re.search(r'[a-zA-Z]', reset_data.new_password))
+        has_number = bool(re.search(r'\d', reset_data.new_password))
+        has_special = bool(re.search(r'[!@#$%^&*(),.?":{}|<>]', reset_data.new_password))
+        
+        if not (has_letter and has_number and has_special):
+            return ResetPasswordResponse(
+                success=False,
+                message="비밀번호는 영문, 숫자, 특수문자를 모두 포함해야 합니다."
+            )
+        
+        # 비밀번호 업데이트
+        success = crud_auth.update_user_password(db, user.mt_idx, reset_data.new_password)
+        
+        if not success:
+            logger.error(f"비밀번호 업데이트 실패: 사용자 {user.mt_idx}")
+            return ResetPasswordResponse(
+                success=False,
+                message="비밀번호 변경에 실패했습니다."
+            )
+        
+        logger.info(f"✅ 전화번호 기반 비밀번호 재설정 완료: 사용자 {user.mt_idx}")
+        
+        return ResetPasswordResponse(
+            success=True,
+            message="비밀번호가 성공적으로 변경되었습니다.",
+            data={
+                "user_id": user.mt_idx,
+                "updated_at": datetime.utcnow().isoformat()
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"전화번호 기반 비밀번호 재설정 실패: {str(e)}")
+        return ResetPasswordResponse(
+            success=False,
+            message="요청 처리 중 오류가 발생했습니다."
+        )

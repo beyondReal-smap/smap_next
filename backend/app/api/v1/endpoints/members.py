@@ -384,6 +384,7 @@ async def get_user_profile(
             "mt_gender": user.mt_gender,
             "mt_type": user.mt_type,
             "mt_level": user.mt_level,
+            "mt_file1": user.mt_file1,  # 프로필 이미지 URL
             "mt_wdate": user.mt_wdate.isoformat() if user.mt_wdate else None
         }
         
