@@ -70,7 +70,7 @@ struct FocusableTextField: View {
             .keyboardType(keyboardType)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .frame(height: 56) // 고정 높이
         .background(BrandColors.inputBackground)
         .cornerRadius(12)
         .overlay(
@@ -182,7 +182,7 @@ struct FocusableSecureField: View {
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .frame(height: 56) // 고정 높이
         .background(BrandColors.inputBackground)
         .cornerRadius(12)
         .overlay(
@@ -198,26 +198,29 @@ struct CustomAppleSignInButton: View {
     var onTap: () -> Void
     
     var body: some View {
-        Button(action: onTap) {
+        Button(action: {
+            HapticManager.shared.impact(style: .medium)
+            onTap()
+        }) {
             HStack(spacing: 12) {
                 // Apple 로고
                 Image(systemName: "apple.logo")
                     .font(.suite(size: 22, weight: .medium))
-                    .foregroundColor(.black)
+                    .foregroundColor(.white)
                 
                 Text("Apple로 계속하기")
                     .font(.suite(size: 15, weight: .medium))
-                    .foregroundColor(BrandColors.textPrimary)
+                    .foregroundColor(.white)
             }
             .frame(maxWidth: .infinity)
             .frame(height: 48)
-            .background(Color.white)
+            .background(Color.black)
             .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(BrandColors.border, lineWidth: 1)
-            )
-            .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+            // .overlay(
+            //    RoundedRectangle(cornerRadius: 12)
+            //        .stroke(BrandColors.border, lineWidth: 1)
+            // )
+            .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
         }
     }
 }
@@ -386,37 +389,28 @@ struct LoginView: View {
     // MARK: - Logo Section
     
     private var logoSection: some View {
-        VStack(spacing: 4) {
-            HStack(spacing: 8) {
-                // 앱 아이콘 (Fallback to symbol if image fails)
-                Group {
-                    if let image = Bundle.main.icon {
-                        Image(uiImage: image)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                    } else {
-                        Image(systemName: "location.fill")
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .foregroundColor(BrandColors.primary)
-                    }
-                }
-                .frame(width: 32, height: 32)
-                .cornerRadius(8)
-                .shadow(color: Color.black.opacity(0.2), radius: 4, x: 0, y: 2)
-                
+        VStack(spacing: -10) {
+            // 앱 아이콘
+            // 앱 아이콘 (AppNoBg)
+            Image("AppNoBg")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 80, height: 80) // Size adjustment if needed
+            
+            VStack(spacing: 4) {
                 // 앱 이름 - smap
                 Text("smap")
                     .font(.suite(size: 32, weight: .bold))
                     .foregroundColor(BrandColors.textPrimary)
+                
+                // 서브텍스트
+                Text("소중한 사람들과 함께하는 위치 공유")
+                    .font(.suite(size: 14))
+                    .foregroundColor(BrandColors.textSecondary)
+                    .multilineTextAlignment(.center)
             }
-            
-            // 서브텍스트
-            Text("소중한 사람들과 함께하는 위치 공유")
-                .font(.suite(size: 14))
-                .foregroundColor(BrandColors.textSecondary)
-                .multilineTextAlignment(.center)
         }
+        .padding(.bottom, 20)
     }
     
     // MARK: - Login Form Section
@@ -464,6 +458,7 @@ struct LoginView: View {
     
     private var loginButton: some View {
         Button(action: {
+            HapticManager.shared.impact(style: .medium)
             UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
             loginAction()
         }) {
@@ -499,6 +494,7 @@ struct LoginView: View {
     
     private var forgotPasswordLink: some View {
         Button(action: {
+            HapticManager.shared.impact(style: .light)
             showForgotPassword = true
         }) {
             Text("비밀번호를 잊어버리셨나요?")
@@ -532,6 +528,7 @@ struct LoginView: View {
         VStack(spacing: 12) {
             // Google 로그인 버튼
             Button(action: {
+                HapticManager.shared.impact(style: .medium)
                 viewModel.googleLogin()
             }) {
                 HStack(spacing: 12) {
@@ -655,6 +652,7 @@ class HomeViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var isSidebarOpen: Bool = false
     @Published var hasUnreadNotifications: Bool = false
+    @Published var showGroupCreationModal: Bool = false
     
     private let homeService = HomeService.shared
     private var badgePollingTimer: Timer?
@@ -667,7 +665,9 @@ class HomeViewModel: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.checkUnreadNotifications()
+            Task { @MainActor in
+                self?.checkUnreadNotifications()
+            }
         }
     }
     
@@ -687,9 +687,14 @@ class HomeViewModel: ObservableObject {
             
             print("📝 [HomeViewModel] Fetched \(fetchedGroups.count) groups")
             self.groups = fetchedGroups
-            if let first = fetchedGroups.first {
+            
+            if fetchedGroups.isEmpty {
+                print("⚠️ [HomeViewModel] No groups found, triggering mandatory group creation")
+                self.showGroupCreationModal = true
+            } else if let first = fetchedGroups.first {
                 self.selectGroup(first)
             }
+            
             self.isLoading = false
             checkUnreadNotifications()
             startBadgePolling() // 폴링 시작
@@ -700,11 +705,21 @@ class HomeViewModel: ObservableObject {
             } else {
                 self.errorMessage = error.localizedDescription
             }
+            
+            // 그룹이 없고 에러가 난 경우에도 (특히 401 등) 신규 사용자의 경우일 수 있으므로
+            // 모달을 띄워 그룹 생성을 유도하거나 최소한 UI가 멈춰있지 않게 함
+            // 단, 401이면 생성이 실패할 수도 있지만, 사용자 경험상 먹통보다는 나음
+            if self.groups.isEmpty {
+                 print("⚠️ [HomeViewModel] Error occurred but groups are empty. Forcing Group Creation Modal.")
+                self.showGroupCreationModal = true
+            }
+            
             self.isLoading = false
         }
     }
     
     func selectGroup(_ group: SmapGroup) {
+        HapticManager.shared.selection()
         self.selectedGroup = group
         Task {
             await fetchGroupData(sgtIdx: group.sgt_idx)
@@ -756,7 +771,7 @@ class HomeViewModel: ObservableObject {
         
         Task {
             do {
-                let logs = try await NotificationService.shared.getMemberPushLogs(memberId: user.mt_idx)
+                let logs = try await NotificationService.shared.getMemberPushLogs(memberId: user.mt_idx ?? 0)
                 DispatchQueue.main.async {
                     self.hasUnreadNotifications = logs.contains(where: { $0.plt_read_chk == .N })
                 }
@@ -771,7 +786,7 @@ class HomeViewModel: ObservableObject {
         guard let user = AuthService.shared.getUserData() else { return }
         Task {
             do {
-                let response = try await NotificationService.shared.markAllAsRead(memberId: user.mt_idx)
+                let response = try await NotificationService.shared.markAllAsRead(memberId: user.mt_idx ?? 0)
                 if response.success == true {
                     print("✅ [HomeViewModel] 모든 알림 읽음 처리 성공")
                     DispatchQueue.main.async {
@@ -790,7 +805,9 @@ class HomeViewModel: ObservableObject {
     func startBadgePolling() {
         badgePollingTimer?.invalidate()
         badgePollingTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
-            self?.checkUnreadNotifications()
+            Task { @MainActor in
+                self?.checkUnreadNotifications()
+            }
         }
         print("⏱️ [HomeViewModel] Badge polling started")
     }
@@ -880,6 +897,7 @@ class HomeViewModel: ObservableObject {
     }
     
     func selectMember(_ member: SmapGroupMember) {
+        HapticManager.shared.selection()
         for i in 0..<members.count {
             members[i].isSelected = (members[i].mt_idx == member.mt_idx)
         }
@@ -956,6 +974,7 @@ struct HomeView: View {
     @State private var sidebarDragOffset: CGFloat = 0
     @State private var showNotifications = false
     @State private var showSettings = false // 설정 시트용 추가
+    @State private var isMapLoading = true  // 지도 로딩 상태
 
     
     let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255) // #0113A3
@@ -1005,6 +1024,9 @@ struct HomeView: View {
             .sheet(isPresented: $showSettings) {
                 SettingMenuView()
             }
+            .fullScreenCover(isPresented: $viewModel.showGroupCreationModal) {
+                GroupCreationView(viewModel: viewModel)
+            }
             
             // 3. Sidebar Overlay (Blur + Dim)
             if viewModel.isSidebarOpen || sidebarDragOffset > 0 {
@@ -1044,19 +1066,55 @@ struct HomeView: View {
                     .padding(.bottom, 20)
                 }
             }
+            
+            if isMapLoading {
+                MapLoadingOverlay()
+                    .transition(AnyTransition.opacity)
+                    .zIndex(1000)
+            }
+        }
+        .onAppear {
+            handleLoading()
         }
         .onDisappear {
             viewModel.pauseUpdates()
             // 페이지를 벗어날 때 사이드바 자동(즉시) 닫기
             viewModel.isSidebarOpen = false
             sidebarDragOffset = 0
+            // 다시 돌아올 때를 위해 로딩 상태 리셋
+            isMapLoading = true
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("closeSidebars"))) { _ in
-            // 전역 사이드바 닫기 알림 수신 시 즉시 닫기
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("closeSidebars"))) { notification in
             viewModel.isSidebarOpen = false
             sidebarDragOffset = 0
+            if let targetTab = notification.object as? Int, targetTab == 0 {
+                isMapLoading = true
+                handleLoading()
+            }
         }
         .navigationBarHidden(true)
+    }
+    
+    /// 지도 로딩 조절 로직 (최소 1.5초 및 데이터 완료 대기)
+    private func handleLoading() {
+        // 이미 진행 중인 타이머가 있을 수 있으므로 isMapLoading이 true일 때만 시작
+        guard isMapLoading else { return }
+        
+        Task {
+            // 최소 1.5초 대기
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            
+            // 뷰모델 데이터 로딩 대기 (최대 5초)
+            var retryCount = 0
+            while viewModel.isLoading && retryCount < 25 {
+                try? await Task.sleep(nanoseconds: 200_000_000)
+                retryCount += 1
+            }
+            
+            withAnimation(.easeOut(duration: 0.3)) {
+                isMapLoading = false
+            }
+        }
     }
     
     // MARK: - Computed Properties
@@ -1120,6 +1178,7 @@ struct HomeView: View {
     // MARK: - Actions
     
     private func openSidebar() {
+        HapticManager.shared.impact(style: .light)
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             viewModel.isSidebarOpen = true
             sidebarDragOffset = 0
@@ -1127,6 +1186,7 @@ struct HomeView: View {
     }
     
     private func closeSidebar() {
+        HapticManager.shared.impact(style: .light)
         withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
             viewModel.isSidebarOpen = false
             sidebarDragOffset = 0
@@ -1284,9 +1344,9 @@ struct DateCell: View {
         Button(action: onTap) {
             VStack(spacing: 4) {
                 Text(dayOfWeek)
-                    .font(.suite(size: 12))
+                    .font(.suite(size: 10))
                 Text(dayOfMonth)
-                    .font(.suite(size: 16, weight: .bold))
+                    .font(.suite(size: 14, weight: .bold))
             }
             .frame(width: 50, height: 50)
             .background(isSelected ? Color(red: 1/255, green: 19/255, blue: 163/255) : Color.white)
@@ -1429,7 +1489,7 @@ struct StatItemView: View {
     
     var body: some View {
         HStack(spacing: 2) {
-            Text(label).font(.suite(size: 13)).foregroundColor(.gray)
+            Text(label).font(.suite(size: 10)).foregroundColor(.gray)
             Text("\(count)").font(.suite(size: 13, weight: .bold)).foregroundColor(color)
         }
     }
@@ -1443,7 +1503,10 @@ struct FloatingActionHomeButton: View {
     private let pinkColor = Color(red: 236/255, green: 72/255, blue: 153/255) // Pink-500
     
     var body: some View {
-        Button(action: action) {
+        Button(action: {
+            HapticManager.shared.impact(style: .medium)
+            action()
+        }) {
             ZStack(alignment: .topTrailing) {
                 // Main Button Circle
                 Circle()
@@ -1707,10 +1770,10 @@ struct MainTabView: View {
                 }
                 .tag(4)
         }
-        .accentColor(Color(red: 1/255, green: 19/255, blue: 163/255))
         .onChange(of: selectedTab) { _ in
-            // 탭 전환 시 모든 사이드바 닫기 알림 발생
-            NotificationCenter.default.post(name: NSNotification.Name("closeSidebars"), object: nil)
+            HapticManager.shared.selection()
+            // 탭 전환 시 모든 사이드바 닫기 알림 발생 (현재 선택된 탭 인덱스 전달)
+            NotificationCenter.default.post(name: NSNotification.Name("closeSidebars"), object: selectedTab)
         }
         .onReceive(logoutPublisher) { _ in
             // 로그아웃 알림 수신 시 로그인 페이지로 이동
@@ -1783,7 +1846,19 @@ struct NaverMapView: UIViewRepresentable {
         view.showZoomControls = false
         view.showLocationButton = false  // 현재위치 플로팅 버튼 숨김
         view.mapView.positionMode = .disabled  // 현재위치 마커 숨김
+        view.mapView.zoomLevel = 15
         view.mapView.touchDelegate = context.coordinator
+        
+        // 사용자의 현재 위치로 초기화 (LocationService에서 가져옴)
+        let lastLocation = LocationService.sharedInstance.getLastLocation()
+        if lastLocation.coordinate.latitude != 0.0 && lastLocation.coordinate.longitude != 0.0 {
+            let initialPosition = NMGLatLng(lat: lastLocation.coordinate.latitude, lng: lastLocation.coordinate.longitude)
+            view.mapView.moveCamera(NMFCameraUpdate(scrollTo: initialPosition))
+            print("📍 [NaverMapView-Home] Using device location: (\(lastLocation.coordinate.latitude), \(lastLocation.coordinate.longitude))")
+        } else {
+            print("📍 [NaverMapView-Home] No device location, using default")
+        }
+        
         return view
     }
     
@@ -1863,7 +1938,9 @@ struct NaverMapView: UIViewRepresentable {
             // 배터리 라벨
             let batteryLabel = UILabel()
             batteryLabel.font = UIFont(name: "SUITE-Regular", size: 12) ?? .systemFont(ofSize: 12)
-            batteryLabel.text = "🔋 배터리: \(battery)%"
+            let batteryLevel = member.mlt_battery ?? -1
+            let batteryText = batteryLevel < 0 ? "확인 불가" : "\(batteryLevel)%"
+            batteryLabel.text = "🔋 배터리: \(batteryText)"
             batteryLabel.textColor = .gray
             batteryLabel.frame = CGRect(x: padding, y: yOffset, width: width - padding * 2, height: 18)
             containerView.addSubview(batteryLabel)
@@ -2253,7 +2330,7 @@ struct MarkerFactory {
         let renderer = UIGraphicsImageRenderer(size: CGSize(width: totalWidth, height: topPadding + size + 5 + labelHeight))
         
         return renderer.image { context in
-            let ctx = context.cgContext
+            _ = context.cgContext
             
             // 1. Circle & Pin
             let rect = CGRect(x: (totalWidth - size) / 2, y: topPadding, width: size, height: size)
@@ -2327,6 +2404,7 @@ struct MarkerFactory {
 // MARK: - Notification Components
 
 
+@MainActor
 class NotificationViewModel: ObservableObject {
     @Published var notifications: [PushLog] = []
     @Published var isLoading: Bool = false
@@ -2347,7 +2425,7 @@ class NotificationViewModel: ObservableObject {
         
         Task {
             do {
-                let logs = try await notificationService.getMemberPushLogs(memberId: user.mt_idx)
+                let logs = try await notificationService.getMemberPushLogs(memberId: user.mt_idx ?? 0)
                 DispatchQueue.main.async {
                     self.notifications = logs
                     self.isLoading = false
@@ -2412,7 +2490,7 @@ class NotificationViewModel: ObservableObject {
         
         Task {
             do {
-                let response = try await notificationService.markAllAsRead(memberId: user.mt_idx)
+                let response = try await notificationService.markAllAsRead(memberId: user.mt_idx ?? 0)
                 if response.success == true {
                     DispatchQueue.main.async {
                         self.notifications = self.notifications.map { log in
@@ -2468,7 +2546,7 @@ class NotificationViewModel: ObservableObject {
         
         Task {
             do {
-                let response = try await notificationService.deleteAllNotifications(memberId: user.mt_idx)
+                let response = try await notificationService.deleteAllNotifications(memberId: user.mt_idx ?? 0)
                 if response.success == true {
                     DispatchQueue.main.async {
                         self.notifications.removeAll()
@@ -2940,7 +3018,7 @@ struct PushLog: Codable, Identifiable, Equatable {
         guard let targetDate = date else { return sDateStr }
         
         let calendar = Calendar.current
-        let now = Date()
+        _ = Date()
         
         // 시간 포맷 (오전/오후 HH:mm)
         let timeFormatter = DateFormatter()
@@ -3208,13 +3286,20 @@ class GroupService {
     
     /// 그룹 생성
     func createGroup(title: String, memo: String) async throws -> SmapGroup {
-        let url = URL(string: "\(baseURL)/groups")!
+        let url = URL(string: "\(baseURL)/groups/")!  // 꼭 trailing slash 필요!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        if let token = authService.getToken() {
+        // 토큰 디버깅
+        let token = authService.getToken()
+        print("🔑 [HomeService.createGroup] Token retrieved: \(token != nil ? "YES (\(token!.prefix(20))...)" : "NO (nil)")")
+        
+        if let token = token {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            print("🔑 [HomeService.createGroup] Authorization header set")
+        } else {
+            print("⚠️ [HomeService.createGroup] No token available - request will fail!")
         }
         
         // Get user ID from UserDefaults
@@ -3425,6 +3510,7 @@ struct SimpleResponse: Codable {
 
 // MARK: - GroupViewModel
 
+@MainActor
 class GroupViewModel: ObservableObject {
     @Published var groups: [SmapGroup] = []
     @Published var selectedGroup: SmapGroup?
@@ -4041,6 +4127,7 @@ struct RegisterBasicInfoView: View {
                         text: $viewModel.registerData.mt_name,
                         icon: "person"
                     )
+                    .frame(height: 56)
                     
                     // 닉네임
                     FocusableTextField(
@@ -4048,6 +4135,7 @@ struct RegisterBasicInfoView: View {
                         text: $viewModel.registerData.mt_nickname,
                         icon: "tag"
                     )
+                    .frame(height: 56)
                     
                     // 이메일 (선택)
                     VStack(alignment: .leading, spacing: 4) {
@@ -4060,6 +4148,7 @@ struct RegisterBasicInfoView: View {
                             icon: "envelope",
                             keyboardType: .emailAddress
                         )
+                        .frame(height: 56)
                         
                         // 이메일 형식 오류 표시
                         if let email = viewModel.registerData.mt_email, !email.isEmpty, !viewModel.validateEmail(email) {
@@ -4073,41 +4162,45 @@ struct RegisterBasicInfoView: View {
                         }
                     }
                     
-                    // 비밀번호 (토글 가능)
-                    VStack(alignment: .leading, spacing: 8) {
-                        FocusableSecureField(
-                             placeholder: "비밀번호",
-                             text: Binding(
-                                 get: { viewModel.registerData.mt_pwd ?? "" },
-                                 set: { viewModel.registerData.mt_pwd = $0 }
-                             ),
-                             icon: "lock",
-                             showPassword: $viewModel.showPassword
-                        )
+                    // 비밀번호 (토글 가능) - 소셜 계정은 생략
+                    if !viewModel.isSocialAccount {
+                        VStack(alignment: .leading, spacing: 8) {
+                            FocusableSecureField(
+                                 placeholder: "비밀번호",
+                                 text: Binding(
+                                     get: { viewModel.registerData.mt_pwd ?? "" },
+                                     set: { viewModel.registerData.mt_pwd = $0 }
+                                 ),
+                                 icon: "lock",
+                                 showPassword: $viewModel.showPassword
+                            )
+                            .frame(height: 56)
+                            
+                            // 비밀번호 규칙 표시
+                            PasswordRulesView(password: viewModel.registerData.mt_pwd ?? "", viewModel: viewModel)
+                        }
                         
-                        // 비밀번호 규칙 표시
-                        PasswordRulesView(password: viewModel.registerData.mt_pwd ?? "", viewModel: viewModel)
-                    }
-                    
-                    // 비밀번호 확인 (토글 가능)
-                    VStack(alignment: .leading, spacing: 4) {
-                        FocusableSecureField(
-                            placeholder: "비밀번호 확인",
-                            text: $viewModel.passwordConfirm,
-                            icon: "lock.shield",
-                            showPassword: $viewModel.showPasswordConfirm
-                        )
-                        
-                        // 비밀번호 일치 여부 표시
-                        if !viewModel.passwordConfirm.isEmpty {
-                            let matches = viewModel.registerData.mt_pwd == viewModel.passwordConfirm
-                            HStack(spacing: 4) {
-                                Image(systemName: matches ? "checkmark.circle.fill" : "xmark.circle.fill")
-                                    .font(.suite(size: 12))
-                                Text(matches ? "비밀번호가 일치합니다" : "비밀번호가 일치하지 않습니다")
-                                    .font(.suite(size: 12))
+                        // 비밀번호 확인 (토글 가능)
+                        VStack(alignment: .leading, spacing: 4) {
+                            FocusableSecureField(
+                                placeholder: "비밀번호 확인",
+                                text: $viewModel.passwordConfirm,
+                                icon: "lock.shield",
+                                showPassword: $viewModel.showPasswordConfirm
+                            )
+                            .frame(height: 56)
+                            
+                            // 비밀번호 일치 여부 표시
+                            if !viewModel.passwordConfirm.isEmpty {
+                                let matches = viewModel.registerData.mt_pwd == viewModel.passwordConfirm
+                                HStack(spacing: 4) {
+                                    Image(systemName: matches ? "checkmark.circle.fill" : "xmark.circle.fill")
+                                        .font(.suite(size: 12))
+                                    Text(matches ? "비밀번호가 일치합니다" : "비밀번호가 일치하지 않습니다")
+                                        .font(.suite(size: 12))
+                                }
+                                .foregroundColor(matches ? .green : BrandColors.error)
                             }
-                            .foregroundColor(matches ? .green : BrandColors.error)
                         }
                     }
                 }
@@ -4166,6 +4259,13 @@ struct PasswordRuleItem: View {
 // MARK: - Profile View
 struct RegisterProfileView: View {
     @ObservedObject var viewModel: RegisterViewModel
+    @State private var birthDate: Date = {
+        var components = DateComponents()
+        components.year = 2000
+        components.month = 1
+        components.day = 1
+        return Calendar.current.date(from: components) ?? Date()
+    }()
     
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -4175,52 +4275,54 @@ struct RegisterProfileView: View {
             
             // Birth Date
             VStack(alignment: .leading, spacing: 8) {
-                Text("생년월일 (선택)")
-                    .font(.suite(size: 16, weight: .bold))
-                
-                FocusableTextField(
-                    placeholder: "YYYY-MM-DD",
-                    text: Binding(
-                        get: { viewModel.registerData.mt_birth ?? "" },
-                        set: { newValue in
-                            // 자동 포맷팅 적용
-                            viewModel.registerData.mt_birth = viewModel.formatBirthDate(newValue)
-                        }
-                    ),
-                    icon: "calendar",
-                    keyboardType: .numberPad
-                )
-                
-                // 생년월일 형식 에러 표시
-                if let birth = viewModel.registerData.mt_birth, !birth.isEmpty {
-                    if !viewModel.validateBirthDate(birth) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "exclamationmark.circle.fill")
-                                .font(.suite(size: 12))
-                            Text("올바른 생년월일을 입력해주세요 (예: 1990-01-15)")
-                                .font(.suite(size: 12))
-                        }
-                        .foregroundColor(BrandColors.error)
-                    } else {
-                        HStack(spacing: 4) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.suite(size: 12))
-                            Text("유효한 생년월일입니다")
-                                .font(.suite(size: 12))
-                        }
-                        .foregroundColor(.green)
-                    }
+                HStack {
+                    Text("생년월일")
+                        .font(.suite(size: 16, weight: .bold))
+                    Text("* 필수")
+                        .font(.suite(size: 12))
+                        .foregroundColor(BrandColors.primary)
                 }
                 
-                Text("* 숫자만 입력하면 자동으로 형식이 맞춰집니다")
-                    .font(.suite(size: 11))
-                    .foregroundColor(BrandColors.textSecondary)
+                // DatePicker (Wheel Style for fixed height feeling)
+                DatePicker(
+                    "",
+                    selection: $birthDate,
+                    in: ...Date(), // Future dates disabled
+                    displayedComponents: .date
+                )
+                .datePickerStyle(.wheel)
+                .labelsHidden()
+                .frame(maxWidth: .infinity) // 좌우 꽉 차게 설정하여 중앙 정렬 효과
+                .frame(height: 150) // Fixed height
+                .background(Color(white: 0.96))
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color(hex: "#0113A3").opacity(0.1), lineWidth: 1)
+                )
+                
+                // 생년월일 형식 에러 표시 (미래 날짜 등 DatePicker로 제한되지만 검증 로직 결과 표시)
+                if let birth = viewModel.registerData.mt_birth, !birth.isEmpty, !viewModel.validateBirthDate(birth) {
+                     HStack(spacing: 4) {
+                         Image(systemName: "exclamationmark.circle.fill")
+                             .font(.suite(size: 12))
+                         Text("생년월일을 확인해주세요")
+                             .font(.suite(size: 12))
+                     }
+                     .foregroundColor(BrandColors.error)
+                }
             }
+            .padding(.bottom, 10)
             
             // Gender
             VStack(alignment: .leading, spacing: 8) {
-                Text("성별 (선택)")
-                    .font(.suite(size: 16, weight: .bold))
+                HStack {
+                    Text("성별")
+                        .font(.suite(size: 16, weight: .bold))
+                    Text("* 필수")
+                        .font(.suite(size: 12))
+                        .foregroundColor(BrandColors.primary)
+                }
                 
                 HStack(spacing: 16) {
                     GenderButton(title: "남성", isSelected: viewModel.registerData.mt_gender == 1) {
@@ -4235,6 +4337,22 @@ struct RegisterProfileView: View {
             Spacer()
         }
         .padding()
+        .onAppear {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            
+            if let birth = viewModel.registerData.mt_birth, let date = formatter.date(from: birth) {
+                self.birthDate = date
+            } else {
+                // 초기값 설정 (2000-01-01) - 필수 값이므로 초기화 시 값 주입
+                viewModel.registerData.mt_birth = formatter.string(from: birthDate)
+            }
+        }
+        .onChange(of: birthDate) { newValue in
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            viewModel.registerData.mt_birth = formatter.string(from: newValue)
+        }
     }
 }
 
@@ -4264,7 +4382,6 @@ struct GenderButton: View {
 // MARK: - Complete View
 struct RegisterCompleteView: View {
     @ObservedObject var viewModel: RegisterViewModel
-    // Need a way to dismiss the whole flow or navigate to login
     
     var body: some View {
         VStack(spacing: 20) {
@@ -4287,6 +4404,9 @@ struct RegisterCompleteView: View {
             Spacer()
         }
         .padding()
+        .frame(maxWidth: .infinity)
+        // ScrollView 내부에서 수직 중앙 정렬 효과를 위해 화면 높이 활용
+        .frame(height: UIScreen.main.bounds.height - 200) 
     }
 }
 
@@ -4501,7 +4621,7 @@ struct NativeRegisterView: View {
         case .phone: return viewModel.isPhoneValid
         case .verification: return true // Mock
         case .basicInfo: return viewModel.isBasicInfoValid
-        case .profile: return true // Optional fields
+        case .profile: return viewModel.isProfileValid
         case .complete: return true
         }
     }
@@ -4522,6 +4642,7 @@ struct NativeRegisterView: View {
         viewModel.registerData.mt_agree2 = newValue
         viewModel.registerData.mt_agree3 = newValue
         viewModel.registerData.mt_agree4 = newValue
+        viewModel.registerData.mt_agree5 = newValue
     }
 }
 
@@ -5264,12 +5385,14 @@ class MyPlaceViewModel: ObservableObject {
     }
     
     @MainActor func selectGroup(_ group: SmapGroup) {
+        HapticManager.shared.selection()
         guard selectedGroup?.sgt_idx != group.sgt_idx else { return }
         selectedGroup = group
         Task { await loadGroupMembers(sgtIdx: group.sgt_idx) }
     }
     
     @MainActor func selectMember(_ member: PlaceMember) {
+        HapticManager.shared.selection()
         guard selectedMember?.mt_idx != member.mt_idx else { return }
         for i in members.indices { members[i].isSelected = members[i].mt_idx == member.mt_idx }
         selectedMember = member
@@ -5415,6 +5538,7 @@ struct MyPlaceView: View {
     @State private var newLocationCoordinates: (lat: Double, lng: Double)?
     @State private var newLocationName: String? = nil
     @State private var newLocationAddress: String? = nil
+    @State private var isMapLoading = true  // 지도 로딩 상태
     
     private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
     private let sidebarWidth: CGFloat = 320
@@ -5440,8 +5564,6 @@ struct MyPlaceView: View {
                         }
                     })
                 .edgesIgnoringSafeArea(.all).offset(y: 60)
-            } else {
-                Color(UIColor.secondarySystemBackground).edgesIgnoringSafeArea(.all)
             }
             
             // Header
@@ -5470,9 +5592,17 @@ struct MyPlaceView: View {
             VStack { Spacer(); HStack { Spacer(); FloatingActionPlaceButton(count: viewModel.members.count) { viewModel.toggleSidebar() }.padding(.trailing, 20).padding(.bottom, 20) } }
             
             // Loading
-            if viewModel.isLoading { Color.black.opacity(0.3).edgesIgnoringSafeArea(.all).overlay(ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .white)).scaleEffect(1.5)) }
+            
+            if isMapLoading {
+                MapLoadingOverlay()
+                    .transition(AnyTransition.opacity)
+                    .zIndex(1000)
+            }
         }
         .navigationBarHidden(true)
+        .onAppear {
+            handleLoading()
+        }
         .task { await viewModel.loadInitialData() }
         .sheet(isPresented: $viewModel.isLocationPanelOpen) { 
             LocationDetailPanel(
@@ -5508,11 +5638,38 @@ struct MyPlaceView: View {
             // 페이지를 벗어날 때 사이드바 자동(즉시) 닫기
             viewModel.isSidebarOpen = false
             sidebarDragOffset = 0
+            // 다시 돌아올 때를 위해 로딩 상태 리셋
+            isMapLoading = true
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("closeSidebars"))) { _ in
-            // 전역 사이드바 닫기 알림 수신 시 즉시 닫기
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("closeSidebars"))) { notification in
             viewModel.isSidebarOpen = false
             sidebarDragOffset = 0
+            if let targetTab = notification.object as? Int, targetTab == 3 {
+                isMapLoading = true
+                handleLoading()
+            }
+        }
+    }
+    
+    /// 지도 로딩 조절 로직 (최소 1.5초 및 데이터 완료 대기)
+    private func handleLoading() {
+        // 이미 진행 중인 타이머가 있을 수 있으므로 isMapLoading이 true일 때만 시작
+        guard isMapLoading else { return }
+        
+        Task {
+            // 최소 1.5초 대기
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            
+            // 뷰모델 데이터 로딩 대기 (최대 5초)
+            var retryCount = 0
+            while viewModel.isLoading && retryCount < 25 {
+                try? await Task.sleep(nanoseconds: 200_000_000)
+                retryCount += 1
+            }
+            
+            withAnimation(.easeOut(duration: 0.3)) {
+                isMapLoading = false
+            }
         }
     }
     
@@ -5967,7 +6124,7 @@ struct PlaceLocationCell: View {
                         .foregroundColor(.primary)
                         .lineLimit(1)
                     Text(location.address)
-                        .font(.suite(size: 13))
+                        .font(.suite(size: 10))
                         .foregroundColor(.secondary)
                         .lineLimit(1)
                 }
@@ -6008,8 +6165,22 @@ struct MyPlaceMapView: UIViewRepresentable {
         mapView.logoAlign = .leftBottom
         mapView.zoomLevel = 15
         
-        // Use initial center if available, otherwise default to Seoul
-        let center = initialCenter ?? (lat: 37.5665, lng: 126.9780)
+        // 사용자의 현재 위치로 초기화 (LocationService에서 가져옴)
+        var userLat: Double = 37.5665  // 기본값은 서울
+        var userLng: Double = 126.9780
+        
+        // 현재 기기의 마지막 위치 사용 (getLastLocation은 non-optional)
+        let lastLocation = LocationService.sharedInstance.getLastLocation()
+        if lastLocation.coordinate.latitude != 0.0 && lastLocation.coordinate.longitude != 0.0 {
+            userLat = lastLocation.coordinate.latitude
+            userLng = lastLocation.coordinate.longitude
+            print("📍 [MyPlaceMapView-LoginView] Using device location: (\(userLat), \(userLng))")
+        } else {
+            print("📍 [MyPlaceMapView-LoginView] No device location, using Seoul default")
+        }
+        
+        // Use initial center if provided, otherwise use user's location
+        let center = initialCenter ?? (lat: userLat, lng: userLng)
         mapView.moveCamera(NMFCameraUpdate(scrollTo: NMGLatLng(lat: center.lat, lng: center.lng)))
         
         mapView.touchDelegate = context.coordinator
@@ -6459,10 +6630,178 @@ struct LocationDetailPanel: View {
     }
 }
 
-// MARK: - ========================
-// MARK: - ActivityLog Implementation
-// MARK: - ========================
+// [Consolidated] All Activity Log implementation (Models, Service, ViewModel, and Views) 
+// has been moved to specialized files:
+// - Models: ActivityLogModels.swift
+// - Service: ActivityLogService.swift
+// - ViewModel: ActivityLogViewModel.swift
+// - Views: ActivityLogView.swift, ActivityLogSidebarView.swift
+// 
+// MARK: - Group Creation View (Mandatory)
 
+struct GroupCreationView: View {
+    @ObservedObject var viewModel: HomeViewModel
+    @State private var groupName: String = ""
+    @State private var groupDescription: String = ""
+    @State private var isCreating: Bool = false
+    @State private var errorMessage: String?
+    
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.4).edgesIgnoringSafeArea(.all)
+            
+            VStack(spacing: 0) {
+                // Header
+                VStack(spacing: 12) {
+                    Image(systemName: "person.3.fill")
+                        .font(.system(size: 40))
+                        .foregroundColor(BrandColors.primary)
+                    
+                    Text("새로운 그룹 만들기")
+                        .font(.suite(size: 22, weight: .bold))
+                        .foregroundColor(BrandColors.textPrimary)
+                    
+                    Text("가족, 친구, 동료와 함께할 공간을 만들어보세요.")
+                        .font(.suite(size: 14))
+                        .foregroundColor(BrandColors.textSecondary)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.top, 32)
+                .padding(.bottom, 24)
+                
+                // Form
+                VStack(spacing: 20) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("그룹 이름")
+                            .font(.suite(size: 14, weight: .bold))
+                            .foregroundColor(BrandColors.textPrimary)
+                        
+                        FocusableTextField(
+                            placeholder: "예: 우리 가족, 회사 동료",
+                            text: $groupName,
+                            icon: "person.3"
+                        )
+                        .frame(height: 56)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("그룹 설명 (선택)")
+                            .font(.suite(size: 14, weight: .medium))
+                            .foregroundColor(BrandColors.textSecondary)
+                        
+                        FocusableTextField(
+                            placeholder: "그룹에 대한 간단한 설명",
+                            text: $groupDescription,
+                            icon: "doc.text"
+                        )
+                        .frame(height: 56)
+                    }
+                }
+                .padding(.horizontal, 24)
+                
+                if let error = errorMessage {
+                    Text(error)
+                        .font(.suite(size: 13))
+                        .foregroundColor(BrandColors.error)
+                        .padding(.top, 16)
+                        .padding(.horizontal, 24)
+                }
+                
+                // Submit Button
+                Button(action: {
+                    HapticManager.shared.impact(style: .medium)
+                    createGroup()
+                }) {
+                    HStack {
+                        if isCreating {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .padding(.trailing, 8)
+                        }
+                        Text("그룹 만들기")
+                            .font(.suite(size: 16, weight: .bold))
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+                    .background(groupName.isEmpty ? BrandColors.primary.opacity(0.3) : BrandColors.primary)
+                    .cornerRadius(12)
+                    .shadow(color: BrandColors.primary.opacity(0.3), radius: 8, x: 0, y: 4)
+                }
+                .disabled(groupName.isEmpty || isCreating)
+                .padding(24)
+            }
+            .background(Color.white)
+            .cornerRadius(24)
+            .shadow(color: Color.black.opacity(0.1), radius: 20, x: 0, y: 10)
+            .padding(.horizontal, 20)
+        }
+    }
+    
+    private func createGroup() {
+        guard !groupName.isEmpty else { return }
+        
+        isCreating = true
+        errorMessage = nil
+        
+        Task {
+            do {
+                // Use GroupService to create group
+                let _ = try await GroupService.shared.createGroup(title: groupName, memo: groupDescription)
+                
+                // Refresh data and close modal
+                await viewModel.fetchInitialData()
+                
+                DispatchQueue.main.async {
+                    viewModel.showGroupCreationModal = false
+                    isCreating = false
+                }
+                
+            } catch {
+                DispatchQueue.main.async {
+                    isCreating = false
+                    if let apiError = error as? APIError {
+                        errorMessage = apiError.message ?? "그룹 생성에 실패했습니다."
+                    } else {
+                        errorMessage = "알 수 없는 오류가 발생했습니다."
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Haptic Feedback Manager
+
+struct HapticManager {
+    static let shared = HapticManager()
+    
+    private init() {}
+    
+    /// 가벼운 충격 (버튼 탭, 리프레시 등)
+    func impact(style: UIImpactFeedbackGenerator.FeedbackStyle) {
+        let generator = UIImpactFeedbackGenerator(style: style)
+        generator.prepare()
+        generator.impactOccurred()
+    }
+    
+    /// 알림 유형 (성공, 경고, 에러)
+    func notification(type: UINotificationFeedbackGenerator.FeedbackType) {
+        let generator = UINotificationFeedbackGenerator()
+        generator.prepare()
+        generator.notificationOccurred(type)
+    }
+    
+    /// 선택 변경 (피커, 리스트 선택 등)
+    func selection() {
+        let generator = UISelectionFeedbackGenerator()
+        generator.prepare()
+        generator.selectionChanged()
+    }
+}
+
+
+// MARK: - ActivityLog Implementation (Consolidated)
 // MARK: - Location Log Models
 
 /// 개별 위치 로그 데이터
@@ -6493,17 +6832,26 @@ struct LocationLog: Codable, Identifiable {
 }
 
 /// 위치 요약 데이터
-/// 위치 요약 데이터 (Backend LocationLogSummary 대응)
 struct LocationSummary: Codable {
-    let distance: String?       // 예: "5.2 km"
-    let duration: String?       // 예: "2시간 30분"
-    let steps: Int?             // 예: 1234
-    let schedule_count: String? // 예: "3개"
+    let schedule_count: String?
+    let distance: String?
+    let duration: String?
+    let steps: Int?
     
-    // View Convenience Accessors
-    var formattedDistance: String { distance ?? "0 km" }
-    var formattedDuration: String { duration ?? "0분" }
-    var formattedSteps: String { "\(steps ?? 0) 걸음" }
+    var formattedDistance: String {
+        distance ?? "0 km"
+    }
+    
+    var formattedDuration: String {
+        duration ?? "0분"
+    }
+    
+    var formattedSteps: String {
+        if let s = steps {
+            return "\(s) 걸음"
+        }
+        return "0 걸음"
+    }
 }
 
 /// 지도 마커 데이터
@@ -6537,6 +6885,7 @@ struct MapMarker: Codable, Identifiable {
     
     var formattedTime: String {
         guard let timeStr = mlt_gps_time else { return "" }
+        // "2025-01-01 12:30:45" 형식에서 시간만 추출
         let components = timeStr.split(separator: " ")
         if components.count >= 2 {
             let timePart = String(components[1])
@@ -6574,15 +6923,17 @@ struct StayTime: Codable, Identifiable {
         if let sd = stay_duration {
             return sd
         }
-        let totalMinutes = Int(duration)
-        let hours = totalMinutes / 60
-        let minutes = totalMinutes % 60
+        let durationInt = Int(duration)
+        let hours = durationInt / 60
+        let minutes = durationInt % 60
         if hours > 0 {
             return "\(hours)시간 \(minutes)분"
         }
         return "\(minutes)분"
     }
 }
+
+// MARK: - Daily Counts Models
 
 /// 일별 활동 카운트
 struct DailyCount: Codable, Identifiable {
@@ -6602,7 +6953,7 @@ struct DailyCount: Codable, Identifiable {
 struct MemberDailyCount: Codable, Identifiable {
     let member_id: Int
     let member_name: String
-    let mt_nickname: String?
+    let mt_nickname: String? // Added for nickname support
     let member_photo: String?
     let member_gender: Int?
     let daily_counts: [DailyCount]
@@ -6618,6 +6969,7 @@ struct MemberDailyCount: Codable, Identifiable {
     
     /// 14일간 활동 여부 배열 (오래된 날짜 -> 최근 날짜 순)
     var activityDistribution: [Bool] {
+        // 최근 14일 날짜 생성
         let calendar = Calendar.current
         let today = Date()
         var distribution = [Bool](repeating: false, count: 14)
@@ -6651,10 +7003,13 @@ struct DailyCountsResponse: Codable {
     let total_members: Int
 }
 
+// MARK: - Member Activity Models
+
 /// 멤버 활동 데이터
 struct MemberActivity: Codable, Identifiable {
     let member_id: Int
     let member_name: String
+    let mt_nickname: String? // Added for nickname support
     let member_photo: String?
     let member_gender: Int?
     let log_count: Int
@@ -6663,6 +7018,13 @@ struct MemberActivity: Codable, Identifiable {
     let is_active: Bool
     
     var id: Int { member_id }
+    
+    var displayName: String {
+        if let nick = mt_nickname, !nick.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return nick
+        }
+        return member_name
+    }
 }
 
 /// 멤버 활동 응답
@@ -6674,6 +7036,8 @@ struct MemberActivityResponse: Codable {
     let active_members: Int
 }
 
+// MARK: - API Response Wrapper
+
 struct ActivityLogAPIResponse<T: Codable>: Codable {
     let result: String
     let data: T?
@@ -6683,1300 +7047,6 @@ struct ActivityLogAPIResponse<T: Codable>: Codable {
     let message: String?
     
     var isSuccess: Bool { result == "Y" }
-}
-
-// MARK: - ActivityLog Service
-
-class ActivityLogService {
-    static let shared = ActivityLogService()
-    
-    private var baseURL: String {
-        return AuthService.shared.baseURL
-    }
-    
-    private init() { }
-    
-    private func getAuthToken() -> String? {
-        return AuthService.shared.getToken()
-    }
-    
-    private func createRequest(url: URL, method: String = "GET") -> URLRequest {
-        var request = URLRequest(url: url)
-        request.httpMethod = method
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        if let token = getAuthToken() {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        
-        return request
-    }
-    
-    func getDailyLocationCounts(groupId: Int, days: Int = 14) async throws -> DailyCountsResponse {
-        guard let url = URL(string: "\(baseURL)/logs/daily-counts?group_id=\(groupId)&days=\(days)") else {
-            throw URLError(.badURL)
-        }
-        print("🌐 [ActivityLogService] Fetching daily counts: \(url.absoluteString)")
-        let (data, response) = try await URLSession.shared.data(for: createRequest(url: url))
-        
-        if let httpResponse = response as? HTTPURLResponse {
-            print("🌐 [ActivityLogService] Response code: \(httpResponse.statusCode)")
-            if httpResponse.statusCode != 200 {
-                let body = String(data: data, encoding: .utf8) ?? "No body"
-                print("🌐 [ActivityLogService] Error body: \(body)")
-                throw URLError(.badServerResponse)
-            }
-        }
-        
-        return try JSONDecoder().decode(DailyCountsResponse.self, from: data)
-    }
-    
-    func getMapMarkers(memberId: Int, date: String, minSpeed: Double = 1.0, maxAccuracy: Double = 50.0) async throws -> [MapMarker] {
-        guard let url = URL(string: "\(baseURL)/logs/member-location-logs/\(memberId)/map-markers?date=\(date)&min_speed=\(minSpeed)&max_accuracy=\(maxAccuracy)") else {
-            throw URLError(.badURL)
-        }
-        print("🌐 [ActivityLogService] Fetching map markers: \(url.absoluteString)")
-        let (data, response) = try await URLSession.shared.data(for: createRequest(url: url))
-        
-        if let httpResponse = response as? HTTPURLResponse {
-            print("🌐 [ActivityLogService] Response code: \(httpResponse.statusCode)")
-            if httpResponse.statusCode != 200 {
-                let body = String(data: data, encoding: .utf8) ?? "No body"
-                print("🌐 [ActivityLogService] Error body: \(body)")
-            }
-        }
-        
-        do {
-            let apiResponse = try JSONDecoder().decode(ActivityLogAPIResponse<[MapMarker]>.self, from: data)
-            return apiResponse.data ?? []
-        } catch {
-            print("❌ [ActivityLogService] Decode markers failed: \(error)")
-            throw error
-        }
-    }
-    
-    func getStayTimes(memberId: Int, date: String, minSpeed: Double = 1.0, maxAccuracy: Double = 50.0, minDuration: Int = 5) async throws -> [StayTime] {
-        guard let url = URL(string: "\(baseURL)/logs/member-location-logs/\(memberId)/stay-times?date=\(date)&min_speed=\(minSpeed)&max_accuracy=\(maxAccuracy)&min_duration=\(minDuration)") else {
-            throw URLError(.badURL)
-        }
-        print("🌐 [ActivityLogService] Fetching stay times: \(url.absoluteString)")
-        let (data, response) = try await URLSession.shared.data(for: createRequest(url: url))
-        
-        if let httpResponse = response as? HTTPURLResponse {
-            print("🌐 [ActivityLogService] Response code: \(httpResponse.statusCode)")
-            if httpResponse.statusCode != 200 {
-                let body = String(data: data, encoding: .utf8) ?? "No body"
-                print("🌐 [ActivityLogService] Error body: \(body)")
-            }
-        }
-        
-        do {
-            let apiResponse = try JSONDecoder().decode(ActivityLogAPIResponse<[StayTime]>.self, from: data)
-            return apiResponse.data ?? []
-        } catch {
-            print("❌ [ActivityLogService] Decode stays failed: \(error)")
-            throw error
-        }
-    }
-    
-    func getLocationLogSummary(memberId: Int, date: String) async throws -> LocationSummary? {
-        guard let url = URL(string: "\(baseURL)/logs/member-location-logs") else {
-            throw URLError(.badURL)
-        }
-        print("🌐 [ActivityLogService] Fetching summary: \(url.absoluteString) for mt_idx: \(memberId), date: \(date)")
-        var request = createRequest(url: url, method: "POST")
-        // Backend expects YYYY-MM-DD format for start_date and end_date
-        let startDate = date
-        let endDate = date
-        request.httpBody = try JSONSerialization.data(withJSONObject: [
-            "act": "get_location_summary",
-            "mt_idx": memberId,
-            "start_date": startDate,
-            "end_date": endDate
-        ])
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        if let httpResponse = response as? HTTPURLResponse {
-            print("🌐 [ActivityLogService] Response code: \(httpResponse.statusCode)")
-            if httpResponse.statusCode != 200 && httpResponse.statusCode != 201 {
-                let body = String(data: data, encoding: .utf8) ?? "No body"
-                print("🌐 [ActivityLogService] Error body: \(body)")
-            }
-        }
-        
-        do {
-            let apiResponse = try JSONDecoder().decode(ActivityLogAPIResponse<LocationSummary>.self, from: data)
-            return apiResponse.data
-        } catch {
-            print("❌ [ActivityLogService] Decode summary failed: \(error)")
-            throw error
-        }
-    }
-}
-
-// MARK: - ActivityLog ViewModel
-
-@MainActor
-class ActivityLogViewModel: ObservableObject {
-    @Published var isLoading = false
-    @Published var isDailyCountsLoading = false
-    @Published var isMarkersLoading = false
-    @Published var isGroupsLoading = false
-    @Published var errorMessage: String?
-    @Published var showError = false
-    @Published var groups: [SmapGroup] = []
-    @Published var selectedGroup: SmapGroup?
-    @Published var selectedGroupId: Int?
-    @Published var selectedMemberId: Int?
-    @Published var selectedDate: String
-    @Published var dailyCountsResponse: DailyCountsResponse?
-    @Published var memberDailyCounts: [MemberDailyCount] = []
-    @Published var mapMarkers: [MapMarker] = []
-    @Published var stayTimes: [StayTime] = []
-    @Published var locationSummary: LocationSummary?
-    @Published var isSidebarOpen = false
-    @Published var sliderValue: Double = 0
-    @Published var isSliderDragging = false
-    
-    var sortedMapMarkers: [MapMarker] {
-        mapMarkers.sorted { ($0.mlt_gps_time ?? "") < ($1.mlt_gps_time ?? "") }
-    }
-    
-    @Published var calculatedSummary: LocationSummary = LocationSummary(distance: "0 km", duration: "0분", steps: 0, schedule_count: nil)
-    
-    var displayDistance: String { calculatedSummary.formattedDistance }
-    var displayDuration: String { calculatedSummary.formattedDuration }
-    var displaySteps: String { calculatedSummary.formattedSteps }
-    
-    var displayDate: String {
-        if let date = DateFormatter.apiDateOnlyFormatter.date(from: selectedDate) {
-            return DateFormatter.displayDateFormatter.string(from: date)
-        }
-        return selectedDate
-    }
-    
-    private let service = ActivityLogService.shared
-    
-    init() {
-        self.selectedDate = DateFormatter.apiDateOnlyFormatter.string(from: Date())
-    }
-    
-    func selectGroup(_ groupId: Int) async {
-        guard selectedGroupId != groupId else { return }
-        selectedGroupId = groupId
-        selectedMemberId = nil
-        await loadDailyLocationCounts()
-    }
-    
-    func selectMember(_ memberId: Int) async {
-        guard selectedMemberId != memberId else { return }
-        selectedMemberId = memberId
-        await loadMemberLocationData()
-    }
-    
-    func selectMemberAndDate(memberId: Int, date: String) async {
-        selectedMemberId = memberId
-        selectedDate = date
-        await loadMemberLocationData()
-    }
-    
-    func toggleSidebar() {
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-            isSidebarOpen.toggle()
-        }
-    }
-    
-    func closeSidebar() {
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-            isSidebarOpen = false
-        }
-    }
-    
-    func loadInitialData() async {
-        isGroupsLoading = true
-        do {
-            groups = try await HomeService.shared.getMyGroups()
-            if let first = groups.first {
-                selectedGroup = first
-                selectedGroupId = first.sgt_idx
-                await loadDailyLocationCounts()
-            }
-        } catch {
-            errorMessage = "그룹 목록 로드 실패"
-            showError = true
-        }
-        isGroupsLoading = false
-    }
-    
-    func selectGroupFromSidebar(_ group: SmapGroup) async {
-        guard selectedGroupId != group.sgt_idx else { return }
-        selectedGroup = group
-        selectedGroupId = group.sgt_idx
-        selectedMemberId = nil
-        await loadDailyLocationCounts()
-    }
-    
-    private func loadDailyLocationCounts() async {
-        guard let groupId = selectedGroupId else { return }
-        isDailyCountsLoading = true
-        do {
-            let response = try await service.getDailyLocationCounts(groupId: groupId, days: 14)
-            dailyCountsResponse = response
-            memberDailyCounts = response.member_daily_counts
-            if selectedMemberId == nil, let first = memberDailyCounts.first {
-                await selectMember(first.member_id)
-            }
-        } catch {
-            errorMessage = "활동 데이터 로드 실패"
-            showError = true
-        }
-        isDailyCountsLoading = false
-    }
-    
-    private func loadMemberLocationData() async {
-        guard let memberId = selectedMemberId else { return }
-        isMarkersLoading = true
-        isLoading = true
-        mapMarkers = []
-        stayTimes = []
-        locationSummary = nil
-        sliderValue = 0
-        do {
-            async let m = service.getMapMarkers(memberId: memberId, date: selectedDate)
-            async let s = service.getStayTimes(memberId: memberId, date: selectedDate)
-            async let l = service.getLocationLogSummary(memberId: memberId, date: selectedDate)
-            let (markers, stays, summary) = try await (m, s, l)
-            print("📦 [ActivityLogViewModel] Data loaded: markers=\(markers.count), stays=\(stays.count), summary=\(summary != nil)")
-            mapMarkers = markers
-            stayTimes = stays
-            self.calculateClientSideSummary(markers: markers)
-            
-            if isSidebarOpen {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    self.closeSidebar()
-                }
-            }
-        } catch {
-            print("❌ [ActivityLogViewModel] Data load failed: \(error)")
-            errorMessage = "위치 데이터 로드 실패"
-            showError = true
-        }
-        isMarkersLoading = false
-        isLoading = false
-    }
-    
-    private func calculateClientSideSummary(markers: [MapMarker]) {
-        guard !markers.isEmpty else {
-            self.calculatedSummary = LocationSummary(distance: "0 km", duration: "0분", steps: 0, schedule_count: nil)
-            return
-        }
-        
-        let sorted = markers.sorted { ($0.mlt_gps_time ?? "") < ($1.mlt_gps_time ?? "") }
-        
-        var totalDistance: Double = 0
-        var movingTimeSeconds: Double = 0
-        var maxSteps: Int = 0
-        
-        for i in 1..<sorted.count {
-            let prev = sorted[i-1]
-            let curr = sorted[i]
-            
-            // Steps: Find max mt_health_work
-            if let steps = curr.mt_health_work, steps > maxSteps {
-                maxSteps = steps
-            }
-            
-            if prev.latitude != 0 && prev.longitude != 0 && curr.latitude != 0 && curr.longitude != 0 {
-                let dist = haversine(lat1: prev.latitude, lon1: prev.longitude, lat2: curr.latitude, lon2: curr.longitude)
-                
-                // Filter jumps > 1km
-                if dist < 1000 {
-                    totalDistance += dist
-                    
-                    if let prevTitle = prev.mlt_gps_time, let currTitle = curr.mlt_gps_time,
-                       let prevDate = DateFormatter.apiDateFormatter.date(from: prevTitle),
-                       let currDate = DateFormatter.apiDateFormatter.date(from: currTitle) {
-                        
-                        let timeDiff = currDate.timeIntervalSince(prevDate) // seconds
-                        
-                        // Condition: Dist >= 10m OR Speed >= 0.5km/h
-                        let speedKmh = (curr.speed) * 3.6
-                        let isMoving = dist >= 10 || speedKmh >= 0.5
-                        
-                        if timeDiff < 300 && isMoving { // < 5 mins gap
-                            movingTimeSeconds += timeDiff
-                        }
-                    }
-                }
-            }
-        }
-        
-        // Check first marker for steps too
-        if let firstSteps = sorted.first?.mt_health_work, firstSteps > maxSteps {
-            maxSteps = firstSteps
-        }
-
-        let distKm = String(format: "%.1f km", totalDistance / 1000.0)
-        let totalMinutes = Int(movingTimeSeconds / 60)
-        
-        // Format Duration Logic
-        let h = totalMinutes / 60
-        let m = totalMinutes % 60
-        let durationStr = h > 0 ? "\(h)시간 \(m)분" : "\(m)분"
-        
-        print("📊 [ClientSummary] Dist: \(distKm), Time: \(totalMinutes)m, Steps: \(maxSteps)")
-        
-        self.calculatedSummary = LocationSummary(distance: distKm, duration: durationStr, steps: maxSteps, schedule_count: nil)
-    }
-    
-    private func haversine(lat1: Double, lon1: Double, lat2: Double, lon2: Double) -> Double {
-        let R = 6371000.0 // meters
-        let dLat = (lat2 - lat1) * .pi / 180
-        let dLon = (lon2 - lon1) * .pi / 180
-        let a = sin(dLat/2) * sin(dLat/2) + cos(lat1 * .pi / 180) * cos(lat2 * .pi / 180) * sin(dLon/2) * sin(dLon/2)
-        let c = 2 * atan2(sqrt(a), sqrt(1-a))
-        return R * c
-    }
-}
-
-// MARK: - ActivityLog Main View
-
-struct ActivityLogView: View {
-    @StateObject private var viewModel = ActivityLogViewModel()
-    @State private var sidebarDragOffset: CGFloat = 0
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
-    private let sidebarWidth: CGFloat = 320
-    
-    var body: some View {
-        ZStack(alignment: .leading) {
-            ActivityLogMapView(
-                mapMarkers: viewModel.mapMarkers,
-                stayTimes: viewModel.stayTimes,
-                sliderValue: viewModel.sliderValue,
-                isSliderDragging: viewModel.isSliderDragging
-            )
-            .edgesIgnoringSafeArea(.all)
-            .offset(y: 60)
-            
-            VStack {
-                ActivityLogHeaderView()
-                Spacer()
-            }
-            
-            if viewModel.selectedMemberId != nil {
-                VStack {
-                    ActivityLogFloatingCard(
-                        memberName: selectedMemberName,
-                        memberPhoto: selectedMemberPhoto,
-                        displayDate: viewModel.displayDate,
-                        distance: viewModel.displayDistance,
-                        duration: viewModel.displayDuration,
-                        steps: viewModel.displaySteps,
-                        isLoading: viewModel.isLoading,
-                        onTap: { viewModel.toggleSidebar() }
-                    )
-                    .padding(.horizontal, 20)
-                    .padding(.top, 76)
-                    Spacer()
-                }
-            }
-            
-            if !viewModel.sortedMapMarkers.isEmpty {
-                VStack {
-                    Spacer()
-                    HStack {
-                        PathSliderView(sliderValue: $viewModel.sliderValue, isSliderDragging: $viewModel.isSliderDragging)
-                            .padding(.leading, 16)
-                            .padding(.bottom, 20)
-                        Spacer()
-                    }
-                }
-            }
-            
-            if viewModel.isSidebarOpen || sidebarDragOffset > 0 {
-                Color.black.opacity(overlayOpacity)
-                    .edgesIgnoringSafeArea(.all)
-                    .onTapGesture { viewModel.closeSidebar() }
-                    .transition(.opacity)
-            }
-            
-            ActivityLogSidebarView(viewModel: viewModel)
-                .frame(width: sidebarWidth)
-                .offset(x: sidebarOffset)
-                .gesture(sidebarDragGesture)
-                .zIndex(100)
-            
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    FloatingActionLogButton(count: viewModel.memberDailyCounts.count) {
-                        viewModel.toggleSidebar()
-                    }
-                    .padding(.trailing, 20)
-                    .padding(.bottom, 20)
-                }
-            }
-            
-            if viewModel.isLoading && viewModel.mapMarkers.isEmpty {
-                Color.black.opacity(0.3)
-                    .edgesIgnoringSafeArea(.all)
-                    .overlay(
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            .scaleEffect(1.5)
-                    )
-            }
-        }
-        .navigationBarHidden(true)
-        .task { await viewModel.loadInitialData() }
-        .alert(isPresented: $viewModel.showError) {
-            Alert(title: Text("오류"), message: Text(viewModel.errorMessage ?? "알 수 없는 오류"), dismissButton: .default(Text("확인")))
-        }
-        .onDisappear {
-            // 페이지를 벗어날 때 사이드바 자동(즉시) 닫기
-            viewModel.isSidebarOpen = false
-            sidebarDragOffset = 0
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("closeSidebars"))) { _ in
-            // 전역 사이드바 닫기 알림 수신 시 즉시 닫기
-            viewModel.isSidebarOpen = false
-            sidebarDragOffset = 0
-        }
-    }
-    
-    private var selectedMemberName: String {
-        guard let memberId = viewModel.selectedMemberId else { return "" }
-        return viewModel.memberDailyCounts.first { $0.member_id == memberId }?.displayName ?? ""
-    }
-    
-    private var selectedMemberPhoto: String? {
-        guard let memberId = viewModel.selectedMemberId else { return nil }
-        return viewModel.memberDailyCounts.first { $0.member_id == memberId }?.member_photo
-    }
-    
-    private var sidebarOffset: CGFloat {
-        viewModel.isSidebarOpen ? max(0, sidebarDragOffset) : min(0, -sidebarWidth + sidebarDragOffset)
-    }
-    
-    private var overlayOpacity: Double {
-        let p = viewModel.isSidebarOpen ? 1.0 - Double(max(0, -sidebarDragOffset)) / Double(sidebarWidth) : Double(sidebarDragOffset) / Double(sidebarWidth)
-        return 0.4 * max(0, min(1, p))
-    }
-    
-    private var sidebarDragGesture: some Gesture {
-        DragGesture()
-            .onChanged { value in sidebarDragOffset = value.translation.width }
-            .onEnded { value in
-                if viewModel.isSidebarOpen && (value.translation.width < -sidebarWidth * 0.3) {
-                    viewModel.closeSidebar()
-                }
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { sidebarDragOffset = 0 }
-            }
-    }
-}
-
-struct ActivityLogHeaderView: View {
-    var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("활동 로그").font(.suite(size: 22, weight: .bold)).foregroundColor(.black)
-                Text("그룹 멤버들의 활동 기록을 확인해보세요").font(.suite(size: 13)).foregroundColor(.gray)
-            }
-            Spacer()
-        }
-        .padding(.horizontal, 16).padding(.vertical, 10)
-        .background(Color.white.opacity(0.95).shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2))
-    }
-}
-
-struct ActivityLogFloatingCard: View {
-    let memberName: String; let memberPhoto: String?; let displayDate: String; let distance: String; let duration: String; let steps: String; let isLoading: Bool; let onTap: () -> Void
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
-    
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 12) {
-                HStack(spacing: 10) {
-                    if let photo = memberPhoto, let url = getProfileImageUrl(photo) {
-                        AsyncImage(url: url) { phase in
-                            switch phase {
-                            case .empty:
-                                Circle().fill(Color.gray.opacity(0.2)).frame(width: 36, height: 36)
-                            case .success(let image):
-                                image.resizable().aspectRatio(contentMode: .fill).frame(width: 36, height: 36).clipShape(Circle())
-                            case .failure:
-                                Circle().fill(Color.gray.opacity(0.2)).frame(width: 36, height: 36).overlay(Image(systemName: "person.fill").foregroundColor(.gray))
-                            @unknown default:
-                                EmptyView()
-                            }
-                        }
-                    } else {
-                        Circle().fill(Color.gray.opacity(0.2)).frame(width: 36, height: 36).overlay(Image(systemName: "person.fill").foregroundColor(.gray))
-                    }
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 4) {
-                            Text(memberName).font(.suite(size: 14, weight: .bold)).foregroundColor(.black)
-                            Text("의 기록").font(.suite(size: 12)).foregroundColor(.gray)
-                        }
-                        Text(displayDate).font(.suite(size: 12, weight: .medium)).foregroundColor(brandColor)
-                    }
-                }
-                Rectangle().fill(Color.gray.opacity(0.2)).frame(width: 1, height: 32)
-                if isLoading {
-                    ProgressView().frame(width: 100)
-                } else {
-                    HStack(spacing: 12) {
-                        StatItem(icon: "arrow.up.right", color: .red, value: distance)
-                        StatItem(icon: "clock", color: .yellow, value: duration)
-                        StatItem(icon: "figure.walk", color: .blue, value: steps)
-                    }
-                }
-            }
-            .padding(.horizontal, 16).padding(.vertical, 12).background(RoundedRectangle(cornerRadius: 16).fill(Color.white).shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 4))
-        }.buttonStyle(PlainButtonStyle())
-    }
-    
-    private func getProfileImageUrl(_ path: String?) -> URL? {
-        return AuthService.getProfileImageURL(path)
-    }
-}
-
-struct PathSliderView: View {
-    @Binding var sliderValue: Double; @Binding var isSliderDragging: Bool
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Circle().fill(brandColor).frame(width: 20, height: 20).overlay(Image(systemName: "play.fill").font(.suite(size: 8)).foregroundColor(.white))
-                Text("경로 따라가기").font(.suite(size: 14, weight: .bold)).foregroundColor(.black)
-            }
-            VStack(spacing: 8) {
-                GeometryReader { g in
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.2)).frame(height: 8)
-                        RoundedRectangle(cornerRadius: 4).fill(brandColor).frame(width: max(0, g.size.width * CGFloat(sliderValue / 100)), height: 8)
-                        Circle().fill(brandColor).frame(width: 20, height: 20).overlay(Circle().fill(Color.white).frame(width: 6, height: 6)).shadow(radius: 2)
-                            .offset(x: max(0, min(g.size.width - 20, g.size.width * CGFloat(sliderValue / 100) - 10)))
-                    }
-                    .frame(height: 24)
-                    .gesture(DragGesture(minimumDistance: 0).onChanged { v in
-                        isSliderDragging = true
-                        sliderValue = min(100, max(0, Double(v.location.x / g.size.width) * 100))
-                    }.onEnded { _ in isSliderDragging = false })
-                }.frame(height: 24)
-                HStack {
-                    Text("시작").font(.suite(size: 10)).foregroundColor(.gray)
-                    Spacer()
-                    Text("\(Int(sliderValue))%").font(.suite(size: 10, weight: .semibold)).foregroundColor(brandColor).padding(.horizontal, 8).padding(.vertical, 2).background(brandColor.opacity(0.1)).cornerRadius(8)
-                    Spacer()
-                    Text("종료").font(.suite(size: 10)).foregroundColor(.gray)
-                }
-            }
-        }.padding(12).frame(width: 210).background(RoundedRectangle(cornerRadius: 16).fill(Color.white.opacity(0.95)).shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4))
-    }
-}
-
-struct FloatingActionLogButton: View {
-    let count: Int
-    let action: () -> Void
-    
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
-    private let pinkColor = Color(red: 236/255, green: 72/255, blue: 153/255) // Pink-500
-    
-    var body: some View {
-        Button(action: action) {
-            ZStack(alignment: .topTrailing) {
-                Circle()
-                    .fill(brandColor)
-                    .frame(width: 56, height: 56)
-                    .shadow(color: brandColor.opacity(0.3), radius: 12, x: 0, y: 8)
-                    .overlay(
-                        Image(systemName: "person.fill")
-                            .font(.suite(size: 22))
-                            .foregroundColor(.white)
-                    )
-                
-                if count > 0 {
-                    Text(count > 99 ? "99+" : "\(count)")
-                        .font(.suite(size: 12, weight: .bold))
-                        .foregroundColor(.white)
-                        .frame(minWidth: 24, minHeight: 24)
-                        .background(pinkColor)  // Changed from Green to Pink to match Home
-                        .clipShape(Circle())
-                        .offset(x: 4, y: -4)
-                }
-            }
-        }
-    }
-}
-
-struct ActivityLogMapView: UIViewRepresentable {
-    let mapMarkers: [MapMarker]
-    let stayTimes: [StayTime]
-    let sliderValue: Double
-    let isSliderDragging: Bool
-    
-    private let rainbowColors: [UIColor] = [
-        UIColor(red: 255/255, green: 107/255, blue: 107/255, alpha: 1), // #FF6B6B
-        UIColor(red: 255/255, green: 159/255, blue: 67/255, alpha: 1),  // #FF9F43
-        UIColor(red: 255/255, green: 201/255, blue: 71/255, alpha: 1),  // #FFC947
-        UIColor(red: 84/255, green: 214/255, blue: 44/255, alpha: 1),   // #54D62C
-        UIColor(red: 0/255, green: 201/255, blue: 255/255, alpha: 1),   // #00C9FF
-        UIColor(red: 123/255, green: 104/255, blue: 238/255, alpha: 1), // #7B68EE
-        UIColor(red: 255/255, green: 110/255, blue: 199/255, alpha: 1), // #FF6EC7
-        UIColor(red: 255/255, green: 138/255, blue: 128/255, alpha: 1), // #FF8A80
-        UIColor(red: 105/255, green: 240/255, blue: 174/255, alpha: 1), // #69F0AE
-        UIColor(red: 64/255, green: 196/255, blue: 255/255, alpha: 1),  // #40C4FF
-        UIColor(red: 179/255, green: 136/255, blue: 255/255, alpha: 1)  // #B388FF
-    ]
-
-    func makeUIView(context: Context) -> NMFMapView {
-        let m = NMFMapView()
-        m.positionMode = .disabled
-        m.logoAlign = .leftBottom
-        m.zoomLevel = 15
-        return m
-    }
-    
-    func updateUIView(_ mapView: NMFMapView, context: Context) {
-        // 1. Data Processing
-        let sorted = mapMarkers.sorted { ($0.mlt_gps_time ?? "") < ($1.mlt_gps_time ?? "") }
-        
-        var validMarkers: [MapMarker] = []
-        var coords: [NMGLatLng] = []
-        for marker in sorted {
-            if marker.latitude != 0 && marker.longitude != 0 {
-                validMarkers.append(marker)
-                coords.append(NMGLatLng(lat: marker.latitude, lng: marker.longitude))
-            }
-        }
-        
-        // 2. Path Drawing (Only if data changed)
-        if context.coordinator.lastMapMarkersCount != mapMarkers.count || context.coordinator.lastMapMarkersCount == 0 {
-            context.coordinator.clearOverlays()
-            context.coordinator.lastMapMarkersCount = mapMarkers.count
-            
-            print("📍 [ActivityLogMapView] Redrawing path. Markers: \(validMarkers.count)")
-            
-            // Draw Gradient Path
-            if coords.count >= 2 {
-                for i in 0..<(coords.count - 1) {
-                    let start = coords[i]
-                    let end = coords[i+1]
-                    
-                    // Logic from Next.js: Iterate rainbow colors
-                    let progress = Double(i) / Double(coords.count - 1)
-                    let colorIndex = Int(progress * Double(rainbowColors.count - 1))
-                    let nextColorIndex = min(colorIndex + 1, rainbowColors.count - 1)
-                    let segmentProgress = (progress * Double(rainbowColors.count - 1)) - Double(colorIndex)
-                    
-                    let color1 = rainbowColors[colorIndex]
-                    let color2 = rainbowColors[nextColorIndex]
-                    let interpolatedColor = interpolateColor(color1: color1, color2: color2, factor: CGFloat(segmentProgress))
-                    
-                    let line = NMFPolylineOverlay([start, end])
-                    line?.color = interpolatedColor
-                    line?.width = 6 // Slightly thicker for visibility
-                    line?.mapView = mapView
-                    if let line = line {
-                        context.coordinator.polylines.append(line)
-                    }
-                }
-                
-                // Draw Path Dots (Colored Circles)
-                for i in 0..<coords.count {
-                    let progress = Double(i) / Double(coords.count - 1)
-                    let colorIndex = Int(progress * Double(rainbowColors.count - 1))
-                    let nextColorIndex = min(colorIndex + 1, rainbowColors.count - 1)
-                    let segmentProgress = (progress * Double(rainbowColors.count - 1)) - Double(colorIndex)
-                    
-                    let color1 = rainbowColors[colorIndex]
-                    let color2 = rainbowColors[nextColorIndex]
-                    let interpolatedColor = interpolateColor(color1: color1, color2: color2, factor: CGFloat(segmentProgress))
-                    
-                    let dot = NMFMarker()
-                    dot.position = coords[i]
-                    dot.iconImage = NMFOverlayImage(image: generatePathDotImage(color: interpolatedColor))
-                    dot.width = 8
-                    dot.height = 8
-                    dot.anchor = CGPoint(x: 0.5, y: 0.5)
-                    dot.mapView = mapView
-                    context.coordinator.pathDotMarkers.append(dot)
-                }
-                
-                // Draw Arrows every 3 points
-                for i in 0..<(coords.count - 1) {
-                    if i % 3 == 0, i + 1 < coords.count {
-                        let start = coords[i]
-                        let end = coords[i+1]
-                        
-                        // Calculate heading
-                        let dLon = (end.lng - start.lng) * .pi / 180
-                        let y = sin(dLon) * cos(end.lat * .pi / 180)
-                        let x = cos(start.lat * .pi / 180) * sin(end.lat * .pi / 180) - sin(start.lat * .pi / 180) * cos(end.lat * .pi / 180) * cos(dLon)
-                        var heading = atan2(y, x) * 180 / .pi
-                        if heading < 0 { heading += 360 }
-                        
-                        // Calculate interpolated color for arrow
-                        let progress = Double(i) / Double(coords.count - 1)
-                        let colorIndex = Int(progress * Double(rainbowColors.count - 1))
-                        let nextColorIndex = min(colorIndex + 1, rainbowColors.count - 1)
-                        let segmentProgress = (progress * Double(rainbowColors.count - 1)) - Double(colorIndex)
-                        
-                        let color1 = rainbowColors[colorIndex]
-                        let color2 = rainbowColors[nextColorIndex]
-                        let interpolatedColor = interpolateColor(color1: color1, color2: color2, factor: CGFloat(segmentProgress))
-                        
-                        let arrow = NMFMarker()
-                        arrow.position = NMGLatLng(lat: (start.lat + end.lat)/2, lng: (start.lng + end.lng)/2)
-                        // Create a custom arrow image or use a system symbol rotated?
-                        // Using a simple triangle view converted to image would be ideal, but for now we can use a system image
-                        // Note: NMFMarker icon angle property rotates the icon.
-                        // arrow.iconImage = NMFOverlayImage(name: "direction_arrow") 
-                        arrow.iconImage = NMFOverlayImage(image: generateArrowImage(color: interpolatedColor))
-                        arrow.angle = heading
-                        arrow.width = 12
-                        arrow.height = 12
-                        arrow.anchor = CGPoint(x: 0.5, y: 0.5)
-                        arrow.mapView = mapView
-                        context.coordinator.arrowMarkers.append(arrow)
-                    }
-                }
-            }
-            
-            // Draw Start/End Markers
-            if let first = validMarkers.first {
-                let m = NMFMarker()
-                m.position = NMGLatLng(lat: first.latitude, lng: first.longitude)
-                m.iconImage = NMFOverlayImage(image: generateStartEndMarkerImage(text: "S", color: UIColor(red: 34/255, green: 197/255, blue: 94/255, alpha: 1))) // Green
-                m.width = 24
-                m.height = 24
-                m.anchor = CGPoint(x: 0.5, y: 0.5)
-                m.mapView = mapView
-                context.coordinator.markers.append(m)
-                
-                // Initial Camera Move
-                let cameraUpdate = NMFCameraUpdate(scrollTo: NMGLatLng(lat: first.latitude, lng: first.longitude))
-                cameraUpdate.animation = .fly
-                mapView.moveCamera(cameraUpdate)
-            }
-            
-            if let last = validMarkers.last {
-                let m = NMFMarker()
-                m.position = NMGLatLng(lat: last.latitude, lng: last.longitude)
-                m.iconImage = NMFOverlayImage(image: generateStartEndMarkerImage(text: "E", color: UIColor(red: 239/255, green: 68/255, blue: 68/255, alpha: 1))) // Red
-                m.width = 24
-                m.height = 24
-                m.anchor = CGPoint(x: 0.5, y: 0.5)
-                m.mapView = mapView
-                context.coordinator.markers.append(m)
-            }
-            
-            // Stay Markers
-            for (index, stay) in stayTimes.enumerated() {
-                if stay.stayLatitude != 0 && stay.stayLongitude != 0 {
-                    let m = NMFMarker()
-                    m.position = NMGLatLng(lat: stay.stayLatitude, lng: stay.stayLongitude)
-                    
-                    // Style logic from Next.js
-                    // Red (>=300), DkOrange (>=120), Orange (>=60), Yellow (>=30), Green (<30)
-                    let durationForColor = stay.duration // Double minutes
-                    var color = UIColor(red: 34/255, green: 197/255, blue: 94/255, alpha: 1) // Green default
-                    var size: CGFloat = 26
-                    
-                    if durationForColor >= 300 { 
-                        color = UIColor(red: 220/255, green: 38/255, blue: 38/255, alpha: 1); size = 40 // Red
-                    } else if durationForColor >= 120 {
-                        color = UIColor(red: 234/255, green: 88/255, blue: 12/255, alpha: 1); size = 36 // Dark Orange
-                    } else if durationForColor >= 60 {
-                        color = UIColor(red: 245/255, green: 158/255, blue: 11/255, alpha: 1); size = 32 // Orange
-                    } else if durationForColor >= 30 {
-                        color = UIColor(red: 234/255, green: 179/255, blue: 8/255, alpha: 1); size = 28 // Yellow
-                    }
-                    
-                    let markerResult = generateStayMarkerImage(number: index + 1, duration: stay.formattedDuration, color: color, size: size)
-                    
-                    m.iconImage = NMFOverlayImage(image: markerResult.image)
-                    m.width = CGFloat(markerResult.image.size.width)
-                    m.height = CGFloat(markerResult.image.size.height)
-                    m.anchor = markerResult.anchor
-                    
-                    m.mapView = mapView
-                    context.coordinator.stayMarkers.append(m)
-                }
-            }
-        }
-        
-        // 3. Current Position Marker & Camera (Always update on slider change)
-        if !validMarkers.isEmpty {
-            let index = Int(Double(validMarkers.count - 1) * sliderValue / 100.0)
-            let curr = validMarkers[max(0, min(index, validMarkers.count - 1))]
-            
-            // Remove previous current marker
-            context.coordinator.currentPositionMarker?.mapView = nil
-            
-            let m = NMFMarker()
-            m.position = NMGLatLng(lat: curr.latitude, lng: curr.longitude)
-            
-            // Speed-based Icon Logic (Next.js replication)
-            let speedKmh = curr.speed * 3.6
-            var iconName = "figure.stand"
-            if speedKmh >= 30 { iconName = "car.fill" }
-            else if speedKmh >= 15 { iconName = "figure.run" }
-            else if speedKmh >= 3 { iconName = "figure.walk" }
-            
-            m.iconImage = NMFOverlayImage(image: generateIconImage(systemName: iconName, color: UIColor(red: 1/255, green: 19/255, blue: 163/255, alpha: 1)))
-            m.width = 30
-            m.height = 30
-            m.zIndex = 1000
-            m.mapView = mapView
-            context.coordinator.currentPositionMarker = m
-            
-            // 슬라이더 값이 변경될 때마다 즉시 카메라 이동 (애니메이션 없이)
-            let cameraUpdate = NMFCameraUpdate(scrollTo: NMGLatLng(lat: curr.latitude, lng: curr.longitude))
-            cameraUpdate.animation = .none  // 애니메이션 없이 즉시 이동
-            mapView.moveCamera(cameraUpdate)
-        }
-    }
-    
-    private func interpolateColor(color1: UIColor, color2: UIColor, factor: CGFloat) -> UIColor {
-        var r1: CGFloat=0, g1: CGFloat=0, b1: CGFloat=0, a1: CGFloat=0
-        var r2: CGFloat=0, g2: CGFloat=0, b2: CGFloat=0, a2: CGFloat=0
-        color1.getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
-        color2.getRed(&r2, green: &g2, blue: &b2, alpha: &a2)
-        return UIColor(
-            red: r1 + (r2 - r1) * factor,
-            green: g1 + (g2 - g1) * factor,
-            blue: b1 + (b2 - b1) * factor,
-            alpha: 1.0
-        )
-    }
-    
-    func makeCoordinator() -> Coordinator { Coordinator() }
-    
-    private func generateArrowImage(color: UIColor) -> UIImage {
-        let size = CGSize(width: 20, height: 20)
-        let renderer = UIGraphicsImageRenderer(size: size)
-        return renderer.image { ctx in
-            // Draw Triangle
-            let path = UIBezierPath()
-            path.move(to: CGPoint(x: 10, y: 0))
-            path.addLine(to: CGPoint(x: 20, y: 20))
-            path.addLine(to: CGPoint(x: 10, y: 15))
-            path.addLine(to: CGPoint(x: 0, y: 20))
-            path.close()
-            color.setFill()
-            path.fill()
-        }
-    }
-    
-    private func generatePathDotImage(color: UIColor) -> UIImage {
-        let size = CGSize(width: 8, height: 8)
-        let renderer = UIGraphicsImageRenderer(size: size)
-        return renderer.image { ctx in
-            let path = UIBezierPath(ovalIn: CGRect(x: 0, y: 0, width: 8, height: 8))
-            color.setFill()
-            path.fill()
-            
-            // White border (2px) - Inset to ensure fully visible
-            let borderPath = UIBezierPath(ovalIn: CGRect(x: 0.5, y: 0.5, width: 7, height: 7))
-            UIColor.white.setStroke()
-            borderPath.lineWidth = 1.0 // 1.0 looks cleaner for small dots, or keep 1.5 but careful with clip
-            borderPath.stroke()
-        }
-    }
-    
-    private func generateStayMarkerImage(number: Int, duration: String, color: UIColor, size: CGFloat = 30) -> (image: UIImage, anchor: CGPoint) {
-        // Font setup - User requested SUITE
-        let bubbleFont = UIFont(name: "SUITE-Medium", size: 11) ?? UIFont.systemFont(ofSize: 11, weight: .medium)
-        
-        // Calculate dynamic sizes
-        let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.alignment = .center
-        let bubbleAttrs: [NSAttributedString.Key: Any] = [
-            .font: bubbleFont,
-            .foregroundColor: UIColor.white,
-            .paragraphStyle: paragraphStyle
-        ]
-        
-        let bubbleSizeCalc = duration.size(withAttributes: bubbleAttrs)
-        let bubblePaddingH: CGFloat = 12
-        let bubblePaddingV: CGFloat = 4
-        let bubbleW = bubbleSizeCalc.width + bubblePaddingH
-        let bubbleH = bubbleSizeCalc.height + bubblePaddingV
-        
-        let margin: CGFloat = 10
-        let markerX: CGFloat = margin
-        let initialMarkerY: CGFloat = margin + bubbleH/2 
-        
-        // Adjust layout: Bubble should overlap? 
-        // Let's position Bubble Top-Right.
-        // Bubble X: overlaps marker by 10px.
-        let bubbleX = markerX + size - 10
-        
-        // Bubble Y: Centered on the top edge of marker?
-        // Let's shift it up.
-        // If markerY is initialMarkerY, top of marker is initialMarkerY.
-        // Let's place bubble bottom at initialMarkerY + 10 (slap slightly down)
-        // Or strictly top right.
-        
-        // Refined Y Positioning:
-        // Marker Circle Top: initialMarkerY
-        // Bubble Bottom: initialMarkerY + 10
-        // Bubble Top: (initialMarkerY + 10) - bubbleH
-        
-        let bubbleBottom = initialMarkerY + 8
-        let bubbleY = bubbleBottom - bubbleH
-        
-        // Ensure BubbleY is not negative (cut off at top)
-        // If bubbleY < margin, we need to shift everything down.
-        let yShift = max(0, margin - bubbleY)
-        
-        let finalMarkerY = initialMarkerY + yShift
-        let finalBubbleY = bubbleY + yShift
-        
-        let canvasW = bubbleX + bubbleW + margin
-        let canvasH = max(finalMarkerY + size + margin, finalBubbleY + bubbleH + margin)
-        
-        let canvasSize = CGSize(width: canvasW, height: canvasH)
-        
-        let renderer = UIGraphicsImageRenderer(size: canvasSize)
-        let image = renderer.image { ctx in
-            // Draw Bubble
-            let bubbleRect = CGRect(x: bubbleX, y: finalBubbleY, width: bubbleW, height: bubbleH)
-            let bubblePath = UIBezierPath(roundedRect: bubbleRect, cornerRadius: 6)
-            UIColor(red: 31/255, green: 41/255, blue: 55/255, alpha: 1).setFill()
-            bubblePath.fill()
-            
-            // Draw Text
-            let textRect = CGRect(
-                x: bubbleRect.minX, 
-                y: bubbleRect.minY + (bubbleRect.height - bubbleSizeCalc.height) / 2, 
-                width: bubbleRect.width, 
-                height: bubbleSizeCalc.height
-            )
-            duration.draw(in: textRect, withAttributes: bubbleAttrs)
-            
-            // Draw Marker Circle
-            let markerRect = CGRect(x: markerX, y: finalMarkerY, width: size, height: size)
-            let circlePath = UIBezierPath(ovalIn: markerRect)
-            color.setFill()
-            circlePath.fill()
-            
-            // White Border
-            let borderRect = markerRect.insetBy(dx: 1.5, dy: 1.5)
-            let borderPath = UIBezierPath(ovalIn: borderRect)
-            UIColor.white.setStroke()
-            borderPath.lineWidth = 3
-            borderPath.stroke()
-            
-            // Draw Number
-            let numberStr = "\(number)"
-            let numberFont = UIFont(name: "SUITE-Bold", size: 12) ?? UIFont.boldSystemFont(ofSize: 12)
-            let numberAttrs: [NSAttributedString.Key: Any] = [
-                .font: numberFont,
-                .foregroundColor: UIColor.white,
-                .paragraphStyle: paragraphStyle
-            ]
-            let numberSize = numberStr.size(withAttributes: numberAttrs)
-            let numberRect = CGRect(
-                x: markerRect.midX - numberSize.width/2,
-                y: markerRect.midY - numberSize.height/2,
-                width: numberSize.width, 
-                height: numberSize.height
-            )
-            numberStr.draw(in: numberRect, withAttributes: numberAttrs)
-        }
-        
-        // Calculate Anchor (U, V) relative to whole image options (0..1)
-        // Anchor should be at the CENTER of the Marker Circle
-        let anchorX = (markerX + size/2) / canvasSize.width
-        let anchorY = (finalMarkerY + size/2) / canvasSize.height
-        
-        return (image: image, anchor: CGPoint(x: anchorX, y: anchorY))
-    }
-    
-    // Helper to avoid repetitive renderer code
-    private func rendererImage(size: CGSize, actions: (CGContext) -> Void) -> UIImage {
-        return UIGraphicsImageRenderer(size: size).image { ctx in actions(ctx.cgContext) }
-    }
-    
-    private func generateIconImage(systemName: String, color: UIColor) -> UIImage {
-        let config = UIImage.SymbolConfiguration(pointSize: 18, weight: .bold) // Slightly smaller icon to fit better
-        guard let image = UIImage(systemName: systemName, withConfiguration: config)?.withTintColor(color, renderingMode: .alwaysOriginal) else {
-            return UIImage()
-        }
-        let size = CGSize(width: 30, height: 30)
-        let renderer = UIGraphicsImageRenderer(size: size)
-        return renderer.image { ctx in
-            // Draw circle background
-            // Bounds 0..30. Stroke width 2. Center 15,15.
-            // Path should be at inset 1. (0+1 .. 30-1 = 1..29, diam 28)
-            let circleRect = CGRect(x: 1, y: 1, width: 28, height: 28)
-            let circlePath = UIBezierPath(ovalIn: circleRect)
-            UIColor.white.setFill()
-            circlePath.fill()
-            
-            // Draw icon centered
-            // Center is 15,15. Icon is ~20x20. 
-            let iconRect = CGRect(x: 5, y: 5, width: 20, height: 20)
-            image.draw(in: iconRect)
-            
-            // Draw border
-            color.setStroke()
-            circlePath.lineWidth = 2
-            circlePath.stroke()
-        }
-    }
-    
-    private func generateStartEndMarkerImage(text: String, color: UIColor) -> UIImage {
-        let size = CGSize(width: 24, height: 24)
-        let renderer = UIGraphicsImageRenderer(size: size)
-        return renderer.image { ctx in
-            let rect = CGRect(x: 2, y: 2, width: 20, height: 20)
-            let path = UIBezierPath(ovalIn: rect)
-            color.setFill()
-            path.fill()
-            
-            UIColor.white.setStroke()
-            path.lineWidth = 2
-            path.stroke()
-            
-            let paragraphStyle = NSMutableParagraphStyle()
-            paragraphStyle.alignment = .center
-            let attrs: [NSAttributedString.Key: Any] = [
-                .font: UIFont.boldSystemFont(ofSize: 10),
-                .foregroundColor: UIColor.white,
-                .paragraphStyle: paragraphStyle
-            ]
-            let textSize = text.size(withAttributes: attrs)
-            let textRect = CGRect(x: (24 - textSize.width)/2, y: (24 - textSize.height)/2, width: textSize.width, height: textSize.height)
-            text.draw(in: textRect, withAttributes: attrs)
-        }
-    }
-
-    class Coordinator: NSObject {
-        var markers: [NMFMarker] = []
-        var stayMarkers: [NMFMarker] = []
-        var arrowMarkers: [NMFMarker] = []
-        var pathDotMarkers: [NMFMarker] = []
-        var polylines: [NMFPolylineOverlay] = []
-        var currentPositionMarker: NMFMarker?
-        var lastMapMarkersCount: Int = 0
-        
-        func clearOverlays() {
-            markers.forEach { $0.mapView = nil }
-            markers.removeAll()
-            stayMarkers.forEach { $0.mapView = nil }
-            stayMarkers.removeAll()
-            arrowMarkers.forEach { $0.mapView = nil }
-            arrowMarkers.removeAll()
-            pathDotMarkers.forEach { $0.mapView = nil }
-            pathDotMarkers.removeAll()
-            polylines.forEach { $0.mapView = nil }
-            polylines.removeAll()
-            currentPositionMarker?.mapView = nil
-            currentPositionMarker = nil
-            lastMapMarkersCount = 0
-        }
-    }
-}
-
-struct ActivityLogSidebarView: View {
-    @ObservedObject var viewModel: ActivityLogViewModel
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header
-            HStack(spacing: 12) {
-                ZStack { 
-                    RoundedRectangle(cornerRadius: 12).fill(brandColor).frame(width: 40, height: 40)
-                    Image(systemName: "person.fill").foregroundColor(.white) 
-                }
-                VStack(alignment: .leading, spacing: 2) { 
-                    Text("멤버 조회").font(.suite(size: 20, weight: .bold))
-                    Text("멤버를 선택해보세요").font(.suite(size: 15)).foregroundColor(.secondary) 
-                }
-            }
-            .padding(.top, 20)
-            .padding(.horizontal, 24)
-            .padding(.bottom, 16)
-            
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    // Group Selector Section
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 8) { 
-                            Circle().fill(Color.red).frame(width: 8, height: 8)
-                            Text("그룹 목록").font(.suite(size: 16, weight: .bold)) 
-                        }
-                        Menu {
-                            ForEach(viewModel.groups) { group in
-                                Button(group.sgt_title ?? "이름 없음") { 
-                                    Task { await viewModel.selectGroupFromSidebar(group) } 
-                                }
-                            }
-                        } label: {
-                            HStack {
-                                Text(viewModel.selectedGroup?.sgt_title ?? "그룹 선택").font(.suite(size: 17)).foregroundColor(.primary)
-                                Spacer()
-                                Image(systemName: "chevron.down").font(.suite(size: 15)).foregroundColor(.secondary)
-                            }
-                            .padding()
-                            .background(RoundedRectangle(cornerRadius: 12).fill(Color.white))
-                            .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 4)
-                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.gray.opacity(0.1), lineWidth: 1))
-                        }
-                    }
-                    .padding(16)
-                    .background(RoundedRectangle(cornerRadius: 16).fill(Color.white))
-                    .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
-                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.gray.opacity(0.1), lineWidth: 1))
-                    .padding(.horizontal, 20)
-                    
-                    // Member List Section
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack(spacing: 8) {
-                            Circle().fill(Color.green).frame(width: 8, height: 8)
-                            Text("멤버 목록").font(.suite(size: 16, weight: .bold))
-                            Spacer()
-                            Text("\(viewModel.memberDailyCounts.count)명")
-                                .font(.suite(size: 14))
-                                .foregroundColor(.secondary)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Capsule().fill(Color.secondary.opacity(0.1)))
-                        }
-                        
-                        if viewModel.isDailyCountsLoading {
-                            HStack { Spacer(); ProgressView(); Spacer() }.padding(.vertical, 20)
-                        } else {
-                            VStack(spacing: 8) {
-                                ForEach(viewModel.memberDailyCounts) { member in
-                                    ActivityLogMemberCell(
-                                        member: member,
-                                        isSelected: viewModel.selectedMemberId == member.member_id,
-                                        selectedDate: viewModel.selectedDate,
-                                        onMemberTap: { Task { await viewModel.selectMember(member.member_id) } },
-                                        onDateTap: { date in Task { await viewModel.selectMemberAndDate(memberId: member.member_id, date: date) } }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    .padding(16)
-                    .background(RoundedRectangle(cornerRadius: 16).fill(Color.white))
-                    .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
-                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.gray.opacity(0.1), lineWidth: 1))
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 40)
-                }
-            }
-        }
-        .frame(width: 320)
-        .background(
-            Color(red: 245/255, green: 247/255, blue: 250/255)
-                .edgesIgnoringSafeArea(.all)
-        )
-        .cornerRadius(24, corners: [.topRight, .bottomRight])
-        .shadow(color: Color.black.opacity(0.15), radius: 20, x: 5, y: 0)
-    }
-}
-
-struct ActivityLogMemberCell: View {
-    let member: MemberDailyCount; let isSelected: Bool; let selectedDate: String; let onMemberTap: () -> Void; let onDateTap: (String) -> Void
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
-    private let indigoColor = Color(red: 99/255, green: 102/255, blue: 241/255)
-    
-    var body: some View {
-        Button(action: onMemberTap) {
-            HStack(alignment: .center, spacing: 12) {
-                // Left Column: Avatar + Name
-                VStack(spacing: 6) {
-                    if let url = getProfileImageUrl(member.member_photo) {
-                        AsyncImage(url: url) { phase in
-                            switch phase {
-                            case .empty:
-                                Circle().fill(Color.gray.opacity(0.2)).frame(width: 40, height: 40)
-                            case .success(let image):
-                                image.resizable().aspectRatio(contentMode: .fill).frame(width: 40, height: 40).clipShape(Circle()).overlay(Circle().stroke(isSelected ? brandColor : Color.clear, lineWidth: 2))
-                            case .failure:
-                                Circle().fill(Color.gray.opacity(0.2)).frame(width: 40, height: 40).overlay(Image(systemName: "person.fill").foregroundColor(.gray)).overlay(Circle().stroke(isSelected ? brandColor : Color.clear, lineWidth: 2))
-                            @unknown default:
-                                EmptyView()
-                            }
-                        }
-                    } else {
-                        Circle().fill(Color.gray.opacity(0.2)).frame(width: 40, height: 40).overlay(Image(systemName: "person.fill").foregroundColor(.gray)).overlay(Circle().stroke(isSelected ? brandColor : Color.clear, lineWidth: 2))
-                    }
-                    Text(member.displayName)
-                        .font(.suite(size: 14, weight: .semibold)) // Slightly smaller font
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-                        .frame(width: 52) // Reduced width
-                }
-                
-                // Right Column: Calendar
-                calendarView
-                
-                Spacer(minLength: 0)
-            }
-            .padding(.vertical, 12).padding(.horizontal, 12) // Slightly tighter padding if needed, keeping 12
-            .background(isSelected ? brandColor.opacity(0.05) : Color.white)
-            .cornerRadius(16)
-            .overlay(RoundedRectangle(cornerRadius: 16).stroke(isSelected ? brandColor.opacity(0.3) : Color.gray.opacity(0.1), lineWidth: 1))
-            .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
-        }.buttonStyle(PlainButtonStyle())
-    }
-    
-    private var calendarView: some View {
-        VStack(alignment: .leading, spacing: 4) {
-             // Weekday Headers
-            HStack(spacing: 4) { // Reduced spacing 6->4
-                ForEach(0..<7) { col in
-                    let date = Calendar.current.date(byAdding: .day, value: -(6 - col), to: Date()) ?? Date()
-                    let weekday = Calendar.current.component(.weekday, from: date)
-                    let letter = ["S", "M", "T", "W", "T", "F", "S"][weekday - 1]
-                    let isSun = weekday == 1
-                    let isSat = weekday == 7
-                    Text(letter)
-                        .font(.suite(size: 12, weight: .bold))
-                        .foregroundColor(isSun ? .red : (isSat ? .blue : .gray))
-                        .frame(width: 16)
-                }
-            }
-            
-            HStack(spacing: 4) { ForEach(0..<7) { col in let off = 13 - col; let ds = getDateString(daysAgo: off); let ha = member.activityDistribution[col]; CalendarDayCell(hasActivity: ha, isSelected: ds == selectedDate && isSelected, isToday: off == 0, onTap: ha ? { onDateTap(ds) } : nil) } }
-            HStack(spacing: 4) { ForEach(0..<7) { col in let off = 6 - col; let ds = getDateString(daysAgo: off); let ha = member.activityDistribution[7 + col]; CalendarDayCell(hasActivity: ha, isSelected: ds == selectedDate && isSelected, isToday: off == 0, onTap: ha ? { onDateTap(ds) } : nil) } }
-            HStack { Text("1주전").font(.suite(size: 11)).foregroundColor(.secondary); Spacer(); Text("오늘").font(.suite(size: 11, weight: .semibold)).foregroundColor(indigoColor) }
-        }.padding(8).background(Color.gray.opacity(0.05)).cornerRadius(8)
-    }
-    
-    private func getDateString(daysAgo: Int) -> String {
-        if let d = Calendar.current.date(byAdding: .day, value: -daysAgo, to: Date()) { return DateFormatter.apiDateOnlyFormatter.string(from: d) }
-        return ""
-    }
-    
-    private func getProfileImageUrl(_ path: String?) -> URL? {
-        return AuthService.getProfileImageURL(path)
-    }
-}
-
-struct CalendarDayCell: View {
-    let hasActivity: Bool; let isSelected: Bool; let isToday: Bool; let onTap: (() -> Void)?
-    private let pinkColor = Color(red: 236/255, green: 72/255, blue: 153/255)
-    private let indigoColor = Color(red: 99/255, green: 102/255, blue: 241/255)
-    var body: some View {
-        Button(action: { onTap?() }) {
-            ZStack {
-                if isSelected { RoundedRectangle(cornerRadius: 4).fill(pinkColor).shadow(color: pinkColor.opacity(0.3), radius: 2) } else if hasActivity { RoundedRectangle(cornerRadius: 4).fill(indigoColor.opacity(0.8)) } else { RoundedRectangle(cornerRadius: 4).fill(Color.gray.opacity(0.1)) }
-                if isToday { Text("●").font(.suite(size: 8)).foregroundColor(isSelected || hasActivity ? .white : .gray) }
-            }.frame(width: 16, height: 16).overlay(isToday ? RoundedRectangle(cornerRadius: 4).stroke(indigoColor, lineWidth: 1.5) : nil)
-        }.buttonStyle(PlainButtonStyle()).disabled(onTap == nil)
-    }
 }
 
 // MARK: - DateFormatter Extensions
@@ -8015,6 +7085,1362 @@ extension DateFormatter {
     }()
 }
 
+
+class ActivityLogService {
+    static let shared = ActivityLogService()
+    
+    private let baseURL: String
+    private var cancellables = Set<AnyCancellable>()
+    
+    private init() {
+        self.baseURL = "https://api3.smap.site/api/v1"
+    }
+    
+    // MARK: - Private Helpers
+    
+    private func getAuthToken() -> String? {
+        return AuthService.shared.getToken()
+    }
+    
+    private func createRequest(url: URL, method: String = "GET") -> URLRequest {
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        if let token = getAuthToken() {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
+        return request
+    }
+    
+    // MARK: - API Methods
+    
+    /// 최근 N일간 그룹 멤버들의 일별 위치 기록 카운트 조회
+    func getDailyLocationCounts(groupId: Int, days: Int = 14) async throws -> DailyCountsResponse {
+        guard let url = URL(string: "\(baseURL)/logs/daily-counts?group_id=\(groupId)&days=\(days)") else {
+            throw URLError(.badURL)
+        }
+        
+        let request = createRequest(url: url)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            print("[ActivityLogService] getDailyLocationCounts failed with status: \(httpResponse.statusCode)")
+            throw URLError(.badServerResponse)
+        }
+        
+        let decoder = JSONDecoder()
+        return try decoder.decode(DailyCountsResponse.self, from: data)
+    }
+    
+    /// 특정 회원의 특정 날짜 지도 마커 데이터 조회
+    func getMapMarkers(memberId: Int, date: String, minSpeed: Double = 1.0, maxAccuracy: Double = 50.0) async throws -> [MapMarker] {
+        guard let url = URL(string: "\(baseURL)/logs/member-location-logs/\(memberId)/map-markers?date=\(date)&min_speed=\(minSpeed)&max_accuracy=\(maxAccuracy)") else {
+            throw URLError(.badURL)
+        }
+        
+        let request = createRequest(url: url)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            print("[ActivityLogService] getMapMarkers failed with status: \(httpResponse.statusCode)")
+            throw URLError(.badServerResponse)
+        }
+        
+        let decoder = JSONDecoder()
+        let apiResponse = try decoder.decode(ActivityLogAPIResponse<[MapMarker]>.self, from: data)
+        
+        return apiResponse.data ?? []
+    }
+    
+    /// 특정 회원의 특정 날짜 체류시간 분석 조회
+    func getStayTimes(memberId: Int, date: String, minSpeed: Double = 1.0, maxAccuracy: Double = 50.0, minDuration: Int = 5) async throws -> [StayTime] {
+        guard let url = URL(string: "\(baseURL)/logs/member-location-logs/\(memberId)/stay-times?date=\(date)&min_speed=\(minSpeed)&max_accuracy=\(maxAccuracy)&min_duration=\(minDuration)") else {
+            throw URLError(.badURL)
+        }
+        
+        let request = createRequest(url: url)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            print("[ActivityLogService] getStayTimes failed with status: \(httpResponse.statusCode)")
+            throw URLError(.badServerResponse)
+        }
+        
+        let decoder = JSONDecoder()
+        let apiResponse = try decoder.decode(ActivityLogAPIResponse<[StayTime]>.self, from: data)
+        
+        return apiResponse.data ?? []
+    }
+    
+    /// 위치 로그 요약 정보 조회 (PHP 로직 기반)
+    func getLocationLogSummary(memberId: Int, date: String) async throws -> LocationSummary? {
+        guard let url = URL(string: "\(baseURL)/logs/member-location-logs/\(memberId)/summary?date=\(date)") else {
+            throw URLError(.badURL)
+        }
+        
+        let request = createRequest(url: url) // GET Request
+        // Body removal as we switched to GET
+        // request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            print("[ActivityLogService] getLocationLogSummary failed with status: \(httpResponse.statusCode)")
+            throw URLError(.badServerResponse)
+        }
+        
+        let decoder = JSONDecoder()
+        let apiResponse = try decoder.decode(ActivityLogAPIResponse<LocationSummary>.self, from: data)
+        
+        return apiResponse.data
+    }
+    
+    /// 특정 날짜의 그룹 멤버별 위치 기록 활동 조회
+    func getMemberActivityByDate(groupId: Int, date: String) async throws -> MemberActivityResponse? {
+        let timestamp = Int(Date().timeIntervalSince1970 * 1000)
+        guard let url = URL(string: "\(baseURL)/logs/member-activity?group_id=\(groupId)&date=\(date)&_t=\(timestamp)") else {
+            throw URLError(.badURL)
+        }
+        
+        let request = createRequest(url: url)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            print("[ActivityLogService] getMemberActivityByDate failed with status: \(httpResponse.statusCode)")
+            throw URLError(.badServerResponse)
+        }
+        
+        let decoder = JSONDecoder()
+        let apiResponse = try decoder.decode(ActivityLogAPIResponse<MemberActivityResponse>.self, from: data)
+        
+        return apiResponse.data
+    }
+    
+    // MARK: - Combine Publishers (Alternative)
+    
+    func getDailyLocationCountsPublisher(groupId: Int, days: Int = 14) -> AnyPublisher<DailyCountsResponse, Error> {
+        guard let url = URL(string: "\(baseURL)/logs/daily-counts?group_id=\(groupId)&days=\(days)") else {
+            return Fail(error: URLError(.badURL)).eraseToAnyPublisher()
+        }
+        
+        let request = createRequest(url: url)
+        
+        return URLSession.shared.dataTaskPublisher(for: request)
+            .map(\.data)
+            .decode(type: DailyCountsResponse.self, decoder: JSONDecoder())
+            .receive(on: DispatchQueue.main)
+            .eraseToAnyPublisher()
+    }
+    
+    func getMapMarkersPublisher(memberId: Int, date: String) -> AnyPublisher<[MapMarker], Error> {
+        guard let url = URL(string: "\(baseURL)/logs/member-location-logs/\(memberId)/map-markers?date=\(date)&min_speed=1.0&max_accuracy=50.0") else {
+            return Fail(error: URLError(.badURL)).eraseToAnyPublisher()
+        }
+        
+        let request = createRequest(url: url)
+        
+        return URLSession.shared.dataTaskPublisher(for: request)
+            .map(\.data)
+            .decode(type: ActivityLogAPIResponse<[MapMarker]>.self, decoder: JSONDecoder())
+            .map { $0.data ?? [] }
+            .receive(on: DispatchQueue.main)
+            .eraseToAnyPublisher()
+    }
+}
+
+
+
+@MainActor
+class ActivityLogViewModel: ObservableObject {
+    // MARK: - Published Properties
+    
+    // Loading States
+    @Published var isLoading = false
+    @Published var isMapLoading = false
+    @Published var isDailyCountsLoading = false
+    @Published var isMarkersLoading = false
+    @Published var isGroupsLoading = false
+    
+    // Error State
+    @Published var errorMessage: String?
+    @Published var showError = false
+    
+    // Groups
+    @Published var groups: [SmapGroup] = []
+    @Published var selectedGroup: SmapGroup?
+    
+    // Selection States
+    @Published var selectedGroupId: Int?
+    @Published var selectedMemberId: Int?
+    @Published var selectedDate: String
+    
+    // Data
+    @Published var dailyCountsResponse: DailyCountsResponse?
+    @Published var memberDailyCounts: [MemberDailyCount] = []
+    @Published var mapMarkers: [MapMarker] = []
+    @Published var stayTimes: [StayTime] = []
+    @Published var locationSummary: LocationSummary?
+    
+    // UI States
+    @Published var isSidebarOpen = false
+    @Published var sliderValue: Double = 0
+    @Published var isSliderDragging = false
+    
+    // MARK: - Computed Properties
+    
+    /// 현재 선택된 멤버의 일별 카운트 데이터
+    var selectedMemberDailyCount: MemberDailyCount? {
+        guard let memberId = selectedMemberId else { return nil }
+        return memberDailyCounts.first { $0.member_id == memberId }
+    }
+    
+    /// 정렬된 맵 마커 (시간순)
+    var sortedMapMarkers: [MapMarker] {
+        mapMarkers.sorted { ($0.mlt_gps_time ?? "") < ($1.mlt_gps_time ?? "") }
+    }
+    
+    /// 슬라이더 현재 위치의 마커
+    var currentMarkerAtSlider: MapMarker? {
+        guard !sortedMapMarkers.isEmpty else { return nil }
+        let index = Int(Double(sortedMapMarkers.count - 1) * sliderValue / 100.0)
+        let clampedIndex = max(0, min(index, sortedMapMarkers.count - 1))
+        return sortedMapMarkers[clampedIndex]
+    }
+    
+    /// 위치 요약 - 거리
+    var formattedDistance: String {
+        locationSummary?.formattedDistance ?? "0 km"
+    }
+    
+    /// 위치 요약 - 시간
+    var formattedDuration: String {
+        locationSummary?.formattedDuration ?? "0분"
+    }
+    
+    /// 위치 요약 - 걸음수
+    var formattedSteps: String {
+        locationSummary?.formattedSteps ?? "0 걸음"
+    }
+    
+    /// 선택된 날짜의 표시 형식
+    var displayDate: String {
+        if let date = DateFormatter.apiDateOnlyFormatter.date(from: selectedDate) {
+            return DateFormatter.displayDateFormatter.string(from: date)
+        }
+        return selectedDate
+    }
+    
+    /// 최근 14일 날짜 목록
+    var recentDays: [(date: String, displayDate: String, dayOfWeek: String, isToday: Bool, isWeekend: Bool)] {
+        let calendar = Calendar.current
+        let today = Date()
+        var days: [(String, String, String, Bool, Bool)] = []
+        
+        for i in 0..<14 {
+            if let date = calendar.date(byAdding: .day, value: -(13 - i), to: today) {
+                let dateString = DateFormatter.apiDateOnlyFormatter.string(from: date)
+                let displayString = DateFormatter.shortDateFormatter.string(from: date)
+                let weekday = calendar.component(.weekday, from: date)
+                let dayNames = ["S", "M", "T", "W", "T", "F", "S"]
+                let dayOfWeek = dayNames[weekday - 1]
+                let isToday = calendar.isDateInToday(date)
+                let isWeekend = weekday == 1 || weekday == 7
+                
+                days.append((dateString, displayString, dayOfWeek, isToday, isWeekend))
+            }
+        }
+        
+        return days
+    }
+    
+    // MARK: - Private Properties
+    
+    private let service = ActivityLogService.shared
+    private var cancellables = Set<AnyCancellable>()
+    
+    // MARK: - Initialization
+    
+    init() {
+        // 기본값으로 오늘 날짜 설정
+        self.selectedDate = DateFormatter.apiDateOnlyFormatter.string(from: Date())
+    }
+    
+    // MARK: - Public Methods
+    
+    /// 그룹 선택 시 호출
+    func selectGroup(_ groupId: Int) async {
+        guard selectedGroupId != groupId else { return }
+        
+        print("[ActivityLogViewModel] 그룹 선택: \(groupId)")
+        selectedGroupId = groupId
+        selectedMemberId = nil
+        
+        // 일별 카운트 데이터 로드
+        await loadDailyLocationCounts()
+    }
+    
+    /// 멤버 선택 시 호출
+    func selectMember(_ memberId: Int) async {
+        guard selectedMemberId != memberId else { return }
+        
+        print("[ActivityLogViewModel] 멤버 선택: \(memberId)")
+        selectedMemberId = memberId
+        
+        // 해당 멤버의 위치 데이터 로드
+        await loadMemberLocationData()
+    }
+    
+    /// 날짜 선택 시 호출
+    func selectDate(_ date: String) async {
+        guard selectedDate != date else { return }
+        
+        print("[ActivityLogViewModel] 날짜 선택: \(date)")
+        selectedDate = date
+        
+        // 선택된 멤버가 있으면 해당 날짜의 데이터 로드
+        if selectedMemberId != nil {
+            await loadMemberLocationData()
+        }
+    }
+    
+    /// 캘린더 셀 클릭 시 호출 (멤버 + 날짜 동시 변경)
+    func selectMemberAndDate(memberId: Int, date: String) async {
+        print("[ActivityLogViewModel] 멤버+날짜 선택: \(memberId), \(date)")
+        selectedMemberId = memberId
+        selectedDate = date
+        
+        await loadMemberLocationData()
+    }
+    
+    /// 사이드바 토글
+    func toggleSidebar() {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+            isSidebarOpen.toggle()
+        }
+    }
+    
+    /// 사이드바 닫기
+    func closeSidebar() {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+            isSidebarOpen = false
+        }
+    }
+    
+    /// 슬라이더 값 업데이트
+    func updateSliderValue(_ value: Double) {
+        sliderValue = max(0, min(100, value))
+    }
+    
+    /// 초기 데이터 로드 (뷰 진입 시 호출)
+    func loadInitialData() async {
+        print("[ActivityLogViewModel] 초기 데이터 로드 시작")
+        isLoading = true
+        
+        // 1. 그룹 목록 먼저 로드
+        await fetchGroups()
+        
+        // 2. 첫 번째 그룹 자동 선택
+        if let firstGroup = groups.first {
+            print("[ActivityLogViewModel] 첫 번째 그룹 자동 선택: \(firstGroup.sgt_title ?? "N/A")")
+            selectedGroup = firstGroup
+            selectedGroupId = firstGroup.sgt_idx
+            
+            // 3. 해당 그룹의 일별 카운트 로드
+            await loadDailyLocationCounts()
+        }
+        
+        isLoading = false
+    }
+    
+    /// 그룹 목록 가져오기
+    private func fetchGroups() async {
+        isGroupsLoading = true
+        
+        do {
+            let fetchedGroups = try await HomeService.shared.getMyGroups()
+            groups = fetchedGroups
+            print("[ActivityLogViewModel] 그룹 목록 로드 완료: \(fetchedGroups.count)개")
+        } catch {
+            print("[ActivityLogViewModel] 그룹 목록 로드 실패: \(error)")
+            errorMessage = "그룹 목록을 불러오는데 실패했습니다."
+            showError = true
+        }
+        
+        isGroupsLoading = false
+    }
+    
+    /// 그룹 선택 핸들러
+    func selectGroupFromSidebar(_ group: SmapGroup) async {
+        guard selectedGroupId != group.sgt_idx else { return }
+        
+        print("[ActivityLogViewModel] 그룹 변경: \(group.sgt_title ?? "N/A")")
+        selectedGroup = group
+        selectedGroupId = group.sgt_idx
+        selectedMemberId = nil
+        
+        await loadDailyLocationCounts()
+    }
+    
+    // MARK: - Private Methods
+    
+    /// 일별 위치 카운트 로드
+    private func loadDailyLocationCounts() async {
+        guard let groupId = selectedGroupId else { return }
+        
+        isDailyCountsLoading = true
+        errorMessage = nil
+        
+        do {
+            print("[ActivityLogViewModel] 일별 카운트 로드 시작: groupId=\(groupId)")
+            let response = try await service.getDailyLocationCounts(groupId: groupId, days: 14)
+            
+            dailyCountsResponse = response
+            memberDailyCounts = response.member_daily_counts
+            
+            print("[ActivityLogViewModel] 일별 카운트 로드 완료: \(memberDailyCounts.count)명")
+            
+            // 첫 번째 멤버 자동 선택
+            if selectedMemberId == nil, let firstMember = memberDailyCounts.first {
+                await selectMember(firstMember.member_id)
+            }
+            
+        } catch {
+            print("[ActivityLogViewModel] 일별 카운트 로드 실패: \(error)")
+            errorMessage = "활동 데이터를 불러오는데 실패했습니다."
+            showError = true
+        }
+        
+        isDailyCountsLoading = false
+    }
+    
+    /// 선택된 멤버의 위치 데이터 로드
+    private func loadMemberLocationData() async {
+        guard let memberId = selectedMemberId else { return }
+        
+        isMarkersLoading = true
+        isLoading = true
+        errorMessage = nil
+        
+        // 기존 데이터 초기화
+        mapMarkers = []
+        stayTimes = []
+        locationSummary = nil
+        sliderValue = 0
+        
+        do {
+            print("[ActivityLogViewModel] 멤버 위치 데이터 로드 시작: memberId=\(memberId), date=\(selectedDate)")
+            
+            // 병렬로 API 호출
+            async let markersTask = service.getMapMarkers(memberId: memberId, date: selectedDate)
+            async let stayTimesTask = service.getStayTimes(memberId: memberId, date: selectedDate)
+            async let summaryTask = service.getLocationLogSummary(memberId: memberId, date: selectedDate)
+            
+            let (markers, stays, summary) = try await (markersTask, stayTimesTask, summaryTask)
+            
+            mapMarkers = markers
+            stayTimes = stays
+            locationSummary = summary
+            
+            print("[ActivityLogViewModel] 멤버 위치 데이터 로드 완료: 마커=\(markers.count), 체류=\(stays.count)")
+            
+            // 사이드바 자동 닫기 (데이터 로드 후)
+            if isSidebarOpen {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    self.closeSidebar()
+                }
+            }
+            
+        } catch {
+            print("[ActivityLogViewModel] 멤버 위치 데이터 로드 실패: \(error)")
+            errorMessage = "위치 데이터를 불러오는데 실패했습니다."
+            showError = true
+        }
+        
+        isMarkersLoading = false
+        isLoading = false
+    }
+    
+    /// 특정 날짜에 해당 멤버의 활동이 있는지 확인
+    func hasActivityForMember(_ memberId: Int, on date: String) -> Bool {
+        guard let memberCount = memberDailyCounts.first(where: { $0.member_id == memberId }) else {
+            return false
+        }
+        
+        return memberCount.daily_counts.first(where: { $0.date == date })?.count ?? 0 > 0
+    }
+    
+    /// 14일 인덱스에서 날짜 문자열 반환
+    func dateStringForIndex(_ index: Int) -> String {
+        let calendar = Calendar.current
+        let today = Date()
+        let offset = 13 - index // 0 = 13일전, 13 = 오늘
+        
+        if let date = calendar.date(byAdding: .day, value: -offset, to: today) {
+            return DateFormatter.apiDateOnlyFormatter.string(from: date)
+        }
+        
+        return selectedDate
+    }
+    
+    /// 날짜가 선택된 날짜와 같은지 확인
+    func isDateSelected(_ date: String) -> Bool {
+        return date == selectedDate
+    }
+    
+    /// 날짜가 오늘인지 확인
+    func isToday(_ date: String) -> Bool {
+        let today = DateFormatter.apiDateOnlyFormatter.string(from: Date())
+        return date == today
+    }
+}
+
+
+
+struct ActivityLogSidebarView: View {
+    @ObservedObject var viewModel: ActivityLogViewModel
+    
+    @State private var isGroupSelectorOpen = false
+    
+    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header
+            sidebarHeader
+                .padding(.top, 20)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 16)
+            
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Group Selector
+                    groupSelectorSection
+                    
+                    // Member List
+                    memberListSection
+                }
+            }
+        }
+        .frame(width: 320)
+        .background(
+            Color(red: 245/255, green: 247/255, blue: 250/255)
+                .edgesIgnoringSafeArea(.all)
+        )
+        .cornerRadius(24, corners: [.topRight, .bottomRight])
+        .shadow(color: Color.black.opacity(0.15), radius: 20, x: 5, y: 0)
+    }
+    
+    // MARK: - Header
+    
+    private var sidebarHeader: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(brandColor)
+                    .frame(width: 40, height: 40)
+                Image(systemName: "person.fill")
+                    .foregroundColor(.white)
+            }
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text("로그 조회")
+                    .font(.suite(size: 20, weight: .bold))
+                Text("멤버를 선택해보세요")
+                    .font(.suite(size: 15))
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            Button(action: {
+                viewModel.closeSidebar()
+            }) {
+                Image(systemName: "xmark")
+                    .font(.suite(size: 16, weight: .medium))
+                    .foregroundColor(.gray)
+                    .frame(width: 32, height: 32)
+                    .background(Color.white.opacity(0.6))
+                    .clipShape(Circle())
+            }
+        }
+    }
+    
+    // MARK: - Group Selector
+    
+    private var groupSelectorSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Circle().fill(Color.red).frame(width: 8, height: 8)
+                Text("그룹 목록")
+                    .font(.suite(size: 16, weight: .bold))
+            }
+            
+            Menu {
+                ForEach(viewModel.groups) { group in
+                    Button(group.sgt_title ?? "이름 없음") {
+                        Task {
+                            await viewModel.selectGroupFromSidebar(group)
+                        }
+                    }
+                }
+            } label: {
+                HStack {
+                    Text(viewModel.selectedGroup?.sgt_title ?? "그룹 선택")
+                        .font(.suite(size: 17))
+                        .foregroundColor(.primary)
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .font(.suite(size: 15))
+                        .foregroundColor(.secondary)
+                }
+                .padding()
+                .background(RoundedRectangle(cornerRadius: 12).fill(Color.white))
+                .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 4)
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.gray.opacity(0.1), lineWidth: 1))
+            }
+        }
+        .padding(16)
+        .background(RoundedRectangle(cornerRadius: 16).fill(Color.white))
+        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.gray.opacity(0.1), lineWidth: 1))
+        .padding(.horizontal, 20)
+    }
+    
+    // MARK: - Member List
+    
+    private var memberListSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Circle().fill(Color.green).frame(width: 8, height: 8)
+                Text("멤버 목록")
+                    .font(.suite(size: 16, weight: .bold))
+                Spacer()
+                Text("\(viewModel.memberDailyCounts.count)명")
+                    .font(.suite(size: 14))
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(Color.secondary.opacity(0.1)))
+            }
+            
+            if viewModel.isDailyCountsLoading {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
+                }
+                .padding(.vertical, 20)
+            } else if viewModel.memberDailyCounts.isEmpty {
+                emptyMemberView
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(viewModel.memberDailyCounts) { member in
+                        ActivityLogMemberCell(
+                            member: member,
+                            isSelected: viewModel.selectedMemberId == member.member_id,
+                            selectedDate: viewModel.selectedDate,
+                            onMemberTap: {
+                                Task {
+                                    await viewModel.selectMember(member.member_id)
+                                }
+                            },
+                            onDateTap: { dateString in
+                                Task {
+                                    await viewModel.selectMemberAndDate(memberId: member.member_id, date: dateString)
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(RoundedRectangle(cornerRadius: 16).fill(Color.white))
+        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.gray.opacity(0.1), lineWidth: 1))
+        .padding(.horizontal, 20)
+        .padding(.bottom, 40)
+    }
+    
+    private var emptyMemberView: some View {
+        VStack(spacing: 12) {
+            Circle()
+                .fill(Color.gray.opacity(0.1))
+                .frame(width: 48, height: 48)
+                .overlay(
+                    Image(systemName: "person.fill")
+                        .foregroundColor(.gray)
+                )
+            
+            Text("그룹 멤버가 없습니다")
+                .font(.suite(size: 16, weight: .medium))
+                .foregroundColor(.gray)
+            
+            Text("그룹을 선택하거나 멤버를 초대해보세요")
+                .font(.suite(size: 14))
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 24)
+    }
+}
+
+// MARK: - Member Cell with Calendar
+
+struct ActivityLogMemberCell: View {
+    let member: MemberDailyCount
+    let isSelected: Bool
+    let selectedDate: String
+    let onMemberTap: () -> Void
+    let onDateTap: (String) -> Void
+    
+    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    private let pinkColor = Color(red: 236/255, green: 72/255, blue: 153/255)
+    private let indigoColor = Color(red: 99/255, green: 102/255, blue: 241/255)
+    
+    var body: some View {
+        Button(action: onMemberTap) {
+            HStack(spacing: 16) {
+                // Left: Avatar + Nickname
+                VStack(spacing: 8) {
+                    // Avatar
+                    ZStack {
+                        Group {
+                            if let url = getProfileImageUrl(member.member_photo) {
+                                AsyncImage(url: url) { phase in
+                                    switch phase {
+                                    case .success(let image):
+                                        image
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                    default:
+                                        defaultAvatar
+                                    }
+                                }
+                            } else {
+                                defaultAvatar
+                            }
+                        }
+                        .frame(width: 48, height: 48)
+                        .clipShape(Circle())
+                        .overlay(
+                            Circle().stroke(isSelected ? brandColor : Color.gray.opacity(0.1), lineWidth: isSelected ? 3 : 1)
+                        )
+                    } // End ZStack
+                    
+                    // Display Name (Nickname below Avatar)
+                    Text(member.displayName)
+                        .font(.suite(size: 14, weight: .medium))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                        .frame(width: 60) // Limit text width to align with avatar column
+                }
+                
+                // Right: 14-Day Calendar
+                calendarView
+            }
+            .padding(12)
+            .background(isSelected ? brandColor.opacity(0.05) : Color.white.opacity(0.6))
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(isSelected ? brandColor.opacity(0.3) : Color.clear, lineWidth: 1)
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+    
+    // MARK: - Calendar View
+    
+    private var calendarView: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            // Header
+            HStack {
+                Text("2주간 활동")
+                    .font(.suite(size: 13))
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text("\(member.activeDaysCount)/14일")
+                    .font(.suite(size: 13))
+                    .foregroundColor(.secondary)
+            }
+            
+            // Day of Week Headers
+            HStack(spacing: 6) {
+                ForEach(0..<7) { index in
+                    let dayInfo = getDayInfo(for: 13 - index)
+                    
+                    Text(dayInfo.dayOfWeek)
+                        .font(.suite(size: 11, weight: .bold))
+                        .foregroundColor(dayInfo.isWeekend ? (dayInfo.isSunday ? .red : .blue) : .gray)
+                        .frame(width: 16)
+                        .background(dayInfo.isWeekend ? (dayInfo.isSunday ? Color.red.opacity(0.1) : Color.blue.opacity(0.1)) : Color.gray.opacity(0.05))
+                        .cornerRadius(2)
+                }
+            }
+            
+            // First Row (7 days ago to 13 days ago)
+            HStack(spacing: 6) {
+                ForEach(0..<7) { col in
+                    let dayIndex = col  // 0-6: 13일전 ~ 7일전
+                    let offset = 13 - col
+                    let dateString = getDateString(daysAgo: offset)
+                    let hasActivity = member.activityDistribution[dayIndex]
+                    let isSelectedDate = dateString == selectedDate && isSelected
+                    let isToday = offset == 0
+                    
+                    CalendarDayCell(
+                        hasActivity: hasActivity,
+                        isSelected: isSelectedDate,
+                        isToday: isToday,
+                        onTap: hasActivity ? { onDateTap(dateString) } : nil
+                    )
+                }
+            }
+            
+            // Second Row (Today to 6 days ago)
+            HStack(spacing: 6) {
+                ForEach(0..<7) { col in
+                    let dayIndex = 7 + col  // 7-13: 6일전 ~ 오늘
+                    let offset = 6 - col
+                    let dateString = getDateString(daysAgo: offset)
+                    let hasActivity = member.activityDistribution[dayIndex]
+                    let isSelectedDate = dateString == selectedDate && isSelected
+                    let isToday = offset == 0
+                    
+                    CalendarDayCell(
+                        hasActivity: hasActivity,
+                        isSelected: isSelectedDate,
+                        isToday: isToday,
+                        onTap: hasActivity ? { onDateTap(dateString) } : nil
+                    )
+                }
+            }
+            
+            // Footer
+            HStack {
+                Text("1주전")
+                    .font(.suite(size: 12))
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text("오늘")
+                    .font(.suite(size: 12, weight: .semibold))
+                    .foregroundColor(indigoColor)
+            }
+        }
+        .padding(8)
+        .background(Color.gray.opacity(0.05))
+        .cornerRadius(8)
+    }
+    
+    // MARK: - Helpers
+    
+    private var defaultAvatar: some View {
+        Circle()
+            .fill(Color.gray.opacity(0.2))
+            .overlay(
+                Image(systemName: "person.fill")
+                    .foregroundColor(.gray)
+            )
+    }
+    
+    private func getProfileImageUrl(_ path: String?) -> URL? {
+        return AuthService.getProfileImageURL(path)
+    }
+    
+    private func getDateString(daysAgo: Int) -> String {
+        let calendar = Calendar.current
+        if let date = calendar.date(byAdding: .day, value: -daysAgo, to: Date()) {
+            return DateFormatter.apiDateOnlyFormatter.string(from: date)
+        }
+        return ""
+    }
+    
+    private func getDayInfo(for daysAgo: Int) -> (dayOfWeek: String, isWeekend: Bool, isSunday: Bool) {
+        let calendar = Calendar.current
+        if let date = calendar.date(byAdding: .day, value: -daysAgo, to: Date()) {
+            let weekday = calendar.component(.weekday, from: date)
+            let dayNames = ["S", "M", "T", "W", "T", "F", "S"]
+            let dayOfWeek = dayNames[weekday - 1]
+            let isWeekend = weekday == 1 || weekday == 7
+            let isSunday = weekday == 1
+            return (dayOfWeek, isWeekend, isSunday)
+        }
+        return ("", false, false)
+    }
+}
+
+// MARK: - Calendar Day Cell
+
+struct CalendarDayCell: View {
+    let hasActivity: Bool
+    let isSelected: Bool
+    let isToday: Bool
+    let onTap: (() -> Void)?
+    
+    private let pinkColor = Color(red: 236/255, green: 72/255, blue: 153/255)
+    private let indigoColor = Color(red: 99/255, green: 102/255, blue: 241/255)
+    
+    var body: some View {
+        Button(action: {
+            onTap?()
+        }) {
+            ZStack {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(colors: [pinkColor, Color(red: 244/255, green: 63/255, blue: 94/255)]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 4)
+                                .stroke(pinkColor.opacity(0.6), lineWidth: 1)
+                        )
+                        .shadow(color: pinkColor.opacity(0.3), radius: 2)
+                } else if hasActivity {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(indigoColor.opacity(0.8))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 4)
+                                .stroke(indigoColor.opacity(0.3), lineWidth: 0.5)
+                        )
+                } else {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.gray.opacity(0.1))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 4)
+                                .stroke(Color.gray.opacity(0.2), lineWidth: 0.5)
+                        )
+                }
+                
+                if isToday {
+                    Text("●")
+                        .font(.suite(size: 8))
+                        .foregroundColor(isSelected || hasActivity ? .white : .gray)
+                }
+            }
+            .frame(width: 16, height: 16)
+            .overlay(
+                isToday ?
+                RoundedRectangle(cornerRadius: 4)
+                    .stroke(indigoColor, lineWidth: 1.5)
+                : nil
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+        .disabled(onTap == nil)
+    }
+}
+
+
+
+// MARK: - Preview
+
+struct ActivityLogSidebarView_Previews: PreviewProvider {
+    static var previews: some View {
+        ActivityLogSidebarView(viewModel: ActivityLogViewModel())
+    }
+}
+
+
+// MARK: - ActivityLog Main View
+
+struct ActivityLogView: View {
+    @StateObject private var viewModel = ActivityLogViewModel()
+    
+    @State private var sidebarDragOffset: CGFloat = 0
+    @State private var isMapLoading = true  // 지도 로딩 상태
+    
+    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    private let sidebarWidth: CGFloat = 320
+    
+    var body: some View {
+        ZStack(alignment: .leading) {
+            // 1. Map Layer
+            ActivityLogMapView(
+                mapMarkers: viewModel.mapMarkers,
+                stayTimes: viewModel.stayTimes,
+                sliderValue: viewModel.sliderValue,
+                isSliderDragging: viewModel.isSliderDragging
+            )
+            .edgesIgnoringSafeArea(.all)
+            .offset(y: 60)
+            
+            // 2. Header
+            VStack {
+                ActivityLogHeaderView()
+                Spacer()
+            }
+            
+            // 3. Floating Info Card
+            if viewModel.selectedMemberId != nil {
+                VStack {
+                    ActivityLogFloatingCard(
+                        memberName: selectedMemberName,
+                        memberPhoto: selectedMemberPhoto,
+                        displayDate: viewModel.displayDate,
+                        distance: viewModel.formattedDistance,
+                        duration: viewModel.formattedDuration,
+                        steps: viewModel.formattedSteps,
+                        isLoading: viewModel.isLoading,
+                        onTap: {
+                            viewModel.toggleSidebar()
+                        }
+                    )
+                    .padding(.horizontal, 20)
+                    .padding(.top, 76)
+                    
+                    Spacer()
+                }
+            }
+            
+            // 4. Path Slider (Bottom Left)
+            if !viewModel.sortedMapMarkers.isEmpty {
+                VStack {
+                    Spacer()
+                    HStack {
+                        PathSliderView(
+                            sliderValue: $viewModel.sliderValue,
+                            isSliderDragging: $viewModel.isSliderDragging
+                        )
+                        .padding(.leading, 16)
+                        .padding(.bottom, 20) // adjusted from 90 to 20 to match LoginView version
+                        
+                        Spacer()
+                    }
+                }
+            }
+            
+            // 5. Sidebar Overlay
+            if viewModel.isSidebarOpen || sidebarDragOffset > 0 {
+                Color.black.opacity(overlayOpacity)
+                    .edgesIgnoringSafeArea(.all)
+                    .onTapGesture {
+                        viewModel.closeSidebar()
+                    }
+                    .transition(.opacity)
+            }
+            
+            // 6. Sidebar
+            ActivityLogSidebarView(viewModel: viewModel)
+                .frame(width: sidebarWidth)
+                .offset(x: sidebarOffset)
+                .gesture(sidebarDragGesture)
+                .zIndex(100)
+            
+            // 7. Edge Swipe Detection
+            if !viewModel.isSidebarOpen {
+                Color.clear
+                    .frame(width: 20)
+                    .contentShape(Rectangle())
+                    .gesture(edgeSwipeGesture)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            
+            // 8. FAB
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    FloatingActionLogButton(count: viewModel.memberDailyCounts.count) {
+                        viewModel.toggleSidebar()
+                    }
+                    .padding(.trailing, 20)
+                    .padding(.bottom, 20)
+                }
+            }
+            
+            // 9. Loading Overlay
+            if isMapLoading {
+                MapLoadingOverlay()
+                    .transition(AnyTransition.opacity)
+                    .zIndex(1000)
+            }
+        }
+        .onAppear {
+            handleLoading()
+        }
+        .navigationBarHidden(true)
+        .task {
+            // 초기 데이터 로드 (그룹 목록 + 첫 그룹 선택 + 일별 카운트)
+            await viewModel.loadInitialData()
+        }
+        .alert(isPresented: $viewModel.showError) {
+            Alert(
+                title: Text("오류"),
+                message: Text(viewModel.errorMessage ?? "알 수 없는 오류가 발생했습니다."),
+                dismissButton: .default(Text("확인"))
+            )
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("closeSidebars"))) { notification in
+            // 탭 전환 시 사이드바를 닫기
+            viewModel.closeSidebar()
+            
+            // 본인 탭(활동 로그 = 4)으로 전환될 때만 로딩 화면을 다시 표시
+            if let targetTab = notification.object as? Int, targetTab == 4 {
+                isMapLoading = true
+                handleLoading()
+            }
+        }
+        .onDisappear {
+            // 페이지를 벗어날 때 사이드바 자동 닫기 및 로딩 상태 리셋
+            viewModel.closeSidebar()
+            isMapLoading = true
+        }
+    }
+    
+    /// 지도 로딩 조절 로직 (최소 1.5초 및 데이터 완료 대기)
+    private func handleLoading() {
+        guard isMapLoading else { return }
+        
+        Task {
+            // 최소 1.5초 대기
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            
+            // 뷰모델 데이터 로딩 대기 (최대 5초)
+            var retryCount = 0
+            while viewModel.isLoading && retryCount < 25 {
+                try? await Task.sleep(nanoseconds: 200_000_000)
+                retryCount += 1
+            }
+            
+            withAnimation(.easeOut(duration: 0.3)) {
+                isMapLoading = false
+            }
+        }
+    }
+    
+    // MARK: - Computed Properties
+    
+    private var selectedMemberName: String {
+        guard let memberId = viewModel.selectedMemberId else { return "" }
+        return viewModel.memberDailyCounts.first { $0.member_id == memberId }?.displayName ?? ""
+    }
+    
+    private var selectedMemberPhoto: String? {
+        guard let memberId = viewModel.selectedMemberId else { return nil }
+        return viewModel.memberDailyCounts.first { $0.member_id == memberId }?.member_photo
+    }
+    
+    private var sidebarOffset: CGFloat {
+        if viewModel.isSidebarOpen {
+            return max(0, sidebarDragOffset)
+        } else {
+            return min(0, -sidebarWidth + sidebarDragOffset)
+        }
+    }
+    
+    private var overlayOpacity: Double {
+        let progress: Double
+        if viewModel.isSidebarOpen {
+            progress = 1.0 - Double(max(0, -sidebarDragOffset)) / Double(sidebarWidth)
+        } else {
+            progress = Double(sidebarDragOffset) / Double(sidebarWidth)
+        }
+        return 0.4 * max(0, min(1, progress))
+    }
+    
+    // MARK: - Gestures
+    
+    private var edgeSwipeGesture: some Gesture {
+        DragGesture()
+            .onChanged { value in
+                if value.translation.width > 0 {
+                    sidebarDragOffset = min(sidebarWidth, value.translation.width)
+                }
+            }
+            .onEnded { value in
+                if value.translation.width > sidebarWidth * 0.3 || value.predictedEndTranslation.width > sidebarWidth * 0.5 {
+                    viewModel.isSidebarOpen = true
+                    sidebarDragOffset = 0
+                } else {
+                    viewModel.isSidebarOpen = false
+                    sidebarDragOffset = 0
+                }
+            }
+    }
+    
+    private var sidebarDragGesture: some Gesture {
+        DragGesture()
+            .onChanged { value in
+                sidebarDragOffset = value.translation.width
+            }
+            .onEnded { value in
+                if viewModel.isSidebarOpen {
+                    if value.translation.width < -sidebarWidth * 0.3 || value.predictedEndTranslation.width < -sidebarWidth * 0.5 {
+                        viewModel.closeSidebar()
+                    }
+                }
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    sidebarDragOffset = 0
+                }
+            }
+    }
+}
+
+// MARK: - Header View
+
+struct ActivityLogHeaderView: View {
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("활동 로그")
+                    .font(.suite(size: 22, weight: .bold))
+                    .foregroundColor(.black)
+                Text("그룹 멤버들의 활동 기록을 확인해보세요")
+                    .font(.suite(size: 13))
+                    .foregroundColor(.gray)
+            }
+            
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(
+            Color.white.opacity(0.95)
+                .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+                .edgesIgnoringSafeArea(.top)
+        )
+    }
+}
+
+// MARK: - Floating Info Card
+
+struct ActivityLogFloatingCard: View {
+    let memberName: String
+    let memberPhoto: String?
+    let displayDate: String
+    let distance: String
+    let duration: String
+    let steps: String
+    let isLoading: Bool
+    let onTap: () -> Void
+    
+    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                // Member Info
+                HStack(spacing: 10) {
+                    // Avatar
+                    ZStack(alignment: .bottomTrailing) {
+                        Group {
+                            if let url = getProfileImageUrl(memberPhoto) {
+                                AsyncImage(url: url) { phase in
+                                    switch phase {
+                                    case .success(let image):
+                                        image
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                    default:
+                                        defaultAvatar
+                                    }
+                                }
+                            } else {
+                                defaultAvatar
+                            }
+                        }
+                        .frame(width: 36, height: 36)
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                        .shadow(color: Color.black.opacity(0.1), radius: 2)
+                        
+                        // Online indicator
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: 10, height: 10)
+                            .overlay(Circle().stroke(Color.white, lineWidth: 1.5))
+                            .offset(x: 2, y: 2)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 4) {
+                            Text(memberName)
+                                .font(.suite(size: 14, weight: .bold))
+                                .foregroundColor(.black)
+                            Text("의 기록")
+                                .font(.suite(size: 12))
+                                .foregroundColor(.gray)
+                        }
+                        
+                        Text(displayDate)
+                            .font(.suite(size: 12, weight: .medium))
+                            .foregroundColor(brandColor)
+                    }
+                }
+                
+                // Divider
+                Rectangle()
+                    .fill(Color.gray.opacity(0.2))
+                    .frame(width: 1, height: 32)
+                
+                // Stats
+                if isLoading {
+                    ProgressView()
+                        .frame(width: 100)
+                } else {
+                    HStack(spacing: 12) {
+                        StatItem(icon: "arrow.up.right", color: .red, value: distance)
+                        StatItem(icon: "clock", color: .yellow, value: duration)
+                        StatItem(icon: "figure.walk", color: .blue, value: steps)
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.white)
+                    .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 4)
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+    
+    private var defaultAvatar: some View {
+        Circle()
+            .fill(Color.gray.opacity(0.2))
+            .overlay(
+                Image(systemName: "person.fill")
+                    .foregroundColor(.gray)
+            )
+    }
+    
+    private func getProfileImageUrl(_ path: String?) -> URL? {
+        return AuthService.getProfileImageURL(path)
+    }
+}
+
 struct StatItem: View {
     let icon: String
     let color: Color
@@ -8038,5 +8464,540 @@ struct StatItem: View {
                 .minimumScaleFactor(0.8)
         }
         .frame(minWidth: 50)
+    }
+}
+
+// MARK: - Path Slider View
+
+struct PathSliderView: View {
+    @Binding var sliderValue: Double
+    @Binding var isSliderDragging: Bool
+    
+    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Header
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(brandColor)
+                    .frame(width: 20, height: 20)
+                    .overlay(
+                        Image(systemName: "play.fill")
+                            .font(.suite(size: 8))
+                            .foregroundColor(.white)
+                    )
+                
+                Text("경로 따라가기")
+                    .font(.suite(size: 14, weight: .bold))
+                    .foregroundColor(.black)
+            }
+            
+            // Slider
+            VStack(spacing: 8) {
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        // Track
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.gray.opacity(0.2))
+                            .frame(height: 8)
+                        
+                        // Progress
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(brandColor)
+                            .frame(width: max(0, geometry.size.width * CGFloat(sliderValue / 100)), height: 8)
+                        
+                        // Thumb
+                        Circle()
+                            .fill(brandColor)
+                            .frame(width: 20, height: 20)
+                            .overlay(
+                                Circle()
+                                    .fill(Color.white)
+                                    .frame(width: 6, height: 6)
+                            )
+                            .shadow(radius: 2)
+                            .offset(x: max(0, min(geometry.size.width - 20, geometry.size.width * CGFloat(sliderValue / 100) - 10)))
+                            .scaleEffect(isSliderDragging ? 1.2 : 1.0)
+                    }
+                    .frame(height: 24)
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                isSliderDragging = true
+                                let percentage = min(100, max(0, Double(value.location.x / geometry.size.width) * 100))
+                                sliderValue = percentage
+                            }
+                            .onEnded { _ in
+                                isSliderDragging = false
+                            }
+                    )
+                }
+                .frame(height: 24)
+                
+                // Labels
+                HStack {
+                    Text("시작")
+                        .font(.suite(size: 10))
+                        .foregroundColor(.gray)
+                    
+                    Spacer()
+                    
+                    Text("\(Int(sliderValue))%")
+                        .font(.suite(size: 10, weight: .semibold))
+                        .foregroundColor(brandColor)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .background(brandColor.opacity(0.1))
+                        .cornerRadius(8)
+                    
+                    Spacer()
+                    
+                    Text("종료")
+                        .font(.suite(size: 10))
+                        .foregroundColor(.gray)
+                }
+            }
+        }
+        .padding(12)
+        .frame(width: 210)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white.opacity(0.95))
+                .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
+        )
+    }
+}
+
+// MARK: - FAB
+
+struct FloatingActionLogButton: View {
+    let count: Int
+    let action: () -> Void
+    
+    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    private let pinkColor = Color(red: 236/255, green: 72/255, blue: 153/255)
+    
+    var body: some View {
+        Button(action: action) {
+            ZStack(alignment: .topTrailing) {
+                Circle()
+                    .fill(brandColor)
+                    .frame(width: 56, height: 56)
+                    .shadow(color: brandColor.opacity(0.3), radius: 12, x: 0, y: 8)
+                    .overlay(
+                        Image(systemName: "person.fill")
+                            .font(.suite(size: 22))
+                            .foregroundColor(.white)
+                    )
+                
+                if count > 0 {
+                    Text(count > 99 ? "99+" : "\(count)")
+                        .font(.suite(size: 12, weight: .bold))
+                        .foregroundColor(.white)
+                        .frame(minWidth: 24, minHeight: 24)
+                        .background(pinkColor)
+                        .clipShape(Circle())
+                        .offset(x: 4, y: -4)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Map View
+
+struct ActivityLogMapView: UIViewRepresentable {
+    let mapMarkers: [MapMarker]
+    let stayTimes: [StayTime]
+    let sliderValue: Double
+    let isSliderDragging: Bool
+    
+    private let rainbowColors: [UIColor] = [
+        UIColor(red: 255/255, green: 138/255, blue: 128/255, alpha: 1), // Pastel Red
+        UIColor(red: 255/255, green: 183/255, blue: 77/255, alpha: 1),  // Pastel Orange
+        UIColor(red: 255/255, green: 213/255, blue: 79/255, alpha: 1),  // Pastel Yellow
+        UIColor(red: 129/255, green: 199/255, blue: 132/255, alpha: 1), // Pastel Green
+        UIColor(red: 79/255, green: 195/255, blue: 247/255, alpha: 1),  // Pastel Blue
+        UIColor(red: 121/255, green: 134/255, blue: 203/255, alpha: 1), // Pastel Indigo
+        UIColor(red: 186/255, green: 104/255, blue: 200/255, alpha: 1)  // Pastel Violet
+    ]
+
+    func makeUIView(context: Context) -> NMFMapView {
+        let m = NMFMapView()
+        m.positionMode = .disabled
+        m.logoAlign = .leftBottom
+        m.zoomLevel = 15
+        
+        // 사용자의 현재 위치로 초기화
+        let lastLocation = LocationService.sharedInstance.getLastLocation()
+        if lastLocation.coordinate.latitude != 0.0 && lastLocation.coordinate.longitude != 0.0 {
+            let initialPosition = NMGLatLng(lat: lastLocation.coordinate.latitude, lng: lastLocation.coordinate.longitude)
+            m.moveCamera(NMFCameraUpdate(scrollTo: initialPosition))
+            print("📍 [ActivityLogMapView] Using device location: (\(lastLocation.coordinate.latitude), \(lastLocation.coordinate.longitude))")
+        } else {
+            print("📍 [ActivityLogMapView] No device location, using default")
+        }
+        
+        return m
+    }
+    
+    func updateUIView(_ mapView: NMFMapView, context: Context) {
+        // 1. Data Processing
+        let sorted = mapMarkers.sorted { ($0.mlt_gps_time ?? "") < ($1.mlt_gps_time ?? "") }
+        
+        var validMarkers: [MapMarker] = []
+        var coords: [NMGLatLng] = []
+        for marker in sorted {
+            if marker.latitude != 0 && marker.longitude != 0 {
+                validMarkers.append(marker)
+                coords.append(NMGLatLng(lat: marker.latitude, lng: marker.longitude))
+            }
+        }
+        
+        // 2. Path Drawing (Only if data changed)
+        if context.coordinator.lastMapMarkersCount != mapMarkers.count || context.coordinator.lastMapMarkersCount == 0 {
+            context.coordinator.clearOverlays()
+            context.coordinator.lastMapMarkersCount = mapMarkers.count
+            
+            print("📍 [ActivityLogMapView] Redrawing path. Markers: \(validMarkers.count)")
+            
+            // Draw Gradient Path
+            if coords.count >= 2 {
+                for i in 0..<(coords.count - 1) {
+                    let start = coords[i]
+                    let end = coords[i+1]
+                    
+                    let progress = Double(i) / Double(coords.count - 1)
+                    let colorIndex = Int(progress * Double(rainbowColors.count - 1))
+                    let nextColorIndex = min(colorIndex + 1, rainbowColors.count - 1)
+                    let segmentProgress = (progress * Double(rainbowColors.count - 1)) - Double(colorIndex)
+                    
+                    let color1 = rainbowColors[colorIndex]
+                    let color2 = rainbowColors[nextColorIndex]
+                    let interpolatedColor = interpolateColor(color1: color1, color2: color2, factor: CGFloat(segmentProgress))
+                    
+                    let line = NMFPolylineOverlay([start, end])
+                    line?.color = interpolatedColor
+                    line?.width = 6
+                    line?.mapView = mapView
+                    if let line = line {
+                        context.coordinator.polylines.append(line)
+                    }
+                }
+                
+                // Draw Path Dots
+                for i in 0..<coords.count {
+                    let progress = Double(i) / Double(coords.count - 1)
+                    let colorIndex = Int(progress * Double(rainbowColors.count - 1))
+                    let nextColorIndex = min(colorIndex + 1, rainbowColors.count - 1)
+                    let segmentProgress = (progress * Double(rainbowColors.count - 1)) - Double(colorIndex)
+                    
+                    let color1 = rainbowColors[colorIndex]
+                    let color2 = rainbowColors[nextColorIndex]
+                    let interpolatedColor = interpolateColor(color1: color1, color2: color2, factor: CGFloat(segmentProgress))
+                    
+                    let dot = NMFMarker()
+                    dot.position = coords[i]
+                    dot.iconImage = NMFOverlayImage(image: generatePathDotImage(color: interpolatedColor))
+                    dot.width = 8
+                    dot.height = 8
+                    dot.anchor = CGPoint(x: 0.5, y: 0.5)
+                    dot.mapView = mapView
+                    context.coordinator.pathDotMarkers.append(dot)
+                }
+                
+                // Draw Arrows
+                for i in 0..<(coords.count - 1) {
+                    if i % 3 == 0, i + 1 < coords.count {
+                        let start = coords[i]
+                        let end = coords[i+1]
+                        
+                        let dLon = (end.lng - start.lng) * .pi / 180
+                        let y = sin(dLon) * cos(end.lat * .pi / 180)
+                        let x = cos(start.lat * .pi / 180) * sin(end.lat * .pi / 180) - sin(start.lat * .pi / 180) * cos(end.lat * .pi / 180) * cos(dLon)
+                        var heading = atan2(y, x) * 180 / .pi
+                        if heading < 0 { heading += 360 }
+                        
+                        let progress = Double(i) / Double(coords.count - 1)
+                        let colorIndex = Int(progress * Double(rainbowColors.count - 1))
+                        let nextColorIndex = min(colorIndex + 1, rainbowColors.count - 1)
+                        let segmentProgress = (progress * Double(rainbowColors.count - 1)) - Double(colorIndex)
+                        
+                        let color1 = rainbowColors[colorIndex]
+                        let color2 = rainbowColors[nextColorIndex]
+                        let interpolatedColor = interpolateColor(color1: color1, color2: color2, factor: CGFloat(segmentProgress))
+                        
+                        let arrow = NMFMarker()
+                        arrow.position = NMGLatLng(lat: (start.lat + end.lat)/2, lng: (start.lng + end.lng)/2)
+                        arrow.iconImage = NMFOverlayImage(image: generateArrowImage(color: interpolatedColor))
+                        arrow.angle = heading
+                        arrow.width = 12
+                        arrow.height = 12
+                        arrow.anchor = CGPoint(x: 0.5, y: 0.5)
+                        arrow.mapView = mapView
+                        context.coordinator.arrowMarkers.append(arrow)
+                    }
+                }
+            }
+            
+            // Draw Start/End Markers
+            if let first = validMarkers.first {
+                let m = NMFMarker()
+                m.position = NMGLatLng(lat: first.latitude, lng: first.longitude)
+                m.iconImage = NMFOverlayImage(image: generateStartEndMarkerImage(text: "S", color: UIColor(red: 34/255, green: 197/255, blue: 94/255, alpha: 1)))
+                m.width = 24
+                m.height = 24
+                m.anchor = CGPoint(x: 0.5, y: 0.5)
+                m.mapView = mapView
+                context.coordinator.markers.append(m)
+                
+                let cameraUpdate = NMFCameraUpdate(scrollTo: NMGLatLng(lat: first.latitude, lng: first.longitude))
+                cameraUpdate.animation = .fly
+                mapView.moveCamera(cameraUpdate)
+            }
+            
+            if let last = validMarkers.last {
+                let m = NMFMarker()
+                m.position = NMGLatLng(lat: last.latitude, lng: last.longitude)
+                m.iconImage = NMFOverlayImage(image: generateStartEndMarkerImage(text: "E", color: UIColor(red: 239/255, green: 68/255, blue: 68/255, alpha: 1)))
+                m.width = 24
+                m.height = 24
+                m.anchor = CGPoint(x: 0.5, y: 0.5)
+                m.mapView = mapView
+                context.coordinator.markers.append(m)
+            }
+            
+            // Stay Markers
+            for (index, stay) in stayTimes.enumerated() {
+                if stay.stayLatitude != 0 && stay.stayLongitude != 0 {
+                    let m = NMFMarker()
+                    m.position = NMGLatLng(lat: stay.stayLatitude, lng: stay.stayLongitude)
+                    
+                    let durationForColor = stay.duration
+                    var color = UIColor(red: 34/255, green: 197/255, blue: 94/255, alpha: 1)
+                    var size: CGFloat = 26
+                    
+                    if durationForColor >= 300 { 
+                        color = UIColor(red: 220/255, green: 38/255, blue: 38/255, alpha: 1); size = 40
+                    } else if durationForColor >= 120 {
+                        color = UIColor(red: 234/255, green: 88/255, blue: 12/255, alpha: 1); size = 36
+                    } else if durationForColor >= 60 {
+                        color = UIColor(red: 245/255, green: 158/255, blue: 11/255, alpha: 1); size = 32
+                    } else if durationForColor >= 30 {
+                        color = UIColor(red: 234/255, green: 179/255, blue: 8/255, alpha: 1); size = 28
+                    }
+                    
+                    let markerResult = generateStayMarkerImage(number: index + 1, duration: stay.formattedDuration, color: color, size: size)
+                    
+                    m.iconImage = NMFOverlayImage(image: markerResult.image)
+                    m.width = CGFloat(markerResult.image.size.width)
+                    m.height = CGFloat(markerResult.image.size.height)
+                    m.anchor = markerResult.anchor
+                    
+                    m.mapView = mapView
+                    context.coordinator.stayMarkers.append(m)
+                }
+            }
+        }
+        
+        // 3. Current Position Marker & Camera
+        if !validMarkers.isEmpty {
+            let index = Int(Double(validMarkers.count - 1) * sliderValue / 100.0)
+            let curr = validMarkers[max(0, min(index, validMarkers.count - 1))]
+            
+            context.coordinator.currentPositionMarker?.mapView = nil
+            
+            let m = NMFMarker()
+            m.position = NMGLatLng(lat: curr.latitude, lng: curr.longitude)
+            
+            let speedKmh = curr.speed * 3.6
+            var iconName = "figure.stand"
+            if speedKmh >= 30 { iconName = "car.fill" }
+            else if speedKmh >= 15 { iconName = "figure.run" }
+            else if speedKmh >= 3 { iconName = "figure.walk" }
+            
+            m.iconImage = NMFOverlayImage(image: generateIconImage(systemName: iconName, color: UIColor(red: 1/255, green: 19/255, blue: 163/255, alpha: 1)))
+            m.width = 30
+            m.height = 30
+            m.zIndex = 1000
+            m.mapView = mapView
+            context.coordinator.currentPositionMarker = m
+            
+            let cameraUpdate = NMFCameraUpdate(scrollTo: NMGLatLng(lat: curr.latitude, lng: curr.longitude))
+            cameraUpdate.animation = .none
+            mapView.moveCamera(cameraUpdate)
+        }
+    }
+    
+    private func interpolateColor(color1: UIColor, color2: UIColor, factor: CGFloat) -> UIColor {
+        var r1: CGFloat=0, g1: CGFloat=0, b1: CGFloat=0, a1: CGFloat=0
+        var r2: CGFloat=0, g2: CGFloat=0, b2: CGFloat=0, a2: CGFloat=0
+        color1.getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
+        color2.getRed(&r2, green: &g2, blue: &b2, alpha: &a2)
+        return UIColor(
+            red: r1 + (r2 - r1) * factor,
+            green: g1 + (g2 - g1) * factor,
+            blue: b1 + (b2 - b1) * factor,
+            alpha: 1.0
+        )
+    }
+    
+    func makeCoordinator() -> Coordinator { Coordinator() }
+    
+    private func generateArrowImage(color: UIColor) -> UIImage {
+        let size = CGSize(width: 20, height: 20)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { ctx in
+            let path = UIBezierPath()
+            path.move(to: CGPoint(x: 10, y: 0))
+            path.addLine(to: CGPoint(x: 20, y: 20))
+            path.addLine(to: CGPoint(x: 10, y: 15))
+            path.addLine(to: CGPoint(x: 0, y: 20))
+            path.close()
+            color.setFill()
+            path.fill()
+        }
+    }
+    
+    private func generatePathDotImage(color: UIColor) -> UIImage {
+        let size = CGSize(width: 8, height: 8)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { ctx in
+            let path = UIBezierPath(ovalIn: CGRect(x: 0, y: 0, width: 8, height: 8))
+            color.setFill()
+            path.fill()
+            let borderPath = UIBezierPath(ovalIn: CGRect(x: 0.5, y: 0.5, width: 7, height: 7))
+            UIColor.white.setStroke()
+            borderPath.lineWidth = 1.0
+            borderPath.stroke()
+        }
+    }
+    
+    private func generateStayMarkerImage(number: Int, duration: String, color: UIColor, size: CGFloat = 30) -> (image: UIImage, anchor: CGPoint) {
+        let bubbleFont = UIFont(name: "SUITE-Medium", size: 11) ?? UIFont.systemFont(ofSize: 11, weight: .medium)
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.alignment = .center
+        let bubbleAttrs: [NSAttributedString.Key: Any] = [
+            .font: bubbleFont,
+            .foregroundColor: UIColor.white,
+            .paragraphStyle: paragraphStyle
+        ]
+        let bubbleSizeCalc = duration.size(withAttributes: bubbleAttrs)
+        let bubblePaddingH: CGFloat = 12
+        let bubblePaddingV: CGFloat = 4
+        let bubbleW = bubbleSizeCalc.width + bubblePaddingH
+        let bubbleH = bubbleSizeCalc.height + bubblePaddingV
+        let margin: CGFloat = 10
+        let markerX: CGFloat = margin
+        let initialMarkerY: CGFloat = margin + bubbleH/2 
+        let bubbleX = markerX + size - 10
+        let bubbleBottom = initialMarkerY + 8
+        let bubbleY = bubbleBottom - bubbleH
+        let yShift = max(0, margin - bubbleY)
+        let finalMarkerY = initialMarkerY + yShift
+        let finalBubbleY = bubbleY + yShift
+        let canvasW = bubbleX + bubbleW + margin
+        let canvasH = max(finalMarkerY + size + margin, finalBubbleY + bubbleH + margin)
+        let canvasSize = CGSize(width: canvasW, height: canvasH)
+        let renderer = UIGraphicsImageRenderer(size: canvasSize)
+        let image = renderer.image { ctx in
+            let bubbleRect = CGRect(x: bubbleX, y: finalBubbleY, width: bubbleW, height: bubbleH)
+            let bubblePath = UIBezierPath(roundedRect: bubbleRect, cornerRadius: 6)
+            UIColor(red: 31/255, green: 41/255, blue: 55/255, alpha: 1).setFill()
+            bubblePath.fill()
+            let textRect = CGRect(x: bubbleRect.minX, y: bubbleRect.minY + (bubbleRect.height - bubbleSizeCalc.height) / 2, width: bubbleRect.width, height: bubbleSizeCalc.height)
+            duration.draw(in: textRect, withAttributes: bubbleAttrs)
+            let markerRect = CGRect(x: markerX, y: finalMarkerY, width: size, height: size)
+            let circlePath = UIBezierPath(ovalIn: markerRect)
+            color.setFill()
+            circlePath.fill()
+            let borderRect = markerRect.insetBy(dx: 1.5, dy: 1.5)
+            let borderPath = UIBezierPath(ovalIn: borderRect)
+            UIColor.white.setStroke()
+            borderPath.lineWidth = 3
+            borderPath.stroke()
+            let numberStr = "\(number)"
+            let numberFont = UIFont(name: "SUITE-Bold", size: 12) ?? UIFont.boldSystemFont(ofSize: 12)
+            let numberAttrs: [NSAttributedString.Key: Any] = [.font: numberFont, .foregroundColor: UIColor.white, .paragraphStyle: paragraphStyle]
+            let numberSize = numberStr.size(withAttributes: numberAttrs)
+            let numberRect = CGRect(x: markerRect.midX - numberSize.width/2, y: markerRect.midY - numberSize.height/2, width: numberSize.width, height: numberSize.height)
+            numberStr.draw(in: numberRect, withAttributes: numberAttrs)
+        }
+        let anchorX = (markerX + size/2) / canvasSize.width
+        let anchorY = (finalMarkerY + size/2) / canvasSize.height
+        return (image: image, anchor: CGPoint(x: anchorX, y: anchorY))
+    }
+    
+    private func generateIconImage(systemName: String, color: UIColor) -> UIImage {
+        let config = UIImage.SymbolConfiguration(pointSize: 18, weight: .bold)
+        guard let image = UIImage(systemName: systemName, withConfiguration: config)?.withTintColor(color, renderingMode: .alwaysOriginal) else { return UIImage() }
+        let size = CGSize(width: 30, height: 30)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { ctx in
+            let circleRect = CGRect(x: 1, y: 1, width: 28, height: 28)
+            let circlePath = UIBezierPath(ovalIn: circleRect)
+            UIColor.white.setFill()
+            circlePath.fill()
+            let iconRect = CGRect(x: 5, y: 5, width: 20, height: 20)
+            image.draw(in: iconRect)
+            color.setStroke()
+            circlePath.lineWidth = 2
+            circlePath.stroke()
+        }
+    }
+    
+    private func generateStartEndMarkerImage(text: String, color: UIColor) -> UIImage {
+        let size = CGSize(width: 24, height: 24)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { ctx in
+            let rect = CGRect(x: 2, y: 2, width: 20, height: 20)
+            let path = UIBezierPath(ovalIn: rect)
+            color.setFill()
+            path.fill()
+            UIColor.white.setStroke()
+            path.lineWidth = 2
+            path.stroke()
+            let paragraphStyle = NSMutableParagraphStyle()
+            paragraphStyle.alignment = .center
+            let attrs: [NSAttributedString.Key: Any] = [.font: UIFont.boldSystemFont(ofSize: 10), .foregroundColor: UIColor.white, .paragraphStyle: paragraphStyle]
+            let textSize = text.size(withAttributes: attrs)
+            let textRect = CGRect(x: (24 - textSize.width)/2, y: (24 - textSize.height)/2, width: textSize.width, height: textSize.height)
+            text.draw(in: textRect, withAttributes: attrs)
+        }
+    }
+
+    class Coordinator: NSObject {
+        var markers: [NMFMarker] = []
+        var stayMarkers: [NMFMarker] = []
+        var arrowMarkers: [NMFMarker] = []
+        var pathDotMarkers: [NMFMarker] = []
+        var polylines: [NMFPolylineOverlay] = []
+        var currentPositionMarker: NMFMarker?
+        var lastMapMarkersCount: Int = 0
+        
+        func clearOverlays() {
+            markers.forEach { $0.mapView = nil }
+            markers.removeAll()
+            stayMarkers.forEach { $0.mapView = nil }
+            stayMarkers.removeAll()
+            arrowMarkers.forEach { $0.mapView = nil }
+            arrowMarkers.removeAll()
+            pathDotMarkers.forEach { $0.mapView = nil }
+            pathDotMarkers.removeAll()
+            polylines.forEach { $0.mapView = nil }
+            polylines.removeAll()
+            currentPositionMarker?.mapView = nil
+            currentPositionMarker = nil
+            lastMapMarkersCount = 0
+        }
+    }
+}
+
+// MARK: - Preview
+
+struct ActivityLogView_Previews: PreviewProvider {
+    static var previews: some View {
+        ActivityLogView()
     }
 }

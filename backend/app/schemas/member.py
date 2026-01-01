@@ -98,6 +98,7 @@ class RegisterRequest(BaseModel):
     mt_agree3: bool
     mt_agree4: Optional[bool] = False
     mt_agree5: Optional[bool] = False
+    mt_token_id: Optional[str] = None  # FCM 토큰
     mt_push1: Optional[bool] = True
     mt_lat: Optional[float] = None
     mt_long: Optional[float] = None

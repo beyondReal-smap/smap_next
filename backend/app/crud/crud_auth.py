@@ -158,35 +158,61 @@ def get_hashed_password(password: str) -> str:
 
 def create_user(db: Session, user_in: RegisterRequest) -> Member:
     """새로운 사용자를 생성합니다."""
-    hashed_password = get_hashed_password(user_in.mt_pwd)
+    import random
+    
+    # 비밀번호 해싱 (있는 경우에만)
+    hashed_password = None
+    if user_in.mt_pwd:
+        hashed_password = get_hashed_password(user_in.mt_pwd)
+        
+    # mt_hp (전화번호) 처리 - mt_id가 전화번호 형식이면 mt_hp로 사용
+    mt_hp_val = ""
+    clean_id = user_in.mt_id.replace("-", "")
+    if clean_id.isdigit():
+        mt_hp_val = clean_id
+    
+    # 프로필 이미지 처리 - mt_file1 컬럼이 50자 제한이므로 긴 URL은 랜덤 아바타로 대체
+    profile_image = user_in.mt_file1
+    if profile_image and len(profile_image) > 50:
+        # 외부 URL이 너무 길면 로컬 아바타 사용
+        avatar_number = random.randint(1, 7)
+        profile_image = f"/images/avatar{avatar_number}.png"
+    elif not profile_image:
+        # 프로필 이미지가 없으면 랜덤 아바타 선택
+        avatar_number = random.randint(1, 7)
+        profile_image = f"/images/avatar{avatar_number}.png"
+        
     db_user = Member(
-        mt_id=user_in.mt_id.replace("-", ""), # 하이픈 제거
+        mt_id=clean_id, # 하이픈 제거
         mt_pwd=hashed_password,
         mt_name=user_in.mt_name,
         mt_email=user_in.mt_email,
-        mt_hp=user_in.mt_hp.replace("-", ""), # 하이픈 제거
-        mt_type=1,  # 기본값: 일반회원
-        mt_level=2, # 기본값: 일반(무료)
-        mt_status=1, # 기본값: 정상
+        mt_nickname=user_in.mt_nickname,
+        mt_hp=mt_hp_val, # mt_hp 설정
+        mt_type=user_in.mt_type or 1,
+        mt_level=user_in.mt_level or 2, # 기본값: 일반(무료)
+        mt_status=user_in.mt_status or 1, # 기본값: 정상
         mt_show='Y', # 기본값: 노출
         mt_wdate=datetime.utcnow(), # 등록일시
         mt_ldate=datetime.utcnow(), # 마지막 로그인 일시 (회원가입 시 현재로)
-        mt_agree1='Y', # 필수 약관 동의로 가정 (실제로는 요청에서 받아야 함)
-        mt_agree2='Y',
-        mt_agree3='Y',
-        # ... 기타 필요한 기본값 설정 ...
+        mt_agree1='Y' if user_in.mt_agree1 else 'N',
+        mt_agree2='Y' if user_in.mt_agree2 else 'N',
+        mt_agree3='Y' if user_in.mt_agree3 else 'N',
+        mt_agree4='Y' if user_in.mt_agree4 else 'N',
+        mt_agree5='Y' if user_in.mt_agree5 else 'N',
+        mt_google_id=user_in.mt_google_id,
+        mt_kakao_id=user_in.mt_kakao_id,
+        mt_apple_id=user_in.mt_apple_id,
+        mt_birth=datetime.strptime(user_in.mt_birth, '%Y-%m-%d').date() if user_in.mt_birth else None,
+        mt_gender=user_in.mt_gender,
+        mt_file1=profile_image,
+        mt_lat=getattr(user_in, 'mt_lat', None) or 37.5642,
+        mt_long=getattr(user_in, 'mt_long', None) or 127.0016,
+        mt_token_id=getattr(user_in, 'mt_token_id', None)
     )
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
-    # FCM 토큰 자동 업데이트 제거 - Swift에서 명시적 요청 시에만 업데이트
-    # try:
-    #     if getattr(user_in, 'fcm_token', None):
-    #         db_user.mt_token_id = user_in.fcm_token
-    #         db.commit()
-    #         db.refresh(db_user)
-    # except Exception:
-    #     db.rollback()
     return db_user
 
 def create_kakao_user(db: Session, kakao_data) -> Member:

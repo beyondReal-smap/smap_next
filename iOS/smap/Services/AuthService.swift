@@ -110,7 +110,7 @@ class AuthService: ObservableObject {
             UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: loginTimeKey)
             
             // 🆕 기존 Native 코드 및 WebView 호환성을 위한 키 설정
-            let mtIdx = String(user.mt_idx)
+            let mtIdx = String(user.mt_idx ?? 0)
             UserDefaults.standard.set(mtIdx, forKey: "mt_idx")
             UserDefaults.standard.set(user.mt_id, forKey: "mt_id")
             UserDefaults.standard.set(user.mt_name, forKey: "mt_name")
@@ -355,7 +355,7 @@ class AuthService: ObservableObject {
     // MARK: - Registration
     
     /// 회원가입
-    func register(request: RegisterRequest) async throws -> UserIdentity {
+    func register(request: RegisterRequest) async throws -> LoginResponse {
         let url = URL(string: "\(baseURL)/auth/register")!
         
         print("📤 [AuthService] 회원가입 요청: \(request.mt_id)")
@@ -380,16 +380,20 @@ class AuthService: ObservableObject {
         let decoder = JSONDecoder()
         
         if httpResponse.statusCode == 201 {
-            let userIdentity = try decoder.decode(UserIdentity.self, from: data)
+            let loginResponse = try decoder.decode(LoginResponse.self, from: data)
             
-            // 회원가입 성공 후 자동 로그인 처리를 위해 데이터 저장
-            // 토큰은 응답에 포함되지 않을 수 있으므로 (UserIdentity만 반환됨),
-            // 별도 로그인 과정을 거치거나, 백엔드에서 토큰을 같이 주도록 수정이 필요할 수 있음.
-            // 현재 백엔드(auth.py) 코드를 보면 UserIdentity만 리턴함.
-            // 따라서 가입 후 바로 로그인이 안될 수 있음. -> 로그인 화면으로 이동하거나, 별도 로그인 호출 필요.
-            // User schema (backend/app/api/v1/endpoints/auth.py @router.post("/register")) returns UserIdentity.
+            // 토큰 및 사용자 정보 저장 (Backend가 이제 토큰을 반환하므로 즉시 로그인 처리)
+            if let data = loginResponse.data, let token = data.token {
+                saveToken(token)
+                print("✅ [AuthService] 회원가입 후 토큰 저장 완료")
+                
+                if let user = data.user {
+                    saveUserData(user)
+                    print("✅ [AuthService] 회원가입 후 사용자 정보 저장 완료: \(user.displayName)")
+                }
+            }
             
-            return userIdentity
+            return loginResponse
         } else {
             if let errorResponse = try? decoder.decode(APIError.self, from: data) {
                 throw errorResponse
@@ -620,7 +624,7 @@ class AuthService: ObservableObject {
     // MARK: - FCM Token
     
     /// 저장된 FCM 토큰 조회
-    private func getFCMToken() -> String? {
+    func getFCMToken() -> String? {
         return UserDefaults.standard.string(forKey: "fcm_token")
     }
 }

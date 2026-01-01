@@ -1,5 +1,5 @@
 # Uncomment the next line to define a global platform for your project
-platform :ios, '13.0'
+platform :ios, '15.0'
 inhibit_all_warnings!
 
 target 'smap' do
@@ -47,7 +47,7 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     target.build_configurations.each do |config|
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
       # Swift 6 언어 모드로 인한 Pods 빌드 오류 방지: Swift 5 모드 강제
       config.build_settings['SWIFT_VERSION'] = '5.9'
       # 엄격 동시성 수준 완화(서드파티 라이브러리 호환 목적)

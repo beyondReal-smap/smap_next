@@ -336,11 +336,26 @@ async def login_for_access_token_custom(
         user=user_identity
     )
 
-@router.post("/register", response_model=UserIdentity, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=LoginResponseHome, status_code=status.HTTP_201_CREATED)
 async def register_user(
-    user_in: RegisterRequest,
+    request: Request,
     db: Session = Depends(get_db)
 ):
+    # 요청 본문 로깅
+    try:
+        body = await request.json()
+        logger.info(f"📝 Register request body: {body}")
+    except Exception as e:
+        logger.error(f"❌ Failed to parse request body: {e}")
+        raise HTTPException(status_code=400, detail="Invalid request body")
+    
+    # 수동으로 RegisterRequest 생성
+    try:
+        user_in = RegisterRequest(**body)
+    except Exception as e:
+        logger.error(f"❌ Pydantic validation error: {e}")
+        raise HTTPException(status_code=422, detail=f"Validation error: {str(e)}")
+    
     existing_user_by_phone = crud_auth.get_user_by_phone(db, user_in.mt_id.replace("-", ""))
     if existing_user_by_phone:
         raise HTTPException(
@@ -357,13 +372,65 @@ async def register_user(
     
     try:
         created_user = crud_auth.create_user(db=db, user_in=user_in)
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="사용자 생성 중 오류가 발생했습니다."
+        
+        # 토큰 생성
+        access_token = create_access_token(
+            data={
+                "mt_idx": created_user.mt_idx,
+                "mt_id": created_user.mt_id,
+                "mt_name": created_user.mt_name
+            }
+        )
+        
+        # 사용자 정보 구성 (login_for_home_page와 동일)
+        user_data = {
+            "mt_idx": created_user.mt_idx,
+            "mt_type": created_user.mt_type or 1,
+            "mt_level": created_user.mt_level or 2,
+            "mt_status": created_user.mt_status or 1,
+            "mt_id": created_user.mt_id or "",
+            "mt_name": created_user.mt_name or "",
+            "mt_nickname": created_user.mt_nickname or "",
+            "mt_hp": created_user.mt_hp or "",
+            "mt_email": created_user.mt_email or "",
+            "mt_birth": created_user.mt_birth.isoformat() if created_user.mt_birth else None,
+            "mt_gender": created_user.mt_gender or 1,
+            "mt_file1": created_user.mt_file1 or "",
+            "mt_lat": float(created_user.mt_lat) if created_user.mt_lat else 37.5642,
+            "mt_long": float(created_user.mt_long) if created_user.mt_long else 127.0016,
+            "mt_sido": created_user.mt_sido or "",
+            "mt_gu": created_user.mt_gu or "",
+            "mt_dong": created_user.mt_dong or "",
+            "mt_onboarding": created_user.mt_onboarding or 'Y',
+            "mt_plan_check": created_user.mt_plan_check or 'N',
+            "mt_plan_date": created_user.mt_plan_date.isoformat() if created_user.mt_plan_date else "",
+            "mt_weather_pop": created_user.mt_weather_pop or "",
+            "mt_weather_sky": created_user.mt_weather_sky or 8,
+            "mt_weather_tmn": created_user.mt_weather_tmn or 18,
+            "mt_weather_tmx": created_user.mt_weather_tmx or 25,
+            "mt_weather_date": created_user.mt_weather_date.isoformat() if created_user.mt_weather_date else datetime.utcnow().isoformat(),
+            "mt_wdate": created_user.mt_wdate.isoformat() if created_user.mt_wdate else datetime.utcnow().isoformat(),
+            "mt_ldate": created_user.mt_ldate.isoformat() if created_user.mt_ldate else datetime.utcnow().isoformat(),
+            "mt_adate": created_user.mt_adate.isoformat() if created_user.mt_adate else datetime.utcnow().isoformat()
+        }
+        
+        return LoginResponseHome(
+            success=True,
+            message="회원가입 성공",
+            data={
+                "token": access_token,
+                "user": user_data
+            }
         )
 
-    return crud_auth.create_user_identity_from_member(created_user)
+    except Exception as e:
+        import traceback
+        logger.error(f"Registration Error: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"사용자 생성 중 오류가 발생했습니다: {str(e)}"
+        )
 
 @router.get("/me", response_model=UserIdentity)
 async def read_users_me(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):

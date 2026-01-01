@@ -36,9 +36,9 @@ struct LoginData: Codable {
 
 /// 사용자 정보 모델 (KakaoSDKUser.User와 충돌 방지를 위해 SMAPUser로 명명)
 struct SMAPUser: Codable, Identifiable {
-    var id: Int { mt_idx }
+    var id: Int { mt_idx ?? 0 }
     
-    let mt_idx: Int
+    let mt_idx: Int?  // Changed to optional Int
     let mt_id: String?           // 전화번호
     let mt_name: String?         // 이름
     let mt_nickname: String?     // 닉네임
@@ -57,7 +57,7 @@ struct SMAPUser: Codable, Identifiable {
     
     /// 명시적 멤버와이즈 이니셜라이저 (프로필 이미지 업데이트 등에 필요)
     init(
-        mt_idx: Int,
+        mt_idx: Int?,
         mt_id: String? = nil,
         mt_name: String? = nil,
         mt_nickname: String? = nil,
@@ -454,6 +454,8 @@ struct RegisterRequest: Codable {
     var mt_google_id: String?
     var mt_kakao_id: String?
     var mt_apple_id: String?
+    
+    var mt_token_id: String? = nil // FCM Token
 }
 
 struct UserIdentity: Codable {

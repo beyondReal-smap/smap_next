@@ -157,6 +157,9 @@ class LoginViewModel: ObservableObject {
         errorMessage = nil
         
         // dispatchQueue를 사용한 비동기 처리
+        let currentPhoneNumber = phoneNumber
+        let currentPassword = password
+        
         DispatchQueue.global(qos: .userInitiated).async {
             let semaphore = DispatchSemaphore(value: 0)
             var loginResponse: LoginResponse?
@@ -166,8 +169,8 @@ class LoginViewModel: ObservableObject {
                 Task {
                     do {
                         loginResponse = try await self.authService.login(
-                            phoneNumber: self.phoneNumber,
-                            password: self.password
+                            phoneNumber: currentPhoneNumber,
+                            password: currentPassword
                         )
                     } catch {
                         loginError = error
@@ -181,10 +184,10 @@ class LoginViewModel: ObservableObject {
                 request.httpMethod = "POST"
                 request.setValue("application/json", forHTTPHeaderField: "Content-Type")
                 
-                let cleanPhone = self.phoneNumber.replacingOccurrences(of: "-", with: "")
+                let cleanPhone = currentPhoneNumber.replacingOccurrences(of: "-", with: "")
                 let body: [String: Any] = [
                     "mt_id": cleanPhone,
-                    "mt_pwd": self.password
+                    "mt_pwd": currentPassword
                 ]
                 request.httpBody = try? JSONSerialization.data(withJSONObject: body)
                 
@@ -287,13 +290,23 @@ class LoginViewModel: ObservableObject {
                             name: name,
                             googleId: googleId
                         )
+                        
+                        // 신규 유저인 경우 자동 가입 시도 -> 제거 (사용자 요청에 따라 수동 가입으로 전환)
+                        // Check both root property and data object property
+                        let isNewUser = loginResponse?.isNewUser ?? loginResponse?.data?.isNewUser ?? false
+                        
+                        // IF isNewUser, do NOT register automatically. Just let it finish so UI can handle it.
+                        if let _ = loginResponse, isNewUser == true {
+                           print("🆕 [LoginViewModel] 신규 Google 회원 감지 - 수동 회원가입으로 이동합니다.")
+                        }
                     } catch {
+                        print("❌ [LoginViewModel] 자동 가입/로그인 중 오류: \(error)")
                         loginError = error
                     }
                     semaphore.signal()
                 }
             } else {
-                // iOS 13/14 fallback
+                // iOS 13/14 fallback - 기존 로직 유지 (자동 가입 미지원)
                 semaphore.signal()
             }
             
@@ -301,7 +314,12 @@ class LoginViewModel: ObservableObject {
             
             DispatchQueue.main.async {
                 if let response = loginResponse, response.success == true {
-                    if response.isNewUser == true {
+                    // 재로그인 후에는 isNewUser가 false여야 함
+                    // Check logic again for final response
+                    let finalIsNewUser = response.isNewUser ?? response.data?.isNewUser ?? false
+                    
+                    if finalIsNewUser == true {
+                        // 자동 가입 실패 또는 로직 오류로 여전히 신규 유저로 인식됨 -> 수동 가입으로 이동
                         self.isNewUser = true
                         self.socialLoginData = [
                             "provider": "google",
@@ -309,15 +327,33 @@ class LoginViewModel: ObservableObject {
                             "name": name ?? "",
                             "google_id": googleId ?? ""
                         ]
-                        print("✅ [LoginViewModel] 신규 Google 회원")
+                        print("⚠️ [LoginViewModel] 자동 가입 실패? 수동 가입으로 전환")
                     } else {
-                        self.isLoggedIn = true
-                        print("✅ [LoginViewModel] 기존 Google 회원 로그인")
+                        // 로그인 성공
+                        // Check both root token and data.token
+                        if let token = response.token ?? response.data?.token {
+                            self.authService.saveToken(token)
+                            
+                            if let user = response.user ?? response.data?.user {
+                                self.authService.saveUserData(user)
+                            }
+                            self.isLoggedIn = true
+                            print("✅ [LoginViewModel] Google 로그인 최종 성공")
+                        } else {
+                            print("❌ [LoginViewModel] 로그인 성공했으나 토큰이 없음 (Data token: \(response.data?.token ?? "nil"))")
+                            self.showErrorMessage("로그인 정보가 올바르지 않습니다. (Token Missing)")
+                        }
                     }
                 } else if let error = loginError {
-                    self.showErrorMessage("Google 로그인에 실패했습니다: \(error.localizedDescription)")
+                    self.showErrorMessage("Google 로그인/가입에 실패했습니다: \(error.localizedDescription)")
                 } else {
-                    self.showErrorMessage("Google 로그인에 실패했습니다.")
+                     if #available(iOS 15.0, *) {
+                         self.showErrorMessage("Google 로그인에 실패했습니다.")
+                     } else {
+                         // iOS 13/14에서는 여기서 에러 처리를 따로 해야 할 수도 있음
+                         // 일단 기존 로직과 동일하게 유지하지 않음 (자동 가입 시도 코드가 15+ 전용이므로)
+                          self.showErrorMessage("Google 로그인에 실패했습니다.")
+                     }
                 }
                 self.isLoading = false
             }
@@ -505,7 +541,7 @@ class LoginViewModel: ObservableObject {
                 showErrorMessage("Apple 로그인이 중단되었습니다.")
             case .unknown:
                 showErrorMessage("알 수 없는 오류가 발생했습니다.")
-            @unknown default:
+            default:
                 showErrorMessage("Apple 로그인에 실패했습니다.")
             }
         } else {
@@ -545,6 +581,7 @@ class LoginViewModel: ObservableObject {
 
 // MARK: - RegisterViewModel
 
+@MainActor
 class RegisterViewModel: ObservableObject {
     // MARK: - Published Properties
     
@@ -600,6 +637,12 @@ class RegisterViewModel: ObservableObject {
     
     // MARK: - Initialization & Social Data
     
+    // MARK: - Computed Properties
+    
+    var isSocialAccount: Bool {
+        return registerData.mt_google_id != nil || registerData.mt_apple_id != nil || registerData.mt_kakao_id != nil
+    }
+
     func applySocialData(_ data: [String: Any]?) {
         guard let data = data else { return }
         
@@ -612,21 +655,43 @@ class RegisterViewModel: ObservableObject {
         }
         
         if let provider = data["provider"] as? String {
-            let id = data["id"] as? String
+            // "id" 키가 없으면 provider별 구체적 키 확인
+            let googleId = data["google_id"] as? String
+            let appleId = data["apple_id"] as? String ?? data["userIdentifier"] as? String  // Apple은 userIdentifier도 확인
+            let kakaoId = data["kakao_id"] as? String
+            let genericId = data["id"] as? String
             
             switch provider {
             case "google":
+                let id = googleId ?? genericId
                 registerData.mt_google_id = id
+                registerData.mt_type = 4 // Google
+                if let id = id { registerData.mt_id = "google_\(id)" }
             case "apple":
+                let id = appleId ?? genericId
                 registerData.mt_apple_id = id
+                registerData.mt_type = 3 // Apple
+                if let id = id { registerData.mt_id = "apple_\(id)" }
+                print("📱 [RegisterViewModel] Apple 소셜 로그인 데이터 적용됨 - isSocialAccount: true")
             case "kakao":
+                let id = kakaoId ?? genericId
                 registerData.mt_kakao_id = id
+                registerData.mt_type = 2 // Kakao
+                if let id = id { registerData.mt_id = "kakao_\(id)" }
             default:
                 break
             }
         }
+        
+        // 프로필 이미지 매핑
+        if let file1 = data["mt_file1"] as? String {
+            registerData.mt_file1 = file1
+        } else if let picture = data["picture"] as? String {
+            registerData.mt_file1 = picture
+        } else if let profileImage = data["profile_image"] as? String {
+            registerData.mt_file1 = profileImage
+        }
     }
-    
     // MARK: - Computed Properties
     
     var isTermsValid: Bool {
@@ -641,15 +706,22 @@ class RegisterViewModel: ObservableObject {
     var isBasicInfoValid: Bool {
         let isNameValid = !registerData.mt_name.isEmpty
         let isNicknameValid = !registerData.mt_nickname.isEmpty
-        let isPasswordValid = isValidPassword(registerData.mt_pwd ?? "")
-        let isPasswordConfirmValid = registerData.mt_pwd == passwordConfirm && !passwordConfirm.isEmpty
         let isEmailValid = validateEmail(registerData.mt_email)
         
-        return isNameValid && isNicknameValid && isPasswordValid && isPasswordConfirmValid && isEmailValid
+        // 소셜 로그인은 비밀번호 검사 생략
+        if isSocialAccount {
+            return isNameValid && isNicknameValid && isEmailValid
+        } else {
+            let isPasswordValid = isValidPassword(registerData.mt_pwd ?? "")
+            let isPasswordConfirmValid = registerData.mt_pwd == passwordConfirm && !passwordConfirm.isEmpty
+            return isNameValid && isNicknameValid && isPasswordValid && isPasswordConfirmValid && isEmailValid
+        }
     }
     
     var isProfileValid: Bool {
-        return validateBirthDate(registerData.mt_birth)
+        let hasBirth = !(registerData.mt_birth?.isEmpty ?? true)
+        let hasGender = (registerData.mt_gender == 1 || registerData.mt_gender == 2)
+        return hasBirth && hasGender && validateBirthDate(registerData.mt_birth)
     }
     
     // MARK: - Methods
@@ -657,7 +729,14 @@ class RegisterViewModel: ObservableObject {
     func nextStep() {
         switch currentStep {
         case .terms:
-            if isTermsValid { currentStep = .phone }
+            if isTermsValid {
+                // 소셜 계정은 핸드폰 인증 건너뛰고 기본 정보 입력으로 이동
+                if isSocialAccount {
+                    currentStep = .basicInfo
+                } else {
+                    currentStep = .phone
+                }
+            }
         case .phone:
             // Skip verification for now or mock it
             if isPhoneValid { currentStep = .basicInfo }
@@ -687,7 +766,12 @@ class RegisterViewModel: ObservableObject {
         case .verification:
             currentStep = .phone
         case .basicInfo:
-            currentStep = .phone
+            // 소셜 계정은 약관 동의로 바로 이동
+            if isSocialAccount {
+                currentStep = .terms
+            } else {
+                currentStep = .phone
+            }
         case .profile:
             currentStep = .basicInfo
         case .complete:
@@ -703,10 +787,12 @@ class RegisterViewModel: ObservableObject {
             errorMessage = "닉네임을 입력해주세요."
         } else if !validateEmail(registerData.mt_email) {
             errorMessage = "올바른 이메일 형식을 입력해주세요."
-        } else if !isValidPassword(registerData.mt_pwd ?? "") {
-            errorMessage = "비밀번호는 8자 이상, 영문/숫자/특수문자 중 2가지 이상을 조합해주세요."
-        } else if registerData.mt_pwd != passwordConfirm || passwordConfirm.isEmpty {
-            errorMessage = "비밀번호가 일치하지 않습니다."
+        } else if !isSocialAccount { // 소셜 계정이 아닐 때만 비밀번호 검사
+            if !isValidPassword(registerData.mt_pwd ?? "") {
+                errorMessage = "비밀번호는 8자 이상, 영문/숫자/특수문자 중 2가지 이상을 조합해주세요."
+            } else if registerData.mt_pwd != passwordConfirm || passwordConfirm.isEmpty {
+                errorMessage = "비밀번호가 일치하지 않습니다."
+            }
         }
         showError = true
     }
@@ -1046,6 +1132,11 @@ class RegisterViewModel: ObservableObject {
     func register() {
         isLoading = true
         
+        // FCM 토큰 주입
+        if let fcmToken = authService.getFCMToken() {
+            registerData.mt_token_id = fcmToken
+        }
+        
         Task {
             do {
                 let _ = try await authService.register(request: registerData)
@@ -1219,7 +1310,7 @@ class ForgotPasswordViewModel: ObservableObject {
         
         URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
             DispatchQueue.main.async {
-                if let error = error {
+                if error != nil {
                     self?.isLoading = false
                     self?.errorMessage = "서버 연결에 실패했습니다."
                     self?.showError = true
@@ -1286,7 +1377,7 @@ class ForgotPasswordViewModel: ObservableObject {
             DispatchQueue.main.async {
                 self?.isLoading = false
                 
-                if let error = error {
+                if error != nil {
                     self?.errorMessage = "인증번호 발송에 실패했습니다."
                     self?.showError = true
                     return
@@ -1375,7 +1466,7 @@ class ForgotPasswordViewModel: ObservableObject {
             DispatchQueue.main.async {
                 self?.isLoading = false
                 
-                if let error = error {
+                if error != nil {
                     self?.errorMessage = "비밀번호 변경에 실패했습니다."
                     self?.showError = true
                     return

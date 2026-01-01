@@ -272,7 +272,7 @@ struct GroupDetailView: View {
                     primaryButton: .destructive(Text("나가기")) {
                         // TODO: Implement leave group (currently reusing delete/remove logic or need new API)
                         // For now, assuming remove self
-                        if let user = AuthService.shared.getUserData() {
+                        if let _ = AuthService.shared.getUserData() {
                             // Temporary workaround: strictly speaking leave != delete, but for MVP member removal works
                             // Ideally GroupService needs leaveGroup endpoint
                         }
@@ -286,7 +286,7 @@ struct GroupDetailView: View {
     private var isCurrentUserOwner: Bool {
         guard let currentUser = AuthService.shared.getUserData() else { return false }
         // Find current user in member list and check owner status
-        if let member = viewModel.groupMembers.first(where: { $0.mt_idx == currentUser.mt_idx }) {
+        if let member = viewModel.groupMembers.first(where: { $0.mt_idx == currentUser.mt_idx ?? 0 }) {
             return member.sgdt_owner_chk == "Y"
         }
         return false 

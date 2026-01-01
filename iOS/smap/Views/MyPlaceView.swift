@@ -17,6 +17,7 @@ struct MyPlaceView: View {
     
     @State private var sidebarDragOffset: CGFloat = 0
     @State private var newLocationCoordinates: (lat: Double, lng: Double)?
+    @State private var isMapLoading = true  // 지도 로딩 상태
     
     private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
     private let sidebarWidth: CGFloat = 320
@@ -90,7 +91,7 @@ struct MyPlaceView: View {
                 }
             }
             
-            // 7. Loading Overlay
+            // 7. Loading Overlay (데이터 로딩)
             if viewModel.isLoading {
                 Color.black.opacity(0.3)
                     .edgesIgnoringSafeArea(.all)
@@ -100,6 +101,16 @@ struct MyPlaceView: View {
                             .scaleEffect(1.5)
                     )
             }
+            
+            // 8. Map Loading Overlay (지도 초기화)
+            if isMapLoading {
+                MapLoadingOverlay()
+                    .transition(AnyTransition.opacity)
+                    .zIndex(1000)
+            }
+        }
+        .onAppear {
+            handleLoading()
         }
         .navigationBarHidden(true)
         .task {
@@ -118,9 +129,42 @@ struct MyPlaceView: View {
                 dismissButton: .default(Text("확인"))
             )
         }
-        .onDisappear {
-            // 페이지를 벗어날 때 사이드바 자동 닫기
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("closeSidebars"))) { notification in
+            // 탭 전환 시 사이드바를 닫기
             viewModel.closeSidebar()
+            
+            // 본인 탭(내장소 = 1)으로 전환될 때만 로딩 화면을 다시 표시
+            if let targetTab = notification.object as? Int, targetTab == 1 {
+                isMapLoading = true
+                handleLoading()
+            }
+        }
+        .onDisappear {
+            // 페이지를 벗어날 때 사이드바 자동 닫기 및 로딩 상태 리셋
+            viewModel.closeSidebar()
+            isMapLoading = true
+        }
+    }
+    
+    /// 지도 로딩 조절 로직 (최소 1.5초 및 데이터 완료 대기)
+    private func handleLoading() {
+        // 이미 진행 중인 타이머가 있을 수 있으므로 isMapLoading이 true일 때만 시작
+        guard isMapLoading else { return }
+        
+        Task {
+            // 최소 1.5초 대기
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            
+            // 뷰모델 데이터 로딩 대기 (최대 5초)
+            var retryCount = 0
+            while viewModel.isLoading && retryCount < 25 {
+                try? await Task.sleep(nanoseconds: 200_000_000)
+                retryCount += 1
+            }
+            
+            withAnimation(.easeOut(duration: 0.3)) {
+                isMapLoading = false
+            }
         }
     }
     
@@ -495,8 +539,21 @@ struct MyPlaceMapView: UIViewRepresentable {
         mapView.logoAlign = .leftBottom
         mapView.zoomLevel = 15
         
-        // 서울시청 기본 위치
-        let defaultPosition = NMGLatLng(lat: 37.5665, lng: 126.9780)
+        // 사용자의 현재 위치로 초기화 (LocationService에서 가져옴)
+        var initialLat: Double = 37.5665  // 기본값은 서울
+        var initialLng: Double = 126.9780
+        
+        // 현재 기기의 마지막 위치 사용 (getLastLocation은 non-optional)
+        let lastLocation = LocationService.sharedInstance.getLastLocation()
+        if lastLocation.coordinate.latitude != 0.0 && lastLocation.coordinate.longitude != 0.0 {
+            initialLat = lastLocation.coordinate.latitude
+            initialLng = lastLocation.coordinate.longitude
+            print("📍 [MyPlaceMapView] Using device location: (\(initialLat), \(initialLng))")
+        } else {
+            print("📍 [MyPlaceMapView] No device location, using Seoul default")
+        }
+        
+        let defaultPosition = NMGLatLng(lat: initialLat, lng: initialLng)
         mapView.moveCamera(NMFCameraUpdate(scrollTo: defaultPosition))
         
         // 맵 탭 이벤트

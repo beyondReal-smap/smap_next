@@ -10,17 +10,43 @@ import SwiftUI
 
 class IntroView: UIViewController {
     
+    private var splashHostingController: UIHostingController<SplashView>?
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         // 🔒 로그인 전 권한 요청 전부 차단: Intro에서는 아무 권한도 요청하지 않음
         print("🔒 [INTRO] 로그인 전 권한 요청 차단 - 인증 상태 확인 중...")
+        
+        // 스플래시 뷰 표시
+        showSplashView()
+        
+        // 인증 상태 확인 후 네비게이션
         self.checkAuthAndNavigate()
+    }
+    
+    private func showSplashView() {
+        // SwiftUI SplashView를 임베드
+        let splashView = SplashView()
+        let hostingController = UIHostingController(rootView: splashView)
+        hostingController.view.translatesAutoresizingMaskIntoConstraints = false
+        
+        addChild(hostingController)
+        view.addSubview(hostingController.view)
+        
+        NSLayoutConstraint.activate([
+            hostingController.view.topAnchor.constraint(equalTo: view.topAnchor),
+            hostingController.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            hostingController.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            hostingController.view.trailingAnchor.constraint(equalTo: view.trailingAnchor)
+        ])
+        
+        hostingController.didMove(toParent: self)
+        splashHostingController = hostingController
     }
     
     private func checkAuthAndNavigate() {
         // 스플래시 화면 최소 2초 표시
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-            guard let self = self else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             
             // 로그인 상태 확인
             let isLoggedIn = AuthService.shared.isLoggedIn
@@ -91,11 +117,20 @@ class IntroView: UIViewController {
         // NativeRegisterView 생성
         let registerView = NativeRegisterView(
             onComplete: {
-                // 회원가입 완료/취소 후 로그인 화면으로 이동
-                print("✅ [INTRO] 회원가입 페이지에서 나감 - LoginView로 이동")
-                DispatchQueue.main.async {
-                    // static 메서드 호출로 재귀 문제 해결
-                    IntroView.navigateToLoginView(appDelegate: appDelegate)
+                // 회원가입 완료
+                print("✅ [INTRO] 회원가입 완료")
+                
+                // 토큰 저장 여부 확인 후 메인으로 이동
+                if AuthService.shared.isLoggedIn {
+                     print("✅ [INTRO] 자동 로그인 성공 - MainView로 이동")
+                     DispatchQueue.main.async {
+                         IntroView.navigateToMainView(appDelegate: appDelegate)
+                     }
+                } else {
+                     print("ℹ️ [INTRO] 로그인 필요 - LoginView로 이동")
+                     DispatchQueue.main.async {
+                         IntroView.navigateToLoginView(appDelegate: appDelegate)
+                     }
                 }
             },
             socialData: socialData,

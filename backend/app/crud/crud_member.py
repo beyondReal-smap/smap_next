@@ -161,10 +161,10 @@ class CRUDMember:
             mt_onboarding=obj_in.mt_onboarding,
             mt_wdate=datetime.utcnow(),
             mt_adate=datetime.utcnow(),
-            # 소셜 로그인 ID 필드
             mt_google_id=getattr(obj_in, 'mt_google_id', None),
             mt_kakao_id=getattr(obj_in, 'mt_kakao_id', None),
-            mt_apple_id=getattr(obj_in, 'mt_apple_id', None)
+            mt_apple_id=getattr(obj_in, 'mt_apple_id', None),
+            mt_token_id=getattr(obj_in, 'mt_token_id', None)
         )
         
         db.add(db_obj)

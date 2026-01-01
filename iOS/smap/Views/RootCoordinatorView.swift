@@ -33,6 +33,67 @@ struct ActivityIndicator: UIViewRepresentable {
     }
 }
 
+// MARK: - Map Loading Overlay
+
+struct MapLoadingOverlay: View {
+    @State private var dotOffset = 0
+    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    private let timer = Timer.publish(every: 0.4, on: .main, in: .common).autoconnect()
+    
+    var body: some View {
+        ZStack {
+            // 배경 (브랜드 컬러 그라데이션)
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    brandColor.opacity(0.95),
+                    Color(red: 102/255, green: 126/255, blue: 234/255).opacity(0.95)
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .edgesIgnoringSafeArea(.all)
+            
+            VStack(spacing: 30) {
+                // 지도 아이콘
+                ZStack {
+                    Circle()
+                        .fill(Color.white.opacity(0.15))
+                        .frame(width: 90, height: 90)
+                    
+                    Image(systemName: "map.fill")
+                        .font(.system(size: 36))
+                        .foregroundColor(.white)
+                }
+                
+                VStack(spacing: 16) {
+                    Text("지도 로딩 중")
+                        .font(.suite(size: 18, weight: .bold))
+                        .foregroundColor(.white)
+                    
+                    // 순차적으로 움직이는 점 3개
+                    HStack(spacing: 8) {
+                        ForEach(0..<3) { index in
+                            Circle()
+                                .fill(Color.white)
+                                .frame(width: 10, height: 10)
+                                .scaleEffect(dotOffset == index ? 1.5 : 1.0)
+                                .opacity(dotOffset == index ? 1.0 : 0.4)
+                        }
+                    }
+                }
+            }
+        }
+        .onAppear {
+            print("🎬 [MapLoadingOverlay] Overlay appeared")
+        }
+        .onReceive(timer) { _ in
+            withAnimation(.easeInOut(duration: 0.4)) {
+                dotOffset = (dotOffset + 1) % 3
+            }
+        }
+    }
+}
+
 /// 앱의 루트 화면 - 로그인 상태에 따라 LoginView 또는 MainView로 분기
 struct RootCoordinatorView: View {
     
@@ -60,26 +121,15 @@ struct RootCoordinatorView: View {
             case .register:
                 // 회원가입 (Native)
                 NativeRegisterView(onComplete: {
-                    // Registration complete -> Check auth state again or navigate to login/main
-                    // Typically after registration, user might need to login or is auto-logged in.
-                    // If auto-logged in (token saved), navigateToMain() works.
-                    // If not, navigateToLogin().
-                    // AuthService.register returns UserIdentity but currently doesn't save token explicitly in my implementation without login call? 
-                    // Wait, I should check AuthService.register logic I added. 
-                    // It returns UserIdentity. It does NOT save token.
-                    // So user likely needs to login.
-                    // But if I want auto-login, I need token from backend registration response.
-                    // Backend `auth.py` /register returns `UserIdentity` which is `MemberResponse` (schema) or similar.
-                    // Schema `UserIdentity` (from looking at `crud_auth.create_user_identity_from_member`) usually has token?
-                    // Let's check `UserIdentity` struct definition in models or schemas.
-                    // In `LoginResponse`, it has `token` and `user`.
-                    // In `auth.py`: `@router.post("/register", response_model=UserIdentity)`
-                    // `create_user_identity_from_member` usually creates Pydantic model.
-                    // If `UserIdentity` has token, great.
-                    // If not, we might need to route to LoginView with a message.
-                    
-                    // For now, let's route to Login, or check auth state.
-                    coordinator.navigateToLogin() 
+                    // Registration complete
+                    // Backend now returns token on registration, and AuthService saves it.
+                    // So we should check if we are logged in.
+                    if AuthService.shared.isLoggedIn {
+                        coordinator.navigateToMain()
+                    } else {
+                        // Fallback if no token (should not happen with new backend)
+                        coordinator.navigateToLogin()
+                    }
                 })
                 
             case .main:
@@ -179,36 +229,26 @@ class RootCoordinator: ObservableObject {
     }
 }
 
-// MARK: - Splash View (iOS 13+)
+// MARK: - Splash View (Premium Animated)
 
 struct SplashView: View {
+    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
     var body: some View {
-        ZStack {
-            // 배경 그라데이션
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color(red: 0.3, green: 0.5, blue: 1.0),
-                    Color(red: 0.6, green: 0.3, blue: 1.0)
-                ]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .edgesIgnoringSafeArea(.all)
-            
-            VStack(spacing: 24) {
-                // 앱 아이콘
-                Image(systemName: "location.circle.fill")
-                    .resizable()
-                    .frame(width: 100, height: 100)
-                    .foregroundColor(.white)
+        GeometryReader { geometry in
+            ZStack {
+                // Background Color #353538
+                Color(red: 53/255, green: 53/255, blue: 56/255)
+                    .edgesIgnoringSafeArea(.all)
                 
-                // 앱 이름
-                Text("Island+")
-                    .font(.suite(size: 36, weight: .bold))
-                    .foregroundColor(.white)
-                
-                // 로딩 인디케이터 (iOS 13 호환)
-                ActivityIndicator(style: .large, color: .white)
+                VStack(spacing: 0) {
+                    // App Icon (AppNoBg from Assets)
+                    Image("AppNoBg")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 80, height: 80) // Adjust size as needed
+                }
+                .position(x: geometry.size.width / 2, y: geometry.size.height * 0.25) // 1/4 Height Position
             }
         }
     }
@@ -288,7 +328,7 @@ public struct SettingMenuView: View {
                             Text("SMAP")
                                 .font(.suite(size: 14, weight: .semibold))
                                 .foregroundColor(.gray)
-                            Text("버전 2.2.5")
+                            Text("버전 3.0.0")
                                 .font(.suite(size: 12))
                                 .foregroundColor(.gray.opacity(0.8))
                         }
@@ -645,9 +685,15 @@ struct AccountSettingsView: View {
     @ViewBuilder
     private var accountInfoSection: some View {
         if let user = authService.currentUser {
+            // 소셜 로그인 여부 확인 (2=카카오, 3=Apple, 4=Google)
+            let isSocialLogin = user.mt_type == 2 || user.mt_type == 3 || user.mt_type == 4
+            
             SettingsSectionView(title: "내 정보") {
-                SettingsInfoRowView(icon: "phone.fill", iconColor: brandColor, title: "휴대폰", value: user.mt_id ?? "-")
-                Divider().padding(.leading, 52)
+                // 소셜 로그인이 아닌 경우에만 휴대폰 번호 표시
+                if !isSocialLogin {
+                    SettingsInfoRowView(icon: "phone.fill", iconColor: brandColor, title: "휴대폰", value: user.mt_id ?? "-")
+                    Divider().padding(.leading, 52)
+                }
                 SettingsInfoRowView(icon: "at", iconColor: .orange, title: "닉네임", value: user.mt_nickname ?? "-")
                 Divider().padding(.leading, 52)
                 SettingsInfoRowView(icon: "person.badge.key.fill", iconColor: .purple, title: "로그인 방식", value: getLoginMethodText(user.mt_type))
@@ -3725,6 +3771,7 @@ struct ScheduleFormView: View {
     }
 }
 
+@MainActor
 class ScheduleViewModel: ObservableObject {
     @Published var schedules: [Schedule] = []
     @Published var groupMembers: [SmapGroupMember] = []

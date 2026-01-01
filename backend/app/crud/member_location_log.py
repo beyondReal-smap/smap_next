@@ -4,6 +4,7 @@ from typing import Optional, List
 from datetime import datetime, timedelta, date
 import math
 from ..models.member_location_log import MemberLocationLog
+from ..models.member import Member
 from ..schemas.member_location_log import (
     MemberLocationLogCreate, 
     MemberLocationLogUpdate,
@@ -48,6 +49,16 @@ def create_location_log(db: Session, log_data: MemberLocationLogCreate) -> Membe
     """위치 로그 생성"""
     db_log = MemberLocationLog(**log_data.model_dump())
     db.add(db_log)
+    
+    # Member 테이블 최신 위치 업데이트
+    if log_data.mlt_lat and log_data.mlt_long:
+        member = db.query(Member).filter(Member.mt_idx == log_data.mt_idx).first()
+        if member:
+            member.mt_lat = log_data.mlt_lat
+            member.mt_long = log_data.mlt_long
+            member.mt_udate = datetime.utcnow()
+            db.add(member)
+            
     db.commit()
     db.refresh(db_log)
     return db_log

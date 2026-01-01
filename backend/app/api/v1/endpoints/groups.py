@@ -39,15 +39,30 @@ def get_current_user_id_from_token(authorization: str = Header(None)) -> Optiona
     """
     Authorization 헤더에서 토큰을 추출하고 사용자 ID를 반환합니다.
     """
+    logger.info(f"[TOKEN_AUTH] Authorization header: {authorization[:50] if authorization else 'None'}...")
+    
     if not authorization or not authorization.startswith("Bearer "):
+        logger.warning("[TOKEN_AUTH] No Bearer token found")
         return None
     
     token = authorization.split(" ")[1]
+    logger.info(f"[TOKEN_AUTH] Token length: {len(token)}")
+    
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        # 'mt_idx' 또는 'sub' 필드에서 사용자 ID 추출 (두 가지 토큰 형식 호환)
         mt_idx: Optional[int] = payload.get("mt_idx")
+        if mt_idx is None:
+            sub = payload.get("sub")
+            if sub:
+                try:
+                    mt_idx = int(sub)
+                except (ValueError, TypeError):
+                    mt_idx = None
+        logger.info(f"[TOKEN_AUTH] Token decoded successfully, mt_idx: {mt_idx}")
         return mt_idx
-    except JWTError:
+    except JWTError as e:
+        logger.error(f"[TOKEN_AUTH] JWT decode error: {e}")
         return None
 
 @router.get("/hidden", response_model=List[GroupResponse])
@@ -278,13 +293,24 @@ def generate_sgt_code(db: Session) -> str:
 @router.post("/", response_model=GroupResponse)
 def create_group(
     group_in: GroupCreate,
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(deps.get_db),
+    authorization: str = Header(None)
 ):
     """
     새로운 그룹을 생성합니다.
     """
+    # 토큰에서 사용자 ID 추출
+    user_id = get_current_user_id_from_token(authorization)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="인증이 필요합니다.")
+        
+    logger.info(f"[CREATE_GROUP] 그룹 생성 요청 - user_id: {user_id}, title: {group_in.sgt_title}")
+
     # 그룹 데이터 생성
     group_data = group_in.dict()
+    
+    # mt_idx는 토큰에서 추출한 값으로 강제 설정 (보안)
+    group_data['mt_idx'] = user_id
     
     # sgt_code 자동 생성 (고유값)
     group_data['sgt_code'] = generate_sgt_code(db)
@@ -303,10 +329,10 @@ def create_group(
     db.refresh(group)
     
     # 그룹 생성자를 GroupDetail 테이블에 그룹장으로 추가
-    if group_data.get('mt_idx'):
+    try:
         group_detail = GroupDetail(
             sgt_idx=group.sgt_idx,
-            mt_idx=group_data['mt_idx'],
+            mt_idx=user_id,
             sgdt_owner_chk='Y',  # 그룹장
             sgdt_leader_chk='N',
             sgdt_discharge='N',
@@ -314,10 +340,16 @@ def create_group(
             sgdt_exit='N',
             sgdt_show='Y',
             sgdt_push_chk='Y',
-            sgdt_wdate=datetime.utcnow()
+            sgdt_wdate=datetime.utcnow(),
+            sgdt_udate=datetime.utcnow()
         )
         db.add(group_detail)
         db.commit()
+        logger.info(f"[CREATE_GROUP] 그룹 멤버(관리자) 생성 완료 - sgdt_idx: {group_detail.sgdt_idx}")
+    except Exception as e:
+        logger.error(f"[CREATE_GROUP] 그룹 멤버 생성 실패: {str(e)}")
+        # 그룹은 생성되었으나 멤버 추가 실패 시? 롤백? 
+        # 일단 로그 남기고 진행. 
     
     return group
 

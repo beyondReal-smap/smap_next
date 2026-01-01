@@ -80,16 +80,24 @@ class GroupService {
     
     /// 그룹 생성
     func createGroup(title: String, memo: String) async throws -> SmapGroup {
-        let url = URL(string: "\(baseURL)/groups")!
+        let url = URL(string: "\(baseURL)/groups/")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        if let token = authService.getToken() {
+        // 토큰 디버깅
+        let token = authService.getToken()
+        print("🔑 [GroupService.createGroup] Token retrieved: \(token != nil ? "YES (\(token!.prefix(20))...)" : "NO (nil)")")
+        
+        if let token = token {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            print("🔑 [GroupService.createGroup] Authorization header set")
+        } else {
+            print("⚠️ [GroupService.createGroup] No token available - request will fail!")
         }
         
         let body: [String: Any] = [
+            "mt_idx": authService.currentUser?.mt_idx ?? 0,
             "sgt_title": title,
             "sgt_memo": memo,
             "sgt_show": "Y"
@@ -163,7 +171,7 @@ class GroupService {
         let group = try JSONDecoder().decode(SmapGroup.self, from: codeData)
         
         // 2. 가입 실행
-        let joinUrl = URL(string: "\(baseURL)/groups/\(group.sgt_idx)/join")!
+        let joinUrl = URL(string: "\(baseURL)/groups/\(group.sgt_idx)/join/")!
         var joinRequest = URLRequest(url: joinUrl)
         joinRequest.httpMethod = "POST"
         

@@ -14,10 +14,23 @@ from app.schemas.member import (
 )
 from app.models.member import Member
 from typing import Optional, List, Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
+import jwt
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+def create_access_token_for_social(user_id: int, expires_delta: Optional[timedelta] = None) -> str:
+    """소셜 로그인용 JWT 토큰 생성"""
+    to_encode = {"sub": str(user_id)}
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    return encoded_jwt
 
 class MemberService:
     def __init__(self):
@@ -310,7 +323,7 @@ class MemberService:
                     data={
                         "member": user_data,
                         "user": user_data,  # 호환성을 위해 추가
-                        "token": f"google_token_{existing_member.mt_idx}",
+                        "token": create_access_token_for_social(existing_member.mt_idx),
                         "is_new_user": False,
                         "isNewUser": False,  # 호환성을 위해 추가
                         "lookup_method": lookup_method,
@@ -428,7 +441,7 @@ class MemberService:
                     data={
                         "member": user_data,
                         "user": user_data,
-                        "token": f"apple_token_{existing_member.mt_idx}",
+                        "token": create_access_token_for_social(existing_member.mt_idx),
                         "is_new_user": False,
                         "isNewUser": False,
                         "lookup_method": lookup_method,

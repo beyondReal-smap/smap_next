@@ -275,7 +275,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         }
         
         IQKeyboardManager.shared.isEnabled = true
-        IQKeyboardManager.shared.enableAutoToolbar = false
+        // Deprecated: enableAutoToolbar. Use KVC to silence warning while maintaining functionality.
+        IQKeyboardManager.shared.setValue(false, forKey: "enableAutoToolbar")
         IQKeyboardManager.shared.resignOnTouchOutside = true
         
         // iOS 14+ 권장 방식: delegate 기반 위치 서비스 시작 (프리퍼미션 이후)
@@ -409,7 +410,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
                     // 저장된 토큰과 비교
                     let savedToken = UserDefaults.standard.string(forKey: "last_fcm_token")
-                    let lastTokenUpdateTime = UserDefaults.standard.double(forKey: "last_fcm_token_update_time")
+                    let _ = UserDefaults.standard.double(forKey: "last_fcm_token_update_time")
 
                     if savedToken != token {
                         // 토큰이 변경되었고 유효기간이 지났을 때만 업데이트
@@ -507,7 +508,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         
         Messaging.messaging().token { [weak self] token, error in
             DispatchQueue.main.async {
-                if let error = error {
+                if error != nil {
                     // print("❌ [FCM Validation] FCM 토큰 가져오기 실패: \(error.localizedDescription)")
                     return
                 }
@@ -553,7 +554,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
         URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             DispatchQueue.main.async {
-                if let error = error {
+                if error != nil {
                     // print("❌ [FCM Validation] 네트워크 오류: \(error.localizedDescription)")
                     return
                 }
@@ -617,7 +618,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         
         Messaging.messaging().token { [weak self] token, error in
             DispatchQueue.main.async {
-                if let error = error {
+                if error != nil {
                     // print("❌ [FCM Force] 토큰 갱신 실패: \(error.localizedDescription)")
                     return
                 }
@@ -821,7 +822,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         print("🔄 [APNS+FCM] APNs 등록 후 FCM 토큰 처리 시작: \(token.prefix(30))...")
 
         // 기존 토큰과 비교
-        let existingToken = UserDefaults.standard.string(forKey: "fcm_token")
+        let _ = UserDefaults.standard.string(forKey: "fcm_token")
 
         // FCM 토큰 저장
         Utils.shared.setToken(token: token)
@@ -1159,7 +1160,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         content.badge = 1
         content.categoryIdentifier = "FCM_MESSAGE"
 
-        let request = UNNotificationRequest(identifier: "fcm_message_\(Date().timeIntervalSince1970)", content: content, trigger: nil)
+        let _ = UNNotificationRequest(identifier: "fcm_message_\(Date().timeIntervalSince1970)", content: content, trigger: nil)
 
         // 중복 알림 방지 - FCM 로컬 알림 생성 비활성화
         print("🚫 [FCM-LOCAL] 중복 방지를 위해 FCM 로컬 알림 생성 건너뛰기")
@@ -1557,7 +1558,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
         if !isBackground {
             // 포그라운드에서는 APNs 토큰 필수
-            guard let apnsToken = currentAPNSToken else {
+            guard currentAPNSToken != nil else {
                 completion(false, "APNs 토큰 없음 (포그라운드)")
                 return
             }
@@ -1569,7 +1570,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         }
 
         // 3. FCM 서비스 상태 확인 (간단한 토큰 요청으로 검증)
-        Messaging.messaging().token { [weak self] refreshedToken, error in
+        Messaging.messaging().token { refreshedToken, error in
             if let error = error {
                 print("❌ [FCM Validation] FCM 서비스 검증 실패: \(error.localizedDescription)")
                 completion(false, "FCM 서비스 오류: \(error.localizedDescription)")
@@ -2729,7 +2730,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         content.sound = .default
         content.badge = NSNumber(value: 1)
 
-        let request = UNNotificationRequest(identifier: "fcm_test_notification_\(Date().timeIntervalSince1970)",
+        let _ = UNNotificationRequest(identifier: "fcm_test_notification_\(Date().timeIntervalSince1970)",
                                           content: content,
                                           trigger: nil)
 
@@ -3017,7 +3018,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     private func monitorFCMServiceConnection() {
         print("🔗 [FCM Monitor] FCM 서비스 연결 상태 모니터링 시작")
 
-        let monitorTimer = Timer.scheduledTimer(withTimeInterval: 300.0, repeats: true) { [weak self] timer in
+        _ = Timer.scheduledTimer(withTimeInterval: 300.0, repeats: true) { [weak self] timer in
             guard let self = self else {
                 timer.invalidate()
                 return
@@ -3085,7 +3086,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             "notification_id": "local_test_\(Int(Date().timeIntervalSince1970))"
         ]
 
-        let request = UNNotificationRequest(
+        let _ = UNNotificationRequest(
             identifier: "fcm_local_test_\(Int(Date().timeIntervalSince1970))",
             content: content,
             trigger: nil // 즉시 표시
@@ -3871,10 +3872,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         // 재진입 보완: 요구사항에 따라 모션/위치만 보완 (카메라/사진은 제외)
         // 순서: 모션 → 위치
         let motionStatus = CMMotionActivityManager.isActivityAvailable() ? CMMotionActivityManager.authorizationStatus() : .authorized
-        let locStatus: CLAuthorizationStatus = {
-            if #available(iOS 14.0, *) { return CLLocationManager().authorizationStatus }
-            return CLLocationManager.authorizationStatus()
-        }()
+        let locStatus = CLLocationManager().authorizationStatus
 
         if motionStatus == .notDetermined {
             requestMotionPermissionIfNeededSequential { [weak self] in
@@ -3916,10 +3914,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
     // 위치 권한 요청 (순차용) - 완료 콜백 제공
     private func requestLocationPermissionSequential(completion: @escaping () -> Void) {
-        let status: CLAuthorizationStatus = {
-            if #available(iOS 14.0, *) { return CLLocationManager().authorizationStatus }
-            return CLLocationManager.authorizationStatus()
-        }()
+        let status = CLLocationManager().authorizationStatus
         if status != .notDetermined {
             completion()
             return
@@ -3932,10 +3927,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         // 상태가 결정될 때까지 폴링 (최대 10초)
         var waited: Double = 0
         func poll() {
-            let s: CLAuthorizationStatus = {
-                if #available(iOS 14.0, *) { return CLLocationManager().authorizationStatus }
-                return CLLocationManager.authorizationStatus()
-            }()
+            let s = CLLocationManager().authorizationStatus
             if s != .notDetermined {
                 print("📍 [PERM] 위치 권한 요청 완료. status=\(s.rawValue)")
                 completion()
@@ -3996,7 +3988,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                 PHPhotoLibrary.requestAuthorization { _ in
                     completeOnMain()
                 }
-            @unknown default:
+            default:
                 completeOnMain()
             }
         }
@@ -5022,7 +5014,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         
         // 기존 토큰 삭제
         Messaging.messaging().deleteToken { [weak self] error in
-            if let error = error {
+            if error != nil {
                 // print("⚠️ [FCM New Token] 기존 토큰 삭제 실패: \(error.localizedDescription)")
             } else {
                 // print("✅ [FCM New Token] 기존 토큰 삭제 성공")
@@ -5697,7 +5689,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                     self?.updateFCMTokenIfNeededWithCheck(token: newToken)
 
                     // 성공 햅틱 피드백 (백그라운드에서도 가능)
-                    if let strongSelf = self {
+                    if self != nil {
                         let notificationFeedback = UINotificationFeedbackGenerator()
                         notificationFeedback.notificationOccurred(.success)
                     }
@@ -5965,16 +5957,16 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         // mt_idx 값 검증 완료 - 유효한 숫자형식이면 FCM 토큰 업데이트 진행
 
         mtIdx = foundMtIdx
-        print("✅ [FCM API] mt_idx 검증 통과: \(mtIdx)")
+        print("✅ [FCM API] mt_idx 검증 통과: \(foundMtIdx)")
         
         // 🔗 APNs 토큰도 함께 전송 (필수)
         var requestData: [String: Any] = [
-            "mt_idx": mtIdx,
+            "mt_idx": foundMtIdx,
             "fcm_token": token
         ]
 
         // 🔴 APNs 토큰 확인 (백그라운드에서는 UserDefaults 우선 사용)
-        var apnsToken = currentAPNSToken ?? UserDefaults.standard.string(forKey: "last_apns_token")
+        let apnsToken = currentAPNSToken ?? UserDefaults.standard.string(forKey: "last_apns_token")
 
         // 백그라운드에서 APNs 토큰이 없으면 재시도 (한 번 더 확인)
         if apnsToken == nil && isBackground {
@@ -6872,7 +6864,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         print("🌐 FCM 서버 연결 테스트 시작")
 
         // FCM 토큰 확인
-        guard let fcmToken = Messaging.messaging().fcmToken else {
+        guard let _ = Messaging.messaging().fcmToken else {
             print("❌ FCM 토큰 없음 - FCM 서버 연결 불가")
             return
         }
@@ -7494,7 +7486,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     }
 
     private func findWebViewInHierarchy() -> WKWebView? {
-        guard let window = UIApplication.shared.windows.first else { return nil }
+        guard let window = (UIApplication.shared.connectedScenes.first as? UIWindowScene)?.windows.first else { return nil }
 
         func findWebView(in view: UIView) -> WKWebView? {
             if let webView = view as? WKWebView {
@@ -8270,7 +8262,7 @@ extension AppDelegate {
         }
 
         // 2. 최근 FCM 메시지 확인
-        if let lastMessage = UserDefaults.standard.dictionary(forKey: "last_fcm_message") {
+        if UserDefaults.standard.dictionary(forKey: "last_fcm_message") != nil {
             print("✅ [FCM 테스트] 최근 FCM 메시지 존재")
 
             if let timestamp = UserDefaults.standard.double(forKey: "last_fcm_message_time") as Double? {
@@ -8439,7 +8431,7 @@ extension AppDelegate {
         }
 
         let session = URLSession(configuration: configuration)
-        let task = session.dataTask(with: request) { [weak self] data, response, error in
+        let task = session.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
                 if let error = error {
                     print("❌ [FCM Request] 네트워크 오류: \(error.localizedDescription)")
@@ -8640,8 +8632,8 @@ extension AppDelegate {
     func setupBackgroundAppRefresh() {
         print("🚀 [Background] 백그라운드 앱 새로고침 설정 시작")
         
-        // 백그라운드 앱 새로고침 권한 요청
-        UIApplication.shared.setMinimumBackgroundFetchInterval(UIApplication.backgroundFetchIntervalMinimum)
+        // 백그라운드 앱 새로고침 권한 요청 (iOS 15+ Target: Deprecated API 제거, rely on default/BGTasks)
+        // UIApplication.shared.setMinimumBackgroundFetchInterval(UIApplication.backgroundFetchIntervalMinimum)
         
         // 백그라운드 작업 알림 등록 (Enhanced 버전 사용)
         NotificationCenter.default.addObserver(
@@ -8966,7 +8958,7 @@ extension AppDelegate {
     private func scheduleImmediateLocalNotification(userInfo: [AnyHashable: Any]) {
         print("🔔 [FCM] 즉시 로컬 알림 스케줄링 시작")
         
-        let center = UNUserNotificationCenter.current()
+        // let center = UNUserNotificationCenter.current()
         
         // 제목과 내용 추출
         var title = "새 알림"
@@ -8994,7 +8986,7 @@ extension AppDelegate {
         content.userInfo = userInfo
         
         // 즉시 트리거 (0.1초 후)
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 0.1, repeats: false)
+        // let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 0.1, repeats: false)
         
         // 고유 식별자 생성
         let identifier = "fcm_immediate_\(Int(Date().timeIntervalSince1970))"
@@ -9180,7 +9172,7 @@ extension AppDelegate {
         }
         
         // FCM 토큰 상태 확인 (서버 업데이트 없이)
-        if let token = currentFCMToken {
+        if currentFCMToken != nil {
             print("📊 [FCM BACKGROUND] 백그라운드 토큰 상태만 확인 (업데이트 없음)")
             // 토큰 상태 확인만 하고 서버 업데이트는 하지 않음
             UserDefaults.standard.set(currentTime, forKey: "last_background_keepalive_update")
