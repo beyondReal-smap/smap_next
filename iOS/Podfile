@@ -53,8 +53,9 @@ post_install do |installer|
       # 엄격 동시성 수준 완화(서드파티 라이브러리 호환 목적)
       config.build_settings['SWIFT_STRICT_CONCURRENCY'] = 'minimal'
       
-      # NMapsMap: 바이너리 프레임워크의 dSYM 누락 오류 방지 (dwarf 로 설정하여 dSYM 생성/검증 건너뜀)
-      if target.name == 'NMapsMap' || target.name == 'NMapsGeometry'
+      # NMapsMap, NMapsGeometry: 바이너리 프레임워크의 dSYM 누락 방지
+      if target.name.include?('NMapsMap') || target.name.include?('NMapsGeometry')
+        puts "Skipping dSYM generation for #{target.name}"
         config.build_settings['DEBUG_INFORMATION_FORMAT'] = 'dwarf'
       end
     end
