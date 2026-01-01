@@ -123,7 +123,44 @@ PODS:
     - AppAuth/Core (~> 1.7)
     - GTMSessionFetcher/Core (< 4.0, >= 3.3)
   - GTMSessionFetcher/Core (3.3.1)
-  - IQKeyboardManagerSwift (7.0.1)
+  - IQKeyboardCore (1.0.8)
+  - IQKeyboardManagerSwift (8.0.1):
+    - IQKeyboardManagerSwift/Appearance (= 8.0.1)
+    - IQKeyboardManagerSwift/Core (= 8.0.1)
+    - IQKeyboardManagerSwift/IQKeyboardReturnManager (= 8.0.1)
+    - IQKeyboardManagerSwift/IQKeyboardToolbarManager (= 8.0.1)
+    - IQKeyboardManagerSwift/IQTextView (= 8.0.1)
+    - IQKeyboardManagerSwift/Resign (= 8.0.1)
+  - IQKeyboardManagerSwift/Appearance (8.0.1):
+    - IQKeyboardManagerSwift/Core
+  - IQKeyboardManagerSwift/Core (8.0.1):
+    - IQKeyboardNotification
+    - IQTextInputViewNotification
+  - IQKeyboardManagerSwift/IQKeyboardReturnManager (8.0.1):
+    - IQKeyboardReturnManager
+  - IQKeyboardManagerSwift/IQKeyboardToolbarManager (8.0.1):
+    - IQKeyboardManagerSwift/Core
+    - IQKeyboardToolbarManager
+  - IQKeyboardManagerSwift/IQTextView (8.0.1):
+    - IQTextView
+  - IQKeyboardManagerSwift/Resign (8.0.1):
+    - IQKeyboardManagerSwift/Core
+  - IQKeyboardNotification (1.0.6)
+  - IQKeyboardReturnManager (1.0.6):
+    - IQKeyboardCore
+  - IQKeyboardToolbar (1.1.3):
+    - IQKeyboardToolbar/Core (= 1.1.3)
+  - IQKeyboardToolbar/Core (1.1.3):
+    - IQKeyboardCore
+    - IQKeyboardToolbar/Placeholderable
+  - IQKeyboardToolbar/Placeholderable (1.1.3)
+  - IQKeyboardToolbarManager (1.1.4):
+    - IQKeyboardToolbar
+    - IQTextInputViewNotification
+  - IQTextInputViewNotification (1.0.9):
+    - IQKeyboardCore
+  - IQTextView (1.0.5):
+    - IQKeyboardToolbar/Placeholderable
   - KakaoSDKAuth (2.22.7):
     - KakaoSDKCommon (= 2.22.7)
   - KakaoSDKCommon (2.22.7):
@@ -140,6 +177,9 @@ PODS:
     - nanopb/encode (= 2.30910.0)
   - nanopb/decode (2.30910.0)
   - nanopb/encode (2.30910.0)
+  - NMapsGeometry (1.0.2)
+  - NMapsMap (3.23.0):
+    - NMapsGeometry
   - PromisesObjC (2.4.0)
   - RecaptchaInterop (100.0.0)
   - SDWebImage (5.21.1):
@@ -161,6 +201,7 @@ DEPENDENCIES:
   - KakaoSDKAuth (~> 2.22)
   - KakaoSDKCommon (~> 2.22)
   - KakaoSDKUser (~> 2.22)
+  - NMapsMap
   - SDWebImage (~> 5.0)
   - SnackBar.swift
   - SwiftyStoreKit
@@ -183,11 +224,20 @@ SPEC REPOS:
     - GoogleUtilities
     - GTMAppAuth
     - GTMSessionFetcher
+    - IQKeyboardCore
     - IQKeyboardManagerSwift
+    - IQKeyboardNotification
+    - IQKeyboardReturnManager
+    - IQKeyboardToolbar
+    - IQKeyboardToolbarManager
+    - IQTextInputViewNotification
+    - IQTextView
     - KakaoSDKAuth
     - KakaoSDKCommon
     - KakaoSDKUser
     - nanopb
+    - NMapsGeometry
+    - NMapsMap
     - PromisesObjC
     - RecaptchaInterop
     - SDWebImage
@@ -212,11 +262,20 @@ SPEC CHECKSUMS:
   GoogleUtilities: d053d902a8edaa9904e1bd00c37535385b8ed152
   GTMAppAuth: f69bd07d68cd3b766125f7e072c45d7340dea0de
   GTMSessionFetcher: 8a1b34ad97ebe6f909fb8b9b77fba99943007556
-  IQKeyboardManagerSwift: 7f6b1b1d1497855d2beea7f2f10ffcc6978525b1
+  IQKeyboardCore: 8652977ec919cf5351aa2977fedd1a6546476fbc
+  IQKeyboardManagerSwift: 835fc9c6e4732398113406d84900ad2e8f141218
+  IQKeyboardNotification: eb4910401f5a0e68f97e71c62f8a0c5b7e9d535c
+  IQKeyboardReturnManager: fcbf51fc68d7536fc1fbcca5231c4e82576b12ac
+  IQKeyboardToolbar: 9fe900f8e7def414be4025af0ca098df764d4fe3
+  IQKeyboardToolbarManager: c8a575e8b5fffe5873d0e75312244498a0759473
+  IQTextInputViewNotification: 3b9fb27a16e7ee8958cc9092cfb07a1a9e1fd559
+  IQTextView: ae13b4922f22e6f027f62c557d9f4f236b19d5c7
   KakaoSDKAuth: 45204252ff7c379c0f86c5573f97ec36885afca0
   KakaoSDKCommon: 132164a6bac8bcd3a4346d3bf777f34f8f39fdca
   KakaoSDKUser: 4c9cf1da78710d19d0b2c2dd32d1a44c544cdfa4
   nanopb: 438bc412db1928dac798aa6fd75726007be04262
+  NMapsGeometry: 4e02554fa9880ef02ed96b075dc84355d6352479
+  NMapsMap: 1964e6f9073301ad3cbe3a12235ba36f6f6cd905
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
   RecaptchaInterop: 7d1a4a01a6b2cb1610a47ef3f85f0c411434cb21
   SDWebImage: f29024626962457f3470184232766516dee8dfea
@@ -224,6 +283,6 @@ SPEC CHECKSUMS:
   SnapKit: d612e99e678a2d3b95bf60b0705ed0a35c03484a
   SwiftyStoreKit: 6b9c08810269f030586dac1fae8e75871a82e84a
 
-PODFILE CHECKSUM: fffe7651805fa25428a7cdb21a0c5d967fed7561
+PODFILE CHECKSUM: 00a6a1f488a0629da86d2e87396c7a34bc6611f7
 
-COCOAPODS: 1.15.2
+COCOAPODS: 1.16.2

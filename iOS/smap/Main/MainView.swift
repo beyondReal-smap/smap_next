@@ -20,6 +20,7 @@ import Photos
 import UserNotifications
 import CoreMotion
 import FirebaseMessaging
+import SwiftUI
 
 class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, WKUIDelegate {
     var popoverController: UIPopoverPresentationController?// 태블릿용 공유하기 띄우기
@@ -62,6 +63,9 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
         NotificationCenter.default.addObserver(self, selector: #selector(self.getPush(_:)), name: NSNotification.Name(rawValue: "getPush"), object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(self.getDeepLink(_:)), name: NSNotification.Name(rawValue: "getDeepLink"), object: nil)
         
+        // 로그아웃 관찰자 추가
+        NotificationCenter.default.addObserver(self, selector: #selector(self.handleLogout), name: NSNotification.Name("logout"), object: nil)
+        
         if let invitation_code = UserDefaults.standard.string(forKey: "invitation_code") {
             if !invitation_code.isEmpty {
                 if invitation_code != "null" {
@@ -93,14 +97,14 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
         print("   - hapticHandler (햅틱 전용)")
         print("   - messageHandler (범용)")
         
-        self.web_view.configuration.preferences.javaScriptEnabled = true
-        self.web_view.configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
-        
         if #available(iOS 14.0, *) {
             self.web_view.configuration.defaultWebpagePreferences.allowsContentJavaScript = true
         } else {
+            #if !targetEnvironment(macCatalyst)
             self.web_view.configuration.preferences.javaScriptEnabled = true
+            #endif
         }
+        self.web_view.configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
         
         // 디버깅을 위한 설정
         if #available(iOS 16.4, *) {
@@ -462,15 +466,68 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
         })
         */
     
-        let location = LocationService.sharedInstance.getLastLocation()
-        var urlString = Http.shared.getWebBaseURL() + "auth?mt_token_id=%@"
-    
-        if location.coordinate.latitude != 0.0 && location.coordinate.longitude != 0.0 {
-            urlString = "\(urlString)&mt_lat=\(location.coordinate.latitude)&mt_long=\(location.coordinate.longitude)"
+        // 📥 저장된 사용자 데이터 및 토큰 가져오기 (Native -> Web 동기화용)
+        let authService = AuthService.shared
+        let savedToken = authService.getToken()
+        let savedUser = authService.getUserData()
+        
+        // 🔄 localStorage 동기화 스크립트 설정
+        var storageScript = ""
+        if let token = savedToken, let user = savedUser {
+            if let userJsonData = try? JSONEncoder().encode(user),
+               let userJson = String(data: userJsonData, encoding: .utf8) {
+                let timestamp = Int64(Date().timeIntervalSince1970 * 1000)
+                storageScript += """
+                    localStorage.setItem('smap_auth_token', '\(token)');
+                    localStorage.setItem('smap_user_data', '\(userJson)');
+                    localStorage.setItem('smap_login_time', '\(timestamp)');
+                    localStorage.setItem('isLoggedIn', 'true');
+                    console.log('✅ [Native -> Web] Auth state synced via localStorage');
+                """
+            }
         }
         
-        Utils.shared.getToken { token in
-            urlString = String.init(format: urlString, token)
+        // 🔄 소셜 로그인 데이터 동기화 (회원가입용)
+        if let socialData = UserDefaults.standard.string(forKey: "socialLoginData") {
+            storageScript += """
+                localStorage.setItem('socialLoginData', '\(socialData)');
+                console.log('✅ [Native -> Web] Social login data synced via localStorage');
+            """
+        }
+        
+        if !storageScript.isEmpty {
+            let userScript = WKUserScript(source: "(function() { \(storageScript) })();", injectionTime: .atDocumentStart, forMainFrameOnly: true)
+            self.web_view.configuration.userContentController.addUserScript(userScript)
+        }
+
+        let location = LocationService.sharedInstance.getLastLocation()
+        var urlString = ""
+        
+        // 🔗 보류 중인 URL이 있는지 확인 (예: 회원가입 페이지)
+        if let pendingUrl = UserDefaults.standard.string(forKey: "pending_webview_url"), !pendingUrl.isEmpty {
+            urlString = pendingUrl
+            UserDefaults.standard.removeObject(forKey: "pending_webview_url")
+            print("🔗 [MainView] 보류 중인 URL 로드: \(urlString)")
+        } else {
+            // 기본 인증 URL 구성
+            urlString = Http.shared.getWebBaseURL() + "auth?mt_token_id=%@"
+            
+            if location.coordinate.latitude != 0.0 && location.coordinate.longitude != 0.0 {
+                urlString = "\(urlString)&mt_lat=\(location.coordinate.latitude)&mt_long=\(location.coordinate.longitude)"
+            }
+        }
+        
+        // 인증 토큰 우선 사용 (FCM 토큰 대신 JWT 토큰 전달)
+        let tokenToUse = savedToken ?? ""
+        
+        Utils.shared.getToken { fcmToken in
+            // mt_token_id 파라미터가 있는 경우에만 치환
+            if urlString.contains("%@") {
+                // JWT 토큰이 있으면 우선 사용, 없으면 FCM 토큰 사용
+                let finalToken = tokenToUse.isEmpty ? fcmToken : tokenToUse
+                urlString = String.init(format: urlString, finalToken)
+            }
+            
             print("로드할 URL: \(urlString)")
             
             if !self.eventUrl.isEmpty {
@@ -573,11 +630,24 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
     }
 
     private func presentPrePermissionAlert(title: String, message: String, continueTitle: String = "계속", cancelTitle: String = "나중에", onContinue: @escaping () -> Void, onCancel: (() -> Void)? = nil) {
-        func topMostController(base: UIViewController? = UIApplication.shared.keyWindow?.rootViewController) -> UIViewController? {
-            if let nav = base as? UINavigationController { return topMostController(base: nav.visibleViewController) }
-            if let tab = base as? UITabBarController { return topMostController(base: tab.selectedViewController) }
-            if let presented = base?.presentedViewController { return topMostController(base: presented) }
-            return base
+        func topMostController(base: UIViewController? = nil) -> UIViewController? {
+            var baseController = base
+            if baseController == nil {
+                if #available(iOS 13.0, *) {
+                    baseController = UIApplication.shared.connectedScenes
+                        .filter { $0.activationState == .foregroundActive }
+                        .compactMap { $0 as? UIWindowScene }
+                        .first?.windows
+                        .filter { $0.isKeyWindow }.first?.rootViewController
+                } else {
+                    baseController = UIApplication.shared.keyWindow?.rootViewController
+                }
+            }
+            
+            if let nav = baseController as? UINavigationController { return topMostController(base: nav.visibleViewController) }
+            if let tab = baseController as? UITabBarController { return topMostController(base: tab.selectedViewController) }
+            if let presented = baseController?.presentedViewController { return topMostController(base: presented) }
+            return baseController
         }
 
         DispatchQueue.main.async {
@@ -627,7 +697,12 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
 
     private func showLocationPrePermissionIfNeeded(completion: @escaping () -> Void) {
         print("📍 [LOCATION] Pre-permission 체크 시작")
-        let status = CLLocationManager.authorizationStatus()
+        let status: CLAuthorizationStatus
+        if #available(iOS 14.0, *) {
+            status = LocationService.sharedInstance.locationManager.authorizationStatus
+        } else {
+            status = CLLocationManager.authorizationStatus()
+        }
         print("📍 [LOCATION] 현재 authorizationStatus: \(status.rawValue)")
         let infoFlagKey = "smap_location_prepermission_info_shown"
         let hasShownInfo = UserDefaults.standard.bool(forKey: infoFlagKey)
@@ -1931,7 +2006,7 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
 
         // 🔑 로그인 성공 시 FCM 토큰 강제 업데이트
         print("🔑 [LOGIN MAINVIEW] 로그인 성공 감지 - FCM 토큰 강제 업데이트 시작")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             // AppDelegate를 통해 FCM 토큰 업데이트
             if let appDelegate = UIApplication.shared.delegate as? AppDelegate {
                 appDelegate.forceUpdateFCMTokenOnLogin()
@@ -2042,6 +2117,22 @@ extension MainView {
                 }
                 
                 
+            }
+            
+            // 🆕 설정 페이지 네이티브 전환 인터셉트
+            if let path = navigationAction.request.url?.path, path == "/setting" || path.hasPrefix("/setting/") {
+                print("⚙️ [MainView] 설정 페이지 인터셉트 - 네이티브 화면 전환: \(path)")
+                decisionHandler(.cancel)
+                self.presentNativeSettings()
+                return
+            }
+            
+            // 📅 일정 페이지 네이티브 전환 인터셉트
+            if let path = navigationAction.request.url?.path, path == "/schedule" || path.hasPrefix("/schedule/") {
+                print("📅 [MainView] 일정 페이지 인터셉트 - 네이티브 화면 전환: \(path)")
+                decisionHandler(.cancel)
+                NotificationCenter.default.post(name: NSNotification.Name("navigateToSchedule"), object: nil)
+                return
             }
             
             // 카카오 SDK가 호출하는 커스텀 URL 스킴인 경우 open(_ url:) 메서드를 호출합니다.
@@ -2430,6 +2521,11 @@ extension MainView {
                 break
             case "appleSignIn":
                 self.performAppleSignIn()
+                break
+                
+            case "navigateToSchedule":
+                print("📅 [MainView] 일정 화면 이동 요청 수신")
+                NotificationCenter.default.post(name: NSNotification.Name("navigateToSchedule"), object: nil)
                 break
                 
             case "googleSignOut":
@@ -3406,6 +3502,48 @@ extension MainView {
             }
         } else {
             print("🌍 [GEOLOCATION] 캐시된 위치 없음 - 사전 주입 생략")
+        }
+    }
+    
+    // MARK: - Native View Navigation
+    
+    /// 네이티브 설정 화면을 표시합니다.
+    private func presentNativeSettings() {
+        DispatchQueue.main.async {
+            let settingView = SettingMenuView()
+            let hostingController = UIHostingController(rootView: settingView)
+            hostingController.modalPresentationStyle = .fullScreen
+            self.present(hostingController, animated: true)
+        }
+    }
+    
+    // MARK: - Logout Handling
+    
+    @objc private func handleLogout() {
+        print("🚪 [MainView] 로그아웃 감지 - 로그인 화면으로 전환")
+        
+        DispatchQueue.main.async {
+            // Dismiss any presented view controllers (like settings)
+            if self.presentedViewController != nil {
+                self.dismiss(animated: true) {
+                    self.navigateToLogin()
+                }
+            } else {
+                self.navigateToLogin()
+            }
+        }
+    }
+    
+    private func navigateToLogin() {
+        // Find existing root coordinator or reset window root
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first {
+            let rootCoordinatorView = RootCoordinatorView()
+            let controller = UIHostingController(rootView: rootCoordinatorView)
+            
+            UIView.transition(with: window, duration: 0.3, options: .transitionCrossDissolve, animations: {
+                window.rootViewController = controller
+            }, completion: nil)
         }
     }
 }

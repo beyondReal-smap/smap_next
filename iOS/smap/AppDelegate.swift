@@ -18,6 +18,8 @@ import GoogleSignIn
 import WebKit
 import KakaoSDKCommon
 import KakaoSDKAuth
+import KakaoSDKUser
+import NMapsMap
 
 // FCM Token Manager - 자동 토큰 업데이트 기능
 
@@ -96,6 +98,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         GIDSignIn.sharedInstance.configuration = config
         print("✅ Google Sign-In 설정 완료")
         
+        // Naver Map 인증 설정 (Info.plist 사용)
+        NMFAuthManager.shared().delegate = self
+        
+        if let bundleId = Bundle.main.bundleIdentifier {
+            print("🗺️ [NaverMap] Running Bundle ID: \(bundleId)")
+        } else {
+             print("❌ [NaverMap] Bundle ID를 찾을 수 없음")
+        }
+        if let ncpKeyId = Bundle.main.infoDictionary?["NMFNcpKeyId"] as? String {
+             print("🗺️ [NaverMap] Info.plist NMFNcpKeyId: \(ncpKeyId)")
+        } else {
+             print("🗺️ [NaverMap] Info.plist Client ID: \(Bundle.main.infoDictionary?["NMFClientId"] ?? "N/A")")
+        }
+        
         // URL Scheme 디버깅
         if let reversedClientId = plist["REVERSED_CLIENT_ID"] as? String {
             print("✅ Reversed Client ID: \(reversedClientId)")
@@ -110,9 +126,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         // GADMobileAds.sharedInstance().start(completionHandler: nil)
 
         
-                // ✅ FCM 자동 초기화 활성화 - 푸시 메시지 수신을 위해
-        Messaging.messaging().isAutoInitEnabled = true
-        print("✅ [FCM] 자동 초기화 활성화 - 푸시 메시지 수신 가능")
+        // ✅ FCM 자동 초기화 비활성화 - APNS 토큰 획득 후 수동 설정
+        Messaging.messaging().isAutoInitEnabled = false
+        print("✅ [FCM] 자동 초기화 비활성화 - APNS 토큰 대기")
 
         // ✅ FCM delegate 설정 활성화 - 토큰 수신을 위해
         Messaging.messaging().delegate = self
@@ -136,7 +152,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         print("╚══════════════════════════════════════════════════════════════╝")
         
         // 🔍 토큰 무결성 검증 시작
-        performTokenIntegrityCheck()
+        if Messaging.messaging().apnsToken != nil {
+            performTokenIntegrityCheck()
+        } else {
+            print("🚫 [FCM] APNS 토큰 대기 중 - 무결성 검증 지연")
+        }
 
         // 저장된 토큰들 확인
         if let savedFCMToken = UserDefaults.standard.string(forKey: "fcm_token") {
@@ -244,13 +264,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         } else {
             // iOS 10 미만에서도 푸시 알림 권한 요청
             print("✅ [PUSH] iOS 10 미만에서도 푸시 알림 권한 요청")
-            let settings: UIUserNotificationSettings =
-                UIUserNotificationSettings(types: [.alert, .badge, .sound], categories: nil)
-            application.registerUserNotificationSettings(settings)
+            #if !targetEnvironment(simulator)
+            if #available(iOS 8.0, *) {
+                let settings: UIUserNotificationSettings =
+                    UIUserNotificationSettings(types: [.alert, .badge, .sound], categories: nil)
+                application.registerUserNotificationSettings(settings)
+            }
+            #endif
             application.registerForRemoteNotifications()
         }
         
-        IQKeyboardManager.shared.enable = true
+        IQKeyboardManager.shared.isEnabled = true
         IQKeyboardManager.shared.enableAutoToolbar = false
         IQKeyboardManager.shared.resignOnTouchOutside = true
         
@@ -261,9 +285,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             print("📍 [LOCATION] 앱 시작 시 자동 위치 권한 요청 생략 (프리퍼미션 대기)")
         }
         
-        StoreKitManager.shared.fetchReceipt { encryptedReceipt, error in
-            if let error = error {
-                print("fetchReceipt error - \(error)")
+        StoreKitManager.shared.fetchReceipt { _, fetchError in
+            if let fetchError = fetchError {
+                print("fetchReceipt error - \(fetchError)")
                 return
             }
             
@@ -283,7 +307,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                     // Unlock content
                 case .failed, .purchasing, .deferred:
                     break // do nothing
-                default:
+                @unknown default:
                     break
                 }
             }
@@ -338,6 +362,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     // MARK: - 🚀 앱 시작 시 FCM 토큰 즉시 검증
         private func performAppLaunchFCMTokenCheck() {
         print("🚀 앱 시작 시 FCM 토큰 검증 시작 (mt_idx 식별 시에만 업데이트)")
+        
+        // APNS 토큰 확인 (없으면 FCM 토큰 요청 시 에러 발생함)
+        guard Messaging.messaging().apnsToken != nil else {
+             print("🚫 [FCM] APNS 토큰 없음 - 앱 시작 시 토큰 검증 건너뜀")
+             return
+        }
 
         // 🚫 사용자가 식별되지 않았으면(mt_idx 없음) FCM 토큰 업데이트를 하지 않음
         let hasUserIdentified = UserDefaults.standard.string(forKey: "mt_idx") != nil ||
@@ -464,20 +494,26 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                               UserDefaults.standard.string(forKey: "savedMtIdx") ??
                               UserDefaults.standard.string(forKey: "current_mt_idx"),
               let mtIdx = Int(mtIdxString) else {
-            print("❌ [FCM Validation] 사용자 ID를 찾을 수 없음")
+            // print("❌ [FCM Validation] 사용자 ID를 찾을 수 없음")
             return
         }
 
         // 현재 FCM 토큰 가져오기
+        // APNS 토큰 확인 (필수)
+        guard Messaging.messaging().apnsToken != nil else {
+             print("🚫 [FCM Validation] APNS 토큰 없음 - 검증 중단")
+             return
+        }
+        
         Messaging.messaging().token { [weak self] token, error in
             DispatchQueue.main.async {
                 if let error = error {
-                    print("❌ [FCM Validation] FCM 토큰 가져오기 실패: \(error.localizedDescription)")
+                    // print("❌ [FCM Validation] FCM 토큰 가져오기 실패: \(error.localizedDescription)")
                     return
                 }
 
                 guard let token = token, !token.isEmpty else {
-                    print("❌ [FCM Validation] FCM 토큰이 nil이거나 비어있음")
+                    // print("❌ [FCM Validation] FCM 토큰이 nil이거나 비어있음")
                     return
                 }
 
@@ -493,7 +529,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
         let urlString = "\(Http.shared.BASE_URL)\(Http.shared.memberFcmTokenUrl)/validate-and-refresh"
         guard let url = URL(string: urlString) else {
-            print("❌ [FCM Validation] 잘못된 URL: \(urlString)")
+            // print("❌ [FCM Validation] 잘못된 URL: \(urlString)")
             return
         }
 
@@ -511,19 +547,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: requestData)
         } catch {
-            print("❌ [FCM Validation] JSON 변환 실패: \(error.localizedDescription)")
+            // print("❌ [FCM Validation] JSON 변환 실패: \(error.localizedDescription)")
             return
         }
 
         URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             DispatchQueue.main.async {
                 if let error = error {
-                    print("❌ [FCM Validation] 네트워크 오류: \(error.localizedDescription)")
+                    // print("❌ [FCM Validation] 네트워크 오류: \(error.localizedDescription)")
                     return
                 }
 
                 guard let httpResponse = response as? HTTPURLResponse else {
-                    print("❌ [FCM Validation] HTTP 응답이 아님")
+                    // print("❌ [FCM Validation] HTTP 응답이 아님")
                     return
                 }
 
@@ -547,7 +583,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                                     UserDefaults.standard.synchronize()
                                 }
                             } else {
-                                print("⚠️ [FCM Validation] 토큰 검증 실패: \(message)")
+                                // print("⚠️ [FCM Validation] 토큰 검증 실패: \(message)")
 
                                 // 토큰이 유효하지 않은 경우 새 토큰 요청
                                 if message.contains("만료") || message.contains("유효하지") {
@@ -557,7 +593,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                             }
                         }
                     } catch {
-                        print("❌ [FCM Validation] JSON 파싱 오류: \(error.localizedDescription)")
+                        // print("❌ [FCM Validation] JSON 파싱 오류: \(error.localizedDescription)")
                     }
                 }
             }
@@ -573,15 +609,21 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         UserDefaults.standard.synchronize()
 
         // FCM 토큰 재생성 요청
+        // APNS 토큰 확인
+        guard Messaging.messaging().apnsToken != nil else {
+             print("🚫 [FCM Force] APNS 토큰 없음 - 갱신 중단")
+             return
+        }
+        
         Messaging.messaging().token { [weak self] token, error in
             DispatchQueue.main.async {
                 if let error = error {
-                    print("❌ [FCM Force] 토큰 갱신 실패: \(error.localizedDescription)")
+                    // print("❌ [FCM Force] 토큰 갱신 실패: \(error.localizedDescription)")
                     return
                 }
 
                 guard let token = token, !token.isEmpty else {
-                    print("❌ [FCM Force] 새 토큰이 nil이거나 비어있음")
+                    // print("❌ [FCM Force] 새 토큰이 nil이거나 비어있음")
                     return
                 }
 
@@ -590,7 +632,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                     if success {
                         print("✅ [FCM Force] 새 토큰 서버 업데이트 성공")
                     } else {
-                        print("❌ [FCM Force] 새 토큰 서버 업데이트 실패")
+                        // print("❌ [FCM Force] 새 토큰 서버 업데이트 실패")
                     }
                 }
             }
@@ -626,6 +668,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         UserDefaults.standard.synchronize()
 
         // FCM 토큰 재생성 요청
+        // APNS 토큰 확인
+        guard Messaging.messaging().apnsToken != nil else {
+             print("🚫 [FCM] APNS 토큰 없음 - 앱 시작 시 갱신 중단")
+             return
+        }
+        
         Messaging.messaging().token { [weak self] token, error in
             DispatchQueue.main.async {
                 if let error = error {
@@ -4889,7 +4937,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     
     /// 토큰 무결성 검증 수행
     private func performTokenIntegrityCheck() {
-        print("🔍 [FCM Integrity] 토큰 무결성 검증 시작")
+        // print("🔍 [FCM Integrity] 토큰 무결성 검증 시작")
         
         // 재시도 횟수 초기화
         fcmTokenRetryCount = 0
@@ -4899,22 +4947,22 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             guard let self = self else { return }
             
             if let error = error {
-                print("❌ [FCM Integrity] 토큰 가져오기 실패: \(error.localizedDescription)")
+                // print("❌ [FCM Integrity] 토큰 가져오기 실패: \(error.localizedDescription)")
                 self.handleTokenError(error)
                 return
             }
             
             guard let token = token else {
-                print("❌ [FCM Integrity] 토큰이 nil")
+                // print("❌ [FCM Integrity] 토큰이 nil")
                 self.handleNilTokenReceived()
                 return
             }
             
-            print("✅ [FCM Integrity] 토큰 가져오기 성공: \(token.prefix(30))...")
+            // print("✅ [FCM Integrity] 토큰 가져오기 성공: \(token.prefix(30))...")
             
             // 토큰 형식 검증
             if !self.validateTokenFormat(token) {
-                print("❌ [FCM Integrity] 토큰 형식 불량")
+                // print("❌ [FCM Integrity] 토큰 형식 불량")
                 self.requestNewToken()
                 return
             }
@@ -4928,13 +4976,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     private func validateTokenFormat(_ token: String) -> Bool {
         // 기본 길이 검증 (일반적으로 140-200자)
         guard token.count >= 140 && token.count <= 200 else {
-            print("❌ [Token Validation] 토큰 길이 불량: \(token.count)")
+            // print("❌ [Token Validation] 토큰 길이 불량: \(token.count)")
             return false
         }
         
         // 콜론 포함 여부 확인
         guard token.contains(":") else {
-            print("❌ [Token Validation] 콜론 없음")
+            // print("❌ [Token Validation] 콜론 없음")
             return false
         }
         
@@ -4943,11 +4991,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         guard components.count == 2,
               components[0].count >= 20,
               components[1].hasPrefix("APA91b") else {
-            print("❌ [Token Validation] 프로젝트 ID 또는 APA91b 접두사 불량")
+            // print("❌ [Token Validation] 프로젝트 ID 또는 APA91b 접두사 불량")
             return false
         }
         
-        print("✅ [Token Validation] 토큰 형식 검증 통과")
+        // print("✅ [Token Validation] 토큰 형식 검증 통과")
         return true
     }
     
@@ -4956,13 +5004,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         fcmTokenRetryCount += 1
         
         if fcmTokenRetryCount < maxTokenRetryAttempts {
-            print("🔄 [FCM Error] 토큰 에러 재시도 \(fcmTokenRetryCount)/\(maxTokenRetryAttempts)")
+            // print("🔄 [FCM Error] 토큰 에러 재시도 \(fcmTokenRetryCount)/\(maxTokenRetryAttempts)")
             
             DispatchQueue.main.asyncAfter(deadline: .now() + Double(fcmTokenRetryCount)) {
                 self.performTokenIntegrityCheck()
             }
         } else {
-            print("❌ [FCM Error] 최대 재시도 초과 - FCM 서비스 재초기화")
+            // print("❌ [FCM Error] 최대 재시도 초과 - FCM 서비스 재초기화")
             fcmTokenRetryCount = 0
             reinitializeFCMService()
         }
@@ -4970,14 +5018,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     
     /// 새로운 토큰 요청
     private func requestNewToken() {
-        print("🆕 [FCM New Token] 새로운 토큰 요청 시작")
+        // print("🆕 [FCM New Token] 새로운 토큰 요청 시작")
         
         // 기존 토큰 삭제
         Messaging.messaging().deleteToken { [weak self] error in
             if let error = error {
-                print("⚠️ [FCM New Token] 기존 토큰 삭제 실패: \(error.localizedDescription)")
+                // print("⚠️ [FCM New Token] 기존 토큰 삭제 실패: \(error.localizedDescription)")
             } else {
-                print("✅ [FCM New Token] 기존 토큰 삭제 성공")
+                // print("✅ [FCM New Token] 기존 토큰 삭제 성공")
             }
             
             // 새 토큰 요청
@@ -4989,7 +5037,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     
     /// FCM 서비스 재초기화
     private func reinitializeFCMService() {
-        print("🔄 [FCM Reinit] FCM 서비스 재초기화 시작")
+        // print("🔄 [FCM Reinit] FCM 서비스 재초기화 시작")
         
         // FCM 비활성화
         Messaging.messaging().isAutoInitEnabled = false
@@ -9281,6 +9329,19 @@ extension AppDelegate {
             print("✅ [FCM VALIDATE] 토큰 형식 유효")
         } else {
             print("❌ [FCM VALIDATE] 토큰 형식 무효 - 포그라운드 복귀 시 갱신 예정")
+        }
+    }
+}
+
+// MARK: - Naver Map Auth Delegate
+extension AppDelegate: NMFAuthManagerDelegate {
+    func authorized(_ state: NMFAuthState, error: Error?) {
+        print("🗺️ [NaverMap] Auth State: \(state)")
+        if let error = error {
+            print("❌ [NaverMap] Auth Error: \(error.localizedDescription)")
+            print("❌ [NaverMap] Code: \((error as NSError).code)")
+        } else {
+            print("✅ [NaverMap] 인증 성공!")
         }
     }
 }

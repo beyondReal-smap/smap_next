@@ -139,4 +139,11 @@ class Utils {
         formatter.locale = Locale(identifier: "ko_KR")
         return formatter.date(from: dateString)
     }
-} 
+}
+
+import SwiftUI
+extension Color {
+    var uiColor: UIColor {
+        return UIColor(self)
+    }
+}

@@ -1,0 +1,40 @@
+# Xcode
+#
+# gitignore contributors: autocomplete, autodetection, MicrosoftVisualStudio, Objective-C, Swift, Xcode
+
+## User-specific
+*.xcuserdatad
+*.xcscmblueprint
+
+## Xcode 8 and later
+/*.xcauthorivedata
+
+## Build results
+build/
+DerivedData/
+
+## CocoaPods
+#
+# We recommend against adding the Pods directory to your repository.
+# However, if you're a team of developers, it is common to check it in.
+Pods/
+Podfile.lock
+
+## Dependency Manager
+.swiftpm/
+.build/
+
+## Folders to exclude
+*.xccheckout
+*.moved-aside
+*.pin
+*.xcuserstate
+
+## Other
+.DS_Store
+*.swp
+*.lock
+
+## Security / Secret files (based on ls output)
+AuthKey_*.p8
+GoogleService-Info.plist
