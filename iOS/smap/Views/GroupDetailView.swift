@@ -246,7 +246,7 @@ struct GroupDetailView: View {
         }
         .sheet(isPresented: $showingQRCode) {
             QRCodeView(
-                data: "https://smap.site/group/\(group.sgt_idx)/join",
+                data: "https://nextstep.smap.site/group/\(group.sgt_idx)/join",
                 size: 250
             )
         }

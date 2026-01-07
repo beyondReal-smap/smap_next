@@ -23,7 +23,7 @@ struct SavedLocation: Codable, Identifiable, Equatable {
     let slt_lat: Double?
     let slt_long: Double?
     let slt_show: String?
-    let slt_enter_alarm: String?  // 알림 설정 (Y/N)
+    var slt_enter_alarm: String?  // 알림 설정 (Y/N)
     let slt_enter_chk: String?
     let slt_wdate: String?
     let slt_udate: String?

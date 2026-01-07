@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+ 스플래시용 아이콘 - 크기 제한 -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/app_no_bg"
+    android:insetTop="30%"
+    android:insetBottom="30%"
+    android:insetLeft="30%"
+    android:insetRight="30%" />

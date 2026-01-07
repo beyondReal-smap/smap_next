@@ -261,6 +261,7 @@ struct LoginView: View {
     
     /// 비밀번호 찾기 시트 표시 여부
     @State private var showForgotPassword = false
+    @State private var isFocused = false
     
     /// 기존 가입자 발견 시 전달받은 전화번호 (자동 입력)
     var prefilledPhone: String?
@@ -292,7 +293,7 @@ struct LoginView: View {
                 // Floating Animations
                 FloatingBackgroundView()
                 
-                ScrollView(showsIndicators: false) {
+                VStack(spacing: 0) {
                     VStack(spacing: 0) {
                         // 상단 여백 (유동적)
                         Spacer()
@@ -350,7 +351,6 @@ struct LoginView: View {
                         Spacer()
                     }
                     .padding(.horizontal, 24)
-                    .frame(minHeight: geometry.size.height)
                 }
                 
                 // 로딩 오버레이
@@ -418,11 +418,24 @@ struct LoginView: View {
     private var loginFormSection: some View {
         VStack(spacing: 16) {
             // 전화번호 입력
-            FocusableTextField(
-                placeholder: "전화번호",
-                text: $viewModel.phoneNumber,
-                icon: "phone.fill",
-                keyboardType: .phonePad
+            HStack(spacing: 12) {
+                Image(systemName: "phone.fill")
+                    .foregroundColor(isFocused ? BrandColors.primary : BrandColors.textSecondary)
+                    .frame(width: 20)
+                
+                PhoneTextField(text: $viewModel.phoneNumber, placeholder: "전화번호", onEditingChanged: { editing in
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isFocused = editing
+                    }
+                })
+            }
+            .padding(.horizontal, 16)
+            .frame(height: 56)
+            .background(BrandColors.inputBackground)
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(isFocused ? BrandColors.primary : BrandColors.border, lineWidth: isFocused ? 2 : 1)
             )
             
             // 비밀번호 입력
@@ -3996,45 +4009,34 @@ struct RegisterPhoneView: View {
                 .font(.suite(size: 24, weight: .bold))
                 .foregroundColor(BrandColors.textPrimary)
             
-            FocusableTextField(
-                placeholder: "010-0000-0000",
-                text: Binding(
-                    get: { viewModel.registerData.mt_id },
-                    set: { newValue in
-                        // 자동 하이픈 포맷팅
-                        viewModel.registerData.mt_id = formatPhoneNumber(newValue)
-                    }
-                ),
-                icon: "phone",
-                keyboardType: .numberPad
-            )
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 12) {
+                    Image(systemName: "phone")
+                        .foregroundColor(isFocused ? BrandColors.primary : BrandColors.textSecondary)
+                        .frame(width: 20)
+                    
+                    PhoneTextField(text: $viewModel.registerData.mt_id, placeholder: "010-0000-0000", onEditingChanged: { editing in
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            isFocused = editing
+                        }
+                    })
+                }
+                .padding(.horizontal, 16)
+                .frame(height: 56)
+                .background(BrandColors.inputBackground)
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(isFocused ? BrandColors.primary : BrandColors.border, lineWidth: isFocused ? 2 : 1)
+                )
+            }
             
             Spacer()
         }
         .padding()
     }
     
-    // 전화번호 자동 포맷팅 (010-0000-0000)
-    private func formatPhoneNumber(_ value: String) -> String {
-        let numbers = value.filter { $0.isNumber }
-        let limited = String(numbers.prefix(11))
-        
-        switch limited.count {
-        case 0...3:
-            return limited
-        case 4...6:
-            let index1 = limited.index(limited.startIndex, offsetBy: 3)
-            return "\(limited[..<index1])-\(limited[index1...])"
-        case 7...10:
-            let index1 = limited.index(limited.startIndex, offsetBy: 3)
-            let index2 = limited.index(limited.startIndex, offsetBy: 6)
-            return "\(limited[..<index1])-\(limited[index1..<index2])-\(limited[index2...])"
-        default:
-            let index1 = limited.index(limited.startIndex, offsetBy: 3)
-            let index2 = limited.index(limited.startIndex, offsetBy: 7)
-            return "\(limited[..<index1])-\(limited[index1..<index2])-\(limited[index2...])"
-        }
-    }
+    @State private var isFocused: Bool = false
 }
 
 // MARK: - Verification View
@@ -4651,6 +4653,7 @@ struct NativeRegisterView: View {
 struct ForgotPasswordView: View {
     @StateObject private var viewModel = ForgotPasswordViewModel()
     @Environment(\.dismiss) var dismiss
+    @State private var isFocused = false
     
     var body: some View {
         NavigationView {
@@ -4768,16 +4771,18 @@ struct ForgotPasswordView: View {
                     .font(.custom("SUITE-SemiBold", size: 14))
                     .foregroundColor(.gray)
                 
-                TextField("010-0000-0000", text: $viewModel.phoneNumber)
-                    .keyboardType(.numberPad)
-                    .font(.custom("SUITE-Medium", size: 18))
+                PhoneTextField(text: $viewModel.phoneNumber, placeholder: "010-0000-0000", onEditingChanged: { editing in
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isFocused = editing
+                    }
+                })
                     .padding(.horizontal, 16)
-                    .frame(height: 56) // Fixed height to prevent resizing
+                    .frame(height: 56)
                     .background(Color(white: 0.96))
                     .cornerRadius(12)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color(hex: "#0113A3").opacity(0.3), lineWidth: 1)
+                            .stroke(isFocused ? Color(hex: "#0113A3") : Color(hex: "#0113A3").opacity(0.3), lineWidth: isFocused ? 2 : 1)
                     )
             }
             
@@ -5032,7 +5037,7 @@ struct SavedLocation: Codable, Identifiable, Equatable {
     let slt_lat: Double?
     let slt_long: Double?
     let slt_show: String?
-    let slt_enter_alarm: String?
+    var slt_enter_alarm: String?
     let slt_enter_chk: String?
     let slt_wdate: String?
     let slt_udate: String?
@@ -5502,17 +5507,30 @@ class MyPlaceViewModel: ObservableObject {
     
     @MainActor
     func toggleNotification(for location: SavedLocation) async -> Bool {
-        do {
-            _ = try await myPlaceService.toggleNotification(locationId: location.slt_idx, enabled: !location.notifications)
-            if let memberId = selectedMember?.mt_idx { 
-                await loadMemberLocations(memberId: memberId)
-                // Critical: Update selectedLocation to trigger UI refresh in detail panel
-                if let updated = locations.first(where: { $0.slt_idx == location.slt_idx }) {
-                    selectedLocation = updated
-                }
+        // Optimistic UI update: update local state immediately to prevent layout jitter
+        let newNotificationState = !location.notifications
+        let newAlarmValue = newNotificationState ? "Y" : "N"
+        if let index = locations.firstIndex(where: { $0.slt_idx == location.slt_idx }) {
+            locations[index].slt_enter_alarm = newAlarmValue
+            // Also update selectedLocation if it's the same location
+            if selectedLocation?.slt_idx == location.slt_idx {
+                selectedLocation = locations[index]
             }
+        }
+        
+        do {
+            // Make the API call (no need to reload all locations)
+            _ = try await myPlaceService.toggleNotification(locationId: location.slt_idx, enabled: newNotificationState)
             return true
         } catch {
+            // Revert on error
+            let revertAlarmValue = newNotificationState ? "N" : "Y"
+            if let index = locations.firstIndex(where: { $0.slt_idx == location.slt_idx }) {
+                locations[index].slt_enter_alarm = revertAlarmValue
+                if selectedLocation?.slt_idx == location.slt_idx {
+                    selectedLocation = locations[index]
+                }
+            }
             handleError(error)
             return false
         }
@@ -5907,7 +5925,10 @@ struct MyPlaceSidebarView: View {
                     ForEach(viewModel.locations) { location in
                         PlaceLocationCell(
                             location: location,
-                            isSelected: viewModel.selectedLocation?.slt_idx == location.slt_idx
+                            isSelected: viewModel.selectedLocation?.slt_idx == location.slt_idx,
+                            onToggleNotification: {
+                                Task { await viewModel.toggleNotification(for: location) }
+                            }
                         ) {
                             viewModel.selectLocationFromSidebar(location)
                         }
@@ -6110,44 +6131,60 @@ struct PlaceMemberCircleCell: View {
 struct PlaceLocationCell: View {
     let location: SavedLocation
     let isSelected: Bool
+    let onToggleNotification: () -> Void
     let onTap: () -> Void
     
     private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
     
     var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 12) {
-                // Location Info
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(location.name)
-                        .font(.suite(size: 16, weight: .medium))
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-                    Text(location.address)
-                        .font(.suite(size: 10))
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
+        ZStack(alignment: .trailing) {
+            // Base layer: Main row content (tappable for selection)
+            Button(action: onTap) {
+                HStack(spacing: 12) {
+                    // Location Info
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(location.name)
+                            .font(.suite(size: 16, weight: .medium))
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+                        Text(location.address)
+                            .font(.suite(size: 10))
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+                    
+                    Spacer()
+                    
+                    // Placeholder for bell button (important: disable hit testing)
+                    Color.clear
+                        .frame(width: 40, height: 40)
+                        .allowsHitTesting(false)
                 }
-                
-                Spacer()
-                
-                // Notification indicator
-                if location.notifications {
-                    Image(systemName: "bell.fill")
-                        .font(.suite(size: 12))
-                        .foregroundColor(.orange)
-                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(isSelected ? brandColor.opacity(0.08) : Color.white.opacity(0.6))
+                .cornerRadius(10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(isSelected ? brandColor.opacity(0.3) : Color.clear, lineWidth: 1)
+                )
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(isSelected ? brandColor.opacity(0.08) : Color.white.opacity(0.6))
-            .cornerRadius(10)
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(isSelected ? brandColor.opacity(0.3) : Color.clear, lineWidth: 1)
-            )
+            .buttonStyle(PlainButtonStyle())
+            
+            // Top layer: Notification Toggle Button (independent touch target)
+            Button(action: onToggleNotification) {
+                Image(systemName: location.notifications ? "bell.fill" : "bell.slash")
+                    .font(.system(size: 14))
+                    .foregroundColor(location.notifications ? .orange : .gray.opacity(0.4))
+                    .frame(width: 36, height: 36)
+                    .background(Color.white)
+                    .clipShape(Circle())
+                    .shadow(color: Color.black.opacity(0.08), radius: 2, x: 0, y: 1)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(PlainButtonStyle())
+            .padding(.trailing, 12)
         }
-        .buttonStyle(PlainButtonStyle())
     }
 }
 
@@ -8999,5 +9036,112 @@ struct ActivityLogMapView: UIViewRepresentable {
 struct ActivityLogView_Previews: PreviewProvider {
     static var previews: some View {
         ActivityLogView()
+    }
+}
+
+// MARK: - Phone Number TextField with Auto Hyphenation (iOS 13+ / UIViewRepresentable)
+// Handles cursor jumping issue by managing formatting at the UITextField level.
+struct PhoneTextField: UIViewRepresentable {
+    @Binding var text: String
+    let placeholder: String
+    var onEditingChanged: ((Bool) -> Void)? = nil
+    
+    class Coordinator: NSObject, UITextFieldDelegate {
+        @Binding var text: String
+        var onEditingChanged: ((Bool) -> Void)?
+        
+        init(text: Binding<String>, onEditingChanged: ((Bool) -> Void)?) {
+            _text = text
+            self.onEditingChanged = onEditingChanged
+        }
+        
+        @objc func textFieldDidChange(_ textField: UITextField) {
+            let digits = (textField.text ?? "").filter { $0.isNumber }.prefix(11)
+            let formatted = formatPhone(String(digits))
+            
+            // Calculate cursor offset from the end to maintain position
+            let selectedRange = textField.selectedTextRange
+            let cursorOffsetFromEnd = textField.offset(from: textField.endOfDocument, to: selectedRange?.end ?? textField.endOfDocument)
+            
+            textField.text = formatted
+            self.text = String(digits) // Update binding with digits only
+            
+            // Restore cursor position
+            if let newPosition = textField.position(from: textField.endOfDocument, offset: cursorOffsetFromEnd) {
+                textField.selectedTextRange = textField.textRange(from: newPosition, to: newPosition)
+            }
+        }
+        
+        func textFieldDidBeginEditing(_ textField: UITextField) {
+            onEditingChanged?(true)
+        }
+        
+        func textFieldDidEndEditing(_ textField: UITextField) {
+            onEditingChanged?(false)
+        }
+        
+        private func formatPhone(_ value: String) -> String {
+            let limited = String(value.prefix(11))
+            switch limited.count {
+            case 0...3:
+                return limited
+            case 4...6:
+                let index1 = limited.index(limited.startIndex, offsetBy: 3)
+                return "\(limited[..<index1])-\(limited[index1...])"
+            case 7...10:
+                let index1 = limited.index(limited.startIndex, offsetBy: 3)
+                let index2 = limited.index(limited.startIndex, offsetBy: 6)
+                return "\(limited[..<index1])-\(limited[index1..<index2])-\(limited[index2...])"
+            default:
+                let index1 = limited.index(limited.startIndex, offsetBy: 3)
+                let index2 = limited.index(limited.startIndex, offsetBy: 7)
+                return "\(limited[..<index1])-\(limited[index1..<index2])-\(limited[index2...])"
+            }
+        }
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: $text, onEditingChanged: onEditingChanged)
+    }
+    
+    func makeUIView(context: Context) -> UITextField {
+        let textField = UITextField()
+        textField.placeholder = placeholder
+        textField.keyboardType = .numberPad
+        textField.delegate = context.coordinator
+        textField.font = UIFont(name: "SUITE-Regular", size: 16)
+        textField.addTarget(context.coordinator, action: #selector(Coordinator.textFieldDidChange(_:)), for: .editingChanged)
+        
+        // Initial text
+        let digits = text.filter { $0.isNumber }
+        textField.text = formatPhone(String(digits.prefix(11)))
+        
+        return textField
+    }
+    
+    func updateUIView(_ uiView: UITextField, context: Context) {
+        let digits = text.filter { $0.isNumber }
+        let formatted = formatPhone(String(digits.prefix(11)))
+        if uiView.text != formatted {
+            uiView.text = formatted
+        }
+    }
+    
+    private func formatPhone(_ value: String) -> String {
+        let limited = String(value.prefix(11))
+        switch limited.count {
+        case 0...3: return limited
+        case 4...6:
+            let index1 = limited.index(limited.startIndex, offsetBy: 3)
+            return "\(limited[..<index1])-\(limited[index1...])"
+        case 7...10:
+            let index1 = limited.index(limited.startIndex, offsetBy: 3)
+            let index2 = limited.index(limited.startIndex, offsetBy: 6)
+            return "\(limited[..<index1])-\(limited[index1..<index2])-\(limited[index2...])"
+        default:
+            let index1 = limited.index(limited.startIndex, offsetBy: 3)
+            let index2 = limited.index(limited.startIndex, offsetBy: 7)
+            return "\(limited[..<index1])-\(limited[index1..<index2])-\(limited[index2...])"
+        }
     }
 }

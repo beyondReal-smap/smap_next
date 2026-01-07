@@ -532,14 +532,29 @@ async def get_member_location_logs(
 @router.get("/member-location-logs/{mt_idx}/summary")
 async def get_location_summary(
     mt_idx: int,
+    date: Optional[str] = Query(None, description="특정 날짜 (YYYY-MM-DD 형식)"),
     start_date: Optional[str] = Query(None, description="시작 날짜 (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="종료 날짜 (YYYY-MM-DD)"),
     db: Session = Depends(get_db)
 ):
-    """위치 로그 요약 정보 조회 (GET 방식)"""
+    """
+    위치 로그 요약 정보 조회 (GET 방식)
+    date 파라미터가 있으면 해당 날짜의 상세 요약을, 
+    없으면 start_date/end_date 범위의 요약을 반환합니다.
+    """
     try:
-        summary = location_log_crud.get_location_summary(db, mt_idx, start_date, end_date)
-        return {"result": "Y", "data": summary.model_dump()}
+        if date:
+            # iOS 앱 및 활동로그 페이지에서 사용하는 특정 날짜 요약 (PHP 로직 기반)
+            summary = location_log_crud.get_location_log_summary(db, mt_idx, date)
+            return {
+                "result": "Y",
+                "data": summary.model_dump(),
+                "message": "위치 로그 요약 조회 성공"
+            }
+        else:
+            # 기간별 기본 요약
+            summary = location_log_crud.get_location_summary(db, mt_idx, start_date, end_date)
+            return {"result": "Y", "data": summary.model_dump()}
     except Exception as e:
         logger.error(f"Error getting location summary: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -581,28 +596,7 @@ async def get_daily_location_logs(
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/member-location-logs/{mt_idx}/summary")
-async def get_daily_location_summary(
-    mt_idx: int,
-    date: str = Query(..., description="날짜 (YYYY-MM-DD 형식)"),
-    db: Session = Depends(get_db)
-):
-    """특정 회원의 특정 날짜 위치 요약 정보 조회 (GET 방식)"""
-    try:
-        logger.info(f"[GET] Daily location summary: mt_idx={mt_idx}, date={date}")
-        
-        summary = location_log_crud.get_member_daily_location_summary(
-            db, mt_idx, date
-        )
-        
-        logger.info(f"Retrieved daily location summary for member {mt_idx} on {date}")
-        
-        return summary
-        
-    except Exception as e:
-        logger.error(f"Error getting daily location summary: {str(e)}")
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=str(e))
+# 중복된 /summary 엔드포인트 제거 (위의 통합 엔드포인트로 대체됨)
 
 @router.get("/member-location-logs/{mt_idx}/path")
 async def get_daily_location_path(

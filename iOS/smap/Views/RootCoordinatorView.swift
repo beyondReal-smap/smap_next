@@ -33,6 +33,80 @@ struct ActivityIndicator: UIViewRepresentable {
     }
 }
 
+// MARK: - Custom DatePicker with 10-minute intervals
+
+/// UIKit의 UIDatePicker를 래핑하여 10분 단위 시간 선택 지원 + SUITE 폰트 적용
+struct DatePickerWith10MinInterval: UIViewRepresentable {
+    @Binding var selection: Date
+    var displayedComponents: DatePickerComponents
+    var accentColor: Color
+    
+    struct DatePickerComponents: OptionSet {
+        let rawValue: Int
+        static let date = DatePickerComponents(rawValue: 1 << 0)
+        static let hourAndMinute = DatePickerComponents(rawValue: 1 << 1)
+    }
+    
+    func makeUIView(context: Context) -> UIDatePicker {
+        let picker = UIDatePicker()
+        picker.minuteInterval = 10 // 10분 단위
+        picker.preferredDatePickerStyle = .compact
+        picker.addTarget(context.coordinator, action: #selector(Coordinator.dateChanged(_:)), for: .valueChanged)
+        
+        // SUITE 폰트를 DatePicker 내부 라벨에 적용
+        applySuiteFont(to: picker)
+        
+        return picker
+    }
+    
+    func updateUIView(_ uiView: UIDatePicker, context: Context) {
+        uiView.date = selection
+        
+        // displayedComponents에 따라 datePickerMode 설정
+        if displayedComponents.contains(.date) && displayedComponents.contains(.hourAndMinute) {
+            uiView.datePickerMode = .dateAndTime
+        } else if displayedComponents.contains(.date) {
+            uiView.datePickerMode = .date
+        } else if displayedComponents.contains(.hourAndMinute) {
+            uiView.datePickerMode = .time
+        }
+        
+        // accentColor 적용
+        uiView.tintColor = UIColor(accentColor)
+        
+        // 폰트 재적용 (상태 변경 시)
+        applySuiteFont(to: uiView)
+    }
+    
+    /// SUITE 폰트를 DatePicker의 모든 UILabel에 적용
+    private func applySuiteFont(to view: UIView) {
+        for subview in view.subviews {
+            if let label = subview as? UILabel {
+                label.font = UIFont(name: "SUITE-Medium", size: label.font.pointSize) ?? label.font
+            }
+            applySuiteFont(to: subview)
+        }
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject {
+        var parent: DatePickerWith10MinInterval
+        
+        init(_ parent: DatePickerWith10MinInterval) {
+            self.parent = parent
+        }
+        
+        @objc func dateChanged(_ sender: UIDatePicker) {
+            parent.selection = sender.date
+            // 값 변경 후 폰트 재적용
+            parent.applySuiteFont(to: sender)
+        }
+    }
+}
+
 // MARK: - Map Loading Overlay
 
 struct MapLoadingOverlay: View {
@@ -199,7 +273,24 @@ class RootCoordinator: ObservableObject {
             guard let self = self else { return }
             
             if self.authService.isLoggedIn {
-                print("✅ [RootCoordinator] 로그인 상태 - MainView로 이동")
+                print("✅ [RootCoordinator] 로그인 상태 - 프로필 갱신 후 MainView로 이동")
+                
+                // 앱 시작 시 사용자 프로필 및 아바타 이미지 갱신
+                Task {
+                    do {
+                        let updatedUser = try await self.authService.fetchUserProfile()
+                        print("✅ [RootCoordinator] 사용자 프로필 갱신 완료: \(updatedUser.displayName)")
+                        
+                        // 아바타 이미지 미리 캐시 (있는 경우)
+                        if let avatarPath = updatedUser.mt_file1,
+                           let avatarUrl = AuthService.getProfileImageURL(avatarPath) {
+                            self.prefetchAvatarImage(url: avatarUrl)
+                        }
+                    } catch {
+                        print("⚠️ [RootCoordinator] 프로필 갱신 실패 (오프라인 모드로 계속): \(error)")
+                    }
+                }
+                
                 self.currentScreen = .main
             } else {
                 print("🔐 [RootCoordinator] 로그아웃 상태 - LoginView로 이동")
@@ -226,6 +317,17 @@ class RootCoordinator: ObservableObject {
         print("📝 [RootCoordinator] 회원가입 화면으로 이동")
         registerSocialData = socialData
         currentScreen = .register
+    }
+    
+    /// 아바타 이미지 미리 다운로드 및 캐시
+    private func prefetchAvatarImage(url: URL) {
+        URLSession.shared.dataTask(with: url) { data, response, error in
+            if let data = data, let _ = UIImage(data: data) {
+                print("✅ [RootCoordinator] 아바타 이미지 캐시 완료: \(url.lastPathComponent)")
+            } else if let error = error {
+                print("⚠️ [RootCoordinator] 아바타 이미지 캐시 실패: \(error.localizedDescription)")
+            }
+        }.resume()
     }
 }
 
@@ -316,7 +418,7 @@ public struct SettingMenuView: View {
                             ])
                             
                             SettingsMenuSectionView(title: "고객 지원", items: [
-                                SettingsMenuItem(title: "사용 가이드", icon: "book.fill", color: .yellow, destination: AnyView(TermsWebView(title: "사용 가이드", url: "https://nextstep.smap.site/setting/manual"))),
+                                SettingsMenuItem(title: "사용 가이드", icon: "book.fill", color: .yellow, destination: AnyView(UserGuideView())),
                                 SettingsMenuItem(title: "1:1 문의", icon: "envelope.fill", color: .orange, destination: AnyView(InquiryView())),
                                 SettingsMenuItem(title: "공지사항", icon: "bell.fill", color: .red, destination: AnyView(NoticeListView()))
                             ])
@@ -328,7 +430,7 @@ public struct SettingMenuView: View {
                             Text("SMAP")
                                 .font(.suite(size: 14, weight: .semibold))
                                 .foregroundColor(.gray)
-                            Text("버전 3.0.0")
+                            Text("버전 3.0.1")
                                 .font(.suite(size: 12))
                                 .foregroundColor(.gray.opacity(0.8))
                         }
@@ -1159,6 +1261,7 @@ class NoticeService {
 }
 
 struct NoticeListView: View {
+    @Environment(\.presentationMode) var presentationMode
     @State private var notices: [SmapNotice] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
@@ -1242,6 +1345,24 @@ struct NoticeListView: View {
         }
         .navigationTitle("공지사항")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text("공지사항")
+                    .font(.suite(size: 18, weight: .bold))
+            }
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: { presentationMode.wrappedValue.dismiss() }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                            .font(.suite(size: 18, weight: .semibold))
+                        Text("뒤로")
+                            .font(.suite(size: 18, weight: .bold))
+                    }
+                    .foregroundColor(.primary)
+                }
+            }
+        }
         .onAppear {
             fetchNotices()
         }
@@ -1368,7 +1489,7 @@ struct InquiryView: View {
     @State private var alertMessage = ""
     @State private var isSuccess = false
     
-    private let botToken = "7701491070:AAH6wpf7wK5o7jq--mRlZWpE_rb3HIIjvBU"
+    private let botToken = "8110782503:AAFSLBB8NWjzZy3vhPZGJH4boVEM2y9h0HM"
     private let chatId = "6495247513"
     
     private let categories = [
@@ -1444,10 +1565,23 @@ struct InquiryView: View {
                                 .font(.suite(size: 15))
                                 .keyboardType(.emailAddress)
                                 .autocapitalization(.none)
-                                .padding()
+                                .padding(.horizontal, 16)
+                                .frame(height: 52) // 고정 높이
                                 .background(Color.white)
                                 .cornerRadius(12)
-                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.gray.opacity(0.2), lineWidth: 1))
+                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(emailValidationBorderColor, lineWidth: 1))
+                            
+                            // 실시간 이메일 유효성 검사 결과
+                            if !email.isEmpty {
+                                HStack(spacing: 6) {
+                                    Image(systemName: isEmailValid ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                                        .font(.suite(size: 12))
+                                    Text(isEmailValid ? "올바른 이메일 형식입니다." : "올바른 이메일 형식이 아닙니다.")
+                                        .font(.suite(size: 12))
+                                }
+                                .foregroundColor(isEmailValid ? .green : .red)
+                                .padding(.leading, 4)
+                            }
                         }
                         
                         VStack(alignment: .leading, spacing: 8) {
@@ -1455,7 +1589,8 @@ struct InquiryView: View {
                                 .font(.suite(size: 15, weight: .bold))
                             TextField("문의 제목을 입력하세요", text: $subject)
                                 .font(.suite(size: 15))
-                                .padding()
+                                .padding(.horizontal, 16)
+                                .frame(height: 52) // 고정 높이
                                 .background(Color.white)
                                 .cornerRadius(12)
                                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.gray.opacity(0.2), lineWidth: 1))
@@ -1510,6 +1645,24 @@ struct InquiryView: View {
         }
         .navigationTitle("1:1 문의")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text("1:1 문의")
+                    .font(.suite(size: 18, weight: .bold))
+            }
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: { presentationMode.wrappedValue.dismiss() }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                            .font(.suite(size: 18, weight: .semibold))
+                        Text("뒤로")
+                            .font(.suite(size: 18, weight: .bold))
+                    }
+                    .foregroundColor(.primary)
+                }
+            }
+        }
         .alert(isPresented: $showingAlert) {
             Alert(
                 title: Text(isSuccess ? "전송 완료" : "오류"),
@@ -1523,8 +1676,23 @@ struct InquiryView: View {
         }
     }
     
+    /// 이메일 형식 유효성 검사 (정규식 사용)
+    private var isEmailValid: Bool {
+        let emailRegex = "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"
+        let emailPredicate = NSPredicate(format: "SELF MATCHES %@", emailRegex)
+        return emailPredicate.evaluate(with: email)
+    }
+    
+    /// 이메일 입력 필드 테두리 색상
+    private var emailValidationBorderColor: Color {
+        if email.isEmpty {
+            return Color.gray.opacity(0.2)
+        }
+        return isEmailValid ? Color.green.opacity(0.5) : Color.red.opacity(0.5)
+    }
+    
     private var isFormValid: Bool {
-        !email.isEmpty && !subject.isEmpty && !message.isEmpty && email.contains("@")
+        isEmailValid && !subject.isEmpty && !message.isEmpty
     }
     
     private func sendInquiry() {
@@ -1570,10 +1738,16 @@ struct InquiryView: View {
             DispatchQueue.main.async {
                 isSending = false
                 if let error = error {
+                    print("❌ [Telegram] Network error: \(error.localizedDescription)")
                     alertMessage = "전송 중 오류가 발생했습니다: \(error.localizedDescription)"
                     isSuccess = false
                     showingAlert = true
                 } else if let httpResponse = response as? HTTPURLResponse {
+                    print("📡 [Telegram] Response status: \(httpResponse.statusCode)")
+                    if let responseData = data, let responseString = String(data: responseData, encoding: .utf8) {
+                        print("📡 [Telegram] Response body: \(responseString)")
+                    }
+                    
                     if httpResponse.statusCode == 200 {
                         alertMessage = "문의가 성공적으로 전송되었습니다."
                         isSuccess = true
@@ -1583,8 +1757,11 @@ struct InquiryView: View {
                         subject = ""
                         message = ""
                     } else {
+                        // Telegram API는 401을 반환하지 않음 - 보통 400 또는 403
+                        // 401이 나온다면 Bot Token이 유효하지 않음
                         let errorDetail = data.flatMap { String(data: $0, encoding: .utf8) } ?? "상세 오류 없음"
-                        alertMessage = "전송에 실패했습니다. (Error: \(httpResponse.statusCode))\n\(errorDetail)"
+                        print("❌ [Telegram] Error detail: \(errorDetail)")
+                        alertMessage = "전송에 실패했습니다. (Error: \(httpResponse.statusCode))"
                         isSuccess = false
                         showingAlert = true
                     }
@@ -1690,6 +1867,20 @@ struct ServiceTermsView: View {
         }
         .background(Color(red: 0.98, green: 0.98, blue: 1.0).edgesIgnoringSafeArea(.all))
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: { presentationMode.wrappedValue.dismiss() }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                            .font(.suite(size: 18, weight: .semibold))
+                        Text("뒤로")
+                            .font(.suite(size: 18, weight: .bold))
+                    }
+                    .foregroundColor(.primary)
+                }
+            }
+        }
     }
 }
 
@@ -1758,6 +1949,20 @@ struct PrivacyPolicyView: View {
         }
         .background(Color(red: 0.98, green: 0.98, blue: 1.0).edgesIgnoringSafeArea(.all))
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: { presentationMode.wrappedValue.dismiss() }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                            .font(.suite(size: 18, weight: .semibold))
+                        Text("뒤로")
+                            .font(.suite(size: 18, weight: .bold))
+                    }
+                    .foregroundColor(.primary)
+                }
+            }
+        }
     }
 }
 
@@ -1827,6 +2032,20 @@ struct LocationTermsView: View {
         }
         .background(Color(red: 0.98, green: 0.98, blue: 1.0).edgesIgnoringSafeArea(.all))
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: { presentationMode.wrappedValue.dismiss() }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                            .font(.suite(size: 18, weight: .semibold))
+                        Text("뒤로")
+                            .font(.suite(size: 18, weight: .bold))
+                    }
+                    .foregroundColor(.primary)
+                }
+            }
+        }
     }
 }
 
@@ -1873,17 +2092,17 @@ struct MarketingConsentView: View {
                     
                     TermSection(title: "동의 철회 및 거부", content: "고객은 언제든지 마케팅 정보 수집 및 이용에 대한 동의를 철회하거나 거부할 수 있습니다.")
                     
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("동의 철회 방법")
-                            .font(.suite(size: 16, weight: .bold))
-                        Text("설정 > 개인정보 처리방침에서 동의 철회 가능")
-                            .font(.suite(size: 13))
-                            .foregroundColor(.gray)
-                    }
-                    .padding(16)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.blue.opacity(0.05))
-                    .cornerRadius(12)
+                    // VStack(alignment: .leading, spacing: 8) {
+                    //     Text("동의 철회 방법")
+                    //         .font(.suite(size: 16, weight: .bold))
+                    //     Text("설정 > 개인정보 처리방침에서 동의 철회 가능")
+                    //         .font(.suite(size: 13))
+                    //         .foregroundColor(.gray)
+                    // }
+                    // .padding(16)
+                    // .frame(maxWidth: .infinity, alignment: .leading)
+                    // .background(Color.blue.opacity(0.05))
+                    // .cornerRadius(12)
                 }
                 .padding(.bottom, 40)
             }
@@ -1891,6 +2110,20 @@ struct MarketingConsentView: View {
         }
         .background(Color(red: 0.98, green: 0.98, blue: 1.0).edgesIgnoringSafeArea(.all))
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: { presentationMode.wrappedValue.dismiss() }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                            .font(.suite(size: 18, weight: .semibold))
+                        Text("뒤로")
+                            .font(.suite(size: 18, weight: .bold))
+                    }
+                    .foregroundColor(.primary)
+                }
+            }
+        }
     }
 }
 
@@ -1938,17 +2171,17 @@ struct ThirdPartyProvisionView: View {
                     
                     TermSection(title: "동의 철회 및 거부", content: "이용자는 언제든지 제3자 제공에 대한 동의를 철회하거나 거부할 수 있습니다.")
                     
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("동의 철회 방법")
-                            .font(.suite(size: 16, weight: .bold))
-                        Text("설정 > 개인정보 처리방침에서 동의 철회 가능")
-                            .font(.suite(size: 13))
-                            .foregroundColor(.gray)
-                    }
-                    .padding(16)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.blue.opacity(0.05))
-                    .cornerRadius(12)
+                    // VStack(alignment: .leading, spacing: 8) {
+                    //     Text("동의 철회 방법")
+                    //         .font(.suite(size: 16, weight: .bold))
+                    //     Text("설정 > 개인정보 처리방침에서 동의 철회 가능")
+                    //         .font(.suite(size: 13))
+                    //         .foregroundColor(.gray)
+                    // }
+                    // .padding(16)
+                    // .frame(maxWidth: .infinity, alignment: .leading)
+                    // .background(Color.blue.opacity(0.05))
+                    // .cornerRadius(12)
                 }
                 .padding(.bottom, 40)
             }
@@ -1956,6 +2189,259 @@ struct ThirdPartyProvisionView: View {
         }
         .background(Color(red: 0.98, green: 0.98, blue: 1.0).edgesIgnoringSafeArea(.all))
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: { presentationMode.wrappedValue.dismiss() }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                            .font(.suite(size: 18, weight: .semibold))
+                        Text("뒤로")
+                            .font(.suite(size: 18, weight: .bold))
+                    }
+                    .foregroundColor(.primary)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - User Guide View
+struct UserGuideView: View {
+    @Environment(\.presentationMode) var presentationMode
+    
+    private let videos: [(title: String, description: String, url: String)] = [
+        ("소개1", "스케줄맵 기본 소개", "https://www.youtube.com/embed/fRLxsHCvwuQ"),
+        ("소개2", "스케줄맵 상세 소개", "https://www.youtube.com/embed/xOqCizxr2uk"),
+        ("그룹", "그룹 기능 사용법", "https://www.youtube.com/embed/Bvzaz5vFyAo"),
+        ("일정", "일정 관리 방법", "https://www.youtube.com/embed/Ba83-yfjvBQ"),
+        ("내장소", "내장소 등록 및 관리", "https://www.youtube.com/embed/EDcvCwZmF38")
+    ]
+    
+    var body: some View {
+        ZStack {
+            Color(red: 0.98, green: 0.98, blue: 1.0).edgesIgnoringSafeArea(.all)
+            
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Header Card
+                    VStack(spacing: 12) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack(spacing: 8) {
+                                    Text("사용 가이드")
+                                        .font(.suite(size: 22, weight: .bold))
+                                        .foregroundColor(.white)
+                                    
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "play.fill")
+                                            .font(.suite(size: 10))
+                                        Text("동영상")
+                                            .font(.suite(size: 11, weight: .medium))
+                                    }
+                                    .foregroundColor(.white.opacity(0.9))
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.white.opacity(0.2))
+                                    .cornerRadius(12)
+                                }
+                                
+                                Text("앱 사용법 및 도움말")
+                                    .font(.suite(size: 14))
+                                    .foregroundColor(.white.opacity(0.85))
+                                Text("동영상으로 쉽게 배우는 스케줄맵")
+                                    .font(.suite(size: 12))
+                                    .foregroundColor(.white.opacity(0.7))
+                            }
+                            Spacer()
+                            
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(Color.white.opacity(0.2))
+                                    .frame(width: 60, height: 60)
+                                Image(systemName: "book.fill")
+                                    .font(.suite(size: 28))
+                                    .foregroundColor(.white)
+                            }
+                        }
+                        
+                        Divider()
+                            .background(Color.white.opacity(0.3))
+                        
+                        HStack(spacing: 0) {
+                            VStack(spacing: 4) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "play.fill")
+                                        .font(.suite(size: 12))
+                                        .foregroundColor(.white.opacity(0.7))
+                                    Text("총 영상")
+                                        .font(.suite(size: 12))
+                                        .foregroundColor(.white.opacity(0.8))
+                                }
+                                Text("\(videos.count)개")
+                                    .font(.suite(size: 18, weight: .bold))
+                                    .foregroundColor(.white)
+                            }
+                            .frame(maxWidth: .infinity)
+                            
+                            VStack(spacing: 4) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "book.fill")
+                                        .font(.suite(size: 12))
+                                        .foregroundColor(.white.opacity(0.7))
+                                    Text("가이드")
+                                        .font(.suite(size: 12))
+                                        .foregroundColor(.white.opacity(0.8))
+                                }
+                                Text("무료")
+                                    .font(.suite(size: 18, weight: .bold))
+                                    .foregroundColor(.white)
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                    }
+                    .padding(24)
+                    .background(
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color.yellow, Color.orange]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .cornerRadius(24)
+                    .shadow(color: Color.orange.opacity(0.3), radius: 10, x: 0, y: 5)
+                    .padding(.horizontal)
+                    
+                    // Video List
+                    VStack(spacing: 16) {
+                        ForEach(videos.indices, id: \.self) { index in
+                            let video = videos[index]
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack(spacing: 12) {
+                                    ZStack {
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(LinearGradient(
+                                                gradient: Gradient(colors: [.yellow, .orange]),
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            ))
+                                            .frame(width: 28, height: 28)
+                                        Image(systemName: "play.fill")
+                                            .font(.suite(size: 12))
+                                            .foregroundColor(.white)
+                                    }
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(video.title)
+                                            .font(.suite(size: 15, weight: .bold))
+                                            .foregroundColor(.primary)
+                                        Text(video.description)
+                                            .font(.suite(size: 12))
+                                            .foregroundColor(.gray)
+                                    }
+                                }
+                                
+                                // YouTube Embed
+                                YouTubePlayer(videoURL: video.url)
+                                    .frame(height: 200)
+                                    .cornerRadius(12)
+                            }
+                            .padding(16)
+                            .background(Color.white)
+                            .cornerRadius(16)
+                            .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
+                        }
+                    }
+                    .padding(.horizontal)
+                    
+                    // Help Section
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("추가 도움이 필요하신가요?")
+                            .font(.suite(size: 15, weight: .bold))
+                            .foregroundColor(.primary)
+                        
+                        Text("동영상 가이드로 해결되지 않는 문제가 있으시면 언제든지 문의해 주세요.")
+                            .font(.suite(size: 13))
+                            .foregroundColor(.gray)
+                        
+                        NavigationLink(destination: InquiryView()) {
+                            HStack {
+                                Spacer()
+                                Text("1:1 문의하기")
+                                    .font(.suite(size: 14, weight: .bold))
+                                    .foregroundColor(.white)
+                                Spacer()
+                            }
+                            .padding(.vertical, 14)
+                            .background(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [.blue, .cyan]),
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .cornerRadius(12)
+                        }
+                    }
+                    .padding(20)
+                    .background(
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color.blue.opacity(0.05), Color.cyan.opacity(0.05)]),
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .cornerRadius(16)
+                    .padding(.horizontal)
+                    .padding(.bottom, 40)
+                }
+                .padding(.top, 20)
+            }
+        }
+        .navigationTitle("사용 가이드")
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text("사용 가이드")
+                    .font(.suite(size: 18, weight: .bold))
+            }
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: { presentationMode.wrappedValue.dismiss() }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                            .font(.suite(size: 18, weight: .semibold))
+                        Text("뒤로")
+                            .font(.suite(size: 18, weight: .bold))
+                    }
+                    .foregroundColor(.primary)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - YouTube Player
+struct YouTubePlayer: UIViewRepresentable {
+    let videoURL: String
+    
+    func makeUIView(context: Context) -> WKWebView {
+        let configuration = WKWebViewConfiguration()
+        configuration.allowsInlineMediaPlayback = true
+        configuration.mediaTypesRequiringUserActionForPlayback = []
+        
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.scrollView.isScrollEnabled = false
+        webView.isOpaque = false
+        webView.backgroundColor = .black
+        return webView
+    }
+    
+    func updateUIView(_ uiView: WKWebView, context: Context) {
+        if let url = URL(string: videoURL) {
+            let request = URLRequest(url: url)
+            uiView.load(request)
+        }
     }
 }
 
@@ -2041,9 +2527,11 @@ struct Schedule: Codable, Identifiable, Equatable {
     let mt_name: String?
     let mt_file1: String?
     let sst_alram: Int?
+    let sst_alarm_t: String? // Human-readable alarm text like "10분 전"
     let sst_supplies: String?
     let sst_repeat_json: String? // Added for recurrence
     let sst_repeat_json_v: String?
+    let sst_pidx: Int? // Added for recurring schedule identification
     let member_name: String?
     let member_photo: String?
     
@@ -2051,8 +2539,8 @@ struct Schedule: Codable, Identifiable, Equatable {
         case sst_idx, mt_idx, sst_title, sst_sdate, sst_edate, sst_all_day, sgt_idx
         case sst_location_title, sst_location_add, sst_location_lat, sst_location_long
         case sst_memo, sst_show, mt_name, mt_file1
-        case sst_alram, sst_supplies
-        case sst_repeat_json, sst_repeat_json_v
+        case sst_alram, sst_alarm_t, sst_supplies
+        case sst_repeat_json, sst_repeat_json_v, sst_pidx
         case member_name, member_photo
     }
     
@@ -2091,8 +2579,18 @@ struct Schedule: Codable, Identifiable, Equatable {
         }
         
         sst_supplies = try? container.decode(String.self, forKey: .sst_supplies)
+        sst_alarm_t = try? container.decode(String.self, forKey: .sst_alarm_t)
         sst_repeat_json = try? container.decode(String.self, forKey: .sst_repeat_json)
         sst_repeat_json_v = try? container.decode(String.self, forKey: .sst_repeat_json_v)
+        
+        // Flexible decoding for sst_pidx (String or Int)
+        if let pidxInt = try? container.decode(Int.self, forKey: .sst_pidx) {
+            sst_pidx = pidxInt
+        } else if let pidxStr = try? container.decode(String.self, forKey: .sst_pidx) {
+            sst_pidx = Int(pidxStr)
+        } else {
+            sst_pidx = nil
+        }
         
         member_name = try? container.decode(String.self, forKey: .member_name)
         member_photo = try? container.decode(String.self, forKey: .member_photo)
@@ -2124,6 +2622,23 @@ struct Schedule: Codable, Identifiable, Equatable {
         case "4": return "매년"
         default: return nil
         }
+    }
+    
+    // Check if schedule is recurring (robust check)
+    var isRecurring: Bool {
+        // Check repeat_json
+        if let json = sst_repeat_json, !json.isEmpty, json != "null" {
+            // Check if it's "None" or "안함" just in case, though usually those are in repeat_json_v
+             if json == "None" || json == "안함" { return false }
+            return true
+        }
+        
+        // Check pidx (parent index for recurring instances)
+        if let pidx = sst_pidx, pidx > 0 {
+            return true
+        }
+        
+        return false
     }
     
     static func == (lhs: Schedule, rhs: Schedule) -> Bool {
@@ -2174,6 +2689,11 @@ struct CreateScheduleRequest: Codable {
     let sst_location_long: Double?
     let sst_memo: String?
     let sst_alram: Int?
+    let sst_alarm_t: String? // Human-readable alarm text
+    let sst_schedule_alarm_chk: String? // Y/N
+    let sst_pick_type: String? // minute/hour/day
+    let sst_pick_result: String? // numeric value
+    let sst_location_alarm: Int? // 4 when location is set
     let sst_supplies: String?
     let sst_repeat_json: String?
     let sst_repeat_json_v: String?
@@ -2182,6 +2702,7 @@ struct CreateScheduleRequest: Codable {
 struct UpdateScheduleRequest: Codable {
     let sst_idx: String
     let groupId: Int
+    let sst_pidx: Int?
     let sst_title: String
     let sst_sdate: String
     let sst_edate: String
@@ -2192,9 +2713,26 @@ struct UpdateScheduleRequest: Codable {
     let sst_location_long: Double?
     let sst_memo: String?
     let sst_alram: Int?
+    let sst_alarm_t: String? // Human-readable alarm text
+    let sst_schedule_alarm_chk: String? // Y/N
+    let sst_pick_type: String? // minute/hour/day
+    let sst_pick_result: String? // numeric value
+    let sst_location_alarm: Int? // 4 when location is set
     let sst_supplies: String?
     let sst_repeat_json: String?
     let sst_repeat_json_v: String?
+    let editOption: String? // "this", "all", "future" for repeat schedules
+    let editorId: String?
+    let editorName: String?
+}
+
+struct DeleteScheduleRequest: Codable {
+    let sst_idx: String
+    let groupId: Int
+    let sst_pidx: Int?
+    let deleteOption: String? // "this", "all", "future" for repeat schedules
+    let editorId: String?
+    let editorName: String?
 }
 
 struct ScheduleSimpleResponse: Codable {
@@ -2333,17 +2871,20 @@ class ScheduleService {
         return result.success
     }
     
-    func deleteSchedule(sstIdx: String, groupId: Int) async throws -> Bool {
+    func deleteSchedule(request: DeleteScheduleRequest) async throws -> Bool {
         let currentUserId = UserDefaults.standard.string(forKey: "mt_idx") ?? ""
-        var components = URLComponents(string: "\(baseURL)/schedule/group/\(groupId)/schedules/\(sstIdx)")!
-        components.queryItems = [URLQueryItem(name: "current_user_id", value: currentUserId)]
+        let urlString = "\(baseURL)/schedule/group/\(request.groupId)/schedules/\(request.sst_idx)?current_user_id=\(currentUserId)"
         
-        guard let url = components.url else { throw APIError(detail: nil, message: "잘못된 URL 형식입니다.") }
-        var request = URLRequest(url: url)
-        request.httpMethod = "DELETE"
-        if let token = authService.getToken() { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+        guard let url = URL(string: urlString) else { throw APIError(detail: nil, message: "잘못된 URL 형식입니다.") }
+        var httpRequest = URLRequest(url: url)
+        httpRequest.httpMethod = "DELETE"
+        httpRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token = authService.getToken() { httpRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let encoder = JSONEncoder()
+        httpRequest.httpBody = try? encoder.encode(request)
+        
+        let (data, response) = try await URLSession.shared.data(for: httpRequest)
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
             let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
             throw APIError(detail: nil, message: "스케줄 삭제에 실패했습니다. (Error: \(statusCode))")
@@ -2361,6 +2902,15 @@ struct NativeScheduleListView: View {
     
     @State private var showingAddSchedule = false
     @State private var scheduleToEdit: Schedule?
+    @State private var scheduleToEditOption: String? // "this", "future", "all"
+    
+    @State private var showingRecurringActionSheet = false
+    @State private var recurringActionType: RecurringActionType = .edit
+    @State private var selectedScheduleForAction: Schedule?
+    
+    enum RecurringActionType {
+        case edit, delete
+    }
     
     private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
     
@@ -2422,11 +2972,46 @@ struct NativeScheduleListView: View {
                     viewModel: viewModel,
                     initialGroupId: viewModel.selectedGroup?.sgt_idx ?? 0,
                     schedule: schedule,
+                    editOption: scheduleToEditOption,
                     onSave: {
                         viewModel.fetchSchedules()
                         scheduleToEdit = nil
                     }
                 )
+            }
+            .confirmationDialog(
+                recurringActionType == .edit ? "반복 일정 수정" : "반복 일정 삭제",
+                isPresented: $showingRecurringActionSheet,
+                titleVisibility: .visible
+            ) {
+                if recurringActionType == .edit {
+                    Button("이 일정만 수정") {
+                        if let s = selectedScheduleForAction {
+                            scheduleToEdit = s
+                            scheduleToEditOption = "this"
+                        }
+                    }
+                    Button("모든 반복 일정 수정") {
+                        if let s = selectedScheduleForAction {
+                            scheduleToEdit = s
+                            scheduleToEditOption = "all"
+                        }
+                    }
+                } else {
+                    Button("이 일정만 삭제", role: .destructive) {
+                        if let s = selectedScheduleForAction {
+                            viewModel.deleteSchedule(s, option: "this")
+                        }
+                    }
+                    Button("모든 반복 일정 삭제", role: .destructive) {
+                        if let s = selectedScheduleForAction {
+                            viewModel.deleteSchedule(s, option: "all")
+                        }
+                    }
+                }
+                Button("취소", role: .cancel) {}
+            } message: {
+                Text("수행할 범위를 선택해 주세요.")
             }
         }
     }
@@ -2461,16 +3046,16 @@ struct NativeScheduleListView: View {
                 Spacer()
                 Button(action: { viewModel.changeMonth(by: -1) }) {
                     Image(systemName: "chevron.left")
-                        .font(.suite(size: 20, weight: .semibold))
+                        .font(.suite(size: 16, weight: .semibold))
                         .foregroundColor(.gray)
                         .padding(.horizontal)
                 }
                 Text(formatMonth(viewModel.currentMonth))
-                    .font(.suite(size: 20, weight: .bold)) // Larger Month
+                    .font(.suite(size: 16, weight: .bold)) // Larger Month
                     .frame(width: 140)
                 Button(action: { viewModel.changeMonth(by: 1) }) {
                     Image(systemName: "chevron.right")
-                        .font(.suite(size: 20, weight: .semibold))
+                        .font(.suite(size: 16, weight: .semibold))
                         .foregroundColor(.gray)
                         .padding(.horizontal)
                 }
@@ -2636,8 +3221,27 @@ struct NativeScheduleListView: View {
                         ScheduleEventCard(
                             schedule: schedule,
                             groupName: viewModel.selectedGroup?.sgt_title,
-                            onEdit: { scheduleToEdit = schedule },
-                            onDelete: { viewModel.deleteSchedule(schedule) }
+                            onEdit: {
+                                print("DEBUG: Edit clicked for schedule: \(schedule.sst_title ?? ""), isRecurring: \(schedule.isRecurring)")
+                                if schedule.isRecurring {
+                                    selectedScheduleForAction = schedule
+                                    recurringActionType = .edit
+                                    showingRecurringActionSheet = true
+                                } else {
+                                    scheduleToEdit = schedule
+                                    scheduleToEditOption = nil
+                                }
+                            },
+                            onDelete: {
+                                print("DEBUG: Delete clicked for schedule: \(schedule.sst_title ?? ""), isRecurring: \(schedule.isRecurring)")
+                                if schedule.isRecurring {
+                                    selectedScheduleForAction = schedule
+                                    recurringActionType = .delete
+                                    showingRecurringActionSheet = true
+                                } else {
+                                    viewModel.deleteSchedule(schedule)
+                                }
+                            }
                         )
                         .padding(.horizontal, 16)
                     }
@@ -2907,6 +3511,7 @@ struct ScheduleFormView: View {
     @ObservedObject var viewModel: ScheduleViewModel
     let initialGroupId: Int
     var schedule: Schedule? = nil
+    var editOption: String? = nil // "this", "all", "future"
     let onSave: () -> Void
     
     @Environment(\.presentationMode) var presentationMode
@@ -2940,10 +3545,11 @@ struct ScheduleFormView: View {
     private let repeatOptions = ["안함", "매일", "매주", "매월", "매년"]
     private let weekdays = ["일", "월", "화", "수", "목", "금", "토"]
     
-    init(viewModel: ScheduleViewModel, initialGroupId: Int, schedule: Schedule? = nil, onSave: @escaping () -> Void) {
+    init(viewModel: ScheduleViewModel, initialGroupId: Int, schedule: Schedule? = nil, editOption: String? = nil, onSave: @escaping () -> Void) {
         self.viewModel = viewModel
         self.initialGroupId = initialGroupId
         self.schedule = schedule
+        self.editOption = editOption
         self.onSave = onSave
         
         let startGroupId = schedule?.sgt_idx ?? (initialGroupId > 0 ? initialGroupId : (viewModel.groups.first?.sgt_idx ?? 0))
@@ -2951,12 +3557,12 @@ struct ScheduleFormView: View {
     }
     
     // Section colors (matching Next.js design)
-    private var section1BgColor: Color { Color(red: 224/255, green: 231/255, blue: 255/255) } // Indigo 50
+    private var section1BgColor: Color { Color(red: 254/255, green: 226/255, blue: 226/255) } // Red 50
     private var section2BgColor: Color { Color(red: 219/255, green: 234/255, blue: 254/255) } // Blue 50
     private var section3BgColor: Color { Color(red: 220/255, green: 252/255, blue: 231/255) } // Green 50
     private var section4BgColor: Color { Color(red: 255/255, green: 251/255, blue: 235/255) } // Amber 50
     
-    private var section1BadgeColor: Color { Color(red: 79/255, green: 70/255, blue: 229/255) }  // Indigo 600
+    private var section1BadgeColor: Color { Color(red: 220/255, green: 38/255, blue: 38/255) }  // Red 600
     private var section2BadgeColor: Color { Color(red: 37/255, green: 99/255, blue: 235/255) }  // Blue 600
     private var section3BadgeColor: Color { Color(red: 22/255, green: 163/255, blue: 74/255) }  // Green 600
     private var section4BadgeColor: Color { Color(red: 217/255, green: 119/255, blue: 6/255) }  // Amber 600
@@ -3096,7 +3702,9 @@ struct ScheduleFormView: View {
                         RoundedRectangle(cornerRadius: 12)
                             .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                     )
+                    .opacity(schedule != nil ? 0.6 : 1.0)
                 }
+                .disabled(schedule != nil)
             }
             
             // Member Selection (Avatar Grid)
@@ -3115,6 +3723,7 @@ struct ScheduleFormView: View {
                                     }
                                 }) {
                                     VStack(spacing: 6) {
+                                        // Avatar and Selection indicator
                                         ZStack {
                                             if let photoUrl = member.mt_file1, !photoUrl.isEmpty {
                                                 AsyncImage(url: URL(string: photoUrl.hasPrefix("http") ? photoUrl : "https://nextstep.smap.site\(photoUrl)")) { phase in
@@ -3144,19 +3753,23 @@ struct ScheduleFormView: View {
                                                     .font(.suite(size: 16))
                                                     .foregroundColor(section1BadgeColor)
                                                     .background(Color.white.clipShape(Circle()))
-                                                    .offset(x: 16, y: 16)
+                                                    .offset(x: 18, y: 18)
                                             }
                                         }
+                                        .frame(width: 60, height: 60)
                                         
                                         Text(member.displayName)
-                                            .font(.suite(size: 12, weight: targetMemberId == member.mt_idx ? .bold : .medium))
+                                            .font(.suite(size: 12))
                                             .foregroundColor(targetMemberId == member.mt_idx ? section1BadgeColor : .gray)
                                             .lineLimit(1)
                                     }
+                                    .opacity(schedule != nil ? (targetMemberId == member.mt_idx ? 1.0 : 0.5) : 1.0)
                                 }
+                                .disabled(schedule != nil)
                                 .buttonStyle(PlainButtonStyle())
                             }
                         }
+                        .padding(.leading, 4) // Prevent first member clipping
                         .padding(.vertical, 4)
                     }
                 }
@@ -3206,8 +3819,8 @@ struct ScheduleFormView: View {
                 
                 TextField("일정 제목을 입력하세요", text: $title)
                     .font(.suite(size: 15))
-                    .frame(height: 24)
-                    .padding(14)
+                    .padding(.horizontal, 14)
+                    .frame(height: 52) // 고정 높이
                     .background(Color.white)
                     .cornerRadius(12)
                     .overlay(
@@ -3234,8 +3847,9 @@ struct ScheduleFormView: View {
                 
                 TextEditor(text: $memo)
                     .font(.suite(size: 15))
-                    .frame(height: 80)
-                    .padding(10)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .frame(height: 100) // 고정 높이 (멀티라인)
                     .background(Color.white)
                     .cornerRadius(12)
                     .overlay(
@@ -3300,11 +3914,21 @@ struct ScheduleFormView: View {
                         .foregroundColor(.gray)
                         .frame(width: 50, alignment: .leading)
                     
-                    DatePicker("", selection: $startDate, displayedComponents: isAllDay ? [.date] : [.date, .hourAndMinute])
-                        .labelsHidden()
-                        .datePickerStyle(CompactDatePickerStyle())
-                        .accentColor(section3BadgeColor)
+                    if isAllDay {
+                        DatePicker("", selection: $startDate, displayedComponents: [.date])
+                            .labelsHidden()
+                            .datePickerStyle(CompactDatePickerStyle())
+                            .accentColor(section3BadgeColor)
+                    } else {
+                        DatePickerWith10MinInterval(
+                            selection: $startDate,
+                            displayedComponents: [.date, .hourAndMinute],
+                            accentColor: section3BadgeColor
+                        )
+                        .frame(height: 35)
+                    }
                 }
+                .frame(minHeight: 40)
                 
                 Divider()
                 
@@ -3315,11 +3939,21 @@ struct ScheduleFormView: View {
                         .foregroundColor(.gray)
                         .frame(width: 50, alignment: .leading)
                     
-                    DatePicker("", selection: $endDate, displayedComponents: isAllDay ? [.date] : [.date, .hourAndMinute])
-                        .labelsHidden()
-                        .datePickerStyle(CompactDatePickerStyle())
-                        .accentColor(section3BadgeColor)
+                    if isAllDay {
+                        DatePicker("", selection: $endDate, displayedComponents: [.date])
+                            .labelsHidden()
+                            .datePickerStyle(CompactDatePickerStyle())
+                            .accentColor(section3BadgeColor)
+                    } else {
+                        DatePickerWith10MinInterval(
+                            selection: $endDate,
+                            displayedComponents: [.date, .hourAndMinute],
+                            accentColor: section3BadgeColor
+                        )
+                        .frame(height: 35)
+                    }
                 }
+                .frame(minHeight: 40)
             }
             .padding(14)
             .background(Color.white)
@@ -3385,6 +4019,12 @@ struct ScheduleFormView: View {
         .padding(16)
         .background(section3BgColor)
         .cornerRadius(16)
+        .onChange(of: startDate) { newStartDate in
+            // 시작일시가 종료일시 이후로 변경되면 종료일시를 시작일시 + 1시간으로 자동 조정
+            if newStartDate >= endDate {
+                endDate = newStartDate.addingTimeInterval(3600) // 1시간 후
+            }
+        }
     }
     
     // MARK: - Section 4: 추가 설정
@@ -3461,7 +4101,8 @@ struct ScheduleFormView: View {
                 
                 TextField("준비물을 입력하세요", text: $supplies)
                     .font(.suite(size: 14))
-                    .padding(12)
+                    .padding(.horizontal, 12)
+                    .frame(height: 48) // 고정 높이
                     .background(Color.white)
                     .cornerRadius(10)
                     .overlay(
@@ -3476,32 +4117,58 @@ struct ScheduleFormView: View {
     }
     
     // MARK: - Save Button
+    
+    /// 시작일시와 종료일시 유효성 검사
+    private var isDateValid: Bool {
+        endDate > startDate
+    }
+    
+    /// 저장 버튼 활성화 조건
+    private var canSave: Bool {
+        !title.isEmpty && isDateValid && !isLoading
+    }
+    
     private var saveButton: some View {
-        Button(action: saveSchedule) {
-            HStack {
-                if isLoading {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                } else {
-                    Text(schedule == nil ? "일정 추가" : "일정 수정")
-                        .font(.suite(size: 16, weight: .bold))
+        VStack(spacing: 8) {
+            // 날짜 유효성 오류 메시지
+            if !isDateValid {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.orange)
+                        .font(.suite(size: 14))
+                    Text("종료 일시는 시작 일시보다 이후여야 합니다.")
+                        .font(.suite(size: 13))
+                        .foregroundColor(.orange)
+                    Spacer()
                 }
+                .padding(.horizontal, 4)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(
-                LinearGradient(
-                    gradient: Gradient(colors: [brandColor, Color(red: 0, green: 26/255, blue: 138/255)]),
-                    startPoint: .leading,
-                    endPoint: .trailing
+            
+            Button(action: saveSchedule) {
+                HStack {
+                    if isLoading {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    } else {
+                        Text(schedule == nil ? "일정 추가" : "일정 수정")
+                            .font(.suite(size: 16, weight: .bold))
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(
+                    LinearGradient(
+                        gradient: Gradient(colors: canSave ? [brandColor, Color(red: 0, green: 26/255, blue: 138/255)] : [Color.gray.opacity(0.5), Color.gray.opacity(0.3)]),
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
                 )
-            )
-            .foregroundColor(.white)
-            .cornerRadius(14)
-            .shadow(color: brandColor.opacity(0.3), radius: 8, x: 0, y: 4)
+                .foregroundColor(.white)
+                .cornerRadius(14)
+                .shadow(color: canSave ? brandColor.opacity(0.3) : Color.clear, radius: 8, x: 0, y: 4)
+            }
+            .disabled(!canSave)
         }
-        .disabled(title.isEmpty || isLoading)
-        .opacity(title.isEmpty ? 0.6 : 1.0)
     }
     
     // MARK: - Alarm Selection Sheet
@@ -3639,18 +4306,52 @@ struct ScheduleFormView: View {
             if let sDateStr = schedule.sst_sdate, let sDate = formatter.date(from: sDateStr) { startDate = sDate }
             if let eDateStr = schedule.sst_edate, let eDate = formatter.date(from: eDateStr) { endDate = eDate }
             
+            // Load Alarm - from sst_alarm_t (text) or sst_alram (minutes)
+            if let alarmText = schedule.sst_alarm_t, !alarmText.isEmpty {
+                // Parse alarm text to minutes
+                alarm = parseAlarmTextToMinutes(alarmText)
+            } else if let alarmVal = schedule.sst_alram, alarmVal > 0 {
+                alarm = alarmVal
+            } else {
+                alarm = 0
+            }
+            
             // Parse Repeat
             if let v = schedule.sst_repeat_json_v, !v.isEmpty {
-                 if v.contains("매주") {
-                     repeatOption = "매주"
-                 } else if repeatOptions.contains(v) {
-                     repeatOption = v
-                 }
+                if v.contains("매주") || v.contains("1주마다") {
+                    repeatOption = "매주"
+                    // Parse weekdays from sst_repeat_json
+                    if let jsonStr = schedule.sst_repeat_json,
+                       let data = jsonStr.data(using: .utf8),
+                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: String],
+                       let r2 = json["r2"], !r2.isEmpty {
+                        // r2 = "1,5" means Monday(1) and Friday(5), 7 = Sunday
+                        let weekdayIndices = r2.split(separator: ",").compactMap { Int($0) }
+                        // Convert: 1-6 stays same, 7 becomes 0 (Sunday)
+                        selectedWeekdays = Set(weekdayIndices.map { $0 == 7 ? 0 : $0 })
+                    }
+                } else if repeatOptions.contains(v) {
+                    repeatOption = v
+                }
             }
         } else {
             if let mtIdxStr = UserDefaults.standard.string(forKey: "mt_idx"), let mtIdx = Int(mtIdxStr) {
                 targetMemberId = mtIdx
             }
+        }
+    }
+    
+    // Helper function to convert alarm text to minutes
+    private func parseAlarmTextToMinutes(_ text: String) -> Int {
+        switch text {
+        case "정시": return 1
+        case "5분 전": return 5
+        case "10분 전": return 10
+        case "15분 전": return 15
+        case "30분 전": return 30
+        case "1시간 전": return 60
+        case "1일 전": return 1440
+        default: return 0
         }
     }
     
@@ -3676,7 +4377,16 @@ struct ScheduleFormView: View {
     }
     
     private func saveSchedule() {
-        guard !title.isEmpty else { return }
+        // 유효성 검사
+        guard !title.isEmpty else {
+            errorMessage = "일정 제목을 입력해주세요."
+            return
+        }
+        
+        guard endDate > startDate else {
+            errorMessage = "종료 일시는 시작 일시보다 이후여야 합니다."
+            return
+        }
         
         isLoading = true
         
@@ -3686,36 +4396,90 @@ struct ScheduleFormView: View {
         let sDateStr = formatter.string(from: startDate)
         let eDateStr = formatter.string(from: endDate)
         
-        // Repeat JSON
+        // Generate alarm text from minutes
+        let alarmText: String? = {
+            switch alarm {
+            case 0: return nil
+            case 1: return "정시"
+            case 5: return "5분 전"
+            case 10: return "10분 전"
+            case 15: return "15분 전"
+            case 30: return "30분 전"
+            case 60: return "1시간 전"
+            case 1440: return "1일 전"
+            default: return nil
+            }
+        }()
+        
+        // Generate alarm pick type and result (matches Next.js)
+        let scheduleAlarmChk: String = alarm == 0 ? "N" : "Y"
+        let pickType: String? = {
+            switch alarm {
+            case 5, 10, 15, 30: return "minute"
+            case 60: return "hour"
+            case 1440: return "day"
+            default: return nil
+            }
+        }()
+        let pickResult: String? = {
+            switch alarm {
+            case 0, 1: return nil
+            case 5: return "5"
+            case 10: return "10"
+            case 15: return "15"
+            case 30: return "30"
+            case 60: return "1"
+            case 1440: return "1"
+            default: return nil
+            }
+        }()
+        
+        // Location alarm: 4 if location is set, nil otherwise
+        let locationAlarm: Int? = !location.isEmpty ? 4 : nil
+        
+        // Repeat JSON - matches Next.js format
         var repeatJson: String? = nil
         var repeatJsonV: String? = nil
         if repeatOption != "안함" {
             var r1 = "0"
+            var r2 = ""
             switch repeatOption {
-            case "매일": r1 = "1"
-            case "매월": r1 = "2"
-            case "매주": r1 = "3"
-            case "매년": r1 = "4"
+            case "매일": r1 = "2"  // Next.js uses 2 for daily
+            case "매주": r1 = "3"  // Next.js uses 3 for weekly
+            case "매월": r1 = "4"  // Next.js uses 4 for monthly
+            case "매년": r1 = "5"  // Next.js uses 5 for yearly
             default: break
             }
-            repeatJson = "{\"r1\":\"\(r1)\"}"
-            repeatJsonV = repeatOption
-            if repeatOption == "매주" {
+            
+            if repeatOption == "매주" && !selectedWeekdays.isEmpty {
+                // Convert weekdays: 0 (Sunday) becomes 7, 1-6 stay same
                 let sortedDays = selectedWeekdays.sorted()
-                if !sortedDays.isEmpty {
-                     let dayString = sortedDays.map { weekdays[$0] }.joined(separator: ",")
-                     repeatJsonV = "매주 \(dayString)"
-                }
+                let r2Values = sortedDays.map { $0 == 0 ? "7" : String($0) }
+                r2 = r2Values.joined(separator: ",")
+                let dayString = sortedDays.map { weekdays[$0] }.joined(separator: ",")
+                repeatJsonV = "1주마다 \(dayString)"
+            } else {
+                repeatJsonV = repeatOption
             }
+            
+            repeatJson = "{\"r1\":\"\(r1)\",\"r2\":\"\(r2)\"}"
         }
+        
+        // For repeat schedule updates: use "all" to update all occurrences if no option provided
+        let isRepeatSchedule = schedule?.sst_repeat_json != nil && !(schedule?.sst_repeat_json?.isEmpty ?? true)
+        let finalEditOption: String? = editOption ?? (isRepeatSchedule ? "all" : nil)
         
         Task {
             do {
                 let success: Bool
                 if let schedule = schedule {
+                    let editorId = UserDefaults.standard.string(forKey: "mt_idx")
+                    let editorName = UserDefaults.standard.string(forKey: "mt_name")
+                    
                     let request = UpdateScheduleRequest(
-                        sst_idx: schedule.id,
+                        sst_idx: schedule.sst_idx,
                         groupId: selectedGroupId,
+                        sst_pidx: schedule.sst_pidx,
                         sst_title: title,
                         sst_sdate: sDateStr,
                         sst_edate: eDateStr,
@@ -3726,9 +4490,17 @@ struct ScheduleFormView: View {
                         sst_location_long: locationLong,
                         sst_memo: memo,
                         sst_alram: alarm == 0 ? nil : alarm,
+                        sst_alarm_t: alarmText,
+                        sst_schedule_alarm_chk: scheduleAlarmChk,
+                        sst_pick_type: pickType,
+                        sst_pick_result: pickResult,
+                        sst_location_alarm: locationAlarm,
                         sst_supplies: supplies,
                         sst_repeat_json: repeatJson,
-                        sst_repeat_json_v: repeatJsonV
+                        sst_repeat_json_v: repeatJsonV,
+                        editOption: finalEditOption,
+                        editorId: editorId,
+                        editorName: editorName
                     )
                     success = try await ScheduleService.shared.updateSchedule(request)
                 } else {
@@ -3745,6 +4517,11 @@ struct ScheduleFormView: View {
                         sst_location_long: locationLong,
                         sst_memo: memo,
                         sst_alram: alarm == 0 ? nil : alarm,
+                        sst_alarm_t: alarmText,
+                        sst_schedule_alarm_chk: scheduleAlarmChk,
+                        sst_pick_type: pickType,
+                        sst_pick_result: pickResult,
+                        sst_location_alarm: locationAlarm,
                         sst_supplies: supplies,
                         sst_repeat_json: repeatJson,
                         sst_repeat_json_v: repeatJsonV
@@ -3754,6 +4531,10 @@ struct ScheduleFormView: View {
                 
                 DispatchQueue.main.async {
                     if success {
+                        // 홈 화면 일정 데이터 새로고침을 위한 알림 발송
+                        NotificationCenter.default.post(name: NSNotification.Name("scheduleDataChanged"), object: nil)
+                        print("📢 [ScheduleFormView] Posted scheduleDataChanged notification")
+                        
                         onSave()
                         presentationMode.wrappedValue.dismiss()
                     } else {
@@ -3808,7 +4589,18 @@ class ScheduleViewModel: ObservableObject {
         return Set(dates)
     }
     
-    init() { fetchGroups() }
+    init() {
+        Task { @MainActor in
+            fetchGroups()
+        }
+        
+        // Listen for group changes from GroupScreen
+        NotificationCenter.default.addObserver(forName: NSNotification.Name("groupsDidChange"), object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in
+                self?.fetchGroups()
+            }
+        }
+    }
     
     func fetchGroups() {
         isLoading = true
@@ -3883,13 +4675,32 @@ class ScheduleViewModel: ObservableObject {
         else { selectedMemberIds.insert(memberId) }
     }
     
-    func deleteSchedule(_ schedule: Schedule) {
+    func deleteSchedule(_ schedule: Schedule, option: String? = nil) {
         guard let groupId = selectedGroup?.sgt_idx else { return }
         isLoading = true
+        
+        let editorId = UserDefaults.standard.string(forKey: "mt_idx")
+        let editorName = UserDefaults.standard.string(forKey: "mt_name")
+        
+        let request = DeleteScheduleRequest(
+            sst_idx: schedule.sst_idx,
+            groupId: groupId,
+            sst_pidx: schedule.sst_pidx,
+            deleteOption: option,
+            editorId: editorId,
+            editorName: editorName
+        )
+        
         Task {
             do {
-                let success = try await scheduleService.deleteSchedule(sstIdx: schedule.sst_idx, groupId: groupId)
-                if success { fetchSchedules() }
+                let success = try await scheduleService.deleteSchedule(request: request)
+                if success {
+                    // 홈 화면 일정 데이터 새로고침을 위한 알림 발송
+                    NotificationCenter.default.post(name: NSNotification.Name("scheduleDataChanged"), object: nil)
+                    print("📢 [ScheduleViewModel] Posted scheduleDataChanged notification after delete")
+                    
+                    fetchSchedules()
+                }
                 else {
                     DispatchQueue.main.async {
                         self.errorMessage = "일정 삭제에 실패했습니다."

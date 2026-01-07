@@ -4146,89 +4146,95 @@ export default function ActivelogPage() {
     `;
   };
 
-  // 현재 위치 마커 생성/업데이트 함수 (성능 최적화)
+  // 현재 위치 마커 생성/업데이트 함수 (성능 최적화 - 객체 재사용)
   const createOrUpdateCurrentPositionMarker = (lat: number, lng: number, targetIndex: number, totalMarkers: number) => {
     if (!map.current || !window.naver?.maps) return;
 
     const LatLng5 = (window as any)?.naver?.maps?.LatLng; if (!LatLng5) return;
     const position = new LatLng5(lat, lng);
 
-    // 기존 마커가 있다면 새로 생성 (InfoWindow 깜빡임 방지)
-    if (currentPositionMarker.current) {
-      // 기존 InfoWindow 정리
-      if (currentPositionMarker.current.infoWindow) {
-        currentPositionMarker.current.infoWindow.close();
-      }
-      currentPositionMarker.current.setMap(null);
-      currentPositionMarker.current = null;
-    }
-
-    // 기존 현재 위치 마커 제거 (최초 생성시에만)
-    if (currentPositionMarker.current) {
-      // InfoWindow가 있다면 먼저 닫기
-      if (currentPositionMarker.current.infoWindow) {
-        currentPositionMarker.current.infoWindow.close();
-      }
-      currentPositionMarker.current.setMap(null);
-    }
-
     // 현재 마커 데이터 가져오기
     const currentMarkerData = sortedLocationData[targetIndex];
     if (!currentMarkerData) return;
 
-    // InfoWindow 내용 생성 (최적화된 함수 사용)
+    // InfoWindow 내용 생성
     const infoContent = createInfoWindowContent(targetIndex, totalMarkers, currentMarkerData);
 
-    // 새로운 현재 위치 마커 생성
+    // 마커 아이콘 HTML 생성 (동적 내용 포함)
+    const iconHtml = `
+      <div style="
+        width: 24px;
+        height: 24px;
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        border: 3px solid white;
+        border-radius: 50%;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 0 0 4px rgba(239,68,68,0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        animation: pulse 2s infinite;
+        /* GPU 가속 최적화 */
+        transform: translateZ(0);
+        will-change: transform, box-shadow;
+        backface-visibility: hidden;
+        -webkit-backface-visibility: hidden;
+      ">
+        <div style="
+          width: 8px;
+          height: 8px;
+          background: white;
+          border-radius: 50%;
+          transform: translateZ(0);
+        "></div>
+      </div>
+      <style>
+        @keyframes pulse {
+          0% { box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 0 0 4px rgba(239,68,68,0.2); transform: translateZ(0) scale(1); }
+          50% { box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 0 0 8px rgba(239,68,68,0.1); transform: translateZ(0) scale(1.05); }
+          100% { box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 0 0 4px rgba(239,68,68,0.2); transform: translateZ(0) scale(1); }
+        }
+      </style>
+    `;
+
+    // 기존 마커가 있다면 업데이트 (객체 재사용)
+    if (currentPositionMarker.current) {
+      // 1. 위치 업데이트
+      currentPositionMarker.current.setPosition(position);
+
+      // 2. 아이콘 업데이트 (필요한 경우만 하거나 매번 해도 DOM 조작보다 가벼움)
+      // 현재는 아이콘이 정적이므로 위치만 옮겨도 되지만, 펄스 애니메이션 재시작 등을 위해 업데이트할 수 있음.
+      // 하지만 성능을 위해 위치만 옮기는 것이 가장 빠름. 여기서는 아이콘이 동일하므로 setIcon 생략 가능 여부 체크.
+      // 만약 아이콘 내부에 숫자가 들어간다면 setIcon 필수. 현재는 숫자 없음. -> setIcon 생략 가능할수도 있지만 안전하게 업데이트.
+      // currentPositionMarker.current.setIcon({
+      //   content: iconHtml,
+      //   anchor: new window.naver.maps.Point(12, 12)
+      // });
+
+      // 3. 타이틀 업데이트
+      currentPositionMarker.current.setTitle(`현재 위치 (${targetIndex + 1}/${totalMarkers})`);
+
+      // 4. InfoWindow 내용 업데이트
+      if (currentPositionMarker.current.infoWindow) {
+        currentPositionMarker.current.infoWindow.setContent(infoContent);
+        // InfoWindow 위치가 마커를 따라가지 않는 경우를 대비해 위치 강제 업데이트가 필요할 수 있음
+        // 하지만 InfoWindow는 마커에 바인딩되어 있으면 보통 따라감.
+        // 만약 안 따라간다면 open 다시 호출
+        if (!currentPositionMarker.current.infoWindow.getMap()) {
+          currentPositionMarker.current.infoWindow.open(map.current, currentPositionMarker.current);
+        }
+      }
+
+      return; // 업데이트 완료 후 리턴
+    }
+
+    // 기존 마커가 없다면 새로 생성
     currentPositionMarker.current = new window.naver.maps.Marker({
       position: position,
       map: map.current,
       title: `현재 위치 (${targetIndex + 1}/${totalMarkers})`,
       icon: {
-        content: `
-          <div style="
-            width: 24px;
-            height: 24px;
-            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-            border: 3px solid white;
-            border-radius: 50%;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 0 0 4px rgba(239,68,68,0.2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            animation: pulse 2s infinite;
-            /* GPU 가속 최적화 */
-            transform: translateZ(0);
-            will-change: transform, box-shadow;
-            backface-visibility: hidden;
-            -webkit-backface-visibility: hidden;
-          ">
-            <div style="
-              width: 8px;
-              height: 8px;
-              background: white;
-              border-radius: 50%;
-              transform: translateZ(0);
-            "></div>
-          </div>
-          <style>
-            @keyframes pulse {
-              0% { 
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 0 0 4px rgba(239,68,68,0.2);
-                transform: translateZ(0) scale(1);
-              }
-              50% { 
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 0 0 8px rgba(239,68,68,0.1);
-                transform: translateZ(0) scale(1.05);
-              }
-              100% { 
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 0 0 4px rgba(239,68,68,0.2);
-                transform: translateZ(0) scale(1);
-              }
-            }
-          </style>
-        `,
+        content: iconHtml,
         anchor: new window.naver.maps.Point(12, 12)
       },
       zIndex: 1000 // 가장 위에 표시
@@ -4249,8 +4255,6 @@ export default function ActivelogPage() {
 
     // 마커에 InfoWindow 참조 저장 (정리할 때 함께 제거하기 위해)
     currentPositionMarker.current.infoWindow = infoWindow;
-
-    // console.log(`[현재위치마커] 위치 업데이트: (${lat}, ${lng}) - ${targetIndex + 1}/${totalMarkers}`);
   };
 
   // 슬라이더 값에 따라 경로 진행 상황 업데이트
@@ -7512,8 +7516,17 @@ export default function ActivelogPage() {
         '#B388FF', // 글로시 퍼플
       ];
 
-      // 각 구간마다 다른 색상의 폴리라인 생성
-      for (let i = 0; i < pathCoordinates.length - 1; i++) {
+      // 각 구간마다 다른 색상의 폴리라인 생성 (청크 단위 최적화)
+      const CHUNK_SIZE = 20; // 20개 포인트를 하나의 청크로 묶음
+
+      for (let i = 0; i < pathCoordinates.length - 1; i += CHUNK_SIZE) {
+        // 청크의 끝 인덱스 계산 (배열 범위를 넘지 않도록)
+        const endIndex = Math.min(i + CHUNK_SIZE, pathCoordinates.length - 1);
+
+        // 청크가 유효하려면 최소 2개 이상의 포인트가 있어야 함
+        if (endIndex <= i) continue;
+
+        // 청크의 시작점 기준으로 진행률 계산 및 색상 결정
         const progress = i / (pathCoordinates.length - 1);
         const colorIndex = Math.floor(progress * (rainbowColors.length - 1));
         const nextColorIndex = Math.min(colorIndex + 1, rainbowColors.length - 1);
@@ -7524,14 +7537,22 @@ export default function ActivelogPage() {
         const color2 = rainbowColors[nextColorIndex];
         const interpolatedColor = interpolateColor(color1, color2, segmentProgress);
 
-        const segmentPath = [pathCoordinates[i], pathCoordinates[i + 1]];
+        // 청크에 포함될 좌표들 추출
+        // Array.slice는 endIndex를 포함하지 않으므로 +1 해줘야 함, 
+        // 그리고 다음 청크와 연결되게 하기 위해 endIndex 포인트도 포함해야 함
+        const chunkPath = pathCoordinates.slice(i, endIndex + 1);
+
         const segmentPolyline = new window.naver.maps.Polyline({
           map: mapInstance,
-          path: segmentPath,
+          path: chunkPath,
           strokeColor: interpolatedColor,
           strokeOpacity: 0.85,
           strokeWeight: 5,
-          strokeStyle: 'solid'
+          strokeStyle: 'solid',
+          startIcon: i === 0 ? window.naver.maps.PointingIcon.CIRCLE : undefined, // 시작점 장식 (선택)
+          startIconSize: i === 0 ? 5 : undefined,
+          endIcon: endIndex === pathCoordinates.length - 1 ? window.naver.maps.PointingIcon.OPEN_ARROW : undefined, // 끝점 화살표 (선택)
+          endIconSize: endIndex === pathCoordinates.length - 1 ? 5 : undefined
         });
 
         window.gradientPolylines.push(segmentPolyline);

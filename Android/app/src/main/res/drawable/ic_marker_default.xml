@@ -1,0 +1,18 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Outer circle (blue) - thinner border -->
+    <path
+        android:pathData="M12,12m-11,0a11,11 0,1 1,22 0a11,11 0,1 1,-22 0"
+        android:fillColor="#3B82F6"/>
+    <!-- White background for icon (Inner circle) - larger radius for thinner border -->
+    <path
+        android:pathData="M12,12m-9.5,0a9.5,9.5 0,1 1,19 0a9.5,9.5 0,1 1,-19 0"
+        android:fillColor="#FFFFFF"/>
+    <!-- LocationOn icon path (blue - INVERTED) - ENLARGED -->
+    <path
+        android:pathData="M12,5.5c-2.485,0 -4.5,2.015 -4.5,4.5c0,3.375 4.5,8.357 4.5,8.357s4.5,-4.982 4.5,-8.357c0,-2.485 -2.015,-4.5 -4.5,-4.5zm0,6.107c-0.887,0 -1.607,-0.72 -1.607,-1.607s0.72,-1.607 1.607,-1.607s1.607,0.72 1.607,1.607s-0.72,1.607 -1.607,1.607z"
+        android:fillColor="#3B82F6"/>
+</vector>

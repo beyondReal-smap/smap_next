@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     # JWT 설정
     JWT_SECRET_KEY: str = "smap!@super-secret"
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 129600  # 90일 (90 * 24 * 60)
     
     # Firebase 설정
     FIREBASE_CREDENTIALS_PATH: str = "backend/com-dmonster-smap-firebase-adminsdk-2zx5p-2610556cf5.json"

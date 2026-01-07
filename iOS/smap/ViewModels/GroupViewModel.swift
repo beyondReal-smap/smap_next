@@ -67,6 +67,8 @@ class GroupViewModel: ObservableObject {
                     self.selectedGroup = newGroup
                     self.isCreating = false
                     self.fetchGroups() // 목록 갱신
+                    // Notify other views that groups have changed
+                    NotificationCenter.default.post(name: NSNotification.Name("groupsDidChange"), object: nil)
                 }
             } catch {
                 DispatchQueue.main.async {
@@ -118,6 +120,8 @@ class GroupViewModel: ObservableObject {
                             self.groupStats = nil
                         }
                         self.isDeleting = false
+                        // Notify other views that groups have changed
+                        NotificationCenter.default.post(name: NSNotification.Name("groupsDidChange"), object: nil)
                     }
                 }
             } catch {
@@ -140,6 +144,8 @@ class GroupViewModel: ObservableObject {
                     DispatchQueue.main.async {
                         self.isJoining = false
                         self.fetchGroups() // 목록 갱신 및 UI 이동
+                        // Notify other views that groups have changed
+                        NotificationCenter.default.post(name: NSNotification.Name("groupsDidChange"), object: nil)
                     }
                 }
             } catch {

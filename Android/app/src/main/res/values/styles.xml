@@ -1,0 +1,16 @@
+<resources>
+    <style name="Theme.SmapWebView" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- 필요에 따라 커스텀 속성 추가 -->
+    </style>
+    
+    <!-- 스플래시 테마 (iOS 스타일 - 정적 화면) -->
+    <style name="Theme.Smap.Splash" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:windowBackground">@drawable/splash_background</item>
+        <item name="android:statusBarColor">@color/splash_background</item>
+        <item name="android:navigationBarColor">@color/splash_background</item>
+        <!-- 페이드 인/아웃 애니메이션 비활성화 -->
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:windowDisablePreview">false</item>
+        <item name="android:windowContentTransitions">false</item>
+    </style>
+</resources>

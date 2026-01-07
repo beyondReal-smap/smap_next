@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- 🔥 개발 환경에서만 cleartext 허용 (프로덕션에서는 제한적 사용) -->
+    <domain-config cleartextTrafficPermitted="false">
+        <!-- 운영 서버 -->
+        <domain includeSubdomains="true">nextstep.smap.site</domain>
+        <domain includeSubdomains="true">smap.site</domain>
+        
+        <!-- Vercel 관련 -->
+        <domain includeSubdomains="true">vercel-dns-017.com</domain>
+        <domain includeSubdomains="true">vercel.app</domain>
+        <domain includeSubdomains="true">vercel.com</domain>
+        <domain includeSubdomains="true">smap-team.vercel.app</domain>
+        <domain includeSubdomains="true">smap-next.vercel.app</domain>
+        
+        <!-- 🔥 로컬 네트워크 범위 (개발자 PC IP)는 아래 cleartextTrafficPermitted=true 섹션으로 이동됨 -->
+        
+        <!-- 외부 서비스 -->
+        <domain includeSubdomains="true">map.naver.com</domain>
+        <domain includeSubdomains="true">map.naver.net</domain>
+        <!-- 네이버 지도 JS SDK 및 오픈 API -->
+        <domain includeSubdomains="true">oapi.map.naver.com</domain>
+        <domain includeSubdomains="true">openapi.map.naver.com</domain>
+        
+        <!-- 🔥 IP 주소 직접 접근 (DNS 문제 우회) -->
+        <!-- IP 직접 접근은 SSL 핀/호스트네임 검증 문제 유발 가능하므로 제거 -->
+        
+        <!-- 🔥 추가 IP 주소 (DNS 해석 실패 대비) -->
+        <domain includeSubdomains="true">76.76.19.2</domain>
+        <domain includeSubdomains="true">76.76.19.3</domain>
+        <domain includeSubdomains="true">76.76.19.4</domain>
+        <domain includeSubdomains="true">76.76.19.5</domain>
+        <domain includeSubdomains="true">76.76.19.6</domain>
+        <domain includeSubdomains="true">76.76.19.7</domain>
+        <domain includeSubdomains="true">76.76.19.8</domain>
+        <domain includeSubdomains="true">76.76.19.9</domain>
+        <domain includeSubdomains="true">76.76.19.10</domain>
+        
+        <!-- 🔥 Google 서비스 (에뮬레이터에서 문제 발생 시) -->
+        <domain includeSubdomains="true">googleapis.com</domain>
+        <domain includeSubdomains="true">google.com</domain>
+        <domain includeSubdomains="true">gstatic.com</domain>
+        <domain includeSubdomains="true">googleusercontent.com</domain>
+        
+        <!-- 🔥 DNS 서버 -->
+        <domain includeSubdomains="true">8.8.8.8</domain>
+        <domain includeSubdomains="true">8.8.4.4</domain>
+        <domain includeSubdomains="true">1.1.1.1</domain>
+        <domain includeSubdomains="true">1.0.0.1</domain>
+    </domain-config>
+    
+    <!-- 개발 환경용 설정 - 디버그 빌드에서만 cleartext 허용 -->
+    <debug-overrides cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system"/>
+            <certificates src="user"/>
+        </trust-anchors>
+    </debug-overrides>
+    
+    <!-- 개발 환경에서만 필요한 도메인들에 대해 cleartext 허용 -->
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- 로컬 개발 환경 -->
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <domain includeSubdomains="true">0.0.0.0</domain>
+        
+        <!-- 로컬 네트워크 범위 (개발자 PC IP) -->
+        <domain includeSubdomains="true">192.168.0.0</domain>
+        <domain includeSubdomains="true">192.168.1.0</domain>
+        <domain includeSubdomains="true">192.168.1.100</domain>
+        <domain includeSubdomains="true">192.168.100.0</domain>
+        <domain includeSubdomains="true">10.0.0.0</domain>
+        <domain includeSubdomains="true">172.16.0.0</domain>
+    </domain-config>
+    
+    <!-- 기본 설정 -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system"/>
+        </trust-anchors>
+    </base-config>
+</network-security-config> 

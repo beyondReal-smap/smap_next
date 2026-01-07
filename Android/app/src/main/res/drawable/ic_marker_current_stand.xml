@@ -1,0 +1,14 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="30dp"
+    android:height="30dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Solid Blue Circle -->
+    <path
+        android:fillColor="#0113A3"
+        android:pathData="M12,12m-11,0a11,11 0,1 1,22 0a11,11 0,1 1,-22 0"/>
+    <!-- Simple White Standing Person (Accessibility) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,2c1.1,0 2,0.9 2,2s-0.9,2 -2,2s-2,-0.9 -2,-2s0.9,-2 2,-2zm2,19v-6h3v-2c0-1.1-0.9-2-2-2h-6c-1.1,0-2,0.9-2,2v2h3v6h2z"/>
+</vector>

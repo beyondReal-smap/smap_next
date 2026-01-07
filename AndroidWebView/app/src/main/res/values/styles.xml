@@ -1,5 +1,0 @@
-<resources>
-    <style name="Theme.SmapWebView" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <!-- 필요에 따라 커스텀 속성 추가 -->
-    </style>
-</resources> 

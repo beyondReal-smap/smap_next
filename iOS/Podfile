@@ -57,6 +57,8 @@ post_install do |installer|
       if target.name.include?('NMapsMap') || target.name.include?('NMapsGeometry')
         puts "Skipping dSYM generation for #{target.name}"
         config.build_settings['DEBUG_INFORMATION_FORMAT'] = 'dwarf'
+        # Suppress deprecation warnings for this vendor framework
+        config.build_settings['GCC_WARN_ABOUT_DEPRECATED_FUNCTIONS'] = 'NO'
       end
     end
 

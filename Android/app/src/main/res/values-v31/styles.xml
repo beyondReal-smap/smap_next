@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 12+ 스플래시 테마 -->
+    <style name="Theme.Smap.Splash" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:windowBackground">@drawable/splash_background</item>
+        <item name="android:statusBarColor">@color/splash_background</item>
+        <item name="android:navigationBarColor">@color/splash_background</item>
+        <!-- Android 12+ 시스템 스플래시 설정: 시스템 아이콘 숨김 (커스텀 스플래시에 집중) -->
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_icon_small</item>
+        <item name="android:windowSplashScreenBackground">@color/splash_background</item>
+        <item name="android:windowSplashScreenAnimationDuration">0</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/splash_background</item>
+        <!-- 애니메이션 비활성화 -->
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:windowContentTransitions">false</item>
+    </style>
+</resources>

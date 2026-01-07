@@ -137,6 +137,6 @@ struct QRCodeView: View {
 
 struct QRCodeView_Previews: PreviewProvider {
     static var previews: some View {
-        QRCodeView(data: "https://smap.site/group/123/join", size: 250)
+        QRCodeView(data: "https://nextstep.smap.site/group/123/join", size: 250)
     }
 }

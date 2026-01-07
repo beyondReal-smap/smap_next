@@ -406,17 +406,127 @@ struct MyPlaceSidebarView: View {
                     .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
                     .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.gray.opacity(0.1), lineWidth: 1))
                     .padding(.horizontal, 20)
+                }
+                
+                // Location List Section (Only if member is selected)
+                if let selectedMember = viewModel.selectedMember {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 8) {
+                            Circle().fill(Color.orange).frame(width: 8, height: 8)
+                            Text("\(selectedMember.displayName)의 장소").font(.suite(size: 16, weight: .bold))
+                            Spacer()
+                            Text("\(viewModel.locations.count)개")
+                                .font(.suite(size: 14))
+                                .foregroundColor(.secondary)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Capsule().fill(Color.secondary.opacity(0.1)))
+                        }
+                        
+                        if viewModel.isLoadingLocations {
+                            HStack { Spacer(); ProgressView(); Spacer() }.padding(.vertical, 20)
+                        } else if viewModel.locations.isEmpty {
+                            Text("등록된 장소가 없습니다.")
+                                .font(.suite(size: 14))
+                                .foregroundColor(.gray)
+                                .padding(.vertical, 20)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                        } else {
+                            LazyVStack(spacing: 12) {
+                                ForEach(viewModel.locations) { location in
+                                    LocationListCell(location: location, isSelected: viewModel.selectedLocation?.id == location.id, onToggleNotification: {
+                                        Task { await viewModel.toggleNotification(for: location) }
+                                    }) {
+                                        viewModel.selectLocationFromSidebar(location)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding(16)
+                    .background(RoundedRectangle(cornerRadius: 16).fill(Color.white))
+                    .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
+                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.gray.opacity(0.1), lineWidth: 1))
+                    .padding(.horizontal, 20)
                     .padding(.bottom, 40)
                 }
             }
         }
         .frame(width: 320)
-        .background(
-            Color(red: 245/255, green: 247/255, blue: 250/255)
-                .edgesIgnoringSafeArea(.all)
-        )
+        .background(Color(red: 245/255, green: 247/255, blue: 250/255).edgesIgnoringSafeArea(.all))
         .cornerRadius(24, corners: [.topRight, .bottomRight])
         .shadow(color: Color.black.opacity(0.15), radius: 20, x: 5, y: 0)
+    }
+}
+
+// MARK: - Location List Cell
+
+struct LocationListCell: View {
+    let location: SavedLocation
+    let isSelected: Bool
+    let onToggleNotification: () -> Void
+    let onTap: () -> Void
+    
+    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
+    var body: some View {
+        ZStack(alignment: .trailing) {
+            // Base layer: Main row content (tappable for selection)
+            Button(action: onTap) {
+                HStack(spacing: 12) {
+                    // Icon
+                    ZStack {
+                        Circle()
+                            .fill(isSelected ? brandColor.opacity(0.1) : Color.gray.opacity(0.05))
+                            .frame(width: 40, height: 40)
+                        Image(systemName: "mappin.and.ellipse")
+                            .font(.system(size: 18))
+                            .foregroundColor(isSelected ? brandColor : .gray)
+                    }
+                    
+                    // Text
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(location.name)
+                            .font(.suite(size: 16, weight: .medium))
+                            .foregroundColor(isSelected ? brandColor : .primary)
+                            .lineLimit(1)
+                        Text(location.address)
+                            .font(.suite(size: 12))
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+                    
+                    Spacer()
+                    
+                    // Spacer for bell - explicitly disable hit testing here
+                    Color.clear
+                        .frame(width: 56, height: 44)
+                        .allowsHitTesting(false)
+                }
+                .padding(12)
+                .background(isSelected ? brandColor.opacity(0.03) : Color.white)
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(isSelected ? brandColor.opacity(0.3) : Color.gray.opacity(0.1), lineWidth: 1)
+                )
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            // Top layer: Bell button (separate from main button's touch area)
+            Button(action: onToggleNotification) {
+                Image(systemName: location.notifications ? "bell.fill" : "bell.slash")
+                    .font(.system(size: 16))
+                    .foregroundColor(location.notifications ? .orange : .gray.opacity(0.4))
+                    .frame(width: 44, height: 44)
+                    .background(Color.white)
+                    .clipShape(Circle())
+                    .shadow(color: Color.black.opacity(0.08), radius: 3, x: 0, y: 1)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(PlainButtonStyle())
+            .padding(.trailing, 18)
+        }
     }
 }
 

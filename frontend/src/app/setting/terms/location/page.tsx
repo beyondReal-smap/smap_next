@@ -97,18 +97,18 @@ export default function LocationTermsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isEmbed = (searchParams?.get('embed') === '1');
-  
+
   // 약관 페이지 상태 관리 훅 사용
   const { isVisible, isLoading, isInitialized, applyStyles } = useTermsPageState({
     pageName: 'LOCATION',
     isEmbed
   });
-  
+
   // 페이지 로드 시 body, html 스타일 초기화 (헤더 고정을 위해 필요)
   useEffect(() => {
     document.body.setAttribute('data-page', '/setting/terms/location');
     document.body.classList.add('location-terms-page-active');
-    
+
     // body, html 스타일 강제 초기화 (헤더 고정을 위해 필요)
     document.body.style.position = 'static';
     document.body.style.overflow = 'visible';
@@ -122,13 +122,13 @@ export default function LocationTermsPage() {
     document.documentElement.style.willChange = 'auto';
     document.documentElement.style.perspective = 'none';
     document.documentElement.style.backfaceVisibility = 'visible';
-    
+
     return () => {
       document.body.removeAttribute('data-page');
       document.body.classList.remove('location-terms-page-active');
     };
   }, []);
-  
+
   // 페이지 가시성 변경 감지 및 복원
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -142,7 +142,7 @@ export default function LocationTermsPage() {
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    
+
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
@@ -150,18 +150,18 @@ export default function LocationTermsPage() {
 
   const handleBack = () => {
     triggerHapticFeedback(HapticFeedbackType.SELECTION, '위치기반서비스 약관 뒤로가기', { component: 'setting-terms', action: 'back-navigation' });
-    
+
     // 이전 페이지가 register인지 확인
     const referrer = document.referrer;
     const isFromRegister = referrer.includes('/register') || referrer.includes('register');
-    
+
     if (isFromRegister) {
       // register 페이지에서 온 경우 register로 돌아가기
       // URL에서 소셜 로그인 정보와 현재 단계 정보를 유지
       const urlParams = new URLSearchParams(window.location.search);
       const social = urlParams.get('social');
       const step = urlParams.get('step') || 'terms';
-      
+
       let targetUrl = '/register';
       if (social) {
         targetUrl += `?social=${social}`;
@@ -169,7 +169,7 @@ export default function LocationTermsPage() {
           targetUrl += `&step=${step}`;
         }
       }
-      
+
       router.push(targetUrl);
     } else {
       // setting 페이지에서 온 경우 setting으로 돌아가기
@@ -180,7 +180,7 @@ export default function LocationTermsPage() {
   // 로딩 상태일 때만 로딩 화면 표시 (가시성과 초기화 상태는 무시)
   if (isLoading) {
     return (
-      <TermsPageLoading 
+      <TermsPageLoading
         message="위치기반서비스 약관 로딩 중..."
         subMessage="잠시만 기다려주세요"
       />
@@ -201,18 +201,19 @@ export default function LocationTermsPage() {
         }}
       >
         {/* embed 모드가 아닐 때만 헤더 표시 (register에서 온 경우에도 헤더 표시) */}
-        <AnimatedHeader variant="enhanced" className="setting-header">
-            <motion.div 
-              initial={{ opacity: 0, x: -40 }} 
-              animate={{ opacity: 1, x: 0 }} 
-              transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }} 
+        {!isEmbed && (
+          <AnimatedHeader variant="enhanced" className="setting-header">
+            <motion.div
+              initial={{ opacity: 0, x: -40 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
               className="setting-header-content motion-div"
             >
-              <motion.button 
-                onClick={handleBack} 
-                className="setting-back-button" 
-                whileHover={{ scale: 1.05 }} 
-                whileTap={{ scale: 0.95 }} 
+              <motion.button
+                onClick={handleBack}
+                className="setting-back-button"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 aria-label="뒤로가기"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -225,6 +226,8 @@ export default function LocationTermsPage() {
               </div>
             </motion.div>
           </AnimatedHeader>
+        )}
+
 
         {/* 컨텐츠 영역 - 고정 위치 (setting 페이지와 동일한 구조) */}
         <motion.div
@@ -234,7 +237,7 @@ export default function LocationTermsPage() {
           className={`absolute inset-0 px-4 space-y-6 content-area hide-scrollbar ${isEmbed ? 'pt-6' : 'pt-20'}`}
           data-testid="location-terms-page-content"
           data-content-type="location-terms-page-content"
-          style={{ 
+          style={{
             top: '0px',
             bottom: '0px',
             left: '0',
@@ -341,6 +344,6 @@ export default function LocationTermsPage() {
       </div>
     </>
   );
-} 
+}
 
- 
+

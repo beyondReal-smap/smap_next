@@ -1,0 +1,11 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="30dp"
+    android:height="30dp"
+    android:viewportWidth="30"
+    android:viewportHeight="30">
+    <!-- Solid circle (no border as requested by user in last feedback) -->
+    <!-- The color will be tinted via iconTintColor in the Marker -->
+    <path
+        android:fillColor="#888888"
+        android:pathData="M15,15m-14,0a14,14 0,1 1,28 0a14,14 0,1 1,-28 0"/>
+</vector>

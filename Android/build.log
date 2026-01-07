@@ -1,0 +1,102 @@
+> Task :clean UP-TO-DATE
+> Task :app:clean
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:checkKotlinGradlePluginConfigurationErrors
+> Task :app:dataBindingMergeDependencyArtifactsDebug
+> Task :app:generateDebugResValues
+> Task :app:generateDebugResources
+> Task :app:processDebugGoogleServices
+> Task :app:packageDebugResources
+> Task :app:generateDebugBuildConfig
+> Task :app:parseDebugLocalResources
+> Task :app:mapDebugSourceSetPaths
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+> Task :app:checkDebugAarMetadata
+
+> Task :app:processDebugMainManifest
+/Users/genie/SmapSource/smap_next/Android/app/src/main/AndroidManifest.xml:66:5-143:19 Warning:
+	application@android:allowBackup was tagged at AndroidManifest.xml:66 to replace other declarations but no other declaration present
+
+> Task :app:processDebugManifest
+> Task :app:javaPreCompileDebug
+> Task :app:mergeDebugShaders
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets
+> Task :app:processDebugManifestForPackage
+> Task :app:compressDebugAssets
+> Task :app:desugarDebugFileDependencies
+> Task :app:mergeDebugResources
+> Task :app:dataBindingGenBaseClassesDebug
+> Task :app:checkDebugDuplicateClasses
+> Task :app:mergeDebugStartupProfile UP-TO-DATE
+> Task :app:mergeLibDexDebug
+> Task :app:mergeDebugJniLibFolders
+> Task :app:validateSigningDebug
+> Task :app:writeDebugAppMetadata
+> Task :app:writeDebugSigningConfigVersions
+> Task :app:mergeDebugNativeLibs
+
+> Task :app:stripDebugDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libnavermap.so.
+
+> Task :app:processDebugResources
+> Task :app:mergeExtDexDebug
+
+> Task :app:compileDebugKotlin
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/LocationService.kt:52:28 'getRunningServices(Int): (Mutable)List<ActivityManager.RunningServiceInfo!>!' is deprecated. Deprecated in Java
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/LocationService.kt:217:47 'getter for interval: Long' is deprecated. Deprecated in Java
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/MyFirebaseMessagingService.kt:323:17 Condition 'context == null' is always 'false'
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/MyFirebaseMessagingService.kt:337:17 Condition 'prefs == null' is always 'false'
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/activitylog/ActivityLogComponents.kt:50:38 'DirectionsWalk: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.DirectionsWalk
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/activitylog/ActivityLogComponents.kt:68:38 'DirectionsRun: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.DirectionsRun
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/activitylog/ActivityLogComponents.kt:379:41 'DirectionsWalk: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.DirectionsWalk
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/activitylog/ActivityLogScreen.kt:47:9 Variable 'selectedDate' is never used
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/group/GroupComponents.kt:575:5 Parameter 'isOwner' is never used
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/home/HomeComponents.kt:289:62 Unnecessary non-null assertion (!!) on a non-null receiver of type String
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/home/HomeComponents.kt:289:92 Unnecessary non-null assertion (!!) on a non-null receiver of type String
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/home/HomeScreen.kt:28:5 Parameter 'onLogout' is never used
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/home/HomeScreen.kt:175:90 Unnecessary non-null assertion (!!) on a non-null receiver of type Double
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/home/HomeScreen.kt:175:118 Unnecessary non-null assertion (!!) on a non-null receiver of type Double
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/home/HomeSidebar.kt:226:73 Elvis operator (?:) always returns the left operand of non-nullable type Int
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/home/HomeSidebar.kt:227:79 Elvis operator (?:) always returns the left operand of non-nullable type Int
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/home/HomeViewModel.kt:240:29 Parameter 'mtIdx' is never used
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/login/LoginActivity.kt:15:47 'GoogleSignIn' is deprecated. Deprecated in Java
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/login/LoginActivity.kt:16:47 'GoogleSignInClient' is deprecated. Deprecated in Java
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/login/LoginActivity.kt:17:47 'GoogleSignInOptions' is deprecated. Deprecated in Java
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/login/LoginActivity.kt:30:46 'GoogleSignInClient' is deprecated. Deprecated in Java
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/login/LoginActivity.kt:36:20 'GoogleSignIn' is deprecated. Deprecated in Java
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/login/LoginActivity.kt:106:19 'GoogleSignInOptions' is deprecated. Deprecated in Java
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/login/LoginActivity.kt:106:47 'GoogleSignInOptions' is deprecated. Deprecated in Java
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/login/LoginActivity.kt:112:30 'GoogleSignIn' is deprecated. Deprecated in Java
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/myplace/MyPlaceComponents.kt:184:13 'Divider(Modifier = ..., Dp = ..., Color = ...): Unit' is deprecated. Renamed to HorizontalDivider
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/myplace/MyPlaceScreen.kt:46:9 Variable 'context' is never used
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/myplace/MyPlaceScreen.kt:156:65 Parameter 'point' is never used, could be renamed to _
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/myplace/MyPlaceScreen.kt:363:5 Parameter 'selectedMember' is never used
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/myplace/MyPlaceScreen.kt:364:5 Parameter 'locationCount' is never used
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/register/RegisterActivity.kt:34:33 'getSerializableExtra(String!): Serializable?' is deprecated. Deprecated in Java
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/register/RegisterScreen.kt:892:98 'Theme_Holo_Light_Dialog: Int' is deprecated. Deprecated in Java
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/register/RegisterScreen.kt:893:37 'setter for calendarViewShown: Boolean' is deprecated. Deprecated in Java
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/register/RegisterScreen.kt:894:37 'setter for spinnersShown: Boolean' is deprecated. Deprecated in Java
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/register/RegisterViewModel.kt:278:89 Elvis operator (?:) always returns the left operand of non-nullable type String?
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/schedule/ScheduleComponents.kt:416:5 Parameter 'onDismiss' is never used
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/schedule/ScheduleComponents.kt:491:41 'EventNote: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.EventNote
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/schedule/ScheduleDialogs.kt:146:61 'Notes: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Notes
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/schedule/ScheduleScreen.kt:36:9 Variable 'schedules' is never used
+w: file:///Users/genie/SmapSource/smap_next/Android/app/src/main/java/com/dmonster/smap/ui/schedule/ScheduleScreen.kt:188:92 Parameter 'editOption' is never used, could be renamed to _
+
+> Task :app:compileDebugJavaWithJavac
+> Task :app:dexBuilderDebug
+> Task :app:mergeDebugGlobalSynthetics
+> Task :app:processDebugJavaRes
+> Task :app:mergeProjectDexDebug
+> Task :app:mergeDebugJavaResource
+> Task :app:packageDebug
+> Task :app:createDebugApkListingFileRedirect
+> Task :app:assembleDebug
+
+BUILD SUCCESSFUL in 28s
+44 actionable tasks: 42 executed, 2 up-to-date

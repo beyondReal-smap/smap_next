@@ -19,18 +19,7 @@ class LoginViewModel: ObservableObject {
     // MARK: - Published Properties
     
     /// 전화번호 입력값
-    @Published var phoneNumber: String = "" {
-        didSet {
-            if phoneNumber != oldValue {
-                let formatted = formatPhoneNumber(phoneNumber)
-                if formatted != phoneNumber {
-                    DispatchQueue.main.async {
-                        self.phoneNumber = formatted
-                    }
-                }
-            }
-        }
-    }
+    @Published var phoneNumber: String = ""
     
     /// 비밀번호 입력값
     @Published var password: String = ""
@@ -67,33 +56,6 @@ class LoginViewModel: ObservableObject {
         isLoggedIn = authService.isLoggedIn
     }
     
-    // MARK: - Phone Number Formatting
-    
-    /// 전화번호 포맷팅 (010-1234-5678 형식)
-    private func formatPhoneNumber(_ value: String) -> String {
-        // 숫자만 추출
-        let numbers = value.filter { $0.isNumber }
-        
-        // 최대 11자리로 제한
-        let limited = String(numbers.prefix(11))
-        
-        // 포맷팅
-        switch limited.count {
-        case 0...3:
-            return limited
-        case 4...6:
-            let index1 = limited.index(limited.startIndex, offsetBy: 3)
-            return "\(limited[..<index1])-\(limited[index1...])"
-        case 7...10:
-            let index1 = limited.index(limited.startIndex, offsetBy: 3)
-            let index2 = limited.index(limited.startIndex, offsetBy: 6)
-            return "\(limited[..<index1])-\(limited[index1..<index2])-\(limited[index2...])"
-        default:
-            let index1 = limited.index(limited.startIndex, offsetBy: 3)
-            let index2 = limited.index(limited.startIndex, offsetBy: 7)
-            return "\(limited[..<index1])-\(limited[index1..<index2])-\(limited[index2...])"
-        }
-    }
     
     // MARK: - Validation
     
@@ -1174,18 +1136,7 @@ class ForgotPasswordViewModel: ObservableObject {
     // MARK: - Published Properties
     
     @Published var currentStep: Step = .phone
-    @Published var phoneNumber: String = "" {
-        didSet {
-            if phoneNumber != oldValue {
-                let formatted = formatPhoneNumber(phoneNumber)
-                if formatted != phoneNumber {
-                    DispatchQueue.main.async {
-                        self.phoneNumber = formatted
-                    }
-                }
-            }
-        }
-    }
+    @Published var phoneNumber: String = ""
     
     @Published var verificationCode: String = ""
     @Published var newPassword: String = ""
@@ -1213,26 +1164,6 @@ class ForgotPasswordViewModel: ObservableObject {
     
     // MARK: - Helper Methods
     
-    private func formatPhoneNumber(_ value: String) -> String {
-        let numbers = value.filter { $0.isNumber }
-        let limited = String(numbers.prefix(11))
-        
-        switch limited.count {
-        case 0...3:
-            return limited
-        case 4...6:
-            let index1 = limited.index(limited.startIndex, offsetBy: 3)
-            return "\(limited[..<index1])-\(limited[index1...])"
-        case 7...10:
-            let index1 = limited.index(limited.startIndex, offsetBy: 3)
-            let index2 = limited.index(limited.startIndex, offsetBy: 6)
-            return "\(limited[..<index1])-\(limited[index1..<index2])-\(limited[index2...])"
-        default:
-            let index1 = limited.index(limited.startIndex, offsetBy: 3)
-            let index2 = limited.index(limited.startIndex, offsetBy: 7)
-            return "\(limited[..<index1])-\(limited[index1..<index2])-\(limited[index2...])"
-        }
-    }
     
     private func formatPhoneForAPI(_ phone: String) -> String {
         return phone.replacingOccurrences(of: "-", with: "")

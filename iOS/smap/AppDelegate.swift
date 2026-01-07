@@ -265,11 +265,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             // iOS 10 미만에서도 푸시 알림 권한 요청
             print("✅ [PUSH] iOS 10 미만에서도 푸시 알림 권한 요청")
             #if !targetEnvironment(simulator)
-            if #available(iOS 8.0, *) {
                 let settings: UIUserNotificationSettings =
                     UIUserNotificationSettings(types: [.alert, .badge, .sound], categories: nil)
                 application.registerUserNotificationSettings(settings)
-            }
             #endif
             application.registerForRemoteNotifications()
         }

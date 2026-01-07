@@ -101,6 +101,7 @@ struct LocationSearchView: View {
     @State private var places: [KakaoPlace] = []
     @State private var isLoading: Bool = false
     @State private var errorMessage: String?
+    @State private var hasSearched: Bool = false // Track if search was performed
     
     private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
     
@@ -122,14 +123,14 @@ struct LocationSearchView: View {
                             .disableAutocorrection(true)
                         
                         if !query.isEmpty {
-                            Button(action: { query = ""; places = [] }) {
+                            Button(action: { query = ""; places = []; hasSearched = false }) {
                                 Image(systemName: "xmark.circle.fill")
                                     .foregroundColor(.gray.opacity(0.5))
                             }
                         }
                     }
                     .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
+                    .frame(height: 52) // 고정 높이
                     .background(Color(UIColor.secondarySystemBackground))
                     .cornerRadius(14)
                     
@@ -164,7 +165,7 @@ struct LocationSearchView: View {
                 } else if let errorMessage = errorMessage {
                     emptyStateView(icon: "exclamationmark.triangle.fill", title: "오류 발생", message: errorMessage)
                 } else if places.isEmpty {
-                    if query.isEmpty {
+                    if !hasSearched {
                         emptyStateView(icon: "map.fill", title: "어디를 찾으시나요?", message: "지번, 도로명 혹은 건물명을 입력하여\n원하는 장소를 검색해 보세요.")
                     } else {
                         emptyStateView(icon: "magnifyingglass", title: "검색 결과 없음", message: "'\(query)'에 대한 검색 결과가 없습니다.\n다른 검색어를 입력해 보세요.")
@@ -266,6 +267,7 @@ struct LocationSearchView: View {
                 DispatchQueue.main.async {
                     self.places = results
                     self.isLoading = false
+                    self.hasSearched = true
                 }
             } catch {
                 DispatchQueue.main.async {

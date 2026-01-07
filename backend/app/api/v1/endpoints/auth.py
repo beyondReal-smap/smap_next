@@ -363,12 +363,13 @@ async def register_user(
             detail="이미 등록된 전화번호입니다.",
         )
     
-    existing_user_by_email = crud_auth.get_user_by_email(db, user_in.mt_email)
-    if existing_user_by_email:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="이미 등록된 이메일입니다.",
-        )
+    if user_in.mt_email and user_in.mt_email.strip():
+        existing_user_by_email = crud_auth.get_user_by_email(db, user_in.mt_email)
+        if existing_user_by_email:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="이미 등록된 이메일입니다.",
+            )
     
     try:
         created_user = crud_auth.create_user(db=db, user_in=user_in)
@@ -505,15 +506,29 @@ async def kakao_login(
                     db.commit()
                     user = email_user
                 else:
-                    # 새 사용자 생성
-                    user = crud_auth.create_kakao_user(db, kakao_request)
-                    is_new_user = True
-                    logger.info(f"[KAKAO LOGIN] 새 카카오 사용자 생성: mt_idx={user.mt_idx}")
+                    # 신규 사용자 - 회원가입 필요 (자동 생성하지 않음)
+                    logger.info(f"[KAKAO LOGIN] 신규 카카오 사용자 - 회원가입 필요: email={kakao_request.email}")
+                    return KakaoLoginResponse(
+                        success=True,
+                        message="신규 사용자입니다. 회원가입을 진행해주세요.",
+                        data={
+                            "is_new_user": True,
+                            "user": None,
+                            "token": None
+                        }
+                    )
             else:
-                # 이메일 없이 새 사용자 생성
-                user = crud_auth.create_kakao_user(db, kakao_request)
-                is_new_user = True
-                logger.info(f"[KAKAO LOGIN] 새 카카오 사용자 생성 (이메일 없음): mt_idx={user.mt_idx}")
+                # 이메일 없이 신규 사용자 - 회원가입 필요 (자동 생성하지 않음)
+                logger.info(f"[KAKAO LOGIN] 신규 카카오 사용자 (이메일 없음) - 회원가입 필요: kakao_id={kakao_request.kakao_id}")
+                return KakaoLoginResponse(
+                    success=True,
+                    message="신규 사용자입니다. 회원가입을 진행해주세요.",
+                    data={
+                        "is_new_user": True,
+                        "user": None,
+                        "token": None
+                    }
+                )
 
         # 로그인 시간 업데이트 (FCM 토큰은 별도 API에서만 업데이트)
         user.mt_ldate = datetime.utcnow()
@@ -557,6 +572,15 @@ async def kakao_login(
             "mt_adate": user.mt_adate.isoformat() if user.mt_adate else datetime.utcnow().isoformat()
         }
 
+        # 토큰 생성 (신규 및 기존 사용자 모두)
+        access_token = create_access_token(
+            data={
+                "mt_idx": user.mt_idx,
+                "mt_id": user.mt_id,
+                "mt_name": user.mt_name
+            }
+        )
+
         logger.info(f"[KAKAO LOGIN] 카카오 로그인 성공: mt_idx={user.mt_idx}, is_new_user={is_new_user}")
         
         return KakaoLoginResponse(
@@ -564,6 +588,7 @@ async def kakao_login(
             message="카카오 로그인 성공" if not is_new_user else "카카오 계정으로 회원가입되었습니다.",
             data={
                 "user": user_data,
+                "token": access_token,
                 "isNewUser": is_new_user
             }
         )
