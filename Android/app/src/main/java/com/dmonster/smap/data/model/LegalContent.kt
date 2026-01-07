@@ -18,7 +18,7 @@ object LegalContent {
     // 1. 서비스 이용약관
     val ServiceTerms = LegalDocument(
         title = "서비스 이용약관",
-        effectiveDate = "2024-05-30",
+        effectiveDate = "2026-01-08",
         sections = listOf(
             TermSection("제1조(목적)", "이 약관은 비욘드리얼(이하 \"회사\")가 제공하는 제반 서비스의 이용과 관련하여 회사와 회원 간의 권리, 의무 및 책임사항, 기타 필요한 사항을 규정함을 목적으로 합니다."),
             TermSection("제2조(정의)", """
@@ -63,7 +63,7 @@ object LegalContent {
             """.trimIndent()),
             TermSection("기타 조항", "제8조부터 제24조까지의 상세 내용은 서비스 내 운영정책을 따르며, 회사는 개인정보보호, 서비스 이용 제한, 손해배상 및 면책사항 등에 대해 관련 법령을 준수합니다. 상세 문의는 고객센터를 통해 확인 가능합니다.")
         ),
-        footer = "본 약관은 2024-05-30부터 시행합니다."
+        footer = "본 약관은 2026-01-08부터 시행합니다."
     )
 
     // 2. 개인정보 처리방침 (수정본)
@@ -121,7 +121,7 @@ object LegalContent {
     // 3. 위치기반서비스 이용약관
     val LocationTerms = LegalDocument(
         title = "위치기반서비스 이용약관",
-        effectiveDate = "2024-05-30",
+        effectiveDate = "2026-01-08",
         sections = listOf(
             TermSection("제1조(목적)", "본 약관은 회원(비욘드리얼 서비스 약관에 동의한 자, 이하 “회원”)이 비욘드리얼(이하 “회사”)이 제공하는 웹/모바일 애플리케이션(“smap”)의 위치기반서비스를 이용함에 있어 회원과 회사의 권리와 의무, 기타 제반 사항을 정함을 목적으로 합니다."),
             TermSection("제2조(가입자격)", "서비스에 가입할 수 있는 회원은 위치기반서비스를 이용할 수 있는 이동전화 단말기의 소유자 본인이어야 합니다."),
@@ -153,13 +153,13 @@ object LegalContent {
                 3. MMS 등으로 게시물을 등록할 경우 발생하는 요금은 이동통신사 정책에 따릅니다.
             """.trimIndent())
         ),
-        footer = "본 약관은 2024-05-30부터 시행합니다."
+        footer = "본 약관은 2026-01-08부터 시행합니다."
     )
 
     // 4. 개인정보 제3자 제공 동의
     val ThirdPartyProvision = LegalDocument(
         title = "개인정보 제3자 제공 동의",
-        effectiveDate = "2024-05-30",
+        effectiveDate = "2026-01-08",
         intro = "비욘드리얼(이하 \"회사\")는 원활한 서비스 제공을 위해 다음과 같이 개인정보를 제3자에게 제공하고자 합니다.",
         sections = listOf(
             TermSection("제공받는 자", "서비스 연동 파트너사 및 외부 콘텐츠 제공자"),
@@ -172,7 +172,7 @@ object LegalContent {
     // 5. 마케팅 정보 수집 및 이용 동의
     val MarketingConsent = LegalDocument(
         title = "마케팅 정보 수집 및 이용 동의",
-        effectiveDate = "2024-05-30",
+        effectiveDate = "2026-01-08",
         intro = "비욘드리얼(이하 \"회사\")는 고객에게 더 나은 서비스와 혜택을 제공하기 위해 마케팅 정보 수집 및 이용에 대한 동의를 요청합니다.",
         sections = listOf(
             TermSection("수집하는 마케팅 정보", """

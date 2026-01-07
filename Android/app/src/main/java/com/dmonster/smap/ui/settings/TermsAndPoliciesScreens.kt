@@ -23,7 +23,7 @@ import com.dmonster.smap.ui.theme.SuiteFont
 @Composable
 fun TermsBaseScreen(
     title: String,
-    date: String = "2024-05-30",
+    date: String = "2026-01-08",
     onBack: () -> Unit,
     content: @Composable ColumnScope.() -> Unit
 ) {
@@ -191,7 +191,7 @@ fun ServiceTermsScreen(onBack: () -> Unit) {
         )
         TermSection(
             title = "부칙",
-            content = "본 약관은 2024-05-30부터 시행합니다."
+            content = "본 약관은 2026-01-08부터 시행합니다."
         )
     }
 }
@@ -343,7 +343,7 @@ fun LocationTermsScreen(onBack: () -> Unit) {
         )
         TermSection(
             title = "부칙",
-            content = "본 약관은 2024-05-30부터 시행합니다."
+            content = "본 약관은 2026-01-08부터 시행합니다."
         )
     }
 }

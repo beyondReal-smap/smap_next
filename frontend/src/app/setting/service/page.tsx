@@ -108,12 +108,12 @@ export default function ServiceTermsPage() {
     pageName: 'SERVICE',
     isEmbed
   });
-  
+
   // 페이지 로드 시 body, html 스타일 초기화 (헤더 고정을 위해 필요)
   useEffect(() => {
     document.body.setAttribute('data-page', '/setting/service');
     document.body.classList.add('service-terms-page-active');
-    
+
     // body, html 스타일 강제 초기화 (헤더 고정을 위해 필요)
     document.body.style.position = 'static';
     document.body.style.overflow = 'visible';
@@ -127,13 +127,13 @@ export default function ServiceTermsPage() {
     document.documentElement.style.willChange = 'auto';
     document.documentElement.style.perspective = 'none';
     document.documentElement.style.backfaceVisibility = 'visible';
-    
+
     return () => {
       document.body.removeAttribute('data-page');
       document.body.classList.remove('service-terms-page-active');
     };
   }, []);
-  
+
   // 페이지 가시성 변경 감지 및 복원
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -147,7 +147,7 @@ export default function ServiceTermsPage() {
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    
+
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
@@ -158,18 +158,18 @@ export default function ServiceTermsPage() {
       component: 'setting-service-terms',
       action: 'back-navigation'
     });
-    
+
     // 이전 페이지가 register인지 확인
     const referrer = document.referrer;
     const isFromRegister = referrer.includes('/register') || referrer.includes('register');
-    
+
     if (isFromRegister) {
       // register 페이지에서 온 경우 register로 돌아가기
       // URL에서 소셜 로그인 정보와 현재 단계 정보를 유지
       const urlParams = new URLSearchParams(window.location.search);
       const social = urlParams.get('social');
       const step = urlParams.get('step') || 'terms';
-      
+
       let targetUrl = '/register';
       if (social) {
         targetUrl += `?social=${social}`;
@@ -177,7 +177,7 @@ export default function ServiceTermsPage() {
           targetUrl += `&step=${step}`;
         }
       }
-      
+
       router.push(targetUrl);
     } else {
       // setting 페이지에서 온 경우 setting으로 돌아가기
@@ -188,7 +188,7 @@ export default function ServiceTermsPage() {
   // 로딩 상태일 때만 로딩 화면 표시 (가시성과 초기화 상태는 무시)
   if (isLoading) {
     return (
-      <TermsPageLoading 
+      <TermsPageLoading
         message="서비스 이용약관 로딩 중..."
         subMessage="잠시만 기다려주세요"
       />
@@ -211,29 +211,29 @@ export default function ServiceTermsPage() {
       >
         {/* embed 모드가 아닐 때만 헤더 표시 (register에서 온 경우에도 헤더 표시) */}
         <AnimatedHeader variant="enhanced" className="setting-header">
-            <motion.div
-              initial={{ opacity: 0, x: -40 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
-              className="setting-header-content motion-div"
+          <motion.div
+            initial={{ opacity: 0, x: -40 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
+            className="setting-header-content motion-div"
+          >
+            <motion.button
+              onClick={handleBack}
+              className="setting-back-button"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              aria-label="뒤로가기"
             >
-              <motion.button
-                onClick={handleBack}
-                className="setting-back-button"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                aria-label="뒤로가기"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </motion.button>
-              <div className="setting-header-text">
-                <h1 className="text-lg font-bold text-gray-900 leading-tight">서비스 이용약관</h1>
-                <p className="text-xs text-gray-500 leading-tight">서비스 이용에 관한 약관을 확인하세요</p>
-              </div>
-            </motion.div>
-          </AnimatedHeader>
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </motion.button>
+            <div className="setting-header-text">
+              <h1 className="text-lg font-bold text-gray-900 leading-tight">서비스 이용약관</h1>
+              <p className="text-xs text-gray-500 leading-tight">서비스 이용에 관한 약관을 확인하세요</p>
+            </div>
+          </motion.div>
+        </AnimatedHeader>
 
         {/* 컨텐츠 영역 - 고정 위치 (setting 페이지와 동일한 구조) */}
         <motion.div
@@ -243,7 +243,7 @@ export default function ServiceTermsPage() {
           className={`absolute inset-0 px-4 space-y-6 content-area hide-scrollbar ${isEmbed ? 'pt-6' : 'pt-20'}`}
           data-testid="service-terms-page-content"
           data-content-type="service-terms-page-content"
-          style={{ 
+          style={{
             top: '0px',
             bottom: '0px',
             left: '0',
@@ -257,7 +257,7 @@ export default function ServiceTermsPage() {
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-fadeIn service-content">
             <div className="p-6 text-sm leading-relaxed max-w-4xl mx-auto">
               <h2 className="text-2xl font-bold mb-6 text-center">서비스 이용약관</h2>
-              <p className="text-sm text-gray-500 mb-8 text-center">시행일: 2024-05-30</p>
+              <p className="text-sm text-gray-500 mb-8 text-center">시행일: 2026-01-08</p>
 
               <div className="space-y-6 text-gray-800 leading-7">
                 <section>
@@ -529,7 +529,7 @@ export default function ServiceTermsPage() {
 
                 <div className="bg-gray-50 p-4 rounded-lg border-t-4 border-blue-500 mt-6">
                   <h4 className="font-semibold mb-2 text-sm">부칙</h4>
-                  <p className="text-xs text-gray-700">본 약관은 2024-05-30부터 시행합니다.</p>
+                  <p className="text-xs text-gray-700">본 약관은 2026-01-08부터 시행합니다.</p>
                 </div>
               </div>
             </div>

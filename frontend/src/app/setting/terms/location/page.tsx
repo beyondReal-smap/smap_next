@@ -251,7 +251,7 @@ export default function LocationTermsPage() {
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-fadeIn location-content">
             <div className="p-6 text-sm leading-relaxed max-w-4xl mx-auto">
               <h2 className="text-2xl font-bold mb-6 text-center">위치기반서비스 이용약관</h2>
-              <p className="text-sm text-gray-500 mb-8 text-center">시행일: 2024-05-30</p>
+              <p className="text-sm text-gray-500 mb-8 text-center">시행일: 2026-01-08</p>
 
               <div className="space-y-6 text-gray-800 leading-7">
                 <section>
@@ -335,7 +335,7 @@ export default function LocationTermsPage() {
 
                 <div className="bg-gray-50 p-4 rounded-lg border-t-4 border-blue-500 mt-6">
                   <h4 className="font-semibold mb-2 text-sm">부칙</h4>
-                  <p className="text-xs text-gray-700">본 약관은 2024-05-30부터 시행합니다.</p>
+                  <p className="text-xs text-gray-700">본 약관은 2026-01-08부터 시행합니다.</p>
                 </div>
               </div>
             </div>

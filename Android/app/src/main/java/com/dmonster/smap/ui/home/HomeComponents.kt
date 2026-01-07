@@ -198,8 +198,11 @@ fun MemberInfoWindow(
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val batteryLevel = member.mltBattery ?: 0
+    val batteryLevel = member.mltBattery
     val speed = member.mltSpeed ?: 0.0
+    
+    // 배터리 표시 문자열 (null이거나 음수면 "정보없음")
+    val batteryText = if (batteryLevel == null || batteryLevel < 0) "정보없음" else "$batteryLevel%"
     
     // GPS 시간 포맷팅 (iOS 스타일: 16:46)
     val gpsTimeStr = remember(member.mltGpsTime) {
@@ -261,7 +264,7 @@ fun MemberInfoWindow(
             InfoRow(
                 icon = Icons.Filled.BatteryFull, // Ideally should change based on level, but matches screenshot type
                 label = "배터리:",
-                value = "$batteryLevel%",
+                value = batteryText,
                 iconTint = Color(0xFF22C55E)
             )
             

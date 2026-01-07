@@ -8,6 +8,7 @@
 import Foundation
 import Security
 import Combine
+import UIKit
 
 // MARK: - AuthService
 
@@ -180,17 +181,21 @@ class AuthService: ObservableObject {
         let cleanPhone = phoneNumber.replacingOccurrences(of: "-", with: "")
         
         // 기기 정보 가져오기
-        let deviceInfo = Utils.shared.getDeviceInfo()
+        let device = UIDevice.current
+        let deviceId = device.identifierForVendor?.uuidString
+        let deviceModel = device.model
+        let osVersion = device.systemVersion
+        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
         
         let request = LoginRequest(
             mt_id: cleanPhone,
             mt_pwd: password,
             fcm_token: fcmToken ?? getFCMToken(),
-            device_id: deviceInfo["identifierForVendor"] as? String,
-            device_model: deviceInfo["model"] as? String,
+            device_id: deviceId,
+            device_model: deviceModel,
             os_type: "ios",
-            os_version: deviceInfo["systemVersion"] as? String,
-            app_version: deviceInfo["appVersion"] as? String
+            os_version: osVersion,
+            app_version: appVersion
         )
         
         print("📤 [AuthService] 로그인 요청: \(cleanPhone)")

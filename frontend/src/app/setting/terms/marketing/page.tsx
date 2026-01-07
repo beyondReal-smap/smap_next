@@ -250,7 +250,7 @@ export default function MarketingTermsPage() {
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-fadeIn marketing-content">
             <div className="p-6 text-sm leading-relaxed max-w-4xl mx-auto">
               <h2 className="text-2xl font-bold mb-6 text-center">마케팅 정보 수집 및 이용 동의</h2>
-              <p className="text-sm text-gray-500 mb-8 text-center">시행일: 2024-05-30</p>
+              <p className="text-sm text-gray-500 mb-8 text-center">시행일: 2026-01-08</p>
 
               <div className="space-y-6 text-gray-800 leading-7">
                 <p className="mb-4">

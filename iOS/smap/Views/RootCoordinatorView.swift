@@ -1788,7 +1788,7 @@ struct ServiceTermsView: View {
                         .font(.suite(size: 24, weight: .bold))
                         .foregroundColor(.primary)
                     
-                    Text("시행일: 2024-05-30")
+                    Text("시행일: 2026-01-08")
                         .font(.suite(size: 14))
                         .foregroundColor(.gray)
                 }
@@ -1855,7 +1855,7 @@ struct ServiceTermsView: View {
                         .font(.suite(size: 16, weight: .bold))
                         .frame(maxWidth: .infinity, alignment: .leading)
                     
-                    Text("본 약관은 2024-05-30부터 시행합니다.")
+                    Text("본 약관은 2026-01-08부터 시행합니다.")
                         .font(.suite(size: 14))
                         .foregroundColor(.gray)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -2096,7 +2096,7 @@ struct LocationTermsView: View {
                         .font(.suite(size: 24, weight: .bold))
                         .foregroundColor(.primary)
                     
-                    Text("시행일: 2024-05-30")
+                    Text("시행일: 2026-01-08")
                         .font(.suite(size: 14))
                         .foregroundColor(.gray)
                 }
@@ -2141,7 +2141,7 @@ struct LocationTermsView: View {
                     3. MMS 등으로 게시물을 등록할 경우 발생하는 요금은 이동통신사 정책에 따릅니다.
                     """)
                     
-                    TermSection(title: "부칙", content: "본 약관은 2024-05-30부터 시행합니다.")
+                    TermSection(title: "부칙", content: "본 약관은 2026-01-08부터 시행합니다.")
                 }
                 .padding(.bottom, 40)
             }
@@ -2179,7 +2179,7 @@ struct MarketingConsentView: View {
                         .font(.suite(size: 24, weight: .bold))
                         .foregroundColor(.primary)
                     
-                    Text("시행일: 2024-05-30")
+                    Text("시행일: 2026-01-08")
                         .font(.suite(size: 14))
                         .foregroundColor(.gray)
                 }
@@ -2257,7 +2257,7 @@ struct ThirdPartyProvisionView: View {
                         .font(.suite(size: 24, weight: .bold))
                         .foregroundColor(.primary)
                     
-                    Text("시행일: 2024-05-30")
+                    Text("시행일: 2026-01-08")
                         .font(.suite(size: 14))
                         .foregroundColor(.gray)
                 }
