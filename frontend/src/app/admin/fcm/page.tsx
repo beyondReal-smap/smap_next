@@ -32,18 +32,27 @@ export default function AdminFCMPage() {
     const loadHistory = async () => {
         setIsLoading(true);
         try {
-            // TODO: 실제 API 연동
-            const mockHistory: FCMHistory[] = Array.from({ length: 20 }, (_, i) => ({
-                fcm_idx: i + 1,
-                fcm_title: `알림 제목 ${i + 1}`,
-                fcm_body: `알림 내용 ${i + 1}입니다. 중요한 내용을 전달합니다.`,
-                fcm_target: ['all', 'group', 'user'][i % 3] as 'all' | 'group' | 'user',
-                fcm_target_name: ['전체', `그룹 ${i}`, `사용자 ${i}`][i % 3],
-                fcm_status: i % 5 === 0 ? 'failed' : 'success',
-                fcm_sent_count: i % 3 === 0 ? 1247 : i % 3 === 1 ? 8 : 1,
-                fcm_wdate: new Date(Date.now() - i * 86400000).toISOString().replace('T', ' ').slice(0, 16),
-            }));
-            setHistory(mockHistory);
+            const token = localStorage.getItem('admin-token');
+            const response = await fetch('/api/admin/fcm', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                const mappedHistory = result.data.map((h: any) => ({
+                    fcm_idx: h.plt_idx || h.fcm_idx || Date.now(),
+                    fcm_title: h.plt_title || h.fcm_title || '',
+                    fcm_body: h.plt_content || h.fcm_body || '',
+                    fcm_target: 'user' as const,
+                    fcm_target_name: `사용자 ${h.mt_idx || ''}`,
+                    fcm_status: h.plt_status === 'Y' ? 'success' : 'pending' as const,
+                    fcm_sent_count: 1,
+                    fcm_wdate: h.plt_wdate ? new Date(h.plt_wdate).toLocaleString('ko-KR') : '',
+                }));
+                setHistory(mappedHistory);
+            }
         } catch (error) {
             console.error('Failed to load FCM history:', error);
         } finally {
@@ -57,26 +66,40 @@ export default function AdminFCMPage() {
             return;
         }
 
+        if (formData.target !== 'all' && !formData.targetId) {
+            alert('발송 대상 ID를 입력해주세요.');
+            return;
+        }
+
         setIsSending(true);
         try {
-            // TODO: 실제 FCM 발송 API 호출
-            await new Promise(resolve => setTimeout(resolve, 1500));
+            const token = localStorage.getItem('admin-token');
+            const response = await fetch('/api/admin/fcm', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    title: formData.title,
+                    content: formData.body,
+                    mt_idx: formData.target === 'user' ? parseInt(formData.targetId) : 0,
+                    plt_type: 'admin',
+                    plt_condition: formData.target,
+                }),
+            });
 
-            const newHistory: FCMHistory = {
-                fcm_idx: Date.now(),
-                fcm_title: formData.title,
-                fcm_body: formData.body,
-                fcm_target: formData.target,
-                fcm_target_name: formData.target === 'all' ? '전체' : formData.target === 'group' ? '그룹' : '개인',
-                fcm_status: 'success',
-                fcm_sent_count: formData.target === 'all' ? 1247 : formData.target === 'group' ? 15 : 1,
-                fcm_wdate: new Date().toISOString().replace('T', ' ').slice(0, 16),
-            };
+            const result = await response.json();
 
-            setHistory(prev => [newHistory, ...prev]);
-            setFormData({ target: 'all', targetId: '', title: '', body: '' });
-            alert('푸시 알림이 발송되었습니다.');
+            if (result.success) {
+                setFormData({ target: 'all', targetId: '', title: '', body: '' });
+                alert('푸시 알림이 발송되었습니다.');
+                loadHistory(); // 목록 새로고침
+            } else {
+                alert(result.message || '발송에 실패했습니다.');
+            }
         } catch (error) {
+            console.error('FCM send error:', error);
             alert('발송에 실패했습니다.');
         } finally {
             setIsSending(false);
@@ -127,8 +150,8 @@ export default function AdminFCMPage() {
                                             key={opt.value}
                                             onClick={() => setFormData(prev => ({ ...prev, target: opt.value as any }))}
                                             className={`flex flex-col items-center p-3 rounded-xl border transition-all ${formData.target === opt.value
-                                                    ? 'border-indigo-500 bg-indigo-50 text-indigo-600'
-                                                    : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                                                ? 'border-indigo-500 bg-indigo-50 text-indigo-600'
+                                                : 'border-slate-200 text-slate-500 hover:border-slate-300'
                                                 }`}
                                         >
                                             <opt.icon className="w-5 h-5 mb-1" />

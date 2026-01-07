@@ -63,9 +63,10 @@ app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
-    docs_url=f"{settings.API_V1_STR}/docs",
-    redoc_url=f"{settings.API_V1_STR}/redoc",
+    docs_url="/docs",    # 루트 경로에서 접근 가능
+    redoc_url="/redoc",  # 루트 경로에서 접근 가능
 )
+
 
 # CORS 미들웨어 설정
 app.add_middleware(

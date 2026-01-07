@@ -28,24 +28,37 @@ export default function AdminGroupsPage() {
     const loadGroups = async () => {
         setIsLoading(true);
         try {
-            // TODO: 실제 API 연동
-            const mockGroups: Group[] = Array.from({ length: 30 }, (_, i) => ({
-                sgt_idx: i + 1,
-                sgt_title: `그룹 ${i + 1}`,
-                sgt_memo: `그룹 ${i + 1}의 설명입니다.`,
-                member_count: Math.floor(Math.random() * 10) + 1,
-                schedule_count: Math.floor(Math.random() * 20),
-                location_count: Math.floor(Math.random() * 15),
-                sgt_wdate: new Date(Date.now() - i * 86400000 * 3).toISOString().split('T')[0],
-                owner_name: `사용자${i + 1}`,
-            }));
-            setGroups(mockGroups);
+            const token = localStorage.getItem('admin-token');
+            const response = await fetch('/api/admin/groups?show_hidden=true', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                // API 응답 데이터를 Group 인터페이스에 맞게 변환
+                const mappedGroups = result.data.map((g: any) => ({
+                    sgt_idx: g.sgt_idx,
+                    sgt_title: g.sgt_title || '제목 없음',
+                    sgt_memo: g.sgt_memo || '',
+                    member_count: g.member_count || 0,
+                    schedule_count: g.schedule_count || 0,
+                    location_count: g.location_count || 0,
+                    sgt_wdate: g.sgt_wdate ? new Date(g.sgt_wdate).toLocaleDateString('ko-KR') : '',
+                    owner_name: g.owner_name || `사용자 ${g.mt_idx || ''}`,
+                }));
+                setGroups(mappedGroups);
+            } else {
+                console.error('Failed to load groups:', result.message);
+            }
         } catch (error) {
             console.error('Failed to load groups:', error);
         } finally {
             setIsLoading(false);
         }
     };
+
 
     const filteredGroups = groups.filter(group =>
         group.sgt_title.includes(searchQuery) ||

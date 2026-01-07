@@ -1,27 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import resolveBackendBaseUrl from '../../../_utils/backend';
 
-// 관리자 회원 목록 조회 API
+// 관리자 회원 목록 조회 API - 백엔드 /api/v1/members/ 사용
 export async function GET(request: NextRequest) {
     try {
-        // 관리자 토큰 확인
-        const authHeader = request.headers.get('Authorization');
-        if (!authHeader) {
-            return NextResponse.json({ success: false, message: '인증이 필요합니다.' }, { status: 401 });
-        }
-
         const { searchParams } = new URL(request.url);
-        const page = searchParams.get('page') || '1';
-        const size = searchParams.get('size') || '50';
+        const page = parseInt(searchParams.get('page') || '1');
+        const size = parseInt(searchParams.get('size') || '100');
         const search = searchParams.get('search') || '';
+        const skip = (page - 1) * size;
 
-        console.log('[Admin Members API] 회원 목록 조회:', { page, size, search });
+        console.log('[Admin Members API] 회원 목록 조회:', { page, size, search, skip });
 
         const backendBase = resolveBackendBaseUrl();
-        let backendUrl = `${backendBase}/api/v1/admin/members?page=${page}&size=${size}`;
-        if (search) {
-            backendUrl += `&search=${encodeURIComponent(search)}`;
-        }
+        const backendUrl = `${backendBase}/api/v1/members/?skip=${skip}&limit=${size}`;
 
         process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
 
@@ -33,49 +25,77 @@ export async function GET(request: NextRequest) {
         });
 
         if (!response.ok) {
-            // 백엔드 API가 없는 경우 더미 데이터 반환
-            console.log('[Admin Members API] 백엔드 API 미구현, 더미 데이터 반환');
-            const mockMembers = Array.from({ length: 50 }, (_, i) => ({
-                mt_idx: i + 1,
-                mt_id: `user${i + 1}`,
-                mt_name: `사용자${i + 1}`,
-                mt_nickname: `닉네임${i + 1}`,
-                mt_hp: `010-${String(1000 + i).padStart(4, '0')}-${String(1000 + i).padStart(4, '0')}`,
-                mt_email: `user${i + 1}@example.com`,
-                mt_status: i % 10 === 0 ? 'N' : 'Y',
-                mt_wdate: new Date(Date.now() - i * 86400000).toISOString().split('T')[0],
-            }));
-
-            return NextResponse.json({
-                success: true,
-                data: mockMembers,
-                total: 50,
-                page: parseInt(page),
-                size: parseInt(size),
-            });
+            console.error('[Admin Members API] 백엔드 에러:', response.status);
+            throw new Error(`Backend API error: ${response.status}`);
         }
 
         const data = await response.json();
-        return NextResponse.json(data);
+        console.log('[Admin Members API] 백엔드 응답 성공, 회원 수:', Array.isArray(data) ? data.length : 'N/A');
+
+        // 검색어가 있으면 필터링
+        let members = Array.isArray(data) ? data : [];
+        if (search) {
+            const searchLower = search.toLowerCase();
+            members = members.filter((m: any) =>
+                (m.mt_name && m.mt_name.toLowerCase().includes(searchLower)) ||
+                (m.mt_nickname && m.mt_nickname.toLowerCase().includes(searchLower)) ||
+                (m.mt_email && m.mt_email.toLowerCase().includes(searchLower)) ||
+                (m.mt_hp && m.mt_hp.includes(search))
+            );
+        }
+
+        return NextResponse.json({
+            success: true,
+            data: members,
+            total: members.length,
+            page,
+            size,
+        });
     } catch (error) {
         console.error('[Admin Members API] 오류:', error);
         return NextResponse.json(
-            { success: false, message: '회원 목록을 불러오는데 실패했습니다.' },
+            { success: false, message: '회원 목록을 불러오는데 실패했습니다.', error: String(error) },
             { status: 500 }
         );
     }
 }
 
-// 관리자 회원 정보 수정/삭제 API
+// 회원 정보 수정 API - 백엔드 /api/v1/members/{member_id} PUT 사용
 export async function PUT(request: NextRequest) {
     try {
         const body = await request.json();
-        console.log('[Admin Members API] 회원 정보 수정:', body);
+        const { mt_idx, ...updateData } = body;
 
-        // TODO: 백엔드 API 연동
+        if (!mt_idx) {
+            return NextResponse.json({ success: false, message: '회원 ID가 필요합니다.' }, { status: 400 });
+        }
+
+        console.log('[Admin Members API] 회원 정보 수정:', mt_idx, updateData);
+
+        const backendBase = resolveBackendBaseUrl();
+        const backendUrl = `${backendBase}/api/v1/members/${mt_idx}`;
+
+        process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
+
+        const response = await fetch(backendUrl, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(updateData),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('[Admin Members API] 수정 실패:', response.status, errorText);
+            throw new Error(`Backend API error: ${response.status}`);
+        }
+
+        const data = await response.json();
         return NextResponse.json({
             success: true,
             message: '회원 정보가 수정되었습니다.',
+            data,
         });
     } catch (error) {
         console.error('[Admin Members API] 수정 오류:', error);
@@ -86,14 +106,36 @@ export async function PUT(request: NextRequest) {
     }
 }
 
+// 회원 삭제 API - 백엔드 /api/v1/members/{member_id} DELETE 사용
 export async function DELETE(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
         const mt_idx = searchParams.get('mt_idx');
 
+        if (!mt_idx) {
+            return NextResponse.json({ success: false, message: '회원 ID가 필요합니다.' }, { status: 400 });
+        }
+
         console.log('[Admin Members API] 회원 삭제:', mt_idx);
 
-        // TODO: 백엔드 API 연동
+        const backendBase = resolveBackendBaseUrl();
+        const backendUrl = `${backendBase}/api/v1/members/${mt_idx}`;
+
+        process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
+
+        const response = await fetch(backendUrl, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('[Admin Members API] 삭제 실패:', response.status, errorText);
+            throw new Error(`Backend API error: ${response.status}`);
+        }
+
         return NextResponse.json({
             success: true,
             message: '회원이 삭제되었습니다.',

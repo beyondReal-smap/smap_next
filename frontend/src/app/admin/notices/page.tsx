@@ -27,16 +27,25 @@ export default function AdminNoticesPage() {
     const loadNotices = async () => {
         setIsLoading(true);
         try {
-            // TODO: 실제 API 연동
-            const mockNotices: Notice[] = Array.from({ length: 15 }, (_, i) => ({
-                nt_idx: i + 1,
-                nt_title: `공지사항 ${i + 1}`,
-                nt_content: `공지사항 ${i + 1}의 상세 내용입니다. 이 공지는 중요한 내용을 담고 있습니다.`,
-                nt_show: i % 5 === 0 ? 'N' : 'Y',
-                nt_wdate: new Date(Date.now() - i * 86400000 * 2).toISOString().split('T')[0],
-                view_count: Math.floor(Math.random() * 500),
-            }));
-            setNotices(mockNotices);
+            const token = localStorage.getItem('admin-token');
+            const response = await fetch('/api/admin/notices?show_only=false', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                const mappedNotices = result.data.map((n: any) => ({
+                    nt_idx: n.nt_idx,
+                    nt_title: n.nt_title || '',
+                    nt_content: n.nt_content || '',
+                    nt_show: n.nt_show || 'Y',
+                    nt_wdate: n.nt_wdate ? new Date(n.nt_wdate).toLocaleDateString('ko-KR') : '',
+                    view_count: n.nt_hit || n.view_count || 0,
+                }));
+                setNotices(mappedNotices);
+            }
         } catch (error) {
             console.error('Failed to load notices:', error);
         } finally {
@@ -58,30 +67,62 @@ export default function AdminNoticesPage() {
     };
 
     const handleSubmit = async () => {
-        // TODO: 실제 API 호출
-        if (editMode && selectedNotice) {
-            setNotices(prev => prev.map(n =>
-                n.nt_idx === selectedNotice.nt_idx
-                    ? { ...n, nt_title: formData.title, nt_content: formData.content }
-                    : n
-            ));
-        } else {
-            const newNotice: Notice = {
-                nt_idx: Date.now(),
-                nt_title: formData.title,
-                nt_content: formData.content,
-                nt_show: 'Y',
-                nt_wdate: new Date().toISOString().split('T')[0],
-                view_count: 0,
-            };
-            setNotices(prev => [newNotice, ...prev]);
+        const token = localStorage.getItem('admin-token');
+
+        try {
+            if (editMode && selectedNotice) {
+                // 수정 API 호출
+                await fetch('/api/admin/notices', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({
+                        nt_idx: selectedNotice.nt_idx,
+                        nt_title: formData.title,
+                        nt_content: formData.content,
+                    }),
+                });
+            } else {
+                // 작성 API 호출
+                await fetch('/api/admin/notices', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({
+                        nt_title: formData.title,
+                        nt_content: formData.content,
+                        nt_show: 'Y',
+                    }),
+                });
+            }
+            setShowModal(false);
+            loadNotices(); // 목록 새로고침
+        } catch (error) {
+            console.error('Failed to save notice:', error);
+            alert('공지사항 저장에 실패했습니다.');
         }
-        setShowModal(false);
     };
 
     const handleDelete = async (notice: Notice) => {
         if (!confirm(`"${notice.nt_title}" 공지를 삭제하시겠습니까?`)) return;
-        setNotices(prev => prev.filter(n => n.nt_idx !== notice.nt_idx));
+
+        try {
+            const token = localStorage.getItem('admin-token');
+            await fetch(`/api/admin/notices?nt_idx=${notice.nt_idx}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
+            loadNotices(); // 목록 새로고침
+        } catch (error) {
+            console.error('Failed to delete notice:', error);
+            alert('공지사항 삭제에 실패했습니다.');
+        }
     };
 
     return (
