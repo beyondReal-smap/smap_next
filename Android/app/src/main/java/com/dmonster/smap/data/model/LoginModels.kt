@@ -8,7 +8,12 @@ import com.google.gson.annotations.SerializedName
 data class LoginRequest(
     @SerializedName("mt_id") val mtId: String,      // 전화번호
     @SerializedName("mt_pwd") val mtPwd: String,    // 비밀번호
-    @SerializedName("fcm_token") val fcmToken: String? = null
+    @SerializedName("fcm_token") val fcmToken: String? = null,
+    @SerializedName("device_id") val deviceId: String? = null,
+    @SerializedName("device_model") val deviceModel: String? = null,
+    @SerializedName("os_type") val osType: String? = null,
+    @SerializedName("os_version") val osVersion: String? = null,
+    @SerializedName("app_version") val appVersion: String? = null
 )
 
 /**
@@ -92,7 +97,12 @@ data class KakaoLoginRequest(
     val nickname: String?,
     @SerializedName("profile_image") val profileImage: String? = null,
     @SerializedName("access_token") val accessToken: String?,
-    @SerializedName("lookup_strategy") val lookupStrategy: String = "email_first"
+    @SerializedName("lookup_strategy") val lookupStrategy: String = "email_first",
+    @SerializedName("device_id") val deviceId: String? = null,
+    @SerializedName("device_model") val deviceModel: String? = null,
+    @SerializedName("os_type") val osType: String? = null,
+    @SerializedName("os_version") val osVersion: String? = null,
+    @SerializedName("app_version") val appVersion: String? = null
 )
 
 /**

@@ -14,6 +14,11 @@ struct LoginRequest: Codable {
     let mt_id: String      // 전화번호 (010-1234-5678 형식 또는 01012345678)
     let mt_pwd: String     // 비밀번호
     let fcm_token: String? // FCM 토큰 (선택)
+    let device_id: String? // 기기 식별번호
+    let device_model: String? // 기기 모델명
+    let os_type: String? // "ios" 또는 "android"
+    let os_version: String? // OS 버전
+    let app_version: String? // 앱 버전
 }
 
 /// 로그인 응답 모델

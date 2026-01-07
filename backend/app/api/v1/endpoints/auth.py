@@ -27,6 +27,11 @@ class LoginRequestHome(BaseModel):
     mt_id: str  # 아이디 (전화번호 또는 이메일)
     mt_pwd: str  # 비밀번호
     fcm_token: Optional[str] = None  # 선택적 FCM 토큰
+    device_id: Optional[str] = None  # 기기 식별번호
+    device_model: Optional[str] = None  # 기기 모델명
+    os_type: Optional[str] = None  # "ios" 또는 "android"
+    os_version: Optional[str] = None  # OS 버전
+    app_version: Optional[str] = None  # 앱 버전
 
 # home/page.tsx의 AuthContext에서 사용하는 로그인 응답 모델
 class LoginResponseHome(BaseModel):
@@ -42,6 +47,11 @@ class KakaoLoginRequest(BaseModel):
     profile_image: Optional[str] = None
     access_token: str
     fcm_token: Optional[str] = None  # 선택적 FCM 토큰
+    device_id: Optional[str] = None  # 기기 식별번호
+    device_model: Optional[str] = None  # 기기 모델명
+    os_type: Optional[str] = None  # "ios" 또는 "android"
+    os_version: Optional[str] = None  # OS 버전
+    app_version: Optional[str] = None  # 앱 버전
 
 # 카카오 로그인 응답 모델
 class KakaoLoginResponse(BaseModel):
@@ -190,12 +200,22 @@ async def login_for_home_page(
             }
         )
         
-        # 로그인 시간 업데이트 (FCM 토큰은 별도 API에서만 업데이트)
+        # 로그인 시간 업데이트
         user.mt_ldate = datetime.utcnow()
-        # FCM 토큰 자동 업데이트 제거 - Swift에서 명시적 요청 시에만 업데이트
-        # if getattr(login_request, 'fcm_token', None):
-        #     if not user.mt_token_id or user.mt_token_id != login_request.fcm_token:
-        #         user.mt_token_id = login_request.fcm_token
+        user.mt_adate = datetime.utcnow()  # 최근 접속일시도 업데이트
+        
+        # 기기 정보 업데이트
+        if login_request.device_id:
+            user.mt_device_id = login_request.device_id
+        if login_request.device_model:
+            user.mt_device_model = login_request.device_model
+        if login_request.os_type:
+            user.mt_os_check = 1 if login_request.os_type.lower() == 'ios' else 0
+        if login_request.os_version:
+            user.mt_os_version = login_request.os_version
+        if login_request.app_version:
+            user.mt_app_version = login_request.app_version
+        
         db.commit()
 
         # home/page.tsx의 Member 타입에 맞는 사용자 정보 구성
@@ -530,12 +550,22 @@ async def kakao_login(
                     }
                 )
 
-        # 로그인 시간 업데이트 (FCM 토큰은 별도 API에서만 업데이트)
+        # 로그인 시간 업데이트
         user.mt_ldate = datetime.utcnow()
-        # FCM 토큰 자동 업데이트 제거 - Swift에서 명시적 요청 시에만 업데이트
-        # if getattr(kakao_request, 'fcm_token', None):
-        #     if not user.mt_token_id or user.mt_token_id != kakao_request.fcm_token:
-        #         user.mt_token_id = kakao_request.fcm_token
+        user.mt_adate = datetime.utcnow()  # 최근 접속일시도 업데이트
+        
+        # 기기 정보 업데이트
+        if kakao_request.device_id:
+            user.mt_device_id = kakao_request.device_id
+        if kakao_request.device_model:
+            user.mt_device_model = kakao_request.device_model
+        if kakao_request.os_type:
+            user.mt_os_check = 1 if kakao_request.os_type.lower() == 'ios' else 0
+        if kakao_request.os_version:
+            user.mt_os_version = kakao_request.os_version
+        if kakao_request.app_version:
+            user.mt_app_version = kakao_request.app_version
+        
         db.commit()
 
         # 사용자 정보 구성

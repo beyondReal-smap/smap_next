@@ -69,6 +69,10 @@ class Member(BaseModel):
     mt_google_id = Column(String(255), nullable=True, comment='Google 계정 ID')
     mt_kakao_id = Column(String(255), nullable=True, comment='Kakao 계정 ID')
     mt_apple_id = Column(String(255), nullable=True, comment='Apple 계정 ID')
+    mt_device_id = Column(String(100), nullable=True, comment='기기 식별번호')
+    mt_device_model = Column(String(100), nullable=True, comment='기기 모델명')
+    mt_os_version = Column(String(50), nullable=True, comment='OS 버전')
+    mt_app_version = Column(String(20), nullable=True, comment='앱 버전')
 
     @classmethod
     def find_by_email(cls, db: Session, email: str) -> Optional['Member']:

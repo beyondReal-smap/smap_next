@@ -179,10 +179,18 @@ class AuthService: ObservableObject {
         // 전화번호에서 하이픈 제거
         let cleanPhone = phoneNumber.replacingOccurrences(of: "-", with: "")
         
+        // 기기 정보 가져오기
+        let deviceInfo = Utils.shared.getDeviceInfo()
+        
         let request = LoginRequest(
             mt_id: cleanPhone,
             mt_pwd: password,
-            fcm_token: fcmToken ?? getFCMToken()
+            fcm_token: fcmToken ?? getFCMToken(),
+            device_id: deviceInfo["identifierForVendor"] as? String,
+            device_model: deviceInfo["model"] as? String,
+            os_type: "ios",
+            os_version: deviceInfo["systemVersion"] as? String,
+            app_version: deviceInfo["appVersion"] as? String
         )
         
         print("📤 [AuthService] 로그인 요청: \(cleanPhone)")

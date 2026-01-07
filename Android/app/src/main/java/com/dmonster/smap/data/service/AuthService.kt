@@ -66,7 +66,24 @@ class AuthService private constructor(private val context: Context) {
      */
     suspend fun login(phoneNumber: String, password: String): LoginResponse = withContext(Dispatchers.IO) {
         val cleanPhone = phoneNumber.replace("-", "")
-        val request = LoginRequest(mtId = cleanPhone, mtPwd = password)
+        
+        // 기기 정보 수집
+        val deviceId = android.provider.Settings.Secure.getString(context.contentResolver, android.provider.Settings.Secure.ANDROID_ID)
+        val deviceModel = android.os.Build.MODEL
+        val osVersion = android.os.Build.VERSION.RELEASE
+        val appVersion = try {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName
+        } catch (e: Exception) { null }
+        
+        val request = LoginRequest(
+            mtId = cleanPhone, 
+            mtPwd = password,
+            deviceId = deviceId,
+            deviceModel = deviceModel,
+            osType = "android",
+            osVersion = osVersion,
+            appVersion = appVersion
+        )
         
         val jsonBody = gson.toJson(request)
         val requestBody = jsonBody.toRequestBody("application/json".toMediaType())
