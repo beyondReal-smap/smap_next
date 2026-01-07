@@ -320,7 +320,7 @@ def check_nickname_availability(
         "message": "사용 가능한 닉네임입니다." if is_available else "이미 사용 중인 닉네임입니다."
     }
 
-@router.get("/", response_model=List[MemberResponse])
+@router.get("/")
 def get_members(
     db: Session = Depends(deps.get_db),
     skip: int = 0,
@@ -331,12 +331,51 @@ def get_members(
     멤버 목록을 조회합니다.
     특정 ID가 제공되면 해당 멤버만 반환합니다.
     """
-    if id:
-        member = db.query(Member).filter(Member.mt_idx == id).first()
-        return [member] if member else []
-    
-    members = db.query(Member).offset(skip).limit(limit).all()
-    return members
+    try:
+        if id:
+            member = db.query(Member).filter(Member.mt_idx == id).first()
+            if not member:
+                return []
+            # 단일 멤버를 안전하게 변환
+            return [_member_to_dict(member)]
+        
+        members = db.query(Member).offset(skip).limit(limit).all()
+        # 각 멤버를 안전하게 딕셔너리로 변환
+        return [_member_to_dict(m) for m in members]
+    except Exception as e:
+        logger.error(f"[GET_MEMBERS] 회원 목록 조회 오류: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"회원 목록 조회 실패: {str(e)}")
+
+
+def _member_to_dict(member: Member) -> dict:
+    """Member 모델을 안전하게 딕셔너리로 변환 (None 값 처리)"""
+    return {
+        "mt_idx": member.mt_idx,
+        "mt_type": member.mt_type or 1,
+        "mt_level": member.mt_level or 2,
+        "mt_status": member.mt_status or 1,
+        "mt_id": member.mt_id or "",
+        "mt_name": member.mt_name or "",
+        "mt_nickname": member.mt_nickname or "",
+        "mt_hp": member.mt_hp or "",
+        "mt_email": member.mt_email or "",
+        "mt_birth": member.mt_birth.isoformat() if member.mt_birth else None,
+        "mt_gender": member.mt_gender or 1,
+        "mt_file1": member.mt_file1 or "",
+        "mt_show": member.mt_show or "Y",
+        "mt_agree1": member.mt_agree1 or "N",
+        "mt_agree2": member.mt_agree2 or "N",
+        "mt_agree3": member.mt_agree3 or "N",
+        "mt_agree4": member.mt_agree4 or "N",
+        "mt_agree5": member.mt_agree5 or "N",
+        "mt_lat": float(member.mt_lat) if member.mt_lat else None,
+        "mt_long": float(member.mt_long) if member.mt_long else None,
+        "mt_wdate": member.mt_wdate.isoformat() if member.mt_wdate else None,
+        "mt_ldate": member.mt_ldate.isoformat() if member.mt_ldate else None,
+        "mt_udate": member.mt_udate.isoformat() if member.mt_udate else None,
+    }
 
 @router.get("/me")
 async def get_user_profile(
