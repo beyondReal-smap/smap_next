@@ -30,25 +30,26 @@ export default function AdminMembersPage() {
     const loadMembers = async () => {
         setIsLoading(true);
         try {
-            // TODO: 실제 API 연동
-            // 임시 데이터
-            const mockMembers: Member[] = Array.from({ length: 50 }, (_, i) => ({
-                mt_idx: i + 1,
-                mt_id: `user${i + 1}`,
-                mt_name: `사용자${i + 1}`,
-                mt_nickname: `닉네임${i + 1}`,
-                mt_hp: `010-${String(1000 + i).padStart(4, '0')}-${String(1000 + i).padStart(4, '0')}`,
-                mt_email: `user${i + 1}@example.com`,
-                mt_status: i % 10 === 0 ? 'N' : 'Y',
-                mt_wdate: new Date(Date.now() - i * 86400000).toISOString().split('T')[0],
-            }));
-            setMembers(mockMembers);
+            const token = localStorage.getItem('admin-token');
+            const response = await fetch('/api/admin/members', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                setMembers(result.data);
+            } else {
+                console.error('Failed to load members:', result.message);
+            }
         } catch (error) {
             console.error('Failed to load members:', error);
         } finally {
             setIsLoading(false);
         }
     };
+
 
     const filteredMembers = members.filter(member =>
         member.mt_name.includes(searchQuery) ||
@@ -139,8 +140,8 @@ export default function AdminMembersPage() {
                                             <td className="px-6 py-4 text-slate-600">{member.mt_email}</td>
                                             <td className="px-6 py-4">
                                                 <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${member.mt_status === 'Y'
-                                                        ? 'bg-green-100 text-green-700'
-                                                        : 'bg-red-100 text-red-700'
+                                                    ? 'bg-green-100 text-green-700'
+                                                    : 'bg-red-100 text-red-700'
                                                     }`}>
                                                     {member.mt_status === 'Y' ? '활성' : '비활성'}
                                                 </span>

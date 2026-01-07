@@ -67,13 +67,13 @@ export default function AdminLoginPage() {
                             <label className="block text-sm font-medium text-slate-300 mb-2">
                                 아이디
                             </label>
-                            <div className="relative">
-                                <FiUser className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                            <div className="flex items-center bg-slate-700/50 border border-slate-600 rounded-xl focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-transparent transition-all">
+                                <FiUser className="w-5 h-5 text-slate-400 ml-3 flex-shrink-0" />
                                 <input
                                     type="text"
                                     value={username}
                                     onChange={(e) => setUsername(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-3 bg-slate-700/50 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                                    className="flex-1 px-3 py-3 bg-transparent text-white placeholder-slate-400 focus:outline-none"
                                     placeholder="관리자 아이디"
                                     required
                                 />
@@ -85,26 +85,27 @@ export default function AdminLoginPage() {
                             <label className="block text-sm font-medium text-slate-300 mb-2">
                                 비밀번호
                             </label>
-                            <div className="relative">
-                                <FiLock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                            <div className="flex items-center bg-slate-700/50 border border-slate-600 rounded-xl focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-transparent transition-all">
+                                <FiLock className="w-5 h-5 text-slate-400 ml-3 flex-shrink-0" />
                                 <input
                                     type={showPassword ? 'text' : 'password'}
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full pl-10 pr-12 py-3 bg-slate-700/50 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                                    className="flex-1 px-3 py-3 bg-transparent text-white placeholder-slate-400 focus:outline-none"
                                     placeholder="비밀번호"
                                     required
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                                    className="px-3 text-slate-400 hover:text-white transition-colors"
                                 >
                                     {showPassword ? <FiEyeOff className="w-5 h-5" /> : <FiEye className="w-5 h-5" />}
                                 </button>
                             </div>
                         </div>
                     </div>
+
 
                     {/* 로그인 버튼 */}
                     <button
