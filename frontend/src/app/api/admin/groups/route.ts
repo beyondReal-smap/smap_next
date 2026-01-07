@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import resolveBackendBaseUrl from '../../../_utils/backend';
+import resolveBackendBaseUrl from '../../_utils/backend';
 
 // 관리자 그룹 목록 조회 API - 백엔드 /api/v1/groups/ 사용
 export async function GET(request: NextRequest) {

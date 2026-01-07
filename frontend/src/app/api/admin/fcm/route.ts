@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import resolveBackendBaseUrl from '../../../_utils/backend';
+import resolveBackendBaseUrl from '../../_utils/backend';
 
 // 관리자 FCM 푸시 발송 API - 백엔드 /api/v1/fcm_sendone/ 사용
 export async function POST(request: NextRequest) {
