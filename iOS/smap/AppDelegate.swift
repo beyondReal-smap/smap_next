@@ -9277,30 +9277,43 @@ extension AppDelegate {
     }
     
     private func updateFCMTokenToServerSilently(token: String, reason: String) {
+        // mt_idx 가져오기
+        guard let mtIdxString = UserDefaults.standard.string(forKey: "mt_idx") ??
+                              UserDefaults.standard.string(forKey: "savedMtIdx"),
+              let mtIdx = Int(mtIdxString) else {
+            // print("🚫 [FCM BACKGROUND] mt_idx 없음 - 조용한 업데이트 건너뜀")
+            return
+        }
+
         // 조용한 백그라운드 업데이트 (로그 최소화)
-        guard let url = URL(string: "https://api3.smap.site/api/v1/member-fcm-token/update") else { return }
+        // URL 수정: /update -> /background-check
+        // Http.shared.BASE_URL 사용
+        let urlString = "\(Http.shared.BASE_URL)\(Http.shared.memberFcmTokenUrl)/background-check"
+        guard let url = URL(string: urlString) else { return }
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        let body = [
+        // Payload 수정 to match BackgroundTokenCheckRequest
+        let body: [String: Any] = [
+            "mt_idx": mtIdx,
             "fcm_token": token,
-            "reason": reason,
-            "background_update": true
-        ] as [String: Any]
+            "check_type": "background",
+            "force_refresh": false
+        ]
         
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
             URLSession.shared.dataTask(with: request) { _, response, error in
                 if let error = error {
-                    print("❌ [FCM BACKGROUND] 조용한 토큰 업데이트 실패: \(error.localizedDescription)")
+                    // print("❌ [FCM BACKGROUND] 조용한 토큰 업데이트 실패: \(error.localizedDescription)")
                 } else if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
-                    print("✅ [FCM BACKGROUND] 조용한 토큰 업데이트 성공")
+                    // print("✅ [FCM BACKGROUND] 조용한 토큰 업데이트 성공")
                 }
             }.resume()
         } catch {
-            print("❌ [FCM BACKGROUND] 요청 생성 실패: \(error.localizedDescription)")
+            // print("❌ [FCM BACKGROUND] 요청 생성 실패: \(error.localizedDescription)")
         }
     }
     

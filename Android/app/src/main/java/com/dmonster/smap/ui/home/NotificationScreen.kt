@@ -44,7 +44,7 @@ fun NotificationScreen(
         modifier = Modifier.fillMaxSize(),
         color = Color.White
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
             // Header
             NotificationHeader(onClose = onClose, viewModel = viewModel)
 

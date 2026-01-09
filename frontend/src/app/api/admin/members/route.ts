@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
         const page = parseInt(searchParams.get('page') || '1');
-        const size = parseInt(searchParams.get('size') || '100');
+        const size = parseInt(searchParams.get('size') || '20');
         const search = searchParams.get('search') || '';
         const skip = (page - 1) * size;
 
@@ -44,10 +44,39 @@ export async function GET(request: NextRequest) {
             );
         }
 
+        // 전체 회원 수 조회 (별도 요청)
+        let totalCount = members.length;
+        try {
+            const countUrl = `${backendBase}/api/v1/members/?skip=0&limit=10000`;
+            const countResponse = await fetch(countUrl, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            if (countResponse.ok) {
+                const countData = await countResponse.json();
+                if (Array.isArray(countData)) {
+                    if (search) {
+                        // 검색 시 필터링된 전체 수
+                        const searchLower = search.toLowerCase();
+                        totalCount = countData.filter((m: any) =>
+                            (m.mt_name && m.mt_name.toLowerCase().includes(searchLower)) ||
+                            (m.mt_nickname && m.mt_nickname.toLowerCase().includes(searchLower)) ||
+                            (m.mt_email && m.mt_email.toLowerCase().includes(searchLower)) ||
+                            (m.mt_hp && m.mt_hp.includes(search))
+                        ).length;
+                    } else {
+                        totalCount = countData.length;
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('[Admin Members API] 전체 수 조회 실패:', e);
+        }
+
         return NextResponse.json({
             success: true,
             data: members,
-            total: members.length,
+            total: totalCount,
             page,
             size,
         });

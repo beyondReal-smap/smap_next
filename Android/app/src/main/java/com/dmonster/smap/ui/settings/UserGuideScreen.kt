@@ -40,7 +40,7 @@ fun UserGuideScreen(onBack: () -> Unit) {
             .fillMaxSize()
             .background(Color(0xFFF7F7F7))
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
             // Header - Back Button
             Box(
                 modifier = Modifier

@@ -4,6 +4,7 @@
     <domain-config cleartextTrafficPermitted="false">
         <!-- 운영 서버 -->
         <domain includeSubdomains="true">nextstep.smap.site</domain>
+        <domain includeSubdomains="true">api3.smap.site</domain>
         <domain includeSubdomains="true">smap.site</domain>
         
         <!-- Vercel 관련 -->

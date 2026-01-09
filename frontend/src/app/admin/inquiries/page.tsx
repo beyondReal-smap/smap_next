@@ -40,6 +40,8 @@ export default function AdminInquiriesPage() {
                 member_name: `사용자${i + 1}`,
                 member_email: `user${i + 1}@example.com`,
             }));
+            // 최신순 정렬 (qt_wdate 기준 내림차순)
+            mockInquiries.sort((a, b) => new Date(b.qt_wdate).getTime() - new Date(a.qt_wdate).getTime());
             setInquiries(mockInquiries);
         } catch (error) {
             console.error('Failed to load inquiries:', error);
@@ -91,8 +93,8 @@ export default function AdminInquiriesPage() {
                         key={f}
                         onClick={() => setFilter(f)}
                         className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${filter === f
-                                ? 'bg-indigo-600 text-white'
-                                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
                             }`}
                     >
                         {f === 'all' ? '전체' : f === 'pending' ? '대기 중' : '답변 완료'}
@@ -134,8 +136,8 @@ export default function AdminInquiriesPage() {
                                         </div>
                                     </div>
                                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${inquiry.qt_status === 'pending'
-                                            ? 'bg-amber-100 text-amber-700'
-                                            : 'bg-green-100 text-green-700'
+                                        ? 'bg-amber-100 text-amber-700'
+                                        : 'bg-green-100 text-green-700'
                                         }`}>
                                         {inquiry.qt_status === 'pending' ? '대기' : '완료'}
                                     </span>
@@ -165,8 +167,8 @@ export default function AdminInquiriesPage() {
                                     <p className="text-xs text-slate-400 mt-1">{selectedInquiry.qt_wdate}</p>
                                 </div>
                                 <span className={`px-3 py-1 rounded-full text-xs font-medium ${selectedInquiry.qt_status === 'pending'
-                                        ? 'bg-amber-100 text-amber-700'
-                                        : 'bg-green-100 text-green-700'
+                                    ? 'bg-amber-100 text-amber-700'
+                                    : 'bg-green-100 text-green-700'
                                     }`}>
                                     {selectedInquiry.qt_status === 'pending' ? '대기 중' : '답변 완료'}
                                 </span>
@@ -189,7 +191,7 @@ export default function AdminInquiriesPage() {
                                     value={answer}
                                     onChange={(e) => setAnswer(e.target.value)}
                                     rows={5}
-                                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                                    className="w-full max-w-lg px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
                                     placeholder="답변을 입력하세요..."
                                 />
                             </div>

@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
         const page = parseInt(searchParams.get('page') || '1');
-        const size = parseInt(searchParams.get('size') || '100');
+        const size = parseInt(searchParams.get('size') || '10000');
         const search = searchParams.get('search') || '';
         const skip = (page - 1) * size;
         const showHidden = searchParams.get('show_hidden') === 'true';

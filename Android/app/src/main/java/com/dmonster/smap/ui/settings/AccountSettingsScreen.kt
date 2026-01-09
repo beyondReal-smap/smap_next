@@ -92,7 +92,7 @@ fun AccountSettingsScreen(
                     .fillMaxSize()
                     .background(Color(0xFFF7F7F7))
             ) {
-                Column(modifier = Modifier.fillMaxSize()) {
+                Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
                     // Header
                     Box(
                         modifier = Modifier

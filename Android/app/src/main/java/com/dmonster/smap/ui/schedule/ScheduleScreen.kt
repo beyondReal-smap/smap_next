@@ -58,6 +58,10 @@ fun ScheduleScreen(
     var showRecurringDeleteDialog by remember { mutableStateOf(false) }
     var selectedScheduleForAction by remember { mutableStateOf<SmapSchedule?>(null) }
     
+    // Smooth transition states
+    var lastEditSchedule by remember { mutableStateOf<SmapSchedule?>(null) }
+    if (showEditDialog != null) lastEditSchedule = showEditDialog
+    
     // Reactive Derived States - re-computed when schedules or selectedDate changes
     val selectedDateSchedules = remember(schedules, selectedDate) {
         viewModel.getSchedulesForDate(selectedDate)
@@ -234,7 +238,12 @@ fun ScheduleScreen(
             onDelete = { viewModel.showDeleteDialog(schedule) }
         )
     }
-    if (showCreateDialog) {
+    // Create Event Screen
+    AnimatedVisibility(
+        visible = showCreateDialog,
+        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+    ) {
         CreateEditEventDialog(
             isEdit = false,
             schedule = null,
@@ -263,36 +272,44 @@ fun ScheduleScreen(
             isLoading = isCreating
         )
     }
-    
-    showEditDialog?.let { schedule ->
-        CreateEditEventDialog(
-            isEdit = true,
-            schedule = schedule,
-            selectedDate = selectedDate,
-            groups = groups,
-            selectedGroup = selectedGroup,
-            members = members,
-            onGroupSelect = { viewModel.selectGroup(it) },
-            onDismiss = { viewModel.hideEditDialog() },
-            initialEditOption = editOption,
-            onSave = { targetMemberId, title, startDate, endDate, isAllDay, memo, location, lat, lng, alarm, repeat, editOption ->
-                viewModel.updateSchedule(
-                    scheduleId = schedule.sstIdx,
-                    title = title,
-                    startDate = startDate,
-                    endDate = endDate,
-                    isAllDay = isAllDay,
-                    memo = memo,
-                    locationName = location,
-                    locationLat = lat,
-                    locationLng = lng,
-                    alarmTime = alarm,
-                    repeatConfig = repeat,
-                    editOption = editOption
-                )
-            },
-            isLoading = false
-        )
+
+    // Edit Event Screen
+    AnimatedVisibility(
+        visible = showEditDialog != null,
+        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+    ) {
+        val scheduleToEdit = showEditDialog ?: lastEditSchedule
+        scheduleToEdit?.let { schedule ->
+            CreateEditEventDialog(
+                isEdit = true,
+                schedule = schedule,
+                selectedDate = selectedDate,
+                groups = groups,
+                selectedGroup = selectedGroup,
+                members = members,
+                onGroupSelect = { viewModel.selectGroup(it) },
+                onDismiss = { viewModel.hideEditDialog() },
+                initialEditOption = editOption,
+                onSave = { targetMemberId, title, startDate, endDate, isAllDay, memo, location, lat, lng, alarm, repeat, editOption ->
+                    viewModel.updateSchedule(
+                        scheduleId = schedule.sstIdx,
+                        title = title,
+                        startDate = startDate,
+                        endDate = endDate,
+                        isAllDay = isAllDay,
+                        memo = memo,
+                        locationName = location,
+                        locationLat = lat,
+                        locationLng = lng,
+                        alarmTime = alarm,
+                        repeatConfig = repeat,
+                        editOption = editOption
+                    )
+                },
+                isLoading = false
+            )
+        }
     }
     
     showDeleteDialog?.let { schedule ->

@@ -143,6 +143,14 @@
             android:name="com.naver.maps.map.NCP_KEY_ID"
             android:value="4e12mmctfk" />
 
+        <!-- 🔥 Firebase 기본 알림 아이콘 설정 -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_notification" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/brand_primary" />
+
         <!-- Kakao Login Redirect -->
         <activity
             android:name="com.kakao.sdk.auth.AuthCodeHandlerActivity"

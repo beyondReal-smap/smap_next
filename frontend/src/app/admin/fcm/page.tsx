@@ -26,11 +26,13 @@ export default function AdminFCMPage() {
     });
 
     useEffect(() => {
-        loadHistory();
+        loadHistory(true);
     }, []);
 
-    const loadHistory = async () => {
-        setIsLoading(true);
+    const loadHistory = async (showLoading = false) => {
+        if (showLoading) {
+            setIsLoading(true);
+        }
         try {
             const token = localStorage.getItem('admin-token');
             const response = await fetch('/api/admin/fcm', {
@@ -40,7 +42,7 @@ export default function AdminFCMPage() {
             });
             const result = await response.json();
 
-            if (result.success && result.data) {
+            if (result.success && Array.isArray(result.data)) {
                 const mappedHistory = result.data.map((h: any) => ({
                     fcm_idx: h.plt_idx || h.fcm_idx || Date.now(),
                     fcm_title: h.plt_title || h.fcm_title || '',
@@ -49,8 +51,15 @@ export default function AdminFCMPage() {
                     fcm_target_name: `사용자 ${h.mt_idx || ''}`,
                     fcm_status: h.plt_status === 'Y' ? 'success' : 'pending' as const,
                     fcm_sent_count: 1,
-                    fcm_wdate: h.plt_wdate ? new Date(h.plt_wdate).toLocaleString('ko-KR') : '',
+                    fcm_wdate: h.plt_wdate || '',
+                    fcm_wdate_raw: h.plt_wdate ? new Date(h.plt_wdate).getTime() : 0,
                 }));
+                // 최신순 정렬
+                mappedHistory.sort((a: any, b: any) => b.fcm_wdate_raw - a.fcm_wdate_raw);
+                // 날짜 포맷팅
+                mappedHistory.forEach((h: any) => {
+                    h.fcm_wdate = h.fcm_wdate ? new Date(h.fcm_wdate).toLocaleString('ko-KR') : '';
+                });
                 setHistory(mappedHistory);
             }
         } catch (error) {
@@ -92,7 +101,7 @@ export default function AdminFCMPage() {
             const result = await response.json();
 
             if (result.success) {
-                setFormData({ target: 'all', targetId: '', title: '', body: '' });
+                setFormData(prev => ({ ...prev, title: '', body: '' }));
                 alert('푸시 알림이 발송되었습니다.');
                 loadHistory(); // 목록 새로고침
             } else {
@@ -149,12 +158,12 @@ export default function AdminFCMPage() {
                                         <button
                                             key={opt.value}
                                             onClick={() => setFormData(prev => ({ ...prev, target: opt.value as any }))}
-                                            className={`flex flex-col items-center p-3 rounded-xl border transition-all ${formData.target === opt.value
+                                            className={`flex items-center justify-center space-x-2 p-3 rounded-xl border transition-all ${formData.target === opt.value
                                                 ? 'border-indigo-500 bg-indigo-50 text-indigo-600'
                                                 : 'border-slate-200 text-slate-500 hover:border-slate-300'
                                                 }`}
                                         >
-                                            <opt.icon className="w-5 h-5 mb-1" />
+                                            <opt.icon className="w-4 h-4" />
                                             <span className="text-xs font-medium">{opt.label}</span>
                                         </button>
                                     ))}
@@ -171,7 +180,7 @@ export default function AdminFCMPage() {
                                         type="text"
                                         value={formData.targetId}
                                         onChange={(e) => setFormData(prev => ({ ...prev, targetId: e.target.value }))}
-                                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        className="w-full max-w-sm px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                         placeholder="ID 입력"
                                     />
                                 </div>
@@ -184,7 +193,7 @@ export default function AdminFCMPage() {
                                     type="text"
                                     value={formData.title}
                                     onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    className="w-full max-w-sm px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                     placeholder="알림 제목"
                                 />
                             </div>
@@ -196,7 +205,7 @@ export default function AdminFCMPage() {
                                     value={formData.body}
                                     onChange={(e) => setFormData(prev => ({ ...prev, body: e.target.value }))}
                                     rows={4}
-                                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                                    className="w-full max-w-sm px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
                                     placeholder="알림 내용"
                                 />
                             </div>
@@ -239,8 +248,8 @@ export default function AdminFCMPage() {
 
                                     return (
                                         <div key={item.fcm_idx} className="p-4 hover:bg-slate-50 transition-colors">
-                                            <div className="flex items-start space-x-3">
-                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${color}`}>
+                                            <div className="flex items-center space-x-3">
+                                                <div className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center ${color}`}>
                                                     <StatusIcon className="w-5 h-5" />
                                                 </div>
                                                 <div className="flex-1 min-w-0">

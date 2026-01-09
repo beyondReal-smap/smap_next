@@ -418,23 +418,16 @@ fun CreateEditEventDialog(
     // UI Colors (Updated to white per user request)
     // Removed specific section backgrounds to ensure all are white
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = Color(0xFFF2F2F7),
-        tonalElevation = 0.dp,
-        dragHandle = { BottomSheetDefaults.DragHandle() },
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = Color(0xFFF2F2F7)
     ) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = Color(0xFFF2F2F7),
-            tonalElevation = 0.dp
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .padding(bottom = 24.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(bottom = 24.dp)
-            ) {
             // Header
             Box(
                 modifier = Modifier
@@ -778,7 +771,6 @@ fun CreateEditEventDialog(
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp
                         )
-                    }
                 }
             }
         }

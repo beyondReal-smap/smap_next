@@ -30,12 +30,15 @@ export async function GET(request: NextRequest) {
         }
 
         const data = await response.json();
-        console.log('[Admin Notices API] 백엔드 응답 성공');
+        console.log('[Admin Notices API] 백엔드 응답 성공:', data);
+
+        // 백엔드가 { notices: [...], total, page, size, total_pages } 형태로 반환
+        const notices = data.notices || data.data || (Array.isArray(data) ? data : []);
 
         return NextResponse.json({
             success: true,
-            data: data.data || data,
-            total: data.total || (data.data ? data.data.length : 0),
+            data: notices,
+            total: data.total || notices.length,
             page: data.page || page,
             size: data.size || size,
         });

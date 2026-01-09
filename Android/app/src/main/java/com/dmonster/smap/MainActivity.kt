@@ -52,12 +52,23 @@ class MainActivity : ComponentActivity() {
                 var showBackgroundGuide by remember { mutableStateOf(false) }
                 
                 // Permission Launchers
-                val foregroundLocationLauncher = rememberLauncherForActivityResult(
+                val permissionLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestMultiplePermissions()
                 ) { permissions ->
-                    val granted = permissions.entries.all { it.value }
-                    if (granted) {
+                    val locationGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                                        permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+                    val notificationGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        permissions[Manifest.permission.POST_NOTIFICATIONS] == true
+                    } else {
+                        true
+                    }
+
+                    if (locationGranted) {
                         checkAndRequestBackgroundLocation(onShowGuide = { showBackgroundGuide = true })
+                    }
+                    
+                    if (notificationGranted) {
+                        Log.d(TAG, "✅ [FCM] Notification permission granted")
                     }
                 }
 
@@ -71,7 +82,14 @@ class MainActivity : ComponentActivity() {
 
                 // Initial Check
                 LaunchedEffect(Unit) {
-                    if (!hasLocationPermissions()) {
+                    val hasLocation = hasLocationPermissions()
+                    val hasNotification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                    } else {
+                        true
+                    }
+
+                    if (!hasLocation || !hasNotification) {
                         showDisclosure = true
                     } else if (!hasBackgroundLocationPermission()) {
                         showBackgroundGuide = true
@@ -93,12 +111,14 @@ class MainActivity : ComponentActivity() {
                         LocationPermissionDialog(
                             onConfirm = {
                                 showDisclosure = false
-                                foregroundLocationLauncher.launch(
-                                    arrayOf(
-                                        Manifest.permission.ACCESS_FINE_LOCATION,
-                                        Manifest.permission.ACCESS_COARSE_LOCATION
-                                    )
+                                val permissions = mutableListOf(
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION
                                 )
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    permissions.add(Manifest.permission.POST_NOTIFICATIONS)
+                                }
+                                permissionLauncher.launch(permissions.toTypedArray())
                             },
                             onDismiss = { showDisclosure = false }
                         )

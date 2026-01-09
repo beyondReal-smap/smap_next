@@ -76,7 +76,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     }
 
     return (
-        <div className="min-h-screen bg-slate-100">
+        <div className="h-screen bg-slate-100 overflow-hidden">
             {/* 모바일 메뉴 오버레이 */}
             {sidebarOpen && (
                 <div
@@ -85,7 +85,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 />
             )}
 
-            {/* 사이드바 */}
+            {/* 사이드바 - 고정 */}
             <aside className={`
         fixed top-0 left-0 z-50 h-full w-64 bg-slate-900 transform transition-transform duration-300 ease-in-out
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
@@ -146,10 +146,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 </div>
             </aside>
 
-            {/* 메인 콘텐츠 */}
-            <div className="lg:ml-64">
-                {/* 헤더 */}
-                <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-6 sticky top-0 z-30">
+            {/* 메인 콘텐츠 - 헤더 고정, 본문만 스크롤 */}
+            <div className="lg:ml-64 h-screen flex flex-col">
+                {/* 헤더 - 고정 */}
+                <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-6 flex-shrink-0">
                     <button
                         onClick={() => setSidebarOpen(true)}
                         className="lg:hidden text-slate-600 hover:text-slate-900"
@@ -165,8 +165,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                     </div>
                 </header>
 
-                {/* 페이지 콘텐츠 */}
-                <main className="p-4 lg:p-6">
+                {/* 페이지 콘텐츠 - 스크롤 가능 */}
+                <main className="flex-1 overflow-y-auto p-4 lg:p-6">
                     {children}
                 </main>
             </div>

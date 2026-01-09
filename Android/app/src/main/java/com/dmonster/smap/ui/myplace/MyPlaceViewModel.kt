@@ -304,6 +304,7 @@ class MyPlaceViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun showEditDialog(location: SavedLocation) {
+        _selectedLocation.value = location // 마커 선택 상태 업데이트 (빨간색 마커로 변경)
         _showEditDialog.value = location
     }
 

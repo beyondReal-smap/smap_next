@@ -41,6 +41,13 @@ fun SettingsScreen(
     var isInquiryVisible by remember { mutableStateOf(false) }
     var isNoticeListVisible by remember { mutableStateOf(false) }
     var selectedNotice by remember { mutableStateOf<SmapNotice?>(null) }
+    
+    // Remember last states for smooth exit animations
+    var lastTermsType by remember { mutableStateOf<String?>(null) }
+    if (selectedTermsScreen != null) lastTermsType = selectedTermsScreen
+    
+    var lastNotice by remember { mutableStateOf<SmapNotice?>(null) }
+    if (selectedNotice != null) lastNotice = selectedNotice
 
     // Track if any sub-screen is visible
     val isAnySubScreenVisible = isAccountSettingsVisible || 
@@ -67,7 +74,7 @@ fun SettingsScreen(
                 animationSpec = tween(300)
             )
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
+            Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
                 // Header - Custom Pill-style Back Button
                 Box(
                     modifier = Modifier
@@ -189,7 +196,8 @@ fun SettingsScreen(
                 animationSpec = tween(300)
             )
         ) {
-            selectedTermsScreen?.let { type ->
+            val termsType = selectedTermsScreen ?: lastTermsType
+            termsType?.let { type ->
                 when (type) {
                     "service" -> ServiceTermsScreen(onBack = { selectedTermsScreen = null })
                     "privacy" -> PrivacyPolicyScreen(onBack = { selectedTermsScreen = null })
@@ -256,7 +264,8 @@ fun SettingsScreen(
                 animationSpec = tween(300)
             )
         ) {
-            selectedNotice?.let { notice ->
+            val noticeToDisplay = selectedNotice ?: lastNotice
+            noticeToDisplay?.let { notice ->
                 NoticeDetailScreen(
                     notice = notice,
                     onBack = { selectedNotice = null }

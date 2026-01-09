@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import android.content.SharedPreferences
 import com.dmonster.smap.data.model.*
+import com.dmonster.smap.MyFirebaseMessagingService
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -268,6 +269,9 @@ class AuthService private constructor(private val context: Context) {
         val success1 = prefs.edit().putString(KEY_USER_DATA, json).commit()
         val success2 = prefs.edit().putInt(KEY_MT_IDX, user.mtIdx ?: 0).commit()
         Log.d(TAG, "👤 User data saved: ${user.mtNickname} (Success: ${success1 && success2})")
+        
+        // FCM 토큰 업데이트 트리거
+        MyFirebaseMessagingService.triggerTokenUpdate(context)
     }
     
     fun getUserData(): SMAPUser? {

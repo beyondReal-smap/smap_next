@@ -150,26 +150,28 @@ fun HomeHeaderView(
         }
         
         Row(horizontalArrangement = Arrangement.spacedBy(0.dp)) {
-            // Notification Button
-            Box(modifier = Modifier.size(48.dp)) {
-                IconButton(
-                    onClick = onNotificationTap,
-                    modifier = Modifier.fillMaxSize()
+            // Notification Button with Badge
+            IconButton(
+                onClick = onNotificationTap,
+                modifier = Modifier.size(48.dp)
+            ) {
+                BadgedBox(
+                    badge = {
+                        if (hasUnread) {
+                            Badge(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .offset(y = (-4).dp),  // 🔥 위로 조금 올림
+                                containerColor = Color.Red
+                            )
+                        }
+                    }
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Notifications,
                         contentDescription = "Notifications",
                         tint = Color.Gray,
                         modifier = Modifier.size(24.dp)
-                    )
-                }
-                if (hasUnread) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .background(Color.Red, CircleShape)
-                            .align(Alignment.TopEnd)
-                            .offset(x = (-4).dp, y = 4.dp)
                     )
                 }
             }

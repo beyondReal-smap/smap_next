@@ -127,6 +127,10 @@ class AuthService: ObservableObject {
             
             self.currentUser = user
             print("✅ [AuthService] 사용자 데이터 저장 완료: \(user.displayName) (idx: \(mtIdx))")
+            
+            // 🚀 FCM 토큰 업데이트 트리거 (AppDelegate의 handleForceUpdateFCMToken 호출)
+            NotificationCenter.default.post(name: NSNotification.Name("ForceUpdateFCMToken"), object: nil)
+            print("📣 [AuthService] FCM 토큰 강제 업데이트 노티피케이션 발송")
         }
     }
     

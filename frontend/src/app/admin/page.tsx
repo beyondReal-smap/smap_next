@@ -48,21 +48,57 @@ export default function AdminDashboardPage() {
         todaySignups: 0,
         pendingInquiries: 0,
     });
+    const [recentMembers, setRecentMembers] = useState<any[]>([]);
+    const [recentNotices, setRecentNotices] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        // TODO: 실제 API 연동
-        // 임시 데이터
-        setTimeout(() => {
-            setStats({
-                totalMembers: 1247,
-                totalGroups: 328,
-                todaySignups: 23,
-                pendingInquiries: 8,
-            });
-            setIsLoading(false);
-        }, 500);
+        loadDashboardData();
     }, []);
+
+    const loadDashboardData = async () => {
+        try {
+            // 통계 조회 (건수만)
+            const statsRes = await fetch('/api/admin/stats');
+            const statsData = await statsRes.json();
+            console.log('[Dashboard] Stats API response:', statsData);
+
+            // 최근 가입 회원 5명 조회
+            const membersRes = await fetch('/api/admin/members?size=5');
+            const membersData = await membersRes.json();
+
+            // 공지사항 조회
+            const noticesRes = await fetch('/api/admin/notices?size=5');
+            const noticesData = await noticesRes.json();
+
+            const members = Array.isArray(membersData.data) ? membersData.data : [];
+            const notices = Array.isArray(noticesData.data) ? noticesData.data : [];
+
+            // 최근 가입 회원 정렬
+            const sortedMembers = [...members].sort((a: any, b: any) => {
+                const dateA = new Date(a.mt_wdate || 0);
+                const dateB = new Date(b.mt_wdate || 0);
+                return dateB.getTime() - dateA.getTime();
+            }).slice(0, 5);
+
+            // 통계 데이터 설정
+            if (statsData.success && statsData.data) {
+                setStats({
+                    totalMembers: statsData.data.total_members || 0,
+                    totalGroups: statsData.data.total_groups || 0,
+                    todaySignups: statsData.data.today_signups || 0,
+                    pendingInquiries: statsData.data.pending_inquiries || 0,
+                });
+            }
+
+            setRecentMembers(sortedMembers);
+            setRecentNotices(notices.slice(0, 5));
+        } catch (error) {
+            console.error('Dashboard data load error:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     if (isLoading) {
         return (
@@ -116,47 +152,57 @@ export default function AdminDashboardPage() {
                 <div className="bg-white rounded-2xl border border-slate-200 p-6">
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-lg font-semibold text-slate-900">최근 가입 회원</h2>
-                        <button className="text-indigo-600 text-sm font-medium hover:underline">
+                        <a href="/admin/members" className="text-indigo-600 text-sm font-medium hover:underline">
                             전체 보기
-                        </button>
+                        </a>
                     </div>
                     <div className="space-y-4">
-                        {[1, 2, 3, 4, 5].map((i) => (
-                            <div key={i} className="flex items-center space-x-3">
-                                <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center">
-                                    <span className="text-slate-600 font-medium">U</span>
+                        {recentMembers.length > 0 ? recentMembers.map((member) => (
+                            <div key={member.mt_idx} className="flex items-center space-x-3">
+                                <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
+                                    <span className="text-indigo-600 font-medium">
+                                        {(member.mt_name || member.mt_nickname || 'U')[0]}
+                                    </span>
                                 </div>
                                 <div className="flex-1">
-                                    <p className="text-sm font-medium text-slate-900">사용자 {i}</p>
-                                    <p className="text-xs text-slate-500">user{i}@example.com</p>
+                                    <p className="text-sm font-medium text-slate-900">
+                                        {member.mt_name || member.mt_nickname || '이름 없음'}
+                                    </p>
+                                    <p className="text-xs text-slate-500">{member.mt_email || member.mt_hp || '-'}</p>
                                 </div>
-                                <span className="text-xs text-slate-400">방금 전</span>
+                                <span className="text-xs text-slate-400">
+                                    {member.mt_wdate ? new Date(member.mt_wdate).toLocaleDateString('ko-KR') : '-'}
+                                </span>
                             </div>
-                        ))}
+                        )) : (
+                            <p className="text-sm text-slate-500 text-center py-4">최근 가입한 회원이 없습니다.</p>
+                        )}
                     </div>
                 </div>
 
-                {/* 최근 문의 */}
+                {/* 최근 공지사항 */}
                 <div className="bg-white rounded-2xl border border-slate-200 p-6">
                     <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-lg font-semibold text-slate-900">최근 문의</h2>
-                        <button className="text-indigo-600 text-sm font-medium hover:underline">
+                        <h2 className="text-lg font-semibold text-slate-900">최근 공지사항</h2>
+                        <a href="/admin/notices" className="text-indigo-600 text-sm font-medium hover:underline">
                             전체 보기
-                        </button>
+                        </a>
                     </div>
                     <div className="space-y-4">
-                        {[1, 2, 3, 4, 5].map((i) => (
-                            <div key={i} className="flex items-start space-x-3">
-                                <div className={`w-2 h-2 rounded-full mt-2 ${i <= 3 ? 'bg-amber-500' : 'bg-green-500'}`} />
+                        {recentNotices.length > 0 ? recentNotices.map((notice) => (
+                            <div key={notice.nt_idx} className="flex items-start space-x-3">
+                                <div className={`w-2 h-2 rounded-full mt-2 ${notice.nt_show === 'Y' ? 'bg-green-500' : 'bg-amber-500'}`} />
                                 <div className="flex-1">
-                                    <p className="text-sm font-medium text-slate-900">문의 제목 {i}</p>
-                                    <p className="text-xs text-slate-500 mt-1">앱 사용 중 문제가 발생했습니다...</p>
+                                    <p className="text-sm font-medium text-slate-900">{notice.nt_title || '제목 없음'}</p>
+                                    <p className="text-xs text-slate-500 mt-1 line-clamp-1">{notice.nt_content || ''}</p>
                                 </div>
-                                <span className={`text-xs px-2 py-1 rounded-full ${i <= 3 ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
-                                    {i <= 3 ? '대기' : '완료'}
+                                <span className="text-xs text-slate-400">
+                                    {notice.nt_wdate ? new Date(notice.nt_wdate).toLocaleDateString('ko-KR') : '-'}
                                 </span>
                             </div>
-                        ))}
+                        )) : (
+                            <p className="text-sm text-slate-500 text-center py-4">최근 공지사항이 없습니다.</p>
+                        )}
                     </div>
                 </div>
             </div>

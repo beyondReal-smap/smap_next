@@ -12,8 +12,8 @@ android {
         applicationId = "com.dmonster.smap"
         minSdk = 24
         targetSdk = 35
-        versionCode = 31
-        versionName = "2.2.7"
+        versionCode = 36
+        versionName = "2.2.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         resourceConfigurations += setOf("ko", "en")
@@ -43,7 +43,8 @@ android {
         }
 
         getByName("release") {
-            isMinifyEnabled = true
+            isMinifyEnabled = false  // 🔥 크래시 문제 해결을 위해 비활성화
+            isShrinkResources = false
             signingConfig = signingConfigs.getByName("release")
             buildConfigField("String", "BASE_URL", baseUrl)
             proguardFiles(

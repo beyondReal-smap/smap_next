@@ -1,6 +1,9 @@
 package com.dmonster.smap
 
 import android.app.Application
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.Context
 import android.os.Build
 import android.util.Log
 import com.naver.maps.map.NaverMapSdk
@@ -41,6 +44,9 @@ class SmapApplication : Application() {
         // 🔥 KeyHash 로그 출력 (카카오 콘솔 등록용)
         val keyHash = Utility.getKeyHash(this)
         Log.i("SmapApplication", "🔑 [KAKAO_KEY_HASH] $keyHash")
+
+        // FCM 알림 채널 초기화
+        createNotificationChannel()
     }
     
     /**
@@ -260,4 +266,23 @@ class SmapApplication : Application() {
         Log.d("SmapApplication", "  - FINGERPRINT: ${Build.FINGERPRINT}")
         Log.d("SmapApplication", "  - 하드웨어: ${Build.HARDWARE}")
     }
-} 
+
+    /**
+     * FCM 알림 채널 생성 (Android 8.0+)
+     */
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channelId = "smap_notification_channel"
+            val channelName = "SMAP 알림"
+            val importance = NotificationManager.IMPORTANCE_HIGH
+            val channel = NotificationChannel(channelId, channelName, importance).apply {
+                description = "SMAP의 주요 알림을 수신합니다."
+                enableLights(true)
+                enableVibration(true)
+            }
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+            Log.d("SmapApplication", "✅ FCM Notification Channel Created")
+        }
+    }
+}

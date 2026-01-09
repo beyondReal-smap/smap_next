@@ -55,7 +55,7 @@ fun NoticeListScreen(onBack: () -> Unit, onNoticeClick: (SmapNotice) -> Unit) {
             .fillMaxSize()
             .background(Color(0xFFF7F7F7))
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
             // Header
             Box(
                 modifier = Modifier
@@ -170,7 +170,7 @@ fun NoticeDetailScreen(notice: SmapNotice, onBack: () -> Unit) {
             .fillMaxSize()
             .background(Color(0xFFF7F7F7))
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
             // Header
             Box(
                 modifier = Modifier

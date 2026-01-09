@@ -3,6 +3,7 @@
     <!-- 브랜드 색상 -->
     <color name="primary">#0113A3</color>
     <color name="primary_dark">#001F87</color>
+    <color name="brand_primary">#0113A3</color>
     <color name="background">#FEF8F9</color>
     
     <!-- 스플래시 배경색 (iOS와 동일) -->

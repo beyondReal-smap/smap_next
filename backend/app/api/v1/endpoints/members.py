@@ -324,7 +324,7 @@ def check_nickname_availability(
 def get_members(
     db: Session = Depends(deps.get_db),
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 10000,
     id: Optional[int] = Query(None, description="특정 멤버 ID로 필터링")
 ):
     """
@@ -351,6 +351,16 @@ def get_members(
 
 def _member_to_dict(member: Member) -> dict:
     """Member 모델을 안전하게 딕셔너리로 변환 (None 값 처리)"""
+    def safe_date(val):
+        """날짜 값을 안전하게 문자열로 변환"""
+        if val is None:
+            return None
+        if isinstance(val, str):
+            return val
+        if hasattr(val, 'isoformat'):
+            return val.isoformat()
+        return str(val)
+    
     return {
         "mt_idx": member.mt_idx,
         "mt_type": member.mt_type or 1,
@@ -361,7 +371,7 @@ def _member_to_dict(member: Member) -> dict:
         "mt_nickname": member.mt_nickname or "",
         "mt_hp": member.mt_hp or "",
         "mt_email": member.mt_email or "",
-        "mt_birth": member.mt_birth.isoformat() if member.mt_birth else None,
+        "mt_birth": safe_date(member.mt_birth),
         "mt_gender": member.mt_gender or 1,
         "mt_file1": member.mt_file1 or "",
         "mt_show": member.mt_show or "Y",
@@ -372,9 +382,9 @@ def _member_to_dict(member: Member) -> dict:
         "mt_agree5": member.mt_agree5 or "N",
         "mt_lat": float(member.mt_lat) if member.mt_lat else None,
         "mt_long": float(member.mt_long) if member.mt_long else None,
-        "mt_wdate": member.mt_wdate.isoformat() if member.mt_wdate else None,
-        "mt_ldate": member.mt_ldate.isoformat() if member.mt_ldate else None,
-        "mt_udate": member.mt_udate.isoformat() if member.mt_udate else None,
+        "mt_wdate": safe_date(member.mt_wdate),
+        "mt_ldate": safe_date(member.mt_ldate),
+        "mt_udate": safe_date(member.mt_udate),
     }
 
 @router.get("/me")

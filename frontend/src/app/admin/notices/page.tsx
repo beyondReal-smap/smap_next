@@ -35,15 +35,18 @@ export default function AdminNoticesPage() {
             });
             const result = await response.json();
 
-            if (result.success && result.data) {
+            if (result.success && Array.isArray(result.data)) {
                 const mappedNotices = result.data.map((n: any) => ({
                     nt_idx: n.nt_idx,
                     nt_title: n.nt_title || '',
                     nt_content: n.nt_content || '',
                     nt_show: n.nt_show || 'Y',
                     nt_wdate: n.nt_wdate ? new Date(n.nt_wdate).toLocaleDateString('ko-KR') : '',
+                    nt_wdate_raw: n.nt_wdate ? new Date(n.nt_wdate).getTime() : 0,
                     view_count: n.nt_hit || n.view_count || 0,
                 }));
+                // 최신순 정렬
+                mappedNotices.sort((a: any, b: any) => b.nt_wdate_raw - a.nt_wdate_raw);
                 setNotices(mappedNotices);
             }
         } catch (error) {
@@ -207,7 +210,7 @@ export default function AdminNoticesPage() {
                                     type="text"
                                     value={formData.title}
                                     onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    className="w-full max-w-md px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                     placeholder="공지 제목을 입력하세요"
                                 />
                             </div>
@@ -217,7 +220,7 @@ export default function AdminNoticesPage() {
                                     value={formData.content}
                                     onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
                                     rows={6}
-                                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                                    className="w-full max-w-md px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
                                     placeholder="공지 내용을 입력하세요"
                                 />
                             </div>

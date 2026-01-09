@@ -88,7 +88,41 @@ def send_fcm_push_notification(
         args = request.dict()
         logger.debug(f"파싱된 파라미터: {args}")
 
-        logger.debug("회원 정보 조회 중")
+        if args['mt_idx'] == 0:
+            logger.info("📢 [FCM] 모든 사용자에게 푸시 발송 시작")
+            # FCM 토큰이 있는 모든 사용자 조회
+            members = Member.get_token_list(db)
+            logger.info(f"FCM 토큰 보유 사용자 수: {len(members)}")
+
+            success_count = 0
+            for m in members:
+                try:
+                    firebase_service.send_push_notification(
+                        m.mt_token_id,
+                        args['plt_title'],
+                        args['plt_content'],
+                        member_id=m.mt_idx
+                    )
+                    success_count += 1
+                except Exception as e:
+                    logger.error(f"❌ [FCM] 사용자 {m.mt_idx}에게 발송 실패: {e}")
+
+            # 전체 발송 이력 저장 (mt_idx=0으로 저장하거나 개별 저장할 수 있으나, 일단 성격상 공지형태로 0으로 하나만 저장)
+            # plt_type이 'admin'이면 1로 변환 (Integer 컬럼 대응)
+            log_args = args.copy()
+            if log_args.get('plt_type') == 'admin':
+                log_args['plt_type'] = '1'
+            
+            push_log = create_push_log(log_args, 0, 2, db)
+            db.add(push_log)
+            db.commit()
+
+            return create_response(
+                SUCCESS,
+                "전체 발송 성공",
+                f"총 {len(members)}명 중 {success_count}명에게 푸시를 발송했습니다."
+            )
+
         # mt_idx로 회원 조회
         member = Member.find_by_idx(db, args['mt_idx'])
         
@@ -104,122 +138,24 @@ def send_fcm_push_notification(
 
         if not member.mt_token_id:
             logger.debug("앱 토큰이 존재하지 않아 푸시 발송 실패")
-            # 푸시 로그는 호출하는 쪽에서 저장하므로 여기서는 저장하지 않음 (중복 방지)
-            # push_log는 호출하는 쪽에서 push_log_add를 통해 저장됨
             return create_response(
                 FAILURE,
                 "푸시발송(단건) 실패",
                 "앱토큰이 존재하지 않습니다."
             )
 
-        # FCM 토큰 만료 여부 확인 (임시로 90일로 연장)
-        now = datetime.now()
-        if member.mt_token_expiry_date and now > member.mt_token_expiry_date:
-            logger.warning(f"FCM 토큰이 만료됨 - 회원 ID: {member.mt_idx}, 만료일: {member.mt_token_expiry_date}")
-
-            # 임시로 토큰 만료일을 90일 연장
-            member.mt_token_expiry_date = now + timedelta(days=90)
-            db.commit()
-            logger.info(f"FCM 토큰 만료일 90일 연장 - 회원 ID: {member.mt_idx}")
-
-            # 토큰 만료 검증 계속 진행
-            # return create_response(
-            #     FAILURE,
-            #     "푸시발송(단건) 실패",
-            #     "FCM 토큰이 만료되었습니다. 앱을 재시작하여 토큰을 갱신해주세요."
-            # )
-
-        # mt_token_id 상태 모니터링 (삭제 현상 추적)
-        if not member.mt_token_id:
-            logger.error(f"🚨 FCM 전송 시 mt_token_id 없음: 회원 {member.mt_idx}의 토큰이 사라짐")
-        else:
-            logger.info(f"✅ FCM 전송 시 mt_token_id 확인: 회원 {member.mt_idx} 토큰 정상 (길이: {len(member.mt_token_id)})")
-
-        # FCM 토큰이 80일 이상 업데이트되지 않은 경우 경고 로그 (90일 만료에 맞게 조정)
-        if member.mt_token_updated_at and (now - member.mt_token_updated_at).days >= 80:
-            logger.warning(f"FCM 토큰이 80일 이상 업데이트되지 않음 - 회원 ID: {member.mt_idx}, 마지막 업데이트: {member.mt_token_updated_at}")
-
         # Firebase 사용 가능 여부 확인
         if not firebase_service.is_available():
             logger.debug("Firebase가 사용 불가능하여 푸시 발송 실패")
-            # 푸시 로그는 호출하는 쪽에서 저장하므로 여기서는 저장하지 않음 (중복 방지)
-            # push_log는 호출하는 쪽에서 push_log_add를 통해 저장됨
             return create_response(
                 FAILURE, 
                 "푸시발송(단건) 실패", 
                 "Firebase 서비스가 사용 불가능합니다. 관리자에게 문의하세요."
             )
 
-        # FCM 토큰 최종 검증 (개선된 버전)
-        if not member.mt_token_id or len(str(member.mt_token_id).strip()) == 0:
-            logger.warning(f"🚨 [FCM] 토큰이 비어있음 - 회원: {member.mt_idx}")
-            # 푸시 로그는 호출하는 쪽에서 저장하므로 여기서는 저장하지 않음 (중복 방지)
-            # push_log는 호출하는 쪽에서 push_log_add를 통해 저장됨
-            return create_response(
-                FAILURE,
-                "푸시발송(단건) 실패 - 토큰 없음",
-                "FCM 토큰이 존재하지 않습니다. 앱을 재시작하여 새로운 토큰을 받아주세요."
-            )
-    
-        # FCM 토큰 형식 검증 (서버 레벨에서 한 번 더 검증)
-        if not firebase_service._validate_fcm_token(member.mt_token_id):
-            logger.warning(f"🚨 [FCM] 잘못된 토큰 형식 - 회원: {member.mt_idx}, 토큰: {member.mt_token_id[:50]}...")
-            
-            # 잘못된 토큰 즉시 무효화
-            try:
-                firebase_service._handle_token_invalidation(
-                    member.mt_token_id,
-                    "invalid_token_format_sendone",
-                    args.get('plt_title'),
-                    args.get('plt_content')
-                )
-            except Exception as cleanup_error:
-                logger.error(f"❌ [FCM] 토큰 무효화 처리 실패: {cleanup_error}")
-            
-            # 푸시 로그는 호출하는 쪽에서 저장하므로 여기서는 저장하지 않음 (중복 방지)
-            # push_log는 호출하는 쪽에서 push_log_add를 통해 저장됨
-            return create_response(
-                FAILURE,
-                "푸시발송(단건) 실패 - 잘못된 토큰",
-                "FCM 토큰 형식이 올바르지 않습니다. 앱을 재시작하여 새로운 토큰을 받아주세요."
-            )
-
         logger.info(f"📤 [FCM] 푸시 메시지 전송 시작 - 회원: {member.mt_idx}")
-        logger.debug(f"📤 [FCM] 토큰: {member.mt_token_id[:30]}...")
-        logger.debug(f"📤 [FCM] 제목: {args['plt_title']}")
-        logger.debug(f"📤 [FCM] 내용: {args['plt_content'][:50]}...")
 
         try:
-            # iOS 기기인지 확인하여 최적화된 전송 방식 선택
-            # 1. 우선 데이터베이스의 OS 정보 사용 (mt_os_check: 0=android, 1=ios)
-            db_os_check = member.mt_os_check if hasattr(member, 'mt_os_check') else None
-            is_ios_from_db = db_os_check == 1
-
-            # 2. User-Agent 정보 확인 (요청에 포함된 경우)
-            user_agent_raw = args.get('user_agent', '')
-            user_agent = user_agent_raw.lower() if user_agent_raw else ''
-            is_ios_from_ua = 'ios' in user_agent or 'iphone' in user_agent or 'ipad' in user_agent
-
-            # 3. 최종 iOS 감지 로직 (DB 우선, UA 보조)
-            is_ios_device = is_ios_from_db or is_ios_from_ua
-
-            logger.info(f"📱 [FCM] DB OS 체크: {db_os_check} (0=Android, 1=iOS)")
-            logger.info(f"📱 [FCM] User-Agent: '{user_agent}'")
-            logger.info(f"📱 [FCM] DB 기반 iOS 감지: {is_ios_from_db}")
-            logger.info(f"📱 [FCM] UA 기반 iOS 감지: {is_ios_from_ua}")
-            logger.info(f"📱 [FCM] 최종 iOS 감지: {is_ios_device}")
-
-            # FCM 토큰 존재 여부 확인
-            if not member.mt_token_id or member.mt_token_id.strip() == "":
-                logger.warning(f"🚨 [FCM] FCM 토큰이 없음 - 회원: {member.mt_idx}, 건너뜀")
-                # 푸시 로그는 호출하는 쪽에서 저장하므로 여기서는 저장하지 않음 (중복 방지)
-                # push_log는 호출하는 쪽에서 push_log_add를 통해 저장됨
-                return create_response(
-                    FAILURE,
-                    "푸시발송(단건) 실패",
-                    "FCM 토큰이 존재하지 않습니다."
-                )
-
             response = firebase_service.send_push_notification(
                 member.mt_token_id,
                 args['plt_title'],
@@ -228,16 +164,22 @@ def send_fcm_push_notification(
             )
 
             logger.info(f"✅ [FCM] Firebase 전송 성공 - 응답: {response}")
-            logger.debug(f"📊 [FCM] 메시지 ID: {response}")
             
-            # 푸시 로그는 호출하는 쪽에서 저장하므로 여기서는 저장하지 않음 (중복 방지)
-            # push_log는 호출하는 쪽에서 push_log_add를 통해 저장됨
+            # 📝 푸시 이력 저장 추가
+            # plt_type이 'admin'이면 1로 변환 (Integer 컬럼 대응)
+            log_args = args.copy()
+            if log_args.get('plt_type') == 'admin':
+                log_args['plt_type'] = '1'
+                
+            push_log = create_push_log(log_args, member.mt_idx, 2, db)
+            db.add(push_log)
+            db.commit()
 
-            logger.debug("푸시 발송 성공")
+            logger.debug("푸시 발송 성공 및 이력 저장 완료")
             return create_response(
                 SUCCESS, 
                 "푸시발송(단건) 성공", 
-                "푸시발송(단건) 성공했습니다."
+                "푸시발송(단건) 성공 및 이력이 저장되었습니다."
             )
             
         except messaging.UnregisteredError as firebase_error:

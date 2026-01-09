@@ -217,7 +217,7 @@ def get_group(
 def get_groups(
     db: Session = Depends(deps.get_db),
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 10000,
     show_hidden: bool = False
 ):
     """

@@ -21,49 +21,55 @@ export default function AdminMembersPage() {
     const [selectedMember, setSelectedMember] = useState<Member | null>(null);
     const [showModal, setShowModal] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 10;
+    const [totalCount, setTotalCount] = useState(0);
+    const itemsPerPage = 20;
 
     useEffect(() => {
-        loadMembers();
-    }, []);
+        loadMembers(currentPage, searchQuery);
+    }, [currentPage]);
 
-    const loadMembers = async () => {
+    // 검색어 변경 시 1페이지로 리셋
+    useEffect(() => {
+        const debounceTimer = setTimeout(() => {
+            setCurrentPage(1);
+            loadMembers(1, searchQuery);
+        }, 300);
+        return () => clearTimeout(debounceTimer);
+    }, [searchQuery]);
+
+    const loadMembers = async (page: number, search: string = '') => {
         setIsLoading(true);
         try {
             const token = localStorage.getItem('admin-token');
-            const response = await fetch('/api/admin/members', {
+            const response = await fetch(`/api/admin/members?page=${page}&size=${itemsPerPage}&search=${encodeURIComponent(search)}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                 },
             });
             const result = await response.json();
 
-            if (result.success && result.data) {
-                setMembers(result.data);
+            if (result.success && Array.isArray(result.data)) {
+                // 최신 가입자가 위에 오도록 정렬
+                const sortedMembers = [...result.data].sort((a: any, b: any) => {
+                    const dateA = new Date(a.mt_wdate || 0);
+                    const dateB = new Date(b.mt_wdate || 0);
+                    return dateB.getTime() - dateA.getTime();
+                });
+                setMembers(sortedMembers);
+                setTotalCount(result.total || result.data.length);
             } else {
                 console.error('Failed to load members:', result.message);
+                setMembers([]);
             }
         } catch (error) {
             console.error('Failed to load members:', error);
+            setMembers([]);
         } finally {
             setIsLoading(false);
         }
     };
 
-
-    const filteredMembers = members.filter(member =>
-        member.mt_name.includes(searchQuery) ||
-        member.mt_nickname.includes(searchQuery) ||
-        member.mt_email.includes(searchQuery) ||
-        member.mt_hp.includes(searchQuery)
-    );
-
-    const paginatedMembers = filteredMembers.slice(
-        (currentPage - 1) * itemsPerPage,
-        currentPage * itemsPerPage
-    );
-
-    const totalPages = Math.ceil(filteredMembers.length / itemsPerPage);
+    const totalPages = Math.ceil(totalCount / itemsPerPage) || 1;
 
     const handleDelete = async (member: Member) => {
         if (!confirm(`${member.mt_name} 회원을 삭제하시겠습니까?`)) return;
@@ -78,26 +84,30 @@ export default function AdminMembersPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900">회원 관리</h1>
-                    <p className="text-slate-500 mt-1">전체 회원 {members.length}명</p>
+                    <p className="text-slate-500 mt-1">전체 회원 {totalCount}명</p>
                 </div>
             </div>
 
             {/* 검색 및 필터 */}
             <div className="bg-white rounded-2xl border border-slate-200 p-4">
                 <div className="flex flex-col sm:flex-row gap-4">
-                    <div className="relative flex-1">
-                        <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                    <div className="flex items-center w-96 bg-white border border-slate-200 rounded-xl px-3 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-transparent">
+                        <FiSearch className="w-5 h-5 text-slate-400 flex-shrink-0" />
                         <input
                             type="text"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder="이름, 닉네임, 이메일, 전화번호로 검색"
-                            className="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                            autoComplete="off"
+                            className="w-full px-3 py-2.5 bg-transparent border-none focus:outline-none focus:ring-0"
                         />
                     </div>
-                    <button className="flex items-center space-x-2 px-4 py-2.5 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
+                    <button
+                        onClick={() => setSearchQuery('')}
+                        className="flex items-center space-x-2 px-4 py-2.5 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+                    >
                         <FiFilter className="w-5 h-5 text-slate-500" />
-                        <span className="text-slate-600">필터</span>
+                        <span className="text-slate-600">초기화</span>
                     </button>
                 </div>
             </div>
@@ -123,7 +133,7 @@ export default function AdminMembersPage() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {paginatedMembers.map((member) => (
+                                    {members.map((member) => (
                                         <tr key={member.mt_idx} className="hover:bg-slate-50 transition-colors">
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center space-x-3">
@@ -175,7 +185,7 @@ export default function AdminMembersPage() {
                         {/* 페이지네이션 */}
                         <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
                             <p className="text-sm text-slate-500">
-                                {filteredMembers.length}명 중 {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, filteredMembers.length)}명 표시
+                                총 {totalCount}명 중 {Math.min((currentPage - 1) * itemsPerPage + 1, totalCount)}-{Math.min(currentPage * itemsPerPage, totalCount)}명 표시
                             </p>
                             <div className="flex items-center space-x-2">
                                 <button

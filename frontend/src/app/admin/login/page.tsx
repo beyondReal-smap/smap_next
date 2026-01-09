@@ -67,14 +67,15 @@ export default function AdminLoginPage() {
                             <label className="block text-sm font-medium text-slate-300 mb-2">
                                 아이디
                             </label>
-                            <div className="flex items-center bg-slate-700/50 border border-slate-600 rounded-xl focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-transparent transition-all">
+                            <div className="relative flex items-center bg-slate-700/50 border border-slate-600 rounded-xl focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-transparent transition-all overflow-hidden">
                                 <FiUser className="w-5 h-5 text-slate-400 ml-3 flex-shrink-0" />
                                 <input
                                     type="text"
                                     value={username}
                                     onChange={(e) => setUsername(e.target.value)}
-                                    className="flex-1 px-3 py-3 bg-transparent text-white placeholder-slate-400 focus:outline-none"
+                                    className="flex-1 px-3 py-3 bg-transparent border-none text-white placeholder-slate-400 focus:outline-none focus:ring-0 [&:-webkit-autofill]:bg-transparent [&:-webkit-autofill]:text-white [&:-webkit-autofill]:[background-color:transparent!important] [&:-webkit-autofill]:[-webkit-box-shadow:0_0_0_1000px_rgb(51_65_85/0.5)_inset!important] [&:-webkit-autofill]:[-webkit-text-fill-color:white!important]"
                                     placeholder="관리자 아이디"
+                                    autoComplete="off"
                                     required
                                 />
                             </div>
@@ -85,14 +86,15 @@ export default function AdminLoginPage() {
                             <label className="block text-sm font-medium text-slate-300 mb-2">
                                 비밀번호
                             </label>
-                            <div className="flex items-center bg-slate-700/50 border border-slate-600 rounded-xl focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-transparent transition-all">
+                            <div className="relative flex items-center bg-slate-700/50 border border-slate-600 rounded-xl focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-transparent transition-all overflow-hidden">
                                 <FiLock className="w-5 h-5 text-slate-400 ml-3 flex-shrink-0" />
                                 <input
                                     type={showPassword ? 'text' : 'password'}
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="flex-1 px-3 py-3 bg-transparent text-white placeholder-slate-400 focus:outline-none"
+                                    className="flex-1 px-3 py-3 bg-transparent border-none text-white placeholder-slate-400 focus:outline-none focus:ring-0 [&:-webkit-autofill]:bg-transparent [&:-webkit-autofill]:text-white [&:-webkit-autofill]:[background-color:transparent!important] [&:-webkit-autofill]:[-webkit-box-shadow:0_0_0_1000px_rgb(51_65_85/0.5)_inset!important] [&:-webkit-autofill]:[-webkit-text-fill-color:white!important]"
                                     placeholder="비밀번호"
+                                    autoComplete="off"
                                     required
                                 />
                                 <button
@@ -123,7 +125,7 @@ export default function AdminLoginPage() {
 
                 {/* 푸터 */}
                 <p className="text-center text-slate-500 text-sm mt-6">
-                    © 2024 SMAP. All rights reserved.
+                    © 2026 SMAP. All rights reserved.
                 </p>
             </div>
         </div>

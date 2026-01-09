@@ -18,7 +18,7 @@ def get_push_logs(
     """
     푸시 로그 목록을 조회합니다.
     """
-    push_logs = db.query(PushLog).offset(skip).limit(limit).all()
+    push_logs = db.query(PushLog).order_by(PushLog.plt_idx.desc()).offset(skip).limit(limit).all()
     return push_logs
 
 @router.get("/{push_log_id}", response_model=PushLogResponse)
@@ -95,6 +95,22 @@ def create_push_log(
     """
     새로운 푸시 로그를 생성합니다.
     """
+    # 중복 로그 방지: "API3_FCM_service" (system_auto) 로그는 무시
+    # 서버 스케줄러에서(plt_type=2) 이미 상세 로그를 남기고 있음
+    if push_log_in.plt_memo == "API3_FCM_service" or push_log_in.plt_condition == "system_auto":
+        # logger는 상단에 정의되어 있지 않으므로 여기서 logging import 필요할 수 있음 
+        # 하지만 API 로그 미들웨어가 있으므로 warning만 호출하거나 pass
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"🚫 [DUPLICATE LOG] API3_FCM_service 로그 저장 건너뜀 (mt_idx={push_log_in.mt_idx})")
+        
+        # 가짜 응답 반환 (DB 저장 안함)
+        return PushLogResponse(
+            plt_idx=0,
+            **push_log_in.dict(),
+            plt_wdate=datetime.now()
+        )
+
     push_log = PushLog(**push_log_in.dict())
     db.add(push_log)
     db.commit()
