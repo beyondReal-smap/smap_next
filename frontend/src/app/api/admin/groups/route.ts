@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
         console.log('[Admin Groups API] 그룹 목록 조회:', { page, size, search, skip, showHidden });
 
         const backendBase = resolveBackendBaseUrl();
-        const backendUrl = `${backendBase}/api/v1/groups/?skip=${skip}&limit=${size}&show_hidden=${showHidden}`;
+        const backendUrl = `${backendBase}/api/v1/admin/groups?skip=${skip}&limit=${size}&show_hidden=${showHidden}`;
 
         process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
 
