@@ -1753,6 +1753,7 @@ struct StatusBadge: View {
 
 struct MainTabView: View {
     @State private var selectedTab: Int = 0
+    @Namespace private var tabAnimation
     
     // 로그아웃 알림 퍼블리셔
     private let logoutPublisher = NotificationCenter.default.publisher(for: NSNotification.Name("logout"))
@@ -1782,11 +1783,11 @@ struct MainTabView: View {
     }
     
     var body: some View {
-        TabView(selection: $selectedTab) {
+        TabView(selection: $selectedTab.animation(.easeInOut(duration: 0.25))) {
             // 1. 홈 (Native)
             HomeView()
                 .tabItem {
-                    Image(systemName: "house") // Outline style
+                    Image(systemName: "house")
                     Text("홈")
                 }
                 .tag(0)
@@ -1794,7 +1795,7 @@ struct MainTabView: View {
             // 2. 그룹 (Native)
             GroupListView()
                 .tabItem {
-                    Image(systemName: "person.3.fill") // Using standard SF Symbol
+                    Image(systemName: "person.3.fill")
                     Text("그룹")
                 }
                 .tag(1)
@@ -1802,7 +1803,7 @@ struct MainTabView: View {
             // 3. 일정 (Native)
             NativeScheduleListView()
                 .tabItem {
-                    Image(systemName: "calendar") // Outline style
+                    Image(systemName: "calendar")
                     Text("일정")
                 }
                 .tag(2)
@@ -1810,7 +1811,7 @@ struct MainTabView: View {
             // 4. 내장소 (Native)
             MyPlaceView()
                 .tabItem {
-                    Image(systemName: "location.circle") // Cleaner location icon
+                    Image(systemName: "location.circle")
                     Text("내장소")
                 }
                 .tag(3)
@@ -1818,7 +1819,7 @@ struct MainTabView: View {
             // 5. 활동 로그 (Native)
             ActivityLogView()
                 .tabItem {
-                    Image(systemName: "clock.arrow.circlepath") // History/Log icon
+                    Image(systemName: "clock.arrow.circlepath")
                     Text("활동 로그")
                 }
                 .tag(4)
@@ -2083,9 +2084,9 @@ struct NaverMapView: UIViewRepresentable {
                         selectedMember = member
                         selectedMarker = marker
                         // Z-order: 선택된 멤버는 더 위에 표시
-                        marker.zIndex = 1000
+                        marker.zIndex = 2000
                     } else {
-                        marker.zIndex = 0
+                        marker.zIndex = 100
                     }
                     
                     // 비동기 이미지 로드 및 업데이트
@@ -2126,6 +2127,9 @@ struct NaverMapView: UIViewRepresentable {
                     
                     // 마커에 스케줄 데이터 저장
                     marker.userInfo = ["schedule": schedule]
+                    
+                    // Z-order: 일정 마커는 일반 멤버보다는 위, 선택된 멤버보다는 아래
+                    marker.zIndex = 1000
                     
                     marker.mapView = mapView
                     markers.append(marker)
@@ -8005,7 +8009,7 @@ struct ActivityLogSidebarView: View {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(brandColor)
                     .frame(width: 40, height: 40)
-                Image(systemName: "person.fill")
+                Image(systemName: "clock.arrow.circlepath")
                     .foregroundColor(.white)
             }
             

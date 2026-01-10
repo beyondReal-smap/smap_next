@@ -6,7 +6,7 @@ import { FiTrash2, FiShield, FiInfo, FiArrowRight, FiMail, FiSmartphone } from '
 
 export default function AccountDeletionPage() {
     const appName = "SMAP";
-    const supportEmail = "support@smap.site"; // 실제 고객센터 이메일로 수정 필요
+    const supportEmail = "admin@smap.site"; // 실제 고객센터 이메일로 수정 필요
 
     return (
         <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
@@ -14,9 +14,11 @@ export default function AccountDeletionPage() {
             <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
                 <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                        <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                            <span className="text-white font-bold text-lg">S</span>
-                        </div>
+                        <img
+                            src="/images/smap_logo_nobackground.png"
+                            alt="SMAP Logo"
+                            className="w-8 h-8 object-contain"
+                        />
                         <span className="font-bold text-xl tracking-tight">{appName}</span>
                     </div>
                 </div>
@@ -66,7 +68,7 @@ export default function AccountDeletionPage() {
                             </li>
                         </ol>
                         <a
-                            href="/setting/account/withdraw"
+                            href="/account-deletion/withdraw"
                             className="inline-flex items-center text-blue-600 font-semibold hover:underline group"
                         >
                             온라인 탈퇴 페이지 바로가기

@@ -50,7 +50,7 @@ fun ActivityLogHeader(
             .fillMaxWidth()
             .background(Color.White.copy(alpha = 0.9f))
             .statusBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(top = 8.dp, start = 16.dp, end = 16.dp, bottom = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -497,7 +497,7 @@ fun ActivityMemberSidebar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .statusBarsPadding()
-                    .padding(horizontal = 20.dp, vertical = 20.dp),
+                    .padding(top = 20.dp, start = 24.dp, end = 24.dp, bottom = 16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -509,7 +509,7 @@ fun ActivityMemberSidebar(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Person,
+                            imageVector = Icons.Default.History,
                             contentDescription = null,
                             tint = Color.White,
                             modifier = Modifier.size(20.dp)
@@ -532,9 +532,8 @@ fun ActivityMemberSidebar(
                         )
                     }
                 }
-                IconButton(onClick = onClose) {
-                    Icon(Icons.Default.Close, "닫기", tint = Color.Gray)
-                }
+                // Close button removed to match Home Sidebar style
+
             }
             
             // Scrollable Content

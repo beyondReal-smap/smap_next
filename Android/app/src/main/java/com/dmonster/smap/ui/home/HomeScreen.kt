@@ -263,6 +263,7 @@ fun HomeScreen(
                                 Marker(
                                     state = MarkerState(position = LatLng(member.mltLat!!, member.mltLong!!)),
                                     icon = OverlayImage.fromBitmap(memberMarkerBitmap),
+                                    zIndex = if (member.isSelected) 2000 else 100,
                                     onClick = {
                                         viewModel.selectMember(member.mtIdx)
                                         true
@@ -283,6 +284,7 @@ fun HomeScreen(
                                 Marker(
                                     state = MarkerState(position = LatLng(lat, lng)),
                                     icon = OverlayImage.fromBitmap(markerBitmap),
+                                    zIndex = 1000,
                                     onClick = {
                                         // TODO: Show Schedule Detail InfoWindow
                                         true

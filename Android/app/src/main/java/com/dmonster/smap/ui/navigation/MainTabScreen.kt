@@ -1,6 +1,7 @@
 package com.dmonster.smap.ui.navigation
 
 import android.view.HapticFeedbackConstants
+import androidx.compose.animation.*
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -75,12 +76,32 @@ fun MainTabScreen(
                 .fillMaxSize()
                 .padding(bottom = 80.dp) // Navigation bar 높이 (약 80dp)
         ) {
-            when (selectedTabIndex) {
-                0 -> HomeScreen(viewModel = homeViewModel, onLogout = onLogout)
-                1 -> GroupScreen()
-                2 -> ScheduleScreen()
-                3 -> MyPlaceScreen()
-                4 -> ActivityLogScreen()
+            AnimatedContent(
+                targetState = selectedTabIndex,
+                transitionSpec = {
+                    if (targetState > initialState) {
+                        // 오른쪽에서 왼쪽으로 들어옴 (오른쪽 탭 클릭 시)
+                        (slideInHorizontally { width -> width } + fadeIn()).togetherWith(
+                            slideOutHorizontally { width -> -width } + fadeOut()
+                        )
+                    } else {
+                        // 왼쪽에서 오른쪽으로 들어옴 (왼쪽 탭 클릭 시)
+                        (slideInHorizontally { width -> -width } + fadeIn()).togetherWith(
+                            slideOutHorizontally { width -> width } + fadeOut()
+                        )
+                    }.using(
+                        SizeTransform(clip = false)
+                    )
+                },
+                label = "TabTransition"
+            ) { targetIndex ->
+                when (targetIndex) {
+                    0 -> HomeScreen(viewModel = homeViewModel, onLogout = onLogout)
+                    1 -> GroupScreen()
+                    2 -> ScheduleScreen()
+                    3 -> MyPlaceScreen()
+                    4 -> ActivityLogScreen()
+                }
             }
         }
         
