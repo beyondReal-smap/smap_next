@@ -571,8 +571,8 @@ export default function WithdrawPage() {
               </motion.button>
               <div className="flex items-center space-x-3">
                 <div>
-                  <h1 className="text-lg font-bold text-gray-900">회원탈퇴</h1>
-                  <p className="text-xs text-gray-500">신중하게 결정해주세요</p>
+                  <h1 className="text-lg font-bold text-gray-900">SMAP 회원탈퇴</h1>
+                  <p className="text-xs text-gray-500">계정 및 데이터 삭제 절차</p>
                 </div>
               </div>
             </motion.div>
@@ -605,12 +605,16 @@ export default function WithdrawPage() {
                 <FiAlertTriangle className="w-4 h-4" style={{ color: '#DC2626' }} />
               </div>
               <div>
-                <h3 className="text-sm font-semibold mb-1" style={{ color: '#7F1D1D' }}>탈퇴 주의사항</h3>
-                <ul className="text-sm space-y-0.5" style={{ color: '#B91C1C' }}>
-                  <li>• 계정 정보 영구 삭제</li>
-                  <li>• 데이터 복구 불가능</li>
-                  <li>• 30일간 재가입 제한</li>
-                </ul>
+                <h3 className="text-sm font-semibold mb-1" style={{ color: '#7F1D1D' }}>SMAP 계정 삭제 안내</h3>
+                <div className="text-xs space-y-2" style={{ color: '#B91C1C' }}>
+                  <p>사용자님의 계정과 관련 데이터를 삭제하기 위해 다음 단계를 진행합니다:</p>
+                  <ol className="list-decimal list-inside space-y-1">
+                    <li>본인 확인 (비밀번호 입력 또는 소셜 로그인 확인)</li>
+                    <li>서비스 개선을 위한 탈퇴 사유 선택</li>
+                    <li>데이터 삭제 범위 확인 및 최종 동의</li>
+                  </ol>
+                  <p className="font-bold underline text-red-600 mt-1">※ 30일간 재가입이 제한됩니다.</p>
+                </div>
               </div>
             </div>
           </motion.div>
@@ -826,8 +830,26 @@ export default function WithdrawPage() {
                         <FiX className="w-2.5 h-2.5 text-red-600" />
                       </div>
                       <div>
-                        <h4 className="text-sm font-medium text-gray-900 mb-0.5">계정 정보 삭제</h4>
-                        <p className="text-xs text-gray-600">모든 개인정보와 이용 기록이 영구 삭제됩니다.</p>
+                        <h4 className="text-sm font-medium text-gray-900 mb-0.5">삭제되는 데이터 유형</h4>
+                        <p className="text-xs text-gray-600">
+                          - 프로필 정보: 이름, 이메일, 전화번호, 닉네임, 프로필 사진<br />
+                          - 위치 기록: 활동 로그 경로, GPS 좌표, 방문 장소 기록<br />
+                          - 계정 정보: 로그인 ID, 연동된 소셜 계정 정보
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start space-x-2">
+                      <div className="w-5 h-5 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <FiX className="w-2.5 h-2.5 text-red-600" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-900 mb-0.5">데이터 보관 및 삭제 기간</h4>
+                        <p className="text-xs text-gray-600">
+                          - 즉시 삭제: 사용자 프로필 및 모든 위치 기록 데이터<br />
+                          - 30일 보관: 부정 가입 방지를 위해 회원의 닉네임 및 중복가입 확인정보(CI)는 30일간 보관 후 완전히 삭제됩니다.<br />
+                          - 법령 준수: 관련 법령(소비자 보호법 등)에 의해 보존이 필요한 기록은 해당 기간 동안 별도 보관됩니다.
+                        </p>
                       </div>
                     </div>
 
@@ -837,17 +859,7 @@ export default function WithdrawPage() {
                       </div>
                       <div>
                         <h4 className="text-sm font-medium text-gray-900 mb-0.5">데이터 복구 불가</h4>
-                        <p className="text-xs text-gray-600">탈퇴 후에는 어떠한 방법으로도 복구할 수 없습니다.</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start space-x-2">
-                      <div className="w-5 h-5 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <FiX className="w-2.5 h-2.5 text-red-600" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-medium text-gray-900 mb-0.5">서비스 이용 제한</h4>
-                        <p className="text-xs text-gray-600">탈퇴 후 30일간 동일한 정보로 재가입이 제한됩니다.</p>
+                        <p className="text-xs text-gray-600">삭제 처리된 데이터는 어떠한 경우에도 복구할 수 없습니다.</p>
                       </div>
                     </div>
                   </div>

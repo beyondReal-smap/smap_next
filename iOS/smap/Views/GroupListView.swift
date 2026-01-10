@@ -107,6 +107,32 @@ struct GroupListView: View {
             }
         }
     }
+    
+    // 그룹 ID(sgt_idx)로 직접 가입하는 함수
+    private func joinGroupById(_ groupId: String) {
+        guard let sgt_idx = Int(groupId), let mt_idx = AuthService.shared.currentUser?.mt_idx else {
+            print("❌ [DEEP_LINK] 가입 실패: 유효하지 않은 ID 또는 사용자 정보")
+            return
+        }
+        
+        print("🚀 [DEEP_LINK] 그룹 가입 API 호출 시작 - mt_idx: \(mt_idx), sgt_idx: \(sgt_idx)")
+        
+        Task {
+            do {
+                let success = try await GroupService.shared.joinGroupById(mt_idx: mt_idx, sgt_idx: sgt_idx)
+                await MainActor.run {
+                    if success {
+                        print("✅ [DEEP_LINK] 그룹 가입 성공!")
+                        viewModel.fetchGroups()
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    print("❌ [DEEP_LINK] 그룹 가입 실패: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
 }
 
 struct GroupListHeaderView: View {
@@ -215,7 +241,8 @@ struct InviteCodeSection: View {
                     .autocorrectionDisabled()
                     .keyboardType(.asciiCapable) // 영문/숫자 키보드 강제
             }
-            .padding()
+            .padding(.horizontal)
+            .frame(height: 56) // 높이 고정
             .background(Color.white)
             .cornerRadius(12)
             .overlay(

@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -135,6 +136,7 @@ fun InviteCodeSection(
                 val filtered = newValue.uppercase().filter { it in 'A'..'Z' || it in '0'..'9' }
                 onCodeChange(filtered)
             },
+            placeholder = { Text("초대 코드 입력", style = TextStyle(color = Color.Gray, fontSize = 14.sp)) },
             singleLine = true,
             leadingIcon = {
                 Icon(Icons.Filled.PersonAdd, null, tint = Color.Gray, modifier = Modifier.size(20.dp))
