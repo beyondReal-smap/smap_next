@@ -80,6 +80,20 @@ struct GroupListView: View {
             .navigationBarHidden(true)
             .onAppear {
                 viewModel.fetchGroups()
+                
+                // 앱 실행 시 저장된 딥링크 그룹 ID가 있는지 확인
+                if let pendingGroupId = UserDefaults.standard.string(forKey: "pending_join_group_id") {
+                    print("👥 [DEEP_LINK] 저장된 펜딩 그룹 ID 발견: \(pendingGroupId)")
+                    joinGroupById(pendingGroupId)
+                    UserDefaults.standard.removeObject(forKey: "pending_join_group_id")
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("handleGroupJoinDeepLink"))) { notification in
+                if let groupId = notification.userInfo?["group_id"] as? String {
+                    print("👥 [DEEP_LINK] 알림 수신 - 그룹 가입 실행: \(groupId)")
+                    joinGroupById(groupId)
+                    UserDefaults.standard.removeObject(forKey: "pending_join_group_id")
+                }
             }
             .alert(isPresented: $viewModel.showError) {
                 Alert(title: Text("알림"), message: Text(viewModel.errorMessage ?? "오류가 발생했습니다."), dismissButton: .default(Text("확인")))
@@ -180,12 +194,26 @@ struct InviteCodeSection: View {
     var onJoin: () -> Void
     
     var body: some View {
+        // 커스텀 바인딩을 사용하여 입력을 즉시 필터링
+        let filteredBinding = Binding<String>(
+            get: { self.inviteCode },
+            set: { newValue in
+                // 대문자로 변환하고 영문 알파벳(A-Z)과 숫자(0-9)만 허용
+                self.inviteCode = newValue.uppercased().filter { char in
+                    char.isASCII && (char.isLetter || char.isNumber)
+                }
+            }
+        )
+        
         HStack(spacing: 12) {
             HStack {
                 Image(systemName: "person.badge.plus")
                     .foregroundColor(.gray)
-                TextField("초대 코드 입력...", text: $inviteCode)
+                TextField("초대 코드 입력...", text: filteredBinding)
                     .font(.suite(size: 16))
+                    .textInputAutocapitalization(.characters)
+                    .autocorrectionDisabled()
+                    .keyboardType(.asciiCapable) // 영문/숫자 키보드 강제
             }
             .padding()
             .background(Color.white)

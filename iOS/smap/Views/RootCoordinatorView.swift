@@ -430,7 +430,7 @@ public struct SettingMenuView: View {
                             Text("SMAP")
                                 .font(.suite(size: 14, weight: .semibold))
                                 .foregroundColor(.gray)
-                            Text("버전 3.0.1")
+                            Text("버전 3.0.2")
                                 .font(.suite(size: 12))
                                 .foregroundColor(.gray.opacity(0.8))
                         }
@@ -808,13 +808,27 @@ struct AccountSettingsView: View {
     private var logoutSection: some View {
         VStack(spacing: 0) {
             Button(action: { showingLogoutAlert = true }) {
-                HStack {
+                HStack(spacing: 12) {
+                    // 로그아웃 아이콘
+                    Image(systemName: "rectangle.portrait.and.arrow.right")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(.white)
+                        .frame(width: 28, height: 28)
+                        .background(Color.red.opacity(0.8))
+                        .cornerRadius(6)
+                    
                     Text("로그아웃")
                         .font(.suite(size: 16))
                         .foregroundColor(.red)
+                    
                     Spacer()
+                    
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(Color(UIColor.tertiaryLabel))
                 }
-                .padding()
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
                 .background(Color(UIColor.systemBackground))
             }
         }

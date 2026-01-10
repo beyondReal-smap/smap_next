@@ -7281,7 +7281,29 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             return AuthController.handleOpenUrl(url: url)
         }
         
-        // 기존 딥링크 처리
+        // smap 딥링크 처리 (통합 스킴)
+        if url.scheme == "smap" {
+            print("📱 [DEEP_LINK] smap 스킴 감지됨: \(url)")
+            
+            // 형식: smap://group/{id}/join
+            let pathComponents = url.pathComponents // ["/", "group", "{id}", "join"]
+            if pathComponents.count >= 3 && pathComponents[1] == "group" {
+                let groupId = pathComponents[2]
+                print("👥 [DEEP_LINK] 그룹 가입 요청 감지 - 그룹 ID: \(groupId)")
+                
+                // 그룹 정보 저장 및 알림 발송
+                UserDefaults.standard.set(groupId, forKey: "pending_join_group_id")
+                
+                NotificationCenter.default.post(
+                    name: NSNotification.Name(rawValue: "handleGroupJoinDeepLink"),
+                    object: nil,
+                    userInfo: ["group_id": groupId]
+                )
+            }
+            return true
+        }
+        
+        // 기존 smapapp 딥링크 처리 (하위 호환성)
         if url.scheme == "smapapp" {
             print("딥링크 URL: \(url)")
             
@@ -9305,10 +9327,8 @@ extension AppDelegate {
         
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
-            URLSession.shared.dataTask(with: request) { _, response, error in
-                if let error = error {
-                    // print("❌ [FCM BACKGROUND] 조용한 토큰 업데이트 실패: \(error.localizedDescription)")
-                } else if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+            URLSession.shared.dataTask(with: request) { _, response, _ in
+                if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
                     // print("✅ [FCM BACKGROUND] 조용한 토큰 업데이트 성공")
                 }
             }.resume()

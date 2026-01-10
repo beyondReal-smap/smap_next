@@ -50,14 +50,17 @@ def create_location_log(db: Session, log_data: MemberLocationLogCreate) -> Membe
     db_log = MemberLocationLog(**log_data.model_dump())
     db.add(db_log)
     
-    # Member 테이블 최신 위치 업데이트
-    if log_data.mlt_lat and log_data.mlt_long:
+    # Member 테이블 최신 위치 업데이트 (mlt_lat, mlt_long이 None이 아닌 경우)
+    if log_data.mlt_lat is not None and log_data.mlt_long is not None:
         member = db.query(Member).filter(Member.mt_idx == log_data.mt_idx).first()
         if member:
             member.mt_lat = log_data.mlt_lat
             member.mt_long = log_data.mlt_long
             member.mt_udate = datetime.utcnow()
             db.add(member)
+            print(f"📍 [CRUD] member_t 위치 업데이트: mt_idx={log_data.mt_idx}, lat={log_data.mlt_lat}, long={log_data.mlt_long}")
+        else:
+            print(f"⚠️ [CRUD] member_t 멤버 없음: mt_idx={log_data.mt_idx}")
             
     db.commit()
     db.refresh(db_log)

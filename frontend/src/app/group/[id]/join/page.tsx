@@ -35,19 +35,19 @@ export default function GroupJoinPage() {
         // body 스타일 초기화
         const bodyStyle = document.body.style;
         const htmlStyle = document.documentElement.style;
-        
+
         // 모든 잘못된 스타일 속성들 제거
         const badStyles = [
-          'position', 'bottom', 'left', 'right', 'top', 'z-index', 
-          'background', 'backdrop-filter', 'transform', 'will-change', 
+          'position', 'bottom', 'left', 'right', 'top', 'z-index',
+          'background', 'backdrop-filter', 'transform', 'will-change',
           'perspective', 'backface-visibility', 'overflow', 'height', 'width'
         ];
-        
+
         badStyles.forEach(prop => {
           bodyStyle.removeProperty(prop);
           htmlStyle.removeProperty(prop);
         });
-        
+
         // 정상적인 기본 스타일 강제 설정
         bodyStyle.setProperty('position', 'static', 'important');
         bodyStyle.setProperty('overflow', 'visible', 'important');
@@ -59,7 +59,7 @@ export default function GroupJoinPage() {
         bodyStyle.setProperty('height', 'auto', 'important');
         bodyStyle.setProperty('transform', 'none', 'important');
         bodyStyle.setProperty('z-index', 'auto', 'important');
-        
+
         htmlStyle.setProperty('position', 'static', 'important');
         htmlStyle.setProperty('overflow', 'visible', 'important');
         htmlStyle.setProperty('top', 'auto', 'important');
@@ -71,17 +71,17 @@ export default function GroupJoinPage() {
         htmlStyle.setProperty('transform', 'none', 'important');
         htmlStyle.setProperty('z-index', 'auto', 'important');
       };
-      
+
       // 즉시 실행
       resetBodyStyles();
-      
+
       // 약간의 지연 후에도 실행 (다른 스크립트가 덮어쓰는 경우 대비)
       const timeouts = [
         setTimeout(resetBodyStyles, 100),
         setTimeout(resetBodyStyles, 500),
         setTimeout(resetBodyStyles, 1000)
       ];
-      
+
       // 컴포넌트 언마운트 시 정리
       return () => {
         timeouts.forEach(timeout => clearTimeout(timeout));
@@ -102,18 +102,18 @@ export default function GroupJoinPage() {
     if (typeof navigator === 'undefined') return false;
     return /iPad|iPhone|iPod/.test(navigator.userAgent);
   };
-  
+
   const isAndroid = () => {
     if (typeof navigator === 'undefined') return false;
     return /Android/.test(navigator.userAgent);
   };
-  
+
   const isMobile = () => isIOS() || isAndroid();
-  
+
   // 앱 설치 여부 확인 (iOS)
   const checkAppInstalled = () => {
     if (typeof window === 'undefined') return false;
-    
+
     try {
       // iOS에서 앱 설치 여부 확인
       if (isIOS()) {
@@ -123,13 +123,13 @@ export default function GroupJoinPage() {
         iframe.style.display = 'none';
         iframe.src = testLink;
         document.body.appendChild(iframe);
-        
+
         setTimeout(() => {
           if (document.body.contains(iframe)) {
             document.body.removeChild(iframe);
           }
         }, 100);
-        
+
         // 실제로는 정확한 확인이 어려우므로 false 반환 (안전하게)
         return false;
       }
@@ -148,25 +148,25 @@ export default function GroupJoinPage() {
   useEffect(() => {
     const fetchGroupInfo = async () => {
       if (!groupId) return;
-      
+
       try {
         setLoading(true);
         console.log(`[GroupJoin] 그룹 정보 조회 시작 - groupId: ${groupId}`);
-        
+
         // 공개 그룹 정보 조회
         const response = await fetch(`/api/groups/${groupId}/public`);
-        
+
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        
+
         const responseData = await response.json();
         console.log(`[GroupJoin] 공개 그룹 정보 응답:`, responseData);
-        
+
         if (!responseData.success || !responseData.data) {
           throw new Error('그룹 정보를 찾을 수 없습니다.');
         }
-        
+
         const group = responseData.data;
         setGroupInfo({
           sgt_idx: group.sgt_idx,
@@ -176,7 +176,15 @@ export default function GroupJoinPage() {
           sgt_code: group.sgt_code,
           memberCount: group.memberCount || 0
         });
-        
+
+        // ✅ 정보 로드 후 모바일이면 자동으로 앱 열기 시도
+        if (isMobile()) {
+          // 약간의 지연 시간을 주어 페이지 렌더링 후 실행
+          setTimeout(() => {
+            handleOpenApp();
+          }, 1000);
+        }
+
       } catch (error) {
         console.error('그룹 정보 조회 오류:', error);
         setError(error instanceof Error ? error.message : '그룹 정보를 불러오는 중 오류가 발생했습니다.');
@@ -191,32 +199,32 @@ export default function GroupJoinPage() {
   // 앱 열기 시도
   const handleOpenApp = () => {
     if (typeof window === 'undefined') return;
-    
+
     console.log(`[GROUP_JOIN] 앱 열기 시작 - 그룹 ID: ${groupId}`);
-    
+
     // 그룹 정보 저장
     const groupJoinData = {
       groupId: parseInt(groupId),
       groupTitle: groupInfo?.sgt_title,
       timestamp: Date.now()
     };
-    
+
     localStorage.setItem('pendingGroupJoin', JSON.stringify(groupJoinData));
     console.log('[GROUP_JOIN] localStorage에 그룹 정보 저장:', groupJoinData);
-    
+
     // 딥링크 시도
     try {
       if (isIOS()) {
         // iOS Safari에서 안전한 딥링크 처리
         const deepLink = `smap://group/${groupId}/join`;
         const fallbackUrl = APP_STORE_URL;
-        
+
         console.log(`[GROUP_JOIN] iOS 딥링크 시도: ${deepLink}`);
-        
+
         // iOS에서 더 안전한 딥링크 처리 방법
         let appOpened = false;
         let fallbackTimeout: NodeJS.Timeout;
-        
+
         // 페이지 가시성 변화를 감지하여 앱이 열렸는지 확인
         const handleVisibilityChange = () => {
           if (document.hidden) {
@@ -227,17 +235,17 @@ export default function GroupJoinPage() {
             }
           }
         };
-        
+
         // 페이지 포커스 변화를 감지
         const handleFocus = () => {
           if (appOpened) {
             console.log('[GROUP_JOIN] iOS 앱이 열린 후 포커스 복귀');
           }
         };
-        
+
         document.addEventListener('visibilitychange', handleVisibilityChange);
         window.addEventListener('focus', handleFocus);
-        
+
         // 딥링크 시도 (Safari 오류 방지를 위한 안전한 방법)
         try {
           // 방법 1: iframe 사용 (가장 안전한 방법)
@@ -248,7 +256,7 @@ export default function GroupJoinPage() {
           iframe.style.top = '-9999px';
           iframe.src = deepLink;
           document.body.appendChild(iframe);
-          
+
           // 100ms 후 iframe 제거
           setTimeout(() => {
             if (document.body.contains(iframe)) {
@@ -257,7 +265,7 @@ export default function GroupJoinPage() {
           }, 100);
         } catch (e) {
           console.log('[GROUP_JOIN] iOS iframe 방법 실패:', e);
-          
+
           // 방법 2: window.open 사용 (대안)
           try {
             const newWindow = window.open(deepLink, '_blank');
@@ -270,24 +278,24 @@ export default function GroupJoinPage() {
             console.log('[GROUP_JOIN] iOS window.open 방법도 실패:', e2);
           }
         }
-        
+
         // 2초 후 앱이 열리지 않았으면 앱스토어로 이동
         fallbackTimeout = setTimeout(() => {
           document.removeEventListener('visibilitychange', handleVisibilityChange);
           window.removeEventListener('focus', handleFocus);
-          
+
           if (!appOpened) {
             console.log('[GROUP_JOIN] iOS 앱이 열리지 않음, 앱스토어로 이동');
             window.open(fallbackUrl, '_blank');
           }
         }, 2000);
-        
+
       } else if (isAndroid()) {
         // 안드로이드에서 더 안정적인 방법 사용
         const deepLink = `smap://group/${groupId}/join`;
         console.log(`[GROUP_JOIN] Android 딥링크 시도: ${deepLink}`);
         let appOpened = false;
-        
+
         // 페이지 가시성 변화를 감지하여 앱이 열렸는지 확인
         const handleVisibilityChange = () => {
           if (document.hidden) {
@@ -295,16 +303,16 @@ export default function GroupJoinPage() {
             console.log('[GROUP_JOIN] Android 앱이 열림 감지됨');
           }
         };
-        
+
         document.addEventListener('visibilitychange', handleVisibilityChange);
-        
+
         // 1. 딥링크 시도 (iframe 사용으로 안전하게)
         try {
           const iframe = document.createElement('iframe');
           iframe.style.display = 'none';
           iframe.src = deepLink;
           document.body.appendChild(iframe);
-          
+
           setTimeout(() => {
             if (document.body.contains(iframe)) {
               document.body.removeChild(iframe);
@@ -313,7 +321,7 @@ export default function GroupJoinPage() {
         } catch (e) {
           console.log('[GROUP_JOIN] Android iframe 방법 실패:', e);
         }
-        
+
         // 2초 후 앱이 열리지 않았으면 플레이스토어로 이동
         setTimeout(() => {
           document.removeEventListener('visibilitychange', handleVisibilityChange);
@@ -343,7 +351,7 @@ export default function GroupJoinPage() {
       <>
         {/* 헤더 */}
         <div className="min-h-screen flex items-center justify-center bg-white">
-          <IOSCompatibleSpinner 
+          <IOSCompatibleSpinner
             message="그룹 정보를 불러오는 중..."
             size="lg"
           />
@@ -373,15 +381,15 @@ export default function GroupJoinPage() {
             margin-bottom: 0 !important;
           }
         `}</style>
-        
+
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-4">
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.5 }}
             className="text-center p-6 bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl max-w-sm w-full"
           >
-            <motion.div 
+            <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ delay: 0.5, duration: 0.3 }}
@@ -389,7 +397,7 @@ export default function GroupJoinPage() {
             >
               😕
             </motion.div>
-            <motion.h1 
+            <motion.h1
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.6, duration: 0.4 }}
@@ -397,7 +405,7 @@ export default function GroupJoinPage() {
             >
               그룹을 찾을 수 없습니다
             </motion.h1>
-            <motion.p 
+            <motion.p
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.7, duration: 0.4 }}
@@ -472,49 +480,49 @@ export default function GroupJoinPage() {
           min-height: 100vh !important;
         }
       `}</style>
-      
+
       <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-200 to-pink-200 relative overflow-hidden">
         {/* 배경 장식 */}
-        <motion.div 
+        <motion.div
           className="absolute inset-0 overflow-hidden"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3, duration: 0.8 }}
         >
-          <motion.div 
+          <motion.div
             className="absolute top-20 left-10 w-32 h-32 bg-white/20 rounded-full blur-xl"
-            animate={{ 
+            animate={{
               y: [0, -10, 0],
               rotate: [0, 180, 360]
             }}
-            transition={{ 
-              duration: 8, 
-              repeat: Infinity, 
-              ease: "easeInOut" 
+            transition={{
+              duration: 8,
+              repeat: Infinity,
+              ease: "easeInOut"
             }}
           ></motion.div>
-          <motion.div 
+          <motion.div
             className="absolute bottom-20 right-10 w-40 h-40 bg-white/20 rounded-full blur-xl"
-            animate={{ 
+            animate={{
               x: [0, 10, 0],
               scale: [1, 1.1, 1]
             }}
-            transition={{ 
-              duration: 6, 
-              repeat: Infinity, 
-              ease: "easeInOut" 
+            transition={{
+              duration: 6,
+              repeat: Infinity,
+              ease: "easeInOut"
             }}
           ></motion.div>
-          <motion.div 
+          <motion.div
             className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-white/10 rounded-full blur-xl"
-            animate={{ 
+            animate={{
               rotate: [0, 360],
               scale: [1, 1.2, 1]
             }}
-            transition={{ 
-              duration: 10, 
-              repeat: Infinity, 
-              ease: "linear" 
+            transition={{
+              duration: 10,
+              repeat: Infinity,
+              ease: "linear"
             }}
           ></motion.div>
         </motion.div>
@@ -534,7 +542,7 @@ export default function GroupJoinPage() {
               transition={{ delay: 0.5, duration: 0.5 }}
             >
               {/* 로고 및 헤더 */}
-              <motion.div 
+              <motion.div
                 className="text-center mb-6"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -556,7 +564,7 @@ export default function GroupJoinPage() {
                     priority
                   />
                 </motion.div> */}
-                
+
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -586,14 +594,14 @@ export default function GroupJoinPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.9, duration: 0.5 }}
               >
-                <motion.div 
+                <motion.div
                   className="bg-gradient-to-r from-indigo-100 to-purple-100 rounded-2xl p-4 mb-4"
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 1.0, duration: 0.4 }}
                   whileHover={{ scale: 1.02 }}
                 >
-                  <motion.h2 
+                  <motion.h2
                     className="text-xl font-bold text-gray-800 mb-2"
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -601,9 +609,9 @@ export default function GroupJoinPage() {
                   >
                     {groupInfo.sgt_title}
                   </motion.h2>
-                  
+
                   {(groupInfo.sgt_content || groupInfo.sgt_memo) && (
-                    <motion.p 
+                    <motion.p
                       className="text-gray-600 text-sm mb-3 leading-relaxed"
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -612,8 +620,8 @@ export default function GroupJoinPage() {
                       {groupInfo.sgt_content || groupInfo.sgt_memo}
                     </motion.p>
                   )}
-                  
-                  <motion.div 
+
+                  <motion.div
                     className="flex items-center justify-center bg-white rounded-xl py-2 px-3 shadow-sm mb-3"
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -622,10 +630,10 @@ export default function GroupJoinPage() {
                     <FaUsers className="mr-2 text-indigo-500 text-sm" />
                     <span className="text-gray-700 font-medium text-sm">멤버 {groupInfo.memberCount}명</span>
                   </motion.div>
-                  
+
                   {/* 초대 코드 표시 */}
                   {groupInfo.sgt_code && (
-                    <motion.div 
+                    <motion.div
                       className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-3 border border-blue-200"
                       initial={{ opacity: 0, scale: 0.9 }}
                       animate={{ opacity: 1, scale: 1 }}
@@ -653,7 +661,7 @@ export default function GroupJoinPage() {
                   <motion.button
                     onClick={handleOpenApp}
                     className="w-full bg-gradient-to-r from-indigo-400 to-purple-500 text-white py-4 rounded-2xl font-bold text-base flex items-center justify-center space-x-2 shadow-xl hover:shadow-2xl transition-all relative overflow-hidden"
-                    whileHover={{ 
+                    whileHover={{
                       scale: 1.02,
                       boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)"
                     }}
@@ -671,8 +679,8 @@ export default function GroupJoinPage() {
                     </motion.div>
                     <span className="relative z-10">{isMobile() ? 'SMAP 앱에서 열기' : '앱 다운로드'}</span>
                   </motion.button>
-                  
-                  <motion.p 
+
+                  <motion.p
                     className="text-center text-xs text-gray-500 mt-2"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}

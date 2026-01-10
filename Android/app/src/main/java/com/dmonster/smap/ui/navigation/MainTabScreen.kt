@@ -135,6 +135,7 @@ fun MainTabScreen(
             GroupCreationScreen(
                 isCreating = isCreatingGroup,
                 onCreateGroup = { name, desc -> homeViewModel.createGroup(name, desc) },
+                onJoinGroup = { inviteCode -> homeViewModel.joinGroup(inviteCode) },
                 errorMessage = errorMessage
             )
         }

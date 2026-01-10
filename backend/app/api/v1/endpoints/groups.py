@@ -171,11 +171,15 @@ def get_current_user_groups(
     
     result = []
     for group, group_detail in user_groups:
-        # 멤버 수 계산
-        member_count = db.query(func.count(GroupDetail.sgdt_idx)).filter(
+        # 멤버 수 계산 (그룹 멤버 상세 API와 동일한 조건 적용)
+        member_count = db.query(func.count(GroupDetail.sgdt_idx)).join(
+            Member, Member.mt_idx == GroupDetail.mt_idx
+        ).filter(
             GroupDetail.sgt_idx == group.sgt_idx,
             GroupDetail.sgdt_exit == 'N',
-            GroupDetail.sgdt_show == 'Y'
+            GroupDetail.sgdt_show == 'Y',
+            GroupDetail.sgdt_discharge == 'N',  # 방출되지 않은 멤버만
+            Member.mt_status == 1  # 활성 상태 회원만
         ).scalar() or 0
         
         group_data = {

@@ -184,21 +184,25 @@ class AuthService: ObservableObject {
         // 전화번호에서 하이픈 제거
         let cleanPhone = phoneNumber.replacingOccurrences(of: "-", with: "")
         
-        // 기기 정보 가져오기
-        let device = UIDevice.current
-        let deviceId = device.identifierForVendor?.uuidString
-        let deviceModel = device.model
-        let osVersion = device.systemVersion
+        // 기기 정보 가져오기 (MainActor에서 캡처)
+        let deviceInfo = await MainActor.run {
+            let device = UIDevice.current
+            return (
+                deviceId: device.identifierForVendor?.uuidString,
+                deviceModel: device.model,
+                osVersion: device.systemVersion
+            )
+        }
         let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
         
         let request = LoginRequest(
             mt_id: cleanPhone,
             mt_pwd: password,
             fcm_token: fcmToken ?? getFCMToken(),
-            device_id: deviceId,
-            device_model: deviceModel,
+            device_id: deviceInfo.deviceId,
+            device_model: deviceInfo.deviceModel,
             os_type: "ios",
-            os_version: osVersion,
+            os_version: deviceInfo.osVersion,
             app_version: appVersion
         )
         

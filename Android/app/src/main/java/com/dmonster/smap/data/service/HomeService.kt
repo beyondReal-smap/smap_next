@@ -280,4 +280,85 @@ class HomeService private constructor(private val context: Context) {
             return@withContext null
         }
     }
+    
+    /**
+     * 초대코드로 그룹 가입
+     * 1단계: GET /api/v1/groups/code/{code} - 그룹 정보 조회
+     * 2단계: POST /api/v1/groups/{group_id}/join - 그룹 가입
+     */
+    suspend fun joinGroup(inviteCode: String): Boolean = withContext(Dispatchers.IO) {
+        val token = authService.getToken()
+        if (token.isNullOrBlank()) {
+            Log.e(TAG, "❌ [joinGroup] 토큰 없음")
+            return@withContext false
+        }
+        
+        val mtIdx = authService.getMtIdx()
+        if (mtIdx == 0) {
+            Log.e(TAG, "❌ [joinGroup] 사용자 ID 없음")
+            return@withContext false
+        }
+        
+        try {
+            // 1단계: 초대코드로 그룹 정보 조회
+            Log.d(TAG, "🚀 [joinGroup] 1단계: 초대코드로 그룹 조회 - code: $inviteCode")
+            
+            val codeRequest = Request.Builder()
+                .url("$BASE_URL/groups/code/$inviteCode")
+                .get()
+                .addHeader("Authorization", "Bearer $token")
+                .addHeader("Content-Type", "application/json")
+                .addHeader("User-Agent", "SmapAndroid/1.0")
+                .build()
+            
+            val codeResponse = httpClient.newCall(codeRequest).execute()
+            val codeResponseBody = codeResponse.body?.string() ?: ""
+            
+            Log.d(TAG, "📥 [joinGroup] 그룹 조회 응답: ${codeResponse.code}, Body: $codeResponseBody")
+            
+            if (!codeResponse.isSuccessful) {
+                Log.e(TAG, "❌ [joinGroup] 유효하지 않은 초대 코드")
+                return@withContext false
+            }
+            
+            // 그룹 정보 파싱
+            val group = gson.fromJson(codeResponseBody, SmapGroup::class.java)
+            val groupId = group.sgtIdx
+            Log.d(TAG, "✅ [joinGroup] 그룹 조회 성공 - ID: $groupId, Title: ${group.sgtTitle}")
+            
+            // 2단계: 그룹 가입
+            Log.d(TAG, "🚀 [joinGroup] 2단계: 그룹 가입 - groupId: $groupId, mtIdx: $mtIdx")
+            
+            val joinBody = mapOf(
+                "mt_idx" to mtIdx,
+                "sgt_idx" to groupId
+            )
+            val jsonBody = gson.toJson(joinBody)
+            
+            val joinRequest = Request.Builder()
+                .url("$BASE_URL/groups/$groupId/join")
+                .post(jsonBody.toByteArray().toRequestBody("application/json".toMediaType()))
+                .addHeader("Authorization", "Bearer $token")
+                .addHeader("Content-Type", "application/json")
+                .addHeader("User-Agent", "SmapAndroid/1.0")
+                .build()
+            
+            val joinResponse = httpClient.newCall(joinRequest).execute()
+            val joinResponseBody = joinResponse.body?.string() ?: ""
+            
+            Log.d(TAG, "📥 [joinGroup] 가입 응답: ${joinResponse.code}, Body: $joinResponseBody")
+            
+            if (!joinResponse.isSuccessful) {
+                Log.e(TAG, "❌ [joinGroup] 그룹 가입 실패: ${joinResponse.code}")
+                return@withContext false
+            }
+            
+            Log.d(TAG, "✅ [joinGroup] 그룹 가입 성공!")
+            return@withContext true
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ [joinGroup] 오류 발생", e)
+            return@withContext false
+        }
+    }
 }

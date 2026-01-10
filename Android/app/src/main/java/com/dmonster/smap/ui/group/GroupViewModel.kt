@@ -228,7 +228,9 @@ class GroupViewModel(application: Application) : AndroidViewModel(application) {
     // MARK: - Actions
 
     fun updateInviteCode(code: String) {
-        _inviteCode.value = code
+        // 대문자로 변환하고 영문 알파벳(A-Z)과 숫자(0-9)만 허용 (한글 제외)
+        val filtered = code.uppercase().filter { it in 'A'..'Z' || it in '0'..'9' }
+        _inviteCode.value = filtered
     }
 
     fun joinGroupByCode() {

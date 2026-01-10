@@ -46,6 +46,9 @@ class MainActivity : ComponentActivity() {
             return
         }
 
+        // 딥링크 처리
+        handleDeepLink(intent)
+
         setContent {
             SmapTheme {
                 var showDisclosure by remember { mutableStateOf(false) }
@@ -189,6 +192,33 @@ class MainActivity : ComponentActivity() {
         startActivity(intent)
         overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
         finish()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleDeepLink(intent)
+    }
+
+    private fun handleDeepLink(intent: Intent?) {
+        intent?.data?.let { uri ->
+            Log.d(TAG, "📱 [DEEP_LINK] Received URI: $uri")
+            
+            // smap://group/{id}/join 처리
+            if (uri.scheme == "smap" && uri.host == "group") {
+                val pathSegments = uri.pathSegments
+                if (pathSegments.size >= 2 && pathSegments[1] == "join") {
+                    val groupId = pathSegments[0]
+                    Log.d(TAG, "👥 [DEEP_LINK] Group ID: $groupId")
+                    
+                    // TODO: ViewModel 등을 통해 그룹 가입 로직 실행
+                    // 여기서는 일단 SharedPreferences나 전역 상태에 저장하여 UI에서 처리하게 함
+                    getSharedPreferences("smap_prefs", MODE_PRIVATE).edit()
+                        .putString("pending_group_id", groupId)
+                        .apply()
+                }
+            }
+        }
     }
 }
 

@@ -155,7 +155,7 @@ fun SettingsScreen(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text("SMAP", fontFamily = SuiteFont, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color.Gray)
-                        Text("버전 1.0.0", fontFamily = SuiteFont, fontSize = 12.sp, color = Color.Gray.copy(alpha = 0.8f))
+                        Text("버전 3.0.2", fontFamily = SuiteFont, fontSize = 12.sp, color = Color.Gray.copy(alpha = 0.8f))
                     }
                     
                     Spacer(modifier = Modifier.height(40.dp))

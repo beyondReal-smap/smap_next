@@ -4,7 +4,9 @@ class GroupService {
     static let shared = GroupService()
     private let authService = AuthService.shared
     
-    private init() {}
+    private init() {
+        NSLog("🔷 [GroupService] GroupService 싱글톤 초기화됨 - 빌드 시간: \(Date())")
+    }
     
     private var baseURL: String {
         return authService.baseURL
@@ -153,10 +155,14 @@ class GroupService {
     
     /// 그룹 가입 (초대 코드)
     func joinGroup(inviteCode: String) async throws -> Bool {
+        NSLog("🚀🚀🚀 [GroupService.joinGroup] 함수 진입 - inviteCode: %@", inviteCode)
+        print("🚀 [GroupService.joinGroup] 초대코드로 그룹 가입 시작: \(inviteCode)")
+        
         // 1. 코드로 그룹 정보 조회
         let codeUrl = URL(string: "\(baseURL)/groups/code/\(inviteCode)")!
         var codeRequest = URLRequest(url: codeUrl)
         codeRequest.httpMethod = "GET"
+        codeRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
         if let token = authService.getToken() {
             codeRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -164,32 +170,90 @@ class GroupService {
         
         let (codeData, codeResponse) = try await URLSession.shared.data(for: codeRequest)
         
-        guard let httpCodeResponse = codeResponse as? HTTPURLResponse, httpCodeResponse.statusCode == 200 else {
+        guard let httpCodeResponse = codeResponse as? HTTPURLResponse else {
+            throw APIError(detail: nil, message: "네트워크 오류가 발생했습니다.")
+        }
+        
+        print("📥 [GroupService.joinGroup] 그룹 조회 응답: \(httpCodeResponse.statusCode)")
+        
+        // 그룹 조회 응답 로깅
+        if let responseString = String(data: codeData, encoding: .utf8) {
+            print("📥 [GroupService.joinGroup] 그룹 조회 응답 body: \(responseString)")
+        }
+        
+        if httpCodeResponse.statusCode != 200 {
             throw APIError(detail: nil, message: "유효하지 않은 초대 코드입니다.")
         }
         
         let group = try JSONDecoder().decode(SmapGroup.self, from: codeData)
+        print("✅ [GroupService.joinGroup] 그룹 정보 조회 성공: \(group.sgt_title ?? "") (ID: \(group.sgt_idx))")
         
-        // 2. 가입 실행
-        let joinUrl = URL(string: "\(baseURL)/groups/\(group.sgt_idx)/join/")!
+        // 2. 가입 실행 - mt_idx와 sgt_idx를 body에 포함
+        guard let currentUser = authService.currentUser else {
+            print("❌ [GroupService.joinGroup] 현재 사용자 정보가 없습니다.")
+            throw APIError(detail: nil, message: "로그인이 필요합니다.")
+        }
+        
+        guard let mtIdx = currentUser.mt_idx else {
+            print("❌ [GroupService.joinGroup] 사용자 ID(mt_idx)가 없습니다.")
+            throw APIError(detail: nil, message: "사용자 정보가 올바르지 않습니다. 다시 로그인해주세요.")
+        }
+        
+        let joinUrl = URL(string: "\(baseURL)/groups/\(group.sgt_idx)/join")!
         var joinRequest = URLRequest(url: joinUrl)
         joinRequest.httpMethod = "POST"
+        joinRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
         if let token = authService.getToken() {
             joinRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
         
-        let (_, joinResponse) = try await URLSession.shared.data(for: joinRequest)
+        // 백엔드 GroupJoinRequest 스키마에 맞게 body 구성
+        let body: [String: Any] = [
+            "mt_idx": mtIdx,
+            "sgt_idx": group.sgt_idx
+        ]
+        joinRequest.httpBody = try JSONSerialization.data(withJSONObject: body)
         
-        guard let httpJoinResponse = joinResponse as? HTTPURLResponse, httpJoinResponse.statusCode == 200 else {
-            let statusCode = (joinResponse as? HTTPURLResponse)?.statusCode ?? -1
-            if statusCode == 409 {
-                throw APIError(detail: nil, message: "이미 가입된 그룹입니다.")
-            }
-            throw APIError(detail: nil, message: "그룹 가입에 실패했습니다. (Error: \(statusCode))")
+        print("📤 [GroupService.joinGroup] 가입 요청: mt_idx=\(mtIdx), sgt_idx=\(group.sgt_idx)")
+        print("📤 [GroupService.joinGroup] 가입 URL: \(joinUrl.absoluteString)")
+        
+        let (joinData, joinResponse) = try await URLSession.shared.data(for: joinRequest)
+        
+        guard let httpJoinResponse = joinResponse as? HTTPURLResponse else {
+            throw APIError(detail: nil, message: "네트워크 오류가 발생했습니다.")
         }
         
-        return true
+        print("📥 [GroupService.joinGroup] 가입 응답: \(httpJoinResponse.statusCode)")
+        
+        // 가입 응답 로깅
+        if let responseString = String(data: joinData, encoding: .utf8) {
+            print("📥 [GroupService.joinGroup] 가입 응답 body: \(responseString)")
+        }
+        
+        if httpJoinResponse.statusCode == 200 {
+            print("✅ [GroupService.joinGroup] 그룹 가입 성공!")
+            return true
+        } else if httpJoinResponse.statusCode == 400 {
+            // 이미 가입된 경우
+            if let json = try? JSONSerialization.jsonObject(with: joinData) as? [String: Any],
+               let detail = json["detail"] as? String {
+                throw APIError(detail: nil, message: detail)
+            }
+            throw APIError(detail: nil, message: "이미 가입된 그룹입니다.")
+        } else {
+            // 에러 메시지 파싱 시도
+            if let json = try? JSONSerialization.jsonObject(with: joinData) as? [String: Any],
+               let detail = json["detail"] as? String {
+                throw APIError(detail: nil, message: detail)
+            }
+            throw APIError(detail: nil, message: "그룹 가입에 실패했습니다. (Error: \(httpJoinResponse.statusCode))")
+        }
+    }
+    
+    /// 그룹 가입 (초대 코드) - alias
+    func joinGroupByCode(code: String) async throws -> Bool {
+        return try await joinGroup(inviteCode: code)
     }
     
     /// 그룹 삭제 (소프트 삭제)
@@ -268,6 +332,59 @@ class GroupService {
         
         let result = try JSONDecoder().decode(SimpleResponse.self, from: data)
         return result.success
+    }
+    
+    /// 그룹 ID로 직접 가입 (딥링크용)
+    func joinGroupById(mt_idx: Int, sgt_idx: Int) async throws -> Bool {
+        print("🚀 [GroupService.joinGroupById] 그룹 ID로 가입 시작: \(sgt_idx)")
+        
+        let joinUrl = URL(string: "\(baseURL)/groups/\(sgt_idx)/join")!
+        var joinRequest = URLRequest(url: joinUrl)
+        joinRequest.httpMethod = "POST"
+        joinRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        if let token = authService.getToken() {
+            joinRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
+        let body: [String: Any] = [
+            "mt_idx": mt_idx,
+            "sgt_idx": sgt_idx
+        ]
+        joinRequest.httpBody = try JSONSerialization.data(withJSONObject: body)
+        
+        let (joinData, joinResponse) = try await URLSession.shared.data(for: joinRequest)
+        
+        guard let httpJoinResponse = joinResponse as? HTTPURLResponse else {
+            throw APIError(detail: nil, message: "네트워크 오류가 발생했습니다.")
+        }
+        
+        if httpJoinResponse.statusCode == 200 {
+            print("✅ [GroupService.joinGroupById] 그룹 가입 성공!")
+            return true
+        } else {
+            if let json = try? JSONSerialization.jsonObject(with: joinData) as? [String: Any],
+               let detail = json["detail"] as? String {
+                throw APIError(detail: nil, message: detail)
+            }
+            throw APIError(detail: nil, message: "그룹 가입에 실패했습니다. (Error: \(httpJoinResponse.statusCode))")
+        }
+    }
+    
+    // 콜백 기반 래퍼 (기존 UI 코드 호환용)
+    func joinGroupById(mt_idx: Int, sgt_idx: Int, completion: @escaping (Bool, String?) -> Void) {
+        Task {
+            do {
+                let success = try await joinGroupById(mt_idx: mt_idx, sgt_idx: sgt_idx)
+                completion(success, nil)
+            } catch {
+                if let apiError = error as? APIError {
+                    completion(false, apiError.message)
+                } else {
+                    completion(false, error.localizedDescription)
+                }
+            }
+        }
     }
 }
 

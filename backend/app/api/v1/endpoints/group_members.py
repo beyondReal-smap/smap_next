@@ -62,9 +62,14 @@ def get_group_members(
         member_ids = [row.mt_idx for row in basic_result]
         location_data = {}
         
+        logger.info(f"📍 [GET_GROUP_MEMBERS] 위치 조회 대상 멤버 IDs: {member_ids}")
+        
         if member_ids:
-            # IN 절을 사용하여 한 번에 모든 멤버의 최신 위치 조회
-            location_query = text("""
+            # IN 절의 tuple 바인딩 문제를 해결하기 위해 동적 SQL 생성
+            placeholders = ", ".join([str(mid) for mid in member_ids])
+            
+            # member_location_log_t에서 최신 위치 조회
+            location_query = text(f"""
                 SELECT DISTINCT
                     mll1.mt_idx,
                     mll1.mlt_lat,
@@ -76,13 +81,14 @@ def get_group_members(
                 INNER JOIN (
                     SELECT mt_idx, MAX(mlt_gps_time) as max_time
                     FROM member_location_log_t
-                    WHERE mt_idx IN :member_ids 
+                    WHERE mt_idx IN ({placeholders}) 
                         AND mlt_gps_time IS NOT NULL
                     GROUP BY mt_idx
                 ) mll2 ON mll1.mt_idx = mll2.mt_idx AND mll1.mlt_gps_time = mll2.max_time
             """)
             
-            location_results = db.execute(location_query, {"member_ids": tuple(member_ids)}).fetchall()
+            location_results = db.execute(location_query).fetchall()
+            logger.info(f"📍 [GET_GROUP_MEMBERS] member_location_log_t 조회 결과: {len(location_results)}건")
             
             # 위치 데이터를 딕셔너리로 변환
             for loc in location_results:
@@ -93,8 +99,32 @@ def get_group_members(
                     "mlt_battery": int(loc.mlt_battery) if loc.mlt_battery else None,
                     "mlt_gps_time": str(loc.mlt_gps_time) if loc.mlt_gps_time else None,
                 }
+            
+            # 3단계: member_location_log_t에 데이터가 없는 멤버는 member_t의 mt_lat, mt_long을 fallback으로 사용
+            missing_members = [mid for mid in member_ids if mid not in location_data]
+            if missing_members:
+                logger.info(f"📍 [GET_GROUP_MEMBERS] 위치 로그 없는 멤버 {len(missing_members)}명, member_t에서 fallback 조회")
+                missing_placeholders = ", ".join([str(mid) for mid in missing_members])
+                fallback_query = text(f"""
+                    SELECT mt_idx, mt_lat, mt_long
+                    FROM member_t
+                    WHERE mt_idx IN ({missing_placeholders})
+                        AND mt_lat IS NOT NULL 
+                        AND mt_long IS NOT NULL
+                """)
+                fallback_results = db.execute(fallback_query).fetchall()
+                
+                for member in fallback_results:
+                    location_data[member.mt_idx] = {
+                        "mlt_lat": float(member.mt_lat) if member.mt_lat else None,
+                        "mlt_long": float(member.mt_long) if member.mt_long else None,
+                        "mlt_speed": None,
+                        "mlt_battery": None,
+                        "mlt_gps_time": None,  # fallback이므로 시간 정보 없음
+                    }
+                logger.info(f"📍 [GET_GROUP_MEMBERS] member_t fallback 결과: {len(fallback_results)}건")
         
-        # 3단계: 결과 데이터 조합
+        # 4단계: 결과 데이터 조합
         members = []
         for row in basic_result:
             # 해당 멤버의 위치 정보 가져오기
@@ -217,4 +247,93 @@ def remove_member_from_group(
     db.add(group_detail)
     db.commit()
     
-    return {"success": True, "message": "Member removed from group successfully"} 
+    return {"success": True, "message": "Member removed from group successfully"}
+
+@router.delete("/{group_id}/member/{member_id}")
+def remove_member_from_group_path(
+    group_id: int,
+    member_id: int,
+    db: Session = Depends(deps.get_db)
+):
+    """
+    그룹에서 멤버를 제거합니다. (경로 파라미터 버전)
+    """
+    logger.info(f"[REMOVE_MEMBER] 멤버 내보내기 요청 - group_id: {group_id}, member_id: {member_id}")
+    
+    group_detail = db.query(GroupDetail).filter(
+        GroupDetail.sgt_idx == group_id,
+        GroupDetail.mt_idx == member_id,
+        GroupDetail.sgdt_show == 'Y'
+    ).first()
+    
+    if not group_detail:
+        logger.warning(f"[REMOVE_MEMBER] 멤버를 찾을 수 없음 - group_id: {group_id}, member_id: {member_id}")
+        raise HTTPException(status_code=404, detail="Member not found in the group")
+    
+    # 소프트 삭제 처리
+    group_detail.sgdt_show = 'N'
+    group_detail.sgdt_exit = 'Y'
+    db.add(group_detail)
+    db.commit()
+    
+    logger.info(f"[REMOVE_MEMBER] 멤버 내보내기 완료 - group_id: {group_id}, member_id: {member_id}")
+    
+    return {"success": True, "message": "멤버가 그룹에서 내보내졌습니다."}
+
+@router.put("/{group_id}/role")
+def update_member_role(
+    group_id: int,
+    role_data: dict,
+    db: Session = Depends(deps.get_db)
+):
+    """
+    그룹 멤버의 역할(리더)을 변경합니다.
+    """
+    # member_id 추출 (키 존재 여부로 체크)
+    member_id = role_data.get("member_id") if "member_id" in role_data else role_data.get("mt_idx")
+    
+    # is_leader 추출 (False 값도 올바르게 처리)
+    is_leader = None
+    if "is_leader" in role_data:
+        is_leader = role_data.get("is_leader")
+    elif "sgdt_leader_chk" in role_data:
+        is_leader = role_data.get("sgdt_leader_chk")
+    
+    logger.info(f"[UPDATE_ROLE] 역할 변경 요청 - group_id: {group_id}, member_id: {member_id}, is_leader: {is_leader}, raw_data: {role_data}")
+    
+    if not member_id:
+        raise HTTPException(status_code=400, detail="member_id or mt_idx is required")
+    
+    group_detail = db.query(GroupDetail).filter(
+        GroupDetail.sgt_idx == group_id,
+        GroupDetail.mt_idx == member_id,
+        GroupDetail.sgdt_show == 'Y',
+        GroupDetail.sgdt_exit == 'N'
+    ).first()
+    
+    if not group_detail:
+        logger.warning(f"[UPDATE_ROLE] 멤버를 찾을 수 없음 - group_id: {group_id}, member_id: {member_id}")
+        raise HTTPException(status_code=404, detail="Member not found in the group")
+    
+    # 리더 여부 변경
+    if is_leader is not None:
+        if isinstance(is_leader, bool):
+            group_detail.sgdt_leader_chk = 'Y' if is_leader else 'N'
+        else:
+            group_detail.sgdt_leader_chk = str(is_leader).upper()  # 'Y' or 'N' string
+    
+    db.add(group_detail)
+    db.commit()
+    
+    logger.info(f"[UPDATE_ROLE] 역할 변경 완료 - member_id: {member_id}, sgdt_leader_chk: {group_detail.sgdt_leader_chk}")
+    
+    return {
+        "success": True, 
+        "message": "멤버 역할이 변경되었습니다.",
+        "data": {
+            "sgdt_idx": group_detail.sgdt_idx,
+            "sgt_idx": group_id,
+            "mt_idx": member_id,
+            "sgdt_leader_chk": group_detail.sgdt_leader_chk
+        }
+    }

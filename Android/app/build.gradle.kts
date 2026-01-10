@@ -12,8 +12,8 @@ android {
         applicationId = "com.dmonster.smap"
         minSdk = 24
         targetSdk = 35
-        versionCode = 36
-        versionName = "2.2.8"
+        versionCode = 38
+        versionName = "3.0.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         resourceConfigurations += setOf("ko", "en")
@@ -93,6 +93,7 @@ dependencies {
     // Lifecycle
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     
     // Coroutine
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")

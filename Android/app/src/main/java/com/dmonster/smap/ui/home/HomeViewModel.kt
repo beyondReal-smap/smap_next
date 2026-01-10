@@ -241,6 +241,39 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     
+    /**
+     * 초대코드로 그룹 가입
+     */
+    fun joinGroup(inviteCode: String) {
+        viewModelScope.launch {
+            _isCreatingGroup.value = true
+            _errorMessage.value = null
+            
+            try {
+                Log.d(TAG, "🚀 [API] 초대코드로 그룹 가입 시작: $inviteCode")
+                val success = homeService.joinGroup(inviteCode)
+                
+                if (success) {
+                    Log.d(TAG, "✅ [API] 그룹 가입 성공")
+                    _showGroupCreationModal.value = false
+                    
+                    // 데이터 새로고침
+                    loadDataFromAPI()
+                    
+                    // Global Event 발송
+                    GlobalEventBus.emit(GlobalEvent.GroupsChanged)
+                } else {
+                    _errorMessage.value = "그룹 가입에 실패했습니다. 초대 코드를 확인해주세요."
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ [API] 그룹 가입 실패", e)
+                _errorMessage.value = "그룹 가입 중 오류가 발생했습니다: ${e.message}"
+            } finally {
+                _isCreatingGroup.value = false
+            }
+        }
+    }
+    
     fun hideGroupCreationModal() {
         _showGroupCreationModal.value = false
     }
@@ -283,10 +316,39 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * 데이터 새로고침
+     * 데이터 새로고침 (그룹 목록 + 현재 선택된 그룹의 멤버/일정)
      */
     fun refreshData() {
-        loadDataFromAPI()
+        viewModelScope.launch {
+            _isLoading.value = true
+            _errorMessage.value = null
+            
+            try {
+                Log.d(TAG, "🔄 [REFRESH] 전체 데이터 새로고침 시작")
+                
+                // 1. 그룹 목록 새로고침
+                val groups = homeService.getGroups()
+                _groups.value = groups
+                Log.d(TAG, "🔄 [REFRESH] ${groups.size}개 그룹 로드 완료")
+                
+                // 2. 현재 선택된 그룹의 멤버/일정 새로고침
+                val currentGroup = _selectedGroup.value
+                if (currentGroup != null) {
+                    Log.d(TAG, "🔄 [REFRESH] 그룹(${currentGroup.sgtIdx}) 멤버/일정 새로고침")
+                    loadGroupData(currentGroup.sgtIdx)
+                } else if (groups.isNotEmpty()) {
+                    // 선택된 그룹이 없으면 첫 번째 그룹 선택
+                    selectGroup(groups.first())
+                }
+                
+                Log.d(TAG, "✅ [REFRESH] 전체 데이터 새로고침 완료")
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ [REFRESH] 데이터 새로고침 실패", e)
+                _errorMessage.value = "데이터를 새로고침하는데 실패했습니다: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
     }
 
     fun toggleSidebar() {

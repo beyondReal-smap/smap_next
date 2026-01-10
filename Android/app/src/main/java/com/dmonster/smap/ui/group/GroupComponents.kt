@@ -130,13 +130,20 @@ fun InviteCodeSection(
     ) {
         OutlinedTextField(
             value = inviteCode,
-            onValueChange = onCodeChange,
-            placeholder = { Text("초대 코드 입력...", fontFamily = SuiteFont, color = Color.LightGray) },
+            onValueChange = { newValue ->
+                // UI 레벨에서도 즉시 필터링 (영문 대문자와 숫자만)
+                val filtered = newValue.uppercase().filter { it in 'A'..'Z' || it in '0'..'9' }
+                onCodeChange(filtered)
+            },
             singleLine = true,
             leadingIcon = {
                 Icon(Icons.Filled.PersonAdd, null, tint = Color.Gray, modifier = Modifier.size(20.dp))
             },
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardOptions = KeyboardOptions(
+                capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Characters,
+                keyboardType = androidx.compose.ui.text.input.KeyboardType.Ascii, // 영문 키보드 권장
+                imeAction = ImeAction.Done
+            ),
             keyboardActions = KeyboardActions(onDone = {
                 focusManager.clearFocus()
                 if (inviteCode.isNotBlank()) onJoin()

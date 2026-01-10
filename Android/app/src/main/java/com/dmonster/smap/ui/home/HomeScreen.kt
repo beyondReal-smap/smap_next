@@ -10,7 +10,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.settings.SettingsScreen
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -25,9 +24,12 @@ import kotlinx.coroutines.launch
 import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
 import android.util.Log
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import coil.request.ImageRequest
 import coil.request.SuccessResult
 import coil.imageLoader
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalNaverMapApi::class)
 @Composable
@@ -77,6 +79,27 @@ fun HomeScreen(
     val notiViewModel: NotificationViewModel = viewModel()
     val unreadCount by notiViewModel.summary.collectAsState()
     val hasUnread = unreadCount.unread > 0
+    
+    // 화면 진입 시 항상 데이터 새로고침 (위치 포함)
+    LaunchedEffect(Unit) {
+        Log.d("HomeScreen", "🔄 [HomeScreen] Screen entered - refreshing data")
+        viewModel.refreshData()
+    }
+    
+    // 앱이 foreground로 돌아올 때 데이터 새로고침
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                Log.d("HomeScreen", "🔄 [HomeScreen] App resumed - refreshing location data")
+                viewModel.refreshData()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
     
     LaunchedEffect(isLoading) {
         if (!isLoading && isMapLoading) {
@@ -212,7 +235,7 @@ fun HomeScreen(
                     )
                 }
             },
-            gesturesEnabled = true
+            gesturesEnabled = false
         ) {
             Scaffold(
                 snackbarHost = { SnackbarHost(snackbarHostState) }

@@ -38,6 +38,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>smapapp</string>
+				<string>smap</string>
 			</array>
 		</dict>
 		<dict>

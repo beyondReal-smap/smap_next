@@ -53,6 +53,8 @@ struct FocusableTextField: View {
     let icon: String
     var keyboardType: UIKeyboardType = .default
     var textContentType: UITextContentType? = nil
+    var autocapitalizationType: UITextAutocapitalizationType = .none
+    var autocorrectionDisabled: Bool = true
     @State private var isFocused: Bool = false
     
     var body: some View {
@@ -68,6 +70,8 @@ struct FocusableTextField: View {
             })
             .font(.suite(size: 16))
             .keyboardType(keyboardType)
+            .autocapitalization(autocapitalizationType) // use older API for better FocusableTextField compatibility if needed, or textInputAutocapitalization
+            .disableAutocorrection(autocorrectionDisabled)
         }
         .padding(.horizontal, 16)
         .frame(height: 56) // 고정 높이
@@ -976,6 +980,31 @@ class HomeViewModel: ObservableObject {
         print("📊 [getMemberTodayStats] Stats: completed=\(completed), ongoing=\(ongoing), upcoming=\(upcoming)")
         return (completed, ongoing, upcoming)
     }
+    
+    /// 현재 선택된 그룹의 데이터 새로고침 (멤버 위치 포함)
+    func refreshData() async {
+        print("🔄 [HomeViewModel] refreshData started")
+        
+        // 1. 그룹 목록 새로고침
+        do {
+            let fetchedGroups = try await homeService.getMyGroups()
+            self.groups = fetchedGroups
+            print("🔄 [HomeViewModel] Refreshed \(fetchedGroups.count) groups")
+        } catch {
+            print("⚠️ [HomeViewModel] 그룹 새로고침 실패: \(error)")
+        }
+        
+        // 2. 현재 선택된 그룹의 멤버/일정 새로고침
+        if let currentGroup = selectedGroup {
+            print("🔄 [HomeViewModel] Refreshing group \(currentGroup.sgt_idx) data")
+            await fetchGroupData(sgtIdx: currentGroup.sgt_idx)
+        } else if let firstGroup = groups.first {
+            // 선택된 그룹이 없으면 첫 번째 그룹 선택
+            selectGroup(firstGroup)
+        }
+        
+        print("✅ [HomeViewModel] refreshData completed")
+    }
 }
 
 // MARK: - HomeView (Merged from separate file)
@@ -1088,6 +1117,10 @@ struct HomeView: View {
         }
         .onAppear {
             handleLoading()
+            // 홈 화면이 다시 표시될 때 멤버 위치 새로고침
+            Task {
+                await viewModel.refreshData()
+            }
         }
         .onDisappear {
             viewModel.pauseUpdates()
@@ -1096,6 +1129,13 @@ struct HomeView: View {
             sidebarDragOffset = 0
             // 다시 돌아올 때를 위해 로딩 상태 리셋
             isMapLoading = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            // 앱이 foreground로 돌아올 때 위치 데이터 새로고침
+            print("🔄 [HomeView] App entered foreground - refreshing location data")
+            Task {
+                await viewModel.refreshData()
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("closeSidebars"))) { notification in
             viewModel.isSidebarOpen = false
@@ -3386,10 +3426,13 @@ class GroupService {
     
     /// 그룹 가입 (초대 코드)
     func joinGroup(inviteCode: String) async throws -> Bool {
+        print("🚀 [HomeService.joinGroup] 초대코드로 그룹 가입 시작: \(inviteCode)")
+        
         // 1. 코드로 그룹 정보 조회
         let codeUrl = URL(string: "\(baseURL)/groups/code/\(inviteCode)")!
         var codeRequest = URLRequest(url: codeUrl)
         codeRequest.httpMethod = "GET"
+        codeRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
         if let token = authService.getToken() {
             codeRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -3397,32 +3440,72 @@ class GroupService {
         
         let (codeData, codeResponse) = try await URLSession.shared.data(for: codeRequest)
         
-        guard let httpCodeResponse = codeResponse as? HTTPURLResponse, httpCodeResponse.statusCode == 200 else {
+        guard let httpCodeResponse = codeResponse as? HTTPURLResponse else {
+            throw APIError(detail: nil, message: "네트워크 오류가 발생했습니다.")
+        }
+        
+        print("📥 [HomeService.joinGroup] 그룹 조회 응답: \(httpCodeResponse.statusCode)")
+        
+        if httpCodeResponse.statusCode != 200 {
             throw APIError(detail: nil, message: "유효하지 않은 초대 코드입니다.")
         }
         
         let group = try JSONDecoder().decode(SmapGroup.self, from: codeData)
+        print("✅ [HomeService.joinGroup] 그룹 정보 조회 성공: \(group.sgt_title ?? "") (ID: \(group.sgt_idx))")
         
-        // 2. 가입 실행
+        // 2. 가입 실행 - mt_idx와 sgt_idx를 body에 포함
+        guard let currentUser = authService.currentUser else {
+            print("❌ [HomeService.joinGroup] 현재 사용자 정보가 없습니다.")
+            throw APIError(detail: nil, message: "로그인이 필요합니다.")
+        }
+        
+        guard let mtIdx = currentUser.mt_idx else {
+            print("❌ [HomeService.joinGroup] 사용자 ID(mt_idx)가 없습니다.")
+            throw APIError(detail: nil, message: "사용자 정보가 올바르지 않습니다. 다시 로그인해주세요.")
+        }
+        
         let joinUrl = URL(string: "\(baseURL)/groups/\(group.sgt_idx)/join")!
         var joinRequest = URLRequest(url: joinUrl)
         joinRequest.httpMethod = "POST"
+        joinRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
         if let token = authService.getToken() {
             joinRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
         
-        let (_, joinResponse) = try await URLSession.shared.data(for: joinRequest)
+        // 백엔드 GroupJoinRequest 스키마에 맞게 body 구성
+        let body: [String: Any] = [
+            "mt_idx": mtIdx,
+            "sgt_idx": group.sgt_idx
+        ]
+        joinRequest.httpBody = try JSONSerialization.data(withJSONObject: body)
         
-        guard let httpJoinResponse = joinResponse as? HTTPURLResponse, httpJoinResponse.statusCode == 200 else {
-            let statusCode = (joinResponse as? HTTPURLResponse)?.statusCode ?? -1
-            if statusCode == 409 {
-                throw APIError(detail: nil, message: "이미 가입된 그룹입니다.")
-            }
-            throw APIError(detail: nil, message: "그룹 가입에 실패했습니다. (Error: \(statusCode))")
+        print("📤 [HomeService.joinGroup] 가입 요청: mt_idx=\(mtIdx), sgt_idx=\(group.sgt_idx)")
+        
+        let (joinData, joinResponse) = try await URLSession.shared.data(for: joinRequest)
+        
+        guard let httpJoinResponse = joinResponse as? HTTPURLResponse else {
+            throw APIError(detail: nil, message: "네트워크 오류가 발생했습니다.")
         }
         
-        return true
+        print("📥 [HomeService.joinGroup] 가입 응답: \(httpJoinResponse.statusCode)")
+        
+        if httpJoinResponse.statusCode == 200 {
+            print("✅ [HomeService.joinGroup] 그룹 가입 성공!")
+            return true
+        } else if httpJoinResponse.statusCode == 400 {
+            if let json = try? JSONSerialization.jsonObject(with: joinData) as? [String: Any],
+               let detail = json["detail"] as? String {
+                throw APIError(detail: nil, message: detail)
+            }
+            throw APIError(detail: nil, message: "이미 가입된 그룹입니다.")
+        } else {
+            if let json = try? JSONSerialization.jsonObject(with: joinData) as? [String: Any],
+               let detail = json["detail"] as? String {
+                throw APIError(detail: nil, message: detail)
+            }
+            throw APIError(detail: nil, message: "그룹 가입에 실패했습니다. (Error: \(httpJoinResponse.statusCode))")
+        }
     }
     
     /// 그룹 삭제 (소프트 삭제)
@@ -6680,74 +6763,174 @@ struct GroupCreationView: View {
     @ObservedObject var viewModel: HomeViewModel
     @State private var groupName: String = ""
     @State private var groupDescription: String = ""
+    @State private var inviteCode: String = ""
     @State private var isCreating: Bool = false
     @State private var errorMessage: String?
+    @State private var selectedTab: Int = 0 // 0 = Create, 1 = Join
+    
+    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    private let pinkColor = Color(red: 236/255, green: 72/255, blue: 153/255)
+    private let orangeColor = Color(red: 245/255, green: 158/255, blue: 11/255)
     
     var body: some View {
         ZStack {
-            Color.black.opacity(0.4).edgesIgnoringSafeArea(.all)
+            // Background gradient
+            LinearGradient(
+                gradient: Gradient(colors: [Color(white: 0.98), Color.white]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .edgesIgnoringSafeArea(.all)
             
             VStack(spacing: 0) {
-                // Header
-                VStack(spacing: 12) {
-                    Image(systemName: "person.3.fill")
-                        .font(.system(size: 40))
-                        .foregroundColor(BrandColors.primary)
+                // Header Icon
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(colors: [brandColor.opacity(0.1), pinkColor.opacity(0.1)]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 120, height: 120)
                     
-                    Text("새로운 그룹 만들기")
-                        .font(.suite(size: 22, weight: .bold))
-                        .foregroundColor(BrandColors.textPrimary)
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(colors: [brandColor, pinkColor]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 80, height: 80)
+                        .shadow(color: brandColor.opacity(0.3), radius: 16, x: 0, y: 8)
                     
-                    Text("가족, 친구, 동료와 함께할 공간을 만들어보세요.")
-                        .font(.suite(size: 14))
-                        .foregroundColor(BrandColors.textSecondary)
-                        .multilineTextAlignment(.center)
+                    Image(systemName: selectedTab == 0 ? "person.3.fill" : "person.badge.plus")
+                        .font(.system(size: 32))
+                        .foregroundColor(.white)
                 }
-                .padding(.top, 32)
-                .padding(.bottom, 24)
+                .padding(.top, 40)
+                .padding(.bottom, 20)
                 
-                // Form
-                VStack(spacing: 20) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("그룹 이름")
-                            .font(.suite(size: 14, weight: .bold))
-                            .foregroundColor(BrandColors.textPrimary)
-                        
-                        FocusableTextField(
-                            placeholder: "예: 우리 가족, 회사 동료",
-                            text: $groupName,
-                            icon: "person.3"
-                        )
-                        .frame(height: 56)
+                // Title
+                Text("그룹 시작하기")
+                    .font(.suite(size: 24, weight: .bold))
+                    .foregroundColor(.black)
+                
+                Text("새 그룹을 만들거나 초대코드로 가입하세요")
+                    .font(.suite(size: 14))
+                    .foregroundColor(.gray)
+                    .padding(.top, 8)
+                
+                // Tab Selector
+                HStack(spacing: 0) {
+                    TabButton(text: "그룹 만들기", isSelected: selectedTab == 0) {
+                        withAnimation { selectedTab = 0 }
                     }
-                    
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("그룹 설명 (선택)")
-                            .font(.suite(size: 14, weight: .medium))
-                            .foregroundColor(BrandColors.textSecondary)
-                        
-                        FocusableTextField(
-                            placeholder: "그룹에 대한 간단한 설명",
-                            text: $groupDescription,
-                            icon: "doc.text"
-                        )
-                        .frame(height: 56)
+                    TabButton(text: "초대코드 입력", isSelected: selectedTab == 1) {
+                        withAnimation { selectedTab = 1 }
                     }
                 }
+                .padding(4)
+                .background(Color.gray.opacity(0.1))
+                .cornerRadius(12)
                 .padding(.horizontal, 24)
+                .padding(.top, 24)
+                
+                // Form Card
+                VStack(spacing: 20) {
+                    if selectedTab == 0 {
+                        // === Create Group Form ===
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("그룹 이름")
+                                .font(.suite(size: 14, weight: .bold))
+                                .foregroundColor(.gray)
+                            
+                            FocusableTextField(
+                                placeholder: "예: 우리 가족, 회사 동료",
+                                text: $groupName,
+                                icon: "tag"
+                            )
+                            .frame(height: 56)
+                        }
+                        
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("그룹 설명 (선택)")
+                                .font(.suite(size: 14, weight: .medium))
+                                .foregroundColor(.gray)
+                            
+                            FocusableTextField(
+                                placeholder: "그룹에 대한 간단한 설명",
+                                text: $groupDescription,
+                                icon: "doc.text"
+                            )
+                            .frame(height: 56)
+                        }
+                    } else {
+                        // === Join Group Form ===
+                        // 커스텀 바인딩을 사용하여 입력을 즉시 필터링
+                        let filteredBinding = Binding<String>(
+                            get: { self.inviteCode },
+                            set: { newValue in
+                                // 대문자로 변환하고 영문 알파벳(A-Z)과 숫자(0-9)만 허용
+                                self.inviteCode = newValue.uppercased().filter { char in
+                                    char.isASCII && (char.isLetter || char.isNumber)
+                                }
+                            }
+                        )
+                        
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("초대 코드")
+                                .font(.suite(size: 14, weight: .bold))
+                                .foregroundColor(.gray)
+                            
+                            FocusableTextField(
+                                placeholder: "초대 코드를 입력하세요",
+                                text: filteredBinding,
+                                icon: "person.badge.plus",
+                                keyboardType: .asciiCapable, // 영문/숫자 키보드 강제
+                                autocapitalizationType: .allCharacters
+                            )
+                            .frame(height: 56)
+                            // FocusableTextField 내부에 전달되지 않을 수 있으므로 내부 TextField 수정 필요
+                        }
+                        
+                        Text("그룹 초대 코드를 받으셨나요?\n코드를 입력하면 해당 그룹에 가입됩니다.")
+                            .font(.suite(size: 13))
+                            .foregroundColor(.gray)
+                            .multilineTextAlignment(.center)
+                            .padding(.top, 8)
+                    }
+                }
+                .padding(24)
+                .background(Color.white)
+                .cornerRadius(20)
+                .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 4)
+                .padding(.horizontal, 24)
+                .padding(.top, 24)
                 
                 if let error = errorMessage {
                     Text(error)
                         .font(.suite(size: 13))
-                        .foregroundColor(BrandColors.error)
+                        .foregroundColor(.red)
                         .padding(.top, 16)
                         .padding(.horizontal, 24)
                 }
                 
+                Spacer()
+                
                 // Submit Button
                 Button(action: {
+                    print("🔘 [GroupCreationView] 버튼 클릭됨 - selectedTab: \(selectedTab), inviteCode: '\(inviteCode)', groupName: '\(groupName)'")
                     HapticManager.shared.impact(style: .medium)
-                    createGroup()
+                    if selectedTab == 0 {
+                        print("🔘 [GroupCreationView] createGroup() 호출")
+                        createGroup()
+                    } else {
+                        print("🔘 [GroupCreationView] joinGroup() 호출")
+                        joinGroup()
+                    }
                 }) {
                     HStack {
                         if isCreating {
@@ -6755,23 +6938,55 @@ struct GroupCreationView: View {
                                 .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                 .padding(.trailing, 8)
                         }
-                        Text("그룹 만들기")
+                        Text(selectedTab == 0 ? "그룹 만들기" : "그룹 가입하기")
                             .font(.suite(size: 16, weight: .bold))
                     }
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 56)
-                    .background(groupName.isEmpty ? BrandColors.primary.opacity(0.3) : BrandColors.primary)
+                    .background(
+                        (selectedTab == 0 && groupName.isEmpty) || (selectedTab == 1 && inviteCode.isEmpty)
+                            ? Color.gray.opacity(0.3)
+                            : (selectedTab == 0 ? brandColor : orangeColor)
+                    )
                     .cornerRadius(12)
-                    .shadow(color: BrandColors.primary.opacity(0.3), radius: 8, x: 0, y: 4)
+                    .shadow(color: (selectedTab == 0 ? brandColor : orangeColor).opacity(0.3), radius: 8, x: 0, y: 4)
                 }
-                .disabled(groupName.isEmpty || isCreating)
-                .padding(24)
+                .disabled((selectedTab == 0 && groupName.isEmpty) || (selectedTab == 1 && inviteCode.isEmpty) || isCreating)
+                .padding(.horizontal, 24)
+                
+                // Tip
+                HStack(spacing: 8) {
+                    Text("💡")
+                        .font(.system(size: 16))
+                    Text(selectedTab == 0
+                        ? "그룹을 만들면 멤버들을 초대할 수 있는 코드가 생성됩니다"
+                        : "초대 코드는 그룹 관리자에게 받을 수 있습니다")
+                        .font(.suite(size: 12))
+                        .foregroundColor(.gray)
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(selectedTab == 0 ? Color.yellow.opacity(0.1) : Color.orange.opacity(0.1))
+                .cornerRadius(12)
+                .padding(.horizontal, 24)
+                .padding(.top, 16)
+                .padding(.bottom, 32)
             }
-            .background(Color.white)
-            .cornerRadius(24)
-            .shadow(color: Color.black.opacity(0.1), radius: 20, x: 0, y: 10)
-            .padding(.horizontal, 20)
+        }
+    }
+    
+    // Tab Button Component
+    @ViewBuilder
+    private func TabButton(text: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(text)
+                .font(.suite(size: 14, weight: isSelected ? .bold : .medium))
+                .foregroundColor(isSelected ? brandColor : .gray)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(isSelected ? Color.white : Color.clear)
+                .cornerRadius(10)
         }
     }
     
@@ -6783,17 +6998,13 @@ struct GroupCreationView: View {
         
         Task {
             do {
-                // Use GroupService to create group
                 let _ = try await GroupService.shared.createGroup(title: groupName, memo: groupDescription)
-                
-                // Refresh data and close modal
                 await viewModel.fetchInitialData()
                 
                 DispatchQueue.main.async {
                     viewModel.showGroupCreationModal = false
                     isCreating = false
                 }
-                
             } catch {
                 DispatchQueue.main.async {
                     isCreating = false
@@ -6801,6 +7012,62 @@ struct GroupCreationView: View {
                         errorMessage = apiError.message ?? "그룹 생성에 실패했습니다."
                     } else {
                         errorMessage = "알 수 없는 오류가 발생했습니다."
+                    }
+                }
+            }
+        }
+    }
+    
+    private func joinGroup() {
+        print("🔵 [GroupCreationView.joinGroup] 함수 호출됨 - inviteCode: '\(inviteCode)'")
+        
+        guard !inviteCode.isEmpty else {
+            print("🔴 [GroupCreationView.joinGroup] 초대코드가 비어있음 - 종료")
+            return
+        }
+        
+        print("🟢 [GroupCreationView.joinGroup] 초대코드 확인됨 - 가입 시작")
+        isCreating = true
+        errorMessage = nil
+        
+        Task {
+            do {
+                // 사용자 정보 확인
+                let currentUser = AuthService.shared.currentUser
+                print("🟡 [GroupCreationView.joinGroup] currentUser: \(String(describing: currentUser))")
+                print("🟡 [GroupCreationView.joinGroup] mt_idx: \(String(describing: currentUser?.mt_idx))")
+                print("🟡 [GroupCreationView.joinGroup] token: \(AuthService.shared.getToken()?.prefix(20) ?? "nil")...")
+                
+                print("🟡 [GroupCreationView.joinGroup] GroupService.joinGroup 호출 시작")
+                let success = try await GroupService.shared.joinGroup(inviteCode: inviteCode)
+                print("🟡 [GroupCreationView.joinGroup] GroupService.joinGroup 결과: \(success)")
+                
+                if success {
+                    print("✅ [GroupCreationView.joinGroup] 가입 성공 - 데이터 갱신 시작")
+                    await viewModel.fetchInitialData()
+                    
+                    await MainActor.run {
+                        viewModel.showGroupCreationModal = false
+                        isCreating = false
+                        print("✅ [GroupCreationView.joinGroup] 모달 닫기 완료")
+                    }
+                } else {
+                    print("❌ [GroupCreationView.joinGroup] 가입 실패 (success=false)")
+                    await MainActor.run {
+                        isCreating = false
+                        errorMessage = "그룹 가입에 실패했습니다. 초대 코드를 확인해주세요."
+                    }
+                }
+            } catch {
+                print("❌ [GroupCreationView.joinGroup] 에러 발생: \(error)")
+                await MainActor.run {
+                    isCreating = false
+                    if let apiError = error as? APIError {
+                        errorMessage = apiError.message ?? "그룹 가입에 실패했습니다."
+                        print("❌ [GroupCreationView.joinGroup] API 에러 메시지: \(apiError.message ?? "nil")")
+                    } else {
+                        errorMessage = "알 수 없는 오류가 발생했습니다: \(error.localizedDescription)"
+                        print("❌ [GroupCreationView.joinGroup] 일반 에러: \(error.localizedDescription)")
                     }
                 }
             }
@@ -8511,6 +8778,8 @@ struct PathSliderView: View {
     @Binding var isSliderDragging: Bool
     
     private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    private let thumbSize: CGFloat = 20
+    private let trackHeight: CGFloat = 8
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -8518,10 +8787,10 @@ struct PathSliderView: View {
             HStack(spacing: 8) {
                 Circle()
                     .fill(brandColor)
-                    .frame(width: 20, height: 20)
+                    .frame(width: 28, height: 28)
                     .overlay(
                         Image(systemName: "play.fill")
-                            .font(.suite(size: 8))
+                            .font(.system(size: 12))
                             .foregroundColor(.white)
                     )
                 
@@ -8530,47 +8799,61 @@ struct PathSliderView: View {
                     .foregroundColor(.black)
             }
             
-            // Slider
-            VStack(spacing: 8) {
+            // Custom Slider
+            VStack(spacing: 4) {
                 GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
-                        // Track
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.gray.opacity(0.2))
-                            .frame(height: 8)
+                    let totalWidth = geometry.size.width
+                    let thumbRadius = thumbSize / 2
+                    // 핸들이 트랙 안에 머물도록 유효 범위 계산
+                    let minX = thumbRadius
+                    let maxX = totalWidth - thumbRadius
+                    let availableWidth = maxX - minX
+                    let thumbCenterX = minX + (availableWidth * CGFloat(sliderValue / 100))
+                    
+                    ZStack {
+                        // Track Background
+                        RoundedRectangle(cornerRadius: trackHeight / 2)
+                            .fill(Color.gray.opacity(0.3))
+                            .frame(height: trackHeight)
                         
-                        // Progress
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(brandColor)
-                            .frame(width: max(0, geometry.size.width * CGFloat(sliderValue / 100)), height: 8)
+                        // Track Progress
+                        HStack {
+                            RoundedRectangle(cornerRadius: trackHeight / 2)
+                                .fill(brandColor)
+                                .frame(width: thumbCenterX, height: trackHeight)
+                            Spacer(minLength: 0)
+                        }
                         
-                        // Thumb
+                        // Thumb (핸들)
                         Circle()
                             .fill(brandColor)
-                            .frame(width: 20, height: 20)
+                            .frame(width: thumbSize, height: thumbSize)
                             .overlay(
                                 Circle()
                                     .fill(Color.white)
-                                    .frame(width: 6, height: 6)
+                                    .frame(width: 8, height: 8)
                             )
-                            .shadow(radius: 2)
-                            .offset(x: max(0, min(geometry.size.width - 20, geometry.size.width * CGFloat(sliderValue / 100) - 10)))
-                            .scaleEffect(isSliderDragging ? 1.2 : 1.0)
+                            .shadow(color: brandColor.opacity(0.3), radius: 4)
+                            .position(x: thumbCenterX, y: geometry.size.height / 2)
                     }
-                    .frame(height: 24)
+                    .frame(height: geometry.size.height)
+                    .contentShape(Rectangle()) // 전체 영역 터치 가능
                     .gesture(
                         DragGesture(minimumDistance: 0)
                             .onChanged { value in
                                 isSliderDragging = true
-                                let percentage = min(100, max(0, Double(value.location.x / geometry.size.width) * 100))
-                                sliderValue = percentage
+                                // 터치 위치를 0-100% 값으로 변환
+                                let touchX = value.location.x
+                                let clampedX = max(minX, min(maxX, touchX))
+                                let newValue = Double((clampedX - minX) / availableWidth) * 100
+                                sliderValue = max(0, min(100, newValue))
                             }
                             .onEnded { _ in
                                 isSliderDragging = false
                             }
                     )
                 }
-                .frame(height: 24)
+                .frame(height: 40) // 터치 영역
                 
                 // Labels
                 HStack {
@@ -8581,7 +8864,7 @@ struct PathSliderView: View {
                     Spacer()
                     
                     Text("\(Int(sliderValue))%")
-                        .font(.suite(size: 10, weight: .semibold))
+                        .font(.suite(size: 10, weight: .bold))
                         .foregroundColor(brandColor)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
@@ -8596,8 +8879,9 @@ struct PathSliderView: View {
                 }
             }
         }
-        .padding(12)
-        .frame(width: 210)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .frame(width: 220)
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .fill(Color.white.opacity(0.95))
@@ -8605,6 +8889,7 @@ struct PathSliderView: View {
         )
     }
 }
+
 
 // MARK: - FAB
 
@@ -8848,15 +9133,10 @@ struct ActivityLogMapView: UIViewRepresentable {
             let m = NMFMarker()
             m.position = NMGLatLng(lat: curr.latitude, lng: curr.longitude)
             
-            let speedKmh = curr.speed * 3.6
-            var iconName = "figure.stand"
-            if speedKmh >= 30 { iconName = "car.fill" }
-            else if speedKmh >= 15 { iconName = "figure.run" }
-            else if speedKmh >= 3 { iconName = "figure.walk" }
-            
-            m.iconImage = NMFOverlayImage(image: generateIconImage(systemName: iconName, color: UIColor(red: 1/255, green: 19/255, blue: 163/255, alpha: 1)))
-            m.width = 30
-            m.height = 30
+            // Current Position Marker (Blue Bordered Circle)
+            m.iconImage = NMFOverlayImage(image: generateCurrentLocationMarkerImage(color: UIColor(red: 1/255, green: 19/255, blue: 163/255, alpha: 1)))
+            m.width = 24
+            m.height = 24
             m.zIndex = 1000
             m.mapView = mapView
             context.coordinator.currentPositionMarker = m
@@ -8966,20 +9246,19 @@ struct ActivityLogMapView: UIViewRepresentable {
         return (image: image, anchor: CGPoint(x: anchorX, y: anchorY))
     }
     
-    private func generateIconImage(systemName: String, color: UIColor) -> UIImage {
-        let config = UIImage.SymbolConfiguration(pointSize: 18, weight: .bold)
-        guard let image = UIImage(systemName: systemName, withConfiguration: config)?.withTintColor(color, renderingMode: .alwaysOriginal) else { return UIImage() }
-        let size = CGSize(width: 30, height: 30)
+    private func generateCurrentLocationMarkerImage(color: UIColor) -> UIImage {
+        let size = CGSize(width: 24, height: 24)
         let renderer = UIGraphicsImageRenderer(size: size)
         return renderer.image { ctx in
-            let circleRect = CGRect(x: 1, y: 1, width: 28, height: 28)
+            // White circle background
+            let circleRect = CGRect(x: 2.5, y: 2.5, width: 19, height: 19)
             let circlePath = UIBezierPath(ovalIn: circleRect)
             UIColor.white.setFill()
             circlePath.fill()
-            let iconRect = CGRect(x: 5, y: 5, width: 20, height: 20)
-            image.draw(in: iconRect)
+            
+            // Color border
             color.setStroke()
-            circlePath.lineWidth = 2
+            circlePath.lineWidth = 5
             circlePath.stroke()
         }
     }
