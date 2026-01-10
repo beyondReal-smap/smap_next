@@ -154,8 +154,8 @@ export default function AccountDeletionPage() {
                 <footer className="mt-16 text-center text-gray-500 text-sm">
                     <p>© {new Date().getFullYear()} {appName}. All rights reserved.</p>
                     <div className="mt-4 space-x-4">
-                        <a href="/setting/terms/service" className="hover:text-gray-800 underline">이용약관</a>
-                        <a href="/setting/terms/privacy" className="hover:text-gray-800 underline">개인정보처리방침</a>
+                        <a href="/legal/terms" className="hover:text-gray-800 underline">이용약관</a>
+                        <a href="/legal/privacy" className="hover:text-gray-800 underline">개인정보처리방침</a>
                     </div>
                 </footer>
             </main>
