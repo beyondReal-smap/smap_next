@@ -182,7 +182,8 @@ fun MemberSidebar(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 24.dp, start = 24.dp, end = 24.dp, bottom = 16.dp),
+                    .statusBarsPadding()
+                    .padding(top = 20.dp, start = 24.dp, end = 24.dp, bottom = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
