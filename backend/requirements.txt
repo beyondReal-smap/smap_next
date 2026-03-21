@@ -1,0 +1,40 @@
+# Web framework and server
+fastapi==0.109.2
+uvicorn==0.27.1
+python-multipart==0.0.9
+
+# Data validation and settings
+pydantic[email]==2.6.1
+pydantic-settings==2.2.1
+python-dotenv==1.0.1
+
+# Database
+sqlalchemy==2.0.27
+alembic==1.13.1
+mysqlclient==2.2.4
+PyMySQL==1.1.0
+
+# Authentication and security
+python-jose==3.3.0
+passlib==1.7.4
+bcrypt==4.1.2
+cryptography==41.0.3
+
+# AI / LLM
+openai==1.12.0
+
+# Image processing
+Pillow==10.2.0
+
+# Async HTTP client
+httpx
+aiohttp==3.9.3
+
+# Task scheduling
+apscheduler==3.10.4
+
+# Push notifications
+firebase-admin==6.4.0
+
+# Caching
+redis>=5.0.0

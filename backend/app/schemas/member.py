@@ -1,0 +1,308 @@
+from pydantic import BaseModel, ConfigDict, field_validator
+from typing import Optional
+from datetime import datetime, date
+from enum import Enum
+
+class YNEnum(str, Enum):
+    Y = "Y"
+    N = "N"
+
+class MemberBase(BaseModel):
+    mt_type: Optional[int] = 1
+    mt_level: Optional[int] = 2
+    mt_status: Optional[int] = 1
+    mt_id: str
+    mt_name: str
+    mt_nickname: str
+    mt_hp: Optional[str] = None
+    mt_email: Optional[str] = None
+    mt_birth: Optional[date] = None
+    mt_gender: Optional[int] = None
+    mt_show: Optional[YNEnum] = YNEnum.Y
+    mt_agree1: Optional[YNEnum] = YNEnum.N
+    mt_agree2: Optional[YNEnum] = YNEnum.N
+    mt_agree3: Optional[YNEnum] = YNEnum.N
+    mt_agree4: Optional[YNEnum] = YNEnum.N
+    mt_agree5: Optional[YNEnum] = YNEnum.N
+    mt_push1: Optional[YNEnum] = YNEnum.N
+    mt_lat: Optional[float] = None
+    mt_long: Optional[float] = None
+    mt_onboarding: Optional[YNEnum] = YNEnum.N
+
+class MemberCreate(MemberBase):
+    mt_pwd: str
+    
+    @field_validator('mt_email')
+    @classmethod
+    def validate_email(cls, v):
+        if v and '@' not in v:
+            raise ValueError('올바른 이메일 형식이 아닙니다.')
+        return v
+    
+    @field_validator('mt_id')
+    @classmethod
+    def validate_phone(cls, v):
+        if not v:
+            raise ValueError('전화번호는 필수입니다.')
+        # 전화번호 형식 검증 (하이픈 제거 후)
+        clean_phone = v.replace('-', '')
+        if not clean_phone.isdigit() or len(clean_phone) < 10:
+            raise ValueError('올바른 전화번호 형식이 아닙니다.')
+        return clean_phone
+
+class MemberUpdate(BaseModel):
+    mt_name: Optional[str] = None
+    mt_nickname: Optional[str] = None
+    mt_email: Optional[str] = None
+    mt_birth: Optional[date] = None
+    mt_gender: Optional[int] = None
+    mt_lat: Optional[float] = None
+    mt_long: Optional[float] = None
+    mt_push1: Optional[YNEnum] = None
+    mt_file1: Optional[str] = None
+
+class MemberResponse(MemberBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    mt_idx: int
+    mt_file1: Optional[str] = None
+    mt_wdate: Optional[datetime] = None
+    mt_ldate: Optional[datetime] = None
+    mt_udate: Optional[datetime] = None
+
+class MemberLogin(BaseModel):
+    mt_id: str  # 전화번호 또는 이메일
+    mt_pwd: str
+
+class MemberLoginResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[dict] = None
+
+# 회원가입 요청 스키마 (프론트엔드와 호환)
+class RegisterRequest(BaseModel):
+    mt_type: Optional[int] = 1
+    mt_level: Optional[int] = 2
+    mt_status: Optional[int] = 1
+    mt_id: str  # 전화번호 (소셜 로그인은 이메일 또는 ID)
+    mt_pwd: Optional[str] = None  # 소셜 로그인은 비밀번호 없음
+    mt_name: str
+    mt_nickname: str
+    mt_email: Optional[str] = None
+    mt_birth: Optional[str] = None  # YYYY-MM-DD 형식
+    mt_gender: Optional[int] = None
+    mt_file1: Optional[str] = None  # 프로필 이미지 경로
+    mt_onboarding: Optional[str] = "N"
+    mt_show: Optional[str] = "Y"
+    mt_agree1: bool
+    mt_agree2: bool
+    mt_agree3: bool
+    mt_agree4: Optional[bool] = False
+    mt_agree5: Optional[bool] = False
+    mt_token_id: Optional[str] = None  # FCM 토큰
+    mt_push1: Optional[bool] = True
+    mt_lat: Optional[float] = None
+    mt_long: Optional[float] = None
+    # 소셜 로그인 ID 필드
+    mt_google_id: Optional[str] = None
+    mt_kakao_id: Optional[str] = None
+    mt_apple_id: Optional[str] = None
+
+class RegisterResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[dict] = None
+
+# Google 로그인 요청 스키마
+class GoogleLoginRequest(BaseModel):
+    google_id: str
+    email: str
+    name: str
+    image: Optional[str] = None
+    access_token: Optional[str] = None
+
+# Google 로그인 응답 스키마
+class GoogleLoginResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[dict] = None
+
+# Apple 로그인 요청 스키마
+class AppleLoginRequest(BaseModel):
+    userIdentifier: str
+    email: Optional[str] = None
+    userName: Optional[str] = None
+    identityToken: Optional[str] = None
+    authorizationCode: Optional[str] = None
+
+# Apple 로그인 응답 스키마
+class AppleLoginResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[dict] = None
+
+# 비밀번호 확인 요청 스키마
+class VerifyPasswordRequest(BaseModel):
+    currentPassword: str
+
+    @field_validator('currentPassword')
+    @classmethod
+    def validate_current_password(cls, v):
+        if not v or not v.strip():
+            raise ValueError('현재 비밀번호를 입력해주세요.')
+        return v
+
+# 비밀번호 확인 응답 스키마
+class VerifyPasswordResponse(BaseModel):
+    success: bool
+    message: str
+
+# 비밀번호 변경 요청 스키마
+class ChangePasswordRequest(BaseModel):
+    currentPassword: str
+    newPassword: str
+
+    @field_validator('currentPassword')
+    @classmethod
+    def validate_current_password(cls, v):
+        if not v or not v.strip():
+            raise ValueError('현재 비밀번호를 입력해주세요.')
+        return v
+
+    @field_validator('newPassword')
+    @classmethod
+    def validate_new_password(cls, v):
+        if not v or not v.strip():
+            raise ValueError('새 비밀번호를 입력해주세요.')
+        
+        # 비밀번호 강도 검사
+        if len(v) < 8:
+            raise ValueError('새 비밀번호는 8자 이상이어야 합니다.')
+        
+        import re
+        
+        # 대문자 포함 검사
+        if not re.search(r'[A-Z]', v):
+            raise ValueError('새 비밀번호는 대문자를 포함해야 합니다.')
+        
+        # 소문자 포함 검사
+        if not re.search(r'[a-z]', v):
+            raise ValueError('새 비밀번호는 소문자를 포함해야 합니다.')
+        
+        # 숫자 포함 검사
+        if not re.search(r'\d', v):
+            raise ValueError('새 비밀번호는 숫자를 포함해야 합니다.')
+        
+        # 특수문자 포함 검사
+        if not re.search(r'[@$!%*?&]', v):
+            raise ValueError('새 비밀번호는 특수문자(@$!%*?&)를 포함해야 합니다.')
+        
+        return v
+
+# 비밀번호 변경 응답 스키마
+class ChangePasswordResponse(BaseModel):
+    success: bool
+    message: str
+
+# 프로필 수정 관련 스키마
+class UpdateProfileRequest(BaseModel):
+    mt_name: str
+    mt_nickname: str
+    mt_birth: Optional[str] = None
+    mt_gender: Optional[int] = None
+
+class UpdateProfileResponse(BaseModel):
+    result: str
+    message: str
+    success: bool
+
+# 연락처 수정 관련 스키마
+class UpdateContactRequest(BaseModel):
+    mt_hp: str
+    mt_email: str
+
+class UpdateContactResponse(BaseModel):
+    result: str
+    message: str
+    success: bool
+
+# 회원 탈퇴 관련 스키마
+class WithdrawRequest(BaseModel):
+    mt_retire_chk: int  # 탈퇴 사유 번호 (1-5)
+    mt_retire_etc: Optional[str] = None  # 기타 사유 (mt_retire_chk가 5일 때)
+    reasons: Optional[list] = None  # 프론트엔드에서 전달하는 사유 목록
+    
+    @field_validator('mt_retire_chk')
+    @classmethod
+    def validate_retire_reason(cls, v):
+        if v not in [1, 2, 3, 4, 5]:
+            raise ValueError('탈퇴 사유는 1-5 사이의 값이어야 합니다.')
+        return v
+    
+    @field_validator('mt_retire_etc')
+    @classmethod
+    def validate_etc_reason(cls, v, info):
+        # mt_retire_chk가 5(기타 이유)일 때 mt_retire_etc 필수
+        if info.data.get('mt_retire_chk') == 5:
+            if not v or not v.strip():
+                raise ValueError('기타 사유를 입력해주세요.')
+        return v
+
+class WithdrawResponse(BaseModel):
+    success: bool
+    message: str
+    result: Optional[str] = None
+
+# 약관 동의 관련 스키마
+class ConsentUpdate(BaseModel):
+    field: str
+    value: YNEnum
+    
+    @field_validator('field')
+    @classmethod
+    def validate_field(cls, v):
+        valid_fields = ['mt_agree1', 'mt_agree2', 'mt_agree3', 'mt_agree4', 'mt_agree5']
+        if v not in valid_fields:
+            raise ValueError(f'유효하지 않은 필드입니다. 허용된 필드: {valid_fields}')
+        return v
+
+class ConsentUpdateAll(BaseModel):
+    mt_agree1: YNEnum
+    mt_agree2: YNEnum
+    mt_agree3: YNEnum
+    mt_agree4: YNEnum
+    mt_agree5: YNEnum
+
+class ConsentInfo(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    mt_agree1: YNEnum
+    mt_agree2: YNEnum
+    mt_agree3: YNEnum
+    mt_agree4: YNEnum
+    mt_agree5: YNEnum
+
+class ConsentResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[ConsentInfo] = None
+
+class ConsentUpdateResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[dict] = None
+
+# 약관 정보 스키마
+class TermInfo(BaseModel):
+    id: str
+    title: str
+    description: str
+    version: str
+    last_updated: str
+    is_required: bool
+    db_field: str
+
+class TermsListResponse(BaseModel):
+    success: bool
+    message: str
+    data: list[TermInfo] 

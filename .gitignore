@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.env
+
+# Node
+node_modules/
+package-lock.json
+
+# Logs
+*.log
+logs/
+
+# Runtime
+*.pid
+*.sock
+
+# OS
+.DS_Store
+
+# Secrets
+*.pem
+*.p8
+*.json
+!backend/app/**/*.json
+
+# Data
+storage/
+backend/app_v2/
+backend/app_v3/
