@@ -43,6 +43,7 @@
 		948ABEFC2BAA8FBE00023DFD /* MltGpsData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 948ABEFB2BAA8FBE00023DFD /* MltGpsData.swift */; };
 		94F4BC352BB6B5F600987BC4 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 94F4BC342BB6B5F600987BC4 /* GoogleService-Info.plist */; };
 		A00AFEC1ED4745714ACBE748 /* GroupServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BB22F47ECA2E49E5A2D6C45 /* GroupServiceTests.swift */; };
+		B11CAFE4D8A24F6E9C3D7A01 /* AuthServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C22DBEF5E9B35A7FA4E68B02 /* AuthServiceTests.swift */; };
 		A1B2C3D40001 /* LoginModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40011 /* LoginModels.swift */; };
 		A1B2C3D40002 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40012 /* AuthService.swift */; };
 		A1B2C3D40003 /* LoginViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40013 /* LoginViewModel.swift */; };
@@ -95,6 +96,7 @@
 		62E3750BD06FB7857AEC15A6 /* smapTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = smapTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		65320A8BB93E6B422E7E9185 /* NetworkErrorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NetworkErrorTests.swift; sourceTree = "<group>"; };
 		7BB22F47ECA2E49E5A2D6C45 /* GroupServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GroupServiceTests.swift; sourceTree = "<group>"; };
+		C22DBEF5E9B35A7FA4E68B02 /* AuthServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthServiceTests.swift; sourceTree = "<group>"; };
 		846D82AE62D1FF1FAFD3B490 /* KeychainManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeychainManager.swift; sourceTree = "<group>"; };
 		84E5F9E1CE2882E5F246A7EC /* UserDefaultsManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UserDefaultsManager.swift; sourceTree = "<group>"; };
 		94339A4F2B2BE26F002177C1 /* smap.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = smap.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -222,6 +224,7 @@
 		5A63F1A4B4D31D3B7F01C463 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				C22DBEF5E9B35A7FA4E68B02 /* AuthServiceTests.swift */,
 				7BB22F47ECA2E49E5A2D6C45 /* GroupServiceTests.swift */,
 			);
 			name = Services;
@@ -733,6 +736,7 @@
 				21B1B201D32CBA943DA80918 /* DataMigrationTests.swift in Sources */,
 				5E6CED4CBEC392A0A1DA64FC /* MockURLProtocol.swift in Sources */,
 				A00AFEC1ED4745714ACBE748 /* GroupServiceTests.swift in Sources */,
+				B11CAFE4D8A24F6E9C3D7A01 /* AuthServiceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
