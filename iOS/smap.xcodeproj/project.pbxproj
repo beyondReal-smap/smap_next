@@ -10,8 +10,10 @@
 		002FFB7C69C962F6EDA964C9 /* UserDefaultsManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBEF99544122643C1993480F /* UserDefaultsManagerTests.swift */; };
 		05B3502305B5521A68675EF9 /* NetworkErrorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65320A8BB93E6B422E7E9185 /* NetworkErrorTests.swift */; };
 		067DD5BC4F9A7B5551B9FD4E /* AppConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5276E8F7F9EB554FB0284094 /* AppConfiguration.swift */; };
+		06C6150BCC131DA8C2455FF0 /* DataMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F2025C78F84D972ACF396A1 /* DataMigration.swift */; };
 		0F10BD14511AFFF3CBE017E5 /* Pods_smap.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 37FC506E4A26E11B0DA96829 /* Pods_smap.framework */; };
 		17CB2A28F3CAA2D170BD8FCF /* PlaceholderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9E2B42038DD89D78086429E /* PlaceholderTests.swift */; };
+		21B1B201D32CBA943DA80918 /* DataMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A285D1EDA2D7751AD0989FE6 /* DataMigrationTests.swift */; };
 		2DFB1160235A3F1D99E22B25 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D22CA221744223B0C67BEC1F /* APIClient.swift */; };
 		2F6C4327DCBD332F30081EAB /* APIEndpointTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDC76362DAC64DB193EB137B /* APIEndpointTests.swift */; };
 		3D5E7B1D367F512422B8C08A /* APIEndpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD697FC1738D83F5A06E98BE /* APIEndpoint.swift */; };
@@ -71,6 +73,7 @@
 
 /* Begin PBXFileReference section */
 		015524C0E4DDFD774AF076D7 /* NetworkError.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NetworkError.swift; sourceTree = "<group>"; };
+		0F2025C78F84D972ACF396A1 /* DataMigration.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DataMigration.swift; sourceTree = "<group>"; };
 		1543F20C479DC08F43430167 /* Pods-smapTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-smapTests.release.xcconfig"; path = "Target Support Files/Pods-smapTests/Pods-smapTests.release.xcconfig"; sourceTree = "<group>"; };
 		2BA1F183FACB1962B895B550 /* Release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		358E7C44A47807BE3A3431B4 /* Pods_smapTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_smapTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -107,6 +110,7 @@
 		A1B2C3D40013 /* LoginViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginViewModel.swift; sourceTree = "<group>"; };
 		A1B2C3D40014 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		A1B2C3D40015 /* RootCoordinatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootCoordinatorView.swift; sourceTree = "<group>"; };
+		A285D1EDA2D7751AD0989FE6 /* DataMigrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DataMigrationTests.swift; sourceTree = "<group>"; };
 		A658788DFD22BBB65D68B968 /* Pods-smap.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-smap.debug.xcconfig"; path = "Target Support Files/Pods-smap/Pods-smap.debug.xcconfig"; sourceTree = "<group>"; };
 		A9E2B42038DD89D78086429E /* PlaceholderTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlaceholderTests.swift; sourceTree = "<group>"; };
 		AB01FED42F3C817D4F548182 /* KeychainManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeychainManagerTests.swift; sourceTree = "<group>"; };
@@ -194,6 +198,7 @@
 			children = (
 				846D82AE62D1FF1FAFD3B490 /* KeychainManager.swift */,
 				84E5F9E1CE2882E5F246A7EC /* UserDefaultsManager.swift */,
+				0F2025C78F84D972ACF396A1 /* DataMigration.swift */,
 			);
 			name = Storage;
 			path = Storage;
@@ -225,6 +230,7 @@
 			children = (
 				AB01FED42F3C817D4F548182 /* KeychainManagerTests.swift */,
 				BBEF99544122643C1993480F /* UserDefaultsManagerTests.swift */,
+				A285D1EDA2D7751AD0989FE6 /* DataMigrationTests.swift */,
 			);
 			name = Storage;
 			path = Storage;
@@ -644,6 +650,7 @@
 				2DFB1160235A3F1D99E22B25 /* APIClient.swift in Sources */,
 				CF30A8F7B5222FBC7B041BFE /* KeychainManager.swift in Sources */,
 				B20C990C52F079F35037935F /* UserDefaultsManager.swift in Sources */,
+				06C6150BCC131DA8C2455FF0 /* DataMigration.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -657,6 +664,7 @@
 				EF3267D73FEB1306499EA513 /* APIClientTests.swift in Sources */,
 				812C6D4A8BFC26DF9D7C3DB1 /* KeychainManagerTests.swift in Sources */,
 				002FFB7C69C962F6EDA964C9 /* UserDefaultsManagerTests.swift in Sources */,
+				21B1B201D32CBA943DA80918 /* DataMigrationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
