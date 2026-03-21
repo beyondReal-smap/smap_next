@@ -25,6 +25,7 @@ enum APIEndpoint {
     case deleteGroup(sgtIdx: Int)  // Note: HTTP PUT (soft delete via sgt_show="N"), not DELETE
     case joinGroupByCode(code: String)
     case joinGroupById(sgtIdx: Int, mtIdx: Int)
+    case getGroupSummary
 
     // MARK: - Group Members
     case getGroupMembers(sgtIdx: Int)
@@ -86,6 +87,7 @@ enum APIEndpoint {
         case .deleteGroup(let sgtIdx): return "/groups/\(sgtIdx)"
         case .joinGroupByCode(let code): return "/groups/code/\(code)"
         case .joinGroupById(let sgtIdx, _): return "/groups/\(sgtIdx)/join"
+        case .getGroupSummary: return "/groups/current-user/summary"
         case .getGroupMembers(let sgtIdx): return "/group-members/member/\(sgtIdx)"
         case .updateMemberRole(let sgtIdx, _, _): return "/group-members/\(sgtIdx)/role"
         case .removeMember(let sgtIdx, let mtIdx): return "/group-members/\(sgtIdx)/member/\(mtIdx)"
@@ -113,7 +115,7 @@ enum APIEndpoint {
         switch self {
         case .getCurrentUserGroups, .getGroupMembers, .getGroupStats,
              .fetchProfile, .getMemberLocations, .getGroupSchedules,
-             .getMemberPushLogs, .joinGroupByCode:
+             .getMemberPushLogs, .joinGroupByCode, .getGroupSummary:
             return .GET
         case .login, .googleLogin, .appleLogin, .register,
              .createGroup, .joinGroupById, .createLocation,

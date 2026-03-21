@@ -1359,8 +1359,13 @@ struct SidebarView: View {
                         }
                         
                         VStack(spacing: 8) { // Reduced spacing from 12
+                            let currentUserIdx = AuthService.shared.getUserData()?.mt_idx
                             ForEach(viewModel.members) { member in
-                                SidebarMemberCell(member: member, stats: viewModel.getMemberTodayStats(mtIdx: member.mt_idx)) {
+                                SidebarMemberCell(
+                                    member: member,
+                                    stats: viewModel.getMemberTodayStats(mtIdx: member.mt_idx),
+                                    isSelf: member.mt_idx == currentUserIdx
+                                ) {
                                     viewModel.selectMember(member)
                                     withAnimation {
                                         viewModel.isSidebarOpen = false
@@ -1426,14 +1431,15 @@ struct DateCell: View {
 struct SidebarMemberCell: View {
     let member: SmapGroupMember
     let stats: (completed: Int, ongoing: Int, upcoming: Int)
+    var isSelf: Bool = false
     let onTap: () -> Void
     
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 12) {
-                MemberAvatarView(member: member)
+                MemberAvatarView(member: member, isSelf: isSelf)
                 
-                MemberStatsView(name: member.displayName, stats: stats)
+                MemberStatsView(name: isSelf ? "\(member.displayName) (나)" : member.displayName, stats: stats)
                 
                 Spacer()
             }
@@ -1450,6 +1456,7 @@ struct SidebarMemberCell: View {
 
 struct MemberAvatarView: View {
     let member: SmapGroupMember
+    var isSelf: Bool = false
     private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
     
     var body: some View {
@@ -3239,412 +3246,6 @@ struct GroupMemberStats: Codable {
     let is_leader: Bool
 }
 
-struct GroupSummary: Codable {
-    let group_count: Int
-    let total_members: Int
-}
-
-// MARK: - GroupService
-
-class GroupService {
-    static let shared = GroupService()
-    private let authService = AuthService.shared
-    
-    private init() {}
-    
-    private var baseURL: String {
-        return authService.baseURL
-    }
-    
-    /// 현재 사용자의 그룹 목록 가져오기
-    func getCurrentUserGroups() async throws -> [SmapGroup] {
-        let url = URL(string: "\(baseURL)/groups/current-user")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        if let token = authService.getToken() {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
-            throw APIError(detail: nil, message: "그룹 목록을 불러오는데 실패했습니다. (Error: \(statusCode))")
-        }
-        
-        return try JSONDecoder().decode([SmapGroup].self, from: data)
-    }
-    
-    /// 그룹 요약 정보 가져오기 (총 그룹 수, 총 멤버 수)
-    func getGroupSummary() async throws -> GroupSummary {
-        let url = URL(string: "\(baseURL)/groups/current-user/summary")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        if let token = authService.getToken() {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
-            throw APIError(detail: nil, message: "그룹 요약 정보를 불러오는데 실패했습니다. (Error: \(statusCode))")
-        }
-        
-        return try JSONDecoder().decode(GroupSummary.self, from: data)
-    }
-    
-    /// 그룹 멤버 목록 가져오기
-    func getGroupMembers(sgtIdx: Int) async throws -> [SmapGroupMember] {
-        let url = URL(string: "\(baseURL)/group-members/member/\(sgtIdx)")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        if let token = authService.getToken() {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
-            throw APIError(detail: nil, message: "멤버 정보를 불러오는데 실패했습니다. (Error: \(statusCode))")
-        }
-        
-        return try JSONDecoder().decode([SmapGroupMember].self, from: data)
-    }
-    
-    /// 그룹 통계 가져오기
-    func getGroupStats(sgtIdx: Int) async throws -> GroupStats {
-        let url = URL(string: "\(baseURL)/groups/\(sgtIdx)/stats")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        if let token = authService.getToken() {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
-            throw APIError(detail: nil, message: "그룹 통계를 불러오는데 실패했습니다. (Error: \(statusCode))")
-        }
-        
-        let result = try JSONDecoder().decode(GroupStats.self, from: data)
-        return result
-    }
-    
-    /// 그룹 생성
-    func createGroup(title: String, memo: String) async throws -> SmapGroup {
-        let url = URL(string: "\(baseURL)/groups/")!  // 꼭 trailing slash 필요!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        // 토큰 디버깅
-        let token = authService.getToken()
-        print("🔑 [HomeService.createGroup] Token retrieved: \(token != nil ? "YES (\(token!.prefix(20))...)" : "NO (nil)")")
-        
-        if let token = token {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-            print("🔑 [HomeService.createGroup] Authorization header set")
-        } else {
-            print("⚠️ [HomeService.createGroup] No token available - request will fail!")
-        }
-        
-        // Get user ID from UserDefaults
-        let userId = UserDefaults.standard.integer(forKey: "mt_idx")
-        
-        var body: [String: Any] = [
-            "sgt_title": title,
-            "sgt_memo": memo,
-            "sgt_show": "Y"
-        ]
-        
-        // Add user ID if available
-        if userId > 0 {
-            body["mt_idx"] = userId
-        }
-        
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse, (httpResponse.statusCode == 200 || httpResponse.statusCode == 201) else {
-            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
-            throw APIError(detail: nil, message: "그룹 생성에 실패했습니다. (Error: \(statusCode))")
-        }
-        
-        // Backend returns GroupResponse directly, try decoding SmapGroup first
-        do {
-            let group = try JSONDecoder().decode(SmapGroup.self, from: data)
-            return group
-        } catch {
-            // Fallback: try wrapped response format
-            if let result = try? JSONDecoder().decode(GroupCreateResponse.self, from: data),
-               result.success, let group = result.data {
-                return group
-            }
-            throw APIError(detail: nil, message: "그룹 생성 응답 파싱 실패")
-        }
-    }
-    
-    /// 그룹 수정
-    func updateGroup(sgtIdx: Int, title: String, memo: String) async throws -> SmapGroup {
-        let url = URL(string: "\(baseURL)/groups/\(sgtIdx)")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "PUT"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        if let token = authService.getToken() {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        
-        let body: [String: Any] = [
-            "sgt_title": title,
-            "sgt_memo": memo
-        ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
-            throw APIError(detail: nil, message: "그룹 수정에 실패했습니다. (Error: \(statusCode))")
-        }
-        
-        let result = try JSONDecoder().decode(GroupCreateResponse.self, from: data)
-        if result.success, let group = result.data {
-            return group
-        } else {
-            throw APIError(detail: nil, message: result.message ?? "그룹 수정 실패")
-        }
-    }
-    
-    /// 그룹 가입 (초대 코드)
-    func joinGroup(inviteCode: String) async throws -> Bool {
-        print("🚀 [HomeService.joinGroup] 초대코드로 그룹 가입 시작: \(inviteCode)")
-        
-        // 1. 코드로 그룹 정보 조회
-        let codeUrl = URL(string: "\(baseURL)/groups/code/\(inviteCode)")!
-        var codeRequest = URLRequest(url: codeUrl)
-        codeRequest.httpMethod = "GET"
-        codeRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        if let token = authService.getToken() {
-            codeRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        
-        let (codeData, codeResponse) = try await URLSession.shared.data(for: codeRequest)
-        
-        guard let httpCodeResponse = codeResponse as? HTTPURLResponse else {
-            throw APIError(detail: nil, message: "네트워크 오류가 발생했습니다.")
-        }
-        
-        print("📥 [HomeService.joinGroup] 그룹 조회 응답: \(httpCodeResponse.statusCode)")
-        
-        if httpCodeResponse.statusCode != 200 {
-            throw APIError(detail: nil, message: "유효하지 않은 초대 코드입니다.")
-        }
-        
-        let group = try JSONDecoder().decode(SmapGroup.self, from: codeData)
-        print("✅ [HomeService.joinGroup] 그룹 정보 조회 성공: \(group.sgt_title ?? "") (ID: \(group.sgt_idx))")
-        
-        // 2. 가입 실행 - mt_idx와 sgt_idx를 body에 포함
-        guard let currentUser = authService.currentUser else {
-            print("❌ [HomeService.joinGroup] 현재 사용자 정보가 없습니다.")
-            throw APIError(detail: nil, message: "로그인이 필요합니다.")
-        }
-        
-        guard let mtIdx = currentUser.mt_idx else {
-            print("❌ [HomeService.joinGroup] 사용자 ID(mt_idx)가 없습니다.")
-            throw APIError(detail: nil, message: "사용자 정보가 올바르지 않습니다. 다시 로그인해주세요.")
-        }
-        
-        let joinUrl = URL(string: "\(baseURL)/groups/\(group.sgt_idx)/join")!
-        var joinRequest = URLRequest(url: joinUrl)
-        joinRequest.httpMethod = "POST"
-        joinRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        if let token = authService.getToken() {
-            joinRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        
-        // 백엔드 GroupJoinRequest 스키마에 맞게 body 구성
-        let body: [String: Any] = [
-            "mt_idx": mtIdx,
-            "sgt_idx": group.sgt_idx
-        ]
-        joinRequest.httpBody = try JSONSerialization.data(withJSONObject: body)
-        
-        print("📤 [HomeService.joinGroup] 가입 요청: mt_idx=\(mtIdx), sgt_idx=\(group.sgt_idx)")
-        
-        let (joinData, joinResponse) = try await URLSession.shared.data(for: joinRequest)
-        
-        guard let httpJoinResponse = joinResponse as? HTTPURLResponse else {
-            throw APIError(detail: nil, message: "네트워크 오류가 발생했습니다.")
-        }
-        
-        print("📥 [HomeService.joinGroup] 가입 응답: \(httpJoinResponse.statusCode)")
-        
-        if httpJoinResponse.statusCode == 200 {
-            print("✅ [HomeService.joinGroup] 그룹 가입 성공!")
-            return true
-        } else if httpJoinResponse.statusCode == 400 {
-            if let json = try? JSONSerialization.jsonObject(with: joinData) as? [String: Any],
-               let detail = json["detail"] as? String {
-                throw APIError(detail: nil, message: detail)
-            }
-            throw APIError(detail: nil, message: "이미 가입된 그룹입니다.")
-        } else {
-            if let json = try? JSONSerialization.jsonObject(with: joinData) as? [String: Any],
-               let detail = json["detail"] as? String {
-                throw APIError(detail: nil, message: detail)
-            }
-            throw APIError(detail: nil, message: "그룹 가입에 실패했습니다. (Error: \(httpJoinResponse.statusCode))")
-        }
-    }
-    
-    /// 그룹 삭제 (소프트 삭제)
-    func deleteGroup(sgtIdx: Int) async throws -> Bool {
-        let url = URL(string: "\(baseURL)/groups/\(sgtIdx)")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "PUT"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        if let token = authService.getToken() {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        
-        // sgt_show를 N으로 변경하여 삭제 처리 (소프트 삭제)
-        let body: [String: Any] = [
-            "sgt_show": "N"
-        ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        
-        let (_, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
-            throw APIError(detail: nil, message: "그룹 삭제에 실패했습니다. (Error: \(statusCode))")
-        }
-        
-        return true
-    }
-    
-    /// 멤버 권한 변경
-    func updateMemberRole(sgtIdx: Int, mtIdx: Int, isLeader: Bool) async throws -> Bool {
-        let url = URL(string: "\(baseURL)/group-members/\(sgtIdx)/role")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "PUT"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        if let token = authService.getToken() {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        
-        let body: [String: Any] = [
-            "mt_idx": mtIdx,
-            "is_leader": isLeader
-        ]
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
-            throw APIError(detail: nil, message: "권한 변경에 실패했습니다. (Error: \(statusCode))")
-        }
-        
-        let result = try JSONDecoder().decode(SimpleResponse.self, from: data)
-        return result.success
-    }
-    
-    /// 그룹에서 멤버 내보내기/탈퇴
-    func removeMember(sgtIdx: Int, mtIdx: Int) async throws -> Bool {
-        let url = URL(string: "\(baseURL)/group-members/\(sgtIdx)/member/\(mtIdx)")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "DELETE"
-        
-        if let token = authService.getToken() {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
-            throw APIError(detail: nil, message: "멤버 내보내기에 실패했습니다. (Error: \(statusCode))")
-        }
-        
-        let result = try JSONDecoder().decode(SimpleResponse.self, from: data)
-        return result.success
-    }
-    
-    /// 그룹 ID로 직접 가입 (딥링크용)
-    func joinGroupById(mt_idx: Int, sgt_idx: Int) async throws -> Bool {
-        print("🚀 [GroupService.joinGroupById] 그룹 ID로 가입 시작: \(sgt_idx)")
-        
-        let joinUrl = URL(string: "\(baseURL)/groups/\(sgt_idx)/join")!
-        var joinRequest = URLRequest(url: joinUrl)
-        joinRequest.httpMethod = "POST"
-        joinRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        if let token = authService.getToken() {
-            joinRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        
-        let body: [String: Any] = [
-            "mt_idx": mt_idx,
-            "sgt_idx": sgt_idx
-        ]
-        joinRequest.httpBody = try JSONSerialization.data(withJSONObject: body)
-        
-        let (joinData, joinResponse) = try await URLSession.shared.data(for: joinRequest)
-        
-        guard let httpJoinResponse = joinResponse as? HTTPURLResponse else {
-            throw APIError(detail: nil, message: "네트워크 오류가 발생했습니다.")
-        }
-        
-        if httpJoinResponse.statusCode == 200 {
-            print("✅ [GroupService.joinGroupById] 그룹 가입 성공!")
-            return true
-        } else {
-            if let json = try? JSONSerialization.jsonObject(with: joinData) as? [String: Any],
-               let detail = json["detail"] as? String {
-                throw APIError(detail: nil, message: detail)
-            }
-            throw APIError(detail: nil, message: "그룹 가입에 실패했습니다. (Error: \(httpJoinResponse.statusCode))")
-        }
-    }
-}
-
-// MARK: - API Response Helpers for Groups
-
-struct StatsResponse: Codable {
-    let success: Bool
-    let message: String?
-    let data: GroupStats?
-}
-
-struct GroupCreateResponse: Codable {
-    let success: Bool
-    let message: String?
-    let data: SmapGroup?
-}
-
-struct SimpleResponse: Codable {
-    let success: Bool
-    let message: String?
-}
-
 // MARK: - GroupViewModel
 
 @MainActor
@@ -3861,6 +3462,42 @@ class GroupViewModel: ObservableObject {
                 }
             } catch {
                 DispatchQueue.main.async { self.handleError(error) }
+            }
+        }
+    }
+    
+    /// 그룹 나가기 (탈퇴)
+    func leaveGroup(sgtIdx: Int) {
+        guard let currentUser = AuthService.shared.getUserData(),
+              let mtIdx = currentUser.mt_idx else {
+            self.errorMessage = "사용자 정보를 찾을 수 없습니다."
+            self.showError = true
+            return
+        }
+        
+        isDeleting = true
+        Task {
+            do {
+                let success = try await groupService.removeMember(sgtIdx: sgtIdx, mtIdx: mtIdx)
+                if success {
+                    DispatchQueue.main.async {
+                        self.groups.removeAll(where: { $0.sgt_idx == sgtIdx })
+                        if self.selectedGroup?.sgt_idx == sgtIdx {
+                            self.selectedGroup = nil
+                            self.groupMembers = []
+                            self.groupStats = nil
+                        }
+                        self.isDeleting = false
+                        // 목록 갱신 및 알림
+                        self.fetchGroups()
+                        NotificationCenter.default.post(name: NSNotification.Name("groupsDidChange"), object: nil)
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.handleError(error)
+                    self.isDeleting = false
+                }
             }
         }
     }
@@ -4393,6 +4030,10 @@ struct RegisterProfileView: View {
         return Calendar.current.date(from: components) ?? Date()
     }()
     
+    // 생년월일 입력 여부 (Apple 가이드라인 대응)
+    @State private var provideBirthDate: Bool = false
+    @State private var provideGender: Bool = false
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("프로필 정보를\n설정해주세요")
@@ -4400,32 +4041,49 @@ struct RegisterProfileView: View {
                 .foregroundColor(BrandColors.textPrimary)
             
             // Birth Date
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Text("생년월일")
                         .font(.suite(size: 16, weight: .bold))
-                    Text("* 필수")
+                    Text("(선택)")
                         .font(.suite(size: 12))
-                        .foregroundColor(BrandColors.primary)
+                        .foregroundColor(BrandColors.textSecondary)
+                    
+                    Spacer()
+                    
+                    Toggle("", isOn: $provideBirthDate)
+                        .labelsHidden()
+                        .scaleEffect(0.8)
                 }
                 
-                // DatePicker (Wheel Style for fixed height feeling)
-                DatePicker(
-                    "",
-                    selection: $birthDate,
-                    in: ...Date(), // Future dates disabled
-                    displayedComponents: .date
-                )
-                .datePickerStyle(.wheel)
-                .labelsHidden()
-                .frame(maxWidth: .infinity) // 좌우 꽉 차게 설정하여 중앙 정렬 효과
-                .frame(height: 150) // Fixed height
-                .background(Color(white: 0.96))
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color(hex: "#0113A3").opacity(0.1), lineWidth: 1)
-                )
+                if provideBirthDate {
+                    // DatePicker (Wheel Style)
+                    DatePicker(
+                        "",
+                        selection: $birthDate,
+                        in: ...Date(),
+                        displayedComponents: .date
+                    )
+                    .datePickerStyle(.wheel)
+                    .labelsHidden()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 150)
+                    .background(Color(white: 0.96))
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color(hex: "#0113A3").opacity(0.1), lineWidth: 1)
+                    )
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                } else {
+                    Text("생년월일을 입력하지 않습니다.")
+                        .font(.suite(size: 14))
+                        .foregroundColor(BrandColors.textSecondary)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(Color(white: 0.98))
+                        .cornerRadius(12)
+                }
                 
                 // 생년월일 형식 에러 표시 (미래 날짜 등 DatePicker로 제한되지만 검증 로직 결과 표시)
                 if let birth = viewModel.registerData.mt_birth, !birth.isEmpty, !viewModel.validateBirthDate(birth) {
@@ -4441,22 +4099,38 @@ struct RegisterProfileView: View {
             .padding(.bottom, 10)
             
             // Gender
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Text("성별")
                         .font(.suite(size: 16, weight: .bold))
-                    Text("* 필수")
+                    Text("(선택)")
                         .font(.suite(size: 12))
-                        .foregroundColor(BrandColors.primary)
+                        .foregroundColor(BrandColors.textSecondary)
+                    
+                    Spacer()
+                    
+                    Toggle("", isOn: $provideGender)
+                        .labelsHidden()
+                        .scaleEffect(0.8)
                 }
                 
-                HStack(spacing: 16) {
-                    GenderButton(title: "남성", isSelected: viewModel.registerData.mt_gender == 1) {
-                        viewModel.registerData.mt_gender = 1
+                if provideGender {
+                    HStack(spacing: 16) {
+                        GenderButton(title: "남성", isSelected: viewModel.registerData.mt_gender == 1) {
+                            viewModel.registerData.mt_gender = 1
+                        }
+                        GenderButton(title: "여성", isSelected: viewModel.registerData.mt_gender == 2) {
+                            viewModel.registerData.mt_gender = 2
+                        }
                     }
-                    GenderButton(title: "여성", isSelected: viewModel.registerData.mt_gender == 2) {
-                        viewModel.registerData.mt_gender = 2
-                    }
+                } else {
+                    Text("성별을 선택하지 않습니다.")
+                        .font(.suite(size: 14))
+                        .foregroundColor(BrandColors.textSecondary)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(Color(white: 0.98))
+                        .cornerRadius(12)
                 }
             }
             
@@ -4464,20 +4138,44 @@ struct RegisterProfileView: View {
         }
         .padding()
         .onAppear {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd"
-            
-            if let birth = viewModel.registerData.mt_birth, let date = formatter.date(from: birth) {
-                self.birthDate = date
+            // 초기 로드 시 기존 데이터가 있으면 토글 활성화
+            if let birth = viewModel.registerData.mt_birth, !birth.isEmpty {
+                provideBirthDate = true
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy-MM-dd"
+                if let date = formatter.date(from: birth) {
+                    self.birthDate = date
+                }
             } else {
-                // 초기값 설정 (2000-01-01) - 필수 값이므로 초기화 시 값 주입
+                provideBirthDate = false
+            }
+            
+            if viewModel.registerData.mt_gender != nil {
+                provideGender = true
+            } else {
+                provideGender = false
+            }
+        }
+        .onChange(of: provideBirthDate) { newValue in
+            if newValue {
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy-MM-dd"
                 viewModel.registerData.mt_birth = formatter.string(from: birthDate)
+            } else {
+                viewModel.registerData.mt_birth = nil
+            }
+        }
+        .onChange(of: provideGender) { newValue in
+            if !newValue {
+                viewModel.registerData.mt_gender = nil
             }
         }
         .onChange(of: birthDate) { newValue in
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd"
-            viewModel.registerData.mt_birth = formatter.string(from: newValue)
+            if provideBirthDate {
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy-MM-dd"
+                viewModel.registerData.mt_birth = formatter.string(from: newValue)
+            }
         }
     }
 }
@@ -5462,9 +5160,13 @@ class MyPlaceViewModel: ObservableObject {
     func loadGroupMembers(sgtIdx: Int) async {
         do {
             let fetchedMembers = try await groupService.getGroupMembers(sgtIdx: sgtIdx)
+            let currentUserIdx = AuthService.shared.getUserData()?.mt_idx
             var placeMembers: [PlaceMember] = []
             for (index, member) in fetchedMembers.enumerated() {
-                var placeMember = PlaceMember(from: member, isSelected: index == 0)
+                // Select current user by default, otherwise first member
+                let isCurrentUser = member.mt_idx == currentUserIdx
+                let shouldSelect = isCurrentUser || (currentUserIdx == nil && index == 0)
+                var placeMember = PlaceMember(from: member, isSelected: shouldSelect)
                 
                 // Use the unwrapped mt_idx from placeMember (defaults to 0 if nil)
                 let mtIdx = placeMember.mt_idx
@@ -5480,9 +5182,12 @@ class MyPlaceViewModel: ObservableObject {
                 placeMembers.append(placeMember)
             }
             self.members = placeMembers
-            if let firstMember = placeMembers.first, firstMember.mt_idx > 0 {
-                self.selectedMember = firstMember
-                await loadMemberLocations(memberId: firstMember.mt_idx, centerOnFirst: true)
+            // Select current user first, fallback to first member
+            let selfMember = placeMembers.first(where: { $0.mt_idx == currentUserIdx })
+            let memberToSelect = selfMember ?? placeMembers.first
+            if let member = memberToSelect, member.mt_idx > 0 {
+                self.selectedMember = member
+                await loadMemberLocations(memberId: member.mt_idx, centerOnFirst: true)
             }
         } catch {
             handleError(error)
@@ -5511,6 +5216,37 @@ class MyPlaceViewModel: ObservableObject {
             handleError(error)
             isLoadingLocations = false
         }
+    }
+    
+    @MainActor
+    func canManageLocation(_ location: SavedLocation) -> Bool {
+        guard let currentUser = AuthService.shared.currentUser else { return false }
+        
+        // 1. Own data
+        if location.mt_idx == currentUser.mt_idx {
+            return true
+        }
+        
+        // Find current user's role in the group
+        guard let currentMember = members.first(where: { $0.mt_idx == currentUser.mt_idx }) else {
+            return false
+        }
+        
+        // 2. Owner can manage anything
+        if currentMember.isOwner {
+            return true
+        }
+        
+        // 3. Leader can manage anything except Owner's data
+        if currentMember.isLeader {
+            let targetMember = members.first(where: { $0.mt_idx == location.mt_idx })
+            if targetMember?.isOwner == true {
+                return false
+            }
+            return true
+        }
+        
+        return false
     }
     
     @MainActor func selectGroup(_ group: SmapGroup) {
@@ -6001,8 +5737,12 @@ struct MyPlaceSidebarView: View {
             
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 16) {
+                    let currentUserIdx = AuthService.shared.getUserData()?.mt_idx
                     ForEach(viewModel.members) { member in
-                        PlaceMemberCircleCell(member: member) {
+                        PlaceMemberCircleCell(
+                            member: member,
+                            isSelf: member.mt_idx == currentUserIdx
+                        ) {
                             viewModel.selectMember(member)
                         }
                     }
@@ -6050,6 +5790,7 @@ struct MyPlaceSidebarView: View {
                         PlaceLocationCell(
                             location: location,
                             isSelected: viewModel.selectedLocation?.slt_idx == location.slt_idx,
+                            canManage: viewModel.canManageLocation(location),
                             onToggleNotification: {
                                 Task { await viewModel.toggleNotification(for: location) }
                             }
@@ -6071,6 +5812,7 @@ struct MyPlaceSidebarView: View {
 
 struct PlaceMemberCell: View {
     let member: PlaceMember
+    var isSelf: Bool = false
     let onTap: () -> Void
     private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
     
@@ -6127,7 +5869,7 @@ struct PlaceMemberCell: View {
                 
                 // Member Info
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(member.displayName)
+                    Text(isSelf ? "\(member.displayName) (나)" : member.displayName)
                         .font(.suite(size: 17, weight: .medium))
                         .foregroundColor(.primary)
                     Text("장소 \(member.locationCount)개")
@@ -6174,6 +5916,7 @@ struct PlaceMemberCell: View {
 
 struct PlaceMemberCircleCell: View {
     let member: PlaceMember
+    var isSelf: Bool = false
     let onTap: () -> Void
     private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
     
@@ -6225,11 +5968,11 @@ struct PlaceMemberCircleCell: View {
                     }
                 }
                 
-                Text(member.displayName)
+                Text(isSelf ? "\(member.displayName) (나)" : member.displayName)
                     .font(.suite(size: 13, weight: member.isSelected ? .bold : .medium))
                     .foregroundColor(member.isSelected ? brandColor : .primary)
                     .lineLimit(1)
-                    .frame(width: 60)
+                    .frame(width: 65)
             }
         }
         .buttonStyle(PlainButtonStyle())
@@ -6255,6 +5998,7 @@ struct PlaceMemberCircleCell: View {
 struct PlaceLocationCell: View {
     let location: SavedLocation
     let isSelected: Bool
+    let canManage: Bool
     let onToggleNotification: () -> Void
     let onTap: () -> Void
     
@@ -6296,18 +6040,20 @@ struct PlaceLocationCell: View {
             .buttonStyle(PlainButtonStyle())
             
             // Top layer: Notification Toggle Button (independent touch target)
-            Button(action: onToggleNotification) {
-                Image(systemName: location.notifications ? "bell.fill" : "bell.slash")
-                    .font(.system(size: 14))
-                    .foregroundColor(location.notifications ? .orange : .gray.opacity(0.4))
-                    .frame(width: 36, height: 36)
-                    .background(Color.white)
-                    .clipShape(Circle())
-                    .shadow(color: Color.black.opacity(0.08), radius: 2, x: 0, y: 1)
-                    .contentShape(Circle())
+            if canManage {
+                Button(action: onToggleNotification) {
+                    Image(systemName: location.notifications ? "bell.fill" : "bell.slash")
+                        .font(.system(size: 14))
+                        .foregroundColor(location.notifications ? .orange : .gray.opacity(0.4))
+                        .frame(width: 36, height: 36)
+                        .background(Color.white)
+                        .clipShape(Circle())
+                        .shadow(color: Color.black.opacity(0.08), radius: 2, x: 0, y: 1)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(PlainButtonStyle())
+                .padding(.trailing, 12)
             }
-            .buttonStyle(PlainButtonStyle())
-            .padding(.trailing, 12)
         }
     }
 }
@@ -7870,9 +7616,14 @@ class ActivityLogViewModel: ObservableObject {
             
             print("[ActivityLogViewModel] 일별 카운트 로드 완료: \(memberDailyCounts.count)명")
             
-            // 첫 번째 멤버 자동 선택
-            if selectedMemberId == nil, let firstMember = memberDailyCounts.first {
-                await selectMember(firstMember.member_id)
+            // 현재 사용자 먼저 선택, 없으면 첫 번째 멤버
+            if selectedMemberId == nil {
+                let currentUserIdx = AuthService.shared.getUserData()?.mt_idx
+                let selfMember = memberDailyCounts.first(where: { $0.member_id == currentUserIdx })
+                let memberToSelect = selfMember ?? memberDailyCounts.first
+                if let member = memberToSelect {
+                    await selectMember(member.member_id)
+                }
             }
             
         } catch {
@@ -8105,10 +7856,12 @@ struct ActivityLogSidebarView: View {
                 emptyMemberView
             } else {
                 VStack(spacing: 8) {
+                    let currentUserIdx = AuthService.shared.getUserData()?.mt_idx
                     ForEach(viewModel.memberDailyCounts) { member in
                         ActivityLogMemberCell(
                             member: member,
                             isSelected: viewModel.selectedMemberId == member.member_id,
+                            isSelf: member.member_id == currentUserIdx,
                             selectedDate: viewModel.selectedDate,
                             onMemberTap: {
                                 Task {
@@ -8161,6 +7914,7 @@ struct ActivityLogSidebarView: View {
 struct ActivityLogMemberCell: View {
     let member: MemberDailyCount
     let isSelected: Bool
+    var isSelf: Bool = false
     let selectedDate: String
     let onMemberTap: () -> Void
     let onDateTap: (String) -> Void
@@ -8175,7 +7929,7 @@ struct ActivityLogMemberCell: View {
                 // Left: Avatar + Nickname
                 VStack(spacing: 8) {
                     // Avatar
-                    ZStack {
+                    ZStack(alignment: .topTrailing) {
                         Group {
                             if let url = getProfileImageUrl(member.member_photo) {
                                 AsyncImage(url: url) { phase in
@@ -8200,11 +7954,11 @@ struct ActivityLogMemberCell: View {
                     } // End ZStack
                     
                     // Display Name (Nickname below Avatar)
-                    Text(member.displayName)
+                    Text(isSelf ? "\(member.displayName) (나)" : member.displayName)
                         .font(.suite(size: 14, weight: .medium))
                         .foregroundColor(.primary)
                         .lineLimit(1)
-                        .frame(width: 60) // Limit text width to align with avatar column
+                        .frame(width: 65) // Limit text width to align with avatar column
                 }
                 
                 // Right: 14-Day Calendar
@@ -9170,17 +8924,46 @@ struct ActivityLogMapView: UIViewRepresentable {
             let curr = validMarkers[max(0, min(index, validMarkers.count - 1))]
             
             context.coordinator.currentPositionMarker?.mapView = nil
+            context.coordinator.currentInfoMarker?.mapView = nil
             
-            let m = NMFMarker()
-            m.position = NMGLatLng(lat: curr.latitude, lng: curr.longitude)
+            // Get time and speed from current log
+            let timeStr: String
+            if let gpsTime = curr.mlt_gps_time {
+                let cleanedTime = gpsTime.replacingOccurrences(of: "Z", with: "").components(separatedBy: ".").first ?? gpsTime
+                if cleanedTime.count >= 16 {
+                    let startIdx = cleanedTime.index(cleanedTime.startIndex, offsetBy: 11)
+                    let endIdx = cleanedTime.index(cleanedTime.startIndex, offsetBy: 16)
+                    timeStr = String(cleanedTime[startIdx..<endIdx])
+                } else {
+                    timeStr = "--:--"
+                }
+            } else {
+                timeStr = "--:--"
+            }
+            let speed = curr.mlt_speed ?? 0.0
+            let speedStr = String(format: "%.1f km/h", speed)
             
             // Current Position Marker (Blue Bordered Circle)
+            let m = NMFMarker()
+            m.position = NMGLatLng(lat: curr.latitude, lng: curr.longitude)
             m.iconImage = NMFOverlayImage(image: generateCurrentLocationMarkerImage(color: UIColor(red: 1/255, green: 19/255, blue: 163/255, alpha: 1)))
             m.width = 24
             m.height = 24
             m.zIndex = 1000
             m.mapView = mapView
             context.coordinator.currentPositionMarker = m
+            
+            // Info Capsule Marker (Time + Speed)
+            let infoMarker = NMFMarker()
+            infoMarker.position = NMGLatLng(lat: curr.latitude, lng: curr.longitude)
+            let infoImage = generateCurrentPositionInfoImage(time: timeStr, speed: speedStr)
+            infoMarker.iconImage = NMFOverlayImage(image: infoImage)
+            infoMarker.width = CGFloat(infoImage.size.width)
+            infoMarker.height = CGFloat(infoImage.size.height)
+            infoMarker.anchor = CGPoint(x: 0.5, y: 1.0) // Bottom center anchor
+            infoMarker.zIndex = 1001
+            infoMarker.mapView = mapView
+            context.coordinator.currentInfoMarker = infoMarker
             
             let cameraUpdate = NMFCameraUpdate(scrollTo: NMGLatLng(lat: curr.latitude, lng: curr.longitude))
             cameraUpdate.animation = .none
@@ -9331,6 +9114,7 @@ struct ActivityLogMapView: UIViewRepresentable {
         var pathDotMarkers: [NMFMarker] = []
         var polylines: [NMFPolylineOverlay] = []
         var currentPositionMarker: NMFMarker?
+        var currentInfoMarker: NMFMarker?
         var lastMapMarkersCount: Int = 0
         
         func clearOverlays() {
@@ -9346,7 +9130,49 @@ struct ActivityLogMapView: UIViewRepresentable {
             polylines.removeAll()
             currentPositionMarker?.mapView = nil
             currentPositionMarker = nil
+            currentInfoMarker?.mapView = nil
+            currentInfoMarker = nil
             lastMapMarkersCount = 0
+        }
+    }
+    
+    private func generateCurrentPositionInfoImage(time: String, speed: String) -> UIImage {
+        let font = UIFont(name: "SUITE-Bold", size: 12) ?? UIFont.boldSystemFont(ofSize: 12)
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.alignment = .center
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: UIColor.white,
+            .paragraphStyle: paragraphStyle
+        ]
+        
+        let displayText = "\(time)  |  \(speed)"
+        let textSize = displayText.size(withAttributes: attrs)
+        
+        let paddingH: CGFloat = 12
+        let paddingV: CGFloat = 6
+        let capsuleWidth = textSize.width + paddingH * 2
+        let capsuleHeight = textSize.height + paddingV * 2
+        let markerBottomPadding: CGFloat = 32 // Gap between capsule and marker
+        
+        let canvasSize = CGSize(width: capsuleWidth, height: capsuleHeight + markerBottomPadding)
+        let renderer = UIGraphicsImageRenderer(size: canvasSize)
+        
+        return renderer.image { ctx in
+            // Draw capsule background
+            let capsuleRect = CGRect(x: 0, y: 0, width: capsuleWidth, height: capsuleHeight)
+            let capsulePath = UIBezierPath(roundedRect: capsuleRect, cornerRadius: capsuleHeight / 2)
+            UIColor(red: 1/255, green: 19/255, blue: 163/255, alpha: 0.9).setFill()
+            capsulePath.fill()
+            
+            // Draw text
+            let textRect = CGRect(
+                x: (capsuleWidth - textSize.width) / 2,
+                y: (capsuleHeight - textSize.height) / 2,
+                width: textSize.width,
+                height: textSize.height
+            )
+            displayText.draw(in: textRect, withAttributes: attrs)
         }
     }
 }
