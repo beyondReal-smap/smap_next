@@ -45,7 +45,7 @@ struct KakaoRoadAddress: Codable {
 // MARK: - Kakao Location Search Service
 class KakaoLocationSearchService: ObservableObject {
     static let shared = KakaoLocationSearchService()
-    private let apiKey = "7fbf60571daf54ca5bee8373a1f31d2d"
+    private var apiKey: String { AppConfiguration.kakaoAPIKey }
     
     private init() {}
     
