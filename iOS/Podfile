@@ -8,30 +8,35 @@ target 'smap' do
 
   # 네트워킹
   pod 'Alamofire', '~> 5.5'
-  
+
   # Firebase (푸시 알림 등)
   pod 'Firebase/Auth'
   pod 'Firebase/Core'
   pod 'Firebase/Messaging'
-  
+
   # Google Sign-In SDK
   pod 'GoogleSignIn', '~> 7.0'
   # AppAuth 최신 버전 명시(경고 개선 및 호환성)
   pod 'AppAuth', '~> 1.7'
-  
+
   # Kakao SDK (네이티브 로그인)
   pod 'KakaoSDKCommon', '~> 2.22'
   pod 'KakaoSDKAuth', '~> 2.22'
   pod 'KakaoSDKUser', '~> 2.22'
-  
+
   # 인앱 결제 (필요한 경우)
   pod 'SwiftyStoreKit'
-  
+
   # 광고 (필요한 경우 - 배포시 주석 해제)
   # pod 'Google-Mobile-Ads-SDK'
 
   # Pods for smap
   pod 'NMapsMap'
+
+  # Unit test target — inherits pod search paths from smap
+  target 'smapTests' do
+    inherit! :search_paths
+  end
 
 end
 
