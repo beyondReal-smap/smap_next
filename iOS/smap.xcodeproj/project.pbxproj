@@ -53,6 +53,7 @@
 		B4DC719F3B3F3F3377E9FB81 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DC1B67D2BBBF002A1F25E204 /* Foundation.framework */; };
 		B85D4559B18C1D8AFD42FDC7 /* SMAPTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24ADB4DD2C3D90F283A452AB /* SMAPTextField.swift */; };
 		CF30A8F7B5222FBC7B041BFE /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 846D82AE62D1FF1FAFD3B490 /* KeychainManager.swift */; };
+		D8E08C312831C21689EFE9F2 /* DeepLinkService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA6CF58C88788CD855B7AB6C /* DeepLinkService.swift */; };
 		E424ECF29A5C98D0CE6257AB /* NetworkError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 015524C0E4DDFD774AF076D7 /* NetworkError.swift */; };
 		EF3267D73FEB1306499EA513 /* APIClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8794820D7585E07BB427EEC /* APIClientTests.swift */; };
 		F6010CCC2F035594008B05B7 /* SUITE-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F6010CC42F035594008B05B7 /* SUITE-Bold.ttf */; };
@@ -136,6 +137,7 @@
 		C8794820D7585E07BB427EEC /* APIClientTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = APIClientTests.swift; sourceTree = "<group>"; };
 		CDC76362DAC64DB193EB137B /* APIEndpointTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = APIEndpointTests.swift; sourceTree = "<group>"; };
 		D22CA221744223B0C67BEC1F /* APIClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		DA6CF58C88788CD855B7AB6C /* DeepLinkService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DeepLinkService.swift; sourceTree = "<group>"; };
 		DC1B67D2BBBF002A1F25E204 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		DD697FC1738D83F5A06E98BE /* APIEndpoint.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = APIEndpoint.swift; sourceTree = "<group>"; };
 		EA7E3CC88DCEADC59E0D5E35 /* Pods-smap.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-smap.release.xcconfig"; path = "Target Support Files/Pods-smap/Pods-smap.release.xcconfig"; sourceTree = "<group>"; };
@@ -393,6 +395,7 @@
 				A1B2C3D40012 /* AuthService.swift */,
 				AC62D12FBC527A10551D4FB2 /* GroupService.swift */,
 				BC8E7FB0E82B413EEE836BDA /* FCMService.swift */,
+				DA6CF58C88788CD855B7AB6C /* DeepLinkService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -712,6 +715,7 @@
 				7D54FC619E5AE0816B42F335 /* SMAPSnackBar.swift in Sources */,
 				375C873CC460DC9644A11067 /* GroupService.swift in Sources */,
 				2F03E9F9C5537F7D6337263F /* FCMService.swift in Sources */,
+				D8E08C312831C21689EFE9F2 /* DeepLinkService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
