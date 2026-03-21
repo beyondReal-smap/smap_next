@@ -95,9 +95,9 @@ class LoginViewModel: ObservableObject {
                 }
                 self.isLoading = false
             }
-        } catch let error as APIError {
+        } catch let error as NetworkError {
             DispatchQueue.main.async {
-                self.showErrorMessage(error.errorDescription ?? "로그인에 실패했습니다.")
+                self.showErrorMessage(error.userMessage)
                 self.isLoading = false
             }
         } catch {
@@ -107,7 +107,7 @@ class LoginViewModel: ObservableObject {
             }
         }
     }
-    
+
     /// 전화번호/비밀번호 로그인 (iOS 13/14 동기 래퍼)
     func loginSync() {
         guard isInputValid else {
@@ -390,9 +390,9 @@ class LoginViewModel: ObservableObject {
                 }
                 self.isLoading = false
             }
-        } catch let error as APIError {
+        } catch let error as NetworkError {
             DispatchQueue.main.async {
-                self.showErrorMessage(error.errorDescription ?? "Apple 로그인에 실패했습니다.")
+                self.showErrorMessage(error.userMessage)
                 self.isLoading = false
             }
         } catch {
@@ -402,7 +402,7 @@ class LoginViewModel: ObservableObject {
             }
         }
     }
-    
+
     /// Apple 로그인 처리 (iOS 13/14 동기 래퍼)
     func handleAppleLoginSync(authorization: ASAuthorization) {
         guard let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential else {
@@ -681,9 +681,11 @@ class RegisterViewModel: ObservableObject {
     }
     
     var isProfileValid: Bool {
-        let hasBirth = !(registerData.mt_birth?.isEmpty ?? true)
-        let hasGender = (registerData.mt_gender == 1 || registerData.mt_gender == 2)
-        return hasBirth && hasGender && validateBirthDate(registerData.mt_birth)
+        // 생년월일과 성별은 이제 선택 사항입니다. (Apple 가이드라인 5.1.1 준수)
+        if let birth = registerData.mt_birth, !birth.isEmpty {
+            return validateBirthDate(birth)
+        }
+        return true
     }
     
     // MARK: - Methods
@@ -1109,8 +1111,8 @@ class RegisterViewModel: ObservableObject {
             } catch {
                 DispatchQueue.main.async {
                     self.isLoading = false
-                    if let apiError = error as? APIError {
-                        self.errorMessage = apiError.message ?? "회원가입에 실패했습니다."
+                    if let networkError = error as? NetworkError {
+                        self.errorMessage = networkError.userMessage
                     } else {
                         self.errorMessage = error.localizedDescription
                     }

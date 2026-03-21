@@ -212,6 +212,7 @@ class GroupViewModel: ObservableObject {
                 if success {
                     self.fetchGroupMembers(sgtIdx: group.sgt_idx) // 멤버 목록 갱신
                     self.fetchGroupStats(sgtIdx: group.sgt_idx) // 통계도 갱신
+                    self.fetchGroups() // 내 그룹 목록 갱신
                 }
             } catch {
                 DispatchQueue.main.async { self.handleError(error) }
@@ -219,9 +220,45 @@ class GroupViewModel: ObservableObject {
         }
     }
     
+    /// 그룹 나가기 (탈퇴)
+    func leaveGroup(sgtIdx: Int) {
+        guard let currentUser = AuthService.shared.getUserData(),
+              let mtIdx = currentUser.mt_idx else {
+            self.errorMessage = "사용자 정보를 찾을 수 없습니다."
+            self.showError = true
+            return
+        }
+        
+        isDeleting = true
+        Task {
+            do {
+                let success = try await groupService.removeMember(sgtIdx: sgtIdx, mtIdx: mtIdx)
+                if success {
+                    DispatchQueue.main.async {
+                        self.groups.removeAll(where: { $0.sgt_idx == sgtIdx })
+                        if self.selectedGroup?.sgt_idx == sgtIdx {
+                            self.selectedGroup = nil
+                            self.groupMembers = []
+                            self.groupStats = nil
+                        }
+                        self.isDeleting = false
+                        // 목록 갱신 및 알림
+                        self.fetchGroups()
+                        NotificationCenter.default.post(name: NSNotification.Name("groupsDidChange"), object: nil)
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.handleError(error)
+                    self.isDeleting = false
+                }
+            }
+        }
+    }
+    
     private func handleError(_ error: Error) {
-        if let apiError = error as? APIError {
-            self.errorMessage = apiError.message ?? apiError.detail ?? "오류가 발생했습니다."
+        if let networkError = error as? NetworkError {
+            self.errorMessage = networkError.userMessage
         } else {
             self.errorMessage = error.localizedDescription
         }
