@@ -18,6 +18,7 @@
 		2F6C4327DCBD332F30081EAB /* APIEndpointTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDC76362DAC64DB193EB137B /* APIEndpointTests.swift */; };
 		3D5E7B1D367F512422B8C08A /* APIEndpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD697FC1738D83F5A06E98BE /* APIEndpoint.swift */; };
 		4215AE05A4B3B081BD9C9BF2 /* SMAPLoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18493739DEB5E311957CE00E /* SMAPLoadingView.swift */; };
+		5E6CED4CBEC392A0A1DA64FC /* MockURLProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6E857FB9A66B645DD27275D /* MockURLProtocol.swift */; };
 		68598F319DBC8C0FC1916EDC /* Pods_smapTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 358E7C44A47807BE3A3431B4 /* Pods_smapTests.framework */; };
 		7B3BDD67E349F3AE195AEAE0 /* SMAPButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = F49C868EA905A5BA43A716DF /* SMAPButton.swift */; };
 		7D54FC619E5AE0816B42F335 /* SMAPSnackBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16F34A3F1A8B143430D99E8A /* SMAPSnackBar.swift */; };
@@ -120,6 +121,7 @@
 		A1B2C3D40015 /* RootCoordinatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootCoordinatorView.swift; sourceTree = "<group>"; };
 		A285D1EDA2D7751AD0989FE6 /* DataMigrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DataMigrationTests.swift; sourceTree = "<group>"; };
 		A658788DFD22BBB65D68B968 /* Pods-smap.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-smap.debug.xcconfig"; path = "Target Support Files/Pods-smap/Pods-smap.debug.xcconfig"; sourceTree = "<group>"; };
+		A6E857FB9A66B645DD27275D /* MockURLProtocol.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MockURLProtocol.swift; sourceTree = "<group>"; };
 		A8F6BDA102080F14BC5A1377 /* Theme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		A9E2B42038DD89D78086429E /* PlaceholderTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlaceholderTests.swift; sourceTree = "<group>"; };
 		AB01FED42F3C817D4F548182 /* KeychainManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeychainManagerTests.swift; sourceTree = "<group>"; };
@@ -181,6 +183,15 @@
 			path = DesignSystem;
 			sourceTree = "<group>";
 		};
+		23BBEB82B54314186EC0ADB2 /* Helpers */ = {
+			isa = PBXGroup;
+			children = (
+				A6E857FB9A66B645DD27275D /* MockURLProtocol.swift */,
+			);
+			name = Helpers;
+			path = Helpers;
+			sourceTree = "<group>";
+		};
 		24EB5D0181B036805032DD93 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
@@ -197,6 +208,7 @@
 			children = (
 				A9E2B42038DD89D78086429E /* PlaceholderTests.swift */,
 				703A08998D4E015412BCE34B /* Core */,
+				23BBEB82B54314186EC0ADB2 /* Helpers */,
 			);
 			name = smapTests;
 			path = smapTests;
@@ -703,6 +715,7 @@
 				812C6D4A8BFC26DF9D7C3DB1 /* KeychainManagerTests.swift in Sources */,
 				002FFB7C69C962F6EDA964C9 /* UserDefaultsManagerTests.swift in Sources */,
 				21B1B201D32CBA943DA80918 /* DataMigrationTests.swift in Sources */,
+				5E6CED4CBEC392A0A1DA64FC /* MockURLProtocol.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
