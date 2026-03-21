@@ -145,6 +145,8 @@ struct GroupListHeaderView: View {
                 Text("그룹과 멤버를 한눈에 관리하세요")
                     .font(.suite(size: 13))
                     .foregroundColor(.gray)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             Spacer()
         }
@@ -317,6 +319,8 @@ struct GroupCard: View {
                 Text(group.sgt_title ?? "이름 없음")
                     .font(.suite(size: 18, weight: .bold)) // Using Suite font as per design
                     .foregroundColor(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                 
                 Text(group.sgt_memo ?? "그룹 설명이 없습니다")
                     .font(.suite(size: 14))

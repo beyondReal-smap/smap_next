@@ -1044,32 +1044,39 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
     
     private func fileUpload(image: UIImage){
         if let photoData = image.jpegData(compressionQuality: 1.0) {
-            var dic = Dictionary<String, Any>()
-            dic["mt_idx"] = self.fileUploadMtIdx
-            
             UIView.animate(withDuration: 1.0) {
                 self.loadingView.alpha = 1
             }
-            
-            Api.shared.fileUpload(dic: dic, photoName: "mt_file1", photo: photoData) { response, error in
-                
-                self.loadingView.alpha = 0
-                
-                if let error = error {
-                    print("can not fetch data", error)
-                    return
-                }
-                
-                if let response = response {
-                    if response.success == "true" {
-                        self.web_view.evaluateJavaScript("f_member_file_upload_done();") { (any, err) -> Void in
-                            print(err ?? "[f_member_file_upload_done] IOS >> 자바스크립트 : SUCCESS")
+
+            let mtIdx = self.fileUploadMtIdx
+            Task {
+                do {
+                    let data = try await APIClient.shared.upload(
+                        .legacyFileUpload(mt_idx: mtIdx),
+                        fileData: photoData,
+                        fileName: "\(Utils.shared.randomString(length: 20)).jpg",
+                        fieldName: "mt_file1",
+                        additionalFields: ["mt_idx": mtIdx],
+                        token: KeychainManager.shared.getToken()
+                    )
+                    let response = try JSONDecoder().decode(BaseResult<AuthData>.self, from: data)
+
+                    await MainActor.run {
+                        self.loadingView.alpha = 0
+                        if response.success == "true" {
+                            self.web_view.evaluateJavaScript("f_member_file_upload_done();") { (any, err) -> Void in
+                                print(err ?? "[f_member_file_upload_done] IOS >> 자바스크립트 : SUCCESS")
+                            }
+                        } else {
+                            Utils.shared.showSnackBar(view: self.view, message: response.message ?? "")
                         }
-                    } else {
-                        Utils.shared.showSnackBar(view: self.view, message: response.message ?? "")
                     }
-                } else {
-                    Utils.shared.showSnackBar(view: self.view, message: "Network Error")
+                } catch {
+                    print("can not fetch data", error)
+                    await MainActor.run {
+                        self.loadingView.alpha = 0
+                        Utils.shared.showSnackBar(view: self.view, message: "Network Error")
+                    }
                 }
             }
         } else {

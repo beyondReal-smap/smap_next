@@ -159,50 +159,52 @@ struct LocationDetailPanel: View {
             .cornerRadius(12)
             
             // 액션 버튼들
-            VStack(spacing: 12) {
-                Button(action: {
-                    viewModel.startEditing()
-                }) {
-                    HStack {
-                        Image(systemName: "pencil")
-                        Text("편집")
+            if viewModel.canManageLocation(location) {
+                VStack(spacing: 12) {
+                    Button(action: {
+                        viewModel.startEditing()
+                    }) {
+                        HStack {
+                            Image(systemName: "pencil")
+                            Text("편집")
+                        }
+                        .font(.suite(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(brandColor)
+                        .cornerRadius(12)
                     }
-                    .font(.suite(size: 16, weight: .semibold))
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 50)
-                    .background(brandColor)
-                    .cornerRadius(12)
-                }
-                
-                Button(action: {
-                    toggleNotification(location: location)
-                }) {
-                    HStack {
-                        Image(systemName: location.notifications ? "bell.slash" : "bell")
-                        Text(location.notifications ? "알림 끄기" : "알림 켜기")
+                    
+                    Button(action: {
+                        toggleNotification(location: location)
+                    }) {
+                        HStack {
+                            Image(systemName: location.notifications ? "bell.slash" : "bell")
+                            Text(location.notifications ? "알림 끄기" : "알림 켜기")
+                        }
+                        .font(.suite(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(location.notifications ? Color.orange : Color.green)
+                        .cornerRadius(12)
                     }
-                    .font(.suite(size: 16, weight: .semibold))
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 50)
-                    .background(location.notifications ? Color.orange : Color.green)
-                    .cornerRadius(12)
-                }
-                
-                Button(action: {
-                    deleteLocation(location: location)
-                }) {
-                    HStack {
-                        Image(systemName: "trash")
-                        Text("삭제")
+                    
+                    Button(action: {
+                        deleteLocation(location: location)
+                    }) {
+                        HStack {
+                            Image(systemName: "trash")
+                            Text("삭제")
+                        }
+                        .font(.suite(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(Color.red)
+                        .cornerRadius(12)
                     }
-                    .font(.suite(size: 16, weight: .semibold))
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 50)
-                    .background(Color.red)
-                    .cornerRadius(12)
                 }
             }
         }

@@ -6,9 +6,6 @@ target 'smap' do
   # Comment the next line if you don't want to use dynamic frameworks
   use_frameworks!
 
-  # 네트워킹
-  pod 'Alamofire', '~> 5.5'
-
   # Firebase (푸시 알림 등)
   pod 'Firebase/Auth'
   pod 'Firebase/Core'

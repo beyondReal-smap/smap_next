@@ -55,10 +55,19 @@ enum APIEndpoint {
     // MARK: - FCM
     case registerFCMToken(mtIdx: String, fcmToken: String, apnsToken: String?)
 
+    // MARK: - Legacy (Phase 4에서 제거 예정)
+    case legacyTokenAuth(mt_token_id: String)
+    case legacyFileUpload(mt_idx: String)
+
     // MARK: - URL Request Builder
 
     func urlRequest(baseURL: String) -> URLRequest {
-        let url = URL(string: "\(baseURL)\(path)")!
+        let url: URL
+        if let absoluteURL = absoluteURL {
+            url = URL(string: absoluteURL)!
+        } else {
+            url = URL(string: "\(baseURL)\(path)")!
+        }
         var request = URLRequest(url: url)
         request.httpMethod = method.rawValue
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -66,6 +75,18 @@ enum APIEndpoint {
             request.httpBody = body
         }
         return request
+    }
+
+    /// Legacy 엔드포인트용 절대 URL (v1 base URL을 사용하지 않는 경우)
+    private var absoluteURL: String? {
+        switch self {
+        case .legacyTokenAuth:
+            return AppConfiguration.apiBaseURL + "auth/"
+        case .legacyFileUpload:
+            return AppConfiguration.fileAPIURL + "member_file_upload.php"
+        default:
+            return nil
+        }
     }
 
     private var path: String {
@@ -104,6 +125,7 @@ enum APIEndpoint {
         case .deleteAllNotifications(let memberId): return "/push-logs/delete-all?mt_idx=\(memberId)"
         case .createLocationLog: return "/logs/member-location-logs"
         case .registerFCMToken: return "/member-fcm-token/register"
+        case .legacyTokenAuth, .legacyFileUpload: return "" // absoluteURL 사용
         }
     }
 
@@ -121,7 +143,8 @@ enum APIEndpoint {
              .createGroup, .joinGroupById, .createLocation,
              .updateProfile, .changePassword, .verifyPassword, .withdraw,
              .uploadProfileImage, .createLocationLog, .registerFCMToken,
-             .markAllNotificationsRead, .deleteAllNotifications:
+             .markAllNotificationsRead, .deleteAllNotifications,
+             .legacyTokenAuth, .legacyFileUpload:
             return .POST
         case .updateGroup, .updateLocation, .toggleLocationNotification,
              .updateMemberRole, .deleteGroup:
@@ -170,6 +193,10 @@ enum APIEndpoint {
             var dict: [String: Any] = ["mt_idx": mtIdx, "fcm_token": fcmToken]
             if let apnsToken { dict["apns_token"] = apnsToken }
             return try? JSONSerialization.data(withJSONObject: dict)
+        case .legacyTokenAuth(let mt_token_id):
+            return try? JSONSerialization.data(withJSONObject: ["mt_token_id": mt_token_id])
+        case .legacyFileUpload:
+            return nil // multipart body는 APIClient.upload에서 별도 처리
         default:
             return nil
         }

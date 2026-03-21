@@ -167,38 +167,42 @@ public class LocationService: NSObject, CLLocationManagerDelegate{
     
     public func auth() {
         Utils.shared.getToken { mt_token_id in
-            var dic = Dictionary<String, Any>()
-            dic["mt_token_id"] = mt_token_id
-            
             print("🔐 [AUTH] 인증 시도 시작 - 토큰: \(String(mt_token_id.prefix(20)))...")
-            
-            Api.shared.auth(dic: dic) { response, error in
-                if let error = error {
-                    print("❌ [AUTH] 네트워크 오류: \(error)")
-                    self.handleAuthFailure(reason: "네트워크 오류")
-                    return
-                }
-                
-                if let response = response {
+
+            Task {
+                do {
+                    let response: BaseResult<AuthData> = try await APIClient.shared.request(
+                        .legacyTokenAuth(mt_token_id: mt_token_id),
+                        token: KeychainManager.shared.getToken()
+                    )
+
                     if response.success == "true" {
                         print("✅ [AUTH] 인증 성공!")
                         guard let authData = response.data else { return }
-                        self.receiveAuth(authData: authData)
+                        await MainActor.run {
+                            self.receiveAuth(authData: authData)
+                        }
                     } else {
                         let failMessage = response.message ?? "알 수 없는 오류"
                         print("❌ [AUTH] 인증 실패: \(failMessage)")
-                        
+
                         // 신규 토큰인 경우 특별 처리
                         if failMessage.contains("신규앱토큰") {
                             print("🆕 [AUTH] 신규 토큰 감지 - 토큰 등록 시도")
-                            self.handleNewTokenRegistration(token: mt_token_id)
+                            await MainActor.run {
+                                self.handleNewTokenRegistration(token: mt_token_id)
+                            }
                         } else {
-                            self.handleAuthFailure(reason: failMessage)
+                            await MainActor.run {
+                                self.handleAuthFailure(reason: failMessage)
+                            }
                         }
                     }
-                } else {
-                    print("❌ [AUTH] 응답 없음")
-                    self.handleAuthFailure(reason: "서버 응답 없음")
+                } catch {
+                    print("❌ [AUTH] 네트워크 오류: \(error)")
+                    await MainActor.run {
+                        self.handleAuthFailure(reason: "네트워크 오류")
+                    }
                 }
             }
         }
@@ -361,17 +365,20 @@ public class LocationService: NSObject, CLLocationManagerDelegate{
                     print("   📍 배터리: \(batteryPercent)%")
                     print("   📍 걸음수: \(stepCount)")
                     
-                    Api.shared.memberLocation(dic: dic) { response, error in
-                        if let error = error {
-                            print("❌ [API] 위치 데이터 전송 실패: \(error)")
-                            return
-                        }
-                        
-                        if let response = response {
+                    // FastAPI create_location_log 액션에 맞는 필드 추가
+                    dic["act"] = "create_location_log"
+                    dic["source"] = "ios-app"
+
+                    Task {
+                        do {
+                            let response: BaseResult<AuthData> = try await APIClient.shared.request(
+                                .createLocationLog(params: dic),
+                                token: KeychainManager.shared.getToken()
+                            )
                             print("✅ [API] 위치 데이터 전송 성공: \(response.success ?? "unknown")")
                             print("📍 [API] 서버 응답: \(response.message ?? "")")
-                        } else {
-                            print("⚠️ [API] 서버 응답 없음")
+                        } catch {
+                            print("❌ [API] 위치 데이터 전송 실패: \(error)")
                         }
                     }
                 } else {
@@ -403,6 +410,31 @@ public class LocationService: NSObject, CLLocationManagerDelegate{
         }
     }
     
+    private func isValidLocation(_ location: CLLocation) -> Bool {
+        let coord = location.coordinate
+        
+        // 1. 0,0 좌표 필터링
+        if coord.latitude == 0.0 && coord.longitude == 0.0 { return false }
+        
+        // 2. 유효 범위 필터링
+        if coord.latitude < -90.0 || coord.latitude > 90.0 { return false }
+        if coord.longitude < -180.0 || coord.longitude > 180.0 { return false }
+        
+        // 3. 정확도 필터링 (너무 낮은 정확도 무시 - 예: 1000m 이상)
+        if location.horizontalAccuracy > 1000 {
+            print("⚠️ [LOCATION] 낮은 정확도 (\(location.horizontalAccuracy)m) - 전송 건너뜀")
+            return false
+        }
+        
+        // 4. 타임스탬프 필터링 (너무 오래된 데이터 무시 - 5분 이상)
+        if abs(location.timestamp.timeIntervalSinceNow) > 300 {
+            print("⚠️ [LOCATION] 오래된 위치 데이터 - 전송 건너뜀")
+            return false
+        }
+        
+        return true
+    }
+
     @objc func appStateChange(_ notification: Notification){
         print("LocationService appStateChange")
         let state = notification.userInfo?["state"] as? String
@@ -429,6 +461,12 @@ public class LocationService: NSObject, CLLocationManagerDelegate{
             var mltGpsDataList: [MltGpsData] = []
             
             locations.forEach { location in
+                // 📍 위치 데이터 검증
+                guard isValidLocation(location) else {
+                    print("⚠️ [LOCATION] 유효하지 않은 위치 데이터 건너뜀: (\(location.coordinate.latitude), \(location.coordinate.longitude))")
+                    return
+                }
+                
                 var speed = location.speed
                 if location.speed < 0 {
                     speed = 0

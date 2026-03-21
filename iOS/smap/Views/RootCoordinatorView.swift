@@ -430,7 +430,7 @@ public struct SettingMenuView: View {
                             Text("SMAP")
                                 .font(.suite(size: 14, weight: .semibold))
                                 .foregroundColor(.gray)
-                            Text("버전 3.0.2")
+                            Text("버전 3.0.4")
                                 .font(.suite(size: 12))
                                 .foregroundColor(.gray.opacity(0.8))
                         }
@@ -3352,6 +3352,7 @@ struct NativeScheduleListView: View {
                         ScheduleEventCard(
                             schedule: schedule,
                             groupName: viewModel.selectedGroup?.sgt_title,
+                            canManage: viewModel.canManageSchedule(schedule),
                             onEdit: {
                                 print("DEBUG: Edit clicked for schedule: \(schedule.sst_title ?? ""), isRecurring: \(schedule.isRecurring)")
                                 if schedule.isRecurring {
@@ -3488,6 +3489,7 @@ struct CalendarDateCell: View {
 struct ScheduleEventCard: View {
     let schedule: Schedule
     let groupName: String? // Added groupName
+    let canManage: Bool
     let onEdit: () -> Void
     let onDelete: () -> Void
     
@@ -3552,6 +3554,8 @@ struct ScheduleEventCard: View {
                     Text(schedule.validMemberName)
                         .font(.suite(size: 12, weight: .bold))
                         .foregroundColor(brandColor)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                     
                     if let gName = groupName {
                         Text("•")
@@ -3560,6 +3564,8 @@ struct ScheduleEventCard: View {
                         Text(gName)
                             .font(.suite(size: 12))
                             .foregroundColor(.gray)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                     }
                 }
                 
@@ -3567,6 +3573,7 @@ struct ScheduleEventCard: View {
                     .font(.suite(size: 15, weight: .medium))
                     .foregroundColor(.primary)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 
                 if let location = schedule.sst_location_title, !location.isEmpty {
                     HStack(spacing: 4) {
@@ -3590,18 +3597,20 @@ struct ScheduleEventCard: View {
                     .background(statusColor.opacity(0.1))
                     .cornerRadius(4)
                 
-                Menu {
-                    Button(action: onEdit) {
-                        Label("수정", systemImage: "pencil")
+                if canManage {
+                    Menu {
+                        Button(action: onEdit) {
+                            Label("수정", systemImage: "pencil")
+                        }
+                        Button(role: .destructive, action: onDelete) {
+                            Label("삭제", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.suite(size: 14))
+                            .foregroundColor(.gray)
+                            .padding(8)
                     }
-                    Button(role: .destructive, action: onDelete) {
-                        Label("삭제", systemImage: "trash")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.suite(size: 14))
-                        .foregroundColor(.gray)
-                        .padding(8)
                 }
             }
         }
@@ -4700,6 +4709,42 @@ class ScheduleViewModel: ObservableObject {
     private let groupService = GroupService.shared
     private var cancellables = Set<AnyCancellable>()
     
+    @MainActor
+    func canManageSchedule(_ schedule: Schedule) -> Bool {
+        guard let currentUserMtIdxStr = UserDefaults.standard.string(forKey: "mt_idx"),
+              let currentUserMtIdx = Int(currentUserMtIdxStr) else { return false }
+        
+        // 1. Own schedule
+        if schedule.mt_idx == currentUserMtIdx {
+            return true
+        }
+        
+        // Find current user's role in the group members list
+        guard let currentMember = groupMembers.first(where: { $0.mt_idx == currentUserMtIdx }) else {
+            // Fallback to userPermissions if member list search fails
+            if let perms = userPermissions {
+                if perms.isOwner { return true }
+            }
+            return false
+        }
+        
+        // 2. Owner can manage everything
+        if currentMember.sgdt_owner_chk == "Y" {
+            return true
+        }
+        
+        // 3. Leader can manage everything except Owner's data
+        if currentMember.sgdt_leader_chk == "Y" {
+            let targetMember = groupMembers.first(where: { $0.mt_idx == schedule.mt_idx })
+            if targetMember?.sgdt_owner_chk == "Y" {
+                return false
+            }
+            return true
+        }
+        
+        return false
+    }
+    
     var filteredSchedules: [Schedule] {
         let schedulesForDate = schedules.filter { schedule in
             guard let startDate = schedule.startDateOnly else { return false }
@@ -4876,6 +4921,9 @@ struct EditProfileView: View {
     @State private var birthDate: Date = Date()
     @State private var gender: Int = 1
     
+    @State private var provideBirthDate: Bool = false
+    @State private var provideGender: Bool = false
+    
     @State private var isLoading: Bool = false
     @State private var showAlert: Bool = false
     @State private var alertMessage: String = ""
@@ -4894,8 +4942,16 @@ struct EditProfileView: View {
             _nickname = State(initialValue: user.mt_nickname ?? "")
             if let birthStr = user.mt_birth, let date = DateFormatter.yyyyMMdd.date(from: birthStr) {
                 _birthDate = State(initialValue: date)
+                _provideBirthDate = State(initialValue: true)
+            } else {
+                _provideBirthDate = State(initialValue: false)
             }
-            _gender = State(initialValue: user.mt_gender ?? 1)
+            if let userGender = user.mt_gender {
+                _gender = State(initialValue: userGender)
+                _provideGender = State(initialValue: true)
+            } else {
+                _provideGender = State(initialValue: false)
+            }
         }
     }
     
@@ -4951,26 +5007,35 @@ struct EditProfileView: View {
                             .background(Color.pink)
                             .cornerRadius(6)
                         
-                        Text("생년월일")
+                        Text("생년월일 (선택)")
                             .font(.suite(size: 16))
                             .foregroundColor(.primary)
                             .lineLimit(1)
                             .layoutPriority(1)
-                            .frame(width: 100, alignment: .leading)
+                            .frame(width: 150, alignment: .leading)
                         
                         Spacer()
                         
-                        DatePicker("", selection: $birthDate, displayedComponents: .date)
+                        Toggle("", isOn: $provideBirthDate)
                             .labelsHidden()
-                            .datePickerStyle(.compact)
-                            .accentColor(brandColor)
-                            .fixedSize()
-                            .frame(width: 130, height: 34, alignment: .trailing)
-                            .clipped()
+                            .scaleEffect(0.8)
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
                     .frame(height: 52)
+                    
+                    if provideBirthDate {
+                        HStack {
+                            Spacer()
+                            DatePicker("", selection: $birthDate, displayedComponents: .date)
+                                .labelsHidden()
+                                .datePickerStyle(.compact)
+                                .accentColor(brandColor)
+                                .fixedSize()
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 12)
+                    }
                     
                     Divider().padding(.leading, 52)
                     
@@ -4982,22 +5047,33 @@ struct EditProfileView: View {
                             .background(Color.purple)
                             .cornerRadius(6)
                         
-                        Text("성별")
+                        Text("성별 (선택)")
                             .font(.suite(size: 16))
                             .foregroundColor(.primary)
                             .lineLimit(1)
                             .layoutPriority(1)
-                            .frame(width: 100, alignment: .leading)
+                            .frame(width: 150, alignment: .leading)
                         
                         Spacer()
                         
-                        HStack(spacing: 8) {
-                            GenderChip(title: "남성", isSelected: gender == 1) { gender = 1 }
-                            GenderChip(title: "여성", isSelected: gender == 2) { gender = 2 }
-                        }
+                        Toggle("", isOn: $provideGender)
+                            .labelsHidden()
+                            .scaleEffect(0.8)
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
+                    
+                    if provideGender {
+                        HStack {
+                            Spacer()
+                            HStack(spacing: 8) {
+                                GenderChip(title: "남성", isSelected: gender == 1) { gender = 1 }
+                                GenderChip(title: "여성", isSelected: gender == 2) { gender = 2 }
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 12)
+                    }
                 }
                 .background(Color(UIColor.systemBackground))
                 .cornerRadius(12)
@@ -5068,7 +5144,8 @@ struct EditProfileView: View {
     
     private func handleSave() {
         isLoading = true
-        let birthStr = dateFormatter.string(from: birthDate)
+        let birthStr = provideBirthDate ? dateFormatter.string(from: birthDate) : nil
+        let genderVal = provideGender ? gender : nil
         
         Task {
             do {
@@ -5076,7 +5153,7 @@ struct EditProfileView: View {
                     name: name,
                     nickname: nickname,
                     birth: birthStr,
-                    gender: gender
+                    gender: genderVal
                 )
                 
                 await MainActor.run {

@@ -29,6 +29,8 @@ struct ShareOptionsView: View {
                                 Text("초대 링크를 복사합니다")
                                     .font(.suite(size: 12))
                                     .foregroundColor(.secondary)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
                             }
                             Spacer()
                         }
@@ -53,6 +55,8 @@ struct ShareOptionsView: View {
                                 Text("QR 코드로 쉽게 초대하세요")
                                     .font(.suite(size: 12))
                                     .foregroundColor(.secondary)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
                             }
                             Spacer()
                         }
@@ -74,6 +78,8 @@ struct ShareOptionsView: View {
                                 Text("문자 메시지로 초대 링크를 전송합니다")
                                     .font(.suite(size: 12))
                                     .foregroundColor(.secondary)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.7)
                             }
                             Spacer()
                         }
@@ -95,6 +101,8 @@ struct ShareOptionsView: View {
                                 Text("다양한 앱으로 공유할 수 있습니다")
                                     .font(.suite(size: 12))
                                     .foregroundColor(.secondary)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
                             }
                             Spacer()
                         }
