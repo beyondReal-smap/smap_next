@@ -15,7 +15,6 @@
 		94339A692B2BE2E5002177C1 /* BaseResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94339A682B2BE2E5002177C1 /* BaseResult.swift */; };
 		94339A6E2B2BE314002177C1 /* Utils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94339A6D2B2BE314002177C1 /* Utils.swift */; };
 		94339A702B2BE323002177C1 /* Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94339A6F2B2BE323002177C1 /* Extensions.swift */; };
-		94339A722B2BE332002177C1 /* AppSnackBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94339A712B2BE332002177C1 /* AppSnackBar.swift */; };
 		94339A752B2BE3DC002177C1 /* Api.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94339A742B2BE3DC002177C1 /* Api.swift */; };
 		94339A772B2BE409002177C1 /* LocationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94339A762B2BE409002177C1 /* LocationService.swift */; };
 		94339A7B2B2BEFC9002177C1 /* IntroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94339A7A2B2BEFC9002177C1 /* IntroView.swift */; };
@@ -57,7 +56,6 @@
 		94339A682B2BE2E5002177C1 /* BaseResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BaseResult.swift; sourceTree = "<group>"; };
 		94339A6D2B2BE314002177C1 /* Utils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Utils.swift; sourceTree = "<group>"; };
 		94339A6F2B2BE323002177C1 /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
-		94339A712B2BE332002177C1 /* AppSnackBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSnackBar.swift; sourceTree = "<group>"; };
 		94339A742B2BE3DC002177C1 /* Api.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Api.swift; sourceTree = "<group>"; };
 		94339A762B2BE409002177C1 /* LocationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationService.swift; sourceTree = "<group>"; };
 		94339A7A2B2BEFC9002177C1 /* IntroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntroView.swift; sourceTree = "<group>"; };
@@ -180,7 +178,6 @@
 				94339A6C2B2BE302002177C1 /* Data */,
 				94339A6D2B2BE314002177C1 /* Utils.swift */,
 				94339A6F2B2BE323002177C1 /* Extensions.swift */,
-				94339A712B2BE332002177C1 /* AppSnackBar.swift */,
 				94339A762B2BE409002177C1 /* LocationService.swift */,
 				94418E202BD0C38E00836120 /* StoreKitManager.swift */,
 			);
@@ -390,13 +387,9 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-smap/Pods-smap-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
-			inputPaths = (
-			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-smap/Pods-smap-frameworks-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -420,7 +413,6 @@
 				948ABEF82BAA8F0300023DFD /* AuthData.swift in Sources */,
 				94339A692B2BE2E5002177C1 /* BaseResult.swift in Sources */,
 				948ABEF62BAA8D4300023DFD /* Http.swift in Sources */,
-				94339A722B2BE332002177C1 /* AppSnackBar.swift in Sources */,
 				94339A532B2BE26F002177C1 /* AppDelegate.swift in Sources */,
 				948ABEFC2BAA8FBE00023DFD /* MltGpsData.swift in Sources */,
 				94418E212BD0C38E00836120 /* StoreKitManager.swift in Sources */,
@@ -586,7 +578,7 @@
 				CODE_SIGN_ENTITLEMENTS = smap/smap.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = ZVXXRV5MTP;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -605,12 +597,12 @@
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
 				INFOPLIST_KEY_UIRequiresFullScreen = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.6;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 3.0.2;
+				MARKETING_VERSION = 3.0.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.dmonster.smap;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -633,7 +625,7 @@
 				CODE_SIGN_ENTITLEMENTS = smap/smap.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 6;
+				CURRENT_PROJECT_VERSION = 5;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = ZVXXRV5MTP;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -653,12 +645,12 @@
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
 				INFOPLIST_KEY_UIRequiresFullScreen = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.6;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 3.0.2;
+				MARKETING_VERSION = 3.0.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.dmonster.smap;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";

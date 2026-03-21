@@ -8,7 +8,7 @@
 import UIKit
 import FirebaseCore
 import FirebaseMessaging
-import IQKeyboardManagerSwift
+
 import CoreLocation
 import AVFoundation
 import Photos
@@ -271,11 +271,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             #endif
             application.registerForRemoteNotifications()
         }
-        
-        IQKeyboardManager.shared.isEnabled = true
-        // Deprecated: enableAutoToolbar. Use KVC to silence warning while maintaining functionality.
-        IQKeyboardManager.shared.setValue(false, forKey: "enableAutoToolbar")
-        IQKeyboardManager.shared.resignOnTouchOutside = true
         
         // iOS 14+ 권장 방식: delegate 기반 위치 서비스 시작 (프리퍼미션 이후)
         if UserDefaults.standard.bool(forKey: "smap_location_prepermission_done") {

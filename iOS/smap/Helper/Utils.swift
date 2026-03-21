@@ -80,7 +80,30 @@ class Utils {
     }
     
     func showSnackBar(view: UIView, message: String){
-        AppSnackBar.make(in: view, message: message, duration: .lengthLong).show()
+        let toastLabel = UILabel()
+        toastLabel.backgroundColor = UIColor.black.withAlphaComponent(0.8)
+        toastLabel.textColor = UIColor.white
+        toastLabel.font = UIFont.systemFont(ofSize: 14)
+        toastLabel.textAlignment = .center
+        toastLabel.text = message
+        toastLabel.alpha = 1.0
+        toastLabel.layer.cornerRadius = 10
+        toastLabel.clipsToBounds = true
+        toastLabel.numberOfLines = 0
+        let maxWidth = view.frame.size.width - 40
+        let textSize = toastLabel.sizeThatFits(CGSize(width: maxWidth, height: CGFloat.greatestFiniteMagnitude))
+        toastLabel.frame = CGRect(
+            x: (view.frame.size.width - textSize.width - 40) / 2,
+            y: view.frame.size.height - 100,
+            width: textSize.width + 40,
+            height: textSize.height + 20
+        )
+        view.addSubview(toastLabel)
+        UIView.animate(withDuration: 3.0, delay: 0.1, options: .curveEaseOut) {
+            toastLabel.alpha = 0.0
+        } completion: { _ in
+            toastLabel.removeFromSuperview()
+        }
     }
 
     // MARK: - WebView 관리 (간소화)
