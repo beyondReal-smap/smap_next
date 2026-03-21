@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		05B3502305B5521A68675EF9 /* NetworkErrorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65320A8BB93E6B422E7E9185 /* NetworkErrorTests.swift */; };
 		067DD5BC4F9A7B5551B9FD4E /* AppConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5276E8F7F9EB554FB0284094 /* AppConfiguration.swift */; };
 		0F10BD14511AFFF3CBE017E5 /* Pods_smap.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 37FC506E4A26E11B0DA96829 /* Pods_smap.framework */; };
 		17CB2A28F3CAA2D170BD8FCF /* PlaceholderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9E2B42038DD89D78086429E /* PlaceholderTests.swift */; };
@@ -34,6 +35,7 @@
 		A1B2C3D40004 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40014 /* LoginView.swift */; };
 		A1B2C3D40005 /* RootCoordinatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40015 /* RootCoordinatorView.swift */; };
 		B4DC719F3B3F3F3377E9FB81 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DC1B67D2BBBF002A1F25E204 /* Foundation.framework */; };
+		E424ECF29A5C98D0CE6257AB /* NetworkError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 015524C0E4DDFD774AF076D7 /* NetworkError.swift */; };
 		F6010CCC2F035594008B05B7 /* SUITE-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F6010CC42F035594008B05B7 /* SUITE-Bold.ttf */; };
 		F6010CCD2F035594008B05B7 /* SUITE-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F6010CCA2F035594008B05B7 /* SUITE-SemiBold.ttf */; };
 		F6010CCE2F035594008B05B7 /* SUITE-ExtraBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F6010CC52F035594008B05B7 /* SUITE-ExtraBold.ttf */; };
@@ -60,6 +62,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		015524C0E4DDFD774AF076D7 /* NetworkError.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NetworkError.swift; sourceTree = "<group>"; };
 		1543F20C479DC08F43430167 /* Pods-smapTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-smapTests.release.xcconfig"; path = "Target Support Files/Pods-smapTests/Pods-smapTests.release.xcconfig"; sourceTree = "<group>"; };
 		2BA1F183FACB1962B895B550 /* Release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		358E7C44A47807BE3A3431B4 /* Pods_smapTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_smapTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -68,6 +71,7 @@
 		4C4397311CA36B89D18C465F /* Pods-smapTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-smapTests.debug.xcconfig"; path = "Target Support Files/Pods-smapTests/Pods-smapTests.debug.xcconfig"; sourceTree = "<group>"; };
 		5276E8F7F9EB554FB0284094 /* AppConfiguration.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppConfiguration.swift; sourceTree = "<group>"; };
 		62E3750BD06FB7857AEC15A6 /* smapTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = smapTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		65320A8BB93E6B422E7E9185 /* NetworkErrorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NetworkErrorTests.swift; sourceTree = "<group>"; };
 		94339A4F2B2BE26F002177C1 /* smap.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = smap.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		94339A522B2BE26F002177C1 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		94339A592B2BE26F002177C1 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
@@ -152,9 +156,28 @@
 			isa = PBXGroup;
 			children = (
 				A9E2B42038DD89D78086429E /* PlaceholderTests.swift */,
+				703A08998D4E015412BCE34B /* Core */,
 			);
 			name = smapTests;
 			path = smapTests;
+			sourceTree = "<group>";
+		};
+		5B2180F45B7A49E607693BDE /* Network */ = {
+			isa = PBXGroup;
+			children = (
+				015524C0E4DDFD774AF076D7 /* NetworkError.swift */,
+			);
+			name = Network;
+			path = Network;
+			sourceTree = "<group>";
+		};
+		703A08998D4E015412BCE34B /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				EF6250BE3F2FE3F5FABE987C /* Network */,
+			);
+			name = Core;
+			path = Core;
 			sourceTree = "<group>";
 		};
 		80E9B37887761E3EB7FA9B06 /* Pods */ = {
@@ -210,6 +233,7 @@
 				94339A602B2BE271002177C1 /* Info.plist */,
 				94F4BC342BB6B5F600987BC4 /* GoogleService-Info.plist */,
 				FD29289CF00E3332E0B6DB82 /* App */,
+				D768E0C5807FBB8F219C6E85 /* Core */,
 			);
 			path = smap;
 			sourceTree = "<group>";
@@ -325,6 +349,24 @@
 			);
 			name = Config;
 			path = Config;
+			sourceTree = "<group>";
+		};
+		D768E0C5807FBB8F219C6E85 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				5B2180F45B7A49E607693BDE /* Network */,
+			);
+			name = Core;
+			path = Core;
+			sourceTree = "<group>";
+		};
+		EF6250BE3F2FE3F5FABE987C /* Network */ = {
+			isa = PBXGroup;
+			children = (
+				65320A8BB93E6B422E7E9185 /* NetworkErrorTests.swift */,
+			);
+			name = Network;
+			path = Network;
 			sourceTree = "<group>";
 		};
 		F6010CCB2F035594008B05B7 /* Font */ = {
@@ -555,6 +597,7 @@
 				F6E644BD2F04D5A100E1D03E /* LocationSearchView.swift in Sources */,
 				A1B2C3D40005 /* RootCoordinatorView.swift in Sources */,
 				067DD5BC4F9A7B5551B9FD4E /* AppConfiguration.swift in Sources */,
+				E424ECF29A5C98D0CE6257AB /* NetworkError.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -563,6 +606,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				17CB2A28F3CAA2D170BD8FCF /* PlaceholderTests.swift in Sources */,
+				05B3502305B5521A68675EF9 /* NetworkErrorTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
