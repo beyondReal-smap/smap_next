@@ -11,6 +11,8 @@
 		067DD5BC4F9A7B5551B9FD4E /* AppConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5276E8F7F9EB554FB0284094 /* AppConfiguration.swift */; };
 		0F10BD14511AFFF3CBE017E5 /* Pods_smap.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 37FC506E4A26E11B0DA96829 /* Pods_smap.framework */; };
 		17CB2A28F3CAA2D170BD8FCF /* PlaceholderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9E2B42038DD89D78086429E /* PlaceholderTests.swift */; };
+		2F6C4327DCBD332F30081EAB /* APIEndpointTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDC76362DAC64DB193EB137B /* APIEndpointTests.swift */; };
+		3D5E7B1D367F512422B8C08A /* APIEndpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD697FC1738D83F5A06E98BE /* APIEndpoint.swift */; };
 		68598F319DBC8C0FC1916EDC /* Pods_smapTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 358E7C44A47807BE3A3431B4 /* Pods_smapTests.framework */; };
 		94339A532B2BE26F002177C1 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94339A522B2BE26F002177C1 /* AppDelegate.swift */; };
 		94339A5A2B2BE26F002177C1 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 94339A582B2BE26F002177C1 /* Main.storyboard */; };
@@ -100,7 +102,9 @@
 		A658788DFD22BBB65D68B968 /* Pods-smap.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-smap.debug.xcconfig"; path = "Target Support Files/Pods-smap/Pods-smap.debug.xcconfig"; sourceTree = "<group>"; };
 		A9E2B42038DD89D78086429E /* PlaceholderTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlaceholderTests.swift; sourceTree = "<group>"; };
 		AD7A59FABE69C71E3559B181 /* Debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
+		CDC76362DAC64DB193EB137B /* APIEndpointTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = APIEndpointTests.swift; sourceTree = "<group>"; };
 		DC1B67D2BBBF002A1F25E204 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		DD697FC1738D83F5A06E98BE /* APIEndpoint.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = APIEndpoint.swift; sourceTree = "<group>"; };
 		EA7E3CC88DCEADC59E0D5E35 /* Pods-smap.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-smap.release.xcconfig"; path = "Target Support Files/Pods-smap/Pods-smap.release.xcconfig"; sourceTree = "<group>"; };
 		F6010CC32F035594008B05B7 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
 		F6010CC42F035594008B05B7 /* SUITE-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SUITE-Bold.ttf"; sourceTree = "<group>"; };
@@ -166,6 +170,7 @@
 			isa = PBXGroup;
 			children = (
 				015524C0E4DDFD774AF076D7 /* NetworkError.swift */,
+				DD697FC1738D83F5A06E98BE /* APIEndpoint.swift */,
 			);
 			name = Network;
 			path = Network;
@@ -364,6 +369,7 @@
 			isa = PBXGroup;
 			children = (
 				65320A8BB93E6B422E7E9185 /* NetworkErrorTests.swift */,
+				CDC76362DAC64DB193EB137B /* APIEndpointTests.swift */,
 			);
 			name = Network;
 			path = Network;
@@ -598,6 +604,7 @@
 				A1B2C3D40005 /* RootCoordinatorView.swift in Sources */,
 				067DD5BC4F9A7B5551B9FD4E /* AppConfiguration.swift in Sources */,
 				E424ECF29A5C98D0CE6257AB /* NetworkError.swift in Sources */,
+				3D5E7B1D367F512422B8C08A /* APIEndpoint.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -607,6 +614,7 @@
 			files = (
 				17CB2A28F3CAA2D170BD8FCF /* PlaceholderTests.swift in Sources */,
 				05B3502305B5521A68675EF9 /* NetworkErrorTests.swift in Sources */,
+				2F6C4327DCBD332F30081EAB /* APIEndpointTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
