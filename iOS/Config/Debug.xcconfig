@@ -1,0 +1,6 @@
+#include "Shared.xcconfig"
+
+// Secrets — DO NOT COMMIT
+// Copy actual values from Http.swift (hashKey) and Services/LocationService.swift (kakaoAPIKey)
+KAKAO_API_KEY = 7fbf60571daf54ca5bee8373a1f31d2d
+AUTH_SECRET_KEY = 518cbe9ed50bf7e72913eb6b5a5e5fc6a8b99d56200ebda3a5bb365dbdccbdf6

@@ -2,6 +2,18 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>API_BASE_URL</key>
+	<string>$(API_BASE_URL)</string>
+	<key>WEB_BASE_URL</key>
+	<string>$(WEB_BASE_URL)</string>
+	<key>FILE_API_URL</key>
+	<string>$(FILE_API_URL)</string>
+	<key>IMAGE_BASE_URL</key>
+	<string>$(IMAGE_BASE_URL)</string>
+	<key>KAKAO_API_KEY</key>
+	<string>$(KAKAO_API_KEY)</string>
+	<key>AUTH_SECRET_KEY</key>
+	<string>$(AUTH_SECRET_KEY)</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>ko</string>
 	<key>CFBundleExecutable</key>

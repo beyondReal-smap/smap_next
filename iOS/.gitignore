@@ -43,3 +43,9 @@ GoogleService-Info.plist
 *.jpg
 *.png
 *.webp
+
+# Secrets
+Config/Debug.xcconfig
+Config/Release.xcconfig
+!Config/*.xcconfig.example
+!Config/Shared.xcconfig

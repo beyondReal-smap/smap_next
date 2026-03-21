@@ -1,0 +1,9 @@
+// Shared configuration for SMAP iOS app
+// API URLs
+API_BASE_URL = https:/$()/api3.smap.site/api/
+WEB_BASE_URL = https:/$()/nextstep.smap.site/
+FILE_API_URL = https:/$()/nextstep.smap.site/api/
+IMAGE_BASE_URL = https:/$()/api3.smap.site
+
+// App Info
+PRODUCT_BUNDLE_IDENTIFIER = com.dmonster.smap
