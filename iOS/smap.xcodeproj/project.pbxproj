@@ -17,8 +17,12 @@
 		2DFB1160235A3F1D99E22B25 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D22CA221744223B0C67BEC1F /* APIClient.swift */; };
 		2F6C4327DCBD332F30081EAB /* APIEndpointTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDC76362DAC64DB193EB137B /* APIEndpointTests.swift */; };
 		3D5E7B1D367F512422B8C08A /* APIEndpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD697FC1738D83F5A06E98BE /* APIEndpoint.swift */; };
+		4215AE05A4B3B081BD9C9BF2 /* SMAPLoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18493739DEB5E311957CE00E /* SMAPLoadingView.swift */; };
 		68598F319DBC8C0FC1916EDC /* Pods_smapTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 358E7C44A47807BE3A3431B4 /* Pods_smapTests.framework */; };
+		7B3BDD67E349F3AE195AEAE0 /* SMAPButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = F49C868EA905A5BA43A716DF /* SMAPButton.swift */; };
+		7D54FC619E5AE0816B42F335 /* SMAPSnackBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16F34A3F1A8B143430D99E8A /* SMAPSnackBar.swift */; };
 		812C6D4A8BFC26DF9D7C3DB1 /* KeychainManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB01FED42F3C817D4F548182 /* KeychainManagerTests.swift */; };
+		8F6FBE0745963AFADB7FCD59 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8F6BDA102080F14BC5A1377 /* Theme.swift */; };
 		94339A532B2BE26F002177C1 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94339A522B2BE26F002177C1 /* AppDelegate.swift */; };
 		94339A5A2B2BE26F002177C1 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 94339A582B2BE26F002177C1 /* Main.storyboard */; };
 		94339A5C2B2BE271002177C1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 94339A5B2B2BE271002177C1 /* Assets.xcassets */; };
@@ -43,6 +47,7 @@
 		A1B2C3D40005 /* RootCoordinatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40015 /* RootCoordinatorView.swift */; };
 		B20C990C52F079F35037935F /* UserDefaultsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84E5F9E1CE2882E5F246A7EC /* UserDefaultsManager.swift */; };
 		B4DC719F3B3F3F3377E9FB81 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DC1B67D2BBBF002A1F25E204 /* Foundation.framework */; };
+		B85D4559B18C1D8AFD42FDC7 /* SMAPTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24ADB4DD2C3D90F283A452AB /* SMAPTextField.swift */; };
 		CF30A8F7B5222FBC7B041BFE /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 846D82AE62D1FF1FAFD3B490 /* KeychainManager.swift */; };
 		E424ECF29A5C98D0CE6257AB /* NetworkError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 015524C0E4DDFD774AF076D7 /* NetworkError.swift */; };
 		EF3267D73FEB1306499EA513 /* APIClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8794820D7585E07BB427EEC /* APIClientTests.swift */; };
@@ -75,6 +80,9 @@
 		015524C0E4DDFD774AF076D7 /* NetworkError.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NetworkError.swift; sourceTree = "<group>"; };
 		0F2025C78F84D972ACF396A1 /* DataMigration.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DataMigration.swift; sourceTree = "<group>"; };
 		1543F20C479DC08F43430167 /* Pods-smapTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-smapTests.release.xcconfig"; path = "Target Support Files/Pods-smapTests/Pods-smapTests.release.xcconfig"; sourceTree = "<group>"; };
+		16F34A3F1A8B143430D99E8A /* SMAPSnackBar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SMAPSnackBar.swift; sourceTree = "<group>"; };
+		18493739DEB5E311957CE00E /* SMAPLoadingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SMAPLoadingView.swift; sourceTree = "<group>"; };
+		24ADB4DD2C3D90F283A452AB /* SMAPTextField.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SMAPTextField.swift; sourceTree = "<group>"; };
 		2BA1F183FACB1962B895B550 /* Release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		358E7C44A47807BE3A3431B4 /* Pods_smapTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_smapTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		35C8904AB8B944173F6017D7 /* Debug.xcconfig.example */ = {isa = PBXFileReference; includeInIndex = 1; path = Debug.xcconfig.example; sourceTree = "<group>"; };
@@ -112,6 +120,7 @@
 		A1B2C3D40015 /* RootCoordinatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootCoordinatorView.swift; sourceTree = "<group>"; };
 		A285D1EDA2D7751AD0989FE6 /* DataMigrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DataMigrationTests.swift; sourceTree = "<group>"; };
 		A658788DFD22BBB65D68B968 /* Pods-smap.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-smap.debug.xcconfig"; path = "Target Support Files/Pods-smap/Pods-smap.debug.xcconfig"; sourceTree = "<group>"; };
+		A8F6BDA102080F14BC5A1377 /* Theme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		A9E2B42038DD89D78086429E /* PlaceholderTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlaceholderTests.swift; sourceTree = "<group>"; };
 		AB01FED42F3C817D4F548182 /* KeychainManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeychainManagerTests.swift; sourceTree = "<group>"; };
 		AD7A59FABE69C71E3559B181 /* Debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
@@ -122,6 +131,7 @@
 		DC1B67D2BBBF002A1F25E204 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		DD697FC1738D83F5A06E98BE /* APIEndpoint.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = APIEndpoint.swift; sourceTree = "<group>"; };
 		EA7E3CC88DCEADC59E0D5E35 /* Pods-smap.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-smap.release.xcconfig"; path = "Target Support Files/Pods-smap/Pods-smap.release.xcconfig"; sourceTree = "<group>"; };
+		F49C868EA905A5BA43A716DF /* SMAPButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SMAPButton.swift; sourceTree = "<group>"; };
 		F6010CC32F035594008B05B7 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
 		F6010CC42F035594008B05B7 /* SUITE-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SUITE-Bold.ttf"; sourceTree = "<group>"; };
 		F6010CC52F035594008B05B7 /* SUITE-ExtraBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SUITE-ExtraBold.ttf"; sourceTree = "<group>"; };
@@ -161,6 +171,16 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		116E3916A97477F03CB5418B /* DesignSystem */ = {
+			isa = PBXGroup;
+			children = (
+				D27825B44675D62407C83144 /* Components */,
+				A8F6BDA102080F14BC5A1377 /* Theme.swift */,
+			);
+			name = DesignSystem;
+			path = DesignSystem;
+			sourceTree = "<group>";
+		};
 		24EB5D0181B036805032DD93 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
@@ -279,6 +299,7 @@
 				94F4BC342BB6B5F600987BC4 /* GoogleService-Info.plist */,
 				FD29289CF00E3332E0B6DB82 /* App */,
 				D768E0C5807FBB8F219C6E85 /* Core */,
+				116E3916A97477F03CB5418B /* DesignSystem */,
 			);
 			path = smap;
 			sourceTree = "<group>";
@@ -394,6 +415,18 @@
 			);
 			name = Config;
 			path = Config;
+			sourceTree = "<group>";
+		};
+		D27825B44675D62407C83144 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				F49C868EA905A5BA43A716DF /* SMAPButton.swift */,
+				24ADB4DD2C3D90F283A452AB /* SMAPTextField.swift */,
+				18493739DEB5E311957CE00E /* SMAPLoadingView.swift */,
+				16F34A3F1A8B143430D99E8A /* SMAPSnackBar.swift */,
+			);
+			name = Components;
+			path = Components;
 			sourceTree = "<group>";
 		};
 		D768E0C5807FBB8F219C6E85 /* Core */ = {
@@ -651,6 +684,11 @@
 				CF30A8F7B5222FBC7B041BFE /* KeychainManager.swift in Sources */,
 				B20C990C52F079F35037935F /* UserDefaultsManager.swift in Sources */,
 				06C6150BCC131DA8C2455FF0 /* DataMigration.swift in Sources */,
+				8F6FBE0745963AFADB7FCD59 /* Theme.swift in Sources */,
+				7B3BDD67E349F3AE195AEAE0 /* SMAPButton.swift in Sources */,
+				B85D4559B18C1D8AFD42FDC7 /* SMAPTextField.swift in Sources */,
+				4215AE05A4B3B081BD9C9BF2 /* SMAPLoadingView.swift in Sources */,
+				7D54FC619E5AE0816B42F335 /* SMAPSnackBar.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
