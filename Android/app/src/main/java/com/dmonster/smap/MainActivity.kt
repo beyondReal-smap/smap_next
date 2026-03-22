@@ -24,7 +24,9 @@ import com.dmonster.smap.ui.components.LocationPermissionDialog
 import com.dmonster.smap.ui.login.LoginActivity
 import com.dmonster.smap.ui.navigation.MainTabScreen
 import com.dmonster.smap.ui.theme.SmapTheme
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     companion object {

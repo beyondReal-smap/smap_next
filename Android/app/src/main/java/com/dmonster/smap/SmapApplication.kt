@@ -9,6 +9,7 @@ import android.util.Log
 import com.naver.maps.map.NaverMapSdk
 import com.kakao.sdk.common.KakaoSdk
 import com.kakao.sdk.common.util.Utility
+import dagger.hilt.android.HiltAndroidApp
 import java.net.InetAddress
 import java.util.concurrent.Executors
 
@@ -16,6 +17,7 @@ import java.util.concurrent.Executors
  * 🔥 SMAP 앱 Application 클래스
  * 에뮬레이터 환경에서의 네트워크 최적화 및 초기 설정
  */
+@HiltAndroidApp
 class SmapApplication : Application() {
 
     override fun onCreate() {

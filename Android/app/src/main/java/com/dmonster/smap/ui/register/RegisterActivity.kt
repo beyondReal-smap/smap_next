@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
@@ -14,10 +15,12 @@ import com.dmonster.smap.MainActivity
 import com.dmonster.smap.R
 import com.dmonster.smap.ui.login.LoginActivity
 import com.dmonster.smap.ui.theme.SmapTheme
+import dagger.hilt.android.AndroidEntryPoint
 
 /**
  * 회원가입 Activity
  */
+@AndroidEntryPoint
 class RegisterActivity : ComponentActivity() {
     
     companion object {
@@ -28,6 +31,7 @@ class RegisterActivity : ComponentActivity() {
     private val viewModel: RegisterViewModel by viewModels()
     
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         
         // 소셜 로그인 데이터 가져오기

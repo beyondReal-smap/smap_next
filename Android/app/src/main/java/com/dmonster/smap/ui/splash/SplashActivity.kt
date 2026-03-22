@@ -22,12 +22,14 @@ import com.dmonster.smap.data.service.AuthService
 import com.dmonster.smap.MainActivity
 import com.dmonster.smap.ui.login.LoginActivity
 import com.dmonster.smap.ui.theme.SmapTheme
+import dagger.hilt.android.AndroidEntryPoint
 
 /**
  * 스플래시 화면 (앱 시작점)
  * - 이미 로그인된 경우: MainActivity로 이동
  * - 로그인 필요한 경우: LoginActivity로 이동
  */
+@AndroidEntryPoint
 @SuppressLint("CustomSplashScreen")
 class SplashActivity : ComponentActivity() {
     
