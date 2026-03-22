@@ -171,6 +171,11 @@ class MainActivity : ComponentActivity() {
                                 } else {
                                     startLocationService()
                                 }
+                            },
+                            onDismiss = {
+                                showBackgroundGuide.value = false
+                                // 백그라운드 권한 없이도 포그라운드 위치 서비스는 시작
+                                startLocationService()
                             }
                         )
                     }

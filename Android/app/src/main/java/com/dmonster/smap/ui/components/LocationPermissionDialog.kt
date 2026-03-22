@@ -184,7 +184,8 @@ fun LocationDeniedOverlay(
 
 @Composable
 fun BackgroundLocationGuideDialog(
-    onConfirm: () -> Unit
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit = {}
 ) {
     Dialog(
         onDismissRequest = {},
@@ -240,6 +241,15 @@ fun BackgroundLocationGuideDialog(
                     colors = ButtonDefaults.buttonColors(containerColor = BrandColors.Primary)
                 ) {
                     Text("네, 알겠습니다", fontFamily = SuiteFont, color = Color.White)
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("나중에 하기", fontFamily = SuiteFont, color = Color.Gray)
                 }
             }
         }
