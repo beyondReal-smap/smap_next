@@ -346,9 +346,20 @@ class LocationService : Service() {
 
     private suspend fun sendLocationToServer(request: CreateLocationLogRequest) {
         try {
-            smapApi.createLocationLog(request)
+            val response = smapApi.createLocationLog(request)
+            if (response.isSuccessful) {
+                Log.d(TAG, "Location sent: (${request.mltLat}, ${request.mltLong}) mode=${currentMode.name}")
+            } else {
+                Log.w(TAG, "Location upload failed: HTTP ${response.code()}")
+                // Re-enqueue on server error for retry
+                if (response.code() >= 500) {
+                    enqueueLocation(request)
+                }
+            }
         } catch (e: Exception) {
-            Log.w(TAG, "Location upload failed: ${e.message}")
+            Log.w(TAG, "Location upload error: ${e.message}")
+            // Re-enqueue on network error for retry
+            enqueueLocation(request)
         }
     }
 

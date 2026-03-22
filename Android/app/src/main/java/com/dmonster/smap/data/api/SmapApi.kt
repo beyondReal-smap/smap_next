@@ -237,7 +237,7 @@ interface SmapApi {
 
     /** POST /logs/member-location-logs  (create a new location log entry) */
     @POST("logs/member-location-logs")
-    suspend fun createLocationLog(@Body request: CreateLocationLogRequest): Unit
+    suspend fun createLocationLog(@Body request: CreateLocationLogRequest): retrofit2.Response<Unit>
 
     /** GET /logs/member-location-logs/{memberId}/daily?date={date} */
     @GET("logs/member-location-logs/{memberId}/daily")

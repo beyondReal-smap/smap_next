@@ -19,7 +19,8 @@ data class CreateLocationLogRequest(
     @SerialName("mlt_battery") val mltBattery: String,
     @SerialName("mlt_fine_location") val mltFineLocation: String = "N",
     @SerialName("mlt_location_chk") val mltLocationChk: String = "N",
-    @SerialName("mt_health_work") val mtHealthWork: String = "0"
+    @SerialName("mt_health_work") val mtHealthWork: String = "0",
+    @SerialName("source") val source: String = "android-app"
 )
 
 /**
