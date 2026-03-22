@@ -20,12 +20,12 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.dmonster.smap.data.service.AuthService
 import com.dmonster.smap.ui.components.BackgroundLocationGuideDialog
-import javax.inject.Inject
-import com.dmonster.smap.ui.components.LocationPermissionDialog
+import com.dmonster.smap.ui.components.LocationDeniedOverlay
 import com.dmonster.smap.ui.login.LoginActivity
 import com.dmonster.smap.ui.navigation.MainTabScreen
 import com.dmonster.smap.ui.theme.SmapTheme
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -36,15 +36,19 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var authService: AuthService
 
+    // Mutable state for overlay so onResume can clear it
+    private var showLocationDeniedOverlay = mutableStateOf(false)
+    private var showBackgroundGuide = mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         val isLoggedIn = authService.isLoggedIn
-        
-        Log.d(TAG, "🔍 [AUTH_GUARD] Check: $isLoggedIn (Token=${authService.getToken()?.take(5)}..., User=${authService.getUserData()?.displayName})")
+
+        Log.d(TAG, "[AUTH_GUARD] Check: $isLoggedIn (Token=${authService.getToken()?.take(5)}..., User=${authService.getUserData()?.displayName})")
 
         if (!isLoggedIn) {
-            Log.e(TAG, "🚫 [AUTH_GUARD] Not logged in - Redirecting to LoginActivity")
+            Log.e(TAG, "[AUTH_GUARD] Not logged in - Redirecting to LoginActivity")
             navigateToLogin()
             return
         }
@@ -54,30 +58,10 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             SmapTheme {
-                var showDisclosure by remember { mutableStateOf(false) }
-                var showBackgroundGuide by remember { mutableStateOf(false) }
-                
-                // Permission Launchers
-                val permissionLauncher = rememberLauncherForActivityResult(
-                    ActivityResultContracts.RequestMultiplePermissions()
-                ) { permissions ->
-                    val locationGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
-                                        permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-                    val notificationGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        permissions[Manifest.permission.POST_NOTIFICATIONS] == true
-                    } else {
-                        true
-                    }
+                val locationDeniedOverlay by showLocationDeniedOverlay
+                val backgroundGuide by showBackgroundGuide
 
-                    if (locationGranted) {
-                        checkAndRequestBackgroundLocation(onShowGuide = { showBackgroundGuide = true })
-                    }
-                    
-                    if (notificationGranted) {
-                        Log.d(TAG, "✅ [FCM] Notification permission granted")
-                    }
-                }
-
+                // Sequential permission launchers
                 val backgroundLocationLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestPermission()
                 ) { isGranted ->
@@ -86,25 +70,72 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // Initial Check
-                LaunchedEffect(Unit) {
-                    val hasLocation = hasLocationPermissions()
-                    val hasNotification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                val locationPermissionLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.RequestMultiplePermissions()
+                ) { permissions ->
+                    val locationGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                                         permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+                    if (locationGranted) {
+                        // Location granted -> check background
+                        if (!hasBackgroundLocationPermission()) {
+                            showBackgroundGuide.value = true
+                        } else {
+                            startLocationService()
+                        }
                     } else {
-                        true
+                        // Location DENIED -> show persistent overlay
+                        showLocationDeniedOverlay.value = true
                     }
+                }
 
-                    if (!hasLocation || !hasNotification) {
-                        showDisclosure = true
-                    } else if (!hasBackgroundLocationPermission()) {
-                        showBackgroundGuide = true
+                val notificationPermissionLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.RequestPermission()
+                ) { _ ->
+                    // After notification result (granted or not), request location
+                    if (!hasLocationPermissions()) {
+                        locationPermissionLauncher.launch(
+                            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+                        )
                     } else {
-                        startLocationService()
+                        // Already has location (edge case)
+                        if (!hasBackgroundLocationPermission()) {
+                            showBackgroundGuide.value = true
+                        } else {
+                            startLocationService()
+                        }
+                    }
+                }
+
+                // Permission check on launch
+                LaunchedEffect(Unit) {
+                    if (hasLocationPermissions()) {
+                        // Already has location -> check background
+                        if (!hasBackgroundLocationPermission()) {
+                            showBackgroundGuide.value = true
+                        } else {
+                            startLocationService()
+                        }
+                    } else {
+                        // No location permission
+                        if (isFirstLaunch()) {
+                            // First launch -> sequential: notification first, then location
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            } else {
+                                locationPermissionLauncher.launch(
+                                    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+                                )
+                            }
+                            markFirstLaunchDone()
+                        } else {
+                            // Subsequent launch with denied location -> show overlay immediately
+                            showLocationDeniedOverlay.value = true
+                        }
                     }
                 }
 
                 Surface(modifier = Modifier.fillMaxSize()) {
+                    // 1. Main content ALWAYS visible first
                     MainTabScreen(
                         onLogout = {
                             stopLocationService()
@@ -113,27 +144,28 @@ class MainActivity : ComponentActivity() {
                         }
                     )
 
-                    if (showDisclosure) {
-                        LocationPermissionDialog(
-                            onConfirm = {
-                                showDisclosure = false
-                                val permissions = mutableListOf(
-                                    Manifest.permission.ACCESS_FINE_LOCATION,
-                                    Manifest.permission.ACCESS_COARSE_LOCATION
-                                )
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                    permissions.add(Manifest.permission.POST_NOTIFICATIONS)
+                    // 2. Location denied overlay (persistent until user acts)
+                    if (locationDeniedOverlay) {
+                        LocationDeniedOverlay(
+                            onGoToSettings = {
+                                showLocationDeniedOverlay.value = false
+                                // Open app settings
+                                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                    data = Uri.fromParts("package", packageName, null)
                                 }
-                                permissionLauncher.launch(permissions.toTypedArray())
+                                startActivity(intent)
                             },
-                            onDismiss = { showDisclosure = false }
+                            onDismiss = {
+                                showLocationDeniedOverlay.value = false
+                            }
                         )
                     }
 
-                    if (showBackgroundGuide) {
+                    // 3. Background location guide
+                    if (backgroundGuide) {
                         BackgroundLocationGuideDialog(
                             onConfirm = {
-                                showBackgroundGuide = false
+                                showBackgroundGuide.value = false
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                                     backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
                                 } else {
@@ -143,6 +175,19 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                 }
+            }
+        }
+    }
+
+    // Re-check when returning from Settings
+    override fun onResume() {
+        super.onResume()
+        // If user returns from Settings and now has location permission
+        if (hasLocationPermissions()) {
+            showLocationDeniedOverlay.value = false
+            if (hasBackgroundLocationPermission()) {
+                showBackgroundGuide.value = false
+                startLocationService()
             }
         }
     }
@@ -161,12 +206,15 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun checkAndRequestBackgroundLocation(onShowGuide: () -> Unit) {
-        if (!hasBackgroundLocationPermission()) {
-            onShowGuide()
-        } else {
-            startLocationService()
-        }
+    private fun isFirstLaunch(): Boolean {
+        val prefs = getSharedPreferences("smap_prefs", MODE_PRIVATE)
+        return !prefs.getBoolean("permission_onboarding_done", false)
+    }
+
+    private fun markFirstLaunchDone() {
+        getSharedPreferences("smap_prefs", MODE_PRIVATE).edit()
+            .putBoolean("permission_onboarding_done", true)
+            .apply()
     }
 
     private fun startLocationService() {
@@ -177,16 +225,16 @@ class MainActivity : ComponentActivity() {
             } else {
                 startService(intent)
             }
-            Log.d(TAG, "✅ [LOCATION] LocationService started")
+            Log.d(TAG, "[LOCATION] LocationService started")
         } catch (e: Exception) {
-            Log.e(TAG, "❌ [LOCATION] Failed to start LocationService: ${e.message}")
+            Log.e(TAG, "[LOCATION] Failed to start LocationService: ${e.message}")
         }
     }
 
     private fun stopLocationService() {
         val intent = Intent(this, LocationService::class.java)
         stopService(intent)
-        Log.d(TAG, "🛑 [LOCATION] LocationService stopped")
+        Log.d(TAG, "[LOCATION] LocationService stopped")
     }
 
     private fun navigateToLogin() {
@@ -205,15 +253,15 @@ class MainActivity : ComponentActivity() {
 
     private fun handleDeepLink(intent: Intent?) {
         intent?.data?.let { uri ->
-            Log.d(TAG, "📱 [DEEP_LINK] Received URI: $uri")
-            
+            Log.d(TAG, "[DEEP_LINK] Received URI: $uri")
+
             // smap://group/{id}/join 처리
             if (uri.scheme == "smap" && uri.host == "group") {
                 val pathSegments = uri.pathSegments
                 if (pathSegments.size >= 2 && pathSegments[1] == "join") {
                     val groupId = pathSegments[0]
-                    Log.d(TAG, "👥 [DEEP_LINK] Group ID: $groupId")
-                    
+                    Log.d(TAG, "[DEEP_LINK] Group ID: $groupId")
+
                     // TODO: ViewModel 등을 통해 그룹 가입 로직 실행
                     // 여기서는 일단 SharedPreferences나 전역 상태에 저장하여 UI에서 처리하게 함
                     getSharedPreferences("smap_prefs", MODE_PRIVATE).edit()
@@ -224,4 +272,3 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-

@@ -105,6 +105,84 @@ fun LocationPermissionDialog(
 }
 
 @Composable
+fun LocationDeniedOverlay(
+    onGoToSettings: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = {},
+        properties = DialogProperties(
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false,
+            usePlatformDefaultWidth = false
+        )
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 32.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    imageVector = Icons.Default.LocationOn,
+                    contentDescription = "위치 권한",
+                    tint = Color(0xFFE74C3C),
+                    modifier = Modifier.size(48.dp)
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "위치 권한이 필요합니다",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = SuiteFont,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    text = "SMAP의 위치 공유 및 활동 로그 기능을 사용하려면 위치 권한을 허용해주세요.\n\n설정 > 권한 > 위치에서 '항상 허용'으로 변경해주세요.",
+                    style = TextStyle(
+                        fontSize = 14.sp,
+                        fontFamily = SuiteFont,
+                        color = Color.Gray,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 20.sp
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Button(
+                    onClick = onGoToSettings,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = BrandColors.Primary)
+                ) {
+                    Text("설정에서 허용하기", fontFamily = SuiteFont, color = Color.White)
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("나중에 하기", fontFamily = SuiteFont, color = Color.Gray)
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun BackgroundLocationGuideDialog(
     onConfirm: () -> Unit
 ) {
