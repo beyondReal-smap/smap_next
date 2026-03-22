@@ -3,6 +3,8 @@ package com.dmonster.smap.ui.myplace
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.dmonster.smap.data.api.ApiResult
+import com.dmonster.smap.data.api.safeApiCall
 import com.dmonster.smap.data.model.SavedLocation
 import com.dmonster.smap.data.model.SmapGroup
 import com.dmonster.smap.data.model.SmapGroupMember
@@ -144,52 +146,70 @@ class MyPlaceViewModel @Inject constructor(
         viewModelScope.launch {
             _isMapLoading.value = true
             val startTime = System.currentTimeMillis()
-            
-            try {
-                // 1. Load Groups
-                val groups = groupService.getGroups()
-                _groups.value = groups
-                
-                if (groups.isNotEmpty()) {
-                    val firstGroup = groups.first()
-                    _selectedGroup.value = firstGroup
-                    
-                    // 2. Load Members
-                    val members = groupService.getGroupMembers(firstGroup.sgtIdx)
-                    _members.value = members
-                    
-                    if (members.isNotEmpty()) {
-                        val firstMember = members.first()
-                        _selectedMember.value = firstMember
-                        
-                        // 3. Load Locations
-                        val locations = myPlaceService.getLocations(firstMember.mtIdx)
-                        _locations.value = locations
-                        
-                        // 4. Auto-select first location for initial pan
-                        if (locations.isNotEmpty()) {
-                            _selectedLocation.value = locations.first()
+
+            when (val result = safeApiCall { groupService.getGroups() }) {
+                is ApiResult.Success -> {
+                    val groups = result.data
+                    _groups.value = groups
+
+                    if (groups.isNotEmpty()) {
+                        val firstGroup = groups.first()
+                        _selectedGroup.value = firstGroup
+
+                        // Load Members
+                        when (val membersResult = safeApiCall { groupService.getGroupMembers(firstGroup.sgtIdx) }) {
+                            is ApiResult.Success -> {
+                                _members.value = membersResult.data
+                                if (membersResult.data.isNotEmpty()) {
+                                    val firstMember = membersResult.data.first()
+                                    _selectedMember.value = firstMember
+
+                                    // Load Locations
+                                    when (val locsResult = safeApiCall { myPlaceService.getLocations(firstMember.mtIdx) }) {
+                                        is ApiResult.Success -> {
+                                            _locations.value = locsResult.data
+                                            if (locsResult.data.isNotEmpty()) {
+                                                _selectedLocation.value = locsResult.data.first()
+                                            }
+                                        }
+                                        else -> {
+                                            Log.e(TAG, "❌ 장소 로드 실패")
+                                            _locations.value = emptyList()
+                                        }
+                                    }
+                                } else {
+                                    _members.value = emptyList()
+                                    _locations.value = emptyList()
+                                }
+                            }
+                            else -> {
+                                Log.e(TAG, "❌ 멤버 로드 실패")
+                                _members.value = emptyList()
+                                _locations.value = emptyList()
+                            }
                         }
                     } else {
+                        _groups.value = emptyList()
                         _members.value = emptyList()
                         _locations.value = emptyList()
                     }
-                } else {
-                    _groups.value = emptyList()
-                    _members.value = emptyList()
-                    _locations.value = emptyList()
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ 초기 데이터 로드 실패", e)
-                _errorMessage.value = "데이터를 불러오는데 실패했습니다"
-            } finally {
-                // Ensure at least 1 second loading for smoothness
-                val elapsed = System.currentTimeMillis() - startTime
-                if (elapsed < 1000) {
-                    kotlinx.coroutines.delay(1000 - elapsed)
+                is ApiResult.Error -> {
+                    Log.e(TAG, "❌ 초기 데이터 로드 실패 (${result.code})")
+                    _errorMessage.value = "데이터를 불러오지 못했습니다 (${result.code})"
                 }
-                _isMapLoading.value = false
+                is ApiResult.NetworkError -> {
+                    Log.e(TAG, "❌ 초기 데이터 로드 실패 - 네트워크", result.exception)
+                    _errorMessage.value = "네트워크 연결을 확인해주세요"
+                }
             }
+
+            // Ensure at least 1 second loading for smoothness
+            val elapsed = System.currentTimeMillis() - startTime
+            if (elapsed < 1000) {
+                kotlinx.coroutines.delay(1000 - elapsed)
+            }
+            _isMapLoading.value = false
         }
     }
 
@@ -198,36 +218,39 @@ class MyPlaceViewModel @Inject constructor(
     private fun loadGroups() {
         viewModelScope.launch {
             _isLoading.value = true
-            try {
-                val groups = groupService.getGroups()
-                _groups.value = groups
-                
-                if (groups.isNotEmpty() && _selectedGroup.value == null) {
-                    selectGroup(groups.first())
+            when (val result = safeApiCall { groupService.getGroups() }) {
+                is ApiResult.Success -> {
+                    _groups.value = result.data
+                    if (result.data.isNotEmpty() && _selectedGroup.value == null) {
+                        selectGroup(result.data.first())
+                    }
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ 그룹 로드 실패", e)
-                _errorMessage.value = "그룹을 불러오는데 실패했습니다"
-            } finally {
-                _isLoading.value = false
+                is ApiResult.Error -> {
+                    Log.e(TAG, "❌ 그룹 로드 실패 (${result.code})")
+                    _errorMessage.value = "그룹을 불러오지 못했습니다 (${result.code})"
+                }
+                is ApiResult.NetworkError -> {
+                    Log.e(TAG, "❌ 그룹 로드 실패 - 네트워크", result.exception)
+                    _errorMessage.value = "네트워크 연결을 확인해주세요"
+                }
             }
+            _isLoading.value = false
         }
     }
 
     private fun loadMembers(groupId: Int) {
         viewModelScope.launch {
-            try {
-                val members = groupService.getGroupMembers(groupId)
-                _members.value = members
-                
-                // 현재 사용자를 기본 선택 (없으면 첫 번째 멤버)
-                if (members.isNotEmpty() && _selectedMember.value == null) {
-                    val currentUserIdx = authService.getUserData()?.mtIdx
-                    val selfMember = members.find { it.mtIdx == currentUserIdx }
-                    selectMember(selfMember ?: members.first())
+            when (val result = safeApiCall { groupService.getGroupMembers(groupId) }) {
+                is ApiResult.Success -> {
+                    _members.value = result.data
+                    if (result.data.isNotEmpty() && _selectedMember.value == null) {
+                        val currentUserIdx = authService.getUserData()?.mtIdx
+                        val selfMember = result.data.find { it.mtIdx == currentUserIdx }
+                        selectMember(selfMember ?: result.data.first())
+                    }
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ 멤버 로드 실패", e)
+                is ApiResult.Error -> Log.e(TAG, "❌ 멤버 로드 실패 (${result.code})")
+                is ApiResult.NetworkError -> Log.e(TAG, "❌ 멤버 로드 실패 - 네트워크", result.exception)
             }
         }
     }
@@ -237,16 +260,21 @@ class MyPlaceViewModel @Inject constructor(
 
         viewModelScope.launch {
             _isLoadingLocations.value = true
-            try {
-                val locations = myPlaceService.getLocations(member.mtIdx)
-                _locations.value = locations
-                Log.d(TAG, "✅ ${locations.size}개 장소 로드")
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ 장소 로드 실패", e)
-                _errorMessage.value = "장소를 불러오는데 실패했습니다"
-            } finally {
-                _isLoadingLocations.value = false
+            when (val result = safeApiCall { myPlaceService.getLocations(member.mtIdx) }) {
+                is ApiResult.Success -> {
+                    _locations.value = result.data
+                    Log.d(TAG, "✅ ${result.data.size}개 장소 로드")
+                }
+                is ApiResult.Error -> {
+                    Log.e(TAG, "❌ 장소 로드 실패 (${result.code})")
+                    _errorMessage.value = "장소 정보를 불러오지 못했습니다 (${result.code})"
+                }
+                is ApiResult.NetworkError -> {
+                    Log.e(TAG, "❌ 장소 로드 실패 - 네트워크", result.exception)
+                    _errorMessage.value = "네트워크 연결을 확인해주세요"
+                }
             }
+            _isLoadingLocations.value = false
         }
     }
 
@@ -432,14 +460,13 @@ class MyPlaceViewModel @Inject constructor(
     ) {
         val group = _selectedGroup.value ?: return
         val member = _selectedMember.value ?: return
-        // val coords = _pendingLocation.value ?: return // Removed
-        
+
         if (title.isBlank()) return
 
         viewModelScope.launch {
             _isCreating.value = true
-            try {
-                val location = myPlaceService.createLocation(
+            when (val result = safeApiCall {
+                myPlaceService.createLocation(
                     memberId = member.mtIdx,
                     groupId = group.sgtIdx,
                     title = title,
@@ -449,18 +476,20 @@ class MyPlaceViewModel @Inject constructor(
                     memo = memo,
                     enterAlarm = enterAlarm
                 )
-                if (location != null) {
-                    _successMessage.value = "장소가 저장되었습니다"
-                    hideAddDialog()
-                    loadLocations()
-                } else {
-                    _errorMessage.value = "장소 저장에 실패했습니다"
+            }) {
+                is ApiResult.Success -> {
+                    if (result.data != null) {
+                        _successMessage.value = "장소가 저장되었습니다"
+                        hideAddDialog()
+                        loadLocations()
+                    } else {
+                        _errorMessage.value = "장소 저장에 실패했습니다"
+                    }
                 }
-            } catch (e: Exception) {
-                _errorMessage.value = "장소 저장 중 오류가 발생했습니다"
-            } finally {
-                _isCreating.value = false
+                is ApiResult.Error -> _errorMessage.value = "장소 저장에 실패했습니다 (${result.code})"
+                is ApiResult.NetworkError -> _errorMessage.value = "네트워크 연결을 확인해주세요"
             }
+            _isCreating.value = false
         }
     }
 
@@ -477,8 +506,8 @@ class MyPlaceViewModel @Inject constructor(
 
         viewModelScope.launch {
             _isLoading.value = true
-            try {
-                val success = myPlaceService.updateLocation(
+            when (val result = safeApiCall {
+                myPlaceService.updateLocation(
                     locationId = locationId,
                     title = title,
                     address = address,
@@ -487,26 +516,28 @@ class MyPlaceViewModel @Inject constructor(
                     memo = memo,
                     enterAlarm = enterAlarm
                 )
-                if (success) {
-                    _successMessage.value = "장소가 수정되었습니다"
-                    hideEditDialog()
-                    loadLocations()
-                } else {
-                    _errorMessage.value = "장소 수정에 실패했습니다"
+            }) {
+                is ApiResult.Success -> {
+                    if (result.data) {
+                        _successMessage.value = "장소가 수정되었습니다"
+                        hideEditDialog()
+                        loadLocations()
+                    } else {
+                        _errorMessage.value = "장소 수정에 실패했습니다"
+                    }
                 }
-            } catch (e: Exception) {
-                _errorMessage.value = "장소 수정 중 오류가 발생했습니다"
-            } finally {
-                _isLoading.value = false
+                is ApiResult.Error -> _errorMessage.value = "장소 수정에 실패했습니다 (${result.code})"
+                is ApiResult.NetworkError -> _errorMessage.value = "네트워크 연결을 확인해주세요"
             }
+            _isLoading.value = false
         }
     }
 
     fun toggleLocationNotification(location: SavedLocation) {
         viewModelScope.launch {
             val newStatus = if (location.sltEnterAlarm == "Y") "N" else "Y"
-            try {
-                val success = myPlaceService.updateLocation(
+            when (val result = safeApiCall {
+                myPlaceService.updateLocation(
                     locationId = location.sltIdx,
                     title = location.name,
                     address = location.address,
@@ -515,25 +546,26 @@ class MyPlaceViewModel @Inject constructor(
                     memo = location.memo,
                     enterAlarm = newStatus
                 )
-                if (success) {
-                    // Update active states immediately for UI feedback
-                    val updatedLocation = location.copy(sltEnterAlarm = newStatus)
-                    
-                    if (_showEditDialog.value?.sltIdx == location.sltIdx) {
-                        _showEditDialog.value = updatedLocation
-                    }
-                    
-                    if (_selectedLocation.value?.sltIdx == location.sltIdx) {
-                        _selectedLocation.value = updatedLocation
-                    }
+            }) {
+                is ApiResult.Success -> {
+                    if (result.data) {
+                        val updatedLocation = location.copy(sltEnterAlarm = newStatus)
 
-                    // Refresh list for consistency
-                    loadLocations()
-                } else {
-                    _errorMessage.value = "알림 설정 변경에 실패했습니다"
+                        if (_showEditDialog.value?.sltIdx == location.sltIdx) {
+                            _showEditDialog.value = updatedLocation
+                        }
+
+                        if (_selectedLocation.value?.sltIdx == location.sltIdx) {
+                            _selectedLocation.value = updatedLocation
+                        }
+
+                        loadLocations()
+                    } else {
+                        _errorMessage.value = "알림 설정 변경에 실패했습니다"
+                    }
                 }
-            } catch (e: Exception) {
-                _errorMessage.value = "알림 설정 변경 중 오류가 발생했습니다"
+                is ApiResult.Error -> _errorMessage.value = "알림 설정 변경에 실패했습니다 (${result.code})"
+                is ApiResult.NetworkError -> _errorMessage.value = "네트워크 연결을 확인해주세요"
             }
         }
     }
@@ -541,24 +573,24 @@ class MyPlaceViewModel @Inject constructor(
     fun deleteLocation(locationId: Int) {
         viewModelScope.launch {
             _isLoading.value = true
-            try {
-                val success = myPlaceService.deleteLocation(locationId)
-                if (success) {
-                    _successMessage.value = "장소가 삭제되었습니다"
-                    hideDeleteDialog()
-                    hideEditDialog()
-                    if (_selectedLocation.value?.sltIdx == locationId) {
-                        _selectedLocation.value = null
+            when (val result = safeApiCall { myPlaceService.deleteLocation(locationId) }) {
+                is ApiResult.Success -> {
+                    if (result.data) {
+                        _successMessage.value = "장소가 삭제되었습니다"
+                        hideDeleteDialog()
+                        hideEditDialog()
+                        if (_selectedLocation.value?.sltIdx == locationId) {
+                            _selectedLocation.value = null
+                        }
+                        loadLocations()
+                    } else {
+                        _errorMessage.value = "장소 삭제에 실패했습니다"
                     }
-                    loadLocations()
-                } else {
-                    _errorMessage.value = "장소 삭제에 실패했습니다"
                 }
-            } catch (e: Exception) {
-                _errorMessage.value = "장소 삭제 중 오류가 발생했습니다"
-            } finally {
-                _isLoading.value = false
+                is ApiResult.Error -> _errorMessage.value = "장소 삭제에 실패했습니다 (${result.code})"
+                is ApiResult.NetworkError -> _errorMessage.value = "네트워크 연결을 확인해주세요"
             }
+            _isLoading.value = false
         }
     }
 

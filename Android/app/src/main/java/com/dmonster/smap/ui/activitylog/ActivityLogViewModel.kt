@@ -9,6 +9,8 @@ import com.dmonster.smap.data.model.DailyCount
 import com.dmonster.smap.data.model.LocationSummary
 import com.dmonster.smap.data.model.SmapGroup
 import com.dmonster.smap.data.model.SmapGroupMember
+import com.dmonster.smap.data.api.ApiResult
+import com.dmonster.smap.data.api.safeApiCall
 import com.dmonster.smap.data.service.ActivityLogService
 import com.dmonster.smap.data.service.AuthService
 import com.dmonster.smap.data.service.GroupService
@@ -118,64 +120,73 @@ class ActivityLogViewModel @Inject constructor(
     private fun loadGroups() {
         viewModelScope.launch {
             _isLoading.value = true
-            try {
-                val groups = groupService.getGroups()
-                _groups.value = groups
-                
-                if (groups.isNotEmpty() && _selectedGroup.value == null) {
-                    selectGroup(groups.first())
+            when (val result = safeApiCall { groupService.getGroups() }) {
+                is ApiResult.Success -> {
+                    _groups.value = result.data
+                    if (result.data.isNotEmpty() && _selectedGroup.value == null) {
+                        selectGroup(result.data.first())
+                    }
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ 그룹 로드 실패", e)
-                _errorMessage.value = "그룹을 불러오는데 실패했습니다"
-            } finally {
-                _isLoading.value = false
+                is ApiResult.Error -> {
+                    Log.e(TAG, "❌ 그룹 로드 실패 (${result.code})")
+                    _errorMessage.value = "그룹을 불러오지 못했습니다 (${result.code})"
+                }
+                is ApiResult.NetworkError -> {
+                    Log.e(TAG, "❌ 그룹 로드 실패 - 네트워크", result.exception)
+                    _errorMessage.value = "네트워크 연결을 확인해주세요"
+                }
             }
+            _isLoading.value = false
         }
     }
 
     private fun loadMembers(groupId: Int) {
         viewModelScope.launch {
-            try {
-                val members = groupService.getGroupMembers(groupId)
-                _members.value = members
-                
-                // 현재 사용자를 기본 선택 (없으면 첫 번째 멤버)
-                if (members.isNotEmpty() && _selectedMember.value == null) {
-                    val currentUserIdx = authService.getUserData()?.mtIdx
-                    val selfMember = members.find { it.mtIdx == currentUserIdx }
-                    selectMember(selfMember ?: members.first())
+            when (val result = safeApiCall { groupService.getGroupMembers(groupId) }) {
+                is ApiResult.Success -> {
+                    _members.value = result.data
+
+                    // 현재 사용자를 기본 선택 (없으면 첫 번째 멤버)
+                    if (result.data.isNotEmpty() && _selectedMember.value == null) {
+                        val currentUserIdx = authService.getUserData()?.mtIdx
+                        val selfMember = result.data.find { it.mtIdx == currentUserIdx }
+                        selectMember(selfMember ?: result.data.first())
+                    }
+
+                    // Load activity stats for all members (for sidebar heatmap) - iOS와 동일한 그룹 API 사용
+                    loadMemberStats(groupId)
                 }
-                
-                // Load activity stats for all members (for sidebar heatmap) - iOS와 동일한 그룹 API 사용
-                loadMemberStats(groupId)
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ 멤버 로드 실패", e)
+                is ApiResult.Error -> Log.e(TAG, "❌ 멤버 로드 실패 (${result.code})")
+                is ApiResult.NetworkError -> Log.e(TAG, "❌ 멤버 로드 실패 - 네트워크", result.exception)
             }
         }
     }
 
     private fun loadMemberStats(groupId: Int) {
         viewModelScope.launch {
-            try {
-                // Single API call for all members in the group - iOS와 동일한 구조
-                val response = activityLogService.getDailyCountsForGroup(groupId, 14)
-                
-                if (response != null && !response.memberDailyCounts.isNullOrEmpty()) {
-                    // Transform MemberDailyCount[] to Map<Int, List<DailyCount>>
-                    val statsMap = response.memberDailyCounts.associate { memberCount ->
-                        memberCount.memberId to (memberCount.dailyCounts ?: emptyList())
+            when (val result = safeApiCall { activityLogService.getDailyCountsForGroup(groupId, 14) }) {
+                is ApiResult.Success -> {
+                    val response = result.data
+                    if (response != null && !response.memberDailyCounts.isNullOrEmpty()) {
+                        // Transform MemberDailyCount[] to Map<Int, List<DailyCount>>
+                        val statsMap = response.memberDailyCounts.associate { memberCount ->
+                            memberCount.memberId to (memberCount.dailyCounts ?: emptyList())
+                        }
+                        Log.d("ActivityLogVM", "Group stats loaded: ${statsMap.size} members, Dates: ${response.startDate} ~ ${response.endDate}")
+                        _memberActivityStats.value = statsMap
+                    } else {
+                        Log.w("ActivityLogVM", "No member stats returned for group $groupId")
+                        _memberActivityStats.value = emptyMap()
                     }
-                    
-                    Log.d("ActivityLogVM", "Group stats loaded: ${statsMap.size} members, Dates: ${response.startDate} ~ ${response.endDate}")
-                    _memberActivityStats.value = statsMap
-                } else {
-                    Log.w("ActivityLogVM", "No member stats returned for group $groupId")
+                }
+                is ApiResult.Error -> {
+                    Log.e(TAG, "Failed to load group member stats (${result.code})")
                     _memberActivityStats.value = emptyMap()
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to load group member stats", e)
-                _memberActivityStats.value = emptyMap()
+                is ApiResult.NetworkError -> {
+                    Log.e(TAG, "Failed to load group member stats - network", result.exception)
+                    _memberActivityStats.value = emptyMap()
+                }
             }
         }
     }
@@ -186,24 +197,31 @@ class ActivityLogViewModel @Inject constructor(
 
         viewModelScope.launch {
             _isLoadingLogs.value = true
-            try {
-                // Load logs and summary in parallel
-                val logs = activityLogService.getLocationLogs(member.mtIdx, date)
-                val summary = activityLogService.getLocationSummary(member.mtIdx, date)
-                val stays = activityLogService.getStayTimes(member.mtIdx, date)
-                
-                _locationLogs.value = logs.filter { it.hasValidCoordinates }
-                _locationSummary.value = summary
-                _stayTimes.value = stays
-                _sliderValue.value = 0.0 // Reset slider to start on new data
-                
-                Log.d(TAG, "✅ ${logs.size}개 로그, 요약: ${summary?.distanceFormatted}")
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ 활동 데이터 로드 실패", e)
-                _errorMessage.value = "활동 데이터를 불러오는데 실패했습니다"
-            } finally {
-                _isLoadingLogs.value = false
+            when (val result = safeApiCall {
+                Triple(
+                    activityLogService.getLocationLogs(member.mtIdx, date),
+                    activityLogService.getLocationSummary(member.mtIdx, date),
+                    activityLogService.getStayTimes(member.mtIdx, date)
+                )
+            }) {
+                is ApiResult.Success -> {
+                    val (logs, summary, stays) = result.data
+                    _locationLogs.value = logs.filter { it.hasValidCoordinates }
+                    _locationSummary.value = summary
+                    _stayTimes.value = stays
+                    _sliderValue.value = 0.0 // Reset slider to start on new data
+                    Log.d(TAG, "✅ ${logs.size}개 로그, 요약: ${summary?.distanceFormatted}")
+                }
+                is ApiResult.Error -> {
+                    Log.e(TAG, "❌ 활동 데이터 로드 실패 (${result.code})")
+                    _errorMessage.value = "활동 데이터를 불러오지 못했습니다 (${result.code})"
+                }
+                is ApiResult.NetworkError -> {
+                    Log.e(TAG, "❌ 활동 데이터 로드 실패 - 네트워크", result.exception)
+                    _errorMessage.value = "네트워크 연결을 확인해주세요"
+                }
             }
+            _isLoadingLogs.value = false
         }
     }
 

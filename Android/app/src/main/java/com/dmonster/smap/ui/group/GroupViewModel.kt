@@ -3,6 +3,8 @@ package com.dmonster.smap.ui.group
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.dmonster.smap.data.api.ApiResult
+import com.dmonster.smap.data.api.safeApiCall
 import com.dmonster.smap.data.model.SmapGroup
 import com.dmonster.smap.data.model.SmapGroupMember
 import com.dmonster.smap.data.service.AuthService
@@ -118,32 +120,37 @@ class GroupViewModel @Inject constructor(
             _isLoading.value = true
             _errorMessage.value = null
 
-            try {
-                val groups = groupService.getGroups()
-                _groups.value = groups
-                Log.d(TAG, "✅ ${groups.size}개 그룹 로드")
+            when (val result = safeApiCall { groupService.getGroups() }) {
+                is ApiResult.Success -> {
+                    val groups = result.data
+                    _groups.value = groups
+                    Log.d(TAG, "✅ ${groups.size}개 그룹 로드")
 
-                // Load member counts for each group
-                val memberCounts = groups.associate { it.sgtIdx to (it.memberCount ?: 0) }.toMutableMap()
-                _groupMemberCounts.value = memberCounts
+                    // Load member counts for each group
+                    val memberCounts = groups.associate { it.sgtIdx to (it.memberCount ?: 0) }.toMutableMap()
+                    _groupMemberCounts.value = memberCounts
 
-                // Optionally refresh secondary counts if needed (but API memberCount should be reliable)
-                for (group in groups) {
-                    try {
-                        val members = groupService.getGroupMembers(group.sgtIdx)
-                        memberCounts[group.sgtIdx] = members.size
-                        _groupMemberCounts.value = memberCounts.toMap()
-                    } catch (e: Exception) {
-                        Log.w(TAG, "⚠️ [loadGroups] Failed to get detailed members for group ${group.sgtIdx}")
+                    // Optionally refresh secondary counts if needed (but API memberCount should be reliable)
+                    for (group in groups) {
+                        when (val membersResult = safeApiCall { groupService.getGroupMembers(group.sgtIdx) }) {
+                            is ApiResult.Success -> {
+                                memberCounts[group.sgtIdx] = membersResult.data.size
+                                _groupMemberCounts.value = memberCounts.toMap()
+                            }
+                            else -> Log.w(TAG, "⚠️ [loadGroups] Failed to get detailed members for group ${group.sgtIdx}")
+                        }
                     }
                 }
-
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ 그룹 로드 실패", e)
-                _errorMessage.value = "그룹을 불러오는데 실패했습니다"
-            } finally {
-                _isLoading.value = false
+                is ApiResult.Error -> {
+                    Log.e(TAG, "❌ 그룹 로드 실패 (${result.code})")
+                    _errorMessage.value = "그룹 정보를 불러오지 못했습니다 (${result.code})"
+                }
+                is ApiResult.NetworkError -> {
+                    Log.e(TAG, "❌ 그룹 로드 실패 - 네트워크", result.exception)
+                    _errorMessage.value = "네트워크 연결을 확인해주세요"
+                }
             }
+            _isLoading.value = false
         }
     }
 
@@ -151,36 +158,49 @@ class GroupViewModel @Inject constructor(
         viewModelScope.launch {
             _isMembersLoading.value = true
 
-            try {
-                val members = groupService.getGroupMembers(group.sgtIdx)
-                _groupMembers.value = members
-                Log.d(TAG, "✅ ${members.size}명 멤버 로드")
+            when (val result = safeApiCall { groupService.getGroupMembers(group.sgtIdx) }) {
+                is ApiResult.Success -> {
+                    val members = result.data
+                    _groupMembers.value = members
+                    Log.d(TAG, "✅ ${members.size}명 멤버 로드")
 
-                // Update member count
-                _groupMemberCounts.value = _groupMemberCounts.value.toMutableMap().apply {
-                    put(group.sgtIdx, members.size)
+                    // Update member count
+                    _groupMemberCounts.value = _groupMemberCounts.value.toMutableMap().apply {
+                        put(group.sgtIdx, members.size)
+                    }
+
+                    // Load schedule count
+                    when (val scResult = safeApiCall { groupService.getGroupScheduleCount(group.sgtIdx) }) {
+                        is ApiResult.Success -> {
+                            Log.d(TAG, "📊 [loadGroupMembers] Schedule Count: ${scResult.data}")
+                            _groupScheduleCounts.value = _groupScheduleCounts.value.toMutableMap().apply {
+                                put(group.sgtIdx, scResult.data)
+                            }
+                        }
+                        else -> Log.w(TAG, "⚠️ Schedule count load failed for group ${group.sgtIdx}")
+                    }
+
+                    // Load location count
+                    when (val lcResult = safeApiCall { groupService.getGroupLocationCount(group.sgtIdx) }) {
+                        is ApiResult.Success -> {
+                            Log.d(TAG, "📊 [loadGroupMembers] Location Count: ${lcResult.data}")
+                            _groupLocationCounts.value = _groupLocationCounts.value.toMutableMap().apply {
+                                put(group.sgtIdx, lcResult.data)
+                            }
+                        }
+                        else -> Log.w(TAG, "⚠️ Location count load failed for group ${group.sgtIdx}")
+                    }
                 }
-
-                // Load schedule count
-                val scheduleCount = groupService.getGroupScheduleCount(group.sgtIdx)
-                Log.d(TAG, "📊 [loadGroupMembers] Schedule Count: $scheduleCount")
-                _groupScheduleCounts.value = _groupScheduleCounts.value.toMutableMap().apply {
-                    put(group.sgtIdx, scheduleCount)
+                is ApiResult.Error -> {
+                    Log.e(TAG, "❌ 멤버/통계 로드 실패 (${result.code})")
+                    _errorMessage.value = "그룹 정보를 불러오지 못했습니다 (${result.code})"
                 }
-
-                // Load location count
-                val locationCount = groupService.getGroupLocationCount(group.sgtIdx)
-                Log.d(TAG, "📊 [loadGroupMembers] Location Count: $locationCount")
-                _groupLocationCounts.value = _groupLocationCounts.value.toMutableMap().apply {
-                    put(group.sgtIdx, locationCount)
+                is ApiResult.NetworkError -> {
+                    Log.e(TAG, "❌ 멤버/통계 로드 실패 - 네트워크", result.exception)
+                    _errorMessage.value = "네트워크 연결을 확인해주세요"
                 }
-
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ 멤버/통계 로드 실패", e)
-                _errorMessage.value = "정보를 불러오는데 실패했습니다"
-            } finally {
-                _isMembersLoading.value = false
             }
+            _isMembersLoading.value = false
         }
     }
 
@@ -241,21 +261,21 @@ class GroupViewModel @Inject constructor(
 
         viewModelScope.launch {
             _isJoining.value = true
-            try {
-                val success = groupService.joinGroupByCode(code)
-                if (success) {
-                    _successMessage.value = "그룹에 가입되었습니다"
-                    _inviteCode.value = ""
-                    loadGroups()
-                    GlobalEventBus.tryEmit(GlobalEvent.GroupsChanged)
-                } else {
-                    _errorMessage.value = "그룹 가입에 실패했습니다"
+            when (val result = safeApiCall { groupService.joinGroupByCode(code) }) {
+                is ApiResult.Success -> {
+                    if (result.data) {
+                        _successMessage.value = "그룹에 가입되었습니다"
+                        _inviteCode.value = ""
+                        loadGroups()
+                        GlobalEventBus.tryEmit(GlobalEvent.GroupsChanged)
+                    } else {
+                        _errorMessage.value = "그룹 가입에 실패했습니다"
+                    }
                 }
-            } catch (e: Exception) {
-                _errorMessage.value = "그룹 가입 중 오류가 발생했습니다"
-            } finally {
-                _isJoining.value = false
+                is ApiResult.Error -> _errorMessage.value = "그룹 가입에 실패했습니다 (${result.code})"
+                is ApiResult.NetworkError -> _errorMessage.value = "네트워크 연결을 확인해주세요"
             }
+            _isJoining.value = false
         }
     }
 
@@ -264,21 +284,21 @@ class GroupViewModel @Inject constructor(
 
         viewModelScope.launch {
             _isCreating.value = true
-            try {
-                val group = groupService.createGroup(title, description.ifBlank { null })
-                if (group != null) {
-                    _successMessage.value = "그룹이 생성되었습니다"
-                    hideCreateDialog()
-                    loadGroups()
-                    GlobalEventBus.tryEmit(GlobalEvent.GroupsChanged)
-                } else {
-                    _errorMessage.value = "그룹 생성에 실패했습니다"
+            when (val result = safeApiCall { groupService.createGroup(title, description.ifBlank { null }) }) {
+                is ApiResult.Success -> {
+                    if (result.data != null) {
+                        _successMessage.value = "그룹이 생성되었습니다"
+                        hideCreateDialog()
+                        loadGroups()
+                        GlobalEventBus.tryEmit(GlobalEvent.GroupsChanged)
+                    } else {
+                        _errorMessage.value = "그룹 생성에 실패했습니다"
+                    }
                 }
-            } catch (e: Exception) {
-                _errorMessage.value = "그룹 생성 중 오류가 발생했습니다"
-            } finally {
-                _isCreating.value = false
+                is ApiResult.Error -> _errorMessage.value = "그룹 생성에 실패했습니다 (${result.code})"
+                is ApiResult.NetworkError -> _errorMessage.value = "네트워크 연결을 확인해주세요"
             }
+            _isCreating.value = false
         }
     }
 
@@ -287,23 +307,23 @@ class GroupViewModel @Inject constructor(
         if (title.isBlank()) return
 
         viewModelScope.launch {
-            try {
-                val success = groupService.updateGroup(group.sgtIdx, title, description.ifBlank { null })
-                if (success) {
-                    _successMessage.value = "그룹이 수정되었습니다"
-                    hideEditDialog()
-                    loadGroups()
-                    // Update selected group
-                    _selectedGroup.value = group.copy(
-                        sgtTitle = title,
-                        sgtMemo = description
-                    )
-                    GlobalEventBus.tryEmit(GlobalEvent.GroupsChanged)
-                } else {
-                    _errorMessage.value = "그룹 수정에 실패했습니다"
+            when (val result = safeApiCall { groupService.updateGroup(group.sgtIdx, title, description.ifBlank { null }) }) {
+                is ApiResult.Success -> {
+                    if (result.data) {
+                        _successMessage.value = "그룹이 수정되었습니다"
+                        hideEditDialog()
+                        loadGroups()
+                        _selectedGroup.value = group.copy(
+                            sgtTitle = title,
+                            sgtMemo = description
+                        )
+                        GlobalEventBus.tryEmit(GlobalEvent.GroupsChanged)
+                    } else {
+                        _errorMessage.value = "그룹 수정에 실패했습니다"
+                    }
                 }
-            } catch (e: Exception) {
-                _errorMessage.value = "그룹 수정 중 오류가 발생했습니다"
+                is ApiResult.Error -> _errorMessage.value = "그룹 수정에 실패했습니다 (${result.code})"
+                is ApiResult.NetworkError -> _errorMessage.value = "네트워크 연결을 확인해주세요"
             }
         }
     }
@@ -312,19 +332,20 @@ class GroupViewModel @Inject constructor(
         val group = _selectedGroup.value ?: return
 
         viewModelScope.launch {
-            try {
-                val success = groupService.deleteGroup(group.sgtIdx)
-                if (success) {
-                    _successMessage.value = "그룹이 삭제되었습니다"
-                    hideDeleteDialog()
-                    backToList()
-                    loadGroups()
-                    GlobalEventBus.tryEmit(GlobalEvent.GroupsChanged)
-                } else {
-                    _errorMessage.value = "그룹 삭제에 실패했습니다"
+            when (val result = safeApiCall { groupService.deleteGroup(group.sgtIdx) }) {
+                is ApiResult.Success -> {
+                    if (result.data) {
+                        _successMessage.value = "그룹이 삭제되었습니다"
+                        hideDeleteDialog()
+                        backToList()
+                        loadGroups()
+                        GlobalEventBus.tryEmit(GlobalEvent.GroupsChanged)
+                    } else {
+                        _errorMessage.value = "그룹 삭제에 실패했습니다"
+                    }
                 }
-            } catch (e: Exception) {
-                _errorMessage.value = "그룹 삭제 중 오류가 발생했습니다"
+                is ApiResult.Error -> _errorMessage.value = "그룹 삭제에 실패했습니다 (${result.code})"
+                is ApiResult.NetworkError -> _errorMessage.value = "네트워크 연결을 확인해주세요"
             }
         }
     }
@@ -334,20 +355,21 @@ class GroupViewModel @Inject constructor(
         val user = authService.getUserData() ?: return
 
         viewModelScope.launch {
-            try {
-                val mtIdx = user.mtIdx ?: return@launch
-                val success = groupService.removeMember(group.sgtIdx, mtIdx)
-                if (success) {
-                    _successMessage.value = "그룹에서 탈퇴되었습니다"
-                    hideDeleteDialog()
-                    backToList()
-                    loadGroups()
-                    GlobalEventBus.tryEmit(GlobalEvent.GroupsChanged)
-                } else {
-                    _errorMessage.value = "그룹 탈퇴에 실패했습니다"
+            val mtIdx = user.mtIdx ?: return@launch
+            when (val result = safeApiCall { groupService.removeMember(group.sgtIdx, mtIdx) }) {
+                is ApiResult.Success -> {
+                    if (result.data) {
+                        _successMessage.value = "그룹에서 탈퇴되었습니다"
+                        hideDeleteDialog()
+                        backToList()
+                        loadGroups()
+                        GlobalEventBus.tryEmit(GlobalEvent.GroupsChanged)
+                    } else {
+                        _errorMessage.value = "그룹 탈퇴에 실패했습니다"
+                    }
                 }
-            } catch (e: Exception) {
-                _errorMessage.value = "그룹 탈퇴 중 오류가 발생했습니다"
+                is ApiResult.Error -> _errorMessage.value = "그룹 탈퇴에 실패했습니다 (${result.code})"
+                is ApiResult.NetworkError -> _errorMessage.value = "네트워크 연결을 확인해주세요"
             }
         }
     }
@@ -357,17 +379,18 @@ class GroupViewModel @Inject constructor(
         val member = _selectedMember.value ?: return
 
         viewModelScope.launch {
-            try {
-                val success = groupService.updateMemberRole(group.sgtIdx, member.mtIdx, isLeader)
-                if (success) {
-                    _successMessage.value = if (isLeader) "리더로 변경되었습니다" else "멤버로 변경되었습니다"
-                    hideMemberManageDialog()
-                    loadGroupMembers(group)
-                } else {
-                    _errorMessage.value = "역할 변경에 실패했습니다"
+            when (val result = safeApiCall { groupService.updateMemberRole(group.sgtIdx, member.mtIdx, isLeader) }) {
+                is ApiResult.Success -> {
+                    if (result.data) {
+                        _successMessage.value = if (isLeader) "리더로 변경되었습니다" else "멤버로 변경되었습니다"
+                        hideMemberManageDialog()
+                        loadGroupMembers(group)
+                    } else {
+                        _errorMessage.value = "역할 변경에 실패했습니다"
+                    }
                 }
-            } catch (e: Exception) {
-                _errorMessage.value = "역할 변경 중 오류가 발생했습니다"
+                is ApiResult.Error -> _errorMessage.value = "역할 변경에 실패했습니다 (${result.code})"
+                is ApiResult.NetworkError -> _errorMessage.value = "네트워크 연결을 확인해주세요"
             }
         }
     }
@@ -377,17 +400,18 @@ class GroupViewModel @Inject constructor(
         val member = _selectedMember.value ?: return
 
         viewModelScope.launch {
-            try {
-                val success = groupService.removeMember(group.sgtIdx, member.mtIdx)
-                if (success) {
-                    _successMessage.value = "멤버가 탈퇴되었습니다"
-                    hideMemberManageDialog()
-                    loadGroupMembers(group)
-                } else {
-                    _errorMessage.value = "멤버 탈퇴에 실패했습니다"
+            when (val result = safeApiCall { groupService.removeMember(group.sgtIdx, member.mtIdx) }) {
+                is ApiResult.Success -> {
+                    if (result.data) {
+                        _successMessage.value = "멤버가 탈퇴되었습니다"
+                        hideMemberManageDialog()
+                        loadGroupMembers(group)
+                    } else {
+                        _errorMessage.value = "멤버 탈퇴에 실패했습니다"
+                    }
                 }
-            } catch (e: Exception) {
-                _errorMessage.value = "멤버 탈퇴 중 오류가 발생했습니다"
+                is ApiResult.Error -> _errorMessage.value = "멤버 탈퇴에 실패했습니다 (${result.code})"
+                is ApiResult.NetworkError -> _errorMessage.value = "네트워크 연결을 확인해주세요"
             }
         }
     }

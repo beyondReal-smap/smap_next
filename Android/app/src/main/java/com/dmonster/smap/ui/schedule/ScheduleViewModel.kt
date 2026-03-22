@@ -3,6 +3,8 @@ package com.dmonster.smap.ui.schedule
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.dmonster.smap.data.api.ApiResult
+import com.dmonster.smap.data.api.safeApiCall
 import com.dmonster.smap.data.model.SmapGroup
 import com.dmonster.smap.data.model.SmapGroupMember
 import com.dmonster.smap.data.model.SmapSchedule
@@ -120,19 +122,23 @@ class ScheduleViewModel @Inject constructor(
     private fun loadGroups() {
         viewModelScope.launch {
             _isLoading.value = true
-            try {
-                val groups = groupService.getGroups()
-                _groups.value = groups
-                
-                if (groups.isNotEmpty() && _selectedGroup.value == null) {
-                    selectGroup(groups.first())
+            when (val result = safeApiCall { groupService.getGroups() }) {
+                is ApiResult.Success -> {
+                    _groups.value = result.data
+                    if (result.data.isNotEmpty() && _selectedGroup.value == null) {
+                        selectGroup(result.data.first())
+                    }
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ 그룹 로드 실패", e)
-                _errorMessage.value = "그룹을 불러오는데 실패했습니다"
-            } finally {
-                _isLoading.value = false
+                is ApiResult.Error -> {
+                    Log.e(TAG, "❌ 그룹 로드 실패 (${result.code})")
+                    _errorMessage.value = "그룹을 불러오지 못했습니다 (${result.code})"
+                }
+                is ApiResult.NetworkError -> {
+                    Log.e(TAG, "❌ 그룹 로드 실패 - 네트워크", result.exception)
+                    _errorMessage.value = "네트워크 연결을 확인해주세요"
+                }
             }
+            _isLoading.value = false
         }
     }
 
@@ -142,45 +148,51 @@ class ScheduleViewModel @Inject constructor(
 
         viewModelScope.launch {
             _isLoadingSchedules.value = true
-            try {
-                val schedules = scheduleService.getSchedules(
+            when (val result = safeApiCall {
+                scheduleService.getSchedules(
                     groupId = group.sgtIdx,
                     year = month.year,
                     month = month.monthValue
                 )
-                val members = _members.value
-                schedules.forEach { s ->
-                    val creatorId = s.mtScheduleIdx ?: s.mtIdx
-                    val member = members.find { it.mtIdx == creatorId }
-                    if (member != null) {
-                        s.memberNameOverride = member.displayName
-                        s.memberPhotoOverride = member.mtFile1
+            }) {
+                is ApiResult.Success -> {
+                    val schedules = result.data
+                    val members = _members.value
+                    schedules.forEach { s ->
+                        val creatorId = s.mtScheduleIdx ?: s.mtIdx
+                        val member = members.find { it.mtIdx == creatorId }
+                        if (member != null) {
+                            s.memberNameOverride = member.displayName
+                            s.memberPhotoOverride = member.mtFile1
+                        }
+                    }
+
+                    _schedules.value = schedules
+                    Log.d(TAG, "✅ ${schedules.size}개 일정 로드 (멤버 매핑 완료)")
+
+                    schedules.take(5).forEach { s ->
+                        Log.d(TAG, "📅 Schedule: title=${s.displayTitle}, creatorId=${s.mtScheduleIdx ?: s.mtIdx}, validName=${s.validMemberName}")
                     }
                 }
-                
-                _schedules.value = schedules
-                Log.d(TAG, "✅ ${schedules.size}개 일정 로드 (멤버 매핑 완료)")
-                
-                // Debug: Sample values
-                schedules.take(5).forEach { s ->
-                    Log.d(TAG, "📅 Schedule: title=${s.displayTitle}, creatorId=${s.mtScheduleIdx ?: s.mtIdx}, validName=${s.validMemberName}")
+                is ApiResult.Error -> {
+                    Log.e(TAG, "❌ 일정 로드 실패 (${result.code})")
+                    _errorMessage.value = "일정을 불러오지 못했습니다 (${result.code})"
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ 일정 로드 실패", e)
-                _errorMessage.value = "일정을 불러오는데 실패했습니다"
-            } finally {
-                _isLoadingSchedules.value = false
+                is ApiResult.NetworkError -> {
+                    Log.e(TAG, "❌ 일정 로드 실패 - 네트워크", result.exception)
+                    _errorMessage.value = "네트워크 연결을 확인해주세요"
+                }
             }
+            _isLoadingSchedules.value = false
         }
     }
 
     private fun loadMembers(groupId: Int) {
         viewModelScope.launch {
-            try {
-                val members = groupService.getGroupMembers(groupId)
-                _members.value = members
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ 멤버 로드 실패", e)
+            when (val result = safeApiCall { groupService.getGroupMembers(groupId) }) {
+                is ApiResult.Success -> _members.value = result.data
+                is ApiResult.Error -> Log.e(TAG, "❌ 멤버 로드 실패 (${result.code})")
+                is ApiResult.NetworkError -> Log.e(TAG, "❌ 멤버 로드 실패 - 네트워크", result.exception)
             }
         }
     }
@@ -288,13 +300,13 @@ class ScheduleViewModel @Inject constructor(
         val group = _selectedGroup.value ?: return
         val user = authService.getUserData() ?: return
         val userId = targetMemberId ?: user.mtIdx ?: return
-        
+
         if (title.isBlank()) return
 
         viewModelScope.launch {
             _isCreating.value = true
-            try {
-                val schedule = scheduleService.createSchedule(
+            when (val result = safeApiCall {
+                scheduleService.createSchedule(
                     groupId = group.sgtIdx,
                     memberId = userId,
                     title = title,
@@ -308,18 +320,20 @@ class ScheduleViewModel @Inject constructor(
                     alarmTime = alarmTime,
                     repeatConfig = repeatConfig
                 )
-                if (schedule != null) {
-                    _successMessage.value = "일정이 생성되었습니다"
-                    hideCreateDialog()
-                    loadSchedules()
-                } else {
-                    _errorMessage.value = "일정 생성에 실패했습니다"
+            }) {
+                is ApiResult.Success -> {
+                    if (result.data != null) {
+                        _successMessage.value = "일정이 생성되었습니다"
+                        hideCreateDialog()
+                        loadSchedules()
+                    } else {
+                        _errorMessage.value = "일정 생성에 실패했습니다"
+                    }
                 }
-            } catch (e: Exception) {
-                _errorMessage.value = "일정 생성 중 오류가 발생했습니다"
-            } finally {
-                _isCreating.value = false
+                is ApiResult.Error -> _errorMessage.value = "일정 생성에 실패했습니다 (${result.code})"
+                is ApiResult.NetworkError -> _errorMessage.value = "네트워크 연결을 확인해주세요"
             }
+            _isCreating.value = false
         }
     }
 
@@ -340,8 +354,8 @@ class ScheduleViewModel @Inject constructor(
         if (title.isBlank()) return
 
         viewModelScope.launch {
-            try {
-                val success = scheduleService.updateSchedule(
+            when (val result = safeApiCall {
+                scheduleService.updateSchedule(
                     scheduleId = scheduleId,
                     title = title,
                     startDate = startDate,
@@ -358,32 +372,36 @@ class ScheduleViewModel @Inject constructor(
                     groupId = _showEditDialog.value?.sgtIdx ?: 0,
                     editOption = editOption
                 )
-                if (success) {
-                    _successMessage.value = "일정이 수정되었습니다"
-                    hideEditDialog()
-                    loadSchedules()
-                } else {
-                    _errorMessage.value = "일정 수정에 실패했습니다"
+            }) {
+                is ApiResult.Success -> {
+                    if (result.data) {
+                        _successMessage.value = "일정이 수정되었습니다"
+                        hideEditDialog()
+                        loadSchedules()
+                    } else {
+                        _errorMessage.value = "일정 수정에 실패했습니다"
+                    }
                 }
-            } catch (e: Exception) {
-                _errorMessage.value = "일정 수정 중 오류가 발생했습니다"
+                is ApiResult.Error -> _errorMessage.value = "일정 수정에 실패했습니다 (${result.code})"
+                is ApiResult.NetworkError -> _errorMessage.value = "네트워크 연결을 확인해주세요"
             }
         }
     }
 
     fun deleteSchedule(scheduleId: String, groupId: Int, deleteOption: String = "this") {
         viewModelScope.launch {
-            try {
-                val success = scheduleService.deleteSchedule(scheduleId, groupId, deleteOption)
-                if (success) {
-                    _successMessage.value = "일정이 삭제되었습니다"
-                    hideDeleteDialog()
-                    loadSchedules()
-                } else {
-                    _errorMessage.value = "일정 삭제에 실패했습니다"
+            when (val result = safeApiCall { scheduleService.deleteSchedule(scheduleId, groupId, deleteOption) }) {
+                is ApiResult.Success -> {
+                    if (result.data) {
+                        _successMessage.value = "일정이 삭제되었습니다"
+                        hideDeleteDialog()
+                        loadSchedules()
+                    } else {
+                        _errorMessage.value = "일정 삭제에 실패했습니다"
+                    }
                 }
-            } catch (e: Exception) {
-                _errorMessage.value = "일정 삭제 중 오류가 발생했습니다"
+                is ApiResult.Error -> _errorMessage.value = "일정 삭제에 실패했습니다 (${result.code})"
+                is ApiResult.NetworkError -> _errorMessage.value = "네트워크 연결을 확인해주세요"
             }
         }
     }

@@ -3,6 +3,8 @@ package com.dmonster.smap.ui.login
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.dmonster.smap.data.api.ApiResult
+import com.dmonster.smap.data.api.safeApiCall
 import com.dmonster.smap.data.model.SocialLoginResponse
 import com.dmonster.smap.data.service.AuthService
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -95,34 +97,41 @@ class LoginViewModel @Inject constructor(
             showErrorMessage("전화번호와 비밀번호를 입력해주세요.")
             return
         }
-        
+
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
-            
+
             Log.d("LoginViewModel", "🚀 일반 로그인 시작: ${_uiState.value.phoneNumber}")
-            try {
-                Log.d("LoginViewModel", "📡 Backend에 로그인 요청 중... (${_uiState.value.phoneNumber})")
-                val response = authService.login(
+            when (val result = safeApiCall {
+                authService.login(
                     phoneNumber = _uiState.value.phoneNumber,
                     password = _uiState.value.password
                 )
-                
-                Log.d("LoginViewModel", "📥 Backend 응답 수신: success=${response.success}")
-                if (response.success) {
-                    Log.d("LoginViewModel", "✅ 로그인 성공 - 메인으로 이동 준비")
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        isLoggedIn = true
-                    )
-                } else {
-                    Log.w("LoginViewModel", "❌ 로그인 실패: ${response.message}")
-                    showErrorMessage(response.message)
+            }) {
+                is ApiResult.Success -> {
+                    val response = result.data
+                    Log.d("LoginViewModel", "📥 Backend 응답 수신: success=${response.success}")
+                    if (response.success) {
+                        Log.d("LoginViewModel", "✅ 로그인 성공 - 메인으로 이동 준비")
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            isLoggedIn = true
+                        )
+                    } else {
+                        Log.w("LoginViewModel", "❌ 로그인 실패: ${response.message}")
+                        showErrorMessage(response.message)
+                    }
                 }
-            } catch (e: Exception) {
-                Log.e("LoginViewModel", "❌ 로그인 중 예외 발생", e)
-                showErrorMessage("네트워크 오류가 발생했습니다: ${e.message}")
+                is ApiResult.Error -> {
+                    Log.e("LoginViewModel", "❌ 로그인 실패 (${result.code})")
+                    showErrorMessage("로그인에 실패했습니다 (${result.code})")
+                }
+                is ApiResult.NetworkError -> {
+                    Log.e("LoginViewModel", "❌ 로그인 중 네트워크 오류", result.exception)
+                    showErrorMessage("네트워크 연결을 확인해주세요")
+                }
             }
-            
+
             _uiState.value = _uiState.value.copy(isLoading = false)
             Log.d("LoginViewModel", "🏁 login 종료 (isLoading = false)")
         }
@@ -134,23 +143,30 @@ class LoginViewModel @Inject constructor(
     fun handleGoogleLoginResult(idToken: String, email: String?, name: String?, googleId: String?, profileImage: String? = null) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
-            
-            try {
-                Log.d("LoginViewModel", "📡 Backend에 Google 로그인 요청 중... ($email)")
-                val response = authService.googleLogin(
+
+            Log.d("LoginViewModel", "📡 Backend에 Google 로그인 요청 중... ($email)")
+            when (val result = safeApiCall {
+                authService.googleLogin(
                     idToken = idToken,
                     email = email,
                     name = name,
                     googleId = googleId
                 )
-                
-                Log.d("LoginViewModel", "📥 Backend 응답 수신: success=${response.success}")
-                handleSocialLoginResponse(response, "google", email, name, googleId, profileImage)
-            } catch (e: Exception) {
-                Log.e("LoginViewModel", "❌ Google 로그인 예외 발생", e)
-                showErrorMessage("Google 로그인 중 오류가 발생했습니다: ${e.message}")
+            }) {
+                is ApiResult.Success -> {
+                    Log.d("LoginViewModel", "📥 Backend 응답 수신: success=${result.data.success}")
+                    handleSocialLoginResponse(result.data, "google", email, name, googleId, profileImage)
+                }
+                is ApiResult.Error -> {
+                    Log.e("LoginViewModel", "❌ Google 로그인 실패 (${result.code})")
+                    showErrorMessage("Google 로그인에 실패했습니다 (${result.code})")
+                }
+                is ApiResult.NetworkError -> {
+                    Log.e("LoginViewModel", "❌ Google 로그인 네트워크 오류", result.exception)
+                    showErrorMessage("네트워크 연결을 확인해주세요")
+                }
             }
-            
+
             _uiState.value = _uiState.value.copy(isLoading = false)
             Log.d("LoginViewModel", "🏁 handleGoogleLoginResult 종료 (isLoading = false)")
         }
@@ -168,24 +184,31 @@ class LoginViewModel @Inject constructor(
     ) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
-            
-            try {
-                Log.d("LoginViewModel", "📡 Backend에 Kakao 로그인 요청 중... ($email)")
-                val response = authService.kakaoLogin(
+
+            Log.d("LoginViewModel", "📡 Backend에 Kakao 로그인 요청 중... ($email)")
+            when (val result = safeApiCall {
+                authService.kakaoLogin(
                     accessToken = accessToken,
                     email = email,
                     nickname = nickname,
                     kakaoId = kakaoId,
                     profileImage = profileImage
                 )
-                
-                Log.d("LoginViewModel", "📥 Backend 응답 수신: success=${response.success}")
-                handleSocialLoginResponse(response, "kakao", email, nickname, kakaoId, profileImage)
-            } catch (e: Exception) {
-                Log.e("LoginViewModel", "❌ Kakao 로그인 예외 발생", e)
-                showErrorMessage("Kakao 로그인 중 오류가 발생했습니다: ${e.message}")
+            }) {
+                is ApiResult.Success -> {
+                    Log.d("LoginViewModel", "📥 Backend 응답 수신: success=${result.data.success}")
+                    handleSocialLoginResponse(result.data, "kakao", email, nickname, kakaoId, profileImage)
+                }
+                is ApiResult.Error -> {
+                    Log.e("LoginViewModel", "❌ Kakao 로그인 실패 (${result.code})")
+                    showErrorMessage("Kakao 로그인에 실패했습니다 (${result.code})")
+                }
+                is ApiResult.NetworkError -> {
+                    Log.e("LoginViewModel", "❌ Kakao 로그인 네트워크 오류", result.exception)
+                    showErrorMessage("네트워크 연결을 확인해주세요")
+                }
             }
-            
+
             _uiState.value = _uiState.value.copy(isLoading = false)
             Log.d("LoginViewModel", "🏁 handleKakaoLoginResult 종료 (isLoading = false)")
         }

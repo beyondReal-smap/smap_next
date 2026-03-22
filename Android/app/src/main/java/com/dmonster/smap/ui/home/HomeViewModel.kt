@@ -3,6 +3,8 @@ package com.dmonster.smap.ui.home
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.dmonster.smap.data.api.ApiResult
+import com.dmonster.smap.data.api.safeApiCall
 import com.dmonster.smap.data.model.SmapGroup
 import com.dmonster.smap.data.model.SmapGroupMember
 import com.dmonster.smap.data.model.SmapSchedule
@@ -175,38 +177,43 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             _isLoading.value = true
             _errorMessage.value = null
-            
-            try {
-                Log.d(TAG, "🚀 [API] 그룹 목록 로드 시작")
-                
-                // 1. 그룹 목록 조회
-                val groups = homeService.getGroups()
-                _groups.value = groups
-                
-                if (groups.isEmpty()) {
-                    Log.w(TAG, "⚠️ [API] 그룹이 없습니다 - 그룹 생성 모달 표시")
-                    _showGroupCreationModal.value = true
-                    _isLoading.value = false
-                    return@launch
+
+            Log.d(TAG, "🚀 [API] 그룹 목록 로드 시작")
+            when (val result = safeApiCall { homeService.getGroups() }) {
+                is ApiResult.Success -> {
+                    val groups = result.data
+                    _groups.value = groups
+
+                    if (groups.isEmpty()) {
+                        Log.w(TAG, "⚠️ [API] 그룹이 없습니다 - 그룹 생성 모달 표시")
+                        _showGroupCreationModal.value = true
+                        _isLoading.value = false
+                        return@launch
+                    }
+
+                    Log.d(TAG, "✅ [API] ${groups.size}개 그룹 로드 완료")
+
+                    // 첫 번째 그룹 자동 선택
+                    if (_selectedGroup.value == null) {
+                        selectGroup(groups.first())
+                    }
                 }
-                
-                Log.d(TAG, "✅ [API] ${groups.size}개 그룹 로드 완료")
-                
-                // 2. 첫 번째 그룹 자동 선택
-                if (_selectedGroup.value == null) {
-                    selectGroup(groups.first())
+                is ApiResult.Error -> {
+                    Log.e(TAG, "❌ [API] 데이터 로드 실패 (${result.code})")
+                    _errorMessage.value = "데이터를 불러오지 못했습니다 (${result.code})"
+                    if (_groups.value.isEmpty()) {
+                        _showGroupCreationModal.value = true
+                    }
                 }
-                
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ [API] 데이터 로드 실패", e)
-                _errorMessage.value = "데이터를 불러오는데 실패했습니다: ${e.message}"
-                // 에러 시에도 그룹이 없으면 모달 표시
-                if (_groups.value.isEmpty()) {
-                    _showGroupCreationModal.value = true
+                is ApiResult.NetworkError -> {
+                    Log.e(TAG, "❌ [API] 데이터 로드 실패 - 네트워크", result.exception)
+                    _errorMessage.value = "네트워크 연결을 확인해주세요"
+                    if (_groups.value.isEmpty()) {
+                        _showGroupCreationModal.value = true
+                    }
                 }
-            } finally {
-                _isLoading.value = false
             }
+            _isLoading.value = false
         }
     }
     
@@ -216,29 +223,30 @@ class HomeViewModel @Inject constructor(
     fun createGroup(name: String, description: String) {
         viewModelScope.launch {
             _isCreatingGroup.value = true
-            
-            try {
-                Log.d(TAG, "🚀 [API] 그룹 생성 시작: $name")
-                val newGroup = homeService.createGroup(name, description)
-                
-                if (newGroup != null) {
-                    Log.d(TAG, "✅ [API] 그룹 생성 성공: ${newGroup.sgtIdx}")
-                    _showGroupCreationModal.value = false
-                    
-                    // 데이터 새로고침
-                    loadDataFromAPI()
-                    
-                    // Global Event 발송
-                    GlobalEventBus.emit(GlobalEvent.GroupsChanged)
-                } else {
-                    _errorMessage.value = "그룹 생성에 실패했습니다. 다시 시도해주세요."
+
+            Log.d(TAG, "🚀 [API] 그룹 생성 시작: $name")
+            when (val result = safeApiCall { homeService.createGroup(name, description) }) {
+                is ApiResult.Success -> {
+                    val newGroup = result.data
+                    if (newGroup != null) {
+                        Log.d(TAG, "✅ [API] 그룹 생성 성공: ${newGroup.sgtIdx}")
+                        _showGroupCreationModal.value = false
+                        loadDataFromAPI()
+                        GlobalEventBus.emit(GlobalEvent.GroupsChanged)
+                    } else {
+                        _errorMessage.value = "그룹 생성에 실패했습니다. 다시 시도해주세요."
+                    }
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ [API] 그룹 생성 실패", e)
-                _errorMessage.value = "그룹 생성 중 오류가 발생했습니다: ${e.message}"
-            } finally {
-                _isCreatingGroup.value = false
+                is ApiResult.Error -> {
+                    Log.e(TAG, "❌ [API] 그룹 생성 실패 (${result.code})")
+                    _errorMessage.value = "그룹 생성에 실패했습니다 (${result.code})"
+                }
+                is ApiResult.NetworkError -> {
+                    Log.e(TAG, "❌ [API] 그룹 생성 실패 - 네트워크", result.exception)
+                    _errorMessage.value = "네트워크 연결을 확인해주세요"
+                }
             }
+            _isCreatingGroup.value = false
         }
     }
     
@@ -249,29 +257,29 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             _isCreatingGroup.value = true
             _errorMessage.value = null
-            
-            try {
-                Log.d(TAG, "🚀 [API] 초대코드로 그룹 가입 시작: $inviteCode")
-                val success = homeService.joinGroup(inviteCode)
-                
-                if (success) {
-                    Log.d(TAG, "✅ [API] 그룹 가입 성공")
-                    _showGroupCreationModal.value = false
-                    
-                    // 데이터 새로고침
-                    loadDataFromAPI()
-                    
-                    // Global Event 발송
-                    GlobalEventBus.emit(GlobalEvent.GroupsChanged)
-                } else {
-                    _errorMessage.value = "그룹 가입에 실패했습니다. 초대 코드를 확인해주세요."
+
+            Log.d(TAG, "🚀 [API] 초대코드로 그룹 가입 시작: $inviteCode")
+            when (val result = safeApiCall { homeService.joinGroup(inviteCode) }) {
+                is ApiResult.Success -> {
+                    if (result.data) {
+                        Log.d(TAG, "✅ [API] 그룹 가입 성공")
+                        _showGroupCreationModal.value = false
+                        loadDataFromAPI()
+                        GlobalEventBus.emit(GlobalEvent.GroupsChanged)
+                    } else {
+                        _errorMessage.value = "그룹 가입에 실패했습니다. 초대 코드를 확인해주세요."
+                    }
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ [API] 그룹 가입 실패", e)
-                _errorMessage.value = "그룹 가입 중 오류가 발생했습니다: ${e.message}"
-            } finally {
-                _isCreatingGroup.value = false
+                is ApiResult.Error -> {
+                    Log.e(TAG, "❌ [API] 그룹 가입 실패 (${result.code})")
+                    _errorMessage.value = "그룹 가입에 실패했습니다 (${result.code})"
+                }
+                is ApiResult.NetworkError -> {
+                    Log.e(TAG, "❌ [API] 그룹 가입 실패 - 네트워크", result.exception)
+                    _errorMessage.value = "네트워크 연결을 확인해주세요"
+                }
             }
+            _isCreatingGroup.value = false
         }
     }
     
@@ -284,36 +292,50 @@ class HomeViewModel @Inject constructor(
      */
     private fun loadGroupData(groupId: Int) {
         viewModelScope.launch {
-            try {
-                Log.d(TAG, "🚀 [API] 그룹($groupId) 멤버 및 일정 로드 시작")
-                
-                // 멤버 목록 조회
-                val members = homeService.getGroupMembers(groupId)
-                
-                // 현재 사용자를 기본 선택 (없으면 첫 번째 멤버)
-                if (members.isNotEmpty() && _selectedMemberId.value == null) {
-                    val currentUserIdx = homeService.getCurrentUserIdx()
-                    val selfMember = members.find { it.mtIdx == currentUserIdx }
-                    _selectedMemberId.value = selfMember?.mtIdx ?: members.first().mtIdx
+            Log.d(TAG, "🚀 [API] 그룹($groupId) 멤버 및 일정 로드 시작")
+
+            when (val result = safeApiCall { homeService.getGroupMembers(groupId) }) {
+                is ApiResult.Success -> {
+                    val members = result.data
+
+                    // 현재 사용자를 기본 선택 (없으면 첫 번째 멤버)
+                    if (members.isNotEmpty() && _selectedMemberId.value == null) {
+                        val currentUserIdx = homeService.getCurrentUserIdx()
+                        val selfMember = members.find { it.mtIdx == currentUserIdx }
+                        _selectedMemberId.value = selfMember?.mtIdx ?: members.first().mtIdx
+                    }
+
+                    val currentSelectedId = _selectedMemberId.value
+                    val membersWithSelection = members.map { member ->
+                        member.copy(isSelected = member.mtIdx == currentSelectedId)
+                    }
+                    _members.value = membersWithSelection
+                    Log.d(TAG, "✅ [API] ${members.size}명 멤버 로드 완료")
+
+                    // 일정 목록 조회 (14일)
+                    when (val schedResult = safeApiCall { homeService.getGroupSchedules(groupId, 14) }) {
+                        is ApiResult.Success -> {
+                            _allSchedules.value = schedResult.data
+                            Log.d(TAG, "✅ [API] ${schedResult.data.size}개 일정 로드 완료")
+                        }
+                        is ApiResult.Error -> {
+                            Log.e(TAG, "❌ [API] 일정 로드 실패 (${schedResult.code})")
+                            _errorMessage.value = "일정을 불러오지 못했습니다 (${schedResult.code})"
+                        }
+                        is ApiResult.NetworkError -> {
+                            Log.e(TAG, "❌ [API] 일정 로드 실패 - 네트워크", schedResult.exception)
+                            _errorMessage.value = "네트워크 연결을 확인해주세요"
+                        }
+                    }
                 }
-                
-                val currentSelectedId = _selectedMemberId.value
-                val membersWithSelection = members.map { member -> 
-                    member.copy(isSelected = member.mtIdx == currentSelectedId) 
+                is ApiResult.Error -> {
+                    Log.e(TAG, "❌ [API] 그룹 데이터 로드 실패 (${result.code})")
+                    _errorMessage.value = "그룹 데이터를 불러오지 못했습니다 (${result.code})"
                 }
-                _members.value = membersWithSelection
-                
-                Log.d(TAG, "✅ [API] ${members.size}명 멤버 로드 완료")
-                
-                // 일정 목록 조회 (14일)
-                val schedules = homeService.getGroupSchedules(groupId, 14)
-                _allSchedules.value = schedules
-                
-                Log.d(TAG, "✅ [API] ${schedules.size}개 일정 로드 완료")
-                
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ [API] 그룹 데이터 로드 실패", e)
-                _errorMessage.value = "그룹 데이터를 불러오는데 실패했습니다"
+                is ApiResult.NetworkError -> {
+                    Log.e(TAG, "❌ [API] 그룹 데이터 로드 실패 - 네트워크", result.exception)
+                    _errorMessage.value = "네트워크 연결을 확인해주세요"
+                }
             }
         }
     }
@@ -325,32 +347,34 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             _isLoading.value = true
             _errorMessage.value = null
-            
-            try {
-                Log.d(TAG, "🔄 [REFRESH] 전체 데이터 새로고침 시작")
-                
-                // 1. 그룹 목록 새로고침
-                val groups = homeService.getGroups()
-                _groups.value = groups
-                Log.d(TAG, "🔄 [REFRESH] ${groups.size}개 그룹 로드 완료")
-                
-                // 2. 현재 선택된 그룹의 멤버/일정 새로고침
-                val currentGroup = _selectedGroup.value
-                if (currentGroup != null) {
-                    Log.d(TAG, "🔄 [REFRESH] 그룹(${currentGroup.sgtIdx}) 멤버/일정 새로고침")
-                    loadGroupData(currentGroup.sgtIdx)
-                } else if (groups.isNotEmpty()) {
-                    // 선택된 그룹이 없으면 첫 번째 그룹 선택
-                    selectGroup(groups.first())
+
+            Log.d(TAG, "🔄 [REFRESH] 전체 데이터 새로고침 시작")
+            when (val result = safeApiCall { homeService.getGroups() }) {
+                is ApiResult.Success -> {
+                    val groups = result.data
+                    _groups.value = groups
+                    Log.d(TAG, "🔄 [REFRESH] ${groups.size}개 그룹 로드 완료")
+
+                    val currentGroup = _selectedGroup.value
+                    if (currentGroup != null) {
+                        Log.d(TAG, "🔄 [REFRESH] 그룹(${currentGroup.sgtIdx}) 멤버/일정 새로고침")
+                        loadGroupData(currentGroup.sgtIdx)
+                    } else if (groups.isNotEmpty()) {
+                        selectGroup(groups.first())
+                    }
+
+                    Log.d(TAG, "✅ [REFRESH] 전체 데이터 새로고침 완료")
                 }
-                
-                Log.d(TAG, "✅ [REFRESH] 전체 데이터 새로고침 완료")
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ [REFRESH] 데이터 새로고침 실패", e)
-                _errorMessage.value = "데이터를 새로고침하는데 실패했습니다: ${e.message}"
-            } finally {
-                _isLoading.value = false
+                is ApiResult.Error -> {
+                    Log.e(TAG, "❌ [REFRESH] 데이터 새로고침 실패 (${result.code})")
+                    _errorMessage.value = "데이터를 새로고침하지 못했습니다 (${result.code})"
+                }
+                is ApiResult.NetworkError -> {
+                    Log.e(TAG, "❌ [REFRESH] 데이터 새로고침 실패 - 네트워크", result.exception)
+                    _errorMessage.value = "네트워크 연결을 확인해주세요"
+                }
             }
+            _isLoading.value = false
         }
     }
 
