@@ -1,6 +1,5 @@
 package com.dmonster.smap
 
-import com.dmonster.smap.BuildConfig
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -15,36 +14,81 @@ import android.os.Looper
 import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
+import com.dmonster.smap.data.api.SmapApi
+import com.dmonster.smap.data.model.CreateLocationLogRequest
 import com.google.android.gms.location.*
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.*
-import okhttp3.*
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
-import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.*
 
+/**
+ * Adaptive 3-mode foreground location service for battery-efficient tracking.
+ *
+ * Modes:
+ *  - STATIONARY : low-power, 5 min interval, 500 m displacement, 15 min heartbeat
+ *  - WALKING    : high-accuracy, 30 s interval, 30 m displacement, 1 min batch
+ *  - AUTOMOTIVE : high-accuracy, 15 s interval, 100 m displacement, 1 min batch
+ *
+ * Mode is detected from GPS speed with a 5-minute dwell timer before entering
+ * STATIONARY, and instant upgrade to WALKING/AUTOMOTIVE when movement resumes.
+ */
 class LocationService : Service() {
+
+    // ── Hilt entry point (Service cannot use @Inject) ──────────────────────
+
+    @EntryPoint
+    @InstallIn(SingletonComponent::class)
+    interface LocationServiceEntryPoint {
+        fun smapApi(): SmapApi
+    }
+
+    private val smapApi: SmapApi by lazy {
+        EntryPointAccessors.fromApplication(
+            applicationContext, LocationServiceEntryPoint::class.java
+        ).smapApi()
+    }
+
+    // ── Power modes ────────────────────────────────────────────────────────
+
+    enum class PowerMode { STATIONARY, WALKING, AUTOMOTIVE }
+
+    private var currentMode = PowerMode.WALKING
+
+    // ── Location client ────────────────────────────────────────────────────
+
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var locationRequest: LocationRequest
-    private val client = OkHttpClient()
 
-    // 속도 변화 감지 관련 변수들
-    private var lastSpeed: Float = -1f
-    private var lastLocationTime: Long = 0L
-    private var speedChangeThreshold = 0.3f // 속도 변화 임계값 (m/s) - 사람이 걷는 정도
+    // ── Activity / mode detection ──────────────────────────────────────────
+
+    private var stationaryStartTime: Long = 0L
     private var lastLocation: Location? = null
-    private var distanceThreshold = 10.0f // 거리 기반 임계값 (미터)
+
+    // ── Location batching ──────────────────────────────────────────────────
+
+    private val pendingLocations = mutableListOf<CreateLocationLogRequest>()
+    private val maxQueueSize = 100
+    private var batchTimer: Timer? = null
+    private var heartbeatTimer: Timer? = null
+
+    // ── Coroutine scope ────────────────────────────────────────────────────
+
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    // ── Constants ──────────────────────────────────────────────────────────
 
     companion object {
         private const val TAG = "LocationService"
         private const val NOTIFICATION_CHANNEL_ID = "LocationServiceChannel"
         private const val NOTIFICATION_ID = 10000
-        private const val GPS_REFRESH_INTERVAL = 10000L // 10초로 단축
-        private const val GPS_MIN_REFRESH_INTERVAL = 5000L // 5초로 단축
-        private const val GPS_MAX_REFRESH_INTERVAL = 15000L // 15초로 단축
-        private val API_BASE_URL = "${BuildConfig.WEB_BASE_URL}/api"
+
+        private const val STATIONARY_DWELL_MS = 5 * 60 * 1000L  // 5 min before entering stationary
+        private const val HEARTBEAT_INTERVAL_MS = 900_000L       // 15 min
+        private const val BATCH_INTERVAL_MS = 60_000L            // 1 min
 
         fun isRunning(context: Context): Boolean {
             val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
@@ -53,123 +97,295 @@ class LocationService : Service() {
         }
     }
 
+    // ── Location callback ──────────────────────────────────────────────────
+
     private val locationCallback: LocationCallback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
-            Log.d(TAG, "🔥 [LOCATION] ===== 위치 업데이트 수신 시작 =====")
-            Log.d(TAG, "🔥 [LOCATION] onLocationResult 호출됨 - 위치 개수: ${result.locations.size}")
-            Log.d(TAG, "🔥 [LOCATION] 서비스 상태 - 속도 임계값: ${speedChangeThreshold}m/s, 거리 임계값: ${distanceThreshold}m")
-            
             result.locations.lastOrNull()?.let { location ->
-                Log.d(TAG, "📍 [LOCATION] 새로운 위치 데이터 수신:")
-                Log.d(TAG, "   위도: ${location.latitude}")
-                Log.d(TAG, "   경도: ${location.longitude}")
-                Log.d(TAG, "   속도: ${location.speed} m/s")
-                Log.d(TAG, "   정확도: ${location.accuracy} m")
-                Log.d(TAG, "   시간: ${SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(location.time))}")
-                
-                // 좌표 유효성 검증
-                if (!isValidCoordinate(location)) {
-                    Log.w(TAG, "⚠️ [LOCATION] 유효하지 않은 좌표 - 전송 건너뜀")
-                    Log.w(TAG, "   위도: ${location.latitude}, 경도: ${location.longitude}")
-                    return
-                }
-                
-                // 속도 변화 감지 및 위치 정보 전송
-                val shouldSend = shouldSendLocationBasedOnSpeed(location)
-                Log.d(TAG, "🤔 [LOCATION] 전송 여부 결정: $shouldSend")
-                
-                if (shouldSend) {
-                    val mltGpsData = MltGpsData(
-                        location.latitude.toString(),
-                        location.longitude.toString(),
-                        location.speed.toString(),
-                        location.accuracy.toString(),
-                        SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(location.time))
-                    )
+                if (!isValidCoordinate(location)) return
 
-                    Log.d(TAG, "✅ [LOCATION] 위치 정보 서버 전송 시작")
-                    sendLocationToServer(mltGpsData)
-                } else {
-                    Log.d(TAG, "⏭️ [LOCATION] 위치 정보 전송 건너뜀")
-                }
+                // Detect power mode from speed
+                detectModeFromLocation(location)
+
+                // Build request and enqueue
+                val request = buildLocationLogRequest(location) ?: return
+                enqueueLocation(request)
+                lastLocation = location
             }
-        }
-
-        override fun onLocationAvailability(locationAvailability: LocationAvailability) {
-            super.onLocationAvailability(locationAvailability)
-            Log.d(TAG, "onLocationAvailability: ${locationAvailability.isLocationAvailable}")
         }
     }
 
-    private fun createLocationRequest(): LocationRequest =
-        LocationRequest.Builder(
-            Priority.PRIORITY_HIGH_ACCURACY,
-            GPS_REFRESH_INTERVAL
-        ).apply {
-            setMinUpdateIntervalMillis(GPS_MIN_REFRESH_INTERVAL)
-            setMaxUpdateDelayMillis(GPS_MAX_REFRESH_INTERVAL)
-            setGranularity(Granularity.GRANULARITY_PERMISSION_LEVEL)
-            setWaitForAccurateLocation(true)
-        }.build()
+    // ── Service lifecycle ──────────────────────────────────────────────────
 
     override fun onCreate() {
         super.onCreate()
-        Log.d(TAG, "LocationService onCreate")
-        
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
-        locationRequest = createLocationRequest()
+        locationRequest = createLocationRequest(PowerMode.WALKING)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "🚀 [LOCATION] ===== LocationService 시작 =====")
-        Log.d(TAG, "🚀 [LOCATION] LocationService onStartCommand")
-        Log.d(TAG, "🚀 [LOCATION] Intent: ${intent?.action ?: "null"}")
-        Log.d(TAG, "🚀 [LOCATION] Flags: $flags, StartId: $startId")
-        
-        // Android 15+ 권한 체크
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            val fgServicePermission = ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.FOREGROUND_SERVICE_LOCATION
-            )
-            Log.d(TAG, "🔐 [LOCATION] FOREGROUND_SERVICE_LOCATION 권한: ${fgServicePermission == PackageManager.PERMISSION_GRANTED}")
+        Log.d(TAG, "LocationService starting")
 
-            if (fgServicePermission != PackageManager.PERMISSION_GRANTED) {
-                Log.e(TAG, "❌ [LOCATION] FOREGROUND_SERVICE_LOCATION 권한이 없습니다")
+        // Android 14+ foreground service location permission
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.FOREGROUND_SERVICE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+                Log.e(TAG, "FOREGROUND_SERVICE_LOCATION permission missing")
                 stopSelf()
                 return START_NOT_STICKY
             }
         }
-        
-        // 위치 권한 체크
-        val fineLocationPermission = ActivityCompat.checkSelfPermission(
-            this,
-            Manifest.permission.ACCESS_FINE_LOCATION
-        )
-        val coarseLocationPermission = ActivityCompat.checkSelfPermission(
-            this,
-            Manifest.permission.ACCESS_COARSE_LOCATION
-        )
 
-        Log.d(TAG, "🔐 [LOCATION] ACCESS_FINE_LOCATION 권한: ${fineLocationPermission == PackageManager.PERMISSION_GRANTED}")
-        Log.d(TAG, "🔐 [LOCATION] ACCESS_COARSE_LOCATION 권한: ${coarseLocationPermission == PackageManager.PERMISSION_GRANTED}")
-
-        if (fineLocationPermission != PackageManager.PERMISSION_GRANTED &&
-            coarseLocationPermission != PackageManager.PERMISSION_GRANTED) {
-            Log.e(TAG, "❌ [LOCATION] 위치 권한이 없습니다")
+        // Location permission
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED &&
+            ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            Log.e(TAG, "Location permission missing")
             stopSelf()
             return START_NOT_STICKY
         }
-        
-        // 서비스 시작 즉시 포그라운드 전환
-        createNotificationChannel()
-        startForeground(NOTIFICATION_ID, createNotification())
-        
-        startLocationTracking()
 
-        Log.d(TAG, "✅ [LOCATION] LocationService 시작 완료 - 포그라운드 서비스 실행 중")
+        createNotificationChannel()
+        startForeground(NOTIFICATION_ID, createNotification(currentMode))
+        startLocationTracking()
+        startTimerForMode(currentMode)
+
+        Log.d(TAG, "LocationService started in ${currentMode.name} mode")
         return START_STICKY
     }
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onDestroy() {
+        super.onDestroy()
+        fusedLocationClient.removeLocationUpdates(locationCallback)
+        batchTimer?.cancel()
+        heartbeatTimer?.cancel()
+        flushPendingLocations()
+        serviceScope.cancel()
+        Log.d(TAG, "LocationService destroyed")
+    }
+
+    // ── Location request per mode ──────────────────────────────────────────
+
+    private fun createLocationRequest(mode: PowerMode): LocationRequest {
+        return when (mode) {
+            PowerMode.STATIONARY -> LocationRequest.Builder(
+                Priority.PRIORITY_LOW_POWER, 300_000L  // 5 min
+            ).setMinUpdateDistanceMeters(500f)
+                .setGranularity(Granularity.GRANULARITY_PERMISSION_LEVEL)
+                .build()
+
+            PowerMode.WALKING -> LocationRequest.Builder(
+                Priority.PRIORITY_HIGH_ACCURACY, 30_000L  // 30 sec
+            ).setMinUpdateDistanceMeters(30f)
+                .setGranularity(Granularity.GRANULARITY_PERMISSION_LEVEL)
+                .setWaitForAccurateLocation(true)
+                .build()
+
+            PowerMode.AUTOMOTIVE -> LocationRequest.Builder(
+                Priority.PRIORITY_HIGH_ACCURACY, 15_000L  // 15 sec
+            ).setMinUpdateDistanceMeters(100f)
+                .setGranularity(Granularity.GRANULARITY_PERMISSION_LEVEL)
+                .setWaitForAccurateLocation(true)
+                .build()
+        }
+    }
+
+    // ── Tracking ───────────────────────────────────────────────────────────
+
+    private fun startLocationTracking() {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED &&
+            ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED
+        ) return
+
+        fusedLocationClient.requestLocationUpdates(
+            locationRequest,
+            locationCallback,
+            Looper.myLooper()
+        )
+    }
+
+    // ── Mode detection (speed-based) ───────────────────────────────────────
+
+    private fun detectModeFromLocation(location: Location) {
+        val speed = if (location.speed < 0f) 0f else location.speed  // m/s
+
+        val detectedMode = when {
+            speed < 0.5f  -> PowerMode.STATIONARY  // < 1.8 km/h
+            speed < 8.0f  -> PowerMode.WALKING     // < 28.8 km/h (walk / run / cycle)
+            else          -> PowerMode.AUTOMOTIVE   // > 28.8 km/h
+        }
+
+        if (detectedMode == PowerMode.STATIONARY) {
+            // Only enter stationary after dwelling for STATIONARY_DWELL_MS
+            if (stationaryStartTime == 0L) {
+                stationaryStartTime = System.currentTimeMillis()
+            } else if (System.currentTimeMillis() - stationaryStartTime > STATIONARY_DWELL_MS) {
+                switchToMode(PowerMode.STATIONARY)
+            }
+        } else {
+            // Moving: reset dwell timer & switch immediately
+            stationaryStartTime = 0L
+            switchToMode(detectedMode)
+        }
+    }
+
+    // ── Mode switching ─────────────────────────────────────────────────────
+
+    private fun switchToMode(newMode: PowerMode) {
+        if (newMode == currentMode) return
+        Log.d(TAG, "Mode: ${currentMode.name} -> ${newMode.name}")
+        currentMode = newMode
+
+        // Flush pending before reconfiguring
+        flushPendingLocations()
+
+        // Stop old timers
+        batchTimer?.cancel()
+        heartbeatTimer?.cancel()
+
+        // Reconfigure location request
+        fusedLocationClient.removeLocationUpdates(locationCallback)
+        locationRequest = createLocationRequest(newMode)
+        startLocationTracking()
+
+        // Start appropriate timer
+        startTimerForMode(newMode)
+
+        // Update notification
+        updateNotification(newMode)
+    }
+
+    private fun startTimerForMode(mode: PowerMode) {
+        when (mode) {
+            PowerMode.STATIONARY -> startHeartbeatTimer()
+            PowerMode.WALKING,
+            PowerMode.AUTOMOTIVE -> startBatchTimer()
+        }
+    }
+
+    // ── Batching ───────────────────────────────────────────────────────────
+
+    private fun enqueueLocation(data: CreateLocationLogRequest) {
+        synchronized(pendingLocations) {
+            pendingLocations.add(data)
+            if (pendingLocations.size > maxQueueSize) {
+                pendingLocations.removeAt(0)  // evict oldest
+            }
+        }
+    }
+
+    private fun startBatchTimer() {
+        batchTimer?.cancel()
+        batchTimer = Timer().apply {
+            scheduleAtFixedRate(object : TimerTask() {
+                override fun run() { flushPendingLocations() }
+            }, BATCH_INTERVAL_MS, BATCH_INTERVAL_MS)
+        }
+    }
+
+    private fun startHeartbeatTimer() {
+        heartbeatTimer?.cancel()
+        heartbeatTimer = Timer().apply {
+            scheduleAtFixedRate(object : TimerTask() {
+                override fun run() { sendHeartbeat() }
+            }, HEARTBEAT_INTERVAL_MS, HEARTBEAT_INTERVAL_MS)
+        }
+    }
+
+    private fun flushPendingLocations() {
+        val toSend: List<CreateLocationLogRequest>
+        synchronized(pendingLocations) {
+            if (pendingLocations.isEmpty()) return
+            toSend = pendingLocations.toList()
+            pendingLocations.clear()
+        }
+        toSend.forEach { request ->
+            serviceScope.launch { sendLocationToServer(request) }
+        }
+    }
+
+    /**
+     * Heartbeat: re-send the last known location so the server knows the device
+     * is still alive during long stationary periods.
+     */
+    private fun sendHeartbeat() {
+        val loc = lastLocation ?: return
+        val request = buildLocationLogRequest(loc) ?: return
+        serviceScope.launch { sendLocationToServer(request) }
+    }
+
+    // ── Build request model ────────────────────────────────────────────────
+
+    private fun buildLocationLogRequest(location: Location): CreateLocationLogRequest? {
+        val prefs = getSharedPreferences("smap_auth_prefs", Context.MODE_PRIVATE)
+        val mtIdxInt = prefs.getInt("mt_idx", -1)
+        if (mtIdxInt == -1) return null
+
+        val dateFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+
+        return CreateLocationLogRequest(
+            mtIdx = mtIdxInt.toString(),
+            mltLat = location.latitude,
+            mltLong = location.longitude,
+            mltAccuracy = location.accuracy.toDouble(),
+            mltSpeed = location.speed.toDouble(),
+            mltAltitude = if (location.hasAltitude()) location.altitude else 0.0,
+            mltTimestamp = dateFormatter.format(Date()),
+            mltBattery = getBatteryLevel()
+        )
+    }
+
+    // ── Server communication (Retrofit) ────────────────────────────────────
+
+    private suspend fun sendLocationToServer(request: CreateLocationLogRequest) {
+        try {
+            smapApi.createLocationLog(request)
+        } catch (e: Exception) {
+            Log.w(TAG, "Location upload failed: ${e.message}")
+        }
+    }
+
+    // ── Coordinate validation ──────────────────────────────────────────────
+
+    private fun isValidCoordinate(location: Location): Boolean {
+        val lat = location.latitude
+        val lng = location.longitude
+
+        if (lat == 0.0 && lng == 0.0) return false
+        if (lat < -90.0 || lat > 90.0) return false
+        if (lng < -180.0 || lng > 180.0) return false
+        if (lat.isNaN() || lat.isInfinite()) return false
+        if (lng.isNaN() || lng.isInfinite()) return false
+        if (location.accuracy > 1000) return false
+
+        // Mock location check
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (location.isMock) return false
+        } else {
+            @Suppress("DEPRECATION")
+            if (location.isFromMockProvider) return false
+        }
+
+        return true
+    }
+
+    // ── Battery level ──────────────────────────────────────────────────────
+
+    private fun getBatteryLevel(): String {
+        val intent = registerReceiver(null, android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val level = intent?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale = intent?.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1) ?: -1
+        return if (level != -1 && scale != -1) ((level * 100) / scale.toFloat()).toInt().toString() else "0"
+    }
+
+    // ── Notification ───────────────────────────────────────────────────────
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -181,318 +397,28 @@ class LocationService : Service() {
                 description = "'활동 로그' 및 '그룹 멤버와 실시간 위치 공유' 기능을 위해 백그라운드에서 위치를 수집합니다."
                 setShowBadge(false)
             }
-            
-            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.createNotificationChannel(channel)
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.createNotificationChannel(channel)
         }
     }
 
-    private fun createNotification() = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
-        .setContentTitle("SMAP 위치 공유 중")
-        .setContentText("활동 로그 기록 및 멤버와의 실시간 위치 공유를 위해 위치를 수집하고 있습니다.")
-        .setSmallIcon(R.mipmap.ic_launcher)
-        .setPriority(NotificationCompat.PRIORITY_LOW)
-        .setOngoing(true)
-        .build()
+    private fun createNotification(mode: PowerMode) =
+        NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
+            .setContentTitle("SMAP 위치 공유 중")
+            .setContentText(notificationText(mode))
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
+            .build()
 
-    private fun startLocationTracking() {
-        Log.d(TAG, "📡 [LOCATION] ===== 위치 추적 시작 =====")
-
-        if (ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            Log.e(TAG, "Location permission not granted")
-            return
-        }
-
-        // 마지막 위치 요청
-        fusedLocationClient.lastLocation
-            .addOnSuccessListener { location ->
-                location?.let {
-                    Log.d(TAG, "Last location: ${it.latitude}, ${it.longitude}")
-                }
-            }
-
-        // 위치 정보 업데이트 시작
-        Log.d(TAG, "📡 [LOCATION] 위치 업데이트 요청 설정:")
-        Log.d(TAG, "   인터벌: ${locationRequest.interval}ms")
-        Log.d(TAG, "   최소 인터벌: ${locationRequest.minUpdateIntervalMillis}ms")
-        Log.d(TAG, "   최대 대기시간: ${locationRequest.maxUpdateDelayMillis}ms")
-        Log.d(TAG, "   우선순위: ${locationRequest.priority}")
-
-        fusedLocationClient.requestLocationUpdates(
-            locationRequest,
-            locationCallback,
-            Looper.myLooper()
-        )
-
-        Log.d(TAG, "✅ [LOCATION] 위치 추적 시작됨 - GPS 업데이트 요청 완료")
+    private fun updateNotification(mode: PowerMode) {
+        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.notify(NOTIFICATION_ID, createNotification(mode))
     }
 
-    private fun stopLocationTracking() {
-        fusedLocationClient.removeLocationUpdates(locationCallback)
-        Log.d(TAG, "Location tracking stopped")
+    private fun notificationText(mode: PowerMode): String = when (mode) {
+        PowerMode.STATIONARY -> "정지 중 (저전력 모드)"
+        PowerMode.WALKING    -> "이동 중 (도보)"
+        PowerMode.AUTOMOTIVE -> "이동 중 (차량)"
     }
-
-    /**
-     * 속도 변화 및 거리 기반으로 위치 정보 전송 여부를 결정
-     * 사람이 걷는 정도의 속도 변화를 감지하고 거리 기반 대안 로직 추가
-     */
-    private fun shouldSendLocationBasedOnSpeed(location: Location): Boolean {
-        val currentSpeed = location.speed
-        val currentTime = System.currentTimeMillis()
-
-        // 음수 속도는 0으로 처리 (iOS와 동일)
-        val validSpeed = if (currentSpeed < 0) 0f else currentSpeed
-
-        Log.d(TAG, "🔍 [SPEED] 속도 분석 시작:")
-        Log.d(TAG, "   현재 속도: ${validSpeed}m/s (${validSpeed * 3.6}km/h)")
-        Log.d(TAG, "   이전 속도: ${lastSpeed}m/s (${lastSpeed * 3.6}km/h)")
-        Log.d(TAG, "   임계값: ${speedChangeThreshold}m/s (${speedChangeThreshold * 3.6}km/h)")
-
-        // 첫 번째 위치 업데이트인 경우
-        if (lastSpeed == -1f) {
-            lastSpeed = validSpeed
-            lastLocationTime = currentTime
-            lastLocation = location
-            Log.d(TAG, "✅ [SPEED] 첫 번째 위치 업데이트 - 서버 전송")
-            return true
-        }
-
-        // 1. 속도 변화 기반 감지
-        val speedDifference = Math.abs(validSpeed - lastSpeed)
-        Log.d(TAG, "📊 [SPEED] 속도 차이: ${speedDifference}m/s (${speedDifference * 3.6}km/h)")
-
-        if (speedDifference >= speedChangeThreshold) {
-            Log.d(TAG, "✅ [SPEED] 속도 변화 감지 - 서버 전송")
-            updateLocationData(location, validSpeed, currentTime)
-            return true
-        }
-
-        // 2. 거리 기반 대안 로직 (속도 변화가 없어도)
-        lastLocation?.let { prevLocation ->
-            val distance = location.distanceTo(prevLocation)
-            Log.d(TAG, "📏 [DISTANCE] 거리 계산: ${distance}m (임계값: ${distanceThreshold}m)")
-            
-            if (distance >= distanceThreshold) {
-                Log.d(TAG, "✅ [DISTANCE] 거리 기반 감지 - 서버 전송")
-                updateLocationData(location, validSpeed, currentTime)
-                return true
-            }
-        }
-
-        // 3. 주기적 전송 (3분마다)
-        val timeSinceLastSend = currentTime - lastLocationTime
-        val threeMinutesInMillis = 3 * 60 * 1000L
-        Log.d(TAG, "⏰ [TIME] 마지막 전송 후 경과 시간: ${timeSinceLastSend / 1000}초")
-
-        if (timeSinceLastSend >= threeMinutesInMillis) {
-            Log.d(TAG, "✅ [TIME] 주기적 전송 (3분 경과) - 서버 전송")
-            updateLocationData(location, validSpeed, currentTime)
-            return true
-        }
-
-        // 4. 정지 상태에서 움직임 감지 (속도 0에서 0.5m/s 이상으로 변화)
-        if (lastSpeed < 0.1f && validSpeed >= 0.5f) {
-            Log.d(TAG, "✅ [MOVEMENT] 정지에서 움직임 감지 - 서버 전송")
-            updateLocationData(location, validSpeed, currentTime)
-            return true
-        }
-
-        Log.d(TAG, "⏭️ [SKIP] 모든 조건 미충족 - 전송 건너뜀")
-        return false
-    }
-
-    /**
-     * 위치 데이터 업데이트 헬퍼 함수
-     */
-    private fun updateLocationData(location: Location, speed: Float, time: Long) {
-        lastSpeed = speed
-        lastLocationTime = time
-        lastLocation = location
-        Log.d(TAG, "🔄 [UPDATE] 위치 데이터 업데이트 완료")
-    }
-
-    private fun sendLocationToServer(mltGpsData: MltGpsData) {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                Log.d(TAG, "🚀 [SERVER] 위치 데이터 서버 전송 시작")
-                Log.d(TAG, "📊 [SERVER] 전송할 데이터:")
-                Log.d(TAG, "   위도: ${mltGpsData.mlt_lat}")
-                Log.d(TAG, "   경도: ${mltGpsData.mlt_long}")
-                Log.d(TAG, "   속도: ${mltGpsData.mlt_speed} m/s")
-                Log.d(TAG, "   정확도: ${mltGpsData.mlt_accuracy} m")
-                Log.d(TAG, "   시간: ${mltGpsData.mlt_gps_time}")
-                
-                // 🔍 mt_idx 값 확인 및 로깅
-                val prefs = getSharedPreferences("smap_auth_prefs", Context.MODE_PRIVATE)
-                val mt_idx_int = prefs.getInt("mt_idx", -1)
-                val mt_idx = if (mt_idx_int != -1) mt_idx_int.toString() else ""
-
-                Log.d(TAG, "🔍 [SERVER] SharedPreferences 모든 값 확인:")
-                prefs.all.forEach { (key, value) ->
-                    Log.d(TAG, "  $key = $value")
-                }
-
-                Log.d(TAG, "🔍 [SERVER] mt_idx 값: '$mt_idx' (int: $mt_idx_int)")
-
-                if (mt_idx.isNotEmpty() && mt_idx != "null") {
-                    // iOS와 동일한 데이터 포맷 사용
-                    val dateFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-                    val currentTimeString = dateFormatter.format(Date())
-
-                    val data = java.util.HashMap<String, Any>()
-                    data["act"] = "create_location_log"  // 백엔드에서 요구하는 액션 파라미터
-                    data["mt_idx"] = mt_idx
-                    data["mlt_lat"] = mltGpsData.mlt_lat.toDoubleOrNull() ?: 0.0
-                    data["mlt_long"] = mltGpsData.mlt_long.toDoubleOrNull() ?: 0.0
-                    data["mlt_accuracy"] = mltGpsData.mlt_accuracy.toDoubleOrNull() ?: 0.0
-                    data["mlt_speed"] = mltGpsData.mlt_speed.toDoubleOrNull() ?: 0.0
-                    data["mlt_altitude"] = 0.0 // 안드로이드에서는 고도 정보가 제한적
-                    data["mlt_timestamp"] = currentTimeString
-                    data["mlt_battery"] = getBatteryLevel()
-                    data["mlt_fine_location"] = "N"
-                    data["mlt_location_chk"] = "N"
-                    data["mt_health_work"] = "0" // 안드로이드에서는 걸음 수 정보를 별도 처리
-
-                    Log.d(TAG, "서버로 전송할 위치 데이터:")
-                    Log.d(TAG, "  mt_idx: $mt_idx")
-                    Log.d(TAG, "  위도: ${data["mlt_lat"]}")
-                    Log.d(TAG, "  경도: ${data["mlt_long"]}")
-                    Log.d(TAG, "  정확도: ${data["mlt_accuracy"]}")
-                    Log.d(TAG, "  속도: ${data["mlt_speed"]}")
-                    Log.d(TAG, "  배터리: ${data["mlt_battery"]}%")
-
-                    val requestBody = JSONObject(data as Map<*, *>?).toString()
-                        .toRequestBody("application/json".toMediaType())
-
-                    // 올바른 API 엔드포인트 사용
-                    val apiUrl = "${BuildConfig.API_BASE_URL}logs/member-location-logs"
-                    Log.d(TAG, "📡 [API] 요청 URL: $apiUrl")
-                    Log.d(TAG, "📡 [API] 요청 데이터: ${JSONObject(data as Map<*, *>?).toString()}")
-
-                    val request = Request.Builder()
-                        .url(apiUrl)
-                        .post(requestBody)
-                        .build()
-
-                    // 타임아웃 설정
-                    val timeoutClient = client.newBuilder()
-                        .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
-                        .readTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
-                        .writeTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
-                        .build()
-
-                    timeoutClient.newCall(request).execute().use { response ->
-                        Log.d(TAG, "📡 [API] 서버 응답 수신:")
-                        Log.d(TAG, "   응답 코드: ${response.code}")
-                        Log.d(TAG, "   응답 메시지: ${response.message}")
-                        Log.d(TAG, "   응답 시간: ${System.currentTimeMillis()}")
-
-                        if (response.isSuccessful) {
-                            Log.d(TAG, "✅ [SUCCESS] 위치 데이터 전송 성공!")
-                            val responseBody = response.body?.string()
-                            Log.d(TAG, "📄 [SUCCESS] 서버 응답 본문: ${responseBody ?: "응답 없음"}")
-                            Log.d(TAG, "🎉 [SUCCESS] 위치 전송 완료 - 다음 업데이트 대기")
-                        } else {
-                            Log.e(TAG, "❌ [ERROR] 위치 데이터 전송 실패!")
-                            Log.e(TAG, "   실패 코드: ${response.code}")
-                            val errorBody = response.body?.string()
-                            Log.e(TAG, "   에러 응답: ${errorBody ?: "에러 세부 정보 없음"}")
-                            Log.e(TAG, "   요청 헤더: ${request.headers}")
-                            Log.e(TAG, "   응답 헤더: ${response.headers}")
-                        }
-                    }
-                } else {
-                    Log.w(TAG, "⚠️ [SKIP] mt_idx가 유효하지 않아 위치 데이터 전송 건너뜀")
-                    Log.w(TAG, "   mt_idx 값: '$mt_idx'")
-                    Log.w(TAG, "   mt_idx_int 값: $mt_idx_int")
-                    Log.w(TAG, "   사용자 로그인이 필요할 수 있습니다")
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "💥 [EXCEPTION] 위치 데이터 전송 중 오류 발생!")
-                Log.e(TAG, "   오류 메시지: ${e.message}")
-                Log.e(TAG, "   오류 타입: ${e.javaClass.simpleName}")
-                Log.e(TAG, "   스택 트레이스:")
-                e.printStackTrace()
-                Log.e(TAG, "🔄 [EXCEPTION] 다음 위치 업데이트에서 재시도 예정")
-            }
-        }
-    }
-
-    private fun isValidCoordinate(location: Location): Boolean {
-        val latitude = location.latitude
-        val longitude = location.longitude
-        
-        // 1. 0,0 좌표는 대부분 GPS 초기화 오류임
-        if (latitude == 0.0 && longitude == 0.0) return false
-        
-        // 2. 위도/경도 범위 체크
-        if (latitude < -90.0 || latitude > 90.0) return false
-        if (longitude < -180.0 || longitude > 180.0) return false
-        
-        // 3. NaN 또는 무한대 체크
-        if (latitude.isNaN() || latitude.isInfinite()) return false
-        if (longitude.isNaN() || longitude.isInfinite()) return false
-        
-        // 4. 정확도 체크 (너무 낮은 정확도는 무시 - 예: 1000m 이상)
-        if (location.accuracy > 1000) {
-            Log.w(TAG, "⚠️ [LOCATION] 낮은 정확도 (${location.accuracy}m) - 전송 건너뜀")
-            return false
-        }
-
-        // 5. 모의 위치 체크 (개발자 옵션 등)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (location.isMock) {
-                Log.w(TAG, "⚠️ [LOCATION] 모의 위치 감지 - 전송 건너뜀")
-                return false
-            }
-        } else {
-            @Suppress("DEPRECATION")
-            if (location.isFromMockProvider) {
-                Log.w(TAG, "⚠️ [LOCATION] 모의 위치 감지 - 전송 건너뜀")
-                return false
-            }
-        }
-        
-        // 한국 범위를 벗어나는 좌표에 대한 경고 로깅
-        if (latitude < 30.0 || latitude > 45.0 || longitude < 120.0 || longitude > 135.0) {
-            Log.w(TAG, "🌐 [LOCATION] 좌표가 한국 범위를 벗어남: ($latitude, $longitude)")
-        }
-        
-        return true
-    }
-
-    private fun getBatteryLevel(): String {
-        val batteryIntent = registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
-        val level = batteryIntent?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
-        val scale = batteryIntent?.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1) ?: -1
-        
-        return if (level != -1 && scale != -1) {
-            ((level * 100) / scale.toFloat()).toInt().toString()
-        } else {
-            "0"
-        }
-    }
-
-    override fun onBind(intent: Intent?): IBinder? = null
-
-    override fun onDestroy() {
-        super.onDestroy()
-        stopLocationTracking()
-        Log.d(TAG, "LocationService onDestroy")
-    }
-
-    data class MltGpsData(
-        val mlt_lat: String,
-        val mlt_long: String,
-        val mlt_speed: String,
-        val mlt_accuracy: String,
-        val mlt_gps_time: String
-    )
-} 
+}

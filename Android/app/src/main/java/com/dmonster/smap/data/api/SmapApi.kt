@@ -235,6 +235,10 @@ interface SmapApi {
     // Activity Log endpoints (from ActivityLogService)
     // =========================================================================
 
+    /** POST /logs/member-location-logs  (create a new location log entry) */
+    @POST("logs/member-location-logs")
+    suspend fun createLocationLog(@Body request: CreateLocationLogRequest): Unit
+
     /** GET /logs/member-location-logs/{memberId}/daily?date={date} */
     @GET("logs/member-location-logs/{memberId}/daily")
     suspend fun getLocationLogs(

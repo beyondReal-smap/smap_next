@@ -4,6 +4,25 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
+ * 위치 로그 생성 요청 (LocationService -> server)
+ */
+@Serializable
+data class CreateLocationLogRequest(
+    @SerialName("act") val act: String = "create_location_log",
+    @SerialName("mt_idx") val mtIdx: String,
+    @SerialName("mlt_lat") val mltLat: Double,
+    @SerialName("mlt_long") val mltLong: Double,
+    @SerialName("mlt_accuracy") val mltAccuracy: Double,
+    @SerialName("mlt_speed") val mltSpeed: Double,
+    @SerialName("mlt_altitude") val mltAltitude: Double = 0.0,
+    @SerialName("mlt_timestamp") val mltTimestamp: String,
+    @SerialName("mlt_battery") val mltBattery: String,
+    @SerialName("mlt_fine_location") val mltFineLocation: String = "N",
+    @SerialName("mlt_location_chk") val mltLocationChk: String = "N",
+    @SerialName("mt_health_work") val mtHealthWork: String = "0"
+)
+
+/**
  * 위치 로그 데이터
  */
 @Serializable
