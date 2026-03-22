@@ -1,25 +1,26 @@
 package com.dmonster.smap.data.model
 
-import com.google.gson.annotations.SerializedName
-import java.io.Serializable
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 /**
  * 위치 로그 데이터
  */
+@Serializable
 data class LocationLog(
-    @SerializedName("mlt_idx") val mltIdx: Int?,
-    @SerializedName("mt_idx") val mtIdx: Int?,
-    @SerializedName("mlt_lat") val mltLat: Double?,
-    @SerializedName("mlt_long") val mltLong: Double?,
-    @SerializedName("mlt_speed") val mltSpeed: Double?,
-    @SerializedName("mlt_gps_time") val mltGpsTime: String?,
-    @SerializedName("mlt_wdate") val mltWdate: String?
-) : Serializable {
+    @SerialName("mlt_idx") val mltIdx: Int? = null,
+    @SerialName("mt_idx") val mtIdx: Int? = null,
+    @SerialName("mlt_lat") val mltLat: Double? = null,
+    @SerialName("mlt_long") val mltLong: Double? = null,
+    @SerialName("mlt_speed") val mltSpeed: Double? = null,
+    @SerialName("mlt_gps_time") val mltGpsTime: String? = null,
+    @SerialName("mlt_wdate") val mltWdate: String? = null
+) {
     val latitude: Double get() = mltLat ?: 0.0
     val longitude: Double get() = mltLong ?: 0.0
     val speed: Double get() = mltSpeed ?: 0.0
     val time: String get() = mltGpsTime ?: ""
-    
+
     val hasValidCoordinates: Boolean
         get() = mltLat != null && mltLong != null && mltLat != 0.0 && mltLong != 0.0
 }
@@ -27,18 +28,19 @@ data class LocationLog(
 /**
  * 위치 요약 데이터 - iOS API 응답 형식과 일치
  */
+@Serializable
 data class LocationSummary(
-    @SerializedName("schedule_count") val scheduleCount: String?,
-    @SerializedName("distance") val distance: String?,
-    @SerializedName("duration") val duration: String?,
-    @SerializedName("steps") val steps: Int?,
+    @SerialName("schedule_count") val scheduleCount: String? = null,
+    @SerialName("distance") val distance: String? = null,
+    @SerialName("duration") val duration: String? = null,
+    @SerialName("steps") val steps: Int? = null,
     // Legacy fields (fallback)
-    @SerializedName("total_distance") val totalDistance: Double?,
-    @SerializedName("total_time") val totalTime: Int?,
-    @SerializedName("total_steps") val totalSteps: Int?,
-    @SerializedName("date") val date: String?
-) : Serializable {
-    
+    @SerialName("total_distance") val totalDistance: Double? = null,
+    @SerialName("total_time") val totalTime: Int? = null,
+    @SerialName("total_steps") val totalSteps: Int? = null,
+    @SerialName("date") val date: String? = null
+) {
+
     val distanceFormatted: String
         get() {
             // First try iOS format (pre-formatted string)
@@ -53,7 +55,7 @@ data class LocationSummary(
                 String.format("%.0f m", dist)
             }
         }
-    
+
     val timeFormatted: String
         get() {
             // First try iOS format (pre-formatted string)
@@ -70,7 +72,7 @@ data class LocationSummary(
                 "${minutes}분"
             }
         }
-    
+
     val stepsFormatted: String
         get() {
             val stepsValue = steps ?: totalSteps ?: 0
@@ -82,16 +84,17 @@ data class LocationSummary(
         }
 }
 
+@Serializable
 data class StayTime(
-    @SerializedName("start_time") val startTime: String?,
-    @SerializedName("end_time") val endTime: String?,
-    @SerializedName("duration") val durationDouble: Double?,
-    @SerializedName("latitude") val latitude: Double?,
-    @SerializedName("longitude") val longitude: Double?,
-    @SerializedName("start_lat") val startLat: Double?,
-    @SerializedName("start_long") val startLong: Double?,
-    @SerializedName("location") val location: String?,
-    @SerializedName("stay_duration") val stayDuration: String?
+    @SerialName("start_time") val startTime: String? = null,
+    @SerialName("end_time") val endTime: String? = null,
+    @SerialName("duration") val durationDouble: Double? = null,
+    @SerialName("latitude") val latitude: Double? = null,
+    @SerialName("longitude") val longitude: Double? = null,
+    @SerialName("start_lat") val startLat: Double? = null,
+    @SerialName("start_long") val startLong: Double? = null,
+    @SerialName("location") val location: String? = null,
+    @SerialName("stay_duration") val stayDuration: String? = null
 ) {
     val duration: Int
         get() = durationDouble?.toInt() ?: 0
@@ -110,35 +113,38 @@ data class StayTime(
         }
 }
 
+@Serializable
 data class StayTimeListResponse(
-    @SerializedName("result") val result: String?,
-    @SerializedName("success") val success: Boolean?,
-    @SerializedName("data") val data: List<StayTime>?,
-    @SerializedName("message") val message: String?
+    @SerialName("result") val result: String? = null,
+    @SerialName("success") val success: Boolean? = null,
+    @SerialName("data") val data: List<StayTime>? = null,
+    @SerialName("message") val message: String? = null
 )
 
 /**
  * 일일 활동 카운트 (캘린더용) - iOS와 동일
  */
+@Serializable
 data class DailyCount(
-    @SerializedName("date") val date: String?,
-    @SerializedName("count") val count: Int?,
-    @SerializedName("formatted_date") val formattedDate: String? = null,
-    @SerializedName("day_of_week") val dayOfWeek: String? = null,
-    @SerializedName("is_today") val isToday: Boolean? = false,
-    @SerializedName("is_weekend") val isWeekend: Boolean? = false
+    @SerialName("date") val date: String? = null,
+    @SerialName("count") val count: Int? = null,
+    @SerialName("formatted_date") val formattedDate: String? = null,
+    @SerialName("day_of_week") val dayOfWeek: String? = null,
+    @SerialName("is_today") val isToday: Boolean? = false,
+    @SerialName("is_weekend") val isWeekend: Boolean? = false
 )
 
 /**
  * 멤버별 일별 카운트 - iOS와 동일
  */
+@Serializable
 data class MemberDailyCount(
-    @SerializedName("member_id") val memberId: Int,
-    @SerializedName("member_name") val memberName: String?,
-    @SerializedName("mt_nickname") val mtNickname: String?,
-    @SerializedName("member_photo") val memberPhoto: String?,
-    @SerializedName("member_gender") val memberGender: Int?,
-    @SerializedName("daily_counts") val dailyCounts: List<DailyCount>?
+    @SerialName("member_id") val memberId: Int = 0,
+    @SerialName("member_name") val memberName: String? = null,
+    @SerialName("mt_nickname") val mtNickname: String? = null,
+    @SerialName("member_photo") val memberPhoto: String? = null,
+    @SerialName("member_gender") val memberGender: Int? = null,
+    @SerialName("daily_counts") val dailyCounts: List<DailyCount>? = null
 ) {
     val displayName: String
         get() = mtNickname?.takeIf { it.isNotBlank() } ?: memberName ?: ""
@@ -147,42 +153,45 @@ data class MemberDailyCount(
 /**
  * 그룹 전체 일별 카운트 API 응답 - iOS와 동일
  */
+@Serializable
 data class GroupDailyCountsResponse(
-    @SerializedName("member_daily_counts") val memberDailyCounts: List<MemberDailyCount>?,
-    @SerializedName("total_daily_counts") val totalDailyCounts: List<DailyCount>?,
-    @SerializedName("total_days") val totalDays: Int?,
-    @SerializedName("start_date") val startDate: String?,
-    @SerializedName("end_date") val endDate: String?,
-    @SerializedName("group_id") val groupId: Int?,
-    @SerializedName("total_members") val totalMembers: Int?
+    @SerialName("member_daily_counts") val memberDailyCounts: List<MemberDailyCount>? = null,
+    @SerialName("total_daily_counts") val totalDailyCounts: List<DailyCount>? = null,
+    @SerialName("total_days") val totalDays: Int? = null,
+    @SerialName("start_date") val startDate: String? = null,
+    @SerialName("end_date") val endDate: String? = null,
+    @SerialName("group_id") val groupId: Int? = null,
+    @SerialName("total_members") val totalMembers: Int? = null
 )
 
 /**
  * 위치 로그 목록 API 응답
  */
+@Serializable
 data class LocationLogListResponse(
-    @SerializedName("result") val result: String?,
-    @SerializedName("success") val success: Boolean?,
-    @SerializedName("data") val data: List<LocationLog>?,
-    @SerializedName("message") val message: String?
+    @SerialName("result") val result: String? = null,
+    @SerialName("success") val success: Boolean? = null,
+    @SerialName("data") val data: List<LocationLog>? = null,
+    @SerialName("message") val message: String? = null
 )
 
 /**
  * 위치 요약 API 응답
  */
+@Serializable
 data class LocationSummaryResponse(
-    @SerializedName("result") val result: String?,
-    @SerializedName("success") val success: Boolean?,
-    @SerializedName("data") val data: LocationSummary?,
-    @SerializedName("message") val message: String?
+    @SerialName("result") val result: String? = null,
+    @SerialName("success") val success: Boolean? = null,
+    @SerialName("data") val data: LocationSummary? = null,
+    @SerialName("message") val message: String? = null
 )
 
 /**
  * 일일 카운트 API 응답 (Legacy - 개별 멤버용)
  */
+@Serializable
 data class DailyCountsResponse(
-    @SerializedName("success") val success: Boolean?,
-    @SerializedName("data") val data: List<DailyCount>?,
-    @SerializedName("message") val message: String?
+    @SerialName("success") val success: Boolean? = null,
+    @SerialName("data") val data: List<DailyCount>? = null,
+    @SerialName("message") val message: String? = null
 )
-

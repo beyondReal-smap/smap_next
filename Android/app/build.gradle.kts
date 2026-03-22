@@ -135,8 +135,8 @@ dependencies {
     // Retrofit
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
 
-    // Kotlinx Serialization
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    // Kotlinx Serialization (1.6.3 is compatible with Kotlin 1.9.x)
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     implementation("com.squareup.retrofit2:converter-kotlinx-serialization:2.11.0")
     
     // Jetpack Compose

@@ -1,66 +1,70 @@
 package com.dmonster.smap.data.model
 
-import com.google.gson.annotations.SerializedName
-import java.io.Serializable
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 /**
  * 저장 장소 데이터
  */
+@Serializable
 data class SavedLocation(
-    @SerializedName("slt_idx") val sltIdx: Int,
-    @SerializedName("slt_title") val sltTitle: String?,
-    @SerializedName("slt_add") val sltAdd: String?,
-    @SerializedName("slt_lat") val sltLat: Double?,
-    @SerializedName("slt_long") val sltLong: Double?,
-    @SerializedName("slt_memo") val sltMemo: String?,
-    @SerializedName("slt_show") val sltShow: String?,
-    @SerializedName("slt_wdate") val sltWdate: String?,
-    @SerializedName("slt_udate") val sltUdate: String?,
-    @SerializedName("mt_idx") val mtIdx: Int?,
-    @SerializedName("sgt_idx") val sgtIdx: Int?,
-    @SerializedName("slt_enter_alarm") val sltEnterAlarm: String?
-) : Serializable {
+    @SerialName("slt_idx") val sltIdx: Int = 0,
+    @SerialName("slt_title") val sltTitle: String? = null,
+    @SerialName("slt_add") val sltAdd: String? = null,
+    @SerialName("slt_lat") val sltLat: Double? = null,
+    @SerialName("slt_long") val sltLong: Double? = null,
+    @SerialName("slt_memo") val sltMemo: String? = null,
+    @SerialName("slt_show") val sltShow: String? = null,
+    @SerialName("slt_wdate") val sltWdate: String? = null,
+    @SerialName("slt_udate") val sltUdate: String? = null,
+    @SerialName("mt_idx") val mtIdx: Int? = null,
+    @SerialName("sgt_idx") val sgtIdx: Int? = null,
+    @SerialName("slt_enter_alarm") val sltEnterAlarm: String? = null
+) {
     val id: Int get() = sltIdx
     val name: String get() = sltTitle ?: "이름 없음"
     val address: String get() = sltAdd ?: "주소 없음"
     val latitude: Double get() = sltLat ?: 0.0
     val longitude: Double get() = sltLong ?: 0.0
     val memo: String get() = sltMemo ?: ""
-    
+
     val hasValidCoordinates: Boolean
-        get() = sltLat != null && sltLong != null && sltLat != 0.0 && sltLong != 0.0 && 
+        get() = sltLat != null && sltLong != null && sltLat != 0.0 && sltLong != 0.0 &&
                 !sltLat.isNaN() && !sltLong.isNaN()
 }
 
 /**
  * 저장 장소 목록 API 응답
  */
+@Serializable
 data class SavedLocationListResponse(
-    @SerializedName("success") val success: Boolean?,
-    @SerializedName("data") val data: List<SavedLocation>?,
-    @SerializedName("message") val message: String?
+    @SerialName("success") val success: Boolean? = null,
+    @SerialName("data") val data: List<SavedLocation>? = null,
+    @SerialName("message") val message: String? = null
 )
 
 /**
  * 저장 장소 단일 API 응답
  */
+@Serializable
 data class SavedLocationResponse(
-    @SerializedName("success") val success: Boolean?,
-    @SerializedName("data") val data: SavedLocation?,
-    @SerializedName("message") val message: String?
+    @SerialName("success") val success: Boolean? = null,
+    @SerialName("data") val data: SavedLocation? = null,
+    @SerialName("message") val message: String? = null
 )
 
 /**
  * Kakao 장소 검색 결과 모델
  */
+@Serializable
 data class KakaoPlace(
-    @SerializedName("id") val id: String,
-    @SerializedName("place_name") val placeName: String,
-    @SerializedName("address_name") val addressName: String,
-    @SerializedName("road_address_name") val roadAddressName: String,
-    @SerializedName("x") val x: String, // Longitude
-    @SerializedName("y") val y: String  // Latitude
-) : java.io.Serializable {
+    @SerialName("id") val id: String,
+    @SerialName("place_name") val placeName: String,
+    @SerialName("address_name") val addressName: String,
+    @SerialName("road_address_name") val roadAddressName: String,
+    @SerialName("x") val x: String, // Longitude
+    @SerialName("y") val y: String  // Latitude
+) {
     val latitude: Double get() = y.toDoubleOrNull() ?: 0.0
     val longitude: Double get() = x.toDoubleOrNull() ?: 0.0
     val displayName: String get() = placeName
@@ -70,26 +74,32 @@ data class KakaoPlace(
 /**
  * Kakao 장소 검색 API 응답
  */
+@Serializable
 data class KakaoPlaceResponse(
-    @SerializedName("documents") val documents: List<KakaoPlace>
+    @SerialName("documents") val documents: List<KakaoPlace> = emptyList()
 )
 
 /**
  * Kakao 역지오코딩 API 응답
  */
+@Serializable
 data class KakaoAddressResponse(
-    @SerializedName("documents") val documents: List<KakaoAddressDocument>
+    @SerialName("documents") val documents: List<KakaoAddressDocument> = emptyList()
 )
 
+@Serializable
 data class KakaoAddressDocument(
-    @SerializedName("address") val address: KakaoAddress?,
-    @SerializedName("road_address") val roadAddress: KakaoRoadAddress?
+    @SerialName("address") val address: KakaoAddress? = null,
+    @SerialName("road_address") val roadAddress: KakaoRoadAddress? = null
 )
 
+@Serializable
 data class KakaoAddress(
-    @SerializedName("address_name") val addressName: String
+    @SerialName("address_name") val addressName: String = ""
 )
 
+@Serializable
 data class KakaoRoadAddress(
-    @SerializedName("address_name") val addressName: String
+    @SerialName("address_name") val addressName: String = "",
+    @SerialName("building_name") val buildingName: String? = null
 )
