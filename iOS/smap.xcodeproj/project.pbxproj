@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		002FFB7C69C962F6EDA964C9 /* UserDefaultsManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBEF99544122643C1993480F /* UserDefaultsManagerTests.swift */; };
+		0038684E0920661E4B2384A0 /* LocationUploader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 840C55BC87A1397A64A6E8F3 /* LocationUploader.swift */; };
 		0231D220B1DD3440E7CAADD1 /* NativeScheduleListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4966457FF96D5CB6773C3483 /* NativeScheduleListView.swift */; };
 		035F02E6E98DD0D9AE5B71D3 /* MapLoadingOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB1D9F49827B5A03E90C884C /* MapLoadingOverlay.swift */; };
 		05355DF893CDC6A514475030 /* NoticeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 917653CD5E9DF6A39F3C0D80 /* NoticeService.swift */; };
@@ -21,6 +22,7 @@
 		16ADB0E846CAB0CAE24A1698 /* GroupViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6482EE75F8FB57368F9AA596 /* GroupViewModel.swift */; };
 		17CB2A28F3CAA2D170BD8FCF /* PlaceholderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9E2B42038DD89D78086429E /* PlaceholderTests.swift */; };
 		1BA2CF580A71FE22D923090F /* MyPlaceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C553883905483D628F4A4375 /* MyPlaceViewModel.swift */; };
+		1BF47F45CD9E94D9199A9244 /* LocationUploaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E874A2E9677947BEB95450D4 /* LocationUploaderTests.swift */; };
 		1CC172CA1B02FC2ADA76D1F8 /* DatePickerWith10MinInterval.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5C9B0F080B4BC5600FCEE94 /* DatePickerWith10MinInterval.swift */; };
 		21B1B201D32CBA943DA80918 /* DataMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A285D1EDA2D7751AD0989FE6 /* DataMigrationTests.swift */; };
 		239BDBDE0C223BAE59D93C24 /* GoogleLogoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5DABB42E6265FB9E0530FED /* GoogleLogoView.swift */; };
@@ -182,6 +184,7 @@
 		77E9C6311F4640B2DA7A85D6 /* MyPlaceView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MyPlaceView.swift; sourceTree = "<group>"; };
 		7BB22F47ECA2E49E5A2D6C45 /* GroupServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GroupServiceTests.swift; sourceTree = "<group>"; };
 		7EA413D4AEAFB6F0BFEF8C0D /* MainTabView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
+		840C55BC87A1397A64A6E8F3 /* LocationUploader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocationUploader.swift; sourceTree = "<group>"; };
 		846D82AE62D1FF1FAFD3B490 /* KeychainManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeychainManager.swift; sourceTree = "<group>"; };
 		84E5F9E1CE2882E5F246A7EC /* UserDefaultsManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UserDefaultsManager.swift; sourceTree = "<group>"; };
 		917653CD5E9DF6A39F3C0D80 /* NoticeService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NoticeService.swift; sourceTree = "<group>"; };
@@ -238,6 +241,7 @@
 		E2A02ACE6F91BA98F264AFD8 /* PhoneTextField.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PhoneTextField.swift; sourceTree = "<group>"; };
 		E5DABB42E6265FB9E0530FED /* GoogleLogoView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GoogleLogoView.swift; sourceTree = "<group>"; };
 		E77034C856577C9BCFC39234 /* SecureFocusField.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SecureFocusField.swift; sourceTree = "<group>"; };
+		E874A2E9677947BEB95450D4 /* LocationUploaderTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocationUploaderTests.swift; sourceTree = "<group>"; };
 		E88EBC4AED2C7B4160E5DCD7 /* InquiryView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InquiryView.swift; sourceTree = "<group>"; };
 		EA7E3CC88DCEADC59E0D5E35 /* Pods-smap.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-smap.release.xcconfig"; path = "Target Support Files/Pods-smap/Pods-smap.release.xcconfig"; sourceTree = "<group>"; };
 		EB5E8B6769F63DAECC4C6BFB /* LocationDetailPanel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocationDetailPanel.swift; sourceTree = "<group>"; };
@@ -308,6 +312,7 @@
 			isa = PBXGroup;
 			children = (
 				E1D246FE60C9E54299F38147 /* MotionManagerTests.swift */,
+				E874A2E9677947BEB95450D4 /* LocationUploaderTests.swift */,
 			);
 			name = Location;
 			path = Location;
@@ -575,6 +580,7 @@
 			isa = PBXGroup;
 			children = (
 				DC3CB5B6A915CFD9F08A1CB9 /* MotionManager.swift */,
+				840C55BC87A1397A64A6E8F3 /* LocationUploader.swift */,
 			);
 			name = Location;
 			path = Location;
@@ -1061,6 +1067,7 @@
 				74DE4DEA68BBA71092E9E720 /* ImagePicker.swift in Sources */,
 				58FB60A84CDC19A4B17C4322 /* WithdrawView.swift in Sources */,
 				0C152DD71348FF6D4E12A024 /* MotionManager.swift in Sources */,
+				0038684E0920661E4B2384A0 /* LocationUploader.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1079,6 +1086,7 @@
 				A00AFEC1ED4745714ACBE748 /* GroupServiceTests.swift in Sources */,
 				B11CAFE4D8A24F6E9C3D7A01 /* AuthServiceTests.swift in Sources */,
 				4221032B90BB19C1E6FF8BA4 /* MotionManagerTests.swift in Sources */,
+				1BF47F45CD9E94D9199A9244 /* LocationUploaderTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
