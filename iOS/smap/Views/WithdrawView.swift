@@ -170,7 +170,7 @@ struct WithdrawView: View {
                 message: Text("회원 탈퇴가 완료되었습니다. 그동안 서비스를 이용해주셔서 감사합니다."),
                 dismissButton: .default(Text("확인")) {
                     // AuthService.withdraw already calls logout() which sends "logout" notification
-                    // Local logout handles redirection in RootCoordinatorView
+                    // Local logout handles redirection in RootView
                 }
             )
         }

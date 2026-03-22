@@ -8,7 +8,6 @@
 import UIKit
 import CoreLocation
 import CoreMotion
-import WebKit
 
 // iOS 14+ 권장사항을 완전히 준수하여 UI 응답성 경고 방지
 
@@ -27,9 +26,6 @@ public class LocationService: NSObject, CLLocationManagerDelegate{
     var locationAuthStatus: CLAuthorizationStatus?
     private var pendingAuthCompletion: (() -> Void)? = nil
     
-    // 🌐 웹뷰 통신을 위한 참조
-    weak var webView: WKWebView?
-    
     override public init() {
         self.locationManager = CLLocationManager()
             
@@ -44,14 +40,6 @@ public class LocationService: NSObject, CLLocationManagerDelegate{
         print("📍 [LOCATION] LocationService 초기화 완료 - delegate 설정됨")
         
         NotificationCenter.default.addObserver(self, selector: #selector(self.appStateChange(_:)), name: NSNotification.Name(rawValue: "appStateChange"), object: nil)
-    }
-    
-    // MARK: - 🌐 웹뷰 설정 메서드
-    
-    /// 웹뷰 참조 설정 (MainView에서 호출)
-    public func setWebView(_ webView: WKWebView) {
-        print("🔥🔥🔥 [CRITICAL] LocationService webView 설정됨! 🔥🔥🔥")
-        self.webView = webView
     }
     
     // MARK: - 📍 위치 권한 처리 (iOS 14+ 최적화)
@@ -488,9 +476,6 @@ public class LocationService: NSObject, CLLocationManagerDelegate{
                 mltGpsDataList.append(mltGpsData)
                 
                 self.lastLocation = location
-                
-                // 🔥🔥🔥 [CRITICAL] 웹뷰로 위치 데이터 전송 🔥🔥🔥
-                sendLocationToWebView(location)
             }
             
             if mltGpsDataList.count > 0 {
@@ -639,101 +624,5 @@ public class LocationService: NSObject, CLLocationManagerDelegate{
         print("✅ [LOCATION-USER] 사용자 정보 정리 완료")
         print("💾 [LOCATION-USER] savedMtIdx: \(self.savedMtIdx)")
         print("💾 [LOCATION-USER] Utils.getMtIdx(): \(Utils.shared.getMtIdx())")
-    }
-    
-    // MARK: - 🌐 웹뷰 통신 메서드
-    
-    private func sendLocationToWebView(_ location: CLLocation) {
-        guard let webView = self.webView else {
-            print("⚠️ [LOCATION] 웹뷰 참조가 없음 - 위치 데이터 전송 건너뜀")
-            return
-        }
-        
-        print("🔥🔥🔥 [CRITICAL] sendLocationToWebView 호출됨! 웹뷰로 위치 데이터 전송! 🔥🔥🔥")
-        print("📍 [LOCATION] 전송할 데이터:")
-        print("   📍 위도: \(location.coordinate.latitude)")
-        print("   📍 경도: \(location.coordinate.longitude)")
-        print("   📍 정확도: \(location.horizontalAccuracy)")
-        print("   📍 속도: \(location.speed)")
-        print("   📍 고도: \(location.altitude)")
-        print("   📍 타임스탬프: \(location.timestamp)")
-        
-        let timestampMs = Int(location.timestamp.timeIntervalSince1970 * 1000)
-        let resultScript = """
-            console.log('🔥🔥🔥 [LocationService] 위치 업데이트 스크립트 실행 시작! 🔥🔥🔥');
-            console.log('📍 [LocationService] window.onLocationUpdate 존재 여부:', typeof window.onLocationUpdate);
-            console.log('📍 [LocationService] mt_idx 상태:', '\(savedMtIdx)');
-            console.log('📍 [LocationService] mt_idx 길이:', '\(savedMtIdx)'.length);
-            
-            if (window.onLocationUpdate) {
-                console.log('📍 [LocationService] 지속적 위치 업데이트 콜백 실행');
-                
-                const locationData = {
-                    latitude: \(location.coordinate.latitude),
-                    longitude: \(location.coordinate.longitude),
-                    accuracy: \(location.horizontalAccuracy),
-                    speed: \(location.speed),
-                    altitude: \(location.altitude),
-                    timestamp: \(timestampMs),
-                    source: 'ios-location-service',
-                    mt_idx: '\(savedMtIdx)',
-                    debug: {
-                        savedMtIdx: '\(savedMtIdx)',
-                        hasValidMtIdx: '\(savedMtIdx)' !== '' && '\(savedMtIdx)' !== 'null',
-                        platform: 'iOS'
-                    }
-                };
-                
-                console.log('📍 [LocationService] 전송할 위치 데이터:', locationData);
-                
-                try {
-                    window.onLocationUpdate(locationData);
-                    console.log('📍 [LocationService] 위치 업데이트 콜백 실행 완료');
-                } catch (error) {
-                    console.error('❌ [LocationService] 위치 업데이트 콜백 실행 중 오류:', error);
-                }
-            } else {
-                console.log('⚠️ [LocationService] onLocationUpdate 함수를 찾을 수 없습니다');
-                console.log('⚠️ [LocationService] window 객체 확인:', typeof window);
-                
-                // 강제로 onLocationUpdate 함수 등록
-                console.log('🔧 [LocationService] onLocationUpdate 함수 강제 등록');
-                window.onLocationUpdate = function(data) {
-                    console.log('📍 [TEMP-LocationService] 임시 onLocationUpdate 함수 호출:', data);
-                };
-                
-                // 다시 시도
-                const locationData = {
-                    latitude: \(location.coordinate.latitude),
-                    longitude: \(location.coordinate.longitude),
-                    accuracy: \(location.horizontalAccuracy),
-                    speed: \(location.speed),
-                    altitude: \(location.altitude),
-                    timestamp: \(timestampMs),
-                    source: 'ios-location-service',
-                    mt_idx: '\(savedMtIdx)',
-                    debug: {
-                        savedMtIdx: '\(savedMtIdx)',
-                        hasValidMtIdx: '\(savedMtIdx)' !== '' && '\(savedMtIdx)' !== 'null',
-                        platform: 'iOS'
-                    }
-                };
-                
-                window.onLocationUpdate(locationData);
-            }
-        """
-        
-        print("📍 [LOCATION] JavaScript 스크립트 생성 완료")
-        
-        DispatchQueue.main.async {
-            webView.evaluateJavaScript(resultScript) { result, error in
-                if let error = error {
-                    print("❌ [LOCATION] 위치 업데이트 웹 콜백 실행 실패: \(error)")
-                } else {
-                    print("✅ [LOCATION] 위치 업데이트 웹 콜백 실행 완료")
-                    print("📍 [LOCATION] JavaScript 실행 결과: \(result ?? "null")")
-                }
-            }
-        }
     }
 }

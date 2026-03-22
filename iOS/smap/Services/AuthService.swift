@@ -146,7 +146,7 @@ class AuthService: ObservableObject {
         deleteToken()
         deleteUserData()
         print("[AuthService] 로그아웃 완료 - 알림 발송")
-        // NotificationCenter를 통해 로그아웃 알림 전송 (MainView 및 RootCoordinator에서 수신)
+        // NotificationCenter를 통해 로그아웃 알림 전송 (RootView에서 수신)
         NotificationCenter.default.post(name: NSNotification.Name("logout"), object: nil)
     }
 

@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import WebKit
 
 // MARK: - MainTabView & Subviews (Consolidated for Compilation)
 
@@ -96,52 +95,3 @@ struct MainTabView: View {
     }
 }
 
-struct TabWebView: UIViewRepresentable {
-    let urlString: String
-    
-    func makeUIView(context: Context) -> WKWebView {
-        let webView = WKWebView()
-        webView.navigationDelegate = context.coordinator
-        return webView
-    }
-    
-    func updateUIView(_ uiView: WKWebView, context: Context) {
-        if let url = URL(string: urlString) {
-            let request = URLRequest(url: url)
-            
-            let authService = AuthService.shared
-            var storageScript = ""
-            if let token = authService.getToken(), let user = authService.getUserData() {
-                if let userJsonData = try? JSONEncoder().encode(user),
-                   let userJson = String(data: userJsonData, encoding: .utf8) {
-                    let timestamp = Int64(Date().timeIntervalSince1970 * 1000)
-                    storageScript += """
-                        localStorage.setItem('smap_auth_token', '\(token)');
-                        localStorage.setItem('smap_user_data', '\(userJson)');
-                        localStorage.setItem('smap_login_time', '\(timestamp)');
-                        localStorage.setItem('isLoggedIn', 'true');
-                    """
-                }
-            }
-            
-            if !storageScript.isEmpty {
-                let userScript = WKUserScript(source: "(function() { \(storageScript) })();", injectionTime: .atDocumentStart, forMainFrameOnly: true)
-                uiView.configuration.userContentController.addUserScript(userScript)
-            }
-            
-            uiView.load(request)
-        }
-    }
-    
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-    
-    class Coordinator: NSObject, WKNavigationDelegate {
-        var parent: TabWebView
-        
-        init(_ parent: TabWebView) {
-            self.parent = parent
-        }
-    }
-}

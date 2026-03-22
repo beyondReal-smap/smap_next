@@ -8,7 +8,6 @@
 import Foundation
 import UIKit
 import FirebaseMessaging
-import WebKit
 
 // FCM 메시지 처리를 위한 Notification 이름 정의
 extension Notification.Name {
@@ -71,14 +70,6 @@ class Utils {
         }
     }
     
-    //랜덤 문자열
-    func randomString(length: Int) -> String{
-        let str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-        let iv = str.createRandomStr(length: length)
-        
-        return iv
-    }
-    
     func showSnackBar(view: UIView, message: String){
         let toastLabel = UILabel()
         toastLabel.backgroundColor = UIColor.black.withAlphaComponent(0.8)
@@ -104,21 +95,5 @@ class Utils {
         } completion: { _ in
             toastLabel.removeFromSuperview()
         }
-    }
-
-    // MARK: - WebView 관리 (간소화)
-
-    /// WKWebView 참조 저장용
-    private weak var webView: WKWebView?
-
-    /// WKWebView 참조 설정
-    func setWebView(_ webView: WKWebView) {
-        self.webView = webView
-        print("✅ [Utils] WebView 참조 설정됨")
-    }
-
-    /// WKWebView 참조 가져오기
-    func getWebView() -> WKWebView? {
-        return webView
     }
 }
