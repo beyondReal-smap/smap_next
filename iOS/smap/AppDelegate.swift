@@ -681,6 +681,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         print("📢 [NOTIFICATION] FCM 토큰 강제 업데이트 요청 수신")
         // 기존의 forceUpdateFCMTokenOnLogin 메소드 호출
         forceUpdateFCMTokenOnLogin()
+
+        // 로그인/가입 직후 권한 온보딩 트리거 (첫 로그인 시 applicationDidBecomeActive가 이미 지나간 경우)
+        waitForPushPermissionSettlement { [weak self] in
+            self?.runPermissionOnboardingIfNeeded()
+        }
     }
 
     // MARK: - 🔑 로그인 시 FCM 토큰 강제 업데이트 (웹뷰에서 호출)
