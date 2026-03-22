@@ -1,6 +1,7 @@
 import XCTest
 @testable import smap
 
+@MainActor
 final class AuthServiceTests: XCTestCase {
     var service: AuthService!
     var keychain: KeychainManager!
