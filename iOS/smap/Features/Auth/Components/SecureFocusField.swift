@@ -76,7 +76,7 @@ struct FocusableSecureField: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .foregroundColor(isFocused ? BrandColors.primary : BrandColors.textSecondary)
+                .foregroundColor(isFocused ? SMAPTheme.Color.primary : SMAPTheme.Color.textSecondary)
                 .frame(width: 20)
 
             ZStack(alignment: .leading) {
@@ -104,17 +104,18 @@ struct FocusableSecureField: View {
                 showPassword.toggle()
             }) {
                 Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
-                    .foregroundColor(BrandColors.textSecondary)
+                    .foregroundColor(SMAPTheme.Color.textSecondary)
                     .frame(width: 20)
             }
+            .accessibilityLabel(showPassword ? "비밀번호 숨기기" : "비밀번호 보기")
         }
         .padding(.horizontal, 16)
         .frame(height: 56) // 고정 높이
-        .background(BrandColors.inputBackground)
+        .background(SMAPTheme.Color.inputBackground)
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(isFocused ? BrandColors.primary : BrandColors.border, lineWidth: isFocused ? 2 : 1)
+                .stroke(isFocused ? SMAPTheme.Color.primary : SMAPTheme.Color.border, lineWidth: isFocused ? 2 : 1)
         )
     }
 }

@@ -48,6 +48,7 @@ struct HomeHeaderView: View {
                     }
                 }
                 .frame(width: 36, height: 44)
+                .accessibilityLabel("알림")
 
                 Button(action: {
                     onSettingsTap()
@@ -57,13 +58,14 @@ struct HomeHeaderView: View {
                         .foregroundColor(.gray)
                 }
                 .frame(width: 36, height: 44)
+                .accessibilityLabel("설정")
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .background(
             BlurView(style: .systemUltraThinMaterialLight)
-                .edgesIgnoringSafeArea(.top)
+                .ignoresSafeArea(edges: .top)
         )
     }
 }

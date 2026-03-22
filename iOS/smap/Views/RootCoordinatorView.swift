@@ -11,14 +11,14 @@ import SwiftUI
 // MARK: - Splash View (Premium Animated)
 
 struct SplashView: View {
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
 
     var body: some View {
         GeometryReader { geometry in
             ZStack {
                 // Background Color #353538
                 Color(red: 53/255, green: 53/255, blue: 56/255)
-                    .edgesIgnoringSafeArea(.all)
+                    .ignoresSafeArea()
 
                 VStack(spacing: 0) {
                     // App Icon (AppNoBg from Assets)
@@ -26,6 +26,7 @@ struct SplashView: View {
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 80, height: 80) // Adjust size as needed
+                        .accessibilityHidden(true)
                 }
                 .position(x: geometry.size.width / 2, y: geometry.size.height * 0.25) // 1/4 Height Position
             }

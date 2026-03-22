@@ -129,6 +129,7 @@ struct ShareOptionsView: View {
                                     .font(.suite(size: 18))
                                     .foregroundColor(SMAPTheme.Color.primary)
                             }
+                            .accessibilityLabel("초대 코드 복사")
                         }
                         .padding(.vertical, 8)
                     }

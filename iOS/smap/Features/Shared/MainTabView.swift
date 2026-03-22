@@ -48,38 +48,43 @@ struct MainTabView: View {
                     Image(systemName: "house")
                     Text("홈")
                 }
+                .accessibilityLabel("홈 탭")
                 .tag(0)
-            
+
             // 2. 그룹 (Native)
             GroupListView()
                 .tabItem {
                     Image(systemName: "person.3.fill")
                     Text("그룹")
                 }
+                .accessibilityLabel("그룹 탭")
                 .tag(1)
-            
+
             // 3. 일정 (Native)
             NativeScheduleListView()
                 .tabItem {
                     Image(systemName: "calendar")
                     Text("일정")
                 }
+                .accessibilityLabel("일정 탭")
                 .tag(2)
-            
+
             // 4. 내장소 (Native)
             MyPlaceView()
                 .tabItem {
                     Image(systemName: "location.circle")
                     Text("내장소")
                 }
+                .accessibilityLabel("내장소 탭")
                 .tag(3)
-            
+
             // 5. 활동 로그 (Native)
             ActivityLogView()
                 .tabItem {
                     Image(systemName: "clock.arrow.circlepath")
                     Text("활동 로그")
                 }
+                .accessibilityLabel("활동 로그 탭")
                 .tag(4)
         }
         .onChange(of: selectedTab) { _ in

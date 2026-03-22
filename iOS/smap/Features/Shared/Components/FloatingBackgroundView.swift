@@ -66,7 +66,7 @@ struct FloatingBackgroundView: View {
                 delay: 4
             )
         }
-        .edgesIgnoringSafeArea(.all)
+        .ignoresSafeArea()
     }
 }
 

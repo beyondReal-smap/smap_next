@@ -9,7 +9,7 @@ import SwiftUI
 
 struct MapLoadingOverlay: View {
     @State private var dotOffset = 0
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
     private let timer = Timer.publish(every: 0.4, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -17,13 +17,13 @@ struct MapLoadingOverlay: View {
             // 배경 (브랜드 컬러 그라데이션)
             LinearGradient(
                 gradient: Gradient(colors: [
-                    brandColor.opacity(0.95),
+                    SMAPTheme.Color.primary.opacity(0.95),
                     Color(red: 102/255, green: 126/255, blue: 234/255).opacity(0.95)
                 ]),
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-            .edgesIgnoringSafeArea(.all)
+            .ignoresSafeArea()
 
             VStack(spacing: 30) {
                 // 지도 아이콘

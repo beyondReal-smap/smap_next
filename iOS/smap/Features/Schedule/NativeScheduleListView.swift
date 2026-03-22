@@ -146,6 +146,7 @@ struct NativeScheduleListView: View {
                     .font(.suite(size: 22, weight: .bold)) // Larger Plus
                     .foregroundColor(SMAPTheme.Color.primary)
             }
+            .accessibilityLabel("일정 추가")
         }
 
         .padding(.vertical, 8)
@@ -164,6 +165,7 @@ struct NativeScheduleListView: View {
                         .foregroundColor(.gray)
                         .padding(.horizontal)
                 }
+                .accessibilityLabel("이전 달")
                 Text(formatMonth(viewModel.currentMonth))
                     .font(.suite(size: 16, weight: .bold)) // Larger Month
                     .frame(width: 140)
@@ -173,6 +175,7 @@ struct NativeScheduleListView: View {
                         .foregroundColor(.gray)
                         .padding(.horizontal)
                 }
+                .accessibilityLabel("다음 달")
                 Spacer()
             }
             .padding(.top, 8)
@@ -594,6 +597,7 @@ struct ScheduleEventCard: View {
                             .foregroundColor(.gray)
                             .padding(8)
                     }
+                    .accessibilityLabel("일정 관리")
                 }
             }
         }

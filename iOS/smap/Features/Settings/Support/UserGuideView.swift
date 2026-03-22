@@ -23,7 +23,7 @@ struct UserGuideView: View {
 
     var body: some View {
         ZStack {
-            Color(red: 0.98, green: 0.98, blue: 1.0).edgesIgnoringSafeArea(.all)
+            Color(red: 0.98, green: 0.98, blue: 1.0).ignoresSafeArea()
 
             ScrollView {
                 VStack(spacing: 20) {

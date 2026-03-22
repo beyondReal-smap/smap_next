@@ -77,6 +77,7 @@ struct ActivityLogSidebarView: View {
                     .background(Color.white.opacity(0.6))
                     .clipShape(Circle())
             }
+            .accessibilityLabel("닫기")
         }
     }
     

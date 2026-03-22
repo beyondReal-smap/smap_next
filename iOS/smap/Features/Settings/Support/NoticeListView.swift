@@ -16,7 +16,7 @@ struct NoticeListView: View {
 
     var body: some View {
         ZStack {
-            Color(red: 0.98, green: 0.98, blue: 1.0).edgesIgnoringSafeArea(.all)
+            Color(red: 0.98, green: 0.98, blue: 1.0).ignoresSafeArea()
 
             if isLoading {
                 ProgressView("공지사항을 불러오는 중...")

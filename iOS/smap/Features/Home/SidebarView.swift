@@ -9,7 +9,7 @@ import SwiftUI
 
 struct SidebarView: View {
     @ObservedObject var viewModel: HomeViewModel
-    let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -17,7 +17,7 @@ struct SidebarView: View {
             HStack(spacing: 12) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(brandColor)
+                        .fill(SMAPTheme.Color.primary)
                         .frame(width: 40, height: 40)
                     Image(systemName: "person.2.fill")
                         .foregroundColor(.white)
@@ -138,7 +138,7 @@ struct SidebarView: View {
         .frame(width: 320)
         .background(
             Color(red: 245/255, green: 247/255, blue: 250/255)
-                .edgesIgnoringSafeArea(.all)
+                .ignoresSafeArea()
         )
         .cornerRadius(24, corners: [.topRight, .bottomRight])
         .shadow(color: Color.black.opacity(0.15), radius: 20, x: 5, y: 0)
@@ -159,7 +159,7 @@ struct DateCell: View {
                     .font(.suite(size: 14, weight: .bold))
             }
             .frame(width: 50, height: 50)
-            .background(isSelected ? Color(red: 1/255, green: 19/255, blue: 163/255) : Color.white)
+            .background(isSelected ? SMAPTheme.Color.primary : Color.white)
             .foregroundColor(isSelected ? .white : .primary)
             .cornerRadius(12)
             .shadow(color: Color.black.opacity(0.05), radius: 5)
@@ -196,11 +196,11 @@ struct SidebarMemberCell: View {
                 Spacer()
             }
             .padding(12)
-            .background(member.isSelected ? Color(red: 1/255, green: 19/255, blue: 163/255).opacity(0.05) : Color.white.opacity(0.6))
+            .background(member.isSelected ? SMAPTheme.Color.primary.opacity(0.05) : Color.white.opacity(0.6))
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(member.isSelected ? Color(red: 1/255, green: 19/255, blue: 163/255).opacity(0.3) : Color.clear, lineWidth: 1)
+                    .stroke(member.isSelected ? SMAPTheme.Color.primary.opacity(0.3) : Color.clear, lineWidth: 1)
             )
         }
     }
@@ -209,7 +209,7 @@ struct SidebarMemberCell: View {
 struct MemberAvatarView: View {
     let member: SmapGroupMember
     var isSelf: Bool = false
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
 
     var body: some View {
         let _ = print("🔍 [MemberAvatarView] \(member.mt_name ?? "unknown"): mt_file1 = '\(member.mt_file1 ?? "nil")', URL = \(getProfileImageUrl(member.mt_file1)?.absoluteString ?? "nil")")
@@ -240,7 +240,7 @@ struct MemberAvatarView: View {
             }
             .overlay(
                 Circle()
-                    .stroke(member.isSelected ? brandColor : Color.clear, lineWidth: 2.5)
+                    .stroke(member.isSelected ? SMAPTheme.Color.primary : Color.clear, lineWidth: 2.5)
             )
 
             // Crown Icon (Owner) - 테두리 위에 표시
@@ -311,7 +311,7 @@ struct FloatingActionHomeButton: View {
     let count: Int
     let action: () -> Void
 
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255) // #0113A3
+    
     private let pinkColor = Color(red: 236/255, green: 72/255, blue: 153/255) // Pink-500
 
     var body: some View {
@@ -322,9 +322,9 @@ struct FloatingActionHomeButton: View {
             ZStack(alignment: .topTrailing) {
                 // Main Button Circle
                 Circle()
-                    .fill(brandColor)
+                    .fill(SMAPTheme.Color.primary)
                     .frame(width: 56, height: 56)
-                    .shadow(color: brandColor.opacity(0.3), radius: 12, x: 0, y: 8)
+                    .shadow(color: SMAPTheme.Color.primary.opacity(0.3), radius: 12, x: 0, y: 8)
                     .overlay(
                         Image(systemName: "person.fill")
                             .font(.suite(size: 22))
@@ -343,5 +343,6 @@ struct FloatingActionHomeButton: View {
                 }
             }
         }
+        .accessibilityLabel("멤버 조회")
     }
 }

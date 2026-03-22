@@ -19,7 +19,7 @@ struct TermSection: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title)
                 .font(.suite(size: 18, weight: .bold))
-                .foregroundColor(Color(red: 1/255, green: 19/255, blue: 163/255))
+                .foregroundColor(SMAPTheme.Color.primary)
 
             Text(content)
                 .font(.suite(size: 15))
@@ -124,7 +124,7 @@ struct ServiceTermsView: View {
             }
             .padding(.horizontal, 20)
         }
-        .background(Color(red: 0.98, green: 0.98, blue: 1.0).edgesIgnoringSafeArea(.all))
+        .background(Color(red: 0.98, green: 0.98, blue: 1.0).ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar {
@@ -230,7 +230,7 @@ struct PrivacyPolicyView: View {
             }
             .padding(.horizontal, 20)
         }
-        .background(Color(red: 0.98, green: 0.98, blue: 1.0).edgesIgnoringSafeArea(.all))
+        .background(Color(red: 0.98, green: 0.98, blue: 1.0).ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar {
@@ -271,7 +271,7 @@ struct LocationTermsView: View {
                 }.padding(.bottom, 40)
             }.padding(.horizontal, 20)
         }
-        .background(Color(red: 0.98, green: 0.98, blue: 1.0).edgesIgnoringSafeArea(.all))
+        .background(Color(red: 0.98, green: 0.98, blue: 1.0).ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline).navigationBarBackButtonHidden(true)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
@@ -303,7 +303,7 @@ struct MarketingConsentView: View {
                 }.padding(.bottom, 40)
             }.padding(.horizontal, 20)
         }
-        .background(Color(red: 0.98, green: 0.98, blue: 1.0).edgesIgnoringSafeArea(.all))
+        .background(Color(red: 0.98, green: 0.98, blue: 1.0).ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline).navigationBarBackButtonHidden(true)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
@@ -335,7 +335,7 @@ struct ThirdPartyProvisionView: View {
                 }.padding(.bottom, 40)
             }.padding(.horizontal, 20)
         }
-        .background(Color(red: 0.98, green: 0.98, blue: 1.0).edgesIgnoringSafeArea(.all))
+        .background(Color(red: 0.98, green: 0.98, blue: 1.0).ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline).navigationBarBackButtonHidden(true)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {

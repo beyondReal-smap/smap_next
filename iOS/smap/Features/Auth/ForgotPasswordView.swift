@@ -82,6 +82,7 @@ struct ForgotPasswordView: View {
                     .font(.suite(size: 20, weight: .medium))
                     .foregroundColor(.black)
             }
+            .accessibilityLabel("뒤로")
             Spacer()
         }
         .padding(.horizontal, 20)
@@ -230,6 +231,7 @@ struct ForgotPasswordView: View {
                             Image(systemName: viewModel.showNewPassword ? "eye.slash.fill" : "eye.fill")
                                 .foregroundColor(.gray)
                         }
+                        .accessibilityLabel(viewModel.showNewPassword ? "비밀번호 숨기기" : "비밀번호 보기")
                     }
                     .font(.custom("SUITE-Medium", size: 18))
                     .padding(.horizontal, 16)
@@ -263,6 +265,7 @@ struct ForgotPasswordView: View {
                             Image(systemName: viewModel.showConfirmPassword ? "eye.slash.fill" : "eye.fill")
                                 .foregroundColor(.gray)
                         }
+                        .accessibilityLabel(viewModel.showConfirmPassword ? "비밀번호 숨기기" : "비밀번호 보기")
                     }
                     .font(.custom("SUITE-Medium", size: 18))
                     .padding(.horizontal, 16)

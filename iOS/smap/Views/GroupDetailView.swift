@@ -162,6 +162,7 @@ struct GroupDetailView: View {
                         .background(Color.white.opacity(0.15))
                         .clipShape(Circle())
                 }
+                .accessibilityLabel("그룹 설정")
             }
             
             Divider().background(Color.white.opacity(0.2))
@@ -187,6 +188,7 @@ struct GroupDetailView: View {
                                     .font(.suite(size: 12))
                                     .foregroundColor(.white.opacity(0.8))
                             }
+                            .accessibilityLabel("초대 코드 복사")
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 4)
@@ -486,6 +488,7 @@ struct MemberRowNew: View {
                         .foregroundColor(.gray)
                         .padding(4)
                 }
+                .accessibilityLabel("멤버 관리")
             }
         }
         .padding(.horizontal, 20)

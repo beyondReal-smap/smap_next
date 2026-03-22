@@ -18,7 +18,7 @@ struct GroupCreationView: View {
     @State private var errorMessage: String?
     @State private var selectedTab: Int = 0 // 0 = Create, 1 = Join
     
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
     private let pinkColor = Color(red: 236/255, green: 72/255, blue: 153/255)
     private let orangeColor = Color(red: 245/255, green: 158/255, blue: 11/255)
     
@@ -30,7 +30,7 @@ struct GroupCreationView: View {
                 startPoint: .top,
                 endPoint: .bottom
             )
-            .edgesIgnoringSafeArea(.all)
+            .ignoresSafeArea()
             
             VStack(spacing: 0) {
                 // Header Icon
@@ -38,7 +38,7 @@ struct GroupCreationView: View {
                     Circle()
                         .fill(
                             LinearGradient(
-                                gradient: Gradient(colors: [brandColor.opacity(0.1), pinkColor.opacity(0.1)]),
+                                gradient: Gradient(colors: [SMAPTheme.Color.primary.opacity(0.1), pinkColor.opacity(0.1)]),
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
@@ -48,13 +48,13 @@ struct GroupCreationView: View {
                     Circle()
                         .fill(
                             LinearGradient(
-                                gradient: Gradient(colors: [brandColor, pinkColor]),
+                                gradient: Gradient(colors: [SMAPTheme.Color.primary, pinkColor]),
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
                         .frame(width: 80, height: 80)
-                        .shadow(color: brandColor.opacity(0.3), radius: 16, x: 0, y: 8)
+                        .shadow(color: SMAPTheme.Color.primary.opacity(0.3), radius: 16, x: 0, y: 8)
                     
                     Image(systemName: selectedTab == 0 ? "person.3.fill" : "person.badge.plus")
                         .font(.system(size: 32))
@@ -197,10 +197,10 @@ struct GroupCreationView: View {
                     .background(
                         (selectedTab == 0 && groupName.isEmpty) || (selectedTab == 1 && inviteCode.isEmpty)
                             ? Color.gray.opacity(0.3)
-                            : (selectedTab == 0 ? brandColor : orangeColor)
+                            : (selectedTab == 0 ? SMAPTheme.Color.primary : orangeColor)
                     )
                     .cornerRadius(12)
-                    .shadow(color: (selectedTab == 0 ? brandColor : orangeColor).opacity(0.3), radius: 8, x: 0, y: 4)
+                    .shadow(color: (selectedTab == 0 ? SMAPTheme.Color.primary : orangeColor).opacity(0.3), radius: 8, x: 0, y: 4)
                 }
                 .disabled((selectedTab == 0 && groupName.isEmpty) || (selectedTab == 1 && inviteCode.isEmpty) || isCreating)
                 .padding(.horizontal, 24)
@@ -232,7 +232,7 @@ struct GroupCreationView: View {
         Button(action: action) {
             Text(text)
                 .font(.suite(size: 14, weight: isSelected ? .bold : .medium))
-                .foregroundColor(isSelected ? brandColor : .gray)
+                .foregroundColor(isSelected ? SMAPTheme.Color.primary : .gray)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
                 .background(isSelected ? Color.white : Color.clear)

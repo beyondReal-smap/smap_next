@@ -22,7 +22,7 @@ struct FocusableTextField: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .foregroundColor(isFocused ? BrandColors.primary : BrandColors.textSecondary)
+                .foregroundColor(isFocused ? SMAPTheme.Color.primary : SMAPTheme.Color.textSecondary)
                 .frame(width: 20)
 
             TextField(placeholder, text: $text, onEditingChanged: { editing in
@@ -37,11 +37,11 @@ struct FocusableTextField: View {
         }
         .padding(.horizontal, 16)
         .frame(height: 56) // 고정 높이
-        .background(BrandColors.inputBackground)
+        .background(SMAPTheme.Color.inputBackground)
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(isFocused ? BrandColors.primary : BrandColors.border, lineWidth: isFocused ? 2 : 1)
+                .stroke(isFocused ? SMAPTheme.Color.primary : SMAPTheme.Color.border, lineWidth: isFocused ? 2 : 1)
         )
     }
 }

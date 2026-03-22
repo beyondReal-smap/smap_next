@@ -103,7 +103,7 @@ struct LocationSearchView: View {
     @State private var errorMessage: String?
     @State private var hasSearched: Bool = false // Track if search was performed
     
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
     
     var onSelect: (KakaoPlace) -> Void
     
@@ -115,7 +115,7 @@ struct LocationSearchView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "magnifyingglass")
                             .font(.suite(size: 16, weight: .bold))
-                            .foregroundColor(brandColor)
+                            .foregroundColor(SMAPTheme.Color.primary)
                         
                         TextField("지번, 도로명, 건물명 검색", text: $query, onCommit: performSearch)
                             .font(.suite(size: 15))
@@ -127,6 +127,7 @@ struct LocationSearchView: View {
                                 Image(systemName: "xmark.circle.fill")
                                     .foregroundColor(.gray.opacity(0.5))
                             }
+                            .accessibilityLabel("검색어 지우기")
                         }
                     }
                     .padding(.horizontal, 14)
@@ -140,7 +141,7 @@ struct LocationSearchView: View {
                             .foregroundColor(.white)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
-                            .background(query.isEmpty ? Color.gray.opacity(0.3) : brandColor)
+                            .background(query.isEmpty ? Color.gray.opacity(0.3) : SMAPTheme.Color.primary)
                             .cornerRadius(14)
                     }
                     .disabled(query.isEmpty)
@@ -154,7 +155,7 @@ struct LocationSearchView: View {
             
             // Content Area
             ZStack {
-                Color(UIColor.systemGroupedBackground).edgesIgnoringSafeArea(.all)
+                Color(UIColor.systemGroupedBackground).ignoresSafeArea()
                 
                 if isLoading {
                     VStack(spacing: 16) {
@@ -181,11 +182,11 @@ struct LocationSearchView: View {
                                     HStack(spacing: 16) {
                                         ZStack {
                                             Circle()
-                                                .fill(brandColor.opacity(0.1))
+                                                .fill(SMAPTheme.Color.primary.opacity(0.1))
                                                 .frame(width: 40, height: 40)
                                             Image(systemName: "mappin.and.ellipse")
                                                 .font(.suite(size: 18))
-                                                .foregroundColor(brandColor)
+                                                .foregroundColor(SMAPTheme.Color.primary)
                                         }
                                         
                                         VStack(alignment: .leading, spacing: 4) {
@@ -239,7 +240,7 @@ struct LocationSearchView: View {
                 
                 Image(systemName: icon)
                     .font(.suite(size: 40))
-                    .foregroundColor(brandColor.opacity(0.6))
+                    .foregroundColor(SMAPTheme.Color.primary.opacity(0.6))
             }
             
             VStack(spacing: 8) {

@@ -9,7 +9,6 @@ import SwiftUI
 
 struct NotificationRow: View {
     let notification: PushLog
-    let brandColor: Color
     let pinkColor: Color
 
     private var iconName: String {
@@ -30,7 +29,7 @@ struct NotificationRow: View {
     private var iconColor: Color {
         switch iconName {
         case "location.fill": return .red
-        case "person.3.fill": return brandColor
+        case "person.3.fill": return SMAPTheme.Color.primary
         case "calendar": return .orange
         case "envelope.fill": return .green
         default: return pinkColor

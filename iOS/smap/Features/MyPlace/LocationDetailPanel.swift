@@ -22,10 +22,10 @@ struct LocationDetailPanel: View {
     @State private var showLocationSearch: Bool = false
     @State private var isInitialized: Bool = false
     
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 ZStack {
                     if let location = viewModel.selectedLocation, !viewModel.isEditMode { 
@@ -49,13 +49,13 @@ struct LocationDetailPanel: View {
                     }) {
                         Text("닫기").font(.suite(size: 16, weight: .medium))
                     }
-                    .foregroundColor(brandColor) 
+                    .foregroundColor(SMAPTheme.Color.primary) 
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     if viewModel.isEditMode {
                         Button("저장") { saveLocation() }
                             .font(.suite(size: 16, weight: .bold))
-                            .foregroundColor(brandColor)
+                            .foregroundColor(SMAPTheme.Color.primary)
                             .disabled(viewModel.isSaving || locationName.isEmpty || locationAddress.isEmpty)
                     }
                 }
@@ -63,7 +63,7 @@ struct LocationDetailPanel: View {
         }
         .onAppear { setupInitialValues() }
         .sheet(isPresented: $showLocationSearch) {
-            NavigationView {
+            NavigationStack {
                 LocationSearchView { place in
                     locationName = place.place_name
                     locationAddress = place.road_address_name.isEmpty ? place.address_name : place.road_address_name
@@ -88,13 +88,13 @@ struct LocationDetailPanel: View {
             VStack(spacing: 16) {
                 ZStack {
                     Circle()
-                        .fill(brandColor.opacity(0.1))
+                        .fill(SMAPTheme.Color.primary.opacity(0.1))
                         .frame(width: 100, height: 100)
                     
                     Circle()
-                        .fill(LinearGradient(gradient: Gradient(colors: [brandColor, brandColor.opacity(0.7)]), startPoint: .topLeading, endPoint: .bottomTrailing))
+                        .fill(LinearGradient(gradient: Gradient(colors: [SMAPTheme.Color.primary, SMAPTheme.Color.primary.opacity(0.7)]), startPoint: .topLeading, endPoint: .bottomTrailing))
                         .frame(width: 72, height: 72)
-                        .shadow(color: brandColor.opacity(0.3), radius: 10, x: 0, y: 5)
+                        .shadow(color: SMAPTheme.Color.primary.opacity(0.3), radius: 10, x: 0, y: 5)
                     
                     Image(systemName: "mappin.and.ellipse")
                         .font(.suite(size: 32, weight: .bold))
@@ -110,7 +110,7 @@ struct LocationDetailPanel: View {
                     HStack(spacing: 4) {
                         Image(systemName: "mappin.circle.fill")
                             .font(.suite(size: 14))
-                            .foregroundColor(brandColor)
+                            .foregroundColor(SMAPTheme.Color.primary)
                         Text(location.address)
                             .font(.suite(size: 15))
                             .foregroundColor(.secondary)
@@ -126,11 +126,11 @@ struct LocationDetailPanel: View {
                 HStack(spacing: 16) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(brandColor.opacity(0.05))
+                            .fill(SMAPTheme.Color.primary.opacity(0.05))
                             .frame(width: 44, height: 44)
                         Image(systemName: "location.circle.fill")
                             .font(.suite(size: 20))
-                            .foregroundColor(brandColor)
+                            .foregroundColor(SMAPTheme.Color.primary)
                     }
                     
                     VStack(alignment: .leading, spacing: 2) {
@@ -187,10 +187,11 @@ struct LocationDetailPanel: View {
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 56)
-                        .background(brandColor)
+                        .background(SMAPTheme.Color.primary)
                         .cornerRadius(16)
-                        .shadow(color: brandColor.opacity(0.2), radius: 8, x: 0, y: 4)
+                        .shadow(color: SMAPTheme.Color.primary.opacity(0.2), radius: 8, x: 0, y: 4)
                     }
+                    .accessibilityLabel("정보 수정")
                     
                     Button(action: { Task { _ = await viewModel.toggleNotification(for: location) } }) {
                         VStack(spacing: 4) {
@@ -205,6 +206,7 @@ struct LocationDetailPanel: View {
                         .cornerRadius(16)
                         .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
                     }
+                    .accessibilityLabel(location.notifications ? "알림 끄기" : "알림 켜기")
                 }
                 
                 Button(action: { Task { let success = await viewModel.deleteLocation(location); if success { presentationMode.wrappedValue.dismiss() } } }) {
@@ -219,6 +221,7 @@ struct LocationDetailPanel: View {
                     .background(Color.red.opacity(0.05))
                     .cornerRadius(16)
                 }
+                .accessibilityLabel("이 장소 삭제")
             }
             .padding(.top, 8)
             
@@ -232,7 +235,7 @@ struct LocationDetailPanel: View {
             VStack(alignment: .leading, spacing: 12) {
                 Label("등록 대상 멤버", systemImage: "person.circle.fill")
                     .font(.suite(size: 14, weight: .bold))
-                    .foregroundColor(brandColor)
+                    .foregroundColor(SMAPTheme.Color.primary)
                 
                 if let member = viewModel.selectedMember {
                     HStack(spacing: 16) {
@@ -281,21 +284,22 @@ struct LocationDetailPanel: View {
             VStack(alignment: .leading, spacing: 12) {
                 Label("장소 정보", systemImage: "map.fill")
                     .font(.suite(size: 14, weight: .bold))
-                    .foregroundColor(brandColor)
+                    .foregroundColor(SMAPTheme.Color.primary)
                 
                 VStack(spacing: 16) {
                     // Search Trigger
                     Button(action: { showLocationSearch = true }) {
                         HStack {
-                            Image(systemName: "magnifyingglass").foregroundColor(brandColor)
+                            Image(systemName: "magnifyingglass").foregroundColor(SMAPTheme.Color.primary)
                             Text("주소 검색으로 찾기").font(.suite(size: 15, weight: .medium))
                             Spacer()
                             Image(systemName: "chevron.right").font(.suite(size: 14, weight: .bold)).foregroundColor(.secondary)
                         }
                         .padding(16)
-                        .background(brandColor.opacity(0.05))
+                        .background(SMAPTheme.Color.primary.opacity(0.05))
                         .cornerRadius(12)
                     }
+                    .accessibilityLabel("주소 검색")
                     
                     // Name Input
                     VStack(alignment: .leading, spacing: 8) {
@@ -331,13 +335,13 @@ struct LocationDetailPanel: View {
                             Text("선택된 좌표").font(.suite(size: 12, weight: .semibold)).foregroundColor(.secondary)
                             Text(String(format: "%.6f, %.6f", locationLatitude, locationLongitude))
                                 .font(.suite(size: 14))
-                                .foregroundColor(brandColor)
+                                .foregroundColor(SMAPTheme.Color.primary)
                         }
                         Spacer()
-                        Image(systemName: "location.viewfinder").foregroundColor(brandColor)
+                        Image(systemName: "location.viewfinder").foregroundColor(SMAPTheme.Color.primary)
                     }
                     .padding(14)
-                    .background(brandColor.opacity(0.03))
+                    .background(SMAPTheme.Color.primary.opacity(0.03))
                     .cornerRadius(12)
                 }
                 .padding(16)
@@ -350,7 +354,7 @@ struct LocationDetailPanel: View {
             VStack(alignment: .leading, spacing: 12) {
                 Label("알림 설정", systemImage: "bell.badge.fill")
                     .font(.suite(size: 14, weight: .bold))
-                    .foregroundColor(brandColor)
+                    .foregroundColor(SMAPTheme.Color.primary)
                 
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
@@ -362,7 +366,7 @@ struct LocationDetailPanel: View {
                     }
                     Spacer()
                     Toggle("", isOn: $notificationsEnabled).labelsHidden()
-                        .tint(brandColor)
+                        .tint(SMAPTheme.Color.primary)
                 }
                 .padding(16)
                 .background(Color.white)

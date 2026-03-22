@@ -279,6 +279,7 @@ struct PasswordFormRow: View {
                         .foregroundColor(.gray.opacity(0.5))
                         .padding(10)
                 }
+                .accessibilityLabel(isVisible ? "비밀번호 숨기기" : "비밀번호 보기")
             }
             .font(.suite(size: 15))
             .padding(.horizontal, 16)

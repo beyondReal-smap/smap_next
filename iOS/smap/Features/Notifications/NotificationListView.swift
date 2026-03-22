@@ -13,11 +13,11 @@ struct NotificationListView: View {
     @StateObject var viewModel = NotificationViewModel()
     @Environment(\.dismiss) var dismiss
 
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
     private let pinkColor = Color(red: 236/255, green: 72/255, blue: 153/255)
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 // Background Gradient
                 LinearGradient(
@@ -56,7 +56,7 @@ struct NotificationListView: View {
                     }
                 }
             }
-            .navigationBarHidden(true)
+            .toolbar(.hidden, for: .navigationBar)
             .onAppear {
                 viewModel.fetchNotifications()
             }
@@ -83,6 +83,7 @@ struct NotificationListView: View {
                     .background(Color.gray.opacity(0.1))
                     .clipShape(Circle())
             }
+            .accessibilityLabel("닫기")
 
             // Title
             VStack(alignment: .leading, spacing: 2) {
@@ -109,6 +110,7 @@ struct NotificationListView: View {
                     .background(Color.gray.opacity(0.1))
                     .clipShape(Circle())
             }
+            .accessibilityLabel("메뉴")
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
@@ -122,14 +124,14 @@ struct NotificationListView: View {
             VStack(spacing: 4) {
                 Text("\(viewModel.notifications.count)")
                     .font(.suite(size: 24, weight: .bold))
-                    .foregroundColor(brandColor)
+                    .foregroundColor(SMAPTheme.Color.primary)
                 Text("전체")
                     .font(.suite(size: 11))
                     .foregroundColor(.gray)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
-            .background(brandColor.opacity(0.08))
+            .background(SMAPTheme.Color.primary.opacity(0.08))
             .cornerRadius(12)
 
             // Unread count
@@ -167,11 +169,11 @@ struct NotificationListView: View {
         VStack(spacing: 16) {
             ZStack {
                 Circle()
-                    .fill(brandColor.opacity(0.1))
+                    .fill(SMAPTheme.Color.primary.opacity(0.1))
                     .frame(width: 80, height: 80)
 
                 ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: brandColor))
+                    .progressViewStyle(CircularProgressViewStyle(tint: SMAPTheme.Color.primary))
                     .scaleEffect(1.5)
             }
 
@@ -188,7 +190,7 @@ struct NotificationListView: View {
                 Circle()
                     .fill(
                         LinearGradient(
-                            gradient: Gradient(colors: [brandColor.opacity(0.1), pinkColor.opacity(0.1)]),
+                            gradient: Gradient(colors: [SMAPTheme.Color.primary.opacity(0.1), pinkColor.opacity(0.1)]),
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -198,13 +200,13 @@ struct NotificationListView: View {
                 Circle()
                     .fill(
                         LinearGradient(
-                            gradient: Gradient(colors: [brandColor, pinkColor]),
+                            gradient: Gradient(colors: [SMAPTheme.Color.primary, pinkColor]),
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
                     .frame(width: 80, height: 80)
-                    .shadow(color: brandColor.opacity(0.3), radius: 15, x: 0, y: 8)
+                    .shadow(color: SMAPTheme.Color.primary.opacity(0.3), radius: 15, x: 0, y: 8)
 
                 Image(systemName: "bell.slash.fill")
                     .font(.suite(size: 32))
@@ -244,7 +246,7 @@ struct NotificationListView: View {
         ScrollView {
             LazyVStack(spacing: 12) {
                 ForEach(viewModel.notifications) { notification in
-                    NotificationRow(notification: notification, brandColor: brandColor, pinkColor: pinkColor)
+                    NotificationRow(notification: notification, pinkColor: pinkColor)
                         .onAppear {
                             if notification.plt_read_chk == .N {
                                 viewModel.markAsRead(notification)

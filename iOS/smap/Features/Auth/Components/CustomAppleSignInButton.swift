@@ -34,7 +34,7 @@ struct CustomAppleSignInButton: View {
             .cornerRadius(12)
             // .overlay(
             //    RoundedRectangle(cornerRadius: 12)
-            //        .stroke(BrandColors.border, lineWidth: 1)
+            //        .stroke(SMAPTheme.Color.border, lineWidth: 1)
             // )
             .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
         }

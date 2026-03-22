@@ -67,6 +67,7 @@ struct WithdrawView: View {
                             .foregroundColor(.primary)
                             .padding(8)
                     }
+                    .accessibilityLabel("뒤로")
                     
                     Spacer()
                     
@@ -262,6 +263,7 @@ struct WithdrawView: View {
                             Image(systemName: showPassword ? "eye.slash" : "eye")
                                 .foregroundColor(.gray)
                         }
+                        .accessibilityLabel(showPassword ? "비밀번호 숨기기" : "비밀번호 보기")
                     }
                     .padding()
                     .background(Color.white)

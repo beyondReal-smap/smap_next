@@ -9,18 +9,6 @@
 import SwiftUI
 import AuthenticationServices
 
-// MARK: - Brand Colors
-
-struct BrandColors {
-    static let primary = Color(red: 1/255, green: 19/255, blue: 163/255)  // #0113A3
-    static let primaryDark = Color(red: 0/255, green: 31/255, blue: 135/255)  // #001f87
-    static let background = Color(red: 254/255, green: 248/255, blue: 249/255)  // #fef8f9
-    static let textPrimary = Color.black
-    static let textSecondary = Color(UIColor.systemGray)
-    static let inputBackground = Color(UIColor.systemGray6)
-    static let border = Color(UIColor.systemGray4)
-    static let error = Color.red
-}
 
 // MARK: - Custom Font Extension
 extension Font {
@@ -76,7 +64,7 @@ struct LoginView: View {
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
-                .edgesIgnoringSafeArea(.all)
+                .ignoresSafeArea()
 
                 // Floating Animations
                 FloatingBackgroundView()
@@ -184,17 +172,18 @@ struct LoginView: View {
                 .resizable()
                 .aspectRatio(contentMode: .fit)
                 .frame(width: 80, height: 80) // Size adjustment if needed
+                .accessibilityHidden(true)
 
             VStack(spacing: 4) {
                 // 앱 이름 - smap
                 Text("smap")
                     .font(.suite(size: 32, weight: .bold))
-                    .foregroundColor(BrandColors.textPrimary)
+                    .foregroundColor(SMAPTheme.Color.textPrimary)
 
                 // 서브텍스트
                 Text("소중한 사람들과 함께하는 위치 공유")
                     .font(.suite(size: 14))
-                    .foregroundColor(BrandColors.textSecondary)
+                    .foregroundColor(SMAPTheme.Color.textSecondary)
                     .multilineTextAlignment(.center)
             }
         }
@@ -208,7 +197,7 @@ struct LoginView: View {
             // 전화번호 입력
             HStack(spacing: 12) {
                 Image(systemName: "phone.fill")
-                    .foregroundColor(isFocused ? BrandColors.primary : BrandColors.textSecondary)
+                    .foregroundColor(isFocused ? SMAPTheme.Color.primary : SMAPTheme.Color.textSecondary)
                     .frame(width: 20)
 
                 PhoneTextField(text: $viewModel.phoneNumber, placeholder: "전화번호", onEditingChanged: { editing in
@@ -219,11 +208,11 @@ struct LoginView: View {
             }
             .padding(.horizontal, 16)
             .frame(height: 56)
-            .background(BrandColors.inputBackground)
+            .background(SMAPTheme.Color.inputBackground)
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(isFocused ? BrandColors.primary : BrandColors.border, lineWidth: isFocused ? 2 : 1)
+                    .stroke(isFocused ? SMAPTheme.Color.primary : SMAPTheme.Color.border, lineWidth: isFocused ? 2 : 1)
             )
 
             // 비밀번호 입력
@@ -241,17 +230,17 @@ struct LoginView: View {
     private func errorMessageView(_ message: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.circle.fill")
-                .foregroundColor(BrandColors.error)
+                .foregroundColor(SMAPTheme.Color.error)
 
 
             Text(message)
                 .font(.suite(size: 14))
-                .foregroundColor(BrandColors.error)
+                .foregroundColor(SMAPTheme.Color.error)
 
             Spacer()
         }
         .padding(12)
-        .background(BrandColors.error.opacity(0.1))
+        .background(SMAPTheme.Color.error.opacity(0.1))
         .cornerRadius(8)
     }
 
@@ -274,9 +263,9 @@ struct LoginView: View {
             .foregroundColor(.white)
             .frame(maxWidth: .infinity)
             .frame(height: 52)
-            .background(viewModel.isInputValid ? BrandColors.primary : BrandColors.primary.opacity(0.3))
+            .background(viewModel.isInputValid ? SMAPTheme.Color.primary : SMAPTheme.Color.primary.opacity(0.3))
             .cornerRadius(12)
-            .shadow(color: viewModel.isInputValid ? BrandColors.primary.opacity(0.3) : Color.clear, radius: 4, x: 0, y: 2)
+            .shadow(color: viewModel.isInputValid ? SMAPTheme.Color.primary.opacity(0.3) : Color.clear, radius: 4, x: 0, y: 2)
         }
         .disabled(!viewModel.isInputValid || viewModel.isLoading)
     }
@@ -300,7 +289,7 @@ struct LoginView: View {
         }) {
             Text("비밀번호를 잊어버리셨나요?")
                 .font(.suite(size: 14))
-                .foregroundColor(BrandColors.primary)
+                .foregroundColor(SMAPTheme.Color.primary)
         }
     }
 
@@ -309,16 +298,16 @@ struct LoginView: View {
     private var dividerSection: some View {
         HStack {
             Rectangle()
-                .fill(BrandColors.border)
+                .fill(SMAPTheme.Color.border)
                 .frame(height: 1)
 
             Text("또는")
                 .font(.suite(size: 14))
-                .foregroundColor(BrandColors.textSecondary)
+                .foregroundColor(SMAPTheme.Color.textSecondary)
                 .padding(.horizontal, 12)
 
             Rectangle()
-                .fill(BrandColors.border)
+                .fill(SMAPTheme.Color.border)
                 .frame(height: 1)
         }
     }
@@ -339,7 +328,7 @@ struct LoginView: View {
 
                     Text("Google로 계속하기")
                         .font(.suite(size: 15, weight: .medium))
-                        .foregroundColor(BrandColors.textPrimary)
+                        .foregroundColor(SMAPTheme.Color.textPrimary)
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 48)
@@ -347,7 +336,7 @@ struct LoginView: View {
                 .cornerRadius(12)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(BrandColors.border, lineWidth: 1)
+                        .stroke(SMAPTheme.Color.border, lineWidth: 1)
                 )
                 .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
             }
@@ -397,7 +386,7 @@ struct LoginView: View {
         HStack(spacing: 4) {
             Text("아직 회원이 아니신가요?")
                 .font(.suite(size: 14))
-                .foregroundColor(BrandColors.textSecondary)
+                .foregroundColor(SMAPTheme.Color.textSecondary)
 
             Button(action: {
                 print("📝 [LoginView] 가입하기 버튼 클릭 (Native Flow)")
@@ -405,7 +394,7 @@ struct LoginView: View {
             }) {
                 Text("가입하기")
                     .font(.suite(size: 14, weight: .semibold))
-                    .foregroundColor(BrandColors.primary)
+                    .foregroundColor(SMAPTheme.Color.primary)
             }
         }
     }
@@ -415,7 +404,7 @@ struct LoginView: View {
     private var loadingOverlay: some View {
         ZStack {
             Color.black.opacity(0.4)
-                .edgesIgnoringSafeArea(.all)
+                .ignoresSafeArea()
 
             VStack(spacing: 16) {
                 ActivityIndicator(style: .large, color: .white)

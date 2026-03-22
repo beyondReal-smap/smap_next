@@ -567,6 +567,7 @@ struct NativeRegisterView: View {
                                 .font(.suite(size: 20, weight: .semibold))
                                 .foregroundColor(SMAPTheme.Color.textPrimary)
                         }
+                        .accessibilityLabel("뒤로")
                     }
                     
                     Spacer()

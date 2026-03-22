@@ -73,6 +73,7 @@ struct GroupListView: View {
                             .clipShape(Circle())
                             .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 5)
                     }
+                    .accessibilityLabel("그룹 추가")
                     .padding()
                 }
             }
@@ -493,6 +494,7 @@ struct CreateGroupView: View {
                                         Image(systemName: "xmark.circle.fill")
                                             .foregroundColor(.gray.opacity(0.4))
                                     }
+                                    .accessibilityLabel("그룹 이름 지우기")
                                 }
                             }
                             .padding(16)
@@ -530,6 +532,7 @@ struct CreateGroupView: View {
                                         Image(systemName: "xmark.circle.fill")
                                             .foregroundColor(.gray.opacity(0.4))
                                     }
+                                    .accessibilityLabel("그룹 설명 지우기")
                                 }
                             }
                             .padding(16)
@@ -611,6 +614,7 @@ struct CreateGroupView: View {
                             .font(.suite(size: 16, weight: .medium))
                             .foregroundColor(.gray)
                     }
+                    .accessibilityLabel("닫기")
                 }
             }
         }

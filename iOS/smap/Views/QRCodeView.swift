@@ -6,10 +6,10 @@ struct QRCodeView: View {
     let size: CGFloat
     @Environment(\.dismiss) var dismiss
     
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 24) {
                 Spacer()
                 
@@ -40,7 +40,7 @@ struct QRCodeView: View {
                     HStack(spacing: 12) {
                         Image(systemName: "1.circle.fill")
                             .font(.suite(size: 20))
-                            .foregroundColor(brandColor)
+                            .foregroundColor(SMAPTheme.Color.primary)
                         Text("카메라 앱을 열어주세요")
                             .font(.suite(size: 14))
                             .foregroundColor(.gray)
@@ -50,7 +50,7 @@ struct QRCodeView: View {
                     HStack(spacing: 12) {
                         Image(systemName: "2.circle.fill")
                             .font(.suite(size: 20))
-                            .foregroundColor(brandColor)
+                            .foregroundColor(SMAPTheme.Color.primary)
                         Text("QR 코드를 스캔해주세요")
                             .font(.suite(size: 14))
                             .foregroundColor(.gray)
@@ -60,7 +60,7 @@ struct QRCodeView: View {
                     HStack(spacing: 12) {
                         Image(systemName: "3.circle.fill")
                             .font(.suite(size: 20))
-                            .foregroundColor(brandColor)
+                            .foregroundColor(SMAPTheme.Color.primary)
                         Text("링크를 탭하여 그룹에 참여하세요")
                             .font(.suite(size: 14))
                             .foregroundColor(.gray)
@@ -82,7 +82,7 @@ struct QRCodeView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(brandColor)
+                    .background(SMAPTheme.Color.primary)
                     .foregroundColor(.white)
                     .cornerRadius(12)
                 }
@@ -96,7 +96,7 @@ struct QRCodeView: View {
                     Button("완료") {
                         dismiss()
                     }
-                    .foregroundColor(brandColor)
+                    .foregroundColor(SMAPTheme.Color.primary)
                 }
             }
         }

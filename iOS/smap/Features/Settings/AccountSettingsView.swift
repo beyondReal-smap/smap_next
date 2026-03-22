@@ -359,6 +359,7 @@ struct AccountSettingsView: View {
                         .clipShape(Circle())
                         .overlay(Circle().stroke(Color.white, lineWidth: 1.5))
                 }
+                .accessibilityLabel("프로필 사진 변경")
                 .offset(x: 2, y: 2)
             }
 

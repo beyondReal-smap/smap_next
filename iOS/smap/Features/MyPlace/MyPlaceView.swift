@@ -194,6 +194,7 @@ struct MyPlaceHeaderView: View {
                     .foregroundColor(.gray)
             }
             .frame(width: 36, height: 44)
+            .accessibilityLabel("검색")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
@@ -223,7 +224,7 @@ struct FloatingActionPlaceButton: View {
                             .font(.suite(size: 22))
                             .foregroundColor(.white)
                     )
-                
+
                 // Badge (Pink)
                 if count > 0 {
                     Text(count > 99 ? "99+" : "\(count)")
@@ -236,6 +237,7 @@ struct FloatingActionPlaceButton: View {
                 }
             }
         }
+        .accessibilityLabel("멤버 조회")
     }
 }
 
@@ -657,6 +659,7 @@ struct PlaceLocationCell: View {
                         .contentShape(Circle())
                 }
                 .buttonStyle(PlainButtonStyle())
+                .accessibilityLabel(location.notifications ? "알림 끄기" : "알림 켜기")
                 .padding(.trailing, 12)
             }
         }
