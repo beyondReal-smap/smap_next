@@ -47,4 +47,8 @@ enum AppConfiguration {
         let base = apiBaseURL.hasSuffix("/") ? String(apiBaseURL.dropLast()) : apiBaseURL
         return "\(base)/v1"
     }()
+
+    // MARK: - API Paths
+
+    static let memberFcmTokenPath = "v1/member-fcm-token/register"
 }

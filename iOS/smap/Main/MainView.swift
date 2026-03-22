@@ -510,7 +510,7 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
             print("🔗 [MainView] 보류 중인 URL 로드: \(urlString)")
         } else {
             // 기본 인증 URL 구성
-            urlString = Http.shared.getWebBaseURL() + "auth?mt_token_id=%@"
+            urlString = AppConfiguration.webBaseURL + "auth?mt_token_id=%@"
             
             if location.coordinate.latitude != 0.0 && location.coordinate.longitude != 0.0 {
                 urlString = "\(urlString)&mt_lat=\(location.coordinate.latitude)&mt_long=\(location.coordinate.longitude)"
@@ -556,7 +556,7 @@ class MainView: UIViewController, WKScriptMessageHandler, WKNavigationDelegate, 
             }
             
             var request = URLRequest(url: url)
-            request.setValue(Http.shared.hashKey, forHTTPHeaderField: "AUTH_SECRETKEY")
+            request.setValue(AppConfiguration.authSecretKey, forHTTPHeaderField: "AUTH_SECRETKEY")
             request.timeoutInterval = 30.0 // 30초 타임아웃
             
             print("웹뷰 로딩 시작: \(url)")
@@ -2774,7 +2774,7 @@ extension MainView {
             case "session_refresh":
                 guard let session_refresh_event_url = body["param"] as? String else { return }
                 let location = LocationService.sharedInstance.getLastLocation()
-                var urlString = Http.shared.WEB_BASE_URL + "auth?mt_token_id=%@"
+                var urlString = AppConfiguration.webBaseURL + "auth?mt_token_id=%@"
             
                 if location.coordinate.latitude != 0.0 && location.coordinate.longitude != 0.0 {
                     urlString = "\(urlString)&mt_lat=\(location.coordinate.latitude)&mt_long=\(location.coordinate.longitude)"
@@ -2787,7 +2787,7 @@ extension MainView {
                     
                     let url = URL(string: urlString)
                     var request = URLRequest(url: url!)
-                    request.setValue(Http.shared.hashKey, forHTTPHeaderField: "AUTH_SECRETKEY")
+                    request.setValue(AppConfiguration.authSecretKey, forHTTPHeaderField: "AUTH_SECRETKEY")
                     self.web_view.load(request)
                 }
                 break

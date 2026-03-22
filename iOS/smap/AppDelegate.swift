@@ -480,7 +480,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     private func validateTokenWithServer(token: String, mtIdx: Int) {
         print("🌐 [FCM Validation] 서버에 토큰 검증 요청 시작")
 
-        let urlString = "\(Http.shared.BASE_URL)\(Http.shared.memberFcmTokenUrl)/validate-and-refresh"
+        let urlString = "\(AppConfiguration.apiBaseURL)\(AppConfiguration.memberFcmTokenPath)/validate-and-refresh"
         guard let url = URL(string: urlString) else {
             // print("❌ [FCM Validation] 잘못된 URL: \(urlString)")
             return
@@ -3770,7 +3770,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             return
         }
 
-        let urlString = Http.shared.BASE_URL + Http.shared.memberFcmTokenUrl
+        let urlString = AppConfiguration.apiBaseURL + AppConfiguration.memberFcmTokenPath
         guard let url = URL(string: urlString) else {
             print("❌ [FCM FORCE] 잘못된 URL")
             UserDefaults.standard.set(false, forKey: "fcm_force_update_in_progress")
@@ -3934,7 +3934,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         }
         
         // API URL 구성
-        let urlString = Http.shared.BASE_URL + Http.shared.memberFcmTokenUrl
+        let urlString = AppConfiguration.apiBaseURL + AppConfiguration.memberFcmTokenPath
         guard let url = URL(string: urlString) else {
             print("❌ [FCM API] 잘못된 URL: \(urlString)")
             return
@@ -4167,7 +4167,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         }
 
         // API URL 구성
-        let urlString = Http.shared.BASE_URL + Http.shared.memberFcmTokenUrl
+        let urlString = AppConfiguration.apiBaseURL + AppConfiguration.memberFcmTokenPath
         guard let url = URL(string: urlString) else {
             print("❌ [FCM Pending] 잘못된 URL: \(urlString)")
             return
@@ -4445,7 +4445,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         }
         
         // API URL 구성
-        let urlString = Http.shared.BASE_URL + Http.shared.memberFcmTokenUrl
+        let urlString = AppConfiguration.apiBaseURL + AppConfiguration.memberFcmTokenPath
         guard let url = URL(string: urlString) else {
             print("❌ [FCM API] 재시도 \(retryCount) - 잘못된 URL: \(urlString)")
             return
@@ -4921,7 +4921,7 @@ extension AppDelegate {
         print("📡 [FCM DB] 사용자 ID: \(mtIdx)")
 
         // API URL 구성 - BASE_URL 중복 방지
-        var baseUrl = Http.shared.BASE_URL
+        var baseUrl = AppConfiguration.apiBaseURL
 
         // BASE_URL에 이미 /api가 포함되어 있는지 확인하고 중복 방지
         if baseUrl.hasSuffix("/api/") {
@@ -5196,7 +5196,7 @@ extension AppDelegate {
         }
 
         // API URL 구성
-        let urlString = Http.shared.BASE_URL + Http.shared.memberFcmTokenUrl
+        let urlString = AppConfiguration.apiBaseURL + AppConfiguration.memberFcmTokenPath
         guard let url = URL(string: urlString) else {
             print("❌ [FCM Request] 잘못된 URL: \(urlString)")
             completion(false)
@@ -5851,8 +5851,8 @@ extension AppDelegate {
 
         // 조용한 백그라운드 업데이트 (로그 최소화)
         // URL 수정: /update -> /background-check
-        // Http.shared.BASE_URL 사용
-        let urlString = "\(Http.shared.BASE_URL)\(Http.shared.memberFcmTokenUrl)/background-check"
+        // AppConfiguration.apiBaseURL 사용
+        let urlString = "\(AppConfiguration.apiBaseURL)\(AppConfiguration.memberFcmTokenPath)/background-check"
         guard let url = URL(string: urlString) else { return }
         
         var request = URLRequest(url: url)

@@ -73,7 +73,6 @@
 		94339A7D2B2BEFD1002177C1 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94339A7C2B2BEFD1002177C1 /* MainView.swift */; };
 		94418E1F2BD0B88B00836120 /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 94418E1E2BD0B88B00836120 /* StoreKit.framework */; };
 		94418E212BD0C38E00836120 /* StoreKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94418E202BD0C38E00836120 /* StoreKitManager.swift */; };
-		948ABEF62BAA8D4300023DFD /* Http.swift in Sources */ = {isa = PBXBuildFile; fileRef = 948ABEF52BAA8D4300023DFD /* Http.swift */; };
 		948ABEF82BAA8F0300023DFD /* AuthData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 948ABEF72BAA8F0300023DFD /* AuthData.swift */; };
 		948ABEFC2BAA8FBE00023DFD /* MltGpsData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 948ABEFB2BAA8FBE00023DFD /* MltGpsData.swift */; };
 		94F4BC352BB6B5F600987BC4 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 94F4BC342BB6B5F600987BC4 /* GoogleService-Info.plist */; };
@@ -201,7 +200,6 @@
 		94418E1E2BD0B88B00836120 /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
 		94418E202BD0C38E00836120 /* StoreKitManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKitManager.swift; sourceTree = "<group>"; };
 		948ABEF42BAA81E900023DFD /* smap.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = smap.entitlements; sourceTree = "<group>"; };
-		948ABEF52BAA8D4300023DFD /* Http.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Http.swift; sourceTree = "<group>"; };
 		948ABEF72BAA8F0300023DFD /* AuthData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthData.swift; sourceTree = "<group>"; };
 		948ABEFB2BAA8FBE00023DFD /* MltGpsData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MltGpsData.swift; sourceTree = "<group>"; };
 		94F4BC342BB6B5F600987BC4 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
@@ -526,7 +524,6 @@
 			children = (
 				F6010CCB2F035594008B05B7 /* Font */,
 				948ABEF42BAA81E900023DFD /* smap.entitlements */,
-				94339A662B2BE295002177C1 /* Http */,
 				94339A672B2BE2C1002177C1 /* Helper */,
 				94339A792B2BEFAF002177C1 /* Main */,
 				A1B2C3D40021 /* Models */,
@@ -545,14 +542,6 @@
 				4C921E0AE8A662C7E85233AC /* Features */,
 			);
 			path = smap;
-			sourceTree = "<group>";
-		};
-		94339A662B2BE295002177C1 /* Http */ = {
-			isa = PBXGroup;
-			children = (
-				948ABEF52BAA8D4300023DFD /* Http.swift */,
-			);
-			path = Http;
 			sourceTree = "<group>";
 		};
 		94339A672B2BE2C1002177C1 /* Helper */ = {
@@ -986,7 +975,6 @@
 				F6010CE52F03E759008B05B7 /* QRCodeView.swift in Sources */,
 				948ABEF82BAA8F0300023DFD /* AuthData.swift in Sources */,
 				94339A692B2BE2E5002177C1 /* BaseResult.swift in Sources */,
-				948ABEF62BAA8D4300023DFD /* Http.swift in Sources */,
 				94339A532B2BE26F002177C1 /* AppDelegate.swift in Sources */,
 				948ABEFC2BAA8FBE00023DFD /* MltGpsData.swift in Sources */,
 				94418E212BD0C38E00836120 /* StoreKitManager.swift in Sources */,
