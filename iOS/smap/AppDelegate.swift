@@ -23,7 +23,6 @@ import NMapsMap
 
 // FCM Token Manager - 자동 토큰 업데이트 기능
 
-@main
 class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterDelegate, MessagingDelegate {
     var window: UIWindow?
     private let motionManager = CMMotionActivityManager()
@@ -74,9 +73,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
         
-        print("╔═══════════════════════════════════════════════════════════════════════════════╗")
-        print("║ 🚀 [SMAP-iOS] 앱 시작 - 완전 최적화 버전                                       ║")
-        print("╚═══════════════════════════════════════════════════════════════════════════════╝")
         
         // 앱 설정 최적화 먼저 실행
         setupAppOptimizations()
@@ -92,22 +88,18 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             return true
         }
         
-        print("✅ Google Client ID: \(clientId)")
         
         let config = GIDConfiguration(clientID: clientId)
         GIDSignIn.sharedInstance.configuration = config
-        print("✅ Google Sign-In 설정 완료")
         
         // Naver Map 인증 설정 (Info.plist 사용)
         NMFAuthManager.shared().delegate = self
         
         if let bundleId = Bundle.main.bundleIdentifier {
-            print("🗺️ [NaverMap] Running Bundle ID: \(bundleId)")
         } else {
              print("❌ [NaverMap] Bundle ID를 찾을 수 없음")
         }
         if let ncpKeyId = Bundle.main.infoDictionary?["NMFNcpKeyId"] as? String {
-             print("🗺️ [NaverMap] Info.plist NMFNcpKeyId: \(ncpKeyId)")
         } else {
              print("🗺️ [NaverMap] Info.plist Client ID: \(Bundle.main.infoDictionary?["NMFClientId"] ?? "N/A")")
         }
@@ -147,9 +139,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         startPeriodicTokenMonitoring()
 
         // 📱 현재 토큰 상태 확인 및 로깅 (개선된 토큰 검증 포함)
-        print("\n╔══════════════════════════════════════════════════════════════╗")
-        print("║ 📊 [토큰 상태] 앱 시작 시 토큰 정보 확인 및 검증                    ║")
-        print("╚══════════════════════════════════════════════════════════════╝")
         
         // 🔍 토큰 무결성 검증 시작
         if Messaging.messaging().apnsToken != nil {
@@ -160,19 +149,16 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
         // 저장된 토큰들 확인
         if let savedFCMToken = UserDefaults.standard.string(forKey: "fcm_token") {
-            print("💾 [저장됨] FCM 토큰: \(savedFCMToken.prefix(30))... (길이: \(savedFCMToken.count))")
         } else {
             print("❌ [저장됨] FCM 토큰: 없음")
         }
 
         if let dbToken = UserDefaults.standard.string(forKey: "last_updated_fcm_token") {
-            print("💾 [DB] 마지막 업데이트 토큰: \(dbToken.prefix(30))... (길이: \(dbToken.count))")
         } else {
             print("❌ [DB] 마지막 업데이트 토큰: 없음")
         }
 
         if let apnsToken = UserDefaults.standard.string(forKey: "last_apns_token") {
-            print("📱 [APNS] 저장된 토큰: \(apnsToken.prefix(30))... (길이: \(apnsToken.count))")
         } else {
             print("❌ [APNS] 저장된 토큰: 없음")
         }
@@ -182,7 +168,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             if let error = error {
                 print("❌ [실시간] FCM 토큰 가져오기 실패: \(error.localizedDescription)")
             } else if let token = token {
-                print("🔥 [실시간] 현재 FCM 토큰: \(token.prefix(30))... (길이: \(token.count))")
 
                 // 저장된 토큰과 비교
                 if let savedToken = UserDefaults.standard.string(forKey: "fcm_token") {
@@ -190,8 +175,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                         print("✅ [토큰 일치] 실시간 토큰과 저장된 토큰이 일치합니다")
                     } else {
                         print("⚠️ [토큰 불일치] 실시간 토큰과 저장된 토큰이 다릅니다!")
-                        print("   📱 실시간: \(token.prefix(20))...")
-                        print("   💾 저장됨: \(savedToken.prefix(20))...")
                     }
                 }
 
@@ -201,9 +184,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                         print("✅ [DB 일치] 실시간 토큰과 DB 토큰이 일치합니다")
                     } else {
                         print("⚠️ [DB 불일치] 실시간 토큰과 DB 토큰이 다릅니다!")
-                        print("   📱 실시간: \(token.prefix(20))...")
-                        print("   💾 DB: \(dbToken.prefix(20))...")
-                        print("   🔄 서버 토큰 업데이트 필요!")
                     }
                 }
             } else {
@@ -234,13 +214,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             }
         }
 
-        print("═══════════════════════════════════════════════════════════════")
         
         if #available(iOS 10.0, *) {
             // For iOS 10 display notification (sent via APNS)
             UNUserNotificationCenter.current().delegate = self
             // ✅ 앱 시작 시 푸시 알림 권한 요청 활성화
-            print("🔔 [PUSH] 런치 시 푸시 알림 권한 요청 활성화")
             
             // 즉시 푸시 알림 권한 요청
             let authOptions: UNAuthorizationOptions = [.alert, .badge, .sound]
@@ -317,15 +295,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         
         print("✅ [SMAP-iOS] 앱 초기화 완료")
 
-        // 🚨 퍼미션 디버그 스위즐 설치 (로그인 전 푸시 권한 호출을 원천 차단 + 호출 스택 로깅)
-        Self.installPermissionDebugGuards()
-
-        // 디버그: Info.plist 권한 문구 확인
-        debugPrintUsageDescriptions()
-        
-        // 🚨 임시 해결책: Info.plist 값이 비어있을 경우 런타임 경고
-        checkAndWarnEmptyUsageDescriptions()
-        
         // ✅ FCM 자동 토큰 업데이트 초기화
         setupFCMAutoTokenUpdate()
 
@@ -355,11 +324,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
     // MARK: - 🚀 앱 시작 시 FCM 토큰 즉시 검증
         private func performAppLaunchFCMTokenCheck() {
-        print("🚀 앱 시작 시 FCM 토큰 검증 시작 (mt_idx 식별 시에만 업데이트)")
         
         // APNS 토큰 확인 (없으면 FCM 토큰 요청 시 에러 발생함)
         guard Messaging.messaging().apnsToken != nil else {
-             print("🚫 [FCM] APNS 토큰 없음 - 앱 시작 시 토큰 검증 건너뜀")
              return
         }
 
@@ -368,18 +335,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                         UserDefaults.standard.string(forKey: "savedMtIdx") != nil
 
         if !hasUserIdentified {
-            print("🚫 [FCM] 사용자가 식별되지 않음(mt_idx 없음) - FCM 토큰 업데이트 건너뜀")
             return
         }
 
-        print("👤 사용자 식별됨(mt_idx 있음) - FCM 토큰 검증 진행")
 
         // 마지막 앱 실행 시간 확인
         let lastAppLaunchTime = UserDefaults.standard.double(forKey: "last_app_launch_time")
         let currentTime = Date().timeIntervalSince1970
         let timeSinceLastLaunch = currentTime - lastAppLaunchTime
 
-        print("📊 마지막 앱 실행으로부터 \(String(format: "%.1f", timeSinceLastLaunch / 3600))시간 경과")
 
         // 현재 앱 실행 시간 기록
         UserDefaults.standard.set(currentTime, forKey: "last_app_launch_time")
@@ -439,7 +403,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     // MARK: - 🔔 FCM 자동 토큰 업데이트 관리
     
     private func setupFCMAutoTokenUpdate() {
-        print("🚀 [FCM Auto] FCM 자동 토큰 업데이트 초기화")
 
         // 앱 상태 변화 감지기 설정
         setupFCMAppStateObservers()
@@ -459,7 +422,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
     // MARK: - 🔍 FCM 토큰 유효성 검증 초기화
     private func setupFCMTokenValidation() {
-        print("🔍 [FCM Validation] FCM 토큰 유효성 검증 초기화")
 
         // 사용자 식별 상태 확인
         let hasUserIdentified = UserDefaults.standard.string(forKey: "mt_idx") != nil ||
@@ -475,13 +437,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
     // MARK: - 🔍 FCM 토큰 유효성 검증 실행
     private func performFCMTokenValidation() {
-        print("🔍 [FCM Validation] FCM 토큰 유효성 검증 시작")
 
         // 📱 앱 상태 확인 - 백그라운드에서도 토큰 검증 허용
         let appState = UIApplication.shared.applicationState
         let isBackground = appState == .background
 
-        print("📱 [FCM Validation] 앱 상태: \(isBackground ? "백그라운드" : "포그라운드") - 토큰 검증 허용")
 
         // 사용자 ID 확인
         guard let mtIdxString = UserDefaults.standard.string(forKey: "mt_idx") ??
@@ -495,7 +455,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         // 현재 FCM 토큰 가져오기
         // APNS 토큰 확인 (필수)
         guard Messaging.messaging().apnsToken != nil else {
-             print("🚫 [FCM Validation] APNS 토큰 없음 - 검증 중단")
              return
         }
         
@@ -664,7 +623,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         // FCM 토큰 재생성 요청
         // APNS 토큰 확인
         guard Messaging.messaging().apnsToken != nil else {
-             print("🚫 [FCM] APNS 토큰 없음 - 앱 시작 시 갱신 중단")
              return
         }
         
@@ -728,178 +686,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         print("📢 [NOTIFICATION] FCM 토큰 강제 업데이트 요청 수신")
         // 기존의 forceUpdateFCMTokenOnLogin 메소드 호출
         forceUpdateFCMTokenOnLogin()
-    }
-    
-        // 타이머 기반 자동 업데이트 제거됨
-
-    // 백그라운드 타이머 기반 토큰 검증 제거됨
-
-    // MARK: - 백그라운드 FCM 토큰 검증 실행 (타이머 제거됨)
-    private func performBackgroundFCMTokenCheck() { // 호출되지 않음
-        let bgTimestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
-        print("🔍 [FCM-BG-VERIFY][\(bgTimestamp)] 백그라운드 FCM 토큰 검증 시작")
-
-        // 사용자 식별 상태 확인
-        let hasUserIdentified = UserDefaults.standard.string(forKey: "mt_idx") != nil ||
-                        UserDefaults.standard.string(forKey: "savedMtIdx") != nil
-
-        guard hasUserIdentified else {
-            print("🔒 [FCM Background] 사용자가 식별되지 않음(mt_idx 없음) - 백그라운드 검증 스킵")
-            return
-        }
-
-        // 백그라운드 시간 체크 제거됨 (타이머 기반 검증 제거)
-
-        // 현재 FCM 토큰 확인 및 서버 검증
-        Messaging.messaging().token { [weak self] token, error in
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("❌ [FCM Background] FCM 토큰 가져오기 실패: \(error.localizedDescription)")
-                    return
-                }
-
-                guard let token = token, !token.isEmpty else {
-                    print("❌ [FCM Background] FCM 토큰이 nil이거나 비어있음")
-                    return
-                }
-
-                print("✅ [FCM Background] FCM 토큰 확인 성공: \(token.prefix(30))...")
-
-                // 백그라운드용 토큰 검증 (더 가벼운 검증)
-                self?.validateFCMTokenForBackground(token: token)
-            }
-        }
-    }
-
-    // MARK: - 백그라운드용 강제 토큰 갱신 (타이머 제거됨)
-    private func forceRefreshFCMTokenForBackground() { // 호출되지 않음
-        print("🔄 [FCM Background] 백그라운드용 강제 FCM 토큰 갱신 시작")
-
-        // 기존 토큰 무효화
-        UserDefaults.standard.removeObject(forKey: "last_fcm_token")
-        UserDefaults.standard.synchronize()
-
-        // FCM 토큰 재생성 요청
-        Messaging.messaging().token { [weak self] token, error in
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("❌ [FCM Background] 백그라운드 토큰 갱신 실패: \(error.localizedDescription)")
-                    // 네트워크 문제일 수 있으므로 1시간 후 재시도
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 3600.0) {
-                        self?.forceRefreshFCMTokenForBackground()
-                    }
-                    return
-                }
-
-                guard let token = token, !token.isEmpty else {
-                    print("❌ [FCM Background] 백그라운드 새 토큰이 nil이거나 비어있음")
-                    return
-                }
-
-                print("✅ [FCM Background] 백그라운드 토큰 갱신 성공: \(token.prefix(30))...")
-                self?.sendFCMTokenToServer(token: token) { success in
-                    if success {
-                        print("✅ [FCM Background] 백그라운드 토큰 서버 업데이트 성공")
-                    } else {
-                        print("❌ [FCM Background] 백그라운드 토큰 서버 업데이트 실패")
-                    }
-                }
-
-                // 백그라운드 시간 리셋 제거됨 (타이머 기반 검증 제거)
-            }
-        }
-    }
-    
-    // MARK: - 🔄 APNs 등록 후 FCM 토큰 처리
-    private func handleFCMTokenAfterAPNSRegistration(_ token: String) {
-        print("🔄 [APNS+FCM] APNs 등록 후 FCM 토큰 처리 시작: \(token.prefix(30))...")
-
-        // 기존 토큰과 비교
-        let _ = UserDefaults.standard.string(forKey: "fcm_token")
-
-        // FCM 토큰 저장
-        Utils.shared.setToken(token: token)
-        UserDefaults.standard.set(token, forKey: "fcm_token")
-        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "fcm_token_received_time")
-        UserDefaults.standard.set(token, forKey: "last_updated_fcm_token")
-        UserDefaults.standard.synchronize()
-
-        currentFCMToken = token
-
-        print("✅ [APNS+FCM] FCM 토큰 저장 완료")
-
-        // 사용자 식별 상태 확인
-        let hasUserIdentified = UserDefaults.standard.string(forKey: "mt_idx") != nil ||
-                               UserDefaults.standard.string(forKey: "savedMtIdx") != nil
-
-        if hasUserIdentified {
-            print("🚀 [APNS+FCM] 사용자 식별됨 - 서버 업데이트 진행")
-            updateFCMTokenIfNeededWithCheck(token: token)
-        } else {
-            print("⏳ [APNS+FCM] 사용자 미식별 - 서버 업데이트 대기")
-            UserDefaults.standard.set(token, forKey: "pending_fcm_token_after_user_identified")
-            UserDefaults.standard.synchronize()
-        }
-    }
-
-    // MARK: - 🔄 FCM 토큰 재생성 재시도
-    private func retryFCMTokenGeneration() {
-        print("🔄 [FCM Retry] FCM 토큰 재생성 재시도")
-
-        Messaging.messaging().token { [weak self] fcmToken, error in
-            if let error = error {
-                print("❌ [FCM Retry] FCM 토큰 재생성 최종 실패: \(error.localizedDescription)")
-                print("🔄 [FCM Retry] 5초 후 최종 재시도")
-                DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
-                    self?.finalFCMTokenAttempt()
-                }
-            } else if let fcmToken = fcmToken {
-                print("✅ [FCM Retry] FCM 토큰 재생성 성공: \(fcmToken.prefix(30))...")
-                self?.handleFCMTokenAfterAPNSRegistration(fcmToken)
-            }
-        }
-    }
-
-    // MARK: - 🔄 FCM 토큰 검증 재시도
-    private func retryTokenVerification(_ originalToken: String) {
-        print("🔄 [FCM Verify Retry] FCM 토큰 검증 재시도")
-
-        Messaging.messaging().token { [weak self] verifiedToken, error in
-            if let error = error {
-                print("❌ [FCM Verify Retry] 토큰 검증 재시도 실패: \(error.localizedDescription)")
-            } else if let verifiedToken = verifiedToken {
-                print("✅ [FCM Verify Retry] 토큰 검증 재시도 성공: \(verifiedToken.prefix(30))...")
-                if verifiedToken == originalToken {
-                    print("✅ [FCM Verify Retry] 토큰 일치 확인 - FCM 서비스 등록 정상")
-                    self?.verifyAndRefreshFCMRegistration(verifiedToken)
-                } else {
-                    print("⚠️ [FCM Verify Retry] 토큰 불일치 - 새로운 토큰으로 업데이트")
-                    self?.handleFCMTokenUpdate(verifiedToken)
-                }
-            }
-        }
-    }
-
-    // MARK: - 🔄 FCM 토큰 최종 시도
-    private func finalFCMTokenAttempt() {
-        print("🔄 [FCM Final] FCM 토큰 최종 생성 시도")
-
-        // FCM 서비스 완전 리셋
-        Messaging.messaging().isAutoInitEnabled = false
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            Messaging.messaging().isAutoInitEnabled = true
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                Messaging.messaging().token { [weak self] fcmToken, error in
-                    if let fcmToken = fcmToken {
-                        print("✅ [FCM Final] FCM 토큰 최종 성공: \(fcmToken.prefix(30))...")
-                        self?.handleFCMTokenAfterAPNSRegistration(fcmToken)
-                    } else {
-                        print("❌ [FCM Final] FCM 토큰 생성 최종 실패 - 수동 재시도 필요")
-                    }
-                }
-            }
-        }
     }
 
     // MARK: - 🔑 로그인 시 FCM 토큰 강제 업데이트 (웹뷰에서 호출)
@@ -1071,9 +857,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                             if granted {
                                 print("✅ [PERMISSION] 푸시 권한 재요청 성공")
                                 // 권한이 허용되었으므로 로컬 알림 스케줄링
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                                    self.scheduleTestLocalNotification()
-                                }
+                                // Permission granted
                             } else {
                                 print("❌ [PERMISSION] 푸시 권한 재요청 실패 또는 거부됨")
                                 if let error = error {
@@ -1087,27 +871,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                 } else {
                     print("✅ [PERMISSION] 모든 권한이 정상입니다")
                 }
-            }
-        }
-    }
-
-    // 테스트 로컬 알림 스케줄링
-    private func scheduleTestLocalNotification() {
-        print("🔔 [LOCAL] 권한 허용 후 테스트 로컬 알림 스케줄링")
-
-        let content = UNMutableNotificationContent()
-        content.title = "🔔 FCM 권한 복원 완료"
-        content.body = "푸시 알림 권한이 허용되었습니다. 이제 FCM 메시지가 정상 표시됩니다."
-        content.sound = .default
-        content.badge = 1
-
-        let request = UNNotificationRequest(identifier: "fcm_permission_restored", content: content, trigger: nil)
-
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error = error {
-                print("❌ [LOCAL] 테스트 알림 스케줄링 실패: \(error.localizedDescription)")
-            } else {
-                print("✅ [LOCAL] 테스트 알림 스케줄링 성공")
             }
         }
     }
@@ -1481,14 +1244,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         print(logMessage)
     }
 
-    /// FCM 백그라운드 로그
-    private func fcmBackgroundLog(_ message: String) {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm:ss.SSS"
-        let timestamp = formatter.string(from: Date())
-        print("🛡️ [FCM-BG][\(timestamp)] \(message)")
-    }
-
     // MARK: - 🔄 FCM 토큰 재등록 재시도
     private func retryFCMTokenRegistration(_ originalToken: String, attempt: Int, maxAttempts: Int) {
         print("🔄 [FCM Retry] 토큰 재등록 시도 \(attempt)/\(maxAttempts)")
@@ -1519,20 +1274,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         }
     }
 
-    // MARK: - 🔒 FCM 토큰 백업 및 유효성 검증 시스템
-
-    // FCM 토큰 변경 전 백업 저장
-    private func backupCurrentFCMToken(_ token: String) {
-        print("💾 [FCM Backup] FCM 토큰 변경 전 백업 저장")
-        UserDefaults.standard.set(token, forKey: "fcm_token_backup")
-        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "fcm_token_backup_time")
-        UserDefaults.standard.synchronize()
-        print("✅ [FCM Backup] FCM 토큰 백업 완료: \(token.prefix(20))...")
-    }
-
     // FCM 토큰 유효성 및 APNs 매칭 상태 검증
     private func validateFCMTokenIntegrity(_ token: String, completion: @escaping (Bool, String) -> Void) {
-        print("🔍 [FCM Validation] FCM 토큰 유효성 검증 시작")
 
         // 1. 기본 토큰 형식 검증
         guard token.count >= 100 else {
@@ -1598,127 +1341,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                 } else {
                     completion(false, "FCM 토큰 갱신 실패")
                 }
-            }
-        }
-    }
-
-    // FCM 토큰 롤백 (이전 토큰으로 복원)
-    private func rollbackFCMToken(_ reason: String) {
-        print("🔄 [FCM Rollback] FCM 토큰 롤백 시작 - 사유: \(reason)")
-
-        guard let backupToken = UserDefaults.standard.string(forKey: "fcm_token_backup") else {
-            print("❌ [FCM Rollback] 백업 토큰 없음 - 롤백 불가")
-            return
-        }
-
-        // 백업 토큰을 현재 토큰으로 복원
-        UserDefaults.standard.set(backupToken, forKey: "fcm_token")
-        UserDefaults.standard.set(backupToken, forKey: "last_updated_fcm_token")
-        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "fcm_token_received_time")
-
-        // FCM 서비스에 백업 토큰 재등록
-        Messaging.messaging().setAPNSToken(currentAPNSToken?.data(using: .utf8) ?? Data(), type: .unknown)
-
-        print("✅ [FCM Rollback] FCM 토큰 롤백 완료: \(backupToken.prefix(20))...")
-
-        // 롤백 기록
-        UserDefaults.standard.set(reason, forKey: "last_rollback_reason")
-        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "last_rollback_time")
-        UserDefaults.standard.synchronize()
-    }
-
-    // FCM 토큰 안전 업데이트 (검증 후 업데이트)
-    private func safelyUpdateFCMToken(_ newToken: String, completion: @escaping (Bool) -> Void) {
-        print("🛡️ [FCM Safe Update] 안전한 FCM 토큰 업데이트 시작")
-
-        // 1. 현재 토큰 백업
-        let currentToken = UserDefaults.standard.string(forKey: "fcm_token") ?? ""
-        if !currentToken.isEmpty {
-            backupCurrentFCMToken(currentToken)
-        }
-
-        // 2. FCM 토큰 유효성 검증
-        validateFCMTokenIntegrity(newToken) { [weak self] isValid, reason in
-            if isValid {
-                print("✅ [FCM Safe Update] 토큰 검증 성공 - DB 업데이트 진행")
-
-                // 검증 성공: DB 업데이트 진행
-                self?.sendFCMTokenToServer(token: newToken) { success in
-                    if success {
-                        print("🎯 [FCM Safe Update] DB 업데이트 성공")
-
-                        // DB 업데이트 성공 후 FCM 서비스 상태 확인
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                            print("🔍 [FCM Debug] DB 업데이트 성공 후 FCM 서비스 상태 확인")
-                            self?.checkFCMServiceRegistrationStatus()
-                        }
-
-                        completion(true)
-                    } else {
-                        print("⚠️ [FCM Safe Update] DB 업데이트 실패 - 롤백 실행")
-                        self?.rollbackFCMToken("DB 업데이트 실패")
-
-                        // DB 업데이트 실패 시 FCM 서비스 상태 확인
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                            print("🔍 [FCM Debug] DB 업데이트 실패 후 FCM 서비스 상태 확인")
-                            self?.checkFCMServiceRegistrationStatus()
-                        }
-
-                        completion(false)
-                    }
-                }
-            } else {
-                print("❌ [FCM Safe Update] 토큰 검증 실패 - 롤백 실행")
-                print("   사유: \(reason)")
-
-                // 검증 실패: 롤백 실행
-                self?.rollbackFCMToken("토큰 검증 실패: \(reason)")
-
-                // 토큰 검증 실패 시 FCM 서비스 상태 확인
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                    print("🔍 [FCM Debug] 토큰 검증 실패 후 FCM 서비스 상태 확인")
-                    self?.checkFCMServiceRegistrationStatus()
-                }
-
-                completion(false)
-            }
-        }
-    }
-
-    /// 백그라운드용 안전한 FCM 토큰 업데이트 (강화된 버전)
-    private func safelyUpdateFCMTokenBackground(_ newToken: String, completion: @escaping (Bool) -> Void) {
-        print("🛡️ [FCM Background Safe Update] 백그라운드용 안전한 FCM 토큰 업데이트 시작")
-
-        // 백그라운드에서는 더 엄격한 토큰 검증
-        validateFCMTokenIntegrityBackground(newToken) { [weak self] isValid, reason in
-            guard let self = self else {
-                print("❌ [FCM Background Safe Update] self가 nil입니다 - 업데이트 중단")
-                return
-            }
-
-            if isValid {
-                print("✅ [FCM Background Safe Update] 백그라운드 토큰 검증 성공 - DB 업데이트 진행")
-
-                // 백그라운드에서는 서버 업데이트를 2번 시도
-                self.sendFCMTokenToServerBackground(token: newToken, retryCount: 0) { success in
-                    if success {
-                        print("🎯 [FCM Background Safe Update] 백그라운드 DB 업데이트 성공")
-
-                        // 백그라운드 토큰 업데이트 성공 후 로컬 저장 보장
-                        UserDefaults.standard.set(newToken, forKey: "fcm_token")
-                        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "last_token_update_time")
-                        UserDefaults.standard.synchronize()
-
-                        completion(true)
-                    } else {
-                        print("❌ [FCM Background Safe Update] 백그라운드 DB 업데이트 실패")
-                        completion(false)
-                    }
-                }
-            } else {
-                print("❌ [FCM Background Safe Update] 백그라운드 토큰 검증 실패")
-                print("   사유: \(reason)")
-                completion(false)
             }
         }
     }
@@ -1826,77 +1448,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                 }
             }
         }
-    }
-
-    /// 백그라운드 토큰 업데이트 재시도 로직
-    private func retryBackgroundTokenUpdate(_ token: String, attempt: Int) {
-        print("🔄 [FCM Background Retry] 백그라운드 토큰 업데이트 재시도 \(attempt)/3")
-
-        if attempt >= 3 {
-            print("❌ [FCM Background Retry] 최대 재시도 횟수 초과 - 백그라운드 토큰 업데이트 포기")
-            return
-        }
-
-        // 재시도 간격: 1회=5초, 2회=10초, 3회=15초
-        let delay = Double(attempt) * 5.0
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-            print("🔄 [FCM Background Retry] 재시도 \(attempt) 시작")
-
-            // FCM 서비스 재등록부터 다시 시작
-            self.forceRefreshFCMServiceRegistration(token)
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                self.safelyUpdateFCMTokenBackground(token) { success in
-                    if success {
-                        print("✅ [FCM Background Retry] 재시도 \(attempt) 성공")
-                    } else {
-                        print("❌ [FCM Background Retry] 재시도 \(attempt) 실패 - 다음 재시도")
-                        self.retryBackgroundTokenUpdate(token, attempt: attempt + 1)
-                    }
-                }
-            }
-        }
-    }
-
-    /// 백그라운드 푸시 수신 상태 검증
-    private func verifyBackgroundPushReception(_ token: String) {
-        print("🔔 [FCM Background Verify] 백그라운드 푸시 수신 상태 검증 시작")
-
-        // 1. FCM 서비스 상태 확인
-        checkFCMServiceRegistrationStatus()
-
-        // 2. 토큰 일치성 확인
-        let currentToken = UserDefaults.standard.string(forKey: "fcm_token")
-        let dbToken = UserDefaults.standard.string(forKey: "last_updated_fcm_token")
-
-        print("🔍 [FCM Background Verify] 토큰 일치성 확인:")
-        print("   📱 현재 토큰: \(currentToken?.prefix(20) ?? "없음")...")
-        print("   💾 DB 토큰: \(dbToken?.prefix(20) ?? "없음")...")
-
-        if currentToken != dbToken {
-            print("⚠️ [FCM Background Verify] 토큰 불일치 감지 - 추가 동기화 필요")
-            // 백그라운드에서 토큰 불일치 시 즉시 서버 동기화
-            sendFCMTokenToServerBackground(token: token, retryCount: 0) { success in
-                if success {
-                    print("✅ [FCM Background Verify] 백그라운드 토큰 동기화 성공")
-                } else {
-                    print("❌ [FCM Background Verify] 백그라운드 토큰 동기화 실패")
-                }
-            }
-        } else {
-            print("✅ [FCM Background Verify] 토큰 일치 확인")
-        }
-
-        // 3. APNs 권한 상태 확인
-        checkPushNotificationPermissions { granted, settings in
-            print("🔐 [FCM Background Verify] 푸시 권한 상태: \(granted ? "허용" : "거부")")
-            if !granted {
-                print("⚠️ [FCM Background Verify] 푸시 권한이 거부됨 - 권한 재요청 필요")
-            }
-        }
-
-        print("✅ [FCM Background Verify] 백그라운드 푸시 수신 상태 검증 완료")
     }
 
     /// 푸시 알림 권한 상태 확인 (간단 버전)
@@ -2022,72 +1573,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         UserDefaults.standard.synchronize()
     }
 
-    /// 백그라운드 토큰 업데이트 전략 (지연적 vs 즉시)
-    private func determineBackgroundTokenUpdateStrategy(_ token: String) -> BackgroundTokenUpdateStrategy {
-        let appState = UIApplication.shared.applicationState
-        let backgroundTimeRemaining = UIApplication.shared.backgroundTimeRemaining
-
-        print("🎯 [FCM Strategy] 백그라운드 토큰 업데이트 전략 결정")
-        print("📊 [FCM Strategy] 백그라운드 잔여 시간: \(backgroundTimeRemaining)초")
-        print("📱 [FCM Strategy] 앱 상태: \(appState.rawValue)")
-
-        // 백그라운드 시간이 충분하면 즉시 업데이트
-        if backgroundTimeRemaining > 25.0 {
-            fcmBackgroundLog("✅ 백그라운드 시간이 충분 (\(Int(backgroundTimeRemaining))초) - 즉시 업데이트")
-            return .immediate
-        }
-
-        // 백그라운드 시간이 보통이면 짧은 지연으로 업데이트
-        else if backgroundTimeRemaining > 15.0 {
-            fcmBackgroundLog("⏰ 백그라운드 시간 보통 (\(Int(backgroundTimeRemaining))초) - 3초 지연 업데이트")
-            return .delayed(3.0)
-        }
-
-        // 백그라운드 시간이 부족하면 긴 지연으로 업데이트 (포그라운드 진입 대기)
-        else if backgroundTimeRemaining > 8.0 {
-            fcmBackgroundLog("⏳ 백그라운드 시간 부족 (\(Int(backgroundTimeRemaining))초) - 10초 지연 업데이트")
-            return .delayed(10.0)
-        }
-
-        // 백그라운드 시간이 매우 부족하면 취소 (다음 기회에)
-        else {
-            fcmBackgroundLog("❌ 백그라운드 시간 매우 부족 (\(Int(backgroundTimeRemaining))초) - 취소 (포그라운드에서 재시도)")
-            return .cancel
-        }
-    }
-
-    /// 백그라운드 토큰 업데이트 실행
-    private func executeBackgroundTokenUpdate(_ token: String, strategy: BackgroundTokenUpdateStrategy) {
-        switch strategy {
-        case .immediate:
-            self.fcmBackgroundLog("🚀 즉시 토큰 업데이트 실행")
-            safelyUpdateFCMTokenBackground(token) { success in
-                if success {
-                    self.fcmBackgroundLog("✅ 즉시 업데이트 성공")
-                } else {
-                    self.fcmBackgroundLog("❌ 즉시 업데이트 실패 - 10초 지연 업데이트로 전환")
-                    self.scheduleDelayedTokenUpdate(token, delay: 10.0)
-                }
-            }
-
-        case .delayed(let delay):
-            self.fcmBackgroundLog("⏰ 지연적 토큰 업데이트 실행 (\(Int(delay))초 후)")
-            scheduleDelayedTokenUpdate(token, delay: delay)
-
-        case .cancel:
-            self.fcmBackgroundLog("🗑️ 토큰 업데이트 취소")
-            self.fcmBackgroundLog("🔄 포그라운드 진입 시 재시도 예정")
-
-            // 취소된 토큰을 임시 저장하여 포그라운드에서 재시도
-            UserDefaults.standard.set(token, forKey: "pending_background_fcm_token")
-            UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "pending_token_cancelled_time")
-            UserDefaults.standard.set(token, forKey: "fcm_token") // 로컬 저장도 유지
-            UserDefaults.standard.synchronize()
-
-            self.fcmBackgroundLog("💾 취소된 토큰 임시 저장 - 포그라운드에서 재시도")
-        }
-    }
-
     // 지연적 토큰 업데이트 작업 아이템 (취소용)
     private var delayedTokenUpdateWorkItem: DispatchWorkItem?
 
@@ -2096,50 +1581,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         case immediate      // 즉시 업데이트
         case delayed(TimeInterval)  // 지연적 업데이트 (지연 시간)
         case cancel         // 업데이트 취소
-    }
-
-    // MARK: - 🛡️ 백그라운드 FCM 토큰 안정화 시스템
-
-    // 백그라운드에서 FCM 토큰 변경 최소화 메소드
-    private func stabilizeBackgroundFCMToken(_ newToken: String) -> Bool {
-        print("🛡️ [FCM Stabilize] 백그라운드 FCM 토큰 안정화 시작")
-
-        // 현재 저장된 토큰 확인
-        guard let currentToken = UserDefaults.standard.string(forKey: "fcm_token") else {
-            print("ℹ️ [FCM Stabilize] 현재 토큰 없음 - 변경 허용")
-            return true // 토큰이 없으면 변경 허용
-        }
-
-        // 토큰이 동일하면 변경 불필요
-        if currentToken == newToken {
-            print("✅ [FCM Stabilize] 토큰 동일 - 변경 불필요")
-            return false // 변경하지 않음
-        }
-
-        // 백그라운드 토큰 안정성 점수 계산
-        let stabilityScore = calculateFCMTokenStability()
-
-        // 안정성 점수가 높으면 변경 제한 (백그라운드에서)
-        if stabilityScore >= 80 {
-            // 디버깅용 값들 미리 계산
-            let lastUpdateHours = Int((Date().timeIntervalSince1970 - UserDefaults.standard.double(forKey: "last_token_update_time")) / 3600)
-            let lastRollbackHours = Int((Date().timeIntervalSince1970 - UserDefaults.standard.double(forKey: "last_rollback_time")) / 3600)
-            let appLaunchHours = Int((Date().timeIntervalSince1970 - UserDefaults.standard.double(forKey: "app_launch_time")) / 3600)
-            let hasApnsToken = currentAPNSToken != nil ? "있음" : "없음"
-
-            print("🛡️ [FCM Stabilize] 토큰 안정성 높음 (\(stabilityScore)점) - 백그라운드 변경 제한")
-            print("   📱 새로운 토큰: \(newToken.prefix(20))...")
-            print("   💾 현재 토큰: \(currentToken.prefix(20))...")
-            print("   📊 안정화 요소:")
-            print("      • 최근 변경: \(lastUpdateHours)시간 전")
-            print("      • 최근 롤백: \(lastRollbackHours)시간 전")
-            print("      • APNs 토큰: \(hasApnsToken)")
-            print("      • 앱 실행: \(appLaunchHours)시간 전")
-            return false // 변경하지 않음
-        }
-
-        print("⚠️ [FCM Stabilize] 토큰 안정성 낮음 (\(stabilityScore)점) - 변경 허용")
-        return true // 변경 허용
     }
 
     // FCM 토큰 안정성 점수 계산 (0-100)
@@ -2182,47 +1623,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
         // 최소 점수 보장
         return max(score, 0)
-    }
-
-    // 백그라운드 FCM 토큰 변경 사전 검증
-    private func preValidateBackgroundFCMTokenChange(_ newToken: String, completion: @escaping (Bool, String) -> Void) {
-        print("🔍 [FCM Pre-Validate] 백그라운드 FCM 토큰 변경 사전 검증")
-
-        // 1. 안정성 기반 변경 필요성 확인 (백그라운드에서는 완화)
-        let shouldChange = stabilizeBackgroundFCMToken(newToken)
-        if !shouldChange {
-            print("🛡️ [FCM Pre-Validate] 안정성 점수가 높아 변경 제한되었으나, FCM 서비스 재등록 강제")
-            // 안정성 점수가 높아도 백그라운드에서는 FCM 서비스 재등록 강제
-            completion(true, "안정성 점수 높음 - FCM 서비스 재등록 강제")
-            return
-        }
-
-        // 2. APNs 토큰 존재 및 유효성 확인 (백그라운드에서는 선택적)
-        if currentAPNSToken == nil {
-            print("⚠️ [FCM Pre-Validate] 백그라운드에서 APNs 토큰 없음 - 검증 계속 진행 (푸시 수신 우선)")
-            // 백그라운드에서는 APNs 토큰이 없어도 FCM 검증 진행
-        }
-
-        // 3. 최소 변경 간격 확인 (백그라운드에서 2분으로 완화)
-        let lastUpdate = UserDefaults.standard.double(forKey: "last_token_update_time")
-        let currentTime = Date().timeIntervalSince1970
-        let minutesSinceLastUpdate = (currentTime - lastUpdate) / 60
-
-        if minutesSinceLastUpdate < 2 {
-            print("⏳ [FCM Pre-Validate] 최소 변경 간격 미충족 (\(Int(minutesSinceLastUpdate))분) - FCM 서비스 재등록 강제")
-            // 최소 간격 미충족해도 백그라운드에서는 FCM 서비스 재등록 강제
-            completion(true, "최소 간격 미충족 - FCM 서비스 재등록 강제")
-            return
-        }
-
-        // 4. 토큰 형식 검증
-        guard newToken.count >= 100 && newToken.contains(":") else {
-            completion(false, "토큰 형식 오류")
-            return
-        }
-
-        print("✅ [FCM Pre-Validate] 백그라운드 토큰 변경 사전 검증 통과")
-        completion(true, "변경 허용")
     }
 
     // MARK: - 🔄 백그라운드 FCM 재등록 (최후의 수단)
@@ -2316,7 +1716,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                 print("✅ [FCM Debug] 로컬 토큰 일치")
             } else {
                 print("⚠️ [FCM Debug] 로컬 토큰 불일치")
-                print("   📱 현재 토큰: \(currentToken.prefix(20))...")
                 print("   💾 저장 토큰: \(savedToken.prefix(20))...")
                 if isBackground {
                     print("🛡️ [FCM Debug] 백그라운드에서 토큰 불일치 - 긴급 업데이트")
@@ -2332,7 +1731,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                 print("✅ [FCM Debug] 서버 토큰 일치")
             } else {
                 print("⚠️ [FCM Debug] 서버 토큰 불일치")
-                print("   📱 현재 토큰: \(currentToken.prefix(20))...")
                 print("   🖥️ 서버 토큰: \(serverToken.prefix(20))...")
                 if isBackground {
                     print("🛡️ [FCM Debug] 백그라운드에서 서버 토큰 불일치 - 백그라운드 동기화")
@@ -2409,334 +1807,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         }
     }
 
-    // FCM 푸시 메시지 수신 테스트 (개발용)
-    private func testFCMPushReception() {
-        print("🔔 [FCM Test] FCM 푸시 메시지 수신 테스트 시작")
-
-        checkFCMServiceRegistrationStatus()
-
-        // 5초 후 재확인
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
-            print("🔄 [FCM Test] 5초 후 FCM 상태 재확인")
-            self.checkFCMServiceRegistrationStatus()
-        }
-    }
-
-    // FCM 푸시 메시지 표시 상태 확인 메소드
-    private func checkFCMPushDisplayStatus() {
-        print("🔔 [FCM Push Status] FCM 푸시 메시지 표시 상태 확인 시작")
-
-        // 현재 푸시 알림 권한 상태 확인
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
-            DispatchQueue.main.async {
-                print("🔧 [FCM Push Status] 푸시 알림 권한 상태: \(settings.authorizationStatus.rawValue)")
-                print("🔧 [FCM Push Status] 권한 상세:")
-                print("   • 알림 허용: \(settings.authorizationStatus == .authorized)")
-                print("   • 알림 표시: \(settings.alertSetting == .enabled)")
-                print("   • 배지 표시: \(settings.badgeSetting == .enabled)")
-                print("   • 소리 재생: \(settings.soundSetting == .enabled)")
-
-                // FCM 서비스 상태 확인
-                let isAutoInitEnabled = Messaging.messaging().isAutoInitEnabled
-                print("🔧 [FCM Push Status] FCM Auto Init: \(isAutoInitEnabled ? "활성화" : "비활성화")")
-
-                // APNs 토큰 상태 확인
-                let hasApnsToken = self.currentAPNSToken != nil
-                print("🔧 [FCM Push Status] APNs 토큰: \(hasApnsToken ? "있음" : "없음")")
-
-                // FCM 토큰 상태 확인
-                Messaging.messaging().token { token, error in
-                    if let token = token {
-                        print("🔧 [FCM Push Status] FCM 토큰 상태: 유효")
-                        print("🔧 [FCM Push Status] 토큰 길이: \(token.count)자")
-
-                        // FCM 토큰 검증
-                        self.validateFCMTokenForPushReception(token) { isValid, message in
-                            print("🎯 [FCM Push Status] 푸시 수신 가능성: \(isValid ? "가능" : "불가능")")
-                            print("📝 [FCM Push Status] 검증 결과: \(message)")
-
-                            if !isValid {
-                                print("⚠️ [FCM Push Status] FCM 토큰 검증 실패 - 수동 재등록 필요")
-                                self.forceRefreshFCMServiceRegistration(token)
-
-                                // 검증 실패 시 추가 디버깅 정보 출력
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                                    print("🔍 [FCM Debug] FCM 토큰 검증 실패로 추가 디버깅")
-                                    self.printFCMDebugInfo()
-                                }
-                            } else {
-                                print("✅ [FCM Push Status] FCM 토큰 검증 성공 - 푸시 수신 준비 완료")
-
-                                // 푸시 수신 가능할 때 추가 검증
-                                self.performDetailedFCMPushTest(token)
-                            }
-                        }
-                    } else {
-                        print("❌ [FCM Push Status] FCM 토큰 없음")
-                        if let error = error {
-                            print("❌ [FCM Push Status] 토큰 조회 오류: \(error.localizedDescription)")
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // FCM 푸시 수신 상세 테스트 메소드
-    private func performDetailedFCMPushTest(_ fcmToken: String) {
-        print("🔬 [FCM Push Test] FCM 푸시 수신 상세 테스트 시작")
-
-        // 1. FCM 토큰 포맷 검증
-        let isValidFormat = fcmToken.count > 100 && fcmToken.contains(":")
-        print("📋 [FCM Push Test] 토큰 포맷 검증: \(isValidFormat ? "유효" : "잘못됨")")
-
-        // 2. FCM 토큰 접두사 확인
-        let tokenPrefix = String(fcmToken.prefix(20))
-        print("📋 [FCM Push Test] 토큰 접두사: \(tokenPrefix)...")
-
-        // 3. DB 토큰과의 일치성 확인
-        if let dbToken = UserDefaults.standard.string(forKey: "last_updated_fcm_token") {
-            let isTokenMatch = fcmToken == dbToken
-            print("📋 [FCM Push Test] DB 토큰 일치: \(isTokenMatch ? "일치" : "불일치")")
-
-            if !isTokenMatch {
-                print("⚠️ [FCM Push Test] 토큰 불일치 발견!")
-                print("   📱 현재 토큰: \(fcmToken.prefix(30))...")
-                print("   💾 DB 토큰: \(dbToken.prefix(30))...")
-            }
-        } else {
-            print("⚠️ [FCM Push Test] DB 토큰 없음")
-        }
-
-        // 4. APNs 토큰 상태 재확인
-        if let apnsToken = self.currentAPNSToken {
-            print("📋 [FCM Push Test] APNs 토큰 존재: \(apnsToken.count)자")
-        } else {
-            print("⚠️ [FCM Push Test] APNs 토큰 없음")
-        }
-
-        // 5. FCM 서비스 상태 재확인
-        let isAutoInitEnabled = Messaging.messaging().isAutoInitEnabled
-        print("📋 [FCM Push Test] FCM Auto Init: \(isAutoInitEnabled ? "활성화" : "비활성화")")
-
-        // 6. 푸시 알림 권한 재확인
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
-            DispatchQueue.main.async {
-                print("📋 [FCM Push Test] 푸시 권한 상태:")
-                print("   • 권한 상태: \(settings.authorizationStatus.rawValue)")
-                print("   • 알림 표시: \(settings.alertSetting.rawValue)")
-                print("   • 소리 재생: \(settings.soundSetting.rawValue)")
-                print("   • 배지 표시: \(settings.badgeSetting.rawValue)")
-
-                // 7. 권한 문제 분석
-                if settings.authorizationStatus != .authorized {
-                    print("🚨 [FCM Push Test] 푸시 알림 권한이 거부됨")
-                    print("💡 [FCM Push Test] 해결: 설정 > 알림 > SMAP > 알림 허용")
-                } else if settings.alertSetting != .enabled {
-                    print("🚨 [FCM Push Test] 알림 표시가 비활성화됨")
-                    print("💡 [FCM Push Test] 해결: 설정 > 알림 > SMAP > 알림 표시 허용")
-                } else if !isAutoInitEnabled {
-                    print("🚨 [FCM Push Test] FCM Auto Init 비활성화")
-                    print("💡 [FCM Push Test] 해결: FCM 서비스 재초기화 필요")
-                } else {
-                            print("✅ [FCM Push Test] 모든 설정이 정상 - 푸시 수신 준비 완료")
-        print("💡 [FCM Push Test] 서버에서 FCM 메시지를 전송해보세요")
-        print("💡 [FCM Push Test] 테스트 토큰: \(fcmToken)")
-
-        // 서버 테스트를 위한 curl 명령어 출력
-        print("🔧 [FCM Push Test] 서버 테스트용 명령어:")
-        print("curl -X POST https://api3.smap.site/api/v1/fcm/send \\")
-        print("  -H 'Content-Type: application/json' \\")
-        print("  -d '{\"fcm_token\":\"\(fcmToken)\",\"title\":\"테스트 알림\",\"body\":\"FCM 푸시 테스트 메시지\"}'")
-                }
-            }
-        }
-
-        // 8. FCM 서비스 재연결 테스트
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-            print("🔄 [FCM Push Test] FCM 서비스 재연결 테스트")
-            Messaging.messaging().token { refreshedToken, error in
-                if let refreshedToken = refreshedToken {
-                    if refreshedToken == fcmToken {
-                        print("✅ [FCM Push Test] 토큰 일관성 유지")
-                    } else {
-                        print("⚠️ [FCM Push Test] 토큰 변경됨")
-                        print("   📱 새 토큰: \(refreshedToken.prefix(30))...")
-                    }
-                } else {
-                    print("❌ [FCM Push Test] 토큰 재조회 실패")
-                    if let error = error {
-                        print("❌ [FCM Push Test] 오류: \(error.localizedDescription)")
-                    }
-                }
-            }
-        }
-    }
-
-    // FCM 메시지 수신 콜백 디버깅 강화
-    private func debugFCMMessageReception(_ message: Any) {
-        print("🔍 [FCM Message Debug] FCM 메시지 수신 디버깅 시작")
-
-        if let messageData = message as? [String: Any] {
-            print("📨 [FCM Message Debug] 메시지 데이터:")
-            for (key, value) in messageData {
-                print("   • \(key): \(value)")
-            }
-        }
-
-        // FCM 서비스 상태 확인
-        Messaging.messaging().token { token, error in
-            if let token = token {
-                print("🔥 [FCM Message Debug] 메시지 수신 시 FCM 토큰: \(token.prefix(20))...")
-
-                // DB 토큰과 비교
-                if let dbToken = UserDefaults.standard.string(forKey: "last_updated_fcm_token") {
-                    if token == dbToken {
-                        print("✅ [FCM Message Debug] 토큰 일치: FCM ↔ DB")
-                    } else {
-                        print("⚠️ [FCM Message Debug] 토큰 불일치!")
-                        print("   📱 현재 토큰: \(token.prefix(20))...")
-                        print("   💾 DB 토큰: \(dbToken.prefix(20))...")
-
-                        // 토큰 불일치 시 서비스 상태 확인
-                        self.checkFCMServiceRegistrationStatus()
-                    }
-                } else {
-                    print("⚠️ [FCM Message Debug] DB 토큰 없음")
-                }
-            } else {
-                print("❌ [FCM Message Debug] FCM 토큰 조회 실패")
-                if let error = error {
-                    print("❌ [FCM Message Debug] 오류: \(error.localizedDescription)")
-                }
-            }
-        }
-
-        // 푸시 알림 권한 상태 확인
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
-            DispatchQueue.main.async {
-                print("🔔 [FCM Message Debug] 푸시 알림 권한 상태:")
-                print("   • 권한 상태: \(settings.authorizationStatus.rawValue)")
-                print("   • 알림 표시: \(settings.alertSetting.rawValue)")
-                print("   • 소리 재생: \(settings.soundSetting.rawValue)")
-                print("   • 배지 표시: \(settings.badgeSetting.rawValue)")
-
-                if settings.authorizationStatus != .authorized {
-                    print("⚠️ [FCM Message Debug] 푸시 알림 권한이 거부됨")
-                }
-                if settings.alertSetting != .enabled {
-                    print("⚠️ [FCM Message Debug] 알림 표시가 비활성화됨")
-                }
-
-                // FCM 메시지 수신 시 강제 알림 표시 테스트
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    print("🔔 [FCM Message Debug] FCM 메시지 수신 시 강제 알림 표시 테스트")
-                    self.forceDisplayFCMNotificationTest(message)
-                }
-
-                // 일반 알림 표시 테스트
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                    print("🔔 [FCM Message Debug] 일반 알림 표시 테스트 시작")
-                    self.testNotificationDisplay()
-                }
-            }
-        }
-    }
-
-    // FCM 메시지 수신 시 강제 알림 표시 테스트
-    private func forceDisplayFCMNotificationTest(_ message: Any) {
-        print("🔔 [FCM Force Test] FCM 메시지 기반 강제 알림 표시 테스트")
-
-        guard let userInfo = message as? [AnyHashable: Any] else {
-            print("❌ [FCM Force Test] 메시지 변환 실패")
-            return
-        }
-
-        // 중복 알림 표시 방지 로직
-        if let messageId = userInfo["gcm.message_id"] as? String,
-           let lastMessageId = lastProcessedFCMMessageId,
-           let lastTime = lastFCMNotificationTime,
-           messageId == lastMessageId,
-           Date().timeIntervalSince(lastTime) < fcmDuplicatePreventionInterval {
-            print("🚫 [FCM Force Test] 중복 FCM 메시지 감지 - 알림 표시 스킵")
-            print("   • 메시지 ID: \(messageId)")
-            print("   • 경과 시간: \(Date().timeIntervalSince(lastTime))초")
-            return
-        }
-
-        // 메시지에서 제목과 본문 추출
-        let title = userInfo["title"] as? String ?? "🔔 FCM 수신 알림"
-        let body = userInfo["body"] as? String ?? "FCM 메시지가 수신되었습니다"
-
-        print("📝 [FCM Force Test] 알림 내용:")
-        print("   • 제목: \(title)")
-        print("   • 본문: \(body)")
-
-        // 중복 방지 정보 및 성공 플래그 업데이트
-        if let messageId = userInfo["gcm.message_id"] as? String {
-            lastProcessedFCMMessageId = messageId
-            lastFCMNotificationTime = Date()
-
-            // 현재 메시지와 일치하는 경우 성공 플래그 설정
-            if messageId == currentFCMMessageId {
-                notificationDisplayedSuccessfully = true
-                print("✅ [FCM Force Test] 알림 표시 성공 - 후속 작업 스킵 플래그 설정")
-            }
-
-            print("✅ [FCM Force Test] 중복 방지 정보 업데이트: \(messageId)")
-        }
-
-        // 강제 로컬 알림 표시
-        let content = UNMutableNotificationContent()
-        content.title = title
-        content.body = body
-        content.sound = .default
-        content.badge = NSNumber(value: UIApplication.shared.applicationIconBadgeNumber + 1)
-        content.userInfo = userInfo
-
-        // 고유 식별자로 중복 방지
-        let identifier = "fcm_force_test_\(Date().timeIntervalSince1970)"
-        let request = UNNotificationRequest(identifier: identifier,
-                                          content: content,
-                                          trigger: nil)
-
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error = error {
-                print("❌ [FCM Force Test] 강제 알림 표시 실패: \(error.localizedDescription)")
-                print("💡 [FCM Force Test] FCM 권한 또는 설정에 문제가 있을 수 있습니다")
-            } else {
-                print("✅ [FCM Force Test] 강제 알림 표시 성공")
-                print("💡 [FCM Force Test] 잠시 후 Notification Center에 알림이 표시되는지 확인하세요")
-                print("💡 [FCM Force Test] 알림이 표시되면 FCM 권한은 정상입니다")
-                print("💡 [FCM Force Test] 알림이 표시되지 않으면 iOS 설정을 확인하세요")
-            }
-        }
-    }
-
-    // 알림 표시 테스트 메소드
-    private func testNotificationDisplay() {
-        print("🔔 [Notification Test] 로컬 알림 표시 테스트 시작")
-
-        let content = UNMutableNotificationContent()
-        content.title = "🧪 FCM 테스트 알림"
-        content.body = "이 알림이 표시되면 FCM 푸시 설정이 정상입니다"
-        content.sound = .default
-        content.badge = NSNumber(value: 1)
-
-        let _ = UNNotificationRequest(identifier: "fcm_test_notification_\(Date().timeIntervalSince1970)",
-                                          content: content,
-                                          trigger: nil)
-
-        // 중복 알림 방지 - 테스트 로컬 알림 생성 비활성화
-        print("🚫 [Notification Test] 중복 방지를 위해 테스트 로컬 알림 생성 건너뛰기")
-        print("📝 [Notification Test] 원본 FCM 알림만 사용하여 권한 테스트")
-    }
-
     // FCM 푸시 알림 강제 표시 메소드
     private func forceDisplayFCMNotification(_ userInfo: [AnyHashable: Any]) {
-        print("╔══════════════════════════════════════════════════════════════╗")
-        print("║ 🔔 [FCM-FORCE-DISPLAY] 알림 표시 시작                          ║")
-        print("╚══════════════════════════════════════════════════════════════╝")
 
         // 중복 알림 표시 방지 로직
         print("🔍 [FCM-FORCE-DISPLAY] 단계 1: 중복 알림 방지 확인")
@@ -2813,378 +1885,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         }
     }
 
-    // Notification Center 상태 확인 메소드
-    private func checkNotificationCenterStatus() {
-        print("╔══════════════════════════════════════════════════════════════╗")
-        print("║ 📱 [NOTIFICATION-CENTER] 상태 확인 시작                         ║")
-        print("╚══════════════════════════════════════════════════════════════╝")
-        print("🔍 [NOTIFICATION-CENTER] 단계 1: Notification Center 알림 조회")
-        print("   📊 대상: UNUserNotificationCenter.current()")
-        print("   🎯 목적: FCM 관련 알림 존재 여부 확인")
-
-        UNUserNotificationCenter.current().getDeliveredNotifications { deliveredNotifications in
-            DispatchQueue.main.async {
-                print("📊 [NOTIFICATION-CENTER] 단계 2: 알림 개수 분석")
-                print("   📱 전달된 알림 총 개수: \(deliveredNotifications.count)")
-
-                // [NOTIFICATION-CENTER] 단계 3: FCM 알림 필터링
-                print("🔍 [NOTIFICATION-CENTER] 단계 3: FCM 알림 필터링")
-                let fcmNotifications = deliveredNotifications.filter { notification in
-                    let title = notification.request.content.title
-                    let body = notification.request.content.body
-                    let identifier = notification.request.identifier
-
-                    let isFCM = title.contains("FCM") ||
-                               title.contains("🔔") ||
-                               body.contains("FCM") ||
-                               body.contains("테스트") ||
-                               identifier.contains("FCM") ||
-                               identifier.contains("fcm")
-
-                    if isFCM {
-                        print("   ✅ FCM 알림 발견: '\(title)'")
-                    }
-
-                    return isFCM
-                }
-
-                // [NOTIFICATION-CENTER] 단계 4: SMAP 알림 필터링
-                print("🔍 [NOTIFICATION-CENTER] 단계 4: SMAP 알림 필터링")
-                let smapNotifications = deliveredNotifications.filter { notification in
-                    let title = notification.request.content.title
-                    let body = notification.request.content.body
-                    let identifier = notification.request.identifier
-
-                    let isSMAP = title.contains("SMAP") ||
-                                title.contains("smap") ||
-                                body.contains("SMAP") ||
-                                body.contains("smap") ||
-                                identifier.contains("SMAP") ||
-                                identifier.contains("smap")
-
-                    if isSMAP {
-                        print("   ✅ SMAP 알림 발견: '\(title)'")
-                    }
-
-                    return isSMAP
-                }
-
-                print("📊 [NOTIFICATION-CENTER] 단계 5: 필터링 결과")
-                print("   🔍 FCM 관련 알림 개수: \(fcmNotifications.count)")
-                print("   🔍 SMAP 관련 알림 개수: \(smapNotifications.count)")
-
-                // [NOTIFICATION-CENTER] 단계 6: 성공 플래그 설정
-                print("🎯 [NOTIFICATION-CENTER] 단계 6: 성공 플래그 평가")
-                if !fcmNotifications.isEmpty,
-                   let currentId = self.currentFCMMessageId {
-                    self.notificationDisplayedSuccessfully = true
-                    print("✅ [NOTIFICATION-CENTER] FCM 알림 발견 - 성공 플래그 설정")
-                    print("   📝 현재 메시지 ID: \(currentId)")
-                    print("   🎉 결과: 알림 표시 성공으로 판정")
-                } else {
-                    print("❌ [NOTIFICATION-CENTER] FCM 알림 없음 - 성공 플래그 유지 안 함")
-                    print("   📝 현재 메시지 ID: \(self.currentFCMMessageId ?? "없음")")
-                    print("   🎯 결과: 알림 표시 실패로 판정")
-                }
-
-                // [NOTIFICATION-CENTER] 단계 7: FCM 알림 분석 및 결과 출력
-                print("📋 [NOTIFICATION-CENTER] 단계 7: FCM 알림 분석 및 결과 출력")
-
-                if fcmNotifications.isEmpty {
-                    print("🚨 [NOTIFICATION-CENTER] FCM 알림 분석 결과: 없음")
-                    print("💡 [NOTIFICATION-CENTER] FCM 메시지 수신 후 알림 표시 실패")
-                    print("🔧 [NOTIFICATION-CENTER] 문제 해결을 위한 확인 사항:")
-                    print("   • iOS 설정 > 알림 > SMAP > 모든 스위치 ON")
-                    print("   • 앱 알림 권한 상태 확인")
-                    print("   • FCM 토큰 유효성 확인")
-                    print("   • 앱 백그라운드 실행 상태 확인")
-                } else {
-                    print("✅ [NOTIFICATION-CENTER] FCM 알림 분석 결과: 발견됨")
-                    print("📝 [NOTIFICATION-CENTER] 발견된 FCM 알림 상세 정보:")
-                    for (index, notification) in fcmNotifications.enumerated() {
-                        print("   \(index + 1). 제목: '\(notification.request.content.title)'")
-                        print("      내용: '\(notification.request.content.body.prefix(50))...'")
-                        print("      시간: \(notification.date)")
-                        print("      ID: \(notification.request.identifier)")
-                    }
-                    print("✅ [FCM SUCCESS] FCM 메시지가 Notification Center에 정상 표시되었습니다!")
-                    print("🎉 [FCM SUCCESS] FCM 푸시 알림 표시 성공!")
-                    print("📝 [FCM] FCM 알림 상세 정보:")
-                    for (index, notification) in fcmNotifications.prefix(3).enumerated() {
-                        print("   \(index + 1). 제목: \(notification.request.content.title)")
-                        print("      내용: \(notification.request.content.body.prefix(50))...")
-                        print("      시간: \(notification.date)")
-                        print("      ID: \(notification.request.identifier)")
-                    }
-                }
-
-                // SMAP 알림 분석
-                if smapNotifications.isEmpty {
-                    print("⚠️ [SMAP] SMAP 앱의 알림이 전달되지 않았습니다")
-                    if !fcmNotifications.isEmpty {
-                        print("💡 [SMAP] FCM 알림은 있지만 SMAP 알림이 없는 것은 정상일 수 있습니다")
-                    }
-                } else {
-                    print("✅ [SMAP] SMAP 앱의 알림이 정상적으로 전달되었습니다")
-                    print("📝 [SMAP] SMAP 알림 상세 정보:")
-                    for (index, notification) in smapNotifications.prefix(3).enumerated() {
-                        print("   \(index + 1). 제목: \(notification.request.content.title)")
-                        print("      내용: \(notification.request.content.body.prefix(50))...")
-                        print("      시간: \(notification.date)")
-                        print("      ID: \(notification.request.identifier)")
-                    }
-                }
-
-                // 전체 알림 목록 (최대 5개)
-                if !deliveredNotifications.isEmpty {
-                    print("📋 [전체] 최근 알림 목록 (최대 5개):")
-                    for (index, notification) in deliveredNotifications.prefix(5).enumerated() {
-                        let title = notification.request.content.title
-                        let body = notification.request.content.body
-                        let identifier = notification.request.identifier
-
-                        print("   \(index + 1). 제목: \(title)")
-                        print("      내용: \(body.prefix(30))...")
-                        print("      앱: \(identifier)")
-                        print("      시간: \(notification.date)")
-                    }
-                }
-
-                // 현재 앱의 알림 권한 상태 재확인
-                UNUserNotificationCenter.current().getNotificationSettings { settings in
-                    DispatchQueue.main.async {
-                        print("🔧 [Notification Center] 현재 알림 권한 상태:")
-                        print("   • 권한 상태: \(settings.authorizationStatus.rawValue) (\(settings.authorizationStatus == .authorized ? "허용" : "거부"))")
-                        print("   • 알림 표시: \(settings.alertSetting.rawValue) (\(settings.alertSetting == .enabled ? "활성" : "비활성"))")
-                        print("   • 소리: \(settings.soundSetting.rawValue) (\(settings.soundSetting == .enabled ? "활성" : "비활성"))")
-                        print("   • 배지: \(settings.badgeSetting.rawValue) (\(settings.badgeSetting == .enabled ? "활성" : "비활성"))")
-
-                        // 권한 상태 분석
-                        if settings.authorizationStatus != .authorized {
-                            print("🚨 [권한] 알림 권한이 거부됨 - iOS 설정 > 알림 > SMAP 에서 허용해주세요")
-                        } else if settings.alertSetting != .enabled {
-                            print("🚨 [권한] 알림 표시가 비활성화됨 - iOS 설정 > 알림 > SMAP 에서 활성화해주세요")
-                        } else if settings.badgeSetting != .enabled {
-                            print("⚠️ [권한] 배지 표시가 비활성화됨 - 앱 아이콘에 알림 표시가 안될 수 있습니다")
-                        } else if settings.soundSetting != .enabled {
-                            print("⚠️ [권한] 소리가 비활성화됨 - 알림 소리가 재생되지 않습니다")
-                        } else {
-                            print("✅ [권한] 모든 알림 권한이 정상입니다")
-                        }
-
-                        // FCM 알림이 없고 권한이 정상인 경우 추가 진단
-                        if fcmNotifications.isEmpty && settings.authorizationStatus == .authorized && settings.alertSetting == .enabled {
-                            print("🔍 [진단] FCM 알림이 없지만 권한은 정상입니다")
-                            print("💡 [진단] 가능한 원인:")
-                            print("   • FCM 메시지가 앱에 도달하지 못함")
-                            print("   • 시스템 알림 표시 메커니즘이 실패함")
-                            print("   • FCM 토큰이 유효하지 않음")
-                            print("   • 앱이 백그라운드에서 제대로 동작하지 않음")
-                        }
-                    }
-                }
-            }
-        }
-
-        // 대기 중인 알림도 확인
-        UNUserNotificationCenter.current().getPendingNotificationRequests { pendingRequests in
-            DispatchQueue.main.async {
-                print("⏳ [Notification Center] 대기 중인 알림 개수: \(pendingRequests.count)")
-
-                if pendingRequests.isEmpty {
-                    print("ℹ️ [Notification Center] 대기 중인 알림 요청이 없습니다")
-                } else {
-                    print("📋 [Notification Center] 대기 중인 알림 목록:")
-                    for (index, request) in pendingRequests.prefix(5).enumerated() {
-                        print("   \(index + 1). ID: \(request.identifier)")
-                        print("      제목: \(request.content.title)")
-                        print("      트리거: \(String(describing: request.trigger))")
-                    }
-                }
-
-                print("═══════════════════════════════════════════════════════════════")
-            }
-        }
-    }
-
-    // FCM 서비스 연결 상태 모니터링 메소드
-    private func monitorFCMServiceConnection() {
-        print("🔗 [FCM Monitor] FCM 서비스 연결 상태 모니터링 시작")
-
-        _ = Timer.scheduledTimer(withTimeInterval: 300.0, repeats: true) { [weak self] timer in
-            guard let self = self else {
-                timer.invalidate()
-                return
-            }
-            
-            // 백그라운드에서는 모니터링 건너뛰기 (배터리 절약)
-            if self.isAppInBackground {
-                print("💤 [FCM Monitor] 백그라운드 상태 - 모니터링 건너뛰기 (배터리 절약)")
-                return
-            }
-
-            // FCM 서비스 상태 주기적 확인 (포그라운드에서만)
-            Messaging.messaging().token { token, error in
-                if let error = error {
-                    print("⚠️ [FCM Monitor] FCM 서비스 연결 오류: \(error.localizedDescription)")
-                    print("🔄 [FCM Monitor] FCM 서비스 재연결 시도")
-                    self.forceRefreshFCMServiceRegistration("")
-                } else if let token = token {
-                    // FCM 토큰 검증
-                    self.validateFCMTokenForPushReception(token) { isValid, message in
-                        if !isValid {
-                            print("⚠️ [FCM Monitor] FCM 토큰 검증 실패: \(message)")
-                            print("🔄 [FCM Monitor] FCM 서비스 재등록 시도")
-                            self.forceRefreshFCMServiceRegistration(token)
-                        } else {
-                            let monitorTimestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
-                    print("✅ [FCM-MONITOR][\(monitorTimestamp)] FCM 서비스 연결 정상")
-                        }
-                    }
-                } else {
-                    print("⚠️ [FCM Monitor] FCM 토큰 없음")
-                    print("🔄 [FCM Monitor] FCM 서비스 재초기화 시도")
-                    Messaging.messaging().isAutoInitEnabled = false
-                    Messaging.messaging().isAutoInitEnabled = true
-                }
-            }
-        }
-
-        // 타이머를 UserDefaults에 저장하여 앱 재시작 시에도 유지
-        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "fcm_monitor_start_time")
-        UserDefaults.standard.synchronize()
-
-        print("✅ [FCM Monitor] FCM 서비스 모니터링 시작됨 (5분 간격)")
-    }
-
-    // 로컬 알림 표시 테스트 메소드 (FCM 수신 시 강제 표시용)
-    func testLocalNotificationDisplay() {
-        print("🔔 [FCM Local Test] 로컬 알림 표시 테스트 시작")
-
-        let content = UNMutableNotificationContent()
-        content.title = "🧪 FCM 로컬 알림 테스트"
-
-        // iOS 15.0 미만에서도 호환되는 날짜 포맷팅
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        let formattedDate = dateFormatter.string(from: Date())
-        content.body = "FCM 메시지 수신 후 로컬 알림 표시 테스트 - \(formattedDate)"
-
-        content.sound = .default
-        content.badge = NSNumber(value: UIApplication.shared.applicationIconBadgeNumber + 1)
-        content.categoryIdentifier = "GENERAL"
-        content.userInfo = [
-            "type": "fcm_local_test",
-            "timestamp": Date().timeIntervalSince1970,
-            "notification_id": "local_test_\(Int(Date().timeIntervalSince1970))"
-        ]
-
-        let _ = UNNotificationRequest(
-            identifier: "fcm_local_test_\(Int(Date().timeIntervalSince1970))",
-            content: content,
-            trigger: nil // 즉시 표시
-        )
-
-        // 중복 알림 방지 - 테스트 로컬 알림 생성 비활성화
-        print("🚫 [FCM Local Test] 중복 방지를 위해 테스트 로컬 알림 생성 건너뛰기")
-        print("📝 [FCM Local Test] 테스트 알림 생성하지 않음 - 원본 FCM만 사용")
-        
-        // Notification Center 상태는 여전히 확인
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-            print("📱 [FCM Local Test] Notification Center 상태 확인")
-            self.checkNotificationCenterStatus()
-        }
-    }
-
-    // 수동 FCM 푸시 테스트 메소드
-    func testFCMPushManually() {
-        print("🧪 [FCM Manual Test] 수동 FCM 푸시 테스트 시작")
-
-        // 1. FCM 서비스 상태 확인
-        checkFCMPushDisplayStatus()
-
-        // 2. 5초 후 FCM 토큰 검증
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
-            print("🔍 [FCM Manual Test] FCM 토큰 검증 중...")
-            Messaging.messaging().token { token, error in
-                if let token = token {
-                    self.validateFCMTokenForPushReception(token) { isValid, message in
-                        print("🎯 [FCM Manual Test] 토큰 검증 결과: \(isValid ? "성공" : "실패")")
-                        print("📝 [FCM Manual Test] 검증 메시지: \(message)")
-
-                        if !isValid {
-                            print("🔄 [FCM Manual Test] FCM 서비스 재등록 실행")
-                            self.forceRefreshFCMServiceRegistration(token)
-                        } else {
-                            print("✅ [FCM Manual Test] FCM 푸시 수신 준비 완료")
-                            print("💡 [FCM Manual Test] 이제 서버에서 FCM 메시지를 전송해보세요")
-                        }
-                    }
-                } else {
-                    print("❌ [FCM Manual Test] FCM 토큰 없음")
-                    if let error = error {
-                        print("❌ [FCM Manual Test] 오류: \(error.localizedDescription)")
-                    }
-                }
-            }
-        }
-
-        // 3. 10초 후 최종 상태 확인
-        DispatchQueue.main.asyncAfter(deadline: .now() + 10.0) {
-            print("📊 [FCM Manual Test] 최종 FCM 상태 확인")
-            self.checkFCMServiceRegistrationStatus()
-        }
-    }
-
-    // FCM 디버깅 정보 출력 (개발자가 수동으로 호출 가능)
-    func printFCMDebugInfo() {
-        print("╔══════════════════════════════════════════════════════════════╗")
-        print("║ 🔍 [FCM Debug] FCM 디버깅 정보 출력                             ║")
-        print("╚══════════════════════════════════════════════════════════════╝")
-
-        // FCM 서비스 상태 확인
-        checkFCMServiceRegistrationStatus()
-
-        // 3초 후 추가 정보 출력
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-            print("📊 [FCM Debug] 추가 디버깅 정보:")
-
-            // FCM 토큰 정보
-            let currentToken = UserDefaults.standard.string(forKey: "fcm_token") ?? "없음"
-            let serverToken = UserDefaults.standard.string(forKey: "last_updated_fcm_token") ?? "없음"
-            let backupToken = UserDefaults.standard.string(forKey: "fcm_token_backup") ?? "없음"
-
-            print("   📱 현재 FCM 토큰: \(currentToken.prefix(20))...")
-            print("   🖥️ 서버 FCM 토큰: \(serverToken.prefix(20))...")
-            print("   💾 백업 FCM 토큰: \(backupToken.prefix(20))...")
-
-            // 타임스탬프 정보
-            let lastUpdate = UserDefaults.standard.double(forKey: "last_token_update_time")
-            let lastRollback = UserDefaults.standard.double(forKey: "last_rollback_time")
-            let appLaunch = UserDefaults.standard.double(forKey: "app_launch_time")
-
-            let updateTime = lastUpdate > 0 ? Date(timeIntervalSince1970: lastUpdate).description : "없음"
-            let rollbackTime = lastRollback > 0 ? Date(timeIntervalSince1970: lastRollback).description : "없음"
-            let launchTime = appLaunch > 0 ? Date(timeIntervalSince1970: appLaunch).description : "없음"
-
-            print("   ⏰ 마지막 토큰 업데이트: \(updateTime)")
-            print("   🔄 마지막 롤백: \(rollbackTime)")
-            print("   🚀 앱 실행 시간: \(launchTime)")
-
-            // 안정화 점수 계산
-            let stabilityScore = self.calculateFCMTokenStability()
-            print("   📊 안정화 점수: \(stabilityScore)/100")
-
-            // 마지막 롤백 사유
-            let rollbackReason = UserDefaults.standard.string(forKey: "last_rollback_reason") ?? "없음"
-            print("   📝 마지막 롤백 사유: \(rollbackReason)")
-
-            // FCM 푸시 메시지 표시 상태 확인
-            print("   🔔 FCM 푸시 표시 상태 확인 중...")
-            self.checkFCMPushDisplayStatus()
-        }
-    }
-
     // MARK: - 🔍 FCM 등록 상태 검증
     private func verifyFCMRegistrationStatus(_ token: String) {
         print("🔍 [FCM Verify Status] FCM 등록 상태 검증 시작")
@@ -3204,95 +1904,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         print("🎯 [FCM Verify Status] FCM 토큰이 Firebase 서비스에 등록됨")
     }
 
-    // MARK: - 🔍 FCM 서비스 등록 상태 확인 및 재등록
-    private func verifyAndRefreshFCMRegistration(_ token: String) {
-        print("🔍 [FCM Verify] FCM 서비스 등록 상태 확인 시작")
-
-        // 1. APNs 토큰 재설정 시도 (푸시 수신 보장)
-        if let apnsToken = currentAPNSToken {
-            print("🔄 [FCM Verify] APNs 토큰 재설정 시도")
-            Messaging.messaging().setAPNSToken(apnsToken.data(using: .utf8) ?? Data(), type: .unknown)
-        } else {
-            print("⚠️ [FCM Verify] APNs 토큰 없음 - FCM 등록에 영향 가능")
-        }
-
-        // 2. FCM 토큰 유효성 검증
-        if token.count < 100 {
-            print("⚠️ [FCM Verify] FCM 토큰 길이가 비정상적: \(token.count)자")
-            return
-        } else {
-            print("✅ [FCM Verify] FCM 토큰 길이 정상: \(token.count)자")
-        }
-
-        // 3. FCM 서비스 상태 재초기화
-        print("🔄 [FCM Verify] FCM 서비스 상태 재초기화")
-        Messaging.messaging().isAutoInitEnabled = false
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            Messaging.messaging().isAutoInitEnabled = true
-
-            // 4. FCM 토큰 재확인
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                Messaging.messaging().token { [weak self] verifiedToken, error in
-                    if let error = error {
-                        print("❌ [FCM Verify] FCM 서비스 재확인 실패: \(error.localizedDescription)")
-                        // 재시도
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                            self?.forceFCMRegistrationRetry(token)
-                        }
-                    } else if let verifiedToken = verifiedToken {
-                        if verifiedToken == token {
-                            print("✅ [FCM Verify] FCM 서비스 등록 상태 정상 확인")
-                            print("🎯 [FCM Verify] FCM 토큰이 FCM 서비스에 제대로 등록됨")
-                        } else {
-                            print("⚠️ [FCM Verify] FCM 서비스 토큰 불일치 감지")
-                            print("   📱 기대 토큰: \(token.prefix(20))...")
-                            print("   🔍 확인 토큰: \(verifiedToken.prefix(20))...")
-                            print("🔄 [FCM Verify] 새로운 토큰으로 재등록 시도")
-                            self?.handleFCMTokenUpdate(verifiedToken)
-                        }
-                    }
-                }
-            }
-        }
-
-        print("✅ [FCM Verify] FCM 서비스 등록 상태 확인 완료")
-    }
-
-    // MARK: - 🔥 FCM 등록 강제 재시도
-    private func forceFCMRegistrationRetry(_ token: String) {
-        print("🔥 [FCM Force Retry] FCM 등록 강제 재시도 시작")
-
-        // FCM 서비스 완전 리셋
-        Messaging.messaging().isAutoInitEnabled = false
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            Messaging.messaging().isAutoInitEnabled = true
-
-            // APNs 토큰 재설정
-            if let apnsToken = self.currentAPNSToken {
-                Messaging.messaging().setAPNSToken(apnsToken.data(using: .utf8) ?? Data(), type: .unknown)
-                print("✅ [FCM Force Retry] APNs 토큰 재설정 완료")
-            }
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                Messaging.messaging().token { [weak self] finalToken, error in
-                    if let finalToken = finalToken {
-                        print("✅ [FCM Force Retry] FCM 등록 최종 성공: \(finalToken.prefix(30))...")
-                        if finalToken == token {
-                            print("🎯 [FCM Force Retry] FCM 토큰 등록 완료 - 푸시 수신 보장")
-                        } else {
-                            print("🔄 [FCM Force Retry] 새로운 토큰 감지 - 업데이트 진행")
-                            self?.handleFCMTokenUpdate(finalToken)
-                        }
-                    } else {
-                        print("❌ [FCM Force Retry] FCM 등록 최종 실패")
-                        print("📱 [FCM Force Retry] 수동 재시작 필요할 수 있음")
-                    }
-                }
-            }
-        }
-    }
-
     private func updateFCMTokenIfNeededWithFetch() {
         // 🔒 중복 실행 방지
         guard !isFCMUpdateInProgress else {
@@ -3305,7 +1916,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                         UserDefaults.standard.string(forKey: "savedMtIdx") != nil
         
         guard hasUserIdentified else {
-            print("🔒 [FCM Auto] 사용자가 식별되지 않음(mt_idx 없음) - FCM 토큰 업데이트 스킵")
             return
         }
         
@@ -3334,53 +1944,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                 
                 // 토큰 변경 감지 및 서버 업데이트 (실제 변경되었을 때만)
                 self?.checkAndUpdateFCMTokenIfNeeded(currentToken: token)
-            }
-        }
-    }
-
-    // MARK: - 🔄 FCM 토큰 업데이트 (토큰 파라미터로 직접 호출)
-    private func updateFCMTokenIfNeededDirect(token: String) {
-        // 🔒 중복 실행 방지
-        if isFCMUpdateInProgress {
-            print("⏳ [FCM Direct] FCM 토큰 업데이트 이미 진행 중 - 스킵")
-            return
-        }
-
-        // 📱 앱 상태 확인 - 백그라운드에서도 토큰 업데이트 허용
-        let appState = UIApplication.shared.applicationState
-        let isBackground = appState == .background
-
-        print("📱 [FCM Direct] 앱 상태: \(isBackground ? "백그라운드" : "포그라운드") - 토큰 업데이트 허용")
-
-        // 사용자 식별 상태 확인 (mt_idx 기준)
-        let hasUserIdentified = UserDefaults.standard.string(forKey: "mt_idx") != nil ||
-                               UserDefaults.standard.string(forKey: "savedMtIdx") != nil
-
-        guard hasUserIdentified else {
-            print("🔒 [FCM Direct] 사용자가 식별되지 않음(mt_idx 없음) - FCM 토큰 업데이트 스킵")
-            return
-        }
-
-        print("🔄 [FCM Direct] FCM 토큰 서버 업데이트 시작: \(token.prefix(30))...")
-        isFCMUpdateInProgress = true
-
-        // 서버 업데이트 수행 (토큰 변경 확인 생략 - 이미 확인됨)
-        sendFCMTokenToServer(token: token) { success in
-            DispatchQueue.main.async {
-                self.isFCMUpdateInProgress = false
-                if success {
-                    print("✅ [FCM Direct] FCM 토큰 서버 업데이트 성공")
-
-                    // 성공 시 로컬 저장소 업데이트
-                    UserDefaults.standard.set(token, forKey: "fcm_token")
-                    UserDefaults.standard.set(token, forKey: "last_updated_fcm_token")
-                    UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "fcm_token_updated_time")
-                    UserDefaults.standard.synchronize()
-
-                    self.lastFCMTokenUpdateTime = Date()
-                } else {
-                    print("❌ [FCM Direct] FCM 토큰 서버 업데이트 실패")
-                }
             }
         }
     }
@@ -3450,68 +2013,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         }
     }
     
-    // MARK: - 🔔 푸시 알림 권한 처리
-    
-    private func setupPushNotificationPermissions() {
-        print("🔔 [PUSH] 푸시 알림 권한 설정 시작")
-        
-        let center = UNUserNotificationCenter.current()
-        
-        // 현재 권한 상태 먼저 확인
-        center.getNotificationSettings { settings in
-            DispatchQueue.main.async {
-                print("🔔 [PUSH] 현재 권한 상태: \(self.authorizationStatusString(settings.authorizationStatus))")
-                
-                switch settings.authorizationStatus {
-                case .authorized, .provisional:
-                    print("✅ [PUSH] 이미 권한이 허용되어 있음")
-                    UIApplication.shared.registerForRemoteNotifications()
-                    
-                case .denied:
-                    print("❌ [PUSH] 권한이 거부되어 있음")
-                    
-                case .notDetermined:
-                    print("🔄 [PUSH] 권한 미결정 - 로그인 후 요청 예정")
-                    print("🔒 [PUSH] 로그인 전 자동 권한 요청 차단")
-                    
-                case .ephemeral:
-                    print("⏱️ [PUSH] 임시 권한")
-                    UIApplication.shared.registerForRemoteNotifications()
-                    
-                @unknown default:
-                    print("❓ [PUSH] 알 수 없는 권한 상태 - 로그인 후 처리")
-                    print("🔒 [PUSH] 로그인 전 자동 권한 요청 차단")
-                }
-            }
-        }
-    }
-    
-    private func requestPushNotificationPermission() {
-        print("🔔 [PUSH] 푸시 알림 권한 요청 시작")
-        
-        let authOptions: UNAuthorizationOptions = [.alert, .badge, .sound]
-        UNUserNotificationCenter.current().requestAuthorization(
-            options: authOptions,
-            completionHandler: { granted, error in
-                DispatchQueue.main.async {
-                    print("🔔 [PUSH] 권한 요청 결과: \(granted ? "허용" : "거부")")
-                    
-                    if let error = error {
-                        print("❌ [PUSH] 권한 요청 오류: \(error.localizedDescription)")
-                    }
-                    
-                    if granted {
-                        print("✅ [PUSH] 사용자가 푸시 알림 권한을 허용함")
-                        UIApplication.shared.registerForRemoteNotifications()
-                    } else {
-                        print("❌ [PUSH] 사용자가 푸시 알림 권한을 거부함")
-                    }
-                }
-            })
-    }
-    
     private func checkPushNotificationStatus() {
-        print("🔔 [PUSH] 푸시 알림 권한 상태 상세 확인 시작")
         
         // 🚨 로그인 전에는 권한 상태 체크하지 않음
         let isLoggedIn = UserDefaults.standard.bool(forKey: "is_logged_in") ||
@@ -3525,11 +2027,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             DispatchQueue.main.async {
-                print("🔍 [PUSH] 앱 활성화 시 권한 상태: \(self.authorizationStatusString(settings.authorizationStatus))")
                 
                 // Firebase 토큰과 함께 상태 출력 (로그인된 경우만)
                 if let token = Messaging.messaging().fcmToken {
-                    print("🔔 [PUSH] 현재 FCM 토큰: \(token)")
                     
                     if settings.authorizationStatus == .denied {
                         print("❌ [PUSH] 경고: FCM 토큰은 있지만 권한이 거부됨!")
@@ -3712,10 +2212,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
         // 🚨 로그인 전에는 푸시 알림 권한 체크하지 않음
         if UserDefaults.standard.bool(forKey: "is_logged_in") {
-            print("🔍 [PUSH] 로그인 상태 - 푸시 알림 권한 상태 확인")
-
-            // 🔍 FCM 수신 상태 진단 (디버깅용)
-            diagnoseFCMTokenReception()
 
             // 🔄 FCM 토큰 DB 동기화 (토큰 불일치 문제 해결)
             print("🔄 [앱 시작] FCM 토큰 DB 동기화 시작")
@@ -3752,7 +2248,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                     let status = settings.authorizationStatus
                     // notDetermined가 아니면 요청창이 사라진 상태로 간주
                     if status != .notDetermined {
-                        print("🔔 [PUSH] 권한 상태 확정: \(self.authorizationStatusString(status)) → 후속 온보딩 진행")
                         completion()
                         return
                     }
@@ -3793,29 +2288,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         ensureMissingPermissionsSequence()
     }
 
-    private func requestLocationWhenInUse() {
-        let lm = CLLocationManager()
-        // 스위즐 가드에 의해 is_logged_in && smap_allow_location_request_now 일 때만 실제 요청됨
-        lm.requestWhenInUseAuthorization()
-        // 요청 후 자동 차단되도록 스위즐 측에서 allow 플래그를 false로 돌림
-    }
-
-    private func ensureLocationPermissionIfNotDetermined() {
-        let status: CLAuthorizationStatus
-        if #available(iOS 14.0, *) {
-            status = CLLocationManager().authorizationStatus
-        } else {
-            status = CLLocationManager.authorizationStatus()
-        }
-        if status == .notDetermined {
-            print("📍 [PERM] 위치 권한 미결정 - 요청 진행")
-            UserDefaults.standard.set(true, forKey: "smap_allow_location_request_now")
-            requestLocationWhenInUse()
-        } else {
-            print("📍 [PERM] 위치 권한 상태: \(status.rawValue)")
-        }
-    }
-
     private func requestMotionPermissionIfNeeded() {
         if CMMotionActivityManager.isActivityAvailable() {
             let status = CMMotionActivityManager.authorizationStatus()
@@ -3831,19 +2303,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             }
         } else {
             print("🏃 [PERM] 모션 액티비티 비지원 디바이스")
-        }
-    }
-
-    private func ensureMotionPermissionIfNotDetermined() {
-        if CMMotionActivityManager.isActivityAvailable() {
-            let status = CMMotionActivityManager.authorizationStatus()
-            if status == .notDetermined {
-                print("🏃 [PERM] 모션 권한 미결정 - 보완 요청 트리거")
-                motionManager.startActivityUpdates(to: OperationQueue.main) { _ in
-                    self.motionManager.stopActivityUpdates()
-                    print("🏃 [PERM] 모션 권한 보완 요청 완료")
-                }
-            }
         }
     }
 
@@ -4090,9 +2549,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     }
 
     func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any], fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
-        print("╔══════════════════════════════════════════════════════════════╗")
-        print("║ 🔔 [FCM] 백그라운드에서 원격 알림 수신!                        ║")
-        print("╚══════════════════════════════════════════════════════════════╝")
         
         let appState = UIApplication.shared.applicationState
         let stateString = appState == .background ? "백그라운드" : appState == .active ? "포그라운드" : "비활성"
@@ -4274,10 +2730,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                 let reason = userInfo["reason"] as? String ?? "unknown"
                 print("🔍 [FCM] 토큰 변경 이유: \(reason)")
 
-                // 백그라운드에서 FCM 토큰 강제 갱신 (여러 번 시도)
-                DispatchQueue.main.async {
-                    self.forceRefreshFCMTokenInBackgroundWithRetry(maxAttempts: 3)
-                }
             }
 
             // 백그라운드 앱 깨우기 플래그 확인
@@ -4364,18 +2816,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         print("📨 [FCM] 백그라운드 FCM 메시지 수신 - 알림 표시 시작")
         print("📝 [FCM] 백그라운드 메시지 내용: \(userInfo)")
 
-        // FCM 메시지 수신 시 즉시 알림 표시 상태 확인
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            print("🔍 [FCM] 백그라운드 FCM 메시지 수신 후 즉시 알림 표시 상태 확인")
-            self.checkFCMPushDisplayStatus()
-        }
-
-        // FCM 메시지 수신 즉시 로컬 알림 표시 테스트 (백업용)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            print("🔔 [FCM] 백그라운드 FCM 메시지 수신 즉시 로컬 알림 표시 테스트")
-            self.testLocalNotificationDisplay()
-        }
-
         // 백그라운드에서 수행할 작업들
         DispatchQueue.global(qos: .background).async {
             // 1. 데이터 미리 가져오기 (필요시)
@@ -4396,9 +2836,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                 if let messageId = userInfo["gcm.message_id"] as? String {
                     self.currentFCMMessageId = messageId
                     self.notificationDisplayedSuccessfully = false
-                    print("╔══════════════════════════════════════════════════════════════╗")
-                    print("║ 🔵 [FCM-BACKGROUND] 백그라운드 FCM 메시지 처리 시작                ║")
-                    print("╚══════════════════════════════════════════════════════════════╝")
                     print("📝 [FCM-BACKGROUND] 메시지 ID: \(messageId)")
                     print("📝 [FCM-BACKGROUND] 메시지 내용: \(userInfo)")
                     print("🔄 [FCM-BACKGROUND] 알림 표시 성공 플래그 초기화")
@@ -4445,29 +2882,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                         return
                     }
 
-                    print("📱 [FCM-BACKGROUND] Notification Center 상태 확인 진행")
-                    print("   🎯 목적: 알림 표시 성공 여부 확인")
-                    self.checkNotificationCenterStatus()
-                }
-
-                // FCM 메시지 수신 후 사용자에게 직접 확인 요청 (알림 표시 실패 시에만)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 10.0) {
-                    // 이미 알림 표시가 성공했다면 사용자 확인 요청 스킵
-                    if self.notificationDisplayedSuccessfully,
-                       let currentId = self.currentFCMMessageId,
-                       let lastId = self.lastProcessedFCMMessageId,
-                       currentId == lastId {
-                        print("✅ [FCM] 백그라운드 알림 표시 성공 확인됨 - 사용자 확인 요청 스킵")
-                        return
-                    }
-
-                    print("🚨 [FCM] 백그라운드 FCM 메시지가 수신되었지만 알림이 표시되지 않을 수 있습니다!")
-                    print("💡 [FCM] 즉시 다음 작업을 수행하세요:")
-                    print("   1. 화면 상단을 아래로 스와이프해서 Notification Center를 확인")
-                    print("   2. SMAP 앱의 알림이 있는지 확인")
-                    print("   3. 알림이 없으면 iOS 설정 > 알림 > SMAP 앱 설정 확인")
-                    print("   4. 아래 명령어로 수동 테스트:")
-                    print("      (UIApplication.shared.delegate as? AppDelegate)?.testFCMPushManually()")
                 }
 
                 print("✅ [FCM] 알림 포함 푸시 처리 완료")
@@ -4566,9 +2980,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 // 기존 showLocalNotificationForBackgroundPush 메소드는 아래의 새 버전으로 대체되었습니다.
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
-        print("╔══════════════════════════════════════════════════════════════╗")
-        print("║ 📱 [APNS] APNS 디바이스 토큰 수신 시작                          ║")
-        print("╚══════════════════════════════════════════════════════════════╝")
 
         // APNS 토큰을 문자열로 변환하여 저장
         let tokenParts = deviceToken.map { data in String(format: "%02.2hhx", data) }
@@ -4606,12 +3017,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             }
         }
 
-        // FCM 서비스 연결 모니터링 시작
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
-            print("🔗 [FCM] FCM 서비스 연결 모니터링 시작")
-            self.monitorFCMServiceConnection()
-        }
-
         // FCM에 APNS 토큰 설정 (강화된 등록)
         Messaging.messaging().setAPNSToken(deviceToken as Data, type: .unknown)
         print("✅ [APNS] APNS 디바이스 토큰 FCM에 등록 완료")
@@ -4622,23 +3027,16 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
         // FCM 서비스에 APNs 토큰 설정 (토큰 갱신 트리거)
         Messaging.messaging().setAPNSToken(deviceToken as Data, type: .unknown)
-        print("📡 [APNS→FCM] APNs 토큰을 FCM에 설정 - 토큰 갱신 이벤트 유발")
 
         // 🎯 이벤트 기반 토큰 관리 시스템
         // FCM 토큰 갱신 이벤트 기반 처리로 전환
         // messaging(_:didReceiveRegistrationToken:)에서 자동으로 처리됨
-        print("⏳ [이벤트 기반] FCM 토큰 갱신 이벤트 대기 중...")
-        print("🎯 [messaging(_:didReceiveRegistrationToken:)] 메서드가 새로운 토큰을 처리할 예정")
-        print("🔗 [APNs→FCM 연동] APNs 토큰 변경 → FCM 토큰 자동 갱신 → 서버 업데이트")
 
         // 현재 FCM 토큰도 확인해서 비교
         Messaging.messaging().token { fcmToken, error in
             if let error = error {
                 print("❌ [FCM] 현재 FCM 토큰 가져오기 실패: \(error.localizedDescription)")
             } else if let fcmToken = fcmToken {
-                print("🔥 [FCM] 현재 FCM 토큰: \(fcmToken)")
-                print("🔥 [FCM] FCM 토큰 길이: \(fcmToken.count)자")
-                print("🔥 [FCM] FCM 토큰 접두사: \(fcmToken.prefix(30))...")
 
                 // FCM 토큰을 UserDefaults에 저장 (디버깅용)
                 UserDefaults.standard.set(fcmToken, forKey: "current_fcm_token")
@@ -4646,13 +3044,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
                 // DB 토큰과 비교 (UserDefaults에서 가져옴)
                 if let dbToken = UserDefaults.standard.string(forKey: "last_updated_fcm_token") {
-                    print("💾 [DB] DB에 저장된 FCM 토큰: \(dbToken.prefix(30))...")
                     if fcmToken == dbToken {
                         print("✅ [토큰 일치] FCM 토큰과 DB 토큰이 일치합니다")
                     } else {
                         print("⚠️ [토큰 불일치] FCM 토큰과 DB 토큰이 다릅니다!")
-                        print("   📱 현재 디바이스 FCM 토큰: \(fcmToken.prefix(20))...")
-                        print("   💾 DB에 저장된 토큰: \(dbToken.prefix(20))...")
                         print("   🔄 토큰 동기화 필요!")
                     }
                 } else {
@@ -4661,7 +3056,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             }
         }
 
-        print("═══════════════════════════════════════════════════════════════")
 
         // 🚫 APNS 토큰 변경 시 FCM 토큰 강제 갱신 비활성화 - 토큰 변경 방지
         let currentAPNSTokenKey = token
@@ -4730,23 +3124,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         
         return isExpiredLocal
     }
-    
-    /// FCM 토큰 변경 차단 여부 확인
-    private func shouldBlockFCMTokenChange() -> Bool {
-        // 이미 토큰 변경이 차단된 상태라면 true 반환
-        if isFCMTokenChangeBlocked {
-            print("🚫 [FCM Block] FCM 토큰 변경이 이미 차단된 상태")
-            return true
-        }
-        
-        // 토큰이 만료되지 않았다면 변경 차단
-        if !isFCMTokenExpired() {
-            print("🚫 [FCM Block] FCM 토큰이 만료되지 않음 - 변경 차단")
-            return true
-        }
-        
-        return false
-    }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
         print("❌ [APNS] APNS 등록 실패: \(error.localizedDescription)")
@@ -4771,7 +3148,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "apns_error_time")
         UserDefaults.standard.synchronize()
 
-        print("🔍 [DEBUG] APNS 등록 실패 - debugPushNotificationStatus()로 상세 진단 가능")
+        print("[FCM] APNS registration failed")
     }
 
     // 🎯 FCM 토큰 갱신 이벤트 핸들러 - 개선된 이벤트 기반 토큰 관리
@@ -5143,12 +3520,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     }
 
 
-
     // ✅ FCM 메시지 수신 처리 활성화
     func messaging(_ messaging: Messaging, didReceive remoteMessage: Any) {
-        print("╔══════════════════════════════════════════════════════════════╗")
-        print("║ 📨 [FCM] FCM 메시지 수신 시작: \(Date())                         ║")
-        print("╚══════════════════════════════════════════════════════════════╝")
 
         // FCM 메시지 구조 상세 분석
         if let message = remoteMessage as? [String: Any] {
@@ -5174,21 +3547,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             }
         }
 
-        // FCM 메시지 수신 디버깅
-        debugFCMMessageReception(remoteMessage)
-
-        // FCM 메시지 수신 시 즉시 알림 표시 상태 확인
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            print("🔍 [FCM] FCM 메시지 수신 후 즉시 알림 표시 상태 확인")
-            self.checkFCMPushDisplayStatus()
-        }
-
-        // FCM 메시지 수신 즉시 로컬 알림 표시 테스트
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            print("🔔 [FCM] FCM 메시지 수신 즉시 로컬 알림 표시 테스트")
-            self.testLocalNotificationDisplay()
-        }
-
             // FCM 메시지 수신 시 권한 상태 즉시 확인 및 재요청
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             print("🔧 [FCM] FCM 메시지 수신 시 권한 상태 확인 및 재요청")
@@ -5203,9 +3561,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
         // FCM 메시지에서 사용자 정보 추출하여 알림 표시 (한 번만)
         if let userInfo = remoteMessage as? [AnyHashable: Any] {
-            print("╔══════════════════════════════════════════════════════════════╗")
-            print("║ 🟢 [FCM-FOREGROUND] 포그라운드 FCM 메시지 처리 시작              ║")
-            print("╚══════════════════════════════════════════════════════════════╝")
             print("📨 [FCM-FOREGROUND] FCM 메시지 수신")
             print("📝 [FCM-FOREGROUND] 메시지 내용: \(userInfo)")
 
@@ -5243,93 +3598,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
             // FCM 메시지 기반 추가 알림 표시 시도 제거 (중복 방지)
 
-            // [FCM-FOREGROUND] 단계 3: Notification Center 상태 확인
-            print("📱 [FCM-FOREGROUND] 단계 3: Notification Center 상태 확인 준비")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                print("🔍 [FCM-FOREGROUND] Notification Center 상태 확인 실행")
-                print("   ⏱️  지연 시간: 0.5초")
 
-                // 이미 알림 표시가 성공했다면 확인 스킵
-                if self.notificationDisplayedSuccessfully,
-                   let currentId = self.currentFCMMessageId,
-                   let lastId = self.lastProcessedFCMMessageId,
-                   currentId == lastId {
-                    print("✅ [FCM-FOREGROUND] 알림 표시 이미 성공 - Notification Center 확인 스킵")
-                    print("   📝 현재 메시지 ID: \(currentId)")
-                    print("   📝 마지막 처리 ID: \(lastId)")
-                    return
-                }
-
-                print("📱 [FCM-FOREGROUND] Notification Center 상태 확인 진행")
-                print("   🎯 목적: 알림 표시 성공 여부 확인")
-                self.checkNotificationCenterStatus()
-            }
-
-            // FCM 메시지 수신 후 사용자에게 직접 확인 요청 (알림 표시 실패 시에만)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 8.0) {
-                // 이미 알림 표시가 성공했다면 사용자 확인 요청 스킵
-                if self.notificationDisplayedSuccessfully,
-                   let currentId = self.currentFCMMessageId,
-                   let lastId = self.lastProcessedFCMMessageId,
-                   currentId == lastId {
-                    print("✅ [FCM] 포그라운드 알림 표시 성공 확인됨 - 사용자 확인 요청 스킵")
-                    return
-                }
-
-                print("🚨 [FCM] FCM 메시지가 수신되었지만 알림이 표시되지 않을 수 있습니다!")
-                print("💡 [FCM] 즉시 다음 작업을 수행하세요:")
-                print("   1. 화면 상단을 아래로 스와이프해서 Notification Center를 확인")
-                print("   2. SMAP 앱의 알림이 있는지 확인")
-                print("   3. 알림이 없으면 iOS 설정 > 알림 > SMAP 앱 설정 확인")
-                print("   4. 아래 명령어로 수동 테스트:")
-                print("      (UIApplication.shared.delegate as? AppDelegate)?.testFCMPushManually()")
-            }
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 13.0) {
-                // 이미 알림 표시가 성공했다면 추가 확인 스킵
-                if self.notificationDisplayedSuccessfully,
-                   let currentId = self.currentFCMMessageId,
-                   let lastId = self.lastProcessedFCMMessageId,
-                   currentId == lastId {
-                    print("✅ [FCM] 포그라운드 알림 표시 성공 확인됨 - 추가 확인 요청 스킵")
-                    return
-                }
-
-                print("🚨 [FCM] 아직 알림이 표시되지 않았나요?")
-                print("💡 [FCM] 다음 사항들을 확인하세요:")
-                print("   • iOS 설정 > 알림 > SMAP > 알림 허용: 켜짐")
-                print("   • iOS 설정 > 알림 > SMAP > 알림 표시: 켜짐")
-                print("   • iOS 설정 > 알림 > SMAP > 배지: 켜짐")
-                print("   • iOS 설정 > 알림 > SMAP > 소리: 켜짐")
-                print("💡 [FCM] 설정이 모두 정상이라면 FCM 토큰 문제가 있을 수 있습니다")
-            }
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 18.0) {
-                print("🚨 [FCM] FCM 알림 표시 문제가 지속되면 다음을 시도하세요:")
-                print("   1. 앱을 완전히 종료하고 다시 실행")
-                print("   2. iOS 설정 > 일반 > 소프트웨어 업데이트 확인")
-                print("   3. FCM 토큰 수동 리프레시:")
-                print("      (UIApplication.shared.delegate as? AppDelegate)?.forceRefreshFCMServiceRegistration('')")
-                print("   4. 알림 설정 재설정:")
-                print("      iOS 설정 > 알림 > SMAP > 모두 끄고 다시 켜기")
-            }
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 25.0) {
-                print("🚨 [FCM] 긴급: FCM 알림이 전혀 표시되지 않는 경우")
-                print("💡 [FCM] 다음 단계별로 시도하세요:")
-                print("   1️⃣ iOS 설정 > 알림 > SMAP 앱 선택")
-                print("   2️⃣ 모든 스위치를 OFF로 설정")
-                print("   3️⃣ 앱을 완전히 종료 (스와이프 업)")
-                print("   4️⃣ 다시 앱 실행")
-                print("   5️⃣ iOS 설정 > 알림 > SMAP에서 모든 스위치를 ON으로 설정")
-                print("   6️⃣ FCM 테스트 메시지 다시 전송")
-            }
         }
 
         // FCM 메시지 수신 시 현재 토큰 상태 확인
         Messaging.messaging().token { [weak self] currentToken, error in
             if let currentToken = currentToken {
-                print("🔥 [메시지 수신 시] 현재 FCM 토큰: \(currentToken.prefix(30))...")
 
                 // DB 토큰과 비교
                 if let dbToken = UserDefaults.standard.string(forKey: "last_updated_fcm_token") {
@@ -5337,18 +3611,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                         print("✅ [메시지 수신] 토큰 일치: FCM ↔ DB")
                     } else {
                         print("⚠️ [메시지 수신] 토큰 불일치!")
-                        print("   📱 현재: \(currentToken.prefix(20))...")
-                        print("   💾 DB: \(dbToken.prefix(20))...")
 
                         // 토큰 불일치 시 FCM 서비스 상태 확인
                         print("🔍 [FCM Debug] 토큰 불일치로 FCM 서비스 상태 확인")
                         self?.checkFCMServiceRegistrationStatus()
 
-                        // FCM 푸시 표시 상태도 확인
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                            print("🔔 [FCM Debug] FCM 푸시 표시 상태 확인")
-                            self?.checkFCMPushDisplayStatus()
-                        }
+
                     }
                 } else {
                     print("⚠️ [메시지 수신] DB 토큰 없음")
@@ -5364,7 +3632,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         UserDefaults.standard.synchronize()
 
         print("📨 [FCM] FCM 메시지 수신 #\(messageCount)")
-        print("═══════════════════════════════════════════════════════════════")
 
         // 메시지 데이터를 Dictionary로 변환
         var messageData: [String: Any] = [:]
@@ -5402,298 +3669,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         DispatchQueue.main.async {
             Utils.shared.sendFCMMessageToWebView(messageData)
         }
-    }
-
-    // MARK: - 🔍 FCM 디버그 및 수동 업데이트 (개발용)
-    @objc func debugFCMTokenStatus() {
-        print("🔍 [FCM DEBUG] FCM 토큰 상태 확인 시작")
-
-        let fcmToken = Messaging.messaging().fcmToken
-        let apnsToken = currentAPNSToken
-        let storedToken = UserDefaults.standard.string(forKey: "fcm_token")
-        let lastUpdatedToken = UserDefaults.standard.string(forKey: "last_updated_fcm_token")
-
-        print("🔍 [FCM DEBUG] 현재 FCM 토큰: \(fcmToken?.prefix(30) ?? "없음")")
-        print("🔍 [FCM DEBUG] 저장된 FCM 토큰: \(storedToken?.prefix(30) ?? "없음")")
-        print("🔍 [FCM DEBUG] 마지막 업데이트 토큰: \(lastUpdatedToken?.prefix(30) ?? "없음")")
-        print("🔍 [FCM DEBUG] APNS 토큰: \(apnsToken?.prefix(30) ?? "없음")")
-
-        // FCM 메시지 수신 통계
-        let messageCount = UserDefaults.standard.integer(forKey: "fcm_message_received_count")
-        let lastMessageTime = UserDefaults.standard.double(forKey: "last_fcm_message_time")
-
-        print("🔍 [FCM DEBUG] FCM 메시지 수신 통계:")
-        print("   - 총 수신 메시지 수: \(messageCount)")
-        if lastMessageTime > 0 {
-            let lastMessageDate = Date(timeIntervalSince1970: lastMessageTime)
-            print("   - 마지막 메시지 수신: \(lastMessageDate)")
-        } else {
-            print("   - 마지막 메시지 수신: 없음")
-        }
-
-        // 권한 상태 확인
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
-            DispatchQueue.main.async {
-                print("🔍 [FCM DEBUG] 알림 권한 상태: \(settings.authorizationStatus.rawValue)")
-                print("🔍 [FCM DEBUG] 알림 권한: \(settings.authorizationStatus == .authorized ? "허용" : "거부")")
-                print("🔍 [FCM DEBUG] 소리 권한: \(settings.soundSetting.rawValue)")
-                print("🔍 [FCM DEBUG] 배지 권한: \(settings.badgeSetting.rawValue)")
-                print("🔍 [FCM DEBUG] 배너 권한: \(settings.alertSetting.rawValue)")
-            }
-        }
-    }
-
-    @objc func forceUpdateFCMTokenDebug() {
-        print("🔄 [FCM DEBUG] FCM 토큰 강제 업데이트 시작 (디버그용)")
-
-        if let fcmToken = Messaging.messaging().fcmToken {
-            print("🔄 [FCM DEBUG] 기존 FCM 토큰으로 서버 업데이트 시도")
-            updateFCMTokenIfNeededWithCheck(token: fcmToken)
-        } else {
-            print("🔄 [FCM DEBUG] FCM 토큰이 없음 - 재생성 시도")
-            Messaging.messaging().token { token, error in
-                if let error = error {
-                    print("❌ [FCM DEBUG] 토큰 재생성 실패: \(error)")
-                } else if let token = token {
-                    print("✅ [FCM DEBUG] 토큰 재생성 성공: \(token.prefix(30))...")
-                    self.updateFCMTokenIfNeededWithCheck(token: token)
-                }
-            }
-        }
-    }
-
-    // FCM 푸시 메시지 수신 테스트
-    @objc func testFCMPushMessage() {
-        print("🧪 [FCM TEST] FCM 푸시 메시지 수신 테스트 시작")
-
-        // 현재 FCM 토큰 상태 확인
-        let fcmToken = Messaging.messaging().fcmToken
-        let storedToken = UserDefaults.standard.string(forKey: "fcm_token")
-
-        print("🧪 [FCM TEST] FCM 토큰 상태:")
-        print("   - 현재 토큰: \(fcmToken?.prefix(20) ?? "없음")...")
-        print("   - 저장된 토큰: \(storedToken?.prefix(20) ?? "없음")...")
-
-        // 토큰 일치 여부 확인
-        if fcmToken == storedToken {
-            print("✅ [FCM TEST] FCM 토큰 일치 - 푸시 메시지 수신 가능")
-        } else {
-            print("⚠️ [FCM TEST] FCM 토큰 불일치 - 토큰 업데이트 필요")
-        }
-
-        // FCM 메시지 수신 통계
-        let messageCount = UserDefaults.standard.integer(forKey: "fcm_message_received_count")
-        let lastMessageTime = UserDefaults.standard.double(forKey: "last_fcm_message_time")
-
-        print("🧪 [FCM TEST] FCM 메시지 수신 상태:")
-        print("   - 총 수신 메시지: \(messageCount)개")
-        if lastMessageTime > 0 {
-            let lastMessageDate = Date(timeIntervalSince1970: lastMessageTime)
-            let timeSinceLastMessage = Date().timeIntervalSince(lastMessageDate)
-            print("   - 마지막 메시지: \(Int(timeSinceLastMessage))초 전")
-        }
-
-        // 권한 상태 확인
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
-            DispatchQueue.main.async {
-                print("🧪 [FCM TEST] 푸시 권한 상태:")
-                print("   - 알림 권한: \(settings.authorizationStatus.rawValue) (\(settings.authorizationStatus == .authorized ? "허용" : "거부"))")
-                print("   - 소리 권한: \(settings.soundSetting.rawValue)")
-                print("   - 배지 권한: \(settings.badgeSetting.rawValue)")
-
-                if settings.authorizationStatus == .authorized {
-                    print("✅ [FCM TEST] 푸시 권한 정상 - FCM 메시지 수신 가능")
-                } else {
-                    print("❌ [FCM TEST] 푸시 권한 거부 - 설정에서 권한 허용 필요")
-                }
-            }
-        }
-
-        // FCM 자동 초기화 상태 확인
-        print("🧪 [FCM TEST] FCM 설정 상태:")
-        print("   - 자동 초기화: \(Messaging.messaging().isAutoInitEnabled)")
-        print("   - APNS 토큰: \(self.currentAPNSToken?.prefix(20) ?? "없음")...")
-
-        print("✅ [FCM TEST] FCM 푸시 메시지 수신 테스트 완료")
-    }
-
-    // FCM 토큰 유효성 검증
-    @objc func validateFCMToken() {
-        print("🔍 [FCM VALIDATION] FCM 토큰 유효성 검증 시작")
-
-        guard let fcmToken = Messaging.messaging().fcmToken else {
-            print("❌ [FCM VALIDATION] FCM 토큰이 없음")
-            return
-        }
-
-        print("🔍 [FCM VALIDATION] FCM 토큰 검증: \(fcmToken.prefix(30))...")
-
-        // 토큰 길이 검증
-        if fcmToken.count < 100 {
-            print("⚠️ [FCM VALIDATION] FCM 토큰 길이가 너무 짧음: \(fcmToken.count)자")
-        } else if fcmToken.count > 300 {
-            print("⚠️ [FCM VALIDATION] FCM 토큰 길이가 너무 김: \(fcmToken.count)자")
-        } else {
-            print("✅ [FCM VALIDATION] FCM 토큰 길이 정상: \(fcmToken.count)자")
-        }
-
-        // 토큰 형식 검증 (FCM 토큰은 일반적으로 특정 패턴을 따름)
-        let tokenPattern = "^[a-zA-Z0-9_-]+$"
-        if fcmToken.range(of: tokenPattern, options: .regularExpression) != nil {
-            print("✅ [FCM VALIDATION] FCM 토큰 형식 정상")
-        } else {
-            print("⚠️ [FCM VALIDATION] FCM 토큰 형식이 비정상적")
-        }
-
-        // 저장된 토큰과 비교
-        let storedToken = UserDefaults.standard.string(forKey: "fcm_token")
-        if fcmToken == storedToken {
-            print("✅ [FCM VALIDATION] FCM 토큰 일치 - 서버와 동기화됨")
-        } else {
-            print("⚠️ [FCM VALIDATION] FCM 토큰 불일치 - 서버 업데이트 필요")
-            print("   - 현재 토큰: \(fcmToken.prefix(20))...")
-            print("   - 저장 토큰: \(storedToken?.prefix(20) ?? "없음")...")
-        }
-
-        // 🔴 APNs 토큰 존재 여부 확인 (푸시 알림 필수)
-        if let apnsToken = currentAPNSToken ?? UserDefaults.standard.string(forKey: "last_apns_token") {
-            print("✅ [FCM VALIDATION] APNs 토큰 존재: \(apnsToken.prefix(20))...")
-            print("📱 [FCM VALIDATION] FCM + APNs 모두 정상 - 푸시 알림 완벽 지원")
-        } else {
-            print("🚨 [FCM VALIDATION] APNs 토큰 없음 - 푸시 메시지 수신 불가")
-            print("📱 [FCM VALIDATION] FCM 토큰만 있어도 백그라운드 푸시는 작동하나, 포그라운드 푸시는 제한됨")
-            print("🔧 [FCM VALIDATION] 해결 방법: 앱 설정 > 알림 > [앱명] 켜기")
-        }
-
-        print("✅ [FCM VALIDATION] FCM 토큰 유효성 검증 완료")
-    }
-
-    // MARK: - 📱 APNs 등록 완료 후 FCM 토큰 업데이트
-    private func checkAndUpdateFCMTokenAfterAPNSRegistration() {
-        print("🔍 [APNS+FCM] APNs 등록 후 FCM 토큰 상태 확인")
-
-        // 백그라운드에서도 FCM 토큰 업데이트 허용 (푸시 수신 보장)
-        let appState = UIApplication.shared.applicationState
-        let isBackground = appState == .background
-
-        if isBackground {
-            print("🛡️ [APNS+FCM] 앱이 백그라운드 상태 - FCM 토큰 업데이트 허용 (푸시 수신 우선)")
-        }
-
-        // 사용자 식별 상태 확인
-        let hasUserIdentified = UserDefaults.standard.string(forKey: "mt_idx") != nil ||
-                               UserDefaults.standard.string(forKey: "savedMtIdx") != nil
-
-        if !hasUserIdentified {
-            print("🔒 [APNS+FCM] 사용자 식별 안됨 - FCM 토큰 업데이트 대기")
-            return
-        }
-
-        // FCM 토큰 확인 및 업데이트
-        Messaging.messaging().token { [weak self] fcmToken, error in
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("❌ [APNS+FCM] FCM 토큰 확인 실패: \(error.localizedDescription)")
-                    return
-                }
-
-                guard let fcmToken = fcmToken, !fcmToken.isEmpty else {
-                    print("❌ [APNS+FCM] FCM 토큰 없음")
-                    return
-                }
-
-                print("✅ [APNS+FCM] FCM 토큰 확인 성공: \(fcmToken.prefix(20))...")
-
-                // FCM 토큰 업데이트 실행 (APNs 토큰이 있으므로 무조건 성공)
-                print("🚀 [APNS+FCM] FCM 토큰 서버 업데이트 시작")
-                self?.updateFCMTokenIfNeededWithCheck(token: fcmToken)
-            }
-        }
-    }
-
-    // MARK: - 🔄 백그라운드 FCM 토큰 강제 갱신 (Silent Push 수신 시)
-    @objc func forceRefreshFCMTokenInBackground() {
-        print("🔄 [FCM BACKGROUND] 백그라운드 FCM 토큰 강제 갱신 시작")
-        forceRefreshFCMTokenInBackgroundWithRetry(maxAttempts: 1)
-    }
-
-    @objc func forceRefreshFCMTokenInBackgroundWithRetry(maxAttempts: Int) {
-        print("🔄 [FCM BACKGROUND] 백그라운드 FCM 토큰 강제 갱신 시작 (최대 시도: \(maxAttempts)회)")
-
-        var attempts = 0
-
-        func attemptTokenRefresh() {
-            attempts += 1
-            print("🔄 [FCM BACKGROUND] 토큰 갱신 시도 \(attempts)/\(maxAttempts)")
-
-            // FCM 토큰 재생성 요청
-            Messaging.messaging().token { [weak self] token, error in
-                DispatchQueue.main.async {
-                    if let error = error {
-                        print("❌ [FCM BACKGROUND] FCM 토큰 재생성 실패 (시도 \(attempts)): \(error.localizedDescription)")
-
-                        // 재시도 가능하면 다시 시도
-                        if attempts < maxAttempts {
-                            print("🔄 [FCM BACKGROUND] 재시도 대기 중...")
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                                attemptTokenRefresh()
-                            }
-                        } else {
-                            print("❌ [FCM BACKGROUND] 모든 재시도 실패")
-                        }
-                        return
-                    }
-
-                    guard let newToken = token else {
-                        print("❌ [FCM BACKGROUND] 새로운 FCM 토큰이 nil입니다 (시도 \(attempts))")
-
-                        // 재시도 가능하면 다시 시도
-                        if attempts < maxAttempts {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                                attemptTokenRefresh()
-                            }
-                        }
-                        return
-                    }
-
-                    print("✅ [FCM BACKGROUND] 새로운 FCM 토큰 생성됨 (시도 \(attempts)): \(newToken.prefix(30))...")
-
-                    // 기존 토큰과 비교
-                    let existingToken = UserDefaults.standard.string(forKey: "fcm_token")
-                    if existingToken == newToken {
-                        print("ℹ️ [FCM BACKGROUND] 토큰이 변경되지 않음 - 업데이트 건너뜀")
-                        return
-                    }
-
-                    print("🔄 [FCM BACKGROUND] 토큰 변경 감지 - 기존: \(existingToken?.prefix(15) ?? "없음"), 새 토큰: \(newToken.prefix(15))...")
-
-                    // 토큰 저장
-                    Utils.shared.setToken(token: newToken)
-                    UserDefaults.standard.set(newToken, forKey: "fcm_token")
-                    UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "fcm_token_received_time")
-                    UserDefaults.standard.set(newToken, forKey: "last_updated_fcm_token")
-                    UserDefaults.standard.synchronize()
-
-                    // FCM 토큰 변수 업데이트
-                    self?.currentFCMToken = newToken
-
-                    // 백그라운드에서도 서버 업데이트 수행
-                    print("🔄 [FCM BACKGROUND] 백그라운드에서 서버 토큰 업데이트 시작")
-                    self?.updateFCMTokenIfNeededWithCheck(token: newToken)
-
-                    // 성공 햅틱 피드백 (백그라운드에서도 가능)
-                    if self != nil {
-                        let notificationFeedback = UINotificationFeedbackGenerator()
-                        notificationFeedback.notificationOccurred(.success)
-                    }
-
-                    print("✅ [FCM BACKGROUND] FCM 토큰 강제 갱신 완료")
-                }
-            }
-        }
-
-        // 첫 번째 시도 시작
-        attemptTokenRefresh()
     }
 
     // MARK: - 🔍 FCM 토큰 서버 업데이트 (푸시 메시지 수신을 위해 개선)
@@ -5766,46 +3741,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                 }
             }
         }
-    }
-
-    // MARK: - 📝 토큰 변경 로그 기록
-    private func logTokenChange(reason: String, newToken: String) {
-        let oldToken = UserDefaults.standard.string(forKey: "fcm_token")
-
-        switch reason {
-        case "auto_refresh":
-            print("🔄 [FCM POLICY 2] 자동 토큰 갱신: \(oldToken?.prefix(10) ?? "nil")... → \(newToken.prefix(10))...")
-        case "login_register":
-            print("📝 [FCM POLICY 1] 로그인 시 토큰 등록: \(newToken.prefix(10))...")
-        case "app_launch_check":
-            if oldToken != newToken {
-                print("🔍 [FCM POLICY 3] 앱 실행 시 토큰 변경 감지: \(oldToken?.prefix(10) ?? "nil")... → \(newToken.prefix(10))...")
-            } else {
-                print("✅ [FCM POLICY 3] 앱 실행 시 토큰 동일 - 갱신 불필요")
-            }
-        default:
-            print("📝 [FCM LOG] 토큰 변경: \(reason) - \(newToken.prefix(10))...")
-        }
-    }
-
-    // MARK: - 🚀 FCM 토큰 강제 업데이트 (무조건 푸시 수신 보장)
-
-    private func forceUpdateFCMTokenToServer(token: String, reason: String = "force_update") {
-        print("🚀 [FCM FORCE] FCM 토큰 강제 서버 업데이트 시작 - 이유: \(reason)")
-        print("🚀 [FCM FORCE] 토큰: \(token.prefix(30))...")
-
-        // 기존 업데이트가 진행 중이면 취소
-        if UserDefaults.standard.bool(forKey: "fcm_force_update_in_progress") {
-            print("⚠️ [FCM FORCE] 이전 강제 업데이트가 진행 중 - 취소하고 새로 시작")
-            UserDefaults.standard.set(false, forKey: "fcm_force_update_in_progress")
-        }
-
-        // 강제 업데이트 진행 중 플래그 설정
-        UserDefaults.standard.set(true, forKey: "fcm_force_update_in_progress")
-        UserDefaults.standard.synchronize()
-
-        // 즉시 서버 업데이트 (재시도 없이)
-        performImmediateFCMTokenUpdate(token: token, reason: reason)
     }
 
     private func performImmediateFCMTokenUpdate(token: String, reason: String) {
@@ -6284,7 +4219,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
     // MARK: - 🔔 FCM 자동 업데이트 시작 (사용자 식별 완료 시 호출)
     @objc func startFCMAutoUpdateAfterUserIdentified() {
-        print("🚀 [FCM Auto] 사용자 식별 완료 - FCM 자동 업데이트 시작")
 
         // 🔍 사용자 식별 전에 저장된 FCM 토큰이 있는지 확인
         if let pendingToken = UserDefaults.standard.string(forKey: "pending_fcm_token_after_user_identified") {
@@ -6350,43 +4284,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         // 타이머 기반 자동 업데이트 제거됨
     }
     
-    // MARK: - 🔔 사용자 정보 저장 시 FCM 토큰 업데이트 (MainView에서 호출)
-    @objc func onUserInfoSaved() {
-        print("👤 [FCM USER] 사용자 정보 저장 감지 - FCM 토큰 업데이트 트리거")
-        
-        // 사용자 정보가 저장된 후 토큰 변경 여부 확인
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            Messaging.messaging().token { [weak self] currentToken, error in
-                DispatchQueue.main.async {
-                    if let error = error {
-                        print("❌ [FCM USER] FCM 토큰 확인 실패: \(error.localizedDescription)")
-                        return
-                    }
-
-                    guard let currentToken = currentToken, !currentToken.isEmpty else {
-                        print("❌ [FCM USER] FCM 토큰 없음")
-                        return
-                    }
-
-                    let savedToken = UserDefaults.standard.string(forKey: "fcm_token")
-                    let hasTokenChanged = savedToken != currentToken
-
-                    print("🔍 [FCM USER] 토큰 변경 확인:")
-                    print("   저장된 토큰: \(savedToken?.prefix(20) ?? "없음")...")
-                    print("   현재 토큰: \(currentToken.prefix(20))...")
-                    print("   토큰 변경됨: \(hasTokenChanged)")
-
-                    if hasTokenChanged {
-                        print("🚨 [FCM USER] 토큰이 변경됨 - 업데이트 실행")
-                        self?.startFCMAutoUpdateAfterUserIdentified()
-                    } else {
-                        print("ℹ️ [FCM USER] 토큰이 변경되지 않음 - 업데이트 스킵")
-                    }
-                }
-            }
-        }
-    }
-    
     // MARK: - 🔔 FCM 토큰 강제 업데이트 (메인용)
     @objc func forceUpdateFCMTokenMain() {
         print("🚨 [FCM FORCE] FCM 토큰 강제 업데이트 시작 (메인)")
@@ -6408,19 +4305,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                 self?.updateFCMTokenIfNeededWithCheck(token: currentToken)
             }
         }
-    }
-    
-    // MARK: - 🔔 FCM 토큰 즉시 업데이트 (디버깅용)
-    @objc func updateFCMTokenNow() {
-        print("🚨 [FCM NOW] FCM 토큰 즉시 업데이트 실행")
-        
-        // 저장된 토큰 초기화
-        UserDefaults.standard.removeObject(forKey: "last_fcm_token")
-        UserDefaults.standard.synchronize()
-        print("🗑️ [FCM NOW] 저장된 토큰 초기화 완료")
-        
-        // 즉시 FCM 토큰 업데이트 실행
-        updateFCMTokenIfNeededWithFetch()
     }
     
     // MARK: - 🔔 FCM 토큰 상태 상세 확인 (디버깅용)
@@ -6502,526 +4386,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             }
                 }
     }
-
-    // MARK: - 🔄 APNS 토큰 변경 시 FCM 토큰 강제 갱신
-    private func forceRefreshFCMTokenOnAPNSTokenChange() {
-        print("🔄 [APNS] APNS 토큰 변경으로 인한 FCM 토큰 강제 갱신 시작")
-
-        // 기존 FCM 토큰 삭제
-        Messaging.messaging().deleteToken { error in
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("❌ [APNS] FCM 토큰 삭제 실패: \(error.localizedDescription)")
-                    return
-                }
-
-                print("✅ [APNS] FCM 토큰 삭제 완료, 새 토큰 생성 대기")
-
-                // 새 FCM 토큰 생성 대기
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                    Messaging.messaging().token { token, error in
-                        DispatchQueue.main.async {
-                            if let error = error {
-                                print("❌ [APNS] 새 FCM 토큰 생성 실패: \(error.localizedDescription)")
-                                return
-                            }
-
-                            if let token = token, !token.isEmpty {
-                                print("✅ [APNS] APNS 토큰 변경 후 새 FCM 토큰 생성 성공: \(token.prefix(30))...")
-                                self.currentFCMToken = token
-                                Utils.shared.setToken(token: token)
-
-                                // 서버에 즉시 업데이트
-                                self.sendFCMTokenToServer(token: token) { success in
-                                    if success {
-                                        print("✅ [APNS] APNS 토큰 변경 후 FCM 토큰 서버 업데이트 성공")
-                                    } else {
-                                        print("❌ [APNS] APNS 토큰 변경 후 FCM 토큰 서버 업데이트 실패")
-                                    }
-                                }
-
-                                print("🚀 [APNS] APNS 토큰 변경에 따른 FCM 토큰 갱신 완료")
-                            } else {
-                                print("❌ [APNS] 새 FCM 토큰이 nil이거나 비어있음")
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: - 🔍 종합 푸시 상태 디버그 (문제 진단용)
-    @objc func debugPushNotificationStatus() {
-        print("\n" + String(repeating: "=", count: 80))
-        print("🔍 [DEBUG] iOS 푸시 알림 종합 상태 진단 (실시간)")
-        print("📅 진단 시간: \(Date().description)")
-        print(String(repeating: "=", count: 80))
-
-        // 1. 로그인 상태 확인
-        let isLoggedIn = UserDefaults.standard.bool(forKey: "is_logged_in") ||
-                        UserDefaults.standard.string(forKey: "mt_idx") != nil ||
-                        UserDefaults.standard.string(forKey: "savedMtIdx") != nil
-        print("👤 로그인 상태: \(isLoggedIn ? "✅ 로그인됨" : "❌ 로그인되지 않음")")
-
-        // 2. 사용자 정보 확인
-        let mtIdx = UserDefaults.standard.string(forKey: "mt_idx") ??
-                   UserDefaults.standard.string(forKey: "savedMtIdx") ??
-                   UserDefaults.standard.string(forKey: "current_mt_idx")
-        print("🆔 사용자 ID: \(mtIdx ?? "❌ 없음")")
-
-        // 3. APNS 토큰 등록 상태 확인
-        if UIApplication.shared.isRegisteredForRemoteNotifications {
-            print("📱 APNS 등록 상태: ✅ 등록됨")
-        } else {
-            print("📱 APNS 등록 상태: ❌ 등록되지 않음 - APNS 토큰을 받을 수 없음!")
-        }
-
-        // 4. APNS 토큰 확인
-        if let apnsToken = currentAPNSToken ?? UserDefaults.standard.string(forKey: "last_apns_token") {
-            print("📱 APNS 토큰: ✅ 존재 (\(apnsToken.prefix(20))...)")
-            print("📱 APNS 토큰 길이: \(apnsToken.count)자")
-        } else {
-            print("📱 APNS 토큰: ❌ 없음 - APNS 토큰 등록 실패!")
-        }
-
-        // APNS 등록 실패 기록 확인
-        if let apnsError = UserDefaults.standard.string(forKey: "last_apns_error") {
-            print("❌ 마지막 APNS 오류: \(apnsError)")
-        }
-
-        // APNS 토큰 변경 기록 확인
-        let savedAPNSToken = UserDefaults.standard.string(forKey: "last_saved_apns_token")
-        if let savedAPNSToken = savedAPNSToken {
-            print("💾 저장된 APNS 토큰: \(savedAPNSToken.prefix(20))...")
-        } else {
-            print("💾 저장된 APNS 토큰: 없음")
-        }
-
-        // 5. FCM 토큰 확인
-        if let fcmToken = Messaging.messaging().fcmToken {
-            print("🔥 FCM 토큰: ✅ 존재 (\(fcmToken.prefix(30))...)")
-            print("🔥 FCM 토큰 길이: \(fcmToken.count)자")
-        } else {
-            print("🔥 FCM 토큰: ❌ 없음 - FCM 토큰 생성 실패!")
-            print("💡 FCM 토큰 없음 원인:")
-            print("   - APNS 토큰이 제대로 등록되지 않음")
-            print("   - 인터넷 연결 문제")
-            print("   - Firebase 설정 문제")
-        }
-
-        // 5. 푸시 권한 상태 확인
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
-            DispatchQueue.main.async {
-                print("🔔 푸시 권한 상태: \(self.authorizationStatusString(settings.authorizationStatus))")
-
-                if settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional {
-                    print("✅ 푸시 알림 권한: 허용됨")
-                } else if settings.authorizationStatus == .denied {
-                    print("❌ 푸시 알림 권한: 거부됨 - 설정에서 허용해주세요!")
-                } else {
-                    print("⚠️ 푸시 알림 권한: 미결정 - 권한 요청 필요")
-                }
-
-                print("🔔 알림 허용: \(settings.alertSetting == .enabled ? "✅" : "❌")")
-                print("🔔 배지 허용: \(settings.badgeSetting == .enabled ? "✅" : "❌")")
-                print("🔔 소리 허용: \(settings.soundSetting == .enabled ? "✅" : "❌")")
-
-                // 6. 서버에 저장된 토큰 확인
-                if let mtIdx = mtIdx, let _ = Int(mtIdx) {
-                    self.checkServerTokenStatus(mtIdx: mtIdx)
-                } else {
-                    print("❌ 서버 토큰 확인 불가: 사용자 ID 없음")
-                }
-
-                        // 7. FCM 자동 초기화 상태 확인
-        print("🔥 FCM 자동 초기화: \(Messaging.messaging().isAutoInitEnabled ? "✅ 활성화" : "❌ 비활성화")")
-
-                        // 8. Firebase 설정 검증
-        self.validateFirebaseConfiguration()
-
-                // 9. FCM 메시지 유형 확인
-        self.validateFCMMessageTypes()
-
-                // 10. FCM 서버 연결 테스트
-        self.testFCMServerConnection()
-
-                // 8. 앱 상태 확인
-                let appState = UIApplication.shared.applicationState
-                switch appState {
-                case .active:
-                    print("📱 앱 상태: ✅ 활성화 (포그라운드)")
-                case .inactive:
-                    print("📱 앱 상태: ⚠️ 비활성화")
-                case .background:
-                    print("📱 앱 상태: 🔄 백그라운드")
-                @unknown default:
-                    print("📱 앱 상태: ❓ 알 수 없음")
-                }
-
-                // 9. 백그라운드 작업 권한 확인
-                if #available(iOS 13.0, *) {
-                    print("🔄 백그라운드 작업 권한: \(UIApplication.shared.backgroundRefreshStatus == .available ? "✅ 사용 가능" : "❌ 제한됨")")
-                }
-
-                print(String(repeating: "=", count: 80))
-                print("🔍 [DEBUG] 진단 완료 - 위 정보를 개발팀에 제공해주세요")
-                print(String(repeating: "=", count: 80))
-            }
-        }
-    }
-
-    // MARK: - 🌐 서버 토큰 상태 확인
-    private func checkServerTokenStatus(mtIdx: String) {
-        print("🌐 서버 토큰 상태 확인 시작")
-
-        let urlString = "\(Http.shared.BASE_URL)\(Http.shared.memberFcmTokenUrl)/status/\(mtIdx)"
-        guard let url = URL(string: urlString) else {
-            print("❌ 서버 토큰 확인 실패: 잘못된 URL")
-            return
-        }
-
-        URLSession.shared.dataTask(with: url) { data, response, error in
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("❌ 서버 토큰 확인 네트워크 오류: \(error.localizedDescription)")
-                    return
-                }
-
-                if let httpResponse = response as? HTTPURLResponse {
-                    print("📡 서버 응답 상태: \(httpResponse.statusCode)")
-
-                    if httpResponse.statusCode == 200, let data = data {
-                        do {
-                            if let jsonResponse = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                                print("📋 서버 토큰 상태:")
-                                print("   - 토큰 존재: \(jsonResponse["has_token"] as? Bool == true ? "✅" : "❌")")
-
-                                if let tokenPreview = jsonResponse["token_preview"] as? String {
-                                    print("   - 서버 토큰 미리보기: \(tokenPreview)")
-
-                                    // 로컬 토큰과 서버 토큰 비교
-                                    if let localToken = Messaging.messaging().fcmToken {
-                                        let serverTokenStart = tokenPreview.replacingOccurrences(of: "...", with: "")
-                                        let localTokenStart = String(localToken.prefix(serverTokenStart.count))
-                                        print("   - 토큰 일치: \(localTokenStart == serverTokenStart ? "✅" : "❌")")
-                                    }
-                                }
-
-                                if let lastUpdated = jsonResponse["token_updated_at"] as? String {
-                                    print("   - 마지막 업데이트: \(lastUpdated)")
-                                }
-
-                                if let expiryDate = jsonResponse["token_expiry_date"] as? String {
-                                    print("   - 만료 예정일: \(expiryDate)")
-                                }
-
-                                if let isExpired = jsonResponse["is_token_expired"] as? Bool, isExpired {
-                                    print("   - 토큰 상태: ❌ 만료됨")
-                                } else if let isNearExpiry = jsonResponse["is_token_near_expiry"] as? Bool, isNearExpiry {
-                                    print("   - 토큰 상태: ⚠️ 곧 만료")
-                                } else {
-                                    print("   - 토큰 상태: ✅ 정상")
-                                }
-                            }
-                        } catch {
-                            print("❌ 서버 응답 파싱 오류: \(error.localizedDescription)")
-                        }
-                    } else {
-                        print("❌ 서버 토큰 확인 실패: HTTP \(httpResponse.statusCode)")
-                    }
-                }
-            }
-        }.resume()
-    }
-
-    // MARK: - 🔧 Firebase 설정 검증
-    private func validateFirebaseConfiguration() {
-        print("🔧 Firebase 설정 검증 시작")
-
-        // GoogleService-Info.plist 파일 검증
-        if let path = Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist"),
-           let plist = NSDictionary(contentsOfFile: path) {
-            print("✅ GoogleService-Info.plist 파일: 발견됨")
-
-            // 필수 키들 검증
-            let requiredKeys = ["PROJECT_ID", "GCM_SENDER_ID", "GOOGLE_APP_ID", "CLIENT_ID"]
-            var missingKeys: [String] = []
-
-            for key in requiredKeys {
-                if plist[key] == nil || (plist[key] as? String)?.isEmpty == true {
-                    missingKeys.append(key)
-                }
-            }
-
-            if missingKeys.isEmpty {
-                print("✅ GoogleService-Info.plist 필수 값들: 모두 존재")
-
-                // 프로젝트 ID 출력 (마스킹)
-                if let projectId = plist["PROJECT_ID"] as? String {
-                    print("📋 프로젝트 ID: \(projectId)")
-                }
-
-                // GCM Sender ID 출력
-                if let gcmSenderId = plist["GCM_SENDER_ID"] as? String {
-                    print("📋 GCM Sender ID: \(gcmSenderId)")
-                }
-            } else {
-                print("❌ GoogleService-Info.plist 누락된 값들: \(missingKeys.joined(separator: ", "))")
-            }
-        } else {
-            print("❌ GoogleService-Info.plist 파일: 찾을 수 없음")
-            print("💡 해결 방법:")
-            print("   - Firebase Console에서 GoogleService-Info.plist 다운로드")
-            print("   - Xcode 프로젝트에 추가")
-            print("   - Target Membership 확인")
-        }
-
-        // Firebase 앱 초기화 상태 확인
-        if let firebaseApp = FirebaseApp.app() {
-            print("✅ Firebase 앱 초기화: 성공")
-            print("📋 Firebase 앱 이름: \(firebaseApp.name)")
-            let options = firebaseApp.options
-            print("📋 Firebase 프로젝트 ID: \(options.projectID ?? "알 수 없음")")
-            print("📋 Firebase 앱 ID: \(options.googleAppID)")
-        } else {
-            print("❌ Firebase 앱 초기화: 실패")
-            print("💡 Firebase 초기화 실패 원인:")
-            print("   - GoogleService-Info.plist 파일 문제")
-            print("   - Firebase.configure() 호출 시점 문제")
-        }
-
-        // APNS 환경 확인
-        #if DEBUG
-            print("🔧 빌드 환경: Debug (Development APNS)")
-        #else
-            print("🔧 빌드 환경: Release (Production APNS)")
-        #endif
-    }
-
-    // MARK: - 📨 FCM 메시지 유형 검증 (iOS 푸시 문제 진단용)
-    private func validateFCMMessageTypes() {
-        print("📨 FCM 메시지 유형 검증 시작")
-
-        // 최근 FCM 메시지 기록 확인
-        if let lastFCMMessage = UserDefaults.standard.dictionary(forKey: "last_fcm_message") {
-            print("📋 최근 FCM 메시지 분석:")
-
-            // 메시지 유형 판별
-            let hasNotification = lastFCMMessage["aps"] as? [String: Any] != nil ||
-                                 (lastFCMMessage["aps"] as? [String: Any])?["alert"] != nil
-
-            let hasData = lastFCMMessage.keys.contains(where: { key in
-                !["aps", "gcm.message_id", "google.c.sender.id", "google.c.fid"].contains(key)
-            })
-
-            let isBackgroundPush = lastFCMMessage["content-available"] as? String == "1" ||
-                                  lastFCMMessage["content-available"] as? Int == 1 ||
-                                  lastFCMMessage["background_push"] as? String == "true"
-
-            let isSilentPush = lastFCMMessage["silent_push"] as? String == "true" ||
-                              lastFCMMessage["token_refresh"] as? String == "true"
-
-            print("   - Notification 객체 포함: \(hasNotification ? "✅" : "❌")")
-            print("   - Data 객체 포함: \(hasData ? "✅" : "❌")")
-            print("   - 백그라운드 푸시: \(isBackgroundPush ? "✅" : "❌")")
-            print("   - Silent 푸시: \(isSilentPush ? "✅" : "❌")")
-
-            // 메시지 유형에 따른 진단
-            if !hasNotification && (isBackgroundPush || isSilentPush) {
-                print("   ⚠️  경고: 백그라운드/Silent 푸시인데 Notification 객체가 없음")
-                print("   💡 해결: 서버에서 Notification 객체를 포함하여 전송해야 함")
-            } else if hasNotification {
-                print("   ✅ 정상: Notification 객체가 포함되어 있음")
-            }
-
-        } else {
-            print("📋 저장된 FCM 메시지가 없음")
-        }
-
-        // FCM 메시지 처리 통계
-        let silentPushCount = UserDefaults.standard.integer(forKey: "silent_push_count")
-        let backgroundPushCount = UserDefaults.standard.integer(forKey: "background_push_count")
-        let notificationPushCount = UserDefaults.standard.integer(forKey: "notification_push_count")
-        let foregroundPushCount = UserDefaults.standard.integer(forKey: "foreground_push_count")
-
-        print("📊 FCM 메시지 처리 통계:")
-        print("   - Silent 푸시: \(silentPushCount)회")
-        print("   - 백그라운드 푸시: \(backgroundPushCount)회")
-        print("   - 알림 푸시: \(notificationPushCount)회")
-        print("   - 포그라운드 푸시: \(foregroundPushCount)회")
-    }
-
-    // MARK: - 🌐 FCM 서버 연결 테스트
-    private func testFCMServerConnection() {
-        print("🌐 FCM 서버 연결 테스트 시작")
-
-        // FCM 토큰 확인
-        guard let _ = Messaging.messaging().fcmToken else {
-            print("❌ FCM 토큰 없음 - FCM 서버 연결 불가")
-            return
-        }
-
-        // 서버 연결 테스트 (간단한 토큰 검증 요청)
-        let mtIdx = UserDefaults.standard.string(forKey: "mt_idx") ??
-                   UserDefaults.standard.string(forKey: "savedMtIdx") ??
-                   UserDefaults.standard.string(forKey: "current_mt_idx")
-
-        guard let userId = mtIdx else {
-            print("❌ 사용자 ID 없음 - 로그인 필요")
-            return
-        }
-
-        let urlString = "\(Http.shared.BASE_URL)\(Http.shared.memberFcmTokenUrl)/status/\(userId)"
-        guard let url = URL(string: urlString) else {
-            print("❌ 서버 URL 구성 실패")
-            return
-        }
-
-        print("📡 서버 연결 테스트: \(urlString)")
-
-        let task = URLSession.shared.dataTask(with: url) { data, response, error in
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("❌ 서버 연결 실패: \(error.localizedDescription)")
-                    print("💡 네트워크 문제 또는 서버 다운 가능성")
-                    return
-                }
-
-                if let httpResponse = response as? HTTPURLResponse {
-                    print("📊 서버 응답 코드: \(httpResponse.statusCode)")
-
-                    if httpResponse.statusCode == 200 {
-                        print("✅ 서버 연결 성공")
-                        print("💡 FCM 푸시가 안 된다면 다음을 확인:")
-                        print("   1. Firebase 콘솔에서 APNS 인증서 설정")
-                        print("   2. 실제 iOS 디바이스에서 테스트")
-                        print("   3. iOS 설정 > 알림 > 앱 권한 확인")
-                        print("   4. 저전력 모드 해제")
-                    } else {
-                        print("⚠️ 서버 응답 오류: \(httpResponse.statusCode)")
-                    }
-                }
-            }
-        }
-        task.resume()
-    }
-
-    // MARK: - 🧪 FCM 토큰 생성 테스트
-    @objc func testFCMTokenGeneration() {
-        print("🧪 FCM 토큰 생성 테스트 시작")
-
-        // FCM 토큰 강제 재생성
-        Messaging.messaging().deleteToken { error in
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("❌ FCM 토큰 삭제 실패: \(error.localizedDescription)")
-                    return
-                }
-
-                print("✅ FCM 토큰 삭제 완료, 새 토큰 생성 시도")
-
-                // 새 토큰 생성
-                Messaging.messaging().token { token, error in
-                    DispatchQueue.main.async {
-                        if let error = error {
-                            print("❌ 새 FCM 토큰 생성 실패: \(error.localizedDescription)")
-                            print("💡 가능한 원인:")
-                            print("   - 인터넷 연결 확인")
-                            print("   - Firebase 설정 확인")
-                            print("   - APNS 토큰 등록 상태 확인")
-                            return
-                        }
-
-                        if let token = token, !token.isEmpty {
-                            print("✅ 새 FCM 토큰 생성 성공: \(token.prefix(30))...")
-                            print("📏 토큰 길이: \(token.count)자")
-
-                            // 서버에 업데이트
-                            self.sendFCMTokenToServer(token: token) { success in
-                                if success {
-                                    print("✅ [FCM TEST] FCM 토큰 생성 테스트 서버 업데이트 성공")
-                                } else {
-                                    print("❌ [FCM TEST] FCM 토큰 생성 테스트 서버 업데이트 실패")
-                                }
-                            }
-                        } else {
-                            print("❌ 새 FCM 토큰이 nil이거나 비어있음")
-                            print("💡 가능한 원인:")
-                            print("   - APNS 토큰 등록 실패")
-                            print("   - Firebase 프로젝트 설정 문제")
-                            print("   - 앱 권한 문제")
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    // MARK: - 🔍 현재 FCM 토큰 상태 확인
-    @objc func checkCurrentFCMTokenStatus() {
-        print("🔍 [FCM STATUS] 현재 FCM 토큰 상태 확인")
-        
-        // UserDefaults에서 mt_idx 확인
-        let mtIdx = UserDefaults.standard.string(forKey: "mt_idx") ?? 
-                   UserDefaults.standard.string(forKey: "savedMtIdx") ??
-                   UserDefaults.standard.string(forKey: "current_mt_idx")
-        
-        print("🔍 [FCM STATUS] UserDefaults mt_idx: \(mtIdx ?? "nil")")
-        
-        // 현재 FCM 토큰 확인
-        Messaging.messaging().token { token, error in
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("❌ [FCM STATUS] FCM 토큰 확인 실패: \(error.localizedDescription)")
-                    return
-                }
-                
-                if let token = token, !token.isEmpty {
-                    print("✅ [FCM STATUS] FCM 토큰 존재: \(token.prefix(50))...")
-                    
-                    // 🔔 FCM 토큰 상태 상세 정보 출력
-                    let lastSavedToken = UserDefaults.standard.string(forKey: "last_fcm_token")
-                    print("🔍 [FCM STATUS] 마지막으로 저장된 FCM 토큰: \(lastSavedToken ?? "없음")")
-                    print("🔍 [FCM STATUS] 현재 FCM 토큰: \(token)")
-                    print("🔍 [FCM STATUS] 토큰 변경 여부: \(lastSavedToken != token ? "변경됨" : "변경 없음")")
-                    
-                    // 토큰이 변경되었다면 서버에 업데이트
-                    if lastSavedToken != token {
-                        print("🔄 [FCM STATUS] 토큰 변경 감지 - 서버 업데이트 시작")
-                        self.checkAndUpdateFCMTokenIfNeeded(currentToken: token)
-                    }
-                } else {
-                    print("❌ [FCM STATUS] FCM 토큰이 nil이거나 비어있음")
-                }
-            }
-        }
-    }
-    
-    private func getCurrentUserMtIdx() -> Int? {
-        // 방법 1: UserDefaults에서 사용자 정보 확인
-        if let mtIdx = UserDefaults.standard.object(forKey: "mt_idx") as? Int {
-            print("🔍 [FCM API] UserDefaults에서 mt_idx 찾음: \(mtIdx)")
-            return mtIdx
-        }
-        
-        // 방법 2: Utils에서 사용자 정보 확인 (기존 방식) - 비동기 처리 필요하므로 생략
-        // Utils.getToken은 비동기 메서드이므로 동기적 처리가 필요한 이 컨텍스트에서는 사용하지 않음
-        
-        // 방법 3: 로그인 상태 확인
-        let isLoggedIn = UserDefaults.standard.bool(forKey: "is_logged_in")
-        if isLoggedIn {
-            print("⚠️ [FCM API] 로그인 상태이지만 mt_idx를 찾을 수 없음 - 나중에 재시도")
-            return nil
-        }
-        
-        // 방법 4: 사용자 정보 없음 - FCM 토큰 업데이트 불가
-        print("⚠️ [FCM API] 사용자 정보 없음 - FCM 토큰 업데이트 불가")
-        return nil
-    }
     
 
-    
     private func retryFCMTokenUpdate(token: String, retryCount: Int) {
         let maxRetries = 3
         
@@ -7138,44 +4504,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                         UserDefaults.standard.set(false, forKey: "fcm_update_in_progress")
                         UserDefaults.standard.synchronize()
                         print("🔓 [FCM] 재시도 실패로 인한 플래그 해제됨")
-                    }
-                }
-            }
-        }
-        
-        task.resume()
-    }
-    
-    private func verifyFCMTokenUpdate(mtIdx: Int) {
-        print("🔍 [FCM API] FCM 토큰 업데이트 확인 시작")
-        
-        guard let url = URL(string: "https://api3.smap.site/api/v1/member-fcm-token/status/\(mtIdx)") else {
-            print("❌ [FCM API] 잘못된 확인 URL")
-            return
-        }
-        
-        let task = URLSession.shared.dataTask(with: url) { data, response, error in
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("❌ [FCM API] 확인 요청 오류: \(error.localizedDescription)")
-                    return
-                }
-                
-                if let data = data {
-                    do {
-                        if let jsonResponse = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                            print("📋 [FCM API] 토큰 상태 확인: \(jsonResponse)")
-                            
-                            if let hasToken = jsonResponse["has_token"] as? Bool, hasToken {
-                                if let tokenPreview = jsonResponse["token_preview"] as? String {
-                                    print("✅ [FCM API] DB에 토큰 저장 확인됨: \(tokenPreview)")
-                                }
-                            } else {
-                                print("❌ [FCM API] DB에 토큰이 저장되지 않음")
-                            }
-                        }
-                    } catch {
-                        print("❌ [FCM API] 확인 응답 파싱 오류: \(error.localizedDescription)")
                     }
                 }
             }
@@ -7310,7 +4638,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         }
         return false
     }
-
 
 
     // MARK: - 📋 큐에 저장된 메시지 처리
@@ -7495,180 +4822,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         print("🗑️ 앱 시작 푸시 데이터 처리 완료 및 삭제됨")
     }
 
-    // MARK: - 🔄 백그라운드 FCM 토큰 준비
-    private func prepareFCMTokenForBackground() {
-        print("🔄 [FCM] 백그라운드 FCM 토큰 준비 시작")
-
-        // 로그인 상태 확인
-        let isLoggedIn = UserDefaults.standard.bool(forKey: "is_logged_in") ||
-                        UserDefaults.standard.string(forKey: "mt_idx") != nil ||
-                        UserDefaults.standard.string(forKey: "savedMtIdx") != nil
-
-        guard isLoggedIn else {
-            print("🔒 [FCM] 로그인 상태가 아님 - 백그라운드 FCM 준비 스킵")
-            return
-        }
-
-        // 현재 FCM 토큰 확인
-        Messaging.messaging().token { [weak self] token, error in
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("❌ [FCM] 백그라운드 토큰 확인 실패: \(error.localizedDescription)")
-                    return
-                }
-
-                guard let token = token, !token.isEmpty else {
-                    print("❌ [FCM] 백그라운드 토큰이 없음")
-                    return
-                }
-
-                print("✅ [FCM] 백그라운드 토큰 준비 완료: \(token.prefix(30))...")
-
-                // 토큰이 백그라운드에서도 유효한지 서버에 확인
-                self?.validateFCMTokenForBackground(token: token)
-
-                // 백그라운드 푸시 수신 준비 완료 로그
-                print("🔄 [FCM] 백그라운드 푸시 수신 준비 완료")
-            }
-        }
-    }
-
-    // MARK: - 🔍 백그라운드 FCM 토큰 유효성 검증
-    private func validateFCMTokenForBackground(token: String) { // 호출되지 않음
-        print("🔍 [FCM] 백그라운드 FCM 토큰 유효성 검증 시작")
-
-        // 사용자 정보 확인
-        guard let mtIdxString = UserDefaults.standard.string(forKey: "mt_idx") ??
-                              UserDefaults.standard.string(forKey: "savedMtIdx") ??
-                              UserDefaults.standard.string(forKey: "current_mt_idx"),
-              let mtIdx = Int(mtIdxString) else {
-            print("❌ [FCM] 백그라운드 검증 실패 - 사용자 정보 없음")
-            return
-        }
-
-        // 백엔드 FCM 토큰 검증 API 사용
-        var baseUrl = Http.shared.BASE_URL
-
-        // BASE_URL에 이미 /api가 포함되어 있는지 확인하고 중복 방지
-        if baseUrl.hasSuffix("/api/") {
-            baseUrl = String(baseUrl.dropLast(5)) // "/api/" 제거
-            print("🔧 [FCM] BASE_URL에서 '/api/' 제거: \(baseUrl)")
-        } else if baseUrl.hasSuffix("/api") {
-            baseUrl = String(baseUrl.dropLast(4)) // "/api" 제거
-            print("🔧 [FCM] BASE_URL에서 '/api' 제거: \(baseUrl)")
-        }
-
-        let urlString = "\(baseUrl)/api/v1/member-fcm-token/background-check"
-        guard let url = URL(string: urlString) else {
-            print("❌ [FCM] 백그라운드 검증 실패 - 잘못된 URL: \(urlString)")
-            return
-        }
-
-        print("🔗 [FCM] 백그라운드 검증 URL: \(urlString)")
-        print("📋 [FCM] BASE_URL 원본: \(Http.shared.BASE_URL)")
-        print("📋 [FCM] BASE_URL 수정 후: \(baseUrl)")
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        // FCM 토큰 변경 감지 및 서버 업데이트 강제
-        let currentToken = UserDefaults.standard.string(forKey: "fcm_token")
-        let isTokenChanged = currentToken != token
-
-        let requestData: [String: Any] = [
-            "mt_idx": mtIdx,
-            "fcm_token": token,
-            "check_type": "background",
-            "force_refresh": isTokenChanged // 토큰 변경 시 서버 업데이트 강제
-        ]
-
-        if isTokenChanged {
-            print("🔄 [FCM Background] 토큰 변경 감지 - 서버 업데이트 강제 적용")
-            print("   📱 현재 토큰: \(token.prefix(20))...")
-            print("   💾 저장 토큰: \(currentToken?.prefix(20) ?? "없음")...")
-        }
-
-        do {
-            request.httpBody = try JSONSerialization.data(withJSONObject: requestData)
-        } catch {
-            print("❌ [FCM] 백그라운드 검증 실패 - JSON 변환 오류")
-            return
-        }
-
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("❌ [FCM] 백그라운드 검증 네트워크 오류: \(error.localizedDescription)")
-                    return
-                }
-
-                if let httpResponse = response as? HTTPURLResponse {
-                    print("📡 [FCM] 백그라운드 검증 HTTP 상태: \(httpResponse.statusCode)")
-
-                    if httpResponse.statusCode == 200 || httpResponse.statusCode == 201 {
-                        let successTimestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
-                        print("✅ [FCM-BG-VERIFY][\(successTimestamp)] 백그라운드 FCM 토큰 검증 성공")
-
-                        // 응답 데이터 확인 (토큰 갱신 여부)
-                        if let data = data {
-                            do {
-                                if let jsonResponse = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                                   let success = jsonResponse["success"] as? Bool, success,
-                                   let message = jsonResponse["message"] as? String {
-                                    print("📋 [FCM] 백그라운드 검증 응답: \(message)")
-
-                                    // 토큰이 갱신된 경우 로컬에도 업데이트
-                                    if message.contains("갱신") || message.contains("변경") {
-                                        print("🔄 [FCM Background] 백그라운드 토큰 변경 감지 - 로컬 업데이트")
-                                        UserDefaults.standard.set(token, forKey: "fcm_token")
-                                        UserDefaults.standard.set(token, forKey: "last_updated_fcm_token")
-                                        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "fcm_token_received_time")
-                                        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "last_fcm_token_update_time")
-                                        UserDefaults.standard.synchronize()
-
-                                        // FCM 서비스 재등록 강제 실행 (백그라운드 푸시 수신 보장)
-                                        DispatchQueue.main.async {
-                                            print("🔥 [FCM Background] 백그라운드 FCM 서비스 재등록 강제 실행")
-                                            self.forceRefreshFCMServiceRegistration(token)
-
-                                            // FCM 서비스 재등록 후 안전한 토큰 업데이트 수행
-                                            self.safelyUpdateFCMToken(token) { success in
-                                                if success {
-                                                    print("✅ [FCM Background] 백그라운드 토큰 안전 업데이트 성공")
-
-                                                    // 토큰 업데이트 성공 후 FCM 서비스 상태 확인
-                                                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                                                        print("🔍 [FCM Debug] 백그라운드 토큰 업데이트 성공 후 FCM 서비스 상태 확인")
-                                                        self.checkFCMServiceRegistrationStatus()
-                                                    }
-                                                } else {
-                                                    print("❌ [FCM Background] 백그라운드 토큰 안전 업데이트 실패")
-
-                                                    // 토큰 업데이트 실패 후 FCM 서비스 상태 확인
-                                                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                                                        print("🔍 [FCM Debug] 백그라운드 토큰 업데이트 실패 후 FCM 서비스 상태 확인")
-                                                        self.checkFCMServiceRegistrationStatus()
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            } catch {
-                                print("❌ [FCM] 백그라운드 검증 응답 파싱 오류: \(error.localizedDescription)")
-                            }
-                        }
-                    } else {
-                        let failTimestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
-                        print("⚠️ [FCM-BG-VERIFY][\(failTimestamp)] 백그라운드 FCM 토큰 검증 실패 - 상태 코드: \(httpResponse.statusCode)")
-                    }
-                }
-            }
-        }.resume()
-    }
-
-
 
     // MARK: - 정리
     deinit {
@@ -7687,116 +4840,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 import ObjectiveC
 
 extension AppDelegate {
-    fileprivate func debugPrintUsageDescriptions() {
-        print("🔎 [PERM] UsageDescription 체크 시작")
-        
-        // 번들 정보 상세 출력
-        print("🔎 [PERM] Bundle Path: \(Bundle.main.bundlePath)")
-        print("🔎 [PERM] Bundle URL: \(Bundle.main.bundleURL)")
-        print("🔎 [PERM] BundleIdentifier: \(Bundle.main.bundleIdentifier ?? "nil")")
-        
-        // Info.plist 파일 직접 읽기 시도
-        let infoPlistPath = Bundle.main.path(forResource: "Info", ofType: "plist")
-        print("🔎 [PERM] Info.plist Path: \(infoPlistPath ?? "NOT FOUND")")
-        
-        if let path = infoPlistPath,
-           let plistData = NSDictionary(contentsOfFile: path) {
-            print("🔎 [PERM] Info.plist 직접 읽기 성공")
-            print("🔎 [PERM] Direct NSCameraUsageDescription: \(plistData["NSCameraUsageDescription"] as? String ?? "EMPTY")")
-            print("🔎 [PERM] Direct NSPhotoLibraryUsageDescription: \(plistData["NSPhotoLibraryUsageDescription"] as? String ?? "EMPTY")")
-            print("🔎 [PERM] Direct NSMotionUsageDescription: \(plistData["NSMotionUsageDescription"] as? String ?? "EMPTY")")
-            print("🔎 [PERM] Direct NSLocationWhenInUseUsageDescription: \(plistData["NSLocationWhenInUseUsageDescription"] as? String ?? "EMPTY")")
-            
-            // 🔧 실제 번들 내 Info.plist 파일의 모든 키 출력
-            print("🔎 [PERM] 실제 Info.plist 파일 내 모든 키:")
-            let allKeys = plistData.allKeys.compactMap { $0 as? String }.sorted()
-            for key in allKeys.filter({ $0.contains("Usage") }) {
-                let value = plistData[key] as? String ?? "nil"
-                print("   \(key): \(value)")
-            }
-        } else {
-            print("🔎 [PERM] Info.plist 직접 읽기 실패")
-        }
-        
-        // Bundle.main을 통한 읽기 (기존)
-        let keys = [
-            "NSCameraUsageDescription",
-            "NSPhotoLibraryUsageDescription", 
-            "NSPhotoLibraryAddUsageDescription",
-            "NSMotionUsageDescription",
-            "NSLocationWhenInUseUsageDescription",
-            "NSLocationAlwaysAndWhenInUseUsageDescription"
-        ]
-        
-        for key in keys {
-            let value = Bundle.main.object(forInfoDictionaryKey: key) as? String
-            print("🔎 [PERM] Bundle \(key): \(value ?? "<nil>")")
-        }
-        
-        // infoDictionary 전체 출력 (일부만)
-        if let infoDict = Bundle.main.infoDictionary {
-            print("🔎 [PERM] infoDictionary keys count: \(infoDict.keys.count)")
-            let permissionKeys = infoDict.keys.filter { $0.contains("Usage") }
-            print("🔎 [PERM] Found permission keys: \(permissionKeys)")
-        }
-    }
     
-    fileprivate func checkAndWarnEmptyUsageDescriptions() {
-        let criticalKeys = [
-            "NSCameraUsageDescription": "카메라",
-            "NSPhotoLibraryUsageDescription": "사진 보관함",
-            "NSMotionUsageDescription": "모션",
-            "NSLocationWhenInUseUsageDescription": "위치"
-        ]
-        
-        var emptyKeys: [String] = []
-        for (key, name) in criticalKeys {
-            let value = Bundle.main.object(forInfoDictionaryKey: key) as? String
-            if value?.isEmpty != false {
-                emptyKeys.append("\(name)(\(key))")
-            }
-        }
-        
-        if !emptyKeys.isEmpty {
-            print("🚨🚨🚨 [CRITICAL] Info.plist UsageDescription 값들이 런타임에서 비어있습니다!")
-            print("🚨🚨🚨 [CRITICAL] 비어있는 키들: \(emptyKeys.joined(separator: ", "))")
-            print("🚨🚨🚨 [CRITICAL] 시스템 권한 다이얼로그에서 설명이 표시되지 않습니다!")
-            print("🔧 [FIX] 해결 방법:")
-            print("   1. Xcode에서 Shift+Cmd+K (Clean Build Folder)")
-            print("   2. 시뮬레이터/기기에서 앱 완전 삭제")
-            print("   3. 프로젝트 재빌드 및 설치")
-            print("   4. Build Settings > Packaging > Info.plist File 경로 확인")
-        } else {
-            print("✅ [PERM] 모든 필수 UsageDescription 값들이 정상적으로 로드됨")
-        }
-        
-        // 🔧 Info.plist 문제 해결 시도: 런타임에서 강제로 설정
-        if !emptyKeys.isEmpty {
-            print("🔧 [FIX] Info.plist 문제로 인해 런타임 하드코딩 설명 사용 활성화")
-            setupRuntimePermissionDescriptions()
-        }
-    }
-    
-
-    
-    private func setupRuntimePermissionDescriptions() {
-        print("🔧 [RUNTIME] 런타임 권한 설명 설정 시작")
-        
-        // Bundle의 Info dictionary에 직접 값 설정 시도 (읽기 전용이므로 실패할 가능성 높음)
-        // 하지만 iOS는 이미 앱 시작 시 Info.plist를 로드하므로 런타임에서 수정 불가
-        
-        // 대신 권한 요청 시 커스텀 alert를 먼저 보여주는 방식으로 해결
-        print("🔧 [RUNTIME] Info.plist는 런타임에서 수정 불가 - 권한 요청 시 커스텀 설명 제공 예정")
-    }
-    
-    private static var didInstallDebugGuards = false
-    static func installPermissionDebugGuards() {
-        guard !didInstallDebugGuards else { return }
-        didInstallDebugGuards = true
-        UNUserNotificationCenter.smap_installRequestAuthSwizzle()
-        CLLocationManager.smap_installLocationAuthSwizzle()
-    }
-
     private func showLocalNotificationForFCMMessage(_ userInfo: [AnyHashable: Any]) {
         print("🔔 [FCM Local] FCM 메시지를 위한 로컬 알림 표시")
 
@@ -7841,7 +4885,6 @@ extension AppDelegate {
 
         // 로그인 상태 확인
         guard UserDefaults.standard.bool(forKey: "is_logged_in") else {
-            print("🔒 [FCM DB] 로그인 상태가 아님 - FCM 토큰 확인 건너뜀")
             return
         }
 
@@ -8032,108 +5075,8 @@ extension AppDelegate {
         }
     }
 
-    // MARK: - 🔍 FCM 토큰 수신 진단
-    private func diagnoseFCMTokenReception() {
-        print("╔══════════════════════════════════════════════════════════════╗")
-        print("║ 🔍 [FCM 진단] FCM 토큰 수신 상태 종합 진단                     ║")
-        print("╚══════════════════════════════════════════════════════════════╝")
-
-        // 1. FCM 토큰 상태 확인
-        print("\n📱 1. FCM 토큰 상태:")
-        if let token = UserDefaults.standard.string(forKey: "fcm_token") {
-            print("   ✅ FCM 토큰 존재: \(token.prefix(30))... (길이: \(token.count))")
-        } else {
-            print("   ❌ FCM 토큰 없음")
-        }
-
-        if let lastUpdated = UserDefaults.standard.double(forKey: "last_fcm_token_update_time") as Double? {
-            let timeAgo = Date().timeIntervalSince1970 - lastUpdated
-            print("   ⏰ 마지막 토큰 업데이트: \(Int(timeAgo))초 전")
-        }
-
-        // 2. 최근 FCM 메시지 확인
-        print("\n📨 2. 최근 FCM 메시지:")
-        if let lastMessage = UserDefaults.standard.dictionary(forKey: "last_fcm_message") {
-            print("   ✅ 최근 메시지 존재")
-            print("   🔍 메시지 키들: \(lastMessage.keys.sorted())")
-            if let timestamp = UserDefaults.standard.double(forKey: "last_fcm_message_time") as Double? {
-                let timeAgo = Date().timeIntervalSince1970 - timestamp
-                print("   ⏰ 메시지 수신 시간: \(Int(timeAgo))초 전")
-            }
-        } else {
-            print("   ❌ 최근 FCM 메시지 없음")
-        }
-
-        // 3. 푸시 권한 상태 확인
-        print("\n🔔 3. 푸시 알림 권한:")
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
-            DispatchQueue.main.async {
-                print("   📱 권한 상태: \(settings.authorizationStatus)")
-                print("   🔕 알림 표시: \(settings.alertSetting)")
-                print("   🔊 소리: \(settings.soundSetting)")
-                print("   🔴 배지: \(settings.badgeSetting)")
-            }
-        }
-
-        // 4. FCM 서비스 상태 확인
-        print("\n🔥 4. FCM 서비스 상태:")
-        if Messaging.messaging().isAutoInitEnabled {
-            print("   ✅ FCM 자동 초기화 활성화됨")
-        } else {
-            print("   ❌ FCM 자동 초기화 비활성화됨")
-        }
-
-        if Messaging.messaging().delegate != nil {
-            print("   ✅ FCM 델리게이트 설정됨")
-        } else {
-            print("   ❌ FCM 델리게이트 설정 안됨")
-        }
-
-        // 5. APNs 토큰 상태 확인
-        print("\n📡 5. APNs 토큰 상태:")
-        if currentAPNSToken != nil {
-            print("   ✅ APNs 토큰 존재: \(currentAPNSToken!.prefix(30))...")
-        } else if let savedAPNSToken = UserDefaults.standard.string(forKey: "last_apns_token") {
-            print("   ⚠️ 저장된 APNs 토큰: \(savedAPNSToken.prefix(30))...")
-        } else {
-            print("   ❌ APNs 토큰 없음")
-        }
-
-        // 6. 백그라운드 모드 확인
-        print("\n🌙 6. 백그라운드 실행 모드:")
-        let appState = UIApplication.shared.applicationState
-        print("   📱 현재 앱 상태: \(appState == .active ? "활성" : appState == .background ? "백그라운드" : "비활성")")
-
-        if let backgroundModes = Bundle.main.object(forInfoDictionaryKey: "UIBackgroundModes") as? [String] {
-            print("   ✅ 백그라운드 모드: \(backgroundModes)")
-        } else {
-            print("   ❌ 백그라운드 모드 설정 없음")
-        }
-
-        // 7. 진단 결과 요약
-        print("\n📋 7. 진단 결과 요약:")
-        print("   💡 FCM 메시지가 수신되지 않는 경우:")
-        print("      1. iOS 푸시 알림 권한이 '허용' 상태인지 확인")
-        print("      2. FCM 토큰이 DB와 일치하는지 확인")
-        print("      3. 앱이 완전히 종료된 상태에서는 백그라운드 푸시 제한될 수 있음")
-        print("      4. FCM 메시지에 'notification' 필드가 포함되어 있는지 확인")
-        print("      5. Firebase Console에서 APNs 인증서가 올바르게 설정되었는지 확인")
-
-        print("\n🔧 디버깅 명령어:")
-        print("   debugPushNotificationStatus()     // 푸시 상태 상세 확인")
-        print("   testFCMTokenGeneration()          // 토큰 재생성 테스트")
-        print("   diagnoseFCMTokenReception()       // 이 진단 실행")
-        print("   forceSyncFCMTokenWithDB()         // FCM 토큰 DB 강제 동기화")
-        print("   testFCMMessageReception()         // FCM 메시지 수신 테스트")
-
-        print("═══════════════════════════════════════════════════════════════")
-    }
-
     // MARK: - 🔄 FCM 토큰 강제 동기화
     private func forceSyncFCMTokenWithDB() {
-        print("╔══════════════════════════════════════════════════════════════╗")
-        print("║ 🔄 [FCM 동기화] FCM 토큰 DB 강제 동기화 시작                  ║")
-        print("╚══════════════════════════════════════════════════════════════╝")
 
         // 로그인 상태 확인
         guard UserDefaults.standard.bool(forKey: "is_logged_in") else {
@@ -8188,103 +5131,6 @@ extension AppDelegate {
                     print("❌ [FCM 동기화] FCM 토큰 DB 동기화 실패")
                     print("💡 [FCM 동기화] 네트워크 연결을 확인해주세요")
                 }
-            }
-        }
-    }
-
-
-
-    // MARK: - 🧪 FCM 메시지 수신 테스트
-    private func testFCMMessageReception() {
-        print("╔══════════════════════════════════════════════════════════════╗")
-        print("║ 🧪 [FCM 테스트] FCM 메시지 수신 테스트 시작                   ║")
-        print("╚══════════════════════════════════════════════════════════════╝")
-
-        // 1. FCM 토큰 확인
-        if let token = UserDefaults.standard.string(forKey: "fcm_token") {
-            print("✅ [FCM 테스트] FCM 토큰 존재: \(token.prefix(30))...")
-        } else {
-            print("❌ [FCM 테스트] FCM 토큰 없음")
-            print("💡 [FCM 테스트] FCM 토큰이 없으면 메시지를 수신할 수 없습니다")
-            return
-        }
-
-        // 2. 최근 FCM 메시지 확인
-        if UserDefaults.standard.dictionary(forKey: "last_fcm_message") != nil {
-            print("✅ [FCM 테스트] 최근 FCM 메시지 존재")
-
-            if let timestamp = UserDefaults.standard.double(forKey: "last_fcm_message_time") as Double? {
-                let timeAgo = Date().timeIntervalSince1970 - timestamp
-                print("⏰ [FCM 테스트] 마지막 메시지 수신: \(Int(timeAgo))초 전")
-
-                if timeAgo < 300 { // 5분 이내
-                    print("✅ [FCM 테스트] 최근에 메시지를 수신했습니다")
-                } else {
-                    print("⚠️ [FCM 테스트] 최근 메시지 수신 기록이 없음")
-                }
-            }
-        } else {
-            print("❌ [FCM 테스트] FCM 메시지 수신 기록 없음")
-            print("💡 [FCM 테스트] 아직 FCM 메시지를 수신한 적이 없습니다")
-        }
-
-        // 3. FCM 서비스 상태 확인
-        print("\n🔥 [FCM 테스트] FCM 서비스 상태:")
-        if Messaging.messaging().isAutoInitEnabled {
-            print("   ✅ FCM 자동 초기화 활성화")
-        } else {
-            print("   ❌ FCM 자동 초기화 비활성화")
-        }
-
-        if Messaging.messaging().delegate != nil {
-            print("   ✅ FCM 델리게이트 설정됨")
-        } else {
-            print("   ❌ FCM 델리게이트 설정 안됨")
-        }
-
-        // 4. APNs 토큰 상태 확인
-        if let apnsToken = UserDefaults.standard.string(forKey: "last_apns_token") {
-            print("   ✅ APNs 토큰 존재: \(apnsToken.prefix(30))...")
-        } else {
-            print("   ❌ APNs 토큰 없음")
-        }
-
-        // 5. 푸시 권한 상태 확인
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
-            DispatchQueue.main.async {
-                print("\n🔔 [FCM 테스트] 푸시 권한 상태: \(settings.authorizationStatus)")
-
-                // 6. 테스트 결과 요약
-                print("\n📋 [FCM 테스트] 테스트 결과:")
-                if settings.authorizationStatus == .authorized {
-                    print("   ✅ 푸시 권한 허용됨")
-                } else {
-                    print("   ❌ 푸시 권한 거부됨 - FCM 메시지를 표시할 수 없습니다")
-                }
-
-                if let _ = UserDefaults.standard.string(forKey: "fcm_token") {
-                    print("   ✅ FCM 토큰 존재")
-                } else {
-                    print("   ❌ FCM 토큰 없음")
-                }
-
-                if let _ = UserDefaults.standard.dictionary(forKey: "last_fcm_message") {
-                    print("   ✅ FCM 메시지 수신 기록 존재")
-                } else {
-                    print("   ❌ FCM 메시지 수신 기록 없음")
-                }
-
-                print("\n💡 [FCM 테스트] 문제 해결 방법:")
-                print("   1. FCM 토큰이 DB와 일치하는지 확인하세요")
-                print("   2. 백엔드에서 올바른 FCM 토큰으로 메시지를 전송하는지 확인하세요")
-                print("   3. 앱이 백그라운드에 있을 때 FCM 메시지가 수신되는지 확인하세요")
-                print("   4. Firebase Console에서 APNs 설정이 올바른지 확인하세요")
-
-                print("\n🔧 [FCM 테스트] 추가 진단:")
-                print("   forceSyncFCMTokenWithDB()  // FCM 토큰 DB 동기화")
-                print("   diagnoseFCMTokenReception() // 종합 진단")
-
-                print("═══════════════════════════════════════════════════════════════")
             }
         }
     }
@@ -8467,118 +5313,12 @@ extension AppDelegate {
 
 }
 
-extension UNUserNotificationCenter {
-    private static let smap_swizzleOnce: Void = {
-        let originalSelector = #selector(UNUserNotificationCenter.requestAuthorization(options:completionHandler:))
-        let swizzledSelector = #selector(UNUserNotificationCenter.smap_requestAuthorization(options:completionHandler:))
-        if let originalMethod = class_getInstanceMethod(UNUserNotificationCenter.self, originalSelector),
-           let swizzledMethod = class_getInstanceMethod(UNUserNotificationCenter.self, swizzledSelector) {
-            method_exchangeImplementations(originalMethod, swizzledMethod)
-            print("🧩 [SWZ-PUSH] requestAuthorization swizzled for debug logging")
-        } else {
-            print("❌ [SWZ-PUSH] Failed to swizzle requestAuthorization")
-        }
-    }()
-    static func smap_installRequestAuthSwizzle() {
-        _ = smap_swizzleOnce
-    }
-
-    @objc func smap_requestAuthorization(options: UNAuthorizationOptions, completionHandler: @escaping (Bool, Error?) -> Void) {
-        let isLoggedIn = UserDefaults.standard.bool(forKey: "is_logged_in")
-        let stack = Thread.callStackSymbols.joined(separator: "\n")
-        print("🛑 [SWZ-PUSH] requestAuthorization intercepted. isLoggedIn=\(isLoggedIn). Options=\(options).\n📚 CallStack:\n\(stack)")
-        
-        // 🔧 [중요] 푸시 알림 확실한 수신을 위해 로그인 여부와 관계없이 권한 허용
-        print("✅ [SWZ-PUSH] 푸시 권한 요청 허용 - iOS 푸시 수신 안정성 향상")
-        
-        // Call original (swizzled) implementation - 로그인 상태와 관계없이 실행
-        self.smap_requestAuthorization(options: options, completionHandler: completionHandler)
-    }
-}
-
-// MARK: - 🧩 CLLocationManager Swizzle (requestWhenInUseAuthorization / requestAlwaysAuthorization)
-extension CLLocationManager {
-    private static let smap_swizzleOnceLoc: Void = {
-        let targetPairs: [(Selector, Selector)] = [
-            (#selector(CLLocationManager.requestWhenInUseAuthorization), #selector(CLLocationManager.smap_requestWhenInUseAuthorization)),
-            (#selector(CLLocationManager.requestAlwaysAuthorization), #selector(CLLocationManager.smap_requestAlwaysAuthorization))
-        ]
-        for (origSel, swzSel) in targetPairs {
-            if let m1 = class_getInstanceMethod(CLLocationManager.self, origSel),
-               let m2 = class_getInstanceMethod(CLLocationManager.self, swzSel) {
-                method_exchangeImplementations(m1, m2)
-            }
-        }
-        print("🧩 [SWZ-LOC] CLLocationManager auth methods swizzled for debug logging")
-    }()
-    static func smap_installLocationAuthSwizzle() { _ = smap_swizzleOnceLoc }
-
-    @objc func smap_requestWhenInUseAuthorization() {
-        let isLoggedIn = UserDefaults.standard.bool(forKey: "is_logged_in")
-        let allowNow = UserDefaults.standard.bool(forKey: "smap_allow_location_request_now")
-        let stack = Thread.callStackSymbols.joined(separator: "\n")
-        print("🛑 [SWZ-LOC] requestWhenInUseAuthorization intercepted. isLoggedIn=\(isLoggedIn), allowNow=\(allowNow)\n📚 CallStack:\n\(stack)")
-        guard isLoggedIn && allowNow else {
-            print("🛑 [SWZ-LOC] Blocked location auth request (not allowed at this stage)")
-            return
-        }
-        UserDefaults.standard.set(false, forKey: "smap_allow_location_request_now")
-        self.smap_requestWhenInUseAuthorization()
-    }
-
-    @objc func smap_requestAlwaysAuthorization() {
-        let isLoggedIn = UserDefaults.standard.bool(forKey: "is_logged_in")
-        let allowNow = UserDefaults.standard.bool(forKey: "smap_allow_location_request_now")
-        print("🛑 [SWZ-LOC] requestAlwaysAuthorization intercepted. isLoggedIn=\(isLoggedIn), allowNow=\(allowNow)")
-        guard isLoggedIn && allowNow else {
-            print("🛑 [SWZ-LOC] Blocked location ALWAYS auth request")
-            return
-        }
-        UserDefaults.standard.set(false, forKey: "smap_allow_location_request_now")
-        self.smap_requestAlwaysAuthorization()
-    }
-
-    // MARK: - 🔧 FCM 푸시 문제 해결 가이드
-    @objc func showFCMTroubleshootingGuide() {
-        print("\n" + String(repeating: "=", count: 80))
-        print("🔧 FCM 푸시 문제 해결 가이드")
-        print("📱 iOS 푸시 알림이 작동하지 않는 경우 단계별 해결")
-        print(String(repeating: "=", count: 80))
-
-        print("\n🚨 가장 중요한 확인사항:")
-        print("1️⃣ 실제 iOS 디바이스에서 테스트 중인가?")
-        print("   - 시뮬레이터에서는 FCM 푸시가 작동하지 않습니다")
-        print("   - 실제 iPhone/iPad에서 테스트하세요")
-
-        print("\n2️⃣ Firebase 콘솔 APNS 설정 확인:")
-        print("   - Firebase Console → 프로젝트 설정 → Cloud Messaging")
-        print("   - iOS 앱 구성에서 APNS 인증서/키가 등록되어 있는지 확인")
-        print("   - Development/Production 환경에 맞는 인증서 등록")
-
-        print("\n3️⃣ iOS 디바이스 설정 확인:")
-        print("   - 설정 → 알림 → [앱 이름] → 알림 허용")
-        print("   - 설정 → 일반 → 백그라운드 앱 새로고침 → [앱 이름] 활성화")
-        print("   - 저전력 모드 해제")
-
-        print("\n🛠️ 문제 진단을 위한 명령어:")
-        print("   debugPushNotificationStatus()     // 종합 상태 확인")
-        print("   testFCMTokenGeneration()          // 토큰 재생성 테스트")
-        print("   updateFCMTokenManually()          // 수동 토큰 업데이트")
-
-        print("\n📞 추가 도움이 필요한 경우:")
-        print("   위 명령어들의 출력 결과를 개발팀에 제공해주세요")
-        print("   특히 'APNS 등록 상태'와 'FCM 토큰' 상태가 중요합니다")
-
-        print(String(repeating: "=", count: 80))
-    }
-}
 
 // MARK: - 🚀 AppDelegate 백그라운드 푸시 최적화 Extension
 extension AppDelegate {
     
     /// 백그라운드 앱 새로고침 설정
     func setupBackgroundAppRefresh() {
-        print("🚀 [Background] 백그라운드 앱 새로고침 설정 시작")
         
         // 백그라운드 앱 새로고침 권한 요청 (iOS 15+ Target: Deprecated API 제거, rely on default/BGTasks)
         // UIApplication.shared.setMinimumBackgroundFetchInterval(UIApplication.backgroundFetchIntervalMinimum)
@@ -8745,7 +5485,6 @@ extension AppDelegate {
     }
     
 
-    
     /// Silent Push를 통한 토큰 갱신 처리
     func handleSilentPushTokenRefresh(_ userInfo: [AnyHashable: Any], completion: @escaping (Bool) -> Void) {
         print("🔇 [Silent Push Handler] 토큰 갱신 처리 시작")
@@ -8869,39 +5608,6 @@ extension AppDelegate {
         }
     }
     
-    // MARK: - 🔍 푸시 알림 디버깅 메서드들 (Enhanced)
-    
-    /// 푸시 권한 강제 재요청 (Enhanced)
-    @objc func forcePushPermissionRequestEnhanced() {
-        print("🔔 [PUSH DEBUG Enhanced] 푸시 권한 강제 재요청 시작")
-        
-        let center = UNUserNotificationCenter.current()
-        center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("❌ [PUSH DEBUG Enhanced] 푸시 권한 요청 오류: \(error.localizedDescription)")
-                } else {
-                    print("✅ [PUSH DEBUG Enhanced] 푸시 권한 요청 결과: \(granted ? "허용됨" : "거부됨")")
-                    
-                    if granted {
-                        print("📱 [PUSH DEBUG Enhanced] APNs 등록 시작")
-                        UIApplication.shared.registerForRemoteNotifications()
-                    }
-                }
-            }
-        }
-    }
-    
-    /// 알림 설정을 문자열로 변환 (Enhanced)
-    private func notificationSettingStringEnhanced(_ setting: UNNotificationSetting) -> String {
-        switch setting {
-        case .notSupported: return "지원되지 않음"
-        case .disabled: return "비활성화"
-        case .enabled: return "활성화"
-        @unknown default: return "알 수 없음"
-        }
-    }
-    
     /// 즉시 로컬 알림 표시 (백그라운드 상태용)
     private func scheduleImmediateLocalNotification(userInfo: [AnyHashable: Any]) {
         print("🔔 [FCM] 즉시 로컬 알림 스케줄링 시작")
@@ -8942,98 +5648,6 @@ extension AppDelegate {
         // 중복 알림 방지 - 즉시 로컬 알림 생성 비활성화 
         print("🚫 [FCM] 중복 방지를 위해 즉시 로컬 알림 생성 건너뛰기")
         print("📝 [FCM] 식별자: \(identifier) - 즉시 알림 생성하지 않음")
-    }
-    
-    /// 강제 로컬 알림 테스트 (시각적 확인용)
-    @objc func testLocalNotification() {
-        print("🔔 [LOCAL TEST] 강제 로컬 알림 테스트 시작")
-        
-        let center = UNUserNotificationCenter.current()
-        let content = UNMutableNotificationContent()
-        content.title = "🧪 로컬 알림 테스트"
-        content.body = "이 알림이 보인다면 iOS 알림 시스템이 정상 작동 중입니다 - \(Date().description)"
-        content.sound = .default
-        content.badge = NSNumber(value: UIApplication.shared.applicationIconBadgeNumber + 1)
-        
-        // 즉시 트리거
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 0.1, repeats: false)
-        let request = UNNotificationRequest(identifier: "local_test_\(Int(Date().timeIntervalSince1970))", content: content, trigger: trigger)
-        
-        center.add(request) { error in
-            if let error = error {
-                print("❌ [LOCAL TEST] 로컬 알림 실패: \(error.localizedDescription)")
-            } else {
-                print("✅ [LOCAL TEST] 로컬 알림 스케줄됨 - 화면에 표시되는지 확인하세요")
-            }
-        }
-    }
-    
-    /// 테스트 푸시 전송 요청
-    @objc func sendTestPushNotification() {
-        print("📤 [PUSH DEBUG] 테스트 푸시 전송 요청")
-        
-        guard let savedToken = UserDefaults.standard.string(forKey: "fcm_token"), !savedToken.isEmpty else {
-            print("❌ [PUSH DEBUG] FCM 토큰이 없음 - 토큰 갱신 후 다시 시도")
-            forceRefreshFCMToken()
-            return
-        }
-        
-        // 현재 시간으로 테스트 메시지 생성
-        let timestamp = DateFormatter().string(from: Date())
-        let testMessage = "테스트 푸시 - \(timestamp)"
-        
-        print("📤 [PUSH DEBUG] 테스트 푸시 전송 중...")
-        print("   - 토큰: \(savedToken.prefix(30))...")
-        print("   - 메시지: \(testMessage)")
-        
-        // 실제 서버 API 호출 (fcm_sendone 엔드포인트 사용)
-        let url = URL(string: "https://api3.smap.site/api/v1/fcm_sendone")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        // 실제 사용자 ID 가져오기
-        let mtIdx = UserDefaults.standard.string(forKey: "mt_idx") ??
-                   UserDefaults.standard.string(forKey: "savedMtIdx") ??
-                   UserDefaults.standard.string(forKey: "current_mt_idx") ?? "0"
-        
-        let requestBody: [String: Any] = [
-            "plt_type": "TEST_DEBUG",
-            "sst_idx": "0",
-            "plt_condition": "iOS Debug Test",
-            "plt_memo": testMessage,
-            "mt_idx": mtIdx, // 실제 사용자 ID
-            "plt_title": "🔍 iOS 푸시 디버그",
-            "plt_content": testMessage
-        ]
-        
-        do {
-            request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
-        } catch {
-            print("❌ [PUSH DEBUG] JSON 직렬화 오류: \(error)")
-            return
-        }
-        
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("❌ [PUSH DEBUG] 테스트 푸시 전송 오류: \(error.localizedDescription)")
-                } else if let httpResponse = response as? HTTPURLResponse {
-                    print("📱 [PUSH DEBUG] 테스트 푸시 응답: HTTP \(httpResponse.statusCode)")
-                    
-                    if let data = data,
-                       let responseString = String(data: data, encoding: .utf8) {
-                        print("📝 [PUSH DEBUG] 응답 내용: \(responseString)")
-                    }
-                    
-                    if httpResponse.statusCode == 200 {
-                        print("✅ [PUSH DEBUG] 테스트 푸시 전송 성공 - 5초 후 수신 여부 확인하세요")
-                    } else {
-                        print("❌ [PUSH DEBUG] 테스트 푸시 전송 실패 - HTTP \(httpResponse.statusCode)")
-                    }
-                }
-            }
-        }.resume()
     }
     
     // MARK: - 백그라운드 FCM 토큰 관리 및 연결 유지
@@ -9287,7 +5901,6 @@ extension AppDelegate {
 // MARK: - Naver Map Auth Delegate
 extension AppDelegate: NMFAuthManagerDelegate {
     func authorized(_ state: NMFAuthState, error: Error?) {
-        print("🗺️ [NaverMap] Auth State: \(state)")
         if let error = error {
             print("❌ [NaverMap] Auth Error: \(error.localizedDescription)")
             print("❌ [NaverMap] Code: \((error as NSError).code)")
