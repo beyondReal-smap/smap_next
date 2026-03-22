@@ -70,7 +70,6 @@
 		94339A6E2B2BE314002177C1 /* Utils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94339A6D2B2BE314002177C1 /* Utils.swift */; };
 		94339A702B2BE323002177C1 /* Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94339A6F2B2BE323002177C1 /* Extensions.swift */; };
 		94339A772B2BE409002177C1 /* LocationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94339A762B2BE409002177C1 /* LocationService.swift */; };
-		94339A7B2B2BEFC9002177C1 /* IntroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94339A7A2B2BEFC9002177C1 /* IntroView.swift */; };
 		94339A7D2B2BEFD1002177C1 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94339A7C2B2BEFD1002177C1 /* MainView.swift */; };
 		94418E1F2BD0B88B00836120 /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 94418E1E2BD0B88B00836120 /* StoreKit.framework */; };
 		94418E212BD0C38E00836120 /* StoreKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94418E202BD0C38E00836120 /* StoreKitManager.swift */; };
@@ -198,7 +197,6 @@
 		94339A6D2B2BE314002177C1 /* Utils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Utils.swift; sourceTree = "<group>"; };
 		94339A6F2B2BE323002177C1 /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
 		94339A762B2BE409002177C1 /* LocationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationService.swift; sourceTree = "<group>"; };
-		94339A7A2B2BEFC9002177C1 /* IntroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntroView.swift; sourceTree = "<group>"; };
 		94339A7C2B2BEFD1002177C1 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		94418E1E2BD0B88B00836120 /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
 		94418E202BD0C38E00836120 /* StoreKitManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKitManager.swift; sourceTree = "<group>"; };
@@ -530,7 +528,6 @@
 				948ABEF42BAA81E900023DFD /* smap.entitlements */,
 				94339A662B2BE295002177C1 /* Http */,
 				94339A672B2BE2C1002177C1 /* Helper */,
-				94339A782B2BEFA8002177C1 /* Intro */,
 				94339A792B2BEFAF002177C1 /* Main */,
 				A1B2C3D40021 /* Models */,
 				A1B2C3D40022 /* Services */,
@@ -578,14 +575,6 @@
 				948ABEFB2BAA8FBE00023DFD /* MltGpsData.swift */,
 			);
 			path = Data;
-			sourceTree = "<group>";
-		};
-		94339A782B2BEFA8002177C1 /* Intro */ = {
-			isa = PBXGroup;
-			children = (
-				94339A7A2B2BEFC9002177C1 /* IntroView.swift */,
-			);
-			path = Intro;
 			sourceTree = "<group>";
 		};
 		94339A792B2BEFAF002177C1 /* Main */ = {
@@ -1002,7 +991,6 @@
 				948ABEFC2BAA8FBE00023DFD /* MltGpsData.swift in Sources */,
 				94418E212BD0C38E00836120 /* StoreKitManager.swift in Sources */,
 				94339A6E2B2BE314002177C1 /* Utils.swift in Sources */,
-				94339A7B2B2BEFC9002177C1 /* IntroView.swift in Sources */,
 				94339A702B2BE323002177C1 /* Extensions.swift in Sources */,
 				A1B2C3D40001 /* LoginModels.swift in Sources */,
 				A1B2C3D40002 /* AuthService.swift in Sources */,

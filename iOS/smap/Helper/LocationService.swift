@@ -293,7 +293,7 @@ public class LocationService: NSObject, CLLocationManagerDelegate{
             mt_idx = self.savedMtIdx
         }
         
-        // 🆕 UserDefaults에서도 mt_idx 확인 (WebViewController에서 저장한 값)
+        // UserDefaults에서도 mt_idx 확인
         if mt_idx == "" || mt_idx == "null" {
             if let userDefaultsMtIdx = UserDefaults.standard.string(forKey: "mt_idx"), !userDefaultsMtIdx.isEmpty {
                 mt_idx = userDefaultsMtIdx
