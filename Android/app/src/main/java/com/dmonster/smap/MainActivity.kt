@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.dmonster.smap.data.service.AuthService
 import com.dmonster.smap.ui.components.BackgroundLocationGuideDialog
+import javax.inject.Inject
 import com.dmonster.smap.ui.components.LocationPermissionDialog
 import com.dmonster.smap.ui.login.LoginActivity
 import com.dmonster.smap.ui.navigation.MainTabScreen
@@ -33,11 +34,11 @@ class MainActivity : ComponentActivity() {
         private const val TAG = "MainActivity"
     }
 
+    @Inject lateinit var authService: AuthService
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-
-        val authService = AuthService.getInstance(this)
         val isLoggedIn = authService.isLoggedIn
         
         Log.d(TAG, "🔍 [AUTH_GUARD] Check: $isLoggedIn (Token=${authService.getToken()?.take(5)}..., User=${authService.getUserData()?.displayName})")

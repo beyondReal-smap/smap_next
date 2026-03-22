@@ -24,7 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.dmonster.smap.data.model.PushLog
 import com.dmonster.smap.ui.theme.SuiteFont
 import java.text.SimpleDateFormat
@@ -34,7 +34,7 @@ import java.util.*
 @Composable
 fun NotificationScreen(
     onClose: () -> Unit,
-    viewModel: NotificationViewModel = viewModel()
+    viewModel: NotificationViewModel = hiltViewModel()
 ) {
     val logs by viewModel.logs.collectAsState()
     val summary by viewModel.summary.collectAsState()

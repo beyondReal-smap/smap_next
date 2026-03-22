@@ -23,7 +23,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.dmonster.smap.data.model.SmapNotice
 import com.dmonster.smap.ui.theme.SuiteFont
 import com.dmonster.smap.ui.theme.BrandColors
@@ -33,7 +33,7 @@ import com.dmonster.smap.ui.theme.BrandColors
 fun SettingsScreen(
     onClose: () -> Unit,
     onLogout: () -> Unit,
-    viewModel: SettingsViewModel = viewModel()
+    viewModel: SettingsViewModel = hiltViewModel()
 ) {
     var isAccountSettingsVisible by remember { mutableStateOf(false) }
     var selectedTermsScreen by remember { mutableStateOf<String?>(null) }
@@ -155,7 +155,7 @@ fun SettingsScreen(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text("SMAP", fontFamily = SuiteFont, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color.Gray)
-                        Text("버전 3.0.2", fontFamily = SuiteFont, fontSize = 12.sp, color = Color.Gray.copy(alpha = 0.8f))
+                        Text("버전 3.0.4", fontFamily = SuiteFont, fontSize = 12.sp, color = Color.Gray.copy(alpha = 0.8f))
                     }
                     
                     Spacer(modifier = Modifier.height(40.dp))

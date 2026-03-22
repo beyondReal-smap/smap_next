@@ -99,4 +99,52 @@ object ActivityLogMarkerUtils {
 
         return bitmap
     }
+
+    /**
+     * Creates an info capsule bitmap showing time and speed for the current position marker.
+     */
+    fun createCurrentPositionInfoBitmap(
+        context: Context,
+        time: String,
+        speed: String
+    ): Bitmap {
+        val suiteBold = ResourcesCompat.getFont(context, R.font.suite_bold)
+        val density = context.resources.displayMetrics.density
+
+        val displayText = "$time  |  $speed"
+        
+        val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = AndroidColor.WHITE
+            textSize = 12f * density
+            typeface = suiteBold ?: Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textAlign = Paint.Align.CENTER
+        }
+        
+        val textWidth = textPaint.measureText(displayText)
+        val paddingH = 12f * density
+        val paddingV = 6f * density
+        val capsuleWidth = textWidth + paddingH * 2
+        val capsuleHeight = textPaint.textSize + paddingV * 2
+        val markerBottomPadding = 32f * density // Gap between capsule and marker
+        
+        val canvasWidth = capsuleWidth
+        val canvasHeight = capsuleHeight + markerBottomPadding
+        
+        val bitmap = Bitmap.createBitmap(canvasWidth.toInt(), canvasHeight.toInt(), Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        
+        // Draw capsule background
+        val capsuleRect = RectF(0f, 0f, capsuleWidth, capsuleHeight)
+        paint.color = AndroidColor.parseColor("#E60113A3") // Brand color with 90% alpha
+        canvas.drawRoundRect(capsuleRect, capsuleHeight / 2, capsuleHeight / 2, paint)
+        
+        // Draw text
+        val textMetrics = textPaint.fontMetrics
+        val textBaseline = capsuleHeight / 2 - (textMetrics.descent + textMetrics.ascent) / 2
+        canvas.drawText(displayText, capsuleWidth / 2, textBaseline, textPaint)
+        
+        return bitmap
+    }
 }

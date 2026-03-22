@@ -1,8 +1,7 @@
 package com.dmonster.smap.ui.home
 
-import android.app.Application
 import android.util.Log
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dmonster.smap.data.model.SmapGroup
 import com.dmonster.smap.data.model.SmapGroupMember
@@ -10,6 +9,8 @@ import com.dmonster.smap.data.model.SmapSchedule
 import com.dmonster.smap.data.service.HomeService
 import com.dmonster.smap.data.GlobalEvent
 import com.dmonster.smap.data.GlobalEventBus
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,14 +27,14 @@ data class MemberStats(
     val upcoming: Int
 )
 
-class HomeViewModel(application: Application) : AndroidViewModel(application) {
+@HiltViewModel
+class HomeViewModel @Inject constructor(
+    private val homeService: HomeService
+) : ViewModel() {
 
     companion object {
         private const val TAG = "HomeViewModel"
     }
-
-    // Service
-    private val homeService = HomeService.getInstance(application)
 
     // Loading State
     private val _isLoading = MutableStateFlow(true)
@@ -289,9 +290,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 // 멤버 목록 조회
                 val members = homeService.getGroupMembers(groupId)
                 
-                // 첫 번째 멤버를 선택 상태로 설정
+                // 현재 사용자를 기본 선택 (없으면 첫 번째 멤버)
                 if (members.isNotEmpty() && _selectedMemberId.value == null) {
-                    _selectedMemberId.value = members.first().mtIdx
+                    val currentUserIdx = homeService.getCurrentUserIdx()
+                    val selfMember = members.find { it.mtIdx == currentUserIdx }
+                    _selectedMemberId.value = selfMember?.mtIdx ?: members.first().mtIdx
                 }
                 
                 val currentSelectedId = _selectedMemberId.value
@@ -462,4 +465,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             return "upcoming"
         }
     }
+
+    fun getCurrentUserIdx(): Int? = homeService.getCurrentUserIdx()
 }

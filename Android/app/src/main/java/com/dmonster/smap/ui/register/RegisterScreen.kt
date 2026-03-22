@@ -34,7 +34,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.dmonster.smap.R
 import com.dmonster.smap.data.model.RegisterStep
 import com.dmonster.smap.data.model.LegalContent
@@ -47,7 +47,7 @@ import com.dmonster.smap.ui.theme.SuiteFont
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RegisterScreen(
-    viewModel: RegisterViewModel = viewModel(),
+    viewModel: RegisterViewModel = hiltViewModel(),
     onComplete: () -> Unit = {},
     onBack: () -> Unit = {},
     onExistingUser: (String) -> Unit = {},
@@ -818,7 +818,7 @@ private fun ProfileContent(
                 .fillMaxWidth()
                 .onFocusChanged { isFocusedBirth = it.isFocused }
                 .clickable { showDatePicker = true },
-            label = { Text("생년월일 (필수)", fontFamily = SuiteFont) },
+            label = { Text("생년월일 (선택)", fontFamily = SuiteFont) },
             placeholder = { Text("탭하여 선택", fontFamily = SuiteFont) },
             readOnly = true,
             enabled = false,
@@ -913,7 +913,7 @@ private fun ProfileContent(
         
         // 성별 선택
         Text(
-            text = "성별 (필수)",
+            text = "성별 (선택)",
             fontFamily = SuiteFont,
             fontWeight = FontWeight.Medium,
             fontSize = 16.sp,

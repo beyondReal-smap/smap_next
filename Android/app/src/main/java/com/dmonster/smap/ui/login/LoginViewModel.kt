@@ -1,11 +1,12 @@
 package com.dmonster.smap.ui.login
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import android.util.Log
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dmonster.smap.data.model.SocialLoginResponse
 import com.dmonster.smap.data.service.AuthService
-import android.util.Log
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,10 +30,11 @@ data class LoginUiState(
 /**
  * 로그인 ViewModel (iOS LoginViewModel 기반)
  */
-class LoginViewModel(application: Application) : AndroidViewModel(application) {
-    
-    private val authService = AuthService.getInstance(application)
-    
+@HiltViewModel
+class LoginViewModel @Inject constructor(
+    private val authService: AuthService
+) : ViewModel() {
+
     private val _uiState = MutableStateFlow(LoginUiState(isLoggedIn = authService.isLoggedIn))
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
     

@@ -40,18 +40,19 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.dmonster.smap.R
 import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.GradientColors
 import com.dmonster.smap.ui.theme.SuiteFont
+import com.dmonster.smap.ui.theme.responsiveSp
 
 /**
  * 로그인 화면 (iOS LoginView 기반)
  */
 @Composable
 fun LoginScreen(
-    viewModel: LoginViewModel = viewModel(),
+    viewModel: LoginViewModel = hiltViewModel(),
     onLoginSuccess: () -> Unit = {},
     onNavigateToRegister: (Map<String, String>?) -> Unit = {},
     onGoogleSignInClick: () -> Unit = {},
@@ -153,7 +154,7 @@ fun LoginScreen(
                         Text(
                             text = "비밀번호를 잊어버리셨나요?",
                             color = BrandColors.Primary,
-                            fontSize = 16.sp,
+                            fontSize = 16.responsiveSp(),
                             fontFamily = SuiteFont
                         )
                     }
@@ -219,7 +220,7 @@ private fun LogoSection() {
         // 앱 이름
         Text(
             text = "smap",
-            fontSize = 34.sp,
+            fontSize = 34.responsiveSp(),
             fontFamily = SuiteFont,
             fontWeight = FontWeight.Bold,
             color = BrandColors.TextPrimary
@@ -228,7 +229,7 @@ private fun LogoSection() {
         // 서브텍스트
         Text(
             text = "소중한 사람들과 함께하는 위치 공유",
-            fontSize = 16.sp,
+            fontSize = 16.responsiveSp(),
             fontFamily = SuiteFont,
             color = BrandColors.TextSecondary,
             textAlign = TextAlign.Center

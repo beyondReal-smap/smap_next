@@ -1,5 +1,6 @@
 package com.dmonster.smap.ui.activitylog
 
+import com.dmonster.smap.AppConstants
 import android.annotation.SuppressLint
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
@@ -15,7 +16,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import android.graphics.PointF
 import android.graphics.Color as AndroidColor
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.dmonster.smap.ui.schedule.GroupSelectorDropdown
 import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.myplace.FloatingActionPlaceButton
@@ -39,7 +40,7 @@ import com.dmonster.smap.R
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalNaverMapApi::class)
 @Composable
 fun ActivityLogScreen(
-    viewModel: ActivityLogViewModel = viewModel()
+    viewModel: ActivityLogViewModel = hiltViewModel()
 ) {
     // Collect States
     val groups by viewModel.groups.collectAsState()
@@ -119,7 +120,10 @@ fun ActivityLogScreen(
 
     // Map State
     val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition(LatLng(37.5665, 126.9780), 12.0)
+        position = CameraPosition(
+            LatLng(AppConstants.DefaultLocation.LATITUDE, AppConstants.DefaultLocation.LONGITUDE), 
+            12.0
+        )
     }
 
 
@@ -228,15 +232,24 @@ fun ActivityLogScreen(
                     MapEffect(validLogs) { map ->
                         if (totalPoints < 1) return@MapEffect
                         
+                        // Current position marker (blue circle)
                         val marker = com.naver.maps.map.overlay.Marker()
                         marker.zIndex = 100
                         marker.width = (24 * density).toInt()
                         marker.height = (24 * density).toInt()
-                        // Set position BEFORE attaching to map to avoid InvalidCoordinateException
                         if (allCoords.isNotEmpty()) {
                             marker.position = allCoords.first()
                         }
                         marker.map = map
+                        
+                        // Info capsule marker (time + speed)
+                        val infoMarker = com.naver.maps.map.overlay.Marker()
+                        infoMarker.zIndex = 101
+                        infoMarker.anchor = android.graphics.PointF(0.5f, 1.0f) // Bottom center
+                        if (allCoords.isNotEmpty()) {
+                            infoMarker.position = allCoords.first()
+                        }
+                        infoMarker.map = map
                         
                         val currentIcon = OverlayImage.fromResource(R.drawable.ic_marker_current_circle)
                         
@@ -256,9 +269,31 @@ fun ActivityLogScreen(
                                     
                                     if (idx < capturedCoords.size && idx < capturedLogs.size) {
                                         val pos = capturedCoords[idx]
+                                        val currentLog = capturedLogs[idx]
                                         
+                                        // Update position marker
                                         marker.position = pos
                                         marker.icon = currentIcon
+                                        
+                                        // Extract time from GPS time string
+                                        val timeStr = currentLog.mltGpsTime?.let { gpsTime ->
+                                            val cleanedTime = gpsTime.replace("Z", "").split(".").firstOrNull() ?: gpsTime
+                                            if (cleanedTime.length >= 16) {
+                                                cleanedTime.substring(11, 16)
+                                            } else {
+                                                "--:--"
+                                            }
+                                        } ?: "--:--"
+                                        
+                                        val speed = currentLog.mltSpeed ?: 0.0
+                                        val speedStr = String.format("%.1f km/h", speed)
+                                        
+                                        // Update info marker
+                                        infoMarker.position = pos
+                                        val infoBitmap = ActivityLogMarkerUtils.createCurrentPositionInfoBitmap(context, timeStr, speedStr)
+                                        infoMarker.icon = OverlayImage.fromBitmap(infoBitmap)
+                                        infoMarker.width = infoBitmap.width
+                                        infoMarker.height = infoBitmap.height
                                         
                                         // Always move camera to follow marker
                                         val update = CameraUpdate.scrollTo(pos)
@@ -272,6 +307,7 @@ fun ActivityLogScreen(
                             awaitCancellation()
                         } finally {
                             marker.map = null
+                            infoMarker.map = null
                             job.cancel()
                         }
                     }
@@ -316,7 +352,7 @@ fun ActivityLogScreen(
             exit = fadeOut() + slideOutVertically { it },
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = 16.dp, bottom = 32.dp)
+                .padding(start = 16.dp, bottom = 20.dp)
                 .zIndex(8f)
         ) {
             PathSlider(
@@ -346,7 +382,7 @@ fun ActivityLogScreen(
             exit = fadeOut(),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 20.dp, bottom = 60.dp)
+                .padding(end = 20.dp, bottom = 20.dp)
                 .zIndex(10f)
         ) {
             FloatingActionPlaceButton(
@@ -385,6 +421,7 @@ fun ActivityLogScreen(
                 selectedGroup = selectedGroup,
                 members = members,
                 selectedMember = selectedMember,
+                currentUserIdx = viewModel.getCurrentUserIdx(),
                 selectedDate = selectedDate,
                 activityStats = memberActivityStats,
                 onGroupSelect = { viewModel.selectGroup(it) },

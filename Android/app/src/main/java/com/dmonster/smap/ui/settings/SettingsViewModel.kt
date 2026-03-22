@@ -1,18 +1,20 @@
 package com.dmonster.smap.ui.settings
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dmonster.smap.data.model.SMAPUser
 import com.dmonster.smap.data.service.AuthService
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-class SettingsViewModel(application: Application) : AndroidViewModel(application) {
-    
-    private val authService = AuthService.getInstance(application)
-    
+@HiltViewModel
+class SettingsViewModel @Inject constructor(
+    private val authService: AuthService
+) : ViewModel() {
+
     private val _user = MutableStateFlow<SMAPUser?>(authService.getUserData())
     val user: StateFlow<SMAPUser?> = _user
     

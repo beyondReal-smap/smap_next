@@ -1,194 +1,167 @@
 package com.dmonster.smap.data.service
 
-import android.content.Context
-import android.util.Log
 import android.content.SharedPreferences
+import android.util.Log
+import com.dmonster.smap.data.api.SmapApi
 import com.dmonster.smap.data.model.*
-import com.dmonster.smap.MyFirebaseMessagingService
-import com.google.gson.Gson
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.io.IOException
-import java.util.concurrent.TimeUnit
 
 /**
- * 인증 서비스 (iOS AuthService 기반)
+ * Authentication / user-profile service.
+ * Network calls delegate to SmapApi; local token/user state uses SharedPreferences.
  */
-class AuthService private constructor(private val context: Context) {
-    
+class AuthService(
+    private val api: SmapApi,
+    private val prefs: SharedPreferences
+) {
+
     companion object {
         private const val TAG = "AuthService"
-        private const val PREFS_NAME = "smap_auth_prefs"
         private const val KEY_TOKEN = "auth_token"
         private const val KEY_USER_DATA = "user_data"
         private const val KEY_MT_IDX = "mt_idx"
-        
-        private const val BASE_URL = "https://api3.smap.site/api/v1"
-        
-        @Volatile
-        private var instance: AuthService? = null
-        
-        fun getInstance(context: Context): AuthService {
-            return instance ?: synchronized(this) {
-                instance ?: AuthService(context.applicationContext).also { instance = it }
-            }
-        }
     }
-    
-    private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    private val gson = Gson()
-    
-    private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
-        .writeTimeout(10, TimeUnit.SECONDS)
-        .build()
-    
-    /**
-     * 로그인 상태 확인
-     */
+
+    private val json = Json {
+        ignoreUnknownKeys = true
+        coerceInputValues = true
+        isLenient = true
+    }
+
+    // =========================================================================
+    // Login state
+    // =========================================================================
+
     val isLoggedIn: Boolean
         get() {
             val token = getToken()
             val userData = getUserData()
             val loggedIn = !token.isNullOrBlank() && userData != null
-            android.util.Log.d(TAG, "🔍 isLoggedIn Check: $loggedIn (token=${if (token != null) (if (token.isBlank()) "blank" else "exists") else "null"}, userData=${if (userData != null) "exists" else "null"})")
+            Log.d(TAG, "isLoggedIn=$loggedIn")
             return loggedIn
         }
-    
-    
+
+    // =========================================================================
+    // Token management
+    // =========================================================================
+
+    fun saveToken(token: String) {
+        prefs.edit().putString(KEY_TOKEN, token).commit()
+        Log.d(TAG, "Token saved: ${token.take(10)}...")
+    }
+
+    fun getToken(): String? = prefs.getString(KEY_TOKEN, null)
+
+    // =========================================================================
+    // User data management
+    // =========================================================================
+
+    fun saveUserData(user: SMAPUser) {
+        val userJson = json.encodeToString(user)
+        prefs.edit().putString(KEY_USER_DATA, userJson).commit()
+        prefs.edit().putInt(KEY_MT_IDX, user.mtIdx ?: 0).commit()
+        Log.d(TAG, "User data saved: ${user.mtNickname}")
+    }
+
+    fun getUserData(): SMAPUser? {
+        val userJson = prefs.getString(KEY_USER_DATA, null) ?: return null
+        return try {
+            json.decodeFromString<SMAPUser>(userJson)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to parse user data", e)
+            null
+        }
+    }
+
+    fun getMtIdx(): Int = prefs.getInt(KEY_MT_IDX, 0)
+
+    // =========================================================================
+    // Logout
+    // =========================================================================
+
+    fun logout() {
+        prefs.edit().clear().apply()
+        Log.d(TAG, "Logged out - all data cleared")
+    }
+
+    // =========================================================================
+    // Network calls (delegated to SmapApi)
+    // =========================================================================
+
     /**
-     * 전화번호/비밀번호 로그인
+     * POST /auth/login
      */
-    suspend fun login(phoneNumber: String, password: String): LoginResponse = withContext(Dispatchers.IO) {
+    suspend fun login(phoneNumber: String, password: String): LoginResponse {
         val cleanPhone = phoneNumber.replace("-", "")
-        
-        // 기기 정보 수집
-        val deviceId = android.provider.Settings.Secure.getString(context.contentResolver, android.provider.Settings.Secure.ANDROID_ID)
-        val deviceModel = android.os.Build.MODEL
-        val osVersion = android.os.Build.VERSION.RELEASE
-        val appVersion = try {
-            context.packageManager.getPackageInfo(context.packageName, 0).versionName
-        } catch (e: Exception) { null }
-        
+
         val request = LoginRequest(
-            mtId = cleanPhone, 
+            mtId = cleanPhone,
             mtPwd = password,
-            deviceId = deviceId,
-            deviceModel = deviceModel,
-            osType = "android",
-            osVersion = osVersion,
-            appVersion = appVersion
+            osType = "android"
         )
-        
-        val jsonBody = gson.toJson(request)
-        val requestBody = jsonBody.toRequestBody("application/json".toMediaType())
-        
-        val httpRequest = Request.Builder()
-            .url("$BASE_URL/auth/login")
-            .post(requestBody)
-            .addHeader("Content-Type", "application/json")
-            .addHeader("User-Agent", "SmapAndroid/1.0")
-            .build()
-        
-        try {
-            Log.d(TAG, "🚀 [HTTP Request] POST $BASE_URL/auth/login")
-            
-            val response = httpClient.newCall(httpRequest).execute()
-            val responseCode = response.code
-            val responseBody = response.body?.string() ?: ""
-            
-            Log.d(TAG, "📥 [HTTP Response] Code: $responseCode")
-            
-            if (responseBody.isEmpty()) {
-                throw IOException("Empty response body from server")
-            }
-            
-            val loginResponse = gson.fromJson(responseBody, LoginResponse::class.java)
-            
+
+        return try {
+            val loginResponse = api.login(request)
+
             if (loginResponse.success) {
-                Log.d(TAG, "✅ [Login] Success - Saving Token")
+                Log.d(TAG, "[Login] Success")
                 loginResponse.data?.token?.let { saveToken(it) }
                 loginResponse.data?.user?.let { saveUserData(it) }
             }
-            
+
             loginResponse
         } catch (e: Exception) {
             Log.e(TAG, "Login failed", e)
-            LoginResponse(success = false, message = "네트워크 오류: ${e.message}", data = null)
+            LoginResponse(success = false, message = "Network error: ${e.message}", data = null)
         }
     }
-    
+
     /**
-     * Google 로그인
+     * POST /auth/google-login
      */
     suspend fun googleLogin(
         idToken: String,
         email: String?,
         name: String?,
         googleId: String?
-    ): SocialLoginResponse = withContext(Dispatchers.IO) {
+    ): SocialLoginResponse {
         val request = GoogleLoginRequest(
             googleId = googleId,
             email = email,
             name = name,
             idToken = idToken
         )
-        
-        val jsonBody = gson.toJson(request)
-        val requestBody = jsonBody.toRequestBody("application/json".toMediaType())
-        
-        val httpRequest = Request.Builder()
-            .url("$BASE_URL/auth/google-login")
-            .post(requestBody)
-            .addHeader("Content-Type", "application/json")
-            .build()
-        
-        try {
-            Log.d(TAG, "🚀 [HTTP Request] POST $BASE_URL/auth/google-login")
-            val response = httpClient.newCall(httpRequest).execute()
-            val responseCode = response.code
-            val responseBody = response.body?.string() ?: ""
-            
-            Log.d(TAG, "📥 [HTTP Response] Code: $responseCode")
-            
-            if (responseBody.isEmpty()) {
-                throw IOException("Empty response body from server")
-            }
-            
-            val loginResponse = gson.fromJson(responseBody, SocialLoginResponse::class.java)
-            
+
+        return try {
+            val loginResponse = api.googleLogin(request)
+
             if (loginResponse.success == true) {
-                Log.d(TAG, "✅ [Social Login] Success")
+                Log.d(TAG, "[Social Login] Google success")
                 val token = loginResponse.token ?: loginResponse.data?.token
                 val user = loginResponse.user ?: loginResponse.data?.user
-                
                 token?.let { saveToken(it) }
                 user?.let { saveUserData(it) }
             }
-            
+
             loginResponse
         } catch (e: Exception) {
-            android.util.Log.e(TAG, "Google login failed", e)
+            Log.e(TAG, "Google login failed", e)
             SocialLoginResponse(
                 success = false,
-                message = "네트워크 오류: ${e.message}",
-                error = e.message,
-                isNewUser = null,
-                user = null,
-                token = null,
-                data = null
+                message = "Network error: ${e.message}",
+                error = e.message
             )
         }
     }
-    
+
     /**
-     * Kakao 로그인
+     * POST /auth/kakao-login
      */
     suspend fun kakaoLogin(
         accessToken: String,
@@ -196,7 +169,7 @@ class AuthService private constructor(private val context: Context) {
         nickname: String?,
         kakaoId: String?,
         profileImage: String? = null
-    ): SocialLoginResponse = withContext(Dispatchers.IO) {
+    ): SocialLoginResponse {
         val request = KakaoLoginRequest(
             kakaoId = kakaoId,
             email = email,
@@ -204,127 +177,39 @@ class AuthService private constructor(private val context: Context) {
             accessToken = accessToken,
             profileImage = profileImage
         )
-        
-        val jsonBody = gson.toJson(request)
-        val requestBody = jsonBody.toRequestBody("application/json".toMediaType())
-        
-        val httpRequest = Request.Builder()
-            .url("$BASE_URL/auth/kakao-login")
-            .post(requestBody)
-            .addHeader("Content-Type", "application/json")
-            .build()
-        
-        try {
-            Log.d(TAG, "🚀 [HTTP Request] POST $BASE_URL/auth/kakao-login")
-            val response = httpClient.newCall(httpRequest).execute()
-            val responseCode = response.code
-            val responseBody = response.body?.string() ?: ""
-            
-            Log.d(TAG, "📥 [HTTP Response] Code: $responseCode")
-            
-            if (responseBody.isEmpty()) {
-                throw IOException("Empty response body from server")
-            }
-            
-            val loginResponse = gson.fromJson(responseBody, SocialLoginResponse::class.java)
-            
+
+        return try {
+            val loginResponse = api.kakaoLogin(request)
+
             if (loginResponse.success == true) {
-                // Raw Response Body 로깅 추가 (디버깅용)
-                Log.d(TAG, "✅ [Social Login] Success (Kakao)")
-                Log.d(TAG, "📦 Response JSON: $responseBody")
-                
+                Log.d(TAG, "[Social Login] Kakao success")
                 val token = loginResponse.token ?: loginResponse.data?.token
                 val user = loginResponse.user ?: loginResponse.data?.user
-                
                 token?.let { saveToken(it) }
                 user?.let { saveUserData(it) }
             }
-            
+
             loginResponse
         } catch (e: Exception) {
             Log.e(TAG, "Kakao login failed", e)
             SocialLoginResponse(
                 success = false,
-                message = "네트워크 오류: ${e.message}",
-                error = e.message,
-                isNewUser = null,
-                user = null,
-                token = null,
-                data = null
+                message = "Network error: ${e.message}",
+                error = e.message
             )
         }
     }
-    
-    // Token 관리
-    fun saveToken(token: String) {
-        val success = prefs.edit().putString(KEY_TOKEN, token).commit()
-        Log.d(TAG, "🔑 Token saved: ${token.take(10)}... (Success: $success)")
-    }
-    
-    fun getToken(): String? = prefs.getString(KEY_TOKEN, null)
-    
-    // 사용자 데이터 관리
-    fun saveUserData(user: SMAPUser) {
-        val json = gson.toJson(user)
-        val success1 = prefs.edit().putString(KEY_USER_DATA, json).commit()
-        val success2 = prefs.edit().putInt(KEY_MT_IDX, user.mtIdx ?: 0).commit()
-        Log.d(TAG, "👤 User data saved: ${user.mtNickname} (Success: ${success1 && success2})")
-        
-        // FCM 토큰 업데이트 트리거
-        MyFirebaseMessagingService.triggerTokenUpdate(context)
-    }
-    
-    fun getUserData(): SMAPUser? {
-        val userJson = prefs.getString(KEY_USER_DATA, null) ?: return null
-        return try {
-            gson.fromJson(userJson, SMAPUser::class.java)
-        } catch (e: Exception) {
-            android.util.Log.e(TAG, "Failed to parse user data", e)
-            null
-        }
-    }
-    
-    fun getMtIdx(): Int = prefs.getInt(KEY_MT_IDX, 0)
-    
-    /**
-     * 로그아웃
-     */
-    fun logout() {
-        prefs.edit()
-            .remove(KEY_TOKEN)
-            .remove(KEY_USER_DATA)
-            .remove(KEY_MT_IDX)
-            .apply()
-        android.util.Log.d(TAG, "Logged out")
-    }
 
     /**
-     * 사용자 프로필 정보 조회
+     * GET /members/me
      */
-    suspend fun fetchUserProfile(): SMAPUser? = withContext(Dispatchers.IO) {
-        val token = getToken() ?: return@withContext null
-        
-        val httpRequest = Request.Builder()
-            .url("$BASE_URL/members/me")
-            .get()
-            .addHeader("Authorization", "Bearer $token")
-            .build()
-        
-        try {
-            val response = httpClient.newCall(httpRequest).execute()
-            val responseBody = response.body?.string() ?: ""
-            
-            if (response.isSuccessful) {
-                // Wrapper class to match server response structure
-                data class ProfileResponse(val success: Boolean, val data: SMAPUser?)
-                val profileResponse = gson.fromJson(responseBody, ProfileResponse::class.java)
-                
-                if (profileResponse.success && profileResponse.data != null) {
-                    saveUserData(profileResponse.data)
-                    return@withContext profileResponse.data
-                }
-            }
-            null
+    suspend fun fetchUserProfile(): SMAPUser? {
+        return try {
+            val response = api.getUserProfile()
+            if (response.success && response.data != null) {
+                saveUserData(response.data)
+                response.data
+            } else null
         } catch (e: Exception) {
             Log.e(TAG, "Fetch profile failed", e)
             null
@@ -332,34 +217,16 @@ class AuthService private constructor(private val context: Context) {
     }
 
     /**
-     * 프로필 정보 업데이트
+     * POST /members/update-profile
      */
-    suspend fun updateProfile(name: String, nickname: String, birth: String?, gender: Int?): ApiResponse<Unit> = withContext(Dispatchers.IO) {
-        val token = getToken() ?: return@withContext ApiResponse(false, "Authentication required")
-        
-        val updateRequest = UpdateProfileRequest(mtName = name, mtNickname = nickname, mtBirth = birth, mtGender = gender)
-        val jsonBody = gson.toJson(updateRequest)
-        val requestBody = jsonBody.toRequestBody("application/json".toMediaType())
-        
-        val httpRequest = Request.Builder()
-            .url("$BASE_URL/members/update-profile")
-            .post(requestBody)
-            .addHeader("Authorization", "Bearer $token")
-            .addHeader("Content-Type", "application/json")
-            .build()
-        
-        try {
-            val response = httpClient.newCall(httpRequest).execute()
-            val responseBody = response.body?.string() ?: ""
-            
-            if (response.isSuccessful) {
-                val apiResponse = gson.fromJson(responseBody, ApiResponse::class.java)
-                if (apiResponse.success) {
-                    fetchUserProfile() // Refresh local data
-                }
-                return@withContext ApiResponse(apiResponse.success, apiResponse.message)
+    suspend fun updateProfile(name: String, nickname: String, birth: String?, gender: Int?): ApiResponse<Unit> {
+        return try {
+            val request = UpdateProfileRequest(mtName = name, mtNickname = nickname, mtBirth = birth, mtGender = gender)
+            val response = api.updateProfile(request)
+            if (response.success) {
+                fetchUserProfile() // Refresh local data
             }
-            ApiResponse(false, "Server error: ${response.code}")
+            ApiResponse(response.success, response.message)
         } catch (e: Exception) {
             Log.e(TAG, "Update profile failed", e)
             ApiResponse(false, "Network error: ${e.message}")
@@ -367,30 +234,12 @@ class AuthService private constructor(private val context: Context) {
     }
 
     /**
-     * 비밀번호 변경
+     * POST /members/change-password
      */
-    suspend fun changePassword(current: String, new: String): ChangePasswordResponse = withContext(Dispatchers.IO) {
-        val token = getToken() ?: return@withContext ChangePasswordResponse(false, "Authentication required")
-        
-        val passwordRequest = ChangePasswordRequest(currentPassword = current, newPassword = new)
-        val jsonBody = gson.toJson(passwordRequest)
-        val requestBody = jsonBody.toRequestBody("application/json".toMediaType())
-        
-        val httpRequest = Request.Builder()
-            .url("$BASE_URL/members/change-password")
-            .post(requestBody)
-            .addHeader("Authorization", "Bearer $token")
-            .addHeader("Content-Type", "application/json")
-            .build()
-        
-        try {
-            val response = httpClient.newCall(httpRequest).execute()
-            val responseBody = response.body?.string() ?: ""
-            
-            if (response.isSuccessful) {
-                return@withContext gson.fromJson(responseBody, ChangePasswordResponse::class.java)
-            }
-            ChangePasswordResponse(false, "Server error: ${response.code}")
+    suspend fun changePassword(current: String, new: String): ChangePasswordResponse {
+        return try {
+            val request = ChangePasswordRequest(currentPassword = current, newPassword = new)
+            api.changePassword(request)
         } catch (e: Exception) {
             Log.e(TAG, "Change password failed", e)
             ChangePasswordResponse(false, "Network error: ${e.message}")
@@ -398,30 +247,12 @@ class AuthService private constructor(private val context: Context) {
     }
 
     /**
-     * 비밀번호 확인 (회원탈퇴 전 본인 확인용)
+     * POST /members/verify-password
      */
-    suspend fun verifyPassword(password: String): VerifyPasswordResponse = withContext(Dispatchers.IO) {
-        val token = getToken() ?: return@withContext VerifyPasswordResponse(false, "Authentication required")
-        
-        val verifyRequest = VerifyPasswordRequest(currentPassword = password)
-        val jsonBody = gson.toJson(verifyRequest)
-        val requestBody = jsonBody.toRequestBody("application/json".toMediaType())
-        
-        val httpRequest = Request.Builder()
-            .url("$BASE_URL/members/verify-password")
-            .post(requestBody)
-            .addHeader("Authorization", "Bearer $token")
-            .addHeader("Content-Type", "application/json")
-            .build()
-        
-        try {
-            val response = httpClient.newCall(httpRequest).execute()
-            val responseBody = response.body?.string() ?: ""
-            
-            if (response.isSuccessful) {
-                return@withContext gson.fromJson(responseBody, VerifyPasswordResponse::class.java)
-            }
-            VerifyPasswordResponse(false, "Server error: ${response.code}")
+    suspend fun verifyPassword(password: String): VerifyPasswordResponse {
+        return try {
+            val request = VerifyPasswordRequest(currentPassword = password)
+            api.verifyPassword(request)
         } catch (e: Exception) {
             Log.e(TAG, "Verify password failed", e)
             VerifyPasswordResponse(false, "Network error: ${e.message}")
@@ -429,34 +260,16 @@ class AuthService private constructor(private val context: Context) {
     }
 
     /**
-     * 회원 탈퇴
+     * POST /members/withdraw
      */
-    suspend fun withdraw(reasonIdx: Int, etcReason: String?, reasons: List<String>): WithdrawResponse = withContext(Dispatchers.IO) {
-        val token = getToken() ?: return@withContext WithdrawResponse(false, "Authentication required")
-        
-        val withdrawRequest = WithdrawRequest(mtRetireChk = reasonIdx, mtRetireEtc = etcReason, reasons = reasons)
-        val jsonBody = gson.toJson(withdrawRequest)
-        val requestBody = jsonBody.toRequestBody("application/json".toMediaType())
-        
-        val httpRequest = Request.Builder()
-            .url("$BASE_URL/members/withdraw")
-            .post(requestBody)
-            .addHeader("Authorization", "Bearer $token")
-            .addHeader("Content-Type", "application/json")
-            .build()
-        
-        try {
-            val response = httpClient.newCall(httpRequest).execute()
-            val responseBody = response.body?.string() ?: ""
-            
-            if (response.isSuccessful) {
-                val withdrawResponse = gson.fromJson(responseBody, WithdrawResponse::class.java)
-                if (withdrawResponse.success) {
-                    logout()
-                }
-                return@withContext withdrawResponse
+    suspend fun withdraw(reasonIdx: Int, etcReason: String?, reasons: List<String>): WithdrawResponse {
+        return try {
+            val request = WithdrawRequest(mtRetireChk = reasonIdx, mtRetireEtc = etcReason, reasons = reasons)
+            val response = api.withdraw(request)
+            if (response.success) {
+                logout()
             }
-            WithdrawResponse(false, "Server error: ${response.code}")
+            response
         } catch (e: Exception) {
             Log.e(TAG, "Withdraw failed", e)
             WithdrawResponse(false, "Network error: ${e.message}")
@@ -464,34 +277,17 @@ class AuthService private constructor(private val context: Context) {
     }
 
     /**
-     * 프로필 이미지 업로드
+     * POST /members/upload-profile-image (multipart)
      */
-    suspend fun uploadProfileImage(imageData: ByteArray): ProfileImageUploadResponse = withContext(Dispatchers.IO) {
-        val token = getToken() ?: return@withContext ProfileImageUploadResponse(false, "Authentication required", null)
-        
-        val requestBody = MultipartBody.Builder()
-            .setType(MultipartBody.FORM)
-            .addFormDataPart("file", "profile.jpg", imageData.toRequestBody("image/jpeg".toMediaType()))
-            .build()
-        
-        val httpRequest = Request.Builder()
-            .url("$BASE_URL/members/upload-profile-image")
-            .post(requestBody)
-            .addHeader("Authorization", "Bearer $token")
-            .build()
-        
-        try {
-            val response = httpClient.newCall(httpRequest).execute()
-            val responseBody = response.body?.string() ?: ""
-            
-            if (response.isSuccessful) {
-                val uploadResponse = gson.fromJson(responseBody, ProfileImageUploadResponse::class.java)
-                if (uploadResponse.success) {
-                    fetchUserProfile() // Refresh local data
-                }
-                return@withContext uploadResponse
+    suspend fun uploadProfileImage(imageData: ByteArray): ProfileImageUploadResponse {
+        return try {
+            val requestBody = imageData.toRequestBody("image/jpeg".toMediaType())
+            val part = MultipartBody.Part.createFormData("file", "profile.jpg", requestBody)
+            val response = api.uploadProfileImage(part)
+            if (response.success) {
+                fetchUserProfile() // Refresh local data
             }
-            ProfileImageUploadResponse(false, "Server error: ${response.code}", null)
+            response
         } catch (e: Exception) {
             Log.e(TAG, "Upload image failed", e)
             ProfileImageUploadResponse(false, "Network error: ${e.message}", null)
@@ -499,29 +295,11 @@ class AuthService private constructor(private val context: Context) {
     }
 
     /**
-     * 공지사항 목록 조회
+     * GET /notices/?page=...&size=...&show_only=true
      */
-    suspend fun getNotices(page: Int = 1, size: Int = 20): SmapNoticeListWithPagination? = withContext(Dispatchers.IO) {
-        val token = getToken()
-        
-        val url = "$BASE_URL/notices/?page=$page&size=$size&show_only=true"
-        val requestBuilder = Request.Builder()
-            .url(url)
-            .get()
-            .addHeader("Content-Type", "application/json")
-        
-        token?.let {
-            requestBuilder.addHeader("Authorization", "Bearer $it")
-        }
-        
-        try {
-            val response = httpClient.newCall(requestBuilder.build()).execute()
-            val responseBody = response.body?.string() ?: ""
-            
-            if (response.isSuccessful) {
-                return@withContext gson.fromJson(responseBody, SmapNoticeListWithPagination::class.java)
-            }
-            null
+    suspend fun getNotices(page: Int = 1, size: Int = 20): SmapNoticeListWithPagination? {
+        return try {
+            api.getNotices(page, size)
         } catch (e: Exception) {
             Log.e(TAG, "Fetch notices failed", e)
             null
@@ -529,24 +307,25 @@ class AuthService private constructor(private val context: Context) {
     }
 
     /**
-     * 1:1 문의 전송 (Telegram Bot API 이용)
+     * Send 1:1 inquiry via Telegram Bot API.
+     * This uses a DIFFERENT base URL (api.telegram.org) so it stays as manual OkHttp.
      */
-    suspend fun sendTelegramInquiry(chatId: String, botToken: String, text: String): Boolean = withContext(Dispatchers.IO) {
-        val url = "https://api.telegram.org/bot$botToken/sendMessage"
-        
-        val telegramRequest = TelegramMessageRequest(chatId = chatId, text = text)
-        val jsonBody = gson.toJson(telegramRequest)
-        val requestBody = jsonBody.toRequestBody("application/json".toMediaType())
-        
-        val httpRequest = Request.Builder()
-            .url(url)
-            .post(requestBody)
-            .addHeader("Content-Type", "application/json")
-            .build()
-        
-        try {
+    suspend fun sendTelegramInquiry(chatId: String, botToken: String, text: String): Boolean {
+        return try {
+            val url = "https://api.telegram.org/bot$botToken/sendMessage"
+            val telegramRequest = TelegramMessageRequest(chatId = chatId, text = text)
+            val jsonBody = json.encodeToString(telegramRequest)
+            val requestBody = jsonBody.toRequestBody("application/json".toMediaType())
+
+            val httpClient = OkHttpClient()
+            val httpRequest = Request.Builder()
+                .url(url)
+                .post(requestBody)
+                .addHeader("Content-Type", "application/json")
+                .build()
+
             val response = httpClient.newCall(httpRequest).execute()
-            Log.d(TAG, "📡 [Telegram] Response: ${response.code}")
+            Log.d(TAG, "[Telegram] Response: ${response.code}")
             response.isSuccessful
         } catch (e: Exception) {
             Log.e(TAG, "Send telegram inquiry failed", e)

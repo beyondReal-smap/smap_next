@@ -1,12 +1,13 @@
 package com.dmonster.smap.ui.home
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dmonster.smap.data.model.PushLog
 import com.dmonster.smap.data.model.NotificationSummary
 import com.dmonster.smap.data.service.AuthService
 import com.dmonster.smap.data.service.NotificationService
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,10 +16,11 @@ import kotlinx.coroutines.launch
 /**
  * 알림 화면 ViewModel
  */
-class NotificationViewModel(application: Application) : AndroidViewModel(application) {
-    
-    private val notificationService = NotificationService.getInstance(application)
-    private val authService = AuthService.getInstance(application)
+@HiltViewModel
+class NotificationViewModel @Inject constructor(
+    private val notificationService: NotificationService,
+    private val authService: AuthService
+) : ViewModel() {
     
     private val _logs = MutableStateFlow<List<PushLog>>(emptyList())
     val logs: StateFlow<List<PushLog>> = _logs.asStateFlow()

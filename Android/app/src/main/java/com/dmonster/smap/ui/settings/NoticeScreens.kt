@@ -24,12 +24,24 @@ import androidx.compose.ui.unit.sp
 import com.dmonster.smap.data.model.SmapNotice
 import com.dmonster.smap.data.service.AuthService
 import com.dmonster.smap.ui.theme.SuiteFont
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.launch
+
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface NoticeEntryPoint {
+    fun authService(): AuthService
+}
 
 @Composable
 fun NoticeListScreen(onBack: () -> Unit, onNoticeClick: (SmapNotice) -> Unit) {
     val context = LocalContext.current
-    val authService = remember { AuthService.getInstance(context) }
+    val authService = remember {
+        EntryPointAccessors.fromApplication(context.applicationContext, NoticeEntryPoint::class.java).authService()
+    }
     var notices by remember { mutableStateOf<List<SmapNotice>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }

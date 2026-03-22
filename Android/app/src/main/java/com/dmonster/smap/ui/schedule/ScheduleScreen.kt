@@ -18,10 +18,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.dmonster.smap.data.model.SmapSchedule
 import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.SuiteFont
+import com.dmonster.smap.ui.theme.responsiveSp
 
 /**
  * 일정 화면 - 달력 + 일정 목록
@@ -29,7 +30,7 @@ import com.dmonster.smap.ui.theme.SuiteFont
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScheduleScreen(
-    viewModel: ScheduleViewModel = viewModel()
+    viewModel: ScheduleViewModel = hiltViewModel()
 ) {
     // Collect States
     val currentMonth by viewModel.currentMonth.collectAsState()
@@ -108,14 +109,14 @@ fun ScheduleScreen(
                 Column {
                     Text(
                         text = "일정",
-                        fontSize = 22.sp,
+                        fontSize = 22.responsiveSp(),
                         fontFamily = SuiteFont,
                         fontWeight = FontWeight.Bold,
                         color = Color.Black
                     )
                     Text(
                         text = "그룹 멤버들과 일정을 공유해보세요",
-                        fontSize = 13.sp,
+                        fontSize = 13.responsiveSp(),
                         fontFamily = SuiteFont,
                         color = Color.Gray
                     )
@@ -200,8 +201,10 @@ fun ScheduleScreen(
                     }
                 } else {
                     items(selectedDateSchedules) { schedule ->
+                        val canManage = viewModel.canManageSchedule(schedule)
                         EventCard(
                             schedule = schedule,
+                            canManage = canManage,
                             onClick = { viewModel.showEventDetail(schedule) },
                             onEdit = {
                                 if (schedule.isRecurring) {
@@ -228,11 +231,11 @@ fun ScheduleScreen(
     }
 }
     
-    // Dialogs
     showEventDetail?.let { schedule ->
+        val canManage = viewModel.canManageSchedule(schedule)
         EventDetailDialog(
             schedule = schedule,
-            canEdit = true, // TODO: Check actual permission
+            canEdit = canManage,
             onDismiss = { viewModel.hideEventDetail() },
             onEdit = { viewModel.showEditDialog(schedule) },
             onDelete = { viewModel.showDeleteDialog(schedule) }

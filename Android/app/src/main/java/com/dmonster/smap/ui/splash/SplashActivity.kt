@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import com.dmonster.smap.R
 import com.dmonster.smap.data.service.AuthService
 import com.dmonster.smap.MainActivity
+import javax.inject.Inject
 import com.dmonster.smap.ui.login.LoginActivity
 import com.dmonster.smap.ui.theme.SmapTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -32,11 +33,13 @@ import dagger.hilt.android.AndroidEntryPoint
 @AndroidEntryPoint
 @SuppressLint("CustomSplashScreen")
 class SplashActivity : ComponentActivity() {
-    
+
     companion object {
         private const val SPLASH_DELAY = 800L  // 0.8초 (더 빠른 전환)
     }
-    
+
+    @Inject lateinit var authService: AuthService
+
     private var keepSplashScreen = true
     
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -73,7 +76,6 @@ class SplashActivity : ComponentActivity() {
     }
     
     private fun navigateNext() {
-        val authService = AuthService.getInstance(this)
         val isLoggedIn = authService.isLoggedIn
         android.util.Log.d("SMAP_DEBUG", "🔍 SplashActivity: isLoggedIn = $isLoggedIn")
         

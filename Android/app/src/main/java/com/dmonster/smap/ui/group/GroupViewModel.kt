@@ -1,8 +1,7 @@
 package com.dmonster.smap.ui.group
 
-import android.app.Application
 import android.util.Log
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dmonster.smap.data.model.SmapGroup
 import com.dmonster.smap.data.model.SmapGroupMember
@@ -10,20 +9,23 @@ import com.dmonster.smap.data.service.AuthService
 import com.dmonster.smap.data.service.GroupService
 import com.dmonster.smap.data.GlobalEvent
 import com.dmonster.smap.data.GlobalEventBus
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 /**
  * 그룹 페이지 ViewModel
  */
-class GroupViewModel(application: Application) : AndroidViewModel(application) {
+@HiltViewModel
+class GroupViewModel @Inject constructor(
+    private val groupService: GroupService,
+    private val authService: AuthService
+) : ViewModel() {
 
     companion object {
         private const val TAG = "GroupViewModel"
     }
-
-    private val groupService = GroupService.getInstance(application)
-    private val authService = AuthService.getInstance(application)
 
     // Current View State
     enum class ViewState { LIST, DETAIL }
@@ -323,6 +325,29 @@ class GroupViewModel(application: Application) : AndroidViewModel(application) {
                 }
             } catch (e: Exception) {
                 _errorMessage.value = "그룹 삭제 중 오류가 발생했습니다"
+            }
+        }
+    }
+
+    fun leaveGroup() {
+        val group = _selectedGroup.value ?: return
+        val user = authService.getUserData() ?: return
+
+        viewModelScope.launch {
+            try {
+                val mtIdx = user.mtIdx ?: return@launch
+                val success = groupService.removeMember(group.sgtIdx, mtIdx)
+                if (success) {
+                    _successMessage.value = "그룹에서 탈퇴되었습니다"
+                    hideDeleteDialog()
+                    backToList()
+                    loadGroups()
+                    GlobalEventBus.tryEmit(GlobalEvent.GroupsChanged)
+                } else {
+                    _errorMessage.value = "그룹 탈퇴에 실패했습니다"
+                }
+            } catch (e: Exception) {
+                _errorMessage.value = "그룹 탈퇴 중 오류가 발생했습니다"
             }
         }
     }

@@ -30,17 +30,29 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dmonster.smap.data.service.AuthService
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
 import com.dmonster.smap.ui.theme.SuiteFont
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
+
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface InquiryEntryPoint {
+    fun authService(): AuthService
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InquiryScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val authService = remember { AuthService.getInstance(context) }
+    val authService = remember {
+        EntryPointAccessors.fromApplication(context.applicationContext, InquiryEntryPoint::class.java).authService()
+    }
     
     var category by remember { mutableStateOf("general") }
     var email by remember { mutableStateOf("") }
@@ -202,8 +214,9 @@ fun InquiryScreen(onBack: () -> Unit) {
                     placeholder = { Text("답변받을 이메일을 입력하세요", fontFamily = SuiteFont, fontSize = 15.sp) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = TextFieldDefaults.outlinedTextFieldColors(
-                        containerColor = Color.White,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedContainerColor = Color.White,
+                        focusedContainerColor = Color.White,
                         unfocusedBorderColor = Color.Gray.copy(alpha = 0.2f),
                         focusedBorderColor = if (isEmailValid) Color.Green.copy(alpha = 0.5f) else Color.Red.copy(alpha = 0.5f)
                     ),
@@ -227,7 +240,11 @@ fun InquiryScreen(onBack: () -> Unit) {
                     placeholder = { Text("문의 제목을 입력하세요", fontFamily = SuiteFont, fontSize = 15.sp) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = TextFieldDefaults.outlinedTextFieldColors(containerColor = Color.White, unfocusedBorderColor = Color.Gray.copy(alpha = 0.2f)),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedContainerColor = Color.White,
+                        focusedContainerColor = Color.White,
+                        unfocusedBorderColor = Color.Gray.copy(alpha = 0.2f)
+                    ),
                     singleLine = true
                 )
 
@@ -241,7 +258,11 @@ fun InquiryScreen(onBack: () -> Unit) {
                     placeholder = { Text("문의 내용을 입력해주세요", fontFamily = SuiteFont, fontSize = 15.sp) },
                     modifier = Modifier.fillMaxWidth().height(150.dp),
                     shape = RoundedCornerShape(12.dp),
-                    colors = TextFieldDefaults.outlinedTextFieldColors(containerColor = Color.White, unfocusedBorderColor = Color.Gray.copy(alpha = 0.2f))
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedContainerColor = Color.White,
+                        focusedContainerColor = Color.White,
+                        unfocusedBorderColor = Color.Gray.copy(alpha = 0.2f)
+                    )
                 )
 
                 Spacer(modifier = Modifier.height(32.dp))

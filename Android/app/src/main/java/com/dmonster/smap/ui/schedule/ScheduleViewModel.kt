@@ -1,8 +1,7 @@
 package com.dmonster.smap.ui.schedule
 
-import android.app.Application
 import android.util.Log
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dmonster.smap.data.model.SmapGroup
 import com.dmonster.smap.data.model.SmapGroupMember
@@ -12,6 +11,8 @@ import com.dmonster.smap.data.service.GroupService
 import com.dmonster.smap.data.service.ScheduleService
 import com.dmonster.smap.data.GlobalEvent
 import com.dmonster.smap.data.GlobalEventBus
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,15 +24,16 @@ import java.time.format.DateTimeFormatter
 /**
  * 일정 페이지 ViewModel
  */
-class ScheduleViewModel(application: Application) : AndroidViewModel(application) {
+@HiltViewModel
+class ScheduleViewModel @Inject constructor(
+    private val scheduleService: ScheduleService,
+    private val groupService: GroupService,
+    private val authService: AuthService
+) : ViewModel() {
 
     companion object {
         private const val TAG = "ScheduleViewModel"
     }
-
-    private val scheduleService = ScheduleService.getInstance(application)
-    private val groupService = GroupService.getInstance(application)
-    private val authService = AuthService.getInstance(application)
 
     // Current Month
     private val _currentMonth = MutableStateFlow(YearMonth.now())
@@ -384,6 +386,31 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
                 _errorMessage.value = "일정 삭제 중 오류가 발생했습니다"
             }
         }
+    }
+
+    // MARK: - Permissions
+
+    fun canManageSchedule(schedule: SmapSchedule): Boolean {
+        val currentUser = authService.getUserData() ?: return false
+        val creatorId = schedule.mtScheduleIdx ?: schedule.mtIdx ?: return false
+        
+        // 1. Own data
+        if (creatorId == currentUser.mtIdx) return true
+        
+        val currentMember = _members.value.find { it.mtIdx == currentUser.mtIdx } ?: return false
+        
+        // 2. Owner can manage anything
+        if (currentMember.sgdtOwnerChk == "Y") return true
+        
+        // 3. Leader can manage anything except Owner's data
+        if (currentMember.sgdtLeaderChk == "Y") {
+            val targetMember = _members.value.find { it.mtIdx == creatorId }
+            // If target is Owner, leader cannot manage
+            if (targetMember?.sgdtOwnerChk == "Y") return false
+            return true
+        }
+        
+        return false
     }
 
     // MARK: - Helpers

@@ -20,7 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.*
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.SuiteFont
 
@@ -31,7 +31,7 @@ import com.dmonster.smap.ui.theme.SuiteFont
 @Composable
 fun ForgotPasswordScreen(
     onDismiss: () -> Unit,
-    viewModel: ForgotPasswordViewModel = viewModel()
+    viewModel: ForgotPasswordViewModel = hiltViewModel()
 ) {
     val currentStep by viewModel.currentStep.collectAsState()
     val phoneNumber by viewModel.phoneNumber.collectAsState()

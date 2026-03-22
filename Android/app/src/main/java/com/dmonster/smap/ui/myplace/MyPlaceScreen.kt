@@ -1,5 +1,6 @@
 package com.dmonster.smap.ui.myplace
 
+import com.dmonster.smap.AppConstants
 import android.annotation.SuppressLint
 import android.util.Log
 import androidx.compose.animation.*
@@ -25,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.dmonster.smap.ui.schedule.GroupSelectorDropdown
 import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.SuiteFont
@@ -48,7 +49,7 @@ import com.dmonster.smap.ui.home.MapLoadingOverlay
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalNaverMapApi::class)
 @Composable
 fun MyPlaceScreen(
-    viewModel: MyPlaceViewModel = viewModel()
+    viewModel: MyPlaceViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
     
@@ -88,7 +89,10 @@ fun MyPlaceScreen(
     
     // NaverMap Camera State
     val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition(LatLng(37.5665, 126.9780), 11.0)
+        position = CameraPosition(
+            LatLng(AppConstants.DefaultLocation.LATITUDE, AppConstants.DefaultLocation.LONGITUDE), 
+            AppConstants.MapZoom.DEFAULT
+        )
     }
 
     // Trigger loading on every visit
@@ -126,7 +130,9 @@ fun MyPlaceScreen(
     LaunchedEffect(isMapLoading) {
         if (!isMapLoading && selectedLocation == null && locations.isEmpty()) {
             cameraPositionState.animate(
-                update = CameraUpdate.scrollTo(LatLng(37.5665, 126.9780))
+                update = CameraUpdate.scrollTo(
+                    LatLng(AppConstants.DefaultLocation.LATITUDE, AppConstants.DefaultLocation.LONGITUDE)
+                )
             )
         }
     }
@@ -150,6 +156,9 @@ fun MyPlaceScreen(
                         isLogoClickEnabled = false
                     ),
                     onMapLongClick = { _, coord ->
+                        viewModel.showAddDialog(coord.latitude, coord.longitude)
+                    },
+                    onMapClick = { _, coord ->
                         viewModel.showAddDialog(coord.latitude, coord.longitude)
                     }
                 ) {
@@ -271,7 +280,7 @@ fun MyPlaceScreen(
             onClick = { viewModel.toggleMemberSidebar() },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 20.dp, bottom = 60.dp)
+                .padding(end = 20.dp, bottom = 20.dp)
                 .zIndex(10f) // Higher than Sidebar Overlay (5f)
         )
         
@@ -287,6 +296,7 @@ fun MyPlaceScreen(
                 selectedGroup = selectedGroup,
                 members = members,
                 selectedMember = selectedMember,
+                currentUserIdx = viewModel.getCurrentUserIdx(),
                 locations = locations,
                 onGroupSelect = { viewModel.selectGroup(it) },
                 onMemberSelect = { viewModel.selectMember(it) },
@@ -295,6 +305,7 @@ fun MyPlaceScreen(
                     viewModel.hideMemberSidebar()
                 },
                 onLocationNotification = { viewModel.toggleLocationNotification(it) },
+                canManageLocation = { viewModel.canManageLocation(it) },
                 onClose = { viewModel.hideMemberSidebar() },
                 isLoading = isLoading,
                 isLoadingLocations = isLoadingLocations
@@ -324,30 +335,33 @@ fun MyPlaceScreen(
             onDismiss = { viewModel.hideAddDialog() },
             onSearchClick = { viewModel.showSearchScreen() },
             onMemberSelect = { viewModel.selectMember(it) },
-            onSave = { title, address, lat, lng, memo ->
-                viewModel.createLocation(title, address, lat, lng, memo)
+            onSave = { title, address, lat, lng, memo, alarm ->
+                viewModel.createLocation(title, address, lat, lng, memo, alarm)
             },
             onDelete = {},
             onNotificationToggle = { /* Not applicable for new items yet */ },
             isLoading = isCreating
         )
     } else if (showEditDialog != null) {
+        val canManage = viewModel.canManageLocation(showEditDialog!!)
         LocationDetailSheet(
             location = showEditDialog,
+            canManage = canManage,
             pendingInfo = pendingPlaceInfo,
             pendingLocation = pendingLocation,
             isNew = false,
             onDismiss = { viewModel.hideEditDialog() },
             onSearchClick = { viewModel.showSearchScreen() },
             onMemberSelect = {},
-            onSave = { title, address, lat, lng, memo ->
+            onSave = { title, address, lat, lng, memo, alarm ->
                 viewModel.updateLocation(
                     locationId = showEditDialog!!.sltIdx,
                     title = title,
                     address = address,
                     lat = lat,
                     lng = lng,
-                    memo = memo
+                    memo = memo,
+                    enterAlarm = alarm
                 )
             },
             onDelete = { viewModel.showDeleteDialog(it) },

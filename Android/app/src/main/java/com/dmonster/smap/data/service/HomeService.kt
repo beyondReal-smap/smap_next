@@ -1,364 +1,117 @@
 package com.dmonster.smap.data.service
 
-import android.content.Context
 import android.util.Log
+import com.dmonster.smap.data.api.SmapApi
 import com.dmonster.smap.data.model.*
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import java.io.IOException
-import java.util.concurrent.TimeUnit
 
 /**
- * Home 화면 데이터 서비스 (iOS HomeModels 기반)
- * 그룹, 멤버, 일정 API 호출 담당
+ * Home screen data service (delegates to SmapApi via Retrofit).
  */
-class HomeService private constructor(private val context: Context) {
-    
+class HomeService(
+    private val api: SmapApi,
+    private val authService: AuthService
+) {
+
     companion object {
         private const val TAG = "HomeService"
-        private const val BASE_URL = "https://api3.smap.site/api/v1"
-        
-        @Volatile
-        private var instance: HomeService? = null
-        
-        fun getInstance(context: Context): HomeService {
-            return instance ?: synchronized(this) {
-                instance ?: HomeService(context.applicationContext).also { instance = it }
-            }
-        }
     }
-    
-    private val gson = Gson()
-    private val authService = AuthService.getInstance(context)
-    
-    private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .writeTimeout(15, TimeUnit.SECONDS)
-        .build()
-    
+
     /**
-     * 현재 사용자의 그룹 목록 조회
-     * GET /api/v1/groups/current-user
+     * Returns the current user's mt_idx.
      */
-    suspend fun getGroups(): List<SmapGroup> = withContext(Dispatchers.IO) {
-        val token = authService.getToken()
-        Log.d(TAG, "🔍 [getGroups] Token status: ${if (token.isNullOrEmpty()) "NULL/EMPTY" else "EXISTS(len=${token.length})"} ")
-        
-        if (token.isNullOrBlank()) {
-            Log.e(TAG, "❌ [getGroups] 토큰 없음")
-            return@withContext emptyList()
-        }
-        
-        val request = Request.Builder()
-            .url("$BASE_URL/groups/current-user")
-            .get()
-            .addHeader("Authorization", "Bearer $token")
-            .addHeader("Content-Type", "application/json")
-            .addHeader("User-Agent", "SmapAndroid/1.0")
-            .build()
-        
-        try {
-            Log.d(TAG, "🚀 [HTTP] GET $BASE_URL/groups/current-user")
-            
-            val response = httpClient.newCall(request).execute()
-            val responseCode = response.code
-            val responseBody = response.body?.string() ?: ""
-            
-            Log.d(TAG, "📥 [HTTP Response] Code: $responseCode, Body: $responseBody")
-            
-            if (!response.isSuccessful) {
-                Log.e(TAG, "❌ [getGroups] HTTP 오류: $responseCode - $responseBody")
-                return@withContext emptyList()
-            }
-            
-            // 응답 파싱
-            try {
-                // 먼저 배열 형태로 파싱 시도 (가장 빈번한 형태)
-                val listType = object : TypeToken<List<SmapGroup>>() {}.type
-                val groups: List<SmapGroup> = gson.fromJson(responseBody, listType)
-                Log.d(TAG, "✅ [getGroups] 그룹 ${groups.size}개 로드 성공 (list)")
-                return@withContext groups
-            } catch (e: Exception) {
-                // 실패하면 wrapper 형태로 파싱 시도 ({data: [...]})
-                try {
-                    val wrapper = gson.fromJson(responseBody, GroupListResponse::class.java)
-                    if (wrapper != null && wrapper.data != null) {
-                        Log.d(TAG, "✅ [getGroups] 그룹 ${wrapper.data.size}개 로드 성공 (wrapper)")
-                        return@withContext wrapper.data
-                    }
-                    return@withContext emptyList()
-                } catch (e2: Exception) {
-                    Log.e(TAG, "❌ [getGroups] 응답 파싱 실패: $responseBody", e2)
-                    return@withContext emptyList()
-                }
-            }
+    fun getCurrentUserIdx(): Int? {
+        return authService.getUserData()?.mtIdx
+    }
+
+    /**
+     * GET /groups/current-user
+     */
+    suspend fun getGroups(): List<SmapGroup> {
+        return try {
+            val groups = api.getCurrentUserGroups()
+            Log.d(TAG, "[getGroups] ${groups.size} groups loaded")
+            groups
         } catch (e: Exception) {
-            Log.e(TAG, "❌ [getGroups] 오류 발생", e)
-            return@withContext emptyList()
+            Log.e(TAG, "[getGroups] error", e)
+            emptyList()
         }
     }
-    
+
     /**
-     * 그룹 멤버 목록 조회
-     * GET /api/v1/group-members/member/{groupId}
+     * GET /group-members/member/{groupId}
      */
-    suspend fun getGroupMembers(groupId: Int): List<SmapGroupMember> = withContext(Dispatchers.IO) {
-        val token = authService.getToken()
-        if (token.isNullOrBlank()) {
-            Log.e(TAG, "❌ [getGroupMembers] 토큰 없음")
-            return@withContext emptyList()
-        }
-        
-        val request = Request.Builder()
-            .url("$BASE_URL/group-members/member/$groupId")
-            .get()
-            .addHeader("Authorization", "Bearer $token")
-            .addHeader("Content-Type", "application/json")
-            .addHeader("User-Agent", "SmapAndroid/1.0")
-            .build()
-        
-        try {
-            Log.d(TAG, "🚀 [HTTP] GET $BASE_URL/group-members/member/$groupId")
-            
-            val response = httpClient.newCall(request).execute()
-            val responseCode = response.code
-            val responseBody = response.body?.string() ?: ""
-            
-            Log.d(TAG, "📥 [HTTP Response] Code: $responseCode, Body: $responseBody")
-            
-            if (!response.isSuccessful) {
-                Log.e(TAG, "❌ [getGroupMembers] HTTP 오류: $responseCode - $responseBody")
-                return@withContext emptyList()
-            }
-            
-            // 응답 파싱
-            try {
-                // 먼저 배열 형태로 파싱 시도
-                val listType = object : TypeToken<List<SmapGroupMember>>() {}.type
-                val members: List<SmapGroupMember> = gson.fromJson(responseBody, listType)
-                Log.d(TAG, "✅ [getGroupMembers] 멤버 ${members.size}명 로드 성공 (list)")
-                return@withContext members
-            } catch (e: Exception) {
-                // 실패하면 wrapper 형태로 파싱 시도
-                try {
-                    val wrapper = gson.fromJson(responseBody, MemberListResponse::class.java)
-                    if (wrapper != null && wrapper.data != null) {
-                        Log.d(TAG, "✅ [getGroupMembers] 멤버 ${wrapper.data.size}명 로드 성공 (wrapper)")
-                        return@withContext wrapper.data
-                    }
-                    return@withContext emptyList()
-                } catch (e2: Exception) {
-                    Log.e(TAG, "❌ [getGroupMembers] 응답 파싱 실패: $responseBody", e2)
-                    return@withContext emptyList()
-                }
-            }
+    suspend fun getGroupMembers(groupId: Int): List<SmapGroupMember> {
+        return try {
+            val members = api.getGroupMembers(groupId)
+            Log.d(TAG, "[getGroupMembers] ${members.size} members loaded")
+            members
         } catch (e: Exception) {
-            Log.e(TAG, "❌ [getGroupMembers] 오류 발생", e)
-            return@withContext emptyList()
+            Log.e(TAG, "[getGroupMembers] error", e)
+            emptyList()
         }
     }
-    
+
     /**
-     * 그룹 일정 목록 조회
-     * GET /api/v1/schedules/group/{groupId}?days=14
+     * GET /schedules/group/{groupId}?days={days}
      */
-    suspend fun getGroupSchedules(groupId: Int, days: Int = 14): List<SmapSchedule> = withContext(Dispatchers.IO) {
-        val token = authService.getToken()
-        if (token.isNullOrBlank()) {
-            Log.e(TAG, "❌ [getGroupSchedules] 토큰 없음")
-            return@withContext emptyList()
-        }
-        
-        val url = "$BASE_URL/schedules/group/$groupId?days=$days"
-        
-        val request = Request.Builder()
-            .url(url)
-            .get()
-            .addHeader("Authorization", "Bearer $token")
-            .addHeader("Content-Type", "application/json")
-            .addHeader("User-Agent", "SmapAndroid/1.0")
-            .build()
-        
-        try {
-            Log.d(TAG, "🚀 [HTTP] GET $url")
-            
-            val response = httpClient.newCall(request).execute()
-            val responseCode = response.code
-            val responseBody = response.body?.string() ?: ""
-            
-            Log.d(TAG, "📥 [HTTP Response] Code: $responseCode, Body: $responseBody")
-            
-            if (!response.isSuccessful) {
-                Log.e(TAG, "❌ [getGroupSchedules] HTTP 오류: $responseCode - $responseBody")
-                return@withContext emptyList()
-            }
-            
-            // 응답 파싱
-            try {
-                // 먼저 배열 형태로 파싱 시도
-                val listType = object : TypeToken<List<SmapSchedule>>() {}.type
-                val schedules: List<SmapSchedule> = gson.fromJson(responseBody, listType)
-                Log.d(TAG, "✅ [getGroupSchedules] 일정 ${schedules.size}개 로드 성공 (list)")
-                return@withContext schedules
-            } catch (e: Exception) {
-                // 실패하면 wrapper 형태로 파싱 시도
-                try {
-                    val wrapper = gson.fromJson(responseBody, ScheduleListResponse::class.java)
-                    if (wrapper != null && wrapper.data != null) {
-                        Log.d(TAG, "✅ [getGroupSchedules] 일정 ${wrapper.data.size}개 로드 성공 (wrapper)")
-                        return@withContext wrapper.data
-                    }
-                    return@withContext emptyList()
-                } catch (e2: Exception) {
-                    Log.e(TAG, "❌ [getGroupSchedules] 응답 파싱 실패: $responseBody", e2)
-                    return@withContext emptyList()
-                }
-            }
+    suspend fun getGroupSchedules(groupId: Int, days: Int = 14): List<SmapSchedule> {
+        return try {
+            val schedules = api.getGroupSchedules(groupId, days)
+            Log.d(TAG, "[getGroupSchedules] ${schedules.size} schedules loaded")
+            schedules
         } catch (e: Exception) {
-            Log.e(TAG, "❌ [getGroupSchedules] 오류 발생", e)
-            return@withContext emptyList()
+            Log.e(TAG, "[getGroupSchedules] error", e)
+            emptyList()
         }
     }
-    
+
     /**
-     * 그룹 생성
-     * POST /api/v1/groups
+     * POST /groups
      */
-    suspend fun createGroup(title: String, memo: String): SmapGroup? = withContext(Dispatchers.IO) {
-        val token = authService.getToken()
-        if (token.isNullOrBlank()) {
-            Log.e(TAG, "❌ [createGroup] 토큰 없음")
-            return@withContext null
-        }
-        
-        val requestBody = mapOf(
-            "sgt_title" to title,
-            "sgt_memo" to memo
-        )
-        val jsonBody = gson.toJson(requestBody)
-        
-        val request = Request.Builder()
-            .url("$BASE_URL/groups")
-            .post(jsonBody.toByteArray().toRequestBody("application/json".toMediaType()))
-            .addHeader("Authorization", "Bearer $token")
-            .addHeader("Content-Type", "application/json")
-            .addHeader("User-Agent", "SmapAndroid/1.0")
-            .build()
-        
-        try {
-            Log.d(TAG, "🚀 [HTTP] POST $BASE_URL/groups - $jsonBody")
-            
-            val response = httpClient.newCall(request).execute()
-            val responseCode = response.code
-            val responseBody = response.body?.string() ?: ""
-            
-            Log.d(TAG, "📥 [HTTP Response] Code: $responseCode, Body: $responseBody")
-            
-            if (!response.isSuccessful) {
-                Log.e(TAG, "❌ [createGroup] HTTP 오류: $responseCode - $responseBody")
-                return@withContext null
-            }
-            
-            // 응답 파싱
-            try {
-                val group = gson.fromJson(responseBody, SmapGroup::class.java)
-                Log.d(TAG, "✅ [createGroup] 그룹 생성 성공: ${group?.sgtIdx}")
-                return@withContext group
-            } catch (e: Exception) {
-                Log.e(TAG, "❌ [createGroup] 응답 파싱 실패: $responseBody", e)
-                return@withContext null
-            }
+    suspend fun createGroup(title: String, memo: String): SmapGroup? {
+        return try {
+            val body = mapOf<String, Any>(
+                "sgt_title" to title,
+                "sgt_memo" to memo
+            )
+            val group = api.createGroup(body)
+            Log.d(TAG, "[createGroup] created: ${group.sgtIdx}")
+            group
         } catch (e: Exception) {
-            Log.e(TAG, "❌ [createGroup] 오류 발생", e)
-            return@withContext null
+            Log.e(TAG, "[createGroup] error", e)
+            null
         }
     }
-    
+
     /**
-     * 초대코드로 그룹 가입
-     * 1단계: GET /api/v1/groups/code/{code} - 그룹 정보 조회
-     * 2단계: POST /api/v1/groups/{group_id}/join - 그룹 가입
+     * Two-step join: lookup group by invite code, then join it.
+     * Step 1: GET /groups/code/{code}
+     * Step 2: POST /groups/{groupId}/join
      */
-    suspend fun joinGroup(inviteCode: String): Boolean = withContext(Dispatchers.IO) {
-        val token = authService.getToken()
-        if (token.isNullOrBlank()) {
-            Log.e(TAG, "❌ [joinGroup] 토큰 없음")
-            return@withContext false
-        }
-        
-        val mtIdx = authService.getMtIdx()
-        if (mtIdx == 0) {
-            Log.e(TAG, "❌ [joinGroup] 사용자 ID 없음")
-            return@withContext false
-        }
-        
-        try {
-            // 1단계: 초대코드로 그룹 정보 조회
-            Log.d(TAG, "🚀 [joinGroup] 1단계: 초대코드로 그룹 조회 - code: $inviteCode")
-            
-            val codeRequest = Request.Builder()
-                .url("$BASE_URL/groups/code/$inviteCode")
-                .get()
-                .addHeader("Authorization", "Bearer $token")
-                .addHeader("Content-Type", "application/json")
-                .addHeader("User-Agent", "SmapAndroid/1.0")
-                .build()
-            
-            val codeResponse = httpClient.newCall(codeRequest).execute()
-            val codeResponseBody = codeResponse.body?.string() ?: ""
-            
-            Log.d(TAG, "📥 [joinGroup] 그룹 조회 응답: ${codeResponse.code}, Body: $codeResponseBody")
-            
-            if (!codeResponse.isSuccessful) {
-                Log.e(TAG, "❌ [joinGroup] 유효하지 않은 초대 코드")
-                return@withContext false
+    suspend fun joinGroup(inviteCode: String): Boolean {
+        return try {
+            val mtIdx = authService.getMtIdx()
+            if (mtIdx == 0) {
+                Log.e(TAG, "[joinGroup] user id missing")
+                return false
             }
-            
-            // 그룹 정보 파싱
-            val group = gson.fromJson(codeResponseBody, SmapGroup::class.java)
+
+            // Step 1: look up group by invite code
+            val group = api.getGroupByCode(inviteCode)
             val groupId = group.sgtIdx
-            Log.d(TAG, "✅ [joinGroup] 그룹 조회 성공 - ID: $groupId, Title: ${group.sgtTitle}")
-            
-            // 2단계: 그룹 가입
-            Log.d(TAG, "🚀 [joinGroup] 2단계: 그룹 가입 - groupId: $groupId, mtIdx: $mtIdx")
-            
-            val joinBody = mapOf(
+            Log.d(TAG, "[joinGroup] group found: $groupId - ${group.sgtTitle}")
+
+            // Step 2: join the group
+            val body = mapOf<String, Any>(
                 "mt_idx" to mtIdx,
                 "sgt_idx" to groupId
             )
-            val jsonBody = gson.toJson(joinBody)
-            
-            val joinRequest = Request.Builder()
-                .url("$BASE_URL/groups/$groupId/join")
-                .post(jsonBody.toByteArray().toRequestBody("application/json".toMediaType()))
-                .addHeader("Authorization", "Bearer $token")
-                .addHeader("Content-Type", "application/json")
-                .addHeader("User-Agent", "SmapAndroid/1.0")
-                .build()
-            
-            val joinResponse = httpClient.newCall(joinRequest).execute()
-            val joinResponseBody = joinResponse.body?.string() ?: ""
-            
-            Log.d(TAG, "📥 [joinGroup] 가입 응답: ${joinResponse.code}, Body: $joinResponseBody")
-            
-            if (!joinResponse.isSuccessful) {
-                Log.e(TAG, "❌ [joinGroup] 그룹 가입 실패: ${joinResponse.code}")
-                return@withContext false
-            }
-            
-            Log.d(TAG, "✅ [joinGroup] 그룹 가입 성공!")
-            return@withContext true
-            
+            api.joinGroup(groupId, body)
+            Log.d(TAG, "[joinGroup] joined successfully")
+            true
         } catch (e: Exception) {
-            Log.e(TAG, "❌ [joinGroup] 오류 발생", e)
-            return@withContext false
+            Log.e(TAG, "[joinGroup] error", e)
+            false
         }
     }
 }

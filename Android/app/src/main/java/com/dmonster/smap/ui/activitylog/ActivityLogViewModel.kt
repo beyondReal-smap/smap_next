@@ -1,8 +1,7 @@
 package com.dmonster.smap.ui.activitylog
 
-import android.app.Application
 import android.util.Log
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dmonster.smap.data.model.LocationLog
 import com.dmonster.smap.data.model.StayTime
@@ -15,6 +14,8 @@ import com.dmonster.smap.data.service.AuthService
 import com.dmonster.smap.data.service.GroupService
 import com.dmonster.smap.data.GlobalEvent
 import com.dmonster.smap.data.GlobalEventBus
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,15 +26,16 @@ import java.time.format.DateTimeFormatter
 /**
  * 활동로그 페이지 ViewModel
  */
-class ActivityLogViewModel(application: Application) : AndroidViewModel(application) {
+@HiltViewModel
+class ActivityLogViewModel @Inject constructor(
+    private val activityLogService: ActivityLogService,
+    private val groupService: GroupService,
+    private val authService: AuthService
+) : ViewModel() {
 
     companion object {
         private const val TAG = "ActivityLogViewModel"
     }
-
-    private val activityLogService = ActivityLogService.getInstance(application)
-    private val groupService = GroupService.getInstance(application)
-    private val authService = AuthService.getInstance(application)
     
     private val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 
@@ -138,8 +140,11 @@ class ActivityLogViewModel(application: Application) : AndroidViewModel(applicat
                 val members = groupService.getGroupMembers(groupId)
                 _members.value = members
                 
+                // 현재 사용자를 기본 선택 (없으면 첫 번째 멤버)
                 if (members.isNotEmpty() && _selectedMember.value == null) {
-                    selectMember(members.first())
+                    val currentUserIdx = authService.getUserData()?.mtIdx
+                    val selfMember = members.find { it.mtIdx == currentUserIdx }
+                    selectMember(selfMember ?: members.first())
                 }
                 
                 // Load activity stats for all members (for sidebar heatmap) - iOS와 동일한 그룹 API 사용
@@ -298,4 +303,6 @@ class ActivityLogViewModel(application: Application) : AndroidViewModel(applicat
     fun clearError() {
         _errorMessage.value = null
     }
+    
+    fun getCurrentUserIdx(): Int? = authService.getUserData()?.mtIdx
 }
