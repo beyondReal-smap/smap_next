@@ -649,12 +649,12 @@ struct MyPlaceMapView: UIViewRepresentable {
         mapView.logoAlign = .leftBottom
         mapView.zoomLevel = 15
         
-        // 사용자의 현재 위치로 초기화 (LocationService에서 가져옴)
+        // 사용자의 현재 위치로 초기화 (LocationManager에서 가져옴)
         var initialLat: Double = 37.5665  // 기본값은 서울
         var initialLng: Double = 126.9780
-        
-        // 현재 기기의 마지막 위치 사용 (getLastLocation은 non-optional)
-        let lastLocation = LocationService.sharedInstance.getLastLocation()
+
+        // 현재 기기의 마지막 위치 사용
+        let lastLocation = LocationManager.shared.lastLocation ?? CLLocation(latitude: 37.5665, longitude: 126.978)
         if lastLocation.coordinate.latitude != 0.0 && lastLocation.coordinate.longitude != 0.0 {
             initialLat = lastLocation.coordinate.latitude
             initialLng = lastLocation.coordinate.longitude

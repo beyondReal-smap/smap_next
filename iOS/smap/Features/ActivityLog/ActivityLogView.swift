@@ -1040,7 +1040,7 @@ struct ActivityLogMapView: UIViewRepresentable {
         m.zoomLevel = 15
         
         // 사용자의 현재 위치로 초기화
-        let lastLocation = LocationService.sharedInstance.getLastLocation()
+        let lastLocation = LocationManager.shared.lastLocation ?? CLLocation(latitude: 37.5665, longitude: 126.978)
         if lastLocation.coordinate.latitude != 0.0 && lastLocation.coordinate.longitude != 0.0 {
             let initialPosition = NMGLatLng(lat: lastLocation.coordinate.latitude, lng: lastLocation.coordinate.longitude)
             m.moveCamera(NMFCameraUpdate(scrollTo: initialPosition))

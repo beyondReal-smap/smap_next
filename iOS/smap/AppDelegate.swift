@@ -252,7 +252,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         
         // iOS 14+ 권장 방식: delegate 기반 위치 서비스 시작 (프리퍼미션 이후)
         if UserDefaults.standard.bool(forKey: "smap_location_prepermission_done") {
-            LocationService.sharedInstance.startLocationUpdatesWithPermissionCheck()
+            LocationManager.shared.startTracking()
         } else {
             print("📍 [LOCATION] 앱 시작 시 자동 위치 권한 요청 생략 (프리퍼미션 대기)")
         }

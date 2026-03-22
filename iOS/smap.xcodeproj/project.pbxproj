@@ -70,13 +70,9 @@
 		94339A532B2BE26F002177C1 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94339A522B2BE26F002177C1 /* AppDelegate.swift */; };
 		94339A5C2B2BE271002177C1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 94339A5B2B2BE271002177C1 /* Assets.xcassets */; };
 		94339A5F2B2BE271002177C1 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 94339A5D2B2BE271002177C1 /* LaunchScreen.storyboard */; };
-		94339A692B2BE2E5002177C1 /* BaseResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94339A682B2BE2E5002177C1 /* BaseResult.swift */; };
 		94339A6E2B2BE314002177C1 /* Utils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94339A6D2B2BE314002177C1 /* Utils.swift */; };
-		94339A772B2BE409002177C1 /* LocationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94339A762B2BE409002177C1 /* LocationService.swift */; };
 		94418E1F2BD0B88B00836120 /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 94418E1E2BD0B88B00836120 /* StoreKit.framework */; };
 		94418E212BD0C38E00836120 /* StoreKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94418E202BD0C38E00836120 /* StoreKitManager.swift */; };
-		948ABEF82BAA8F0300023DFD /* AuthData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 948ABEF72BAA8F0300023DFD /* AuthData.swift */; };
-		948ABEFC2BAA8FBE00023DFD /* MltGpsData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 948ABEFB2BAA8FBE00023DFD /* MltGpsData.swift */; };
 		94F4BC352BB6B5F600987BC4 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 94F4BC342BB6B5F600987BC4 /* GoogleService-Info.plist */; };
 		97334299BB6EFB6F53BA9D4B /* ScheduleCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D41A5CC31619786DF543A3D /* ScheduleCardView.swift */; };
 		9B19896A9DFBE962275EDA56 /* FloatingBackgroundView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4D21A23274BFE83F2D6DB03 /* FloatingBackgroundView.swift */; };
@@ -195,14 +191,10 @@
 		94339A5B2B2BE271002177C1 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		94339A5E2B2BE271002177C1 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		94339A602B2BE271002177C1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		94339A682B2BE2E5002177C1 /* BaseResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BaseResult.swift; sourceTree = "<group>"; };
 		94339A6D2B2BE314002177C1 /* Utils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Utils.swift; sourceTree = "<group>"; };
-		94339A762B2BE409002177C1 /* LocationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationService.swift; sourceTree = "<group>"; };
 		94418E1E2BD0B88B00836120 /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
 		94418E202BD0C38E00836120 /* StoreKitManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKitManager.swift; sourceTree = "<group>"; };
 		948ABEF42BAA81E900023DFD /* smap.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = smap.entitlements; sourceTree = "<group>"; };
-		948ABEF72BAA8F0300023DFD /* AuthData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthData.swift; sourceTree = "<group>"; };
-		948ABEFB2BAA8FBE00023DFD /* MltGpsData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MltGpsData.swift; sourceTree = "<group>"; };
 		94F4BC342BB6B5F600987BC4 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		9A604E96A4889B4AC3055E86 /* NoticeModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NoticeModels.swift; sourceTree = "<group>"; };
 		A08A0EC8330B484B756CE472 /* HomeHeaderView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeHeaderView.swift; sourceTree = "<group>"; };
@@ -562,7 +554,6 @@
 			children = (
 				94339A6C2B2BE302002177C1 /* Data */,
 				94339A6D2B2BE314002177C1 /* Utils.swift */,
-				94339A762B2BE409002177C1 /* LocationService.swift */,
 				94418E202BD0C38E00836120 /* StoreKitManager.swift */,
 			);
 			path = Helper;
@@ -571,9 +562,6 @@
 		94339A6C2B2BE302002177C1 /* Data */ = {
 			isa = PBXGroup;
 			children = (
-				94339A682B2BE2E5002177C1 /* BaseResult.swift */,
-				948ABEF72BAA8F0300023DFD /* AuthData.swift */,
-				948ABEFB2BAA8FBE00023DFD /* MltGpsData.swift */,
 			);
 			path = Data;
 			sourceTree = "<group>";
@@ -982,15 +970,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				94339A772B2BE409002177C1 /* LocationService.swift in Sources */,
 				F6010CE22F03E759008B05B7 /* GroupDetailView.swift in Sources */,
 				F6010CE32F03E759008B05B7 /* GroupListView.swift in Sources */,
 				F6010CE42F03E759008B05B7 /* ShareOptionsView.swift in Sources */,
 				F6010CE52F03E759008B05B7 /* QRCodeView.swift in Sources */,
-				948ABEF82BAA8F0300023DFD /* AuthData.swift in Sources */,
-				94339A692B2BE2E5002177C1 /* BaseResult.swift in Sources */,
 				94339A532B2BE26F002177C1 /* AppDelegate.swift in Sources */,
-				948ABEFC2BAA8FBE00023DFD /* MltGpsData.swift in Sources */,
 				94418E212BD0C38E00836120 /* StoreKitManager.swift in Sources */,
 				94339A6E2B2BE314002177C1 /* Utils.swift in Sources */,
 				A1B2C3D40001 /* LoginModels.swift in Sources */,

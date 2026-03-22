@@ -101,7 +101,7 @@ class AuthService: ObservableObject {
         userDefaults.isLoggedIn = true
 
         // 위치 서비스에 사용자 정보 전달
-        LocationService.sharedInstance.updateUserInfo(
+        LocationManager.shared.updateUserInfo(
             mtIdx: mtIdx,
             mtId: user.mt_id ?? "",
             mtName: user.mt_name ?? user.displayName
@@ -131,7 +131,7 @@ class AuthService: ObservableObject {
         userDefaults.clearAll()
 
         // 위치 서비스 정보 초기화
-        LocationService.sharedInstance.clearUserInfo()
+        LocationManager.shared.clearUserInfo()
 
         self.currentUser = nil
         print("[AuthService] 사용자 데이터 삭제 완료")
