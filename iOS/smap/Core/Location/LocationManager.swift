@@ -43,6 +43,8 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
 
     // MARK: - Tracking Control
 
+    private var isTracking = false
+
     func startTracking() {
         let status: CLAuthorizationStatus
         if #available(iOS 14.0, *) {
@@ -56,12 +58,24 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
             return
         }
 
+        guard !isTracking else {
+            print("[LocationManager] Already tracking - skip")
+            return
+        }
+        isTracking = true
+
         // Start motion detection
         motionManager.startMonitoring()
 
-        // Start in walking mode (safest default)
-        switchToMode(.walking)
+        // Apply walking mode config directly (avoid switchToMode guard for initial setup)
+        currentMode = .walking
+        clManager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
+        clManager.distanceFilter = 30
+        clManager.activityType = .fitness
+        uploader.startBatching(interval: 60)
+
         clManager.startUpdatingLocation()
+        print("[LocationManager] Tracking started in walking mode")
 
         // Warn if only whenInUse permission (stationary mode restricted)
         if status == .authorizedWhenInUse {
@@ -70,6 +84,7 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
     }
 
     func stopTracking() {
+        isTracking = false
         clManager.stopUpdatingLocation()
         motionManager.stopMonitoring()
         uploader.stopBatching()
@@ -199,7 +214,7 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
     private func handleAuthChange(_ status: CLAuthorizationStatus) {
         locationAuthStatus = status
         if status == .authorizedAlways || status == .authorizedWhenInUse {
-            clManager.startUpdatingLocation()
+            startTracking()
             pendingAuthCompletion?()
             pendingAuthCompletion = nil
         }

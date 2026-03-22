@@ -2268,7 +2268,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             performInitialPermissionSequence { [weak self] in
                 // 온보딩 완료 마크 (다음부터는 보완 로직으로)
                 UserDefaults.standard.set(true, forKey: "smap_permission_onboarding_done")
+                UserDefaults.standard.set(true, forKey: "smap_location_prepermission_done")
                 print("✅ [PERM] 권한 온보딩 완료 마크")
+                // 위치 권한이 허용되었으면 추적 시작
+                LocationManager.shared.startTracking()
                 // 보완 체크 한 번 더 (혹시 한쪽이 여전히 notDetermined이면)
                 self?.ensureMissingPermissionsSequence()
             }
@@ -2278,6 +2281,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         // 온보딩 이후: 결핍된 권한만 보완 요청
         print("🧭 [PERM] 재진입 - 결핍된 권한만 보완 요청 (모션 → 위치)")
         ensureMissingPermissionsSequence()
+        // 이미 권한이 있으면 추적 시작 (앱 재실행 시)
+        LocationManager.shared.startTracking()
     }
 
     private func requestMotionPermissionIfNeeded() {
