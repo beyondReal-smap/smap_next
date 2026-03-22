@@ -23,12 +23,12 @@ struct NativeScheduleListView: View {
         case edit, delete
     }
 
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
-                Color(red: 0.98, green: 0.98, blue: 1.0).edgesIgnoringSafeArea(.all)
+                Color(red: 0.98, green: 0.98, blue: 1.0).ignoresSafeArea()
 
 
                 VStack(spacing: 0) {
@@ -55,19 +55,22 @@ struct NativeScheduleListView: View {
                         .padding(.top, 20)
                         .padding(.bottom, 80)
                     }
+                    .refreshable {
+                        viewModel.fetchSchedules()
+                    }
                 }
 
                 if viewModel.isLoading {
                     ZStack {
-                        Color.black.opacity(0.1).edgesIgnoringSafeArea(.all)
-                        ActivityIndicator(style: .large, color: brandColor.uiColor)
+                        Color.black.opacity(0.1).ignoresSafeArea()
+                        ActivityIndicator(style: .large, color: SMAPTheme.Color.primary.uiColor)
                             .padding()
                             .background(Color.white)
                             .cornerRadius(12)
                     }
                 }
             }
-            .navigationBarHidden(true)
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingAddSchedule) {
                 ScheduleFormView(
                     viewModel: viewModel,
@@ -141,7 +144,7 @@ struct NativeScheduleListView: View {
             Button(action: { showingAddSchedule = true }) {
                 Image(systemName: "plus")
                     .font(.suite(size: 22, weight: .bold)) // Larger Plus
-                    .foregroundColor(brandColor)
+                    .foregroundColor(SMAPTheme.Color.primary)
             }
         }
 
@@ -181,7 +184,7 @@ struct NativeScheduleListView: View {
             }) {
                 Text("오늘로 이동")
                     .font(.suite(size: 14, weight: .medium))
-                    .foregroundColor(brandColor)
+                    .foregroundColor(SMAPTheme.Color.primary)
             }
             .padding(.bottom, 4)
             .padding(.top, 4)
@@ -257,11 +260,11 @@ struct NativeScheduleListView: View {
 
                                     if viewModel.selectedMemberIds.contains(member.id) {
                                         Circle()
-                                            .stroke(brandColor, lineWidth: 3)
+                                            .stroke(SMAPTheme.Color.primary, lineWidth: 3)
                                             .frame(width: 60, height: 60)
 
                                         Image(systemName: "checkmark.circle.fill")
-                                            .foregroundColor(brandColor)
+                                            .foregroundColor(SMAPTheme.Color.primary)
                                             .background(Color.white.clipShape(Circle()))
                                             .font(.suite(size: 16))
                                             .offset(x: 20, y: 20)
@@ -318,10 +321,10 @@ struct NativeScheduleListView: View {
                         Button(action: { showingAddSchedule = true }) {
                             Text("일정 추가하기")
                                 .font(.suite(size: 14, weight: .medium))
-                                .foregroundColor(brandColor)
+                                .foregroundColor(SMAPTheme.Color.primary)
                                 .padding(.horizontal, 20)
                                 .padding(.vertical, 10)
-                                .background(brandColor.opacity(0.1))
+                                .background(SMAPTheme.Color.primary.opacity(0.1))
                                 .cornerRadius(20)
                         }
                     }
@@ -415,7 +418,7 @@ struct CalendarDateCell: View {
     let hasEvent: Bool
     let onTap: () -> Void
 
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
 
     var body: some View {
         VStack(spacing: 0) { // Spacing 0 for tighter layout
@@ -426,11 +429,11 @@ struct CalendarDateCell: View {
                 .background(
                     ZStack {
                         if isSelected {
-                            brandColor
+                            SMAPTheme.Color.primary
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
-                                .shadow(color: brandColor.opacity(0.3), radius: 4, x: 0, y: 2)
+                                .shadow(color: SMAPTheme.Color.primary.opacity(0.3), radius: 4, x: 0, y: 2)
                         } else if isToday {
-                            brandColor.opacity(0.1)
+                            SMAPTheme.Color.primary.opacity(0.1)
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
                     }
@@ -458,7 +461,7 @@ struct CalendarDateCell: View {
 
     private var textColor: Color {
         if isSelected { return .white }
-        if isToday { return brandColor }
+        if isToday { return SMAPTheme.Color.primary }
         let weekday = Calendar.current.component(.weekday, from: date)
         if weekday == 1 { return .red.opacity(isCurrentMonth ? 1.0 : 0.5) }
         if weekday == 7 { return .blue.opacity(isCurrentMonth ? 1.0 : 0.5) }
@@ -473,7 +476,7 @@ struct ScheduleEventCard: View {
     let onEdit: () -> Void
     let onDelete: () -> Void
 
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -533,7 +536,7 @@ struct ScheduleEventCard: View {
 
                     Text(schedule.validMemberName)
                         .font(.suite(size: 12, weight: .bold))
-                        .foregroundColor(brandColor)
+                        .foregroundColor(SMAPTheme.Color.primary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
 

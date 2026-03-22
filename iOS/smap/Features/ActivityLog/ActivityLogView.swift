@@ -16,7 +16,7 @@ struct ActivityLogSidebarView: View {
     
     @State private var isGroupSelectorOpen = false
     
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -39,7 +39,7 @@ struct ActivityLogSidebarView: View {
         .frame(width: 320)
         .background(
             Color(red: 245/255, green: 247/255, blue: 250/255)
-                .edgesIgnoringSafeArea(.all)
+                .ignoresSafeArea()
         )
         .cornerRadius(24, corners: [.topRight, .bottomRight])
         .shadow(color: Color.black.opacity(0.15), radius: 20, x: 5, y: 0)
@@ -51,7 +51,7 @@ struct ActivityLogSidebarView: View {
         HStack(spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(brandColor)
+                    .fill(SMAPTheme.Color.primary)
                     .frame(width: 40, height: 40)
                 Image(systemName: "clock.arrow.circlepath")
                     .foregroundColor(.white)
@@ -212,7 +212,7 @@ struct ActivityLogMemberCell: View {
     let onMemberTap: () -> Void
     let onDateTap: (String) -> Void
     
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
     private let pinkColor = Color(red: 236/255, green: 72/255, blue: 153/255)
     private let indigoColor = Color(red: 99/255, green: 102/255, blue: 241/255)
     
@@ -242,7 +242,7 @@ struct ActivityLogMemberCell: View {
                         .frame(width: 48, height: 48)
                         .clipShape(Circle())
                         .overlay(
-                            Circle().stroke(isSelected ? brandColor : Color.gray.opacity(0.1), lineWidth: isSelected ? 3 : 1)
+                            Circle().stroke(isSelected ? SMAPTheme.Color.primary : Color.gray.opacity(0.1), lineWidth: isSelected ? 3 : 1)
                         )
                     } // End ZStack
                     
@@ -258,11 +258,11 @@ struct ActivityLogMemberCell: View {
                 calendarView
             }
             .padding(12)
-            .background(isSelected ? brandColor.opacity(0.05) : Color.white.opacity(0.6))
+            .background(isSelected ? SMAPTheme.Color.primary.opacity(0.05) : Color.white.opacity(0.6))
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? brandColor.opacity(0.3) : Color.clear, lineWidth: 1)
+                    .stroke(isSelected ? SMAPTheme.Color.primary.opacity(0.3) : Color.clear, lineWidth: 1)
             )
         }
         .buttonStyle(PlainButtonStyle())
@@ -472,7 +472,7 @@ struct ActivityLogView: View {
     @State private var sidebarDragOffset: CGFloat = 0
     @State private var isMapLoading = true  // 지도 로딩 상태
     
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
     private let sidebarWidth: CGFloat = 320
     
     var body: some View {
@@ -484,7 +484,7 @@ struct ActivityLogView: View {
                 sliderValue: viewModel.sliderValue,
                 isSliderDragging: viewModel.isSliderDragging
             )
-            .edgesIgnoringSafeArea(.all)
+            .ignoresSafeArea()
             .offset(y: 60)
             
             // 2. Header
@@ -535,7 +535,7 @@ struct ActivityLogView: View {
             // 5. Sidebar Overlay
             if viewModel.isSidebarOpen || sidebarDragOffset > 0 {
                 Color.black.opacity(overlayOpacity)
-                    .edgesIgnoringSafeArea(.all)
+                    .ignoresSafeArea()
                     .onTapGesture {
                         viewModel.closeSidebar()
                     }
@@ -581,17 +581,15 @@ struct ActivityLogView: View {
         .onAppear {
             handleLoading()
         }
-        .navigationBarHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
         .task {
             // 초기 데이터 로드 (그룹 목록 + 첫 그룹 선택 + 일별 카운트)
             await viewModel.loadInitialData()
         }
-        .alert(isPresented: $viewModel.showError) {
-            Alert(
-                title: Text("오류"),
-                message: Text(viewModel.errorMessage ?? "알 수 없는 오류가 발생했습니다."),
-                dismissButton: .default(Text("확인"))
-            )
+        .alert("오류", isPresented: $viewModel.showError) {
+            Button("확인", role: .cancel) {}
+        } message: {
+            Text(viewModel.errorMessage ?? "알 수 없는 오류가 발생했습니다.")
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("closeSidebars"))) { notification in
             // 탭 전환 시 사이드바를 닫기
@@ -720,7 +718,7 @@ struct ActivityLogHeaderView: View {
         .background(
             Color.white.opacity(0.95)
                 .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
-                .edgesIgnoringSafeArea(.top)
+                .ignoresSafeArea(edges: .top)
         )
     }
 }
@@ -737,7 +735,7 @@ struct ActivityLogFloatingCard: View {
     let isLoading: Bool
     let onTap: () -> Void
     
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
     
     var body: some View {
         Button(action: onTap) {
@@ -787,7 +785,7 @@ struct ActivityLogFloatingCard: View {
                         
                         Text(displayDate)
                             .font(.suite(size: 12, weight: .medium))
-                            .foregroundColor(brandColor)
+                            .foregroundColor(SMAPTheme.Color.primary)
                     }
                 }
                 
@@ -865,7 +863,7 @@ struct PathSliderView: View {
     @Binding var sliderValue: Double
     @Binding var isSliderDragging: Bool
     
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
     private let thumbSize: CGFloat = 20
     private let trackHeight: CGFloat = 8
     
@@ -874,7 +872,7 @@ struct PathSliderView: View {
             // Header
             HStack(spacing: 8) {
                 Circle()
-                    .fill(brandColor)
+                    .fill(SMAPTheme.Color.primary)
                     .frame(width: 28, height: 28)
                     .overlay(
                         Image(systemName: "play.fill")
@@ -907,21 +905,21 @@ struct PathSliderView: View {
                         // Track Progress
                         HStack {
                             RoundedRectangle(cornerRadius: trackHeight / 2)
-                                .fill(brandColor)
+                                .fill(SMAPTheme.Color.primary)
                                 .frame(width: thumbCenterX, height: trackHeight)
                             Spacer(minLength: 0)
                         }
                         
                         // Thumb (핸들)
                         Circle()
-                            .fill(brandColor)
+                            .fill(SMAPTheme.Color.primary)
                             .frame(width: thumbSize, height: thumbSize)
                             .overlay(
                                 Circle()
                                     .fill(Color.white)
                                     .frame(width: 8, height: 8)
                             )
-                            .shadow(color: brandColor.opacity(0.3), radius: 4)
+                            .shadow(color: SMAPTheme.Color.primary.opacity(0.3), radius: 4)
                             .position(x: thumbCenterX, y: geometry.size.height / 2)
                     }
                     .frame(height: geometry.size.height)
@@ -953,10 +951,10 @@ struct PathSliderView: View {
                     
                     Text("\(Int(sliderValue))%")
                         .font(.suite(size: 10, weight: .bold))
-                        .foregroundColor(brandColor)
+                        .foregroundColor(SMAPTheme.Color.primary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
-                        .background(brandColor.opacity(0.1))
+                        .background(SMAPTheme.Color.primary.opacity(0.1))
                         .cornerRadius(8)
                     
                     Spacer()
@@ -985,16 +983,16 @@ struct FloatingActionLogButton: View {
     let count: Int
     let action: () -> Void
     
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
     private let pinkColor = Color(red: 236/255, green: 72/255, blue: 153/255)
     
     var body: some View {
         Button(action: action) {
             ZStack(alignment: .topTrailing) {
                 Circle()
-                    .fill(brandColor)
+                    .fill(SMAPTheme.Color.primary)
                     .frame(width: 56, height: 56)
-                    .shadow(color: brandColor.opacity(0.3), radius: 12, x: 0, y: 8)
+                    .shadow(color: SMAPTheme.Color.primary.opacity(0.3), radius: 12, x: 0, y: 8)
                     .overlay(
                         Image(systemName: "person.fill")
                             .font(.suite(size: 22))

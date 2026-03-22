@@ -18,14 +18,14 @@ struct HomeView: View {
     @State private var isMapLoading = true  // 지도 로딩 상태
 
 
-    let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255) // #0113A3
+    
     private let sidebarWidth: CGFloat = 320
 
     var body: some View {
         ZStack(alignment: .leading) {
             // 1. Map Layer (Fullscreen from top 60px basically)
             NaverMapView(members: $viewModel.members, schedules: viewModel.filteredSchedules)
-                .edgesIgnoringSafeArea(.all)
+                .ignoresSafeArea()
                 .offset(y: 60) // Offset map slightly below header
                 .task {
                     // 최초 진입 시에만 데이터 로드
@@ -72,7 +72,7 @@ struct HomeView: View {
             // 3. Sidebar Overlay (Blur + Dim)
             if viewModel.isSidebarOpen || sidebarDragOffset > 0 {
                 Color.black.opacity(overlayOpacity)
-                    .edgesIgnoringSafeArea(.all)
+                    .ignoresSafeArea()
                     .onTapGesture {
                         closeSidebar()
                     }
@@ -116,10 +116,10 @@ struct HomeView: View {
         }
         .onAppear {
             handleLoading()
+        }
+        .task {
             // 홈 화면이 다시 표시될 때 멤버 위치 새로고침
-            Task {
-                await viewModel.refreshData()
-            }
+            await viewModel.refreshData()
         }
         .onDisappear {
             viewModel.pauseUpdates()
@@ -144,7 +144,7 @@ struct HomeView: View {
                 handleLoading()
             }
         }
-        .navigationBarHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
     }
 
     /// 지도 로딩 조절 로직 (최소 1.5초 및 데이터 완료 대기)

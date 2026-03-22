@@ -41,7 +41,7 @@ struct ScheduleFormView: View {
     @State private var isLoading: Bool = false
     @State private var errorMessage: String?
 
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
     private let repeatOptions = ["안함", "매일", "매주", "매월", "매년"]
     private let weekdays = ["일", "월", "화", "수", "목", "금", "토"]
 
@@ -77,9 +77,9 @@ struct ScheduleFormView: View {
     @State private var showingDateTimeSheet: Bool = false
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
-                Color(red: 0.98, green: 0.98, blue: 1.0).edgesIgnoringSafeArea(.all)
+                Color(red: 0.98, green: 0.98, blue: 1.0).ignoresSafeArea()
 
                 ScrollView {
                     VStack(spacing: 16) {
@@ -105,10 +105,10 @@ struct ScheduleFormView: View {
 
                 if isLoading {
                     ZStack {
-                        Color.black.opacity(0.2).edgesIgnoringSafeArea(.all)
+                        Color.black.opacity(0.2).ignoresSafeArea()
                         VStack(spacing: 12) {
                             ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: brandColor))
+                                .progressViewStyle(CircularProgressViewStyle(tint: SMAPTheme.Color.primary))
                                 .scaleEffect(1.2)
                             Text("저장 중...")
                                 .font(.suite(size: 14, weight: .medium))
@@ -136,11 +136,13 @@ struct ScheduleFormView: View {
                 .foregroundColor(.gray)
             )
             .onAppear(perform: setupInitialValues)
-            .alert(item: Binding<AlertItem?>(
-                get: { errorMessage.map { AlertItem(message: $0) } },
-                set: { _ in errorMessage = nil }
-            )) { item in
-                Alert(title: Text("오류"), message: Text(item.message), dismissButton: .default(Text("확인")))
+            .alert("오류", isPresented: Binding(
+                get: { errorMessage != nil },
+                set: { if !$0 { errorMessage = nil } }
+            )) {
+                Button("확인", role: .cancel) {}
+            } message: {
+                Text(errorMessage ?? "")
             }
             .sheet(isPresented: $showingAlarmSheet) {
                 alarmSelectionSheet
@@ -581,7 +583,7 @@ struct ScheduleFormView: View {
                 }
             }
             .sheet(isPresented: $showingLocationSearch) {
-                NavigationView {
+                NavigationStack {
                     LocationSearchView { place in
                         self.location = place.place_name
                         self.locationAddress = place.road_address_name.isEmpty ? place.address_name : place.road_address_name
@@ -658,14 +660,14 @@ struct ScheduleFormView: View {
                 .padding(.vertical, 16)
                 .background(
                     LinearGradient(
-                        gradient: Gradient(colors: canSave ? [brandColor, Color(red: 0, green: 26/255, blue: 138/255)] : [Color.gray.opacity(0.5), Color.gray.opacity(0.3)]),
+                        gradient: Gradient(colors: canSave ? [SMAPTheme.Color.primary, Color(red: 0, green: 26/255, blue: 138/255)] : [Color.gray.opacity(0.5), Color.gray.opacity(0.3)]),
                         startPoint: .leading,
                         endPoint: .trailing
                     )
                 )
                 .foregroundColor(.white)
                 .cornerRadius(14)
-                .shadow(color: canSave ? brandColor.opacity(0.3) : Color.clear, radius: 8, x: 0, y: 4)
+                .shadow(color: canSave ? SMAPTheme.Color.primary.opacity(0.3) : Color.clear, radius: 8, x: 0, y: 4)
             }
             .disabled(!canSave)
         }
@@ -673,7 +675,7 @@ struct ScheduleFormView: View {
 
     // MARK: - Alarm Selection Sheet
     private var alarmSelectionSheet: some View {
-        NavigationView {
+        NavigationStack {
             List {
                 ForEach(alarmOptions, id: \.1) { option in
                     Button(action: {
@@ -706,7 +708,7 @@ struct ScheduleFormView: View {
 
     // MARK: - Repeat Selection Sheet
     private var repeatSelectionSheet: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
                 List {
                     ForEach(repeatOptions, id: \.self) { option in

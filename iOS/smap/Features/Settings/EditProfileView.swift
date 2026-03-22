@@ -23,7 +23,7 @@ struct EditProfileView: View {
     @State private var showAlert: Bool = false
     @State private var alertMessage: String = ""
 
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
 
     private let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -84,7 +84,7 @@ struct EditProfileView: View {
 
                 // Form Fields
                 VStack(spacing: 0) {
-                    ProfileFormRow(icon: "person.fill", iconColor: brandColor, label: "이름", text: $name, placeholder: "이름을 입력하세요")
+                    ProfileFormRow(icon: "person.fill", iconColor: SMAPTheme.Color.primary, label: "이름", text: $name, placeholder: "이름을 입력하세요")
                     Divider().padding(.leading, 52)
                     ProfileFormRow(icon: "at", iconColor: .orange, label: "닉네임", text: $nickname, placeholder: "닉네임을 입력하세요")
                 }
@@ -125,7 +125,7 @@ struct EditProfileView: View {
                             DatePicker("", selection: $birthDate, displayedComponents: .date)
                                 .labelsHidden()
                                 .datePickerStyle(.compact)
-                                .accentColor(brandColor)
+                                .accentColor(SMAPTheme.Color.primary)
                                 .fixedSize()
                         }
                         .padding(.horizontal, 16)
@@ -189,7 +189,7 @@ struct EditProfileView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(canSave ? brandColor : Color.gray.opacity(0.3))
+                    .background(canSave ? SMAPTheme.Color.primary : Color.gray.opacity(0.3))
                     .foregroundColor(.white)
                     .cornerRadius(12)
                 }
@@ -220,16 +220,14 @@ struct EditProfileView: View {
                 }
             }
         }
-        .alert(isPresented: $showAlert) {
-            Alert(
-                title: Text("알림"),
-                message: Text(alertMessage),
-                dismissButton: .default(Text("확인")) {
-                    if alertMessage.contains("성공") {
-                        presentationMode.wrappedValue.dismiss()
-                    }
+        .alert("알림", isPresented: $showAlert) {
+            Button("확인", role: .cancel) {
+                if alertMessage.contains("성공") {
+                    presentationMode.wrappedValue.dismiss()
                 }
-            )
+            }
+        } message: {
+            Text(alertMessage)
         }
     }
 
@@ -305,7 +303,7 @@ struct GenderChip: View {
     let isSelected: Bool
     let action: () -> Void
 
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
 
     var body: some View {
         Button(action: action) {
@@ -313,7 +311,7 @@ struct GenderChip: View {
                 .font(.suite(size: 14, weight: .medium))
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
-                .background(isSelected ? brandColor : Color.gray.opacity(0.15))
+                .background(isSelected ? SMAPTheme.Color.primary : Color.gray.opacity(0.15))
                 .foregroundColor(isSelected ? .white : .primary)
                 .cornerRadius(20)
         }

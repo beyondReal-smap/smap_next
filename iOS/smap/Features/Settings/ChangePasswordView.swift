@@ -32,7 +32,7 @@ struct ChangePasswordView: View {
         return type != 1
     }
 
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
 
     var body: some View {
         ScrollView {
@@ -68,16 +68,14 @@ struct ChangePasswordView: View {
                 }
             }
         }
-        .alert(isPresented: $showAlert) {
-            Alert(
-                title: Text("알림").font(.suite(size: 17, weight: .bold)),
-                message: Text(alertMessage).font(.suite(size: 15)),
-                dismissButton: .default(Text("확인").font(.suite(size: 16, weight: .semibold))) {
-                    if alertMessage.contains("성공") {
-                        presentationMode.wrappedValue.dismiss()
-                    }
+        .alert("알림", isPresented: $showAlert) {
+            Button("확인", role: .cancel) {
+                if alertMessage.contains("성공") {
+                    presentationMode.wrappedValue.dismiss()
                 }
-            )
+            }
+        } message: {
+            Text(alertMessage)
         }
     }
 
@@ -103,7 +101,7 @@ struct ChangePasswordView: View {
                     .font(.suite(size: 17, weight: .bold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(brandColor)
+                    .background(SMAPTheme.Color.primary)
                     .foregroundColor(.white)
                     .cornerRadius(12)
             }
@@ -142,21 +140,21 @@ struct ChangePasswordView: View {
             .frame(maxWidth: .infinity)
             .background(
                 LinearGradient(
-                    gradient: Gradient(colors: [brandColor, Color(red: 102/255, green: 126/255, blue: 234/255)]),
+                    gradient: Gradient(colors: [SMAPTheme.Color.primary, Color(red: 102/255, green: 126/255, blue: 234/255)]),
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
             )
             .cornerRadius(24)
-            .shadow(color: brandColor.opacity(0.3), radius: 12, x: 0, y: 8)
+            .shadow(color: SMAPTheme.Color.primary.opacity(0.3), radius: 12, x: 0, y: 8)
             .padding(.horizontal, 16)
             .padding(.top, 8)
 
             // Input Fields Card
             VStack(spacing: 20) {
-                PasswordFormRow(icon: "lock.fill", iconColor: brandColor, label: "현재 비밀번호", text: $currentPassword, placeholder: "현재 비밀번호를 입력하세요")
+                PasswordFormRow(icon: "lock.fill", iconColor: SMAPTheme.Color.primary, label: "현재 비밀번호", text: $currentPassword, placeholder: "현재 비밀번호를 입력하세요")
 
-                PasswordFormRow(icon: "key.fill", iconColor: brandColor, label: "새 비밀번호", text: $newPassword, placeholder: "새 비밀번호 (8-20자)")
+                PasswordFormRow(icon: "key.fill", iconColor: SMAPTheme.Color.primary, label: "새 비밀번호", text: $newPassword, placeholder: "새 비밀번호 (8-20자)")
 
                 PasswordFormRow(icon: "checkmark.circle.fill", iconColor: .green, label: "새 비밀번호 확인", text: $confirmPassword, placeholder: "비밀번호를 한번 더 입력해 주세요")
             }
@@ -205,10 +203,10 @@ struct ChangePasswordView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
-                .background(canSave ? brandColor : Color.gray.opacity(0.3))
+                .background(canSave ? SMAPTheme.Color.primary : Color.gray.opacity(0.3))
                 .foregroundColor(.white)
                 .cornerRadius(12)
-                .shadow(color: canSave ? brandColor.opacity(0.2) : Color.clear, radius: 8, x: 0, y: 4)
+                .shadow(color: canSave ? SMAPTheme.Color.primary.opacity(0.2) : Color.clear, radius: 8, x: 0, y: 4)
             }
             .disabled(!canSave || isLoading)
             .padding(.horizontal, 16)

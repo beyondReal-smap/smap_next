@@ -29,7 +29,7 @@ struct WithdrawView: View {
     @State private var showSuccessAlert = false
     @State private var showConfirmWithdrawAlert = false
     
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
     private let errorRed = Color(red: 220/255, green: 38/255, blue: 38/255)
     
     let reasonsArr = [
@@ -48,7 +48,7 @@ struct WithdrawView: View {
     
     var body: some View {
         ZStack {
-            Color(UIColor.systemGroupedBackground).edgesIgnoringSafeArea(.all)
+            Color(UIColor.systemGroupedBackground).ignoresSafeArea()
             
             VStack(spacing: 0) {
                 // Header (Navigation Bar)
@@ -91,7 +91,7 @@ struct WithdrawView: View {
                         HStack(spacing: 0) {
                             ZStack {
                                 Circle()
-                                    .fill(step <= currentStep ? brandColor : Color.gray.opacity(0.2))
+                                    .fill(step <= currentStep ? SMAPTheme.Color.primary : Color.gray.opacity(0.2))
                                     .frame(width: 28, height: 28)
                                 
                                 if step < currentStep {
@@ -107,7 +107,7 @@ struct WithdrawView: View {
                             
                             if step < 3 {
                                 Rectangle()
-                                    .fill(step < currentStep ? brandColor : Color.gray.opacity(0.2))
+                                    .fill(step < currentStep ? SMAPTheme.Color.primary : Color.gray.opacity(0.2))
                                     .frame(width: 24, height: 2)
                                     .padding(.leading, 8)
                             }
@@ -152,7 +152,7 @@ struct WithdrawView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
-                        .background(canProceed ? (currentStep == 3 ? errorRed : brandColor) : Color.gray.opacity(0.3))
+                        .background(canProceed ? (currentStep == 3 ? errorRed : SMAPTheme.Color.primary) : Color.gray.opacity(0.3))
                         .foregroundColor(.white)
                         .cornerRadius(12)
                     }
@@ -163,26 +163,22 @@ struct WithdrawView: View {
                 .background(Color(UIColor.systemBackground))
             }
         }
-        .navigationBarHidden(true)
-        .alert(isPresented: $showSuccessAlert) {
-            Alert(
-                title: Text("탈퇴 완료"),
-                message: Text("회원 탈퇴가 완료되었습니다. 그동안 서비스를 이용해주셔서 감사합니다."),
-                dismissButton: .default(Text("확인")) {
-                    // AuthService.withdraw already calls logout() which sends "logout" notification
-                    // Local logout handles redirection in RootView
-                }
-            )
+        .toolbar(.hidden, for: .navigationBar)
+        .alert("탈퇴 완료", isPresented: $showSuccessAlert) {
+            Button("확인", role: .cancel) {
+                // AuthService.withdraw already calls logout() which sends "logout" notification
+                // Local logout handles redirection in RootView
+            }
+        } message: {
+            Text("회원 탈퇴가 완료되었습니다. 그동안 서비스를 이용해주셔서 감사합니다.")
         }
-        .alert(isPresented: $showConfirmWithdrawAlert) {
-            Alert(
-                title: Text("정말 탈퇴하시겠습니까?"),
-                message: Text("모든 데이터가 삭제되며 복구할 수 없습니다."),
-                primaryButton: .destructive(Text("탈퇴")) {
-                    performWithdraw()
-                },
-                secondaryButton: .cancel(Text("취소"))
-            )
+        .alert("정말 탈퇴하시겠습니까?", isPresented: $showConfirmWithdrawAlert) {
+            Button("취소", role: .cancel) {}
+            Button("탈퇴", role: .destructive) {
+                performWithdraw()
+            }
+        } message: {
+            Text("모든 데이터가 삭제되며 복구할 수 없습니다.")
         }
     }
     
@@ -277,7 +273,7 @@ struct WithdrawView: View {
             // Info Card
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "shield.lefthalf.filled")
-                    .foregroundColor(brandColor)
+                    .foregroundColor(SMAPTheme.Color.primary)
                     .font(.system(size: 18))
                 
                 VStack(alignment: .leading, spacing: 4) {
@@ -291,7 +287,7 @@ struct WithdrawView: View {
             }
             .padding()
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(brandColor.opacity(0.05))
+            .background(SMAPTheme.Color.primary.opacity(0.05))
             .cornerRadius(12)
         }
     }
@@ -328,7 +324,7 @@ struct WithdrawView: View {
                             
                             if selectedReasons.contains(reason.text) {
                                 Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(brandColor)
+                                    .foregroundColor(SMAPTheme.Color.primary)
                             } else {
                                 Circle()
                                     .stroke(Color.gray.opacity(0.3), lineWidth: 1)
@@ -336,11 +332,11 @@ struct WithdrawView: View {
                             }
                         }
                         .padding()
-                        .background(selectedReasons.contains(reason.text) ? brandColor.opacity(0.05) : Color.white)
+                        .background(selectedReasons.contains(reason.text) ? SMAPTheme.Color.primary.opacity(0.05) : Color.white)
                         .cornerRadius(12)
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
-                                .stroke(selectedReasons.contains(reason.text) ? brandColor : Color.clear, lineWidth: 1)
+                                .stroke(selectedReasons.contains(reason.text) ? SMAPTheme.Color.primary : Color.clear, lineWidth: 1)
                         )
                         .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
                     }
@@ -410,7 +406,7 @@ struct WithdrawView: View {
                 HStack(spacing: 12) {
                     Image(systemName: agreement ? "checkmark.square.fill" : "square")
                         .font(.system(size: 20))
-                        .foregroundColor(agreement ? brandColor : .gray)
+                        .foregroundColor(agreement ? SMAPTheme.Color.primary : .gray)
                     
                     Text("안내사항을 모두 확인하였으며, 이에 동의합니다.")
                         .font(.suite(size: 14))

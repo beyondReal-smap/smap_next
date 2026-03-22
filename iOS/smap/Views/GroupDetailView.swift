@@ -20,7 +20,7 @@ struct GroupDetailView: View {
     @State private var showingMemberActionSheet = false
     @State private var showingCopiedAlert = false
     
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
     
     var body: some View {
         ScrollView {
@@ -69,32 +69,18 @@ struct GroupDetailView: View {
         } message: {
             Text("초대 코드가 클립보드에 복사되었습니다.")
         }
-        .alert(isPresented: $showingDeleteAlert) {
-            makeDeleteOrLeaveAlert()
-        }
-    }
-    
-    private func makeDeleteOrLeaveAlert() -> Alert {
-        if isCurrentUserOwner {
-            return Alert(
-                title: Text("그룹 삭제"),
-                message: Text("정말로 이 그룹을 삭제하시겠습니까? 모든 데이터가 사라집니다."),
-                primaryButton: .destructive(Text("삭제")) {
-                    self.viewModel.deleteGroup(sgtIdx: self.group.sgt_idx)
-                    self.dismiss()
-                },
-                secondaryButton: .cancel()
-            )
-        } else {
-            return Alert(
-                title: Text("그룹 나가기"),
-                message: Text("정말로 이 그룹을 나가시겠습니까?"),
-                primaryButton: .destructive(Text("나가기")) {
-                    self.viewModel.leaveGroup(sgtIdx: self.group.sgt_idx)
-                    self.dismiss()
-                },
-                secondaryButton: .cancel()
-            )
+        .alert(isCurrentUserOwner ? "그룹 삭제" : "그룹 나가기", isPresented: $showingDeleteAlert) {
+            Button("취소", role: .cancel) {}
+            Button(isCurrentUserOwner ? "삭제" : "나가기", role: .destructive) {
+                if isCurrentUserOwner {
+                    viewModel.deleteGroup(sgtIdx: group.sgt_idx)
+                } else {
+                    viewModel.leaveGroup(sgtIdx: group.sgt_idx)
+                }
+                dismiss()
+            }
+        } message: {
+            Text(isCurrentUserOwner ? "정말로 이 그룹을 삭제하시겠습니까? 모든 데이터가 사라집니다." : "정말로 이 그룹을 나가시겠습니까?")
         }
     }
     
@@ -219,7 +205,7 @@ struct GroupDetailView: View {
         .padding(20)
         .background(
             LinearGradient(
-                gradient: Gradient(colors: [brandColor, Color(red: 0/255, green: 26/255, blue: 138/255)]),
+                gradient: Gradient(colors: [SMAPTheme.Color.primary, SMAPTheme.Color.primaryDark]),
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
@@ -414,7 +400,7 @@ struct MemberRowNew: View {
     @State private var showingRemoveConfirmation = false
     @State private var showingLeaderConfirmation = false
     
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
     
     private var isLeader: Bool {
         member.sgdt_leader_chk == "Y"
@@ -475,10 +461,10 @@ struct MemberRowNew: View {
             if member.sgdt_owner_chk == "Y" {
                 Text("그룹장")
                     .font(.suite(size: 12, weight: .medium))
-                    .foregroundColor(brandColor)
+                    .foregroundColor(SMAPTheme.Color.primary)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 4)
-                    .background(brandColor.opacity(0.1))
+                    .background(SMAPTheme.Color.primary.opacity(0.1))
                     .cornerRadius(8)
             } else if isCurrentUserOwner {
                 Menu {

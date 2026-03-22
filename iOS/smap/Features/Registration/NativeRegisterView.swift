@@ -17,7 +17,7 @@ struct RegisterTermsView: View {
         VStack(alignment: .leading, spacing: 20) {
             Text("서비스 이용을 위해\n약관에 동의해주세요")
                 .font(.suite(size: 24, weight: .bold))
-                .foregroundColor(BrandColors.textPrimary)
+                .foregroundColor(SMAPTheme.Color.textPrimary)
             
             VStack(spacing: 16) {
                 ToggleRow(title: "(필수) 서비스 이용약관", isChecked: $viewModel.registerData.mt_agree1)
@@ -43,10 +43,10 @@ struct ToggleRow: View {
             Button(action: { isChecked.toggle() }) {
                 HStack {
                     Image(systemName: isChecked ? "checkmark.circle.fill" : "circle")
-                        .foregroundColor(isChecked ? BrandColors.primary : .gray)
+                        .foregroundColor(isChecked ? SMAPTheme.Color.primary : .gray)
                     Text(title)
                         .font(.suite(size: 16))
-                        .foregroundColor(BrandColors.textPrimary)
+                        .foregroundColor(SMAPTheme.Color.textPrimary)
                 }
             }
             Spacer()
@@ -66,12 +66,12 @@ struct RegisterPhoneView: View {
         VStack(alignment: .leading, spacing: 20) {
             Text("휴대폰 번호를\n입력해주세요")
                 .font(.suite(size: 24, weight: .bold))
-                .foregroundColor(BrandColors.textPrimary)
+                .foregroundColor(SMAPTheme.Color.textPrimary)
             
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 12) {
                     Image(systemName: "phone")
-                        .foregroundColor(isFocused ? BrandColors.primary : BrandColors.textSecondary)
+                        .foregroundColor(isFocused ? SMAPTheme.Color.primary : SMAPTheme.Color.textSecondary)
                         .frame(width: 20)
                     
                     PhoneTextField(text: $viewModel.registerData.mt_id, placeholder: "010-0000-0000", onEditingChanged: { editing in
@@ -82,11 +82,11 @@ struct RegisterPhoneView: View {
                 }
                 .padding(.horizontal, 16)
                 .frame(height: 56)
-                .background(BrandColors.inputBackground)
+                .background(SMAPTheme.Color.inputBackground)
                 .cornerRadius(12)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(isFocused ? BrandColors.primary : BrandColors.border, lineWidth: isFocused ? 2 : 1)
+                        .stroke(isFocused ? SMAPTheme.Color.primary : SMAPTheme.Color.border, lineWidth: isFocused ? 2 : 1)
                 )
             }
             
@@ -106,7 +106,7 @@ struct RegisterVerificationView: View {
         VStack(alignment: .leading, spacing: 20) {
             Text("인증번호를\n입력해주세요")
                 .font(.suite(size: 24, weight: .bold))
-                .foregroundColor(BrandColors.textPrimary)
+                .foregroundColor(SMAPTheme.Color.textPrimary)
             
             Text("문자로 전송된 인증번호 6자리를 입력해주세요.")
                 .font(.suite(size: 14))
@@ -142,7 +142,7 @@ struct RegisterVerificationView: View {
                 HStack {
                     Text("인증번호 재전송")
                         .font(.suite(size: 13))
-                        .foregroundColor(viewModel.canResend() ? BrandColors.primary : .gray)
+                        .foregroundColor(viewModel.canResend() ? SMAPTheme.Color.primary : .gray)
                         .underline()
                     
                     // 재발송 불가 시 남은 시간 표시
@@ -179,7 +179,7 @@ struct RegisterBasicInfoView: View {
             VStack(alignment: .leading, spacing: 20) {
                 Text("기본 정보를\n입력해주세요")
                     .font(.suite(size: 24, weight: .bold))
-                    .foregroundColor(BrandColors.textPrimary)
+                    .foregroundColor(SMAPTheme.Color.textPrimary)
                 
                 VStack(spacing: 16) {
                     // 이름
@@ -219,7 +219,7 @@ struct RegisterBasicInfoView: View {
                                 Text("올바른 이메일 형식을 입력해주세요")
                                     .font(.suite(size: 12))
                             }
-                            .foregroundColor(BrandColors.error)
+                            .foregroundColor(SMAPTheme.Color.error)
                         }
                     }
                     
@@ -260,7 +260,7 @@ struct RegisterBasicInfoView: View {
                                     Text(matches ? "비밀번호가 일치합니다" : "비밀번호가 일치하지 않습니다")
                                         .font(.suite(size: 12))
                                 }
-                                .foregroundColor(matches ? .green : BrandColors.error)
+                                .foregroundColor(matches ? .green : SMAPTheme.Color.error)
                             }
                         }
                     }
@@ -284,7 +284,7 @@ struct PasswordRulesView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text("비밀번호 규칙")
                 .font(.suite(size: 12, weight: .medium))
-                .foregroundColor(BrandColors.textSecondary)
+                .foregroundColor(SMAPTheme.Color.textSecondary)
             
             HStack(spacing: 12) {
                 PasswordRuleItem(text: "8자 이상", isValid: details.hasMinLength)
@@ -296,7 +296,7 @@ struct PasswordRulesView: View {
             // 조합 안내
             Text("* 영문, 숫자, 특수문자 중 2가지 이상 조합")
                 .font(.suite(size: 11))
-                .foregroundColor(BrandColors.textSecondary)
+                .foregroundColor(SMAPTheme.Color.textSecondary)
         }
     }
 }
@@ -309,10 +309,10 @@ struct PasswordRuleItem: View {
         HStack(spacing: 2) {
             Image(systemName: isValid ? "checkmark.circle.fill" : "circle")
                 .font(.suite(size: 10))
-                .foregroundColor(isValid ? .green : BrandColors.textSecondary)
+                .foregroundColor(isValid ? .green : SMAPTheme.Color.textSecondary)
             Text(text)
                 .font(.suite(size: 11))
-                .foregroundColor(isValid ? .green : BrandColors.textSecondary)
+                .foregroundColor(isValid ? .green : SMAPTheme.Color.textSecondary)
         }
     }
 }
@@ -336,7 +336,7 @@ struct RegisterProfileView: View {
         VStack(alignment: .leading, spacing: 20) {
             Text("프로필 정보를\n설정해주세요")
                 .font(.suite(size: 24, weight: .bold))
-                .foregroundColor(BrandColors.textPrimary)
+                .foregroundColor(SMAPTheme.Color.textPrimary)
             
             // Birth Date
             VStack(alignment: .leading, spacing: 12) {
@@ -345,7 +345,7 @@ struct RegisterProfileView: View {
                         .font(.suite(size: 16, weight: .bold))
                     Text("(선택)")
                         .font(.suite(size: 12))
-                        .foregroundColor(BrandColors.textSecondary)
+                        .foregroundColor(SMAPTheme.Color.textSecondary)
                     
                     Spacer()
                     
@@ -376,7 +376,7 @@ struct RegisterProfileView: View {
                 } else {
                     Text("생년월일을 입력하지 않습니다.")
                         .font(.suite(size: 14))
-                        .foregroundColor(BrandColors.textSecondary)
+                        .foregroundColor(SMAPTheme.Color.textSecondary)
                         .frame(maxWidth: .infinity)
                         .frame(height: 50)
                         .background(Color(white: 0.98))
@@ -391,7 +391,7 @@ struct RegisterProfileView: View {
                          Text("생년월일을 확인해주세요")
                              .font(.suite(size: 12))
                      }
-                     .foregroundColor(BrandColors.error)
+                     .foregroundColor(SMAPTheme.Color.error)
                 }
             }
             .padding(.bottom, 10)
@@ -403,7 +403,7 @@ struct RegisterProfileView: View {
                         .font(.suite(size: 16, weight: .bold))
                     Text("(선택)")
                         .font(.suite(size: 12))
-                        .foregroundColor(BrandColors.textSecondary)
+                        .foregroundColor(SMAPTheme.Color.textSecondary)
                     
                     Spacer()
                     
@@ -424,7 +424,7 @@ struct RegisterProfileView: View {
                 } else {
                     Text("성별을 선택하지 않습니다.")
                         .font(.suite(size: 14))
-                        .foregroundColor(BrandColors.textSecondary)
+                        .foregroundColor(SMAPTheme.Color.textSecondary)
                         .frame(maxWidth: .infinity)
                         .frame(height: 50)
                         .background(Color(white: 0.98))
@@ -489,12 +489,12 @@ struct GenderButton: View {
                 .font(.suite(size: 16, weight: .medium))
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(isSelected ? BrandColors.primary : Color.white)
-                .foregroundColor(isSelected ? .white : BrandColors.textPrimary)
+                .background(isSelected ? SMAPTheme.Color.primary : Color.white)
+                .foregroundColor(isSelected ? .white : SMAPTheme.Color.textPrimary)
                 .cornerRadius(12)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(isSelected ? BrandColors.primary : Color.gray.opacity(0.3), lineWidth: 1)
+                        .stroke(isSelected ? SMAPTheme.Color.primary : Color.gray.opacity(0.3), lineWidth: 1)
                 )
         }
     }
@@ -512,7 +512,7 @@ struct RegisterCompleteView: View {
             Image(systemName: "checkmark.circle.fill")
                 .resizable()
                 .frame(width: 80, height: 80)
-                .foregroundColor(BrandColors.primary)
+                .foregroundColor(SMAPTheme.Color.primary)
             
             Text("회원가입이\n완료되었습니다!")
                 .font(.suite(size: 24, weight: .bold))
@@ -547,7 +547,7 @@ struct NativeRegisterView: View {
     
     var body: some View {
         ZStack {
-            Color.white.edgesIgnoringSafeArea(.all)
+            Color.white.ignoresSafeArea()
             
             VStack(spacing: 0) {
                 // Custom Navigation Bar
@@ -565,7 +565,7 @@ struct NativeRegisterView: View {
                         }) {
                             Image(systemName: "chevron.left")
                                 .font(.suite(size: 20, weight: .semibold))
-                                .foregroundColor(BrandColors.textPrimary)
+                                .foregroundColor(SMAPTheme.Color.textPrimary)
                         }
                     }
                     
@@ -573,7 +573,7 @@ struct NativeRegisterView: View {
                     
                     Text(viewModel.currentStep.title)
                         .font(.suite(size: 18, weight: .bold))
-                        .foregroundColor(BrandColors.textPrimary)
+                        .foregroundColor(SMAPTheme.Color.textPrimary)
                     
                     Spacer()
                     
@@ -589,7 +589,7 @@ struct NativeRegisterView: View {
                 // Progress Bar
                 if viewModel.currentStep != .complete {
                     ProgressView(value: currentProgress, total: 1.0)
-                        .accentColor(BrandColors.primary)
+                        .accentColor(SMAPTheme.Color.primary)
                         .scaleEffect(x: 1, y: 0.5, anchor: .center)
                 }
                 
@@ -627,11 +627,11 @@ struct NativeRegisterView: View {
                         HStack {
                             Image(systemName: isAllTermsAgreed ? "checkmark.circle.fill" : "circle")
                                 .font(.suite(size: 22))
-                                .foregroundColor(isAllTermsAgreed ? BrandColors.primary : .gray)
+                                .foregroundColor(isAllTermsAgreed ? SMAPTheme.Color.primary : .gray)
                             
                             Text("전체 동의하기")
                                 .font(.suite(size: 16, weight: .semibold))
-                                .foregroundColor(BrandColors.textPrimary)
+                                .foregroundColor(SMAPTheme.Color.textPrimary)
                             
                             Spacer()
                         }
@@ -667,7 +667,7 @@ struct NativeRegisterView: View {
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 52)
-                        .background(isNextButtonEnabled ? BrandColors.primary : BrandColors.primary.opacity(0.3))
+                        .background(isNextButtonEnabled ? SMAPTheme.Color.primary : SMAPTheme.Color.primary.opacity(0.3))
                         .cornerRadius(12)
                     }
                     .padding()
@@ -682,26 +682,26 @@ struct NativeRegisterView: View {
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .frame(height: 52)
-                            .background(BrandColors.primary)
+                            .background(SMAPTheme.Color.primary)
                             .cornerRadius(12)
                     }
                     .padding()
                 }
             }
         }
-        .navigationBarHidden(true)
-        .alert(isPresented: $viewModel.showError) {
-            Alert(title: Text("오류"), message: Text(viewModel.errorMessage ?? "알 수 없는 오류"), dismissButton: .default(Text("확인")))
+        .toolbar(.hidden, for: .navigationBar)
+        .alert("오류", isPresented: $viewModel.showError) {
+            Button("확인", role: .cancel) {}
+        } message: {
+            Text(viewModel.errorMessage ?? "알 수 없는 오류")
         }
-        .alert(isPresented: $viewModel.showExistingUserAlert) {
-            Alert(
-                title: Text("알림"),
-                message: Text("이미 가입된 전화번호입니다.\n로그인 페이지로 이동합니다."),
-                dismissButton: .default(Text("확인")) {
-                    // 확인 버튼 누르면 로그인 페이지로 이동
-                    onExistingUser?(viewModel.existingUserPhone)
-                }
-            )
+        .alert("알림", isPresented: $viewModel.showExistingUserAlert) {
+            Button("확인", role: .cancel) {
+                // 확인 버튼 누르면 로그인 페이지로 이동
+                onExistingUser?(viewModel.existingUserPhone)
+            }
+        } message: {
+            Text("이미 가입된 전화번호입니다.\n로그인 페이지로 이동합니다.")
         }
         .onAppear {
             if let socialData = socialData {

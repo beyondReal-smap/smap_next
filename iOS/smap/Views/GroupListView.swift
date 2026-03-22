@@ -8,11 +8,11 @@ struct GroupListView: View {
     @State private var newGroupMemo: String = ""
     
     // Brand Colors
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
     private let secondaryColor = Color.gray
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
                 // Custom Header
                 GroupListHeaderView()
@@ -77,7 +77,7 @@ struct GroupListView: View {
                 }
             }
             .background(Color(white: 0.98)) // Light gray background
-            .navigationBarHidden(true)
+            .toolbar(.hidden, for: .navigationBar)
             .onAppear {
                 viewModel.fetchGroups()
                 
@@ -95,8 +95,10 @@ struct GroupListView: View {
                     UserDefaults.standard.removeObject(forKey: "pending_join_group_id")
                 }
             }
-            .alert(isPresented: $viewModel.showError) {
-                Alert(title: Text("알림"), message: Text(viewModel.errorMessage ?? "오류가 발생했습니다."), dismissButton: .default(Text("확인")))
+            .alert("알림", isPresented: $viewModel.showError) {
+                Button("확인", role: .cancel) {}
+            } message: {
+                Text(viewModel.errorMessage ?? "오류가 발생했습니다.")
             }
             .sheet(isPresented: $showCreateModal) {
                 CreateGroupView(isPresented: $showCreateModal, title: $newGroupTitle, memo: $newGroupMemo) {
@@ -183,7 +185,7 @@ struct StatsCardsView: View {
             .padding()
             .frame(maxWidth: .infinity)
             .background(
-                LinearGradient(gradient: Gradient(colors: [Color(red: 1/255, green: 19/255, blue: 163/255), Color(red: 0/255, green: 26/255, blue: 138/255)]), startPoint: .leading, endPoint: .trailing)
+                LinearGradient(gradient: Gradient(colors: [SMAPTheme.Color.primary, SMAPTheme.Color.primaryDark]), startPoint: .leading, endPoint: .trailing)
             )
             .cornerRadius(16)
             .shadow(color: Color.blue.opacity(0.3), radius: 8, x: 0, y: 4)
@@ -339,7 +341,7 @@ struct GroupCard: View {
                             .foregroundColor(.blue)
                     }
                 }
-                .foregroundColor(Color(red: 1/255, green: 19/255, blue: 163/255))
+                .foregroundColor(SMAPTheme.Color.primary)
                 .padding(.top, 4)
             }
             
@@ -392,11 +394,11 @@ struct CreateGroupView: View {
     
     enum Field { case title, memo }
     
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
     private let pinkColor = Color(red: 236/255, green: 72/255, blue: 153/255)
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 // Background Gradient
                 LinearGradient(
@@ -407,7 +409,7 @@ struct CreateGroupView: View {
                     startPoint: .top,
                     endPoint: .bottom
                 )
-                .edgesIgnoringSafeArea(.all)
+                .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
                     // Header Illustration
@@ -416,7 +418,7 @@ struct CreateGroupView: View {
                         Circle()
                             .fill(
                                 LinearGradient(
-                                    gradient: Gradient(colors: [brandColor.opacity(0.1), pinkColor.opacity(0.1)]),
+                                    gradient: Gradient(colors: [SMAPTheme.Color.primary.opacity(0.1), pinkColor.opacity(0.1)]),
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 )
@@ -428,13 +430,13 @@ struct CreateGroupView: View {
                         Circle()
                             .fill(
                                 LinearGradient(
-                                    gradient: Gradient(colors: [brandColor, pinkColor]),
+                                    gradient: Gradient(colors: [SMAPTheme.Color.primary, pinkColor]),
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 )
                             )
                             .frame(width: 90, height: 90)
-                            .shadow(color: brandColor.opacity(0.3), radius: 15, x: 0, y: 8)
+                            .shadow(color: SMAPTheme.Color.primary.opacity(0.3), radius: 15, x: 0, y: 8)
                             .scaleEffect(isAnimating ? 1.0 : 0.9)
                         
                         // Icon
@@ -471,7 +473,7 @@ struct CreateGroupView: View {
                             HStack(spacing: 6) {
                                 Image(systemName: "tag.fill")
                                     .font(.suite(size: 12))
-                                    .foregroundColor(brandColor)
+                                    .foregroundColor(SMAPTheme.Color.primary)
                                 Text("그룹 이름")
                                     .font(.suite(size: 13, weight: .semibold))
                                     .foregroundColor(.gray)
@@ -479,7 +481,7 @@ struct CreateGroupView: View {
                             
                             HStack(spacing: 12) {
                                 Image(systemName: "person.3.sequence.fill")
-                                    .foregroundColor(focusedField == .title ? brandColor : .gray.opacity(0.5))
+                                    .foregroundColor(focusedField == .title ? SMAPTheme.Color.primary : .gray.opacity(0.5))
                                     .font(.suite(size: 18))
                                 
                                 TextField("예: 우리가족, 친한 친구들", text: $title)
@@ -498,9 +500,9 @@ struct CreateGroupView: View {
                             .cornerRadius(14)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 14)
-                                    .stroke(focusedField == .title ? brandColor : Color.gray.opacity(0.15), lineWidth: focusedField == .title ? 2 : 1)
+                                    .stroke(focusedField == .title ? SMAPTheme.Color.primary : Color.gray.opacity(0.15), lineWidth: focusedField == .title ? 2 : 1)
                             )
-                            .shadow(color: focusedField == .title ? brandColor.opacity(0.1) : Color.clear, radius: 8, x: 0, y: 4)
+                            .shadow(color: focusedField == .title ? SMAPTheme.Color.primary.opacity(0.1) : Color.clear, radius: 8, x: 0, y: 4)
                         }
                         
                         // Group Description Field
@@ -569,7 +571,7 @@ struct CreateGroupView: View {
                                     )
                                 } else {
                                     LinearGradient(
-                                        gradient: Gradient(colors: [brandColor, Color(red: 99/255, green: 102/255, blue: 241/255)]),
+                                        gradient: Gradient(colors: [SMAPTheme.Color.primary, Color(red: 99/255, green: 102/255, blue: 241/255)]),
                                         startPoint: .leading,
                                         endPoint: .trailing
                                     )
@@ -577,7 +579,7 @@ struct CreateGroupView: View {
                             }
                         )
                         .cornerRadius(16)
-                        .shadow(color: title.isEmpty ? Color.clear : brandColor.opacity(0.3), radius: 12, x: 0, y: 6)
+                        .shadow(color: title.isEmpty ? Color.clear : SMAPTheme.Color.primary.opacity(0.3), radius: 12, x: 0, y: 6)
                     }
                     .disabled(title.isEmpty)
                     .padding(.horizontal, 24)

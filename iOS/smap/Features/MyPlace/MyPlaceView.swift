@@ -19,7 +19,7 @@ struct MyPlaceView: View {
     @State private var newLocationAddress: String? = nil
     @State private var isMapLoading = true  // 지도 로딩 상태
     
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
     private let sidebarWidth: CGFloat = 320
     
     var body: some View {
@@ -42,7 +42,7 @@ struct MyPlaceView: View {
                             viewModel.startNewLocation(latitude: lat, longitude: lng)
                         }
                     })
-                .edgesIgnoringSafeArea(.all).offset(y: 60)
+                .ignoresSafeArea().offset(y: 60)
             }
             
             // Header
@@ -56,7 +56,7 @@ struct MyPlaceView: View {
             
             // Sidebar Overlay
             if viewModel.isSidebarOpen || sidebarDragOffset > 0 {
-                Color.black.opacity(overlayOpacity).edgesIgnoringSafeArea(.all).onTapGesture { viewModel.closeSidebar() }
+                Color.black.opacity(overlayOpacity).ignoresSafeArea().onTapGesture { viewModel.closeSidebar() }
             }
             
             // Sidebar
@@ -78,7 +78,7 @@ struct MyPlaceView: View {
                     .zIndex(1000)
             }
         }
-        .navigationBarHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             handleLoading()
         }
@@ -92,7 +92,7 @@ struct MyPlaceView: View {
             ) 
         }
         .sheet(isPresented: $viewModel.isHeaderSearchPresented) {
-            NavigationView {
+            NavigationStack {
                 LocationSearchView { place in
                     if let lat = Double(place.y), let lng = Double(place.x) {
                         newLocationCoordinates = (lat, lng)
@@ -112,7 +112,11 @@ struct MyPlaceView: View {
                 })
             }
         }
-        .alert(isPresented: $viewModel.showError) { Alert(title: Text("오류"), message: Text(viewModel.errorMessage ?? ""), dismissButton: .default(Text("확인"))) }
+        .alert("오류", isPresented: $viewModel.showError) {
+            Button("확인", role: .cancel) {}
+        } message: {
+            Text(viewModel.errorMessage ?? "")
+        }
         .onDisappear {
             // 페이지를 벗어날 때 사이드바 자동(즉시) 닫기
             viewModel.isSidebarOpen = false
@@ -169,7 +173,7 @@ struct MyPlaceView: View {
 struct MyPlaceHeaderView: View {
     let onBackTap: () -> Void
     let onSearchTap: () -> Void
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
     
     var body: some View {
         HStack {
@@ -195,7 +199,7 @@ struct MyPlaceHeaderView: View {
         .padding(.vertical, 8)
         .background(
             BlurView(style: .systemUltraThinMaterialLight)
-                .edgesIgnoringSafeArea(.top)
+                .ignoresSafeArea(edges: .top)
         )
     }
 }
@@ -203,7 +207,7 @@ struct MyPlaceHeaderView: View {
 struct FloatingActionPlaceButton: View {
     let count: Int
     let action: () -> Void
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
     private let pinkColor = Color(red: 236/255, green: 72/255, blue: 153/255) // Pink-500
     
     var body: some View {
@@ -211,9 +215,9 @@ struct FloatingActionPlaceButton: View {
             ZStack(alignment: .topTrailing) {
                 // Main Button Circle
                 Circle()
-                    .fill(brandColor)
+                    .fill(SMAPTheme.Color.primary)
                     .frame(width: 56, height: 56)
-                    .shadow(color: brandColor.opacity(0.3), radius: 12, x: 0, y: 8)
+                    .shadow(color: SMAPTheme.Color.primary.opacity(0.3), radius: 12, x: 0, y: 8)
                     .overlay(
                         Image(systemName: "person.fill")
                             .font(.suite(size: 22))
@@ -237,7 +241,7 @@ struct FloatingActionPlaceButton: View {
 
 struct MyPlaceSidebarView: View {
     @ObservedObject var viewModel: MyPlaceViewModel
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -264,7 +268,7 @@ struct MyPlaceSidebarView: View {
         .frame(width: 320)
         .background(
             Color(red: 245/255, green: 247/255, blue: 250/255)
-                .edgesIgnoringSafeArea(.all)
+                .ignoresSafeArea()
         )
         .cornerRadius(24, corners: [.topRight, .bottomRight])
         .shadow(color: Color.black.opacity(0.15), radius: 20, x: 5, y: 0)
@@ -276,7 +280,7 @@ struct MyPlaceSidebarView: View {
         HStack(spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(brandColor)
+                    .fill(SMAPTheme.Color.primary)
                     .frame(width: 40, height: 40)
                 Image(systemName: "mappin.and.ellipse")
                     .foregroundColor(.white)
@@ -415,7 +419,7 @@ struct PlaceMemberCell: View {
     let member: PlaceMember
     var isSelf: Bool = false
     let onTap: () -> Void
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
     
     var body: some View {
         Button(action: onTap) {
@@ -448,7 +452,7 @@ struct PlaceMemberCell: View {
                     }
                     .overlay(
                         Circle()
-                            .stroke(member.isSelected ? brandColor : Color.clear, lineWidth: 2.5)
+                            .stroke(member.isSelected ? SMAPTheme.Color.primary : Color.clear, lineWidth: 2.5)
                     )
                     
                     // Crown/Star Icon
@@ -482,16 +486,16 @@ struct PlaceMemberCell: View {
                 
                 if member.isSelected {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(brandColor)
+                        .foregroundColor(SMAPTheme.Color.primary)
                         .font(.suite(size: 22))
                 }
             }
             .padding(12)
-            .background(member.isSelected ? brandColor.opacity(0.05) : Color.white)
+            .background(member.isSelected ? SMAPTheme.Color.primary.opacity(0.05) : Color.white)
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(member.isSelected ? brandColor.opacity(0.3) : Color.clear, lineWidth: 1)
+                    .stroke(member.isSelected ? SMAPTheme.Color.primary.opacity(0.3) : Color.clear, lineWidth: 1)
             )
         }
         .buttonStyle(PlainButtonStyle())
@@ -519,7 +523,7 @@ struct PlaceMemberCircleCell: View {
     let member: PlaceMember
     var isSelf: Bool = false
     let onTap: () -> Void
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
     
     var body: some View {
         Button(action: onTap) {
@@ -550,7 +554,7 @@ struct PlaceMemberCircleCell: View {
                     }
                     .overlay(
                         Circle()
-                            .stroke(member.isSelected ? brandColor : Color.gray.opacity(0.2), lineWidth: 2)
+                            .stroke(member.isSelected ? SMAPTheme.Color.primary : Color.gray.opacity(0.2), lineWidth: 2)
                     )
                     
                     // Owner/Leader Badge
@@ -571,7 +575,7 @@ struct PlaceMemberCircleCell: View {
                 
                 Text(isSelf ? "\(member.displayName) (나)" : member.displayName)
                     .font(.suite(size: 13, weight: member.isSelected ? .bold : .medium))
-                    .foregroundColor(member.isSelected ? brandColor : .primary)
+                    .foregroundColor(member.isSelected ? SMAPTheme.Color.primary : .primary)
                     .lineLimit(1)
                     .frame(width: 65)
             }
@@ -603,7 +607,7 @@ struct PlaceLocationCell: View {
     let onToggleNotification: () -> Void
     let onTap: () -> Void
     
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
     
     var body: some View {
         ZStack(alignment: .trailing) {
@@ -631,11 +635,11 @@ struct PlaceLocationCell: View {
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
-                .background(isSelected ? brandColor.opacity(0.08) : Color.white.opacity(0.6))
+                .background(isSelected ? SMAPTheme.Color.primary.opacity(0.08) : Color.white.opacity(0.6))
                 .cornerRadius(10)
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
-                        .stroke(isSelected ? brandColor.opacity(0.3) : Color.clear, lineWidth: 1)
+                        .stroke(isSelected ? SMAPTheme.Color.primary.opacity(0.3) : Color.clear, lineWidth: 1)
                 )
             }
             .buttonStyle(PlainButtonStyle())

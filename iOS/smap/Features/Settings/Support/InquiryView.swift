@@ -30,7 +30,7 @@ struct InquiryView: View {
 
     var body: some View {
         ZStack {
-            Color(red: 0.98, green: 0.98, blue: 1.0).edgesIgnoringSafeArea(.all)
+            Color(red: 0.98, green: 0.98, blue: 1.0).ignoresSafeArea()
 
             ScrollView {
                 VStack(spacing: 24) {
@@ -126,9 +126,12 @@ struct InquiryView: View {
                 }
             }
         }
-        .alert(isPresented: $showingAlert) {
-            Alert(title: Text(isSuccess ? "전송 완료" : "오류"), message: Text(alertMessage),
-                  dismissButton: .default(Text("확인")) { if isSuccess { presentationMode.wrappedValue.dismiss() } })
+        .alert(isSuccess ? "전송 완료" : "오류", isPresented: $showingAlert) {
+            Button("확인", role: .cancel) {
+                if isSuccess { presentationMode.wrappedValue.dismiss() }
+            }
+        } message: {
+            Text(alertMessage)
         }
     }
 

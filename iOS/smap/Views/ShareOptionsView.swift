@@ -9,10 +9,10 @@ struct ShareOptionsView: View {
     @State private var showingAlert = false
     @State private var alertMessage = ""
     
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List {
                 Section(header: Text("그룹 초대 방법").font(.suite(size: 13))) {
                     // 링크 복사
@@ -20,7 +20,7 @@ struct ShareOptionsView: View {
                         HStack {
                             Image(systemName: "doc.on.doc")
                                 .font(.suite(size: 20))
-                                .foregroundColor(brandColor)
+                                .foregroundColor(SMAPTheme.Color.primary)
                                 .frame(width: 30)
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("링크 복사")
@@ -46,7 +46,7 @@ struct ShareOptionsView: View {
                         HStack {
                             Image(systemName: "qrcode")
                                 .font(.suite(size: 20))
-                                .foregroundColor(brandColor)
+                                .foregroundColor(SMAPTheme.Color.primary)
                                 .frame(width: 30)
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("QR 코드 보기")
@@ -69,7 +69,7 @@ struct ShareOptionsView: View {
                         HStack {
                             Image(systemName: "message")
                                 .font(.suite(size: 20))
-                                .foregroundColor(brandColor)
+                                .foregroundColor(SMAPTheme.Color.primary)
                                 .frame(width: 30)
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("문자로 공유")
@@ -92,7 +92,7 @@ struct ShareOptionsView: View {
                         HStack {
                             Image(systemName: "square.and.arrow.up")
                                 .font(.suite(size: 20))
-                                .foregroundColor(brandColor)
+                                .foregroundColor(SMAPTheme.Color.primary)
                                 .frame(width: 30)
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("기본 공유")
@@ -121,13 +121,13 @@ struct ShareOptionsView: View {
                                     .foregroundColor(.secondary)
                                 Text(inviteCode)
                                     .font(.suite(size: 20, weight: .bold))
-                                    .foregroundColor(brandColor)
+                                    .foregroundColor(SMAPTheme.Color.primary)
                             }
                             Spacer()
                             Button(action: copyInviteCode) {
                                 Image(systemName: "doc.on.doc")
                                     .font(.suite(size: 18))
-                                    .foregroundColor(brandColor)
+                                    .foregroundColor(SMAPTheme.Color.primary)
                             }
                         }
                         .padding(.vertical, 8)
@@ -142,16 +142,14 @@ struct ShareOptionsView: View {
                     Button("완료") {
                         isPresented = false
                     }
-                    .foregroundColor(brandColor)
+                    .foregroundColor(SMAPTheme.Color.primary)
                 }
             }
         }
-        .alert(isPresented: $showingAlert) {
-            Alert(
-                title: Text("알림"),
-                message: Text(alertMessage),
-                dismissButton: .default(Text("확인"))
-            )
+        .alert("알림", isPresented: $showingAlert) {
+            Button("확인", role: .cancel) {}
+        } message: {
+            Text(alertMessage)
         }
         .sheet(isPresented: $showingMessageCompose) {
             MessageComposeView(

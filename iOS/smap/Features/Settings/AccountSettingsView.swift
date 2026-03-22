@@ -15,14 +15,14 @@ public struct SettingMenuView: View {
     @Environment(\.presentationMode) var presentationMode
     @ObservedObject var authService = AuthService.shared
 
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
 
     public init() {}
 
     public var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
-                Color(red: 0.98, green: 0.98, blue: 1.0).edgesIgnoringSafeArea(.all)
+                Color(red: 0.98, green: 0.98, blue: 1.0).ignoresSafeArea()
 
                 ScrollView {
                     VStack(spacing: 24) {
@@ -138,7 +138,7 @@ struct ProfileSummaryCard: View {
         .padding(20)
         .background(
             LinearGradient(
-                gradient: Gradient(colors: [Color(red: 1/255, green: 19/255, blue: 163/255), Color(red: 102/255, green: 126/255, blue: 234/255)]),
+                gradient: Gradient(colors: [SMAPTheme.Color.primary, Color(red: 102/255, green: 126/255, blue: 234/255)]),
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
@@ -237,7 +237,7 @@ struct AccountSettingsView: View {
     @State private var showingImageUploadError = false
     @State private var imageUploadErrorMessage = ""
 
-    private let brandColor = Color(red: 1/255, green: 19/255, blue: 163/255)
+    
 
     var body: some View {
         ScrollView {
@@ -285,30 +285,27 @@ struct AccountSettingsView: View {
                 uploadImage()
             }
         }
-        .alert(isPresented: $showingLogoutAlert) {
-            Alert(
-                title: Text("로그아웃"),
-                message: Text("정말로 로그아웃 하시겠습니까?"),
-                primaryButton: .destructive(Text("로그아웃")) {
-                    authService.logout()
-                    NotificationCenter.default.post(name: NSNotification.Name("logout"), object: nil)
-                },
-                secondaryButton: .cancel(Text("취소"))
-            )
+        .alert("로그아웃", isPresented: $showingLogoutAlert) {
+            Button("취소", role: .cancel) {}
+            Button("로그아웃", role: .destructive) {
+                authService.logout()
+                NotificationCenter.default.post(name: NSNotification.Name("logout"), object: nil)
+            }
+        } message: {
+            Text("정말로 로그아웃 하시겠습니까?")
         }
         .onAppear {
             // 페이지 진입 시 로컬 선택 이미지 초기화 (서버 데이터로 표시)
             selectedImage = nil
             inputImage = nil
-
+        }
+        .task {
             // 서버에서 최신 사용자 정보 가져오기
-            Task {
-                do {
-                    _ = try await authService.fetchUserProfile()
-                    print("✅ [AccountSettingsView] 사용자 프로필 갱신 완료")
-                } catch {
-                    print("⚠️ [AccountSettingsView] 사용자 프로필 갱신 실패: \(error)")
-                }
+            do {
+                _ = try await authService.fetchUserProfile()
+                print("✅ [AccountSettingsView] 사용자 프로필 갱신 완료")
+            } catch {
+                print("⚠️ [AccountSettingsView] 사용자 프로필 갱신 실패: \(error)")
             }
         }
         .alert("이미지 업로드 실패", isPresented: $showingImageUploadError) {
@@ -358,7 +355,7 @@ struct AccountSettingsView: View {
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundColor(.white)
                         .padding(6)
-                        .background(brandColor)
+                        .background(SMAPTheme.Color.primary)
                         .clipShape(Circle())
                         .overlay(Circle().stroke(Color.white, lineWidth: 1.5))
                 }
@@ -386,13 +383,13 @@ struct AccountSettingsView: View {
         .frame(maxWidth: .infinity)
         .background(
             LinearGradient(
-                gradient: Gradient(colors: [brandColor, Color(red: 102/255, green: 126/255, blue: 234/255)]),
+                gradient: Gradient(colors: [SMAPTheme.Color.primary, Color(red: 102/255, green: 126/255, blue: 234/255)]),
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
         )
         .cornerRadius(24)
-        .shadow(color: brandColor.opacity(0.3), radius: 12, x: 0, y: 8)
+        .shadow(color: SMAPTheme.Color.primary.opacity(0.3), radius: 12, x: 0, y: 8)
         .padding(.horizontal, 16)
         .padding(.top, 8)
     }
@@ -420,7 +417,7 @@ struct AccountSettingsView: View {
             SettingsSectionView(title: "내 정보") {
                 // 소셜 로그인이 아닌 경우에만 휴대폰 번호 표시
                 if !isSocialLogin {
-                    SettingsInfoRowView(icon: "phone.fill", iconColor: brandColor, title: "휴대폰", value: user.mt_id ?? "-")
+                    SettingsInfoRowView(icon: "phone.fill", iconColor: SMAPTheme.Color.primary, title: "휴대폰", value: user.mt_id ?? "-")
                     Divider().padding(.leading, 52)
                 }
                 SettingsInfoRowView(icon: "at", iconColor: .orange, title: "닉네임", value: user.mt_nickname ?? "-")

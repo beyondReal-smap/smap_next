@@ -15,7 +15,7 @@ struct ForgotPasswordView: View {
     @State private var isFocused = false
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 Color.white.ignoresSafeArea()
                 
@@ -56,13 +56,11 @@ struct ForgotPasswordView: View {
                         .shadow(radius: 10)
                 }
             }
-            .navigationBarHidden(true)
-            .alert(isPresented: $viewModel.showError) {
-                Alert(
-                    title: Text("알림"),
-                    message: Text(viewModel.errorMessage ?? "오류가 발생했습니다."),
-                    dismissButton: .default(Text("확인"))
-                )
+            .toolbar(.hidden, for: .navigationBar)
+            .alert("알림", isPresented: $viewModel.showError) {
+                Button("확인", role: .cancel) {}
+            } message: {
+                Text(viewModel.errorMessage ?? "오류가 발생했습니다.")
             }
         }
     }
