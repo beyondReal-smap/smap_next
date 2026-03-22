@@ -2295,7 +2295,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         // 온보딩 이후: 결핍된 권한만 보완 요청
         print("🧭 [PERM] 재진입 - 결핍된 권한만 보완 요청 (모션 → 위치)")
         ensureMissingPermissionsSequence()
-        // 이미 권한이 있으면 추적 시작 (앱 재실행 시)
+        // 기존 사용자 호환: prepermission 플래그 설정 + 유저 정보 복원 후 추적 시작
+        UserDefaults.standard.set(true, forKey: "smap_location_prepermission_done")
+        restoreLocationManagerUserInfo()
         LocationManager.shared.startTracking()
     }
 
