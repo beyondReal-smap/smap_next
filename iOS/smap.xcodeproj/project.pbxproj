@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		002FFB7C69C962F6EDA964C9 /* UserDefaultsManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBEF99544122643C1993480F /* UserDefaultsManagerTests.swift */; };
 		0038684E0920661E4B2384A0 /* LocationUploader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 840C55BC87A1397A64A6E8F3 /* LocationUploader.swift */; };
+		003F7A2E1B9C4D5E8A6B0C12 /* LocationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C4E9B3A2D1F6E8C0A5B7D94 /* LocationManager.swift */; };
 		0231D220B1DD3440E7CAADD1 /* NativeScheduleListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4966457FF96D5CB6773C3483 /* NativeScheduleListView.swift */; };
 		035F02E6E98DD0D9AE5B71D3 /* MapLoadingOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB1D9F49827B5A03E90C884C /* MapLoadingOverlay.swift */; };
 		05355DF893CDC6A514475030 /* NoticeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 917653CD5E9DF6A39F3C0D80 /* NoticeService.swift */; };
@@ -184,6 +185,7 @@
 		77E9C6311F4640B2DA7A85D6 /* MyPlaceView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MyPlaceView.swift; sourceTree = "<group>"; };
 		7BB22F47ECA2E49E5A2D6C45 /* GroupServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GroupServiceTests.swift; sourceTree = "<group>"; };
 		7EA413D4AEAFB6F0BFEF8C0D /* MainTabView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
+		7C4E9B3A2D1F6E8C0A5B7D94 /* LocationManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocationManager.swift; sourceTree = "<group>"; };
 		840C55BC87A1397A64A6E8F3 /* LocationUploader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocationUploader.swift; sourceTree = "<group>"; };
 		846D82AE62D1FF1FAFD3B490 /* KeychainManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeychainManager.swift; sourceTree = "<group>"; };
 		84E5F9E1CE2882E5F246A7EC /* UserDefaultsManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UserDefaultsManager.swift; sourceTree = "<group>"; };
@@ -581,6 +583,7 @@
 			children = (
 				DC3CB5B6A915CFD9F08A1CB9 /* MotionManager.swift */,
 				840C55BC87A1397A64A6E8F3 /* LocationUploader.swift */,
+				7C4E9B3A2D1F6E8C0A5B7D94 /* LocationManager.swift */,
 			);
 			name = Location;
 			path = Location;
@@ -1068,6 +1071,7 @@
 				58FB60A84CDC19A4B17C4322 /* WithdrawView.swift in Sources */,
 				0C152DD71348FF6D4E12A024 /* MotionManager.swift in Sources */,
 				0038684E0920661E4B2384A0 /* LocationUploader.swift in Sources */,
+				003F7A2E1B9C4D5E8A6B0C12 /* LocationManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
