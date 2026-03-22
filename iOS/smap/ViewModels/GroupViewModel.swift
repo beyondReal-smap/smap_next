@@ -45,7 +45,6 @@ class GroupViewModel: ObservableObject {
                     // 요약 정보도 갱신
                     self.fetchGroupSummary()
                 }
-                }
             } catch {
                 DispatchQueue.main.async {
                     self.handleError(error)

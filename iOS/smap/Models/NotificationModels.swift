@@ -8,19 +8,19 @@
 import Foundation
 
 /// 푸시 알림 읽음 상태
-enum ReadCheck: String, Codable {
+enum ReadCheck: String, Codable, Equatable {
     case Y = "Y"
     case N = "N"
 }
 
 /// 푸시 알림 표시 여부
-enum ShowStatus: String, Codable {
+enum ShowStatus: String, Codable, Equatable {
     case Y = "Y"
     case N = "N"
 }
 
 /// 푸시 알림 타입 (plt_type 기반)
-enum PushNotificationType: Int, Codable {
+enum PushNotificationType: Int, Codable, Equatable {
     case general = 1      // 일반
     case visit = 2        // 방문 (지오펜스 인/아웃)
     case schedule = 3     // 일정 알림
@@ -41,7 +41,7 @@ enum PushNotificationType: Int, Codable {
 }
 
 /// 푸시 로그 데이터 모델
-struct PushLog: Codable, Identifiable {
+struct PushLog: Codable, Identifiable, Equatable {
     var id: Int { plt_idx }
     
     let plt_idx: Int
@@ -120,7 +120,7 @@ struct PushLog: Codable, Identifiable {
 }
 
 /// 알림 전체 삭제/읽음 처리 응답
-struct NotificationActionResponse: Codable {
+struct NotificationActionResponse: Codable, Equatable {
     let success: Bool?
     let message: String?
 }

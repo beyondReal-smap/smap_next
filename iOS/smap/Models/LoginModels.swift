@@ -290,7 +290,8 @@ struct SmapGroupMember: Codable, Identifiable, Equatable {
     let mt_nickname: String? // Added for nickname support
     let mt_email: String?
     let mt_file1: String? // 프로필 이미지
-    
+    let mt_gender: Int?   // 성별 (1: 남, 2: 여)
+
     // 그룹 관리 필드
     let sgdt_idx: Int?
     let sgdt_owner_chk: String?
@@ -307,7 +308,7 @@ struct SmapGroupMember: Codable, Identifiable, Equatable {
     var isSelected: Bool = false
     
     enum CodingKeys: String, CodingKey {
-        case mt_idx, mt_id, mt_name, mt_nickname, mt_email, mt_file1
+        case mt_idx, mt_id, mt_name, mt_nickname, mt_email, mt_file1, mt_gender
         case sgdt_idx, sgdt_owner_chk, sgdt_leader_chk, sgdt_wdate
         case mlt_lat, mlt_long, mlt_speed, mlt_battery, mlt_gps_time
     }

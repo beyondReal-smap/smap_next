@@ -42,7 +42,7 @@ class MyPlaceService {
     // MARK: - Update Location
 
     /// 장소 정보 수정
-    func updateLocation(locationId: Int, request: LocationUpdateRequest) async throws -> Bool {
+    func updateLocation(memberId: Int? = nil, locationId: Int, request: LocationUpdateRequest) async throws -> Bool {
         let result: SimpleResponse = try await apiClient.request(
             .updateLocation(locationId: locationId, request: AnyEncodable(request)),
             token: token
