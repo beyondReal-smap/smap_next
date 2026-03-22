@@ -106,7 +106,7 @@ fun GroupCreationScreen(
                 ) {
                     Icon(
                         imageVector = if (selectedTab == 0) Icons.Filled.Groups else Icons.Filled.PersonAdd,
-                        contentDescription = null,
+                        contentDescription = if (selectedTab == 0) "그룹 생성" else "그룹 참여",
                         tint = Color.White,
                         modifier = Modifier.size(32.dp)
                     )

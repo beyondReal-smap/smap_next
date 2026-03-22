@@ -30,6 +30,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.SuiteFont
 import com.dmonster.smap.ui.theme.responsiveSp
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 
 /**
  * 그룹 화면 - 리스트/상세 뷰 전환
@@ -59,6 +60,7 @@ fun GroupScreen(
     val inviteCode by viewModel.inviteCode.collectAsState()
     val isJoining by viewModel.isJoining.collectAsState()
     val isCreating by viewModel.isCreating.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
     
     // Dialog States
     val showCreateDialog by viewModel.showCreateDialog.collectAsState()
@@ -147,9 +149,11 @@ fun GroupScreen(
                             inviteCode = inviteCode,
                             isLoading = isLoading,
                             isJoining = isJoining,
+                            isRefreshing = isRefreshing,
                             onGroupClick = { viewModel.selectGroup(it) },
                             onInviteCodeChange = { viewModel.updateInviteCode(it) },
                             onJoinGroup = { viewModel.joinGroupByCode() },
+                            onRefresh = { viewModel.refresh() },
                             totalMembers = groupMemberCounts.values.sum()
                         )
                     }
@@ -373,17 +377,25 @@ private fun GroupTopBar(
 // MARK: - List View
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 private fun GroupListView(
     groups: List<com.dmonster.smap.data.model.SmapGroup>,
     groupMemberCounts: Map<Int, Int>,
     inviteCode: String,
     isLoading: Boolean,
     isJoining: Boolean,
+    isRefreshing: Boolean,
     onGroupClick: (com.dmonster.smap.data.model.SmapGroup) -> Unit,
     onInviteCodeChange: (String) -> Unit,
     onJoinGroup: () -> Unit,
+    onRefresh: () -> Unit,
     totalMembers: Int
 ) {
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
+        modifier = Modifier.fillMaxSize()
+    ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 32.dp),
@@ -407,7 +419,7 @@ private fun GroupListView(
                     text = "그룹과 멤버를 한눈에 관리하세요",
                     fontSize = 13.responsiveSp(),
                     fontFamily = SuiteFont,
-                    color = Color.Gray
+                    color = BrandColors.TextSecondary
                 )
             }
         }
@@ -484,8 +496,8 @@ private fun GroupListView(
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Groups,
-                        contentDescription = null,
-                        tint = Color.Gray.copy(alpha = 0.3f),
+                        contentDescription = "그룹 없음",
+                        tint = BrandColors.TextSecondary.copy(alpha = 0.3f),
                         modifier = Modifier.size(64.dp)
                     )
                     Spacer(modifier = Modifier.height(16.dp))
@@ -494,19 +506,20 @@ private fun GroupListView(
                         fontSize = 16.sp,
                         fontFamily = SuiteFont,
                         fontWeight = FontWeight.Bold,
-                        color = Color.Gray
+                        color = BrandColors.TextSecondary
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "새 그룹을 만들거나 초대 코드로 가입해보세요",
                         fontSize = 14.sp,
                         fontFamily = SuiteFont,
-                        color = Color.Gray.copy(alpha = 0.6f)
+                        color = BrandColors.TextSecondary.copy(alpha = 0.6f)
                     )
                 }
             }
         }
     }
+    } // PullToRefreshBox
 }
 
 // MARK: - Detail View
@@ -604,7 +617,7 @@ private fun GroupDetailView(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Person,
-                        contentDescription = null,
+                        contentDescription = "멤버 없음",
                         tint = BrandColors.Primary.copy(alpha = 0.3f),
                         modifier = Modifier.size(48.dp)
                     )
@@ -614,14 +627,14 @@ private fun GroupDetailView(
                         fontSize = 16.sp,
                         fontFamily = SuiteFont,
                         fontWeight = FontWeight.Medium,
-                        color = Color.Gray
+                        color = BrandColors.TextSecondary
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "새로운 멤버를 초대해보세요",
                         fontSize = 14.sp,
                         fontFamily = SuiteFont,
-                        color = Color.Gray.copy(alpha = 0.7f)
+                        color = BrandColors.TextSecondary.copy(alpha = 0.7f)
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(

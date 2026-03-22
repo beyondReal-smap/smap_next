@@ -26,7 +26,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.dmonster.smap.data.model.PushLog
+import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.SuiteFont
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -39,6 +41,7 @@ fun NotificationScreen(
     val logs by viewModel.logs.collectAsState()
     val summary by viewModel.summary.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -56,26 +59,32 @@ fun NotificationScreen(
             )
 
             // List
-            if (isLoading && logs.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = Color(0xFFF06292))
-                }
-            } else if (logs.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = "최근 7일간의 알림이 없습니다",
-                        fontFamily = SuiteFont,
-                        color = Color.Gray
-                    )
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(logs) { log ->
-                        NotificationItem(log = log)
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = { viewModel.refresh() },
+                modifier = Modifier.fillMaxSize()
+            ) {
+                if (isLoading && logs.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = Color(0xFFF06292))
+                    }
+                } else if (logs.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "최근 7일간의 알림이 없습니다",
+                            fontFamily = SuiteFont,
+                            color = BrandColors.TextSecondary
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(logs) { log ->
+                            NotificationItem(log = log)
+                        }
                     }
                 }
             }
@@ -100,7 +109,7 @@ fun NotificationHeader(onClose: () -> Unit, viewModel: NotificationViewModel) {
                 .size(36.dp)
                 .background(Color(0xFFF5F5F5), CircleShape)
         ) {
-            Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.LightGray, modifier = Modifier.size(20.dp))
+            Icon(Icons.Default.Close, contentDescription = "닫기", tint = Color.LightGray, modifier = Modifier.size(20.dp))
         }
 
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -115,7 +124,7 @@ fun NotificationHeader(onClose: () -> Unit, viewModel: NotificationViewModel) {
                 text = "최근 7일간의 알림을 확인하세요",
                 fontSize = 12.sp,
                 fontFamily = SuiteFont,
-                color = Color.Gray
+                color = BrandColors.TextSecondary
             )
         }
 
@@ -126,7 +135,7 @@ fun NotificationHeader(onClose: () -> Unit, viewModel: NotificationViewModel) {
                     .size(36.dp)
                     .border(1.dp, Color(0xFFEEEEEE), CircleShape)
             ) {
-                Icon(Icons.Default.MoreHoriz, contentDescription = "More", tint = Color.LightGray, modifier = Modifier.size(20.dp))
+                Icon(Icons.Default.MoreHoriz, contentDescription = "메뉴", tint = Color.LightGray, modifier = Modifier.size(20.dp))
             }
             
             DropdownMenu(
@@ -137,9 +146,9 @@ fun NotificationHeader(onClose: () -> Unit, viewModel: NotificationViewModel) {
                 DropdownMenuItem(
                     text = { 
                         Text(
-                            text = "전체 삭제", 
+                            text = "전체 삭제",
                             fontFamily = SuiteFont,
-                            color = Color.Red
+                            color = BrandColors.Error
                         ) 
                     },
                     onClick = {

@@ -81,8 +81,8 @@ fun LocationCard(
             ) {
                 Icon(
                     imageVector = Icons.Default.LocationOn,
-                    contentDescription = null,
-                    tint = if (isSelected) Color.White else Color.Gray,
+                    contentDescription = "위치",
+                    tint = if (isSelected) Color.White else BrandColors.TextSecondary,
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -201,12 +201,12 @@ fun MemberSidebar(
                 ) {
                     Icon(
                         imageVector = Icons.Default.LocationOn,
-                        contentDescription = null,
+                        contentDescription = "장소 관리",
                         tint = Color.White,
                         modifier = Modifier.size(24.dp)
                     )
                 }
-                
+
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "장소 관리",
@@ -219,7 +219,7 @@ fun MemberSidebar(
                         text = "멤버를 선택해보세요",
                         fontSize = 15.sp,
                         fontFamily = SuiteFont,
-                        color = Color.Gray
+                        color = BrandColors.TextSecondary
                     )
                 }
             }

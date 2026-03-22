@@ -297,8 +297,8 @@ fun GroupCard(
             
             Icon(
                 imageVector = Icons.Filled.ChevronRight,
-                contentDescription = null,
-                tint = Color.Gray.copy(alpha = 0.5f),
+                contentDescription = "상세 보기",
+                tint = BrandColors.TextSecondary.copy(alpha = 0.5f),
                 modifier = Modifier.size(24.dp)
             )
         }
@@ -357,7 +357,7 @@ fun GroupHeaderCard(
                                 showMenu = false
                                 onEditClick()
                             },
-                            leadingIcon = { Icon(Icons.Filled.Edit, null) }
+                            leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = "수정") }
                         )
                     }
                     
@@ -367,28 +367,28 @@ fun GroupHeaderCard(
                             showMenu = false
                             onInviteClick()
                         },
-                        leadingIcon = { Icon(Icons.Filled.PersonAdd, null) }
+                        leadingIcon = { Icon(Icons.Filled.PersonAdd, contentDescription = "초대") }
                     )
                     
                     Divider()
                     
                     if (isOwner) {
                         DropdownMenuItem(
-                            text = { Text("그룹 삭제", fontFamily = SuiteFont, color = Color.Red) },
+                            text = { Text("그룹 삭제", fontFamily = SuiteFont, color = BrandColors.Error) },
                             onClick = {
                                 showMenu = false
                                 onDeleteClick()
                             },
-                            leadingIcon = { Icon(Icons.Filled.Delete, null, tint = Color.Red) }
+                            leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = "삭제", tint = BrandColors.Error) }
                         )
                     } else {
                         DropdownMenuItem(
-                            text = { Text("그룹 나가기", fontFamily = SuiteFont, color = Color.Red) },
+                            text = { Text("그룹 나가기", fontFamily = SuiteFont, color = BrandColors.Error) },
                             onClick = {
                                 showMenu = false
                                 onLeaveClick()
                             },
-                            leadingIcon = { Icon(Icons.Filled.ExitToApp, null, tint = Color.Red) }
+                            leadingIcon = { Icon(Icons.Filled.ExitToApp, contentDescription = "나가기", tint = BrandColors.Error) }
                         )
                     }
                 }

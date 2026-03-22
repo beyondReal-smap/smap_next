@@ -102,6 +102,10 @@ class GroupViewModel @Inject constructor(
     private val _inviteCode = MutableStateFlow("")
     val inviteCode: StateFlow<String> = _inviteCode.asStateFlow()
 
+    // Pull-to-refresh
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
     // Action Loading States
     private val _isCreating = MutableStateFlow(false)
     val isCreating: StateFlow<Boolean> = _isCreating.asStateFlow()
@@ -426,6 +430,14 @@ class GroupViewModel @Inject constructor(
 
     fun getTotalMembers(): Int {
         return _groupMemberCounts.value.values.sum()
+    }
+
+    fun refresh() {
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            loadGroups()
+            _isRefreshing.value = false
+        }
     }
 
     fun clearError() { _errorMessage.value = null }

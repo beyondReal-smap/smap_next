@@ -30,6 +30,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dmonster.smap.data.service.AuthService
+import com.dmonster.smap.ui.theme.BrandColors
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
@@ -225,8 +226,8 @@ fun InquiryScreen(onBack: () -> Unit) {
                 )
                 if (email.isNotBlank()) {
                     Row(modifier = Modifier.padding(top = 4.dp, start = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Icon(if (isEmailValid) Icons.Default.CheckCircle else Icons.Default.Error, contentDescription = null, tint = if (isEmailValid) Color.Green else Color.Red, modifier = Modifier.size(12.dp))
-                        Text(if (isEmailValid) "올바른 이메일 형식입니다." else "올바른 이메일 형식이 아닙니다.", fontFamily = SuiteFont, fontSize = 12.sp, color = if (isEmailValid) Color.Green else Color.Red)
+                        Icon(if (isEmailValid) Icons.Default.CheckCircle else Icons.Default.Error, contentDescription = if (isEmailValid) "유효" else "오류", tint = if (isEmailValid) Color.Green else BrandColors.Error, modifier = Modifier.size(12.dp))
+                        Text(if (isEmailValid) "올바른 이메일 형식입니다." else "올바른 이메일 형식이 아닙니다.", fontFamily = SuiteFont, fontSize = 12.sp, color = if (isEmailValid) Color.Green else BrandColors.Error)
                     }
                 }
 
@@ -282,7 +283,7 @@ fun InquiryScreen(onBack: () -> Unit) {
                         CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
                     } else {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.Send, contentDescription = "전송", modifier = Modifier.size(18.dp))
                             Text("문의 전송", fontFamily = SuiteFont, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                         }
                     }

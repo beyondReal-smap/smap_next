@@ -70,7 +70,7 @@ fun HomeSidebar(
             ) {
                 Icon(
                     imageVector = Icons.Filled.Groups,
-                    contentDescription = null,
+                    contentDescription = "멤버 조회",
                     tint = Color.White,
                     modifier = Modifier.size(20.dp)
                 )
@@ -102,7 +102,7 @@ fun HomeSidebar(
             item {
                 SectionCard {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        SectionHeader(title = "그룹 목록", color = Color.Red)
+                        SectionHeader(title = "그룹 목록", color = BrandColors.Error)
                         
                         Box {
                             Row(
@@ -122,8 +122,8 @@ fun HomeSidebar(
                                 )
                                 Icon(
                                     imageVector = Icons.Filled.KeyboardArrowDown,
-                                    contentDescription = null,
-                                    tint = Color.Gray
+                                    contentDescription = "그룹 선택",
+                                    tint = BrandColors.TextSecondary
                                 )
                             }
                             
@@ -177,7 +177,7 @@ fun HomeSidebar(
                                     Text(
                                         text = dayOfWeek,
                                         fontSize = 11.sp,
-                                        color = if (isSelected) Color.White.copy(alpha = 0.8f) else Color.Gray,
+                                        color = if (isSelected) Color.White.copy(alpha = 0.8f) else BrandColors.TextSecondary,
                                         fontFamily = SuiteFont
                                     )
                                     Text(
@@ -214,10 +214,10 @@ fun HomeSidebar(
                             Text(
                                 text = "${members.size}명",
                                 fontSize = 14.sp,
-                                color = Color.Gray,
+                                color = BrandColors.TextSecondary,
                                 fontFamily = SuiteFont,
                                 modifier = Modifier
-                                    .background(Color.Gray.copy(0.1f), CircleShape)
+                                    .background(BrandColors.TextSecondary.copy(0.1f), CircleShape)
                                     .padding(horizontal = 8.dp, vertical = 4.dp)
                             )
                         }
@@ -297,7 +297,7 @@ fun MemberVerticalItem(
             modifier = Modifier
                 .size(48.dp)
                 .clip(CircleShape)
-                .background(Color.Gray.copy(0.2f))
+                .background(BrandColors.TextSecondary.copy(0.2f))
                 .border(
                     width = if (isSelected) 2.5.dp else 0.dp,
                     color = if (isSelected) BrandColors.Primary else Color.Transparent,
@@ -329,7 +329,7 @@ fun MemberVerticalItem(
                     }
                 )
             } else {
-                Icon(Icons.Filled.Person, null, tint = Color.Gray)
+                Icon(Icons.Filled.Person, contentDescription = "프로필", tint = BrandColors.TextSecondary)
             }
         }
         
@@ -362,7 +362,7 @@ private fun StatItemView(label: String, count: Int, color: Color) {
         Text(
             text = label,
             fontSize = 10.sp,
-            color = Color.Gray,
+            color = BrandColors.TextSecondary,
             fontFamily = SuiteFont
         )
         Spacer(modifier = Modifier.width(2.dp))

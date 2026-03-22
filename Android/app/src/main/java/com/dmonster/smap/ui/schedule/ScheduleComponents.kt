@@ -479,7 +479,7 @@ fun EventCard(
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Icon(
                                             imageVector = Icons.Default.Edit,
-                                            contentDescription = null,
+                                            contentDescription = "수정",
                                             tint = Color.Gray,
                                             modifier = Modifier.size(18.dp)
                                         )
@@ -497,12 +497,12 @@ fun EventCard(
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Icon(
                                             imageVector = Icons.Default.Delete,
-                                            contentDescription = null,
-                                            tint = Color.Red,
+                                            contentDescription = "삭제",
+                                            tint = BrandColors.Error,
                                             modifier = Modifier.size(18.dp)
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
-                                        Text("삭제", fontFamily = SuiteFont, color = Color.Red)
+                                        Text("삭제", fontFamily = SuiteFont, color = BrandColors.Error)
                                     }
                                 },
                                 onClick = {
@@ -543,8 +543,8 @@ fun GroupSelectorButton(
         )
         Icon(
             imageVector = Icons.Default.KeyboardArrowDown,
-            contentDescription = null,
-            tint = Color.Gray,
+            contentDescription = "그룹 선택",
+            tint = BrandColors.TextSecondary,
             modifier = Modifier.size(18.dp)
         )
     }

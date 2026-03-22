@@ -96,6 +96,10 @@ class ScheduleViewModel @Inject constructor(
     private val _editOption = MutableStateFlow<String?>(null)
     val editOption: StateFlow<String?> = _editOption.asStateFlow()
 
+    // Pull-to-refresh
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
     // Action Loading
     private val _isCreating = MutableStateFlow(false)
     val isCreating: StateFlow<Boolean> = _isCreating.asStateFlow()
@@ -454,6 +458,15 @@ class ScheduleViewModel @Inject constructor(
         }.toSet()
         Log.d(TAG, "📆 getEventDates: ${dates.size} event dates found")
         return dates
+    }
+
+    fun refresh() {
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            loadGroups()
+            loadSchedules()
+            _isRefreshing.value = false
+        }
     }
 
     fun clearError() { _errorMessage.value = null }

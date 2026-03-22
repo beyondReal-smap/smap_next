@@ -30,6 +30,9 @@ class NotificationViewModel @Inject constructor(
     
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
     
     init {
         loadNotifications()
@@ -53,6 +56,14 @@ class NotificationViewModel @Inject constructor(
         }
     }
     
+    fun refresh() {
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            loadNotifications()
+            _isRefreshing.value = false
+        }
+    }
+
     fun markAllAsRead() {
         val mtIdx = authService.getMtIdx() ?: return
         

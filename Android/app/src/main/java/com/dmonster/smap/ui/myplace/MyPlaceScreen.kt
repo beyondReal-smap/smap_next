@@ -422,7 +422,7 @@ private fun MyPlaceTopBar(
                     text = "장소를 등록하고 관리하세요",
                     fontSize = 13.sp,
                     fontFamily = SuiteFont,
-                    color = Color.Gray
+                    color = BrandColors.TextSecondary
                 )
             }
             

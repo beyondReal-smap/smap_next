@@ -23,6 +23,7 @@ import com.dmonster.smap.data.model.SmapSchedule
 import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.SuiteFont
 import com.dmonster.smap.ui.theme.responsiveSp
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 
 /**
  * 일정 화면 - 달력 + 일정 목록
@@ -53,6 +54,7 @@ fun ScheduleScreen(
     val showDeleteDialog by viewModel.showDeleteDialog.collectAsState()
     val isCreating by viewModel.isCreating.collectAsState()
     val editOption by viewModel.editOption.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
     
     // Recurring schedule action states
     var showRecurringEditDialog by remember { mutableStateOf(false) }
@@ -118,7 +120,7 @@ fun ScheduleScreen(
                         text = "그룹 멤버들과 일정을 공유해보세요",
                         fontSize = 13.responsiveSp(),
                         fontFamily = SuiteFont,
-                        color = Color.Gray
+                        color = BrandColors.TextSecondary
                     )
                 }
                 
@@ -166,10 +168,15 @@ fun ScheduleScreen(
             )
             
             // Scrollable Content Below Calendar
-            LazyColumn(
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = { viewModel.refresh() },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),
+                    .weight(1f)
+            ) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 16.dp)
             ) {
                 // Date Header
@@ -227,10 +234,11 @@ fun ScheduleScreen(
                     }
                 }
             }
+            } // PullToRefreshBox
         }
     }
 }
-    
+
     showEventDetail?.let { schedule ->
         val canManage = viewModel.canManageSchedule(schedule)
         EventDetailDialog(

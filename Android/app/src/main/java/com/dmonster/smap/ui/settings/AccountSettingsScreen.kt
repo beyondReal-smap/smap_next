@@ -370,7 +370,7 @@ fun ProfileHeaderWithUpload(
                     border = BorderStroke(2.dp, Color.White)
                 ) {
                     Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        Icon(Icons.Default.CameraAlt, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                        Icon(Icons.Default.CameraAlt, contentDescription = "사진 변경", tint = Color.White, modifier = Modifier.size(14.dp))
                     }
                 }
             }

@@ -355,7 +355,7 @@ fun ProfileSummaryCard(
 
                 Icon(
                     Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = null,
+                    contentDescription = "프로필 수정",
                     tint = Color.White.copy(alpha = 0.5f)
                 )
             }
@@ -422,7 +422,7 @@ fun SettingsMenuItem(
         ) {
             Icon(
                 icon,
-                contentDescription = null,
+                contentDescription = title,
                 tint = iconColor,
                 modifier = Modifier.size(22.dp) // Slightly larger icon
             )
@@ -439,8 +439,8 @@ fun SettingsMenuItem(
 
         Icon(
             Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            contentDescription = null,
-            tint = Color(0xFFD1D1D6), // iOS systemGray4
+            contentDescription = title,
+            tint = BrandColors.Border, // iOS systemGray4
             modifier = Modifier.size(20.dp)
         )
     }
