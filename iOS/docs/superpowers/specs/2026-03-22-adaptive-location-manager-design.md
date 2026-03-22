@@ -56,9 +56,11 @@ Core/Location/
 
 | 모드 | GPS 정확도 | 위치 수신 방식 | distanceFilter | API 전송 | 예상 배터리 |
 |------|-----------|--------------|----------------|---------|-----------|
-| **Stationary** | OFF | significantLocationChanges만 | N/A | 15분 heartbeat | ~0%/h |
-| **Walking** | nearestTenMeters | startUpdatingLocation | 50m | 1분 배칭 | ~3%/h |
-| **Automotive** | bestForNavigation | startUpdatingLocation | 100m | 1분 배칭 | ~5%/h |
+| **Stationary** | threeKilometers (최소 GPS) | startUpdatingLocation (최저 전력) | CLLocationDistanceMax | 15분 heartbeat | ~0.5%/h |
+| **Walking** | nearestTenMeters | startUpdatingLocation | 30m | 1분 배칭 | ~3%/h |
+| **Automotive** | bestForNavigation | startUpdatingLocation | 150m | 1분 배칭 | ~5%/h |
+
+**Stationary 모드 핵심:** GPS를 완전히 끄지 않고 `kCLLocationAccuracyThreeKilometers` + `CLLocationDistanceMax`로 최소 세션 유지. 이유: iOS는 `stopUpdatingLocation()` 호출 시 ~30초 후 앱을 suspend하여 Timer 기반 heartbeat가 작동하지 않음. 최소 GPS 세션을 유지하면 앱이 alive 상태로 남아 heartbeat 타이머가 정상 동작함. 배터리 소모는 거의 없음 (셀타워 기반 위치만 사용).
 
 ---
 
@@ -102,22 +104,25 @@ func switchToMode(_ newMode: PowerMode) {
 
     switch newMode {
     case .stationary:
-        clManager.stopUpdatingLocation()
-        clManager.startMonitoringSignificantLocationChanges()
+        // GPS를 완전히 끄지 않음 — 최소 세션 유지로 앱 alive 보장
+        clManager.desiredAccuracy = kCLLocationAccuracyThreeKilometers
+        clManager.distanceFilter = CLLocationDistanceMax
+        clManager.activityType = .other
+        uploader.stopBatching()
         uploader.startHeartbeat(interval: 900) // 15분
 
     case .walking:
-        clManager.stopMonitoringSignificantLocationChanges()
         clManager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
-        clManager.distanceFilter = 50
-        clManager.startUpdatingLocation()
+        clManager.distanceFilter = 30
+        clManager.activityType = .fitness
+        uploader.stopHeartbeat()
         uploader.startBatching(interval: 60) // 1분
 
     case .automotive:
-        clManager.stopMonitoringSignificantLocationChanges()
         clManager.desiredAccuracy = kCLLocationAccuracyBestForNavigation
-        clManager.distanceFilter = 100
-        clManager.startUpdatingLocation()
+        clManager.distanceFilter = 150
+        clManager.activityType = .automotiveNavigation
+        uploader.stopHeartbeat()
         uploader.startBatching(interval: 60) // 1분
     }
 }
@@ -125,9 +130,11 @@ func switchToMode(_ newMode: PowerMode) {
 
 **공통 설정 (init에서):**
 - `allowsBackgroundLocationUpdates = true`
-- `pausesLocationUpdatesAutomatically = true` (iOS 자체 최적화 활용)
+- `pausesLocationUpdatesAutomatically = false` (커스텀 MotionManager가 전력 관리 담당 — iOS 자동 일시정지와 충돌 방지)
 - `showsBackgroundLocationIndicator = true`
-- `activityType = .other` (모드별로 변경하지 않음 — MotionManager가 판단)
+- `activityType` — 모드별 변경: stationary→`.other`, walking→`.fitness`, automotive→`.automotiveNavigation`
+
+**Note:** `pausesLocationUpdatesAutomatically = true`로 설정하면 iOS가 자체적으로 위치 업데이트를 일시정지하는데, 이는 MotionManager의 모드 전환과 충돌하여 상태 불일치를 유발함. `locationManagerDidPauseUpdates` / `locationManagerDidResumeUpdates` delegate를 추가 처리해야 하는 복잡도도 증가하므로 `false`로 유지.
 
 ### MotionManager (~100줄)
 
@@ -220,8 +227,8 @@ struct LocationData: Codable {
 
 | 상황 | 처리 |
 |------|------|
-| 모션 센서 미지원 기기 | distanceFilter 50m + 1분 쓰로틀링 폴백 |
-| 위치 권한 whenInUse만 | 백그라운드 heartbeat 불가, 포그라운드만 동작 |
+| 모션 센서 미지원 기기 | distanceFilter 30m + 1분 쓰로틀링 폴백 |
+| 위치 권한 whenInUse만 | **Stationary 모드 비활성화** — Walking 모드 고정으로 동작 (GPS 끄면 앱 suspend됨). 포그라운드에서는 정상 작동. 사용자에게 Always 권한 업그레이드 유도 안내 표시. |
 | 위치 권한 거부 | 추적 중지, 에러 로깅 |
 | 네트워크 끊김 | 최대 100건 로컬 큐, 연결 복구 시 일괄 전송 |
 | 앱 종료 | 미전송 데이터 UserDefaults 저장, 재시작 시 복원 |
@@ -253,10 +260,34 @@ typealias LocationService = LocationManager // 임시 호환성
 ```
 
 ### 참조 변경 필요한 곳
+
+| 파일 | 현재 호출 | 변경 |
+|------|----------|------|
+| `Services/AuthService.swift` | `LocationService.sharedInstance.updateUserInfo(...)` | `LocationManager.shared.updateUserInfo(...)` |
+| `Services/AuthService.swift` | `LocationService.sharedInstance.clearUserInfo()` | `LocationManager.shared.clearUserInfo()` |
+| `AppDelegate.swift` | `LocationService.sharedInstance.startLocationUpdatesWithPermissionCheck()` | `LocationManager.shared.startTracking()` |
+| `Features/Home/NaverMapView.swift` | `LocationService.sharedInstance.getLastLocation()` | `LocationManager.shared.lastLocation` (프로퍼티) |
+| `Features/ActivityLog/ActivityLogView.swift` | `LocationService.sharedInstance.getLastLocation()` | `LocationManager.shared.lastLocation` |
+| `Features/MyPlace/MyPlaceView.swift` | `LocationService.sharedInstance.getLastLocation()` | `LocationManager.shared.lastLocation` |
+| `Views/MyPlaceView.swift` (레거시 복사본) | `LocationService.sharedInstance.getLastLocation()` | `LocationManager.shared.lastLocation` |
+
+### 보존할 공개 API (LocationManager에 구현)
+
+```swift
+// 기존 LocationService와 동일 인터페이스
+var lastLocation: CLLocation?                    // getLastLocation() 대체
+var locationAuthStatus: CLAuthorizationStatus?    // 권한 상태
+func startTracking()                              // startLocationUpdatesWithPermissionCheck() 대체
+func stopTracking()
+func updateUserInfo(mtIdx:mtId:mtName:)           // 기존과 동일
+func clearUserInfo()                              // 기존과 동일
+func requestWhenInUseAuthorization(completion:)   // 기존과 동일
+func checkLocationPermissionStatus(completion:)   // 기존과 동일
 ```
-AuthService.swift → LocationService.sharedInstance → LocationManager.shared
-AppDelegate.swift → LocationService.sharedInstance → LocationManager.shared
-```
+
+### auth() 메서드 처리
+
+현재 `LocationService.auth()`는 토큰 기반 인증 후 `receiveAuth()` → `handleNewTokenRegistration()` 플로우를 포함. 이 로직은 앱 초기 인증 시 사용되었으나, 현재 `SmapApp.swift` → `RootView.swift` → `AuthService.shared.isLoggedIn` 체크로 대체됨. **auth() 관련 메서드는 LocationManager에 포함하지 않음** (dead code로 판단). 만약 실행 시 문제가 발견되면 AuthService로 이전.
 
 ---
 
