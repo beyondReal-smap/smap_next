@@ -29,7 +29,7 @@ class AuthService: ObservableObject {
 
     /// 외부 호환용 baseURL (기존 코드에서 authService.baseURL 참조)
     let baseURL = AppConfiguration.apiV1BaseURL
-    static let imageBaseURL = AppConfiguration.imageBaseURL
+    nonisolated static let imageBaseURL = AppConfiguration.imageBaseURL
 
     /// 프로필 이미지 전체 URL 생성 헬퍼
     nonisolated static func getProfileImageURL(_ path: String?) -> URL? {
@@ -116,7 +116,7 @@ class AuthService: ObservableObject {
     }
 
     /// 사용자 데이터 조회
-    nonisolated func getUserData() -> SMAPUser? {
+    func getUserData() -> SMAPUser? {
         userDefaults.getUserData()
     }
 
@@ -138,7 +138,7 @@ class AuthService: ObservableObject {
     }
 
     /// 로그인 상태 확인
-    nonisolated var isLoggedIn: Bool {
+    var isLoggedIn: Bool {
         return getToken() != nil && getUserData() != nil
     }
 
@@ -421,7 +421,7 @@ class AuthService: ObservableObject {
     // MARK: - FCM Token
 
     /// 저장된 FCM 토큰 조회
-    nonisolated func getFCMToken() -> String? {
+    func getFCMToken() -> String? {
         return userDefaults.fcmToken
     }
 }

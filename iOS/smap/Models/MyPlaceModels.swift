@@ -199,7 +199,7 @@ struct PlaceMember: Identifiable {
     
     /// SmapGroupMember에서 변환
     init(from member: SmapGroupMember, locationCount: Int = 0, isSelected: Bool = false) {
-        self.mt_idx = member.mt_idx ?? 0
+        self.mt_idx = member.mt_idx
         self.mt_name = member.mt_name ?? "알 수 없음"
         self.mt_nickname = member.mt_nickname
         self.mt_file1 = member.mt_file1

@@ -521,7 +521,7 @@ struct ScheduleFormView: View {
         .padding(16)
         .background(section3BgColor)
         .cornerRadius(16)
-        .onChange(of: startDate) { newStartDate in
+        .onChange(of: startDate) { _, newStartDate in
             // 시작일시가 종료일시 이후로 변경되면 종료일시를 시작일시 + 1시간으로 자동 조정
             if newStartDate >= endDate {
                 endDate = newStartDate.addingTimeInterval(3600) // 1시간 후

@@ -1,5 +1,6 @@
 import Foundation
 
+@MainActor
 class GroupService {
     static let shared = GroupService()
     private let apiClient: APIClient

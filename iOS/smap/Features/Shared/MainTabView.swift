@@ -12,6 +12,9 @@ import SwiftUI
 struct MainTabView: View {
     @State private var selectedTab: Int = 0
     @Namespace private var tabAnimation
+    @StateObject private var locationPermission = LocationPermissionChecker()
+    @State private var dismissedPermissionView = false
+    @State private var showPermissionView = false
     
     // 로그아웃 알림 퍼블리셔
     private let logoutPublisher = NotificationCenter.default.publisher(for: NSNotification.Name("logout"))
@@ -87,7 +90,7 @@ struct MainTabView: View {
                 .accessibilityLabel("활동 로그 탭")
                 .tag(4)
         }
-        .onChange(of: selectedTab) { _ in
+        .onChange(of: selectedTab) { _, _ in
             HapticManager.shared.selection()
             // 탭 전환 시 모든 사이드바 닫기 알림 발생 (현재 선택된 탭 인덱스 전달)
             NotificationCenter.default.post(name: NSNotification.Name("closeSidebars"), object: selectedTab)
@@ -97,6 +100,33 @@ struct MainTabView: View {
             // No UIKit window manipulation needed.
             print("[MainTabView] logout notification received — RootView will handle navigation")
         }
+        .task {
+            // 첫 로그인/가입 시에는 AppDelegate가 시스템 권한 팝업을 순차 처리하므로
+            // 온보딩 완료 후에만 커스텀 오버레이를 표시
+            let hasOnboarded = UserDefaults.standard.bool(forKey: "smap_permission_onboarding_done")
+            if hasOnboarded {
+                // 이전에 온보딩 완료된 사용자 → 즉시 체크
+                showPermissionView = true
+            } else {
+                // 첫 로그인 → AppDelegate 시스템 팝업이 끝날 때까지 대기 후 체크
+                // 시스템 팝업 종료 후 온보딩 플래그가 설정되면 표시
+                while !UserDefaults.standard.bool(forKey: "smap_permission_onboarding_done") {
+                    try? await Task.sleep(nanoseconds: 1_000_000_000)
+                }
+                showPermissionView = true
+            }
+        }
+        .overlay {
+            if showPermissionView && !locationPermission.isAuthorized && !dismissedPermissionView {
+                LocationPermissionView {
+                    dismissedPermissionView = true
+                }
+                .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: locationPermission.isAuthorized)
+        .animation(.easeInOut(duration: 0.3), value: dismissedPermissionView)
+        .animation(.easeInOut(duration: 0.3), value: showPermissionView)
     }
 }
 

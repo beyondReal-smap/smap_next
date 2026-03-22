@@ -95,12 +95,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         // Naver Map 인증 설정 (Info.plist 사용)
         NMFAuthManager.shared().delegate = self
         
-        if let bundleId = Bundle.main.bundleIdentifier {
-        } else {
+        if Bundle.main.bundleIdentifier == nil {
              print("❌ [NaverMap] Bundle ID를 찾을 수 없음")
         }
-        if let ncpKeyId = Bundle.main.infoDictionary?["NMFNcpKeyId"] as? String {
-        } else {
+        if Bundle.main.infoDictionary?["NMFNcpKeyId"] as? String == nil {
              print("🗺️ [NaverMap] Info.plist Client ID: \(Bundle.main.infoDictionary?["NMFClientId"] ?? "N/A")")
         }
         
@@ -148,18 +146,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         }
 
         // 저장된 토큰들 확인
-        if let savedFCMToken = UserDefaults.standard.string(forKey: "fcm_token") {
-        } else {
+        if UserDefaults.standard.string(forKey: "fcm_token") == nil {
             print("❌ [저장됨] FCM 토큰: 없음")
         }
 
-        if let dbToken = UserDefaults.standard.string(forKey: "last_updated_fcm_token") {
-        } else {
+        if UserDefaults.standard.string(forKey: "last_updated_fcm_token") == nil {
             print("❌ [DB] 마지막 업데이트 토큰: 없음")
         }
 
-        if let apnsToken = UserDefaults.standard.string(forKey: "last_apns_token") {
-        } else {
+        if UserDefaults.standard.string(forKey: "last_apns_token") == nil {
             print("❌ [APNS] 저장된 토큰: 없음")
         }
 
@@ -342,7 +337,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         // 마지막 앱 실행 시간 확인
         let lastAppLaunchTime = UserDefaults.standard.double(forKey: "last_app_launch_time")
         let currentTime = Date().timeIntervalSince1970
-        let timeSinceLastLaunch = currentTime - lastAppLaunchTime
+        let _ = currentTime - lastAppLaunchTime
 
 
         // 현재 앱 실행 시간 기록
@@ -439,8 +434,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     private func performFCMTokenValidation() {
 
         // 📱 앱 상태 확인 - 백그라운드에서도 토큰 검증 허용
-        let appState = UIApplication.shared.applicationState
-        let isBackground = appState == .background
+        let _ = UIApplication.shared.applicationState
 
 
         // 사용자 ID 확인
@@ -1858,12 +1852,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         content.title = title
         content.body = body
         content.sound = .default
-        content.badge = NSNumber(value: UIApplication.shared.applicationIconBadgeNumber + 1)
         content.userInfo = userInfo
 
         print("   📋 알림 콘텐츠 설정 완료")
         print("   🔊 사운드: default")
-        print("   🔴 배지: \(UIApplication.shared.applicationIconBadgeNumber + 1)")
 
         let request = UNNotificationRequest(identifier: "fcm_force_display_\(Date().timeIntervalSince1970)",
                                           content: content,
@@ -4561,7 +4553,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     }
     
     func applicationWillEnterForeground(_ application: UIApplication) {
-        UIApplication.shared.applicationIconBadgeNumber = 0
+        UNUserNotificationCenter.current().setBadgeCount(0)
 
         let userInfo: [AnyHashable: Any] = ["state": "foreground"]
 
@@ -4867,7 +4859,6 @@ extension AppDelegate {
         content.title = title
         content.body = body
         content.sound = .default
-        content.badge = NSNumber(value: UIApplication.shared.applicationIconBadgeNumber + 1)
 
         // FCM 메시지 ID를 식별자로 사용
         let messageId = userInfo["gcm.message_id"] as? String ??
@@ -5635,7 +5626,6 @@ extension AppDelegate {
         content.title = title
         content.body = body
         content.sound = .default
-        content.badge = NSNumber(value: UIApplication.shared.applicationIconBadgeNumber + 1)
         content.categoryIdentifier = "GENERAL_NOTIFICATION"
         content.userInfo = userInfo
         

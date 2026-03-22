@@ -279,7 +279,7 @@ struct AccountSettingsView: View {
         .sheet(isPresented: $showingImagePicker) {
             ImagePicker(image: $inputImage)
         }
-        .onChange(of: inputImage) { newImage in
+        .onChange(of: inputImage) { _, newImage in
             if let newImage = newImage {
                 selectedImage = newImage
                 uploadImage()

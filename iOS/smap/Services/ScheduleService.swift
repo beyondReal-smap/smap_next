@@ -7,6 +7,7 @@
 
 import Foundation
 
+@MainActor
 class ScheduleService {
     static let shared = ScheduleService()
     private let authService = AuthService.shared

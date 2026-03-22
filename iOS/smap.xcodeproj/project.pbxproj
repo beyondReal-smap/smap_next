@@ -98,6 +98,7 @@
 		CF30A8F7B5222FBC7B041BFE /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 846D82AE62D1FF1FAFD3B490 /* KeychainManager.swift */; };
 		D2F191C0F75FEE18DDCD1BDB /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC5F00CCC9CFC0214C3C7BFE /* HomeViewModel.swift */; };
 		D39DB6CD1E613EAFC4DBAB46 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EA413D4AEAFB6F0BFEF8C0D /* MainTabView.swift */; };
+		D3A1B2C4E5F6789012345678 /* LocationPermissionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6789012345678 /* LocationPermissionView.swift */; };
 		D7A062D41C9F5C04C7F919AC /* ChangePasswordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6377EF3F7BCBFF01B8C7D18F /* ChangePasswordView.swift */; };
 		D845AF1DDE0256AA17820CAC /* NoticeModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A604E96A4889B4AC3055E86 /* NoticeModels.swift */; };
 		D89E3E849465DD43116D9358 /* NotificationRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD9EEC516EDA6F9D1D3EE1B5 /* NotificationRow.swift */; };
@@ -181,6 +182,7 @@
 		77E9C6311F4640B2DA7A85D6 /* MyPlaceView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MyPlaceView.swift; sourceTree = "<group>"; };
 		7BB22F47ECA2E49E5A2D6C45 /* GroupServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GroupServiceTests.swift; sourceTree = "<group>"; };
 		7EA413D4AEAFB6F0BFEF8C0D /* MainTabView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6789012345678 /* LocationPermissionView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocationPermissionView.swift; sourceTree = "<group>"; };
 		7C4E9B3A2D1F6E8C0A5B7D94 /* LocationManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocationManager.swift; sourceTree = "<group>"; };
 		840C55BC87A1397A64A6E8F3 /* LocationUploader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocationUploader.swift; sourceTree = "<group>"; };
 		846D82AE62D1FF1FAFD3B490 /* KeychainManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeychainManager.swift; sourceTree = "<group>"; };
@@ -725,6 +727,7 @@
 			isa = PBXGroup;
 			children = (
 				7EA413D4AEAFB6F0BFEF8C0D /* MainTabView.swift */,
+				A1B2C3D4E5F6789012345678 /* LocationPermissionView.swift */,
 				895217284F492312CADE1739 /* Components */,
 			);
 			name = Shared;
@@ -1030,6 +1033,7 @@
 				52DD58CD50F2A4912806E713 /* NativeRegisterView.swift in Sources */,
 				B0E5B55E62CC25B82FD791A3 /* GroupCreationView.swift in Sources */,
 				D39DB6CD1E613EAFC4DBAB46 /* MainTabView.swift in Sources */,
+				D3A1B2C4E5F6789012345678 /* LocationPermissionView.swift in Sources */,
 				0982335F7C2A76E6FD160431 /* HapticManager.swift in Sources */,
 				7272DE8D184A4000ED7906F6 /* PhoneTextField.swift in Sources */,
 				9B19896A9DFBE962275EDA56 /* FloatingBackgroundView.swift in Sources */,
@@ -1231,7 +1235,7 @@
 				CODE_SIGN_ENTITLEMENTS = smap/smap.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = ZVXXRV5MTP;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -1254,7 +1258,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 3.0.4;
+				MARKETING_VERSION = 3.0.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.dmonster.smap;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1277,7 +1281,7 @@
 				CODE_SIGN_ENTITLEMENTS = smap/smap.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 2;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = ZVXXRV5MTP;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -1301,7 +1305,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 3.0.4;
+				MARKETING_VERSION = 3.0.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.dmonster.smap;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";

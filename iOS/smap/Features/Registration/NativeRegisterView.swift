@@ -454,7 +454,7 @@ struct RegisterProfileView: View {
                 provideGender = false
             }
         }
-        .onChange(of: provideBirthDate) { newValue in
+        .onChange(of: provideBirthDate) { _, newValue in
             if newValue {
                 let formatter = DateFormatter()
                 formatter.dateFormat = "yyyy-MM-dd"
@@ -463,12 +463,12 @@ struct RegisterProfileView: View {
                 viewModel.registerData.mt_birth = nil
             }
         }
-        .onChange(of: provideGender) { newValue in
+        .onChange(of: provideGender) { _, newValue in
             if !newValue {
                 viewModel.registerData.mt_gender = nil
             }
         }
-        .onChange(of: birthDate) { newValue in
+        .onChange(of: birthDate) { _, newValue in
             if provideBirthDate {
                 let formatter = DateFormatter()
                 formatter.dateFormat = "yyyy-MM-dd"

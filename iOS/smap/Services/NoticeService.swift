@@ -7,6 +7,7 @@
 
 import Foundation
 
+@MainActor
 class NoticeService {
     static let shared = NoticeService()
     private let authService = AuthService.shared

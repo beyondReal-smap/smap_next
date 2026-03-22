@@ -91,8 +91,6 @@ struct PushLog: Codable, Identifiable, Equatable {
         guard let targetDate = date else { return sDateStr }
         
         let calendar = Calendar.current
-        let now = Date()
-        
         // 시간 포맷 (오전/오후 HH:mm)
         let timeFormatter = DateFormatter()
         timeFormatter.locale = Locale(identifier: "ko_KR")

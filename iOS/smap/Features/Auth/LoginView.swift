@@ -137,12 +137,12 @@ struct LoginView: View {
             .onTapGesture {
                 UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
             }
-        .onChange(of: viewModel.isLoggedIn) { isLoggedIn in
+        .onChange(of: viewModel.isLoggedIn) { _, isLoggedIn in
             if isLoggedIn {
                 onLoginSuccess?()
             }
         }
-        .onChange(of: viewModel.isNewUser) { isNewUser in
+        .onChange(of: viewModel.isNewUser) { _, isNewUser in
             if isNewUser {
                 onNavigateToRegister?(viewModel.socialLoginData)
             }
