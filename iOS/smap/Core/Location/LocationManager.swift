@@ -221,7 +221,10 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
     }
 
     private func enqueueLocation(_ location: CLLocation) {
-        guard !savedMtIdx.isEmpty else { return }
+        guard !savedMtIdx.isEmpty else {
+            print("[LocationManager] enqueue 스킵 - savedMtIdx 비어있음")
+            return
+        }
 
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"

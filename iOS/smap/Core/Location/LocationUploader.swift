@@ -46,6 +46,7 @@ class LocationUploader {
         if pending.count > maxQueueSize {
             pending.removeFirst(pending.count - maxQueueSize)
         }
+        print("[LocationUploader] 위치 enqueue (pending: \(pending.count), mtIdx: \(mtIdx))")
     }
 
     // MARK: - Batching (이동 중)
@@ -87,7 +88,12 @@ class LocationUploader {
     // MARK: - Send
 
     func flush() async {
-        guard !pending.isEmpty, !mtIdx.isEmpty else { return }
+        guard !pending.isEmpty, !mtIdx.isEmpty else {
+            if pending.isEmpty { print("[LocationUploader] flush 스킵 - pending 비어있음") }
+            if mtIdx.isEmpty { print("[LocationUploader] flush 스킵 - mtIdx 비어있음") }
+            return
+        }
+        print("[LocationUploader] flush 시작 - \(pending.count)건 전송 (mtIdx: \(mtIdx))")
 
         let toSend = pending
         for location in toSend {
@@ -121,10 +127,11 @@ class LocationUploader {
         ]
 
         do {
-            let _ = try await apiClient.requestRaw(
+            let (data, response) = try await apiClient.requestRaw(
                 .createLocationLog(params: params),
                 token: KeychainManager.shared.getToken()
             )
+            print("✅ [LocationUploader] 전송 성공 (status: \(response.statusCode))")
             return true
         } catch {
             print("❌ [LocationUploader] 전송 실패: \(error)")

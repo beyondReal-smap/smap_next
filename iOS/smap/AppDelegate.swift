@@ -247,6 +247,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         
         // iOS 14+ 권장 방식: delegate 기반 위치 서비스 시작 (프리퍼미션 이후)
         if UserDefaults.standard.bool(forKey: "smap_location_prepermission_done") {
+            restoreLocationManagerUserInfo()
             LocationManager.shared.startTracking()
         } else {
             print("📍 [LOCATION] 앱 시작 시 자동 위치 권한 요청 생략 (프리퍼미션 대기)")
@@ -2256,6 +2257,18 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         poll()
     }
 
+    // MARK: - 📍 위치 매니저 유저 정보 복원
+    private func restoreLocationManagerUserInfo() {
+        let udm = UserDefaultsManager.shared
+        if let mtIdx = udm.mtIdx, !mtIdx.isEmpty {
+            LocationManager.shared.updateUserInfo(
+                mtIdx: mtIdx,
+                mtId: udm.mtId ?? "",
+                mtName: udm.mtName ?? ""
+            )
+        }
+    }
+
     // MARK: - 📍🏃 권한 온보딩/보완 로직
     private func runPermissionOnboardingIfNeeded() {
         let isLoggedIn = UserDefaults.standard.bool(forKey: "is_logged_in")
@@ -2271,6 +2284,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                 UserDefaults.standard.set(true, forKey: "smap_location_prepermission_done")
                 print("✅ [PERM] 권한 온보딩 완료 마크")
                 // 위치 권한이 허용되었으면 추적 시작
+                self?.restoreLocationManagerUserInfo()
                 LocationManager.shared.startTracking()
                 // 보완 체크 한 번 더 (혹시 한쪽이 여전히 notDetermined이면)
                 self?.ensureMissingPermissionsSequence()
