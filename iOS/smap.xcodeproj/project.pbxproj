@@ -20,6 +20,8 @@
 		375C873CC460DC9644A11067 /* GroupService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC62D12FBC527A10551D4FB2 /* GroupService.swift */; };
 		3D5E7B1D367F512422B8C08A /* APIEndpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD697FC1738D83F5A06E98BE /* APIEndpoint.swift */; };
 		4215AE05A4B3B081BD9C9BF2 /* SMAPLoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18493739DEB5E311957CE00E /* SMAPLoadingView.swift */; };
+		4410063E7C2AFE10FDE434F7 /* SmapApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D95CD631AC850AB0FF7A852C /* SmapApp.swift */; };
+		5DC0069666700DE0509800A2 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65CCDED888D125A36702CFCA /* RootView.swift */; };
 		5E6CED4CBEC392A0A1DA64FC /* MockURLProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6E857FB9A66B645DD27275D /* MockURLProtocol.swift */; };
 		68598F319DBC8C0FC1916EDC /* Pods_smapTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 358E7C44A47807BE3A3431B4 /* Pods_smapTests.framework */; };
 		7B3BDD67E349F3AE195AEAE0 /* SMAPButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = F49C868EA905A5BA43A716DF /* SMAPButton.swift */; };
@@ -96,6 +98,7 @@
 		5276E8F7F9EB554FB0284094 /* AppConfiguration.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppConfiguration.swift; sourceTree = "<group>"; };
 		62E3750BD06FB7857AEC15A6 /* smapTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = smapTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		65320A8BB93E6B422E7E9185 /* NetworkErrorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NetworkErrorTests.swift; sourceTree = "<group>"; };
+		65CCDED888D125A36702CFCA /* RootView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		7BB22F47ECA2E49E5A2D6C45 /* GroupServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GroupServiceTests.swift; sourceTree = "<group>"; };
 		846D82AE62D1FF1FAFD3B490 /* KeychainManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeychainManager.swift; sourceTree = "<group>"; };
 		84E5F9E1CE2882E5F246A7EC /* UserDefaultsManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UserDefaultsManager.swift; sourceTree = "<group>"; };
@@ -137,6 +140,7 @@
 		C8794820D7585E07BB427EEC /* APIClientTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = APIClientTests.swift; sourceTree = "<group>"; };
 		CDC76362DAC64DB193EB137B /* APIEndpointTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = APIEndpointTests.swift; sourceTree = "<group>"; };
 		D22CA221744223B0C67BEC1F /* APIClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		D95CD631AC850AB0FF7A852C /* SmapApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SmapApp.swift; sourceTree = "<group>"; };
 		DA6CF58C88788CD855B7AB6C /* DeepLinkService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DeepLinkService.swift; sourceTree = "<group>"; };
 		DC1B67D2BBBF002A1F25E204 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		DD697FC1738D83F5A06E98BE /* APIEndpoint.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = APIEndpoint.swift; sourceTree = "<group>"; };
@@ -494,6 +498,8 @@
 			isa = PBXGroup;
 			children = (
 				5276E8F7F9EB554FB0284094 /* AppConfiguration.swift */,
+				D95CD631AC850AB0FF7A852C /* SmapApp.swift */,
+				65CCDED888D125A36702CFCA /* RootView.swift */,
 			);
 			name = App;
 			path = App;
@@ -716,6 +722,8 @@
 				375C873CC460DC9644A11067 /* GroupService.swift in Sources */,
 				2F03E9F9C5537F7D6337263F /* FCMService.swift in Sources */,
 				D8E08C312831C21689EFE9F2 /* DeepLinkService.swift in Sources */,
+				4410063E7C2AFE10FDE434F7 /* SmapApp.swift in Sources */,
+				5DC0069666700DE0509800A2 /* RootView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -913,7 +921,6 @@
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "${NSPhotoLibraryUsageDescription}";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
-				INFOPLIST_KEY_UIMainStoryboardFile = Main;
 				INFOPLIST_KEY_UIRequiresFullScreen = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -961,7 +968,6 @@
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "${NSPhotoLibraryUsageDescription}";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
-				INFOPLIST_KEY_UIMainStoryboardFile = Main;
 				INFOPLIST_KEY_UIRequiresFullScreen = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;

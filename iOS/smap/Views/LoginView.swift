@@ -1837,13 +1837,9 @@ struct MainTabView: View {
             NotificationCenter.default.post(name: NSNotification.Name("closeSidebars"), object: selectedTab)
         }
         .onReceive(logoutPublisher) { _ in
-            // 로그아웃 알림 수신 시 로그인 페이지로 이동
-            print("🔐 [MainTabView] 로그아웃 알림 수신 - LoginView로 이동")
-            DispatchQueue.main.async {
-                if let appDelegate = UIApplication.shared.delegate as? AppDelegate {
-                    IntroView.navigateToLoginView(appDelegate: appDelegate)
-                }
-            }
+            // RootView observes "logout" and swaps to LoginView.
+            // No UIKit window manipulation needed.
+            print("[MainTabView] logout notification received — RootView will handle navigation")
         }
     }
 }
