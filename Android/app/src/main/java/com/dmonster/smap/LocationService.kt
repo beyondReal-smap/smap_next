@@ -1,5 +1,6 @@
 package com.dmonster.smap
 
+import com.dmonster.smap.BuildConfig
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -15,8 +16,6 @@ import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import com.google.android.gms.location.*
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.*
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
@@ -45,7 +44,7 @@ class LocationService : Service() {
         private const val GPS_REFRESH_INTERVAL = 10000L // 10초로 단축
         private const val GPS_MIN_REFRESH_INTERVAL = 5000L // 5초로 단축
         private const val GPS_MAX_REFRESH_INTERVAL = 15000L // 15초로 단축
-        private const val API_BASE_URL = "https://nextstep.smap.site/api"
+        private val API_BASE_URL = "${BuildConfig.WEB_BASE_URL}/api"
 
         fun isRunning(context: Context): Boolean {
             val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
@@ -67,6 +66,13 @@ class LocationService : Service() {
                 Log.d(TAG, "   속도: ${location.speed} m/s")
                 Log.d(TAG, "   정확도: ${location.accuracy} m")
                 Log.d(TAG, "   시간: ${SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(location.time))}")
+                
+                // 좌표 유효성 검증
+                if (!isValidCoordinate(location)) {
+                    Log.w(TAG, "⚠️ [LOCATION] 유효하지 않은 좌표 - 전송 건너뜀")
+                    Log.w(TAG, "   위도: ${location.latitude}, 경도: ${location.longitude}")
+                    return
+                }
                 
                 // 속도 변화 감지 및 위치 정보 전송
                 val shouldSend = shouldSendLocationBasedOnSpeed(location)
@@ -324,7 +330,7 @@ class LocationService : Service() {
                 Log.d(TAG, "   시간: ${mltGpsData.mlt_gps_time}")
                 
                 // 🔍 mt_idx 값 확인 및 로깅
-                val prefs = getSharedPreferences("smap_prefs", Context.MODE_PRIVATE)
+                val prefs = getSharedPreferences("smap_auth_prefs", Context.MODE_PRIVATE)
                 val mt_idx_int = prefs.getInt("mt_idx", -1)
                 val mt_idx = if (mt_idx_int != -1) mt_idx_int.toString() else ""
 
@@ -366,7 +372,7 @@ class LocationService : Service() {
                         .toRequestBody("application/json".toMediaType())
 
                     // 올바른 API 엔드포인트 사용
-                    val apiUrl = "https://api3.smap.site/api/v1/logs/member-location-logs"
+                    val apiUrl = "${BuildConfig.API_BASE_URL}logs/member-location-logs"
                     Log.d(TAG, "📡 [API] 요청 URL: $apiUrl")
                     Log.d(TAG, "📡 [API] 요청 데이터: ${JSONObject(data as Map<*, *>?).toString()}")
 
@@ -417,6 +423,49 @@ class LocationService : Service() {
                 Log.e(TAG, "🔄 [EXCEPTION] 다음 위치 업데이트에서 재시도 예정")
             }
         }
+    }
+
+    private fun isValidCoordinate(location: Location): Boolean {
+        val latitude = location.latitude
+        val longitude = location.longitude
+        
+        // 1. 0,0 좌표는 대부분 GPS 초기화 오류임
+        if (latitude == 0.0 && longitude == 0.0) return false
+        
+        // 2. 위도/경도 범위 체크
+        if (latitude < -90.0 || latitude > 90.0) return false
+        if (longitude < -180.0 || longitude > 180.0) return false
+        
+        // 3. NaN 또는 무한대 체크
+        if (latitude.isNaN() || latitude.isInfinite()) return false
+        if (longitude.isNaN() || longitude.isInfinite()) return false
+        
+        // 4. 정확도 체크 (너무 낮은 정확도는 무시 - 예: 1000m 이상)
+        if (location.accuracy > 1000) {
+            Log.w(TAG, "⚠️ [LOCATION] 낮은 정확도 (${location.accuracy}m) - 전송 건너뜀")
+            return false
+        }
+
+        // 5. 모의 위치 체크 (개발자 옵션 등)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (location.isMock) {
+                Log.w(TAG, "⚠️ [LOCATION] 모의 위치 감지 - 전송 건너뜀")
+                return false
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            if (location.isFromMockProvider) {
+                Log.w(TAG, "⚠️ [LOCATION] 모의 위치 감지 - 전송 건너뜀")
+                return false
+            }
+        }
+        
+        // 한국 범위를 벗어나는 좌표에 대한 경고 로깅
+        if (latitude < 30.0 || latitude > 45.0 || longitude < 120.0 || longitude > 135.0) {
+            Log.w(TAG, "🌐 [LOCATION] 좌표가 한국 범위를 벗어남: ($latitude, $longitude)")
+        }
+        
+        return true
     }
 
     private fun getBatteryLevel(): String {

@@ -142,17 +142,18 @@ class SmapApplication : Application() {
         
         val executor = Executors.newSingleThreadExecutor()
         executor.execute {
+            val webDomain = android.net.Uri.parse(BuildConfig.WEB_BASE_URL).host ?: "nextstep.smap.site"
             val domains = listOf(
-                "nextstep.smap.site",
-                "smap-next.vercel.app", 
+                webDomain,
+                "smap-next.vercel.app",
                 "vercel.app",
                 "google.com",
                 "googleapis.com"
             )
-            
+
             // 🔥 에뮬레이터에서 DNS 해석 문제 시 IP 주소 매핑 테이블
             val ipMappings = mapOf(
-                "nextstep.smap.site" to "216.198.79.65",
+                webDomain to "216.198.79.65",
                 "smap-next.vercel.app" to "64.29.17.65"
             )
             

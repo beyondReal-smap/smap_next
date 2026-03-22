@@ -1,5 +1,6 @@
 package com.dmonster.smap.ui.home
 
+import com.dmonster.smap.BuildConfig
 import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -44,6 +45,7 @@ fun HomeSidebar(
     onDateSelected: (String) -> Unit,
     members: List<SmapGroupMember>,
     onMemberSelected: (Int) -> Unit,
+    currentUserIdx: Int? = null,
     getMemberStats: (Int) -> MemberStats = { MemberStats(0, 0, 0) }
 ) {
     var isGroupSelectorExpanded by remember { mutableStateOf(false) }
@@ -224,6 +226,7 @@ fun HomeSidebar(
                             members.forEach { member ->
                                 MemberVerticalItem(
                                     member = member,
+                                    isSelf = member.mtIdx == currentUserIdx,
                                     stats = getMemberStats(member.mtIdx),
                                     onClick = { onMemberSelected(member.mtIdx) }
                                 )
@@ -270,6 +273,7 @@ fun SectionHeader(title: String, color: Color) {
 @Composable
 fun MemberVerticalItem(
     member: SmapGroupMember,
+    isSelf: Boolean = false,
     stats: MemberStats,
     onClick: () -> Unit
 ) {
@@ -304,9 +308,9 @@ fun MemberVerticalItem(
             if (!member.mtFile1.isNullOrBlank()) {
                 val imageUrl = when {
                     member.mtFile1.startsWith("http") -> member.mtFile1
-                    member.mtFile1.startsWith("/images/") -> "https://api3.smap.site${member.mtFile1}"
-                    member.mtFile1.startsWith("/") -> "https://api3.smap.site/images${member.mtFile1}"
-                    else -> "https://api3.smap.site/images/${member.mtFile1}"
+                    member.mtFile1.startsWith("/images/") -> "${BuildConfig.IMAGE_BASE_URL}${member.mtFile1}"
+                    member.mtFile1.startsWith("/") -> "${BuildConfig.IMAGE_BASE_URL}/images${member.mtFile1}"
+                    else -> "${BuildConfig.IMAGE_BASE_URL}/images/${member.mtFile1}"
                 }
                 Log.d("HomeSidebar", "🖼️ Loading avatar for ${member.displayName}: $imageUrl")
                 
@@ -336,7 +340,7 @@ fun MemberVerticalItem(
             verticalArrangement = Arrangement.spacedBy((-6).dp)
         ) {
             Text(
-                text = member.displayName,
+                text = if (isSelf) "${member.displayName} (나)" else member.displayName,
                 fontSize = 17.sp,
                 fontWeight = FontWeight.Medium,
                 fontFamily = SuiteFont

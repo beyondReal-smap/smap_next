@@ -1,5 +1,6 @@
 package com.dmonster.smap.ui.activitylog
 
+import com.dmonster.smap.BuildConfig
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -27,6 +28,7 @@ import com.dmonster.smap.data.model.SmapGroupMember
 import com.dmonster.smap.data.model.DailyCount
 import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.SuiteFont
+import com.dmonster.smap.ui.theme.responsiveSp
 import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.BorderStroke
@@ -57,7 +59,7 @@ fun ActivityLogHeader(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = "활동 로그",
-                fontSize = 22.sp,
+                fontSize = 22.responsiveSp(),
                 fontFamily = SuiteFont,
                 fontWeight = FontWeight.Bold,
                 color = Color.Black
@@ -108,8 +110,8 @@ fun ActivityLogFloatingCard(
                         if (!member?.mtFile1.isNullOrBlank()) {
                             when {
                                 member!!.mtFile1!!.startsWith("http") -> member.mtFile1
-                                member.mtFile1!!.startsWith("/images/") -> "https://api3.smap.site${member.mtFile1}"
-                                else -> "https://api3.smap.site/images/${member.mtFile1}"
+                                member.mtFile1!!.startsWith("/images/") -> "${BuildConfig.IMAGE_BASE_URL}${member.mtFile1}"
+                                else -> "${BuildConfig.IMAGE_BASE_URL}/images/${member.mtFile1}"
                             }
                         } else null
                     }
@@ -198,9 +200,9 @@ fun ActivityLogFloatingCard(
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    StatItem(icon = Icons.AutoMirrored.Filled.ArrowForward, color = Color(0xFFEF4444), value = summary?.distanceFormatted ?: "0 m", modifier = Modifier.weight(1f))
-                    StatItem(icon = Icons.Default.AccessTime, color = Color(0xFFF59E0B), value = summary?.timeFormatted ?: "0분", modifier = Modifier.weight(1f))
-                    StatItem(icon = Icons.Default.DirectionsWalk, color = Color(0xFF3B82F6), value = summary?.stepsFormatted ?: "0", modifier = Modifier.weight(1f))
+                    SummaryStatItem(icon = Icons.AutoMirrored.Filled.ArrowForward, color = Color(0xFFEF4444), value = summary?.distanceFormatted ?: "0 m", modifier = Modifier.weight(1f))
+                    SummaryStatItem(icon = Icons.Default.AccessTime, color = Color(0xFFF59E0B), value = summary?.timeFormatted ?: "0분", modifier = Modifier.weight(1f))
+                    SummaryStatItem(icon = Icons.Default.DirectionsWalk, color = Color(0xFF3B82F6), value = summary?.stepsFormatted ?: "0", modifier = Modifier.weight(1f))
                 }
             }
         }
@@ -208,7 +210,7 @@ fun ActivityLogFloatingCard(
 }
 
 @Composable
-private fun StatItem(
+fun SummaryStatItem(
     icon: ImageVector,
     color: Color,
     value: String,
@@ -217,7 +219,7 @@ private fun StatItem(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
-        modifier = modifier.padding(top = 8.dp)
+        modifier = modifier.padding(top = 1.dp)
     ) {
         Box(
             modifier = Modifier
@@ -232,8 +234,6 @@ private fun StatItem(
                 modifier = Modifier.size(12.dp)
             )
         }
-        
-        Spacer(modifier = Modifier.height(2.dp))
         
         Text(
             text = value,
@@ -298,7 +298,7 @@ fun PathSlider(
                 }
                 Text(
                     text = "경로 따라가기",
-                    fontSize = 14.sp,
+                    fontSize = 14.responsiveSp(),
                     fontFamily = SuiteFont,
                     fontWeight = FontWeight.Bold,
                     color = Color.Black
@@ -469,6 +469,7 @@ fun ActivityMemberSidebar(
     selectedGroup: SmapGroup?,
     members: List<SmapGroupMember>,
     selectedMember: SmapGroupMember?,
+    currentUserIdx: Int?,
     selectedDate: java.time.LocalDate,
     activityStats: Map<Int, List<DailyCount>>,
     onGroupSelect: (SmapGroup) -> Unit,
@@ -519,7 +520,7 @@ fun ActivityMemberSidebar(
                     Column {
                         Text(
                             text = "로그 조회",
-                            fontSize = 20.sp,
+                            fontSize = 20.responsiveSp(),
                             fontFamily = SuiteFont,
                             fontWeight = FontWeight.Bold,
                             color = Color.Black
@@ -664,6 +665,7 @@ fun ActivityMemberSidebar(
                                 ActivityMemberCard(
                                     member = member,
                                     isSelected = selectedMember?.mtIdx == member.mtIdx,
+                                    isSelf = member.mtIdx == currentUserIdx,
                                     selectedDate = selectedDate,
                                     onClick = { onMemberSelect(member) },
                                     onDateSelect = { onMemberAndDateSelect(member, it) },
@@ -683,6 +685,7 @@ fun ActivityMemberSidebar(
 fun ActivityMemberCard(
     member: SmapGroupMember,
     isSelected: Boolean,
+    isSelf: Boolean = false,
     selectedDate: java.time.LocalDate,
     onClick: () -> Unit,
     onDateSelect: (java.time.LocalDate) -> Unit,
@@ -729,8 +732,8 @@ fun ActivityMemberCard(
                             if (!member.mtFile1.isNullOrBlank()) {
                                 when {
                                     member.mtFile1!!.startsWith("http") -> member.mtFile1
-                                    member.mtFile1!!.startsWith("/images/") -> "https://api3.smap.site${member.mtFile1}"
-                                    else -> "https://api3.smap.site/images/${member.mtFile1}"
+                                    member.mtFile1!!.startsWith("/images/") -> "${BuildConfig.IMAGE_BASE_URL}${member.mtFile1}"
+                                    else -> "${BuildConfig.IMAGE_BASE_URL}/images/${member.mtFile1}"
                                 }
                             } else null
                         }
@@ -763,7 +766,7 @@ fun ActivityMemberCard(
                     Spacer(modifier = Modifier.height(8.dp))
                     
                     Text(
-                        text = member.displayName,
+                        text = if (isSelf) "${member.displayName} (나)" else member.displayName,
                         fontSize = 14.sp,
                         fontFamily = SuiteFont,
                         fontWeight = FontWeight.Bold,

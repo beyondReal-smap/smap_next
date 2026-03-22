@@ -1,5 +1,6 @@
 package com.dmonster.smap
 
+import com.dmonster.smap.BuildConfig
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -33,7 +34,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
 
     companion object {
         private const val TAG = "SMAP_FCM"
-        private const val API_BASE_URL = "https://api3.smap.site/api/v1"
+        private val API_BASE_URL = BuildConfig.API_BASE_URL.trimEnd('/')
         private const val PREF_NAME = "smap_auth_prefs"
         private const val KEY_MT_IDX = "mt_idx"
         private const val KEY_FCM_TOKEN = "fcm_token"

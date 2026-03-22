@@ -6,7 +6,7 @@ import retrofit2.http.*
 
 /**
  * Single Retrofit interface for all SMAP backend API endpoints.
- * Base URL: https://api3.smap.site/api/v1/
+ * Base URL: Configured via BuildConfig.API_BASE_URL
  *
  * Note: KakaoLocationService uses a different base URL and auth header,
  * so it is NOT included here.

@@ -1,5 +1,7 @@
 package com.dmonster.smap.ui.home
 
+import com.dmonster.smap.BuildConfig
+import com.dmonster.smap.AppConstants
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -9,7 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.dmonster.smap.ui.settings.SettingsScreen
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -34,7 +36,7 @@ import androidx.lifecycle.LifecycleEventObserver
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalNaverMapApi::class)
 @Composable
 fun HomeScreen(
-    viewModel: HomeViewModel = viewModel(),
+    viewModel: HomeViewModel = hiltViewModel(),
     onLogout: () -> Unit
 ) {
     // Collect State
@@ -76,7 +78,7 @@ fun HomeScreen(
     var isSettingsVisible by remember { mutableStateOf(false) }
     
     // Notification ViewModel
-    val notiViewModel: NotificationViewModel = viewModel()
+    val notiViewModel: NotificationViewModel = hiltViewModel()
     val unreadCount by notiViewModel.summary.collectAsState()
     val hasUnread = unreadCount.unread > 0
     
@@ -130,8 +132,11 @@ fun HomeScreen(
 
     // Naver Map Camera State
     val cameraPositionState = rememberCameraPositionState {
-        // Default position (Seoul)
-        position = CameraPosition(LatLng(37.5665, 126.9780), 10.0)
+        // Default position (Seoul City Hall) - 위치 권한이 없을 때 기본값
+        position = CameraPosition(
+            LatLng(AppConstants.DefaultLocation.LATITUDE, AppConstants.DefaultLocation.LONGITUDE), 
+            AppConstants.MapZoom.DEFAULT
+        )
     }
 
     // Info Window Position (Screen Coordinates)
@@ -146,9 +151,9 @@ fun HomeScreen(
             if (!member.mtFile1.isNullOrBlank() && !memberAvatars.containsKey(member.mtIdx)) {
                 val imageUrl = when {
                     member.mtFile1.startsWith("http") -> member.mtFile1
-                    member.mtFile1.startsWith("/images/") -> "https://api3.smap.site${member.mtFile1}"
-                    member.mtFile1.startsWith("/") -> "https://api3.smap.site/images${member.mtFile1}"
-                    else -> "https://api3.smap.site/images/${member.mtFile1}"
+                    member.mtFile1.startsWith("/images/") -> "${BuildConfig.IMAGE_BASE_URL}${member.mtFile1}"
+                    member.mtFile1.startsWith("/") -> "${BuildConfig.IMAGE_BASE_URL}/images${member.mtFile1}"
+                    else -> "${BuildConfig.IMAGE_BASE_URL}/images/${member.mtFile1}"
                 }
                 
                 scope.launch {
@@ -231,6 +236,7 @@ fun HomeScreen(
                             viewModel.selectMember(memberId)
                             scope.launch { drawerState.close() }
                         },
+                        currentUserIdx = viewModel.getCurrentUserIdx(),
                         getMemberStats = { mtIdx -> viewModel.getMemberTodayStats(mtIdx) }
                     )
                 }
@@ -340,7 +346,7 @@ fun HomeScreen(
             exit = fadeOut(),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 20.dp, bottom = 60.dp)
+                .padding(end = 20.dp, bottom = 20.dp)
         ) {
             FloatingActionHomeButton(
                 memberCount = members.size,

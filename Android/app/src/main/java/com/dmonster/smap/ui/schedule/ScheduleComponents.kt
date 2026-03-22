@@ -1,5 +1,6 @@
 package com.dmonster.smap.ui.schedule
 
+import com.dmonster.smap.BuildConfig
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -32,6 +33,7 @@ import com.dmonster.smap.data.model.SmapGroup
 import com.dmonster.smap.data.model.SmapSchedule
 import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.SuiteFont
+import com.dmonster.smap.ui.theme.responsiveSp
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.YearMonth
@@ -116,14 +118,14 @@ fun MonthCalendar(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = "${currentMonth.year}년 ${currentMonth.monthValue}월",
-                        fontSize = 16.sp,
+                        fontSize = 18.responsiveSp(),
                         fontFamily = SuiteFont,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF1F2937)
                     )
                     Text(
                         text = "오늘로 이동",
-                        fontSize = 11.sp,
+                        fontSize = 13.sp,
                         fontFamily = SuiteFont,
                         color = BrandColors.Primary,
                         modifier = Modifier.clickable(onClick = onToday)
@@ -150,7 +152,7 @@ fun MonthCalendar(
                     ) {
                         Text(
                             text = day,
-                            fontSize = 11.sp,
+                            fontSize = 13.sp,
                             fontFamily = SuiteFont,
                             fontWeight = FontWeight.Medium,
                             color = when (index) {
@@ -179,7 +181,7 @@ fun MonthCalendar(
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(36.dp)
+                                    .height(40.dp)
                                     .padding(1.dp),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -231,7 +233,7 @@ private fun CalendarDay(
     ) {
         Text(
             text = day.toString(),
-            fontSize = 14.sp,
+            fontSize = 16.sp,
             fontFamily = SuiteFont,
             fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal,
             color = when {
@@ -262,7 +264,8 @@ fun EventCard(
     onClick: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    canManage: Boolean = true
 ) {
     val status = getScheduleStatus(schedule)
     var showMenu by remember { mutableStateOf(false) }
@@ -300,19 +303,19 @@ fun EventCard(
             ) {
                 Text(
                     text = if (schedule.sstAllDay == "Y") "종일" else startTime,
-                    fontSize = 22.sp,
+                    fontSize = 24.responsiveSp(),
                     fontFamily = SuiteFont,
                     fontWeight = FontWeight.Bold,
                     color = Color.Black,
-                    lineHeight = 22.sp
+                    lineHeight = 24.sp
                 )
                 if (endTime.isNotEmpty() && schedule.sstAllDay != "Y") {
                     Text(
                         text = "~ $endTime",
-                        fontSize = 12.sp,
+                        fontSize = 13.sp,
                         fontFamily = SuiteFont,
                         color = Color.Gray,
-                        lineHeight = 12.sp
+                        lineHeight = 13.sp
                     )
                 }
                 
@@ -325,15 +328,15 @@ fun EventCard(
                             imageVector = Icons.Default.Repeat,
                             contentDescription = null,
                             tint = Color(0xFF3B82F6),
-                            modifier = Modifier.size(10.dp)
+                            modifier = Modifier.size(12.dp)
                         )
                         Spacer(modifier = Modifier.width(3.dp))
                         Text(
                             text = repeatText ?: "반복",
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             fontFamily = SuiteFont,
                             color = Color(0xFF3B82F6),
-                            lineHeight = 11.sp
+                            lineHeight = 12.sp
                         )
                     }
                 }
@@ -354,17 +357,17 @@ fun EventCard(
                     val photo = schedule.validMemberPhoto
                     if (!photo.isNullOrEmpty()) {
                         AsyncImage(
-                            model = if (photo.startsWith("http")) photo else "https://nextstep.smap.site$photo",
+                            model = if (photo.startsWith("http")) photo else "${BuildConfig.WEB_BASE_URL}$photo",
                             contentDescription = null,
                             modifier = Modifier
-                                .size(16.dp)
+                                .size(20.dp)
                                 .clip(CircleShape),
                             contentScale = ContentScale.Crop
                         )
                     } else {
                         Box(
                             modifier = Modifier
-                                .size(16.dp)
+                                .size(20.dp)
                                 .clip(CircleShape)
                                 .background(Color.Gray.copy(alpha = 0.2f)),
                             contentAlignment = Alignment.Center
@@ -373,7 +376,7 @@ fun EventCard(
                                 imageVector = Icons.Default.Person,
                                 contentDescription = null,
                                 tint = Color.Gray,
-                                modifier = Modifier.size(10.dp)
+                                modifier = Modifier.size(12.dp)
                             )
                         }
                     }
@@ -381,7 +384,7 @@ fun EventCard(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = schedule.validMemberName,
-                        fontSize = 13.sp,
+                        fontSize = 14.sp,
                         fontFamily = SuiteFont,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF00148C)
@@ -389,7 +392,7 @@ fun EventCard(
                     
                     Text(
                         text = " · family",
-                        fontSize = 12.sp,
+                        fontSize = 13.sp,
                         fontFamily = SuiteFont,
                         color = Color.Gray
                     )
@@ -398,7 +401,7 @@ fun EventCard(
                 // Title
                 Text(
                     text = schedule.displayTitle,
-                    fontSize = 18.sp,
+                    fontSize = 20.responsiveSp(),
                     fontFamily = SuiteFont,
                     fontWeight = FontWeight.Medium,
                     color = Color.Black,
@@ -416,12 +419,12 @@ fun EventCard(
                                 imageVector = Icons.Default.LocationOn,
                                 contentDescription = null,
                                 tint = Color.Gray,
-                                modifier = Modifier.size(11.dp)
+                                modifier = Modifier.size(13.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = location,
-                                fontSize = 12.sp,
+                                fontSize = 13.sp,
                                 fontFamily = SuiteFont,
                                 color = Color.Gray,
                                 maxLines = 1,
@@ -445,7 +448,7 @@ fun EventCard(
                 ) {
                     Text(
                         text = status.label,
-                        fontSize = 10.sp,
+                        fontSize = 11.sp,
                         fontFamily = SuiteFont,
                         fontWeight = FontWeight.Bold,
                         color = status.color
@@ -453,59 +456,61 @@ fun EventCard(
                 }
                 
                 // Menu Button with Dropdown
-                Box {
-                    IconButton(
-                        onClick = { showMenu = true },
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.MoreHoriz,
-                            contentDescription = "메뉴",
-                            tint = Color.Gray,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                    
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.Edit,
-                                        contentDescription = null,
-                                        tint = Color.Gray,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("수정", fontFamily = SuiteFont)
+                if (canManage) {
+                    Box {
+                        IconButton(
+                            onClick = { showMenu = true },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MoreHoriz,
+                                contentDescription = "메뉴",
+                                tint = Color.Gray,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.Edit,
+                                            contentDescription = null,
+                                            tint = Color.Gray,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("수정", fontFamily = SuiteFont)
+                                    }
+                                },
+                                onClick = {
+                                    showMenu = false
+                                    onEdit()
                                 }
-                            },
-                            onClick = {
-                                showMenu = false
-                                onEdit()
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.Delete,
-                                        contentDescription = null,
-                                        tint = Color.Red,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("삭제", fontFamily = SuiteFont, color = Color.Red)
+                            )
+                            DropdownMenuItem(
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = null,
+                                            tint = Color.Red,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("삭제", fontFamily = SuiteFont, color = Color.Red)
+                                    }
+                                },
+                                onClick = {
+                                    showMenu = false
+                                    onDelete()
                                 }
-                            },
-                            onClick = {
-                                showMenu = false
-                                onDelete()
-                            }
-                        )
+                            )
+                        }
                     }
                 }
             }
@@ -687,7 +692,7 @@ fun DateHeader(
         ) {
             Text(
                 text = date.format(formatter),
-                fontSize = 18.sp,
+                fontSize = 20.responsiveSp(),
                 fontFamily = SuiteFont,
                 fontWeight = FontWeight.Bold,
                 color = Color.White
@@ -695,7 +700,7 @@ fun DateHeader(
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "${scheduleCount}개의 일정",
-                fontSize = 14.sp,
+                fontSize = 15.sp,
                 fontFamily = SuiteFont,
                 color = Color.White.copy(alpha = 0.8f)
             )

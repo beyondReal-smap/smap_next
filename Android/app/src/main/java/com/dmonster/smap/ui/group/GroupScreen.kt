@@ -1,5 +1,6 @@
 package com.dmonster.smap.ui.group
 
+import com.dmonster.smap.BuildConfig
 import android.content.Intent
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
@@ -25,9 +26,10 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.SuiteFont
+import com.dmonster.smap.ui.theme.responsiveSp
 
 /**
  * 그룹 화면 - 리스트/상세 뷰 전환
@@ -35,7 +37,7 @@ import com.dmonster.smap.ui.theme.SuiteFont
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GroupScreen(
-    viewModel: GroupViewModel = viewModel()
+    viewModel: GroupViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
@@ -163,6 +165,7 @@ fun GroupScreen(
                                 isOwner = viewModel.isCurrentUserOwner(),
                                 onEditClick = { viewModel.showEditDialog() },
                                 onDeleteClick = { viewModel.showDeleteDialog() },
+                                onLeaveClick = { viewModel.showDeleteDialog() },
                                 onShareClick = { viewModel.showShareDialog() },
                                 onInviteClick = { viewModel.showInviteBottomSheet() },
                                 onCopyCode = {
@@ -202,10 +205,15 @@ fun GroupScreen(
     }
     
     if (showDeleteDialog && selectedGroup != null) {
+        val isOwner = viewModel.isCurrentUserOwner()
         DeleteConfirmDialog(
             group = selectedGroup!!,
+            isLeave = !isOwner,
             onDismiss = { viewModel.hideDeleteDialog() },
-            onConfirm = { viewModel.deleteGroup() },
+            onConfirm = { 
+                if (isOwner) viewModel.deleteGroup() 
+                else viewModel.leaveGroup() 
+            },
             isLoading = false
         )
     }
@@ -221,7 +229,7 @@ fun GroupScreen(
                 viewModel.hideShareDialog()
             },
             onCopyLink = {
-                val link = "https://nextstep.smap.site/group/${selectedGroup?.sgtIdx}/join"
+                val link = "${BuildConfig.WEB_BASE_URL}/group/${selectedGroup?.sgtIdx}/join"
                 clipboardManager.setText(AnnotatedString(link))
                 viewModel.hideShareDialog()
             },
@@ -253,7 +261,7 @@ fun GroupScreen(
             group = selectedGroup!!,
             onDismiss = { viewModel.hideInviteBottomSheet() },
             onCopyLink = {
-                val link = "https://nextstep.smap.site/group/${selectedGroup?.sgtIdx}/join"
+                val link = "${BuildConfig.WEB_BASE_URL}/group/${selectedGroup?.sgtIdx}/join"
                 clipboardManager.setText(AnnotatedString(link))
                 viewModel.hideInviteBottomSheet()
             },
@@ -272,7 +280,7 @@ fun GroupScreen(
             },
             onDefaultShare = {
                 val code = selectedGroup?.sgtCode ?: ""
-                val link = "https://nextstep.smap.site/group/${selectedGroup?.sgtIdx}/join"
+                val link = "${BuildConfig.WEB_BASE_URL}/group/${selectedGroup?.sgtIdx}/join"
                 val message = "[SMAP] ${selectedGroup?.sgtTitle} 그룹에 초대합니다!\n초대 코드: $code\n링크: $link"
                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
                     type = "text/plain"
@@ -289,7 +297,7 @@ fun GroupScreen(
     
     // QR Code Dialog
     if (showQRCodeDialog && selectedGroup != null) {
-        val qrData = "https://nextstep.smap.site/group/${selectedGroup?.sgtIdx}/join"
+        val qrData = "${BuildConfig.WEB_BASE_URL}/group/${selectedGroup?.sgtIdx}/join"
         QRCodeDialog(
             data = qrData,
             onDismiss = { viewModel.hideQRCodeDialog() },
@@ -332,7 +340,7 @@ private fun GroupTopBar(
             title = {
                 Text(
                     text = "그룹 상세",
-                    fontSize = 18.sp,
+                    fontSize = 18.responsiveSp(),
                     fontFamily = SuiteFont,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF1F2937)
@@ -390,14 +398,14 @@ private fun GroupListView(
             ) {
                 Text(
                     text = "그룹",
-                    fontSize = 22.sp,
+                    fontSize = 22.responsiveSp(),
                     fontWeight = FontWeight.Bold,
                     fontFamily = SuiteFont,
                     color = Color.Black
                 )
                 Text(
                     text = "그룹과 멤버를 한눈에 관리하세요",
-                    fontSize = 13.sp,
+                    fontSize = 13.responsiveSp(),
                     fontFamily = SuiteFont,
                     color = Color.Gray
                 )
@@ -514,6 +522,7 @@ private fun GroupDetailView(
     isOwner: Boolean,
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit,
+    onLeaveClick: () -> Unit,
     onShareClick: () -> Unit,
     onInviteClick: () -> Unit,
     onCopyCode: () -> Unit,
@@ -528,8 +537,10 @@ private fun GroupDetailView(
         item {
             GroupHeaderCard(
                 group = group,
+                isOwner = isOwner,
                 onEditClick = onEditClick,
                 onDeleteClick = onDeleteClick,
+                onLeaveClick = onLeaveClick,
                 onCopyCode = onCopyCode,
                 onInviteClick = onInviteClick,
                 modifier = Modifier.padding(horizontal = 16.dp)

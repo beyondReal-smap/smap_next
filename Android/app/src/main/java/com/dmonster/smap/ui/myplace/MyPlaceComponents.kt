@@ -1,5 +1,6 @@
 package com.dmonster.smap.ui.myplace
 
+import com.dmonster.smap.BuildConfig
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -41,6 +42,7 @@ import com.dmonster.smap.ui.theme.SuiteFont
 fun LocationCard(
     location: SavedLocation,
     isSelected: Boolean,
+    canManage: Boolean = true,
     onClick: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
@@ -123,28 +125,30 @@ fun LocationCard(
             }
             
             // Edit/Delete Buttons
-            Column {
-                IconButton(
-                    onClick = onEdit,
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "수정",
-                        tint = Color.Gray,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                IconButton(
-                    onClick = onDelete,
-                    modifier = Modifier.size(32.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "삭제",
-                        tint = Color.Red.copy(alpha = 0.7f),
-                        modifier = Modifier.size(18.dp)
-                    )
+            if (canManage) {
+                Column {
+                    IconButton(
+                        onClick = onEdit,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "수정",
+                            tint = Color.Gray,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "삭제",
+                            tint = Color.Red.copy(alpha = 0.7f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
             }
         }
@@ -159,11 +163,13 @@ fun MemberSidebar(
     selectedGroup: SmapGroup?,
     members: List<SmapGroupMember>,
     selectedMember: SmapGroupMember?,
+    currentUserIdx: Int?,
     locations: List<SavedLocation>,
     onGroupSelect: (SmapGroup) -> Unit,
     onMemberSelect: (SmapGroupMember) -> Unit,
     onLocationClick: (SavedLocation) -> Unit,
     onLocationNotification: (SavedLocation) -> Unit,
+    canManageLocation: (SavedLocation) -> Boolean,
     onClose: () -> Unit,
     isLoading: Boolean = false,
     isLoadingLocations: Boolean = false,
@@ -344,6 +350,7 @@ fun MemberSidebar(
                             MemberAvatarItem(
                                 member = member,
                                 isSelected = member.mtIdx == selectedMember?.mtIdx,
+                                isSelf = member.mtIdx == currentUserIdx,
                                 onClick = { onMemberSelect(member) }
                             )
                         }
@@ -453,6 +460,7 @@ fun MemberSidebar(
                         items(locations) { location ->
                             LocationListItem(
                                 location = location,
+                                canManage = canManageLocation(location),
                                 onClick = { onLocationClick(location) },
                                 onNotification = { onLocationNotification(location) }
                             )
@@ -472,15 +480,16 @@ fun MemberSidebar(
 private fun MemberAvatarItem(
     member: SmapGroupMember,
     isSelected: Boolean,
+    isSelf: Boolean = false,
     onClick: () -> Unit
 ) {
     val imageUrl = remember(member.mtFile1) {
         if (!member.mtFile1.isNullOrBlank()) {
             when {
                 member.mtFile1.startsWith("http") -> member.mtFile1
-                member.mtFile1.startsWith("/images/") -> "https://api3.smap.site${member.mtFile1}"
-                member.mtFile1.startsWith("/") -> "https://api3.smap.site/images${member.mtFile1}"
-                else -> "https://api3.smap.site/images/${member.mtFile1}"
+                member.mtFile1.startsWith("/images/") -> "${BuildConfig.IMAGE_BASE_URL}${member.mtFile1}"
+                member.mtFile1.startsWith("/") -> "${BuildConfig.IMAGE_BASE_URL}/images${member.mtFile1}"
+                else -> "${BuildConfig.IMAGE_BASE_URL}/images/${member.mtFile1}"
             }
         } else null
     }
@@ -550,7 +559,7 @@ private fun MemberAvatarItem(
         Spacer(modifier = Modifier.height(6.dp))
         
         Text(
-            text = member.displayName,
+            text = if (isSelf) "${member.displayName} (나)" else member.displayName,
             fontSize = 12.sp,
             fontFamily = SuiteFont,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
@@ -566,6 +575,7 @@ private fun MemberAvatarItem(
 @Composable
 private fun LocationListItem(
     location: SavedLocation,
+    canManage: Boolean,
     onClick: () -> Unit,
     onNotification: () -> Unit
 ) {
@@ -603,13 +613,15 @@ private fun LocationListItem(
             }
             
             // Notification Bell Button
-            IconButton(onClick = onNotification, modifier = Modifier.size(28.dp)) {
-                Icon(
-                    imageVector = Icons.Default.Notifications,
-                    contentDescription = "알림",
-                    tint = if (location.sltEnterAlarm == "Y") Color(0xFFFF9500) else Color.Gray.copy(alpha = 0.4f),
-                    modifier = Modifier.size(18.dp)
-                )
+            if (canManage) {
+                IconButton(onClick = onNotification, modifier = Modifier.size(28.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.Notifications,
+                        contentDescription = "알림",
+                        tint = if (location.sltEnterAlarm == "Y") Color(0xFFFF9500) else Color.Gray.copy(alpha = 0.4f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
         }
     }
@@ -626,9 +638,9 @@ private fun MemberItem(
         if (!member.mtFile1.isNullOrBlank()) {
             when {
                 member.mtFile1.startsWith("http") -> member.mtFile1
-                member.mtFile1.startsWith("/images/") -> "https://api3.smap.site${member.mtFile1}"
-                member.mtFile1.startsWith("/") -> "https://api3.smap.site/images${member.mtFile1}"
-                else -> "https://api3.smap.site/images/${member.mtFile1}"
+                member.mtFile1.startsWith("/images/") -> "${BuildConfig.IMAGE_BASE_URL}${member.mtFile1}"
+                member.mtFile1.startsWith("/") -> "${BuildConfig.IMAGE_BASE_URL}/images${member.mtFile1}"
+                else -> "${BuildConfig.IMAGE_BASE_URL}/images/${member.mtFile1}"
             }
         } else null
     }

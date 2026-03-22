@@ -1,9 +1,16 @@
 package com.dmonster.smap.ui.login
 
+import com.dmonster.smap.BuildConfig
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.gson.Gson
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,14 +27,15 @@ import java.util.concurrent.TimeUnit
 /**
  * 비밀번호 찾기 ViewModel (iOS ForgotPasswordViewModel 참고)
  */
-class ForgotPasswordViewModel : ViewModel() {
+@HiltViewModel
+class ForgotPasswordViewModel @Inject constructor() : ViewModel() {
     
     companion object {
         private const val TAG = "ForgotPasswordVM"
-        private const val BASE_URL = "https://api3.smap.site"
-        private const val CHECK_PHONE_URL = "$BASE_URL/api/v1/members/check/phone/"
-        private const val SMS_SEND_URL = "$BASE_URL/api/v1/sms/send-verification-code"
-        private const val RESET_PASSWORD_URL = "$BASE_URL/api/v1/auth/reset-password-by-phone"
+        private val BASE_URL = BuildConfig.API_BASE_URL.trimEnd('/')
+        private val CHECK_PHONE_URL = "$BASE_URL/members/check/phone/"
+        private val SMS_SEND_URL = "$BASE_URL/sms/send-verification-code"
+        private val RESET_PASSWORD_URL = "$BASE_URL/auth/reset-password-by-phone"
     }
     
     enum class Step {
@@ -42,7 +50,7 @@ class ForgotPasswordViewModel : ViewModel() {
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
     
-    private val gson = Gson()
+    private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true; isLenient = true }
     
     // Step state
     private val _currentStep = MutableStateFlow(Step.PHONE)
@@ -195,8 +203,8 @@ class ForgotPasswordViewModel : ViewModel() {
             val body = response.body?.string()
             
             if (response.isSuccessful && body != null) {
-                val json = gson.fromJson(body, Map::class.java)
-                json["available"] as? Boolean
+                val parsed = json.parseToJsonElement(body).jsonObject
+                parsed["available"]?.jsonPrimitive?.boolean
             } else {
                 null
             }
@@ -217,32 +225,31 @@ class ForgotPasswordViewModel : ViewModel() {
         
         try {
             val result = withContext(Dispatchers.IO) {
-                val requestBody = mapOf("phone_number" to cleanPhone)
-                val jsonBody = gson.toJson(requestBody)
-                
+                val requestBody = """{"phone_number":"$cleanPhone"}"""
+
                 val request = Request.Builder()
                     .url(SMS_SEND_URL)
-                    .post(jsonBody.toByteArray().toRequestBody("application/json".toMediaType()))
+                    .post(requestBody.toByteArray().toRequestBody("application/json".toMediaType()))
                     .build()
-                
+
                 val response = httpClient.newCall(request).execute()
                 val body = response.body?.string()
-                
+
                 if (response.isSuccessful && body != null) {
-                    gson.fromJson(body, Map::class.java)
+                    json.parseToJsonElement(body).jsonObject
                 } else {
                     null
                 }
             }
-            
+
             _isLoading.value = false
-            
-            if (result != null && result["success"] == true) {
-                sentVerificationCode = result["code"] as? String
+
+            if (result != null && result["success"]?.jsonPrimitive?.boolean == true) {
+                sentVerificationCode = result["code"]?.jsonPrimitive?.content
                 startTimer()
                 _currentStep.value = Step.VERIFICATION
             } else {
-                _errorMessage.value = result?.get("error") as? String ?: "인증번호 발송에 실패했습니다."
+                _errorMessage.value = result?.get("error")?.jsonPrimitive?.content ?: "인증번호 발송에 실패했습니다."
             }
         } catch (e: Exception) {
             Log.e(TAG, "Send verification error: ${e.message}")
@@ -291,33 +298,29 @@ class ForgotPasswordViewModel : ViewModel() {
                 val cleanPhone = formatPhoneForAPI(_phoneNumber.value)
                 
                 val result = withContext(Dispatchers.IO) {
-                    val requestBody = mapOf(
-                        "phone" to cleanPhone,
-                        "new_password" to _newPassword.value
-                    )
-                    val jsonBody = gson.toJson(requestBody)
-                    
+                    val jsonBody = """{"phone":"$cleanPhone","new_password":"${_newPassword.value}"}"""
+
                     val request = Request.Builder()
                         .url(RESET_PASSWORD_URL)
                         .post(jsonBody.toByteArray().toRequestBody("application/json".toMediaType()))
                         .build()
-                    
+
                     val response = httpClient.newCall(request).execute()
                     val body = response.body?.string()
-                    
+
                     if (response.isSuccessful && body != null) {
-                        gson.fromJson(body, Map::class.java)
+                        json.parseToJsonElement(body).jsonObject
                     } else {
                         null
                     }
                 }
-                
+
                 _isLoading.value = false
-                
-                if (result != null && result["success"] == true) {
+
+                if (result != null && result["success"]?.jsonPrimitive?.boolean == true) {
                     _currentStep.value = Step.COMPLETE
                 } else {
-                    _errorMessage.value = result?.get("message") as? String ?: "비밀번호 변경에 실패했습니다."
+                    _errorMessage.value = result?.get("message")?.jsonPrimitive?.content ?: "비밀번호 변경에 실패했습니다."
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Reset password error: ${e.message}")

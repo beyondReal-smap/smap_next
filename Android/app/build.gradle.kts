@@ -121,12 +121,6 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
-    // Gson for JSON parsing
-    implementation("com.google.code.gson:gson:2.11.0")
-
-    // JSON
-    implementation("org.json:json:20240303")
-
     // Hilt DI
     implementation("com.google.dagger:hilt-android:2.51.1")
     ksp("com.google.dagger:hilt-android-compiler:2.51.1")

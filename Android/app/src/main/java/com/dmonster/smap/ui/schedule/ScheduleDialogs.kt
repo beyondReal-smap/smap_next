@@ -1,5 +1,6 @@
 package com.dmonster.smap.ui.schedule
 
+import com.dmonster.smap.BuildConfig
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.BorderStroke
@@ -840,9 +841,9 @@ fun MemberItem(
         if (!member.mtFile1.isNullOrBlank()) {
             when {
                 member.mtFile1.startsWith("http") -> member.mtFile1
-                member.mtFile1.startsWith("/images/") -> "https://api3.smap.site${member.mtFile1}"
-                member.mtFile1.startsWith("/") -> "https://api3.smap.site/images${member.mtFile1}"
-                else -> "https://api3.smap.site/images/${member.mtFile1}"
+                member.mtFile1.startsWith("/images/") -> "${BuildConfig.IMAGE_BASE_URL}${member.mtFile1}"
+                member.mtFile1.startsWith("/") -> "${BuildConfig.IMAGE_BASE_URL}/images${member.mtFile1}"
+                else -> "${BuildConfig.IMAGE_BASE_URL}/images/${member.mtFile1}"
             }
         } else null
     }

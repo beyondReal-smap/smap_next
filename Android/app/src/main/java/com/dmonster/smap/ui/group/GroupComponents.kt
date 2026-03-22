@@ -1,5 +1,6 @@
 package com.dmonster.smap.ui.group
 
+import com.dmonster.smap.BuildConfig
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -30,6 +31,7 @@ import com.dmonster.smap.data.model.SmapGroup
 import com.dmonster.smap.data.model.SmapGroupMember
 import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.SuiteFont
+import com.dmonster.smap.ui.theme.responsiveSp
 import coil.compose.AsyncImage
 
 // MARK: - Stats Cards
@@ -84,7 +86,7 @@ private fun StatsCard(
         Column(modifier = Modifier.fillMaxSize()) {
             Text(
                 text = title,
-                fontSize = 14.sp,
+                fontSize = 14.responsiveSp(),
                 fontFamily = SuiteFont,
                 fontWeight = FontWeight.Bold,
                 color = Color.White.copy(alpha = 0.9f)
@@ -92,7 +94,7 @@ private fun StatsCard(
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = value,
-                fontSize = 28.sp,
+                fontSize = 28.responsiveSp(),
                 fontFamily = SuiteFont,
                 fontWeight = FontWeight.Bold,
                 color = Color.White
@@ -187,7 +189,7 @@ fun InviteCodeSection(
                     fontFamily = SuiteFont,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
-                    fontSize = 17.sp
+                    fontSize = 17.responsiveSp()
                 )
             }
         }
@@ -246,7 +248,7 @@ fun GroupCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = group.sgtTitle ?: "이름 없음",
-                    fontSize = 20.sp,
+                    fontSize = 20.responsiveSp(),
                     fontFamily = SuiteFont,
                     fontWeight = FontWeight.Bold,
                     color = Color.Black
@@ -308,8 +310,10 @@ fun GroupCard(
 @Composable
 fun GroupHeaderCard(
     group: SmapGroup,
+    isOwner: Boolean,
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit,
+    onLeaveClick: () -> Unit,
     onCopyCode: () -> Unit,
     onInviteClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -346,14 +350,17 @@ fun GroupHeaderCard(
                     expanded = showMenu,
                     onDismissRequest = { showMenu = false }
                 ) {
-                    DropdownMenuItem(
-                        text = { Text("그룹 정보 수정", fontFamily = SuiteFont) },
-                        onClick = {
-                            showMenu = false
-                            onEditClick()
-                        },
-                        leadingIcon = { Icon(Icons.Filled.Edit, null) }
-                    )
+                    if (isOwner) {
+                        DropdownMenuItem(
+                            text = { Text("그룹 정보 수정", fontFamily = SuiteFont) },
+                            onClick = {
+                                showMenu = false
+                                onEditClick()
+                            },
+                            leadingIcon = { Icon(Icons.Filled.Edit, null) }
+                        )
+                    }
+                    
                     DropdownMenuItem(
                         text = { Text("멤버 초대하기", fontFamily = SuiteFont) },
                         onClick = {
@@ -362,15 +369,28 @@ fun GroupHeaderCard(
                         },
                         leadingIcon = { Icon(Icons.Filled.PersonAdd, null) }
                     )
+                    
                     Divider()
-                    DropdownMenuItem(
-                        text = { Text("그룹 삭제", fontFamily = SuiteFont, color = Color.Red) },
-                        onClick = {
-                            showMenu = false
-                            onDeleteClick()
-                        },
-                        leadingIcon = { Icon(Icons.Filled.Delete, null, tint = Color.Red) }
-                    )
+                    
+                    if (isOwner) {
+                        DropdownMenuItem(
+                            text = { Text("그룹 삭제", fontFamily = SuiteFont, color = Color.Red) },
+                            onClick = {
+                                showMenu = false
+                                onDeleteClick()
+                            },
+                            leadingIcon = { Icon(Icons.Filled.Delete, null, tint = Color.Red) }
+                        )
+                    } else {
+                        DropdownMenuItem(
+                            text = { Text("그룹 나가기", fontFamily = SuiteFont, color = Color.Red) },
+                            onClick = {
+                                showMenu = false
+                                onLeaveClick()
+                            },
+                            leadingIcon = { Icon(Icons.Filled.ExitToApp, null, tint = Color.Red) }
+                        )
+                    }
                 }
             }
             
@@ -402,7 +422,7 @@ fun GroupHeaderCard(
                     Column {
                         Text(
                             text = group.sgtTitle ?: "그룹",
-                            fontSize = 24.sp,
+                            fontSize = 24.responsiveSp(),
                             fontFamily = SuiteFont,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
@@ -591,9 +611,9 @@ fun MemberListItem(
         if (!member.mtFile1.isNullOrBlank()) {
             when {
                 member.mtFile1.startsWith("http") -> member.mtFile1
-                member.mtFile1.startsWith("/images/") -> "https://api3.smap.site${member.mtFile1}"
-                member.mtFile1.startsWith("/") -> "https://api3.smap.site/images${member.mtFile1}"
-                else -> "https://api3.smap.site/images/${member.mtFile1}"
+                member.mtFile1.startsWith("/images/") -> "${BuildConfig.IMAGE_BASE_URL}${member.mtFile1}"
+                member.mtFile1.startsWith("/") -> "${BuildConfig.IMAGE_BASE_URL}/images${member.mtFile1}"
+                else -> "${BuildConfig.IMAGE_BASE_URL}/images/${member.mtFile1}"
             }
         } else null
     }

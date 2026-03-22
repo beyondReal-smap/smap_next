@@ -1,14 +1,21 @@
 package com.dmonster.smap.ui.register
 
-import android.app.Application
+import com.dmonster.smap.BuildConfig
 import android.util.Log
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dmonster.smap.data.model.LegalContent
 import com.dmonster.smap.data.model.RegisterRequest
 import com.dmonster.smap.data.model.RegisterStep
 import com.dmonster.smap.data.service.AuthService
-import com.google.gson.Gson
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -25,15 +32,18 @@ import java.util.concurrent.TimeUnit
 /**
  * 회원가입 ViewModel (iOS RegisterViewModel 기반)
  */
-class RegisterViewModel(application: Application) : AndroidViewModel(application) {
-    
+@HiltViewModel
+class RegisterViewModel @Inject constructor(
+    private val authService: AuthService
+) : ViewModel() {
+
     companion object {
         private const val TAG = "RegisterViewModel"
-        private const val SMS_API_URL = "https://api3.smap.site/api/v1/sms/send-verification-code"
-        private const val CHECK_PHONE_API_URL = "https://api3.smap.site/api/v1/members/check/phone/"
-        private const val REGISTER_API_URL = "https://api3.smap.site/api/v1/auth/register"
+        private val SMS_API_URL = "${BuildConfig.API_BASE_URL}sms/send-verification-code"
+        private val CHECK_PHONE_API_URL = "${BuildConfig.API_BASE_URL}members/check/phone/"
+        private val REGISTER_API_URL = "${BuildConfig.API_BASE_URL}auth/register"
     }
-    
+
     // UI State
     data class RegisterUiState(
         val currentStep: RegisterStep = RegisterStep.TERMS,
@@ -42,35 +52,33 @@ class RegisterViewModel(application: Application) : AndroidViewModel(application
         val isVerificationLoading: Boolean = false,
         val errorMessage: String? = null,
         val showError: Boolean = false,
-        
+
         // Verification
         val verificationCode: String = "",
         val verificationSent: Boolean = false,
         val verificationTimer: Int = 0,
-        
+
         // Password
         val passwordConfirm: String = "",
         val showPassword: Boolean = false,
         val showPasswordConfirm: Boolean = false,
-        
+
         // Registration complete
         val isRegistrationComplete: Boolean = false,
         val showExistingUserAlert: Boolean = false,
         val existingUserPhone: String = "",
-        
+
         // Legal Detail
         val currentLegalDocument: LegalContent.LegalDocument? = null
     )
-    
+
     private val _uiState = MutableStateFlow(RegisterUiState())
     val uiState: StateFlow<RegisterUiState> = _uiState.asStateFlow()
-    
-    private val authService = AuthService.getInstance(application)
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
-    private val gson = Gson()
+    private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true; isLenient = true }
     
     private var timerJob: Job? = null
     private var sentVerificationCode: String? = null
@@ -259,8 +267,7 @@ class RegisterViewModel(application: Application) : AndroidViewModel(application
                 Log.d(TAG, "✅ 신규 전화번호 - SMS 발송 진행")
                 
                 // SMS 발송
-                val smsRequestBody = mapOf("phone_number" to phone)
-                val requestBody = gson.toJson(smsRequestBody)
+                val requestBody = """{"phone_number":"$phone"}"""
                     .toRequestBody("application/json".toMediaType())
                 
                 val smsRequest = Request.Builder()
@@ -433,10 +440,8 @@ class RegisterViewModel(application: Application) : AndroidViewModel(application
     
     val isProfileValid: Boolean
         get() {
-            val data = _uiState.value.registerData
-            val hasBirthDate = !data.mtBirth.isNullOrBlank()
-            val hasGender = data.mtGender == 1 || data.mtGender == 2
-            return hasBirthDate && hasGender
+            // Apple Guideline 5.1.1: 생년월일과 성별은 선택 사항으로 변경
+            return true
         }
     
     // MARK: - Profile
@@ -501,7 +506,7 @@ class RegisterViewModel(application: Application) : AndroidViewModel(application
         
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val requestBody = gson.toJson(_uiState.value.registerData)
+                val requestBody = json.encodeToString(_uiState.value.registerData)
                     .toRequestBody("application/json".toMediaType())
                 
                 val request = Request.Builder()
@@ -523,11 +528,14 @@ class RegisterViewModel(application: Application) : AndroidViewModel(application
                     
                     // 사용자 데이터 저장
                     try {
-                        val jsonObject = com.google.gson.JsonParser.parseString(body).asJsonObject
-                        val dataObject = jsonObject.getAsJsonObject("data")
-                        val userObject = dataObject?.getAsJsonObject("user")
-                        if (userObject != null) {
-                            val user = gson.fromJson(userObject, com.dmonster.smap.data.model.SMAPUser::class.java)
+                        val parsed = json.parseToJsonElement(body).jsonObject
+                        val dataObject = parsed["data"]?.jsonObject
+                        val userJson = dataObject?.get("user")
+                        if (userJson != null) {
+                            val user = json.decodeFromJsonElement(
+                                com.dmonster.smap.data.model.SMAPUser.serializer(),
+                                userJson
+                            )
                             authService.saveUserData(user)
                             Log.d(TAG, "회원가입 완료 - 사용자 데이터 저장: ${user.mtNickname}")
                         }

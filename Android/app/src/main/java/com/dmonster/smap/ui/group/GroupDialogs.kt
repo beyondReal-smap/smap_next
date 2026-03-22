@@ -1,5 +1,6 @@
 package com.dmonster.smap.ui.group
 
+import com.dmonster.smap.BuildConfig
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -338,6 +339,7 @@ fun EditGroupDialog(
 @Composable
 fun DeleteConfirmDialog(
     group: SmapGroup,
+    isLeave: Boolean = false,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
     isLoading: Boolean
@@ -354,7 +356,7 @@ fun DeleteConfirmDialog(
         },
         title = {
             Text(
-                text = "그룹 삭제",
+                text = if (isLeave) "그룹 나가기" else "그룹 삭제",
                 fontFamily = SuiteFont,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center
@@ -362,7 +364,11 @@ fun DeleteConfirmDialog(
         },
         text = {
             Text(
-                text = "'${group.sgtTitle}'을(를) 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없으며, 모든 멤버가 그룹에서 나가게 됩니다.",
+                text = if (isLeave) {
+                    "'${group.sgtTitle}' 그룹에서 나가시겠습니까?\n\n이후 다시 가입하려면 초대 코드가 필요합니다."
+                } else {
+                    "'${group.sgtTitle}'을(를) 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없으며, 모든 멤버가 그룹에서 나가게 됩니다."
+                },
                 fontFamily = SuiteFont,
                 textAlign = TextAlign.Center,
                 style = LocalTextStyle.current.copy(
@@ -386,7 +392,7 @@ fun DeleteConfirmDialog(
                         strokeWidth = 2.dp
                     )
                 } else {
-                    Text("삭제", fontFamily = SuiteFont)
+                    Text(if (isLeave) "나가기" else "삭제", fontFamily = SuiteFont)
                 }
             }
         },
@@ -561,9 +567,9 @@ fun MemberManageDialog(
         if (!member.mtFile1.isNullOrBlank()) {
             when {
                 member.mtFile1.startsWith("http") -> member.mtFile1
-                member.mtFile1.startsWith("/images/") -> "https://api3.smap.site${member.mtFile1}"
-                member.mtFile1.startsWith("/") -> "https://api3.smap.site/images${member.mtFile1}"
-                else -> "https://api3.smap.site/images/${member.mtFile1}"
+                member.mtFile1.startsWith("/images/") -> "${BuildConfig.IMAGE_BASE_URL}${member.mtFile1}"
+                member.mtFile1.startsWith("/") -> "${BuildConfig.IMAGE_BASE_URL}/images${member.mtFile1}"
+                else -> "${BuildConfig.IMAGE_BASE_URL}/images/${member.mtFile1}"
             }
         } else null
     }
@@ -922,7 +928,7 @@ fun QRCodeDialog(
         containerColor = Color.White,
         shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
         dragHandle = null,
-        windowInsets = WindowInsets(0, 0, 0, 0)
+        contentWindowInsets = { WindowInsets(0, 0, 0, 0) }
     ) {
         Column(
             modifier = Modifier

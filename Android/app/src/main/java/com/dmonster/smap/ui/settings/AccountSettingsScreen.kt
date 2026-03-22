@@ -1,5 +1,6 @@
 package com.dmonster.smap.ui.settings
 
+import com.dmonster.smap.BuildConfig
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -338,9 +339,9 @@ fun ProfileHeaderWithUpload(
                 } else if (!profileImage.isNullOrBlank()) {
                     val imageUrl = when {
                         profileImage.startsWith("http") -> profileImage
-                        profileImage.startsWith("/images/") -> "https://api3.smap.site$profileImage"
-                        profileImage.startsWith("/") -> "https://api3.smap.site/images$profileImage"
-                        else -> "https://api3.smap.site/images/$profileImage"
+                        profileImage.startsWith("/images/") -> "${BuildConfig.IMAGE_BASE_URL}$profileImage"
+                        profileImage.startsWith("/") -> "${BuildConfig.IMAGE_BASE_URL}/images$profileImage"
+                        else -> "${BuildConfig.IMAGE_BASE_URL}/images/$profileImage"
                     }
                     AsyncImage(
                         model = imageUrl,

@@ -1,8 +1,7 @@
 package com.dmonster.smap.ui.myplace
 
-import android.app.Application
 import android.util.Log
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dmonster.smap.data.model.SavedLocation
 import com.dmonster.smap.data.model.SmapGroup
@@ -12,6 +11,8 @@ import com.dmonster.smap.data.service.GroupService
 import com.dmonster.smap.data.service.MyPlaceService
 import com.dmonster.smap.data.GlobalEvent
 import com.dmonster.smap.data.GlobalEventBus
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,20 +22,21 @@ import okhttp3.Request
 import com.dmonster.smap.data.model.KakaoPlace
 import com.dmonster.smap.data.model.KakaoPlaceResponse
 import com.dmonster.smap.data.model.KakaoAddressResponse
-import com.google.gson.Gson
+import kotlinx.serialization.json.Json
 
 /**
  * 내장소 페이지 ViewModel
  */
-class MyPlaceViewModel(application: Application) : AndroidViewModel(application) {
+@HiltViewModel
+class MyPlaceViewModel @Inject constructor(
+    private val myPlaceService: MyPlaceService,
+    private val groupService: GroupService,
+    private val authService: AuthService
+) : ViewModel() {
 
     companion object {
         private const val TAG = "MyPlaceViewModel"
     }
-
-    private val myPlaceService = MyPlaceService.getInstance(application)
-    private val groupService = GroupService.getInstance(application)
-    private val authService = AuthService.getInstance(application)
 
     // Groups
     private val _groups = MutableStateFlow<List<SmapGroup>>(emptyList())
@@ -115,7 +117,7 @@ class MyPlaceViewModel(application: Application) : AndroidViewModel(application)
     val isMapLoading: StateFlow<Boolean> = _isMapLoading.asStateFlow()
 
     private val httpClient = OkHttpClient()
-    private val gson = Gson()
+    private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true; isLenient = true }
     private val KAKAO_API_KEY = "7fbf60571daf54ca5bee8373a1f31d2d"
 
     private val _pendingPlaceInfo = MutableStateFlow<Triple<String, String, String?>?>(null)
@@ -218,9 +220,11 @@ class MyPlaceViewModel(application: Application) : AndroidViewModel(application)
                 val members = groupService.getGroupMembers(groupId)
                 _members.value = members
                 
-                // 첫 번째 멤버 자동 선택
+                // 현재 사용자를 기본 선택 (없으면 첫 번째 멤버)
                 if (members.isNotEmpty() && _selectedMember.value == null) {
-                    selectMember(members.first())
+                    val currentUserIdx = authService.getUserData()?.mtIdx
+                    val selfMember = members.find { it.mtIdx == currentUserIdx }
+                    selectMember(selfMember ?: members.first())
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "❌ 멤버 로드 실패", e)
@@ -287,12 +291,12 @@ class MyPlaceViewModel(application: Application) : AndroidViewModel(application)
         _pendingLocation.value = lat to lng
         _showAddDialog.value = true
         
-        // Try to reverse geocode to get address
+        // Try to reverse geocode to get address for potential manual add
         viewModelScope.launch {
-            val address = reverseGeocode(lat, lng)
-            if (address != null) {
-                // If we successfully got an address, pre-fill it
-                _pendingPlaceInfo.value = Triple("지도에서 선택한 장소", address, null)
+            val result = reverseGeocode(lat, lng)
+            if (result != null) {
+                val (name, address) = result
+                _pendingPlaceInfo.value = Triple(name ?: "", address ?: "", null)
             }
         }
     }
@@ -343,7 +347,7 @@ class MyPlaceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    private suspend fun reverseGeocode(lat: Double, lng: Double): String? {
+    private suspend fun reverseGeocode(lat: Double, lng: Double): Pair<String?, String?>? {
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val url = "https://dapi.kakao.com/v2/local/geo/coord2address.json?x=$lng&y=$lat"
@@ -354,10 +358,12 @@ class MyPlaceViewModel(application: Application) : AndroidViewModel(application)
 
                 val response = httpClient.newCall(request).execute()
                 if (response.isSuccessful) {
-                    val body = response.body?.string()
-                    val result = gson.fromJson(body, KakaoAddressResponse::class.java)
+                    val body = response.body?.string() ?: return@withContext null
+                    val result = json.decodeFromString<KakaoAddressResponse>(body)
                     val doc = result.documents.firstOrNull()
-                    doc?.roadAddress?.addressName ?: doc?.address?.addressName
+                    val address = doc?.roadAddress?.addressName ?: doc?.address?.addressName
+                    val building = doc?.roadAddress?.buildingName
+                    building to address
                 } else {
                     null
                 }
@@ -387,8 +393,8 @@ class MyPlaceViewModel(application: Application) : AndroidViewModel(application)
                 }
                 
                 if (response.isSuccessful) {
-                    val body = response.body?.string()
-                    val result = gson.fromJson(body, KakaoPlaceResponse::class.java)
+                    val body = response.body?.string() ?: ""
+                    val result = json.decodeFromString<KakaoPlaceResponse>(body)
                     _searchResults.value = result.documents
                     _hasSearched.value = true
                 } else {
@@ -421,7 +427,8 @@ class MyPlaceViewModel(application: Application) : AndroidViewModel(application)
         address: String,
         lat: Double,
         lng: Double,
-        memo: String?
+        memo: String?,
+        enterAlarm: String = "Y"
     ) {
         val group = _selectedGroup.value ?: return
         val member = _selectedMember.value ?: return
@@ -439,7 +446,8 @@ class MyPlaceViewModel(application: Application) : AndroidViewModel(application)
                     address = address,
                     lat = lat,
                     lng = lng,
-                    memo = memo
+                    memo = memo,
+                    enterAlarm = enterAlarm
                 )
                 if (location != null) {
                     _successMessage.value = "장소가 저장되었습니다"
@@ -538,6 +546,7 @@ class MyPlaceViewModel(application: Application) : AndroidViewModel(application)
                 if (success) {
                     _successMessage.value = "장소가 삭제되었습니다"
                     hideDeleteDialog()
+                    hideEditDialog()
                     if (_selectedLocation.value?.sltIdx == locationId) {
                         _selectedLocation.value = null
                     }
@@ -553,6 +562,30 @@ class MyPlaceViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    // MARK: - Permissions
+
+    fun canManageLocation(location: SavedLocation): Boolean {
+        val currentUser = authService.getUserData() ?: return false
+        
+        // 1. Own data
+        if (location.mtIdx == currentUser.mtIdx) return true
+        
+        val currentMember = _members.value.find { it.mtIdx == currentUser.mtIdx } ?: return false
+        
+        // 2. Owner can manage anything
+        if (currentMember.sgdtOwnerChk == "Y") return true
+        
+        // 3. Leader can manage anything except Owner's data
+        if (currentMember.sgdtLeaderChk == "Y") {
+            val targetMember = _members.value.find { it.mtIdx == location.mtIdx }
+            // If target is Owner, leader cannot manage
+            if (targetMember?.sgdtOwnerChk == "Y") return false
+            return true
+        }
+        
+        return false
+    }
+
     // MARK: - Helpers
 
     fun getLocationsWithCoordinates(): List<SavedLocation> {
@@ -561,4 +594,6 @@ class MyPlaceViewModel(application: Application) : AndroidViewModel(application)
 
     fun clearError() { _errorMessage.value = null }
     fun clearSuccess() { _successMessage.value = null }
+    
+    fun getCurrentUserIdx(): Int? = authService.getUserData()?.mtIdx
 }

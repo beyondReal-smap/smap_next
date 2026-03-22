@@ -1,5 +1,6 @@
 package com.dmonster.smap.ui.myplace
 
+import com.dmonster.smap.BuildConfig
 import kotlinx.coroutines.launch
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
@@ -11,6 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -58,13 +60,14 @@ fun LocationDetailSheet(
     onDismiss: () -> Unit,
     onSearchClick: () -> Unit,
     onMemberSelect: (SmapGroupMember) -> Unit,
-    onSave: (title: String, address: String, lat: Double, lng: Double, memo: String?) -> Unit,
+    onSave: (title: String, address: String, lat: Double, lng: Double, memo: String?, enterAlarm: String) -> Unit,
     onDelete: (SavedLocation) -> Unit,
     onNotificationToggle: (SavedLocation) -> Unit,
-    isLoading: Boolean
+    isLoading: Boolean,
+    canManage: Boolean = true
 ) {
     val scope = rememberCoroutineScope()
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false) // 전체 화면 확장을 위해 false로 설정
     
     // Helper to close with animation
     val closeWithAnimation: (onComplete: () -> Unit) -> Unit = { onComplete ->
@@ -93,6 +96,7 @@ fun LocationDetailSheet(
         mutableStateOf(pendingLocation?.second ?: location?.longitude ?: 0.0)
     }
     var memo by remember(location) { mutableStateOf(location?.memo ?: pendingInfo?.third ?: "") }
+    var enterAlarm by remember(location) { mutableStateOf(location?.sltEnterAlarm ?: "Y") }
     
     var showMemberSelector by remember { mutableStateOf(false) }
     
@@ -139,15 +143,10 @@ fun LocationDetailSheet(
                     fontFamily = SuiteFont
                 )
                 
-                if (isEditMode || isNew) {
+                if ((isEditMode || isNew) && canManage) {
                     TextButton(
                         onClick = { 
-                            onSave(name, address, lat, lng, memo.ifBlank { null })
-                            // Closing is handled by the Screen/ViewModel setting state to false, 
-                            // but we can try to animate out here if we want immediate feedback.
-                            // However, since Screen's 'if' will cut it off, 
-                            // we usually rely on the ViewModel's state change.
-                            // To be safe, we let the Screen handle the 'if' and just trigger saving.
+                            onSave(name, address, lat, lng, memo.ifBlank { null }, enterAlarm)
                         },
                         enabled = name.isNotBlank() && address.isNotBlank() && !isLoading
                     ) {
@@ -160,7 +159,7 @@ fun LocationDetailSheet(
                         )
                     }
                 } else {
-                    Spacer(modifier = Modifier.width(64.dp)) // Proper alignment
+                    Spacer(modifier = Modifier.width(64.dp))
                 }
             }
 
@@ -223,15 +222,17 @@ fun LocationDetailSheet(
                     Spacer(modifier = Modifier.height(24.dp))
                     
                     // Buttons
-                        ActionButton(text = "편집", icon = Icons.Default.Edit, bgColor = BrandColors.Primary) { isEditMode = true }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        ActionButton(
-                            text = if (loc.sltEnterAlarm == "Y") "알림 끄기" else "알림 켜기", 
-                            icon = if (loc.sltEnterAlarm == "Y") Icons.Default.NotificationsOff else Icons.Default.NotificationsActive, 
-                            bgColor = Color(0xFFF97316)
-                        ) { onNotificationToggle(loc) }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        ActionButton(text = "삭제", icon = Icons.Default.Delete, bgColor = Color.Red) { onDelete(loc) }
+                        if (canManage) {
+                            ActionButton(text = "편집", icon = Icons.Default.Edit, bgColor = BrandColors.Primary) { isEditMode = true }
+                            Spacer(modifier = Modifier.height(12.dp))
+                            ActionButton(
+                                text = if (loc.sltEnterAlarm == "Y") "알림 끄기" else "알림 켜기", 
+                                icon = if (loc.sltEnterAlarm == "Y") Icons.Default.NotificationsOff else Icons.Default.NotificationsActive, 
+                                bgColor = Color(0xFFF97316)
+                            ) { onNotificationToggle(loc) }
+                            Spacer(modifier = Modifier.height(12.dp))
+                            ActionButton(text = "삭제", icon = Icons.Default.Delete, bgColor = Color.Red) { onDelete(loc) }
+                        }
                     }
                 } else {
                     // EDIT / NEW MODE
@@ -271,9 +272,9 @@ fun LocationDetailSheet(
                                         if (!file.isNullOrBlank()) {
                                             when {
                                                 file.startsWith("http") -> file
-                                                file.startsWith("/images/") -> "https://api3.smap.site$file"
-                                                file.startsWith("/") -> "https://api3.smap.site/images$file"
-                                                else -> "https://api3.smap.site/images/$file"
+                                                file.startsWith("/images/") -> "${BuildConfig.IMAGE_BASE_URL}$file"
+                                                file.startsWith("/") -> "${BuildConfig.IMAGE_BASE_URL}/images$file"
+                                                else -> "${BuildConfig.IMAGE_BASE_URL}/images/$file"
                                             }
                                         } else null
                                     }
@@ -400,9 +401,9 @@ fun LocationDetailSheet(
                                  )
                              }
                             Switch(
-                                checked = location?.sltEnterAlarm == "Y", 
+                                checked = enterAlarm == "Y", 
                                 onCheckedChange = { 
-                                    if (location != null) onNotificationToggle(location)
+                                    enterAlarm = if (it) "Y" else "N"
                                 },
                                 colors = SwitchDefaults.colors(
                                     checkedThumbColor = Color.White,
@@ -576,11 +577,9 @@ fun LocationSearchSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        dragHandle = { BottomSheetDefaults.DragHandle() },
-        containerColor = Color(0xFFF2F2F7),
         tonalElevation = 0.dp,
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-        modifier = Modifier.fillMaxHeight(0.9f)
+        modifier = Modifier.fillMaxSize() // 검색창은 다 가려버리기 위해 fillMaxSize 사용
     ) {
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -769,9 +768,9 @@ private fun MemberSelectorDialog(
                                 if (!file.isNullOrBlank()) {
                                     when {
                                         file.startsWith("http") -> file
-                                        file.startsWith("/images/") -> "https://api3.smap.site$file"
-                                        file.startsWith("/") -> "https://api3.smap.site/images$file"
-                                        else -> "https://api3.smap.site/images/$file"
+                                        file.startsWith("/images/") -> "${BuildConfig.IMAGE_BASE_URL}$file"
+                                        file.startsWith("/") -> "${BuildConfig.IMAGE_BASE_URL}/images$file"
+                                        else -> "${BuildConfig.IMAGE_BASE_URL}/images/$file"
                                     }
                                 } else null
                             }
