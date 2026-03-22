@@ -1,0 +1,348 @@
+//
+// TermsViews.swift
+// smap
+//
+// Extracted from RootCoordinatorView.swift
+// Contains: ServiceTermsView, PrivacyPolicyView, LocationTermsView,
+//           MarketingConsentView, ThirdPartyProvisionView, TermSection
+//
+
+import SwiftUI
+
+// MARK: - Term Section Component
+
+struct TermSection: View {
+    let title: String
+    let content: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.suite(size: 18, weight: .bold))
+                .foregroundColor(Color(red: 1/255, green: 19/255, blue: 163/255))
+
+            Text(content)
+                .font(.suite(size: 15))
+                .lineSpacing(6)
+                .foregroundColor(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(20)
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
+    }
+}
+
+// MARK: - Service Terms View
+struct ServiceTermsView: View {
+    @Environment(\.presentationMode) var presentationMode
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                // Header
+                VStack(spacing: 8) {
+                    Text("서비스 이용약관")
+                        .font(.suite(size: 24, weight: .bold))
+                        .foregroundColor(.primary)
+
+                    Text("시행일: 2026-01-08")
+                        .font(.suite(size: 14))
+                        .foregroundColor(.gray)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 20)
+
+                Group {
+                    TermSection(title: "제1조(목적)", content: "이 약관은 비욘드리얼(이하 \"회사\")가 제공하는 제반 서비스의 이용과 관련하여 회사와 회원 간의 권리, 의무 및 책임사항, 기타 필요한 사항을 규정함을 목적으로 합니다.")
+
+                    TermSection(title: "제2조(정의)", content: """
+                    1. "서비스"라 함은 구현되는 단말기(PC, TV, 휴대형단말기 등의 각종 유무선 장치를 포함)와 상관없이 이용자가 이용할 수 있는 회사의 제반 서비스를 의미합니다.
+                       ① smap 서비스
+                       ② 기타 회사가 정하는 서비스
+                    2. "smap 서비스"라 함은 실시간 위치조회, 위치와 일정 기반 알림 등 회사가 이용자에게 제공하는 서비스를 말합니다.
+                    3. "이용자"란 회사가 제공하는 서비스를 받는 개인회원과 비회원을 말합니다.
+                    4. "개인회원"은 회사에 개인정보를 제공하여 회원등록을 한 사람으로, 회사로부터 지속적으로 정보를 제공받고 서비스를 계속적으로 이용할 수 있는 자를 말합니다.
+                    5. "비회원"은 회원가입 없이 회사가 제공하는 서비스를 이용하는 자를 말합니다.
+                    6. "아이디(ID)"란 회원의 식별과 서비스 이용을 위하여 회원이 정하고 회사가 승인하는 문자 또는 문자와 숫자의 조합을 의미합니다.
+                    7. "비밀번호"란 회원이 부여받은 아이디와 일치되는 회원임을 확인하고 비밀의 보호를 위해 회원이 정한 문자(특수문자 포함)와 숫자의 조합을 의미합니다.
+                    8. "유료서비스"란 회사가 유료로 제공하는 제반 서비스를 의미합니다.
+                    9. "결제"란 회사가 제공하는 유료서비스를 이용하기 위하여 회원이 지불수단을 선택하고 금융정보를 입력하는 행위를 말합니다.
+                    10. "할인쿠폰"은 이용자가 회사의 서비스를 이용하면서 그 대가를 지급하는 데 사용하기 위하여 회사가 발행 및 관리하는 지급수단을 말합니다.
+                    11. "콘텐츠"란 정보통신망법에 따라 정보통신망에서 사용되는 부호·문자·음성·음향·이미지 또는 영상 등으로 정보 형태의 글, 사진, 동영상 및 각종 파일과 링크 등을 말합니다.
+                    """)
+
+                    TermSection(title: "제3조(약관 외 준칙)", content: "이 약관에서 정하지 아니한 사항은 법령 또는 회사가 정한 서비스의 개별약관, 운영정책 및 규칙 등(이하 \"세부지침\")의 규정에 따르며, 본 약관과 세부지침이 충돌할 경우 세부지침이 우선합니다.")
+
+                    TermSection(title: "제4조(약관의 효력과 변경)", content: """
+                    1. 이 약관은 회사가 제공하는 모든 인터넷서비스에 게시하여 공시합니다. 회사는 전자상거래법, 약관규제법, 정보통신망법 등 관련 법령에 위배되지 않는 범위에서 본 약관을 변경할 수 있으며, 변경 시 최소 7일(불리하거나 중대한 사항은 30일) 이전부터 공지합니다. 기존 이용자에게는 전자적 수단(전자우편, 문자메시지, 서비스 내 알림 등)으로 개별 통지할 수 있습니다. 변경 된 약관은 시행일부터 효력이 발생합니다.
+                    2. 회사는 개정약관 공지 또는 통지 시, '변경에 동의하지 아니한 경우 공지일 또는 통지를 받은 날로부터 7일(불리하거나 중대한 사항은 30일) 내 해지 가능하며, 해지 의사표시가 없으면 동의한 것으로 간주'됨을 함께 통지합니다.
+                    3. 이용자가 전항의 기간 내 거절 의사를 표시하지 않을 때에는 개정 약관에 동의한 것으로 봅니다.
+                    """)
+                }
+
+                Group {
+                    TermSection(title: "제5조(이용자에 대한 통지)", content: """
+                    1. 회사는 이 약관에 별도 규정이 없는 한 전자우편, 문자(SMS), 전자쪽지, 푸시 알림 등의 전자적 수단으로 통지할 수 있습니다.
+                    2. 이용자 전체에 대한 통지는 7일 이상 서비스 내 공지 게시로 갈음할 수 있습니다. 다만, 회원 개별 거래에 중대한 영향을 미치는 사항은 개별 통지합니다.
+                    3. 연락처 미기재, 변경 후 미수정, 오기재 등으로 개별 통지가 어려운 경우 공지로 개별 통지를 갈음한 것으로 간주합니다.
+                    """)
+
+                    TermSection(title: "제6조(이용계약의 체결)", content: """
+                    1. 회원가입 시, 이용자가 약관에 동의하고 가입 신청을 하며 회사가 이를 승낙한 때
+                    2. 비회원 유료 이용의 경우, 결제가 완료된 때
+                    3. 무료 서비스인 경우, 관련 부가 기능 이용에 필요한 절차 진행 시
+                    """)
+
+                    TermSection(title: "제7조(회원가입에 대한 승낙)", content: """
+                    1. 회사는 이용계약 요청이 있으면 원칙적으로 승낙합니다.
+                    2. 필요 시 실명확인 및 본인인증을 요청할 수 있습니다.
+                    3. 설비 부족, 기술·업무상 문제 등으로 승낙을 유보할 수 있습니다.
+                    4. 승낙 거절·유보 시 원칙적으로 신청자에게 알립니다(불가피한 경우 예외).
+                    5. 계약 성립 시점은 가입완료(또는 결제완료) 표시 시점입니다.
+                    6. 회사 정책에 따라 등급별로 이용시간·횟수·메뉴 등에 차등을 둘 수 있습니다.
+                    7. 관련 법령에 따른 연령·등급 제한을 둘 수 있습니다.
+                    """)
+                }
+
+                TermSection(title: "기타 조항", content: "제8조부터 제24조까지의 상세 내용은 서비스 내 운영정책을 따르며, 회사는 개인정보보호, 서비스 이용 제한, 손해배상 및 면책사항 등에 대해 관련 법령을 준수합니다. 상세 문의는 고객센터를 통해 확인 가능합니다.")
+
+                // Footer
+                VStack(spacing: 8) {
+                    Text("부칙")
+                        .font(.suite(size: 16, weight: .bold))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Text("본 약관은 2026-01-08부터 시행합니다.")
+                        .font(.suite(size: 14))
+                        .foregroundColor(.gray)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(.top, 20)
+                .padding(.bottom, 40)
+            }
+            .padding(.horizontal, 20)
+        }
+        .background(Color(red: 0.98, green: 0.98, blue: 1.0).edgesIgnoringSafeArea(.all))
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: { presentationMode.wrappedValue.dismiss() }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                            .font(.suite(size: 18, weight: .semibold))
+                        Text("뒤로")
+                            .font(.suite(size: 18, weight: .bold))
+                    }
+                    .foregroundColor(.primary)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Privacy Policy View
+struct PrivacyPolicyView: View {
+    @Environment(\.presentationMode) var presentationMode
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                VStack(spacing: 8) {
+                    Text("개인정보 처리방침")
+                        .font(.suite(size: 24, weight: .bold))
+                        .foregroundColor(.primary)
+                    Text("시행일: 2026-01-08")
+                        .font(.suite(size: 14))
+                        .foregroundColor(.gray)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 20)
+
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("비욘드리얼(\"회사\"라 함)는 이용자의 개인정보를 소중하게 생각하며, 『개인정보 보호법』 및 『위치정보의 보호 및 이용 등에 관한 법률』 등 관련 법령을 준수하고 있습니다.")
+                        .font(.suite(size: 15)).lineSpacing(6)
+                    Text("본 방침은 \"smap\" 서비스 이용 시 수집되는 위치 데이터를 포함한 개인정보의 처리 과정을 상세히 공개합니다.")
+                        .font(.suite(size: 15)).lineSpacing(6)
+
+                    TermSection(title: "1. 개인정보 수집 항목 및 이용목적", content: "회사는 서비스 제공을 위해 아래와 같은 개인정보 및 기기 액세스 권한을 수집·이용합니다.")
+
+                    // Collection table
+                    VStack(alignment: .leading, spacing: 0) {
+                        HStack(spacing: 0) {
+                            Text("구분").font(.suite(size: 13, weight: .bold)).frame(width: 80, alignment: .leading).padding(8)
+                            Text("수집 항목").font(.suite(size: 13, weight: .bold)).frame(maxWidth: .infinity, alignment: .leading).padding(8)
+                            Text("이용 목적").font(.suite(size: 13, weight: .bold)).frame(maxWidth: .infinity, alignment: .leading).padding(8)
+                        }.background(Color.gray.opacity(0.15))
+                        Divider()
+                        HStack(alignment: .top, spacing: 0) {
+                            Text("위치 정보\n(필수)").font(.suite(size: 12, weight: .medium)).frame(width: 80, alignment: .leading).padding(8)
+                            Text("실시간 GPS 위치 데이터, 이동 경로, 기기 위치 정보").font(.suite(size: 12)).frame(maxWidth: .infinity, alignment: .leading).padding(8)
+                            Text("그룹 내 실시간 위치 공유, 일정 장소 기반 알림, 위치 기반 서비스 제공").font(.suite(size: 12)).frame(maxWidth: .infinity, alignment: .leading).padding(8)
+                        }
+                        Divider()
+                        HStack(alignment: .top, spacing: 0) {
+                            Text("회원 정보\n(필수)").font(.suite(size: 12, weight: .medium)).frame(width: 80, alignment: .leading).padding(8)
+                            Text("이메일 주소, 비밀번호, 닉네임, 프로필 사진").font(.suite(size: 12)).frame(maxWidth: .infinity, alignment: .leading).padding(8)
+                            Text("서비스 가입 및 본인 확인, 사용자 식별").font(.suite(size: 12)).frame(maxWidth: .infinity, alignment: .leading).padding(8)
+                        }
+                        Divider()
+                        HStack(alignment: .top, spacing: 0) {
+                            Text("기기 정보\n(필수)").font(.suite(size: 12, weight: .medium)).frame(width: 80, alignment: .leading).padding(8)
+                            Text("단말기 식별번호(ID), OS 버전, 방문 기록").font(.suite(size: 12)).frame(maxWidth: .infinity, alignment: .leading).padding(8)
+                            Text("서비스 최적화 및 부정 이용 방지").font(.suite(size: 12)).frame(maxWidth: .infinity, alignment: .leading).padding(8)
+                        }
+                    }
+                    .background(Color.white).cornerRadius(8)
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.gray.opacity(0.3), lineWidth: 1))
+
+                    // Important notice
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("[중요] 위치 정보 액세스 고지").font(.suite(size: 15, weight: .bold)).foregroundColor(.orange)
+                        Text("\"smap\"은 앱이 닫혀 있거나 사용 중이 아닐 때도 실시간 위치 공유 기능을 지원하기 위해 위치 데이터를 수집합니다.").font(.suite(size: 14)).lineSpacing(4)
+                        Text("이용자가 '항상 허용'으로 설정한 경우에 한해 백그라운드에서 위치 정보를 액세스하며, 이는 그룹 멤버 간의 원활한 일정 및 위치 공유를 위한 핵심 기능입니다.").font(.suite(size: 14)).lineSpacing(4)
+                    }
+                    .padding(16).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.orange.opacity(0.1)).cornerRadius(12)
+                    .overlay(Rectangle().fill(Color.orange).frame(width: 4), alignment: .leading)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                    TermSection(title: "2. 위치정보의 보호 및 이용 (추가)", content: "회사는 위치기반서비스를 제공하기 위해 이용자의 위치정보를 처리하며, 다음과 같은 원칙을 준수합니다.\n\n• 수집 방법: GPS, Wi-Fi, 기기 센서 등을 통해 실시간으로 수집합니다.\n• 보유 및 이용: 이용 목적이 달성되거나 이용자가 동의를 철회할 경우 즉시 파기합니다. 단, 관련 법령에 따라 기록을 보존해야 하는 경우 해당 기간(예: 위치정보 이용·제공사실 확인자료 6개월) 동안 보관합니다.\n• 이용자 권리: 이용자는 언제든지 위치 정보 수집에 대한 동의를 거부하거나 철회할 수 있으며, 이 경우 서비스의 일부(실시간 공유 등) 이용이 제한될 수 있습니다.")
+                    TermSection(title: "3. 개인정보의 제3자에 대한 제공", content: "회사는 이용자의 사전 동의 없이 개인정보를 외부에 제공하지 않습니다.\n\n단, 그룹 공유 기능을 선택하여 이용자가 스스로 위치 정보를 그룹 멤버에게 노출하는 경우는 예외로 합니다.")
+                    TermSection(title: "4. 개인정보의 파기", content: "개인정보는 수집 및 이용목적이 달성되면 지체 없이 파기합니다. 전자적 파일 형태는 복구가 불가능한 기술적 방법을 사용하여 삭제합니다.")
+                    TermSection(title: "5. 개인정보 보호책임자", content: "회사는 개인정보 및 위치정보와 관련한 고충 처리를 위하여 아래와 같이 책임자를 지정하고 있습니다.")
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("개인정보 보호책임자").font(.suite(size: 16, weight: .bold))
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("성명: 정진").font(.suite(size: 14))
+                            Text("전화: 070-8065-2207").font(.suite(size: 14))
+                            Text("이메일: admin@smap.site").font(.suite(size: 14))
+                        }.foregroundColor(.gray)
+                    }
+                    .padding(16).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.blue.opacity(0.05)).cornerRadius(12)
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.blue.opacity(0.1), lineWidth: 1))
+                }
+                .padding(.bottom, 40)
+            }
+            .padding(.horizontal, 20)
+        }
+        .background(Color(red: 0.98, green: 0.98, blue: 1.0).edgesIgnoringSafeArea(.all))
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: { presentationMode.wrappedValue.dismiss() }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left").font(.suite(size: 18, weight: .semibold))
+                        Text("뒤로").font(.suite(size: 18, weight: .bold))
+                    }.foregroundColor(.primary)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Location Terms View
+struct LocationTermsView: View {
+    @Environment(\.presentationMode) var presentationMode
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                VStack(spacing: 8) {
+                    Text("위치기반서비스 이용약관").font(.suite(size: 24, weight: .bold)).foregroundColor(.primary)
+                    Text("시행일: 2026-01-08").font(.suite(size: 14)).foregroundColor(.gray)
+                }.frame(maxWidth: .infinity).padding(.vertical, 20)
+
+                VStack(alignment: .leading, spacing: 20) {
+                    TermSection(title: "제1조(목적)", content: "본 약관은 회원(비욘드리얼 서비스 약관에 동의한 자, 이하 \"회원\")이 비욘드리얼(이하 \"회사\")이 제공하는 웹/모바일 애플리케이션(\"smap\")의 위치기반서비스를 이용함에 있어 회원과 회사의 권리와 의무, 기타 제반 사항을 정함을 목적으로 합니다.")
+                    TermSection(title: "제2조(가입자격)", content: "서비스에 가입할 수 있는 회원은 위치기반서비스를 이용할 수 있는 이동전화 단말기의 소유자 본인이어야 합니다.")
+                    TermSection(title: "제3조(서비스 가입)", content: "회사는 다음 각 호에 해당하는 가입신청을 승낙하지 않을 수 있습니다.\n1. 실명이 아니거나 타인의 명의를 사용하는 등 허위로 신청하는 경우\n2. 고객 등록 사항을 누락하거나 오기하여 신청하는 경우\n3. 공공질서 또는 미풍양속을 저해하거나 저해할 목적을 가지고 신청하는 경우\n4. 기타 회사가 정한 이용신청 요건이 충족되지 않았을 경우")
+                    TermSection(title: "제4조(서비스 해지)", content: "회원은 회사가 정한 절차를 통해 서비스 해지를 신청할 수 있습니다.")
+                    TermSection(title: "제5조(이용약관의 효력 및 변경)", content: "1. 본 약관은 서비스를 신청한 고객 또는 개인위치정보주체가 회사가 정한 절차에 따라 회원으로 등록함으로써 효력이 발생합니다.\n2. 서비스 신청자가 온라인에서 본 약관을 모두 읽고 \"동의하기\"를 클릭한 경우 본 약관의 내용에 동의한 것으로 봅니다.\n3. 본 약관에 동의하지 않는 경우, 회사가 개인위치정보를 기반으로 제공하는 혜택 및 편의 제공에 일부 제한이 발생할 수 있습니다.\n4. 회사는 관계 법령의 범위 내에서 본 약관을 개정할 수 있으며, 개정 시 적용일자, 개정사유를 명시하여 적용일자 10일 전부터 서비스 내 공지합니다. 회원에게 불리하거나 권리를 제한하는 개정의 경우 30일 전부터 공지하고 전자적 수단으로 고지합니다.")
+                    TermSection(title: "제6조(약관 외 준칙)", content: "본 약관에 명시되지 않은 사항은 관계 법령 및 건전한 거래관행에 따릅니다.")
+                    TermSection(title: "제7조(서비스의 내용)", content: "회사가 제공하는 위치기반서비스는 아래와 같습니다.\n1. 위치기반 콘텐츠 분류(지오태깅)\n2. 회사 및 제휴사의 상품/서비스 정보 제공\n3. 마케팅 서비스 및 프로모션 혜택 알림 제공\n4. 길 안내 등 생활편의 서비스 제공")
+                    TermSection(title: "제8조(서비스 이용요금)", content: "1. 서비스는 무료 제공을 원칙으로 합니다. 단, 유료서비스는 해당 화면에 명시된 요금을 지불하여 이용할 수 있습니다.\n2. 무선 데이터 통신료는 이동통신사 정책에 따르며 회원이 부담합니다.\n3. MMS 등으로 게시물을 등록할 경우 발생하는 요금은 이동통신사 정책에 따릅니다.")
+                    TermSection(title: "부칙", content: "본 약관은 2026-01-08부터 시행합니다.")
+                }.padding(.bottom, 40)
+            }.padding(.horizontal, 20)
+        }
+        .background(Color(red: 0.98, green: 0.98, blue: 1.0).edgesIgnoringSafeArea(.all))
+        .navigationBarTitleDisplayMode(.inline).navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: { presentationMode.wrappedValue.dismiss() }) {
+                    HStack(spacing: 4) { Image(systemName: "chevron.left").font(.suite(size: 18, weight: .semibold)); Text("뒤로").font(.suite(size: 18, weight: .bold)) }.foregroundColor(.primary)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Marketing Consent View
+struct MarketingConsentView: View {
+    @Environment(\.presentationMode) var presentationMode
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                VStack(spacing: 8) {
+                    Text("마케팅 정보 수집 및 이용 동의").font(.suite(size: 24, weight: .bold)).foregroundColor(.primary)
+                    Text("시행일: 2026-01-08").font(.suite(size: 14)).foregroundColor(.gray)
+                }.frame(maxWidth: .infinity).padding(.vertical, 20)
+
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("비욘드리얼(이하 \"회사\")는 고객에게 더 나은 서비스와 혜택을 제공하기 위해 마케팅 정보 수집 및 이용에 대한 동의를 요청합니다.").font(.suite(size: 15)).lineSpacing(6)
+                    TermSection(title: "수집하는 마케팅 정보", content: "회사는 다음과 같은 마케팅 정보를 수집할 수 있습니다:\n• 이름, 연락처(전화번호, 이메일)\n• 서비스 이용 내역 및 선호도\n• 마케팅 캠페인 참여 이력\n• 고객 만족도 조사 결과")
+                    TermSection(title: "마케팅 정보 이용 목적", content: "수집된 마케팅 정보는 다음 목적으로만 이용됩니다:\n• 신규 서비스 및 이벤트 안내\n• 맞춤형 혜택 및 프로모션 제공\n• 고객 만족도 향상을 위한 서비스 개선\n• 마케팅 성과 분석 및 통계")
+                    TermSection(title: "동의 철회 및 거부", content: "고객은 언제든지 마케팅 정보 수집 및 이용에 대한 동의를 철회하거나 거부할 수 있습니다.")
+                }.padding(.bottom, 40)
+            }.padding(.horizontal, 20)
+        }
+        .background(Color(red: 0.98, green: 0.98, blue: 1.0).edgesIgnoringSafeArea(.all))
+        .navigationBarTitleDisplayMode(.inline).navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: { presentationMode.wrappedValue.dismiss() }) {
+                    HStack(spacing: 4) { Image(systemName: "chevron.left").font(.suite(size: 18, weight: .semibold)); Text("뒤로").font(.suite(size: 18, weight: .bold)) }.foregroundColor(.primary)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Third Party Provision View
+struct ThirdPartyProvisionView: View {
+    @Environment(\.presentationMode) var presentationMode
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                VStack(spacing: 8) {
+                    Text("개인정보 제3자 제공 동의").font(.suite(size: 24, weight: .bold)).foregroundColor(.primary)
+                    Text("시행일: 2026-01-08").font(.suite(size: 14)).foregroundColor(.gray)
+                }.frame(maxWidth: .infinity).padding(.vertical, 20)
+
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("비욘드리얼(이하 \"회사\")는 원칙적으로 이용자의 개인정보를 제1조(개인정보의 처리목적)에서 명시한 범위 내에서 처리하며, 이용자의 사전 동의 없이는 본래의 범위를 초과하여 처리하거나 제3자에게 제공하지 않습니다.").font(.suite(size: 15)).lineSpacing(6)
+                    TermSection(title: "제3자 제공이 필요한 경우", content: "다음의 경우에만 개인정보를 제3자에게 제공할 수 있습니다:\n• 이용자가 개인정보의 수집 및 이용에 대한 동의와 별도로 제3자 제공에 사전 동의한 경우\n• 법률규정이 있거나 법령상 의무준수를 위해 불가피한 경우\n• 수사기관이 수사목적을 위해 관계법령이 정한 절차를 거쳐 요구하는 경우\n• 통계작성 및 학술연구 등의 목적을 위해 필요한 경우")
+                    TermSection(title: "제3자 제공 시 고지사항", content: "개인정보를 제3자에게 제공하는 경우 다음 사항을 미리 고지합니다:\n• 개인정보를 제공받는 자의 성명과 연락처\n• 제공받는 자의 개인정보 이용 목적\n• 제공하는 개인정보의 항목\n• 제공받는 자의 개인정보 보유 및 이용 기간\n• 동의 거부권이 존재한다는 사실 및 동의 거부에 따른 불이익의 내용")
+                    TermSection(title: "동의 철회 및 거부", content: "이용자는 언제든지 제3자 제공에 대한 동의를 철회하거나 거부할 수 있습니다.")
+                }.padding(.bottom, 40)
+            }.padding(.horizontal, 20)
+        }
+        .background(Color(red: 0.98, green: 0.98, blue: 1.0).edgesIgnoringSafeArea(.all))
+        .navigationBarTitleDisplayMode(.inline).navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: { presentationMode.wrappedValue.dismiss() }) {
+                    HStack(spacing: 4) { Image(systemName: "chevron.left").font(.suite(size: 18, weight: .semibold)); Text("뒤로").font(.suite(size: 18, weight: .bold)) }.foregroundColor(.primary)
+                }
+            }
+        }
+    }
+}
