@@ -76,11 +76,11 @@ class MainActivity : ComponentActivity() {
                     val locationGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
                                          permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
                     if (locationGranted) {
-                        // Location granted -> check background
-                        if (!hasBackgroundLocationPermission()) {
+                        // Location granted ("앱을 사용할 때" 포함) -> 서비스 시작
+                        startLocationService()
+                        // "항상 허용"이 아니면 백그라운드 안내 (1회)
+                        if (!hasBackgroundLocationPermission() && !hasShownBackgroundGuide()) {
                             showBackgroundGuide.value = true
-                        } else {
-                            startLocationService()
                         }
                     } else {
                         // Location DENIED -> show persistent overlay
@@ -97,11 +97,10 @@ class MainActivity : ComponentActivity() {
                             arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
                         )
                     } else {
-                        // Already has location (edge case)
-                        if (!hasBackgroundLocationPermission()) {
+                        // Already has location — start service
+                        startLocationService()
+                        if (!hasBackgroundLocationPermission() && !hasShownBackgroundGuide()) {
                             showBackgroundGuide.value = true
-                        } else {
-                            startLocationService()
                         }
                     }
                 }
@@ -109,11 +108,11 @@ class MainActivity : ComponentActivity() {
                 // Permission check on launch
                 LaunchedEffect(Unit) {
                     if (hasLocationPermissions()) {
-                        // Already has location -> check background
-                        if (!hasBackgroundLocationPermission()) {
+                        // "앱을 사용할 때" 또는 "항상 허용" — 서비스 시작
+                        startLocationService()
+                        // "항상 허용"이 아니면 백그라운드 안내 (첫 1회만)
+                        if (!hasBackgroundLocationPermission() && !hasShownBackgroundGuide()) {
                             showBackgroundGuide.value = true
-                        } else {
-                            startLocationService()
                         }
                     } else {
                         // No location permission
@@ -174,6 +173,7 @@ class MainActivity : ComponentActivity() {
                             },
                             onDismiss = {
                                 showBackgroundGuide.value = false
+                                markBackgroundGuideDismissed()
                                 // 백그라운드 권한 없이도 포그라운드 위치 서비스는 시작
                                 startLocationService()
                             }
@@ -219,6 +219,17 @@ class MainActivity : ComponentActivity() {
     private fun markFirstLaunchDone() {
         getSharedPreferences("smap_prefs", MODE_PRIVATE).edit()
             .putBoolean("permission_onboarding_done", true)
+            .apply()
+    }
+
+    private fun hasShownBackgroundGuide(): Boolean {
+        return getSharedPreferences("smap_prefs", MODE_PRIVATE)
+            .getBoolean("background_guide_dismissed", false)
+    }
+
+    private fun markBackgroundGuideDismissed() {
+        getSharedPreferences("smap_prefs", MODE_PRIVATE).edit()
+            .putBoolean("background_guide_dismissed", true)
             .apply()
     }
 
