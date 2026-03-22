@@ -25,7 +25,6 @@ class ScheduleViewModel: ObservableObject {
     private let groupService = GroupService.shared
     private var cancellables = Set<AnyCancellable>()
 
-    @MainActor
     func canManageSchedule(_ schedule: Schedule) -> Bool {
         guard let currentUserMtIdxStr = UserDefaults.standard.string(forKey: "mt_idx"),
               let currentUserMtIdx = Int(currentUserMtIdxStr) else { return false }
@@ -99,16 +98,12 @@ class ScheduleViewModel: ObservableObject {
         Task {
             do {
                 let fetchedGroups = try await groupService.getCurrentUserGroups()
-                DispatchQueue.main.async {
-                    self.groups = fetchedGroups
-                    if self.selectedGroup == nil, let firstGroup = fetchedGroups.first { self.selectGroup(firstGroup) }
-                    self.isLoading = false
-                }
+                self.groups = fetchedGroups
+                if self.selectedGroup == nil, let firstGroup = fetchedGroups.first { self.selectGroup(firstGroup) }
+                self.isLoading = false
             } catch {
-                DispatchQueue.main.async {
-                    self.errorMessage = error.localizedDescription
-                    self.isLoading = false
-                }
+                self.errorMessage = error.localizedDescription
+                self.isLoading = false
             }
         }
     }
@@ -126,17 +121,13 @@ class ScheduleViewModel: ObservableObject {
         Task {
             do {
                 let data = try await scheduleService.getGroupSchedules(groupId: group.sgt_idx, startDate: startDateStr, endDate: endDateStr)
-                DispatchQueue.main.async {
-                    self.schedules = data.schedules
-                    self.groupMembers = data.groupMembers
-                    self.userPermissions = data.userPermission
-                    self.isLoading = false
-                }
+                self.schedules = data.schedules
+                self.groupMembers = data.groupMembers
+                self.userPermissions = data.userPermission
+                self.isLoading = false
             } catch {
-                DispatchQueue.main.async {
-                    self.errorMessage = error.localizedDescription
-                    self.isLoading = false
-                }
+                self.errorMessage = error.localizedDescription
+                self.isLoading = false
             }
         }
     }
@@ -194,16 +185,12 @@ class ScheduleViewModel: ObservableObject {
                     fetchSchedules()
                 }
                 else {
-                    DispatchQueue.main.async {
-                        self.errorMessage = "일정 삭제에 실패했습니다."
-                        self.isLoading = false
-                    }
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    self.errorMessage = error.localizedDescription
+                    self.errorMessage = "일정 삭제에 실패했습니다."
                     self.isLoading = false
                 }
+            } catch {
+                self.errorMessage = error.localizedDescription
+                self.isLoading = false
             }
         }
     }

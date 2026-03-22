@@ -9,6 +9,7 @@ import Foundation
 import SwiftUI
 import Combine
 
+@MainActor
 class ActivityLogViewModel: ObservableObject {
     // MARK: - Published Properties
 
@@ -308,9 +309,8 @@ class ActivityLogViewModel: ObservableObject {
 
             // 사이드바 자동 닫기 (데이터 로드 후)
             if isSidebarOpen {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    self.closeSidebar()
-                }
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                self.closeSidebar()
             }
 
         } catch {

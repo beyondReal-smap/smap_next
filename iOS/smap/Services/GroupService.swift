@@ -62,7 +62,7 @@ class GroupService {
         let group: SmapGroup = try await apiClient.request(.joinGroupByCode(code: inviteCode), token: token)
 
         // 2. 가입 실행
-        guard let mtIdx = AuthService.shared.currentUser?.mt_idx else {
+        guard let mtIdx = AuthService.shared.getUserData()?.mt_idx else {
             throw NetworkError.unauthorized
         }
         let _ = try await apiClient.requestRaw(.joinGroupById(sgtIdx: group.sgt_idx, mtIdx: mtIdx), token: token)

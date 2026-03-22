@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 import Combine
 
+@MainActor
 class GroupViewModel: ObservableObject {
     @Published var groups: [SmapGroup] = []
     @Published var selectedGroup: SmapGroup?
@@ -30,26 +31,22 @@ class GroupViewModel: ObservableObject {
         Task {
             do {
                 let fetchedGroups = try await groupService.getCurrentUserGroups()
-                DispatchQueue.main.async {
-                    self.groups = fetchedGroups
-                    self.isLoading = false
-                    
-                    if let selected = self.selectedGroup,
-                       let updated = fetchedGroups.first(where: { $0.sgt_idx == selected.sgt_idx }) {
-                        self.selectedGroup = updated
-                    } else if self.selectedGroup == nil && !fetchedGroups.isEmpty {
-                        // 선택된 그룹이 없으면 첫번째 그룹 선택 (옵션)
-                        // self.selectedGroup = fetchedGroups.first
-                    }
-                    
-                    // 요약 정보도 갱신
-                    self.fetchGroupSummary()
+                self.groups = fetchedGroups
+                self.isLoading = false
+
+                if let selected = self.selectedGroup,
+                   let updated = fetchedGroups.first(where: { $0.sgt_idx == selected.sgt_idx }) {
+                    self.selectedGroup = updated
+                } else if self.selectedGroup == nil && !fetchedGroups.isEmpty {
+                    // 선택된 그룹이 없으면 첫번째 그룹 선택 (옵션)
+                    // self.selectedGroup = fetchedGroups.first
                 }
+
+                // 요약 정보도 갱신
+                self.fetchGroupSummary()
             } catch {
-                DispatchQueue.main.async {
-                    self.handleError(error)
-                    self.isLoading = false
-                }
+                self.handleError(error)
+                self.isLoading = false
             }
         }
     }
@@ -61,19 +58,15 @@ class GroupViewModel: ObservableObject {
         Task {
             do {
                 let newGroup = try await groupService.createGroup(title: title, memo: memo)
-                DispatchQueue.main.async {
-                    self.groups.append(newGroup)
-                    self.selectedGroup = newGroup
-                    self.isCreating = false
-                    self.fetchGroups() // 목록 갱신
-                    // Notify other views that groups have changed
-                    NotificationCenter.default.post(name: NSNotification.Name("groupsDidChange"), object: nil)
-                }
+                self.groups.append(newGroup)
+                self.selectedGroup = newGroup
+                self.isCreating = false
+                self.fetchGroups() // 목록 갱신
+                // Notify other views that groups have changed
+                NotificationCenter.default.post(name: NSNotification.Name("groupsDidChange"), object: nil)
             } catch {
-                DispatchQueue.main.async {
-                    self.handleError(error)
-                    self.isCreating = false
-                }
+                self.handleError(error)
+                self.isCreating = false
             }
         }
     }
@@ -86,20 +79,16 @@ class GroupViewModel: ObservableObject {
             do {
                 // 수정된 그룹 정보 반환을 가정하거나, 다시 조회
                 let updatedGroup = try await groupService.updateGroup(sgtIdx: sgtIdx, title: title, memo: memo)
-                DispatchQueue.main.async {
-                    if let index = self.groups.firstIndex(where: { $0.sgt_idx == sgtIdx }) {
-                        self.groups[index] = updatedGroup
-                    }
-                    if self.selectedGroup?.sgt_idx == sgtIdx {
-                        self.selectedGroup = updatedGroup
-                    }
-                    self.isUpdating = false
+                if let index = self.groups.firstIndex(where: { $0.sgt_idx == sgtIdx }) {
+                    self.groups[index] = updatedGroup
                 }
+                if self.selectedGroup?.sgt_idx == sgtIdx {
+                    self.selectedGroup = updatedGroup
+                }
+                self.isUpdating = false
             } catch {
-                DispatchQueue.main.async {
-                    self.handleError(error)
-                    self.isUpdating = false
-                }
+                self.handleError(error)
+                self.isUpdating = false
             }
         }
     }
@@ -111,27 +100,23 @@ class GroupViewModel: ObservableObject {
             do {
                 let success = try await groupService.deleteGroup(sgtIdx: sgtIdx)
                 if success {
-                    DispatchQueue.main.async {
-                        self.groups.removeAll(where: { $0.sgt_idx == sgtIdx })
-                        if self.selectedGroup?.sgt_idx == sgtIdx {
-                            self.selectedGroup = nil
-                            self.groupMembers = []
-                            self.groupStats = nil
-                        }
-                        self.isDeleting = false
-                        // Notify other views that groups have changed
-                        NotificationCenter.default.post(name: NSNotification.Name("groupsDidChange"), object: nil)
+                    self.groups.removeAll(where: { $0.sgt_idx == sgtIdx })
+                    if self.selectedGroup?.sgt_idx == sgtIdx {
+                        self.selectedGroup = nil
+                        self.groupMembers = []
+                        self.groupStats = nil
                     }
+                    self.isDeleting = false
+                    // Notify other views that groups have changed
+                    NotificationCenter.default.post(name: NSNotification.Name("groupsDidChange"), object: nil)
                 }
             } catch {
-                DispatchQueue.main.async {
-                    self.handleError(error)
-                    self.isDeleting = false
-                }
+                self.handleError(error)
+                self.isDeleting = false
             }
         }
     }
-    
+
     /// 그룹 가입 (초대 코드)
     func joinGroup(inviteCode: String) {
         guard !inviteCode.isEmpty else { return }
@@ -140,18 +125,14 @@ class GroupViewModel: ObservableObject {
             do {
                 let success = try await groupService.joinGroup(inviteCode: inviteCode)
                 if success {
-                    DispatchQueue.main.async {
-                        self.isJoining = false
-                        self.fetchGroups() // 목록 갱신 및 UI 이동
-                        // Notify other views that groups have changed
-                        NotificationCenter.default.post(name: NSNotification.Name("groupsDidChange"), object: nil)
-                    }
+                    self.isJoining = false
+                    self.fetchGroups() // 목록 갱신 및 UI 이동
+                    // Notify other views that groups have changed
+                    NotificationCenter.default.post(name: NSNotification.Name("groupsDidChange"), object: nil)
                 }
             } catch {
-                DispatchQueue.main.async {
-                    self.handleError(error)
-                    self.isJoining = false
-                }
+                self.handleError(error)
+                self.isJoining = false
             }
         }
     }
@@ -164,9 +145,7 @@ class GroupViewModel: ObservableObject {
         Task {
             do {
                 let members = try await groupService.getGroupMembers(sgtIdx: sgtIdx)
-                DispatchQueue.main.async {
-                    self.groupMembers = members
-                }
+                self.groupMembers = members
             } catch {
                 print("❌ [GroupViewModel] 멤버 조회 실패: \(error)")
             }
@@ -178,9 +157,7 @@ class GroupViewModel: ObservableObject {
         Task {
             do {
                 let stats = try await groupService.getGroupStats(sgtIdx: sgtIdx)
-                DispatchQueue.main.async {
-                    self.groupStats = stats
-                }
+                self.groupStats = stats
             } catch {
                 print("❌ [GroupViewModel] 통계 조회 실패: \(error)")
             }
@@ -197,11 +174,11 @@ class GroupViewModel: ObservableObject {
                     self.fetchGroupMembers(sgtIdx: group.sgt_idx) // 멤버 목록 갱신
                 }
             } catch {
-                DispatchQueue.main.async { self.handleError(error) }
+                self.handleError(error)
             }
         }
     }
-    
+
     /// 멤버 강퇴
     func removeMember(member: SmapGroupMember) {
         guard let group = selectedGroup else { return }
@@ -214,7 +191,7 @@ class GroupViewModel: ObservableObject {
                     self.fetchGroups() // 내 그룹 목록 갱신
                 }
             } catch {
-                DispatchQueue.main.async { self.handleError(error) }
+                self.handleError(error)
             }
         }
     }
@@ -233,24 +210,20 @@ class GroupViewModel: ObservableObject {
             do {
                 let success = try await groupService.removeMember(sgtIdx: sgtIdx, mtIdx: mtIdx)
                 if success {
-                    DispatchQueue.main.async {
-                        self.groups.removeAll(where: { $0.sgt_idx == sgtIdx })
-                        if self.selectedGroup?.sgt_idx == sgtIdx {
-                            self.selectedGroup = nil
-                            self.groupMembers = []
-                            self.groupStats = nil
-                        }
-                        self.isDeleting = false
-                        // 목록 갱신 및 알림
-                        self.fetchGroups()
-                        NotificationCenter.default.post(name: NSNotification.Name("groupsDidChange"), object: nil)
+                    self.groups.removeAll(where: { $0.sgt_idx == sgtIdx })
+                    if self.selectedGroup?.sgt_idx == sgtIdx {
+                        self.selectedGroup = nil
+                        self.groupMembers = []
+                        self.groupStats = nil
                     }
+                    self.isDeleting = false
+                    // 목록 갱신 및 알림
+                    self.fetchGroups()
+                    NotificationCenter.default.post(name: NSNotification.Name("groupsDidChange"), object: nil)
                 }
             } catch {
-                DispatchQueue.main.async {
-                    self.handleError(error)
-                    self.isDeleting = false
-                }
+                self.handleError(error)
+                self.isDeleting = false
             }
         }
     }
@@ -269,9 +242,7 @@ class GroupViewModel: ObservableObject {
         Task {
             do {
                 let summary = try await groupService.getGroupSummary()
-                DispatchQueue.main.async {
-                    self.totalMembers = summary.total_members
-                }
+                self.totalMembers = summary.total_members
             } catch {
                 print("❌ [GroupViewModel] 요약 정보 조회 실패: \(error)")
             }

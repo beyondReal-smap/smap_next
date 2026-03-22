@@ -8,6 +8,7 @@
 import Foundation
 import SwiftUI
 
+@MainActor
 class HomeViewModel: ObservableObject {
     @Published var groups: [SmapGroup] = []
     @Published var selectedGroup: SmapGroup?
@@ -139,9 +140,7 @@ class HomeViewModel: ObservableObject {
         Task {
             do {
                 let logs = try await NotificationService.shared.getMemberPushLogs(memberId: user.mt_idx ?? 0)
-                DispatchQueue.main.async {
-                    self.hasUnreadNotifications = logs.contains(where: { $0.plt_read_chk == .N })
-                }
+                self.hasUnreadNotifications = logs.contains(where: { $0.plt_read_chk == .N })
             } catch {
                 print("⚠️ [HomeViewModel] 미확인 알림 체크 실패: \(error)")
             }
@@ -156,9 +155,7 @@ class HomeViewModel: ObservableObject {
                 let response = try await NotificationService.shared.markAllAsRead(memberId: user.mt_idx ?? 0)
                 if response.success == true {
                     print("✅ [HomeViewModel] 모든 알림 읽음 처리 성공")
-                    DispatchQueue.main.async {
-                        self.hasUnreadNotifications = false
-                    }
+                    self.hasUnreadNotifications = false
                     // 알림 목록이 열려있을 경우를 위해 이벤트 발송
                     NotificationCenter.default.post(name: NSNotification.Name("notificationSyncNeeded"), object: nil)
                 }

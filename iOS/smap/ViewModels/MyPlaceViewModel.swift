@@ -8,6 +8,7 @@
 import Foundation
 import SwiftUI
 
+@MainActor
 class MyPlaceViewModel: ObservableObject {
     @Published var groups: [SmapGroup] = []
     @Published var selectedGroup: SmapGroup?
@@ -30,7 +31,6 @@ class MyPlaceViewModel: ObservableObject {
     private let groupService = GroupService.shared
     private let myPlaceService = MyPlaceService.shared
 
-    @MainActor
     func loadInitialData() async {
         isLoading = true
         do {
@@ -47,7 +47,6 @@ class MyPlaceViewModel: ObservableObject {
         }
     }
 
-    @MainActor
     func loadGroupMembers(sgtIdx: Int) async {
         do {
             let fetchedMembers = try await groupService.getGroupMembers(sgtIdx: sgtIdx)
@@ -85,7 +84,6 @@ class MyPlaceViewModel: ObservableObject {
         }
     }
 
-    @MainActor
     func loadMemberLocations(memberId: Int, centerOnFirst: Bool = false) async {
         isLoadingLocations = true
         do {
@@ -109,7 +107,6 @@ class MyPlaceViewModel: ObservableObject {
         }
     }
 
-    @MainActor
     func canManageLocation(_ location: SavedLocation) -> Bool {
         guard let currentUser = AuthService.shared.currentUser else { return false }
 
@@ -140,14 +137,14 @@ class MyPlaceViewModel: ObservableObject {
         return false
     }
 
-    @MainActor func selectGroup(_ group: SmapGroup) {
+    func selectGroup(_ group: SmapGroup) {
         HapticManager.shared.selection()
         guard selectedGroup?.sgt_idx != group.sgt_idx else { return }
         selectedGroup = group
         Task { await loadGroupMembers(sgtIdx: group.sgt_idx) }
     }
 
-    @MainActor func selectMember(_ member: PlaceMember) {
+    func selectMember(_ member: PlaceMember) {
         HapticManager.shared.selection()
         guard selectedMember?.mt_idx != member.mt_idx else { return }
         for i in members.indices { members[i].isSelected = members[i].mt_idx == member.mt_idx }
@@ -197,7 +194,6 @@ class MyPlaceViewModel: ObservableObject {
         }
     }
 
-    @MainActor
     func saveLocation(title: String, address: String, latitude: Double, longitude: Double, notifications: Bool) async -> Bool {
         guard let memberId = selectedMember?.mt_idx else { return false }
         isSaving = true
@@ -238,7 +234,6 @@ class MyPlaceViewModel: ObservableObject {
         }
     }
 
-    @MainActor
     func deleteLocation(_ location: SavedLocation) async -> Bool {
         guard let memberId = selectedMember?.mt_idx else { return false }
         isSaving = true
@@ -256,7 +251,6 @@ class MyPlaceViewModel: ObservableObject {
         }
     }
 
-    @MainActor
     func toggleNotification(for location: SavedLocation) async -> Bool {
         // Optimistic UI update: update local state immediately to prevent layout jitter
         let newNotificationState = !location.notifications

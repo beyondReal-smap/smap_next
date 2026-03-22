@@ -12,6 +12,7 @@ import UIKit
 // MARK: - AuthService
 
 /// 인증 관련 API 통신 서비스
+@MainActor
 class AuthService: ObservableObject {
 
     @Published var currentUser: SMAPUser?
@@ -31,7 +32,7 @@ class AuthService: ObservableObject {
     static let imageBaseURL = AppConfiguration.imageBaseURL
 
     /// 프로필 이미지 전체 URL 생성 헬퍼
-    static func getProfileImageURL(_ path: String?) -> URL? {
+    nonisolated static func getProfileImageURL(_ path: String?) -> URL? {
         guard let path = path?.trimmingCharacters(in: .whitespaces), !path.isEmpty else { return nil }
 
         // 1. 완전한 URL인 경우
@@ -74,7 +75,7 @@ class AuthService: ObservableObject {
     }
 
     /// JWT 토큰 조회
-    func getToken() -> String? {
+    nonisolated func getToken() -> String? {
         keychain.getToken()
     }
 
@@ -115,7 +116,7 @@ class AuthService: ObservableObject {
     }
 
     /// 사용자 데이터 조회
-    func getUserData() -> SMAPUser? {
+    nonisolated func getUserData() -> SMAPUser? {
         userDefaults.getUserData()
     }
 
@@ -137,7 +138,7 @@ class AuthService: ObservableObject {
     }
 
     /// 로그인 상태 확인
-    var isLoggedIn: Bool {
+    nonisolated var isLoggedIn: Bool {
         return getToken() != nil && getUserData() != nil
     }
 
@@ -420,7 +421,7 @@ class AuthService: ObservableObject {
     // MARK: - FCM Token
 
     /// 저장된 FCM 토큰 조회
-    func getFCMToken() -> String? {
+    nonisolated func getFCMToken() -> String? {
         return userDefaults.fcmToken
     }
 }
