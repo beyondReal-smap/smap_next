@@ -376,12 +376,14 @@ class LocationService : Service() {
         if (lng.isNaN() || lng.isInfinite()) return false
         if (location.accuracy > 1000) return false
 
-        // Mock location check
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (location.isMock) return false
-        } else {
-            @Suppress("DEPRECATION")
-            if (location.isFromMockProvider) return false
+        // Mock location check (skip in debug builds for emulator testing)
+        if (!BuildConfig.DEBUG) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (location.isMock) return false
+            } else {
+                @Suppress("DEPRECATION")
+                if (location.isFromMockProvider) return false
+            }
         }
 
         return true
