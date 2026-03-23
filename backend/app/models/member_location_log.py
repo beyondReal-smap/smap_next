@@ -70,7 +70,7 @@ class MemberLocationLog(BaseModel):
             ).group_by(cls.mt_idx).subquery()
             # 메인 쿼리: 서브쿼리 결과와 조인
             rows = db.query(
-                cls.mt_idx, cls.mlt_lat, cls.mlt_long
+                cls.mt_idx, cls.mlt_lat, cls.mlt_long, cls.mlt_accuacy, cls.mlt_gps_time
             ).join(
                 subq,
                 (cls.mlt_idx == subq.c.max_idx) & (cls.mt_idx == subq.c.mt_idx)
@@ -79,6 +79,8 @@ class MemberLocationLog(BaseModel):
                 result[row.mt_idx] = {
                     'lat': float(row.mlt_lat) if row.mlt_lat else 0,
                     'long': float(row.mlt_long) if row.mlt_long else 0,
+                    'accuracy': float(row.mlt_accuacy) if row.mlt_accuacy else None,
+                    'gps_time': row.mlt_gps_time,
                 }
         return result
 

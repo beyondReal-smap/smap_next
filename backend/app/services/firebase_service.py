@@ -158,32 +158,39 @@ class FirebaseService:
                         "background_mode": str(background_mode).lower(),
                         "member_id": str(member_id) if member_id else "unknown"
                     },
-                        apns=messaging.APNSConfig(
-                            headers={
-                                "apns-push-type": "alert",
-                                "apns-priority": "10",  # 최고 우선순위
-                                "apns-topic": settings.IOS_BUNDLE_ID,
-                                "apns-expiration": str(int(time.time()) + 7776000),  # 90일 유효 (백그라운드 푸시 최대 개선)
-                                # "apns-collapse-id": 제거 - 각 알림을 개별 전송하여 배치 방지
-                                "apns-thread-id": f"notification_{member_id}_{int(time.time())}"  # 개별 스레드로 즉시 알림
-                            },
-                            payload=messaging.APNSPayload(
-                                aps=messaging.Aps(
-                                    sound='default',
-                                    badge=1,
-                                    alert=messaging.ApsAlert(
-                                        title=title,
-                                        body=content
-                                    ),
-                                    mutable_content=True,
-                                    content_available=True,  # 백그라운드 처리 활성화
-                                    thread_id=f"notification_{member_id}_{int(time.time())}",  # 개별 스레드 ID
-                                    category="GENERAL_NOTIFICATION"
+                    android=messaging.AndroidConfig(
+                        priority='high',
+                        notification=messaging.AndroidNotification(
+                            channel_id='high_importance_channel',
+                            sound='default',
+                            default_vibrate_timings=True,
+                            notification_priority='PRIORITY_HIGH',
+                        )
+                    ),
+                    apns=messaging.APNSConfig(
+                        headers={
+                            "apns-push-type": "alert",
+                            "apns-priority": "10",
+                            "apns-topic": settings.IOS_BUNDLE_ID,
+                            "apns-expiration": str(int(time.time()) + 7776000),
+                            "apns-thread-id": f"notification_{member_id}_{int(time.time())}"
+                        },
+                        payload=messaging.APNSPayload(
+                            aps=messaging.Aps(
+                                sound='default',
+                                badge=1,
+                                alert=messaging.ApsAlert(
+                                    title=title,
+                                    body=content
                                 ),
-
-                            )
+                                mutable_content=True,
+                                content_available=True,
+                                thread_id=f"notification_{member_id}_{int(time.time())}",
+                                category="GENERAL_NOTIFICATION"
+                            ),
                         )
                     )
+                )
                     
                 # FCM 전송 실행
                 response = messaging.send(message)
@@ -291,15 +298,17 @@ class FirebaseService:
                         android=messaging.AndroidConfig(
                             priority='high',
                             notification=messaging.AndroidNotification(
-                                sound='default'
+                                channel_id='high_importance_channel',
+                                sound='default',
+                                default_vibrate_timings=True,
+                                priority='high',
                             )
                         ),
                         apns=messaging.APNSConfig(
                             headers={
                                 "apns-push-type": "alert",
-                                "apns-priority": "5",  # 10에서 5로 변경 (일반 우선순위)
+                                "apns-priority": "10",  # 즉시 전달 (소리/진동 보장)
                                 "apns-topic": settings.IOS_BUNDLE_ID,
-                                # expiration과 thread-id 제거로 단순화
                             },
                             payload=messaging.APNSPayload(
                                 aps=messaging.Aps(
@@ -308,8 +317,8 @@ class FirebaseService:
                                     alert=messaging.ApsAlert(
                                         title=title,
                                         body=content
-                                    )
-                                    # mutable_content, content_available, category 제거로 단순화
+                                    ),
+                                    content_available=True,
                                 )
                             )
                         )
@@ -326,7 +335,10 @@ class FirebaseService:
                         android=messaging.AndroidConfig(
                             priority='high',
                             notification=messaging.AndroidNotification(
-                                sound='default'
+                                channel_id='high_importance_channel',
+                                sound='default',
+                                default_vibrate_timings=True,
+                                priority='high',
                             )
                         )
                     )

@@ -88,7 +88,28 @@ def send_batch_push(tokens_and_messages: list) -> list:
             ),
             android=fb_messaging.AndroidConfig(
                 priority='high',
-                notification=fb_messaging.AndroidNotification(sound='default')
+                notification=fb_messaging.AndroidNotification(
+                    channel_id='high_importance_channel',
+                    sound='default',
+                    default_vibrate_timings=True,
+                    priority='high',
+                )
+            ),
+            apns=fb_messaging.APNSConfig(
+                headers={
+                    "apns-push-type": "alert",
+                    "apns-priority": "10",
+                },
+                payload=fb_messaging.APNSPayload(
+                    aps=fb_messaging.Aps(
+                        sound='default',
+                        badge=1,
+                        alert=fb_messaging.ApsAlert(
+                            title=title,
+                            body=content
+                        ),
+                    )
+                )
             )
         )
         messages.append(msg)

@@ -3,11 +3,25 @@
 
 - 그룹 일정 장소 진입/퇴장 알림
 - My Place 진입/퇴장 알림
+
+히스테리시스:
+  진입 판정 ≤ 80m, 이탈 판정 ≥ 120m (GPS 오차에 의한 반복 전환 방지)
+GPS 정확도 필터:
+  accuracy > 50m 인 위치는 무시
+My Place 쿨다운:
+  마지막 상태 변경 후 최소 3분 경과해야 재전환 가능
 """
 import logging
+from datetime import datetime, timedelta
 from typing import Dict
 
 from sqlalchemy.orm import Session
+
+# ── 지오펜스 상수 ──
+GEOFENCE_ENTRY_RADIUS = 80.0      # 진입 판정 거리 (m)
+GEOFENCE_EXIT_RADIUS = 120.0      # 이탈 판정 거리 (m)
+GPS_ACCURACY_THRESHOLD = 50.0     # GPS 정확도 필터 (m)
+MY_PLACE_COOLDOWN = timedelta(minutes=3)  # My Place 상태 전환 쿨다운
 
 from app.jobs.base import (
     get_group_member_data,
@@ -235,6 +249,11 @@ def run_location_entry_alert(db: Session) -> None:
                 if not member_loc:
                     continue
 
+                # GPS 정확도 필터: 부정확한 위치 무시
+                accuracy = member_loc.get("accuracy")
+                if accuracy is not None and accuracy > GPS_ACCURACY_THRESHOLD:
+                    continue
+
                 target_lat = float(record_value(schedule, "sst_location_lat"))
                 target_long = float(record_value(schedule, "sst_location_long"))
                 distance = haversine(member_loc["lat"], member_loc["long"], target_lat, target_long)
@@ -245,7 +264,7 @@ def run_location_entry_alert(db: Session) -> None:
                     "distance": formatted_distance
                 }
 
-                if distance <= 100.0 and int(record_value(schedule, "sst_entry_cnt") or 0) == 0:
+                if distance <= GEOFENCE_ENTRY_RADIUS and int(record_value(schedule, "sst_entry_cnt") or 0) == 0:
                     group_data = get_group_member_data(db, sgt_idx, mt_idx)
                     _send_entry_notifications(db, group_data, schedule, plt_condition, plt_memo, push_json)
                     _update_entry_status(db, record_value(schedule, "sst_idx"))
@@ -303,6 +322,11 @@ def run_location_exit_alert(db: Session) -> None:
                 if not member_loc:
                     continue
 
+                # GPS 정확도 필터: 부정확한 위치 무시
+                accuracy = member_loc.get("accuracy")
+                if accuracy is not None and accuracy > GPS_ACCURACY_THRESHOLD:
+                    continue
+
                 target_lat = float(record_value(schedule, "sst_location_lat"))
                 target_long = float(record_value(schedule, "sst_location_long"))
                 distance = haversine(member_loc["lat"], member_loc["long"], target_lat, target_long)
@@ -313,7 +337,7 @@ def run_location_exit_alert(db: Session) -> None:
                     "distance": formatted_distance
                 }
 
-                if distance >= 100.0 and int(record_value(schedule, "sst_exit_cnt") or 0) == 0:
+                if distance >= GEOFENCE_EXIT_RADIUS and int(record_value(schedule, "sst_exit_cnt") or 0) == 0:
                     group_data = get_group_member_data(db, sgt_idx, mt_idx)
                     _send_exit_notifications(db, group_data, schedule, plt_condition, plt_memo, push_json)
                     _update_exit_status(db, record_value(schedule, "sst_idx"))
@@ -345,6 +369,8 @@ def run_my_location_entry_alert(db: Session) -> None:
         recent_locs = MemberLocationLog.get_recent_locations_batch(db, mt_idx_list)
         member_map = prefetch_members(db, mt_idx_list)
 
+        now = datetime.now()
+
         for loc in candidates:
             mt_idx = int(loc["mt_idx"])
             slt_idx = loc["slt_idx"]
@@ -352,12 +378,22 @@ def run_my_location_entry_alert(db: Session) -> None:
             if not member_loc:
                 continue
 
+            # GPS 정확도 필터
+            accuracy = member_loc.get("accuracy")
+            if accuracy is not None and accuracy > GPS_ACCURACY_THRESHOLD:
+                continue
+
+            # 쿨다운 체크: 마지막 상태 변경 후 최소 3분 경과 필요
+            last_update = loc.get("slt_udate")
+            if last_update and (now - last_update) < MY_PLACE_COOLDOWN:
+                continue
+
             target_lat = float(loc["slt_lat"])
             target_long = float(loc["slt_long"])
             distance = haversine(member_loc["lat"], member_loc["long"], target_lat, target_long)
             formatted_distance = "{:,.1f}".format(distance)
 
-            if distance <= 100.0:
+            if distance <= GEOFENCE_ENTRY_RADIUS:
                 member = member_map.get(mt_idx)
                 if member and member.mt_token_id:
                     lang = normalize_lang(getattr(member, "mt_lang", None))
@@ -388,6 +424,7 @@ def run_my_location_entry_alert(db: Session) -> None:
                     location_obj = MyLocation.find_by_idx(db, slt_idx)
                     if location_obj:
                         location_obj.slt_enter_chk = "Y"
+                        location_obj.slt_udate = now
 
         # 루프 완료 후 단일 커밋
         db.commit()
@@ -417,6 +454,8 @@ def run_my_location_exit_alert(db: Session) -> None:
         recent_locs = MemberLocationLog.get_recent_locations_batch(db, mt_idx_list)
         member_map = prefetch_members(db, mt_idx_list)
 
+        now = datetime.now()
+
         for loc in my_locations:
             mt_idx = int(loc["mt_idx"])
             slt_idx = loc["slt_idx"]
@@ -424,12 +463,22 @@ def run_my_location_exit_alert(db: Session) -> None:
             if not member_loc:
                 continue
 
+            # GPS 정확도 필터
+            accuracy = member_loc.get("accuracy")
+            if accuracy is not None and accuracy > GPS_ACCURACY_THRESHOLD:
+                continue
+
+            # 쿨다운 체크: 마지막 상태 변경 후 최소 3분 경과 필요
+            last_update = loc.get("slt_udate")
+            if last_update and (now - last_update) < MY_PLACE_COOLDOWN:
+                continue
+
             target_lat = float(loc["slt_lat"])
             target_long = float(loc["slt_long"])
             distance = haversine(member_loc["lat"], member_loc["long"], target_lat, target_long)
             formatted_distance = "{:,.1f}".format(distance)
 
-            if distance >= 100.0:
+            if distance >= GEOFENCE_EXIT_RADIUS:
                 member = member_map.get(mt_idx)
                 if member and member.mt_token_id:
                     lang = normalize_lang(getattr(member, "mt_lang", None))
@@ -460,6 +509,7 @@ def run_my_location_exit_alert(db: Session) -> None:
                     location_obj = MyLocation.find_by_idx(db, slt_idx)
                     if location_obj:
                         location_obj.slt_enter_chk = "N"
+                        location_obj.slt_udate = now
 
         # 루프 완료 후 단일 커밋
         db.commit()
