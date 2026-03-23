@@ -89,7 +89,7 @@ def send_batch_push(tokens_and_messages: list) -> list:
             android=fb_messaging.AndroidConfig(
                 priority='high',
                 notification=fb_messaging.AndroidNotification(
-                    channel_id='high_importance_channel',
+                    channel_id='com.dmonster.smap-Smap',
                     sound='default',
                     default_sound=True,
                     default_vibrate_timings=True,

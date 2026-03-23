@@ -151,7 +151,7 @@ class FirebaseService:
                     data={
                         "title": title,
                         "body": content,
-                        "click_action": "FLUTTER_NOTIFICATION_CLICK",
+                        "click_action": "OPEN_ACTIVITY",
                         "notification_type": "ios_optimized",
                         "timestamp": str(int(time.time())),
                         "delivery_mode": "guaranteed",
@@ -161,7 +161,7 @@ class FirebaseService:
                     android=messaging.AndroidConfig(
                         priority='high',
                         notification=messaging.AndroidNotification(
-                            channel_id='high_importance_channel',
+                            channel_id='com.dmonster.smap-Smap',
                             sound='default',
                             default_sound=True,
                             default_vibrate_timings=True,
@@ -293,7 +293,7 @@ class FirebaseService:
                         data={
                             "title": title,
                             "body": content,
-                            "click_action": "FLUTTER_NOTIFICATION_CLICK",
+                            "click_action": "OPEN_ACTIVITY",
                             "notification_type": "standard_push",
                             "timestamp": str(int(time.time())),
                             "ios_delivery_mode": "reliable"
@@ -301,7 +301,7 @@ class FirebaseService:
                         android=messaging.AndroidConfig(
                             priority='high',
                             notification=messaging.AndroidNotification(
-                                channel_id='high_importance_channel',
+                                channel_id='com.dmonster.smap-Smap',
                                 sound='default',
                                 default_sound=True,
                                 default_vibrate_timings=True,
@@ -343,14 +343,14 @@ class FirebaseService:
                         data={
                             "title": title,
                             "body": content,
-                            "click_action": "FLUTTER_NOTIFICATION_CLICK",
+                            "click_action": "OPEN_ACTIVITY",
                             "notification_type": "standard_push",
                             "timestamp": str(int(time.time())),
                         },
                         android=messaging.AndroidConfig(
                             priority='high',
                             notification=messaging.AndroidNotification(
-                                channel_id='high_importance_channel',
+                                channel_id='com.dmonster.smap-Smap',
                                 sound='default',
                                 default_sound=True,
                                 default_vibrate_timings=True,
