@@ -91,8 +91,10 @@ def send_batch_push(tokens_and_messages: list) -> list:
                 notification=fb_messaging.AndroidNotification(
                     channel_id='high_importance_channel',
                     sound='default',
+                    default_sound=True,
                     default_vibrate_timings=True,
                     priority='high',
+                    visibility='public',
                 )
             ),
             apns=fb_messaging.APNSConfig(
@@ -108,6 +110,9 @@ def send_batch_push(tokens_and_messages: list) -> list:
                             title=title,
                             body=content
                         ),
+                        custom_data={
+                            "interruption-level": "time-sensitive",
+                        },
                     )
                 )
             )

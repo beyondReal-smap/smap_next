@@ -163,8 +163,10 @@ class FirebaseService:
                         notification=messaging.AndroidNotification(
                             channel_id='high_importance_channel',
                             sound='default',
+                            default_sound=True,
                             default_vibrate_timings=True,
-                            notification_priority='PRIORITY_HIGH',
+                            priority='high',
+                            visibility='public',
                         )
                     ),
                     apns=messaging.APNSConfig(
@@ -173,7 +175,6 @@ class FirebaseService:
                             "apns-priority": "10",
                             "apns-topic": settings.IOS_BUNDLE_ID,
                             "apns-expiration": str(int(time.time()) + 7776000),
-                            "apns-thread-id": f"notification_{member_id}_{int(time.time())}"
                         },
                         payload=messaging.APNSPayload(
                             aps=messaging.Aps(
@@ -184,9 +185,11 @@ class FirebaseService:
                                     body=content
                                 ),
                                 mutable_content=True,
-                                content_available=True,
                                 thread_id=f"notification_{member_id}_{int(time.time())}",
-                                category="GENERAL_NOTIFICATION"
+                                category="GENERAL_NOTIFICATION",
+                                custom_data={
+                                    "interruption-level": "time-sensitive",
+                                },
                             ),
                         )
                     )
@@ -300,15 +303,18 @@ class FirebaseService:
                             notification=messaging.AndroidNotification(
                                 channel_id='high_importance_channel',
                                 sound='default',
+                                default_sound=True,
                                 default_vibrate_timings=True,
                                 priority='high',
+                                visibility='public',
                             )
                         ),
                         apns=messaging.APNSConfig(
                             headers={
                                 "apns-push-type": "alert",
-                                "apns-priority": "10",  # 즉시 전달 (소리/진동 보장)
+                                "apns-priority": "10",
                                 "apns-topic": settings.IOS_BUNDLE_ID,
+                                "apns-collapse-id": f"alert_{int(time.time())}",
                             },
                             payload=messaging.APNSPayload(
                                 aps=messaging.Aps(
@@ -318,26 +324,38 @@ class FirebaseService:
                                         title=title,
                                         body=content
                                     ),
+                                    custom_data={
+                                        "interruption-level": "time-sensitive",
+                                    },
                                 )
                             )
                         )
                     )
                 else:
-                    # Android 토큰인 경우 Android 전용 설정만
-                    logger.debug(f"[FCM Android] Android 토큰 감지됨 - Android 설정만 적용: {_mask_token(token)}")
+                    # Android 토큰인 경우 Android 전용 설정
+                    logger.debug(f"[FCM Android] Android 토큰 감지됨 - Android 설정 적용: {_mask_token(token)}")
                     message = messaging.Message(
                         token=token,
                         notification=messaging.Notification(
                             title=title,
                             body=content
                         ),
+                        data={
+                            "title": title,
+                            "body": content,
+                            "click_action": "FLUTTER_NOTIFICATION_CLICK",
+                            "notification_type": "standard_push",
+                            "timestamp": str(int(time.time())),
+                        },
                         android=messaging.AndroidConfig(
                             priority='high',
                             notification=messaging.AndroidNotification(
                                 channel_id='high_importance_channel',
                                 sound='default',
+                                default_sound=True,
                                 default_vibrate_timings=True,
                                 priority='high',
+                                visibility='public',
                             )
                         )
                     )
