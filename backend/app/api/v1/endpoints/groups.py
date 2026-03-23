@@ -1,5 +1,5 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func, text
 import hashlib
@@ -58,16 +58,13 @@ def get_hidden_groups(
 @router.get("/current-user/summary")
 def get_group_summary(
     db: Session = Depends(deps.get_db),
-    authorization: str = Header(None)
+    user_id: int = Depends(deps.get_required_user_id)
 ):
     """
     현재 사용자의 그룹 정보를 요약하여 반환합니다.
     - 총 그룹 수
     - 총 멤버 수 (중복 제거)
     """
-    user_id = deps.get_current_user_id(authorization)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="인증이 필요합니다.")
     
     logger.info(f"[GET_GROUP_SUMMARY] 그룹 요약 정보 조회 - user_id: {user_id}")
     
@@ -107,16 +104,12 @@ def get_group_summary(
 @router.get("/current-user", response_model=List[dict])
 def get_current_user_groups(
     db: Session = Depends(deps.get_db),
-    authorization: str = Header(None)
+    user_id: int = Depends(deps.get_required_user_id)
 ):
     """
     현재 로그인한 사용자가 속한 그룹 목록을 조회합니다.
     home/page.tsx의 groupService.getCurrentUserGroups()에서 사용
     """
-    # 토큰에서 사용자 ID 추출
-    user_id = deps.get_current_user_id(authorization)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="인증이 필요합니다.")
     
     logger.info(f"[GET_CURRENT_USER_GROUPS] 사용자 ID: {user_id}")
     
@@ -130,42 +123,36 @@ def get_current_user_groups(
     ).all()
     
     logger.info(f"[GET_CURRENT_USER_GROUPS] 조회된 그룹 수: {len(user_groups)}")
-    
-    # 디버깅을 위해 모든 그룹 정보 로깅
-    all_user_groups = db.query(Group, GroupDetail).join(
-        GroupDetail, Group.sgt_idx == GroupDetail.sgt_idx
-    ).filter(
-        GroupDetail.mt_idx == user_id
-    ).all()
-    
-    logger.info(f"[GET_CURRENT_USER_GROUPS] 필터링 전 모든 그룹 수: {len(all_user_groups)}")
-    for group, group_detail in all_user_groups:
-        logger.info(f"[GET_CURRENT_USER_GROUPS] 그룹 정보 - sgt_idx: {group.sgt_idx}, sgt_title: {group.sgt_title}, sgt_show: {group.sgt_show}, sgdt_exit: {group_detail.sgdt_exit}")
-    
-    result = []
-    for group, group_detail in user_groups:
-        # 멤버 수 계산 (그룹 멤버 상세 API와 동일한 조건 적용)
-        member_count = db.query(func.count(GroupDetail.sgdt_idx)).join(
+
+    # 그룹별 멤버 수를 한 번의 쿼리로 일괄 조회 (N+1 방지)
+    group_ids = [g.sgt_idx for g, _ in user_groups]
+    member_counts = {}
+    if group_ids:
+        counts = db.query(
+            GroupDetail.sgt_idx, func.count(GroupDetail.sgdt_idx)
+        ).join(
             Member, Member.mt_idx == GroupDetail.mt_idx
         ).filter(
-            GroupDetail.sgt_idx == group.sgt_idx,
+            GroupDetail.sgt_idx.in_(group_ids),
             GroupDetail.sgdt_exit == 'N',
             GroupDetail.sgdt_show == 'Y',
-            GroupDetail.sgdt_discharge == 'N',  # 방출되지 않은 멤버만
-            Member.mt_status == 1  # 활성 상태 회원만
-        ).scalar() or 0
-        
+            GroupDetail.sgdt_discharge == 'N',
+            Member.mt_status == 1
+        ).group_by(GroupDetail.sgt_idx).all()
+        member_counts = dict(counts)
+
+    result = []
+    for group, group_detail in user_groups:
         group_data = {
             "sgt_idx": group.sgt_idx,
-            "mt_idx": group.mt_idx,  # 그룹 오너 ID
+            "mt_idx": group.mt_idx,
             "sgt_title": group.sgt_title or f"그룹 {group.sgt_idx}",
             "sgt_code": group.sgt_code or "",
             "sgt_memo": group.sgt_memo or "",
             "sgt_show": group.sgt_show or 'Y',
             "sgt_wdate": group.sgt_wdate.isoformat() if group.sgt_wdate else datetime.utcnow().isoformat(),
             "sgt_udate": group.sgt_udate.isoformat() if group.sgt_udate else datetime.utcnow().isoformat(),
-            "member_count": member_count,
-            # 현재 사용자의 그룹 내 역할 정보
+            "member_count": member_counts.get(group.sgt_idx, 0),
             "is_owner": group_detail.sgdt_owner_chk == 'Y',
             "is_leader": group_detail.sgdt_leader_chk == 'Y',
             "join_date": group_detail.sgdt_wdate.isoformat() if group_detail.sgdt_wdate else datetime.utcnow().isoformat()
@@ -180,8 +167,8 @@ def get_current_user_groups(
 @router.post("/join")
 def join_group_by_code(
     request: GroupJoinByCodeRequest,
-    db: Session = Depends(deps.get_db),
-    authorization: str = Header(None)
+    user_id: int = Depends(deps.get_required_user_id),
+    db: Session = Depends(deps.get_db)
 ):
     """
     초대 코드를 사용하여 그룹에 가입합니다.
@@ -372,15 +359,11 @@ def generate_sgt_code(db: Session) -> str:
 def create_group(
     group_in: GroupCreate,
     db: Session = Depends(deps.get_db),
-    authorization: str = Header(None)
+    user_id: int = Depends(deps.get_required_user_id)
 ):
     """
     새로운 그룹을 생성합니다.
     """
-    # 토큰에서 사용자 ID 추출
-    user_id = deps.get_current_user_id(authorization)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="인증이 필요합니다.")
         
     logger.info(f"[CREATE_GROUP] 그룹 생성 요청 - user_id: {user_id}, title: {group_in.sgt_title}")
 
@@ -732,8 +715,8 @@ def get_group_stats(
 def join_group(
     group_id: int,
     join_request: GroupJoinRequest,
-    db: Session = Depends(deps.get_db),
-    authorization: str = Header(None)
+    user_id: int = Depends(deps.get_required_user_id),
+    db: Session = Depends(deps.get_db)
 ):
     """
     그룹에 가입합니다.

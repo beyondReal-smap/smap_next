@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 def create_access_token_for_social(user_id: int, expires_delta: Optional[timedelta] = None) -> str:
     """소셜 로그인용 JWT 토큰 생성"""
-    to_encode = {"sub": str(user_id)}
+    to_encode = {"mt_idx": user_id}
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:

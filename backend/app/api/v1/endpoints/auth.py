@@ -1,5 +1,7 @@
 import os
 import uuid
+import time
+import secrets
 import logging
 from datetime import datetime, timedelta
 from typing import Optional
@@ -33,6 +35,10 @@ from app.schemas.auth import (
 )
 from app.schemas.member import AppleLoginRequest, AppleLoginResponse
 from app.core.config import settings
+from app.api.v1.endpoints.sms import (
+    _get_verification_code, _delete_verification_code,
+    _is_verified, _clear_verified,
+)
 from app.models.member import Member
 
 router = APIRouter()
@@ -186,8 +192,9 @@ def refresh_token(
     """
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        mt_idx: Optional[int] = payload.get("mt_idx")
-        
+        # mt_idx 먼저 확인, 없으면 sub 확인 (하위 호환)
+        mt_idx: Optional[int] = payload.get("mt_idx") or payload.get("sub")
+
         if mt_idx is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -274,7 +281,7 @@ async def register_user(
         user_in = RegisterRequest(**body)
     except Exception as e:
         logger.error(f"❌ Pydantic validation error: {e}")
-        raise HTTPException(status_code=422, detail=f"Validation error: {str(e)}")
+        raise HTTPException(status_code=422, detail="요청 데이터 형식이 올바르지 않습니다.")
     
     existing_user_by_phone = crud_auth.get_user_by_phone(db, user_in.mt_id.replace("-", ""))
     if existing_user_by_phone:
@@ -350,7 +357,7 @@ async def register_user(
         logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"사용자 생성 중 오류가 발생했습니다: {str(e)}"
+            detail="사용자 생성 중 오류가 발생했습니다."
         )
 
 @router.get("/me", response_model=UserIdentity)
@@ -1273,12 +1280,23 @@ def reset_password_by_phone(
     """
     try:
         import re
-        
+
         # 전화번호 정리
         clean_phone = reset_data.phone.replace('-', '').replace(' ', '')
-        
+
         logger.info(f"🔄 전화번호 기반 비밀번호 재설정 요청: {clean_phone[:3]}***")
-        
+
+        # SMS 인증 확인: verify-code에서 설정한 인증 완료 상태 우선 확인
+        verified_by_state = _is_verified(clean_phone)
+        if not verified_by_state:
+            # 단독 호출 지원: 인증 완료 상태가 없으면 인증코드 직접 검증
+            stored_code = _get_verification_code(clean_phone)
+            if not stored_code:
+                raise HTTPException(status_code=400, detail="SMS 인증을 먼저 완료해주세요.")
+            if not secrets.compare_digest(reset_data.verification_code, stored_code):
+                raise HTTPException(status_code=400, detail="인증번호가 일치하지 않습니다.")
+            _delete_verification_code(clean_phone)
+
         # 전화번호로 사용자 조회
         user = crud_auth.get_user_by_phone(db, clean_phone)
         
@@ -1317,8 +1335,11 @@ def reset_password_by_phone(
                 message="비밀번호 변경에 실패했습니다."
             )
         
+        # 인증 완료 상태 정리 (재사용 방지)
+        _clear_verified(clean_phone)
+
         logger.info(f"✅ 전화번호 기반 비밀번호 재설정 완료: 사용자 {user.mt_idx}")
-        
+
         return ResetPasswordResponse(
             success=True,
             message="비밀번호가 성공적으로 변경되었습니다.",

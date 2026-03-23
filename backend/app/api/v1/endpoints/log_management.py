@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from app.api import deps
 from app.core.log_manager import get_log_manager
 import logging
 
@@ -6,8 +7,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.post("/rotate")
-def rotate_logs():
+def rotate_logs(user_id: int = Depends(deps.get_required_admin_id)):
     """로그 파일 로테이션 수행"""
+
     try:
         log_manager = get_log_manager()
         log_manager.rotate_logs()
@@ -22,8 +24,9 @@ def rotate_logs():
         raise HTTPException(status_code=500, detail=f"로그 로테이션 실패: {str(e)}")
 
 @router.post("/compress")
-def compress_logs(days_old: int = 7):
+def compress_logs(days_old: int = 7, user_id: int = Depends(deps.get_required_admin_id)):
     """오래된 로그 파일 압축"""
+
     try:
         log_manager = get_log_manager()
         log_manager.compress_old_logs(days_old=days_old)
@@ -38,8 +41,9 @@ def compress_logs(days_old: int = 7):
         raise HTTPException(status_code=500, detail=f"로그 압축 실패: {str(e)}")
 
 @router.post("/cleanup")
-def cleanup_logs(days_old: int = 30):
+def cleanup_logs(days_old: int = 30, user_id: int = Depends(deps.get_required_admin_id)):
     """오래된 압축 로그 파일 정리"""
+
     try:
         log_manager = get_log_manager()
         log_manager.cleanup_old_compressed_logs(days_old=days_old)
@@ -54,8 +58,9 @@ def cleanup_logs(days_old: int = 30):
         raise HTTPException(status_code=500, detail=f"로그 정리 실패: {str(e)}")
 
 @router.post("/full-cleanup")
-def full_log_cleanup():
+def full_log_cleanup(user_id: int = Depends(deps.get_required_admin_id)):
     """전체 로그 정리 작업 수행 (로테이션 + 압축 + 정리)"""
+
     try:
         log_manager = get_log_manager()
         
@@ -78,8 +83,9 @@ def full_log_cleanup():
         raise HTTPException(status_code=500, detail=f"전체 로그 정리 실패: {str(e)}")
 
 @router.get("/stats")
-def get_log_stats():
+def get_log_stats(user_id: int = Depends(deps.get_required_admin_id)):
     """로그 파일 통계 정보 조회"""
+
     try:
         log_manager = get_log_manager()
         stats = log_manager.get_log_stats()
@@ -94,8 +100,9 @@ def get_log_stats():
         raise HTTPException(status_code=500, detail=f"로그 통계 조회 실패: {str(e)}")
 
 @router.post("/start-auto-cleanup")
-def start_auto_cleanup(interval_hours: int = 24):
+def start_auto_cleanup(interval_hours: int = 24, user_id: int = Depends(deps.get_required_admin_id)):
     """자동 로그 정리 스레드 시작"""
+
     try:
         log_manager = get_log_manager()
         cleanup_thread = log_manager.start_auto_cleanup(interval_hours=interval_hours)
@@ -114,8 +121,9 @@ def start_auto_cleanup(interval_hours: int = 24):
         raise HTTPException(status_code=500, detail=f"자동 로그 정리 시작 실패: {str(e)}")
 
 @router.get("/health")
-def log_health_check():
+def log_health_check(user_id: int = Depends(deps.get_required_admin_id)):
     """로그 시스템 상태 확인"""
+
     try:
         log_manager = get_log_manager()
         stats = log_manager.get_log_stats()

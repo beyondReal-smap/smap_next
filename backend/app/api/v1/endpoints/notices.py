@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.db.session import get_db
+from app.api import deps
 from app.core.cache import cached, cache_delete_pattern
 from app.crud.notice import get_notice_crud
 from app.schemas.notice import (
@@ -97,11 +98,12 @@ def get_notice(
 @router.post("/", response_model=NoticeResponse)
 def create_notice(
     notice: NoticeCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user_id: int = Depends(deps.get_required_admin_id)
 ):
     """
     공지사항 생성 (관리자 전용)
-    
+
     - **notice**: 생성할 공지사항 정보
     """
     crud = get_notice_crud(db)
@@ -113,11 +115,12 @@ def create_notice(
 def update_notice(
     notice_id: int,
     notice: NoticeUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user_id: int = Depends(deps.get_required_admin_id)
 ):
     """
     공지사항 수정 (관리자 전용)
-    
+
     - **notice_id**: 수정할 공지사항 ID
     - **notice**: 수정할 공지사항 정보
     """
@@ -133,11 +136,12 @@ def update_notice(
 @router.delete("/{notice_id}")
 def delete_notice(
     notice_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user_id: int = Depends(deps.get_required_admin_id)
 ):
     """
     공지사항 삭제 (관리자 전용)
-    
+
     - **notice_id**: 삭제할 공지사항 ID
     """
     crud = get_notice_crud(db)
@@ -152,11 +156,12 @@ def delete_notice(
 @router.patch("/{notice_id}/hide", response_model=NoticeResponse)
 def hide_notice(
     notice_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user_id: int = Depends(deps.get_required_admin_id)
 ):
     """
     공지사항 숨김 처리 (관리자 전용)
-    
+
     - **notice_id**: 숨길 공지사항 ID
     """
     crud = get_notice_crud(db)
@@ -170,11 +175,12 @@ def hide_notice(
 @router.patch("/{notice_id}/show", response_model=NoticeResponse)
 def show_notice(
     notice_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user_id: int = Depends(deps.get_required_admin_id)
 ):
     """
     공지사항 노출 처리 (관리자 전용)
-    
+
     - **notice_id**: 노출할 공지사항 ID
     """
     crud = get_notice_crud(db)

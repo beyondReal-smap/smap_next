@@ -3,6 +3,7 @@ from app.models.base import BaseModel
 from app.models.enums import ReadCheckEnum, ShowEnum
 from sqlalchemy.orm import Session
 from typing import Optional, List
+from datetime import datetime
 
 class PushLog(BaseModel):
     __tablename__ = "push_log_t"
@@ -47,4 +48,13 @@ class PushLog(BaseModel):
             cls.mt_idx == mt_idx,
             cls.plt_read_chk == ReadCheckEnum.N,
             cls.plt_show == ShowEnum.Y
-        ).all() 
+        ).all()
+
+    @classmethod
+    def get_reserved_pushes(cls, db: Session, now: datetime) -> List['PushLog']:
+        """예약된 푸시 알림을 조회합니다 (plt_status=1, 발송 시간 도래)."""
+        return db.query(cls).filter(
+            cls.plt_status == 1,
+            cls.plt_sdate <= now,
+            cls.plt_show == ShowEnum.Y
+        ).all()

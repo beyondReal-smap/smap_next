@@ -222,10 +222,10 @@ class CRUDMember:
     @staticmethod
     def hash_password(password: str) -> str:
         """비밀번호 해싱"""
-        from app.config import Config
-        
+        from app.core.config import settings
+
         # bcrypt 비용 설정 (config에서 가져오기)
-        cost = Config.PASSWORD_BCRYPT_COST
+        cost = settings.PASSWORD_BCRYPT_COST
         salt = bcrypt.gensalt(rounds=cost)
         return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
 

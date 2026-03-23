@@ -4,13 +4,15 @@ import json
 import logging
 from typing import Optional
 
+from app.core.config import settings
+
 logger = logging.getLogger(__name__)
 
 class SMSService:
     def __init__(self):
-        self.aligo_user_id = os.getenv('ALIGO_USER_ID', 'smap2023')
-        self.aligo_key = os.getenv('ALIGO_KEY', '6uvw7alcd1v1u6dx5thv31lzic8mxfrt')
-        self.aligo_sender = os.getenv('ALIGO_SENDER', '070-8065-2207')
+        self.aligo_user_id = settings.ALIGO_USER_ID
+        self.aligo_key = settings.ALIGO_KEY
+        self.aligo_sender = settings.ALIGO_SENDER
         self.aligo_url = 'https://apis.aligo.in/send/'
         
         # Fixie 프록시 설정 (고정 IP 사용)

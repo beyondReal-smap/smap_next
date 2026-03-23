@@ -1,13 +1,14 @@
 """
 관리자 대시보드 통계 API
 """
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, date
 from typing import List, Optional
 import logging
 
+from app.api import deps
 from app.db.session import get_db
 from app.models.member import Member
 from app.models.group import Group
@@ -20,13 +21,14 @@ logger = logging.getLogger(__name__)
 
 
 @router.get("/stats")
-def get_admin_stats(db: Session = Depends(get_db)):
+def get_admin_stats(user_id: int = Depends(deps.get_required_admin_id), db: Session = Depends(get_db)):
     """
     관리자 대시보드 통계 조회
     - 전체 회원 수
     - 전체 그룹 수
     - 오늘 가입자 수
     """
+
     try:
         # 전체 회원 수 (활성 회원만: mt_level >= 2)
         total_members = db.query(func.count(Member.mt_idx)).filter(
@@ -67,62 +69,88 @@ def get_admin_stats(db: Session = Depends(get_db)):
 
 @router.get("/groups")
 def get_admin_groups(
+    user_id: int = Depends(deps.get_required_admin_id),
     db: Session = Depends(get_db),
-    skip: int = Query(0, ge=0),
-    limit: int = Query(10000, ge=1, le=10000),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
     show_hidden: bool = Query(False)
 ):
     """
-    관리자용 그룹 목록 조회 - 각 그룹의 멤버 수, 일정 수, 장소 수 포함
+    관리자용 그룹 목록 조회 - 서브쿼리 집계로 N+1 쿼리 해결
+    각 그룹의 멤버 수, 일정 수, 장소 수를 1-2개 쿼리로 조회
     """
+    from sqlalchemy.orm import aliased
+    from sqlalchemy import case, literal_column
+
     try:
-        logger.info(f"[ADMIN_GROUPS] 그룹 목록 조회 시작 - skip: {skip}, limit: {limit}, show_hidden: {show_hidden}")
-        
-        # 그룹 목록 조회
-        if show_hidden:
-            groups = db.query(Group).offset(skip).limit(limit).all()
-        else:
-            groups = db.query(Group).filter(Group.sgt_show == 'Y').offset(skip).limit(limit).all()
-        
-        logger.info(f"[ADMIN_GROUPS] 조회된 그룹 수: {len(groups)}")
-        
+        logger.info(f"[ADMIN_GROUPS] 그룹 목록 조회 시작 - offset: {offset}, limit: {limit}")
+
+        # 서브쿼리 1: 그룹별 활성 멤버 수
+        member_count_sq = db.query(
+            GroupDetail.sgt_idx,
+            func.count(GroupDetail.sgdt_idx).label("member_count")
+        ).filter(
+            GroupDetail.sgdt_exit == 'N',
+            GroupDetail.sgdt_show == 'Y'
+        ).group_by(GroupDetail.sgt_idx).subquery()
+
+        # 서브쿼리 2: 그룹별 활성 멤버의 mt_idx 목록을 활용한 일정/장소 수
+        # 활성 멤버의 mt_idx 서브쿼리
+        active_member_sq = db.query(
+            GroupDetail.sgt_idx,
+            GroupDetail.mt_idx
+        ).filter(
+            GroupDetail.sgdt_exit == 'N',
+            GroupDetail.sgdt_show == 'Y'
+        ).subquery()
+
+        # 서브쿼리 3: 그룹별 일정 수 (활성 멤버의 활성 일정)
+        schedule_count_sq = db.query(
+            active_member_sq.c.sgt_idx,
+            func.count(Schedule.sst_idx).label("schedule_count")
+        ).join(
+            Schedule, Schedule.mt_idx == active_member_sq.c.mt_idx
+        ).filter(
+            Schedule.sst_show == 'Y'
+        ).group_by(active_member_sq.c.sgt_idx).subquery()
+
+        # 서브쿼리 4: 그룹별 장소 수 (활성 멤버의 활성 장소)
+        location_count_sq = db.query(
+            active_member_sq.c.sgt_idx,
+            func.count(Location.slt_idx).label("location_count")
+        ).join(
+            Location, Location.mt_idx == active_member_sq.c.mt_idx
+        ).filter(
+            Location.slt_show == 'Y'
+        ).group_by(active_member_sq.c.sgt_idx).subquery()
+
+        # 메인 쿼리: 그룹 + 소유자 + 집계 서브쿼리 조인
+        query = db.query(
+            Group,
+            Member.mt_name,
+            Member.mt_nickname,
+            func.coalesce(member_count_sq.c.member_count, 0).label("member_count"),
+            func.coalesce(schedule_count_sq.c.schedule_count, 0).label("schedule_count"),
+            func.coalesce(location_count_sq.c.location_count, 0).label("location_count"),
+        ).outerjoin(
+            Member, Member.mt_idx == Group.mt_idx
+        ).outerjoin(
+            member_count_sq, member_count_sq.c.sgt_idx == Group.sgt_idx
+        ).outerjoin(
+            schedule_count_sq, schedule_count_sq.c.sgt_idx == Group.sgt_idx
+        ).outerjoin(
+            location_count_sq, location_count_sq.c.sgt_idx == Group.sgt_idx
+        )
+
+        if not show_hidden:
+            query = query.filter(Group.sgt_show == 'Y')
+
+        rows = query.offset(offset).limit(limit).all()
+
         result = []
-        for group in groups:
-            # 멤버 수 (탈퇴하지 않은 활성 멤버)
-            member_count = db.query(func.count(GroupDetail.sgdt_idx)).filter(
-                GroupDetail.sgt_idx == group.sgt_idx,
-                GroupDetail.sgdt_exit == 'N',
-                GroupDetail.sgdt_show == 'Y'
-            ).scalar() or 0
-            
-            # 그룹 멤버 목록 조회 (일정/장소 계산용)
-            member_ids = db.query(GroupDetail.mt_idx).filter(
-                GroupDetail.sgt_idx == group.sgt_idx,
-                GroupDetail.sgdt_exit == 'N',
-                GroupDetail.sgdt_show == 'Y'
-            ).all()
-            member_ids = [m[0] for m in member_ids]
-            
-            # 일정 수 (그룹 멤버들의 활성 일정)
-            schedule_count = 0
-            if member_ids:
-                schedule_count = db.query(func.count(Schedule.sst_idx)).filter(
-                    Schedule.mt_idx.in_(member_ids),
-                    Schedule.sst_show == 'Y'
-                ).scalar() or 0
-            
-            # 장소 수 (그룹 멤버들의 활성 장소)
-            location_count = 0
-            if member_ids:
-                location_count = db.query(func.count(Location.slt_idx)).filter(
-                    Location.mt_idx.in_(member_ids),
-                    Location.slt_show == 'Y'
-                ).scalar() or 0
-            
-            # 그룹 소유자 정보
-            owner = db.query(Member).filter(Member.mt_idx == group.mt_idx).first()
-            owner_name = owner.mt_name or owner.mt_nickname or f"사용자 {group.mt_idx}" if owner else f"사용자 {group.mt_idx}"
-            
+        for group, mt_name, mt_nickname, member_count, schedule_count, location_count in rows:
+            owner_name = mt_name or mt_nickname or f"사용자 {group.mt_idx}"
+
             group_data = {
                 "sgt_idx": group.sgt_idx,
                 "sgt_title": group.sgt_title or "",
@@ -138,11 +166,11 @@ def get_admin_groups(
                 "sgt_udate": group.sgt_udate.isoformat() if group.sgt_udate else None
             }
             result.append(group_data)
-        
+
         logger.info(f"[ADMIN_GROUPS] 그룹 목록 조회 완료 - 결과 수: {len(result)}")
-        
+
         return result
-        
+
     except Exception as e:
         logger.error(f"[ADMIN_GROUPS] 그룹 목록 조회 실패: {str(e)}")
         raise

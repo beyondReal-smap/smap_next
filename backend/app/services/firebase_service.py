@@ -7,9 +7,11 @@ import json
 import time
 import ssl
 from datetime import datetime
-from app.config import Config
+from app.core.config import settings
+from app.core.utils import mask_token as _mask_token
 
 logger = logging.getLogger(__name__)
+
 
 class FirebaseService:
     _instance = None
@@ -58,7 +60,7 @@ class FirebaseService:
                         logger.warning(f"Invalid JSON in FIREBASE_CREDENTIALS_JSON: {e}")
                 
                 # 방법 2: 파일 경로에서 인증서 파일 읽기
-                cred_path = Config.FIREBASE_CREDENTIALS_PATH
+                cred_path = settings.FIREBASE_CREDENTIALS_PATH
                 if os.path.exists(cred_path):
                     cred = credentials.Certificate(cred_path)
                     firebase_admin.initialize_app(cred)
@@ -123,14 +125,14 @@ class FirebaseService:
             logger.warning("Firebase가 초기화되지 않아 푸시 알림을 건너뜁니다.")
             return "firebase_disabled"
             
-        logger.info(f"📱 [FCM iOS] iOS 최적화 푸시 시작 - 토큰: {token[:30]}..., 백그라운드: {background_mode}")
+        logger.info(f"📱 [FCM iOS] iOS 최적화 푸시 시작 - 토큰: {_mask_token(token)}, 백그라운드: {background_mode}")
         
         # 토큰 유효성 검증
         if not self._validate_fcm_token(token):
-            logger.warning(f"⚠️ [FCM iOS] 토큰 유효성 검증 실패: {token[:30]}...")
+            logger.warning(f"⚠️ [FCM iOS] 토큰 유효성 검증 실패: {_mask_token(token)}")
             return "invalid_token"
             
-        logger.info(f"✅ [FCM iOS] 토큰 유효성 검증 통과: {token[:30]}...")
+        logger.info(f"✅ [FCM iOS] 토큰 유효성 검증 통과: {_mask_token(token)}")
         
         try:
             logger.info(f"📱 [FCM iOS] 토큰 검증 통과")
@@ -160,7 +162,7 @@ class FirebaseService:
                             headers={
                                 "apns-push-type": "alert",
                                 "apns-priority": "10",  # 최고 우선순위
-                                "apns-topic": Config.IOS_BUNDLE_ID,
+                                "apns-topic": settings.IOS_BUNDLE_ID,
                                 "apns-expiration": str(int(time.time()) + 7776000),  # 90일 유효 (백그라운드 푸시 최대 개선)
                                 # "apns-collapse-id": 제거 - 각 알림을 개별 전송하여 배치 방지
                                 "apns-thread-id": f"notification_{member_id}_{int(time.time())}"  # 개별 스레드로 즉시 알림
@@ -190,33 +192,33 @@ class FirebaseService:
                 return response
                 
             except messaging.UnregisteredError:
-                logger.warning(f"🚨 [FCM iOS] 등록되지 않은 토큰: {token[:30]}...")
+                logger.warning(f"🚨 [FCM iOS] 등록되지 않은 토큰: {_mask_token(token)}")
                 # 무효화 처리를 매우 보수적으로 변경
                 if self._should_invalidate_token(token, "unregistered"):
-                    logger.info(f"🗑️ [FCM iOS] 토큰 무효화 승인됨: {token[:30]}...")
+                    logger.info(f"🗑️ [FCM iOS] 토큰 무효화 승인됨: {_mask_token(token)}")
                     self._handle_token_invalidation(token, "unregistered", title, content)
                 else:
-                    logger.info(f"⚠️ [FCM iOS] 토큰 무효화 거부됨 - 보존: {token[:30]}...")
+                    logger.info(f"⚠️ [FCM iOS] 토큰 무효화 거부됨 - 보존: {_mask_token(token)}")
                 return "unregistered"
 
             except messaging.SenderIdMismatchError:
-                logger.warning(f"🚨 [FCM iOS] Sender ID 불일치: {token[:30]}...")
+                logger.warning(f"🚨 [FCM iOS] Sender ID 불일치: {_mask_token(token)}")
                 # 무효화 처리를 매우 보수적으로 변경
                 if self._should_invalidate_token(token, "sender_mismatch"):
-                    logger.info(f"🗑️ [FCM iOS] 토큰 무효화 승인됨: {token[:30]}...")
+                    logger.info(f"🗑️ [FCM iOS] 토큰 무효화 승인됨: {_mask_token(token)}")
                     self._handle_token_invalidation(token, "sender_mismatch", title, content)
                 else:
-                    logger.info(f"⚠️ [FCM iOS] 토큰 무효화 거부됨 - 보존: {token[:30]}...")
+                    logger.info(f"⚠️ [FCM iOS] 토큰 무효화 거부됨 - 보존: {_mask_token(token)}")
                 return "sender_mismatch"
                     
             except Exception as e:
                 logger.error(f"❌ [FCM iOS] 푸시 전송 실패: {e}")
                 # 무효화 처리를 매우 보수적으로 변경
                 if self._should_invalidate_token(token, "send_failed"):
-                    logger.warning(f"🗑️ [FCM iOS] 전송 실패로 토큰 무효화 승인됨: {token[:30]}...")
+                    logger.warning(f"🗑️ [FCM iOS] 전송 실패로 토큰 무효화 승인됨: {_mask_token(token)}")
                     self._handle_token_invalidation(token, "send_failed", title, content)
                 else:
-                    logger.info(f"⚠️ [FCM iOS] 전송 실패 - 토큰 보존: {token[:30]}...")
+                    logger.info(f"⚠️ [FCM iOS] 전송 실패 - 토큰 보존: {_mask_token(token)}")
                 return f"send_failed: {e}"
                     
         except Exception as e:
@@ -240,8 +242,7 @@ class FirebaseService:
         if not self._firebase_available:
             logger.warning("Firebase가 초기화되지 않아 푸시 알림을 건너뜁니다.")
             if enable_fallback and member_id:
-                import asyncio
-                asyncio.create_task(self._trigger_fallback_notification(member_id, title, content, "firebase_disabled"))
+                self._run_fallback_sync(member_id, title, content, "firebase_disabled")
             return "firebase_disabled"
 
         last_error = None
@@ -250,26 +251,21 @@ class FirebaseService:
         for attempt in range(max_retries + 1):
             try:
                 if attempt > 0:
-                    logger.info(f"🔄 [FCM] 푸시 재시도 {attempt}/{max_retries} - 토큰: {token[:30]}...")
+                    logger.info(f"🔄 [FCM] 푸시 재시도 {attempt}/{max_retries} - 토큰: {_mask_token(token)}")
 
-                logger.info(f"📤 [FCM] 푸시 메시지 전송 시작 - 토큰: {token[:30]}..., 제목: {title}")
+                logger.debug(f"[FCM] 푸시 메시지 전송 시작 - 토큰: {_mask_token(token)}, 제목: {title}")
 
                 # 메시지 데이터 검증
                 if not token or not title or not content:
                     raise ValueError(f"필수 FCM 데이터가 누락됨: token={token[:10] if token else None}, title={title[:10] if title else None}, content={content[:10] if content else None}")
 
                 # FCM 토큰 형식 검증 (개선된 버전)
-                logger.info(f"🔍 [FCM] 토큰 형식 검증 시작: {token[:30]}...")
+                logger.debug(f"[FCM] 토큰 형식 검증 시작: {_mask_token(token)}")
                 if not self._validate_fcm_token(token):
-                    logger.error(f"❌ [FCM] 토큰 형식 검증 실패: {token[:50]}...")
-
-                    # 토큰 형식 검증 실패 시 무효화하지 않음 (FCM 서버에서 실제 검증)
-                    # 형식 검증은 클라이언트 측에서 이미 수행되어야 함
-                    logger.warning(f"⚠️ [FCM] 토큰 형식이 올바르지 않지만, FCM 서버에서 재시도")
-                    # raise ValueError(f"FCM 토큰 형식이 잘못되었습니다. 새로운 토큰을 요청해주세요.")
+                    logger.warning(f"[FCM] 토큰 형식 검증 실패, FCM 서버에서 재시도: {_mask_token(token)}")
 
                 # FCM 메시지 구성 (FCM v1 API 형식 준수)
-                logger.info(f"📤 [FCM] 메시지 구성 시작")
+                logger.debug(f"[FCM] 메시지 구성 시작")
 
                 # Firebase Admin SDK의 send() 메소드에 맞게 Message 객체 생성
                 # iOS 최적화: 토큰에 콜론(:)이 있으면 iOS로 판단하여 APNs 설정 추가
@@ -277,7 +273,7 @@ class FirebaseService:
 
                 if is_ios_token:
                     # iOS 토큰인 경우 APNs 설정 포함
-                    logger.info(f"📱 [FCM iOS] iOS 토큰 감지됨 - APNs 설정 적용: {token[:30]}...")
+                    logger.debug(f"[FCM iOS] iOS 토큰 감지됨 - APNs 설정 적용: {_mask_token(token)}")
                     message = messaging.Message(
                         token=token,
                         notification=messaging.Notification(
@@ -302,7 +298,7 @@ class FirebaseService:
                             headers={
                                 "apns-push-type": "alert",
                                 "apns-priority": "5",  # 10에서 5로 변경 (일반 우선순위)
-                                "apns-topic": Config.IOS_BUNDLE_ID,
+                                "apns-topic": settings.IOS_BUNDLE_ID,
                                 # expiration과 thread-id 제거로 단순화
                             },
                             payload=messaging.APNSPayload(
@@ -320,7 +316,7 @@ class FirebaseService:
                     )
                 else:
                     # Android 토큰인 경우 Android 전용 설정만
-                    logger.info(f"🤖 [FCM Android] Android 토큰 감지됨 - Android 설정만 적용: {token[:30]}...")
+                    logger.debug(f"[FCM Android] Android 토큰 감지됨 - Android 설정만 적용: {_mask_token(token)}")
                     message = messaging.Message(
                         token=token,
                         notification=messaging.Notification(
@@ -335,65 +331,38 @@ class FirebaseService:
                         )
                     )
 
-                logger.info(f"📤 [FCM] 메시지 구성 완료 - 토큰: {token[:30]}..., 제목: {title}")
+                logger.debug(f"[FCM] 메시지 구성 완료 - 토큰: {_mask_token(token)}, 제목: {title}")
 
                 # FCM 메시지 전송 시도
-                logger.info(f"🚀 [FCM] FCM 메시지 전송 시작...")
-                logger.info(f"🚀 [FCM] 메시지 데이터: token={token[:20]}..., title={title}, content={content[:20]}...")
-
                 try:
-                    # 메시지 객체 상세 정보 로깅
-                    logger.info(f"🚀 [FCM] 메시지 객체 검증:")
-                    logger.info(f"   - 타입: {type(message)}")
-                    logger.info(f"   - token: {getattr(message, 'token', 'MISSING')}")
-                    logger.info(f"   - notification: {getattr(message, 'notification', 'MISSING')}")
-                    if hasattr(message, 'notification') and message.notification:
-                        logger.info(f"   - title: {getattr(message.notification, 'title', 'MISSING')}")
-                        logger.info(f"   - body: {getattr(message.notification, 'body', 'MISSING')}")
-
-                    # 메시지 객체의 전체 구조 로깅 (디버깅용)
-                    try:
-                        import json
-                        message_dict = {
-                            'token': message.token,
-                            'notification': {
-                                'title': message.notification.title if message.notification else None,
-                                'body': message.notification.body if message.notification else None
-                            } if message.notification else None
-                        }
-                        logger.info(f"🔍 [FCM DEBUG] 메시지 구조: {json.dumps(message_dict, ensure_ascii=False, indent=2)}")
-                    except Exception as debug_error:
-                        logger.warning(f"🔍 [FCM DEBUG] 메시지 구조 로깅 실패: {debug_error}")
+                    # 디버그용 메시지 객체 검증 로깅
+                    logger.debug(f"[FCM] 메시지 객체: token={_mask_token(token)}, title={title}")
 
                     # FCM 전송 시도
                     response = messaging.send(message)
-                    logger.info(f"✅ [FCM] FCM 전송 성공: {response}")
+                    logger.debug(f"[FCM] FCM 전송 성공: {response}")
                 except Exception as send_error:
-                    logger.error(f"🚨 [FCM] messaging.send() 호출 실패: {send_error}")
-                    logger.error(f"🚨 [FCM] 오류 타입: {type(send_error)}")
-                    logger.error(f"🚨 [FCM] 오류 상세: {str(send_error)}")
+                    logger.error(f"[FCM] messaging.send() 호출 실패: {send_error}")
 
                     # 스택 트레이스 로깅
                     import traceback
-                    logger.error(f"🚨 [FCM] 스택 트레이스:\n{traceback.format_exc()}")
+                    logger.error(f"[FCM] 스택 트레이스:\n{traceback.format_exc()}")
 
                     raise send_error
-                logger.info(f"✅ [FCM POLICY 4] FCM 메시지 전송 성공: {response}")
-                logger.info(f"📊 [FCM] 전송 성공 - 메시지 ID: {response}")
+                logger.info(f"[FCM] 푸시 전송 성공 - 메시지 ID: {response}")
                 return response
 
             except messaging.UnregisteredError as e:
                 # ✅ 4단계: 서버 측 비활성 토큰 처리 (리소스 관리) - 더욱 보수적으로 수정
                 # NotRegistered 에러: 토큰이 더 이상 유효하지 않음 (앱 삭제 등)
-                logger.warning(f"🚨 [FCM POLICY 4] 비활성 토큰 감지 (UnregisteredError): {token[:30]}...")
+                logger.warning(f"🚨 [FCM POLICY 4] 비활성 토큰 감지 (UnregisteredError): {_mask_token(token)}")
                 logger.warning(f"🚨 [FCM POLICY 4] 토큰 전송 실패: {e}")
                 logger.warning(f"🚨 [FCM POLICY 4] 하지만 즉시 삭제하지 않고 재시도 후 판단")
 
                 # ⚠️ 즉시 토큰 삭제하지 않음 - 일시적인 Firebase 서버 문제일 수 있음
                 # 폴백 알림만 트리거 (토큰 정리는 하지 않음)
                 if enable_fallback and member_id:
-                    import asyncio
-                    asyncio.create_task(self._trigger_fallback_notification(member_id, title, content, "token_send_failed"))
+                    self._run_fallback_sync(member_id, title, content, "token_send_failed")
 
                 # 토큰 무효화 처리 시도 (하지만 _should_invalidate_token에서 거부될 것임)
                 if self._should_invalidate_token(token, "unregistered"):
@@ -409,7 +378,7 @@ class FirebaseService:
 
             except messaging.ThirdPartyAuthError as e:
                 # ThirdPartyAuthError: 토큰 형식이 잘못되었거나 인증 오류
-                logger.warning(f"🚨 [FCM POLICY 4] 잘못된 토큰 형식 (ThirdPartyAuthError): {token[:30]}...")
+                logger.warning(f"🚨 [FCM POLICY 4] 잘못된 토큰 형식 (ThirdPartyAuthError): {_mask_token(token)}")
                 logger.warning(f"🚨 [FCM POLICY 4] 토큰 형식이 잘못되어 삭제 처리 필요: {e}")
                 logger.warning(f"🚨 [FCM POLICY 4] FCM 푸시 메시지 전송 실패 - 토큰 형식이 잘못됨")
 
@@ -417,8 +386,7 @@ class FirebaseService:
                 self._handle_token_invalidation(token, "invalid_registration", title, content)
                 # 폴백 알림 트리거
                 if enable_fallback and member_id:
-                    import asyncio
-                    asyncio.create_task(self._trigger_fallback_notification(member_id, title, content, "token_invalid"))
+                    self._run_fallback_sync(member_id, title, content, "token_invalid")
                 if attempt == max_retries:  # 마지막 시도에서도 실패한 경우
                     raise
                 last_error = e
@@ -428,8 +396,7 @@ class FirebaseService:
                 logger.error(f"❌ [FCM POLICY 4] FCM 메시지 전송 실패 (시도 {attempt + 1}/{max_retries + 1}): {e}")
                 # 일반 오류 발생 시 폴백 알림 (중요한 메시지에만)
                 if enable_fallback and member_id and attempt == max_retries:
-                    import asyncio
-                    asyncio.create_task(self._trigger_fallback_notification(member_id, title, content, "fcm_error"))
+                    self._run_fallback_sync(member_id, title, content, "fcm_error")
                 if attempt == max_retries:  # 마지막 시도에서도 실패한 경우
                     raise
                 last_error = e
@@ -445,7 +412,7 @@ class FirebaseService:
         FCM에서 NotRegistered/InvalidRegistration 에러가 발생한 토큰을 처리
         """
         logger.warning(f"🚨 [FCM POLICY 4] 비활성 토큰 처리 시작: {reason}")
-        logger.warning(f"🚨 [FCM POLICY 4] 삭제 대상 토큰: {token[:30]}...")
+        logger.warning(f"🚨 [FCM POLICY 4] 삭제 대상 토큰: {_mask_token(token)}")
 
         # TODO: 데이터베이스에서 해당 토큰을 찾아서 삭제하는 로직 구현 필요
         # 현재는 로그만 기록하고 추후 데이터베이스 정리 작업에서 사용
@@ -520,7 +487,7 @@ class FirebaseService:
                     headers={
                         "apns-push-type": "alert",  # alert로 설정하여 사용자에게 표시
                         "apns-priority": "10",  # 최고 우선순위로 설정
-                        "apns-topic": Config.IOS_BUNDLE_ID,  # iOS 앱 번들 ID
+                        "apns-topic": settings.IOS_BUNDLE_ID,  # iOS 앱 번들 ID
                         "apns-expiration": str(int(time.time()) + 7776000),  # 90일 유효 (백그라운드 푸시 최대 개선)
                         # "apns-collapse-id": 제거 - 각 알림을 개별 전송하여 배치 방지
                         "apns-thread-id": f"background_{int(time.time())}"  # 개별 백그라운드 스레드로 즉시 알림
@@ -557,14 +524,14 @@ class FirebaseService:
 
         except messaging.UnregisteredError as e:
             # ✅ 4단계: 서버 측 비활성 토큰 처리 (리소스 관리)
-            logger.warning(f"🚨 [FCM POLICY 4] 백그라운드 푸시에서 비활성 토큰 감지 (UnregisteredError): {token[:30]}...")
+            logger.warning(f"🚨 [FCM POLICY 4] 백그라운드 푸시에서 비활성 토큰 감지 (UnregisteredError): {_mask_token(token)}")
             logger.warning(f"🚨 [FCM POLICY 4] 토큰이 유효하지 않아 삭제 처리 필요: {e}")
 
             self._handle_token_invalidation(token, "background_push_unregistered", title, content)
             raise
 
         except messaging.ThirdPartyAuthError as e:
-            logger.warning(f"🚨 [FCM POLICY 4] 백그라운드 푸시에서 잘못된 토큰 형식 (ThirdPartyAuthError): {token[:30]}...")
+            logger.warning(f"🚨 [FCM POLICY 4] 백그라운드 푸시에서 잘못된 토큰 형식 (ThirdPartyAuthError): {_mask_token(token)}")
             logger.warning(f"🚨 [FCM POLICY 4] 토큰 형식이 잘못되어 삭제 처리 필요: {e}")
 
             self._handle_inactive_token(token, "background_push_invalid")
@@ -595,7 +562,7 @@ class FirebaseService:
             return "firebase_disabled"
 
         try:
-            logger.info(f"🤫 [FCM SILENT] Silent 푸시 전송 시작 - 토큰: {token[:30]}..., 이유: {reason}")
+            logger.info(f"🤫 [FCM SILENT] Silent 푸시 전송 시작 - 토큰: {_mask_token(token)}, 이유: {reason}")
 
             # Silent 푸시를 위한 데이터 구성 (사용자에게 표시되지 않음)
             data = {
@@ -617,7 +584,7 @@ class FirebaseService:
                     headers={
                         "apns-push-type": "background",  # background 타입으로 설정하여 사용자에게 표시하지 않음
                         "apns-priority": "10",  # Silent 푸시라도 최고 우선순위로 설정하여 무시 방지
-                        "apns-topic": Config.IOS_BUNDLE_ID,  # 올바른 번들 ID 설정
+                        "apns-topic": settings.IOS_BUNDLE_ID,  # 올바른 번들 ID 설정
                         "apns-expiration": str(int(time.time()) + 7776000),  # 90일 유효 (백그라운드 푸시 최대 개선)
                         # "apns-collapse-id": 제거 - 각 알림을 개별 전송하여 배치 방지
                         "apns-thread-id": f"silent_{reason}_{int(time.time())}"  # 개별 Silent 스레드로 즉시 처리
@@ -649,14 +616,14 @@ class FirebaseService:
 
         except messaging.UnregisteredError as e:
             # ✅ 4단계: 서버 측 비활성 토큰 처리 (리소스 관리)
-            logger.warning(f"🚨 [FCM POLICY 4] Silent 푸시에서 비활성 토큰 감지 (UnregisteredError): {token[:30]}...")
+            logger.warning(f"🚨 [FCM POLICY 4] Silent 푸시에서 비활성 토큰 감지 (UnregisteredError): {_mask_token(token)}")
             logger.warning(f"🚨 [FCM POLICY 4] 토큰이 유효하지 않아 삭제 처리 필요: {e}")
 
             self._handle_token_invalidation(token, "silent_push_unregistered", "", "")
             raise
 
         except messaging.ThirdPartyAuthError as e:
-            logger.warning(f"🚨 [FCM POLICY 4] Silent 푸시에서 잘못된 토큰 형식 (ThirdPartyAuthError): {token[:30]}...")
+            logger.warning(f"🚨 [FCM POLICY 4] Silent 푸시에서 잘못된 토큰 형식 (ThirdPartyAuthError): {_mask_token(token)}")
             logger.warning(f"🚨 [FCM POLICY 4] 토큰 형식이 잘못되어 삭제 처리 필요: {e}")
 
             self._handle_token_invalidation(token, "silent_push_invalid", "", "")
@@ -677,7 +644,7 @@ class FirebaseService:
             logger.warning(f"⚠️ [FCM CLEANUP] 일시적인 Firebase 서버 문제일 수 있어 토큰을 보존합니다")
             
             # 토큰 정리하지 않고 로그만 기록
-            logger.info(f"📊 [FCM CLEANUP] 토큰 정리 생략 - 회원: {member_id}, 토큰: {token[:30]}...")
+            logger.info(f"📊 [FCM CLEANUP] 토큰 정리 생략 - 회원: {member_id}, 토큰: {_mask_token(token)}")
             
             # 향후 관리자가 수동으로 정리할 수 있도록 로그 파일에 기록
             try:
@@ -701,6 +668,19 @@ class FirebaseService:
 
         except Exception as e:
             logger.error(f"❌ [FCM CLEANUP] 토큰 정리 처리 실패: {e}")
+
+    def _run_fallback_sync(self, member_id: int, title: str, content: str, reason: str):
+        """동기 컨텍스트에서 폴백 알림을 안전하게 실행합니다."""
+        import asyncio
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(self._trigger_fallback_notification(member_id, title, content, reason))
+        except RuntimeError:
+            # 이벤트 루프가 없는 스레드 (APScheduler 등) — 새 루프에서 실행
+            try:
+                asyncio.run(self._trigger_fallback_notification(member_id, title, content, reason))
+            except Exception as e:
+                logger.error(f"Fallback notification failed: {e}")
 
     async def _trigger_fallback_notification(self, member_id: int, title: str, content: str, reason: str):
         """
@@ -1308,8 +1288,6 @@ SMAP 팀 드림 - 언제나 최고의 서비스를 제공하기 위해 노력하
             import smtplib
             from email.mime.text import MIMEText
             from email.mime.multipart import MIMEMultipart
-            from app.config import settings
-
             # 이메일 메시지 생성
             message = MIMEMultipart("alternative")
             message["Subject"] = subject
@@ -1418,19 +1396,19 @@ SMAP 팀 드림 - 언제나 최고의 서비스를 제공하기 위해 노력하
                     return False
                     
             else:
-                logger.warning(f"🚨 [FCM TOKEN VALIDATION] 잘못된 토큰 구조: {token[:30]}...")
+                logger.warning(f"🚨 [FCM TOKEN VALIDATION] 잘못된 토큰 구조: {_mask_token(token)}")
                 return False
         else:
             # 콜론이 없는 경우: 직접적인 토큰 문자열
             # 현재 DB에 저장된 토큰 형태 (fR8nxUvlA0znuI4IoO5h... 등)
-            logger.info(f"✅ [FCM TOKEN VALIDATION] 직접 토큰 문자열 형식: {token[:30]}...")
+            logger.info(f"✅ [FCM TOKEN VALIDATION] 직접 토큰 문자열 형식: {_mask_token(token)}")
             
             # 기본 문자 검증 - 영숫자, 하이픈, 언더스코어만 허용
             if not re.match(r'^[a-zA-Z0-9_-]+$', token):
-                logger.warning(f"🚨 [FCM TOKEN VALIDATION] 토큰에 허용되지 않는 문자: {token[:30]}...")
+                logger.warning(f"🚨 [FCM TOKEN VALIDATION] 토큰에 허용되지 않는 문자: {_mask_token(token)}")
                 return False
 
-        logger.info(f"✅ [FCM TOKEN VALIDATION] 토큰 형식 검증 통과: {token[:30]}...")
+        logger.info(f"✅ [FCM TOKEN VALIDATION] 토큰 형식 검증 통과: {_mask_token(token)}")
         return True
 
     def send_silent_push_for_token_refresh(self, token: str, member_id: int = None) -> str:
@@ -1452,7 +1430,7 @@ SMAP 팀 드림 - 언제나 최고의 서비스를 제공하기 위해 노력하
             return "firebase_disabled"
             
         try:
-            logger.info(f"🔇 [Silent Push] 토큰 갱신용 Silent Push 전송 시작 - 토큰: {token[:30]}...")
+            logger.info(f"🔇 [Silent Push] 토큰 갱신용 Silent Push 전송 시작 - 토큰: {_mask_token(token)}")
             
             # Silent Push 메시지 생성 (iOS 최적화)
             message = messaging.Message(
@@ -1499,7 +1477,7 @@ SMAP 팀 드림 - 언제나 최고의 서비스를 제공하기 위해 노력하
             return "silent_push_sent"
             
         except messaging.UnregisteredError:
-            logger.warning(f"🚨 [Silent Push] 토큰이 등록되지 않음 - 토큰 무효화 처리: {token[:30]}...")
+            logger.warning(f"🚨 [Silent Push] 토큰이 등록되지 않음 - 토큰 무효화 처리: {_mask_token(token)}")
             self._handle_token_invalidation(token, "unregistered_silent_push")
             return "token_unregistered"
             
@@ -1568,11 +1546,11 @@ SMAP 팀 드림 - 언제나 최고의 서비스를 제공하기 위해 노력하
         iOS 최적화된 푸시 전송 메소드
         iOS 푸시 수신율을 높이기 위한 특화된 설정 적용
         """
-        logger.info(f"📱 [FCM iOS] iOS 최적화 푸시 시작 - 토큰: {token[:30]}..., 백그라운드: {is_background}")
+        logger.info(f"📱 [FCM iOS] iOS 최적화 푸시 시작 - 토큰: {_mask_token(token)}, 백그라운드: {is_background}")
 
         # iOS 토큰 검증
         if not self.validate_ios_token(token):
-            logger.error(f"📱 [FCM iOS] iOS 토큰 검증 실패: {token[:30]}...")
+            logger.error(f"📱 [FCM iOS] iOS 토큰 검증 실패: {_mask_token(token)}")
             raise ValueError("iOS FCM 토큰이 유효하지 않습니다")
 
         logger.info(f"📱 [FCM iOS] 토큰 검증 통과")
@@ -1590,12 +1568,12 @@ SMAP 팀 드림 - 언제나 최고의 서비스를 제공하기 위해 노력하
                 schedule_id=None
             )
         else:
-            logger.info(f"📱 [FCM iOS] 일반 푸시 전송 (재시도: {Config.IOS_PUSH_RETRY_COUNT})")
+            logger.info(f"📱 [FCM iOS] 일반 푸시 전송 (재시도: {settings.IOS_PUSH_RETRY_COUNT})")
             return self.send_push_notification(
                 token=token,
                 title=title,
                 content=content,
-                max_retries=Config.IOS_PUSH_RETRY_COUNT  # 설정된 재시도 횟수 사용
+                max_retries=settings.IOS_PUSH_RETRY_COUNT  # 설정된 재시도 횟수 사용
             )
 
     def _should_invalidate_token(self, token: str, reason: str) -> bool:
@@ -1621,7 +1599,7 @@ SMAP 팀 드림 - 언제나 최고의 서비스를 제공하기 위해 노력하
             # 토큰으로 사용자 조회
             member = db.query(Member).filter(Member.mt_token_id == token).first()
             if not member:
-                logger.warning(f"⚠️ [TOKEN INVALIDATION] 토큰에 해당하는 사용자를 찾을 수 없음: {token[:30]}...")
+                logger.warning(f"⚠️ [TOKEN INVALIDATION] 토큰에 해당하는 사용자를 찾을 수 없음: {_mask_token(token)}")
                 return False
 
             current_time = datetime.now()
@@ -1675,7 +1653,7 @@ SMAP 팀 드림 - 언제나 최고의 서비스를 제공하기 위해 노력하
             content: 원래 전송하려던 푸시 내용
         """
         try:
-            logger.info(f"🔄 [FCM TOKEN MANAGEMENT] 토큰 무효화 처리 시작 - 토큰: {token[:30]}..., 이유: {reason}")
+            logger.info(f"🔄 [FCM TOKEN MANAGEMENT] 토큰 무효화 처리 시작 - 토큰: {_mask_token(token)}, 이유: {reason}")
 
             # 데이터베이스 연결
             from app.db.session import get_db
@@ -1712,7 +1690,7 @@ SMAP 팀 드림 - 언제나 최고의 서비스를 제공하기 위해 노력하
                     # db.commit()
 
                     logger.info(f"✅ [FCM TOKEN MANAGEMENT] 토큰 제거 완료 - 사용자: {member.mt_idx}")
-                    logger.info(f"📊 [FCM TOKEN MANAGEMENT] 정리 기록: 이유={reason}, 토큰_접두사={token[:30]}..., 타임스탬프={int(time.time())}")
+                    logger.info(f"📊 [FCM TOKEN MANAGEMENT] 정리 기록: 이유={reason}, 토큰_접두사={_mask_token(token)}, 타임스탬프={int(time.time())}")
 
                     # 무효화 기록을 파일에 저장 (디버깅 및 추적용)
                     try:
@@ -1749,8 +1727,8 @@ SMAP 팀 드림 - 언제나 최고의 서비스를 제공하기 위해 노력하
                         logger.warning(f"⚠️ [FCM TOKEN MANAGEMENT] 토큰 갱신 알림 전송 실패: {e}")
 
                 else:
-                    logger.warning(f"⚠️ [FCM TOKEN MANAGEMENT] 무효화된 토큰에 해당하는 사용자를 찾을 수 없음: {token[:30]}...")
-                    logger.info(f"📊 [FCM TOKEN MANAGEMENT] 정리 기록 (사용자 미발견): 이유={reason}, 토큰_접두사={token[:30]}..., 타임스탬프={int(time.time())}")
+                    logger.warning(f"⚠️ [FCM TOKEN MANAGEMENT] 무효화된 토큰에 해당하는 사용자를 찾을 수 없음: {_mask_token(token)}")
+                    logger.info(f"📊 [FCM TOKEN MANAGEMENT] 정리 기록 (사용자 미발견): 이유={reason}, 토큰_접두사={_mask_token(token)}, 타임스탬프={int(time.time())}")
                     
                     # 사용자 미발견 기록도 로그에 저장
                     try:
@@ -1775,7 +1753,7 @@ SMAP 팀 드림 - 언제나 최고의 서비스를 제공하기 위해 노력하
 
         except Exception as e:
             logger.error(f"❌ [FCM TOKEN MANAGEMENT] 토큰 무효화 처리 중 오류: {e}")
-            logger.error(f"   토큰: {token[:30]}..., 이유: {reason}")
+            logger.error(f"   토큰: {_mask_token(token)}, 이유: {reason}")
             
             # 에러 정보도 로그에 기록
             try:
@@ -1824,5 +1802,36 @@ SMAP 팀 드림 - 언제나 최고의 서비스를 제공하기 위해 노력하
         except Exception as e:
             logger.error(f"❌ [FCM TOKEN REFRESH] 토큰 갱신 알림 전송 실패: {e}")
 
+    def send_batch_push(self, messages: list) -> list:
+        """최대 500건씩 FCM 배치 전송
+
+        Args:
+            messages: firebase_admin.messaging.Message 객체 리스트
+
+        Returns:
+            list: 각 메시지의 SendResponse 리스트
+        """
+        if not self._firebase_available:
+            logger.warning("Firebase가 초기화되지 않아 배치 푸시를 건너뜁니다.")
+            return []
+
+        all_responses = []
+        for i in range(0, len(messages), 500):
+            chunk = messages[i:i + 500]
+            try:
+                batch_response = messaging.send_each(chunk)
+                all_responses.extend(batch_response.responses)
+            except Exception as e:
+                logger.error(f"[FCM BATCH] 배치 전송 실패 (chunk {i // 500 + 1}): {e}")
+                # 실패한 청크의 응답을 None으로 채움
+                all_responses.extend([None] * len(chunk))
+
+        success_count = sum(1 for r in all_responses if r and r.success)
+        fail_count = len(all_responses) - success_count
+        logger.info(f"[FCM BATCH] 배치 전송 완료 - 성공: {success_count}, 실패: {fail_count}, 전체: {len(all_responses)}")
+
+        return all_responses
+
+
 # 싱글톤 인스턴스 생성
-firebase_service = FirebaseService() 
+firebase_service = FirebaseService()

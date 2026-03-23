@@ -3,7 +3,7 @@ import bcrypt
 from datetime import datetime # mt_wdate 등 날짜 필드용
 from app.models.member import Member  # member_t 테이블에 매핑된 모델
 from app.schemas.auth import UserIdentity, RegisterRequest # RegisterRequest 임포트
-from app.config import Config  # 설정 파일 import
+from app.core.config import settings
 from typing import Optional
 import re
 
@@ -122,23 +122,23 @@ def validate_password_policy(password: str) -> tuple[bool, list[str]]:
     errors = []
     
     # 최소 길이 검사
-    if len(password) < Config.PASSWORD_MIN_LENGTH:
-        errors.append(f"비밀번호는 최소 {Config.PASSWORD_MIN_LENGTH}자 이상이어야 합니다.")
+    if len(password) < settings.PASSWORD_MIN_LENGTH:
+        errors.append(f"비밀번호는 최소 {settings.PASSWORD_MIN_LENGTH}자 이상이어야 합니다.")
     
     # 대문자 검사
-    if Config.PASSWORD_REQUIRE_UPPERCASE and not re.search(r'[A-Z]', password):
+    if settings.PASSWORD_REQUIRE_UPPERCASE and not re.search(r'[A-Z]', password):
         errors.append("비밀번호에 대문자가 포함되어야 합니다.")
     
     # 소문자 검사
-    if Config.PASSWORD_REQUIRE_LOWERCASE and not re.search(r'[a-z]', password):
+    if settings.PASSWORD_REQUIRE_LOWERCASE and not re.search(r'[a-z]', password):
         errors.append("비밀번호에 소문자가 포함되어야 합니다.")
     
     # 숫자 검사
-    if Config.PASSWORD_REQUIRE_NUMBERS and not re.search(r'\d', password):
+    if settings.PASSWORD_REQUIRE_NUMBERS and not re.search(r'\d', password):
         errors.append("비밀번호에 숫자가 포함되어야 합니다.")
     
     # 특수문자 검사
-    if Config.PASSWORD_REQUIRE_SPECIAL and not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+    if settings.PASSWORD_REQUIRE_SPECIAL and not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
         errors.append("비밀번호에 특수문자가 포함되어야 합니다.")
     
     return len(errors) == 0, errors
@@ -151,7 +151,7 @@ def get_hashed_password(password: str) -> str:
         raise ValueError(f"비밀번호 정책 위반: {', '.join(errors)}")
     
     # bcrypt 비용 설정 (PHP의 PASSWORD_DEFAULT와 동일한 방식)
-    cost = Config.PASSWORD_BCRYPT_COST
+    cost = settings.PASSWORD_BCRYPT_COST
     salt = bcrypt.gensalt(rounds=cost)
     
     return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
@@ -412,10 +412,10 @@ def get_current_member(
     token = authorization.split(" ")[1]
 
     try:
-        secret_key = 'smap!@super-secret'
-        algorithm = 'HS256'
-        payload = jwt.decode(token, secret_key, algorithms=[algorithm])
-        mt_idx: Optional[int] = payload.get("mt_idx")
+        from app.core.config import settings
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        # mt_idx 먼저 확인, 없으면 sub 확인 (하위 호환)
+        mt_idx: Optional[int] = payload.get("mt_idx") or payload.get("sub")
         if not mt_idx:
             raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다.")
 

@@ -1,12 +1,12 @@
 from sqlalchemy import Column, Integer, String, Text, Enum, DateTime, func
-from .base import Base
+from .base import BaseModel
 import enum
 
 class NoticeShowEnum(str, enum.Enum):
     Y = "Y"  # 노출
     N = "N"  # 노출안함
 
-class Notice(Base):
+class Notice(BaseModel):
     __tablename__ = "notice_t"
     
     nt_idx = Column(Integer, primary_key=True, index=True, autoincrement=True, comment="공지사항 ID")

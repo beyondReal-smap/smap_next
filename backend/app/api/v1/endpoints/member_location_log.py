@@ -39,7 +39,8 @@ def _get_mt_idx_from_token(request: Request) -> Tuple[Optional[int], Optional[st
         return None, "Authorization 헤더가 필요합니다 (Bearer 토큰)."
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        mt_idx = payload.get("mt_idx")
+        # mt_idx 먼저 확인, 없으면 sub 확인 (하위 호환)
+        mt_idx = payload.get("mt_idx") or payload.get("sub")
         if not mt_idx:
             return None, "토큰에 mt_idx가 없습니다."
         return int(mt_idx), None

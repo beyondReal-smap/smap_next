@@ -30,7 +30,8 @@ def get_current_user_id(authorization: str = Header(None)) -> Optional[int]:
         payload = jwt.decode(
             token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
         )
-        return payload.get("mt_idx")
+        # mt_idx 먼저 확인, 없으면 sub 확인 (하위 호환)
+        return payload.get("mt_idx") or payload.get("sub")
     except JWTError:
         return None
 
@@ -47,6 +48,23 @@ def get_required_user_id(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="인증이 필요합니다.",
             headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user_id
+
+
+def get_required_admin_id(
+    user_id: int = Depends(get_required_user_id),
+    db: Session = Depends(get_db),
+) -> int:
+    """
+    관리자 권한이 필수인 엔드포인트용 의존성.
+    mt_level == 9인 사용자만 허용하며, 그 외에는 403 에러를 반환합니다.
+    """
+    user = db.query(Member).filter(Member.mt_idx == user_id, Member.mt_status == 1).first()
+    if not user or user.mt_level != 9:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="관리자 권한이 필요합니다.",
         )
     return user_id
 

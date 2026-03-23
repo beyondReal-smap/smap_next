@@ -3,13 +3,18 @@ FCM Silent Push API 엔드포인트
 토큰 갱신을 위한 조용한 푸시 알림 전송
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from app.database import get_db
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
+from app.api import deps
+from app.db.session import get_db
+from app.models.member import Member
 from app.services.firebase_service import FirebaseService
 
 logger = logging.getLogger(__name__)
@@ -36,14 +41,16 @@ class SilentPushResponse(BaseModel):
 @router.post("/send-silent-push", response_model=SilentPushResponse)
 def send_silent_push_for_token_refresh(
     request: SilentPushRequest,
+    user_id: int = Depends(deps.get_required_user_id),
     db=Depends(get_db)
 ):
     """
     FCM 토큰 갱신을 위한 Silent Push 전송
-    
+
     iOS 앱이 백그라운드에 있을 때 토큰 갱신을 유도하기 위해 조용한 푸시를 보냅니다.
     사용자에게는 알림이 표시되지 않고, 앱에서만 토큰 갱신 로직이 실행됩니다.
     """
+
     try:
         logger.info(f"🔇 [Silent Push API] 토큰 갱신용 Silent Push 요청 - 사용자: {request.mt_idx}")
         
@@ -51,25 +58,21 @@ def send_silent_push_for_token_refresh(
         fcm_token = request.fcm_token
         
         if not fcm_token:
-            # DB에서 토큰 조회
-            cursor = db.cursor()
-            cursor.execute("""
-                SELECT mt_token_id 
-                FROM members 
-                WHERE mt_idx = %s AND mt_token_id IS NOT NULL AND mt_token_id != ''
-            """, (request.mt_idx,))
-            
-            result = cursor.fetchone()
-            cursor.close()
-            
-            if not result:
+            # DB에서 토큰 조회 (Member ORM 사용)
+            member = db.query(Member).filter(
+                Member.mt_idx == request.mt_idx,
+                Member.mt_token_id.isnot(None),
+                Member.mt_token_id != ''
+            ).first()
+
+            if not member:
                 logger.warning(f"❌ [Silent Push API] 사용자의 FCM 토큰을 찾을 수 없음: {request.mt_idx}")
                 raise HTTPException(
                     status_code=404,
                     detail="FCM 토큰을 찾을 수 없습니다. 앱에서 토큰을 등록해주세요."
                 )
-            
-            fcm_token = result[0]
+
+            fcm_token = member.mt_token_id
         
         logger.info(f"🔇 [Silent Push API] 토큰 확인 완료: {fcm_token[:30]}...")
         
@@ -134,33 +137,29 @@ def send_silent_push_for_token_refresh(
 
 @router.post("/send-batch-silent-push")
 def send_batch_silent_push_for_stale_tokens(
+    user_id: int = Depends(deps.get_required_admin_id),
     db=Depends(get_db)
 ):
     """
-    오래된 토큰을 가진 사용자들에게 일괄 Silent Push 전송
-    
+    오래된 토큰을 가진 사용자들에게 일괄 Silent Push 전송 (관리자 전용)
+
     마지막 토큰 업데이트가 24시간 이상 된 사용자들에게 토큰 갱신을 유도하기 위해
     Silent Push를 일괄 전송합니다.
     """
+
     try:
         logger.info("🔇 [Batch Silent Push] 오래된 토큰을 가진 사용자들에게 일괄 Silent Push 시작")
         
-        # 24시간 이상 토큰 업데이트가 없는 사용자 조회
-        cursor = db.cursor()
-        cursor.execute("""
-            SELECT mt_idx, mt_token_id, mt_token_updated_at
-            FROM members 
-            WHERE mt_token_id IS NOT NULL 
-            AND mt_token_id != ''
-            AND mt_status = 1
-            AND (mt_token_updated_at IS NULL OR mt_token_updated_at < NOW() - INTERVAL 24 HOUR)
-            LIMIT 100
-        """)
-        
-        stale_tokens = cursor.fetchall()
-        cursor.close()
-        
-        if not stale_tokens:
+        # 24시간 이상 토큰 업데이트가 없는 사용자 조회 (Member ORM 사용)
+        threshold = datetime.now() - timedelta(hours=24)
+        stale_members = db.query(Member).filter(
+            Member.mt_token_id.isnot(None),
+            Member.mt_token_id != '',
+            Member.mt_status == 1,
+            (Member.mt_token_updated_at.is_(None)) | (Member.mt_token_updated_at < threshold)
+        ).limit(100).all()
+
+        if not stale_members:
             logger.info("✅ [Batch Silent Push] 오래된 토큰을 가진 사용자가 없음")
             return {
                 "success": True,
@@ -169,14 +168,14 @@ def send_batch_silent_push_for_stale_tokens(
                 "success_count": 0,
                 "failed_count": 0
             }
-        
-        logger.info(f"🔇 [Batch Silent Push] {len(stale_tokens)}명의 사용자에게 Silent Push 전송 시작")
-        
+
+        logger.info(f"🔇 [Batch Silent Push] {len(stale_members)}명의 사용자에게 Silent Push 전송 시작")
+
         success_count = 0
         failed_count = 0
-        
-        for row in stale_tokens:
-            mt_idx, fcm_token, last_updated = row
+
+        for member in stale_members:
+            mt_idx, fcm_token, last_updated = member.mt_idx, member.mt_token_id, member.mt_token_updated_at
             
             try:
                 # Silent Push 전송
@@ -201,7 +200,7 @@ def send_batch_silent_push_for_stale_tokens(
         return {
             "success": True,
             "message": f"일괄 Silent Push 전송 완료",
-            "processed_count": len(stale_tokens),
+            "processed_count": len(stale_members),
             "success_count": success_count,
             "failed_count": failed_count
         }

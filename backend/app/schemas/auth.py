@@ -135,6 +135,7 @@ class ResetPasswordByPhoneRequest(BaseModel):
     """전화번호 기반 비밀번호 재설정 (네이티브 앱용)"""
     phone: str
     new_password: str
+    verification_code: str
 
 
 class VerifyResetTokenRequest(BaseModel):
