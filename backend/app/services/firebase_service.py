@@ -318,7 +318,6 @@ class FirebaseService:
                                         title=title,
                                         body=content
                                     ),
-                                    content_available=True,
                                 )
                             )
                         )

@@ -22,6 +22,7 @@ GEOFENCE_ENTRY_RADIUS = 80.0      # 진입 판정 거리 (m)
 GEOFENCE_EXIT_RADIUS = 120.0      # 이탈 판정 거리 (m)
 GPS_ACCURACY_THRESHOLD = 50.0     # GPS 정확도 필터 (m)
 MY_PLACE_COOLDOWN = timedelta(minutes=3)  # My Place 상태 전환 쿨다운
+GPS_STALE_THRESHOLD = timedelta(minutes=5)  # GPS 데이터 유효 기간
 
 from app.jobs.base import (
     get_group_member_data,
@@ -38,6 +39,16 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # 내부 헬퍼
 # ---------------------------------------------------------------------------
+
+def _is_gps_usable(member_loc: Dict, now: datetime = None) -> bool:
+    """GPS 데이터가 사용 가능한지 (정확도 + 신선도) 확인합니다."""
+    accuracy = member_loc.get("accuracy")
+    if accuracy is not None and accuracy > GPS_ACCURACY_THRESHOLD:
+        return False
+    gps_time = member_loc.get("gps_time")
+    if gps_time and now and (now - gps_time) > GPS_STALE_THRESHOLD:
+        return False
+    return True
 
 def _send_entry_notifications(
     db: Session,
@@ -208,8 +219,9 @@ def run_location_entry_alert(db: Session) -> None:
     from app.models.member_location_log import MemberLocationLog
 
     try:
+        now = datetime.now()
         plt_condition = "30초 - 장소알림"
-        plt_memo = "일정에 입력한 장소의 100미터 반경에 들어왔을때"
+        plt_memo = f"일정에 입력한 장소의 {int(GEOFENCE_ENTRY_RADIUS)}미터 반경에 들어왔을때"
 
         schedules = Schedule.get_now_schedule_in_members(db)
         if not schedules:
@@ -246,12 +258,7 @@ def run_location_entry_alert(db: Session) -> None:
 
             if mt_idx and int(record_value(schedule, "mt_idx") or 0) != int(mt_idx):
                 member_loc = recent_locs.get(int(mt_idx))
-                if not member_loc:
-                    continue
-
-                # GPS 정확도 필터: 부정확한 위치 무시
-                accuracy = member_loc.get("accuracy")
-                if accuracy is not None and accuracy > GPS_ACCURACY_THRESHOLD:
+                if not member_loc or not _is_gps_usable(member_loc, now):
                     continue
 
                 target_lat = float(record_value(schedule, "sst_location_lat"))
@@ -282,8 +289,9 @@ def run_location_exit_alert(db: Session) -> None:
     from app.models.member_location_log import MemberLocationLog
 
     try:
+        now = datetime.now()
         plt_condition = "30초 - 장소알림"
-        plt_memo = "일정에 입력한 장소의 100미터 반경에서 이탈했을때"
+        plt_memo = f"일정에 입력한 장소의 {int(GEOFENCE_EXIT_RADIUS)}미터 반경에서 이탈했을때"
 
         schedules = Schedule.get_now_schedule_out_members(db)
         if not schedules:
@@ -319,12 +327,7 @@ def run_location_exit_alert(db: Session) -> None:
 
             if mt_idx and int(record_value(schedule, "mt_idx") or 0) != int(mt_idx):
                 member_loc = recent_locs.get(int(mt_idx))
-                if not member_loc:
-                    continue
-
-                # GPS 정확도 필터: 부정확한 위치 무시
-                accuracy = member_loc.get("accuracy")
-                if accuracy is not None and accuracy > GPS_ACCURACY_THRESHOLD:
+                if not member_loc or not _is_gps_usable(member_loc, now):
                     continue
 
                 target_lat = float(record_value(schedule, "sst_location_lat"))
@@ -356,7 +359,7 @@ def run_my_location_entry_alert(db: Session) -> None:
 
     try:
         plt_condition = "30s - My Place Entry"
-        plt_memo = "내가 등록한 장소의 100미터 반경에 들어왔을때"
+        plt_memo = f"내가 등록한 장소의 {int(GEOFENCE_ENTRY_RADIUS)}미터 반경에 들어왔을때"
 
         my_locations = MyLocation.get_all_active(db)
         # 미진입 상태만 필터
@@ -375,12 +378,7 @@ def run_my_location_entry_alert(db: Session) -> None:
             mt_idx = int(loc["mt_idx"])
             slt_idx = loc["slt_idx"]
             member_loc = recent_locs.get(mt_idx)
-            if not member_loc:
-                continue
-
-            # GPS 정확도 필터
-            accuracy = member_loc.get("accuracy")
-            if accuracy is not None and accuracy > GPS_ACCURACY_THRESHOLD:
+            if not member_loc or not _is_gps_usable(member_loc, now):
                 continue
 
             # 쿨다운 체크: 마지막 상태 변경 후 최소 3분 경과 필요
@@ -443,7 +441,7 @@ def run_my_location_exit_alert(db: Session) -> None:
 
     try:
         plt_condition = "30s - My Place Exit"
-        plt_memo = "내가 등록한 장소의 100미터 반경에서 이탈했을때"
+        plt_memo = f"내가 등록한 장소의 {int(GEOFENCE_EXIT_RADIUS)}미터 반경에서 이탈했을때"
 
         my_locations = MyLocation.get_all_active_in(db)
         if not my_locations:
@@ -460,12 +458,7 @@ def run_my_location_exit_alert(db: Session) -> None:
             mt_idx = int(loc["mt_idx"])
             slt_idx = loc["slt_idx"]
             member_loc = recent_locs.get(mt_idx)
-            if not member_loc:
-                continue
-
-            # GPS 정확도 필터
-            accuracy = member_loc.get("accuracy")
-            if accuracy is not None and accuracy > GPS_ACCURACY_THRESHOLD:
+            if not member_loc or not _is_gps_usable(member_loc, now):
                 continue
 
             # 쿨다운 체크: 마지막 상태 변경 후 최소 3분 경과 필요
