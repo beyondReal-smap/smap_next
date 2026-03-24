@@ -24,7 +24,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.dmonster.smap.data.model.LocationSummary
-import com.dmonster.smap.data.model.SmapGroup
 import com.dmonster.smap.data.model.SmapGroupMember
 import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.SuiteFont
@@ -98,13 +97,13 @@ fun ActivityLogFloatingCard(
                 // Avatar
                 Box(modifier = Modifier.size(36.dp)) {
                     val imageUrl = remember(member?.mtFile1) {
-                        if (!member?.mtFile1.isNullOrBlank()) {
+                        member?.mtFile1?.takeIf { it.isNotBlank() }?.let { file ->
                             when {
-                                member!!.mtFile1!!.startsWith("http") -> member.mtFile1
-                                member.mtFile1!!.startsWith("/images/") -> "${BuildConfig.IMAGE_BASE_URL}${member.mtFile1}"
-                                else -> "${BuildConfig.IMAGE_BASE_URL}/images/${member.mtFile1}"
+                                file.startsWith("http") -> file
+                                file.startsWith("/images/") -> "${BuildConfig.IMAGE_BASE_URL}$file"
+                                else -> "${BuildConfig.IMAGE_BASE_URL}/images/$file"
                             }
-                        } else null
+                        }
                     }
 
                     Box(
@@ -131,20 +130,20 @@ fun ActivityLogFloatingCard(
                         }
                     }
 
-                    // Online indicator
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .align(Alignment.BottomEnd)
-                            .offset(x = 2.dp, y = 2.dp)
-                            .background(Color.Green, CircleShape)
-                            .border(1.5.dp, Color.White, CircleShape)
-                    )
+                    // Online indicator - hidden until real online status data is available
+                    // Box(
+                    //     modifier = Modifier
+                    //         .size(10.dp)
+                    //         .align(Alignment.BottomEnd)
+                    //         .offset(x = 2.dp, y = 2.dp)
+                    //         .background(Color.Green, CircleShape)
+                    //         .border(1.5.dp, Color.White, CircleShape)
+                    // )
                 }
 
                 Spacer(modifier = Modifier.width(8.dp))
 
-                Column(verticalArrangement = Arrangement.spacedBy((-3).dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = member?.displayName ?: "선택 없음",
@@ -257,7 +256,7 @@ fun PathSlider(
 
     // Update dragging state based on actual interaction
     LaunchedEffect(isDragActive) {
-        android.util.Log.d("PathSlider", "isDragActive changed: $isDragActive")
+        if (BuildConfig.DEBUG) android.util.Log.d("PathSlider", "isDragActive changed: $isDragActive")
         onDraggingChange(isDragActive)
     }
 
@@ -301,11 +300,11 @@ fun PathSlider(
                 Slider(
                     value = sliderValue.toFloat(),
                     onValueChange = { newValue ->
-                        android.util.Log.d("PathSlider", "onValueChange: $newValue")
+                        if (BuildConfig.DEBUG) android.util.Log.d("PathSlider", "onValueChange: $newValue")
                         onValueChange(newValue.toDouble())
                     },
                     onValueChangeFinished = {
-                        android.util.Log.d("PathSlider", "onValueChangeFinished")
+                        if (BuildConfig.DEBUG) android.util.Log.d("PathSlider", "onValueChangeFinished")
                     },
                     valueRange = 0f..100f,
                     interactionSource = interactionSource,
@@ -369,117 +368,6 @@ fun PathSlider(
                 }
             }
         }
-    }
-}
-
-// MARK: - Date Selector
-
-@Composable
-fun DateSelector(
-    formattedDate: String,
-    isToday: Boolean,
-    canGoNext: Boolean,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
-    onToday: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            // Previous Button
-            IconButton(onClick = onPrevious) {
-                Icon(
-                    imageVector = Icons.Default.ChevronLeft,
-                    contentDescription = "이전 날",
-                    tint = BrandColors.Primary
-                )
-            }
-
-            // Date Display
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.clickable(enabled = !isToday, onClick = onToday)
-            ) {
-                Text(
-                    text = formattedDate,
-                    fontSize = 16.sp,
-                    fontFamily = SuiteFont,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF1F2937)
-                )
-
-                if (!isToday) {
-                    Spacer(modifier = Modifier.width(8.dp))
-                    TextButton(
-                        onClick = onToday,
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        Text(
-                            text = "오늘",
-                            fontSize = 12.sp,
-                            fontFamily = SuiteFont,
-                            color = BrandColors.Primary
-                        )
-                    }
-                }
-            }
-
-            // Next Button
-            IconButton(
-                onClick = onNext,
-                enabled = canGoNext
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ChevronRight,
-                    contentDescription = "다음 날",
-                    tint = if (canGoNext) BrandColors.Primary else Color.Gray.copy(alpha = 0.3f)
-                )
-            }
-        }
-    }
-}
-
-// MARK: - Group Selector
-
-@Composable
-fun ActivityGroupSelector(
-    selectedGroup: SmapGroup?,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFFF3F4F6))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = selectedGroup?.sgtTitle ?: "그룹 선택",
-            fontSize = 14.sp,
-            fontFamily = SuiteFont,
-            fontWeight = FontWeight.Medium,
-            color = Color(0xFF1F2937)
-        )
-        Spacer(modifier = Modifier.width(4.dp))
-        Icon(
-            imageVector = Icons.Default.KeyboardArrowDown,
-            contentDescription = null,
-            tint = Color.Gray,
-            modifier = Modifier.size(18.dp)
-        )
     }
 }
 

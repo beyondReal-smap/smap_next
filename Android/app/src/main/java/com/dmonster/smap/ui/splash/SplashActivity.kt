@@ -4,8 +4,6 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -17,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.lifecycleScope
 import com.dmonster.smap.R
 import com.dmonster.smap.data.service.AuthService
 import com.dmonster.smap.MainActivity
@@ -24,6 +23,8 @@ import javax.inject.Inject
 import com.dmonster.smap.ui.login.LoginActivity
 import com.dmonster.smap.ui.theme.SmapTheme
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * 스플래시 화면 (앱 시작점)
@@ -61,7 +62,7 @@ class SplashActivity : ComponentActivity() {
                 ) {
                     Image(
                         painter = painterResource(id = R.drawable.app_no_bg),
-                        contentDescription = null,
+                        contentDescription = "SMAP 앱 로고",
                         modifier = Modifier.size(80.dp)
                     )
                 }
@@ -69,10 +70,11 @@ class SplashActivity : ComponentActivity() {
         }
         
         // 스플래시 딜레이 후 다음 화면으로 이동
-        Handler(Looper.getMainLooper()).postDelayed({
+        lifecycleScope.launch {
+            delay(SPLASH_DELAY)
             keepSplashScreen = false
             navigateNext()
-        }, SPLASH_DELAY)
+        }
     }
     
     private fun navigateNext() {
@@ -89,11 +91,15 @@ class SplashActivity : ComponentActivity() {
         
         val intent = Intent(this, nextActivity)
         startActivity(intent)
-        
+
         // 화면 전환 애니메이션 비활성화
-        @Suppress("DEPRECATION")
-        overridePendingTransition(0, 0)
-        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            overrideActivityTransition(OVERRIDE_TRANSITION_OPEN, android.R.anim.fade_in, android.R.anim.fade_out)
+        } else {
+            @Suppress("DEPRECATION")
+            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
+        }
+
         finish()
     }
 }

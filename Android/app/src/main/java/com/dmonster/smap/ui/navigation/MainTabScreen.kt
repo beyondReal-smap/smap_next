@@ -1,6 +1,7 @@
 package com.dmonster.smap.ui.navigation
 
 import android.view.HapticFeedbackConstants
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,8 +14,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -44,11 +47,11 @@ sealed class TabItem(
     val selectedIcon: ImageVector,
     val unselectedIcon: ImageVector
 ) {
-    data object Home : TabItem("홈", Icons.Filled.Home, Icons.Filled.Home)
-    data object Group : TabItem("그룹", Icons.Filled.Groups, Icons.Filled.Groups)
-    data object Schedule : TabItem("일정", Icons.Filled.CalendarMonth, Icons.Filled.CalendarMonth)
-    data object MyPlace : TabItem("내장소", Icons.Filled.LocationOn, Icons.Filled.LocationOn)
-    data object ActivityLog : TabItem("활동 로그", Icons.Filled.History, Icons.Filled.History)
+    data object Home : TabItem("홈", Icons.Filled.Home, Icons.Outlined.Home)
+    data object Group : TabItem("그룹", Icons.Filled.Groups, Icons.Outlined.Groups)
+    data object Schedule : TabItem("일정", Icons.Filled.CalendarMonth, Icons.Outlined.CalendarMonth)
+    data object MyPlace : TabItem("내장소", Icons.Filled.LocationOn, Icons.Outlined.Place)
+    data object ActivityLog : TabItem("활동 로그", Icons.Filled.History, Icons.Outlined.History)
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -56,7 +59,7 @@ sealed class TabItem(
 fun MainTabScreen(
     onLogout: () -> Unit
 ) {
-    var selectedTabIndex by remember { mutableIntStateOf(0) }
+    var selectedTabIndex by rememberSaveable { mutableIntStateOf(0) }
     val view = LocalView.current
     
     // HomeViewModel to access group creation modal state
@@ -156,11 +159,15 @@ fun MainTabScreen(
 
             // Full-screen Group Creation Modal
             if (showGroupCreationModal) {
+                BackHandler {
+                    homeViewModel.hideGroupCreationModal()
+                }
                 GroupCreationScreen(
                     isCreating = isCreatingGroup,
                     onCreateGroup = { name, desc -> homeViewModel.createGroup(name, desc) },
                     onJoinGroup = { inviteCode -> homeViewModel.joinGroup(inviteCode) },
-                    errorMessage = errorMessage
+                    errorMessage = errorMessage,
+                    onDismiss = { homeViewModel.hideGroupCreationModal() }
                 )
             }
         }

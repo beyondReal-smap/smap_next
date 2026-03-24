@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Tag
@@ -36,7 +37,8 @@ fun GroupCreationScreen(
     isCreating: Boolean,
     onCreateGroup: (name: String, description: String) -> Unit,
     onJoinGroup: (inviteCode: String) -> Unit,
-    errorMessage: String?
+    errorMessage: String?,
+    onDismiss: (() -> Unit)? = null
 ) {
     var groupName by remember { mutableStateOf("") }
     var groupDescription by remember { mutableStateOf("") }
@@ -329,8 +331,8 @@ fun GroupCreationScreen(
                         onJoinGroup(inviteCode)
                     }
                 },
-                enabled = (selectedTab == 0 && groupName.isNotBlank()) || 
-                          (selectedTab == 1 && inviteCode.isNotBlank()) && !isCreating,
+                enabled = ((selectedTab == 0 && groupName.isNotBlank()) ||
+                           (selectedTab == 1 && inviteCode.isNotBlank())) && !isCreating,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
@@ -389,6 +391,25 @@ fun GroupCreationScreen(
             }
             
             Spacer(modifier = Modifier.height(32.dp))
+        }
+
+        // Close/Dismiss button in top-right corner
+        if (onDismiss != null) {
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+                    .size(36.dp)
+                    .background(Color.Gray.copy(alpha = 0.1f), CircleShape)
+            ) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = "닫기",
+                    tint = Color.Gray,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
     }
 }

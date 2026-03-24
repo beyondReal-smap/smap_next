@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -42,6 +43,10 @@ class RegisterViewModel @Inject constructor(
         private val SMS_API_URL = "${BuildConfig.API_BASE_URL}sms/send-verification-code"
         private val CHECK_PHONE_API_URL = "${BuildConfig.API_BASE_URL}members/check/phone/"
         private val REGISTER_API_URL = "${BuildConfig.API_BASE_URL}auth/register"
+        private val client = OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .build()
     }
 
     // UI State
@@ -74,13 +79,13 @@ class RegisterViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(RegisterUiState())
     val uiState: StateFlow<RegisterUiState> = _uiState.asStateFlow()
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .build()
     private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true; isLenient = true }
     
     private var timerJob: Job? = null
+    private var errorJob: Job? = null
+    // TODO: Server-side verification - send the user-entered code to the server for verification
+    // instead of storing and comparing locally. Keeping client-side comparison for now until
+    // the server API supports a verify-code endpoint.
     private var sentVerificationCode: String? = null
     private var lastSentTime: Long? = null  // 재발송 제한용 (밀리초)
     
@@ -216,8 +221,8 @@ class RegisterViewModel @Inject constructor(
             return
         }
         
-        // 테스트 번호 처리
-        if (phone == "01011111111") {
+        // 테스트 번호 처리 (debug builds only)
+        if (BuildConfig.DEBUG && phone == "01011111111") {
             Log.d(TAG, "📱 테스트 번호 - 실제 SMS 발송 생략")
             sentVerificationCode = null  // 테스트 번호는 111111로 고정
             lastSentTime = System.currentTimeMillis()
@@ -232,29 +237,29 @@ class RegisterViewModel @Inject constructor(
         }
         
         _uiState.value = _uiState.value.copy(isVerificationLoading = true)
-        
-        viewModelScope.launch(Dispatchers.IO) {
+
+        viewModelScope.launch {
             try {
                 // 전화번호 중복 확인
-                val checkRequest = Request.Builder()
-                    .url("$CHECK_PHONE_API_URL$phone")
-                    .get()
-                    .build()
-                
-                val checkResponse = client.newCall(checkRequest).execute()
-                val checkBody = checkResponse.body?.string()
-                
-                Log.d(TAG, "📱 전화번호 중복 확인 응답: $checkBody")
-                Log.d(TAG, "📱 응답 코드: ${checkResponse.code}")
-                
-                // available: false 이면서 명시적으로 존재하는 경우만 기존 사용자로 처리
-                // API 응답이 {"available": true} 이거나 응답이 없으면 신규 사용자로 처리
-                val isExistingUser = checkBody?.let { body ->
-                    // available 필드가 명시적으로 false인 경우만
-                    body.contains("\"available\":false") || body.contains("\"available\": false")
-                } ?: false
-                
-                if (isExistingUser) {
+                val checkResult = withContext(Dispatchers.IO) {
+                    val checkRequest = Request.Builder()
+                        .url("$CHECK_PHONE_API_URL$phone")
+                        .get()
+                        .build()
+
+                    val checkResponse = client.newCall(checkRequest).execute()
+                    val checkBody = checkResponse.body?.string()
+
+                    Log.d(TAG, "📱 전화번호 중복 확인 응답: $checkBody")
+                    Log.d(TAG, "📱 응답 코드: ${checkResponse.code}")
+
+                    // available: false 이면서 명시적으로 존재하는 경우만 기존 사용자로 처리
+                    checkBody?.let { body ->
+                        body.contains("\"available\":false") || body.contains("\"available\": false")
+                    } ?: false
+                }
+
+                if (checkResult) {
                     Log.d(TAG, "⚠️ 이미 가입된 전화번호 감지")
                     _uiState.value = _uiState.value.copy(
                         isVerificationLoading = false,
@@ -263,38 +268,42 @@ class RegisterViewModel @Inject constructor(
                     )
                     return@launch
                 }
-                
+
                 Log.d(TAG, "✅ 신규 전화번호 - SMS 발송 진행")
-                
+
                 // SMS 발송
-                val requestBody = """{"phone_number":"$phone"}"""
-                    .toRequestBody("application/json".toMediaType())
-                
-                val smsRequest = Request.Builder()
-                    .url(SMS_API_URL)
-                    .post(requestBody)
-                    .build()
-                
-                val smsResponse = client.newCall(smsRequest).execute()
-                val smsBody = smsResponse.body?.string()
-                
-                Log.d(TAG, "SMS 응답: $smsBody")
-                
-                if (smsResponse.isSuccessful && smsBody?.contains("\"success\":true") == true) {
+                val smsResult = withContext(Dispatchers.IO) {
+                    val requestBody = """{"phone_number":"$phone"}"""
+                        .toRequestBody("application/json".toMediaType())
+
+                    val smsRequest = Request.Builder()
+                        .url(SMS_API_URL)
+                        .post(requestBody)
+                        .build()
+
+                    val smsResponse = client.newCall(smsRequest).execute()
+                    val smsBody = smsResponse.body?.string()
+
+                    Log.d(TAG, "SMS 응답: $smsBody")
+                    Pair(smsResponse.isSuccessful, smsBody)
+                }
+
+                val (isSuccessful, smsBody) = smsResult
+                if (isSuccessful && smsBody?.contains("\"success\":true") == true) {
                     // 백엔드에서 반환된 인증번호 저장 (iOS와 동일하게 'code' 필드 파싱)
                     val codeMatch = Regex("\"code\"\\s*:\\s*\"?(\\d+)\"?").find(smsBody ?: "")
                     sentVerificationCode = codeMatch?.groupValues?.get(1)
                     lastSentTime = System.currentTimeMillis()
-                    
+
                     Log.d(TAG, "✅ 인증번호 발송 성공 - 코드 저장됨: ${sentVerificationCode != null}")
-                    
+
                     _uiState.value = _uiState.value.copy(
                         isVerificationLoading = false,
                         verificationSent = true,
                         verificationTimer = 180,  // 3분
                         currentStep = RegisterStep.VERIFICATION
                     )
-                    
+
                     startTimer()
                 } else {
                     _uiState.value = _uiState.value.copy(isVerificationLoading = false)
@@ -323,8 +332,8 @@ class RegisterViewModel @Inject constructor(
             return
         }
         
-        // 테스트 번호 처리
-        if (phone == "01011111111") {
+        // 테스트 번호 처리 (debug builds only)
+        if (BuildConfig.DEBUG && phone == "01011111111") {
             if (inputCode == "111111") {
                 Log.d(TAG, "✅ 테스트 번호 인증 성공")
                 timerJob?.cancel()
@@ -491,7 +500,7 @@ class RegisterViewModel @Inject constructor(
             RegisterStep.PHONE -> RegisterStep.TERMS
             RegisterStep.VERIFICATION -> RegisterStep.PHONE
             RegisterStep.BASIC_INFO -> {
-                if (isSocialAccount) RegisterStep.TERMS else RegisterStep.PHONE
+                if (isSocialAccount) RegisterStep.TERMS else RegisterStep.VERIFICATION
             }
             RegisterStep.PROFILE -> RegisterStep.BASIC_INFO
             RegisterStep.COMPLETE -> return
@@ -503,29 +512,34 @@ class RegisterViewModel @Inject constructor(
     
     private fun completeRegistration() {
         _uiState.value = _uiState.value.copy(isLoading = true)
-        
-        viewModelScope.launch(Dispatchers.IO) {
+
+        viewModelScope.launch {
             try {
-                val requestBody = json.encodeToString(_uiState.value.registerData)
-                    .toRequestBody("application/json".toMediaType())
-                
-                val request = Request.Builder()
-                    .url(REGISTER_API_URL)
-                    .post(requestBody)
-                    .build()
-                
-                val response = client.newCall(request).execute()
-                val body = response.body?.string()
-                
-                Log.d(TAG, "회원가입 응답: $body")
-                
-                if (response.isSuccessful && body?.contains("\"success\":true") == true) {
+                val result = withContext(Dispatchers.IO) {
+                    val requestBody = json.encodeToString(_uiState.value.registerData)
+                        .toRequestBody("application/json".toMediaType())
+
+                    val request = Request.Builder()
+                        .url(REGISTER_API_URL)
+                        .post(requestBody)
+                        .build()
+
+                    val response = client.newCall(request).execute()
+                    val body = response.body?.string()
+
+                    Log.d(TAG, "회원가입 응답: $body")
+                    Triple(response.isSuccessful, response.code, body)
+                }
+
+                val (isSuccessful, responseCode, body) = result
+
+                if (isSuccessful && body?.contains("\"success\":true") == true) {
                     // 토큰 저장
                     val tokenMatch = Regex("\"token\":\"([^\"]+)\"").find(body)
                     tokenMatch?.groupValues?.get(1)?.let { token ->
                         authService.saveToken(token)
                     }
-                    
+
                     // 사용자 데이터 저장
                     try {
                         val parsed = json.parseToJsonElement(body).jsonObject
@@ -542,7 +556,7 @@ class RegisterViewModel @Inject constructor(
                     } catch (e: Exception) {
                         Log.e(TAG, "사용자 데이터 파싱 오류", e)
                     }
-                    
+
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         currentStep = RegisterStep.COMPLETE,
@@ -550,12 +564,12 @@ class RegisterViewModel @Inject constructor(
                     )
                 } else {
                     _uiState.value = _uiState.value.copy(isLoading = false)
-                    
-                    val errorMessage = if (response.code == 409) {
+
+                    val errorMessage = if (responseCode == 409) {
                         Log.w(TAG, "회원가입 중복 오류 (409): $body")
                         "이미 가입된 정보(전화번호, 이메일 등)가 있거나\n이미 사용 중인 닉네임입니다."
                     } else {
-                        Log.w(TAG, "회원가입 실패 (${response.code}): $body")
+                        Log.w(TAG, "회원가입 실패 ($responseCode): $body")
                         Regex("\"message\":\"([^\"]+)\"").find(body ?: "")
                             ?.groupValues?.get(1) ?: "회원가입에 실패했습니다"
                     }
@@ -573,31 +587,27 @@ class RegisterViewModel @Inject constructor(
     
     fun applySocialData(data: Map<String, String>?) {
         if (data == null) return
-        
+
+        val nickname = data["nickname"] ?: data["name"] ?: ""
+
+        // Determine type and id based on provider
+        val (mtType, mtId) = when (data["provider"]) {
+            "google" -> 4 to "google_${data["google_id"] ?: ""}"
+            "kakao" -> 2 to "kakao_${data["kakao_id"] ?: ""}"
+            else -> _uiState.value.registerData.mtType to _uiState.value.registerData.mtId
+        }
+
         val registerData = _uiState.value.registerData.copy(
             mtEmail = data["email"],
             mtName = data["name"] ?: "",
+            mtNickname = nickname,
             mtGoogleId = data["google_id"],
             mtKakaoId = data["kakao_id"],
-            mtFile1 = data["picture"] ?: data["profile_image"]
+            mtFile1 = data["picture"] ?: data["profile_image"],
+            mtType = mtType,
+            mtId = mtId
         )
-        
-        // provider에 따라 mt_type 설정
-        when (data["provider"]) {
-            "google" -> {
-                registerData.mtType = 4
-                registerData.mtId = "google_${data["google_id"] ?: ""}"
-            }
-            "kakao" -> {
-                registerData.mtType = 2
-                registerData.mtId = "kakao_${data["kakao_id"] ?: ""}"
-            }
-        }
-        
-        // 닉네임과 이름이 모두 비어있는 경우 방지
-        val nickname = data["nickname"] ?: data["name"] ?: ""
-        registerData.mtNickname = nickname
-        
+
         _uiState.value = _uiState.value.copy(registerData = registerData)
     }
     
@@ -613,8 +623,9 @@ class RegisterViewModel @Inject constructor(
             errorMessage = message,
             showError = true
         )
-        
-        viewModelScope.launch {
+
+        errorJob?.cancel()
+        errorJob = viewModelScope.launch {
             delay(3000)
             _uiState.value = _uiState.value.copy(showError = false)
         }

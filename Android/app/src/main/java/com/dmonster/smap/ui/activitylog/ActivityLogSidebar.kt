@@ -50,8 +50,8 @@ fun ActivityMemberSidebar(
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Calculate last 14 days for heatmap
-    val today = remember { java.time.LocalDate.now() }
+    // Calculate last 14 days for heatmap (recalculates across midnight)
+    val today = remember(System.currentTimeMillis() / 86400000) { java.time.LocalDate.now() }
     val heatmapDates = remember(today) {
         (0..13).map { today.minusDays((13 - it).toLong()) }
     }
@@ -275,7 +275,7 @@ fun ActivityMemberCard(
                 } else null
             } catch (e: Exception) { null }
         }.toSet()
-        android.util.Log.d("ActivityComponents", "Member ${member.mtIdx} Active Dates: ${parsed.size} (Sample: ${parsed.firstOrNull()}) from ${dailyCounts.size} raw items")
+        if (BuildConfig.DEBUG) android.util.Log.d("ActivityComponents", "Member ${member.mtIdx} Active Dates: ${parsed.size} (Sample: ${parsed.firstOrNull()}) from ${dailyCounts.size} raw items")
         parsed
     }
 
@@ -301,13 +301,13 @@ fun ActivityMemberCard(
                     // Avatar
                     Box(modifier = Modifier.size(48.dp)) {
                         val imageUrl = remember(member.mtFile1) {
-                            if (!member.mtFile1.isNullOrBlank()) {
+                            member.mtFile1?.takeIf { it.isNotBlank() }?.let { file ->
                                 when {
-                                    member.mtFile1!!.startsWith("http") -> member.mtFile1
-                                    member.mtFile1!!.startsWith("/images/") -> "${BuildConfig.IMAGE_BASE_URL}${member.mtFile1}"
-                                    else -> "${BuildConfig.IMAGE_BASE_URL}/images/${member.mtFile1}"
+                                    file.startsWith("http") -> file
+                                    file.startsWith("/images/") -> "${BuildConfig.IMAGE_BASE_URL}$file"
+                                    else -> "${BuildConfig.IMAGE_BASE_URL}/images/$file"
                                 }
-                            } else null
+                            }
                         }
 
                         Box(
@@ -414,7 +414,7 @@ fun ActivityHeatmap(
 
     val indigoColor = Color(0xFF6366F1)
     val pinkColor = Color(0xFFEC4899)
-    val today = remember { java.time.LocalDate.now() }
+    val today = remember(System.currentTimeMillis() / 86400000) { java.time.LocalDate.now() }
 
     Column(
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -427,13 +427,22 @@ fun ActivityHeatmap(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
+            val koreanDayLabels = mapOf(
+                java.time.DayOfWeek.MONDAY to "월",
+                java.time.DayOfWeek.TUESDAY to "화",
+                java.time.DayOfWeek.WEDNESDAY to "수",
+                java.time.DayOfWeek.THURSDAY to "목",
+                java.time.DayOfWeek.FRIDAY to "금",
+                java.time.DayOfWeek.SATURDAY to "토",
+                java.time.DayOfWeek.SUNDAY to "일"
+            )
             dates.takeLast(7).forEach { date ->
                 val dayOfWeek = date.dayOfWeek
                 val isSunday = dayOfWeek == java.time.DayOfWeek.SUNDAY
                 val isSaturday = dayOfWeek == java.time.DayOfWeek.SATURDAY
 
                 Text(
-                    text = dayOfWeek.name.first().toString(),
+                    text = koreanDayLabels[dayOfWeek] ?: dayOfWeek.name.first().toString(),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = when {
@@ -523,12 +532,8 @@ fun HeatmapCell(
                     isSelectedDate -> Brush.linearGradient(
                         colors = listOf(pinkColor, roseColor)
                     )
-                    isActive -> Brush.linearGradient(
-                        colors = listOf(indigoColor.copy(alpha = 0.8f), indigoColor.copy(alpha = 0.8f))
-                    )
-                    else -> Brush.linearGradient(
-                        colors = listOf(Color.Gray.copy(alpha = 0.1f), Color.Gray.copy(alpha = 0.1f))
-                    )
+                    isActive -> androidx.compose.ui.graphics.SolidColor(indigoColor.copy(alpha = 0.8f))
+                    else -> androidx.compose.ui.graphics.SolidColor(Color.Gray.copy(alpha = 0.1f))
                 },
                 RoundedCornerShape(4.dp)
             )

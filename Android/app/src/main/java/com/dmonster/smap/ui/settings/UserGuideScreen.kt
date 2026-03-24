@@ -1,5 +1,6 @@
 package com.dmonster.smap.ui.settings
 
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
@@ -170,6 +171,8 @@ fun GuideVideoItem(video: GuideVideo) {
 
 @Composable
 fun YouTubePlayerCompose(url: String) {
+    val trustedDomains = listOf("youtube.com", "www.youtube.com", "youtu.be", "www.youtube-nocookie.com")
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -181,11 +184,23 @@ fun YouTubePlayerCompose(url: String) {
                 WebView(context).apply {
                     settings.javaScriptEnabled = true
                     settings.mediaPlaybackRequiresUserGesture = false
-                    webViewClient = WebViewClient()
+                    webViewClient = object : WebViewClient() {
+                        override fun shouldOverrideUrlLoading(
+                            view: WebView?,
+                            request: WebResourceRequest?
+                        ): Boolean {
+                            val host = request?.url?.host ?: return true
+                            return !trustedDomains.any { host.endsWith(it) }
+                        }
+                    }
                     loadUrl(url)
                 }
             },
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
+            onRelease = { webView ->
+                webView.stopLoading()
+                webView.destroy()
+            }
         )
     }
 }

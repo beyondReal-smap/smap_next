@@ -1,6 +1,7 @@
 package com.dmonster.smap.ui.register
 
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -35,8 +36,12 @@ class RegisterActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         
         // 소셜 로그인 데이터 가져오기
-        @Suppress("UNCHECKED_CAST")
-        val socialData = intent.getSerializableExtra(EXTRA_SOCIAL_DATA) as? HashMap<String, String>
+        val socialData = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent.getSerializableExtra(EXTRA_SOCIAL_DATA, HashMap::class.java) as? HashMap<String, String>
+        } else {
+            @Suppress("DEPRECATION", "UNCHECKED_CAST")
+            intent.getSerializableExtra(EXTRA_SOCIAL_DATA) as? HashMap<String, String>
+        }
         
         setContent {
             SmapTheme {
@@ -69,10 +74,15 @@ class RegisterActivity : ComponentActivity() {
         val intent = Intent(this, MainActivity::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
-        overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            overrideActivityTransition(OVERRIDE_TRANSITION_OPEN, android.R.anim.fade_in, android.R.anim.fade_out)
+        } else {
+            @Suppress("DEPRECATION")
+            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
+        }
         finish()
     }
-    
+
     private fun navigateToLogin(prefilledPhone: String?) {
         val intent = Intent(this, LoginActivity::class.java)
         prefilledPhone?.let {
@@ -80,7 +90,12 @@ class RegisterActivity : ComponentActivity() {
         }
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
-        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            overrideActivityTransition(OVERRIDE_TRANSITION_OPEN, android.R.anim.fade_in, android.R.anim.fade_out)
+        } else {
+            @Suppress("DEPRECATION")
+            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
+        }
         finish()
     }
 }

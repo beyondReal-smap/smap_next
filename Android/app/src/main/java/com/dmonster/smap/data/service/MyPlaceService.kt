@@ -6,6 +6,9 @@ import com.dmonster.smap.data.model.*
 
 /**
  * MyPlace (saved-location) service (delegates to SmapApi via Retrofit).
+ *
+ * NOTE: Methods intentionally do NOT catch exceptions.
+ * Errors propagate to the ViewModel's safeApiCall wrapper for proper handling.
  */
 class MyPlaceService(private val api: SmapApi) {
 
@@ -17,14 +20,9 @@ class MyPlaceService(private val api: SmapApi) {
      * GET /locations/member/{memberId}
      */
     suspend fun getLocations(memberId: Int): List<SavedLocation> {
-        return try {
-            val locations = api.getLocations(memberId)
-            Log.d(TAG, "[getLocations] ${locations.size} locations loaded")
-            locations
-        } catch (e: Exception) {
-            Log.e(TAG, "[getLocations] error", e)
-            emptyList()
-        }
+        val locations = api.getLocations(memberId)
+        Log.d(TAG, "[getLocations] ${locations.size} locations loaded")
+        return locations
     }
 
     /**
@@ -40,25 +38,20 @@ class MyPlaceService(private val api: SmapApi) {
         memo: String? = null,
         enterAlarm: String? = "Y"
     ): SavedLocation? {
-        return try {
-            val body = mutableMapOf<String, Any>(
-                "mt_idx" to memberId,
-                "sgt_idx" to groupId,
-                "slt_title" to title,
-                "slt_add" to address,
-                "slt_lat" to lat,
-                "slt_long" to lng
-            )
-            memo?.let { body["slt_memo"] = it }
-            enterAlarm?.let { body["slt_enter_alarm"] = it }
+        val body = CreateLocationRequest(
+            mtIdx = memberId,
+            sgtIdx = groupId,
+            sltTitle = title,
+            sltAdd = address,
+            sltLat = lat,
+            sltLong = lng,
+            sltMemo = memo,
+            sltEnterAlarm = enterAlarm
+        )
 
-            val location = api.createLocation(body)
-            Log.d(TAG, "[createLocation] created: ${location.name}")
-            location
-        } catch (e: Exception) {
-            Log.e(TAG, "[createLocation] error", e)
-            null
-        }
+        val location = api.createLocation(body)
+        Log.d(TAG, "[createLocation] created: ${location.name}")
+        return location
     }
 
     /**
@@ -73,36 +66,26 @@ class MyPlaceService(private val api: SmapApi) {
         memo: String? = null,
         enterAlarm: String? = null
     ): Boolean {
-        return try {
-            val body = mutableMapOf<String, Any>(
-                "slt_title" to title,
-                "slt_add" to address,
-                "slt_lat" to lat,
-                "slt_long" to lng
-            )
-            memo?.let { body["slt_memo"] = it }
-            enterAlarm?.let { body["slt_enter_alarm"] = it }
+        val body = UpdateLocationRequest(
+            sltTitle = title,
+            sltAdd = address,
+            sltLat = lat,
+            sltLong = lng,
+            sltMemo = memo,
+            sltEnterAlarm = enterAlarm
+        )
 
-            api.updateLocation(locationId, body)
-            Log.d(TAG, "[updateLocation] updated")
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "[updateLocation] error", e)
-            false
-        }
+        api.updateLocation(locationId, body)
+        Log.d(TAG, "[updateLocation] updated")
+        return true
     }
 
     /**
      * DELETE /locations/{locationId}
      */
     suspend fun deleteLocation(locationId: Int): Boolean {
-        return try {
-            api.deleteLocation(locationId)
-            Log.d(TAG, "[deleteLocation] deleted")
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "[deleteLocation] error", e)
-            false
-        }
+        api.deleteLocation(locationId)
+        Log.d(TAG, "[deleteLocation] deleted")
+        return true
     }
 }

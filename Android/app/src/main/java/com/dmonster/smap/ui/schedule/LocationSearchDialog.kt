@@ -21,8 +21,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.dmonster.smap.data.model.KakaoPlace
 import com.dmonster.smap.data.service.KakaoLocationService
-import com.dmonster.smap.data.service.KakaoPlace
 import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.SuiteFont
 import kotlinx.coroutines.launch
@@ -131,7 +131,7 @@ fun LocationSearchDialog(
                 }
             }
 
-            Divider(color = Color.Gray.copy(alpha = 0.1f))
+            HorizontalDivider(color = Color.Gray.copy(alpha = 0.1f))
 
             // Result List
             Box(modifier = Modifier.weight(1f)) {

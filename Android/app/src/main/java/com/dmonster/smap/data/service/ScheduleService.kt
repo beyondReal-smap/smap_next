@@ -6,6 +6,9 @@ import com.dmonster.smap.data.model.*
 
 /**
  * Schedule management service (delegates to SmapApi via Retrofit).
+ *
+ * NOTE: Methods intentionally do NOT catch exceptions.
+ * Errors propagate to the ViewModel's safeApiCall wrapper for proper handling.
  */
 class ScheduleService(
     private val api: SmapApi,
@@ -34,38 +37,28 @@ class ScheduleService(
      * GET /schedules/group/{groupId}?days=60, then client-side filter by year/month.
      */
     suspend fun getSchedules(groupId: Int, year: Int, month: Int): List<SmapSchedule> {
-        return try {
-            val startDate = String.format("%04d-%02d-01", year, month)
-            val nextMonth = if (month == 12) 1 else month + 1
-            val nextYear = if (month == 12) year + 1 else year
-            val endDate = String.format("%04d-%02d-01", nextYear, nextMonth)
+        val startDate = String.format("%04d-%02d-01", year, month)
+        val nextMonth = if (month == 12) 1 else month + 1
+        val nextYear = if (month == 12) year + 1 else year
+        val endDate = String.format("%04d-%02d-01", nextYear, nextMonth)
 
-            val schedules = api.getGroupSchedules(groupId, 60)
+        val schedules = api.getGroupSchedules(groupId, 60)
 
-            val filtered = schedules.filter { schedule ->
-                val date = schedule.date ?: return@filter false
-                val isVisible = schedule.sstShow?.uppercase() == "Y"
-                isVisible && date >= startDate && date < endDate
-            }
-
-            Log.d(TAG, "[getSchedules] ${filtered.size} schedules (total: ${schedules.size})")
-            filtered
-        } catch (e: Exception) {
-            Log.e(TAG, "[getSchedules] error", e)
-            emptyList()
+        val filtered = schedules.filter { schedule ->
+            val date = schedule.date ?: return@filter false
+            val isVisible = schedule.sstShow?.uppercase() == "Y"
+            isVisible && date >= startDate && date < endDate
         }
+
+        Log.d(TAG, "[getSchedules] ${filtered.size} schedules (total: ${schedules.size})")
+        return filtered
     }
 
     /**
      * GET /schedules/{scheduleId}
      */
     suspend fun getScheduleDetail(scheduleId: String): SmapSchedule? {
-        return try {
-            api.getScheduleDetail(scheduleId)
-        } catch (e: Exception) {
-            Log.e(TAG, "[getScheduleDetail] error", e)
-            null
-        }
+        return api.getScheduleDetail(scheduleId)
     }
 
     /**
@@ -85,29 +78,24 @@ class ScheduleService(
         alarmTime: String? = null,
         repeatConfig: String? = null
     ): SmapSchedule? {
-        return try {
-            val body = mutableMapOf<String, Any>(
-                "sgt_idx" to groupId,
-                "mt_idx" to memberId,
-                "sst_title" to title,
-                "sst_sdate" to startDate,
-                "sst_edate" to endDate,
-                "sst_all_day" to if (isAllDay) "Y" else "N",
-                "sst_alram" to (mapAlarmStringToMinutes(alarmTime) ?: 0)
-            )
-            memo?.let { body["sst_memo"] = it }
-            locationName?.let { body["sst_location_title"] = it }
-            locationLat?.let { body["sst_location_lat"] = it }
-            locationLng?.let { body["sst_location_long"] = it }
-            repeatConfig?.let { body["sst_repeat_json_v"] = it }
+        val body = CreateScheduleRequest(
+            sgtIdx = groupId,
+            mtIdx = memberId,
+            sstTitle = title,
+            sstSdate = startDate,
+            sstEdate = endDate,
+            sstAllDay = if (isAllDay) "Y" else "N",
+            sstAlram = mapAlarmStringToMinutes(alarmTime) ?: 0,
+            sstMemo = memo,
+            sstLocationTitle = locationName,
+            sstLocationLat = locationLat,
+            sstLocationLong = locationLng,
+            sstRepeatJsonV = repeatConfig
+        )
 
-            val schedule = api.createSchedule(body)
-            Log.d(TAG, "[createSchedule] created: ${schedule.displayTitle}")
-            schedule
-        } catch (e: Exception) {
-            Log.e(TAG, "[createSchedule] error", e)
-            null
-        }
+        val schedule = api.createSchedule(body)
+        Log.d(TAG, "[createSchedule] created: ${schedule.displayTitle}")
+        return schedule
     }
 
     /**
@@ -130,37 +118,32 @@ class ScheduleService(
         groupId: Int = 0,
         editOption: String = "this"
     ): Boolean {
-        return try {
-            val currentUserId = authService.getMtIdx().toString()
-            val user = authService.getUserData()
+        val currentUserId = authService.getMtIdx().toString()
+        val user = authService.getUserData()
 
-            val body = mutableMapOf<String, Any>(
-                "sst_idx" to scheduleId,
-                "groupId" to groupId,
-                "sst_pidx" to (parentIdx ?: 0),
-                "sst_title" to title,
-                "sst_sdate" to startDate,
-                "sst_edate" to endDate,
-                "sst_all_day" to if (isAllDay) "Y" else "N",
-                "editOption" to editOption,
-                "editorId" to currentUserId,
-                "editorName" to (user?.mtName ?: ""),
-                "sst_alram" to (mapAlarmStringToMinutes(alarmTime) ?: 0)
-            )
-            memo?.let { body["sst_memo"] = it }
-            locationName?.let { body["sst_location_title"] = it }
-            locationLat?.let { body["sst_location_lat"] = it }
-            locationLng?.let { body["sst_location_long"] = it }
-            repeatJson?.let { body["sst_repeat_json"] = it }
-            repeatConfig?.let { body["sst_repeat_json_v"] = it }
+        val body = UpdateScheduleRequest(
+            sstIdx = scheduleId,
+            groupId = groupId,
+            sstPidx = parentIdx ?: 0,
+            sstTitle = title,
+            sstSdate = startDate,
+            sstEdate = endDate,
+            sstAllDay = if (isAllDay) "Y" else "N",
+            editOption = editOption,
+            editorId = currentUserId,
+            editorName = user?.mtName ?: "",
+            sstAlram = mapAlarmStringToMinutes(alarmTime) ?: 0,
+            sstMemo = memo,
+            sstLocationTitle = locationName,
+            sstLocationLat = locationLat,
+            sstLocationLong = locationLng,
+            sstRepeatJson = repeatJson,
+            sstRepeatJsonV = repeatConfig
+        )
 
-            api.updateSchedule(groupId, scheduleId, currentUserId, body)
-            Log.d(TAG, "[updateSchedule] updated")
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "[updateSchedule] error", e)
-            false
-        }
+        api.updateSchedule(groupId, scheduleId, currentUserId, body)
+        Log.d(TAG, "[updateSchedule] updated")
+        return true
     }
 
     /**
@@ -171,21 +154,16 @@ class ScheduleService(
         groupId: Int,
         deleteOption: String = "this"
     ): Boolean {
-        return try {
-            val currentUserId = authService.getMtIdx().toString()
+        val currentUserId = authService.getMtIdx().toString()
 
-            val body = mapOf<String, Any>(
-                "sst_idx" to scheduleId,
-                "groupId" to groupId,
-                "deleteOption" to deleteOption
-            )
+        val body = DeleteScheduleRequest(
+            sstIdx = scheduleId,
+            groupId = groupId,
+            deleteOption = deleteOption
+        )
 
-            api.deleteSchedule(groupId, scheduleId, currentUserId, body)
-            Log.d(TAG, "[deleteSchedule] deleted")
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "[deleteSchedule] error", e)
-            false
-        }
+        api.deleteSchedule(groupId, scheduleId, currentUserId, body)
+        Log.d(TAG, "[deleteSchedule] deleted")
+        return true
     }
 }

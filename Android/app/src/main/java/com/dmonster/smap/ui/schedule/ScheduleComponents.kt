@@ -43,15 +43,15 @@ import java.util.*
 
 // MARK: - Schedule Status
 
-enum class ScheduleStatus(val label: String, val color: Color, val bgColor: Color) {
+enum class ScheduleStatusUI(val label: String, val color: Color, val bgColor: Color) {
     UPCOMING("예정", Color(0xFF2563EB), Color(0xFFDBEAFE)),
     ONGOING("진행중", Color(0xFF16A34A), Color(0xFFDCFCE7)),
     COMPLETED("완료", Color(0xFF6B7280), Color(0xFFF3F4F6))
 }
 
-fun getScheduleStatus(schedule: SmapSchedule): ScheduleStatus {
+fun getScheduleStatusUI(schedule: SmapSchedule): ScheduleStatusUI {
     val now = LocalDateTime.now()
-    val dateStr = schedule.date ?: return ScheduleStatus.UPCOMING
+    val dateStr = schedule.date ?: return ScheduleStatusUI.UPCOMING
     
     return try {
         val startTime = if (dateStr.length >= 16) {
@@ -68,12 +68,12 @@ fun getScheduleStatus(schedule: SmapSchedule): ScheduleStatus {
         }
         
         when {
-            now.isBefore(startTime) -> ScheduleStatus.UPCOMING
-            now.isAfter(endTime) -> ScheduleStatus.COMPLETED
-            else -> ScheduleStatus.ONGOING
+            now.isBefore(startTime) -> ScheduleStatusUI.UPCOMING
+            now.isAfter(endTime) -> ScheduleStatusUI.COMPLETED
+            else -> ScheduleStatusUI.ONGOING
         }
     } catch (e: Exception) {
-        ScheduleStatus.UPCOMING
+        ScheduleStatusUI.UPCOMING
     }
 }
 
@@ -267,7 +267,7 @@ fun EventCard(
     modifier: Modifier = Modifier,
     canManage: Boolean = true
 ) {
-    val status = getScheduleStatus(schedule)
+    val status = getScheduleStatusUI(schedule)
     var showMenu by remember { mutableStateOf(false) }
     
     // Parse time from date string (format: 2026-01-04T10:00:00)
@@ -390,12 +390,7 @@ fun EventCard(
                         color = Color(0xFF00148C)
                     )
                     
-                    Text(
-                        text = " · family",
-                        fontSize = 13.sp,
-                        fontFamily = SuiteFont,
-                        color = Color.Gray
-                    )
+                    // Fix #14: Removed hardcoded " · family" text
                 }
                 
                 // Title
@@ -675,7 +670,7 @@ fun DateHeader(
     scheduleCount: Int = 0,
     modifier: Modifier = Modifier
 ) {
-    val formatter = DateTimeFormatter.ofPattern("M월 d일 EEEE", Locale.KOREAN)
+    val formatter = DateTimeFormatter.ofPattern("M월 d일 EEEE", Locale.KOREA)
     
     Card(
         modifier = modifier

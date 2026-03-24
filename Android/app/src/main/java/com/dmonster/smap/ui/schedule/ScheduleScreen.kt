@@ -2,6 +2,7 @@ package com.dmonster.smap.ui.schedule
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -53,6 +54,7 @@ fun ScheduleScreen(
     val showEditDialog by viewModel.showEditDialog.collectAsState()
     val showDeleteDialog by viewModel.showDeleteDialog.collectAsState()
     val isCreating by viewModel.isCreating.collectAsState()
+    val isActionLoading by viewModel.isActionLoading.collectAsState()
     val editOption by viewModel.editOption.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     
@@ -123,14 +125,25 @@ fun ScheduleScreen(
                         color = BrandColors.TextSecondary
                     )
                 }
-                
-                IconButton(onClick = { viewModel.showCreateDialog() }) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "일정 추가",
-                        tint = BrandColors.Primary,
-                        modifier = Modifier.size(28.dp)
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    // Fix #11: Group selector button to toggle the dropdown
+                    GroupSelectorButton(
+                        selectedGroup = selectedGroup,
+                        onClick = { viewModel.toggleGroupSelector() }
                     )
+
+                    IconButton(onClick = { viewModel.showCreateDialog() }) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "일정 추가",
+                            tint = BrandColors.Primary,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
                 }
             }
             
@@ -239,14 +252,31 @@ fun ScheduleScreen(
     }
 }
 
+    // Fix #5: Route recurring events through RecurringScheduleActionDialog from EventDetailDialog
     showEventDetail?.let { schedule ->
         val canManage = viewModel.canManageSchedule(schedule)
         EventDetailDialog(
             schedule = schedule,
             canEdit = canManage,
             onDismiss = { viewModel.hideEventDetail() },
-            onEdit = { viewModel.showEditDialog(schedule) },
-            onDelete = { viewModel.showDeleteDialog(schedule) }
+            onEdit = {
+                viewModel.dismissEventDetail()
+                if (schedule.isRecurring) {
+                    selectedScheduleForAction = schedule
+                    showRecurringEditDialog = true
+                } else {
+                    viewModel.showEditDialog(schedule)
+                }
+            },
+            onDelete = {
+                viewModel.dismissEventDetail()
+                if (schedule.isRecurring) {
+                    selectedScheduleForAction = schedule
+                    showRecurringDeleteDialog = true
+                } else {
+                    viewModel.showDeleteDialog(schedule)
+                }
+            }
         )
     }
     // Create Event Screen
@@ -318,11 +348,11 @@ fun ScheduleScreen(
                         editOption = editOption
                     )
                 },
-                isLoading = false
+                isLoading = isActionLoading
             )
         }
     }
-    
+
     showDeleteDialog?.let { schedule ->
         val isRepeat = !schedule.sstIdx.isNullOrEmpty() && schedule.sstIdx.contains("-")
         DeleteScheduleDialog(
@@ -332,7 +362,7 @@ fun ScheduleScreen(
             onConfirm = { deleteOption ->
                 viewModel.deleteSchedule(schedule.sstIdx, schedule.sgtIdx ?: 0, deleteOption)
             },
-            isLoading = false
+            isLoading = isActionLoading
         )
     }
     

@@ -31,7 +31,7 @@ fun EventDetailDialog(
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val status = getScheduleStatus(schedule)
+    val status = getScheduleStatusUI(schedule)
     val startTime = schedule.date?.drop(11)?.take(5) ?: "00:00"
     val endTime = schedule.sstEdate?.drop(11)?.take(5) ?: ""
     val dateStr = schedule.date?.take(10) ?: ""

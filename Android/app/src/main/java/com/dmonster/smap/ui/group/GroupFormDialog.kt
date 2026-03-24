@@ -198,8 +198,8 @@ fun EditGroupDialog(
     onUpdate: (String, String) -> Unit,
     isLoading: Boolean
 ) {
-    var name by remember { mutableStateOf(group.sgtTitle ?: "") }
-    var description by remember { mutableStateOf(group.sgtMemo ?: "") }
+    var name by remember(group.sgtIdx) { mutableStateOf(group.sgtTitle ?: "") }
+    var description by remember(group.sgtIdx) { mutableStateOf(group.sgtMemo ?: "") }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(

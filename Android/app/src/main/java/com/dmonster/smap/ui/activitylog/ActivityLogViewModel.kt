@@ -1,6 +1,7 @@
 package com.dmonster.smap.ui.activitylog
 
 import android.util.Log
+import com.dmonster.smap.BuildConfig
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dmonster.smap.data.model.LocationLog
@@ -21,6 +22,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -98,15 +100,17 @@ class ActivityLogViewModel @Inject constructor(
     private val _showMemberSidebar = MutableStateFlow(false)
     val showMemberSidebar: StateFlow<Boolean> = _showMemberSidebar.asStateFlow()
 
+    private var isLoadingGroups = false
+
     init {
         loadGroups()
-        
+
         // Global Event Observation
         viewModelScope.launch {
             GlobalEventBus.events.collect { event ->
                 when (event) {
                     is GlobalEvent.GroupsChanged -> {
-                        Log.d(TAG, "🔄 [Event] Groups changed event received, refreshing data")
+                        if (BuildConfig.DEBUG) Log.d(TAG, "[Event] Groups changed event received, refreshing data")
                         loadGroups()
                     }
                     else -> {}
@@ -118,25 +122,31 @@ class ActivityLogViewModel @Inject constructor(
     // MARK: - Data Loading
 
     private fun loadGroups() {
+        if (isLoadingGroups) return
+        isLoadingGroups = true
         viewModelScope.launch {
             _isLoading.value = true
-            when (val result = safeApiCall { groupService.getGroups() }) {
-                is ApiResult.Success -> {
-                    _groups.value = result.data
-                    if (result.data.isNotEmpty() && _selectedGroup.value == null) {
-                        selectGroup(result.data.first())
+            try {
+                when (val result = safeApiCall { groupService.getGroups() }) {
+                    is ApiResult.Success -> {
+                        _groups.value = result.data
+                        if (result.data.isNotEmpty() && _selectedGroup.value == null) {
+                            selectGroup(result.data.first())
+                        }
+                    }
+                    is ApiResult.Error -> {
+                        if (BuildConfig.DEBUG) Log.e(TAG, "그룹 로드 실패 (${result.code})")
+                        _errorMessage.value = "그룹을 불러오지 못했습니다 (${result.code})"
+                    }
+                    is ApiResult.NetworkError -> {
+                        if (BuildConfig.DEBUG) Log.e(TAG, "그룹 로드 실패 - 네트워크", result.exception)
+                        _errorMessage.value = "네트워크 연결을 확인해주세요"
                     }
                 }
-                is ApiResult.Error -> {
-                    Log.e(TAG, "❌ 그룹 로드 실패 (${result.code})")
-                    _errorMessage.value = "그룹을 불러오지 못했습니다 (${result.code})"
-                }
-                is ApiResult.NetworkError -> {
-                    Log.e(TAG, "❌ 그룹 로드 실패 - 네트워크", result.exception)
-                    _errorMessage.value = "네트워크 연결을 확인해주세요"
-                }
+            } finally {
+                _isLoading.value = false
+                isLoadingGroups = false
             }
-            _isLoading.value = false
         }
     }
 
@@ -156,8 +166,8 @@ class ActivityLogViewModel @Inject constructor(
                     // Load activity stats for all members (for sidebar heatmap) - iOS와 동일한 그룹 API 사용
                     loadMemberStats(groupId)
                 }
-                is ApiResult.Error -> Log.e(TAG, "❌ 멤버 로드 실패 (${result.code})")
-                is ApiResult.NetworkError -> Log.e(TAG, "❌ 멤버 로드 실패 - 네트워크", result.exception)
+                is ApiResult.Error -> { if (BuildConfig.DEBUG) Log.e(TAG, "멤버 로드 실패 (${result.code})") }
+                is ApiResult.NetworkError -> { if (BuildConfig.DEBUG) Log.e(TAG, "멤버 로드 실패 - 네트워크", result.exception) }
             }
         }
     }
@@ -172,19 +182,19 @@ class ActivityLogViewModel @Inject constructor(
                         val statsMap = response.memberDailyCounts.associate { memberCount ->
                             memberCount.memberId to (memberCount.dailyCounts ?: emptyList())
                         }
-                        Log.d("ActivityLogVM", "Group stats loaded: ${statsMap.size} members, Dates: ${response.startDate} ~ ${response.endDate}")
+                        if (BuildConfig.DEBUG) Log.d("ActivityLogVM", "Group stats loaded: ${statsMap.size} members, Dates: ${response.startDate} ~ ${response.endDate}")
                         _memberActivityStats.value = statsMap
                     } else {
-                        Log.w("ActivityLogVM", "No member stats returned for group $groupId")
+                        if (BuildConfig.DEBUG) Log.w("ActivityLogVM", "No member stats returned for group $groupId")
                         _memberActivityStats.value = emptyMap()
                     }
                 }
                 is ApiResult.Error -> {
-                    Log.e(TAG, "Failed to load group member stats (${result.code})")
+                    if (BuildConfig.DEBUG) Log.e(TAG, "Failed to load group member stats (${result.code})")
                     _memberActivityStats.value = emptyMap()
                 }
                 is ApiResult.NetworkError -> {
-                    Log.e(TAG, "Failed to load group member stats - network", result.exception)
+                    if (BuildConfig.DEBUG) Log.e(TAG, "Failed to load group member stats - network", result.exception)
                     _memberActivityStats.value = emptyMap()
                 }
             }
@@ -193,57 +203,40 @@ class ActivityLogViewModel @Inject constructor(
 
     fun loadActivityData() {
         val member = _selectedMember.value ?: return
-        val date = _selectedDate.value.format(dateFormatter)
+        val dateStr = _selectedDate.value.format(dateFormatter)
 
         viewModelScope.launch {
+            _isLoading.value = true
             _isLoadingLogs.value = true
-            when (val result = safeApiCall {
-                Triple(
-                    activityLogService.getLocationLogs(member.mtIdx, date),
-                    activityLogService.getLocationSummary(member.mtIdx, date),
-                    activityLogService.getStayTimes(member.mtIdx, date)
-                )
-            }) {
-                is ApiResult.Success -> {
-                    val (logs, summary, stays) = result.data
-                    _locationLogs.value = logs.filter { it.hasValidCoordinates }
-                    _locationSummary.value = summary
-                    _stayTimes.value = stays
-                    _sliderValue.value = 0.0 // Reset slider to start on new data
-                    Log.d(TAG, "✅ ${logs.size}개 로그, 요약: ${summary?.distanceFormatted}")
+            try {
+                val logsDeferred = async { safeApiCall { activityLogService.getLocationLogs(member.mtIdx, dateStr) } }
+                val summaryDeferred = async { safeApiCall { activityLogService.getLocationSummary(member.mtIdx, dateStr) } }
+                val stayTimesDeferred = async { safeApiCall { activityLogService.getStayTimes(member.mtIdx, dateStr) } }
+
+                when (val result = logsDeferred.await()) {
+                    is ApiResult.Success -> {
+                        _locationLogs.value = result.data.filter { it.hasValidCoordinates }
+                        _sliderValue.value = 0.0
+                    }
+                    is ApiResult.Error -> _errorMessage.value = "활동 데이터를 불러오지 못했습니다 (${result.code})"
+                    is ApiResult.NetworkError -> _errorMessage.value = "네트워크 연결을 확인해주세요"
                 }
-                is ApiResult.Error -> {
-                    Log.e(TAG, "❌ 활동 데이터 로드 실패 (${result.code})")
-                    _errorMessage.value = "활동 데이터를 불러오지 못했습니다 (${result.code})"
+                when (val result = summaryDeferred.await()) {
+                    is ApiResult.Success -> _locationSummary.value = result.data
+                    else -> { /* error already handled above */ }
                 }
-                is ApiResult.NetworkError -> {
-                    Log.e(TAG, "❌ 활동 데이터 로드 실패 - 네트워크", result.exception)
-                    _errorMessage.value = "네트워크 연결을 확인해주세요"
+                when (val result = stayTimesDeferred.await()) {
+                    is ApiResult.Success -> _stayTimes.value = result.data
+                    else -> { /* error already handled above */ }
                 }
+            } finally {
+                _isLoading.value = false
+                _isLoadingLogs.value = false
             }
-            _isLoadingLogs.value = false
         }
     }
 
     // MARK: - Date Navigation
-
-    fun goToPreviousDay() {
-        _selectedDate.value = _selectedDate.value.minusDays(1)
-        loadActivityData()
-    }
-
-    fun goToNextDay() {
-        val tomorrow = _selectedDate.value.plusDays(1)
-        if (!tomorrow.isAfter(LocalDate.now())) {
-            _selectedDate.value = tomorrow
-            loadActivityData()
-        }
-    }
-
-    fun goToToday() {
-        _selectedDate.value = LocalDate.now()
-        loadActivityData()
-    }
 
     fun selectDate(date: LocalDate) {
         if (!date.isAfter(LocalDate.now())) {
@@ -313,10 +306,6 @@ class ActivityLogViewModel @Inject constructor(
         val formatter = DateTimeFormatter.ofPattern("M월 d일 (E)", java.util.Locale.KOREAN)
         return date.format(formatter)
     }
-
-    fun isToday(): Boolean = _selectedDate.value == LocalDate.now()
-    
-    fun canGoNext(): Boolean = !_selectedDate.value.plusDays(1).isAfter(LocalDate.now())
 
     fun clearError() {
         _errorMessage.value = null

@@ -35,9 +35,10 @@ object ActivityLogMarkerUtils {
             textAlign = Paint.Align.CENTER
         }
 
+        val density = context.resources.displayMetrics.density
         val durationPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = AndroidColor.WHITE
-            textSize = 28f // Fixed size for duration label
+            textSize = 28f * density // Density-scaled size for duration label
             typeface = suiteMedium ?: Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
             textAlign = Paint.Align.CENTER
         }
@@ -63,7 +64,6 @@ object ActivityLogMarkerUtils {
 
         // 4. Draw Circle (Marker) with Border
         val circleX = markerSizePx / 2 + margin / 2
-        val density = context.resources.displayMetrics.density
         val borderWidth = 1.5f * density
         
         // Outer Border (White)

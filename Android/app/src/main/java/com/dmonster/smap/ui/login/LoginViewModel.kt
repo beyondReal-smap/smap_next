@@ -27,7 +27,10 @@ data class LoginUiState(
     val isLoggedIn: Boolean = false,
     val isNewUser: Boolean = false,
     val socialLoginData: Map<String, String>? = null
-)
+) {
+    val isInputValid: Boolean
+        get() = phoneNumber.length >= 10 && password.isNotEmpty()
+}
 
 /**
  * 로그인 ViewModel (iOS LoginViewModel 기반)
@@ -64,36 +67,10 @@ class LoginViewModel @Inject constructor(
     }
     
     /**
-     * 입력값 유효성 검사
-     */
-    val isInputValid: Boolean
-        get() {
-            return _uiState.value.phoneNumber.length >= 10 && _uiState.value.password.isNotEmpty()
-        }
-    
-    /**
-     * 포맷된 전화번호 (표시용)
-     */
-    val formattedPhoneNumber: String
-        get() = formatPhoneNumber(_uiState.value.phoneNumber)
-    
-    /**
-     * 전화번호 포맷팅 (010-1234-5678 형식)
-     */
-    private fun formatPhoneNumber(digits: String): String {
-        return when {
-            digits.length <= 3 -> digits
-            digits.length <= 6 -> "${digits.substring(0, 3)}-${digits.substring(3)}"
-            digits.length <= 10 -> "${digits.substring(0, 3)}-${digits.substring(3, 6)}-${digits.substring(6)}"
-            else -> "${digits.substring(0, 3)}-${digits.substring(3, 7)}-${digits.substring(7)}"
-        }
-    }
-    
-    /**
      * 전화번호/비밀번호 로그인
      */
     fun login() {
-        if (!isInputValid) {
+        if (!_uiState.value.isInputValid) {
             showErrorMessage("전화번호와 비밀번호를 입력해주세요.")
             return
         }
@@ -131,9 +108,6 @@ class LoginViewModel @Inject constructor(
                     showErrorMessage("네트워크 연결을 확인해주세요")
                 }
             }
-
-            _uiState.value = _uiState.value.copy(isLoading = false)
-            Log.d("LoginViewModel", "🏁 login 종료 (isLoading = false)")
         }
     }
     
@@ -166,9 +140,6 @@ class LoginViewModel @Inject constructor(
                     showErrorMessage("네트워크 연결을 확인해주세요")
                 }
             }
-
-            _uiState.value = _uiState.value.copy(isLoading = false)
-            Log.d("LoginViewModel", "🏁 handleGoogleLoginResult 종료 (isLoading = false)")
         }
     }
     
@@ -208,9 +179,6 @@ class LoginViewModel @Inject constructor(
                     showErrorMessage("네트워크 연결을 확인해주세요")
                 }
             }
-
-            _uiState.value = _uiState.value.copy(isLoading = false)
-            Log.d("LoginViewModel", "🏁 handleKakaoLoginResult 종료 (isLoading = false)")
         }
     }
     
@@ -274,6 +242,20 @@ class LoginViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(phoneNumber = digits)
     }
     
+    /**
+     * 로그인 성공 상태 초기화 (one-shot event 소비 후 호출)
+     */
+    fun resetLoginState() {
+        _uiState.value = _uiState.value.copy(isLoggedIn = false)
+    }
+
+    /**
+     * 신규 회원 상태 초기화 (one-shot event 소비 후 호출)
+     */
+    fun resetNewUserState() {
+        _uiState.value = _uiState.value.copy(isNewUser = false)
+    }
+
     /**
      * 로딩 상태 설정 (외부용)
      */

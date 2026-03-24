@@ -1,7 +1,6 @@
 package com.dmonster.smap.ui.myplace
 
 import com.dmonster.smap.AppConstants
-import android.annotation.SuppressLint
 import android.util.Log
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
@@ -27,7 +26,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.dmonster.smap.ui.schedule.GroupSelectorDropdown
 import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.SuiteFont
 import com.naver.maps.geometry.LatLng
@@ -45,7 +43,6 @@ import com.dmonster.smap.ui.home.MapLoadingOverlay
 /**
  * 내장소 화면 - 지도 + 장소 목록
  */
-@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalNaverMapApi::class)
 @Composable
 fun MyPlaceScreen(
@@ -67,7 +64,6 @@ fun MyPlaceScreen(
     val successMessage by viewModel.successMessage.collectAsState()
     
     // Dialog States
-    val showGroupSelector by viewModel.showGroupSelector.collectAsState()
     val showMemberSidebar by viewModel.showMemberSidebar.collectAsState()
     val showAddDialog by viewModel.showAddDialog.collectAsState()
     val showEditDialog by viewModel.showEditDialog.collectAsState()
@@ -115,12 +111,15 @@ fun MyPlaceScreen(
         }
     }
     
-    // Move camera to selected location
+    // Move camera to selected location with zoom
     LaunchedEffect(selectedLocation) {
         selectedLocation?.let { location ->
             if (location.hasValidCoordinates) {
                 cameraPositionState.animate(
-                    update = CameraUpdate.scrollTo(LatLng(location.latitude, location.longitude))
+                    update = CameraUpdate.scrollAndZoomTo(
+                        LatLng(location.latitude, location.longitude),
+                        15.0
+                    )
                 )
             }
         }
@@ -158,8 +157,8 @@ fun MyPlaceScreen(
                     onMapLongClick = { _, coord ->
                         viewModel.showAddDialog(coord.latitude, coord.longitude)
                     },
-                    onMapClick = { _, coord ->
-                        viewModel.showAddDialog(coord.latitude, coord.longitude)
+                    onMapClick = { _, _ ->
+                        viewModel.clearSelection()
                     }
                 ) {
                     // Native Marker & InfoWindow Management via MapEffect
@@ -209,6 +208,9 @@ fun MyPlaceScreen(
                                 com.naver.maps.map.overlay.InfoWindow().apply {
                                     this.adapter = adapter
                                     this.anchor = android.graphics.PointF(0.5f, 0.0f)
+                                    // offsetY positions the info window above the marker.
+                                    // Values correspond to marker drawable height: selected=32dp, default=24dp,
+                                    // plus a 4dp gap so the label doesn't overlap the icon.
                                     this.offsetY = if (isSelected) -context.dpToPx(36) else -context.dpToPx(32)
                                     this.zIndex = 200
                                     this.alpha = 0.9f
@@ -227,22 +229,7 @@ fun MyPlaceScreen(
                     onSearchClick = { viewModel.showSearchScreen() }
                 )
                 
-                // Group Selector Dropdown
-                AnimatedVisibility(
-                    visible = showGroupSelector,
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically(),
-                    modifier = Modifier.padding(top = 100.dp, start = 16.dp, end = 16.dp)
-                ) {
-                    GroupSelectorDropdown(
-                        groups = groups,
-                        selectedGroup = selectedGroup,
-                        onGroupSelect = { viewModel.selectGroup(it) },
-                        onDismiss = { viewModel.hideGroupSelector() }
-                    )
-                }
-                
-                // Removed FloatingActionPlaceButton from inside Scaffold to put it above overlay
+                // Group selector is in the sidebar; no standalone overlay needed here.
 
                 // Loading overlay
                 if (isLoading) {
@@ -342,32 +329,34 @@ fun MyPlaceScreen(
             onNotificationToggle = { /* Not applicable for new items yet */ },
             isLoading = isCreating
         )
-    } else if (showEditDialog != null) {
-        val canManage = viewModel.canManageLocation(showEditDialog!!)
-        LocationDetailSheet(
-            location = showEditDialog,
-            canManage = canManage,
-            pendingInfo = pendingPlaceInfo,
-            pendingLocation = pendingLocation,
-            isNew = false,
-            onDismiss = { viewModel.hideEditDialog() },
-            onSearchClick = { viewModel.showSearchScreen() },
-            onMemberSelect = {},
-            onSave = { title, address, lat, lng, memo, alarm ->
-                viewModel.updateLocation(
-                    locationId = showEditDialog!!.sltIdx,
-                    title = title,
-                    address = address,
-                    lat = lat,
-                    lng = lng,
-                    memo = memo,
-                    enterAlarm = alarm
-                )
-            },
-            onDelete = { viewModel.showDeleteDialog(it) },
-            onNotificationToggle = { viewModel.toggleLocationNotification(it) },
-            isLoading = isLoading
-        )
+    } else {
+        showEditDialog?.let { location ->
+            val canManage = viewModel.canManageLocation(location)
+            LocationDetailSheet(
+                location = location,
+                canManage = canManage,
+                pendingInfo = pendingPlaceInfo,
+                pendingLocation = pendingLocation,
+                isNew = false,
+                onDismiss = { viewModel.hideEditDialog() },
+                onSearchClick = { viewModel.showSearchScreen() },
+                onMemberSelect = {},
+                onSave = { title, address, lat, lng, memo, alarm ->
+                    viewModel.updateLocation(
+                        locationId = location.sltIdx,
+                        title = title,
+                        address = address,
+                        lat = lat,
+                        lng = lng,
+                        memo = memo,
+                        enterAlarm = alarm
+                    )
+                },
+                onDelete = { viewModel.showDeleteDialog(it) },
+                onNotificationToggle = { viewModel.toggleLocationNotification(it) },
+                isLoading = isLoading
+            )
+        }
     }
     
     // Location Search Sheet
@@ -486,11 +475,7 @@ fun FloatingActionPlaceButton(
     }
 }
 
-// Extension functions for DP/PX conversion
+// Extension function for DP/PX conversion
 fun android.content.Context.dpToPx(dp: Int): Int {
     return (dp * resources.displayMetrics.density).toInt()
-}
-
-fun android.content.Context.pxToDp(px: Int): Int {
-    return (px / resources.displayMetrics.density).toInt()
 }

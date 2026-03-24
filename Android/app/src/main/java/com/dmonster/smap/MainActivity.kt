@@ -45,7 +45,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val isLoggedIn = authService.isLoggedIn
 
-        Log.d(TAG, "[AUTH_GUARD] Check: $isLoggedIn (Token=${authService.getToken()?.take(5)}..., User=${authService.getUserData()?.displayName})")
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "[AUTH_GUARD] Check: $isLoggedIn (Token=${authService.getToken()?.take(5)}..., User=${authService.getUserData()?.displayName})")
+        }
 
         if (!isLoggedIn) {
             Log.e(TAG, "[AUTH_GUARD] Not logged in - Redirecting to LoginActivity")
@@ -257,7 +259,12 @@ class MainActivity : ComponentActivity() {
         val intent = Intent(this, LoginActivity::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
-        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            overrideActivityTransition(OVERRIDE_TRANSITION_OPEN, android.R.anim.fade_in, android.R.anim.fade_out)
+        } else {
+            @Suppress("DEPRECATION")
+            overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+        }
         finish()
     }
 

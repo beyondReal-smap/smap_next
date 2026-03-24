@@ -42,52 +42,73 @@ fun NotificationScreen(
     val summary by viewModel.summary.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
+
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Show error message in Snackbar
+    LaunchedEffect(errorMessage) {
+        errorMessage?.let { message ->
+            snackbarHostState.showSnackbar(
+                message = message,
+                actionLabel = "확인",
+                duration = SnackbarDuration.Long
+            )
+            viewModel.clearError()
+        }
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = Color.White
     ) {
-        Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
-            // Header
-            NotificationHeader(onClose = onClose, viewModel = viewModel)
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
+                // Header
+                NotificationHeader(onClose = onClose, viewModel = viewModel)
 
-            // Summary Cards
-            NotificationSummaryRow(
-                total = summary.total,
-                unread = summary.unread,
-                read = summary.read
-            )
+                // Summary Cards
+                NotificationSummaryRow(
+                    total = summary.total,
+                    unread = summary.unread,
+                    read = summary.read
+                )
 
-            // List
-            PullToRefreshBox(
-                isRefreshing = isRefreshing,
-                onRefresh = { viewModel.refresh() },
-                modifier = Modifier.fillMaxSize()
-            ) {
-                if (isLoading && logs.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = Color(0xFFF06292))
-                    }
-                } else if (logs.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(
-                            text = "최근 7일간의 알림이 없습니다",
-                            fontFamily = SuiteFont,
-                            color = BrandColors.TextSecondary
-                        )
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(logs) { log ->
-                            NotificationItem(log = log)
+                // List
+                PullToRefreshBox(
+                    isRefreshing = isRefreshing,
+                    onRefresh = { viewModel.refresh() },
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    if (isLoading && logs.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(color = Color(0xFFF06292))
+                        }
+                    } else if (logs.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(
+                                text = "최근 7일간의 알림이 없습니다",
+                                fontFamily = SuiteFont,
+                                color = BrandColors.TextSecondary
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(logs, key = { it.pltIdx }) { log ->
+                                NotificationItem(log = log)
+                            }
                         }
                     }
                 }
             }
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
         }
     }
 }
@@ -95,6 +116,7 @@ fun NotificationScreen(
 @Composable
 fun NotificationHeader(onClose: () -> Unit, viewModel: NotificationViewModel) {
     var showMenu by remember { mutableStateOf(false) }
+    var showDeleteConfirmation by remember { mutableStateOf(false) }
 
     Row(
         modifier = Modifier
@@ -137,27 +159,70 @@ fun NotificationHeader(onClose: () -> Unit, viewModel: NotificationViewModel) {
             ) {
                 Icon(Icons.Default.MoreHoriz, contentDescription = "메뉴", tint = Color.LightGray, modifier = Modifier.size(20.dp))
             }
-            
+
             DropdownMenu(
                 expanded = showMenu,
                 onDismissRequest = { showMenu = false },
                 modifier = Modifier.background(Color.White)
             ) {
                 DropdownMenuItem(
-                    text = { 
+                    text = {
                         Text(
                             text = "전체 삭제",
                             fontFamily = SuiteFont,
                             color = BrandColors.Error
-                        ) 
+                        )
                     },
                     onClick = {
                         showMenu = false
-                        viewModel.deleteAllLogs()
+                        showDeleteConfirmation = true
                     }
                 )
             }
         }
+    }
+
+    if (showDeleteConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = false },
+            title = {
+                Text(
+                    text = "전체 삭제",
+                    fontFamily = SuiteFont,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = "모든 알림을 삭제하시겠습니까?",
+                    fontFamily = SuiteFont
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteConfirmation = false
+                    viewModel.deleteAllLogs()
+                }) {
+                    Text(
+                        text = "삭제",
+                        fontFamily = SuiteFont,
+                        fontWeight = FontWeight.Bold,
+                        color = BrandColors.Error
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmation = false }) {
+                    Text(
+                        text = "취소",
+                        fontFamily = SuiteFont,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            shape = RoundedCornerShape(16.dp),
+            containerColor = Color.White
+        )
     }
 }
 
@@ -226,13 +291,17 @@ fun NotificationItem(log: PushLog) {
     
     // Parse timestamp (plt_sdate)
     val formattedTime = remember(log.pltSdate) {
-        try {
-            val date = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault()).parse(log.pltSdate) ?: Date()
-            val outFormat = SimpleDateFormat("a hh:mm", Locale.KOREAN)
-            outFormat.format(date)
-        } catch (e: Exception) {
-            ""
-        }
+        log.pltSdate?.let { dateStr ->
+            try {
+                val date = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault()).parse(dateStr)
+                if (date != null) {
+                    val outFormat = SimpleDateFormat("a hh:mm", Locale.KOREAN)
+                    outFormat.format(date)
+                } else ""
+            } catch (e: Exception) {
+                ""
+            }
+        } ?: ""
     }
     
     // Determine icon/emoji - Only add if NOT already in the title

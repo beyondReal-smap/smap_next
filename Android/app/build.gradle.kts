@@ -15,8 +15,8 @@ android {
         applicationId = "com.dmonster.smap"
         minSdk = 28
         targetSdk = 35
-        versionCode = 50
-        versionName = "3.0.5"
+        versionCode = 51
+        versionName = "3.0.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         resourceConfigurations += setOf("ko", "en")
@@ -26,6 +26,12 @@ android {
         buildConfigField("String", "API_BASE_URL", "\"https://api3.smap.site/api/v1/\"")
         buildConfigField("String", "IMAGE_BASE_URL", "\"https://api3.smap.site\"")
         buildConfigField("String", "WEB_BASE_URL", "\"https://nextstep.smap.site\"")
+
+        // API keys — values loaded from gradle.properties or local.properties
+        buildConfigField("String", "GOOGLE_OAUTH_CLIENT_ID", "\"${project.findProperty("GOOGLE_OAUTH_CLIENT_ID") ?: ""}\"")
+        buildConfigField("String", "TELEGRAM_BOT_TOKEN", "\"${project.findProperty("TELEGRAM_BOT_TOKEN") ?: ""}\"")
+        buildConfigField("String", "TELEGRAM_CHAT_ID", "\"${project.findProperty("TELEGRAM_CHAT_ID") ?: ""}\"")
+        buildConfigField("String", "KAKAO_API_KEY", "\"${project.findProperty("KAKAO_API_KEY") ?: ""}\"")
     }
 
     signingConfigs {

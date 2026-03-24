@@ -26,7 +26,8 @@ import kotlinx.coroutines.launch
 import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
 import android.util.Log
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.activity.compose.BackHandler
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.request.ImageRequest
 import coil.request.SuccessResult
 import coil.imageLoader
@@ -49,7 +50,7 @@ fun HomeScreen(
     val isSidebarOpen by viewModel.isSidebarOpen.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
-    
+    val selectedMemberId by viewModel.selectedMemberId.collectAsState()
 
     // Snackbar Host State for error messages
     val snackbarHostState = remember { SnackbarHostState() }
@@ -82,13 +83,7 @@ fun HomeScreen(
     val unreadCount by notiViewModel.summary.collectAsState()
     val hasUnread = unreadCount.unread > 0
     
-    // 화면 진입 시 항상 데이터 새로고침 (위치 포함)
-    LaunchedEffect(Unit) {
-        Log.d("HomeScreen", "🔄 [HomeScreen] Screen entered - refreshing data")
-        viewModel.refreshData()
-    }
-    
-    // 앱이 foreground로 돌아올 때 데이터 새로고침
+    // 앱이 foreground로 돌아올 때 데이터 새로고침 (ON_RESUME handles initial load too)
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -155,28 +150,26 @@ fun HomeScreen(
                     member.mtFile1.startsWith("/") -> "${BuildConfig.IMAGE_BASE_URL}/images${member.mtFile1}"
                     else -> "${BuildConfig.IMAGE_BASE_URL}/images/${member.mtFile1}"
                 }
-                
-                scope.launch {
-                    try {
-                        val request = ImageRequest.Builder(context)
-                            .data(imageUrl)
-                            .size(100) // Small size for marker
-                            .allowHardware(false) // Disable hardware bitmaps for custom drawing
-                            .build()
-                        val result = (context.imageLoader.execute(request) as? SuccessResult)?.drawable
-                        (result as? BitmapDrawable)?.bitmap?.let { 
-                            memberAvatars[member.mtIdx] = it 
-                        }
-                    } catch (e: Exception) {
-                        Log.e("HomeScreen", "Error loading marker avatar for ${member.displayName}: ${e.message}")
+
+                try {
+                    val request = ImageRequest.Builder(context)
+                        .data(imageUrl)
+                        .size(100) // Small size for marker
+                        .allowHardware(false) // Disable hardware bitmaps for custom drawing
+                        .build()
+                    val result = (context.imageLoader.execute(request) as? SuccessResult)?.drawable
+                    (result as? BitmapDrawable)?.bitmap?.let {
+                        memberAvatars[member.mtIdx] = it
                     }
+                } catch (e: Exception) {
+                    Log.e("HomeScreen", "Error loading marker avatar for ${member.displayName}: ${e.message}")
                 }
             }
         }
     }
 
     // Effect: Move camera when member selected or group changes
-    LaunchedEffect(members, filteredSchedules) {
+    LaunchedEffect(selectedMemberId, selectedGroup) {
         val selectedMember = members.find { it.isSelected }
         
         if (selectedMember != null && selectedMember.mltLat != null && selectedMember.mltLong != null) {
@@ -354,6 +347,17 @@ fun HomeScreen(
             )
         }
 
+        // BackHandler for overlay screens
+        BackHandler(enabled = isNotificationVisible) {
+            isNotificationVisible = false
+            if (hasUnread) {
+                notiViewModel.markAllAsRead()
+            }
+        }
+        BackHandler(enabled = isSettingsVisible) {
+            isSettingsVisible = false
+        }
+
         // 5. Notification Screen Overlay (Slide-up Animation)
         AnimatedVisibility(
             visible = isNotificationVisible,
@@ -362,9 +366,11 @@ fun HomeScreen(
             modifier = Modifier.fillMaxSize()
         ) {
             NotificationScreen(
-                onClose = { 
+                onClose = {
                     isNotificationVisible = false
-                    notiViewModel.markAllAsRead() // iOS 스타일: 열람 시 모두 읽음 처리하거나 적절한 시점에 처리
+                    if (hasUnread) {
+                        notiViewModel.markAllAsRead()
+                    }
                 },
                 viewModel = notiViewModel
             )

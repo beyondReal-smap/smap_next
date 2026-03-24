@@ -20,25 +20,25 @@ enum class RegisterStep(val title: String, val progress: Float) {
  */
 @Serializable
 data class RegisterRequest(
-    @SerialName("mt_id") var mtId: String = "",
-    @SerialName("mt_pwd") var mtPwd: String? = null,
-    @SerialName("mt_name") var mtName: String = "",
-    @SerialName("mt_nickname") var mtNickname: String = "",
-    @SerialName("mt_email") var mtEmail: String? = null,
-    @SerialName("mt_hp") var mtHp: String? = null,
-    @SerialName("mt_birth") var mtBirth: String? = null,
-    @SerialName("mt_gender") var mtGender: Int? = null,
-    @SerialName("mt_file1") var mtFile1: String? = null,
-    @SerialName("mt_type") var mtType: Int = 1,  // 1:일반, 2:카카오, 3:애플, 4:구글
-    @SerialName("mt_google_id") var mtGoogleId: String? = null,
-    @SerialName("mt_apple_id") var mtAppleId: String? = null,
-    @SerialName("mt_kakao_id") var mtKakaoId: String? = null,
-    @SerialName("mt_agree1") var mtAgree1: Boolean = false,  // 서비스 이용약관 (필수)
-    @SerialName("mt_agree2") var mtAgree2: Boolean = false,  // 개인정보 수집이용 (필수)
-    @SerialName("mt_agree3") var mtAgree3: Boolean = false,  // 위치정보 이용약관 (필수)
-    @SerialName("mt_agree4") var mtAgree4: Boolean = false,  // 마케팅 정보 수신 (선택)
-    @SerialName("mt_agree5") var mtAgree5: Boolean = false,  // 야간 알림 수신 (선택)
-    @SerialName("fcm_token") var fcmToken: String? = null
+    @SerialName("mt_id") val mtId: String = "",
+    @SerialName("mt_pwd") val mtPwd: String? = null,
+    @SerialName("mt_name") val mtName: String = "",
+    @SerialName("mt_nickname") val mtNickname: String = "",
+    @SerialName("mt_email") val mtEmail: String? = null,
+    @SerialName("mt_hp") val mtHp: String? = null,
+    @SerialName("mt_birth") val mtBirth: String? = null,
+    @SerialName("mt_gender") val mtGender: Int? = null,
+    @SerialName("mt_file1") val mtFile1: String? = null,
+    @SerialName("mt_type") val mtType: Int = 1,  // 1:일반, 2:카카오, 3:애플, 4:구글
+    @SerialName("mt_google_id") val mtGoogleId: String? = null,
+    @SerialName("mt_apple_id") val mtAppleId: String? = null,
+    @SerialName("mt_kakao_id") val mtKakaoId: String? = null,
+    @SerialName("mt_agree1") val mtAgree1: Boolean = false,  // 서비스 이용약관 (필수)
+    @SerialName("mt_agree2") val mtAgree2: Boolean = false,  // 개인정보 수집이용 (필수)
+    @SerialName("mt_agree3") val mtAgree3: Boolean = false,  // 위치정보 이용약관 (필수)
+    @SerialName("mt_agree4") val mtAgree4: Boolean = false,  // 마케팅 정보 수신 (선택)
+    @SerialName("mt_agree5") val mtAgree5: Boolean = false,  // 야간 알림 수신 (선택)
+    @SerialName("fcm_token") val fcmToken: String? = null
 )
 
 /**

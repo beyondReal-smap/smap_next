@@ -33,27 +33,39 @@ class NotificationViewModel @Inject constructor(
 
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
-    
+
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
     init {
         loadNotifications()
     }
-    
+
     fun loadNotifications() {
         val mtIdx = authService.getMtIdx() ?: return
-        
+
         viewModelScope.launch {
             _isLoading.value = true
-            val fetchedLogs = notificationService.getMemberPushLogs(mtIdx)
-            _logs.value = fetchedLogs
-            
-            // Calculate summary
-            val total = fetchedLogs.size
-            val unread = fetchedLogs.count { it.pltReadChk == "N" }
-            val read = total - unread
-            _summary.value = NotificationSummary(total, unread, read)
-            
-            _isLoading.value = false
+            _errorMessage.value = null
+            try {
+                val fetchedLogs = notificationService.getMemberPushLogs(mtIdx)
+                _logs.value = fetchedLogs
+
+                // Calculate summary
+                val total = fetchedLogs.size
+                val unread = fetchedLogs.count { it.pltReadChk == "N" }
+                val read = total - unread
+                _summary.value = NotificationSummary(total, unread, read)
+            } catch (e: Exception) {
+                _errorMessage.value = "알림을 불러오지 못했습니다: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
         }
+    }
+
+    fun clearError() {
+        _errorMessage.value = null
     }
     
     fun refresh() {

@@ -28,8 +28,6 @@ import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
-import kotlinx.coroutines.launch
-
 @EntryPoint
 @InstallIn(SingletonComponent::class)
 interface NoticeEntryPoint {
@@ -45,20 +43,17 @@ fun NoticeListScreen(onBack: () -> Unit, onNoticeClick: (SmapNotice) -> Unit) {
     var notices by remember { mutableStateOf<List<SmapNotice>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
-        scope.launch {
-            try {
-                val response = authService.getNotices()
-                if (response != null) {
-                    notices = response.notices
-                }
-            } catch (e: Exception) {
-                errorMessage = e.message ?: "Unknown error"
-            } finally {
-                isLoading = false
+        try {
+            val response = authService.getNotices()
+            if (response != null) {
+                notices = response.notices
             }
+        } catch (e: Exception) {
+            errorMessage = e.message ?: "Unknown error"
+        } finally {
+            isLoading = false
         }
     }
 

@@ -3,6 +3,7 @@ package com.dmonster.smap.ui.schedule
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.dmonster.smap.BuildConfig
 import com.dmonster.smap.data.api.ApiResult
 import com.dmonster.smap.data.api.safeApiCall
 import com.dmonster.smap.data.model.SmapGroup
@@ -60,9 +61,6 @@ class ScheduleViewModel @Inject constructor(
     private val _members = MutableStateFlow<List<SmapGroupMember>>(emptyList())
     val members: StateFlow<List<SmapGroupMember>> = _members.asStateFlow()
 
-    private val _selectedMember = MutableStateFlow<SmapGroupMember?>(null)
-    val selectedMember: StateFlow<SmapGroupMember?> = _selectedMember.asStateFlow()
-
     // Loading States
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -100,19 +98,22 @@ class ScheduleViewModel @Inject constructor(
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
-    // Action Loading
+    // Action Loading (Fix #8: shared loading state for update/delete)
     private val _isCreating = MutableStateFlow(false)
     val isCreating: StateFlow<Boolean> = _isCreating.asStateFlow()
 
+    private val _isActionLoading = MutableStateFlow(false)
+    val isActionLoading: StateFlow<Boolean> = _isActionLoading.asStateFlow()
+
     init {
         loadGroups()
-        
+
         // Global Event Observation
         viewModelScope.launch {
             GlobalEventBus.events.collect { event ->
                 when (event) {
                     is GlobalEvent.GroupsChanged -> {
-                        Log.d(TAG, "🔄 [Event] Groups changed event received, refreshing data")
+                        if (BuildConfig.DEBUG) Log.d(TAG, "[Event] Groups changed event received, refreshing data")
                         loadGroups()
                     }
                     else -> {}
@@ -134,15 +135,37 @@ class ScheduleViewModel @Inject constructor(
                     }
                 }
                 is ApiResult.Error -> {
-                    Log.e(TAG, "❌ 그룹 로드 실패 (${result.code})")
+                    Log.e(TAG, "그룹 로드 실패 (${result.code})")
                     _errorMessage.value = "그룹을 불러오지 못했습니다 (${result.code})"
                 }
                 is ApiResult.NetworkError -> {
-                    Log.e(TAG, "❌ 그룹 로드 실패 - 네트워크", result.exception)
+                    Log.e(TAG, "그룹 로드 실패 - 네트워크", result.exception)
                     _errorMessage.value = "네트워크 연결을 확인해주세요"
                 }
             }
             _isLoading.value = false
+        }
+    }
+
+    /**
+     * Suspend version of groups loading for use in refresh().
+     */
+    private suspend fun loadGroupsSuspend() {
+        when (val result = safeApiCall { groupService.getGroups() }) {
+            is ApiResult.Success -> {
+                _groups.value = result.data
+                if (result.data.isNotEmpty() && _selectedGroup.value == null) {
+                    _selectedGroup.value = result.data.first()
+                }
+            }
+            is ApiResult.Error -> {
+                Log.e(TAG, "그룹 로드 실패 (${result.code})")
+                _errorMessage.value = "그룹을 불러오지 못했습니다 (${result.code})"
+            }
+            is ApiResult.NetworkError -> {
+                Log.e(TAG, "그룹 로드 실패 - 네트워크", result.exception)
+                _errorMessage.value = "네트워크 연결을 확인해주세요"
+            }
         }
     }
 
@@ -151,53 +174,65 @@ class ScheduleViewModel @Inject constructor(
         val month = _currentMonth.value
 
         viewModelScope.launch {
-            _isLoadingSchedules.value = true
-            when (val result = safeApiCall {
-                scheduleService.getSchedules(
-                    groupId = group.sgtIdx,
-                    year = month.year,
-                    month = month.monthValue
-                )
-            }) {
-                is ApiResult.Success -> {
-                    val schedules = result.data
-                    val members = _members.value
-                    schedules.forEach { s ->
-                        val creatorId = s.mtScheduleIdx ?: s.mtIdx
-                        val member = members.find { it.mtIdx == creatorId }
-                        if (member != null) {
-                            s.memberNameOverride = member.displayName
-                            s.memberPhotoOverride = member.mtFile1
-                        }
-                    }
-
-                    _schedules.value = schedules
-                    Log.d(TAG, "✅ ${schedules.size}개 일정 로드 (멤버 매핑 완료)")
-
-                    schedules.take(5).forEach { s ->
-                        Log.d(TAG, "📅 Schedule: title=${s.displayTitle}, creatorId=${s.mtScheduleIdx ?: s.mtIdx}, validName=${s.validMemberName}")
-                    }
-                }
-                is ApiResult.Error -> {
-                    Log.e(TAG, "❌ 일정 로드 실패 (${result.code})")
-                    _errorMessage.value = "일정을 불러오지 못했습니다 (${result.code})"
-                }
-                is ApiResult.NetworkError -> {
-                    Log.e(TAG, "❌ 일정 로드 실패 - 네트워크", result.exception)
-                    _errorMessage.value = "네트워크 연결을 확인해주세요"
-                }
-            }
-            _isLoadingSchedules.value = false
+            loadSchedulesSuspend(group, month)
         }
     }
 
-    private fun loadMembers(groupId: Int) {
-        viewModelScope.launch {
-            when (val result = safeApiCall { groupService.getGroupMembers(groupId) }) {
-                is ApiResult.Success -> _members.value = result.data
-                is ApiResult.Error -> Log.e(TAG, "❌ 멤버 로드 실패 (${result.code})")
-                is ApiResult.NetworkError -> Log.e(TAG, "❌ 멤버 로드 실패 - 네트워크", result.exception)
+    /**
+     * Suspend version of schedule loading for use in refresh() and selectGroup().
+     */
+    private suspend fun loadSchedulesSuspend(group: SmapGroup? = null, month: YearMonth? = null) {
+        val g = group ?: _selectedGroup.value ?: return
+        val m = month ?: _currentMonth.value
+
+        _isLoadingSchedules.value = true
+        when (val result = safeApiCall {
+            scheduleService.getSchedules(
+                groupId = g.sgtIdx,
+                year = m.year,
+                month = m.monthValue
+            )
+        }) {
+            is ApiResult.Success -> {
+                val schedules = result.data
+                val members = _members.value
+                schedules.forEach { s ->
+                    val creatorId = s.mtScheduleIdx ?: s.mtIdx
+                    val member = members.find { it.mtIdx == creatorId }
+                    if (member != null) {
+                        s.memberNameOverride = member.displayName
+                        s.memberPhotoOverride = member.mtFile1
+                    }
+                }
+
+                _schedules.value = schedules
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "${schedules.size}개 일정 로드 (멤버 매핑 완료)")
+                    schedules.take(5).forEach { s ->
+                        Log.d(TAG, "Schedule: title=${s.displayTitle}, creatorId=${s.mtScheduleIdx ?: s.mtIdx}, validName=${s.validMemberName}")
+                    }
+                }
             }
+            is ApiResult.Error -> {
+                Log.e(TAG, "일정 로드 실패 (${result.code})")
+                _errorMessage.value = "일정을 불러오지 못했습니다 (${result.code})"
+            }
+            is ApiResult.NetworkError -> {
+                Log.e(TAG, "일정 로드 실패 - 네트워크", result.exception)
+                _errorMessage.value = "네트워크 연결을 확인해주세요"
+            }
+        }
+        _isLoadingSchedules.value = false
+    }
+
+    /**
+     * Suspend version of member loading. Fix #7: await members before loading schedules.
+     */
+    private suspend fun loadMembersSuspend(groupId: Int) {
+        when (val result = safeApiCall { groupService.getGroupMembers(groupId) }) {
+            is ApiResult.Success -> _members.value = result.data
+            is ApiResult.Error -> Log.e(TAG, "멤버 로드 실패 (${result.code})")
+            is ApiResult.NetworkError -> Log.e(TAG, "멤버 로드 실패 - 네트워크", result.exception)
         }
     }
 
@@ -207,13 +242,16 @@ class ScheduleViewModel @Inject constructor(
         _selectedDate.value = date
     }
 
+    // Fix #13: Reset selectedDate to first day of new month when navigating
     fun goToPreviousMonth() {
         _currentMonth.value = _currentMonth.value.minusMonths(1)
+        _selectedDate.value = _currentMonth.value.atDay(1)
         loadSchedules()
     }
 
     fun goToNextMonth() {
         _currentMonth.value = _currentMonth.value.plusMonths(1)
+        _selectedDate.value = _currentMonth.value.atDay(1)
         loadSchedules()
     }
 
@@ -223,15 +261,14 @@ class ScheduleViewModel @Inject constructor(
         loadSchedules()
     }
 
+    // Fix #7: Await loadMembers before loadSchedules to avoid race condition
     fun selectGroup(group: SmapGroup) {
         _selectedGroup.value = group
         _showGroupSelector.value = false
-        loadMembers(group.sgtIdx)
-        loadSchedules()
-    }
-
-    fun selectMember(member: SmapGroupMember?) {
-        _selectedMember.value = member
+        viewModelScope.launch {
+            loadMembersSuspend(group.sgtIdx)
+            loadSchedulesSuspend(group)
+        }
     }
 
     // MARK: - Dialog Controls
@@ -246,6 +283,10 @@ class ScheduleViewModel @Inject constructor(
 
     fun showEventDetail(schedule: SmapSchedule) {
         _showEventDetail.value = schedule
+    }
+
+    fun dismissEventDetail() {
+        _showEventDetail.value = null
     }
 
     fun hideEventDetail() {
@@ -341,6 +382,7 @@ class ScheduleViewModel @Inject constructor(
         }
     }
 
+    // Fix #8: Add _isActionLoading for update/delete
     fun updateSchedule(
         scheduleId: String,
         title: String,
@@ -358,54 +400,64 @@ class ScheduleViewModel @Inject constructor(
         if (title.isBlank()) return
 
         viewModelScope.launch {
-            when (val result = safeApiCall {
-                scheduleService.updateSchedule(
-                    scheduleId = scheduleId,
-                    title = title,
-                    startDate = startDate,
-                    endDate = endDate,
-                    isAllDay = isAllDay,
-                    memo = memo,
-                    locationName = locationName,
-                    locationLat = locationLat,
-                    locationLng = locationLng,
-                    alarmTime = alarmTime,
-                    repeatConfig = repeatConfig,
-                    repeatJson = _showEditDialog.value?.sstRepeatJson,
-                    parentIdx = _showEditDialog.value?.sstPidx,
-                    groupId = _showEditDialog.value?.sgtIdx ?: 0,
-                    editOption = editOption
-                )
-            }) {
-                is ApiResult.Success -> {
-                    if (result.data) {
-                        _successMessage.value = "일정이 수정되었습니다"
-                        hideEditDialog()
-                        loadSchedules()
-                    } else {
-                        _errorMessage.value = "일정 수정에 실패했습니다"
+            _isActionLoading.value = true
+            try {
+                when (val result = safeApiCall {
+                    scheduleService.updateSchedule(
+                        scheduleId = scheduleId,
+                        title = title,
+                        startDate = startDate,
+                        endDate = endDate,
+                        isAllDay = isAllDay,
+                        memo = memo,
+                        locationName = locationName,
+                        locationLat = locationLat,
+                        locationLng = locationLng,
+                        alarmTime = alarmTime,
+                        repeatConfig = repeatConfig,
+                        repeatJson = _showEditDialog.value?.sstRepeatJson,
+                        parentIdx = _showEditDialog.value?.sstPidx,
+                        groupId = _showEditDialog.value?.sgtIdx ?: 0,
+                        editOption = editOption
+                    )
+                }) {
+                    is ApiResult.Success -> {
+                        if (result.data) {
+                            _successMessage.value = "일정이 수정되었습니다"
+                            hideEditDialog()
+                            loadSchedules()
+                        } else {
+                            _errorMessage.value = "일정 수정에 실패했습니다"
+                        }
                     }
+                    is ApiResult.Error -> _errorMessage.value = "일정 수정에 실패했습니다 (${result.code})"
+                    is ApiResult.NetworkError -> _errorMessage.value = "네트워크 연결을 확인해주세요"
                 }
-                is ApiResult.Error -> _errorMessage.value = "일정 수정에 실패했습니다 (${result.code})"
-                is ApiResult.NetworkError -> _errorMessage.value = "네트워크 연결을 확인해주세요"
+            } finally {
+                _isActionLoading.value = false
             }
         }
     }
 
     fun deleteSchedule(scheduleId: String, groupId: Int, deleteOption: String = "this") {
         viewModelScope.launch {
-            when (val result = safeApiCall { scheduleService.deleteSchedule(scheduleId, groupId, deleteOption) }) {
-                is ApiResult.Success -> {
-                    if (result.data) {
-                        _successMessage.value = "일정이 삭제되었습니다"
-                        hideDeleteDialog()
-                        loadSchedules()
-                    } else {
-                        _errorMessage.value = "일정 삭제에 실패했습니다"
+            _isActionLoading.value = true
+            try {
+                when (val result = safeApiCall { scheduleService.deleteSchedule(scheduleId, groupId, deleteOption) }) {
+                    is ApiResult.Success -> {
+                        if (result.data) {
+                            _successMessage.value = "일정이 삭제되었습니다"
+                            hideDeleteDialog()
+                            loadSchedules()
+                        } else {
+                            _errorMessage.value = "일정 삭제에 실패했습니다"
+                        }
                     }
+                    is ApiResult.Error -> _errorMessage.value = "일정 삭제에 실패했습니다 (${result.code})"
+                    is ApiResult.NetworkError -> _errorMessage.value = "네트워크 연결을 확인해주세요"
                 }
-                is ApiResult.Error -> _errorMessage.value = "일정 삭제에 실패했습니다 (${result.code})"
-                is ApiResult.NetworkError -> _errorMessage.value = "네트워크 연결을 확인해주세요"
+            } finally {
+                _isActionLoading.value = false
             }
         }
     }
@@ -415,15 +467,15 @@ class ScheduleViewModel @Inject constructor(
     fun canManageSchedule(schedule: SmapSchedule): Boolean {
         val currentUser = authService.getUserData() ?: return false
         val creatorId = schedule.mtScheduleIdx ?: schedule.mtIdx ?: return false
-        
+
         // 1. Own data
         if (creatorId == currentUser.mtIdx) return true
-        
+
         val currentMember = _members.value.find { it.mtIdx == currentUser.mtIdx } ?: return false
-        
+
         // 2. Owner can manage anything
         if (currentMember.sgdtOwnerChk == "Y") return true
-        
+
         // 3. Leader can manage anything except Owner's data
         if (currentMember.sgdtLeaderChk == "Y") {
             val targetMember = _members.value.find { it.mtIdx == creatorId }
@@ -431,41 +483,63 @@ class ScheduleViewModel @Inject constructor(
             if (targetMember?.sgdtOwnerChk == "Y") return false
             return true
         }
-        
+
         return false
     }
 
     // MARK: - Helpers
 
+    // Fix #3: Multi-day events now show on intermediate days by checking date range
     fun getSchedulesForDate(date: LocalDate): List<SmapSchedule> {
-        val dateStr = date.format(DateTimeFormatter.ISO_LOCAL_DATE)
+        val dateStr = date.toString() // "yyyy-MM-dd"
         val filtered = _schedules.value.filter { schedule ->
-            schedule.date?.startsWith(dateStr) == true
+            val startDate = schedule.date?.take(10) ?: return@filter false
+            val endDate = schedule.sstEdate?.take(10) ?: startDate
+            dateStr in startDate..endDate
         }
-        Log.d(TAG, "📆 getSchedulesForDate: date=$dateStr, total=${_schedules.value.size}, filtered=${filtered.size}")
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "getSchedulesForDate: date=$dateStr, total=${_schedules.value.size}, filtered=${filtered.size}")
+        }
         return filtered
     }
 
+    // Fix #3: Include all dates in range for multi-day events
     fun getEventDates(): Set<LocalDate> {
-        val dates = _schedules.value.mapNotNull { schedule ->
-            schedule.date?.let {
-                try {
-                    LocalDate.parse(it.take(10))
-                } catch (e: Exception) {
-                    null
+        val dates = mutableSetOf<LocalDate>()
+        _schedules.value.forEach { schedule ->
+            val startStr = schedule.date?.take(10) ?: return@forEach
+            val endStr = schedule.sstEdate?.take(10) ?: startStr
+            try {
+                var current = LocalDate.parse(startStr)
+                val end = LocalDate.parse(endStr)
+                while (!current.isAfter(end)) {
+                    dates.add(current)
+                    current = current.plusDays(1)
                 }
+            } catch (e: Exception) {
+                // skip invalid dates
             }
-        }.toSet()
-        Log.d(TAG, "📆 getEventDates: ${dates.size} event dates found")
+        }
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "getEventDates: ${dates.size} event dates found")
+        }
         return dates
     }
 
+    // Fix #2: Inline loading logic so isRefreshing is set to false only after completion
     fun refresh() {
         viewModelScope.launch {
             _isRefreshing.value = true
-            loadGroups()
-            loadSchedules()
-            _isRefreshing.value = false
+            try {
+                loadGroupsSuspend()
+                val group = _selectedGroup.value
+                if (group != null) {
+                    loadMembersSuspend(group.sgtIdx)
+                    loadSchedulesSuspend(group)
+                }
+            } finally {
+                _isRefreshing.value = false
+            }
         }
     }
 

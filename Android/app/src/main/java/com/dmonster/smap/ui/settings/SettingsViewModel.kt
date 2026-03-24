@@ -17,10 +17,19 @@ class SettingsViewModel @Inject constructor(
 
     private val _user = MutableStateFlow<SMAPUser?>(authService.getUserData())
     val user: StateFlow<SMAPUser?> = _user
-    
+
+    // Track active loading operations to prevent shared state conflicts
+    private val _activeLoadingOps = MutableStateFlow<Set<String>>(emptySet())
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading
-    
+
+    private fun setLoading(op: String, loading: Boolean) {
+        val current = _activeLoadingOps.value.toMutableSet()
+        if (loading) current.add(op) else current.remove(op)
+        _activeLoadingOps.value = current
+        _isLoading.value = current.isNotEmpty()
+    }
+
     private val _userMessage = MutableStateFlow<String?>(null)
     val userMessage: StateFlow<String?> = _userMessage
     
@@ -30,18 +39,18 @@ class SettingsViewModel @Inject constructor(
     
     fun refreshProfile() {
         viewModelScope.launch {
-            _isLoading.value = true
+            setLoading("refreshProfile", true)
             val updatedUser = authService.fetchUserProfile()
             if (updatedUser != null) {
                 _user.value = updatedUser
             }
-            _isLoading.value = false
+            setLoading("refreshProfile", false)
         }
     }
-    
+
     fun updateProfile(name: String, nickname: String, birth: String?, gender: Int?) {
         viewModelScope.launch {
-            _isLoading.value = true
+            setLoading("updateProfile", true)
             val response = authService.updateProfile(name, nickname, birth, gender)
             if (response.success) {
                 _user.value = authService.getUserData()
@@ -49,13 +58,13 @@ class SettingsViewModel @Inject constructor(
             } else {
                 _userMessage.value = response.message ?: "업데이트 실패"
             }
-            _isLoading.value = false
+            setLoading("updateProfile", false)
         }
     }
-    
+
     fun uploadProfileImage(imageData: ByteArray) {
         viewModelScope.launch {
-            _isLoading.value = true
+            setLoading("uploadImage", true)
             val response = authService.uploadProfileImage(imageData)
             if (response.success) {
                 _user.value = authService.getUserData()
@@ -63,7 +72,7 @@ class SettingsViewModel @Inject constructor(
             } else {
                 _userMessage.value = response.message ?: "이미지 업로드 실패"
             }
-            _isLoading.value = false
+            setLoading("uploadImage", false)
         }
     }
     
@@ -74,36 +83,36 @@ class SettingsViewModel @Inject constructor(
 
     fun verifyPassword(password: String, onResult: (Boolean, String?) -> Unit) {
         viewModelScope.launch {
-            _isLoading.value = true
+            setLoading("verifyPassword", true)
             val response = authService.verifyPassword(password)
             onResult(response.success, response.message)
-            _isLoading.value = false
+            setLoading("verifyPassword", false)
         }
     }
 
     fun withdraw(reasonIdx: Int, etcReason: String?, reasons: List<String>, onSuccess: () -> Unit) {
         viewModelScope.launch {
-            _isLoading.value = true
+            setLoading("withdraw", true)
             val response = authService.withdraw(reasonIdx, etcReason, reasons)
             if (response.success) {
                 onSuccess()
             } else {
                 _userMessage.value = response.message ?: "탈퇴 처리 실패"
             }
-            _isLoading.value = false
+            setLoading("withdraw", false)
         }
     }
-    
+
     fun changePassword(currentPassword: String, newPassword: String) {
         viewModelScope.launch {
-            _isLoading.value = true
+            setLoading("changePassword", true)
             val response = authService.changePassword(currentPassword, newPassword)
             if (response.success) {
                 _userMessage.value = "비밀번호가 성공적으로 변경되었습니다."
             } else {
                 _userMessage.value = response.message ?: "비밀번호 변경 실패"
             }
-            _isLoading.value = false
+            setLoading("changePassword", false)
         }
     }
     

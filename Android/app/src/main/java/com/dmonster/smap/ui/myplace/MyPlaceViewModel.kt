@@ -3,6 +3,7 @@ package com.dmonster.smap.ui.myplace
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.dmonster.smap.BuildConfig
 import com.dmonster.smap.data.api.ApiResult
 import com.dmonster.smap.data.api.safeApiCall
 import com.dmonster.smap.data.model.SavedLocation
@@ -38,6 +39,7 @@ class MyPlaceViewModel @Inject constructor(
 
     companion object {
         private const val TAG = "MyPlaceViewModel"
+        private val httpClient = OkHttpClient()
     }
 
     // Groups
@@ -118,22 +120,22 @@ class MyPlaceViewModel @Inject constructor(
     private val _isMapLoading = MutableStateFlow(true)
     val isMapLoading: StateFlow<Boolean> = _isMapLoading.asStateFlow()
 
-    private val httpClient = OkHttpClient()
     private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true; isLenient = true }
-    private val KAKAO_API_KEY = "7fbf60571daf54ca5bee8373a1f31d2d"
+    private val KAKAO_API_KEY = BuildConfig.KAKAO_API_KEY
 
     private val _pendingPlaceInfo = MutableStateFlow<Triple<String, String, String?>?>(null)
     val pendingPlaceInfo: StateFlow<Triple<String, String, String?>?> = _pendingPlaceInfo.asStateFlow()
 
     init {
-        performInitialLoad()
-        
+        // performInitialLoad() is called from LaunchedEffect in MyPlaceScreen
+        // to ensure data refreshes on every visit to the screen.
+
         // Global Event Observation
         viewModelScope.launch {
             GlobalEventBus.events.collect { event ->
                 when (event) {
                     is GlobalEvent.GroupsChanged -> {
-                        Log.d(TAG, "🔄 [Event] Groups changed event received, refreshing data")
+                        if (BuildConfig.DEBUG) Log.d(TAG, "[Event] Groups changed event received, refreshing data")
                         performInitialLoad()
                     }
                     else -> {}
@@ -173,7 +175,7 @@ class MyPlaceViewModel @Inject constructor(
                                             }
                                         }
                                         else -> {
-                                            Log.e(TAG, "❌ 장소 로드 실패")
+                                            if (BuildConfig.DEBUG) Log.e(TAG, "Location load failed during initial load")
                                             _locations.value = emptyList()
                                         }
                                     }
@@ -183,7 +185,7 @@ class MyPlaceViewModel @Inject constructor(
                                 }
                             }
                             else -> {
-                                Log.e(TAG, "❌ 멤버 로드 실패")
+                                if (BuildConfig.DEBUG) Log.e(TAG, "Member load failed during initial load")
                                 _members.value = emptyList()
                                 _locations.value = emptyList()
                             }
@@ -195,11 +197,11 @@ class MyPlaceViewModel @Inject constructor(
                     }
                 }
                 is ApiResult.Error -> {
-                    Log.e(TAG, "❌ 초기 데이터 로드 실패 (${result.code})")
+                    if (BuildConfig.DEBUG) Log.e(TAG, "Initial data load failed (${result.code})")
                     _errorMessage.value = "데이터를 불러오지 못했습니다 (${result.code})"
                 }
                 is ApiResult.NetworkError -> {
-                    Log.e(TAG, "❌ 초기 데이터 로드 실패 - 네트워크", result.exception)
+                    if (BuildConfig.DEBUG) Log.e(TAG, "Initial data load failed - network", result.exception)
                     _errorMessage.value = "네트워크 연결을 확인해주세요"
                 }
             }
@@ -215,29 +217,6 @@ class MyPlaceViewModel @Inject constructor(
 
     // MARK: - Data Loading
 
-    private fun loadGroups() {
-        viewModelScope.launch {
-            _isLoading.value = true
-            when (val result = safeApiCall { groupService.getGroups() }) {
-                is ApiResult.Success -> {
-                    _groups.value = result.data
-                    if (result.data.isNotEmpty() && _selectedGroup.value == null) {
-                        selectGroup(result.data.first())
-                    }
-                }
-                is ApiResult.Error -> {
-                    Log.e(TAG, "❌ 그룹 로드 실패 (${result.code})")
-                    _errorMessage.value = "그룹을 불러오지 못했습니다 (${result.code})"
-                }
-                is ApiResult.NetworkError -> {
-                    Log.e(TAG, "❌ 그룹 로드 실패 - 네트워크", result.exception)
-                    _errorMessage.value = "네트워크 연결을 확인해주세요"
-                }
-            }
-            _isLoading.value = false
-        }
-    }
-
     private fun loadMembers(groupId: Int) {
         viewModelScope.launch {
             when (val result = safeApiCall { groupService.getGroupMembers(groupId) }) {
@@ -249,8 +228,8 @@ class MyPlaceViewModel @Inject constructor(
                         selectMember(selfMember ?: result.data.first())
                     }
                 }
-                is ApiResult.Error -> Log.e(TAG, "❌ 멤버 로드 실패 (${result.code})")
-                is ApiResult.NetworkError -> Log.e(TAG, "❌ 멤버 로드 실패 - 네트워크", result.exception)
+                is ApiResult.Error -> { if (BuildConfig.DEBUG) Log.e(TAG, "Member load failed (${result.code})") }
+                is ApiResult.NetworkError -> { if (BuildConfig.DEBUG) Log.e(TAG, "Member load failed - network", result.exception) }
             }
         }
     }
@@ -263,14 +242,14 @@ class MyPlaceViewModel @Inject constructor(
             when (val result = safeApiCall { myPlaceService.getLocations(member.mtIdx) }) {
                 is ApiResult.Success -> {
                     _locations.value = result.data
-                    Log.d(TAG, "✅ ${result.data.size}개 장소 로드")
+                    if (BuildConfig.DEBUG) Log.d(TAG, "${result.data.size} locations loaded")
                 }
                 is ApiResult.Error -> {
-                    Log.e(TAG, "❌ 장소 로드 실패 (${result.code})")
+                    if (BuildConfig.DEBUG) Log.e(TAG, "Location load failed (${result.code})")
                     _errorMessage.value = "장소 정보를 불러오지 못했습니다 (${result.code})"
                 }
                 is ApiResult.NetworkError -> {
-                    Log.e(TAG, "❌ 장소 로드 실패 - 네트워크", result.exception)
+                    if (BuildConfig.DEBUG) Log.e(TAG, "Location load failed - network", result.exception)
                     _errorMessage.value = "네트워크 연결을 확인해주세요"
                 }
             }
@@ -290,6 +269,7 @@ class MyPlaceViewModel @Inject constructor(
 
     fun selectMember(member: SmapGroupMember) {
         _selectedMember.value = member
+        _selectedLocation.value = null  // Clear selection when switching members
         loadLocations()
     }
 
@@ -336,8 +316,11 @@ class MyPlaceViewModel @Inject constructor(
     }
 
     fun showEditDialog(location: SavedLocation) {
+        _pendingLocation.value = null
+        _pendingPlaceInfo.value = null
         _selectedLocation.value = location // 마커 선택 상태 업데이트 (빨간색 마커로 변경)
         _showEditDialog.value = location
+        _showAddDialog.value = false
     }
 
     fun hideEditDialog() {
@@ -396,7 +379,7 @@ class MyPlaceViewModel @Inject constructor(
                     null
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Reverse geocoding failed", e)
+                if (BuildConfig.DEBUG) Log.e(TAG, "Reverse geocoding failed", e)
                 null
             }
         }
@@ -429,7 +412,7 @@ class MyPlaceViewModel @Inject constructor(
                     _errorMessage.value = "검색에 실패했습니다"
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Search failed", e)
+                if (BuildConfig.DEBUG) Log.e(TAG, "Search failed", e)
                 _errorMessage.value = "검색 중 오류가 발생했습니다"
             } finally {
                 _isSearching.value = false
@@ -533,6 +516,8 @@ class MyPlaceViewModel @Inject constructor(
         }
     }
 
+    // TODO: Replace with a dedicated PATCH endpoint for notification toggle when available.
+    // Currently sends a full update with all fields from the existing location.
     fun toggleLocationNotification(location: SavedLocation) {
         viewModelScope.launch {
             val newStatus = if (location.sltEnterAlarm == "Y") "N" else "Y"
@@ -620,12 +605,12 @@ class MyPlaceViewModel @Inject constructor(
 
     // MARK: - Helpers
 
-    fun getLocationsWithCoordinates(): List<SavedLocation> {
-        return _locations.value.filter { it.hasValidCoordinates }
+    fun clearSelection() {
+        _selectedLocation.value = null
     }
 
     fun clearError() { _errorMessage.value = null }
     fun clearSuccess() { _successMessage.value = null }
-    
+
     fun getCurrentUserIdx(): Int? = authService.getUserData()?.mtIdx
 }

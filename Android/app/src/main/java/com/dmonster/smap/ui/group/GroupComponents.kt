@@ -255,8 +255,8 @@ fun GroupCard(
                 )
                 
                 Text(
-                    text = group.sgtMemo ?: "지니 시리 다연 다은", // Mocking based on screenshot 0
-                    fontSize = 15.sp,
+                    text = group.sgtMemo ?: "",
+                    fontSize = 15.responsiveSp(),
                     fontFamily = SuiteFont,
                     color = Color.Gray,
                     maxLines = 1,
@@ -279,7 +279,7 @@ fun GroupCard(
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = "${memberCount}명",
-                            fontSize = 14.sp,
+                            fontSize = 14.responsiveSp(),
                             fontFamily = SuiteFont,
                             fontWeight = FontWeight.Medium,
                             color = Color(0xFF001A8E)
@@ -287,8 +287,8 @@ fun GroupCard(
                     }
                     
                     Text(
-                        text = group.sgtWdate?.take(10) ?: "2024-10-11",
-                        fontSize = 14.sp,
+                        text = group.sgtWdate?.take(10) ?: "",
+                        fontSize = 14.responsiveSp(),
                         fontFamily = SuiteFont,
                         color = Color(0xFF0EA5E9)
                     )
@@ -370,8 +370,8 @@ fun GroupHeaderCard(
                         leadingIcon = { Icon(Icons.Filled.PersonAdd, contentDescription = "초대") }
                     )
                     
-                    Divider()
-                    
+                    HorizontalDivider()
+
                     if (isOwner) {
                         DropdownMenuItem(
                             text = { Text("그룹 삭제", fontFamily = SuiteFont, color = BrandColors.Error) },
@@ -428,8 +428,8 @@ fun GroupHeaderCard(
                             color = Color.White
                         )
                         Text(
-                            text = group.sgtMemo ?: "지니 시리 다연 다은",
-                            fontSize = 15.sp,
+                            text = group.sgtMemo ?: "",
+                            fontSize = 15.responsiveSp(),
                             fontFamily = SuiteFont,
                             color = Color.White.copy(alpha = 0.7f)
                         )
@@ -437,7 +437,7 @@ fun GroupHeaderCard(
                 }
                 
                 Spacer(modifier = Modifier.height(14.dp))
-                Divider(color = Color.White.copy(alpha = 0.1f))
+                HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
                 Spacer(modifier = Modifier.height(14.dp))
                 
                 Row(
@@ -448,7 +448,7 @@ fun GroupHeaderCard(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = "초대 코드",
-                            fontSize = 14.sp,
+                            fontSize = 14.responsiveSp(),
                             fontFamily = SuiteFont,
                             color = Color.White.copy(alpha = 0.5f)
                         )
@@ -463,7 +463,7 @@ fun GroupHeaderCard(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     text = group.sgtCode ?: "N/A",
-                                    fontSize = 16.sp,
+                                    fontSize = 16.responsiveSp(),
                                     fontFamily = SuiteFont,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
@@ -480,8 +480,8 @@ fun GroupHeaderCard(
                     }
                     
                     Text(
-                        text = "생성일: ${group.sgtWdate?.take(10) ?: "2024.10.11"}",
-                        fontSize = 13.sp,
+                        text = "생성일: ${group.sgtWdate?.take(10) ?: ""}",
+                        fontSize = 13.responsiveSp(),
                         fontFamily = SuiteFont,
                         color = Color.White.copy(alpha = 0.4f)
                     )
@@ -575,16 +575,16 @@ private fun DetailStatCard(
             } else {
                 Text(
                     text = value,
-                    fontSize = 28.sp,
+                    fontSize = 28.responsiveSp(),
                     fontFamily = SuiteFont,
                     fontWeight = FontWeight.Bold,
                     color = iconColor
                 )
             }
-            
+
             Text(
                 text = title,
-                fontSize = 14.sp,
+                fontSize = 14.responsiveSp(),
                 fontFamily = SuiteFont,
                 fontWeight = FontWeight.Bold,
                 color = iconColor
@@ -598,7 +598,6 @@ private fun DetailStatCard(
 @Composable
 fun MemberListItem(
     member: SmapGroupMember,
-    isOwner: Boolean,
     canManage: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -695,12 +694,12 @@ fun MemberListItem(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = member.displayName,
-                    fontSize = 18.sp,
+                    fontSize = 18.responsiveSp(),
                     fontFamily = SuiteFont,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF1F2937)
                 )
-                
+
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = when {
@@ -708,7 +707,7 @@ fun MemberListItem(
                             isLeader -> "리더"
                             else -> "멤버"
                         },
-                        fontSize = 14.sp,
+                        fontSize = 14.responsiveSp(),
                         fontFamily = SuiteFont,
                         color = if (isOwnerMember) Color(0xFFF59E0B) else if (isLeader) Color(0xFF3B82F6) else Color.Gray
                     )
@@ -725,7 +724,7 @@ fun MemberListItem(
                         ) {
                             Text(
                                 text = if (isOwnerMember) "그룹장" else "리더",
-                                fontSize = 11.sp,
+                                fontSize = 11.responsiveSp(),
                                 fontFamily = SuiteFont,
                                 fontWeight = FontWeight.Bold,
                                 color = if (isOwnerMember) Color(0xFFB45309) else Color(0xFF1E40AF)

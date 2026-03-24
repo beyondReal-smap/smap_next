@@ -1,6 +1,7 @@
 package com.dmonster.smap.ui.login
 
 import android.util.Log
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -23,25 +25,26 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.dmonster.smap.R
+import com.dmonster.smap.ui.common.PhoneVisualTransformation
 import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.GradientColors
 import com.dmonster.smap.ui.theme.SuiteFont
@@ -63,17 +66,19 @@ fun LoginScreen(
     // 비밀번호 찾기 화면 표시 여부
     var showForgotPassword by remember { mutableStateOf(false) }
     
-    // 로그인 성공 시 콜백
+    // 로그인 성공 시 콜백 (one-shot event)
     LaunchedEffect(uiState.isLoggedIn) {
         if (uiState.isLoggedIn) {
             onLoginSuccess()
+            viewModel.resetLoginState()
         }
     }
-    
-    // 신규 회원 시 회원가입 화면으로 이동
+
+    // 신규 회원 시 회원가입 화면으로 이동 (one-shot event)
     LaunchedEffect(uiState.isNewUser) {
         if (uiState.isNewUser) {
             onNavigateToRegister(uiState.socialLoginData)
+            viewModel.resetNewUserState()
         }
     }
     
@@ -140,7 +145,7 @@ fun LoginScreen(
                     
                     // 로그인 버튼
                     LoginButton(
-                        enabled = viewModel.isInputValid && !uiState.isLoading,
+                        enabled = uiState.isInputValid && !uiState.isLoading,
                         isLoading = uiState.isLoading,
                         onClick = {
                             viewModel.login()
@@ -189,6 +194,9 @@ fun LoginScreen(
         }
         
         // 비밀번호 찾기 오버레이 (Slide-up Animation)
+        if (showForgotPassword) {
+            BackHandler { showForgotPassword = false }
+        }
         androidx.compose.animation.AnimatedVisibility(
             visible = showForgotPassword,
             enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
@@ -238,43 +246,6 @@ private fun LogoSection() {
 }
 
 /**
- * 전화번호를 하이픈으로 포맷팅하는 VisualTransformation
- */
-private class PhoneVisualTransformation : VisualTransformation {
-    override fun filter(text: AnnotatedString): TransformedText {
-        val digits = text.text
-        val formatted = buildString {
-            digits.forEachIndexed { index, c ->
-                if (index == 3 || index == 7) append('-')
-                append(c)
-            }
-        }
-        
-        val offsetMapping = object : OffsetMapping {
-            override fun originalToTransformed(offset: Int): Int {
-                return when {
-                    offset <= 3 -> offset
-                    offset <= 7 -> offset + 1
-                    else -> offset + 2
-                }.coerceAtMost(formatted.length)
-            }
-            
-            override fun transformedToOriginal(offset: Int): Int {
-                return when {
-                    offset <= 3 -> offset
-                    offset <= 4 -> offset // 하이픈 위치 대응
-                    offset <= 8 -> offset - 1
-                    offset <= 9 -> offset - 1 // 하이픈 위치 대응
-                    else -> offset - 2
-                }.coerceAtMost(digits.length)
-            }
-        }
-        
-        return TransformedText(AnnotatedString(formatted), offsetMapping)
-    }
-}
-
-/**
  * 로그인 폼
  */
 @Composable
@@ -288,6 +259,7 @@ private fun LoginForm(
 ) {
     var isPhoneFocused by remember { mutableStateOf(false) }
     var isPasswordFocused by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -309,7 +281,13 @@ private fun LoginForm(
                 )
             },
             visualTransformation = PhoneVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Phone,
+                imeAction = ImeAction.Next
+            ),
+            keyboardActions = KeyboardActions(
+                onNext = { focusManager.moveFocus(FocusDirection.Down) }
+            ),
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
@@ -319,7 +297,7 @@ private fun LoginForm(
                 unfocusedContainerColor = BrandColors.InputBackground
             )
         )
-        
+
         // 비밀번호 입력
         OutlinedTextField(
             value = password,
@@ -345,9 +323,15 @@ private fun LoginForm(
                     )
                 }
             },
-            visualTransformation = if (showPassword) VisualTransformation.None 
+            visualTransformation = if (showPassword) VisualTransformation.None
                                    else PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Password,
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = { focusManager.clearFocus() }
+            ),
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
@@ -501,6 +485,7 @@ private fun SocialLoginSection(
                 text = "Google로 계속하기",
                 color = BrandColors.TextPrimary,
                 fontSize = 17.sp,
+                fontFamily = SuiteFont,
                 fontWeight = FontWeight.Medium
             )
         }
@@ -557,7 +542,10 @@ private fun SignUpSection(onClick: () -> Unit) {
             color = BrandColors.Primary,
             fontSize = 16.sp,
             fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.clickable(onClick = onClick)
+            modifier = Modifier
+                .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                .clickable(onClick = onClick)
+                .wrapContentSize(Alignment.Center)
         )
     }
 }
@@ -589,29 +577,42 @@ private fun FloatingBackground() {
         label = "offset2"
     )
     
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp
+    val screenHeight = configuration.screenHeightDp
+
     Box(modifier = Modifier.fillMaxSize()) {
         // 플로팅 원 1
         Box(
             modifier = Modifier
-                .offset(x = (50 + offset1).dp, y = (100 + offset1).dp)
+                .offset(
+                    x = (screenWidth * 0.13f + offset1).dp,
+                    y = (screenHeight * 0.12f + offset1).dp
+                )
                 .size(120.dp)
                 .clip(CircleShape)
                 .background(Color.White.copy(alpha = 0.1f))
         )
-        
+
         // 플로팅 원 2
         Box(
             modifier = Modifier
-                .offset(x = (250 + offset2).dp, y = (300 + offset2).dp)
+                .offset(
+                    x = (screenWidth * 0.65f + offset2).dp,
+                    y = (screenHeight * 0.37f + offset2).dp
+                )
                 .size(80.dp)
                 .clip(CircleShape)
                 .background(Color.White.copy(alpha = 0.15f))
         )
-        
+
         // 플로팅 원 3
         Box(
             modifier = Modifier
-                .offset(x = (100 - offset1).dp, y = (500 - offset1).dp)
+                .offset(
+                    x = (screenWidth * 0.26f - offset1).dp,
+                    y = (screenHeight * 0.62f - offset1).dp
+                )
                 .size(100.dp)
                 .clip(CircleShape)
                 .background(Color.White.copy(alpha = 0.08f))
@@ -656,8 +657,4 @@ private fun LoadingOverlay() {
     }
 }
 
-@Preview(showBackground = true)
-@Composable
-private fun LoginScreenPreview() {
-    LoginScreen()
-}
+// Preview removed: LoginScreen requires hiltViewModel() which is not available in @Preview

@@ -6,6 +6,9 @@ import com.dmonster.smap.data.model.*
 
 /**
  * Activity-log service (delegates to SmapApi via Retrofit).
+ *
+ * NOTE: Methods intentionally do NOT catch exceptions.
+ * Errors propagate to the ViewModel's safeApiCall wrapper for proper handling.
  */
 class ActivityLogService(private val api: SmapApi) {
 
@@ -17,57 +20,37 @@ class ActivityLogService(private val api: SmapApi) {
      * GET /logs/member-location-logs/{memberId}/stay-times?date=...
      */
     suspend fun getStayTimes(memberId: Int, date: String): List<StayTime> {
-        return try {
-            val response = api.getStayTimes(memberId, date)
-            val list = response.data ?: emptyList()
-            Log.d(TAG, "[getStayTimes] ${list.size} stay records loaded")
-            list
-        } catch (e: Exception) {
-            Log.e(TAG, "[getStayTimes] error", e)
-            emptyList()
-        }
+        val response = api.getStayTimes(memberId, date)
+        val list = response.data ?: emptyList()
+        Log.d(TAG, "[getStayTimes] ${list.size} stay records loaded")
+        return list
     }
 
     /**
      * GET /logs/member-location-logs/{memberId}/daily?date=...
      */
     suspend fun getLocationLogs(memberId: Int, date: String): List<LocationLog> {
-        return try {
-            val response = api.getLocationLogs(memberId, date)
-            val logs = response.data ?: emptyList()
-            Log.d(TAG, "[getLocationLogs] ${logs.size} logs loaded")
-            logs
-        } catch (e: Exception) {
-            Log.e(TAG, "[getLocationLogs] error", e)
-            emptyList()
-        }
+        val response = api.getLocationLogs(memberId, date)
+        val logs = response.data ?: emptyList()
+        Log.d(TAG, "[getLocationLogs] ${logs.size} logs loaded")
+        return logs
     }
 
     /**
      * GET /logs/member-location-logs/{memberId}/summary?date=...
      */
     suspend fun getLocationSummary(memberId: Int, date: String): LocationSummary? {
-        return try {
-            val response = api.getLocationSummary(memberId, date)
-            Log.d(TAG, "[getLocationSummary] data=${response.data != null}")
-            response.data
-        } catch (e: Exception) {
-            Log.e(TAG, "[getLocationSummary] error", e)
-            null
-        }
+        val response = api.getLocationSummary(memberId, date)
+        Log.d(TAG, "[getLocationSummary] data=${response.data != null}")
+        return response.data
     }
 
     /**
      * GET /logs/daily-counts?group_id=...&days=...
      */
     suspend fun getDailyCountsForGroup(groupId: Int, days: Int = 14): GroupDailyCountsResponse? {
-        return try {
-            val response = api.getDailyCountsForGroup(groupId, days)
-            Log.d(TAG, "[getDailyCountsForGroup] response received")
-            response
-        } catch (e: Exception) {
-            Log.e(TAG, "[getDailyCountsForGroup] error", e)
-            null
-        }
+        val response = api.getDailyCountsForGroup(groupId, days)
+        Log.d(TAG, "[getDailyCountsForGroup] response received")
+        return response
     }
 }

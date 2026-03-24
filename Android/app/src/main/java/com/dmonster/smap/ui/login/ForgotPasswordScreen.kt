@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -14,13 +15,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.*
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.dmonster.smap.ui.common.PhoneVisualTransformation
 import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.SuiteFont
 
@@ -60,25 +63,27 @@ fun ForgotPasswordScreen(
             .background(Color.White)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Header
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = {
-                    if (!viewModel.goBack()) {
-                        onDismiss()
+            // Header (hide back arrow on COMPLETE step)
+            if (currentStep != ForgotPasswordViewModel.Step.COMPLETE) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = {
+                        if (!viewModel.goBack()) {
+                            onDismiss()
+                        }
+                    }) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color.Black
+                        )
                     }
-                }) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = Color.Black
-                    )
+                    Spacer(modifier = Modifier.weight(1f))
                 }
-                Spacer(modifier = Modifier.weight(1f))
             }
             
             // Content
@@ -214,8 +219,14 @@ private fun PhoneStepContent(
                 value = phoneNumber,
                 onValueChange = onPhoneChange,
                 placeholder = { Text("010-0000-0000", fontFamily = SuiteFont) },
-                visualTransformation = ForgotPhoneVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                visualTransformation = PhoneVisualTransformation(),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Phone,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = { if (phoneNumber.replace("-", "").length >= 10 && !isLoading) onSendCode() }
+                ),
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
@@ -358,6 +369,7 @@ private fun NewPasswordStepContent(
     onResetPassword: () -> Unit,
     isLoading: Boolean
 ) {
+    val focusManager = LocalFocusManager.current
     Column(verticalArrangement = Arrangement.spacedBy(30.dp)) {
         // New Password Field
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -374,6 +386,13 @@ private fun NewPasswordStepContent(
                 onValueChange = onNewPasswordChange,
                 placeholder = { Text("8자 이상, 영문/숫자/특수문자 포함", fontFamily = SuiteFont) },
                 visualTransformation = if (showNewPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    imeAction = ImeAction.Next
+                ),
+                keyboardActions = KeyboardActions(
+                    onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                ),
                 trailingIcon = {
                     IconButton(onClick = onToggleNewPassword) {
                         Icon(
@@ -418,6 +437,13 @@ private fun NewPasswordStepContent(
                 onValueChange = onConfirmPasswordChange,
                 placeholder = { Text("다시 입력해주세요", fontFamily = SuiteFont) },
                 visualTransformation = if (showConfirmPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = { focusManager.clearFocus() }
+                ),
                 trailingIcon = {
                     IconButton(onClick = onToggleConfirmPassword) {
                         Icon(
@@ -548,39 +574,3 @@ private fun CompleteStepContent(onDismiss: () -> Unit) {
     }
 }
 
-/**
- * 전화번호를 하이픈으로 포맷팅하는 VisualTransformation
- */
-private class ForgotPhoneVisualTransformation : VisualTransformation {
-    override fun filter(text: AnnotatedString): TransformedText {
-        val digits = text.text
-        val formatted = buildString {
-            digits.forEachIndexed { index, c ->
-                if (index == 3 || index == 7) append('-')
-                append(c)
-            }
-        }
-        
-        val offsetMapping = object : OffsetMapping {
-            override fun originalToTransformed(offset: Int): Int {
-                return when {
-                    offset <= 3 -> offset
-                    offset <= 7 -> offset + 1
-                    else -> offset + 2
-                }.coerceAtMost(formatted.length)
-            }
-            
-            override fun transformedToOriginal(offset: Int): Int {
-                return when {
-                    offset <= 3 -> offset
-                    offset <= 4 -> offset // 하이픈 위치 대응
-                    offset <= 8 -> offset - 1
-                    offset <= 9 -> offset - 1 // 하이픈 위치 대응
-                    else -> offset - 2
-                }.coerceAtMost(digits.length)
-            }
-        }
-        
-        return TransformedText(AnnotatedString(formatted), offsetMapping)
-    }
-}

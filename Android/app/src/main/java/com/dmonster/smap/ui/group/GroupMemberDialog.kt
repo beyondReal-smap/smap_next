@@ -33,6 +33,7 @@ fun MemberManageDialog(
     isLoading: Boolean
 ) {
     val isLeader = member.sgdtLeaderChk == "Y"
+    var showRemoveConfirm by remember { mutableStateOf(false) }
 
     // Resolve avatar URL
     val imageUrl = androidx.compose.runtime.remember(member.mtFile1) {
@@ -44,6 +45,26 @@ fun MemberManageDialog(
                 else -> "${BuildConfig.IMAGE_BASE_URL}/images/${member.mtFile1}"
             }
         } else null
+    }
+
+    // Remove confirmation dialog
+    if (showRemoveConfirm) {
+        AlertDialog(
+            onDismissRequest = { showRemoveConfirm = false },
+            title = { Text("멤버 내보내기", fontFamily = SuiteFont, fontWeight = FontWeight.Bold) },
+            text = { Text("${member.displayName}님을 그룹에서 내보내시겠습니까?", fontFamily = SuiteFont) },
+            confirmButton = {
+                TextButton(onClick = {
+                    onRemove()
+                    showRemoveConfirm = false
+                }) { Text("내보내기", fontFamily = SuiteFont, color = Color.Red) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRemoveConfirm = false }) {
+                    Text("취소", fontFamily = SuiteFont)
+                }
+            }
+        )
     }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -126,9 +147,9 @@ fun MemberManageDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Remove Button
+                // Remove Button - now shows confirmation dialog first
                 OutlinedButton(
-                    onClick = onRemove,
+                    onClick = { showRemoveConfirm = true },
                     enabled = !isLoading,
                     modifier = Modifier.fillMaxWidth().height(44.dp),
                     shape = RoundedCornerShape(10.dp),

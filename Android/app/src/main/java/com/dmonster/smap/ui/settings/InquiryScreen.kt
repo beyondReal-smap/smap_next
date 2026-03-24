@@ -30,6 +30,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dmonster.smap.data.service.AuthService
+import com.dmonster.smap.BuildConfig
 import com.dmonster.smap.ui.theme.BrandColors
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -74,8 +75,8 @@ fun InquiryScreen(onBack: () -> Unit) {
     val isEmailValid = android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
     val isFormValid = isEmailValid && subject.isNotBlank() && message.isNotBlank()
 
-    val botToken = "8110782503:AAFSLBB8NWjzZy3vhPZGJH4boVEM2y9h0HM"
-    val chatId = "6495247513"
+    val botToken = BuildConfig.TELEGRAM_BOT_TOKEN
+    val chatId = BuildConfig.TELEGRAM_CHAT_ID
 
     val sendInquiry = {
         if (isFormValid && !isSending) {

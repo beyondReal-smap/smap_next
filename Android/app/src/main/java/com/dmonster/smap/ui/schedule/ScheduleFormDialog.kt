@@ -25,6 +25,7 @@ import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.SuiteFont
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 // MARK: - Create/Edit Event Dialog
 
@@ -67,6 +68,8 @@ fun CreateEditEventDialog(
     var locationName by remember { mutableStateOf(schedule?.location ?: "") }
     var locationLat by remember { mutableStateOf(schedule?.sstLocationLat) }
     var locationLng by remember { mutableStateOf(schedule?.sstLocationLong) }
+    // Fix #12: Initialize alarm from existing schedule data if editing
+    // TODO: SmapSchedule does not have an alarm field yet; default to "없음"
     var alarmTime by remember { mutableStateOf("없음") }
     var repeatConfig by remember { mutableStateOf(schedule?.repeatDescription ?: "반복 안함") }
     var editOptionState by remember { mutableStateOf(initialEditOption ?: "this") }
@@ -91,8 +94,8 @@ fun CreateEditEventDialog(
             onDismiss = { showLocationSearch = false },
             onSelect = { place ->
                 locationName = place.placeName
-                locationLat = place.y
-                locationLng = place.x
+                locationLat = place.latitude
+                locationLng = place.longitude
                 showLocationSearch = false
             }
         )
@@ -152,7 +155,7 @@ fun CreateEditEventDialog(
             onDismissRequest = { showStartTimePicker = false },
             confirmButton = {
                 TextButton(onClick = {
-                    startTime = String.format("%02d:%02d", timePickerState.hour, timePickerState.minute)
+                    startTime = String.format(Locale.US, "%02d:%02d", timePickerState.hour, timePickerState.minute)
                     showStartTimePicker = false
                 }) { Text("확인") }
             },
@@ -172,7 +175,7 @@ fun CreateEditEventDialog(
             onDismissRequest = { showEndTimePicker = false },
             confirmButton = {
                 TextButton(onClick = {
-                    endTime = String.format("%02d:%02d", timePickerState.hour, timePickerState.minute)
+                    endTime = String.format(Locale.US, "%02d:%02d", timePickerState.hour, timePickerState.minute)
                     showEndTimePicker = false
                 }) { Text("확인") }
             },
@@ -537,9 +540,29 @@ fun CreateEditEventDialog(
                 }
             }
 
+            // Fix #9: Date validation error state
+            var dateValidationError by remember { mutableStateOf<String?>(null) }
+
+            dateValidationError?.let { error ->
+                Text(
+                    text = error,
+                    color = Color.Red,
+                    fontSize = 13.sp,
+                    fontFamily = SuiteFont,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
+                )
+            }
+
             // Save Button
             Button(
                     onClick = {
+                        // Fix #9: Validate start/end dates before saving
+                        if (endDate < startDate || (endDate == startDate && endTime <= startTime && !isAllDay)) {
+                            dateValidationError = "종료 시간은 시작 시간 이후여야 합니다"
+                            return@Button
+                        }
+                        dateValidationError = null
+
                         val startDateTime = "$startDate $startTime"
                         val endDateTime = "$endDate $endTime"
                         onSave(
@@ -552,6 +575,8 @@ fun CreateEditEventDialog(
                             locationName.ifBlank { null },
                             locationLat,
                             locationLng,
+                            // Fix #19: alarmTime is sent as display string (e.g., "없음", "5분 전").
+                            // This is tightly coupled with the backend which expects these Korean display strings.
                             alarmTime,
                             if (repeatConfig == "반복 안함") null else repeatConfig,
                             editOptionState

@@ -1,7 +1,7 @@
 package com.dmonster.smap.ui.activitylog
 
 import com.dmonster.smap.AppConstants
-import android.annotation.SuppressLint
+import com.dmonster.smap.BuildConfig
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -12,12 +12,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
-import android.graphics.PointF
 import android.graphics.Color as AndroidColor
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.dmonster.smap.ui.schedule.GroupSelectorDropdown
 import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.myplace.FloatingActionPlaceButton
 import com.dmonster.smap.ui.home.MapLoadingOverlay
@@ -28,16 +25,13 @@ import com.naver.maps.geometry.LatLng
 import com.naver.maps.map.CameraPosition
 import com.naver.maps.map.CameraUpdate
 import com.naver.maps.map.compose.*
-import com.naver.maps.map.util.MarkerIcons
-import com.dmonster.smap.data.model.StayTime
 import com.naver.maps.map.overlay.OverlayImage
 import com.dmonster.smap.R
 
 /**
  * 활동로그 화면 - 지도 + 이동경로 + 요약 (iOS 스타일)
  */
-@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalNaverMapApi::class)
+@OptIn(ExperimentalNaverMapApi::class)
 @Composable
 fun ActivityLogScreen(
     viewModel: ActivityLogViewModel = hiltViewModel()
@@ -71,7 +65,6 @@ fun ActivityLogScreen(
     var isMapLoading by remember { mutableStateOf(true) }
     
     LaunchedEffect(Unit) {
-        viewModel.loadActivityData()
         // Ensure map loading shows for at least 1.5 seconds
         delay(1500)
         isMapLoading = false
@@ -104,7 +97,7 @@ fun ActivityLogScreen(
             valid
         }
         val coords = sampledLogs.map { LatLng(it.latitude, it.longitude) }
-        android.util.Log.d("ActivityLogScreen", "📍 Data processed: raw=${locationLogs.size}, valid=${valid.size}, sampled=${sampledLogs.size}")
+        if (BuildConfig.DEBUG) android.util.Log.d("ActivityLogScreen", "Data processed: raw=${locationLogs.size}, valid=${valid.size}, sampled=${sampledLogs.size}")
         Triple(sampledLogs, coords, sampledLogs.size)
     }
     
@@ -114,7 +107,7 @@ fun ActivityLogScreen(
     
     // Debug logging for slider value changes
     LaunchedEffect(uiSliderValue) {
-        android.util.Log.d("ActivityLogScreen", "🎚️ Slider: value=$uiSliderValue, totalPoints=$totalPoints, isDragging=$isSliderDragging")
+        if (BuildConfig.DEBUG) android.util.Log.d("ActivityLogScreen", "Slider: value=$uiSliderValue, totalPoints=$totalPoints, isDragging=$isSliderDragging")
     }
 
 
@@ -138,7 +131,16 @@ fun ActivityLogScreen(
             }
         }
     }
-    
+
+    // Handle error messages via snackbar
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(errorMessage) {
+        errorMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearError()
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         // 1. Map Layer
         NaverMap(
@@ -184,7 +186,7 @@ fun ActivityLogScreen(
                                 else -> 26f
                             } * stayDensity
 
-                            val markerBitmap = remember(index, stay.formattedDuration, colorInt, baseSizePx) {
+                            val markerBitmap = remember(stay.startTime, stay.endTime, colorInt, baseSizePx) {
                                 ActivityLogMarkerUtils.createStayMarkerBitmap(
                                     stayContext,
                                     index + 1,
@@ -213,15 +215,15 @@ fun ActivityLogScreen(
                             zIndex = 60
                         )
                     }
-                    
-                    // 3. End Marker (iOS: "E" red circle)
+
+                    // 3. End Marker (iOS: "E" red circle) - higher zIndex than start
                     if (allCoords.isNotEmpty()) {
                         Marker(
                             state = MarkerState(position = allCoords.last()),
                             icon = OverlayImage.fromResource(R.drawable.ic_marker_end),
                             width = 28.dp,
                             height = 28.dp,
-                            zIndex = 60
+                            zIndex = 61
                         )
                     }
                     
@@ -295,10 +297,12 @@ fun ActivityLogScreen(
                                         infoMarker.width = infoBitmap.width
                                         infoMarker.height = infoBitmap.height
                                         
-                                        // Always move camera to follow marker
-                                        val update = CameraUpdate.scrollTo(pos)
-                                        update.animate(com.naver.maps.map.CameraAnimation.None)
-                                        map.moveCamera(update)
+                                        // Only move camera when user is actively dragging the slider
+                                        if (isSliderDragging) {
+                                            val update = CameraUpdate.scrollTo(pos)
+                                            update.animate(com.naver.maps.map.CameraAnimation.None)
+                                            map.moveCamera(update)
+                                        }
                                     }
                                 }
                         }
@@ -358,12 +362,12 @@ fun ActivityLogScreen(
             PathSlider(
                 sliderValue = uiSliderValue.toDouble(),
                 isDragging = isSliderDragging,
-                onValueChange = { 
-                    android.util.Log.d("ActivityLogScreen", "🎚️ PathSlider onValueChange: $it")
+                onValueChange = {
+                    if (BuildConfig.DEBUG) android.util.Log.d("ActivityLogScreen", "PathSlider onValueChange: $it")
                     uiSliderValue = it.toFloat()
                 },
-                onDraggingChange = { dragging -> 
-                    android.util.Log.d("ActivityLogScreen", "🎚️ PathSlider onDraggingChange: $dragging")
+                onDraggingChange = { dragging ->
+                    if (BuildConfig.DEBUG) android.util.Log.d("ActivityLogScreen", "PathSlider onDraggingChange: $dragging")
                     if (isLocalDragging != dragging) {
                         isLocalDragging = dragging
                         viewModel.setSliderDragging(dragging)
@@ -431,35 +435,26 @@ fun ActivityLogScreen(
             )
         }
         
-        // Group Selector Dropdown (Absolute Positioning)
-        if (showGroupSelector) {
+        // Empty state overlay for map when no location data
+        if (locationLogs.isEmpty() && selectedMember != null && !isLoading && !isLoadingLogs && !isMapLoading) {
             Box(
-                modifier = Modifier
-                    .padding(top = 100.dp, start = 16.dp, end = 16.dp)
+                modifier = Modifier.fillMaxSize().zIndex(5f),
+                contentAlignment = Alignment.Center
             ) {
-                GroupSelectorDropdown(
-                    groups = groups,
-                    selectedGroup = selectedGroup,
-                    onGroupSelect = { viewModel.selectGroup(it) },
-                    onDismiss = { viewModel.hideGroupSelector() }
-                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "활동 데이터가 없습니다",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Color.DarkGray
+                    )
+                    Text(
+                        "선택한 날짜에 기록된 활동이 없습니다",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray
+                    )
+                }
             }
         }
-        
-        // Date Selector & Navigation Overlay (Usually integrated or needed? iOS has it in sidebar or top? 
-        // In iOS code: `ActivityLogHeaderView` is simple title. Users change view? 
-        // Android original had `DateSelector` at bottom. 
-        // iOS seems to rely on the data loaded. 
-        // Let's add Date navigation support perhaps in the FloatingCard or hidden?
-        // iOS `ActivityLogView` doesn't blatantly show date picker on map. It might be in sidebar or just implied.
-        // But Android version had it. I'll stick to iOS alignment which minimizes clutter.
-        // Actually, looking at iOS `LocationDetailPanel` (MyPlace) or `ActivityLogFloatingCard`, the date is displayed there.
-        // How to change date? In Android `ActivityLogScreen`, there was a date selector.
-        // I should probably keep the date change functionality somewhere.
-        // Maybe in the sidebar? Or maybe the user didn't ask for date picker removal but UI alignment.
-        // I will add the DateSelector if needed, but for now I'll stick to the "match iOS" instruction which lacks visible date picker in the main map view.
-        // However, I see `displayDate` in FloatingCard.
-        // I'll leave it as is.
         
         // 7. Map Loading Overlay
         if (isMapLoading) {
@@ -473,25 +468,20 @@ fun ActivityLogScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .zIndex(25f)
                     .background(Color.White.copy(alpha = 0.5f)),
                 contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator(color = BrandColors.Primary)
             }
         }
-    }
-    
-    // Handle messages
-    val snackbarHostState = remember { SnackbarHostState() }
-    LaunchedEffect(errorMessage) {
-        errorMessage?.let {
-            snackbarHostState.showSnackbar(it)
-            viewModel.clearError()
-        }
-    }
-    
-    // Snackbar Host
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
-        SnackbarHost(hostState = snackbarHostState)
+
+        // Snackbar Host (inside main Box with proper zIndex)
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .zIndex(100f)
+        )
     }
 }

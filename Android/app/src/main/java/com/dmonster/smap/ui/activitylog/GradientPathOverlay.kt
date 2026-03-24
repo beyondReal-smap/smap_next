@@ -51,19 +51,22 @@ fun GradientPathOverlay(
     width: androidx.compose.ui.unit.Dp = 6.dp
 ) {
     if (coords.size < 2) return
-    
-    // 1. 그라데이션 Polyline 그리기
-    for (i in 0 until coords.size - 1) {
-        val start = coords[i]
-        val end = coords[i + 1]
-        
-        val progress = i.toFloat() / (coords.size - 1).toFloat()
+
+    // 1. Gradient polylines - use step to reduce composable count (~50 segments max)
+    val step = maxOf(1, (coords.size - 1) / 50)
+    val sampledIndices = (0 until coords.size step step).toMutableList()
+    if (sampledIndices.last() != coords.size - 1) {
+        sampledIndices.add(coords.size - 1)
+    }
+    for (j in 0 until sampledIndices.size - 1) {
+        val startIdx = sampledIndices[j]
+        val endIdx = sampledIndices[j + 1]
+        val progress = startIdx.toFloat() / (coords.size - 1).toFloat()
         val segmentColor = getColorForProgress(progress)
-        
         PolylineOverlay(
-            coords = listOf(start, end),
-            width = width,
+            coords = coords.subList(startIdx, endIdx + 1),
             color = segmentColor,
+            width = width,
             capType = com.naver.maps.map.compose.LineCap.Round,
             joinType = com.naver.maps.map.compose.LineJoin.Round
         )

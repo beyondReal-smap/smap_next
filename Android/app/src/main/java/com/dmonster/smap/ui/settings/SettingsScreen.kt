@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.dmonster.smap.BuildConfig
 import com.dmonster.smap.data.model.SmapNotice
 import com.dmonster.smap.ui.theme.SuiteFont
 import com.dmonster.smap.ui.theme.BrandColors
@@ -155,7 +156,7 @@ fun SettingsScreen(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text("SMAP", fontFamily = SuiteFont, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color.Gray)
-                        Text("버전 3.0.4", fontFamily = SuiteFont, fontSize = 12.sp, color = Color.Gray.copy(alpha = 0.8f))
+                        Text("버전 ${BuildConfig.VERSION_NAME}", fontFamily = SuiteFont, fontSize = 12.sp, color = Color.Gray.copy(alpha = 0.8f))
                     }
                     
                     Spacer(modifier = Modifier.height(40.dp))

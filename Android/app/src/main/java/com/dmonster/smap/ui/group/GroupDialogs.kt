@@ -1,5 +1,6 @@
 package com.dmonster.smap.ui.group
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -17,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -24,6 +26,8 @@ import androidx.compose.ui.unit.sp
 import com.dmonster.smap.data.model.SmapGroup
 import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.SuiteFont
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 // MARK: - Invite Member Bottom Sheet
 
@@ -39,6 +43,7 @@ fun InviteMemberBottomSheet(
     onCopyCode: () -> Unit
 ) {
     val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -189,6 +194,7 @@ fun InviteMemberBottomSheet(
                         onClick = {
                             group.sgtCode?.let {
                                 clipboardManager.setText(AnnotatedString(it))
+                                Toast.makeText(context, "초대 코드가 복사되었습니다", Toast.LENGTH_SHORT).show()
                             }
                             onCopyCode()
                         }
@@ -255,7 +261,12 @@ fun QRCodeDialog(
     onDismiss: () -> Unit,
     onShare: (android.graphics.Bitmap) -> Unit
 ) {
-    val qrBitmap = remember(data) { generateQRCodeBitmap(data, 512) }
+    var qrBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    LaunchedEffect(data) {
+        qrBitmap = withContext(Dispatchers.Default) {
+            generateQRCodeBitmap(data, 512)
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -320,7 +331,8 @@ fun QRCodeDialog(
             Spacer(modifier = Modifier.height(24.dp))
 
             // QR Code Image
-            if (qrBitmap != null) {
+            val currentBitmap = qrBitmap
+            if (currentBitmap != null) {
                 Card(
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -334,7 +346,7 @@ fun QRCodeDialog(
                         contentAlignment = Alignment.Center
                     ) {
                         androidx.compose.foundation.Image(
-                            bitmap = qrBitmap.asImageBitmap(),
+                            bitmap = currentBitmap.asImageBitmap(),
                             contentDescription = "QR Code",
                             modifier = Modifier.fillMaxSize()
                         )

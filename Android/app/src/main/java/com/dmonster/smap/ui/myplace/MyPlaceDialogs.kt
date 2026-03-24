@@ -52,6 +52,8 @@ import androidx.compose.ui.platform.LocalContext
 @Composable
 fun LocationDetailSheet(
     location: SavedLocation?,
+    // Default to emptyList() because the edit-mode caller does not pass members;
+    // only the add-mode caller provides the member list for the target-member selector.
     members: List<SmapGroupMember> = emptyList(),
     selectedMember: SmapGroupMember? = null,
     pendingInfo: Triple<String, String, String?>? = null,
@@ -348,6 +350,7 @@ fun LocationDetailSheet(
                         // Inputs
                         InputSection(title = "장소 이름 *", value = name, placeholder = "장소 이름을 입력하세요") { name = it }
                         InputSection(title = "상세 주소 *", value = address, placeholder = "주소를 입력하세요") { address = it }
+                        InputSection(title = "메모", value = memo, placeholder = "메모를 입력하세요 (선택)") { memo = it }
                     }
                     
                     // Coordinates (Read-only)
@@ -670,13 +673,15 @@ fun LocationSearchSheet(
                     SearchEmptyState(
                         icon = Icons.Default.Map,
                         title = "어디를 찾으시나요?",
-                        message = "지번, 도로명 혹은 건물명을 입력하여\n원하는 장소를 검색해 보세요."
+                        message = "지번, 도로명 혹은 건물명을 입력하여\n원하는 장소를 검색해 보세요.",
+                        modifier = Modifier.weight(1f)
                     )
                 } else {
                     SearchEmptyState(
                         icon = Icons.Default.Search,
                         title = "검색 결과 없음",
-                        message = "'$query'에 대한 검색 결과가 없습니다.\n다른 검색어를 입력해 보세요."
+                        message = "'$query'에 대한 검색 결과가 없습니다.\n다른 검색어를 입력해 보세요.",
+                        modifier = Modifier.weight(1f)
                     )
                 }
             } else {
@@ -820,8 +825,8 @@ private fun MemberSelectorDialog(
 }
 
 @Composable
-private fun SearchEmptyState(icon: ImageVector, title: String, message: String) {
-    Box(modifier = Modifier.fillMaxWidth().fillMaxHeight(), contentAlignment = Alignment.Center) {
+private fun SearchEmptyState(icon: ImageVector, title: String, message: String, modifier: Modifier = Modifier) {
+    Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,

@@ -1,6 +1,7 @@
 package com.dmonster.smap.ui.login
 
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -11,6 +12,7 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import com.dmonster.smap.BuildConfig
 import com.dmonster.smap.MainActivity
 import com.dmonster.smap.R
 import com.dmonster.smap.ui.theme.SmapTheme
@@ -113,7 +115,7 @@ class LoginActivity : ComponentActivity() {
     
     private fun setupGoogleSignIn() {
         // Web OAuth 클라이언트 ID (requestIdToken에는 반드시 Web Client ID를 사용해야 함)
-        val serverClientId = "283271180972-n6gsgc0chrtqcehjr4ve249k42ont8q2.apps.googleusercontent.com"
+        val serverClientId = BuildConfig.GOOGLE_OAUTH_CLIENT_ID
         
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestIdToken(serverClientId)
@@ -191,10 +193,15 @@ class LoginActivity : ComponentActivity() {
         val intent = Intent(this, MainActivity::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
-        overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            overrideActivityTransition(OVERRIDE_TRANSITION_OPEN, android.R.anim.fade_in, android.R.anim.fade_out)
+        } else {
+            @Suppress("DEPRECATION")
+            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
+        }
         finish()
     }
-    
+
     private fun navigateToRegister(socialData: Map<String, String>?) {
         val intent = Intent(this, com.dmonster.smap.ui.register.RegisterActivity::class.java)
         socialData?.let {
@@ -204,7 +211,12 @@ class LoginActivity : ComponentActivity() {
             )
         }
         startActivity(intent)
-        overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            overrideActivityTransition(OVERRIDE_TRANSITION_OPEN, android.R.anim.fade_in, android.R.anim.fade_out)
+        } else {
+            @Suppress("DEPRECATION")
+            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
+        }
         finish()
     }
 }

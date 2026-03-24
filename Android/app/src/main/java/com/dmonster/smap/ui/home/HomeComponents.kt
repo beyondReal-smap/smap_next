@@ -219,6 +219,7 @@ fun MemberInfoWindow(
                 val date = inputSdf.parse(gpsTime.replace("Z", "").split(".")[0])
                 if (date != null) {
                     val outputSdf = SimpleDateFormat("HH:mm", Locale.KOREA)
+                    outputSdf.timeZone = TimeZone.getDefault()
                     outputSdf.format(date)
                 } else "정보 없음"
             } catch (e: Exception) {
@@ -274,7 +275,7 @@ fun MemberInfoWindow(
             InfoRow(
                 icon = Icons.Filled.DirectionsWalk,
                 label = "속도:",
-                value = "${String.format("%.1f", speed)}km/h",
+                value = "${String.format(Locale.US, "%.1f", speed)}km/h",
                 iconTint = Color(0xFFF59E0B)
             )
             

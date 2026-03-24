@@ -78,6 +78,10 @@ class HomeViewModel @Inject constructor(
     private val _daysForCalendar = MutableStateFlow<List<Pair<String, String>>>(emptyList())
     val daysForCalendar: StateFlow<List<Pair<String, String>>> = _daysForCalendar.asStateFlow()
 
+    // Cached member stats to avoid recomputation during composition
+    private val _memberStatsCache = MutableStateFlow<Map<Int, MemberStats>>(emptyMap())
+    val memberStatsCache: StateFlow<Map<Int, MemberStats>> = _memberStatsCache.asStateFlow()
+
     init {
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         _selectedDate.value = today
@@ -91,6 +95,18 @@ class HomeViewModel @Inject constructor(
                 filterSchedules(schedules, date, group, memberId)
             }.collect {
                 _filteredSchedules.value = it
+            }
+        }
+
+        // Precompute member stats whenever schedules, date, or members change
+        viewModelScope.launch {
+            combine(_allSchedules, _selectedDate, _members) { schedules, date, members ->
+                val currentTime = System.currentTimeMillis()
+                members.associate { member ->
+                    member.mtIdx to computeMemberStats(member.mtIdx, schedules, date, currentTime)
+                }
+            }.collect {
+                _memberStatsCache.value = it
             }
         }
 
@@ -418,21 +434,26 @@ class HomeViewModel @Inject constructor(
     }
 
     /**
-     * Get member schedule stats for today (completed, ongoing, upcoming)
-     * Matches iOS getMemberTodayStats() function
+     * Get member schedule stats for today (completed, ongoing, upcoming).
+     * Returns cached result from memberStatsCache to avoid recomputation during composition.
      */
     fun getMemberTodayStats(mtIdx: Int): MemberStats {
-        val currentTime = System.currentTimeMillis()
-        val selectedDateStr = _selectedDate.value
-        
-        // Filter by member AND date
-        val memberSchedules = _allSchedules.value.filter { schedule ->
-            // 1. Filter by member ID (mtIdx or mtScheduleIdx)
+        return _memberStatsCache.value[mtIdx] ?: MemberStats(0, 0, 0)
+    }
+
+    /**
+     * Compute stats for a single member - used by the cache collector.
+     */
+    private fun computeMemberStats(
+        mtIdx: Int,
+        schedules: List<SmapSchedule>,
+        selectedDateStr: String,
+        currentTime: Long
+    ): MemberStats {
+        val memberSchedules = schedules.filter { schedule ->
             val sMemberId = schedule.mtIdx ?: schedule.mtScheduleIdx
-            // If ID is null, it might be a group schedule visible to all
             val isMemberMatch = sMemberId == null || sMemberId == mtIdx
-            
-            // 2. Filter by date
+
             val scheduleDate = try {
                 val date = schedule.date
                 if (!date.isNullOrEmpty() && date.length >= 10) date.substring(0, 10) else ""
@@ -442,21 +463,16 @@ class HomeViewModel @Inject constructor(
             val isDateMatch = scheduleDate == selectedDateStr
             if (!isDateMatch) return@filter false
 
-            // 3. Filter by visibility
             val isVisible = schedule.sstShow != "N"
             if (!isVisible) return@filter false
-            
-            if (sMemberId != null) {
-                Log.v(TAG, "🔍 [getMemberTodayStats] Comparing schedule member $sMemberId with target $mtIdx -> Match: $isMemberMatch")
-            }
-            
+
             isMemberMatch
         }
-        
+
         var completed = 0
         var ongoing = 0
         var upcoming = 0
-        
+
         for (schedule in memberSchedules) {
             val status = getScheduleStatus(schedule, currentTime)
             when (status) {
@@ -465,11 +481,7 @@ class HomeViewModel @Inject constructor(
                 "upcoming" -> upcoming++
             }
         }
-        
-        if (memberSchedules.isNotEmpty()) {
-            Log.d(TAG, "📊 [getMemberTodayStats] mtIdx: $mtIdx -> Done: $completed, Doing: $ongoing, Will: $upcoming (Total: ${memberSchedules.size})")
-        }
-        
+
         return MemberStats(completed, ongoing, upcoming)
     }
     

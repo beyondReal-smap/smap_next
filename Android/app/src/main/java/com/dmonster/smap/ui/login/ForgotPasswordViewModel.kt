@@ -12,6 +12,7 @@ import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,6 +23,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 /**
@@ -36,19 +38,18 @@ class ForgotPasswordViewModel @Inject constructor() : ViewModel() {
         private val CHECK_PHONE_URL = "$BASE_URL/members/check/phone/"
         private val SMS_SEND_URL = "$BASE_URL/sms/send-verification-code"
         private val RESET_PASSWORD_URL = "$BASE_URL/auth/reset-password-by-phone"
+        private val httpClient = OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .build()
     }
-    
+
     enum class Step {
         PHONE,
         VERIFICATION,
         NEW_PASSWORD,
         COMPLETE
     }
-    
-    private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .build()
     
     private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true; isLenient = true }
     
@@ -67,6 +68,10 @@ class ForgotPasswordViewModel @Inject constructor() : ViewModel() {
     private val _verificationTimer = MutableStateFlow(0)
     val verificationTimer: StateFlow<Int> = _verificationTimer.asStateFlow()
     
+    private var timerJob: Job? = null
+    // TODO: Server-side verification - send the user-entered code to the server for verification
+    // instead of storing and comparing locally. Keeping client-side comparison for now until
+    // the server API supports a verify-code endpoint.
     private var sentVerificationCode: String? = null
     
     // Password state
@@ -215,8 +220,8 @@ class ForgotPasswordViewModel @Inject constructor() : ViewModel() {
     }
     
     private suspend fun sendVerificationCode(cleanPhone: String) {
-        // Test number handling
-        if (cleanPhone == "01011111111") {
+        // Test number handling (debug builds only)
+        if (BuildConfig.DEBUG && cleanPhone == "01011111111") {
             _isLoading.value = false
             startTimer()
             _currentStep.value = Step.VERIFICATION
@@ -225,7 +230,9 @@ class ForgotPasswordViewModel @Inject constructor() : ViewModel() {
         
         try {
             val result = withContext(Dispatchers.IO) {
-                val requestBody = """{"phone_number":"$cleanPhone"}"""
+                val requestBody = JSONObject().apply {
+                    put("phone_number", cleanPhone)
+                }.toString()
 
                 val request = Request.Builder()
                     .url(SMS_SEND_URL)
@@ -262,8 +269,8 @@ class ForgotPasswordViewModel @Inject constructor() : ViewModel() {
         val code = _verificationCode.value
         val cleanPhone = formatPhoneForAPI(_phoneNumber.value)
         
-        // Test number handling
-        if (cleanPhone == "01011111111" && code == "111111") {
+        // Test number handling (debug builds only)
+        if (BuildConfig.DEBUG && cleanPhone == "01011111111" && code == "111111") {
             _currentStep.value = Step.NEW_PASSWORD
             return
         }
@@ -298,7 +305,10 @@ class ForgotPasswordViewModel @Inject constructor() : ViewModel() {
                 val cleanPhone = formatPhoneForAPI(_phoneNumber.value)
                 
                 val result = withContext(Dispatchers.IO) {
-                    val jsonBody = """{"phone":"$cleanPhone","new_password":"${_newPassword.value}"}"""
+                    val jsonBody = JSONObject().apply {
+                        put("phone", cleanPhone)
+                        put("new_password", _newPassword.value)
+                    }.toString()
 
                     val request = Request.Builder()
                         .url(RESET_PASSWORD_URL)
@@ -333,8 +343,9 @@ class ForgotPasswordViewModel @Inject constructor() : ViewModel() {
     // MARK: - Helpers
     
     private fun startTimer() {
+        timerJob?.cancel()
         _verificationTimer.value = 180
-        viewModelScope.launch {
+        timerJob = viewModelScope.launch {
             while (_verificationTimer.value > 0) {
                 delay(1000)
                 _verificationTimer.value -= 1
