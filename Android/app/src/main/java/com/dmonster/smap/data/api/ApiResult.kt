@@ -16,5 +16,9 @@ suspend fun <T> safeApiCall(call: suspend () -> T): ApiResult<T> {
         ApiResult.Error(e.code(), e.message())
     } catch (e: IOException) {
         ApiResult.NetworkError(e)
+    } catch (e: Exception) {
+        // Catch serialization errors (JsonDecodingException, etc.)
+        // that occur when API returns unexpected response format
+        ApiResult.Error(-1, e.message ?: "알 수 없는 오류가 발생했습니다")
     }
 }
