@@ -215,6 +215,8 @@ def run_send_daily_weather_notifications(db: Session) -> None:
                     push_result,
                     weather_info
                 )
+            else:
+                logger.debug(f"[Weather Push] mt_idx={mt_idx}: no fresh weather data, skipping")
 
         logger.info("Daily weather notifications executed successfully")
 
@@ -396,4 +398,104 @@ def run_schedule_movement_alert(db: Session) -> None:
 
     except Exception as e:
         logger.exception(f"Error in schedule movement alerts: {e}")
+        db.rollback()
+
+
+def run_refresh_weather_data(db: Session) -> None:
+    """기상청 단기예보 API로 활성 회원의 날씨 데이터를 갱신한다.
+
+    회원을 격자(5km) 단위로 그룹핑하여 격자당 1회만 API 호출.
+    매일 06:30 실행 → 07:00 날씨 푸시 전에 데이터 갱신 완료.
+    """
+    from app.models.member import Member
+    from app.services.weather_service import (
+        latlong_to_grid,
+        fetch_kma_forecast,
+        parse_kma_forecast,
+    )
+
+    try:
+        members = db.query(
+            Member.mt_idx, Member.mt_lat, Member.mt_long
+        ).filter(
+            Member.mt_level > 1,
+            Member.mt_status == 1,
+            Member.mt_lat.isnot(None),
+            Member.mt_long.isnot(None),
+        ).all()
+
+        if not members:
+            logger.info("[Weather Refresh] No active members with location data")
+            return
+
+        # 격자 단위로 회원 그룹핑
+        grid_members: dict[tuple[int, int], list[int]] = {}
+        for m in members:
+            try:
+                lat_f, lon_f = float(m.mt_lat), float(m.mt_long)
+                if not (33.0 <= lat_f <= 39.0 and 124.0 <= lon_f <= 132.0):
+                    continue  # 한국 범위 밖 무시
+                nx, ny = latlong_to_grid(lat_f, lon_f)
+                grid_members.setdefault((nx, ny), []).append(m.mt_idx)
+            except (TypeError, ValueError):
+                continue
+
+        logger.info(
+            f"[Weather Refresh] {len(members)} members → "
+            f"{len(grid_members)} unique grids"
+        )
+
+        target_date = datetime.now().strftime("%Y%m%d")
+        updated_count = 0
+        failed_grids = 0
+
+        for (nx, ny), mt_idx_list in grid_members.items():
+            raw = fetch_kma_forecast(nx, ny)
+            forecast = parse_kma_forecast(raw, target_date)
+
+            if not forecast:
+                failed_grids += 1
+                continue
+
+            # TINYINT 범위 클램핑 (-128~127)
+            tmx = max(-128, min(127, forecast["tmx"]))
+            tmn = max(-128, min(127, forecast["tmn"]))
+            sky = max(0, min(127, forecast["sky"]))
+
+            # 해당 격자의 모든 회원 일괄 업데이트
+            now = datetime.now()
+            try:
+                db.execute(text("""
+                    UPDATE member_t
+                    SET mt_weather_tmx = :tmx,
+                        mt_weather_tmn = :tmn,
+                        mt_weather_sky = :sky,
+                        mt_weather_pop = :pop,
+                        mt_weather_date = :wdate
+                    WHERE mt_idx IN :mt_idxs
+                """), {
+                    "tmx": tmx,
+                    "tmn": tmn,
+                    "sky": sky,
+                    "pop": forecast["pop"],
+                    "wdate": now,
+                    "mt_idxs": tuple(mt_idx_list),
+                })
+                updated_count += len(mt_idx_list)
+            except Exception as e:
+                logger.warning(
+                    f"[Weather Refresh] Grid ({nx},{ny}) update failed: {e}, "
+                    f"values: tmx={tmx} tmn={tmn} sky={sky}"
+                )
+                failed_grids += 1
+                db.rollback()
+
+        db.commit()
+        logger.info(
+            f"[Weather Refresh] Done: {updated_count} members updated, "
+            f"{failed_grids} grids failed"
+        )
+
+    except Exception as e:
+        logger.exception(f"[Weather Refresh] Error: {e}")
         db.rollback()

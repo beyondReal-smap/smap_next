@@ -45,6 +45,7 @@ def _get_job_func(job_name: str):
             run_send_daily_weather_notifications,
             run_send_my_location_push_notifications,
             run_schedule_movement_alert,
+            run_refresh_weather_data,
         )
 
         _JOB_REGISTRY.update({
@@ -68,6 +69,7 @@ def _get_job_func(job_name: str):
             "send_daily_weather_notifications": run_send_daily_weather_notifications,
             "send_my_location_push_notifications": run_send_my_location_push_notifications,
             "schedule_movement_alert": run_schedule_movement_alert,
+            "refresh_weather_data": run_refresh_weather_data,
         })
 
     return _JOB_REGISTRY.get(job_name)
@@ -158,6 +160,11 @@ class BackgroundTasks:
             self._run_job, CronTrigger(hour=21, minute=0),
             args=['notify_low_battery_at_9pm'],
             id='notify_low_battery_at_9pm', **_cron_opts
+        )
+        self.scheduler.add_job(
+            self._run_job, CronTrigger(hour=6, minute=30),
+            args=['refresh_weather_data'],
+            id='refresh_weather_data', **_cron_opts
         )
         self.scheduler.add_job(
             self._run_job, CronTrigger(hour=7, minute=0),

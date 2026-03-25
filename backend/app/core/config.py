@@ -82,6 +82,9 @@ class Settings(BaseSettings):
     IOS_BUNDLE_ID: str = "com.dmonster.smap"
     IOS_PUSH_RETRY_COUNT: int = 3
 
+    # 기상청 API 설정
+    KMA_SERVICE_KEY: str = Field(default="", validation_alias=AliasChoices("KMA_SERVICE_KEY"))
+
     # 비밀번호 정책 설정
     PASSWORD_MIN_LENGTH: int = 8
     PASSWORD_BCRYPT_COST: int = 12
