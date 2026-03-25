@@ -24,36 +24,55 @@ logger = logging.getLogger(__name__)
 
 
 def run_notify_low_battery_at_9pm(db: Session) -> None:
-    """배터리 부족 알림"""
-    from app.models.member import Member
+    """배터리 부족 알림 — 최근 1주일 내 접속 + 배터리 50% 이하 대상"""
     from app.services.push_service import send_push, push_log_add
 
     try:
         plt_condition = "일일 - 배터리알림"
         plt_memo = "저녁 9시 배터리 부족 알림"
 
-        members = Member.get_all_active(db)
+        # 최근 7일 내 접속 + 배터리 50% 이하인 회원만 조회
+        # member_location_log_t에서 각 회원의 최신 배터리 수치를 가져옴
+        rows = db.execute(text("""
+            SELECT m.mt_idx, m.mt_token_id, m.mt_lang, latest.battery
+            FROM member_t m
+            INNER JOIN (
+                SELECT mt_idx, mlt_battery AS battery
+                FROM member_location_log_t
+                WHERE (mt_idx, mlt_wdate) IN (
+                    SELECT mt_idx, MAX(mlt_wdate)
+                    FROM member_location_log_t
+                    WHERE mlt_battery IS NOT NULL AND mlt_battery > 0
+                    GROUP BY mt_idx
+                )
+            ) latest ON m.mt_idx = latest.mt_idx
+            WHERE m.mt_level > 1
+              AND m.mt_status = 1
+              AND m.mt_ldate >= :cutoff
+              AND m.mt_token_id IS NOT NULL
+              AND latest.battery <= 50
+        """), {"cutoff": datetime.now() - timedelta(days=7)}).fetchall()
 
-        for member in members:
-            mt_idx = str(member.mt_idx)
+        for row in rows:
+            mt_idx = str(row.mt_idx)
 
             messages = {
                 "ko": {
                     "title": "배터리 부족 알림 🔋",
-                    "content": "배터리가 부족해요! 충전해주세요."
+                    "content": f"배터리가 {row.battery}%로 부족해요! 충전해주세요."
                 },
                 "en": {
                     "title": "Low Battery Alert 🔋",
-                    "content": "Your battery is low! Please charge your device."
+                    "content": f"Your battery is at {row.battery}%! Please charge your device."
                 }
             }
 
-            lang = normalize_lang(getattr(member, "mt_lang", None))
+            lang = normalize_lang(row.mt_lang)
             push_title = messages.get(lang, messages["ko"])["title"]
             push_content = messages.get(lang, messages["ko"])["content"]
 
             push_result = send_push(
-                member.mt_token_id,
+                row.mt_token_id,
                 push_title,
                 push_content
             )
@@ -67,10 +86,10 @@ def run_notify_low_battery_at_9pm(db: Session) -> None:
                 push_title,
                 push_content,
                 push_result,
-                {}
+                {"battery": row.battery}
             )
 
-        logger.info("Low battery notifications executed successfully")
+        logger.info(f"Low battery notifications: {len(rows)} members notified")
 
     except Exception as e:
         logger.exception(f"Error in low battery notifications: {e}")
@@ -157,7 +176,7 @@ def run_send_daily_log_notifications(db: Session) -> None:
 
 
 def run_send_daily_weather_notifications(db: Session) -> None:
-    """일일 날씨 알림"""
+    """일일 날씨 알림 — 최근 1주일 내 접속자만 대상"""
     from app.models.member import Member
     from app.services.push_service import send_push, push_log_add
     from app.services.weather_service import get_weather_info
@@ -166,7 +185,7 @@ def run_send_daily_weather_notifications(db: Session) -> None:
         plt_condition = "일일 - 날씨알림"
         plt_memo = "오늘의 날씨 정보 알림"
 
-        members = Member.get_all_active(db)
+        members = Member.get_recently_active(db)
 
         for member in members:
             mt_idx = str(member.mt_idx)
@@ -244,6 +263,10 @@ def run_send_my_location_push_notifications(db: Session) -> None:
 
             member = Member.find_by_idx(db, int(mt_idx))
             if not member:
+                continue
+
+            # 최근 1주일 내 접속하지 않은 회원은 스킵
+            if not member.mt_ldate or member.mt_ldate < datetime.now() - timedelta(days=7):
                 continue
 
             member_location = MemberLocationLog.getDistance(

@@ -120,6 +120,16 @@ class Member(BaseModel):
         ).all()
 
     @classmethod
+    def get_recently_active(cls, db: Session, days: int = 7) -> List['Member']:
+        """최근 N일 이내에 로그인한 활성 회원만 조회합니다."""
+        cutoff = datetime.now() - timedelta(days=days)
+        return db.query(cls).filter(
+            cls.mt_level > 1,
+            cls.mt_status == 1,
+            cls.mt_ldate >= cutoff,
+        ).all()
+
+    @classmethod
     def get_all_active_lite(cls, db: Session):
         """스케줄러용 경량 멤버 조회 (필수 컬럼만)"""
         return db.query(

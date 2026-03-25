@@ -241,7 +241,7 @@ def run_send_silent_push_to_all_users(db: Session) -> None:
 
 
 def run_trigger_app_execution_at_7_30pm(db: Session) -> None:
-    """앱 실행 트리거"""
+    """앱 실행 트리거 — 최근 1주일 내 접속자만 대상"""
     from app.models.member import Member
     from app.services.push_service import send_push, push_log_add
 
@@ -249,7 +249,7 @@ def run_trigger_app_execution_at_7_30pm(db: Session) -> None:
         plt_condition = "일일 - 앱실행알림"
         plt_memo = "저녁 7시 30분 앱 실행 알림"
 
-        members = Member.get_all_active(db)
+        members = Member.get_recently_active(db)
 
         for member in members:
             mt_idx = str(member.mt_idx)
