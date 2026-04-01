@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -6,6 +8,13 @@ plugins {
     id("com.google.devtools.ksp")
     id("org.jetbrains.kotlin.plugin.serialization")
 }
+
+val localProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+fun localOrGradleProp(key: String): String? =
+    localProps.getProperty(key) ?: project.findProperty(key)?.toString()
 
 android {
     namespace = "com.dmonster.smap"
@@ -37,9 +46,9 @@ android {
     signingConfigs {
         create("release") {
             storeFile = file("smap.jks")
-            storePassword = project.findProperty("STORE_PASSWORD")?.toString() ?: ""
-            keyAlias = project.findProperty("KEY_ALIAS")?.toString() ?: "key0"
-            keyPassword = project.findProperty("KEY_PASSWORD")?.toString() ?: ""
+            storePassword = localOrGradleProp("STORE_PASSWORD") ?: ""
+            keyAlias = localOrGradleProp("KEY_ALIAS") ?: "key0"
+            keyPassword = localOrGradleProp("KEY_PASSWORD") ?: ""
         }
     }
 
