@@ -24,8 +24,8 @@ android {
         applicationId = "com.dmonster.smap"
         minSdk = 28
         targetSdk = 35
-        versionCode = 53
-        versionName = "3.0.8"
+        versionCode = 54
+        versionName = "3.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         resourceConfigurations += setOf("ko", "en")
