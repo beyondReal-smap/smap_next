@@ -131,7 +131,7 @@ actor LocationUploader {
         ]
 
         do {
-            let (data, response) = try await apiClient.requestRaw(
+            let (_, response) = try await apiClient.requestRaw(
                 .createLocationLog(params: params),
                 token: KeychainManager.shared.getToken()
             )

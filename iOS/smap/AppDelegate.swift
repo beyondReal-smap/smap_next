@@ -3844,8 +3844,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         print("🚀 [FCM-API][\(timestamp)] FCM 토큰 서버 업데이트 시작")
 
         // 📱 앱 상태 확인 - 백그라운드에서도 토큰 업데이트 허용
-        let appState = UIApplication.shared.applicationState
-        let isBackground = appState == .background
+        let isBackground: Bool
+        if Thread.isMainThread {
+            isBackground = UIApplication.shared.applicationState == .background
+        } else {
+            isBackground = DispatchQueue.main.sync { UIApplication.shared.applicationState == .background }
+        }
 
         self.fcmLog("📱 앱 상태: \(isBackground ? "백그라운드" : "포그라운드") - 토큰 업데이트 허용")
 
