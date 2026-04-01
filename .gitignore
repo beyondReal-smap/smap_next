@@ -173,6 +173,7 @@ AndroidWebView/app/release/
 AndroidWebView/app/debug/
 AndroidWebView/build/
 AndroidWebView/local.properties
+Android/local.properties
 AndroidWebView/.idea/
 AndroidWebView/*.iml
 AndroidWebView/app/*.iml

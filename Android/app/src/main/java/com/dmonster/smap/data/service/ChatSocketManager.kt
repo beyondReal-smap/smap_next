@@ -154,8 +154,11 @@ class ChatSocketManager(
     }
 
     fun sendMessage(scrIdx: Int, content: String) {
-        val escaped = content.replace("\"", "\\\"").replace("\n", "\\n")
-        webSocket?.send("42[\"send_message\",{\"scr_idx\":$scrIdx,\"content\":\"$escaped\"}]")
+        val payload = JSONObject().apply {
+            put("scr_idx", scrIdx)
+            put("content", content)
+        }
+        webSocket?.send("42${JSONArray().put("send_message").put(payload)}")
     }
 
     fun sendReadUpdate(scrIdx: Int, scmsgIdx: Int) {
