@@ -9,20 +9,26 @@ import os
 import sys
 import time
 import traceback
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.exc import SQLAlchemyError
+
+import socketio
 
 from app.api.v1.api import api_router
 from app.core.config import settings
 from app.core.log_manager import get_log_manager
 from app.core.scheduler import scheduler
 from app.db.session import engine
+from app.websocket.chat_ws import sio as socketio_server
 
 # ---------------------------------------------------------------------------
 # 경로 설정
@@ -144,24 +150,117 @@ app.add_middleware(
 
 
 @app.middleware("http")
+async def hwgi_cors(request: Request, call_next):
+    """hwgi 엔드포인트에 대해 모든 Origin 허용 (로컬 HTML 파일 지원)"""
+    if "/api/v1/hwgi/" in str(request.url.path) or request.url.path.startswith("/uploads/hwgi"):
+        if request.method == "OPTIONS":
+            from starlette.responses import Response
+            resp = Response(status_code=200)
+            resp.headers["Access-Control-Allow-Origin"] = request.headers.get("origin", "*")
+            resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+            resp.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+            resp.headers["Access-Control-Max-Age"] = "3600"
+            return resp
+        response = await call_next(request)
+        origin = request.headers.get("origin", "*")
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        return response
+    return await call_next(request)
+
+
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    """각 요청에 고유 Request-ID를 부여하여 분산 로깅 추적을 지원"""
+    request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())[:8]
+    request.state.request_id = request_id
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
+    return response
+
+
+@app.middleware("http")
 async def log_requests(request: Request, call_next):
+    request_id = getattr(request.state, "request_id", "-")
     try:
         response = await call_next(request)
         if response.status_code >= 400:
             logger.warning(
-                f"Request failed: {request.method} {request.url} - Status: {response.status_code}"
+                f"[{request_id}] {request.method} {request.url} - {response.status_code}"
             )
         return response
     except Exception as e:
-        logger.error(f"Request failed: {request.method} {request.url} - Error: {e}")
+        logger.error(f"[{request_id}] {request.method} {request.url} - Error: {e}")
         logger.error(f"Traceback: {traceback.format_exc()}")
         raise
+
+
+# ---------------------------------------------------------------------------
+# 글로벌 예외 핸들러
+# ---------------------------------------------------------------------------
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """요청 유효성 검사 실패 시 일관된 에러 응답"""
+    request_id = getattr(request.state, "request_id", "-")
+    logger.warning(f"[{request_id}] Validation error: {exc.errors()}")
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": {
+                "code": "VALIDATION_ERROR",
+                "message": "요청 데이터가 올바르지 않습니다.",
+                "details": exc.errors(),
+            },
+            "request_id": request_id,
+        },
+    )
+
+
+@app.exception_handler(SQLAlchemyError)
+async def sqlalchemy_exception_handler(request: Request, exc: SQLAlchemyError):
+    """데이터베이스 에러 시 내부 정보를 숨기고 일관된 에러 응답"""
+    request_id = getattr(request.state, "request_id", "-")
+    logger.error(f"[{request_id}] Database error: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": {
+                "code": "DATABASE_ERROR",
+                "message": "데이터베이스 처리 중 오류가 발생했습니다.",
+            },
+            "request_id": request_id,
+        },
+    )
+
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    """처리되지 않은 예외를 안전하게 처리"""
+    request_id = getattr(request.state, "request_id", "-")
+    logger.error(f"[{request_id}] Unhandled exception: {exc}")
+    logger.error(traceback.format_exc())
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": {
+                "code": "INTERNAL_ERROR",
+                "message": "서버 내부 오류가 발생했습니다.",
+            },
+            "request_id": request_id,
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
 # 라우터
 # ---------------------------------------------------------------------------
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+# ---------------------------------------------------------------------------
+# Socket.IO (채팅 WebSocket)
+# ---------------------------------------------------------------------------
+app.mount("/ws", socketio.ASGIApp(socketio_server))
 
 
 # ---------------------------------------------------------------------------
@@ -261,6 +360,8 @@ async def redirect_double_slash_api(request: Request, path: str):
 @app.get("/debug/images", tags=["debug"])
 async def debug_images():
     """이미지 디렉토리 경로와 파일 목록을 확인합니다."""
+    if not settings.DEBUG:
+        return JSONResponse(status_code=404, content={"detail": "Not found"})
     files = [f.name for f in IMAGES_DIR.glob("*")] if IMAGES_DIR.exists() else []
     return {
         "base_dir": str(BASE_DIR),
@@ -276,6 +377,11 @@ async def debug_images():
 # ---------------------------------------------------------------------------
 app.mount("/static", StaticFiles(directory=str(STORAGE_DIR)), name="static")
 app.mount("/images", StaticFiles(directory=str(IMAGES_DIR)), name="images")
+
+# 업로드 파일 서빙
+UPLOADS_DIR = STORAGE_DIR / "uploads"
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
 
 # ---------------------------------------------------------------------------

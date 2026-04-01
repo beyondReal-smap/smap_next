@@ -147,13 +147,15 @@ def render_push_message(
     lang: str,
     variables: Dict[str, str],
     fallback_template: Dict[str, str],
+    member_id: Optional[int] = None,
 ) -> tuple:
-    """AI 메시지 서비스를 통해 푸시 메시지를 렌더링합니다."""
-    from app.services.ai_message_service import ai_message_service
+    """알림 조합기를 통해 푸시 메시지를 렌더링합니다."""
+    from app.services.notifications.composer import compose_notification
 
-    return ai_message_service.render_message(
+    return compose_notification(
         event_type=event_type,
         lang=lang,
         variables=variables,
-        fallback_template=fallback_template,
+        member_id=member_id,
+        fallback_templates=[fallback_template],
     )

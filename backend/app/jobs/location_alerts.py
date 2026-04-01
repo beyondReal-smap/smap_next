@@ -27,11 +27,10 @@ GPS_STALE_THRESHOLD = timedelta(minutes=5)  # GPS 데이터 유효 기간
 from app.jobs.base import (
     get_group_member_data,
     haversine,
-    normalize_lang,
     prefetch_members,
     record_value,
-    render_push_message,
 )
+from app.services.notifications import dispatch_notification
 
 logger = logging.getLogger(__name__)
 
@@ -59,20 +58,7 @@ def _send_entry_notifications(
     push_json: Dict,
 ) -> None:
     """진입 알림을 전송합니다."""
-    from app.services.push_service import send_push, push_log_add
-
     try:
-        messages = {
-            "ko": {
-                "title": "일정장소 도착알림 📍",
-                "content": "{name}님이 '{title}' 장소에 도착했어요! 🎉"
-            },
-            "en": {
-                "title": "Arrival at scheduled location 📍",
-                "content": "{name} has arrived at '{title}'! 🎉"
-            }
-        }
-
         actor_name = group_data["member"].get("mt_name", "회원")
         schedule_title = record_value(schedule, "sst_title") or "일정"
 
@@ -82,31 +68,15 @@ def _send_entry_notifications(
             if str(target.get("mt_idx")) == str(group_data["member"].get("mt_idx")):
                 continue
 
-            lang = normalize_lang(target.get("mt_lang"))
-            fallback_template = messages.get(lang, messages["ko"])
-            push_title, push_content = render_push_message(
+            dispatch_notification(
+                db=db,
+                recipient=target,
                 event_type="schedule_place_entry",
-                lang=lang,
                 variables={"name": actor_name, "title": schedule_title},
-                fallback_template=fallback_template,
-            )
-
-            push_result = send_push(
-                target.get("mt_token_id"),
-                push_title,
-                push_content
-            )
-
-            push_log_add(
-                db,
-                target.get("mt_idx"),
-                record_value(schedule, "sst_idx"),
-                plt_condition,
-                plt_memo,
-                push_title,
-                push_content,
-                push_result,
-                push_json
+                plt_condition=plt_condition,
+                plt_memo=plt_memo,
+                resource_id=record_value(schedule, "sst_idx"),
+                push_json=push_json,
             )
 
     except Exception as e:
@@ -122,20 +92,7 @@ def _send_exit_notifications(
     push_json: Dict,
 ) -> None:
     """이탈 알림을 전송합니다."""
-    from app.services.push_service import send_push, push_log_add
-
     try:
-        messages = {
-            "ko": {
-                "title": "일정장소 출발알림 👋",
-                "content": "{name}님이 '{title}' 장소에서 출발했어요!"
-            },
-            "en": {
-                "title": "Departure from scheduled location 👋",
-                "content": "{name} has departed from '{title}'!"
-            }
-        }
-
         actor_name = group_data["member"].get("mt_name", "회원")
         schedule_title = record_value(schedule, "sst_title") or "일정"
 
@@ -145,31 +102,15 @@ def _send_exit_notifications(
             if str(target.get("mt_idx")) == str(group_data["member"].get("mt_idx")):
                 continue
 
-            lang = normalize_lang(target.get("mt_lang"))
-            fallback_template = messages.get(lang, messages["ko"])
-            push_title, push_content = render_push_message(
+            dispatch_notification(
+                db=db,
+                recipient=target,
                 event_type="schedule_place_exit",
-                lang=lang,
                 variables={"name": actor_name, "title": schedule_title},
-                fallback_template=fallback_template,
-            )
-
-            push_result = send_push(
-                target.get("mt_token_id"),
-                push_title,
-                push_content
-            )
-
-            push_log_add(
-                db,
-                target.get("mt_idx"),
-                record_value(schedule, "sst_idx"),
-                plt_condition,
-                plt_memo,
-                push_title,
-                push_content,
-                push_result,
-                push_json
+                plt_condition=plt_condition,
+                plt_memo=plt_memo,
+                resource_id=record_value(schedule, "sst_idx"),
+                push_json=push_json,
             )
 
     except Exception as e:
@@ -177,35 +118,23 @@ def _send_exit_notifications(
 
 
 def _update_entry_status(db: Session, sst_idx: int) -> None:
-    """진입 상태를 업데이트합니다."""
+    """진입 상태를 업데이트합니다. (커밋은 호출자가 수행)"""
     from app.models.schedule import Schedule
 
-    try:
-        schedule = Schedule.find_by_idx(db, sst_idx)
-        if schedule:
-            schedule.sst_in_chk = "Y"
-            schedule.sst_entry_cnt = (schedule.sst_entry_cnt or 0) + 1
-            db.commit()
-
-    except Exception as e:
-        logger.exception(f"Error updating entry status: {e}")
-        db.rollback()
+    schedule = Schedule.find_by_idx(db, sst_idx)
+    if schedule:
+        schedule.sst_in_chk = "Y"
+        schedule.sst_entry_cnt = (schedule.sst_entry_cnt or 0) + 1
 
 
 def _update_exit_status(db: Session, sst_idx: int) -> None:
-    """이탈 상태를 업데이트합니다."""
+    """이탈 상태를 업데이트합니다. (커밋은 호출자가 수행)"""
     from app.models.schedule import Schedule
 
-    try:
-        schedule = Schedule.find_by_idx(db, sst_idx)
-        if schedule:
-            schedule.sst_in_chk = "N"
-            schedule.sst_exit_cnt = (schedule.sst_exit_cnt or 0) + 1
-            db.commit()
-
-    except Exception as e:
-        logger.exception(f"Error updating exit status: {e}")
-        db.rollback()
+    schedule = Schedule.find_by_idx(db, sst_idx)
+    if schedule:
+        schedule.sst_in_chk = "N"
+        schedule.sst_exit_cnt = (schedule.sst_exit_cnt or 0) + 1
 
 
 # ---------------------------------------------------------------------------
@@ -276,10 +205,12 @@ def run_location_entry_alert(db: Session) -> None:
                     _send_entry_notifications(db, group_data, schedule, plt_condition, plt_memo, push_json)
                     _update_entry_status(db, record_value(schedule, "sst_idx"))
 
+        db.commit()
         logger.info("Location entry alert executed successfully")
 
     except Exception as e:
         logger.exception(f"Error in location entry alert: {e}")
+        db.rollback()
 
 
 def run_location_exit_alert(db: Session) -> None:
@@ -345,17 +276,18 @@ def run_location_exit_alert(db: Session) -> None:
                     _send_exit_notifications(db, group_data, schedule, plt_condition, plt_memo, push_json)
                     _update_exit_status(db, record_value(schedule, "sst_idx"))
 
+        db.commit()
         logger.info("Location exit alert executed successfully")
 
     except Exception as e:
         logger.exception(f"Error in location exit alert: {e}")
+        db.rollback()
 
 
 def run_my_location_entry_alert(db: Session) -> None:
     """내 장소 진입 알림 (배치 최적화)"""
     from app.models.my_location import MyLocation
     from app.models.member_location_log import MemberLocationLog
-    from app.services.push_service import send_push, push_log_add
 
     try:
         plt_condition = "30s - My Place Entry"
@@ -394,29 +326,22 @@ def run_my_location_entry_alert(db: Session) -> None:
             if distance <= GEOFENCE_ENTRY_RADIUS:
                 member = member_map.get(mt_idx)
                 if member and member.mt_token_id:
-                    lang = normalize_lang(getattr(member, "mt_lang", None))
                     location_title = loc.get("slt_title") or "내장소"
                     member_name = member.mt_nickname or member.mt_name or "회원"
 
-                    fallback = {
-                        "title": "내장소 방문알림 📍",
-                        "content": "{name}님이 내장소 '{title}'에 방문했어요! 🎉",
-                    } if lang == "ko" else {
-                        "title": "My place arrival 📍",
-                        "content": "{name} arrived at '{title}'! 🎉",
-                    }
-
-                    push_title, push_content = render_push_message(
-                        event_type="my_place_entry", lang=lang,
+                    dispatch_notification(
+                        db=db,
+                        recipient=member,
+                        event_type="my_place_entry",
                         variables={"name": member_name, "title": location_title},
-                        fallback_template=fallback,
-                    )
-
-                    push_result = send_push(member.mt_token_id, push_title, push_content)
-                    push_log_add(
-                        db, mt_idx, slt_idx, plt_condition, plt_memo,
-                        push_title, push_content, push_result,
-                        {"lat": "{:.7f}".format(target_lat), "lng": "{:.7f}".format(target_long), "distance": formatted_distance}
+                        plt_condition=plt_condition,
+                        plt_memo=plt_memo,
+                        resource_id=slt_idx,
+                        push_json={
+                            "lat": "{:.7f}".format(target_lat),
+                            "lng": "{:.7f}".format(target_long),
+                            "distance": formatted_distance,
+                        },
                     )
 
                     location_obj = MyLocation.find_by_idx(db, slt_idx)
@@ -437,7 +362,6 @@ def run_my_location_exit_alert(db: Session) -> None:
     """내 장소 이탈 알림 (배치 최적화)"""
     from app.models.my_location import MyLocation
     from app.models.member_location_log import MemberLocationLog
-    from app.services.push_service import send_push, push_log_add
 
     try:
         plt_condition = "30s - My Place Exit"
@@ -474,29 +398,22 @@ def run_my_location_exit_alert(db: Session) -> None:
             if distance >= GEOFENCE_EXIT_RADIUS:
                 member = member_map.get(mt_idx)
                 if member and member.mt_token_id:
-                    lang = normalize_lang(getattr(member, "mt_lang", None))
                     location_title = loc.get("slt_title") or "내장소"
                     member_name = member.mt_nickname or member.mt_name or "회원"
 
-                    fallback = {
-                        "title": "내장소 이탈알림 👋",
-                        "content": "{name}님이 내장소 '{title}'에서 이탈했어요!",
-                    } if lang == "ko" else {
-                        "title": "My place departure 👋",
-                        "content": "{name} departed from '{title}'!",
-                    }
-
-                    push_title, push_content = render_push_message(
-                        event_type="my_place_exit", lang=lang,
+                    dispatch_notification(
+                        db=db,
+                        recipient=member,
+                        event_type="my_place_exit",
                         variables={"name": member_name, "title": location_title},
-                        fallback_template=fallback,
-                    )
-
-                    push_result = send_push(member.mt_token_id, push_title, push_content)
-                    push_log_add(
-                        db, mt_idx, slt_idx, plt_condition, plt_memo,
-                        push_title, push_content, push_result,
-                        {"lat": "{:.7f}".format(target_lat), "lng": "{:.7f}".format(target_long), "distance": formatted_distance}
+                        plt_condition=plt_condition,
+                        plt_memo=plt_memo,
+                        resource_id=slt_idx,
+                        push_json={
+                            "lat": "{:.7f}".format(target_lat),
+                            "lng": "{:.7f}".format(target_long),
+                            "distance": formatted_distance,
+                        },
                     )
 
                     location_obj = MyLocation.find_by_idx(db, slt_idx)

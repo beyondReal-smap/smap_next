@@ -21,9 +21,10 @@ class Group(BaseModel):
         소프트 삭제: sgt_show를 'N'으로 변경
         """
         from datetime import datetime
-        self.sgt_show = 'N'
+        self.sgt_show = ShowEnum.N
         self.sgt_udate = datetime.utcnow()
         db.commit()
+        db.refresh(self)
         return self
 
     def restore(self, db: Session):
@@ -31,9 +32,10 @@ class Group(BaseModel):
         복구: sgt_show를 'Y'로 변경
         """
         from datetime import datetime
-        self.sgt_show = 'Y'
+        self.sgt_show = ShowEnum.Y
         self.sgt_udate = datetime.utcnow()
         db.commit()
+        db.refresh(self)
         return self
 
     @classmethod
@@ -65,4 +67,4 @@ class Group(BaseModel):
         return db.query(cls).filter(
             cls.sgt_code == code,
             cls.sgt_show == ShowEnum.Y
-        ).first() 
+        ).first()

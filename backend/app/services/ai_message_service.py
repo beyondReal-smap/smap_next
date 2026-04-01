@@ -15,13 +15,21 @@ logger = logging.getLogger(__name__)
 
 
 class AIMessageService:
-    CACHE_VERSION = "v1"
+    CACHE_VERSION = "v2"
     DEFAULT_CACHE_TTL_SECONDS = 30 * 24 * 60 * 60
     DEFAULT_FAILURE_CACHE_TTL_SECONDS = 24 * 60 * 60
     EVENT_PROMPTS = {
         "schedule_place_entry": "A group member arrived at the location for a scheduled event.",
         "schedule_place_exit": "A group member departed from the location for a scheduled event.",
         "schedule_start": "A scheduled event will start in 30 minutes.",
+        "low_battery": "A user's device battery is low and they should be encouraged to charge soon.",
+        "daily_log": "Summarize that today's location records are ready to review in the app.",
+        "daily_weather": "Provide a friendly daily weather update that helps someone prepare before going out.",
+        "my_location_near": "A saved personal place is nearby and the user may want to stop by.",
+        "schedule_movement": "A scheduled destination is still far away and the user should check departure timing.",
+        "app_reengagement": "Encourage the user to reopen the app and review today's activity.",
+        "my_place_entry": "The user has arrived near their saved place.",
+        "my_place_exit": "The user has moved away from their saved place.",
     }
 
     def __init__(self):
@@ -59,9 +67,22 @@ class AIMessageService:
         event_type: str,
         lang: str,
         variables: Dict[str, str],
-        fallback_template: Dict[str, str],
+        fallback_template: Optional[Dict[str, str]] = None,
+        fallback_templates: Optional[list[Dict[str, str]]] = None,
+        variant_index: int = 0,
     ) -> tuple[str, str]:
         normalized_lang = self._normalize_lang(lang)
+        candidate_templates = list(fallback_templates or [])
+        if fallback_template:
+            candidate_templates.append(fallback_template)
+        if not candidate_templates:
+            raise ValueError("At least one fallback template is required.")
+
+        selected_index = 0
+        if candidate_templates:
+            selected_index = variant_index % len(candidate_templates)
+        selected_fallback_template = candidate_templates[selected_index]
+
         template = self._get_cached_template(event_type, normalized_lang)
 
         if template is None:
@@ -76,23 +97,34 @@ class AIMessageService:
                 self._store_template(
                     event_type,
                     normalized_lang,
-                    fallback_template,
+                    selected_fallback_template,
                     ttl_seconds=self.failure_cache_ttl_seconds,
                 )
-                template = fallback_template
+                template = selected_fallback_template
 
-        template = template or fallback_template
+        template = template or selected_fallback_template
         safe_variables = {key: str(value) for key, value in variables.items()}
-        return (
-            template["title"].format(**safe_variables),
-            template["content"].format(**safe_variables),
-        )
+        try:
+            return (
+                template["title"].format(**safe_variables),
+                template["content"].format(**safe_variables),
+            )
+        except KeyError as exc:
+            logger.warning(
+                "AI message template missing placeholder %s for %s:%s; falling back",
+                exc,
+                event_type,
+                normalized_lang,
+            )
+            return (
+                selected_fallback_template["title"].format(**safe_variables),
+                selected_fallback_template["content"].format(**safe_variables),
+            )
 
-    def _normalize_lang(self, lang: Optional[str]) -> str:
-        value = (lang or "ko").strip().lower()
-        if value.startswith("en"):
-            return "en"
-        return "ko"
+    @staticmethod
+    def _normalize_lang(lang: Optional[str]) -> str:
+        from app.jobs.base import normalize_lang
+        return normalize_lang(lang)
 
     def _cache_key(self, event_type: str, lang: str) -> str:
         return f"ai-message:{self.CACHE_VERSION}:{self.model}:{event_type}:{lang}"

@@ -40,19 +40,21 @@ class MemberRemoveRequest(BaseModel):
 
 @router.get("/hidden", response_model=List[GroupResponse])
 def get_hidden_groups(
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(deps.get_db),
+    user_id: int = Depends(deps.get_required_user_id),
 ):
     """
     숨겨진 그룹 목록을 조회합니다. (sgt_show = 'N'인 그룹들)
+    인증된 사용자만 자신이 소유한 숨겨진 그룹을 조회할 수 있습니다.
     """
-    logger.info("[GET_HIDDEN_GROUPS] 숨겨진 그룹 목록 조회 시작")
-    
-    hidden_groups = db.query(Group).filter(Group.sgt_show == 'N').all()
-    
+    logger.info(f"[GET_HIDDEN_GROUPS] 숨겨진 그룹 목록 조회 - user_id: {user_id}")
+
+    hidden_groups = db.query(Group).filter(
+        Group.sgt_show == 'N',
+        Group.mt_idx == user_id,
+    ).all()
+
     logger.info(f"[GET_HIDDEN_GROUPS] 숨겨진 그룹 수: {len(hidden_groups)}")
-    for group in hidden_groups:
-        logger.info(f"[GET_HIDDEN_GROUPS] 숨겨진 그룹 - sgt_idx: {group.sgt_idx}, sgt_title: {group.sgt_title}")
-    
     return hidden_groups
 
 @router.get("/current-user/summary")
@@ -246,7 +248,14 @@ def join_group_by_code(
         db.refresh(new_membership)
         
         logger.info(f"[JOIN_GROUP_BY_CODE] 그룹 가입 성공 - sgdt_idx: {new_membership.sgdt_idx}")
-        
+
+        # 채팅방 멤버 자동 추가
+        try:
+            from app.services.chat_service import chat_service
+            chat_service.add_member_to_group_chat(db, group_id, request.mt_idx)
+        except Exception as chat_e:
+            logger.error(f"[JOIN_GROUP_BY_CODE] 채팅방 멤버 추가 실패: {chat_e}")
+
         return {
             "success": True,
             "message": "그룹에 성공적으로 가입되었습니다.",
@@ -259,7 +268,7 @@ def join_group_by_code(
                 "sgdt_wdate": new_membership.sgdt_wdate.isoformat() if new_membership.sgdt_wdate else datetime.utcnow().isoformat()
             }
         }
-        
+
     except Exception as e:
         logger.error(f"[JOIN_GROUP_BY_CODE] 그룹 가입 실패: {str(e)}")
         db.rollback()
@@ -409,9 +418,15 @@ def create_group(
         logger.info(f"[CREATE_GROUP] 그룹 멤버(관리자) 생성 완료 - sgdt_idx: {group_detail.sgdt_idx}")
     except Exception as e:
         logger.error(f"[CREATE_GROUP] 그룹 멤버 생성 실패: {str(e)}")
-        # 그룹은 생성되었으나 멤버 추가 실패 시? 롤백? 
-        # 일단 로그 남기고 진행. 
-    
+
+    # 채팅방 자동 생성
+    try:
+        from app.services.chat_service import chat_service
+        chat_service.create_group_chat_room(db, group.sgt_idx, group.sgt_title, [user_id])
+        logger.info(f"[CREATE_GROUP] 채팅방 자동 생성 완료 - sgt_idx: {group.sgt_idx}")
+    except Exception as e:
+        logger.error(f"[CREATE_GROUP] 채팅방 생성 실패: {str(e)}")
+
     return group
 
 @router.put("/{group_id}", response_model=GroupResponse)
@@ -435,7 +450,7 @@ def update_group(
         logger.info(f"[UPDATE_GROUP] 업데이트 전 그룹 상태 - sgt_show: {group.sgt_show}, sgt_title: {group.sgt_title}")
         
         # 소프트 삭제 요청인지 확인
-        if group_in.sgt_show == 'N':
+        if group_in.sgt_show == ShowEnum.N:
             logger.warning(f"[UPDATE_GROUP] 🚫 소프트 삭제 요청 감지 - group_id: {group_id}")
             logger.warning(f"[UPDATE_GROUP] ⚠️ 실제 DB 삭제가 아닌 숨김 처리를 실행합니다")
             logger.warning(f"[UPDATE_GROUP] 🔍 삭제 전 그룹 상태 확인 - sgt_show: {group.sgt_show}")
@@ -512,7 +527,7 @@ def restore_group(
     logger.info(f"[RESTORE_GROUP] 복구 전 그룹 상태 - sgt_show: {group.sgt_show}, sgt_title: {group.sgt_title}")
     
     # sgt_show를 'Y'로 변경하여 복구
-    group.sgt_show = 'Y'
+    group.sgt_show = ShowEnum.Y
     group.sgt_udate = datetime.utcnow()
     
     logger.info(f"[RESTORE_GROUP] 그룹 복구 실행 - sgt_show를 'Y'로 변경")
@@ -806,7 +821,14 @@ def join_group(
         db.refresh(new_membership)
         
         logger.info(f"[JOIN_GROUP] 그룹 가입 성공 - sgdt_idx: {new_membership.sgdt_idx}, group_id: {group_id}, mt_idx: {join_request.mt_idx}")
-        
+
+        # 채팅방 멤버 자동 추가
+        try:
+            from app.services.chat_service import chat_service
+            chat_service.add_member_to_group_chat(db, group_id, join_request.mt_idx)
+        except Exception as chat_e:
+            logger.error(f"[JOIN_GROUP] 채팅방 멤버 추가 실패: {chat_e}")
+
         return {
             "success": True,
             "message": "그룹에 성공적으로 가입되었습니다.",

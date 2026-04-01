@@ -80,12 +80,6 @@ class BackgroundTasks:
         self.scheduler = BackgroundScheduler()
         self._db_local = local()
         self._jobs_scheduled = False
-        self.scheduler.add_job(
-            self._run_background_task,
-            trigger=IntervalTrigger(seconds=60),
-            id='background_task',
-            replace_existing=True
-        )
 
     def start(self):
         if not self._jobs_scheduled:
@@ -171,19 +165,27 @@ class BackgroundTasks:
             args=['send_daily_weather_notifications'],
             id='send_daily_weather_notifications', **_cron_opts
         )
+        self.scheduler.add_job(
+            self._run_job, CronTrigger(hour=21, minute=30),
+            args=['send_daily_log_notifications'],
+            id='send_daily_log_notifications', **_cron_opts
+        )
+        self.scheduler.add_job(
+            self._run_job, CronTrigger(hour=7, minute=30),
+            args=['send_my_location_push_notifications'],
+            id='send_my_location_push_notifications', **_cron_opts
+        )
+
+        # 5분 주기: 일정 이동 알림
+        _5m = dict(minutes=5, misfire_grace_time=60, max_instances=1, coalesce=True)
+        self.scheduler.add_job(
+            self._run_job, 'interval', args=['schedule_movement_alert'],
+            id='schedule_movement_alert', **_5m
+        )
 
     # ------------------------------------------------------------------
     # 작업 실행
     # ------------------------------------------------------------------
-    def _run_background_task(self):
-        db = SessionLocal()
-        try:
-            logger.info("Background task running...")
-        except Exception as e:
-            logger.exception(f"Error in background task: {e}")
-        finally:
-            db.close()
-
     def _run_job(self, job_name: str):
         """DB 세션을 생성하고 해당 job 함수를 실행합니다."""
         job_func = _get_job_func(job_name)
