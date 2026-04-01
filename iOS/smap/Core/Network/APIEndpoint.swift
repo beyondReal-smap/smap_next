@@ -40,6 +40,7 @@ enum APIEndpoint {
     case toggleLocationNotification(locationId: Int, enabled: String)
 
     // MARK: - Schedules
+    case getGroupSchedulesSummary(sgtIdx: Int)  // 홈 화면용 간략 조회
     case getGroupSchedules(sgtIdx: Int, currentUserId: String, startDate: String, endDate: String, memberId: Int? = nil)
     case createSchedule(sgtIdx: Int, currentUserId: String, request: AnyEncodable)
     case updateSchedule(sgtIdx: Int, sstIdx: String, currentUserId: String, request: AnyEncodable)
@@ -125,6 +126,7 @@ enum APIEndpoint {
         case .updateLocation(let locationId, _): return "/locations/\(locationId)"
         case .deleteLocation(let locationId): return "/locations/\(locationId)"
         case .toggleLocationNotification(let locationId, _): return "/locations/\(locationId)/notification"
+        case .getGroupSchedulesSummary(let sgtIdx): return "/schedules/group/\(sgtIdx)"
         case .getGroupSchedules(let sgtIdx, let currentUserId, let startDate, let endDate, let memberId):
             var path = "/schedule/group/\(sgtIdx)/schedules?current_user_id=\(currentUserId)&start_date=\(startDate)&end_date=\(endDate)"
             if let memberId { path += "&member_id=\(memberId)" }
@@ -159,7 +161,8 @@ enum APIEndpoint {
     private var method: HTTPMethod {
         switch self {
         case .getCurrentUserGroups, .getGroupMembers, .getGroupStats,
-             .fetchProfile, .getMemberLocations, .getGroupSchedules,
+             .fetchProfile, .getMemberLocations,
+             .getGroupSchedulesSummary, .getGroupSchedules,
              .getMemberPushLogs, .joinGroupByCode, .getGroupSummary,
              .getChatRooms, .getChatMessages:
             return .GET
