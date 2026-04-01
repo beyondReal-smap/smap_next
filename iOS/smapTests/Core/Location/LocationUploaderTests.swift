@@ -13,27 +13,29 @@ final class LocationUploaderTests: XCTestCase {
         uploader = LocationUploader(apiClient: client, mtIdx: "42")
     }
 
-    override func tearDown() {
-        uploader.stopBatching()
-        uploader.stopHeartbeat()
+    override func tearDown() async throws {
+        await uploader.stopBatching()
+        await uploader.stopHeartbeat()
         MockURLProtocol.requestHandler = nil
-        super.tearDown()
+        try await super.tearDown()
     }
 
-    func testEnqueue_addsToQueue() {
+    func testEnqueue_addsToQueue() async {
         let loc = LocationData(lat: 37.5, lng: 127.0, accuracy: 10, speed: 0,
                                altitude: 50, timestamp: "2026-03-22 12:00:00", battery: 80, steps: 100)
-        uploader.enqueue(loc)
-        XCTAssertEqual(uploader.pendingCount, 1)
+        await uploader.enqueue(loc)
+        let count = await uploader.pendingCount
+        XCTAssertEqual(count, 1)
     }
 
-    func testEnqueue_evictsOldest_whenOverMax() {
+    func testEnqueue_evictsOldest_whenOverMax() async {
         for i in 0..<105 {
             let loc = LocationData(lat: Double(i), lng: 0, accuracy: 10, speed: 0,
                                    altitude: 0, timestamp: "", battery: 0, steps: 0)
-            uploader.enqueue(loc)
+            await uploader.enqueue(loc)
         }
-        XCTAssertEqual(uploader.pendingCount, 100) // max 100
+        let count = await uploader.pendingCount
+        XCTAssertEqual(count, 100) // max 100
     }
 
     func testFlush_sendsAllPending() async {
@@ -45,11 +47,12 @@ final class LocationUploaderTests: XCTestCase {
 
         let loc = LocationData(lat: 37.5, lng: 127.0, accuracy: 10, speed: 0,
                                altitude: 50, timestamp: "2026-03-22 12:00:00", battery: 80, steps: 100)
-        uploader.enqueue(loc)
-        uploader.enqueue(loc)
+        await uploader.enqueue(loc)
+        await uploader.enqueue(loc)
 
         await uploader.flush()
-        XCTAssertEqual(uploader.pendingCount, 0)
+        let count = await uploader.pendingCount
+        XCTAssertEqual(count, 0)
         XCTAssertGreaterThan(requestCount, 0)
     }
 
@@ -60,9 +63,25 @@ final class LocationUploaderTests: XCTestCase {
 
         let loc = LocationData(lat: 37.5, lng: 127.0, accuracy: 10, speed: 0,
                                altitude: 50, timestamp: "", battery: 0, steps: 0)
-        uploader.enqueue(loc)
+        await uploader.enqueue(loc)
 
         await uploader.flush()
-        XCTAssertEqual(uploader.pendingCount, 1) // still there
+        let count = await uploader.pendingCount
+        XCTAssertEqual(count, 1) // still there
+    }
+
+    func testFlush_persistsQueueAfterSuccess() async {
+        MockURLProtocol.requestHandler = { request in
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data())
+        }
+
+        let loc = LocationData(lat: 37.5, lng: 127.0, accuracy: 10, speed: 0,
+                               altitude: 50, timestamp: "2026-03-22 12:00:00", battery: 80, steps: 100)
+        await uploader.enqueue(loc)
+        await uploader.flush()
+
+        // After successful flush, persisted queue should be cleared
+        let data = UserDefaults.standard.data(forKey: "smap_pending_locations")
+        XCTAssertNil(data, "Persisted queue should be cleared after successful flush")
     }
 }

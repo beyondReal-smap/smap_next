@@ -453,6 +453,15 @@ class HomeService {
 
     /// 그룹 일정 목록 가져오기
     func getGroupSchedules(sgtIdx: Int) async throws -> [SmapSchedule] {
-        try await apiClient.request(.getGroupSchedules(sgtIdx: sgtIdx), token: token)
+        let currentUserId = UserDefaults.standard.string(forKey: "mt_idx") ?? ""
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let today = formatter.string(from: Date())
+        // Home screen: fetch today's schedules
+        let result: ScheduleListResponse = try await apiClient.request(
+            .getGroupSchedules(sgtIdx: sgtIdx, currentUserId: currentUserId, startDate: today, endDate: today),
+            token: token
+        )
+        return result.data?.schedules ?? []
     }
 }

@@ -1,0 +1,6 @@
+#include "Shared.xcconfig"
+
+// Copy this file to Release.xcconfig and fill in actual values
+// CI should inject these via environment variables
+KAKAO_API_KEY = your_kakao_api_key_here
+AUTH_SECRET_KEY = your_auth_secret_key_here

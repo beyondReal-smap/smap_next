@@ -40,7 +40,10 @@ enum APIEndpoint {
     case toggleLocationNotification(locationId: Int, enabled: String)
 
     // MARK: - Schedules
-    case getGroupSchedules(sgtIdx: Int)
+    case getGroupSchedules(sgtIdx: Int, currentUserId: String, startDate: String, endDate: String, memberId: Int? = nil)
+    case createSchedule(sgtIdx: Int, currentUserId: String, request: AnyEncodable)
+    case updateSchedule(sgtIdx: Int, sstIdx: Int, currentUserId: String, request: AnyEncodable)
+    case deleteSchedule(sgtIdx: Int, sstIdx: Int, currentUserId: String, request: AnyEncodable)
 
     // MARK: - Notifications
     case getMemberPushLogs(memberId: Int)
@@ -48,6 +51,11 @@ enum APIEndpoint {
     case markAllNotificationsRead(memberId: Int)
     case deleteNotification(notificationId: Int)
     case deleteAllNotifications(memberId: Int)
+
+    // MARK: - Chat
+    case getChatRooms
+    case createDMRoom(targetMtIdx: Int)
+    case getChatMessages(scrIdx: Int, before: Int? = nil, limit: Int = 50)
 
     // MARK: - Location Logging
     case createLocationLog(params: [String: Any])
@@ -117,12 +125,27 @@ enum APIEndpoint {
         case .updateLocation(let locationId, _): return "/locations/\(locationId)"
         case .deleteLocation(let locationId): return "/locations/\(locationId)"
         case .toggleLocationNotification(let locationId, _): return "/locations/\(locationId)/notification"
-        case .getGroupSchedules(let sgtIdx): return "/schedules/group/\(sgtIdx)"
+        case .getGroupSchedules(let sgtIdx, let currentUserId, let startDate, let endDate, let memberId):
+            var path = "/schedule/group/\(sgtIdx)/schedules?current_user_id=\(currentUserId)&start_date=\(startDate)&end_date=\(endDate)"
+            if let memberId { path += "&member_id=\(memberId)" }
+            return path
+        case .createSchedule(let sgtIdx, let currentUserId, _):
+            return "/schedule/group/\(sgtIdx)/schedules?current_user_id=\(currentUserId)"
+        case .updateSchedule(let sgtIdx, let sstIdx, let currentUserId, _):
+            return "/schedule/group/\(sgtIdx)/schedules/\(sstIdx)?current_user_id=\(currentUserId)"
+        case .deleteSchedule(let sgtIdx, let sstIdx, let currentUserId, _):
+            return "/schedule/group/\(sgtIdx)/schedules/\(sstIdx)?current_user_id=\(currentUserId)"
         case .getMemberPushLogs(let memberId): return "/push-logs/member/\(memberId)"
         case .markNotificationRead(let id): return "/push-logs/\(id)/read"
         case .markAllNotificationsRead(let memberId): return "/push-logs/read-all?mt_idx=\(memberId)"
         case .deleteNotification(let id): return "/push-logs/\(id)"
         case .deleteAllNotifications(let memberId): return "/push-logs/delete-all?mt_idx=\(memberId)"
+        case .getChatRooms: return "/chats/rooms/"
+        case .createDMRoom: return "/chats/rooms/dm"
+        case .getChatMessages(let scrIdx, let before, let limit):
+            var path = "/chats/rooms/\(scrIdx)/messages?limit=\(limit)"
+            if let before { path += "&before=\(before)" }
+            return path
         case .createLocationLog: return "/logs/member-location-logs"
         case .registerFCMToken: return "/member-fcm-token/register"
         case .legacyTokenAuth, .legacyFileUpload: return "" // absoluteURL 사용
@@ -137,19 +160,21 @@ enum APIEndpoint {
         switch self {
         case .getCurrentUserGroups, .getGroupMembers, .getGroupStats,
              .fetchProfile, .getMemberLocations, .getGroupSchedules,
-             .getMemberPushLogs, .joinGroupByCode, .getGroupSummary:
+             .getMemberPushLogs, .joinGroupByCode, .getGroupSummary,
+             .getChatRooms, .getChatMessages:
             return .GET
         case .login, .googleLogin, .appleLogin, .register,
              .createGroup, .joinGroupById, .createLocation,
              .updateProfile, .changePassword, .verifyPassword, .withdraw,
              .uploadProfileImage, .createLocationLog, .registerFCMToken,
              .markAllNotificationsRead, .deleteAllNotifications,
+             .createDMRoom, .createSchedule,
              .legacyTokenAuth, .legacyFileUpload:
             return .POST
         case .updateGroup, .updateLocation, .toggleLocationNotification,
-             .updateMemberRole, .deleteGroup:
+             .updateMemberRole, .deleteGroup, .updateSchedule:
             return .PUT
-        case .deleteLocation, .removeMember, .deleteNotification:
+        case .deleteLocation, .removeMember, .deleteNotification, .deleteSchedule:
             return .DELETE
         case .markNotificationRead:
             return .PATCH
@@ -179,14 +204,17 @@ enum APIEndpoint {
             return try? JSONSerialization.data(withJSONObject: ["sgt_title": title, "sgt_memo": memo])
         case .deleteGroup:
             return try? JSONSerialization.data(withJSONObject: ["sgt_show": "N"])
-        case .joinGroupById(_, let mtIdx):
-            return try? JSONSerialization.data(withJSONObject: ["mt_idx": mtIdx])
+        case .joinGroupById(let sgtIdx, let mtIdx):
+            return try? JSONSerialization.data(withJSONObject: ["mt_idx": mtIdx, "sgt_idx": sgtIdx])
         case .updateMemberRole(_, let mtIdx, let isLeader):
             return try? JSONSerialization.data(withJSONObject: ["mt_idx": mtIdx, "is_leader": isLeader])
-        case .createLocation(_, let req), .updateLocation(_, let req):
+        case .createLocation(_, let req), .updateLocation(_, let req),
+             .createSchedule(_, _, let req), .updateSchedule(_, _, _, let req), .deleteSchedule(_, _, _, let req):
             return try? JSONEncoder().encode(req)
         case .toggleLocationNotification(_, let enabled):
             return try? JSONSerialization.data(withJSONObject: ["slt_enter_alarm": enabled])
+        case .createDMRoom(let targetMtIdx):
+            return try? JSONSerialization.data(withJSONObject: ["target_mt_idx": targetMtIdx])
         case .createLocationLog(let params):
             return try? JSONSerialization.data(withJSONObject: params)
         case .registerFCMToken(let mtIdx, let fcmToken, let apnsToken):

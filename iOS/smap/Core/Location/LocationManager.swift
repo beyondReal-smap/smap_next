@@ -72,7 +72,7 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
         clManager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
         clManager.distanceFilter = 30
         clManager.activityType = .fitness
-        uploader.startBatching(interval: 60)
+        Task { await uploader.startBatching(interval: 60) }
 
         clManager.startUpdatingLocation()
         print("[LocationManager] Tracking started in walking mode")
@@ -87,9 +87,11 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
         isTracking = false
         clManager.stopUpdatingLocation()
         motionManager.stopMonitoring()
-        uploader.stopBatching()
-        uploader.stopHeartbeat()
-        uploader.savePendingQueue()
+        Task {
+            await uploader.stopBatching()
+            await uploader.stopHeartbeat()
+            await uploader.savePendingQueue()
+        }
     }
 
     // MARK: - Mode Switching
@@ -112,13 +114,14 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
         currentMode = newMode
         print("[LocationManager] Mode switch: \(oldMode.rawValue) -> \(newMode.rawValue)")
 
-        // Clean up previous timers
-        uploader.stopBatching()
-        uploader.stopHeartbeat()
+        // Clean up previous timers and flush pending data on mode transition
+        Task {
+            await uploader.stopBatching()
+            await uploader.stopHeartbeat()
 
-        // Flush pending data on mode transition
-        if !oldMode.rawValue.isEmpty {
-            Task { await uploader.flush() }
+            if !oldMode.rawValue.isEmpty {
+                await uploader.flush()
+            }
         }
 
         switch newMode {
@@ -126,19 +129,19 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
             clManager.desiredAccuracy = kCLLocationAccuracyThreeKilometers
             clManager.distanceFilter = CLLocationDistanceMax
             clManager.activityType = .other
-            uploader.startHeartbeat(interval: 900) // 15 min
+            Task { await uploader.startHeartbeat(interval: 900) } // 15 min
 
         case .walking:
             clManager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
             clManager.distanceFilter = 30
             clManager.activityType = .fitness
-            uploader.startBatching(interval: 60) // 1 min
+            Task { await uploader.startBatching(interval: 60) } // 1 min
 
         case .automotive:
             clManager.desiredAccuracy = kCLLocationAccuracyBestForNavigation
             clManager.distanceFilter = 150
             clManager.activityType = .automotiveNavigation
-            uploader.startBatching(interval: 60) // 1 min
+            Task { await uploader.startBatching(interval: 60) } // 1 min
         }
     }
 
@@ -146,7 +149,7 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
 
     func updateUserInfo(mtIdx: String, mtId: String, mtName: String) {
         self.savedMtIdx = mtIdx
-        uploader.updateMtIdx(mtIdx)
+        Task { await uploader.updateMtIdx(mtIdx) }
         print("[LocationManager] User info updated: \(mtIdx)")
 
         // If we have a cached location, send it immediately
@@ -158,7 +161,7 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
 
     func clearUserInfo() {
         savedMtIdx = ""
-        uploader.updateMtIdx("")
+        Task { await uploader.updateMtIdx("") }
         print("[LocationManager] User info cleared")
     }
 
@@ -244,7 +247,7 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
                 battery: battery,
                 steps: steps
             )
-            uploader.enqueue(data)
+            await uploader.enqueue(data)
         }
     }
 

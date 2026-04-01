@@ -14,24 +14,25 @@ struct LocationData: Codable {
     let steps: Int
 }
 
-/// 위치 데이터 배칭 및 서버 전송
-class LocationUploader {
+/// 위치 데이터 배칭 및 서버 전송 (actor for thread safety)
+actor LocationUploader {
 
     private let apiClient: APIClient
     private var mtIdx: String
     private var pending: [LocationData] = []
-    private var batchTimer: Timer?
-    private var heartbeatTimer: Timer?
     private let maxQueueSize = 100
     private var lastHeartbeatLocation: LocationData?
     private let pedometer = CMPedometer()
+
+    private var batchTask: Task<Void, Never>?
+    private var heartbeatTask: Task<Void, Never>?
 
     var pendingCount: Int { pending.count }
 
     init(apiClient: APIClient = .shared, mtIdx: String = "") {
         self.apiClient = apiClient
         self.mtIdx = mtIdx
-        restorePendingQueue()
+        self.pending = Self.loadPersistedQueue()
     }
 
     func updateMtIdx(_ idx: String) {
@@ -53,36 +54,36 @@ class LocationUploader {
 
     func startBatching(interval: TimeInterval) {
         stopBatching()
-        DispatchQueue.main.async {
-            self.batchTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
-                Task { await self?.flush() }
+        batchTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                guard !Task.isCancelled else { break }
+                await self?.flush()
             }
         }
     }
 
     func stopBatching() {
-        DispatchQueue.main.async {
-            self.batchTimer?.invalidate()
-            self.batchTimer = nil
-        }
+        batchTask?.cancel()
+        batchTask = nil
     }
 
     // MARK: - Heartbeat (정지 중)
 
     func startHeartbeat(interval: TimeInterval) {
         stopHeartbeat()
-        DispatchQueue.main.async {
-            self.heartbeatTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
-                Task { await self?.sendHeartbeat() }
+        heartbeatTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                guard !Task.isCancelled else { break }
+                await self?.sendHeartbeat()
             }
         }
     }
 
     func stopHeartbeat() {
-        DispatchQueue.main.async {
-            self.heartbeatTimer?.invalidate()
-            self.heartbeatTimer = nil
-        }
+        heartbeatTask?.cancel()
+        heartbeatTask = nil
     }
 
     // MARK: - Send
@@ -102,6 +103,9 @@ class LocationUploader {
                 pending.removeAll { $0.timestamp == location.timestamp && $0.lat == location.lat }
             }
         }
+
+        // Persist immediately after flush to prevent replay on restart
+        persistQueue()
     }
 
     private func sendHeartbeat() async {
@@ -142,16 +146,23 @@ class LocationUploader {
     // MARK: - Persistence
 
     func savePendingQueue() {
-        if let data = try? JSONEncoder().encode(pending) {
+        persistQueue()
+    }
+
+    private func persistQueue() {
+        if pending.isEmpty {
+            UserDefaults.standard.removeObject(forKey: "smap_pending_locations")
+        } else if let data = try? JSONEncoder().encode(pending) {
             UserDefaults.standard.set(data, forKey: "smap_pending_locations")
         }
     }
 
-    private func restorePendingQueue() {
-        if let data = UserDefaults.standard.data(forKey: "smap_pending_locations"),
-           let saved = try? JSONDecoder().decode([LocationData].self, from: data) {
-            pending = saved
+    private static func loadPersistedQueue() -> [LocationData] {
+        guard let data = UserDefaults.standard.data(forKey: "smap_pending_locations"),
+              let saved = try? JSONDecoder().decode([LocationData].self, from: data) else {
+            return []
         }
+        return saved
     }
 
     // MARK: - Step Count Helper
