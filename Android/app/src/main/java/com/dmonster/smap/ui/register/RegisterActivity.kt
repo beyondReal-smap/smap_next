@@ -36,11 +36,16 @@ class RegisterActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         
         // 소셜 로그인 데이터 가져오기
-        val socialData = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            intent.getSerializableExtra(EXTRA_SOCIAL_DATA, HashMap::class.java) as? HashMap<String, String>
-        } else {
-            @Suppress("DEPRECATION", "UNCHECKED_CAST")
-            intent.getSerializableExtra(EXTRA_SOCIAL_DATA) as? HashMap<String, String>
+        val socialData = try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.getSerializableExtra(EXTRA_SOCIAL_DATA, HashMap::class.java) as? HashMap<String, String>
+            } else {
+                @Suppress("DEPRECATION", "UNCHECKED_CAST")
+                intent.getSerializableExtra(EXTRA_SOCIAL_DATA) as? HashMap<String, String>
+            }
+        } catch (e: Exception) {
+            Log.e("RegisterActivity", "Failed to parse social data", e)
+            null
         }
         
         setContent {

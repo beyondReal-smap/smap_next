@@ -202,140 +202,168 @@ fun GroupScreen(
         )
     }
     
-    if (showEditDialog && selectedGroup != null) {
-        EditGroupDialog(
-            group = selectedGroup!!,
-            onDismiss = { viewModel.hideEditDialog() },
-            onUpdate = { name, desc -> viewModel.updateGroup(name, desc) },
-            isLoading = isActionLoading
-        )
+    if (showEditDialog) {
+        selectedGroup?.let { group ->
+            EditGroupDialog(
+                group = group,
+                onDismiss = { viewModel.hideEditDialog() },
+                onUpdate = { name, desc -> viewModel.updateGroup(name, desc) },
+                isLoading = isActionLoading
+            )
+        }
     }
 
-    if (showDeleteDialog && selectedGroup != null) {
-        val isOwner = viewModel.isCurrentUserOwner()
-        DeleteConfirmDialog(
-            group = selectedGroup!!,
-            isLeave = !isOwner,
-            onDismiss = { viewModel.hideDeleteDialog() },
-            onConfirm = {
-                if (isOwner) viewModel.deleteGroup()
-                else viewModel.leaveGroup()
-            },
-            isLoading = isActionLoading
-        )
+    if (showDeleteDialog) {
+        selectedGroup?.let { group ->
+            val isOwner = viewModel.isCurrentUserOwner()
+            DeleteConfirmDialog(
+                group = group,
+                isLeave = !isOwner,
+                onDismiss = { viewModel.hideDeleteDialog() },
+                onConfirm = {
+                    if (isOwner) viewModel.deleteGroup()
+                    else viewModel.leaveGroup()
+                },
+                isLoading = isActionLoading
+            )
+        }
     }
     
-    if (showShareDialog && selectedGroup != null) {
-        ShareGroupDialog(
-            group = selectedGroup!!,
-            onDismiss = { viewModel.hideShareDialog() },
-            onCopyCode = {
-                selectedGroup?.sgtCode?.let {
-                    clipboardManager.setText(AnnotatedString(it))
+    if (showShareDialog) {
+        selectedGroup?.let { group ->
+            ShareGroupDialog(
+                group = group,
+                onDismiss = { viewModel.hideShareDialog() },
+                onCopyCode = {
+                    group.sgtCode?.let {
+                        clipboardManager.setText(AnnotatedString(it))
+                    }
+                    viewModel.hideShareDialog()
+                },
+                onCopyLink = {
+                    val link = "${BuildConfig.WEB_BASE_URL}/group/${group.sgtIdx}/join"
+                    clipboardManager.setText(AnnotatedString(link))
+                    viewModel.hideShareDialog()
+                },
+                onSMS = {
+                    val code = group.sgtCode ?: ""
+                    val message = "[SMAP] ${group.sgtTitle} 그룹에 초대합니다!\n초대 코드: $code"
+                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                        data = android.net.Uri.parse("sms:?body=${android.net.Uri.encode(message)}")
+                    }
+                    try {
+                        context.startActivity(intent)
+                    } catch (e: Exception) {
+                        android.util.Log.e("GroupScreen", "Failed to start activity", e)
+                    }
+                    viewModel.hideShareDialog()
                 }
-                viewModel.hideShareDialog()
-            },
-            onCopyLink = {
-                val link = "${BuildConfig.WEB_BASE_URL}/group/${selectedGroup?.sgtIdx}/join"
-                clipboardManager.setText(AnnotatedString(link))
-                viewModel.hideShareDialog()
-            },
-            onSMS = {
-                val code = selectedGroup?.sgtCode ?: ""
-                val message = "[SMAP] ${selectedGroup?.sgtTitle} 그룹에 초대합니다!\n초대 코드: $code"
-                val intent = Intent(Intent.ACTION_VIEW).apply {
-                    data = android.net.Uri.parse("sms:?body=${android.net.Uri.encode(message)}")
-                }
-                context.startActivity(intent)
-                viewModel.hideShareDialog()
-            }
-        )
+            )
+        }
     }
-    
-    if (showMemberManageDialog && selectedMember != null) {
-        MemberManageDialog(
-            member = selectedMember!!,
-            onDismiss = { viewModel.hideMemberManageDialog() },
-            onChangeRole = { isLeader -> viewModel.updateMemberRole(isLeader) },
-            onRemove = { viewModel.removeMember() },
-            isLoading = isActionLoading
-        )
+
+    if (showMemberManageDialog) {
+        selectedMember?.let { member ->
+            MemberManageDialog(
+                member = member,
+                onDismiss = { viewModel.hideMemberManageDialog() },
+                onChangeRole = { isLeader -> viewModel.updateMemberRole(isLeader) },
+                onRemove = { viewModel.removeMember() },
+                isLoading = isActionLoading
+            )
+        }
     }
     
     // Invite Bottom Sheet
-    if (showInviteBottomSheet && selectedGroup != null) {
-        InviteMemberBottomSheet(
-            group = selectedGroup!!,
-            onDismiss = { viewModel.hideInviteBottomSheet() },
-            onCopyLink = {
-                val link = "${BuildConfig.WEB_BASE_URL}/group/${selectedGroup?.sgtIdx}/join"
-                clipboardManager.setText(AnnotatedString(link))
-                viewModel.hideInviteBottomSheet()
-            },
-            onShowQRCode = {
-                viewModel.hideInviteBottomSheet()
-                viewModel.showQRCodeDialog()
-            },
-            onShareSMS = {
-                val code = selectedGroup?.sgtCode ?: ""
-                val message = "[SMAP] ${selectedGroup?.sgtTitle} 그룹에 초대합니다!\n초대 코드: $code"
-                val intent = Intent(Intent.ACTION_VIEW).apply {
-                    data = android.net.Uri.parse("sms:?body=${android.net.Uri.encode(message)}")
+    if (showInviteBottomSheet) {
+        selectedGroup?.let { group ->
+            InviteMemberBottomSheet(
+                group = group,
+                onDismiss = { viewModel.hideInviteBottomSheet() },
+                onCopyLink = {
+                    val link = "${BuildConfig.WEB_BASE_URL}/group/${group.sgtIdx}/join"
+                    clipboardManager.setText(AnnotatedString(link))
+                    viewModel.hideInviteBottomSheet()
+                },
+                onShowQRCode = {
+                    viewModel.hideInviteBottomSheet()
+                    viewModel.showQRCodeDialog()
+                },
+                onShareSMS = {
+                    val code = group.sgtCode ?: ""
+                    val message = "[SMAP] ${group.sgtTitle} 그룹에 초대합니다!\n초대 코드: $code"
+                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                        data = android.net.Uri.parse("sms:?body=${android.net.Uri.encode(message)}")
+                    }
+                    try {
+                        context.startActivity(intent)
+                    } catch (e: Exception) {
+                        android.util.Log.e("GroupScreen", "Failed to start activity", e)
+                    }
+                    viewModel.hideInviteBottomSheet()
+                },
+                onDefaultShare = {
+                    val code = group.sgtCode ?: ""
+                    val link = "${BuildConfig.WEB_BASE_URL}/group/${group.sgtIdx}/join"
+                    val message = "[SMAP] ${group.sgtTitle} 그룹에 초대합니다!\n초대 코드: $code\n링크: $link"
+                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_TEXT, message)
+                    }
+                    try {
+                        context.startActivity(Intent.createChooser(shareIntent, "공유하기"))
+                    } catch (e: Exception) {
+                        android.util.Log.e("GroupScreen", "Failed to start activity", e)
+                    }
+                    viewModel.hideInviteBottomSheet()
+                },
+                onCopyCode = {
+                    // Code is already copied inside the composable
                 }
-                context.startActivity(intent)
-                viewModel.hideInviteBottomSheet()
-            },
-            onDefaultShare = {
-                val code = selectedGroup?.sgtCode ?: ""
-                val link = "${BuildConfig.WEB_BASE_URL}/group/${selectedGroup?.sgtIdx}/join"
-                val message = "[SMAP] ${selectedGroup?.sgtTitle} 그룹에 초대합니다!\n초대 코드: $code\n링크: $link"
-                val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                    type = "text/plain"
-                    putExtra(Intent.EXTRA_TEXT, message)
-                }
-                context.startActivity(Intent.createChooser(shareIntent, "공유하기"))
-                viewModel.hideInviteBottomSheet()
-            },
-            onCopyCode = {
-                // Code is already copied inside the composable
-            }
-        )
+            )
+        }
     }
     
     // QR Code Dialog
-    if (showQRCodeDialog && selectedGroup != null) {
-        val qrData = "${BuildConfig.WEB_BASE_URL}/group/${selectedGroup?.sgtIdx}/join"
-        val scope = rememberCoroutineScope()
-        QRCodeDialog(
-            data = qrData,
-            onDismiss = { viewModel.hideQRCodeDialog() },
-            onShare = { bitmap ->
-                scope.launch {
-                    // Perform file I/O off the main thread
-                    val uri = withContext(Dispatchers.IO) {
-                        val cachePath = java.io.File(context.cacheDir, "images")
-                        cachePath.mkdirs()
-                        val file = java.io.File(cachePath, "qr_code.png")
-                        val fileOutputStream = java.io.FileOutputStream(file)
-                        bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, fileOutputStream)
-                        fileOutputStream.close()
+    if (showQRCodeDialog) {
+        selectedGroup?.let { group ->
+            val qrData = "${BuildConfig.WEB_BASE_URL}/group/${group.sgtIdx}/join"
+            val scope = rememberCoroutineScope()
+            QRCodeDialog(
+                data = qrData,
+                onDismiss = { viewModel.hideQRCodeDialog() },
+                onShare = { bitmap ->
+                    scope.launch {
+                        // Perform file I/O off the main thread
+                        val uri = withContext(Dispatchers.IO) {
+                            val cachePath = java.io.File(context.cacheDir, "images")
+                            cachePath.mkdirs()
+                            val file = java.io.File(cachePath, "qr_code.png")
+                            val fileOutputStream = java.io.FileOutputStream(file)
+                            bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, fileOutputStream)
+                            fileOutputStream.close()
 
-                        androidx.core.content.FileProvider.getUriForFile(
-                            context,
-                            "${context.packageName}.provider",
-                            file
-                        )
-                    }
+                            androidx.core.content.FileProvider.getUriForFile(
+                                context,
+                                "${context.packageName}.provider",
+                                file
+                            )
+                        }
 
-                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                        type = "image/png"
-                        putExtra(Intent.EXTRA_STREAM, uri)
-                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = "image/png"
+                            putExtra(Intent.EXTRA_STREAM, uri)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        try {
+                            context.startActivity(Intent.createChooser(shareIntent, "QR 코드 공유"))
+                        } catch (e: Exception) {
+                            android.util.Log.e("GroupScreen", "Failed to start activity", e)
+                        }
                     }
-                    context.startActivity(Intent.createChooser(shareIntent, "QR 코드 공유"))
                 }
-            }
-        )
+            )
+        }
     }
 }
 

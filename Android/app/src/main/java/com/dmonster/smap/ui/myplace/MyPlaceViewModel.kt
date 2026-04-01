@@ -370,11 +370,16 @@ class MyPlaceViewModel @Inject constructor(
                 val response = httpClient.newCall(request).execute()
                 if (response.isSuccessful) {
                     val body = response.body?.string() ?: return@withContext null
-                    val result = json.decodeFromString<KakaoAddressResponse>(body)
-                    val doc = result.documents.firstOrNull()
-                    val address = doc?.roadAddress?.addressName ?: doc?.address?.addressName
-                    val building = doc?.roadAddress?.buildingName
-                    building to address
+                    try {
+                        val result = json.decodeFromString<KakaoAddressResponse>(body)
+                        val doc = result.documents.firstOrNull()
+                        val address = doc?.roadAddress?.addressName ?: doc?.address?.addressName
+                        val building = doc?.roadAddress?.buildingName
+                        building to address
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to parse address response", e)
+                        null
+                    }
                 } else {
                     null
                 }
@@ -402,12 +407,17 @@ class MyPlaceViewModel @Inject constructor(
                 val response = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                     httpClient.newCall(request).execute()
                 }
-                
+
                 if (response.isSuccessful) {
                     val body = response.body?.string() ?: ""
-                    val result = json.decodeFromString<KakaoPlaceResponse>(body)
-                    _searchResults.value = result.documents
-                    _hasSearched.value = true
+                    try {
+                        val result = json.decodeFromString<KakaoPlaceResponse>(body)
+                        _searchResults.value = result.documents
+                        _hasSearched.value = true
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to parse search response", e)
+                        _errorMessage.value = "검색 결과 처리에 실패했습니다"
+                    }
                 } else {
                     _errorMessage.value = "검색에 실패했습니다"
                 }

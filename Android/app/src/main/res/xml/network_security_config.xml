@@ -25,29 +25,12 @@
         
         <!-- 🔥 IP 주소 직접 접근 (DNS 문제 우회) -->
         <!-- IP 직접 접근은 SSL 핀/호스트네임 검증 문제 유발 가능하므로 제거 -->
-        
-        <!-- 🔥 추가 IP 주소 (DNS 해석 실패 대비) -->
-        <domain includeSubdomains="true">76.76.19.2</domain>
-        <domain includeSubdomains="true">76.76.19.3</domain>
-        <domain includeSubdomains="true">76.76.19.4</domain>
-        <domain includeSubdomains="true">76.76.19.5</domain>
-        <domain includeSubdomains="true">76.76.19.6</domain>
-        <domain includeSubdomains="true">76.76.19.7</domain>
-        <domain includeSubdomains="true">76.76.19.8</domain>
-        <domain includeSubdomains="true">76.76.19.9</domain>
-        <domain includeSubdomains="true">76.76.19.10</domain>
-        
+
         <!-- 🔥 Google 서비스 (에뮬레이터에서 문제 발생 시) -->
         <domain includeSubdomains="true">googleapis.com</domain>
         <domain includeSubdomains="true">google.com</domain>
         <domain includeSubdomains="true">gstatic.com</domain>
         <domain includeSubdomains="true">googleusercontent.com</domain>
-        
-        <!-- 🔥 DNS 서버 -->
-        <domain includeSubdomains="true">8.8.8.8</domain>
-        <domain includeSubdomains="true">8.8.4.4</domain>
-        <domain includeSubdomains="true">1.1.1.1</domain>
-        <domain includeSubdomains="true">1.0.0.1</domain>
     </domain-config>
     
     <!-- 개발 환경용 설정 - 디버그 빌드에서만 cleartext 허용 -->

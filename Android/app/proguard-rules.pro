@@ -180,4 +180,34 @@
 # ==========================================
 -keepclasseswithmembernames class * {
     native <methods>;
-} 
+}
+
+# ==========================================
+# Hilt Dependency Injection
+# ==========================================
+-keep class dagger.hilt.** { *; }
+-keep class javax.inject.** { *; }
+-keepclassmembers class * {
+    @dagger.hilt.android.lifecycle.HiltViewModel <init>(...);
+}
+
+# ==========================================
+# Kotlinx Serialization
+# ==========================================
+-keepattributes RuntimeVisibleAnnotations,AnnotationDefault
+-keepclassmembers class kotlinx.serialization.json.** { *** Companion; }
+-keepclasseswithmembers class kotlinx.serialization.json.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+-keep,includedescriptorclasses class com.dmonster.smap.**$$serializer { *; }
+-keepclassmembers class com.dmonster.smap.** {
+    *** Companion;
+}
+-keepclasseswithmembers class com.dmonster.smap.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+
+# ==========================================
+# Retrofit API Interfaces
+# ==========================================
+-keep,allowobfuscation interface com.dmonster.smap.data.api.** { *; } 

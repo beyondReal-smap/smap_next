@@ -15,8 +15,8 @@ android {
         applicationId = "com.dmonster.smap"
         minSdk = 28
         targetSdk = 35
-        versionCode = 51
-        versionName = "3.0.6"
+        versionCode = 53
+        versionName = "3.0.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         resourceConfigurations += setOf("ko", "en")
@@ -37,9 +37,9 @@ android {
     signingConfigs {
         create("release") {
             storeFile = file("smap.jks")
-            storePassword = "dmonster"
-            keyAlias = "key0"
-            keyPassword = "dmonster"
+            storePassword = project.findProperty("STORE_PASSWORD")?.toString() ?: ""
+            keyAlias = project.findProperty("KEY_ALIAS")?.toString() ?: "key0"
+            keyPassword = project.findProperty("KEY_PASSWORD")?.toString() ?: ""
         }
     }
 
@@ -56,8 +56,8 @@ android {
         }
 
         getByName("release") {
-            isMinifyEnabled = false  // 🔥 크래시 문제 해결을 위해 비활성화
-            isShrinkResources = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             signingConfig = signingConfigs.getByName("release")
             buildConfigField("String", "BASE_URL", baseUrl)
             proguardFiles(

@@ -174,8 +174,8 @@ class LocationService : Service() {
     private fun createLocationRequest(mode: PowerMode): LocationRequest {
         return when (mode) {
             PowerMode.STATIONARY -> LocationRequest.Builder(
-                Priority.PRIORITY_LOW_POWER, 300_000L  // 5 min
-            ).setMinUpdateDistanceMeters(500f)
+                Priority.PRIORITY_BALANCED_POWER_ACCURACY, 120_000L  // 2 min
+            ).setMinUpdateDistanceMeters(50f)
                 .setGranularity(Granularity.GRANULARITY_PERMISSION_LEVEL)
                 .build()
 
@@ -204,11 +204,16 @@ class LocationService : Service() {
             != PackageManager.PERMISSION_GRANTED
         ) return
 
-        fusedLocationClient.requestLocationUpdates(
-            locationRequest,
-            locationCallback,
-            Looper.myLooper()
-        )
+        try {
+            fusedLocationClient.requestLocationUpdates(
+                locationRequest,
+                locationCallback,
+                Looper.myLooper()
+            )
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Location permission revoked during request", e)
+            stopSelf()
+        }
     }
 
     // ── Mode detection (speed-based) ───────────────────────────────────────
@@ -392,10 +397,15 @@ class LocationService : Service() {
     // ── Battery level ──────────────────────────────────────────────────────
 
     private fun getBatteryLevel(): String {
-        val intent = registerReceiver(null, android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-        val level = intent?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
-        val scale = intent?.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1) ?: -1
-        return if (level != -1 && scale != -1) ((level * 100) / scale.toFloat()).toInt().toString() else "0"
+        return try {
+            val intent = registerReceiver(null, android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            val level = intent?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
+            val scale = intent?.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1) ?: -1
+            if (level != -1 && scale != -1) ((level * 100) / scale.toFloat()).toInt().toString() else "0"
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to get battery level", e)
+            "0"
+        }
     }
 
     // ── Notification ───────────────────────────────────────────────────────

@@ -3,6 +3,7 @@ package com.dmonster.smap.data.service
 import android.util.Log
 import com.dmonster.smap.data.api.SmapApi
 import com.dmonster.smap.data.model.*
+import kotlinx.serialization.json.Json
 
 /**
  * Activity-log service (delegates to SmapApi via Retrofit).
@@ -29,11 +30,26 @@ class ActivityLogService(private val api: SmapApi) {
     /**
      * GET /logs/member-location-logs/{memberId}/daily?date=...
      */
+    private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true; isLenient = true }
+
     suspend fun getLocationLogs(memberId: Int, date: String): List<LocationLog> {
-        val response = api.getLocationLogs(memberId, date)
-        val logs = response.data ?: emptyList()
-        Log.d(TAG, "[getLocationLogs] ${logs.size} logs loaded")
-        return logs
+        return try {
+            val response = api.getLocationLogs(memberId, date)
+            val body = response.body()?.string() ?: return emptyList()
+            val trimmed = body.trim()
+            // Backend returns [] (empty array) when no data, but LocationLogListResponse expects {}
+            if (trimmed == "[]" || trimmed.startsWith("[")) {
+                Log.d(TAG, "[getLocationLogs] empty or array response, returning empty list")
+                return emptyList()
+            }
+            val parsed = json.decodeFromString<LocationLogListResponse>(trimmed)
+            val logs = parsed.data ?: emptyList()
+            Log.d(TAG, "[getLocationLogs] ${logs.size} logs loaded")
+            logs
+        } catch (e: Exception) {
+            Log.e(TAG, "[getLocationLogs] Failed to load logs", e)
+            emptyList()
+        }
     }
 
     /**

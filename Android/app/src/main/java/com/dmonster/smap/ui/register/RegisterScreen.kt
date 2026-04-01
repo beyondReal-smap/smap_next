@@ -185,9 +185,10 @@ fun RegisterScreen(
             }
 
             // Error Message
-            if (uiState.showError && uiState.errorMessage != null) {
+            val errorMsg = uiState.errorMessage
+            if (uiState.showError && errorMsg != null) {
                 Text(
-                    text = uiState.errorMessage!!,
+                    text = errorMsg,
                     color = BrandColors.Error,
                     fontFamily = SuiteFont,
                     fontSize = 16.sp,

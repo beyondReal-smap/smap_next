@@ -114,8 +114,8 @@ fun ActivityLogScreen(
     // Map State
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition(
-            LatLng(AppConstants.DefaultLocation.LATITUDE, AppConstants.DefaultLocation.LONGITUDE), 
-            12.0
+            LatLng(AppConstants.DefaultLocation.LATITUDE, AppConstants.DefaultLocation.LONGITUDE),
+            15.0
         )
     }
 
@@ -167,8 +167,9 @@ fun ActivityLogScreen(
                     val stayDensity = stayContext.resources.displayMetrics.density
                     
                     stayTimes.forEachIndexed { index, stay ->
-                        if (stay.stayLatitude != null && stay.stayLongitude != null && 
-                            stay.stayLatitude != 0.0 && stay.stayLongitude != 0.0) {
+                        val stayLat = stay.stayLatitude
+                        val stayLng = stay.stayLongitude
+                        if (stayLat != null && stayLng != null && stayLat != 0.0 && stayLng != 0.0) {
                             val duration = stay.duration
                             val colorInt = when {
                                 duration >= 300 -> AndroidColor.parseColor("#FF6B6B") // Vivid Red
@@ -197,7 +198,7 @@ fun ActivityLogScreen(
                             }
 
                             Marker(
-                                state = MarkerState(position = LatLng(stay.stayLatitude!!, stay.stayLongitude!!)),
+                                state = MarkerState(position = LatLng(stayLat, stayLng)),
                                 icon = OverlayImage.fromBitmap(markerBitmap),
                                 anchor = androidx.compose.ui.geometry.Offset(0.2f, 0.5f), // Adjusted anchor based on circle position in bitmap
                                 zIndex = 70
@@ -297,12 +298,10 @@ fun ActivityLogScreen(
                                         infoMarker.width = infoBitmap.width
                                         infoMarker.height = infoBitmap.height
                                         
-                                        // Only move camera when user is actively dragging the slider
-                                        if (isSliderDragging) {
-                                            val update = CameraUpdate.scrollTo(pos)
-                                            update.animate(com.naver.maps.map.CameraAnimation.None)
-                                            map.moveCamera(update)
-                                        }
+                                        // Always move camera to follow slider position (match iOS behavior)
+                                        val update = CameraUpdate.scrollTo(pos)
+                                        update.animate(com.naver.maps.map.CameraAnimation.None)
+                                        map.moveCamera(update)
                                     }
                                 }
                         }

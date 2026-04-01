@@ -120,29 +120,35 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 staticClient.newCall(request).enqueue(object : Callback {
                     override fun onFailure(call: Call, e: IOException) {
                         Log.e(TAG, "❌ [FCM FORCE] 네트워크 오류: ${e.message}")
-                        CoroutineScope(Dispatchers.Main).launch {
-                            kotlinx.coroutines.delay(3000)
-                            forceSendTokenToServer(context, token, mtIdx, reason + "_retry")
+                        val retryCount = reason.split("_retry").size - 1
+                        if (retryCount < 3) {
+                            CoroutineScope(Dispatchers.Main).launch {
+                                kotlinx.coroutines.delay(3000L * (retryCount + 1))
+                                forceSendTokenToServer(context, token, mtIdx, reason + "_retry")
+                            }
+                        } else {
+                            Log.e(TAG, "❌ [FCM FORCE] 최대 재시도 횟수 초과, 포기")
                         }
                     }
 
                     override fun onResponse(call: Call, response: Response) {
-                        response.body?.string()?.let { responseBody ->
-                            try {
-                                val jsonResponse = JSONObject(responseBody)
-                                val success = jsonResponse.optBoolean("success", false)
-                                if (success) {
-                                    Log.d(TAG, "✅ [FCM FORCE] FCM 토큰 강제 업데이트 성공!")
-                                    saveTokenUpdateTime(context)
-                                    saveTokenToPreferences(context, token)
-                                } else {
-                                    Log.e(TAG, "❌ [FCM FORCE] 서버 오류: ${jsonResponse.optString("message")}")
+                        response.use { resp ->
+                            resp.body?.string()?.let { responseBody ->
+                                try {
+                                    val jsonResponse = JSONObject(responseBody)
+                                    val success = jsonResponse.optBoolean("success", false)
+                                    if (success) {
+                                        Log.d(TAG, "✅ [FCM FORCE] FCM 토큰 강제 업데이트 성공!")
+                                        saveTokenUpdateTime(context)
+                                        saveTokenToPreferences(context, token)
+                                    } else {
+                                        Log.e(TAG, "❌ [FCM FORCE] 서버 오류: ${jsonResponse.optString("message")}")
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "❌ [FCM FORCE] JSON 파싱 오류: ${e.message}")
                                 }
-                            } catch (e: Exception) {
-                                Log.e(TAG, "❌ [FCM FORCE] JSON 파싱 오류: ${e.message}")
                             }
                         }
-                        response.close()
                     }
                 })
             } catch (e: Exception) {

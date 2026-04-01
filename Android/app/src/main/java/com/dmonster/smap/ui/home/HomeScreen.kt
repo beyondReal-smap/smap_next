@@ -174,8 +174,10 @@ fun HomeScreen(
         
         if (selectedMember != null && selectedMember.mltLat != null && selectedMember.mltLong != null) {
             // 1. Zoom to selected member
+            val lat = selectedMember.mltLat ?: return@LaunchedEffect
+            val lng = selectedMember.mltLong ?: return@LaunchedEffect
             cameraPositionState.animate(
-                update = CameraUpdate.scrollAndZoomTo(LatLng(selectedMember.mltLat!!, selectedMember.mltLong!!), 16.0)
+                update = CameraUpdate.scrollAndZoomTo(LatLng(lat, lng), 16.0)
                     .animate(com.naver.maps.map.CameraAnimation.Fly, 1000)
             )
         } else {
@@ -184,15 +186,19 @@ fun HomeScreen(
             
             // Add member locations
             members.forEach { m ->
-                if (m.mltLat != null && m.mltLong != null) {
-                    markerPoints.add(LatLng(m.mltLat!!, m.mltLong!!))
+                val lat = m.mltLat
+                val lng = m.mltLong
+                if (lat != null && lng != null) {
+                    markerPoints.add(LatLng(lat, lng))
                 }
             }
             
             // Add schedule locations
             filteredSchedules.forEach { s ->
-                if (s.sstLocationLat != null && s.sstLocationLong != null) {
-                    markerPoints.add(LatLng(s.sstLocationLat!!, s.sstLocationLong!!))
+                val lat = s.sstLocationLat
+                val lng = s.sstLocationLong
+                if (lat != null && lng != null) {
+                    markerPoints.add(LatLng(lat, lng))
                 }
             }
             
@@ -253,14 +259,16 @@ fun HomeScreen(
                     ) {
                         // Member Markers (Show all members with locations)
                         members.forEach { member ->
-                            if (member.mltLat != null && member.mltLong != null) {
+                            val memberLat = member.mltLat
+                            val memberLng = member.mltLong
+                            if (memberLat != null && memberLng != null) {
                                 val avatarBitmap = memberAvatars[member.mtIdx]
                                 val memberMarkerBitmap = remember(member.mtIdx, member.displayName, member.isSelected, avatarBitmap) {
                                     MarkerUtils.createMemberMarkerBitmap(context, member.displayName, member.isSelected, avatarBitmap)
                                 }
-                                
+
                                 Marker(
-                                    state = MarkerState(position = LatLng(member.mltLat!!, member.mltLong!!)),
+                                    state = MarkerState(position = LatLng(memberLat, memberLng)),
                                     icon = OverlayImage.fromBitmap(memberMarkerBitmap),
                                     zIndex = if (member.isSelected) 2000 else 100,
                                     onClick = {
@@ -295,8 +303,10 @@ fun HomeScreen(
                         // Effect: Update InfoWindow screen position
                         MapEffect(members, cameraPositionState.position, cameraPositionState.isMoving) { map ->
                             val selected = members.find { it.isSelected }
-                            if (selected != null && selected.mltLat != null && selected.mltLong != null) {
-                                markerScreenPosition = map.projection.toScreenLocation(LatLng(selected.mltLat!!, selected.mltLong!!))
+                            val selectedLat = selected?.mltLat
+                            val selectedLng = selected?.mltLong
+                            if (selected != null && selectedLat != null && selectedLng != null) {
+                                markerScreenPosition = map.projection.toScreenLocation(LatLng(selectedLat, selectedLng))
                             } else {
                                 markerScreenPosition = null
                             }
@@ -306,12 +316,13 @@ fun HomeScreen(
                     // 2. Member Info Window (Anchored Overlay)
                     // Place it here so it's behind the Header and Loading Overlay
                     val selectedMember = members.find { it.isSelected }
-                    if (selectedMember != null && markerScreenPosition != null) {
+                    val screenPos = markerScreenPosition
+                    if (selectedMember != null && screenPos != null) {
                         Box(
                             modifier = Modifier
                                 .offset(
-                                    x = with(LocalDensity.current) { (markerScreenPosition!!.x / density).dp } - 90.dp,
-                                    y = with(LocalDensity.current) { (markerScreenPosition!!.y / density).dp } - 180.dp
+                                    x = with(LocalDensity.current) { (screenPos.x / density).dp } - 90.dp,
+                                    y = with(LocalDensity.current) { (screenPos.y / density).dp } - 180.dp
                                 )
                         ) {
                             MemberInfoWindow(

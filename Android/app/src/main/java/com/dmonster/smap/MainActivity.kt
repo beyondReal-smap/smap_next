@@ -283,13 +283,14 @@ class MainActivity : ComponentActivity() {
                 val pathSegments = uri.pathSegments
                 if (pathSegments.size >= 2 && pathSegments[1] == "join") {
                     val groupId = pathSegments[0]
-                    Log.d(TAG, "[DEEP_LINK] Group ID: $groupId")
-
-                    // TODO: ViewModel 등을 통해 그룹 가입 로직 실행
-                    // 여기서는 일단 SharedPreferences나 전역 상태에 저장하여 UI에서 처리하게 함
-                    getSharedPreferences("smap_prefs", MODE_PRIVATE).edit()
-                        .putString("pending_group_id", groupId)
-                        .apply()
+                    if (groupId.toIntOrNull() != null) {
+                        Log.d(TAG, "[DEEP_LINK] Group ID: $groupId")
+                        getSharedPreferences("smap_prefs", MODE_PRIVATE).edit()
+                            .putString("pending_group_id", groupId)
+                            .apply()
+                    } else {
+                        Log.e(TAG, "[DEEP_LINK] Invalid group ID: $groupId")
+                    }
                 }
             }
         }

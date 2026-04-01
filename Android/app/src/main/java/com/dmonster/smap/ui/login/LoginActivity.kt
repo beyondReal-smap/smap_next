@@ -35,7 +35,7 @@ class LoginActivity : ComponentActivity() {
     }
     
     private val viewModel: LoginViewModel by viewModels()
-    private lateinit var googleSignInClient: GoogleSignInClient
+    private var googleSignInClient: GoogleSignInClient? = null
     
     // Google Sign-In 결과 처리
     private val googleSignInLauncher = registerForActivityResult(
@@ -116,20 +116,31 @@ class LoginActivity : ComponentActivity() {
     private fun setupGoogleSignIn() {
         // Web OAuth 클라이언트 ID (requestIdToken에는 반드시 Web Client ID를 사용해야 함)
         val serverClientId = BuildConfig.GOOGLE_OAUTH_CLIENT_ID
-        
+
+        if (serverClientId.isNullOrBlank()) {
+            Log.w(TAG, "Google Sign-In 설정 건너뜀: GOOGLE_OAUTH_CLIENT_ID가 설정되지 않음")
+            return
+        }
+
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestIdToken(serverClientId)
             .requestEmail()
             .requestProfile()
             .build()
-        
+
         googleSignInClient = GoogleSignIn.getClient(this, gso)
         Log.d(TAG, "Google Sign-In 설정 완료")
     }
     
     private fun startGoogleSignIn() {
+        val client = googleSignInClient
+        if (client == null) {
+            Log.e(TAG, "❌ Google Sign-In이 설정되지 않았습니다. GOOGLE_OAUTH_CLIENT_ID를 확인하세요.")
+            viewModel.showErrorMessage("Google 로그인이 설정되지 않았습니다.")
+            return
+        }
         viewModel.setLoading(true)
-        val signInIntent = googleSignInClient.signInIntent
+        val signInIntent = client.signInIntent
         googleSignInLauncher.launch(signInIntent)
     }
     
