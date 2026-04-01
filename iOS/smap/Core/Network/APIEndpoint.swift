@@ -42,8 +42,8 @@ enum APIEndpoint {
     // MARK: - Schedules
     case getGroupSchedules(sgtIdx: Int, currentUserId: String, startDate: String, endDate: String, memberId: Int? = nil)
     case createSchedule(sgtIdx: Int, currentUserId: String, request: AnyEncodable)
-    case updateSchedule(sgtIdx: Int, sstIdx: Int, currentUserId: String, request: AnyEncodable)
-    case deleteSchedule(sgtIdx: Int, sstIdx: Int, currentUserId: String, request: AnyEncodable)
+    case updateSchedule(sgtIdx: Int, sstIdx: String, currentUserId: String, request: AnyEncodable)
+    case deleteSchedule(sgtIdx: Int, sstIdx: String, currentUserId: String, request: AnyEncodable)
 
     // MARK: - Notifications
     case getMemberPushLogs(memberId: Int)
