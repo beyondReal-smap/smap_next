@@ -185,5 +185,7 @@ def push_log_add(
             logger.error(f"Push notification failed for member {mt_idx}: {push_result['msg']}")
 
     except Exception as e:
-        logger.error(f"Error adding push log: {e}")
-        db.rollback()
+        # 로그 실패 시 경고만 남기고 트랜잭션은 건드리지 않음
+        # rollback()은 호출자의 전체 트랜잭션을 무효화하므로 금지
+        logger.warning(f"Error adding push log (non-fatal): {e}")
+        db.expunge(push_log)

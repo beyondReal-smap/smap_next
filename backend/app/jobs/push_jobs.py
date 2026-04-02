@@ -127,44 +127,19 @@ def run_schedule_notification(db: Session) -> None:
         db.rollback()
 
 
-def _build_silent_message(token: str, reason: str) -> "messaging.Message":
-    """Silent 푸시용 FCM Message 객체를 생성합니다."""
-    import time as _time
-    from firebase_admin import messaging
-    from app.core.config import settings
-
-    ts = str(int(_time.time() * 1000))
-    data = {
-        "silent_push": "true",
-        "reason": reason,
-        "timestamp": ts,
-        "token_refresh": "true",
-        "background_wake": "true",
-        "force_token_update": "true",
-    }
-    return messaging.Message(
-        data=data,
-        android=messaging.AndroidConfig(priority="high"),
-        apns=messaging.APNSConfig(
-            headers={
-                "apns-push-type": "background",
-                "apns-priority": "10",
-                "apns-topic": settings.IOS_BUNDLE_ID,
-                "apns-expiration": str(int(_time.time()) + 7776000),
-            },
-            payload=messaging.APNSPayload(
-                aps=messaging.Aps(
-                    content_available=True,
-                    thread_id="silent",
-                ),
-            ),
-        ),
-        token=token,
-    )
+_SILENT_BATCH_SIZE = 500
 
 
 def run_send_silent_push_to_all_users(db: Session) -> None:
-    """모든 FCM 토큰 보유 사용자에게 Silent 푸시 배치 전송 (백그라운드 토큰 유지용)"""
+    """모든 FCM 토큰 보유 사용자에게 Silent 푸시 배치 전송 (백그라운드 토큰 유지용)
+
+    메모리 최적화: 전체 Message 리스트를 한번에 구성하지 않고
+    500건 청크 단위로 빌드→전송→해제를 반복합니다.
+    Config 객체는 한 번만 생성하여 재사용합니다.
+    """
+    import time as _time
+    from firebase_admin import messaging
+    from app.core.config import settings
     from app.models.member import Member
     from app.services.firebase_service import firebase_service
 
@@ -178,7 +153,7 @@ def run_send_silent_push_to_all_users(db: Session) -> None:
         all_members = Member.get_token_list(db)
 
         priority_mt_idxs = {member.mt_idx for member in priority_members}
-        remaining_members = [member for member in all_members if member.mt_idx not in priority_mt_idxs]
+        remaining_members = [m for m in all_members if m.mt_idx not in priority_mt_idxs]
 
         target_members = priority_members + remaining_members
         priority_count = len(priority_members)
@@ -191,23 +166,57 @@ def run_send_silent_push_to_all_users(db: Session) -> None:
         if not target_members:
             return
 
-        # FCM Message 객체를 배치로 구성
-        messages = []
-        for i, member in enumerate(target_members):
-            reason = "priority_token_refresh" if i < priority_count else "scheduled_token_refresh"
-            try:
-                messages.append(_build_silent_message(member.mt_token_id, reason))
-            except Exception as e:
-                logger.warning(f"Silent 메시지 구성 실패 - mt_idx: {member.mt_idx}: {e}")
+        # 공유 config 객체를 한 번만 생성하여 재사용 (객체 할당 최소화)
+        android_cfg = messaging.AndroidConfig(priority="high")
+        apns_expiration = str(int(_time.time()) + 7776000)
+        apns_payload = messaging.APNSPayload(
+            aps=messaging.Aps(content_available=True, thread_id="silent"),
+        )
 
-        # 배치 전송 (500건씩 자동 청킹)
-        responses = firebase_service.send_batch_push(messages)
+        total_success = 0
+        total_fail = 0
 
-        success_count = sum(1 for r in responses if r and r.success)
-        fail_count = len(responses) - success_count
+        # 청크 단위로 빌드→전송→해제 (메모리 피크 최소화)
+        for chunk_start in range(0, len(target_members), _SILENT_BATCH_SIZE):
+            chunk = target_members[chunk_start:chunk_start + _SILENT_BATCH_SIZE]
+            ts = str(int(_time.time() * 1000))
+
+            messages = []
+            for i, member in enumerate(chunk, start=chunk_start):
+                reason = "priority_token_refresh" if i < priority_count else "scheduled_token_refresh"
+                try:
+                    messages.append(messaging.Message(
+                        data={
+                            "silent_push": "true",
+                            "reason": reason,
+                            "timestamp": ts,
+                            "token_refresh": "true",
+                            "background_wake": "true",
+                            "force_token_update": "true",
+                        },
+                        android=android_cfg,
+                        apns=messaging.APNSConfig(
+                            headers={
+                                "apns-push-type": "background",
+                                "apns-priority": "10",
+                                "apns-topic": settings.IOS_BUNDLE_ID,
+                                "apns-expiration": apns_expiration,
+                            },
+                            payload=apns_payload,
+                        ),
+                        token=member.mt_token_id,
+                    ))
+                except Exception as e:
+                    logger.warning(f"Silent 메시지 구성 실패 - mt_idx: {member.mt_idx}: {e}")
+
+            if messages:
+                responses = firebase_service.send_batch_push(messages)
+                total_success += sum(1 for r in responses if r and r.success)
+                total_fail += sum(1 for r in responses if not r or not r.success)
+
         logger.info(
-            f"Silent 푸시 배치 전송 완료 - 성공: {success_count}/{len(responses)}, "
-            f"실패: {fail_count}"
+            f"Silent 푸시 배치 전송 완료 - 성공: {total_success}, "
+            f"실패: {total_fail}, 전체: {total_success + total_fail}"
         )
 
     except Exception as e:

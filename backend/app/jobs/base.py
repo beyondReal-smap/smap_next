@@ -7,15 +7,9 @@ DB 세션을 파라미터로 받는 순수 함수들로 구성됩니다.
 import logging
 from typing import Any, Dict, List, Optional
 
+from app.core.utils import normalize_lang  # noqa: F401 — re-export for backward compat
+
 logger = logging.getLogger(__name__)
-
-
-def normalize_lang(lang: Optional[str]) -> str:
-    """언어 코드를 정규화합니다."""
-    value = (lang or "ko").strip().lower()
-    if value.startswith("en"):
-        return "en"
-    return "ko"
 
 
 def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:

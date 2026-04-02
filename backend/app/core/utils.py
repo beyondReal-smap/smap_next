@@ -38,6 +38,14 @@ def mToKm(distance_m: float) -> float:
     return distance_m / 1000
 
 
+def normalize_lang(lang: str | None) -> str:
+    """언어 코드를 정규화합니다 ('ko' 또는 'en')."""
+    value = (lang or "ko").strip().lower()
+    if value.startswith("en"):
+        return "en"
+    return "ko"
+
+
 def mask_token(token: str) -> str:
     """FCM 토큰을 로그용으로 마스킹합니다. 처음 8자 + ...끝 4자"""
     if not token or len(token) < 16:

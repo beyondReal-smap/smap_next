@@ -2,7 +2,7 @@ import hashlib
 from datetime import date
 from typing import Dict, List, Optional, Tuple
 
-from app.jobs.base import normalize_lang as normalize_notification_lang
+from app.core.utils import normalize_lang as normalize_notification_lang
 from app.services.ai_message_service import ai_message_service
 from app.services.notifications.catalog import get_templates
 from app.services.notifications.events import get_required_placeholders

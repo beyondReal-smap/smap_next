@@ -94,11 +94,13 @@ def mask_sensitive_data(data: dict) -> dict:
 
 
 def _scheduler_disabled() -> bool:
-    return os.getenv("SMAP_DISABLE_SCHEDULER", "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-    }
+    # PM2 ecosystem.config.js uses SMAP_SCHEDULER_DISABLED
+    # 하위 호환을 위해 두 변수명 모두 지원
+    val = (
+        os.getenv("SMAP_SCHEDULER_DISABLED", "")
+        or os.getenv("SMAP_DISABLE_SCHEDULER", "")
+    ).strip().lower()
+    return val in {"1", "true", "yes"}
 
 
 # ---------------------------------------------------------------------------
@@ -236,7 +238,9 @@ async def sqlalchemy_exception_handler(request: Request, exc: SQLAlchemyError):
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
-    """처리되지 않은 예외를 안전하게 처리"""
+    """처리되지 않은 예외를 안전하게 처리 (치명적 예외는 전파)"""
+    if isinstance(exc, (KeyboardInterrupt, SystemExit)):
+        raise exc
     request_id = getattr(request.state, "request_id", "-")
     logger.error(f"[{request_id}] Unhandled exception: {exc}")
     logger.error(traceback.format_exc())

@@ -123,7 +123,7 @@ class AIMessageService:
 
     @staticmethod
     def _normalize_lang(lang: Optional[str]) -> str:
-        from app.jobs.base import normalize_lang
+        from app.core.utils import normalize_lang
         return normalize_lang(lang)
 
     def _cache_key(self, event_type: str, lang: str) -> str:
