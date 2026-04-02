@@ -1,6 +1,5 @@
 import smtplib
 import ssl
-import os
 import aiohttp
 import json
 from email.mime.text import MIMEText
@@ -19,9 +18,9 @@ class EmailService:
         self.sender_password = settings.EMAIL_PASSWORD
         
         # 네이버웍스 설정
-        self.naverworks_client_id = os.getenv('NAVERWORKS_CLIENT_ID')
-        self.naverworks_client_secret = os.getenv('NAVERWORKS_CLIENT_SECRET')
-        self.naverworks_domain = os.getenv('NAVERWORKS_DOMAIN')
+        self.naverworks_client_id = settings.NAVERWORKS_CLIENT_ID or None
+        self.naverworks_client_secret = settings.NAVERWORKS_CLIENT_SECRET or None
+        self.naverworks_domain = settings.NAVERWORKS_DOMAIN or None
         self.naverworks_access_token = None
         
     async def get_naverworks_access_token(self) -> str:
@@ -361,7 +360,7 @@ class EmailService:
                     logger.warning(f"⚠️ Gmail SMTP로 폴백: {email}")
             
             # 개발 환경에서는 Mock 처리 (네이버웍스 설정이 없을 때만)
-            if os.getenv('NODE_ENV') == 'development':
+            if settings.NODE_ENV == 'development':
                 logger.info(f"📧 [개발환경] 이메일 발송 Mock: {email}")
                 logger.info(f"📧 [개발환경] 재설정 링크: {reset_url}")
                 

@@ -30,7 +30,7 @@ from app.jobs.base import (
     prefetch_members,
     record_value,
 )
-from app.services.notifications import dispatch_notification
+from app.services.notifications import dispatch_notification, dispatch_notifications_batch
 
 logger = logging.getLogger(__name__)
 
@@ -62,22 +62,20 @@ def _send_entry_notifications(
         actor_name = group_data["member"].get("mt_name", "회원")
         schedule_title = record_value(schedule, "sst_title") or "일정"
 
-        for target in [group_data.get("owner", {}), group_data.get("leader", {})]:
-            if not target:
-                continue
-            if str(target.get("mt_idx")) == str(group_data["member"].get("mt_idx")):
-                continue
-
-            dispatch_notification(
-                db=db,
-                recipient=target,
-                event_type="schedule_place_entry",
-                variables={"name": actor_name, "title": schedule_title},
-                plt_condition=plt_condition,
-                plt_memo=plt_memo,
-                resource_id=record_value(schedule, "sst_idx"),
-                push_json=push_json,
-            )
+        batch = [
+            {
+                "recipient": target,
+                "event_type": "schedule_place_entry",
+                "variables": {"name": actor_name, "title": schedule_title},
+                "plt_condition": plt_condition,
+                "plt_memo": plt_memo,
+                "resource_id": record_value(schedule, "sst_idx"),
+                "push_json": push_json,
+            }
+            for target in [group_data.get("owner", {}), group_data.get("leader", {})]
+            if target and str(target.get("mt_idx")) != str(group_data["member"].get("mt_idx"))
+        ]
+        dispatch_notifications_batch(db, batch)
 
     except Exception as e:
         logger.exception(f"Error sending entry notifications: {e}")
@@ -96,22 +94,20 @@ def _send_exit_notifications(
         actor_name = group_data["member"].get("mt_name", "회원")
         schedule_title = record_value(schedule, "sst_title") or "일정"
 
-        for target in [group_data.get("owner", {}), group_data.get("leader", {})]:
-            if not target:
-                continue
-            if str(target.get("mt_idx")) == str(group_data["member"].get("mt_idx")):
-                continue
-
-            dispatch_notification(
-                db=db,
-                recipient=target,
-                event_type="schedule_place_exit",
-                variables={"name": actor_name, "title": schedule_title},
-                plt_condition=plt_condition,
-                plt_memo=plt_memo,
-                resource_id=record_value(schedule, "sst_idx"),
-                push_json=push_json,
-            )
+        batch = [
+            {
+                "recipient": target,
+                "event_type": "schedule_place_exit",
+                "variables": {"name": actor_name, "title": schedule_title},
+                "plt_condition": plt_condition,
+                "plt_memo": plt_memo,
+                "resource_id": record_value(schedule, "sst_idx"),
+                "push_json": push_json,
+            }
+            for target in [group_data.get("owner", {}), group_data.get("leader", {})]
+            if target and str(target.get("mt_idx")) != str(group_data["member"].get("mt_idx"))
+        ]
+        dispatch_notifications_batch(db, batch)
 
     except Exception as e:
         logger.exception(f"Error sending exit notifications: {e}")
@@ -306,6 +302,9 @@ def run_my_location_entry_alert(db: Session) -> None:
 
         now = datetime.now()
 
+        entry_batch = []
+        entry_locations = []  # (slt_idx,) — 배치 전송 후 상태 업데이트용
+
         for loc in candidates:
             mt_idx = int(loc["mt_idx"])
             slt_idx = loc["slt_idx"]
@@ -313,7 +312,6 @@ def run_my_location_entry_alert(db: Session) -> None:
             if not member_loc or not _is_gps_usable(member_loc, now):
                 continue
 
-            # 쿨다운 체크: 마지막 상태 변경 후 최소 3분 경과 필요
             last_update = loc.get("slt_udate")
             if last_update and (now - last_update) < MY_PLACE_COOLDOWN:
                 continue
@@ -329,25 +327,28 @@ def run_my_location_entry_alert(db: Session) -> None:
                     location_title = loc.get("slt_title") or "내장소"
                     member_name = member.mt_nickname or member.mt_name or "회원"
 
-                    dispatch_notification(
-                        db=db,
-                        recipient=member,
-                        event_type="my_place_entry",
-                        variables={"name": member_name, "title": location_title},
-                        plt_condition=plt_condition,
-                        plt_memo=plt_memo,
-                        resource_id=slt_idx,
-                        push_json={
+                    entry_batch.append({
+                        "recipient": member,
+                        "event_type": "my_place_entry",
+                        "variables": {"name": member_name, "title": location_title},
+                        "plt_condition": plt_condition,
+                        "plt_memo": plt_memo,
+                        "resource_id": slt_idx,
+                        "push_json": {
                             "lat": "{:.7f}".format(target_lat),
                             "lng": "{:.7f}".format(target_long),
                             "distance": formatted_distance,
                         },
-                    )
+                    })
+                    entry_locations.append(slt_idx)
 
-                    location_obj = MyLocation.find_by_idx(db, slt_idx)
-                    if location_obj:
-                        location_obj.slt_enter_chk = "Y"
-                        location_obj.slt_udate = now
+        dispatch_notifications_batch(db, entry_batch)
+
+        for slt_idx in entry_locations:
+            location_obj = MyLocation.find_by_idx(db, slt_idx)
+            if location_obj:
+                location_obj.slt_enter_chk = "Y"
+                location_obj.slt_udate = now
 
         # 루프 완료 후 단일 커밋
         db.commit()
@@ -378,6 +379,9 @@ def run_my_location_exit_alert(db: Session) -> None:
 
         now = datetime.now()
 
+        exit_batch = []
+        exit_locations = []
+
         for loc in my_locations:
             mt_idx = int(loc["mt_idx"])
             slt_idx = loc["slt_idx"]
@@ -385,7 +389,6 @@ def run_my_location_exit_alert(db: Session) -> None:
             if not member_loc or not _is_gps_usable(member_loc, now):
                 continue
 
-            # 쿨다운 체크: 마지막 상태 변경 후 최소 3분 경과 필요
             last_update = loc.get("slt_udate")
             if last_update and (now - last_update) < MY_PLACE_COOLDOWN:
                 continue
@@ -401,25 +404,28 @@ def run_my_location_exit_alert(db: Session) -> None:
                     location_title = loc.get("slt_title") or "내장소"
                     member_name = member.mt_nickname or member.mt_name or "회원"
 
-                    dispatch_notification(
-                        db=db,
-                        recipient=member,
-                        event_type="my_place_exit",
-                        variables={"name": member_name, "title": location_title},
-                        plt_condition=plt_condition,
-                        plt_memo=plt_memo,
-                        resource_id=slt_idx,
-                        push_json={
+                    exit_batch.append({
+                        "recipient": member,
+                        "event_type": "my_place_exit",
+                        "variables": {"name": member_name, "title": location_title},
+                        "plt_condition": plt_condition,
+                        "plt_memo": plt_memo,
+                        "resource_id": slt_idx,
+                        "push_json": {
                             "lat": "{:.7f}".format(target_lat),
                             "lng": "{:.7f}".format(target_long),
                             "distance": formatted_distance,
                         },
-                    )
+                    })
+                    exit_locations.append(slt_idx)
 
-                    location_obj = MyLocation.find_by_idx(db, slt_idx)
-                    if location_obj:
-                        location_obj.slt_enter_chk = "N"
-                        location_obj.slt_udate = now
+        dispatch_notifications_batch(db, exit_batch)
+
+        for slt_idx in exit_locations:
+            location_obj = MyLocation.find_by_idx(db, slt_idx)
+            if location_obj:
+                location_obj.slt_enter_chk = "N"
+                location_obj.slt_udate = now
 
         # 루프 완료 후 단일 커밋
         db.commit()

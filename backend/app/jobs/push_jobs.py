@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.jobs.base import (
     prefetch_members,
 )
-from app.services.notifications import dispatch_notification
+from app.services.notifications import dispatch_notification, dispatch_notifications_batch
 
 logger = logging.getLogger(__name__)
 
@@ -78,25 +78,26 @@ def run_schedule_notification(db: Session) -> None:
         owner_ids = list(set(int(s.mt_idx) for s in schedules if s.mt_idx))
         member_map = prefetch_members(db, owner_ids)
 
+        batch = []
+        schedules_to_mark = []
+
         for schedule in schedules:
             sst_idx = schedule.sst_idx
-            mt_idx = str(schedule.mt_idx)
             schedule_title = schedule.sst_title or "일정"
 
             owner = member_map.get(int(schedule.mt_idx))
             if not owner or not owner.mt_token_id:
                 continue
 
-            dispatch_notification(
-                db=db,
-                recipient=owner,
-                event_type="schedule_start",
-                variables={"title": schedule_title},
-                plt_condition=plt_condition,
-                plt_memo=plt_memo,
-                resource_id=sst_idx,
-                push_json={},
-            )
+            batch.append({
+                "recipient": owner,
+                "event_type": "schedule_start",
+                "variables": {"title": schedule_title},
+                "plt_condition": plt_condition,
+                "plt_memo": plt_memo,
+                "resource_id": sst_idx,
+                "push_json": {},
+            })
 
             # 그룹 일정인 경우 그룹 멤버들에게도 알림 (단일 쿼리)
             if schedule.sgt_idx is not None:
@@ -105,17 +106,21 @@ def run_schedule_notification(db: Session) -> None:
                                if t and str(t.get("mt_idx")) != str(owner.mt_idx) and t.get("mt_token_id")]
 
                 for target in all_targets:
-                    dispatch_notification(
-                        db=db,
-                        recipient=target,
-                        event_type="schedule_start",
-                        variables={"title": schedule_title},
-                        plt_condition=plt_condition,
-                        plt_memo=plt_memo,
-                        resource_id=sst_idx,
-                        push_json={},
-                    )
+                    batch.append({
+                        "recipient": target,
+                        "event_type": "schedule_start",
+                        "variables": {"title": schedule_title},
+                        "plt_condition": plt_condition,
+                        "plt_memo": plt_memo,
+                        "resource_id": sst_idx,
+                        "push_json": {},
+                    })
 
+            schedules_to_mark.append(schedule)
+
+        dispatch_notifications_batch(db, batch)
+
+        for schedule in schedules_to_mark:
             schedule.sst_schedule_chk = "Y"
 
         # 루프 완료 후 단일 커밋
@@ -234,15 +239,17 @@ def run_trigger_app_execution_at_7_30pm(db: Session) -> None:
 
         members = Member.get_recently_active(db)
 
-        for member in members:
-            dispatch_notification(
-                db=db,
-                recipient=member,
-                event_type="app_reengagement",
-                variables={},
-                plt_condition=plt_condition,
-                plt_memo=plt_memo,
-            )
+        batch = [
+            {
+                "recipient": member,
+                "event_type": "app_reengagement",
+                "variables": {},
+                "plt_condition": plt_condition,
+                "plt_memo": plt_memo,
+            }
+            for member in members
+        ]
+        dispatch_notifications_batch(db, batch)
 
         logger.info("App execution trigger executed successfully")
 

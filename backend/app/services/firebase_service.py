@@ -48,7 +48,7 @@ class FirebaseService:
             # 초기화되지 않은 경우 새로 초기화
             try:
                 # 방법 1: 환경변수에서 JSON 문자열로 인증서 정보 가져오기
-                firebase_credentials_json = os.getenv('FIREBASE_CREDENTIALS_JSON')
+                firebase_credentials_json = settings.FIREBASE_CREDENTIALS_JSON
                 if firebase_credentials_json:
                     try:
                         cred_dict = json.loads(firebase_credentials_json)
@@ -70,9 +70,9 @@ class FirebaseService:
                     logger.warning(f"Firebase credentials file not found: {cred_path}")
                 
                 # 방법 3: 개별 환경변수로 인증서 정보 구성
-                project_id = os.getenv('FIREBASE_PROJECT_ID')
-                private_key = os.getenv('FIREBASE_PRIVATE_KEY')
-                client_email = os.getenv('FIREBASE_CLIENT_EMAIL')
+                project_id = settings.FIREBASE_PROJECT_ID
+                private_key = settings.FIREBASE_PRIVATE_KEY
+                client_email = settings.FIREBASE_CLIENT_EMAIL
                 
                 if project_id and private_key and client_email:
                     # 개행 문자 처리
@@ -83,7 +83,7 @@ class FirebaseService:
                         "project_id": project_id,
                         "private_key": private_key,
                         "client_email": client_email,
-                        "client_id": os.getenv('FIREBASE_CLIENT_ID', ''),
+                        "client_id": settings.FIREBASE_CLIENT_ID,
                         "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                         "token_uri": "https://oauth2.googleapis.com/token",
                         "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
@@ -809,7 +809,6 @@ class FirebaseService:
         """
         try:
             from app.services.email_service import email_service
-            import os
 
             # FCM 폴백용 이메일 제목
             subject = f"[SMAP 알림] {title}"
@@ -1273,12 +1272,11 @@ SMAP 팀 드림 - 언제나 최고의 서비스를 제공하기 위해 노력하
         """
         try:
             from app.services.email_service import email_service
-            import os
 
             # 네이버웍스 설정 확인 및 우선 사용 (EmailService 구조 참고)
-            if (os.getenv('NAVERWORKS_CLIENT_ID') and
-                os.getenv('NAVERWORKS_CLIENT_SECRET') and
-                os.getenv('NAVERWORKS_DOMAIN')):
+            if (settings.NAVERWORKS_CLIENT_ID and
+                settings.NAVERWORKS_CLIENT_SECRET and
+                settings.NAVERWORKS_DOMAIN):
 
                 logger.info(f"📧 네이버웍스 이메일 폴백 시도: {email}")
 
@@ -1298,7 +1296,7 @@ SMAP 팀 드림 - 언제나 최고의 서비스를 제공하기 위해 노력하
                     logger.warning(f"⚠️ Gmail SMTP로 폴백: {email}")
 
             # 개발 환경에서는 Mock 처리
-            if os.getenv('NODE_ENV') == 'development':
+            if settings.NODE_ENV == 'development':
                 logger.info(f"📧 [개발환경] FCM 폴백 이메일 Mock: {email}")
                 logger.info(f"📧 [개발환경] 제목: {subject}")
 
@@ -1724,7 +1722,6 @@ SMAP 팀 드림 - 언제나 최고의 서비스를 제공하기 위해 노력하
                     # 무효화 기록을 파일에 저장 (디버깅 및 추적용)
                     try:
                         import json
-                        import os
                         log_file = "invalid_tokens.log"
                         with open(log_file, "a", encoding="utf-8") as f:
                             f.write(f"{json.dumps(backup_info, ensure_ascii=False)}\n")

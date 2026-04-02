@@ -5,7 +5,6 @@ SMAP API - FastAPI Application
 스케줄러와 로그 매니저의 생명주기를 관리합니다.
 """
 import logging
-import os
 import sys
 import time
 import traceback
@@ -95,12 +94,8 @@ def mask_sensitive_data(data: dict) -> dict:
 
 def _scheduler_disabled() -> bool:
     # PM2 ecosystem.config.js uses SMAP_SCHEDULER_DISABLED
-    # 하위 호환을 위해 두 변수명 모두 지원
-    val = (
-        os.getenv("SMAP_SCHEDULER_DISABLED", "")
-        or os.getenv("SMAP_DISABLE_SCHEDULER", "")
-    ).strip().lower()
-    return val in {"1", "true", "yes"}
+    # AliasChoices로 SMAP_DISABLE_SCHEDULER도 지원
+    return settings.scheduler_disabled
 
 
 # ---------------------------------------------------------------------------

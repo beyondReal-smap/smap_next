@@ -99,6 +99,41 @@ class Settings(BaseSettings):
     EMAIL_SMTP_SERVER: str = "smtp.gmail.com"
     EMAIL_SMTP_PORT: int = 465
 
+    # Firebase 인증 대체 수단 (파일이 없을 때 환경변수로 초기화)
+    FIREBASE_CREDENTIALS_JSON: str = ""
+    FIREBASE_PRIVATE_KEY: str = ""
+    FIREBASE_CLIENT_EMAIL: str = ""
+    FIREBASE_CLIENT_ID: str = ""
+
+    # 네이버웍스 설정
+    NAVERWORKS_CLIENT_ID: str = ""
+    NAVERWORKS_CLIENT_SECRET: str = ""
+    NAVERWORKS_DOMAIN: str = ""
+
+    # OpenAI 설정
+    OPENAI_API_KEY: str = ""
+    OPENAI_MODEL: str = "gpt-5.2-chat-latest"
+
+    # AI 메시지 캐시 설정
+    AI_MESSAGE_CACHE_TTL_SECONDS: int = 30 * 24 * 60 * 60  # 30일
+    AI_MESSAGE_FAILURE_CACHE_TTL_SECONDS: int = 24 * 60 * 60  # 1일
+    AI_MESSAGE_CACHE_PATH: str = ""
+
+    # Redis 설정
+    REDIS_URL: str = ""
+
+    # Fixie 프록시 (고정 IP)
+    FIXIE_URL: str = ""
+
+    # 환경 구분
+    NODE_ENV: str = "production"
+
+    # 스케줄러 비활성화
+    SMAP_SCHEDULER_DISABLED: str = Field(
+        default="",
+        validation_alias=AliasChoices("SMAP_SCHEDULER_DISABLED", "SMAP_DISABLE_SCHEDULER"),
+    )
+
     # 하위 호환성을 위한 별칭
     @property
     def SECRET_KEY(self) -> str:
@@ -107,6 +142,11 @@ class Settings(BaseSettings):
     @property
     def ALGORITHM(self) -> str:
         return self.JWT_ALGORITHM
+
+    @property
+    def scheduler_disabled(self) -> bool:
+        val = self.SMAP_SCHEDULER_DISABLED.strip().lower()
+        return val in {"1", "true", "yes"}
 
     @model_validator(mode="after")
     def _post_init(self):
@@ -119,6 +159,11 @@ class Settings(BaseSettings):
             )
         # Firebase 인증서 파일 경로를 절대 경로로 해석
         self.FIREBASE_CREDENTIALS_PATH = _resolve_path(self.FIREBASE_CREDENTIALS_PATH)
+        # AI 메시지 캐시 경로 기본값
+        if not self.AI_MESSAGE_CACHE_PATH:
+            self.AI_MESSAGE_CACHE_PATH = str(
+                _BACKEND_DIR / "storage" / "ai_message_cache.sqlite3"
+            )
         return self
 
     model_config = SettingsConfigDict(

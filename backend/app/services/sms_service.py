@@ -1,4 +1,3 @@
-import os
 import aiohttp
 import json
 import logging
@@ -16,7 +15,7 @@ class SMSService:
         self.aligo_url = 'https://apis.aligo.in/send/'
         
         # Fixie 프록시 설정 (고정 IP 사용)
-        self.fixie_url = os.getenv('FIXIE_URL')  # 예: http://fixie:PASSWORD@velodrome.usefixie.com:80
+        self.fixie_url = settings.FIXIE_URL or None  # 예: http://fixie:PASSWORD@velodrome.usefixie.com:80
         self.use_proxy = bool(self.fixie_url)
         
         if self.use_proxy:

@@ -1,6 +1,5 @@
 import json
 import logging
-import os
 import re
 import sqlite3
 import time
@@ -10,6 +9,8 @@ from typing import Dict, Optional
 
 import redis
 from openai import OpenAI
+
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -33,26 +34,11 @@ class AIMessageService:
     }
 
     def __init__(self):
-        self.model = os.getenv("OPENAI_MODEL", "gpt-5.2-chat-latest")
-        self.cache_ttl_seconds = int(
-            os.getenv(
-                "AI_MESSAGE_CACHE_TTL_SECONDS",
-                str(self.DEFAULT_CACHE_TTL_SECONDS),
-            )
-        )
-        self.failure_cache_ttl_seconds = int(
-            os.getenv(
-                "AI_MESSAGE_FAILURE_CACHE_TTL_SECONDS",
-                str(self.DEFAULT_FAILURE_CACHE_TTL_SECONDS),
-            )
-        )
+        self.model = settings.OPENAI_MODEL
+        self.cache_ttl_seconds = settings.AI_MESSAGE_CACHE_TTL_SECONDS
+        self.failure_cache_ttl_seconds = settings.AI_MESSAGE_FAILURE_CACHE_TTL_SECONDS
         self.backend_dir = Path(__file__).resolve().parents[2]
-        self.cache_path = Path(
-            os.getenv(
-                "AI_MESSAGE_CACHE_PATH",
-                str(self.backend_dir / "storage" / "ai_message_cache.sqlite3"),
-            )
-        )
+        self.cache_path = Path(settings.AI_MESSAGE_CACHE_PATH)
         self.cache_path.parent.mkdir(parents=True, exist_ok=True)
 
         self._cache_lock = Lock()
@@ -130,7 +116,7 @@ class AIMessageService:
         return f"ai-message:{self.CACHE_VERSION}:{self.model}:{event_type}:{lang}"
 
     def _build_redis_client(self):
-        redis_url = os.getenv("REDIS_URL")
+        redis_url = settings.REDIS_URL
         if not redis_url:
             return None
 
@@ -260,7 +246,7 @@ class AIMessageService:
         lang: str,
         placeholders: list[str],
     ) -> Optional[Dict[str, str]]:
-        api_key = os.getenv("OPENAI_API_KEY")
+        api_key = settings.OPENAI_API_KEY
         if not api_key or event_type not in self.EVENT_PROMPTS:
             return None
 

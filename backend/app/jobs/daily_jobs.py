@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from app.jobs.base import (
     prefetch_members,
 )
-from app.services.notifications import dispatch_notification
+from app.services.notifications import dispatch_notification, dispatch_notifications_batch
 
 logger = logging.getLogger(__name__)
 
@@ -50,16 +50,18 @@ def run_notify_low_battery_at_9pm(db: Session) -> None:
               AND latest.battery <= 50
         """), {"cutoff": datetime.now() - timedelta(days=7)}).fetchall()
 
-        for row in rows:
-            dispatch_notification(
-                db=db,
-                recipient=row,
-                event_type="low_battery",
-                variables={"battery": row.battery},
-                plt_condition=plt_condition,
-                plt_memo=plt_memo,
-                push_json={"battery": row.battery},
-            )
+        batch = [
+            {
+                "recipient": row,
+                "event_type": "low_battery",
+                "variables": {"battery": row.battery},
+                "plt_condition": plt_condition,
+                "plt_memo": plt_memo,
+                "push_json": {"battery": row.battery},
+            }
+            for row in rows
+        ]
+        dispatch_notifications_batch(db, batch)
 
         db.commit()
         logger.info(f"Low battery notifications: {len(rows)} members notified")
@@ -94,20 +96,19 @@ def run_send_daily_log_notifications(db: Session) -> None:
         # 로그가 있는 멤버만 배치 조회
         member_map = prefetch_members(db, list(log_count_map.keys()))
 
-        for mt_idx, log_count in log_count_map.items():
-            member = member_map.get(mt_idx)
-            if not member or not member.mt_token_id:
-                continue
-
-            dispatch_notification(
-                db=db,
-                recipient=member,
-                event_type="daily_log",
-                variables={"log_count": log_count},
-                plt_condition=plt_condition,
-                plt_memo=plt_memo,
-                push_json={"log_count": log_count},
-            )
+        batch = [
+            {
+                "recipient": member,
+                "event_type": "daily_log",
+                "variables": {"log_count": log_count},
+                "plt_condition": plt_condition,
+                "plt_memo": plt_memo,
+                "push_json": {"log_count": log_count},
+            }
+            for mt_idx, log_count in log_count_map.items()
+            if (member := member_map.get(mt_idx)) and member.mt_token_id
+        ]
+        dispatch_notifications_batch(db, batch)
 
         # 루프 완료 후 단일 커밋
         db.commit()
@@ -129,34 +130,29 @@ def run_send_daily_weather_notifications(db: Session) -> None:
 
         members = Member.get_recently_active(db)
 
+        batch = []
         for member in members:
-            # 회원의 위치 기반으로 날씨 정보 가져오기
-            weather_info = get_weather_info(
-                db,
-                member.mt_lat,
-                member.mt_long
-            )
-
+            weather_info = get_weather_info(db, member.mt_lat, member.mt_long)
             if weather_info:
                 is_english = str(getattr(member, "mt_lang", "") or "").lower().startswith("en")
                 location = weather_info.get("location") or ("your area" if is_english else "현재 위치")
-                dispatch_notification(
-                    db=db,
-                    recipient=member,
-                    event_type="daily_weather",
-                    variables={
+                batch.append({
+                    "recipient": member,
+                    "event_type": "daily_weather",
+                    "variables": {
                         "temp": weather_info["temperature"],
                         "weather": weather_info["weather"],
                         "humidity": weather_info["humidity"],
                         "location": location,
                     },
-                    plt_condition=plt_condition,
-                    plt_memo=plt_memo,
-                    push_json=weather_info,
-                )
+                    "plt_condition": plt_condition,
+                    "plt_memo": plt_memo,
+                    "push_json": weather_info,
+                })
             else:
                 logger.debug(f"[Weather Push] mt_idx={member.mt_idx}: no fresh weather data, skipping")
 
+        dispatch_notifications_batch(db, batch)
         db.commit()
         logger.info("Daily weather notifications executed successfully")
 
@@ -185,6 +181,7 @@ def run_send_my_location_push_notifications(db: Session) -> None:
         member_map = prefetch_members(db, mt_idx_list)
         recent_locs = MemberLocationLog.get_recent_locations_batch(db, mt_idx_list)
 
+        nearby_batch = []
         for loc in my_locations:
             mt_idx = int(loc["mt_idx"])
             slt_idx = loc["slt_idx"]
@@ -213,20 +210,20 @@ def run_send_my_location_push_notifications(db: Session) -> None:
                     "lng": "{:.7f}".format(target_long),
                     "distance": formatted_distance,
                 }
-                dispatch_notification(
-                    db=db,
-                    recipient=member,
-                    event_type="my_location_near",
-                    variables={
+                nearby_batch.append({
+                    "recipient": member,
+                    "event_type": "my_location_near",
+                    "variables": {
                         "title": loc.get("slt_title") or "내장소",
                         "distance": formatted_distance,
                     },
-                    plt_condition=plt_condition,
-                    plt_memo=plt_memo,
-                    resource_id=slt_idx,
-                    push_json=push_json,
-                )
+                    "plt_condition": plt_condition,
+                    "plt_memo": plt_memo,
+                    "resource_id": slt_idx,
+                    "push_json": push_json,
+                })
 
+        dispatch_notifications_batch(db, nearby_batch)
         db.commit()
         logger.info("My location push notifications executed successfully")
 
@@ -254,6 +251,9 @@ def run_schedule_movement_alert(db: Session) -> None:
         member_map = prefetch_members(db, owner_ids)
         recent_locs = MemberLocationLog.get_recent_locations_batch(db, owner_ids)
 
+        movement_batch = []
+        schedules_to_mark = []
+
         for schedule in schedules:
             sst_idx = schedule.sst_idx
             mt_idx = int(schedule.mt_idx)
@@ -278,20 +278,23 @@ def run_schedule_movement_alert(db: Session) -> None:
                     "lng": "{:.7f}".format(target_long),
                     "distance": formatted_distance,
                 }
-                dispatch_notification(
-                    db=db,
-                    recipient=owner,
-                    event_type="schedule_movement",
-                    variables={
+                movement_batch.append({
+                    "recipient": owner,
+                    "event_type": "schedule_movement",
+                    "variables": {
                         "title": schedule.sst_title or "일정",
                         "distance": formatted_distance,
                     },
-                    plt_condition=plt_condition,
-                    plt_memo=plt_memo,
-                    resource_id=sst_idx,
-                    push_json=push_json,
-                )
-                schedule.sst_alram = 0
+                    "plt_condition": plt_condition,
+                    "plt_memo": plt_memo,
+                    "resource_id": sst_idx,
+                    "push_json": push_json,
+                })
+                schedules_to_mark.append(schedule)
+
+        dispatch_notifications_batch(db, movement_batch)
+        for schedule in schedules_to_mark:
+            schedule.sst_alram = 0
 
         db.commit()
         logger.info("Schedule movement alerts executed successfully")
