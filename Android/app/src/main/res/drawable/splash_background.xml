@@ -1,12 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  windowBackground용 단색.
+  아이콘 표시는 Android 12+ 시스템 스플래시(splash_icon_small)가 담당한다.
+  bitmap을 layer-list로 넣으면 원본 이미지 크기대로 중앙에 배치되어 고해상도 이미지가
+  화면을 가득 채우는 현상이 발생하므로 사용하지 않는다.
+-->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- 배경색 -->
     <item android:drawable="@color/splash_background" />
-    
-    <!-- 앱 아이콘 - 화면 중앙에 배치 -->
-    <item>
-        <bitmap
-            android:gravity="center"
-            android:src="@drawable/app_no_bg" />
-    </item>
 </layer-list>
