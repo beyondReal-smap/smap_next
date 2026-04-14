@@ -8,6 +8,9 @@ enum APIEndpoint {
     case googleLogin(GoogleLoginRequest)
     case appleLogin(AppleLoginRequest)
     case register(RegisterRequest)
+    case refreshTokenV2(refreshToken: String)
+    case logoutWithRefresh(refreshToken: String?)
+    case appVersionCheck(platform: String, version: String)
 
     // MARK: - Profile
     case fetchProfile
@@ -104,6 +107,12 @@ enum APIEndpoint {
         case .googleLogin: return "/auth/google-login"
         case .appleLogin: return "/auth/apple-login"
         case .register: return "/auth/register"
+        case .refreshTokenV2: return "/auth/refresh"
+        case .logoutWithRefresh: return "/auth/logout"
+        case .appVersionCheck(let platform, let version):
+            let p = platform.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? platform
+            let v = version.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? version
+            return "/app/version-check?platform=\(p)&version=\(v)"
         case .fetchProfile: return "/members/me"
         case .updateProfile: return "/members/update-profile"
         case .changePassword: return "/members/change-password"
@@ -164,7 +173,7 @@ enum APIEndpoint {
              .fetchProfile, .getMemberLocations,
              .getGroupSchedulesSummary, .getGroupSchedules,
              .getMemberPushLogs, .joinGroupByCode, .getGroupSummary,
-             .getChatRooms, .getChatMessages:
+             .getChatRooms, .getChatMessages, .appVersionCheck:
             return .GET
         case .login, .googleLogin, .appleLogin, .register,
              .createGroup, .joinGroupById, .createLocation,
@@ -172,6 +181,7 @@ enum APIEndpoint {
              .uploadProfileImage, .createLocationLog, .registerFCMToken,
              .markAllNotificationsRead, .deleteAllNotifications,
              .createDMRoom, .createSchedule,
+             .refreshTokenV2, .logoutWithRefresh,
              .legacyTokenAuth, .legacyFileUpload:
             return .POST
         case .updateGroup, .updateLocation, .toggleLocationNotification,
@@ -223,6 +233,12 @@ enum APIEndpoint {
         case .registerFCMToken(let mtIdx, let fcmToken, let apnsToken):
             var dict: [String: Any] = ["mt_idx": mtIdx, "fcm_token": fcmToken]
             if let apnsToken { dict["apns_token"] = apnsToken }
+            return try? JSONSerialization.data(withJSONObject: dict)
+        case .refreshTokenV2(let refresh):
+            return try? JSONSerialization.data(withJSONObject: ["refresh_token": refresh])
+        case .logoutWithRefresh(let refresh):
+            var dict: [String: Any] = [:]
+            if let refresh, !refresh.isEmpty { dict["refresh_token"] = refresh }
             return try? JSONSerialization.data(withJSONObject: dict)
         case .legacyTokenAuth(let mt_token_id):
             return try? JSONSerialization.data(withJSONObject: ["mt_token_id": mt_token_id])

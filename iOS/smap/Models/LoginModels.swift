@@ -31,10 +31,14 @@ struct LoginResponse: Codable {
 /// 로그인 데이터 (사용자 정보 포함)
 struct LoginData: Codable {
     let token: String?
+    let refresh_token: String?
+    let expires_in: Int?
     let user: SMAPUser?
-    
+
     enum CodingKeys: String, CodingKey {
         case token
+        case refresh_token
+        case expires_in
         case user
     }
 }
@@ -166,6 +170,13 @@ struct SocialLoginData: Codable {
     let isNewUser: Bool?
     let user: SMAPUser?
     let token: String?
+    let refresh_token: String?
+    let expires_in: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case isNewUser = "is_new_user"
+        case user, token, refresh_token, expires_in
+    }
 }
 
 // MARK: - Apple Login Models
@@ -190,6 +201,39 @@ struct AppleLoginData: Codable {
     let isNewUser: Bool
     let user: SMAPUser?
     let token: String?
+    let refresh_token: String?
+    let expires_in: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case isNewUser = "is_new_user"
+        case user, token, refresh_token, expires_in
+    }
+}
+
+// MARK: - Refresh / Logout / Version Check
+
+/// /auth/refresh (v2) 응답
+struct RefreshTokenResponse: Codable {
+    let success: Bool
+    let token: String?
+    let refresh_token: String?
+    let expires_in: Int?
+    let message: String?
+}
+
+/// /auth/logout 응답
+struct LogoutResponse: Codable {
+    let success: Bool
+    let message: String?
+}
+
+/// /app/version-check 응답
+struct AppVersionCheckResponse: Codable {
+    let platform: String?
+    let current_version: String?
+    let min_supported_version: String?
+    let update_required: Bool
+    let force_update: Bool
 }
 
 // MARK: - Error Models

@@ -8,6 +8,9 @@ final class APIClient: @unchecked Sendable {
     private let session: URLSession
     private let baseURL: String
 
+    /// 동시에 여러 401이 들어와도 refresh를 한 번만 수행하기 위한 직렬화 actor.
+    private let refreshCoordinator = RefreshCoordinator()
+
     init(
         session: URLSession = .shared,
         baseURL: String = AppConfiguration.apiV1BaseURL
@@ -23,22 +26,7 @@ final class APIClient: @unchecked Sendable {
         token: String? = nil,
         decoder: JSONDecoder = JSONDecoder()
     ) async throws -> T {
-        var urlRequest = endpoint.urlRequest(baseURL: baseURL)
-
-        if let token {
-            urlRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-
-        let (data, response) = try await performRequest(urlRequest)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw NetworkError.unknown(-1, data)
-        }
-
-        guard (200...299).contains(httpResponse.statusCode) else {
-            throw NetworkError.fromHTTPStatus(httpResponse.statusCode, data: data)
-        }
-
+        let (data, _) = try await dispatch(endpoint: endpoint, token: token, retryOn401: true)
         do {
             return try decoder.decode(T.self, from: data)
         } catch let error as DecodingError {
@@ -51,23 +39,71 @@ final class APIClient: @unchecked Sendable {
         _ endpoint: APIEndpoint,
         token: String? = nil
     ) async throws -> (Data, HTTPURLResponse) {
-        var urlRequest = endpoint.urlRequest(baseURL: baseURL)
+        return try await dispatch(endpoint: endpoint, token: token, retryOn401: true)
+    }
 
-        if let token {
-            urlRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    // MARK: - 401 자동 재시도가 포함된 단일 진입점
+
+    private func dispatch(
+        endpoint: APIEndpoint,
+        token: String?,
+        retryOn401: Bool
+    ) async throws -> (Data, HTTPURLResponse) {
+        let effectiveToken = token ?? KeychainManager.shared.getToken()
+        var urlRequest = endpoint.urlRequest(baseURL: baseURL)
+        if let effectiveToken {
+            urlRequest.setValue("Bearer \(effectiveToken)", forHTTPHeaderField: "Authorization")
         }
 
         let (data, response) = try await performRequest(urlRequest)
-
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.unknown(-1, data)
+        }
+
+        // 401 → refresh 후 한 번만 재시도. refresh 엔드포인트 자체는 재시도 안 함.
+        if httpResponse.statusCode == 401, retryOn401, !endpoint.isRefreshEndpoint {
+            if let newAccess = await refreshCoordinator.refreshIfNeeded(
+                attemptedWith: effectiveToken,
+                client: self
+            ) {
+                var retried = endpoint.urlRequest(baseURL: baseURL)
+                retried.setValue("Bearer \(newAccess)", forHTTPHeaderField: "Authorization")
+                let (data2, response2) = try await performRequest(retried)
+                guard let http2 = response2 as? HTTPURLResponse else {
+                    throw NetworkError.unknown(-1, data2)
+                }
+                guard (200...299).contains(http2.statusCode) else {
+                    throw NetworkError.fromHTTPStatus(http2.statusCode, data: data2)
+                }
+                return (data2, http2)
+            }
         }
 
         guard (200...299).contains(httpResponse.statusCode) else {
             throw NetworkError.fromHTTPStatus(httpResponse.statusCode, data: data)
         }
-
         return (data, httpResponse)
+    }
+
+    // refresh 호출은 RefreshCoordinator에서 수행. 토큰 저장은 여기서.
+    fileprivate func performRefresh(refreshToken raw: String) async -> RefreshTokenResponse? {
+        do {
+            let response: RefreshTokenResponse = try await {
+                let endpoint = APIEndpoint.refreshTokenV2(refreshToken: raw)
+                let (data, _) = try await dispatch(endpoint: endpoint, token: nil, retryOn401: false)
+                return try JSONDecoder().decode(RefreshTokenResponse.self, from: data)
+            }()
+            if response.success {
+                if let access = response.token { KeychainManager.shared.saveToken(access) }
+                if let newRefresh = response.refresh_token, !newRefresh.isEmpty {
+                    KeychainManager.shared.saveRefreshToken(newRefresh)
+                }
+                return response
+            }
+            return nil
+        } catch {
+            return nil
+        }
     }
 
     // MARK: - Multipart Upload
@@ -125,5 +161,47 @@ final class APIClient: @unchecked Sendable {
         } catch let error as URLError {
             throw NetworkError.network(error)
         }
+    }
+}
+
+// MARK: - Refresh coordination
+
+/// 동시에 들어온 401 요청들이 같은 raw refresh token으로 refresh를 두 번 호출해
+/// 서버의 reuse detection을 트리거하지 않도록 한 번만 직렬화한다.
+private actor RefreshCoordinator {
+    private var inflight: Task<String?, Never>?
+
+    func refreshIfNeeded(attemptedWith oldAccess: String?, client: APIClient) async -> String? {
+        // 다른 호출이 이미 새 access를 저장해 두었으면 그것을 사용.
+        if let stored = KeychainManager.shared.getToken(),
+           let attempted = oldAccess,
+           stored != attempted {
+            return stored
+        }
+
+        if let task = inflight { return await task.value }
+
+        guard let raw = KeychainManager.shared.getRefreshToken(), !raw.isEmpty else {
+            return nil
+        }
+
+        let task = Task<String?, Never> {
+            let response = await client.performRefresh(refreshToken: raw)
+            return response?.token
+        }
+        inflight = task
+        let value = await task.value
+        inflight = nil
+        return value
+    }
+}
+
+// MARK: - APIEndpoint helpers
+
+extension APIEndpoint {
+    /// refresh 자체 호출이 401일 때 자기 자신을 다시 refresh하지 않도록 식별.
+    var isRefreshEndpoint: Bool {
+        if case .refreshTokenV2 = self { return true }
+        return false
     }
 }

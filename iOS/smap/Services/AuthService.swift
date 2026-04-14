@@ -85,6 +85,22 @@ class AuthService: ObservableObject {
         print("[AuthService] 토큰 삭제 완료")
     }
 
+    /// Refresh token 저장 (Keychain 별도 item)
+    func saveRefreshToken(_ token: String) {
+        keychain.saveRefreshToken(token)
+        print("[AuthService] Refresh 토큰 저장 완료 (\(token.count)자)")
+    }
+
+    /// Refresh token 조회
+    nonisolated func getRefreshToken() -> String? {
+        keychain.getRefreshToken()
+    }
+
+    /// Refresh token 삭제
+    func deleteRefreshToken() {
+        keychain.deleteRefreshToken()
+    }
+
     // MARK: - User Data Management (UserDefaultsManager)
 
     /// 사용자 데이터 저장
@@ -142,13 +158,27 @@ class AuthService: ObservableObject {
         return getToken() != nil && getUserData() != nil
     }
 
-    /// 완전 로그아웃
+    /// 완전 로그아웃. 서버 revoke는 fire-and-forget — 네트워크 실패 시에도 로컬은 비운다.
     func logout() {
+        let refresh = getRefreshToken()
         deleteToken()
+        deleteRefreshToken()
         deleteUserData()
         print("[AuthService] 로그아웃 완료 - 알림 발송")
-        // NotificationCenter를 통해 로그아웃 알림 전송 (RootView에서 수신)
         NotificationCenter.default.post(name: NSNotification.Name("logout"), object: nil)
+
+        if let refresh, !refresh.isEmpty {
+            Task.detached {
+                do {
+                    let _: LogoutResponse = try await APIClient.shared.request(
+                        .logoutWithRefresh(refreshToken: refresh)
+                    )
+                    print("[AuthService] 서버 logout 완료")
+                } catch {
+                    print("[AuthService] 서버 logout 실패(로컬은 이미 정리됨): \(error)")
+                }
+            }
+        }
     }
 
     // MARK: - Login API
@@ -188,6 +218,9 @@ class AuthService: ObservableObject {
             if let token = userData.token {
                 saveToken(token)
             }
+            if let refresh = userData.refresh_token, !refresh.isEmpty {
+                saveRefreshToken(refresh)
+            }
             if let user = userData.user {
                 saveUserData(user)
             }
@@ -215,8 +248,11 @@ class AuthService: ObservableObject {
         )
 
         if response.success == true, let user = response.user {
-            if let token = response.token {
+            if let token = response.token ?? response.data?.token {
                 saveToken(token)
+            }
+            if let refresh = response.data?.refresh_token, !refresh.isEmpty {
+                saveRefreshToken(refresh)
             }
             saveUserData(user)
         }
@@ -254,6 +290,9 @@ class AuthService: ObservableObject {
             if !loginData.isNewUser {
                 if let token = loginData.token {
                     saveToken(token)
+                }
+                if let refresh = loginData.refresh_token, !refresh.isEmpty {
+                    saveRefreshToken(refresh)
                 }
                 if let user = loginData.user {
                     saveUserData(user)
