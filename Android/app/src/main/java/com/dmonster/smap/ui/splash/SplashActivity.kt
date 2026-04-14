@@ -7,25 +7,14 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.dmonster.smap.BuildConfig
-import com.dmonster.smap.R
 import com.dmonster.smap.data.api.SmapApi
 import com.dmonster.smap.data.service.AuthService
 import com.dmonster.smap.MainActivity
 import javax.inject.Inject
 import com.dmonster.smap.ui.login.LoginActivity
-import com.dmonster.smap.ui.theme.SmapTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -49,32 +38,16 @@ class SplashActivity : ComponentActivity() {
     private var keepSplashScreen = true
     
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Android 12+ 시스템 스플래시 처
+        // Android 12+ 시스템 스플래시. 12 미만은 Theme.Smap.Splash의 windowBackground가 표시된다.
+        // setContent로 별도 Compose 스플래시를 그리지 않는다 — 시스템 스플래시와 겹쳐 두 번
+        // 보이는 현상을 방지하기 위함. 강제 업데이트 다이얼로그는 setContent 없이도 정상 표시된다.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val splashScreen = installSplashScreen()
-            splashScreen.setKeepOnScreenCondition { keepSplashScreen }
+            installSplashScreen().setKeepOnScreenCondition { keepSplashScreen }
         }
-        
+
         super.onCreate(savedInstanceState)
-        
-        setContent {
-            SmapTheme {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0xFF353538)), // iOS 스플래시와 동일한 배경색
-                    contentAlignment = Alignment.Center
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.app_no_bg),
-                        contentDescription = "SMAP 앱 로고",
-                        modifier = Modifier.size(80.dp)
-                    )
-                }
-            }
-        }
-        
-        // 스플래시 딜레이 + 강제 업데이트 체크
+
+        // 스플래시 유지 + 강제 업데이트 체크 후 다음 화면으로 이동
         lifecycleScope.launch {
             delay(SPLASH_DELAY)
             keepSplashScreen = false
