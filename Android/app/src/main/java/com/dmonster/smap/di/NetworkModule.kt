@@ -3,6 +3,7 @@ package com.dmonster.smap.di
 import com.dmonster.smap.BuildConfig
 import com.dmonster.smap.data.api.AuthInterceptor
 import com.dmonster.smap.data.api.SmapApi
+import com.dmonster.smap.data.api.TokenAuthenticator
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -26,13 +27,18 @@ object NetworkModule {
         ignoreUnknownKeys = true
         coerceInputValues = true
         isLenient = true
+        encodeDefaults = true
     }
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(authInterceptor: AuthInterceptor): OkHttpClient {
+    fun provideOkHttpClient(
+        authInterceptor: AuthInterceptor,
+        tokenAuthenticator: TokenAuthenticator
+    ): OkHttpClient {
         return OkHttpClient.Builder()
             .addInterceptor(authInterceptor)
+            .authenticator(tokenAuthenticator)
             .addInterceptor(HttpLoggingInterceptor().apply {
                 level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY
                         else HttpLoggingInterceptor.Level.NONE
