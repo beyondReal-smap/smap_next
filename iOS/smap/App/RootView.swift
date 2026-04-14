@@ -193,9 +193,8 @@ private struct ForceUpdateView: View {
     }
 
     private func openAppStore() {
-        // 실제 SMAP App Store URL로 교체 (롤아웃 Phase D에서 확정).
-        // 기본은 검색 URL — 정확한 ID는 Apple Connect에서 확인 후 교체.
-        let urlString = "https://apps.apple.com/app/id6450881892"
+        // SMAP iOS App Store ID. iTunes Lookup API 검증값 (bundleId: com.dmonster.smap).
+        let urlString = "https://apps.apple.com/app/id6480279658"
         if let url = URL(string: urlString) {
             UIApplication.shared.open(url)
         }
