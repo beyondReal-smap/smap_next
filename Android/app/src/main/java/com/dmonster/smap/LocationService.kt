@@ -1,13 +1,19 @@
 package com.dmonster.smap
 
 import android.Manifest
+import android.app.AlarmManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.os.Build
 import android.os.IBinder
 import android.os.Looper
@@ -22,8 +28,12 @@ import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.*
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Date
+import java.util.Locale
 
 /**
  * Adaptive 3-mode foreground location service for battery-efficient tracking.
@@ -66,18 +76,26 @@ class LocationService : Service() {
     // ── Activity / mode detection ──────────────────────────────────────────
 
     private var stationaryStartTime: Long = 0L
-    private var lastLocation: Location? = null
+    @Volatile private var lastLocation: Location? = null
+    private var consecutiveAuthFailures = 0
+    private val maxAuthFailures = 3
 
     // ── Location batching ──────────────────────────────────────────────────
 
     private val pendingLocations = mutableListOf<CreateLocationLogRequest>()
     private val maxQueueSize = 100
-    private var batchTimer: Timer? = null
-    private var heartbeatTimer: Timer? = null
+    private var batchJob: Job? = null
+    private var heartbeatPendingIntent: PendingIntent? = null
+
+    // ── Connectivity callback ──────────────────────────────────────────────
+    // 오프라인 구간에 쌓인 pendingLocations를 네트워크 복구 시 즉시 비우기 위한 훅.
+    // 배치 타이머/heartbeat를 기다리지 않고 재전송을 트리거한다.
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
     // ── Coroutine scope ────────────────────────────────────────────────────
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     // ── Constants ──────────────────────────────────────────────────────────
 
@@ -85,15 +103,70 @@ class LocationService : Service() {
         private const val TAG = "LocationService"
         private const val NOTIFICATION_CHANNEL_ID = "LocationServiceChannel"
         private const val NOTIFICATION_ID = 10000
+        private const val AUTH_PREFS = "smap_auth_prefs"
+        private const val QUEUE_PREFS = "smap_location_service"
+        private const val KEY_PENDING_QUEUE = "pending_queue"
+        private const val KEY_LAST_LOCATION = "last_location"
+        private const val RESTART_DELAY_MS = 5_000L
 
         private const val STATIONARY_DWELL_MS = 5 * 60 * 1000L  // 5 min before entering stationary
         private const val HEARTBEAT_INTERVAL_MS = 900_000L       // 15 min
         private const val BATCH_INTERVAL_MS = 60_000L            // 1 min
 
+        private const val ACTION_HEARTBEAT = "com.dmonster.smap.ACTION_HEARTBEAT"
+        private const val REQUEST_CODE_HEARTBEAT = 2002
+
         fun isRunning(context: Context): Boolean {
             val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
             return manager.getRunningServices(Integer.MAX_VALUE)
                 .any { it.service.className == LocationService::class.java.name }
+        }
+
+        fun hasRequiredPermissions(context: Context): Boolean {
+            val fine = ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            val coarse = ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            val locationGranted = fine || coarse
+            val backgroundGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
+            val foregroundServiceGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                ActivityCompat.checkSelfPermission(context, Manifest.permission.FOREGROUND_SERVICE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
+            return locationGranted && backgroundGranted && foregroundServiceGranted
+        }
+
+        fun isUserLoggedIn(context: Context): Boolean {
+            val prefs = context.getSharedPreferences(AUTH_PREFS, Context.MODE_PRIVATE)
+            val token = prefs.getString("auth_token", null)
+            val mtIdx = prefs.getInt("mt_idx", -1)
+            return !token.isNullOrBlank() && mtIdx > 0
+        }
+
+        fun startIfEligible(context: Context, reason: String) {
+            if (!isUserLoggedIn(context)) {
+                Log.d(TAG, "Skip start ($reason): user not logged in")
+                return
+            }
+            if (!hasRequiredPermissions(context)) {
+                Log.d(TAG, "Skip start ($reason): required location permissions missing")
+                return
+            }
+
+            val intent = Intent(context, LocationService::class.java).putExtra("restart_reason", reason)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+                Log.d(TAG, "LocationService start requested ($reason)")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to start LocationService ($reason)", e)
+            }
         }
     }
 
@@ -101,17 +174,18 @@ class LocationService : Service() {
 
     private val locationCallback: LocationCallback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
-            result.locations.lastOrNull()?.let { location ->
-                if (!isValidCoordinate(location)) return
+            var latestValid: Location? = null
+            for (location in result.locations) {
+                if (!isValidCoordinate(location)) continue
 
-                // Detect power mode from speed
-                detectModeFromLocation(location)
-
-                // Build request and enqueue
-                val request = buildLocationLogRequest(location) ?: return
+                // Build request and enqueue all valid locations
+                val request = buildLocationLogRequest(location) ?: continue
                 enqueueLocation(request)
                 lastLocation = location
+                latestValid = location
             }
+            // Mode detection on latest location only to avoid thrashing
+            latestValid?.let { detectModeFromLocation(it) }
         }
     }
 
@@ -121,9 +195,23 @@ class LocationService : Service() {
         super.onCreate()
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         locationRequest = createLocationRequest(PowerMode.WALKING)
+        restorePendingLocations()
+        restoreLastLocation()
+        registerNetworkCallback()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Ensure foreground state first (required within 5s of onCreate on API 31+)
+        createNotificationChannel()
+        startForeground(NOTIFICATION_ID, createNotification(currentMode))
+
+        // Handle AlarmManager-triggered heartbeat action
+        if (intent?.action == ACTION_HEARTBEAT) {
+            sendHeartbeat()
+            scheduleHeartbeatAlarm()   // schedule next
+            return START_STICKY
+        }
+
         Log.d(TAG, "LocationService starting")
 
         // Android 14+ foreground service location permission
@@ -148,8 +236,8 @@ class LocationService : Service() {
             return START_NOT_STICKY
         }
 
-        createNotificationChannel()
-        startForeground(NOTIFICATION_ID, createNotification(currentMode))
+        cancelAlarms()
+        fusedLocationClient.removeLocationUpdates(locationCallback)
         startLocationTracking()
         startTimerForMode(currentMode)
 
@@ -160,13 +248,19 @@ class LocationService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        persistPendingLocations()
+        persistLastLocation()
         super.onDestroy()
         fusedLocationClient.removeLocationUpdates(locationCallback)
-        batchTimer?.cancel()
-        heartbeatTimer?.cancel()
-        flushPendingLocations()
+        cancelAlarms()
+        unregisterNetworkCallback()
         serviceScope.cancel()
         Log.d(TAG, "LocationService destroyed")
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        scheduleRestart("task_removed")
     }
 
     // ── Location request per mode ──────────────────────────────────────────
@@ -174,8 +268,13 @@ class LocationService : Service() {
     private fun createLocationRequest(mode: PowerMode): LocationRequest {
         return when (mode) {
             PowerMode.STATIONARY -> LocationRequest.Builder(
-                Priority.PRIORITY_BALANCED_POWER_ACCURACY, 120_000L  // 2 min
-            ).setMinUpdateDistanceMeters(50f)
+                Priority.PRIORITY_BALANCED_POWER_ACCURACY, 120_000L  // 2 min (desired)
+            )
+                // 정지 상태에서는 displacement 필터가 크면 콜백이 아예 오지 않아
+                // lastLocation/heartbeat가 stale해진다. 대신 시간 기반 하한을 걸어
+                // 센서 노이즈로 인한 과도한 콜백을 방지한다(최소 5분 간격).
+                .setMinUpdateDistanceMeters(20f)
+                .setMinUpdateIntervalMillis(300_000L) // 5 min lower bound
                 .setGranularity(Granularity.GRANULARITY_PERMISSION_LEVEL)
                 .build()
 
@@ -208,7 +307,7 @@ class LocationService : Service() {
             fusedLocationClient.requestLocationUpdates(
                 locationRequest,
                 locationCallback,
-                Looper.myLooper()
+                Looper.getMainLooper()
             )
         } catch (e: SecurityException) {
             Log.e(TAG, "Location permission revoked during request", e)
@@ -251,16 +350,15 @@ class LocationService : Service() {
         // Flush pending before reconfiguring
         flushPendingLocations()
 
-        // Stop old timers
-        batchTimer?.cancel()
-        heartbeatTimer?.cancel()
+        // Stop old alarms
+        cancelAlarms()
 
         // Reconfigure location request
         fusedLocationClient.removeLocationUpdates(locationCallback)
         locationRequest = createLocationRequest(newMode)
         startLocationTracking()
 
-        // Start appropriate timer
+        // Start appropriate alarm
         startTimerForMode(newMode)
 
         // Update notification
@@ -284,24 +382,84 @@ class LocationService : Service() {
                 pendingLocations.removeAt(0)  // evict oldest
             }
         }
+        persistPendingLocations()
     }
 
     private fun startBatchTimer() {
-        batchTimer?.cancel()
-        batchTimer = Timer().apply {
-            scheduleAtFixedRate(object : TimerTask() {
-                override fun run() { flushPendingLocations() }
-            }, BATCH_INTERVAL_MS, BATCH_INTERVAL_MS)
+        batchJob?.cancel()
+        batchJob = serviceScope.launch {
+            while (isActive) {
+                delay(BATCH_INTERVAL_MS)
+                flushPendingLocations()
+            }
         }
     }
 
     private fun startHeartbeatTimer() {
-        heartbeatTimer?.cancel()
-        heartbeatTimer = Timer().apply {
-            scheduleAtFixedRate(object : TimerTask() {
-                override fun run() { sendHeartbeat() }
-            }, HEARTBEAT_INTERVAL_MS, HEARTBEAT_INTERVAL_MS)
+        cancelHeartbeatAlarm()
+        scheduleHeartbeatAlarm()
+    }
+
+    private fun scheduleHeartbeatAlarm() {
+        val intent = Intent(this, LocationService::class.java).setAction(ACTION_HEARTBEAT)
+        heartbeatPendingIntent = PendingIntent.getService(
+            this, REQUEST_CODE_HEARTBEAT, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val am = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        am.setAndAllowWhileIdle(
+            AlarmManager.RTC_WAKEUP,
+            System.currentTimeMillis() + HEARTBEAT_INTERVAL_MS,
+            heartbeatPendingIntent!!
+        )
+    }
+
+    private fun cancelHeartbeatAlarm() {
+        heartbeatPendingIntent?.let {
+            (getSystemService(Context.ALARM_SERVICE) as AlarmManager).cancel(it)
+            it.cancel()
         }
+        heartbeatPendingIntent = null
+    }
+
+    private fun cancelAlarms() {
+        batchJob?.cancel()
+        batchJob = null
+        cancelHeartbeatAlarm()
+    }
+
+    // ── Connectivity callback ──────────────────────────────────────────────
+
+    private fun registerNetworkCallback() {
+        if (networkCallback != null) return
+        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return
+
+        val request = NetworkRequest.Builder()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+            .build()
+
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                Log.d(TAG, "Network available — flushing pending locations")
+                // 오프라인 구간에 쌓인 큐를 바로 비운다. 타이머 대기 없이 재전송.
+                serviceScope.launch { flushPendingLocations() }
+            }
+        }
+
+        runCatching {
+            cm.registerNetworkCallback(request, callback)
+            networkCallback = callback
+        }.onFailure {
+            Log.w(TAG, "Failed to register network callback", it)
+        }
+    }
+
+    private fun unregisterNetworkCallback() {
+        val callback = networkCallback ?: return
+        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+        runCatching { cm?.unregisterNetworkCallback(callback) }
+        networkCallback = null
     }
 
     private fun flushPendingLocations() {
@@ -311,16 +469,22 @@ class LocationService : Service() {
             toSend = pendingLocations.toList()
             pendingLocations.clear()
         }
+        persistPendingLocations()
         toSend.forEach { request ->
             serviceScope.launch { sendLocationToServer(request) }
         }
     }
 
     /**
-     * Heartbeat: re-send the last known location so the server knows the device
-     * is still alive during long stationary periods.
+     * Heartbeat: iOS와 동일하게 lastLocation을 주기적으로 강제 송신한다.
+     * pending flush와 별개로 진행 — flush가 네트워크 오류로 재큐잉될 수 있고,
+     * 그 상태에서 `hadPending` 분기로 송신을 스킵하면 서버는 오랫동안 무소식이 된다.
      */
     private fun sendHeartbeat() {
+        // 1) 누적된 위치 flush 시도
+        flushPendingLocations()
+
+        // 2) lastLocation이 있으면 heartbeat으로 한 건 강제 송신
         val loc = lastLocation ?: return
         val request = buildLocationLogRequest(loc) ?: return
         serviceScope.launch { sendLocationToServer(request) }
@@ -329,11 +493,13 @@ class LocationService : Service() {
     // ── Build request model ────────────────────────────────────────────────
 
     private fun buildLocationLogRequest(location: Location): CreateLocationLogRequest? {
-        val prefs = getSharedPreferences("smap_auth_prefs", Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences(AUTH_PREFS, Context.MODE_PRIVATE)
         val mtIdxInt = prefs.getInt("mt_idx", -1)
         if (mtIdxInt == -1) return null
 
         val dateFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+        // Use the GPS-measured time, not the current wall-clock time
+        val locationTime = if (location.time > 0) Date(location.time) else Date()
 
         return CreateLocationLogRequest(
             mtIdx = mtIdxInt.toString(),
@@ -342,7 +508,7 @@ class LocationService : Service() {
             mltAccuracy = location.accuracy.toDouble(),
             mltSpeed = location.speed.toDouble(),
             mltAltitude = if (location.hasAltitude()) location.altitude else 0.0,
-            mltTimestamp = dateFormatter.format(Date()),
+            mltTimestamp = dateFormatter.format(locationTime),
             mltBattery = getBatteryLevel()
         )
     }
@@ -353,12 +519,32 @@ class LocationService : Service() {
         try {
             val response = smapApi.createLocationLog(request)
             if (response.isSuccessful) {
+                consecutiveAuthFailures = 0
                 Log.d(TAG, "Location sent: (${request.mltLat}, ${request.mltLong}) mode=${currentMode.name}")
             } else {
                 Log.w(TAG, "Location upload failed: HTTP ${response.code()}")
-                // Re-enqueue on server error for retry
-                if (response.code() >= 500) {
-                    enqueueLocation(request)
+                when (response.code()) {
+                    401 -> {
+                        consecutiveAuthFailures++
+                        if (consecutiveAuthFailures >= maxAuthFailures) {
+                            // 토큰 폐기 책임은 인증 flow(AuthService.logout / 로그인 재진입)에 위임한다.
+                            // 여기서는 재시도 루프를 멈추고 서비스만 중단 → 사용자 재진입 시점에
+                            // 스플래시/메인이 /members/me 등으로 세션 유효성을 재확인한다.
+                            Log.w(TAG, "Auth failed $maxAuthFailures times — stopping service (token kept)")
+                            stopSelf()
+                        } else {
+                            Log.w(TAG, "Auth failed ($consecutiveAuthFailures/$maxAuthFailures) — will retry")
+                            enqueueLocation(request)
+                        }
+                    }
+                    403 -> {
+                        // 403 may be rate-limit or authorization issue, not necessarily auth failure
+                        Log.w(TAG, "403 Forbidden — dropping location, not clearing token")
+                    }
+                    in 500..599 -> {
+                        // Re-enqueue on server error for retry
+                        enqueueLocation(request)
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -443,5 +629,74 @@ class LocationService : Service() {
         PowerMode.STATIONARY -> "정지 중 (저전력 모드)"
         PowerMode.WALKING    -> "이동 중 (도보)"
         PowerMode.AUTOMOTIVE -> "이동 중 (차량)"
+    }
+
+    private fun persistPendingLocations() {
+        val prefs = getSharedPreferences(QUEUE_PREFS, Context.MODE_PRIVATE)
+        val queueSnapshot = synchronized(pendingLocations) { pendingLocations.toList() }
+        prefs.edit().putString(KEY_PENDING_QUEUE, json.encodeToString(queueSnapshot)).apply()
+    }
+
+    private fun restorePendingLocations() {
+        val prefs = getSharedPreferences(QUEUE_PREFS, Context.MODE_PRIVATE)
+        val raw = prefs.getString(KEY_PENDING_QUEUE, null) ?: return
+        runCatching {
+            json.decodeFromString<List<CreateLocationLogRequest>>(raw)
+        }.onSuccess { restored ->
+            synchronized(pendingLocations) {
+                pendingLocations.clear()
+                pendingLocations.addAll(restored.takeLast(maxQueueSize))
+            }
+        }.onFailure {
+            Log.w(TAG, "Failed to restore pending queue", it)
+        }
+    }
+
+    private fun persistLastLocation() {
+        val location = lastLocation ?: return
+        val request = buildLocationLogRequest(location) ?: return
+        getSharedPreferences(QUEUE_PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_LAST_LOCATION, json.encodeToString(request))
+            .apply()
+    }
+
+    private fun restoreLastLocation() {
+        val prefs = getSharedPreferences(QUEUE_PREFS, Context.MODE_PRIVATE)
+        val raw = prefs.getString(KEY_LAST_LOCATION, null) ?: return
+        runCatching {
+            json.decodeFromString<CreateLocationLogRequest>(raw)
+        }.onSuccess { restored ->
+            // 서비스 프로세스가 재기동될 때 Location 필드도 함께 복원해야
+            // STATIONARY 모드에서 콜백이 늦게 오는 동안에도 heartbeat가 즉시 송신할 수 있다.
+            lastLocation = Location("cached").apply {
+                latitude = restored.mltLat
+                longitude = restored.mltLong
+                accuracy = restored.mltAccuracy.toFloat()
+                altitude = restored.mltAltitude
+                time = System.currentTimeMillis()
+            }
+            enqueueLocation(restored)
+        }.onFailure {
+            Log.w(TAG, "Failed to restore last location", it)
+        }
+        prefs.edit().remove(KEY_LAST_LOCATION).apply()
+    }
+
+    private fun scheduleRestart(reason: String) {
+        if (!isUserLoggedIn(this) || !hasRequiredPermissions(this)) return
+        val intent = Intent(this, LocationRestartReceiver::class.java).putExtra("restart_reason", reason)
+        val pendingIntent = PendingIntent.getBroadcast(
+            this,
+            1001,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        alarmManager.setAndAllowWhileIdle(
+            AlarmManager.RTC_WAKEUP,
+            System.currentTimeMillis() + RESTART_DELAY_MS,
+            pendingIntent
+        )
     }
 }

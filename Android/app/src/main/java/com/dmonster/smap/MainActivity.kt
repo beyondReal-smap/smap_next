@@ -189,13 +189,16 @@ class MainActivity : ComponentActivity() {
     // Re-check when returning from Settings
     override fun onResume() {
         super.onResume()
-        // If user returns from Settings and now has location permission
         if (hasLocationPermissions()) {
             showLocationDeniedOverlay.value = false
             if (hasBackgroundLocationPermission()) {
                 showBackgroundGuide.value = false
-                startLocationService()
             }
+            // 앱 복귀 시 항상 재가동 시도.
+            // LocationService가 401 누적으로 stopSelf 되었거나 OS에 의해 종료된 경우
+            // 사용자가 재진입한 순간 세션이 유효하면 바로 복구된다.
+            // startIfEligible이 로그인/권한/중복을 알아서 검사한다.
+            startLocationService()
         }
     }
 
@@ -236,17 +239,15 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startLocationService() {
-        try {
-            val intent = Intent(this, LocationService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(intent)
-            } else {
-                startService(intent)
-            }
-            Log.d(TAG, "[LOCATION] LocationService started")
-        } catch (e: Exception) {
-            Log.e(TAG, "[LOCATION] Failed to start LocationService: ${e.message}")
+        if (!LocationService.isUserLoggedIn(this)) {
+            Log.w(TAG, "[LOCATION] Skip start - user not logged in")
+            return
         }
+        if (!LocationService.hasRequiredPermissions(this)) {
+            Log.w(TAG, "[LOCATION] Skip start - required location permissions missing")
+            return
+        }
+        LocationService.startIfEligible(this, "main_activity")
     }
 
     private fun stopLocationService() {
