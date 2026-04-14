@@ -48,6 +48,38 @@ class GroupDetail(BaseModel):
         ).all()
 
     @classmethod
+    def get_group_members_with_roles(cls, db: Session, sgt_idx) -> Dict:
+        """그룹의 모든 멤버를 역할별로 단일 쿼리로 반환합니다."""
+        try:
+            from sqlalchemy import text
+            sql = text("""
+                SELECT gdt.sgdt_idx, gdt.mt_idx, gdt.sgdt_owner_chk, gdt.sgdt_leader_chk,
+                       mt.mt_lang, mt.mt_token_id, mt.mt_nickname, mt.mt_name
+                FROM smap_group_detail_t gdt
+                JOIN member_t mt ON gdt.mt_idx = mt.mt_idx
+                WHERE gdt.sgt_idx = :sgt_idx
+                  AND gdt.sgdt_discharge = 'N'
+                  AND gdt.sgdt_exit = 'N'
+                  AND gdt.sgdt_show = 'Y'
+            """)
+            rows = db.execute(sql, {"sgt_idx": int(sgt_idx)}).fetchall()
+            owner = None
+            leader = None
+            members = []
+            for r in rows:
+                m = dict(r._mapping)
+                if m.get("sgdt_owner_chk") == "Y":
+                    owner = m
+                elif m.get("sgdt_leader_chk") == "Y":
+                    leader = m
+                else:
+                    members.append(m)
+            return {"owner": owner, "leader": leader, "members": members}
+        except Exception as e:
+            logger.error(f"Error in get_group_members_with_roles: {e}")
+            return {"owner": None, "leader": None, "members": []}
+
+    @classmethod
     def find_owner(cls, db: Session, sgt_idx: int) -> Optional[Dict]:
         try:
             from app.models.member import Member

@@ -77,6 +77,8 @@ class NotificationViewModel: ObservableObject {
                     }
                 }
             } catch {
+                self.errorMessage = "읽음 처리에 실패했습니다."
+
                 print("❌ [NotificationViewModel] 읽음 처리 실패: \(error)")
             }
         }
@@ -113,6 +115,8 @@ class NotificationViewModel: ObservableObject {
                     NotificationCenter.default.post(name: NSNotification.Name("notificationSyncNeeded"), object: nil)
                 }
             } catch {
+                self.errorMessage = "전체 읽음 처리에 실패했습니다."
+
                 print("❌ [NotificationViewModel] 전체 읽음 처리 실패: \(error)")
             }
         }
@@ -129,6 +133,8 @@ class NotificationViewModel: ObservableObject {
                     NotificationCenter.default.post(name: NSNotification.Name("notificationSyncNeeded"), object: nil)
                 }
             } catch {
+                self.errorMessage = "알림 삭제에 실패했습니다."
+
                 print("❌ [NotificationViewModel] 알림 삭제 실패: \(error)")
             }
         }
@@ -147,6 +153,8 @@ class NotificationViewModel: ObservableObject {
                     NotificationCenter.default.post(name: NSNotification.Name("notificationSyncNeeded"), object: nil)
                 }
             } catch {
+                self.errorMessage = "전체 삭제에 실패했습니다."
+
                 print("❌ [NotificationViewModel] 전체 삭제 실패: \(error)")
             }
         }

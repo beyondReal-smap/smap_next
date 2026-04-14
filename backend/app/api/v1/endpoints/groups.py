@@ -1,8 +1,7 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func, text
-from jose import jwt, JWTError
 import hashlib
 import random
 import string
@@ -13,7 +12,6 @@ from app.models.schedule import Schedule
 from app.models.location import Location
 from app.models.member import Member
 from app.schemas.group import GroupCreate, GroupUpdate, GroupResponse
-from app.core.config import settings
 from datetime import datetime, timedelta
 from app.models.enums import ShowEnum
 import traceback
@@ -30,40 +28,15 @@ class GroupJoinRequest(BaseModel):
     mt_idx: int
     sgt_idx: int
 
+# 초대 코드로 그룹 가입을 위한 스키마
+class GroupJoinByCodeRequest(BaseModel):
+    mt_idx: int
+    sgt_code: str
+
 # 멤버 탈퇴를 위한 스키마
 class MemberRemoveRequest(BaseModel):
     sgdt_show: str = 'N'
     sgdt_exit: str = 'Y'
-
-def get_current_user_id_from_token(authorization: str = Header(None)) -> Optional[int]:
-    """
-    Authorization 헤더에서 토큰을 추출하고 사용자 ID를 반환합니다.
-    """
-    logger.info(f"[TOKEN_AUTH] Authorization header: {authorization[:50] if authorization else 'None'}...")
-    
-    if not authorization or not authorization.startswith("Bearer "):
-        logger.warning("[TOKEN_AUTH] No Bearer token found")
-        return None
-    
-    token = authorization.split(" ")[1]
-    logger.info(f"[TOKEN_AUTH] Token length: {len(token)}")
-    
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        # 'mt_idx' 또는 'sub' 필드에서 사용자 ID 추출 (두 가지 토큰 형식 호환)
-        mt_idx: Optional[int] = payload.get("mt_idx")
-        if mt_idx is None:
-            sub = payload.get("sub")
-            if sub:
-                try:
-                    mt_idx = int(sub)
-                except (ValueError, TypeError):
-                    mt_idx = None
-        logger.info(f"[TOKEN_AUTH] Token decoded successfully, mt_idx: {mt_idx}")
-        return mt_idx
-    except JWTError as e:
-        logger.error(f"[TOKEN_AUTH] JWT decode error: {e}")
-        return None
 
 @router.get("/hidden", response_model=List[GroupResponse])
 def get_hidden_groups(
@@ -85,16 +58,13 @@ def get_hidden_groups(
 @router.get("/current-user/summary")
 def get_group_summary(
     db: Session = Depends(deps.get_db),
-    authorization: str = Header(None)
+    user_id: int = Depends(deps.get_required_user_id)
 ):
     """
     현재 사용자의 그룹 정보를 요약하여 반환합니다.
     - 총 그룹 수
     - 총 멤버 수 (중복 제거)
     """
-    user_id = get_current_user_id_from_token(authorization)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="인증이 필요합니다.")
     
     logger.info(f"[GET_GROUP_SUMMARY] 그룹 요약 정보 조회 - user_id: {user_id}")
     
@@ -134,16 +104,12 @@ def get_group_summary(
 @router.get("/current-user", response_model=List[dict])
 def get_current_user_groups(
     db: Session = Depends(deps.get_db),
-    authorization: str = Header(None)
+    user_id: int = Depends(deps.get_required_user_id)
 ):
     """
     현재 로그인한 사용자가 속한 그룹 목록을 조회합니다.
     home/page.tsx의 groupService.getCurrentUserGroups()에서 사용
     """
-    # 토큰에서 사용자 ID 추출
-    user_id = get_current_user_id_from_token(authorization)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="인증이 필요합니다.")
     
     logger.info(f"[GET_CURRENT_USER_GROUPS] 사용자 ID: {user_id}")
     
@@ -157,42 +123,36 @@ def get_current_user_groups(
     ).all()
     
     logger.info(f"[GET_CURRENT_USER_GROUPS] 조회된 그룹 수: {len(user_groups)}")
-    
-    # 디버깅을 위해 모든 그룹 정보 로깅
-    all_user_groups = db.query(Group, GroupDetail).join(
-        GroupDetail, Group.sgt_idx == GroupDetail.sgt_idx
-    ).filter(
-        GroupDetail.mt_idx == user_id
-    ).all()
-    
-    logger.info(f"[GET_CURRENT_USER_GROUPS] 필터링 전 모든 그룹 수: {len(all_user_groups)}")
-    for group, group_detail in all_user_groups:
-        logger.info(f"[GET_CURRENT_USER_GROUPS] 그룹 정보 - sgt_idx: {group.sgt_idx}, sgt_title: {group.sgt_title}, sgt_show: {group.sgt_show}, sgdt_exit: {group_detail.sgdt_exit}")
-    
-    result = []
-    for group, group_detail in user_groups:
-        # 멤버 수 계산 (그룹 멤버 상세 API와 동일한 조건 적용)
-        member_count = db.query(func.count(GroupDetail.sgdt_idx)).join(
+
+    # 그룹별 멤버 수를 한 번의 쿼리로 일괄 조회 (N+1 방지)
+    group_ids = [g.sgt_idx for g, _ in user_groups]
+    member_counts = {}
+    if group_ids:
+        counts = db.query(
+            GroupDetail.sgt_idx, func.count(GroupDetail.sgdt_idx)
+        ).join(
             Member, Member.mt_idx == GroupDetail.mt_idx
         ).filter(
-            GroupDetail.sgt_idx == group.sgt_idx,
+            GroupDetail.sgt_idx.in_(group_ids),
             GroupDetail.sgdt_exit == 'N',
             GroupDetail.sgdt_show == 'Y',
-            GroupDetail.sgdt_discharge == 'N',  # 방출되지 않은 멤버만
-            Member.mt_status == 1  # 활성 상태 회원만
-        ).scalar() or 0
-        
+            GroupDetail.sgdt_discharge == 'N',
+            Member.mt_status == 1
+        ).group_by(GroupDetail.sgt_idx).all()
+        member_counts = dict(counts)
+
+    result = []
+    for group, group_detail in user_groups:
         group_data = {
             "sgt_idx": group.sgt_idx,
-            "mt_idx": group.mt_idx,  # 그룹 오너 ID
+            "mt_idx": group.mt_idx,
             "sgt_title": group.sgt_title or f"그룹 {group.sgt_idx}",
             "sgt_code": group.sgt_code or "",
             "sgt_memo": group.sgt_memo or "",
             "sgt_show": group.sgt_show or 'Y',
             "sgt_wdate": group.sgt_wdate.isoformat() if group.sgt_wdate else datetime.utcnow().isoformat(),
             "sgt_udate": group.sgt_udate.isoformat() if group.sgt_udate else datetime.utcnow().isoformat(),
-            "member_count": member_count,
-            # 현재 사용자의 그룹 내 역할 정보
+            "member_count": member_counts.get(group.sgt_idx, 0),
             "is_owner": group_detail.sgdt_owner_chk == 'Y',
             "is_leader": group_detail.sgdt_leader_chk == 'Y',
             "join_date": group_detail.sgdt_wdate.isoformat() if group_detail.sgdt_wdate else datetime.utcnow().isoformat()
@@ -203,6 +163,114 @@ def get_current_user_groups(
     result.sort(key=lambda x: x["sgt_title"])
     
     return result
+
+@router.post("/join")
+def join_group_by_code(
+    request: GroupJoinByCodeRequest,
+    user_id: int = Depends(deps.get_required_user_id),
+    db: Session = Depends(deps.get_db)
+):
+    """
+    초대 코드를 사용하여 그룹에 가입합니다.
+    """
+    logger.info(f"[JOIN_GROUP_BY_CODE] 그룹 가입 요청 - mt_idx: {request.mt_idx}, code: {request.sgt_code}")
+    
+    # 코드로 그룹 찾기
+    group = Group.find_by_code(db, request.sgt_code.upper())
+    if not group:
+        logger.error(f"[JOIN_GROUP_BY_CODE] 그룹을 찾을 수 없음 - code: {request.sgt_code}")
+        raise HTTPException(status_code=404, detail="유효하지 않은 초대 코드입니다.")
+        
+    logger.info(f"[JOIN_GROUP_BY_CODE] 그룹 확인 완료 - sgt_idx: {group.sgt_idx}, title: {group.sgt_title}")
+    
+    # 사용자 존재 확인
+    member = db.query(Member).filter(Member.mt_idx == request.mt_idx).first()
+    if not member:
+        logger.error(f"[JOIN_GROUP_BY_CODE] 사용자를 찾을 수 없음 - mt_idx: {request.mt_idx}")
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+        
+    group_id = group.sgt_idx
+    
+    # 이미 그룹에 가입되어 있는지 확인
+    existing_membership = db.query(GroupDetail).filter(
+        and_(
+            GroupDetail.sgt_idx == group_id,
+            GroupDetail.mt_idx == request.mt_idx,
+            GroupDetail.sgdt_exit == 'N'
+        )
+    ).first()
+    
+    if existing_membership:
+        logger.info(f"[JOIN_GROUP_BY_CODE] 기존 멤버십 발견 - sgdt_idx: {existing_membership.sgdt_idx}")
+        
+        if existing_membership.sgdt_show == 'Y':
+            raise HTTPException(status_code=400, detail="이미 이 그룹에 가입되어 있습니다.")
+        else:
+            # 재가입 처리
+            existing_membership.sgdt_show = 'Y'
+            existing_membership.sgdt_exit = 'N'
+            existing_membership.sgdt_udate = datetime.utcnow()
+            db.commit()
+            
+            return {
+                "success": True,
+                "message": "그룹에 성공적으로 재가입되었습니다.",
+                "data": {
+                    "sgdt_idx": existing_membership.sgdt_idx,
+                    "sgt_idx": group_id,
+                    "mt_idx": request.mt_idx,
+                    "sgdt_owner_chk": existing_membership.sgdt_owner_chk,
+                    "sgdt_leader_chk": existing_membership.sgdt_leader_chk,
+                    "sgdt_wdate": existing_membership.sgdt_wdate.isoformat() if existing_membership.sgdt_wdate else datetime.utcnow().isoformat()
+                }
+            }
+            
+    # 새로운 그룹 멤버십 생성
+    try:
+        new_membership = GroupDetail(
+            sgt_idx=group_id,
+            mt_idx=request.mt_idx,
+            sgdt_owner_chk='N',
+            sgdt_leader_chk='N',
+            sgdt_discharge='N',
+            sgdt_group_chk='Y',
+            sgdt_exit='N',
+            sgdt_show='Y',
+            sgdt_push_chk='Y',
+            sgdt_wdate=datetime.utcnow(),
+            sgdt_udate=datetime.utcnow()
+        )
+        
+        db.add(new_membership)
+        db.commit()
+        db.refresh(new_membership)
+        
+        logger.info(f"[JOIN_GROUP_BY_CODE] 그룹 가입 성공 - sgdt_idx: {new_membership.sgdt_idx}")
+
+        # 채팅방 멤버 자동 추가
+        try:
+            from app.services.chat_service import chat_service
+            chat_service.add_member_to_group_chat(db, group_id, request.mt_idx)
+        except Exception as chat_e:
+            logger.error(f"[JOIN_GROUP_BY_CODE] 채팅방 멤버 추가 실패: {chat_e}")
+
+        return {
+            "success": True,
+            "message": "그룹에 성공적으로 가입되었습니다.",
+            "data": {
+                "sgdt_idx": new_membership.sgdt_idx,
+                "sgt_idx": group_id,
+                "mt_idx": request.mt_idx,
+                "sgdt_owner_chk": new_membership.sgdt_owner_chk,
+                "sgdt_leader_chk": new_membership.sgdt_leader_chk,
+                "sgdt_wdate": new_membership.sgdt_wdate.isoformat() if new_membership.sgdt_wdate else datetime.utcnow().isoformat()
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"[JOIN_GROUP_BY_CODE] 그룹 가입 실패: {str(e)}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail="그룹 가입 중 오류가 발생했습니다.")
 
 @router.get("/{group_id}", response_model=GroupResponse)
 def get_group(
@@ -298,15 +366,11 @@ def generate_sgt_code(db: Session) -> str:
 def create_group(
     group_in: GroupCreate,
     db: Session = Depends(deps.get_db),
-    authorization: str = Header(None)
+    user_id: int = Depends(deps.get_required_user_id)
 ):
     """
     새로운 그룹을 생성합니다.
     """
-    # 토큰에서 사용자 ID 추출
-    user_id = get_current_user_id_from_token(authorization)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="인증이 필요합니다.")
         
     logger.info(f"[CREATE_GROUP] 그룹 생성 요청 - user_id: {user_id}, title: {group_in.sgt_title}")
 
@@ -352,9 +416,15 @@ def create_group(
         logger.info(f"[CREATE_GROUP] 그룹 멤버(관리자) 생성 완료 - sgdt_idx: {group_detail.sgdt_idx}")
     except Exception as e:
         logger.error(f"[CREATE_GROUP] 그룹 멤버 생성 실패: {str(e)}")
-        # 그룹은 생성되었으나 멤버 추가 실패 시? 롤백? 
-        # 일단 로그 남기고 진행. 
-    
+
+    # 채팅방 자동 생성
+    try:
+        from app.services.chat_service import chat_service
+        chat_service.create_group_chat_room(db, group.sgt_idx, group.sgt_title, [user_id])
+        logger.info(f"[CREATE_GROUP] 채팅방 자동 생성 완료 - sgt_idx: {group.sgt_idx}")
+    except Exception as e:
+        logger.error(f"[CREATE_GROUP] 채팅방 생성 실패: {str(e)}")
+
     return group
 
 @router.put("/{group_id}", response_model=GroupResponse)
@@ -378,7 +448,7 @@ def update_group(
         logger.info(f"[UPDATE_GROUP] 업데이트 전 그룹 상태 - sgt_show: {group.sgt_show}, sgt_title: {group.sgt_title}")
         
         # 소프트 삭제 요청인지 확인
-        if group_in.sgt_show == 'N':
+        if group_in.sgt_show == ShowEnum.N:
             logger.warning(f"[UPDATE_GROUP] 🚫 소프트 삭제 요청 감지 - group_id: {group_id}")
             logger.warning(f"[UPDATE_GROUP] ⚠️ 실제 DB 삭제가 아닌 숨김 처리를 실행합니다")
             logger.warning(f"[UPDATE_GROUP] 🔍 삭제 전 그룹 상태 확인 - sgt_show: {group.sgt_show}")
@@ -455,7 +525,7 @@ def restore_group(
     logger.info(f"[RESTORE_GROUP] 복구 전 그룹 상태 - sgt_show: {group.sgt_show}, sgt_title: {group.sgt_title}")
     
     # sgt_show를 'Y'로 변경하여 복구
-    group.sgt_show = 'Y'
+    group.sgt_show = ShowEnum.Y
     group.sgt_udate = datetime.utcnow()
     
     logger.info(f"[RESTORE_GROUP] 그룹 복구 실행 - sgt_show를 'Y'로 변경")
@@ -658,8 +728,8 @@ def get_group_stats(
 def join_group(
     group_id: int,
     join_request: GroupJoinRequest,
-    db: Session = Depends(deps.get_db),
-    authorization: str = Header(None)
+    user_id: int = Depends(deps.get_required_user_id),
+    db: Session = Depends(deps.get_db)
 ):
     """
     그룹에 가입합니다.
@@ -749,7 +819,14 @@ def join_group(
         db.refresh(new_membership)
         
         logger.info(f"[JOIN_GROUP] 그룹 가입 성공 - sgdt_idx: {new_membership.sgdt_idx}, group_id: {group_id}, mt_idx: {join_request.mt_idx}")
-        
+
+        # 채팅방 멤버 자동 추가
+        try:
+            from app.services.chat_service import chat_service
+            chat_service.add_member_to_group_chat(db, group_id, join_request.mt_idx)
+        except Exception as chat_e:
+            logger.error(f"[JOIN_GROUP] 채팅방 멤버 추가 실패: {chat_e}")
+
         return {
             "success": True,
             "message": "그룹에 성공적으로 가입되었습니다.",

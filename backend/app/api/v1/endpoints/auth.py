@@ -1,19 +1,45 @@
 import os
 import uuid
-import jwt
+import time
+import secrets
 import logging
+import hashlib
 from datetime import datetime, timedelta
-from typing import Optional
-from pydantic import BaseModel
-from jose import JWTError
+from typing import Optional, Tuple
+from jose import jwt, JWTError
 from fastapi import APIRouter, Depends, HTTPException, status, Body, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from app.crud import crud_auth
-from app.schemas.auth import *
+from app.crud import crud_auth, crud_refresh_token
+from app.schemas.auth import (
+    UserIdentity,
+    RegisterRequest,
+    LoginRequestHome,
+    LoginResponseHome,
+    LoginRequest,
+    LoginResponse,
+    KakaoLoginRequest,
+    KakaoLoginResponse,
+    GoogleUserDataRequest,
+    PhoneUserDataRequest,
+    GoogleUserDataResponse,
+    GoogleLoginRequest,
+    GoogleLoginResponse,
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
+    ResetPasswordByPhoneRequest,
+    VerifyResetTokenRequest,
+    VerifyResetTokenResponse,
+    ResetPasswordRequest,
+    ResetPasswordResponse,
+)
 from app.schemas.member import AppleLoginRequest, AppleLoginResponse
 from app.core.config import settings
+from app.api.v1.endpoints.sms import (
+    _get_verification_code, _delete_verification_code,
+    _is_verified, _clear_verified,
+)
 from app.models.member import Member
 
 router = APIRouter()
@@ -21,125 +47,6 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # 로거 설정
 logger = logging.getLogger(__name__)
-
-# home/page.tsx의 AuthContext에서 사용하는 로그인 요청 모델
-class LoginRequestHome(BaseModel):
-    mt_id: str  # 아이디 (전화번호 또는 이메일)
-    mt_pwd: str  # 비밀번호
-    fcm_token: Optional[str] = None  # 선택적 FCM 토큰
-    device_id: Optional[str] = None  # 기기 식별번호
-    device_model: Optional[str] = None  # 기기 모델명
-    os_type: Optional[str] = None  # "ios" 또는 "android"
-    os_version: Optional[str] = None  # OS 버전
-    app_version: Optional[str] = None  # 앱 버전
-
-# home/page.tsx의 AuthContext에서 사용하는 로그인 응답 모델
-class LoginResponseHome(BaseModel):
-    success: bool
-    message: str
-    data: Optional[dict] = None
-
-# 카카오 로그인 요청 모델
-class KakaoLoginRequest(BaseModel):
-    kakao_id: str
-    email: Optional[str] = None
-    nickname: str
-    profile_image: Optional[str] = None
-    access_token: str
-    fcm_token: Optional[str] = None  # 선택적 FCM 토큰
-    device_id: Optional[str] = None  # 기기 식별번호
-    device_model: Optional[str] = None  # 기기 모델명
-    os_type: Optional[str] = None  # "ios" 또는 "android"
-    os_version: Optional[str] = None  # OS 버전
-    app_version: Optional[str] = None  # 앱 버전
-
-# 카카오 로그인 응답 모델
-class KakaoLoginResponse(BaseModel):
-    success: bool
-    message: str
-    data: Optional[dict] = None
-
-# Google 로그인 사용자 데이터 조회 모델
-class GoogleUserDataRequest(BaseModel):
-    email: str
-    google_id: Optional[str] = None
-
-class PhoneUserDataRequest(BaseModel):
-    phone: str
-    google_id: Optional[str] = None
-
-class GoogleUserDataResponse(BaseModel):
-    success: bool
-    message: str
-    data: Optional[dict] = None
-
-# Google 로그인 요청 모델 (완전히 유연하게 변경)
-class GoogleLoginRequest(BaseModel):
-    google_id: Optional[str] = None
-    email: Optional[str] = None
-    name: Optional[str] = None
-    given_name: Optional[str] = None
-    family_name: Optional[str] = None
-    image: Optional[str] = None
-    id_token: Optional[str] = None
-    # 기타 모든 필드도 옵셔널로 처리
-    lookup_strategy: Optional[str] = "email_first"
-    search_by_email: Optional[bool] = True
-    verify_email_match: Optional[bool] = True
-    email_first_lookup: Optional[bool] = True
-    lookup_priority: Optional[str] = "email"
-
-    class Config:
-        # 추가 필드도 허용하여 엄격한 검증 방지
-        extra = "allow"
-
-# Google 로그인 응답 모델
-class GoogleLoginResponse(BaseModel):
-    success: bool
-    message: str
-    data: Optional[dict] = None
-
-# 레거시/공용 로그인 요청/응답 스키마
-class LoginRequest(BaseModel):
-    mt_hp: str
-    mt_pass: str
-    fcm_token: Optional[str] = None
-
-class LoginResponse(BaseModel):
-    access_token: str
-    user: "UserIdentity"
-
-# 비밀번호 관련 요청/응답 스키마
-class ForgotPasswordRequest(BaseModel):
-    type: str  # "phone" | "email"
-    contact: str
-
-class ForgotPasswordResponse(BaseModel):
-    success: bool
-    message: str
-    data: Optional[dict] = None
-
-# 전화번호 기반 비밀번호 재설정 요청 (네이티브 앱용)
-class ResetPasswordByPhoneRequest(BaseModel):
-    phone: str  # 전화번호 (하이픈 포함 가능)
-    new_password: str  # 새 비밀번호
-
-class VerifyResetTokenRequest(BaseModel):
-    token: str
-
-class VerifyResetTokenResponse(BaseModel):
-    success: bool
-    message: str
-    data: Optional[dict] = None
-
-class ResetPasswordRequest(BaseModel):
-    token: str
-    new_password: str
-
-class ResetPasswordResponse(BaseModel):
-    success: bool
-    message: str
-    data: Optional[dict] = None
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
@@ -151,10 +58,41 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
+
+# ---------------------------------------------------------------------------
+# Refresh token helpers
+# ---------------------------------------------------------------------------
+
+def _client_ip_hash(request: Optional[Request]) -> Optional[str]:
+    """Rate limit / 이상 탐지 보조용. raw IP는 저장하지 않고 해시만 저장."""
+    if request is None or request.client is None:
+        return None
+    client_ip = request.client.host or ""
+    if not client_ip:
+        return None
+    return hashlib.sha256(client_ip.encode("utf-8")).hexdigest()
+
+
+def _issue_refresh_for(
+    db: Session,
+    mt_idx: int,
+    request: Optional[Request],
+) -> str:
+    """로그인 경로에서 공통으로 호출. 새 refresh 체인을 발급하고 raw 문자열 반환."""
+    ua = (request.headers.get("user-agent") if request else None)
+    ip = _client_ip_hash(request)
+    raw, _chain = crud_refresh_token.issue(db, mt_idx, user_agent=ua, ip_hash=ip)
+    return raw
+
+
+def _access_expires_in_seconds() -> int:
+    return int(settings.ACCESS_TOKEN_EXPIRE_MINUTES) * 60
+
 @router.post("/login", response_model=LoginResponseHome)
-async def login_for_home_page(
+def login_for_home_page(
     login_request: LoginRequestHome,
-    db: Session = Depends(get_db)
+    request: Request,
+    db: Session = Depends(get_db),
 ):
     """
     home/page.tsx의 AuthContext에서 사용하는 로그인 API
@@ -251,11 +189,15 @@ async def login_for_home_page(
             "mt_adate": user.mt_adate.isoformat() if user.mt_adate else datetime.utcnow().isoformat()
         }
 
+        refresh_raw = _issue_refresh_for(db, user.mt_idx, request)
+
         return LoginResponseHome(
             success=True,
             message="로그인 성공",
             data={
                 "token": access_token,
+                "refresh_token": refresh_raw,
+                "expires_in": _access_expires_in_seconds(),
                 "user": user_data
             }
         )
@@ -267,57 +209,109 @@ async def login_for_home_page(
         )
 
 @router.post("/logout")
-async def logout():
+def logout(
+    db: Session = Depends(get_db),
+    body: Optional[dict] = Body(default=None),
+):
     """
-    로그아웃 (클라이언트에서 토큰 제거)
+    로그아웃. body에 `refresh_token`이 있으면 서버 측에서 즉시 revoke.
+    raw refresh token은 서버에 평문 저장되지 않으므로 클라이언트가 갖고 있는 값으로만
+    해시 일치 여부를 검증한다.
     """
+    if body and isinstance(body, dict):
+        raw = body.get("refresh_token")
+        if isinstance(raw, str) and raw:
+            crud_refresh_token.revoke_by_raw(db, raw)
     return {
         "success": True,
         "message": "로그아웃되었습니다."
     }
 
+
 @router.post("/refresh")
-async def refresh_token(
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
+def refresh_token(
+    request: Request,
+    db: Session = Depends(get_db),
+    body: Optional[dict] = Body(default=None),
 ):
     """
-    토큰 갱신
+    토큰 갱신.
+    - v2 (권장): body `{"refresh_token": "..."}` → rotation.
+      새 access + 새 refresh를 반환한다. reuse 감지 시 해당 체인 전체 revoke.
+    - v1 (하위 호환): Authorization: Bearer <access_token> → access만 재발급.
+      구 클라이언트 호환용. Phase D에서 최소 버전 상향으로 차단 예정.
     """
+    # ── v2 경로 ─────────────────────────────────────────────────────────
+    if body and isinstance(body, dict):
+        raw = body.get("refresh_token")
+        if isinstance(raw, str) and raw:
+            ua = request.headers.get("user-agent") if request else None
+            ip = _client_ip_hash(request)
+            result = crud_refresh_token.rotate(db, raw, user_agent=ua, ip_hash=ip)
+            if result is None:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Refresh token이 유효하지 않습니다.",
+                )
+            new_raw, mt_idx, _chain = result
+            user = db.query(Member).filter(Member.mt_idx == mt_idx).first()
+            if user is None:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="사용자를 찾을 수 없습니다.",
+                )
+            access_token = create_access_token(
+                data={
+                    "mt_idx": user.mt_idx,
+                    "mt_id": user.mt_id,
+                    "mt_name": user.mt_name,
+                }
+            )
+            return {
+                "success": True,
+                "token": access_token,
+                "refresh_token": new_raw,
+                "expires_in": _access_expires_in_seconds(),
+                "message": "토큰이 갱신되었습니다.",
+            }
+
+    # ── v1 경로 (하위 호환) ─────────────────────────────────────────────
+    auth_header = request.headers.get("authorization", "") if request else ""
+    if not auth_header.lower().startswith("bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="토큰이 필요합니다.",
+        )
+    access = auth_header[7:].strip()
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        mt_idx: Optional[int] = payload.get("mt_idx")
-        
+        payload = jwt.decode(access, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        mt_idx: Optional[int] = payload.get("mt_idx") or payload.get("sub")
         if mt_idx is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="토큰이 유효하지 않습니다."
+                detail="토큰이 유효하지 않습니다.",
             )
-        
-        # 새로운 토큰 생성
         new_token = create_access_token(
             data={
                 "mt_idx": mt_idx,
                 "mt_id": payload.get("mt_id"),
-                "mt_name": payload.get("mt_name")
+                "mt_name": payload.get("mt_name"),
             }
         )
-        
         return {
             "success": True,
             "token": new_token,
-            "message": "토큰이 갱신되었습니다."
+            "message": "토큰이 갱신되었습니다.",
         }
-        
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="토큰 갱신에 실패했습니다."
+            detail="토큰 갱신에 실패했습니다.",
         )
 
 # 기존 로그인 API (하위 호환성을 위해 유지)
 @router.post("/login-original", response_model=LoginResponse)
-async def login_for_access_token_custom(
+def login_for_access_token_custom(
     db: Session = Depends(get_db),
     login_request: LoginRequest = Body(...)
 ):
@@ -374,7 +368,7 @@ async def register_user(
         user_in = RegisterRequest(**body)
     except Exception as e:
         logger.error(f"❌ Pydantic validation error: {e}")
-        raise HTTPException(status_code=422, detail=f"Validation error: {str(e)}")
+        raise HTTPException(status_code=422, detail="요청 데이터 형식이 올바르지 않습니다.")
     
     existing_user_by_phone = crud_auth.get_user_by_phone(db, user_in.mt_id.replace("-", ""))
     if existing_user_by_phone:
@@ -450,11 +444,11 @@ async def register_user(
         logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"사용자 생성 중 오류가 발생했습니다: {str(e)}"
+            detail="사용자 생성 중 오류가 발생했습니다."
         )
 
 @router.get("/me", response_model=UserIdentity)
-async def read_users_me(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+def read_users_me(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -477,9 +471,10 @@ async def read_users_me(db: Session = Depends(get_db), token: str = Depends(oaut
         raise credentials_exception 
 
 @router.post("/kakao-login", response_model=KakaoLoginResponse)
-async def kakao_login(
+def kakao_login(
     kakao_request: KakaoLoginRequest,
-    db: Session = Depends(get_db)
+    request: Request,
+    db: Session = Depends(get_db),
 ):
     """
     카카오 로그인 API
@@ -500,7 +495,15 @@ async def kakao_login(
                     success=False,
                     message="탈퇴한 계정입니다. 새로운 계정으로 가입해주세요."
                 )
-            
+
+            # 차단/비노출 사용자 확인
+            if existing_user.mt_status != 1 or existing_user.mt_show != 'Y':
+                logger.warning(f"[KAKAO LOGIN] 비활성 사용자 로그인 시도: mt_idx={existing_user.mt_idx}")
+                return KakaoLoginResponse(
+                    success=False,
+                    message="비활성화된 계정입니다. 고객센터에 문의해주세요."
+                )
+
             # 기존 사용자 로그인
             logger.info(f"[KAKAO LOGIN] 기존 카카오 사용자 로그인: mt_idx={existing_user.mt_idx}")
             user = existing_user
@@ -612,13 +615,17 @@ async def kakao_login(
         )
 
         logger.info(f"[KAKAO LOGIN] 카카오 로그인 성공: mt_idx={user.mt_idx}, is_new_user={is_new_user}")
-        
+
+        refresh_raw = _issue_refresh_for(db, user.mt_idx, request)
+
         return KakaoLoginResponse(
             success=True,
             message="카카오 로그인 성공" if not is_new_user else "카카오 계정으로 회원가입되었습니다.",
             data={
                 "user": user_data,
                 "token": access_token,
+                "refresh_token": refresh_raw,
+                "expires_in": _access_expires_in_seconds(),
                 "isNewUser": is_new_user
             }
         )
@@ -631,7 +638,7 @@ async def kakao_login(
         ) 
 
 @router.post("/find-user-by-email", response_model=GoogleUserDataResponse)
-async def find_user_by_email(
+def find_user_by_email(
     request: GoogleUserDataRequest,
     db: Session = Depends(get_db)
 ):
@@ -832,7 +839,7 @@ async def find_user_by_email(
                 )
 
 @router.post("/find-user-by-phone", response_model=GoogleUserDataResponse)
-async def find_user_by_phone(
+def find_user_by_phone(
     request: PhoneUserDataRequest,
     db: Session = Depends(get_db)
 ):
@@ -1112,7 +1119,7 @@ async def google_login(
         )
 
 @router.post("/apple-login", response_model=AppleLoginResponse)
-async def apple_login(
+def apple_login(
     apple_request: AppleLoginRequest,
     db: Session = Depends(get_db)
 ):
@@ -1225,7 +1232,7 @@ async def forgot_password(
         )
 
 @router.post("/verify-reset-token", response_model=VerifyResetTokenResponse)
-async def verify_reset_token(
+def verify_reset_token(
     token_data: VerifyResetTokenRequest,
     db: Session = Depends(get_db)
 ):
@@ -1277,7 +1284,7 @@ async def verify_reset_token(
         )
 
 @router.post("/reset-password", response_model=ResetPasswordResponse)
-async def reset_password(
+def reset_password(
     reset_data: ResetPasswordRequest,
     db: Session = Depends(get_db)
 ):
@@ -1363,7 +1370,7 @@ async def reset_password(
         ) 
 
 @router.post("/reset-password-by-phone", response_model=ResetPasswordResponse)
-async def reset_password_by_phone(
+def reset_password_by_phone(
     reset_data: ResetPasswordByPhoneRequest,
     db: Session = Depends(get_db)
 ):
@@ -1373,12 +1380,23 @@ async def reset_password_by_phone(
     """
     try:
         import re
-        
+
         # 전화번호 정리
         clean_phone = reset_data.phone.replace('-', '').replace(' ', '')
-        
+
         logger.info(f"🔄 전화번호 기반 비밀번호 재설정 요청: {clean_phone[:3]}***")
-        
+
+        # SMS 인증 확인: verify-code에서 설정한 인증 완료 상태 우선 확인
+        verified_by_state = _is_verified(clean_phone)
+        if not verified_by_state:
+            # 단독 호출 지원: 인증 완료 상태가 없으면 인증코드 직접 검증
+            stored_code = _get_verification_code(clean_phone)
+            if not stored_code:
+                raise HTTPException(status_code=400, detail="SMS 인증을 먼저 완료해주세요.")
+            if not secrets.compare_digest(reset_data.verification_code, stored_code):
+                raise HTTPException(status_code=400, detail="인증번호가 일치하지 않습니다.")
+            _delete_verification_code(clean_phone)
+
         # 전화번호로 사용자 조회
         user = crud_auth.get_user_by_phone(db, clean_phone)
         
@@ -1417,8 +1435,11 @@ async def reset_password_by_phone(
                 message="비밀번호 변경에 실패했습니다."
             )
         
+        # 인증 완료 상태 정리 (재사용 방지)
+        _clear_verified(clean_phone)
+
         logger.info(f"✅ 전화번호 기반 비밀번호 재설정 완료: 사용자 {user.mt_idx}")
-        
+
         return ResetPasswordResponse(
             success=True,
             message="비밀번호가 성공적으로 변경되었습니다.",

@@ -107,6 +107,8 @@ class GroupViewModel: ObservableObject {
                         self.groupStats = nil
                     }
                     self.isDeleting = false
+                    // 서버에서 최신 그룹 목록 다시 조회
+                    self.fetchGroups()
                     // Notify other views that groups have changed
                     NotificationCenter.default.post(name: NSNotification.Name("groupsDidChange"), object: nil)
                 }

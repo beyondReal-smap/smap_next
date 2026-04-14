@@ -152,12 +152,17 @@ class LoginViewModel: ObservableObject {
                     "mt_pwd": currentPassword
                 ]
                 request.httpBody = try? JSONSerialization.data(withJSONObject: body)
-                
+
                 URLSession.shared.dataTask(with: request) { data, response, error in
                     if let error = error {
                         loginError = error
                     } else if let data = data {
-                        loginResponse = try? JSONDecoder().decode(LoginResponse.self, from: data)
+                        do {
+                            loginResponse = try JSONDecoder().decode(LoginResponse.self, from: data)
+                        } catch {
+                            print("❌ [LoginViewModel] 로그인 응답 파싱 실패: \(error)")
+                            loginError = error
+                        }
                     }
                     semaphore.signal()
                 }.resume()

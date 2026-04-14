@@ -1,0 +1,61 @@
+<h2>SMAP iOS UI/UX 감사 결과</h2>
+<p class="subtitle">현재 코드에서 발견된 개선 포인트를 우선순위별로 정리했습니다. 집중할 영역을 선택해주세요.</p>
+
+<div class="options" data-multiselect>
+
+  <div class="option" data-choice="theme" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>디자인 시스템 통합 <span style="color:#e74c3c;font-size:13px;">CRITICAL</span></h3>
+      <p><strong>214개</strong> 하드코딩된 Color(red:...) → SMAPTheme.Color 전환</p>
+      <p>SMAPButton, SMAPTextField, SMAPLoadingView 등 이미 만들어진 컴포넌트가 <strong>0곳</strong>에서 사용 중</p>
+      <p style="color:#999;font-size:13px;">영향: 26개 파일 | 효과: 디자인 일관성, 다크모드 준비, 유지보수성</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="deprecated" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Deprecated API 제거 <span style="color:#e67e22;font-size:13px;">HIGH</span></h3>
+      <p><strong>NavigationView → NavigationStack</strong> (7개 파일)</p>
+      <p><strong>.edgesIgnoringSafeArea → .ignoresSafeArea</strong> (37곳)</p>
+      <p><strong>.navigationBarHidden → .toolbar(.hidden)</strong> (18곳)</p>
+      <p style="color:#999;font-size:13px;">영향: iOS 17+ 최적화, Xcode 경고 제거</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="accessibility" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>접근성 (Accessibility) <span style="color:#e74c3c;font-size:13px;">CRITICAL</span></h3>
+      <p>accessibilityLabel/Hint 사용: <strong>0건</strong></p>
+      <p>모든 버튼, 아이콘, 인터랙티브 요소에 스크린 리더 지원 없음</p>
+      <p style="color:#999;font-size:13px;">영향: 전체 앱 | 효과: App Store 심사, 법적 요건, 사용자 경험</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="modern" onclick="toggleSelect(this)">
+    <div class="letter">D</div>
+    <div class="content">
+      <h3>모던 SwiftUI 패턴 도입 <span style="color:#f39c12;font-size:13px;">MEDIUM</span></h3>
+      <p><strong>.refreshable</strong> 풀투리프레시 (1곳만 사용 중 → 전체 리스트)</p>
+      <p><strong>.task {}</strong> 비동기 로딩 (.onAppear + Task 대체)</p>
+      <p><strong>@FocusState</strong> 키보드 관리 (1곳만 사용 중)</p>
+      <p style="color:#999;font-size:13px;">영향: 주요 화면 | 효과: UX 개선, 코드 간결화</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="loading" onclick="toggleSelect(this)">
+    <div class="letter">E</div>
+    <div class="content">
+      <h3>로딩/에러/빈상태 표준화 <span style="color:#3498db;font-size:13px;">LOW</span></h3>
+      <p>로딩 상태: 각 화면마다 다른 ProgressView 스타일</p>
+      <p>에러 표시: Alert API 구/신 혼용</p>
+      <p>빈 상태: 일부 화면만 구현</p>
+      <p style="color:#999;font-size:13px;">영향: 전체 앱 | 효과: 일관된 사용자 경험</p>
+    </div>
+  </div>
+
+</div>
+
+<p style="margin-top:24px;color:#aaa;font-size:14px;">복수 선택 가능합니다. 선택 후 터미널에서 알려주세요.</p>

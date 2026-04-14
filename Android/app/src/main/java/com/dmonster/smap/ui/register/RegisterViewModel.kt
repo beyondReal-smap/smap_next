@@ -41,6 +41,7 @@ class RegisterViewModel @Inject constructor(
     companion object {
         private const val TAG = "RegisterViewModel"
         private val SMS_API_URL = "${BuildConfig.API_BASE_URL}sms/send-verification-code"
+        private val VERIFY_CODE_API_URL = "${BuildConfig.API_BASE_URL}sms/verify-code"
         private val CHECK_PHONE_API_URL = "${BuildConfig.API_BASE_URL}members/check/phone/"
         private val REGISTER_API_URL = "${BuildConfig.API_BASE_URL}auth/register"
         private val client = OkHttpClient.Builder()
@@ -83,10 +84,6 @@ class RegisterViewModel @Inject constructor(
     
     private var timerJob: Job? = null
     private var errorJob: Job? = null
-    // TODO: Server-side verification - send the user-entered code to the server for verification
-    // instead of storing and comparing locally. Keeping client-side comparison for now until
-    // the server API supports a verify-code endpoint.
-    private var sentVerificationCode: String? = null
     private var lastSentTime: Long? = null  // 재발송 제한용 (밀리초)
     
     // 재발송 가능 여부 확인 (3분 = 180초 = 180000밀리초)
@@ -224,7 +221,6 @@ class RegisterViewModel @Inject constructor(
         // 테스트 번호 처리 (debug builds only)
         if (BuildConfig.DEBUG && phone == "01011111111") {
             Log.d(TAG, "📱 테스트 번호 - 실제 SMS 발송 생략")
-            sentVerificationCode = null  // 테스트 번호는 111111로 고정
             lastSentTime = System.currentTimeMillis()
             _uiState.value = _uiState.value.copy(
                 isVerificationLoading = false,
@@ -290,12 +286,9 @@ class RegisterViewModel @Inject constructor(
 
                 val (isSuccessful, smsBody) = smsResult
                 if (isSuccessful && smsBody?.contains("\"success\":true") == true) {
-                    // 백엔드에서 반환된 인증번호 저장 (iOS와 동일하게 'code' 필드 파싱)
-                    val codeMatch = Regex("\"code\"\\s*:\\s*\"?(\\d+)\"?").find(smsBody ?: "")
-                    sentVerificationCode = codeMatch?.groupValues?.get(1)
                     lastSentTime = System.currentTimeMillis()
 
-                    Log.d(TAG, "✅ 인증번호 발송 성공 - 코드 저장됨: ${sentVerificationCode != null}")
+                    Log.d(TAG, "✅ 인증번호 발송 성공 - 서버 측 인증코드 저장됨")
 
                     _uiState.value = _uiState.value.copy(
                         isVerificationLoading = false,
@@ -320,18 +313,18 @@ class RegisterViewModel @Inject constructor(
     fun verifyCode() {
         val inputCode = _uiState.value.verificationCode
         val phone = _uiState.value.registerData.mtId.filter { it.isDigit() }
-        
+
         if (inputCode.length != 6) {
             showError("6자리 인증번호를 입력해주세요")
             return
         }
-        
+
         // 타이머 만료 확인
         if (_uiState.value.verificationTimer <= 0) {
             showError("인증번호가 만료되었습니다. 재발송해주세요")
             return
         }
-        
+
         // 테스트 번호 처리 (debug builds only)
         if (BuildConfig.DEBUG && phone == "01011111111") {
             if (inputCode == "111111") {
@@ -343,21 +336,47 @@ class RegisterViewModel @Inject constructor(
             }
             return
         }
-        
-        // 저장된 인증번호와 비교
-        if (sentVerificationCode == null) {
-            showError("인증번호 발송 정보가 없습니다. 다시 요청해주세요")
-            return
-        }
-        
-        if (inputCode == sentVerificationCode) {
-            Log.d(TAG, "✅ 인증번호 확인 성공")
-            sentVerificationCode = null  // 사용된 코드 삭제
-            timerJob?.cancel()
-            nextStep()
-        } else {
-            Log.d(TAG, "❌ 인증번호 불일치 - 입력: $inputCode, 저장된 코드: $sentVerificationCode")
-            showError("인증번호가 일치하지 않습니다")
+
+        // 서버 측 인증번호 검증
+        _uiState.value = _uiState.value.copy(isVerificationLoading = true)
+
+        viewModelScope.launch {
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    val requestBody = """{"phone_number":"$phone","code":"$inputCode"}"""
+                        .toRequestBody("application/json".toMediaType())
+
+                    val request = Request.Builder()
+                        .url(VERIFY_CODE_API_URL)
+                        .post(requestBody)
+                        .build()
+
+                    val response = client.newCall(request).execute()
+                    val body = response.body?.string()
+
+                    Log.d(TAG, "인증번호 검증 응답: $body")
+                    Pair(response.isSuccessful, body)
+                }
+
+                val (isSuccessful, body) = result
+                _uiState.value = _uiState.value.copy(isVerificationLoading = false)
+
+                if (isSuccessful && body?.contains("\"success\":true") == true) {
+                    Log.d(TAG, "✅ 인증번호 확인 성공 (서버 검증)")
+                    timerJob?.cancel()
+                    nextStep()
+                } else {
+                    val errorMsg = body?.let {
+                        Regex("\"error\"\\s*:\\s*\"([^\"]+)\"").find(it)?.groupValues?.get(1)
+                    } ?: "인증번호가 일치하지 않습니다"
+                    Log.d(TAG, "❌ 인증번호 검증 실패: $errorMsg")
+                    showError(errorMsg)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "인증번호 검증 오류", e)
+                _uiState.value = _uiState.value.copy(isVerificationLoading = false)
+                showError("인증번호 확인 중 오류가 발생했습니다")
+            }
         }
     }
     

@@ -1,12 +1,10 @@
-version: '3.8'
-
 services:
   web:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     ports:
-      - "5000:5000"
+      - "9000:9000"
     volumes:
       - .:/app
     environment:
@@ -17,7 +15,4 @@ services:
       - MYSQL_PASSWORD=${MYSQL_PASSWORD}
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    restart: always
-
-volumes:
-  mariadb_data: 
+    restart: always 

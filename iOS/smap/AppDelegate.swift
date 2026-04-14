@@ -484,6 +484,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        guard authorizeFCMRequest(&request, context: "FCM Validation") else {
+            return
+        }
 
         let requestData: [String: Any] = [
             "mt_idx": mtIdx,
@@ -3800,6 +3803,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 30.0  // 30초 타임아웃
         request.httpBody = jsonData
+        guard authorizeFCMRequest(&request, context: "FCM Force") else {
+            UserDefaults.standard.set(false, forKey: "fcm_force_update_in_progress")
+            UserDefaults.standard.synchronize()
+            return
+        }
 
         let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             DispatchQueue.main.async {
@@ -3970,6 +3978,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = jsonData
+        guard authorizeFCMRequest(&request, context: "FCM API") else {
+            completion(false)
+            return
+        }
         
         // URLSession으로 API 호출
         let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
@@ -4202,6 +4214,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = jsonData
+        guard authorizeFCMRequest(&request, context: "FCM Pending") else {
+            UserDefaults.standard.set(pendingToken, forKey: "retry_pending_fcm_token")
+            UserDefaults.standard.synchronize()
+            return
+        }
 
         // URLSession으로 API 호출
         let task = URLSession.shared.dataTask(with: request) { data, response, error in
@@ -4481,6 +4498,16 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = jsonData
+        guard authorizeFCMRequest(&request, context: "FCM API Retry \(retryCount)") else {
+            if retryCount < 3 {
+                self.retryFCMTokenUpdate(token: token, retryCount: retryCount)
+            } else {
+                UserDefaults.standard.set(false, forKey: "fcm_update_in_progress")
+                UserDefaults.standard.synchronize()
+                print("🔓 [FCM] 인증 토큰 없음으로 인한 플래그 해제됨")
+            }
+            return
+        }
         
         // URLSession으로 API 호출
         let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
@@ -4984,6 +5011,10 @@ extension AppDelegate {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = jsonData
+        guard authorizeFCMRequest(&request, context: "FCM DB") else {
+            handleFCMTokenDBCheckFailure()
+            return
+        }
 
         print("📤 [FCM DB] 요청 데이터: \(requestData)")
 
@@ -5234,6 +5265,10 @@ extension AppDelegate {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = jsonData
         request.timeoutInterval = timeoutInterval
+        guard authorizeFCMRequest(&request, context: "FCM Request") else {
+            completion(false)
+            return
+        }
 
         print("🌐 [FCM Request] 요청 URL: \(urlString)")
         print("⏱️ [FCM Request] 타임아웃: \(timeoutInterval)초")
@@ -5807,7 +5842,14 @@ extension AppDelegate {
         
         print("🔍 [Background] 서버에서 토큰 만료일 확인 중...")
         
-        let task = URLSession.shared.dataTask(with: url) { data, response, error in
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        guard authorizeFCMRequest(&request, context: "Background FCM Status") else {
+            completion(false)
+            return
+        }
+
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
             if let error = error {
                 print("❌ [Background] 토큰 상태 확인 요청 실패: \(error.localizedDescription)")
                 completion(false)
@@ -5878,6 +5920,9 @@ extension AppDelegate {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        guard authorizeFCMRequest(&request, context: "FCM Background") else {
+            return
+        }
         
         // Payload 수정 to match BackgroundTokenCheckRequest
         let body: [String: Any] = [
@@ -5915,6 +5960,16 @@ extension AppDelegate {
         } else {
             print("❌ [FCM VALIDATE] 토큰 형식 무효 - 포그라운드 복귀 시 갱신 예정")
         }
+    }
+
+    private func authorizeFCMRequest(_ request: inout URLRequest, context: String) -> Bool {
+        guard let token = KeychainManager.shared.getToken(), !token.isEmpty else {
+            print("🔒 [\(context)] Authorization 토큰 없음 - 무인증 FCM 요청 차단")
+            return false
+        }
+
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        return true
     }
 }
 

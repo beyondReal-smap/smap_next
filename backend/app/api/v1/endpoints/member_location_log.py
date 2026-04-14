@@ -39,7 +39,8 @@ def _get_mt_idx_from_token(request: Request) -> Tuple[Optional[int], Optional[st
         return None, "Authorization 헤더가 필요합니다 (Bearer 토큰)."
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        mt_idx = payload.get("mt_idx")
+        # mt_idx 먼저 확인, 없으면 sub 확인 (하위 호환)
+        mt_idx = payload.get("mt_idx") or payload.get("sub")
         if not mt_idx:
             return None, "토큰에 mt_idx가 없습니다."
         return int(mt_idx), None
@@ -510,7 +511,7 @@ async def handle_location_log_request(
 
 # REST API 스타일 엔드포인트들 (선택사항)
 @router.get("/member-location-logs/{mt_idx}")
-async def get_member_location_logs(
+def get_member_location_logs(
     mt_idx: int,
     start_date: Optional[str] = Query(None, description="시작 날짜 (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="종료 날짜 (YYYY-MM-DD)"),
@@ -530,7 +531,7 @@ async def get_member_location_logs(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/member-location-logs/{mt_idx}/summary")
-async def get_location_summary(
+def get_location_summary(
     mt_idx: int,
     date: Optional[str] = Query(None, description="특정 날짜 (YYYY-MM-DD 형식)"),
     start_date: Optional[str] = Query(None, description="시작 날짜 (YYYY-MM-DD)"),
@@ -560,7 +561,7 @@ async def get_location_summary(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/member-location-logs/{mt_idx}/path")
-async def get_location_path(
+def get_location_path(
     mt_idx: int,
     start_date: Optional[str] = Query(None, description="시작 날짜 (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="종료 날짜 (YYYY-MM-DD)"),
@@ -575,7 +576,7 @@ async def get_location_path(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/member-location-logs/{mt_idx}/daily")
-async def get_daily_location_logs(
+def get_daily_location_logs(
     mt_idx: int,
     date: str = Query(..., description="날짜 (YYYY-MM-DD 형식)"),
     limit: int = Query(1000, description="조회할 로그 수"),
@@ -599,7 +600,7 @@ async def get_daily_location_logs(
 # 중복된 /summary 엔드포인트 제거 (위의 통합 엔드포인트로 대체됨)
 
 @router.get("/member-location-logs/{mt_idx}/path")
-async def get_daily_location_path(
+def get_daily_location_path(
     mt_idx: int,
     date: str = Query(..., description="날짜 (YYYY-MM-DD 형식)"),
     db: Session = Depends(get_db)
@@ -618,7 +619,7 @@ async def get_daily_location_path(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/members-with-logs")
-async def get_members_with_logs(
+def get_members_with_logs(
     group_id: int = Query(..., description="그룹 ID"),
     date: str = Query(..., description="날짜 (YYYY-MM-DD 형식)"),
     db: Session = Depends(get_db)
@@ -639,7 +640,7 @@ async def get_members_with_logs(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/member-location-logs/{mt_idx}/daily-summary")
-async def get_member_location_logs_daily_summary(
+def get_member_location_logs_daily_summary(
     mt_idx: int,
     start_date: str = Query(..., description="시작 날짜 (YYYY-MM-DD 형식)"),
     end_date: str = Query(..., description="종료 날짜 (YYYY-MM-DD 형식)"),
@@ -672,7 +673,7 @@ async def get_member_location_logs_daily_summary(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/member-location-logs/{mt_idx}/stay-times")
-async def get_member_stay_times(
+def get_member_stay_times(
     mt_idx: int,
     date: str = Query(..., description="분석할 날짜 (YYYY-MM-DD 형식)"),
     min_speed: float = Query(1.0, description="체류/이동 구분 기준 속도"),
@@ -705,7 +706,7 @@ async def get_member_stay_times(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/member-location-logs/{mt_idx}/map-markers")
-async def get_member_map_markers(
+def get_member_map_markers(
     mt_idx: int,
     date: str = Query(..., description="조회할 날짜 (YYYY-MM-DD 형식)"),
     min_speed: float = Query(1.0, description="최소 속도 값"),
@@ -741,7 +742,7 @@ async def get_member_map_markers(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/daily-counts")
-async def get_daily_location_counts(
+def get_daily_location_counts(
     group_id: int = Query(..., description="그룹 ID"),
     days: int = Query(14, description="조회할 일수 (기본값: 14일)"),
     db: Session = Depends(get_db)
@@ -883,7 +884,7 @@ async def get_daily_location_counts(
         )
 
 @router.get("/daily-counts-simple")
-async def get_daily_location_counts_simple(
+def get_daily_location_counts_simple(
     group_id: int = Query(..., description="그룹 ID"),
     days: int = Query(14, description="조회할 일수 (기본값: 14일)"),
     db: Session = Depends(get_db)
@@ -963,7 +964,7 @@ async def get_daily_location_counts_simple(
         )
 
 @router.get("/member-activity")
-async def get_member_activity_by_date(
+def get_member_activity_by_date(
     group_id: int = Query(..., description="그룹 ID"),
     date: str = Query(..., description="조회할 날짜 (YYYY-MM-DD)"),
     db: Session = Depends(get_db)

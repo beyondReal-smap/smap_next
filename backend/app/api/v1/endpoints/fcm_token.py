@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.post("/update", response_model=FCMTokenResponse)
-async def update_fcm_token(
+def update_fcm_token(
     request: FCMTokenUpdateRequest,
     db: Session = Depends(deps.get_db),
     current_member: Member = Depends(get_current_member)
@@ -106,7 +106,7 @@ async def update_fcm_token(
         )
 
 @router.get("/status", response_model=FCMTokenResponse)
-async def get_fcm_token_status(
+def get_fcm_token_status(
     db: Session = Depends(deps.get_db),
     current_member: Member = Depends(get_current_member)
 ):
@@ -143,7 +143,7 @@ async def get_fcm_token_status(
         )
 
 @router.post("/notify-token-change", response_model=FCMTokenResponse)
-async def notify_fcm_token_change(
+def notify_fcm_token_change(
     db: Session = Depends(deps.get_db),
     current_member: Member = Depends(get_current_member)
 ):

@@ -62,11 +62,13 @@ class MyPlaceViewModel: ObservableObject {
                 let mtIdx = placeMember.mt_idx
                 if mtIdx > 0 {
                     print("📍 [MyPlaceViewModel] Loading locations for member \(mtIdx)")
-                    if let memberLocations = try? await myPlaceService.getMemberLocations(memberId: mtIdx) {
+                    do {
+                        let memberLocations = try await myPlaceService.getMemberLocations(memberId: mtIdx)
                         placeMember.locationCount = memberLocations.count
                         print("📍 [MyPlaceViewModel] Member \(mtIdx) has \(memberLocations.count) locations")
-                    } else {
-                        print("⚠️ [MyPlaceViewModel] Failed to load locations for member \(mtIdx)")
+                    } catch {
+                        print("⚠️ [MyPlaceViewModel] Failed to load locations for member \(mtIdx): \(error)")
+                        placeMember.locationCount = 0
                     }
                 }
                 placeMembers.append(placeMember)

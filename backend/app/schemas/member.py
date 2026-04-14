@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, validator
+from pydantic import BaseModel, ConfigDict, field_validator
 from typing import Optional
 from datetime import datetime, date
 from enum import Enum
@@ -32,13 +32,15 @@ class MemberBase(BaseModel):
 class MemberCreate(MemberBase):
     mt_pwd: str
     
-    @validator('mt_email')
+    @field_validator('mt_email')
+    @classmethod
     def validate_email(cls, v):
         if v and '@' not in v:
             raise ValueError('올바른 이메일 형식이 아닙니다.')
         return v
     
-    @validator('mt_id')
+    @field_validator('mt_id')
+    @classmethod
     def validate_phone(cls, v):
         if not v:
             raise ValueError('전화번호는 필수입니다.')
@@ -60,14 +62,13 @@ class MemberUpdate(BaseModel):
     mt_file1: Optional[str] = None
 
 class MemberResponse(MemberBase):
+    model_config = ConfigDict(from_attributes=True)
+
     mt_idx: int
     mt_file1: Optional[str] = None
     mt_wdate: Optional[datetime] = None
     mt_ldate: Optional[datetime] = None
     mt_udate: Optional[datetime] = None
-    
-    class Config:
-        from_attributes = True
 
 class MemberLogin(BaseModel):
     mt_id: str  # 전화번호 또는 이메일
@@ -143,8 +144,9 @@ class AppleLoginResponse(BaseModel):
 # 비밀번호 확인 요청 스키마
 class VerifyPasswordRequest(BaseModel):
     currentPassword: str
-    
-    @validator('currentPassword')
+
+    @field_validator('currentPassword')
+    @classmethod
     def validate_current_password(cls, v):
         if not v or not v.strip():
             raise ValueError('현재 비밀번호를 입력해주세요.')
@@ -159,14 +161,16 @@ class VerifyPasswordResponse(BaseModel):
 class ChangePasswordRequest(BaseModel):
     currentPassword: str
     newPassword: str
-    
-    @validator('currentPassword')
+
+    @field_validator('currentPassword')
+    @classmethod
     def validate_current_password(cls, v):
         if not v or not v.strip():
             raise ValueError('현재 비밀번호를 입력해주세요.')
         return v
-    
-    @validator('newPassword')
+
+    @field_validator('newPassword')
+    @classmethod
     def validate_new_password(cls, v):
         if not v or not v.strip():
             raise ValueError('새 비밀번호를 입력해주세요.')
@@ -228,16 +232,18 @@ class WithdrawRequest(BaseModel):
     mt_retire_etc: Optional[str] = None  # 기타 사유 (mt_retire_chk가 5일 때)
     reasons: Optional[list] = None  # 프론트엔드에서 전달하는 사유 목록
     
-    @validator('mt_retire_chk')
+    @field_validator('mt_retire_chk')
+    @classmethod
     def validate_retire_reason(cls, v):
         if v not in [1, 2, 3, 4, 5]:
             raise ValueError('탈퇴 사유는 1-5 사이의 값이어야 합니다.')
         return v
     
-    @validator('mt_retire_etc')
-    def validate_etc_reason(cls, v, values):
+    @field_validator('mt_retire_etc')
+    @classmethod
+    def validate_etc_reason(cls, v, info):
         # mt_retire_chk가 5(기타 이유)일 때 mt_retire_etc 필수
-        if values.get('mt_retire_chk') == 5:
+        if info.data.get('mt_retire_chk') == 5:
             if not v or not v.strip():
                 raise ValueError('기타 사유를 입력해주세요.')
         return v
@@ -252,7 +258,8 @@ class ConsentUpdate(BaseModel):
     field: str
     value: YNEnum
     
-    @validator('field')
+    @field_validator('field')
+    @classmethod
     def validate_field(cls, v):
         valid_fields = ['mt_agree1', 'mt_agree2', 'mt_agree3', 'mt_agree4', 'mt_agree5']
         if v not in valid_fields:
@@ -267,14 +274,13 @@ class ConsentUpdateAll(BaseModel):
     mt_agree5: YNEnum
 
 class ConsentInfo(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     mt_agree1: YNEnum
     mt_agree2: YNEnum
     mt_agree3: YNEnum
     mt_agree4: YNEnum
     mt_agree5: YNEnum
-    
-    class Config:
-        from_attributes = True
 
 class ConsentResponse(BaseModel):
     success: bool

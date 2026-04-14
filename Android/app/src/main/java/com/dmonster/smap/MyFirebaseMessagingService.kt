@@ -79,8 +79,8 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
 
             // 로그인 상태 확인
             val prefs = appContext.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
-            val authToken = prefs.getString("auth_token", null)
-            val isLoggedIn = !authToken.isNullOrBlank()
+            val authToken = prefs.getString("auth_token", null)?.takeIf { it.isNotBlank() }
+            val isLoggedIn = authToken != null
             val mtIdx = prefs.getInt(KEY_MT_IDX, -1)
 
             if (!isLoggedIn || mtIdx == -1) {
@@ -89,10 +89,10 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 return
             }
 
-            forceSendTokenToServer(appContext, token, mtIdx, reason)
+            forceSendTokenToServer(appContext, token, mtIdx, requireNotNull(authToken), reason)
         }
 
-        private fun forceSendTokenToServer(context: Context, token: String, mtIdx: Int, reason: String) {
+        private fun forceSendTokenToServer(context: Context, token: String, mtIdx: Int, authToken: String, reason: String) {
             Log.d(TAG, "🌐 [FCM FORCE] 강제 서버 전송 시작 - mt_idx: $mtIdx")
 
             try {
@@ -114,6 +114,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                     .url(url)
                     .post(requestBody)
                     .addHeader("Content-Type", "application/json")
+                    .addHeader("Authorization", "Bearer $authToken")
                     .addHeader("User-Agent", "SMAP-Android-App")
                     .build()
 
@@ -124,7 +125,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                         if (retryCount < 3) {
                             CoroutineScope(Dispatchers.Main).launch {
                                 kotlinx.coroutines.delay(3000L * (retryCount + 1))
-                                forceSendTokenToServer(context, token, mtIdx, reason + "_retry")
+                                forceSendTokenToServer(context, token, mtIdx, authToken, reason + "_retry")
                             }
                         } else {
                             Log.e(TAG, "❌ [FCM FORCE] 최대 재시도 횟수 초과, 포기")

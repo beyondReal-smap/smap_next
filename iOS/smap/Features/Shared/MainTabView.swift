@@ -89,6 +89,15 @@ struct MainTabView: View {
                 }
                 .accessibilityLabel("활동 로그 탭")
                 .tag(4)
+
+            // 6. 채팅 (Native) - TODO: 빌드 에러 해결 후 활성화
+            // ChatListView()
+            //     .tabItem {
+            //         Image(systemName: "bubble.left.and.bubble.right")
+            //         Text("채팅")
+            //     }
+            //     .accessibilityLabel("채팅 탭")
+            //     .tag(5)
         }
         .onChange(of: selectedTab) { _, _ in
             HapticManager.shared.selection()

@@ -161,7 +161,7 @@ fun HomeHeaderView(
                             Badge(
                                 modifier = Modifier
                                     .size(8.dp)
-                                    .offset(x = (-2).dp, y = (-2).dp),
+                                    .offset(x = 2.dp, y = (-2).dp),
                                 containerColor = Color.Red
                             )
                         }

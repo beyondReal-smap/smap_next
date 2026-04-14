@@ -14,9 +14,8 @@ engine = create_engine(
     pool_size=settings.DB_POOL_SIZE,           # 기본 연결 풀 크기
     max_overflow=settings.DB_MAX_OVERFLOW,    # 오버플로우 연결 수
     pool_timeout=settings.DB_POOL_TIMEOUT,    # 연결 대기 시간
-    pool_reset_on_return='commit',  # 연결 반환 시 자동 커밋
+    pool_reset_on_return='rollback',  # 연결 반환 시 미커밋 트랜잭션 롤백 (안전)
 )
-logger.info(f"Engine URL in session.py: {engine.url}")
 logger.info(f"Database pool settings - Size: {settings.DB_POOL_SIZE}, Max Overflow: {settings.DB_MAX_OVERFLOW}, Timeout: {settings.DB_POOL_TIMEOUT}s")
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

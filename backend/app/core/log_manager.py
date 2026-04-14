@@ -9,6 +9,8 @@ from typing import Optional
 import threading
 import time
 
+logger = logging.getLogger(__name__)
+
 class LogManager:
     """로그 파일 관리자 - 로테이션, 압축, 정리 기능 제공"""
     
@@ -67,7 +69,7 @@ class LogManager:
                     self._rotate_single_log(file_path)
                     
         except Exception as e:
-            print(f"로그 로테이션 중 오류 발생: {e}")
+            logger.error(f"로그 로테이션 중 오류 발생: {e}")
             
     def _rotate_single_log(self, file_path: Path):
         """단일 로그 파일 로테이션"""
@@ -88,7 +90,7 @@ class LogManager:
             if len(existing_backups) >= self.max_files:
                 for old_backup in existing_backups[self.max_files:]:
                     old_backup.unlink()
-                    print(f"오래된 로그 백업 파일 삭제: {old_backup}")
+                    logger.info(f"오래된 로그 백업 파일 삭제: {old_backup}")
             
             # 현재 로그 파일을 백업으로 이동
             shutil.move(str(file_path), str(backup_path))
@@ -96,10 +98,10 @@ class LogManager:
             # 빈 로그 파일 생성
             file_path.touch()
             
-            print(f"로그 파일 로테이션 완료: {file_path} -> {backup_path}")
+            logger.info(f"로그 파일 로테이션 완료: {file_path} -> {backup_path}")
             
         except Exception as e:
-            print(f"로그 파일 로테이션 실패 {file_path}: {e}")
+            logger.error(f"로그 파일 로테이션 실패 {file_path}: {e}")
             
     def compress_old_logs(self, days_old: int = 7):
         """오래된 로그 파일들을 gzip으로 압축"""
@@ -118,7 +120,7 @@ class LogManager:
                                 self._compress_file(backup_file)
                                 
         except Exception as e:
-            print(f"로그 압축 중 오류 발생: {e}")
+            logger.error(f"로그 압축 중 오류 발생: {e}")
             
     def _compress_file(self, file_path: Path):
         """파일을 gzip으로 압축"""
@@ -131,10 +133,10 @@ class LogManager:
                     
             # 원본 파일 삭제
             file_path.unlink()
-            print(f"로그 파일 압축 완료: {file_path} -> {gz_path}")
+            logger.info(f"로그 파일 압축 완료: {file_path} -> {gz_path}")
             
         except Exception as e:
-            print(f"파일 압축 실패 {file_path}: {e}")
+            logger.error(f"파일 압축 실패 {file_path}: {e}")
             
     def cleanup_old_compressed_logs(self, days_old: int = 30):
         """오래된 압축된 로그 파일들 정리"""
@@ -147,10 +149,10 @@ class LogManager:
                 for gz_file in self.log_dir.glob(gz_pattern):
                     if gz_file.stat().st_mtime < cutoff_date.timestamp():
                         gz_file.unlink()
-                        print(f"오래된 압축 로그 파일 삭제: {gz_file}")
+                        logger.info(f"오래된 압축 로그 파일 삭제: {gz_file}")
                         
         except Exception as e:
-            print(f"압축 로그 정리 중 오류 발생: {e}")
+            logger.error(f"압축 로그 정리 중 오류 발생: {e}")
             
     def get_log_stats(self) -> dict:
         """로그 파일 통계 정보 반환"""
@@ -192,7 +194,7 @@ class LogManager:
         def cleanup_worker():
             while True:
                 try:
-                    print(f"자동 로그 정리 시작: {datetime.now()}")
+                    logger.info(f"자동 로그 정리 시작: {datetime.now()}")
                     
                     # 로그 로테이션
                     self.rotate_logs()
@@ -203,10 +205,10 @@ class LogManager:
                     # 오래된 압축 로그 정리
                     self.cleanup_old_compressed_logs(days_old=30)
                     
-                    print(f"자동 로그 정리 완료: {datetime.now()}")
+                    logger.info(f"자동 로그 정리 완료: {datetime.now()}")
                     
                 except Exception as e:
-                    print(f"자동 로그 정리 중 오류: {e}")
+                    logger.error(f"자동 로그 정리 중 오류: {e}")
                     
                 # 지정된 간격만큼 대기
                 time.sleep(interval_hours * 3600)
@@ -214,7 +216,7 @@ class LogManager:
         # 백그라운드 스레드로 실행
         cleanup_thread = threading.Thread(target=cleanup_worker, daemon=True)
         cleanup_thread.start()
-        print(f"자동 로그 정리 스레드 시작 (간격: {interval_hours}시간)")
+        logger.info(f"자동 로그 정리 스레드 시작 (간격: {interval_hours}시간)")
         
         return cleanup_thread
 

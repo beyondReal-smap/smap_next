@@ -2,7 +2,6 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Header, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
-from jose import JWTError, jwt
 from app.api import deps
 from app.core.config import settings
 from app.models.member import Member
@@ -49,69 +48,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-def get_current_user_id_from_token(authorization: str = Header(None)) -> Optional[int]:
-    """
-    Authorization 헤더에서 토큰을 추출하고 사용자 ID를 반환합니다.
-    여러 시크릿 키를 순서대로 시도합니다.
-    """
-    if not authorization or not authorization.startswith("Bearer "):
-        return None
-    
-    token = authorization.split(" ")[1]
-    
-    logger.info(f"[JWT DEBUG] 원본 Authorization 헤더: {authorization[:80]}...")
-    logger.info(f"[JWT DEBUG] 토큰 길이: {len(token)}")
-    
-    # 여러 시크릿 키 시도 (프론트엔드/iOS에서 다양한 키로 서명할 수 있음)
-    secret_keys = [
-        'smap!@super-secret',           # 기본 하드코딩 키
-        settings.SECRET_KEY,             # config에서 가져온 키
-    ]
-    algorithm = 'HS256'
-    
-    for secret_key in secret_keys:
-        try:
-            payload = jwt.decode(token, secret_key, algorithms=[algorithm])
-            mt_idx: Optional[int] = payload.get("mt_idx")
-            
-            logger.info(f"[JWT DEBUG] 토큰 검증 성공 (키: {secret_key[:10]}...)")
-            logger.info(f"[JWT DEBUG] 추출된 mt_idx: {mt_idx}")
-            
-            return mt_idx
-        except JWTError as e:
-            logger.debug(f"[JWT DEBUG] 키 '{secret_key[:10]}...'로 검증 실패: {str(e)}")
-            continue
-        except Exception as e:
-            logger.debug(f"[JWT DEBUG] 키 '{secret_key[:10]}...'로 검증 중 오류: {str(e)}")
-            continue
-    
-    # 모든 키로 실패한 경우, 토큰 페이로드에서 직접 추출 시도 (서명 검증 없이)
-    try:
-        import base64
-        import json
-        # JWT는 header.payload.signature 형식
-        parts = token.split('.')
-        if len(parts) == 3:
-            # Base64 디코딩 (패딩 추가)
-            payload_part = parts[1]
-            padding = 4 - len(payload_part) % 4
-            if padding != 4:
-                payload_part += '=' * padding
-            payload_bytes = base64.urlsafe_b64decode(payload_part)
-            payload = json.loads(payload_bytes)
-            mt_idx = payload.get("mt_idx")
-            
-            if mt_idx:
-                logger.warning(f"[JWT DEBUG] 서명 검증 없이 페이로드에서 mt_idx 추출: {mt_idx}")
-                return mt_idx
-    except Exception as e:
-        logger.error(f"[JWT DEBUG] 페이로드 직접 추출 실패: {str(e)}")
-    
-    logger.error("[JWT DEBUG] 모든 시크릿 키로 JWT 검증 실패")
-    return None
 
 @router.post("/verify-password")
-async def verify_password(
+def verify_password(
     request: VerifyPasswordRequest,
     authorization: str = Header(None),
     db: Session = Depends(deps.get_db)
@@ -120,10 +59,10 @@ async def verify_password(
     현재 비밀번호를 확인합니다.
     """
     logger.info("[VERIFY_PASSWORD] 비밀번호 확인 요청 시작")
-    
+
     try:
         # 토큰에서 사용자 ID 추출
-        user_id = get_current_user_id_from_token(authorization)
+        user_id = deps.get_current_user_id(authorization)
         if not user_id:
             logger.warning("[VERIFY_PASSWORD] 인증 토큰이 없거나 유효하지 않음")
             return {
@@ -131,12 +70,12 @@ async def verify_password(
                 "message": "인증이 필요합니다.",
                 "success": False
             }
-        
+
         logger.info(f"[VERIFY_PASSWORD] 비밀번호 확인 요청 - user_id: {user_id}")
-        
+
         # 현재 비밀번호 확인
         is_valid = crud_auth.verify_user_password(db, user_id, request.currentPassword)
-        
+
         if is_valid:
             logger.info(f"[VERIFY_PASSWORD] 비밀번호 확인 성공 - user_id: {user_id}")
             return {
@@ -151,7 +90,7 @@ async def verify_password(
                 "message": "현재 비밀번호가 올바르지 않습니다.",
                 "success": False
             }
-    
+
     except Exception as e:
         logger.error(f"[VERIFY_PASSWORD] 서버 오류: {str(e)}")
         import traceback
@@ -163,7 +102,7 @@ async def verify_password(
         }
 
 @router.post("/change-password")
-async def change_password(
+def change_password(
     request: ChangePasswordRequest,
     authorization: str = Header(None),
     db: Session = Depends(deps.get_db)
@@ -172,10 +111,10 @@ async def change_password(
     비밀번호를 변경합니다.
     """
     logger.info("[CHANGE_PASSWORD] 비밀번호 변경 요청 시작")
-    
+
     try:
         # 토큰에서 사용자 ID 추출
-        user_id = get_current_user_id_from_token(authorization)
+        user_id = deps.get_current_user_id(authorization)
         if not user_id:
             logger.warning("[CHANGE_PASSWORD] 인증 토큰이 없거나 유효하지 않음")
             return {
@@ -183,9 +122,9 @@ async def change_password(
                 "message": "인증이 필요합니다.",
                 "success": False
             }
-        
+
         logger.info(f"[CHANGE_PASSWORD] 비밀번호 변경 요청 - user_id: {user_id}")
-        
+
         # 사용자 정보 확인
         user = crud_auth.get_user_by_idx(db, user_id)
         if not user:
@@ -195,14 +134,14 @@ async def change_password(
                 "message": "사용자를 찾을 수 없습니다.",
                 "success": False
             }
-        
+
         logger.info(f"[CHANGE_PASSWORD] 사용자 확인됨 - user_id: {user_id}, name: {user.mt_name}, id: {user.mt_id}")
-        
+
         # 현재 비밀번호 확인
         logger.info(f"[CHANGE_PASSWORD] 현재 비밀번호 확인 시작 - user_id: {user_id}")
         is_current_valid = crud_auth.verify_user_password(db, user_id, request.currentPassword)
         logger.info(f"[CHANGE_PASSWORD] 현재 비밀번호 확인 결과 - user_id: {user_id}, valid: {is_current_valid}")
-        
+
         if not is_current_valid:
             logger.warning(f"[CHANGE_PASSWORD] 현재 비밀번호 불일치 - user_id: {user_id}")
             return {
@@ -210,10 +149,10 @@ async def change_password(
                 "message": "현재 비밀번호가 올바르지 않습니다.",
                 "success": False
             }
-        
+
         # 새 비밀번호로 변경
         is_changed = crud_auth.change_user_password(db, user_id, request.newPassword)
-        
+
         if is_changed:
             logger.info(f"[CHANGE_PASSWORD] 비밀번호 변경 성공 - user_id: {user_id}")
             return {
@@ -228,7 +167,7 @@ async def change_password(
                 "message": "비밀번호 변경에 실패했습니다.",
                 "success": False
             }
-    
+
     except ValueError as e:
         # 비밀번호 검증 오류
         logger.warning(f"[CHANGE_PASSWORD] 비밀번호 검증 오류 - user_id: {user_id if 'user_id' in locals() else 'unknown'}, error: {str(e)}")
@@ -237,7 +176,7 @@ async def change_password(
             "message": str(e),
             "success": False
         }
-    
+
     except Exception as e:
         logger.error(f"[CHANGE_PASSWORD] 서버 오류: {str(e)}")
         import traceback
@@ -338,7 +277,7 @@ def get_members(
                 return []
             # 단일 멤버를 안전하게 변환
             return [_member_to_dict(member)]
-        
+
         members = db.query(Member).offset(skip).limit(limit).all()
         # 각 멤버를 안전하게 딕셔너리로 변환
         return [_member_to_dict(m) for m in members]
@@ -360,7 +299,7 @@ def _member_to_dict(member: Member) -> dict:
         if hasattr(val, 'isoformat'):
             return val.isoformat()
         return str(val)
-    
+
     return {
         "mt_idx": member.mt_idx,
         "mt_type": member.mt_type or 1,
@@ -388,7 +327,7 @@ def _member_to_dict(member: Member) -> dict:
     }
 
 @router.get("/me")
-async def get_user_profile(
+def get_user_profile(
     authorization: str = Header(None),
     db: Session = Depends(deps.get_db)
 ):
@@ -397,10 +336,10 @@ async def get_user_profile(
     """
     logger.info("[GET_PROFILE] 사용자 프로필 조회 요청 시작")
     logger.info(f"[GET_PROFILE] Authorization 헤더: {authorization[:50] if authorization else 'None'}...")
-    
+
     try:
         # JWT 토큰에서 사용자 ID 추출
-        user_id = get_current_user_id_from_token(authorization)
+        user_id = deps.get_current_user_id(authorization)
         if not user_id:
             logger.warning("[GET_PROFILE] 인증 토큰이 없거나 유효하지 않음")
             return {
@@ -408,9 +347,9 @@ async def get_user_profile(
                 "message": "인증이 필요합니다.",
                 "success": False
             }
-        
+
         logger.info(f"[GET_PROFILE] 토큰에서 추출한 user_id: {user_id}")
-        
+
         # 데이터베이스에서 최신 사용자 정보 조회
         user = crud_auth.get_user_by_idx(db, user_id)
         if not user:
@@ -420,7 +359,7 @@ async def get_user_profile(
                 "message": "사용자를 찾을 수 없습니다.",
                 "success": False
             }
-        
+
         # 응답 데이터 구성
         profile_data = {
             "mt_idx": user.mt_idx,
@@ -436,7 +375,7 @@ async def get_user_profile(
             "mt_file1": user.mt_file1,  # 프로필 이미지 URL
             "mt_wdate": user.mt_wdate.isoformat() if user.mt_wdate else None
         }
-        
+
         logger.info(f"[GET_PROFILE] 프로필 조회 성공 - user_id: {user_id}, name: {user.mt_name}, nickname: {user.mt_nickname}")
         return {
             "result": "Y",
@@ -444,7 +383,7 @@ async def get_user_profile(
             "message": "프로필 조회가 성공했습니다.",
             "success": True
         }
-        
+
     except Exception as e:
         logger.error(f"[GET_PROFILE] 서버 오류: {str(e)}")
         import traceback
@@ -467,7 +406,7 @@ def get_member(
     member = db.query(Member).filter(Member.mt_idx == member_id).first()
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
-    
+
     # home/page.tsx의 Member 타입에 맞게 데이터 변환
     member_data = {
         "mt_idx": member.mt_idx,
@@ -500,7 +439,7 @@ def get_member(
         "mt_ldate": member.mt_ldate.isoformat() if member.mt_ldate else datetime.utcnow().isoformat(),
         "mt_adate": member.mt_adate.isoformat() if member.mt_adate else datetime.utcnow().isoformat()
     }
-    
+
     return member_data
 
 @router.get("/group/{group_id}", response_model=List[dict])
@@ -524,7 +463,7 @@ def get_group_members(
             GroupDetail.sgdt_discharge == 'N'
         )
     ).all()
-    
+
     result = []
     for member, group_detail in members_with_details:
         member_data = {
@@ -574,7 +513,7 @@ def get_group_members(
             "sgdt_adate": group_detail.sgdt_adate.isoformat() if group_detail.sgdt_adate else ""
         }
         result.append(member_data)
-    
+
     return result
 
 @router.post("/", response_model=MemberResponse)
@@ -604,15 +543,15 @@ def update_member(
     member = db.query(Member).filter(Member.mt_idx == member_id).first()
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
-    
+
     update_data = member_in.dict(exclude_unset=True)
     for field, value in update_data.items():
         setattr(member, field, value)
-    
+
     db.add(member)
     db.commit()
     db.refresh(member)
-    
+
     # home/page.tsx의 Member 타입에 맞게 데이터 변환하여 반환
     member_data = {
         "mt_idx": member.mt_idx,
@@ -644,7 +583,7 @@ def update_member(
         "mt_ldate": member.mt_ldate.isoformat() if member.mt_ldate else datetime.utcnow().isoformat(),
         "mt_adate": member.mt_adate.isoformat() if member.mt_adate else datetime.utcnow().isoformat()
     }
-    
+
     return member_data
 
 @router.delete("/{member_id}")
@@ -658,7 +597,7 @@ def delete_member(
     member = db.query(Member).filter(Member.mt_idx == member_id).first()
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
-    
+
     member.mt_status = 0  # 실제 삭제 대신 상태 변경
     db.add(member)
     db.commit()
@@ -677,7 +616,7 @@ def update_member_location(
     member = db.query(Member).filter(Member.mt_idx == member_id).first()
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
-    
+
     member.mt_lat = str(lat)
     member.mt_long = str(lng)
     db.add(member)
@@ -686,7 +625,7 @@ def update_member_location(
     return member
 
 @router.post("/update-profile")
-async def update_profile(
+def update_profile(
     request: UpdateProfileRequest,
     authorization: str = Header(None),
     db: Session = Depends(deps.get_db)
@@ -695,10 +634,10 @@ async def update_profile(
     사용자 프로필을 업데이트합니다.
     """
     logger.info("[UPDATE_PROFILE] 프로필 업데이트 요청 시작")
-    
+
     try:
         # 토큰에서 사용자 ID 추출
-        user_id = get_current_user_id_from_token(authorization)
+        user_id = deps.get_current_user_id(authorization)
         if not user_id:
             logger.warning("[UPDATE_PROFILE] 인증 토큰이 없거나 유효하지 않음")
             return {
@@ -706,9 +645,9 @@ async def update_profile(
                 "message": "인증이 필요합니다.",
                 "success": False
             }
-        
+
         logger.info(f"[UPDATE_PROFILE] 프로필 업데이트 요청 - user_id: {user_id}")
-        
+
         # 닉네임 중복 확인
         if crud_auth.check_nickname_duplicate(db, user_id, request.mt_nickname):
             logger.warning(f"[UPDATE_PROFILE] 닉네임 중복 - user_id: {user_id}, nickname: {request.mt_nickname}")
@@ -717,7 +656,7 @@ async def update_profile(
                 "message": "이미 사용 중인 닉네임입니다.",
                 "success": False
             }
-        
+
         # 프로필 정보 업데이트
         profile_data = {
             "mt_name": request.mt_name,
@@ -725,9 +664,9 @@ async def update_profile(
             "mt_birth": request.mt_birth,
             "mt_gender": request.mt_gender
         }
-        
+
         is_updated = crud_auth.update_user_profile(db, user_id, profile_data)
-        
+
         if is_updated:
             logger.info(f"[UPDATE_PROFILE] 프로필 업데이트 성공 - user_id: {user_id}")
             return {
@@ -742,7 +681,7 @@ async def update_profile(
                 "message": "프로필 업데이트에 실패했습니다.",
                 "success": False
             }
-    
+
     except Exception as e:
         logger.error(f"[UPDATE_PROFILE] 서버 오류: {str(e)}")
         import traceback
@@ -754,7 +693,7 @@ async def update_profile(
         }
 
 @router.post("/update-contact")
-async def update_contact(
+def update_contact(
     request: UpdateContactRequest,
     authorization: str = Header(None),
     db: Session = Depends(deps.get_db)
@@ -763,10 +702,10 @@ async def update_contact(
     사용자 연락처를 업데이트합니다.
     """
     logger.info("[UPDATE_CONTACT] 연락처 업데이트 요청 시작")
-    
+
     try:
         # 토큰에서 사용자 ID 추출
-        user_id = get_current_user_id_from_token(authorization)
+        user_id = deps.get_current_user_id(authorization)
         if not user_id:
             logger.warning("[UPDATE_CONTACT] 인증 토큰이 없거나 유효하지 않음")
             return {
@@ -774,9 +713,9 @@ async def update_contact(
                 "message": "인증이 필요합니다.",
                 "success": False
             }
-        
+
         logger.info(f"[UPDATE_CONTACT] 연락처 업데이트 요청 - user_id: {user_id}")
-        
+
         # 전화번호 중복 확인
         if crud_auth.check_phone_duplicate(db, user_id, request.mt_hp):
             logger.warning(f"[UPDATE_CONTACT] 전화번호 중복 - user_id: {user_id}, phone: {request.mt_hp}")
@@ -785,7 +724,7 @@ async def update_contact(
                 "message": "이미 사용 중인 전화번호입니다.",
                 "success": False
             }
-        
+
         # 이메일 중복 확인
         if crud_auth.check_email_duplicate(db, user_id, request.mt_email):
             logger.warning(f"[UPDATE_CONTACT] 이메일 중복 - user_id: {user_id}, email: {request.mt_email}")
@@ -794,15 +733,15 @@ async def update_contact(
                 "message": "이미 사용 중인 이메일입니다.",
                 "success": False
             }
-        
+
         # 연락처 정보 업데이트
         contact_data = {
             "mt_hp": request.mt_hp,
             "mt_email": request.mt_email
         }
-        
+
         is_updated = crud_auth.update_user_contact(db, user_id, contact_data)
-        
+
         if is_updated:
             logger.info(f"[UPDATE_CONTACT] 연락처 업데이트 성공 - user_id: {user_id}")
             return {
@@ -817,7 +756,7 @@ async def update_contact(
                 "message": "연락처 업데이트에 실패했습니다.",
                 "success": False
             }
-    
+
     except Exception as e:
         logger.error(f"[UPDATE_CONTACT] 서버 오류: {str(e)}")
         import traceback
@@ -829,7 +768,7 @@ async def update_contact(
         }
 
 @router.post("/withdraw")
-async def withdraw_member(
+def withdraw_member(
     request: WithdrawRequest,
     authorization: str = Header(None),
     db: Session = Depends(deps.get_db)
@@ -839,10 +778,10 @@ async def withdraw_member(
     실제 삭제가 아닌 mt_level을 1로 변경하고 탈퇴 관련 정보를 저장합니다.
     """
     logger.info("[WITHDRAW] 회원 탈퇴 요청 시작")
-    
+
     try:
         # 토큰에서 사용자 ID 추출
-        user_id = get_current_user_id_from_token(authorization)
+        user_id = deps.get_current_user_id(authorization)
         if not user_id:
             logger.warning("[WITHDRAW] 인증 토큰이 없거나 유효하지 않음")
             return {
@@ -850,10 +789,10 @@ async def withdraw_member(
                 "message": "인증이 필요합니다.",
                 "success": False
             }
-        
+
         logger.info(f"[WITHDRAW] 회원 탈퇴 요청 - user_id: {user_id}")
         logger.info(f"[WITHDRAW] 탈퇴 사유: {request.mt_retire_chk}, 기타 사유: {request.mt_retire_etc}")
-        
+
         # 사용자 정보 확인
         user = crud_auth.get_user_by_idx(db, user_id)
         if not user:
@@ -863,7 +802,7 @@ async def withdraw_member(
                 "message": "사용자를 찾을 수 없습니다.",
                 "success": False
             }
-        
+
         # 이미 탈퇴한 회원인지 확인
         if user.mt_level == 1:
             logger.warning(f"[WITHDRAW] 이미 탈퇴한 회원 - user_id: {user_id}")
@@ -872,40 +811,40 @@ async def withdraw_member(
                 "message": "이미 탈퇴한 회원입니다.",
                 "success": False
             }
-        
+
         # 탈퇴 처리
         # 1. 이전 레벨 저장
         user.mt_retire_level = user.mt_level
-        
+
         # 2. 탈퇴 레벨로 변경
         user.mt_level = 1
-        
+
         # 3. 탈퇴 사유 저장
         user.mt_retire_chk = request.mt_retire_chk
         user.mt_retire_etc = request.mt_retire_etc
-        
+
         # 4. 탈퇴 일시 저장
         user.mt_rdate = datetime.utcnow()
-        
+
         # 5. 탈퇴 아이디 저장 (기존 아이디를 탈퇴 아이디로 이동)
         user.mt_id_retire = user.mt_id
-        
+
         # 6. 수정 일시 업데이트
         user.mt_udate = datetime.utcnow()
-        
+
         # 데이터베이스에 저장
         db.add(user)
         db.commit()
-        
+
         logger.info(f"[WITHDRAW] 회원 탈퇴 처리 완료 - user_id: {user_id}")
         logger.info(f"[WITHDRAW] 탈퇴 정보 - 사유: {request.mt_retire_chk}, 기타: {request.mt_retire_etc}, 탈퇴일: {user.mt_rdate}")
-        
+
         return {
             "result": "Y",
             "message": "회원 탈퇴가 완료되었습니다.",
             "success": True
         }
-    
+
     except ValueError as e:
         # 유효성 검사 오류
         logger.warning(f"[WITHDRAW] 유효성 검사 오류 - user_id: {user_id if 'user_id' in locals() else 'unknown'}, error: {str(e)}")
@@ -914,7 +853,7 @@ async def withdraw_member(
             "message": str(e),
             "success": False
         }
-    
+
     except Exception as e:
         logger.error(f"[WITHDRAW] 서버 오류: {str(e)}")
         import traceback
@@ -928,7 +867,7 @@ async def withdraw_member(
 # ==================== 동의 관리 엔드포인트 ====================
 
 @router.get("/consent/{member_id}", response_model=ConsentResponse)
-async def get_consent_info(
+def get_consent_info(
     member_id: int,
     authorization: str = Header(None),
     db: Session = Depends(deps.get_db)
@@ -937,35 +876,35 @@ async def get_consent_info(
     사용자의 동의 정보를 조회합니다.
     """
     logger.info(f"[CONSENT] 동의 정보 조회 요청 - member_id: {member_id}")
-    
+
     try:
         # 토큰에서 사용자 ID 추출
-        current_user_id = get_current_user_id_from_token(authorization)
+        current_user_id = deps.get_current_user_id(authorization)
         if not current_user_id:
             logger.warning("[CONSENT] 인증 토큰이 없거나 유효하지 않음")
             raise HTTPException(status_code=401, detail="인증이 필요합니다.")
-        
+
         # 본인 정보만 조회 가능 (관리자 권한 추가 가능)
         if current_user_id != member_id:
             logger.warning(f"[CONSENT] 권한 없음 - current_user: {current_user_id}, requested: {member_id}")
             raise HTTPException(status_code=403, detail="본인의 동의 정보만 조회할 수 있습니다.")
-        
+
         # 동의 정보 조회
         consent_info = crud_member.get_consent_info(db, user_id=member_id)
         if not consent_info:
             logger.warning(f"[CONSENT] 사용자를 찾을 수 없음 - member_id: {member_id}")
             raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
-        
+
         logger.info(f"[CONSENT] 동의 정보 조회 성공 - member_id: {member_id}")
         from app.schemas.member import ConsentInfo
-        
+
         consent_data = ConsentInfo(**consent_info)
         return ConsentResponse(
             success=True,
             message="동의 정보 조회 성공",
             data=consent_data
         )
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -975,7 +914,7 @@ async def get_consent_info(
         raise HTTPException(status_code=500, detail="서버 오류가 발생했습니다.")
 
 @router.post("/consent", response_model=ConsentUpdateResponse)
-async def update_consent(
+def update_consent(
     request: ConsentUpdate,
     authorization: str = Header(None),
     db: Session = Depends(deps.get_db)
@@ -984,17 +923,17 @@ async def update_consent(
     개별 동의 상태를 변경합니다.
     """
     logger.info(f"[CONSENT] 개별 동의 상태 변경 요청 - field: {request.field}, value: {request.value}")
-    
+
     try:
         # 토큰에서 사용자 ID 추출
-        user_id = get_current_user_id_from_token(authorization)
+        user_id = deps.get_current_user_id(authorization)
         if not user_id:
             logger.warning("[CONSENT] 인증 토큰이 없거나 유효하지 않음")
             raise HTTPException(status_code=401, detail="인증이 필요합니다.")
-        
+
         # 동의 상태 업데이트
         is_updated = crud_member.update_consent(db, user_id=user_id, field=request.field, value=request.value)
-        
+
         if is_updated:
             logger.info(f"[CONSENT] 개별 동의 상태 변경 성공 - user_id: {user_id}, field: {request.field}")
             return ConsentUpdateResponse(
@@ -1006,7 +945,7 @@ async def update_consent(
         else:
             logger.error(f"[CONSENT] 개별 동의 상태 변경 실패 - user_id: {user_id}, field: {request.field}")
             raise HTTPException(status_code=400, detail="동의 상태 변경에 실패했습니다.")
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -1016,7 +955,7 @@ async def update_consent(
         raise HTTPException(status_code=500, detail="서버 오류가 발생했습니다.")
 
 @router.post("/consent/all", response_model=ConsentUpdateResponse)
-async def update_all_consent(
+def update_all_consent(
     request: ConsentUpdateAll,
     authorization: str = Header(None),
     db: Session = Depends(deps.get_db)
@@ -1025,14 +964,14 @@ async def update_all_consent(
     전체 동의 상태를 변경합니다.
     """
     logger.info("[CONSENT] 전체 동의 상태 변경 요청")
-    
+
     try:
         # 토큰에서 사용자 ID 추출
-        user_id = get_current_user_id_from_token(authorization)
+        user_id = deps.get_current_user_id(authorization)
         if not user_id:
             logger.warning("[CONSENT] 인증 토큰이 없거나 유효하지 않음")
             raise HTTPException(status_code=401, detail="인증이 필요합니다.")
-        
+
         # 전체 동의 상태 업데이트
         consent_data = {
             "mt_agree1": request.mt_agree1,
@@ -1041,9 +980,9 @@ async def update_all_consent(
             "mt_agree4": request.mt_agree4,
             "mt_agree5": request.mt_agree5
         }
-        
+
         is_updated = crud_member.update_all_consent(db, user_id=user_id, consent_data=consent_data)
-        
+
         if is_updated:
             logger.info(f"[CONSENT] 전체 동의 상태 변경 성공 - user_id: {user_id}")
             return ConsentUpdateResponse(
@@ -1055,7 +994,7 @@ async def update_all_consent(
         else:
             logger.error(f"[CONSENT] 전체 동의 상태 변경 실패 - user_id: {user_id}")
             raise HTTPException(status_code=400, detail="전체 동의 상태 변경에 실패했습니다.")
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -1065,12 +1004,12 @@ async def update_all_consent(
         raise HTTPException(status_code=500, detail="서버 오류가 발생했습니다.")
 
 @router.get("/terms", response_model=TermsListResponse)
-async def get_terms_list():
+def get_terms_list():
     """
     약관 목록을 조회합니다.
     """
     logger.info("[TERMS] 약관 목록 조회 요청")
-    
+
     try:
         terms = [
             TermInfo(
@@ -1119,14 +1058,14 @@ async def get_terms_list():
                 field="mt_agree5"
             )
         ]
-        
+
         logger.info(f"[TERMS] 약관 목록 조회 성공 - 총 {len(terms)}개")
         return TermsListResponse(
             success=True,
             message="약관 목록 조회 성공",
             data=terms
         )
-    
+
     except Exception as e:
         logger.error(f"[TERMS] 약관 목록 조회 실패: {str(e)}")
         import traceback
@@ -1141,7 +1080,7 @@ UPLOAD_DIR.mkdir(exist_ok=True, parents=True)
 @router.post("/upload-profile-image")
 async def upload_profile_image(
     file: UploadFile = File(...),
-    current_user_id: Optional[int] = Depends(get_current_user_id_from_token),
+    current_user_id: Optional[int] = Depends(deps.get_current_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
@@ -1213,8 +1152,8 @@ async def upload_profile_image(
 
 
 @router.delete("/delete-profile-image")
-async def delete_profile_image(
-    current_user_id: Optional[int] = Depends(get_current_user_id_from_token),
+def delete_profile_image(
+    current_user_id: Optional[int] = Depends(deps.get_current_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
@@ -1261,4 +1200,3 @@ async def delete_profile_image(
         import traceback
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail="프로필 사진 삭제 중 오류가 발생했습니다.")
-

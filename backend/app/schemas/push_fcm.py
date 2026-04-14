@@ -1,6 +1,6 @@
 from typing import Optional
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from app.models.enums import ShowEnum
 
 class PushFCMBase(BaseModel):
@@ -26,5 +26,4 @@ class PushFCMResponse(PushFCMBase):
     pft_idx: int
     pft_wdate: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True 
+    model_config = ConfigDict(from_attributes=True)

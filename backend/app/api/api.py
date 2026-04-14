@@ -1,3 +1,6 @@
+# DEPRECATED: 이 파일은 더 이상 사용되지 않습니다.
+# 활성 라우터는 app/api/v1/api.py에 있습니다.
+# 향후 정리 시 삭제해 주세요.
 from fastapi import APIRouter
 from app.api.v1.endpoints import health, auth, users, groups, group_details, locations, schedules, push_logs, push_fcms, members, group_members, weather, group_schedule_manage, member_location_log, fcm_sendone, notices, orders, fcm_token, member_fcm_token, log_management, fcm_silent_push
 

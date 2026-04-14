@@ -1,28 +1,12 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Header, Query
 from sqlalchemy.orm import Session
-from jose import jwt, JWTError
 from app.api import deps
+from app.core.cache import cached, cache_delete
 from app.models.member import Member
-from app.core.config import settings
 from datetime import datetime
 
 router = APIRouter()
-
-def get_current_user_id_from_token(authorization: str = Header(None)) -> Optional[int]:
-    """
-    Authorization 헤더에서 토큰을 추출하고 사용자 ID를 반환합니다.
-    """
-    if not authorization or not authorization.startswith("Bearer "):
-        return None
-    
-    token = authorization.split(" ")[1]
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        mt_idx: Optional[int] = payload.get("mt_idx")
-        return mt_idx
-    except JWTError:
-        return None
 
 @router.get("/current")
 def get_current_weather(
@@ -37,7 +21,7 @@ def get_current_weather(
     """
     try:
         # 토큰에서 사용자 ID 추출
-        user_id = get_current_user_id_from_token(authorization)
+        user_id = deps.get_current_user_id(authorization)
         
         # 사용자 정보가 있으면 사용자의 날씨 정보 우선 사용
         if user_id:
@@ -91,6 +75,7 @@ def get_current_weather(
         }
 
 @router.get("/member/{member_id}")
+@cached("weather:member", ttl=180)
 def get_member_weather(
     member_id: int,
     db: Session = Depends(deps.get_db)
@@ -151,7 +136,10 @@ def update_member_weather(
         db.add(member)
         db.commit()
         db.refresh(member)
-        
+
+        # 캐시 무효화
+        cache_delete(f'weather:member:{{"member_id": {member_id}}}')
+
         return {
             "success": True,
             "message": "날씨 정보가 업데이트되었습니다.",

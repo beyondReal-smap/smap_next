@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 
@@ -39,8 +39,7 @@ class MemberLocationLogResponse(MemberLocationLogBase):
     mlt_idx: int
     mlt_wdate: Optional[datetime] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class LocationLogListRequest(BaseModel):
     """위치 로그 목록 요청 스키마"""

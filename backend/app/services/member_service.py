@@ -13,6 +13,7 @@ from app.schemas.member import (
     AppleLoginResponse
 )
 from app.models.member import Member
+from app.crud import crud_refresh_token
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 import logging
@@ -23,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 def create_access_token_for_social(user_id: int, expires_delta: Optional[timedelta] = None) -> str:
     """소셜 로그인용 JWT 토큰 생성"""
-    to_encode = {"sub": str(user_id)}
+    to_encode = {"mt_idx": user_id}
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
@@ -317,6 +318,8 @@ class MemberService:
                 
                 logger.info(f"✅ 기존 사용자 로그인 성공 - mt_idx: {existing_member.mt_idx}")
 
+                refresh_raw, _ = crud_refresh_token.issue(db, existing_member.mt_idx)
+
                 return GoogleLoginResponse(
                     success=True,
                     message="Google 로그인 성공",
@@ -324,6 +327,8 @@ class MemberService:
                         "member": user_data,
                         "user": user_data,  # 호환성을 위해 추가
                         "token": create_access_token_for_social(existing_member.mt_idx),
+                        "refresh_token": refresh_raw,
+                        "expires_in": int(settings.ACCESS_TOKEN_EXPIRE_MINUTES) * 60,
                         "is_new_user": False,
                         "isNewUser": False,  # 호환성을 위해 추가
                         "lookup_method": lookup_method,
@@ -435,6 +440,8 @@ class MemberService:
                 
                 logger.info(f"✅ 기존 사용자 로그인 성공 - mt_idx: {existing_member.mt_idx}")
 
+                refresh_raw, _ = crud_refresh_token.issue(db, existing_member.mt_idx)
+
                 return AppleLoginResponse(
                     success=True,
                     message="Apple 로그인 성공",
@@ -442,6 +449,8 @@ class MemberService:
                         "member": user_data,
                         "user": user_data,
                         "token": create_access_token_for_social(existing_member.mt_idx),
+                        "refresh_token": refresh_raw,
+                        "expires_in": int(settings.ACCESS_TOKEN_EXPIRE_MINUTES) * 60,
                         "is_new_user": False,
                         "isNewUser": False,
                         "lookup_method": lookup_method,

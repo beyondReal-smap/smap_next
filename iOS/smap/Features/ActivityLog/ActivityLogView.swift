@@ -494,7 +494,37 @@ struct ActivityLogView: View {
                 Spacer()
             }
             
-            // 3. Floating Info Card
+            // 3. Empty State (no member selected)
+            if viewModel.selectedMemberId == nil && !viewModel.isLoading {
+                VStack {
+                    Spacer()
+                    VStack(spacing: 16) {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.system(size: 40))
+                            .foregroundColor(.gray.opacity(0.4))
+                        Text("멤버를 선택하면\n활동 로그를 확인할 수 있습니다")
+                            .font(.suite(size: 15))
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                        Button(action: { viewModel.toggleSidebar() }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "person.fill")
+                                Text("멤버 선택하기")
+                            }
+                            .font(.suite(size: 14, weight: .medium))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(SMAPTheme.Color.primary)
+                            .cornerRadius(20)
+                        }
+                    }
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity)
+            }
+
+            // 4. Floating Info Card
             if viewModel.selectedMemberId != nil {
                 VStack {
                     ActivityLogFloatingCard(

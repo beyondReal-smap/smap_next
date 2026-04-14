@@ -1,3 +1,5 @@
+# DEPRECATED: 이 파일은 더 이상 사용되지 않습니다.
+# 활성 엔드포인트는 app/api/v1/endpoints/locations.py에 있습니다.
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from typing import List

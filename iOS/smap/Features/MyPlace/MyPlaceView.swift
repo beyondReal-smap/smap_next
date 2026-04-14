@@ -12,7 +12,6 @@ import NMapsMap
 
 struct MyPlaceView: View {
     @StateObject private var viewModel = MyPlaceViewModel()
-    @Environment(\.presentationMode) var presentationMode
     @State private var sidebarDragOffset: CGFloat = 0
     @State private var newLocationCoordinates: (lat: Double, lng: Double)?
     @State private var newLocationName: String? = nil
@@ -46,12 +45,11 @@ struct MyPlaceView: View {
             }
             
             // Header
-            VStack { 
+            VStack {
                 MyPlaceHeaderView(
-                    onBackTap: { presentationMode.wrappedValue.dismiss() }, 
                     onSearchTap: { viewModel.isHeaderSearchPresented = true }
                 )
-                Spacer() 
+                Spacer()
             }
             
             // Sidebar Overlay
@@ -171,10 +169,9 @@ struct MyPlaceView: View {
 }
 
 struct MyPlaceHeaderView: View {
-    let onBackTap: () -> Void
     let onSearchTap: () -> Void
-    
-    
+
+
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
@@ -185,9 +182,9 @@ struct MyPlaceHeaderView: View {
                     .font(.suite(size: 13))
                     .foregroundColor(.gray)
             }
-            
+
             Spacer()
-            
+
             Button(action: onSearchTap) {
                 Image(systemName: "magnifyingglass")
                     .font(.suite(size: 20))

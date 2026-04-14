@@ -152,7 +152,30 @@ def delete_push_log(
     
     db.delete(push_log)
     db.commit()
-    return {"message": "Push log deleted successfully"}
+    return {"success": True, "message": "Push log deleted successfully"}
+
+@router.patch("/{push_log_id}/read")
+def mark_push_log_as_read(
+    push_log_id: int,
+    db: Session = Depends(deps.get_db)
+):
+    """
+    특정 푸시 로그를 읽음 처리합니다.
+    """
+    push_log = PushLog.find_by_idx(db, push_log_id)
+    if not push_log:
+        raise HTTPException(status_code=404, detail="Push log not found")
+
+    try:
+        push_log.plt_read_chk = ReadCheckEnum.Y
+        push_log.plt_rdate = datetime.now()
+        db.add(push_log)
+        db.commit()
+        db.refresh(push_log)
+        return {"success": True, "message": "Push log marked as read"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/delete-all")
 def delete_all_push_logs(
@@ -172,7 +195,7 @@ def delete_all_push_logs(
             "plt_rdate": datetime.now()
         })
         db.commit()
-        return {"message": "All push logs deleted successfully"}
+        return {"success": True, "message": "All push logs deleted successfully"}
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -195,7 +218,7 @@ def read_all_push_logs(
             "plt_rdate": datetime.now()
         })
         db.commit()
-        return {"message": "All push logs marked as read"}
+        return {"success": True, "message": "All push logs marked as read"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e)) 
+        raise HTTPException(status_code=500, detail=str(e))

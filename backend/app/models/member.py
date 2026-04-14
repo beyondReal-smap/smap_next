@@ -112,6 +112,23 @@ class Member(BaseModel):
         }).fetchall()
 
     @classmethod
+    def get_all_active(cls, db: Session) -> List['Member']:
+        """활성 상태의 모든 회원을 조회합니다."""
+        return db.query(cls).filter(
+            cls.mt_level > 1,
+            cls.mt_status == 1
+        ).all()
+
+    @classmethod
+    def get_all_active_lite(cls, db: Session):
+        """스케줄러용 경량 멤버 조회 (필수 컬럼만)"""
+        return db.query(
+            cls.mt_idx, cls.mt_nickname, cls.mt_name,
+            cls.mt_lang, cls.mt_token_id, cls.mt_lat, cls.mt_long,
+            cls.mt_level, cls.mt_status
+        ).filter(cls.mt_level > 1, cls.mt_status == 1).all()
+
+    @classmethod
     def get_token_list(cls, db: Session) -> List['Member']:
         return db.query(cls).filter(
             cls.mt_level > 1,

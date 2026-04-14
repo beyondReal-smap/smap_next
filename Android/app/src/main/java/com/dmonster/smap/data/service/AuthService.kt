@@ -4,6 +4,10 @@ import android.content.SharedPreferences
 import android.util.Log
 import com.dmonster.smap.data.api.SmapApi
 import com.dmonster.smap.data.model.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -15,10 +19,12 @@ import okhttp3.RequestBody.Companion.toRequestBody
 /**
  * Authentication / user-profile service.
  * Network calls delegate to SmapApi; local token/user state uses SharedPreferences.
+ * Refresh token만 별도의 EncryptedSharedPreferences(TokenStore)에 보관.
  */
 class AuthService(
     private val api: SmapApi,
-    private val prefs: SharedPreferences
+    private val prefs: SharedPreferences,
+    private val tokenStore: com.dmonster.smap.data.auth.TokenStore
 ) {
 
     companion object {
@@ -33,6 +39,9 @@ class AuthService(
         coerceInputValues = true
         isLenient = true
     }
+
+    // 로그아웃 시 서버 revoke 호출(fire-and-forget). 호출자의 일반 함수 컨텍스트와 호환.
+    private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     // =========================================================================
     // Login state
@@ -57,6 +66,14 @@ class AuthService(
     }
 
     fun getToken(): String? = prefs.getString(KEY_TOKEN, null)
+
+    /** Refresh token은 EncryptedSharedPreferences에 분리 저장한다. */
+    fun saveRefreshToken(token: String) {
+        tokenStore.saveRefreshToken(token)
+        Log.d(TAG, "Refresh token saved (${token.length} chars)")
+    }
+
+    fun getRefreshToken(): String? = tokenStore.getRefreshToken()
 
     // =========================================================================
     // User data management
@@ -85,9 +102,25 @@ class AuthService(
     // Logout
     // =========================================================================
 
+    /**
+     * 로그아웃. 로컬 prefs와 secure store를 즉시 비우고, 서버 revoke는 fire-and-forget.
+     * 네트워크 실패 시에도 로컬은 항상 비워야 사용자가 다음 진입에서 로그인 화면으로 안내된다.
+     */
     fun logout() {
+        val refresh = tokenStore.getRefreshToken()
         prefs.edit().clear().apply()
-        Log.d(TAG, "Logged out - all data cleared")
+        tokenStore.clearRefreshToken()
+        Log.d(TAG, "Logged out - local cleared")
+
+        if (!refresh.isNullOrBlank()) {
+            backgroundScope.launch {
+                runCatching {
+                    api.logout(LogoutRequest(refreshToken = refresh))
+                }.onFailure {
+                    Log.w(TAG, "Server logout request failed", it)
+                }
+            }
+        }
     }
 
     // =========================================================================
@@ -112,6 +145,7 @@ class AuthService(
             if (loginResponse.success) {
                 Log.d(TAG, "[Login] Success")
                 loginResponse.data?.token?.let { saveToken(it) }
+                loginResponse.data?.refreshToken?.let { saveRefreshToken(it) }
                 loginResponse.data?.user?.let { saveUserData(it) }
             }
 
@@ -145,7 +179,9 @@ class AuthService(
                 Log.d(TAG, "[Social Login] Google success")
                 val token = loginResponse.token ?: loginResponse.data?.token
                 val user = loginResponse.user ?: loginResponse.data?.user
+                val refresh = loginResponse.data?.refreshToken
                 token?.let { saveToken(it) }
+                refresh?.let { saveRefreshToken(it) }
                 user?.let { saveUserData(it) }
             }
 
@@ -171,9 +207,9 @@ class AuthService(
         profileImage: String? = null
     ): SocialLoginResponse {
         val request = KakaoLoginRequest(
-            kakaoId = kakaoId,
+            kakaoId = kakaoId ?: "",
             email = email,
-            nickname = nickname,
+            nickname = nickname ?: "",
             accessToken = accessToken,
             profileImage = profileImage
         )
@@ -185,7 +221,9 @@ class AuthService(
                 Log.d(TAG, "[Social Login] Kakao success")
                 val token = loginResponse.token ?: loginResponse.data?.token
                 val user = loginResponse.user ?: loginResponse.data?.user
+                val refresh = loginResponse.data?.refreshToken
                 token?.let { saveToken(it) }
+                refresh?.let { saveRefreshToken(it) }
                 user?.let { saveUserData(it) }
             }
 

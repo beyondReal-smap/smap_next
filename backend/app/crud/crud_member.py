@@ -5,7 +5,10 @@ from app.schemas.member import MemberCreate, MemberUpdate, RegisterRequest
 from typing import Optional, List
 from datetime import datetime, date
 import bcrypt
+import logging
 import random
+
+logger = logging.getLogger(__name__)
 
 class CRUDMember:
     def __init__(self, model: type[Member]):
@@ -116,10 +119,7 @@ class CRUDMember:
                 pass
         
         # 위치 정보 로깅
-        print(f"📍 [BACKEND] 회원가입 위치 정보 처리:")
-        print(f"   📍 위도: {obj_in.mt_lat}")
-        print(f"   📍 경도: {obj_in.mt_long}")
-        print(f"   📍 위치 정보 타입: {type(obj_in.mt_lat)}, {type(obj_in.mt_long)}")
+        logger.debug("회원가입 위치 정보 처리: lat=%s, long=%s", obj_in.mt_lat, obj_in.mt_long)
         
         # 프로필 이미지 처리
         profile_image = None
@@ -222,10 +222,10 @@ class CRUDMember:
     @staticmethod
     def hash_password(password: str) -> str:
         """비밀번호 해싱"""
-        from app.config import Config
-        
+        from app.core.config import settings
+
         # bcrypt 비용 설정 (config에서 가져오기)
-        cost = Config.PASSWORD_BCRYPT_COST
+        cost = settings.PASSWORD_BCRYPT_COST
         salt = bcrypt.gensalt(rounds=cost)
         return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
 
@@ -248,10 +248,7 @@ class CRUDMember:
 
     def update_location(self, db: Session, *, user: Member, lat: float, lng: float) -> Member:
         """위치 정보 업데이트"""
-        print(f"📍 [BACKEND] 위치 정보 업데이트:")
-        print(f"   📍 사용자 ID: {user.mt_idx}")
-        print(f"   📍 기존 위치: {user.mt_lat}, {user.mt_long}")
-        print(f"   📍 새 위치: {lat}, {lng}")
+        logger.debug("위치 정보 업데이트: user=%s, old=(%s,%s), new=(%s,%s)", user.mt_idx, user.mt_lat, user.mt_long, lat, lng)
         
         user.mt_lat = lat
         user.mt_long = lng

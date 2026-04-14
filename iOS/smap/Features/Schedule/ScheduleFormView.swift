@@ -141,6 +141,7 @@ struct ScheduleFormView: View {
                 set: { if !$0 { errorMessage = nil } }
             )) {
                 Button("확인", role: .cancel) {}
+                Button("다시 시도") { saveSchedule() }
             } message: {
                 Text(errorMessage ?? "")
             }

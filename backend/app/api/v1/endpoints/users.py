@@ -49,7 +49,7 @@ def delete_user(user_id: int, db: Session = Depends(deps.get_db)):
     return db_user
 
 @router.get("/email/{email}")
-async def get_user_by_email(email: str, db: Session = Depends(deps.get_db)):
+def get_user_by_email(email: str, db: Session = Depends(deps.get_db)):
     try:
         user = Member.find_by_email(db, email)
         if not user:
@@ -59,7 +59,7 @@ async def get_user_by_email(email: str, db: Session = Depends(deps.get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/token/{token}")
-async def get_user_by_token(token: str, db: Session = Depends(deps.get_db)):
+def get_user_by_token(token: str, db: Session = Depends(deps.get_db)):
     try:
         user = Member.find_by_token(db, token)
         if not user:
@@ -69,7 +69,7 @@ async def get_user_by_token(token: str, db: Session = Depends(deps.get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/recent/signin/3h")
-async def get_recent_signin_3h(db: Session = Depends(deps.get_db)):
+def get_recent_signin_3h(db: Session = Depends(deps.get_db)):
     try:
         users = Member.get_sign_in_3(db)
         return {"users": users}
@@ -77,7 +77,7 @@ async def get_recent_signin_3h(db: Session = Depends(deps.get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/recent/signin/24h")
-async def get_recent_signin_24h(db: Session = Depends(deps.get_db)):
+def get_recent_signin_24h(db: Session = Depends(deps.get_db)):
     try:
         users = Member.get_sign_in_24(db)
         return {"users": users}
@@ -85,7 +85,7 @@ async def get_recent_signin_24h(db: Session = Depends(deps.get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/not-joined/11days")
-async def get_not_joined_11days(db: Session = Depends(deps.get_db)):
+def get_not_joined_11days(db: Session = Depends(deps.get_db)):
     try:
         users = Member.get_not_join_group_11(db)
         return {"users": users}

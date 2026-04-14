@@ -1,13 +1,11 @@
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from sqlalchemy.orm import Session
-from jose import JWTError, jwt
 import math
 import logging
 
 from app import crud, models, schemas
 from app.api import deps
-from app.core.config import settings
 from app.schemas.order import (
     OrderResponse, 
     OrderListResponse, 
@@ -21,31 +19,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-def get_current_user_id_from_token(authorization: str = Header(None)) -> Optional[int]:
-    """
-    Authorization 헤더에서 토큰을 추출하고 사용자 ID를 반환합니다.
-    """
-    if not authorization or not authorization.startswith("Bearer "):
-        return None
-    
-    token = authorization.split(" ")[1]
-    
-    try:
-        # 직접 하드코딩된 시크릿 키 사용 (프론트엔드와 동일)
-        secret_key = 'smap!@super-secret'
-        algorithm = 'HS256'
-        
-        payload = jwt.decode(token, secret_key, algorithms=[algorithm])
-        mt_idx: Optional[int] = payload.get("mt_idx")
-        
-        return mt_idx
-    except JWTError as e:
-        logger.error(f"JWT 오류: {str(e)}")
-        return None
-    except Exception as e:
-        logger.error(f"기타 오류: {str(e)}")
-        return None
-
 @router.get("/summary/{member_id}", response_model=OrderSummary)
 def get_order_summary(
     member_id: int,
@@ -56,7 +29,7 @@ def get_order_summary(
     회원의 주문 요약 정보 조회
     """
     # 토큰에서 사용자 ID 추출
-    current_user_id = get_current_user_id_from_token(authorization)
+    current_user_id = deps.get_current_user_id(authorization)
     if not current_user_id:
         raise HTTPException(status_code=401, detail="인증이 필요합니다")
     
@@ -81,7 +54,7 @@ def get_orders_by_member(
     회원의 주문 목록 조회 (필터링 및 페이징)
     """
     # 토큰에서 사용자 ID 추출
-    current_user_id = get_current_user_id_from_token(authorization)
+    current_user_id = deps.get_current_user_id(authorization)
     if not current_user_id:
         raise HTTPException(status_code=401, detail="인증이 필요합니다")
     
@@ -122,7 +95,7 @@ def get_order_detail(
     주문 상세 정보 조회
     """
     # 토큰에서 사용자 ID 추출
-    current_user_id = get_current_user_id_from_token(authorization)
+    current_user_id = deps.get_current_user_id(authorization)
     if not current_user_id:
         raise HTTPException(status_code=401, detail="인증이 필요합니다")
     
@@ -146,7 +119,7 @@ def get_order_by_code(
     주문번호로 주문 조회
     """
     # 토큰에서 사용자 ID 추출
-    current_user_id = get_current_user_id_from_token(authorization)
+    current_user_id = deps.get_current_user_id(authorization)
     if not current_user_id:
         raise HTTPException(status_code=401, detail="인증이 필요합니다")
     
@@ -171,7 +144,7 @@ def update_order_status(
     주문 상태 업데이트 (관리자만)
     """
     # 토큰에서 사용자 ID 추출
-    current_user_id = get_current_user_id_from_token(authorization)
+    current_user_id = deps.get_current_user_id(authorization)
     if not current_user_id:
         raise HTTPException(status_code=401, detail="인증이 필요합니다")
     
@@ -200,7 +173,7 @@ def cancel_order(
     주문 취소
     """
     # 토큰에서 사용자 ID 추출
-    current_user_id = get_current_user_id_from_token(authorization)
+    current_user_id = deps.get_current_user_id(authorization)
     if not current_user_id:
         raise HTTPException(status_code=401, detail="인증이 필요합니다")
     
@@ -237,7 +210,7 @@ def get_recent_orders(
     최근 주문 목록 조회
     """
     # 토큰에서 사용자 ID 추출
-    current_user_id = get_current_user_id_from_token(authorization)
+    current_user_id = deps.get_current_user_id(authorization)
     if not current_user_id:
         raise HTTPException(status_code=401, detail="인증이 필요합니다")
     

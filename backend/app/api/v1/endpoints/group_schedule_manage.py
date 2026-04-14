@@ -661,13 +661,13 @@ def get_owner_groups_all_schedules(
         # 요청 파라미터 로깅 및 안전한 복사
         request_year = year
         request_month = month
-        print(f"[DEBUG] 원본 파라미터 - year: {request_year}, month: {request_month}")
+        logger.debug(f"[DEBUG] 원본 파라미터 - year: {request_year}, month: {request_month}")
         
         # 기본값 설정 (원본 파라미터를 변경하지 않고 새 변수 사용)
         final_year = request_year if request_year is not None else now.year
         final_month = request_month if request_month is not None else now.month
         
-        print(f"[DEBUG] 처리 후 파라미터 - final_year: {final_year}, final_month: {final_month}")
+        logger.debug(f"[DEBUG] 처리 후 파라미터 - final_year: {final_year}, final_month: {final_month}")
         
         # 월의 시작일과 마지막일 계산
         if final_month == 12:
@@ -680,8 +680,8 @@ def get_owner_groups_all_schedules(
         start_date = f"{final_year}-{final_month:02d}-01"
         end_date = f"{next_year}-{next_month:02d}-01"
         
-        print(f"[DEBUG] 날짜 계산 결과 - start_date: {start_date}, end_date: {end_date}")
-        print(f"[DEBUG] next_year: {next_year}, next_month: {next_month}")
+        logger.debug(f"[DEBUG] 날짜 계산 결과 - start_date: {start_date}, end_date: {end_date}")
+        logger.debug(f"[DEBUG] next_year: {next_year}, next_month: {next_month}")
         
         # 단계 0: 사용자의 최근 위치 조회
         user_location_query = text("""
@@ -699,9 +699,9 @@ def get_owner_groups_all_schedules(
         if user_location:
             user_lat = float(user_location.mlt_lat) if user_location.mlt_lat else None
             user_lng = float(user_location.mlt_long) if user_location.mlt_long else None
-            print(f"[DEBUG] 사용자 최근 위치: lat={user_lat}, lng={user_lng}")
+            logger.debug(f"[DEBUG] 사용자 최근 위치: lat={user_lat}, lng={user_lng}")
         else:
-            print(f"[DEBUG] 사용자 {current_user_id}의 위치 정보 없음")
+            logger.debug(f"[DEBUG] 사용자 {current_user_id}의 위치 정보 없음")
         
         # 단계 1: 현재 사용자 그룹 목록 먼저 조회
         owner_groups_query = text("""

@@ -24,8 +24,8 @@ android {
         applicationId = "com.dmonster.smap"
         minSdk = 28
         targetSdk = 35
-        versionCode = 54
-        versionName = "3.1.0"
+        versionCode = 56
+        versionName = "3.1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         resourceConfigurations += setOf("ko", "en")
@@ -135,6 +135,9 @@ dependencies {
     // OkHttp for network requests
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
+    // Encrypted preferences for refresh token storage (AndroidX Security)
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
     // Hilt DI
     implementation("com.google.dagger:hilt-android:2.51.1")

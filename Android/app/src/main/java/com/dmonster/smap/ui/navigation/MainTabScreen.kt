@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.dmonster.smap.ui.activitylog.ActivityLogScreen
+import com.dmonster.smap.ui.chat.ChatScreen
 import com.dmonster.smap.ui.group.GroupScreen
 import com.dmonster.smap.ui.home.GroupCreationScreen
 import com.dmonster.smap.ui.home.HomeScreen
@@ -52,6 +53,7 @@ sealed class TabItem(
     data object Schedule : TabItem("일정", Icons.Filled.CalendarMonth, Icons.Outlined.CalendarMonth)
     data object MyPlace : TabItem("내장소", Icons.Filled.LocationOn, Icons.Outlined.Place)
     data object ActivityLog : TabItem("활동 로그", Icons.Filled.History, Icons.Outlined.History)
+    data object Chat : TabItem("채팅", Icons.Filled.Chat, Icons.Filled.Chat)
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -74,6 +76,7 @@ fun MainTabScreen(
         TabItem.Schedule,
         TabItem.MyPlace,
         TabItem.ActivityLog
+        // TabItem.Chat  // TODO: 채팅 기능 완성 후 활성화
     )
     
     Scaffold(
@@ -154,6 +157,7 @@ fun MainTabScreen(
                     2 -> ScheduleScreen()
                     3 -> MyPlaceScreen()
                     4 -> ActivityLogScreen()
+                    // 5 -> ChatScreen()  // TODO: 채팅 기능 완성 후 활성화
                 }
             }
 

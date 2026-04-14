@@ -76,7 +76,7 @@ class LoginActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         
         setupGoogleSignIn()
-        
+                                                                                                                                                                                                
         // 기존 가입자로부터 전달된 전화번호 확인
         val prefilledPhone = intent.getStringExtra("prefilled_phone")
         if (prefilledPhone != null) {

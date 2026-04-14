@@ -29,6 +29,17 @@ interface SmapApi {
     @POST("auth/kakao-login")
     suspend fun kakaoLogin(@Body request: KakaoLoginRequest): SocialLoginResponse
 
+    /** POST /auth/logout — refresh token 서버 측 revoke */
+    @POST("auth/logout")
+    suspend fun logout(@Body request: LogoutRequest): LogoutResponse
+
+    /** GET /app/version-check?platform=android&version=3.x.x — 강제 업데이트 여부 */
+    @GET("app/version-check")
+    suspend fun checkAppVersion(
+        @Query("platform") platform: String = "android",
+        @Query("version") version: String
+    ): AppVersionCheckResponse
+
     // =========================================================================
     // Member / Profile endpoints (from AuthService)
     // =========================================================================
@@ -80,13 +91,17 @@ interface SmapApi {
     @POST("auth/register")
     suspend fun register(@Body request: RegisterRequest): RegisterResponse
 
-    /** POST /auth/send-verification */
-    @POST("auth/send-verification")
+    /** POST /sms/send-verification-code */
+    @POST("sms/send-verification-code")
     suspend fun sendSmsVerification(@Body request: SmsVerificationRequest): SmsVerificationResponse
 
-    /** GET /auth/check-phone?phone_number={phoneNumber} */
-    @GET("auth/check-phone")
-    suspend fun checkPhone(@Query("phone_number") phoneNumber: String): PhoneCheckResponse
+    /** POST /sms/verify-code */
+    @POST("sms/verify-code")
+    suspend fun verifySmsCode(@Body request: VerifySmsCodeRequest): SmsVerificationResponse
+
+    /** GET /members/check/phone/{phoneNumber} */
+    @GET("members/check/phone/{phoneNumber}")
+    suspend fun checkPhone(@Path("phoneNumber") phoneNumber: String): PhoneCheckResponse
 
     // =========================================================================
     // Group endpoints (from GroupService / HomeService)
@@ -102,25 +117,25 @@ interface SmapApi {
 
     /** POST /groups */
     @POST("groups")
-    suspend fun createGroup(@Body body: Map<String, @JvmSuppressWildcards Any>): SmapGroup
+    suspend fun createGroup(@Body body: CreateGroupRequest): SmapGroup
 
     /** PUT /groups/{groupId} */
     @PUT("groups/{groupId}")
     suspend fun updateGroup(
         @Path("groupId") groupId: Int,
-        @Body body: Map<String, @JvmSuppressWildcards Any>
+        @Body body: UpdateGroupRequest
     ): SmapGroup
 
     /** PUT /groups/{groupId} (soft-delete via sgt_show=N) */
     @PUT("groups/{groupId}")
     suspend fun deleteGroup(
         @Path("groupId") groupId: Int,
-        @Body body: Map<String, @JvmSuppressWildcards Any>
+        @Body body: DeleteGroupRequest
     ): SmapGroup
 
     /** POST /groups/join (from GroupService.joinGroupByCode) */
     @POST("groups/join")
-    suspend fun joinGroupByCode(@Body body: Map<String, @JvmSuppressWildcards Any>): SmapGroup
+    suspend fun joinGroupByCode(@Body body: JoinGroupByCodeRequest): SmapGroup
 
     /** GET /groups/code/{code} (from HomeService.joinGroup step 1) */
     @GET("groups/code/{code}")
@@ -130,7 +145,7 @@ interface SmapApi {
     @POST("groups/{groupId}/join")
     suspend fun joinGroup(
         @Path("groupId") groupId: Int,
-        @Body body: Map<String, @JvmSuppressWildcards Any>
+        @Body body: JoinGroupRequest
     ): SmapGroup
 
     // =========================================================================
@@ -145,7 +160,7 @@ interface SmapApi {
     @PUT("group-members/{groupId}/role")
     suspend fun updateMemberRole(
         @Path("groupId") groupId: Int,
-        @Body body: Map<String, @JvmSuppressWildcards Any>
+        @Body body: UpdateMemberRoleRequest
     ): Unit
 
     /** DELETE /group-members/{groupId}/member/{memberId} */
@@ -172,7 +187,7 @@ interface SmapApi {
 
     /** POST /schedules */
     @POST("schedules")
-    suspend fun createSchedule(@Body body: Map<String, @JvmSuppressWildcards Any>): SmapSchedule
+    suspend fun createSchedule(@Body body: CreateScheduleRequest): SmapSchedule
 
     /** PUT /schedule/group/{groupId}/schedules/{scheduleId}?current_user_id={currentUserId} */
     @PUT("schedule/group/{groupId}/schedules/{scheduleId}")
@@ -180,7 +195,7 @@ interface SmapApi {
         @Path("groupId") groupId: Int,
         @Path("scheduleId") scheduleId: String,
         @Query("current_user_id") currentUserId: String,
-        @Body body: Map<String, @JvmSuppressWildcards Any>
+        @Body body: UpdateScheduleRequest
     ): SmapSchedule
 
     /** DELETE /schedule/group/{groupId}/schedules/{scheduleId}?current_user_id={currentUserId} */
@@ -189,7 +204,7 @@ interface SmapApi {
         @Path("groupId") groupId: Int,
         @Path("scheduleId") scheduleId: String,
         @Query("current_user_id") currentUserId: String,
-        @Body body: Map<String, @JvmSuppressWildcards Any>
+        @Body body: DeleteScheduleRequest
     ): Unit
 
     // =========================================================================
@@ -202,13 +217,13 @@ interface SmapApi {
 
     /** POST /locations */
     @POST("locations")
-    suspend fun createLocation(@Body body: Map<String, @JvmSuppressWildcards Any>): SavedLocation
+    suspend fun createLocation(@Body body: CreateLocationRequest): SavedLocation
 
     /** PUT /locations/{locationId} */
     @PUT("locations/{locationId}")
     suspend fun updateLocation(
         @Path("locationId") locationId: Int,
-        @Body body: Map<String, @JvmSuppressWildcards Any>
+        @Body body: UpdateLocationRequest
     ): SavedLocation
 
     /** DELETE /locations/{locationId} */
@@ -239,12 +254,14 @@ interface SmapApi {
     @POST("logs/member-location-logs")
     suspend fun createLocationLog(@Body request: CreateLocationLogRequest): retrofit2.Response<Unit>
 
-    /** GET /logs/member-location-logs/{memberId}/daily?date={date} */
-    @GET("logs/member-location-logs/{memberId}/daily")
+    /** GET /logs/member-location-logs/{memberId}/map-markers?date={date} */
+    @GET("logs/member-location-logs/{memberId}/map-markers")
     suspend fun getLocationLogs(
         @Path("memberId") memberId: Int,
-        @Query("date") date: String
-    ): LocationLogListResponse
+        @Query("date") date: String,
+        @Query("min_speed") minSpeed: Double = 1.0,
+        @Query("max_accuracy") maxAccuracy: Double = 50.0
+    ): retrofit2.Response<okhttp3.ResponseBody>
 
     /** GET /logs/member-location-logs/{memberId}/summary?date={date} */
     @GET("logs/member-location-logs/{memberId}/summary")
@@ -269,4 +286,24 @@ interface SmapApi {
         @Query("group_id") groupId: Int,
         @Query("days") days: Int = 14
     ): GroupDailyCountsResponse
+
+    // =========================================================================
+    // Chat endpoints
+    // =========================================================================
+
+    /** GET /chats/rooms/ */
+    @GET("chats/rooms/")
+    suspend fun getChatRooms(): ChatRoomListResponse
+
+    /** POST /chats/rooms/dm */
+    @POST("chats/rooms/dm")
+    suspend fun createDMRoom(@Body body: CreateDMRequest): CreateDMResponse
+
+    /** GET /chats/rooms/{scrIdx}/messages */
+    @GET("chats/rooms/{scrIdx}/messages")
+    suspend fun getChatMessages(
+        @Path("scrIdx") scrIdx: Int,
+        @Query("before") before: Int? = null,
+        @Query("limit") limit: Int = 50
+    ): List<ChatMessage>
 }

@@ -1,7 +1,9 @@
 package com.dmonster.smap.ui.splash
 
 import android.annotation.SuppressLint
+import android.app.AlertDialog
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -16,7 +18,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
+import com.dmonster.smap.BuildConfig
 import com.dmonster.smap.R
+import com.dmonster.smap.data.api.SmapApi
 import com.dmonster.smap.data.service.AuthService
 import com.dmonster.smap.MainActivity
 import javax.inject.Inject
@@ -40,6 +44,7 @@ class SplashActivity : ComponentActivity() {
     }
 
     @Inject lateinit var authService: AuthService
+    @Inject lateinit var smapApi: SmapApi
 
     private var keepSplashScreen = true
     
@@ -69,14 +74,60 @@ class SplashActivity : ComponentActivity() {
             }
         }
         
-        // 스플래시 딜레이 후 다음 화면으로 이동
+        // 스플래시 딜레이 + 강제 업데이트 체크
         lifecycleScope.launch {
             delay(SPLASH_DELAY)
             keepSplashScreen = false
+
+            if (checkForceUpdate()) {
+                // 강제 업데이트 다이얼로그를 띄운 상태에서 멈춤. navigateNext 호출 안 함.
+                return@launch
+            }
             navigateNext()
         }
     }
-    
+
+    /**
+     * /app/version-check 호출. 강제 업데이트가 필요하면 다이얼로그를 띄우고 true 반환.
+     * 네트워크 실패는 정책상 막지 않고 false 반환(앱 실행 차단보다 통과 우선).
+     */
+    private suspend fun checkForceUpdate(): Boolean {
+        val response = runCatching {
+            smapApi.checkAppVersion(version = BuildConfig.VERSION_NAME)
+        }.getOrNull() ?: return false
+
+        if (!response.forceUpdate) return false
+
+        showForceUpdateDialog(response.minSupportedVersion ?: "")
+        return true
+    }
+
+    private fun showForceUpdateDialog(minVersion: String) {
+        AlertDialog.Builder(this)
+            .setCancelable(false)
+            .setTitle("업데이트 필요")
+            .setMessage("새 버전이 있어 업데이트 후 이용해 주세요.\n(현재 ${BuildConfig.VERSION_NAME} → 최소 ${minVersion})")
+            .setPositiveButton("스토어로 이동") { _, _ ->
+                openPlayStore()
+                finish()
+            }
+            .setNegativeButton("종료") { _, _ -> finish() }
+            .show()
+    }
+
+    private fun openPlayStore() {
+        val pkg = packageName
+        val intent = runCatching {
+            Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$pkg"))
+        }.getOrElse {
+            Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$pkg"))
+        }
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { startActivity(intent) }.onFailure {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$pkg")))
+        }
+    }
+
     private fun navigateNext() {
         val isLoggedIn = authService.isLoggedIn
         android.util.Log.d("SMAP_DEBUG", "🔍 SplashActivity: isLoggedIn = $isLoggedIn")

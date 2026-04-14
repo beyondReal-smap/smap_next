@@ -37,6 +37,7 @@ class ForgotPasswordViewModel @Inject constructor() : ViewModel() {
         private val BASE_URL = BuildConfig.API_BASE_URL.trimEnd('/')
         private val CHECK_PHONE_URL = "$BASE_URL/members/check/phone/"
         private val SMS_SEND_URL = "$BASE_URL/sms/send-verification-code"
+        private val VERIFY_CODE_URL = "$BASE_URL/sms/verify-code"
         private val RESET_PASSWORD_URL = "$BASE_URL/auth/reset-password-by-phone"
         private val httpClient = OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
@@ -69,10 +70,6 @@ class ForgotPasswordViewModel @Inject constructor() : ViewModel() {
     val verificationTimer: StateFlow<Int> = _verificationTimer.asStateFlow()
     
     private var timerJob: Job? = null
-    // TODO: Server-side verification - send the user-entered code to the server for verification
-    // instead of storing and comparing locally. Keeping client-side comparison for now until
-    // the server API supports a verify-code endpoint.
-    private var sentVerificationCode: String? = null
     
     // Password state
     private val _newPassword = MutableStateFlow("")
@@ -252,7 +249,6 @@ class ForgotPasswordViewModel @Inject constructor() : ViewModel() {
             _isLoading.value = false
 
             if (result != null && result["success"]?.jsonPrimitive?.boolean == true) {
-                sentVerificationCode = result["code"]?.jsonPrimitive?.content
                 startTimer()
                 _currentStep.value = Step.VERIFICATION
             } else {
@@ -268,22 +264,64 @@ class ForgotPasswordViewModel @Inject constructor() : ViewModel() {
     fun verifyCode() {
         val code = _verificationCode.value
         val cleanPhone = formatPhoneForAPI(_phoneNumber.value)
-        
+
+        if (code.length != 6) {
+            _errorMessage.value = "6자리 인증번호를 입력해주세요."
+            return
+        }
+
         // Test number handling (debug builds only)
         if (BuildConfig.DEBUG && cleanPhone == "01011111111" && code == "111111") {
             _currentStep.value = Step.NEW_PASSWORD
             return
         }
-        
+
         if (_verificationTimer.value <= 0) {
             _errorMessage.value = "인증 시간이 만료되었습니다. 다시 시도해주세요."
             return
         }
-        
-        if (code == sentVerificationCode) {
-            _currentStep.value = Step.NEW_PASSWORD
-        } else {
-            _errorMessage.value = "인증번호가 일치하지 않습니다."
+
+        // 서버 측 인증번호 검증
+        _isLoading.value = true
+
+        viewModelScope.launch {
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    val requestBody = JSONObject().apply {
+                        put("phone_number", cleanPhone)
+                        put("code", code)
+                    }.toString()
+
+                    val request = Request.Builder()
+                        .url(VERIFY_CODE_URL)
+                        .post(requestBody.toByteArray().toRequestBody("application/json".toMediaType()))
+                        .build()
+
+                    val response = httpClient.newCall(request).execute()
+                    val body = response.body?.string()
+
+                    Log.d(TAG, "인증번호 검증 응답: $body")
+
+                    if (response.isSuccessful && body != null) {
+                        json.parseToJsonElement(body).jsonObject
+                    } else {
+                        null
+                    }
+                }
+
+                _isLoading.value = false
+
+                if (result != null && result["success"]?.jsonPrimitive?.boolean == true) {
+                    Log.d(TAG, "✅ 인증번호 확인 성공 (서버 검증)")
+                    _currentStep.value = Step.NEW_PASSWORD
+                } else {
+                    _errorMessage.value = result?.get("error")?.jsonPrimitive?.content ?: "인증번호가 일치하지 않습니다."
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "인증번호 검증 오류: ${e.message}")
+                _isLoading.value = false
+                _errorMessage.value = "인증번호 확인 중 오류가 발생했습니다."
+            }
         }
     }
     
@@ -308,6 +346,7 @@ class ForgotPasswordViewModel @Inject constructor() : ViewModel() {
                     val jsonBody = JSONObject().apply {
                         put("phone", cleanPhone)
                         put("new_password", _newPassword.value)
+                        put("verification_code", _verificationCode.value)
                     }.toString()
 
                     val request = Request.Builder()

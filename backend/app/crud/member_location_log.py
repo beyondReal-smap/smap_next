@@ -1,8 +1,11 @@
+import logging
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, desc, asc, text, or_
 from typing import Optional, List
 from datetime import datetime, timedelta, date
 import math
+
+logger = logging.getLogger(__name__)
 from ..models.member_location_log import MemberLocationLog
 from ..models.member import Member
 from ..schemas.member_location_log import (
@@ -58,9 +61,9 @@ def create_location_log(db: Session, log_data: MemberLocationLogCreate) -> Membe
             member.mt_long = log_data.mlt_long
             member.mt_udate = datetime.utcnow()
             db.add(member)
-            print(f"📍 [CRUD] member_t 위치 업데이트: mt_idx={log_data.mt_idx}, lat={log_data.mlt_lat}, long={log_data.mlt_long}")
+            logger.debug(f"[CRUD] member_t 위치 업데이트: mt_idx={log_data.mt_idx}, lat={log_data.mlt_lat}, long={log_data.mlt_long}")
         else:
-            print(f"⚠️ [CRUD] member_t 멤버 없음: mt_idx={log_data.mt_idx}")
+            logger.warning(f"[CRUD] member_t 멤버 없음: mt_idx={log_data.mt_idx}")
             
     db.commit()
     db.refresh(db_log)
@@ -712,7 +715,7 @@ def get_member_map_markers(
     # 데이터가 200건을 넘으면 균일하게 샘플링하여 200건으로 제한
     max_markers = 200
     if len(results) > max_markers:
-        print(f"[get_member_map_marker] 데이터 건수: {len(results)}건 -> {max_markers}건으로 샘플링")
+        logger.debug(f"[get_member_map_marker] 데이터 건수: {len(results)}건 -> {max_markers}건으로 샘플링")
         
         # 균일한 간격으로 샘플링
         total_count = len(results)
@@ -724,10 +727,10 @@ def get_member_map_markers(
             if index < total_count:
                 sampled_results.append(results[index])
         
-        print(f"[get_member_map_markers] 샘플링 완료: {len(sampled_results)}건")
+        logger.debug(f"[get_member_map_markers] 샘플링 완료: {len(sampled_results)}건")
         return sampled_results
     else:
-        print(f"[get_member_map_markers] 데이터 건수: {len(results)}건 (샘플링 불필요)")
+        logger.debug(f"[get_member_map_markers] 데이터 건수: {len(results)}건 (샘플링 불필요)")
     
     return results
 
@@ -790,7 +793,7 @@ def get_schedule_count(db: Session, mt_idx: int, date_str: str) -> int:
         return personal_count + group_count
         
     except Exception as e:
-        print(f"일정 개수 조회 오류: {e}")
+        logger.error(f"일정 개수 조회 오류: {e}")
         return 0
 
 def get_gps_distance_and_time(db: Session, mt_idx: int, date_str: str, max_accuracy: float = 100.0, min_speed: float = 2.0, max_speed: float = 55.0) -> tuple:
@@ -896,7 +899,7 @@ def get_gps_distance_and_time(db: Session, mt_idx: int, date_str: str, max_accur
         return moving_meters, moving_minutes, steps
         
     except Exception as e:
-        print(f"GPS 거리/시간 계산 오류: {e}")
+        logger.error(f"GPS 거리/시간 계산 오류: {e}")
         return 0, 0, 0
 
 def format_distance_km(meters: float) -> str:

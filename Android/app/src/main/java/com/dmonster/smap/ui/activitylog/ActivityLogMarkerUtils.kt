@@ -38,7 +38,7 @@ object ActivityLogMarkerUtils {
         val density = context.resources.displayMetrics.density
         val durationPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = AndroidColor.WHITE
-            textSize = 28f * density // Density-scaled size for duration label
+            textSize = 11f * density // Match iOS 11pt size for duration label
             typeface = suiteMedium ?: Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
             textAlign = Paint.Align.CENTER
         }

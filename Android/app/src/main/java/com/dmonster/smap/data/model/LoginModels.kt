@@ -34,6 +34,8 @@ data class LoginResponse(
 @Serializable
 data class LoginData(
     val token: String? = null,
+    @SerialName("refresh_token") val refreshToken: String? = null,
+    @SerialName("expires_in") val expiresIn: Int? = null,
     val user: SMAPUser? = null
 )
 
@@ -96,14 +98,15 @@ data class GoogleLoginRequest(
 
 /**
  * Kakao 로그인 요청 모델
+ * NOTE: kakao_id, nickname, access_token are required by backend (non-Optional)
  */
 @Serializable
 data class KakaoLoginRequest(
-    @SerialName("kakao_id") val kakaoId: String? = null,
+    @SerialName("kakao_id") val kakaoId: String = "",
     val email: String? = null,
-    val nickname: String? = null,
+    val nickname: String = "",
     @SerialName("profile_image") val profileImage: String? = null,
-    @SerialName("access_token") val accessToken: String? = null,
+    @SerialName("access_token") val accessToken: String = "",
     @SerialName("lookup_strategy") val lookupStrategy: String = "email_first",
     @SerialName("device_id") val deviceId: String? = null,
     @SerialName("device_model") val deviceModel: String? = null,
@@ -130,7 +133,9 @@ data class SocialLoginResponse(
 data class SocialLoginData(
     @SerialName("is_new_user") val isNewUser: Boolean? = null,
     val user: SMAPUser? = null,
-    val token: String? = null
+    val token: String? = null,
+    @SerialName("refresh_token") val refreshToken: String? = null,
+    @SerialName("expires_in") val expiresIn: Int? = null
 )
 
 /**
@@ -144,3 +149,32 @@ data class APIError(
     val errorDescription: String
         get() = message ?: detail ?: "알 수 없는 오류가 발생했습니다."
 }
+
+/**
+ * /auth/logout 요청 — refresh token revoke
+ */
+@Serializable
+data class LogoutRequest(
+    @SerialName("refresh_token") val refreshToken: String
+)
+
+/**
+ * /auth/logout 응답
+ */
+@Serializable
+data class LogoutResponse(
+    val success: Boolean = false,
+    val message: String? = null
+)
+
+/**
+ * /app/version-check 응답 — 강제 업데이트 정책
+ */
+@Serializable
+data class AppVersionCheckResponse(
+    val platform: String? = null,
+    @SerialName("current_version") val currentVersion: String? = null,
+    @SerialName("min_supported_version") val minSupportedVersion: String? = null,
+    @SerialName("update_required") val updateRequired: Boolean = false,
+    @SerialName("force_update") val forceUpdate: Boolean = false
+)

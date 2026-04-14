@@ -38,7 +38,7 @@ data class RegisterRequest(
     @SerialName("mt_agree3") val mtAgree3: Boolean = false,  // 위치정보 이용약관 (필수)
     @SerialName("mt_agree4") val mtAgree4: Boolean = false,  // 마케팅 정보 수신 (선택)
     @SerialName("mt_agree5") val mtAgree5: Boolean = false,  // 야간 알림 수신 (선택)
-    @SerialName("fcm_token") val fcmToken: String? = null
+    @SerialName("mt_token_id") val fcmToken: String? = null
 )
 
 /**
@@ -56,7 +56,16 @@ data class SmsVerificationRequest(
 data class SmsVerificationResponse(
     @SerialName("success") val success: Boolean = false,
     @SerialName("message") val message: String? = null,
-    @SerialName("verification_code") val verificationCode: String? = null  // 개발 환경에서만...
+    @SerialName("error") val error: String? = null
+)
+
+/**
+ * SMS 인증번호 검증 요청
+ */
+@Serializable
+data class VerifySmsCodeRequest(
+    @SerialName("phone_number") val phoneNumber: String,
+    @SerialName("code") val code: String
 )
 
 /**
