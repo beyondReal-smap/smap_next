@@ -24,8 +24,8 @@ android {
         applicationId = "com.dmonster.smap"
         minSdk = 28
         targetSdk = 35
-        versionCode = 58
-        versionName = "3.2.1"
+        versionCode = 62
+        versionName = "3.2.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         resourceConfigurations += setOf("ko", "en")
@@ -36,11 +36,13 @@ android {
         buildConfigField("String", "IMAGE_BASE_URL", "\"https://api3.smap.site\"")
         buildConfigField("String", "WEB_BASE_URL", "\"https://nextstep.smap.site\"")
 
-        // API keys — values loaded from gradle.properties or local.properties
-        buildConfigField("String", "GOOGLE_OAUTH_CLIENT_ID", "\"${project.findProperty("GOOGLE_OAUTH_CLIENT_ID") ?: ""}\"")
-        buildConfigField("String", "TELEGRAM_BOT_TOKEN", "\"${project.findProperty("TELEGRAM_BOT_TOKEN") ?: ""}\"")
-        buildConfigField("String", "TELEGRAM_CHAT_ID", "\"${project.findProperty("TELEGRAM_CHAT_ID") ?: ""}\"")
-        buildConfigField("String", "KAKAO_API_KEY", "\"${project.findProperty("KAKAO_API_KEY") ?: ""}\"")
+        // API keys — values loaded from local.properties (우선) or gradle.properties
+        // project.findProperty 만 사용하면 local.properties 가 읽히지 않아 빈 값이 되므로
+        // 시크릿은 반드시 localOrGradleProp 을 경유시킨다.
+        buildConfigField("String", "GOOGLE_OAUTH_CLIENT_ID", "\"${localOrGradleProp("GOOGLE_OAUTH_CLIENT_ID") ?: ""}\"")
+        buildConfigField("String", "TELEGRAM_BOT_TOKEN", "\"${localOrGradleProp("TELEGRAM_BOT_TOKEN") ?: ""}\"")
+        buildConfigField("String", "TELEGRAM_CHAT_ID", "\"${localOrGradleProp("TELEGRAM_CHAT_ID") ?: ""}\"")
+        buildConfigField("String", "KAKAO_API_KEY", "\"${localOrGradleProp("KAKAO_API_KEY") ?: ""}\"")
     }
 
     signingConfigs {
@@ -128,9 +130,6 @@ dependencies {
     // Google Play Services
     implementation("com.google.android.gms:play-services-auth:21.2.0")
     implementation("com.google.android.gms:play-services-location:21.3.0")
-    
-    // AdMob
-    implementation("com.google.android.gms:play-services-ads:23.6.0")
     
     // OkHttp for network requests
     implementation("com.squareup.okhttp3:okhttp:4.12.0")

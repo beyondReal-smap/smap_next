@@ -77,6 +77,12 @@ class LocationService : Service() {
 
     private var stationaryStartTime: Long = 0L
     @Volatile private var lastLocation: Location? = null
+    // STATIONARY 진입 시점의 기준 위치. 이 지점에서 STATIONARY_ESCAPE_METERS 이상 벗어나면
+    // speed 측정과 무관하게 WALKING으로 승급한다. FLP가 speed=0만 내려보내 stuck되는 케이스 방지.
+    @Volatile private var stationaryReferenceLocation: Location? = null
+    // requestLocationUpdates 성공 여부. AlarmManager로 서비스가 부활했을 때
+    // 위치 구독이 유실된 상태인지 판별하는 데 쓴다.
+    @Volatile private var isTracking = false
     private var consecutiveAuthFailures = 0
     private val maxAuthFailures = 3
 
@@ -107,11 +113,18 @@ class LocationService : Service() {
         private const val QUEUE_PREFS = "smap_location_service"
         private const val KEY_PENDING_QUEUE = "pending_queue"
         private const val KEY_LAST_LOCATION = "last_location"
+        private const val KEY_CURRENT_MODE = "current_mode"
         private const val RESTART_DELAY_MS = 5_000L
 
         private const val STATIONARY_DWELL_MS = 5 * 60 * 1000L  // 5 min before entering stationary
         private const val HEARTBEAT_INTERVAL_MS = 900_000L       // 15 min
         private const val BATCH_INTERVAL_MS = 60_000L            // 1 min
+        // STATIONARY에서 reference 위치로부터 이 거리 이상 벗어나면 speed와 무관하게
+        // WALKING으로 승급. FLP가 speed를 0으로만 돌려줘 모드 전환이 영원히 안 되는
+        // stuck 상태를 방지하기 위한 안전장치.
+        private const val STATIONARY_ESCAPE_METERS = 50f
+        // 폴백 speed 계산 시 너무 오래된 lastLocation과의 gap은 신뢰할 수 없어 무시.
+        private const val SPEED_FALLBACK_MAX_GAP_MS = 10 * 60 * 1000L  // 10 min
 
         private const val ACTION_HEARTBEAT = "com.dmonster.smap.ACTION_HEARTBEAT"
         private const val REQUEST_CODE_HEARTBEAT = 2002
@@ -194,9 +207,16 @@ class LocationService : Service() {
     override fun onCreate() {
         super.onCreate()
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
-        locationRequest = createLocationRequest(PowerMode.WALKING)
+        // 프로세스 부활 시 마지막 모드를 복원해야 올바른 LocationRequest/알림 텍스트로 시작한다.
+        restoreCurrentMode()
+        locationRequest = createLocationRequest(currentMode)
         restorePendingLocations()
         restoreLastLocation()
+        // 부활 직후 STATIONARY 모드라면 복원된 lastLocation을 escape 기준점으로 즉시 세팅.
+        // 이게 없으면 최초 switchToMode 호출 전까지 이동거리 기반 escape가 동작하지 않는다.
+        if (currentMode == PowerMode.STATIONARY) {
+            stationaryReferenceLocation = lastLocation
+        }
         registerNetworkCallback()
     }
 
@@ -209,6 +229,13 @@ class LocationService : Service() {
         if (intent?.action == ACTION_HEARTBEAT) {
             sendHeartbeat()
             scheduleHeartbeatAlarm()   // schedule next
+            // OS가 서비스 프로세스를 Doze/메모리 압박으로 종료했다 부활한 경우
+            // locationCallback 구독이 유실된 상태다. 위치 권한이 있으면 재구독해
+            // 실제 움직임을 다시 감지하도록 한다. (alarm이 막아주려던 바로 그 상황)
+            if (!isTracking && hasLocationPermissionGranted()) {
+                startLocationTracking()
+                startTimerForMode(currentMode)
+            }
             return START_STICKY
         }
 
@@ -237,7 +264,7 @@ class LocationService : Service() {
         }
 
         cancelAlarms()
-        fusedLocationClient.removeLocationUpdates(locationCallback)
+        stopLocationTracking()
         startLocationTracking()
         startTimerForMode(currentMode)
 
@@ -251,7 +278,7 @@ class LocationService : Service() {
         persistPendingLocations()
         persistLastLocation()
         super.onDestroy()
-        fusedLocationClient.removeLocationUpdates(locationCallback)
+        stopLocationTracking()
         cancelAlarms()
         unregisterNetworkCallback()
         serviceScope.cancel()
@@ -268,7 +295,10 @@ class LocationService : Service() {
     private fun createLocationRequest(mode: PowerMode): LocationRequest {
         return when (mode) {
             PowerMode.STATIONARY -> LocationRequest.Builder(
-                Priority.PRIORITY_BALANCED_POWER_ACCURACY, 120_000L  // 2 min (desired)
+                // BALANCED_POWER는 네트워크 fix 위주라 Location.speed가 항상 0으로 내려와
+                // detectModeFromLocation이 WALKING으로 승급 못하고 STATIONARY에 갇힌다.
+                // 2분/5분 하한이 배터리를 이미 보호하므로 priority는 HIGH_ACCURACY 유지.
+                Priority.PRIORITY_HIGH_ACCURACY, 120_000L  // 2 min (desired)
             )
                 // 정지 상태에서는 displacement 필터가 크면 콜백이 아예 오지 않아
                 // lastLocation/heartbeat가 stale해진다. 대신 시간 기반 하한을 걸어
@@ -297,11 +327,7 @@ class LocationService : Service() {
     // ── Tracking ───────────────────────────────────────────────────────────
 
     private fun startLocationTracking() {
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
-            != PackageManager.PERMISSION_GRANTED &&
-            ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
-            != PackageManager.PERMISSION_GRANTED
-        ) return
+        if (!hasLocationPermissionGranted()) return
 
         try {
             fusedLocationClient.requestLocationUpdates(
@@ -309,16 +335,40 @@ class LocationService : Service() {
                 locationCallback,
                 Looper.getMainLooper()
             )
+            isTracking = true
         } catch (e: SecurityException) {
             Log.e(TAG, "Location permission revoked during request", e)
+            isTracking = false
             stopSelf()
         }
+    }
+
+    private fun hasLocationPermissionGranted(): Boolean {
+        return ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+            ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun stopLocationTracking() {
+        fusedLocationClient.removeLocationUpdates(locationCallback)
+        isTracking = false
     }
 
     // ── Mode detection (speed-based) ───────────────────────────────────────
 
     private fun detectModeFromLocation(location: Location) {
-        val speed = if (location.speed < 0f) 0f else location.speed  // m/s
+        // STATIONARY stuck 탈출: speed=0만 들어와도 실제로 충분히 이동했으면 즉시 승급.
+        if (currentMode == PowerMode.STATIONARY) {
+            val ref = stationaryReferenceLocation
+            if (ref != null && location.distanceTo(ref) > STATIONARY_ESCAPE_METERS) {
+                stationaryStartTime = 0L
+                switchToMode(PowerMode.WALKING)
+                return
+            }
+        }
+
+        // FLP가 speed를 안 주는 경우가 흔해 computeSpeed 폴백을 사용한다.
+        val speedMs = computeSpeed(location).toFloat()
+        val speed = if (speedMs < 0f) 0f else speedMs  // m/s
 
         val detectedMode = when {
             speed < 0.5f  -> PowerMode.STATIONARY  // < 1.8 km/h
@@ -346,6 +396,10 @@ class LocationService : Service() {
         if (newMode == currentMode) return
         Log.d(TAG, "Mode: ${currentMode.name} -> ${newMode.name}")
         currentMode = newMode
+        persistCurrentMode()
+
+        // STATIONARY 진입 시 reference 위치를 저장해 이후 이동거리 기반 escape 판정의 기준점으로 삼는다.
+        stationaryReferenceLocation = if (newMode == PowerMode.STATIONARY) lastLocation else null
 
         // Flush pending before reconfiguring
         flushPendingLocations()
@@ -354,7 +408,7 @@ class LocationService : Service() {
         cancelAlarms()
 
         // Reconfigure location request
-        fusedLocationClient.removeLocationUpdates(locationCallback)
+        stopLocationTracking()
         locationRequest = createLocationRequest(newMode)
         startLocationTracking()
 
@@ -476,41 +530,69 @@ class LocationService : Service() {
     }
 
     /**
-     * Heartbeat: iOS와 동일하게 lastLocation을 주기적으로 강제 송신한다.
-     * pending flush와 별개로 진행 — flush가 네트워크 오류로 재큐잉될 수 있고,
-     * 그 상태에서 `hadPending` 분기로 송신을 스킵하면 서버는 오랫동안 무소식이 된다.
+     * Heartbeat: STATIONARY에서 움직임이 없을 때도 "여기에 있다"를 주기적으로 서버에 알린다.
+     *
+     * 중복 전송 방지: 방금 flush한 pending이 있었다면 그 배치에 최근 위치가 포함돼 있으므로
+     * 추가 송신을 생략한다. pending이 비어있던 경우에만 heartbeat 1건을 보낸다.
+     * 또한 heartbeat은 "지금 시각"을 의미해야 하므로 mlt_timestamp를 현재로 덮어쓴다
+     * (과거 GPS time 반복 전송으로 활동로그가 멈춰 보이는 문제 방지).
      */
     private fun sendHeartbeat() {
-        // 1) 누적된 위치 flush 시도
-        flushPendingLocations()
+        val hadPending: Boolean
+        synchronized(pendingLocations) { hadPending = pendingLocations.isNotEmpty() }
 
-        // 2) lastLocation이 있으면 heartbeat으로 한 건 강제 송신
+        flushPendingLocations()
+        if (hadPending) return
+
         val loc = lastLocation ?: return
-        val request = buildLocationLogRequest(loc) ?: return
+        val request = buildLocationLogRequest(loc, useNow = true) ?: return
         serviceScope.launch { sendLocationToServer(request) }
     }
 
     // ── Build request model ────────────────────────────────────────────────
 
-    private fun buildLocationLogRequest(location: Location): CreateLocationLogRequest? {
+    private fun buildLocationLogRequest(
+        location: Location,
+        useNow: Boolean = false
+    ): CreateLocationLogRequest? {
         val prefs = getSharedPreferences(AUTH_PREFS, Context.MODE_PRIVATE)
         val mtIdxInt = prefs.getInt("mt_idx", -1)
         if (mtIdxInt == -1) return null
 
         val dateFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-        // Use the GPS-measured time, not the current wall-clock time
-        val locationTime = if (location.time > 0) Date(location.time) else Date()
+        // heartbeat처럼 "지금도 여기에 있다"를 표현해야 하는 호출은 현재 시각으로 덮어쓴다.
+        // 그렇지 않으면 STATIONARY에서 변화가 없는 동안 GPS time이 과거 시각 그대로 반복 전송된다.
+        val locationTime = when {
+            useNow -> Date()
+            location.time > 0 -> Date(location.time)
+            else -> Date()
+        }
 
         return CreateLocationLogRequest(
             mtIdx = mtIdxInt.toString(),
             mltLat = location.latitude,
             mltLong = location.longitude,
             mltAccuracy = location.accuracy.toDouble(),
-            mltSpeed = location.speed.toDouble(),
+            mltSpeed = computeSpeed(location),
             mltAltitude = if (location.hasAltitude()) location.altitude else 0.0,
             mltTimestamp = dateFormatter.format(locationTime),
             mltBattery = getBatteryLevel()
         )
+    }
+
+    /**
+     * FLP가 제공하는 Location.speed는 provider priority에 따라 항상 0으로 내려올 수 있다.
+     * (BALANCED_POWER 모드 / 네트워크 fix 등) 이때 lastLocation과의 거리·시간으로 폴백 계산한다.
+     * 활동로그 서버 필터(min_speed>=1.0)를 통과시켜 지도에 이동 경로를 표시하기 위함.
+     */
+    private fun computeSpeed(location: Location): Double {
+        if (location.hasSpeed() && location.speed > 0f) return location.speed.toDouble()
+        val prev = lastLocation ?: return 0.0
+        val dtMs = location.time - prev.time
+        if (dtMs <= 0L || dtMs > SPEED_FALLBACK_MAX_GAP_MS) return 0.0
+        val distance = location.distanceTo(prev).toDouble()
+        if (distance < 1.0) return 0.0
+        return distance / (dtMs / 1000.0)
     }
 
     // ── Server communication (Retrofit) ────────────────────────────────────
@@ -659,6 +741,19 @@ class LocationService : Service() {
             .edit()
             .putString(KEY_LAST_LOCATION, json.encodeToString(request))
             .apply()
+    }
+
+    private fun persistCurrentMode() {
+        getSharedPreferences(QUEUE_PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_CURRENT_MODE, currentMode.name)
+            .apply()
+    }
+
+    private fun restoreCurrentMode() {
+        val prefs = getSharedPreferences(QUEUE_PREFS, Context.MODE_PRIVATE)
+        val name = prefs.getString(KEY_CURRENT_MODE, null) ?: return
+        currentMode = runCatching { PowerMode.valueOf(name) }.getOrDefault(PowerMode.WALKING)
     }
 
     private fun restoreLastLocation() {
