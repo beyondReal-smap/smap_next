@@ -8,9 +8,23 @@
         <item name="android:windowBackground">@drawable/splash_background</item>
         <item name="android:statusBarColor">@color/splash_background</item>
         <item name="android:navigationBarColor">@color/splash_background</item>
+        <!-- 밝은 스플래시 배경 위에서 시스템 아이콘이 어두운 색으로 보이게 한다. -->
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
         <!-- 페이드 인/아웃 애니메이션 비활성화 -->
         <item name="android:windowAnimationStyle">@null</item>
         <item name="android:windowDisablePreview">false</item>
         <item name="android:windowContentTransitions">false</item>
+    </style>
+
+    <!--
+      MainActivity 전용 테마.
+      Compose setContent 첫 프레임 전까지는 windowBackground가 그대로 노출되므로,
+      SplashActivity → MainActivity 전환 직후 "흰색 깜빡임"을 방지하기 위해
+      브랜드 배경색(BrandColors.Background = #FEF8F9)을 명시한다.
+      statusBar/navigationBar는 enableEdgeToEdge()가 런타임에 재설정하므로 생략.
+    -->
+    <style name="Theme.Smap.Main" parent="Theme.SmapWebView">
+        <item name="android:windowBackground">@color/background</item>
     </style>
 </resources>

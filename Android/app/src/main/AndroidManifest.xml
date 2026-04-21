@@ -115,6 +115,7 @@
             android:exported="true"
             android:launchMode="singleTask"
             android:screenOrientation="portrait"
+            android:theme="@style/Theme.Smap.Main"
             android:windowSoftInputMode="adjustResize">
             <!-- SMAP 딥링크 처리 (smapapp://smap) -->
             <intent-filter>

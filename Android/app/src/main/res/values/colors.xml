@@ -6,8 +6,12 @@
     <color name="brand_primary">#0113A3</color>
     <color name="background">#FEF8F9</color>
     
-    <!-- 스플래시 배경색 (iOS와 동일) -->
-    <color name="splash_background">#353538</color>
+    <!--
+      스플래시 배경색. BrandColors.Background(#FEF8F9)와 맞추어
+      스플래시 → 메인으로 넘어가는 구간의 색 단차/깜빡임을 제거한다.
+      이전 값 #353538은 메인 화면과 톤 차이가 커서 전환이 부자연스러웠다.
+    -->
+    <color name="splash_background">#FEF8F9</color>
     
     <!-- 카카오 로그인 -->
     <color name="kakao_yellow">#FEE500</color>
