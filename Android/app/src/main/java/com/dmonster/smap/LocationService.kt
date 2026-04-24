@@ -309,17 +309,22 @@ class LocationService : Service() {
                 .build()
 
             PowerMode.WALKING -> LocationRequest.Builder(
-                Priority.PRIORITY_HIGH_ACCURACY, 30_000L  // 30 sec
-            ).setMinUpdateDistanceMeters(30f)
+                Priority.PRIORITY_HIGH_ACCURACY, 10_000L  // 10 sec
+            ).setMinUpdateDistanceMeters(10f)
                 .setGranularity(Granularity.GRANULARITY_PERMISSION_LEVEL)
-                .setWaitForAccurateLocation(true)
+                // interval과 displacement는 AND 평가이므로, 둘 다 좁게 두어야 iOS의
+                // distanceFilter 30m 단독 필터와 비슷한 콜백 빈도를 얻는다.
+                // waitForAccurateLocation(true)는 첫 fix가 정확해질 때까지 대기해
+                // 도심 협곡/실내에서 콜백 자체가 수십 초~수 분 정지되므로 false로 둔다.
+                // 정확도 필터는 클라 isValidCoordinate + 서버 max_accuracy<50 에서 처리.
+                .setWaitForAccurateLocation(false)
                 .build()
 
             PowerMode.AUTOMOTIVE -> LocationRequest.Builder(
-                Priority.PRIORITY_HIGH_ACCURACY, 15_000L  // 15 sec
-            ).setMinUpdateDistanceMeters(100f)
+                Priority.PRIORITY_HIGH_ACCURACY, 5_000L  // 5 sec
+            ).setMinUpdateDistanceMeters(50f)
                 .setGranularity(Granularity.GRANULARITY_PERMISSION_LEVEL)
-                .setWaitForAccurateLocation(true)
+                .setWaitForAccurateLocation(false)
                 .build()
         }
     }
@@ -591,7 +596,11 @@ class LocationService : Service() {
         val dtMs = location.time - prev.time
         if (dtMs <= 0L || dtMs > SPEED_FALLBACK_MAX_GAP_MS) return 0.0
         val distance = location.distanceTo(prev).toDouble()
-        if (distance < 1.0) return 0.0
+        // accuracy 5~30m 구간에서 초당 0.3~1m 이동(걷기 시작/정지, 느린 이동)이
+        // 1.0m 하한에 걸려 speed=0으로 떨어지면, 서버 min_speed>=1.0 필터에
+        // 다시 걸려 지도 경로에서 삭제된다. 하한을 0.3m로 낮춰 걷기 샘플까지
+        // 살리되, 거리/시간 비율은 그대로 반환한다(미세 노이즈는 여전히 배제).
+        if (distance < 0.3) return 0.0
         return distance / (dtMs / 1000.0)
     }
 
