@@ -23,6 +23,7 @@ import androidx.core.app.NotificationCompat
 import com.dmonster.smap.data.api.SmapApi
 import com.dmonster.smap.data.model.CreateLocationLogRequest
 import com.google.android.gms.location.*
+import androidx.core.content.ContextCompat
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -98,6 +99,12 @@ class LocationService : Service() {
     // 배치 타이머/heartbeat를 기다리지 않고 재전송을 트리거한다.
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
+    // ── Activity Recognition Transition ────────────────────────────────────
+    // GPS 콜백과 독립적으로 motion 변화를 감지해 모드 전환을 트리거한다(iOS MotionManager 대응).
+    // PendingIntent → ActivityTransitionReceiver → LocationService의 ACTION_MODE_TRANSITION으로
+    // 신호가 돌아온다.
+    private var activityTransitionPendingIntent: PendingIntent? = null
+
     // ── Coroutine scope ────────────────────────────────────────────────────
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -125,9 +132,14 @@ class LocationService : Service() {
         private const val STATIONARY_ESCAPE_METERS = 50f
         // 폴백 speed 계산 시 너무 오래된 lastLocation과의 gap은 신뢰할 수 없어 무시.
         private const val SPEED_FALLBACK_MAX_GAP_MS = 10 * 60 * 1000L  // 10 min
+        // heartbeat 송신 시 lastLocation 신선도 상한. 이보다 오래된 좌표는 보내지 않는다.
+        // STATIONARY heartbeat이 15분 간격이고, 새 콜백이 60초 STATIONARY interval로 들어오므로
+        // 1시간이면 충분히 보수적인 상한.
+        private const val HEARTBEAT_LAST_LOC_MAX_AGE_MS = 60 * 60 * 1000L  // 1 hour
 
         private const val ACTION_HEARTBEAT = "com.dmonster.smap.ACTION_HEARTBEAT"
         private const val REQUEST_CODE_HEARTBEAT = 2002
+        private const val REQUEST_CODE_ACTIVITY_TRANSITION = 2003
 
         fun isRunning(context: Context): Boolean {
             val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
@@ -135,21 +147,32 @@ class LocationService : Service() {
                 .any { it.service.className == LocationService::class.java.name }
         }
 
+        // Foreground 진입 경로(Activity onResume 등)에서 서비스를 띄우기 위한 최소 권한.
+        // ACCESS_BACKGROUND_LOCATION은 여기서 검사하지 않는다 — Android 공식 문서 기준 location FGS의
+        // 기본 prerequisite는 fine/coarse이며, BG 권한은 "background에서 FGS를 새로 시작할 때"만 필요.
+        // 사용자가 "사용 중에만 허용"을 선택했을 때 foreground 추적까지 막던 회귀를 제거한다.
+        // (iOS LocationManager.startTracking()이 whenInUse 만으로도 walking/automotive 진입하는 동작과 정렬)
         fun hasRequiredPermissions(context: Context): Boolean {
             val fine = ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
             val coarse = ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
             val locationGranted = fine || coarse
-            val backgroundGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED
-            } else {
-                true
-            }
             val foregroundServiceGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 ActivityCompat.checkSelfPermission(context, Manifest.permission.FOREGROUND_SERVICE_LOCATION) == PackageManager.PERMISSION_GRANTED
             } else {
                 true
             }
-            return locationGranted && backgroundGranted && foregroundServiceGranted
+            return locationGranted && foregroundServiceGranted
+        }
+
+        // Background broadcast(BOOT_COMPLETED / MY_PACKAGE_REPLACED / scheduleRestart alarm)에서
+        // FGS를 새로 시작하려 할 때만 추가로 검사한다. Android 11+ 사용자가 "항상 허용"을 안 줬다면
+        // 자동 재시작은 못 하지만, foreground 진입은 hasRequiredPermissions만으로 통과하도록 한다.
+        fun hasBackgroundLocationPermission(context: Context): Boolean {
+            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
         }
 
         fun isUserLoggedIn(context: Context): Boolean {
@@ -159,13 +182,23 @@ class LocationService : Service() {
             return !token.isNullOrBlank() && mtIdx > 0
         }
 
-        fun startIfEligible(context: Context, reason: String) {
+        // requireBackgroundPermission: background broadcast(부팅/패키지 교체/AlarmManager 재시작) 경로에서
+        // FGS를 새로 시작할 때만 true. Activity onResume 등 foreground 경로는 false(기본값)로 두어
+        // "사용 중에만 허용" 사용자도 추적이 시작되게 한다.
+        fun startIfEligible(context: Context, reason: String, requireBackgroundPermission: Boolean = false) {
             if (!isUserLoggedIn(context)) {
                 Log.d(TAG, "Skip start ($reason): user not logged in")
                 return
             }
             if (!hasRequiredPermissions(context)) {
                 Log.d(TAG, "Skip start ($reason): required location permissions missing")
+                return
+            }
+            if (requireBackgroundPermission && !hasBackgroundLocationPermission(context)) {
+                // Android 12+/14+에서 background 시작은 ACCESS_BACKGROUND_LOCATION이 없으면
+                // ForegroundServiceStartNotAllowedException 또는 location 차단이 발생할 수 있다.
+                // 다음 사용자 진입(MainActivity onResume) 시점에 다시 시작된다.
+                Log.d(TAG, "Skip start ($reason): background location permission missing")
                 return
             }
 
@@ -218,6 +251,7 @@ class LocationService : Service() {
             stationaryReferenceLocation = lastLocation
         }
         registerNetworkCallback()
+        registerActivityTransitions()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -235,6 +269,21 @@ class LocationService : Service() {
             if (!isTracking && hasLocationPermissionGranted()) {
                 startLocationTracking()
                 startTimerForMode(currentMode)
+            }
+            return START_STICKY
+        }
+
+        // ActivityTransitionReceiver가 보낸 motion 기반 모드 전환 신호.
+        // GPS 콜백 없이도 STATIONARY ↔ WALKING/AUTOMOTIVE 사이를 깨운다(iOS MotionManager 대응).
+        if (intent?.action == ActivityTransitionReceiver.ACTION_MODE_TRANSITION) {
+            val target = intent.getStringExtra(ActivityTransitionReceiver.EXTRA_TARGET_MODE)
+            val newMode = runCatching { PowerMode.valueOf(target ?: "") }.getOrNull()
+            if (newMode != null && newMode != currentMode) {
+                Log.d(TAG, "Mode transition from ActivityRecognition: ${currentMode.name} -> ${newMode.name}")
+                // STATIONARY 진입은 dwell timer 없이 즉시 적용한다 — Transition API 자체가
+                // STILL을 일정 시간 관찰해야 ENTER 신호를 내보내므로 추가 dwell이 불필요.
+                stationaryStartTime = 0L
+                switchToMode(newMode)
             }
             return START_STICKY
         }
@@ -268,6 +317,13 @@ class LocationService : Service() {
         startLocationTracking()
         startTimerForMode(currentMode)
 
+        // 첫 onCreate에서는 ACTIVITY_RECOGNITION 권한이 없어 register가 skip됐을 수 있다.
+        // 사용자가 권한을 부여한 뒤 MainActivity onResume → startLocationService → 여기 도달하면
+        // 다시 등록을 시도한다(이미 등록돼 있으면 no-op).
+        if (activityTransitionPendingIntent == null) {
+            registerActivityTransitions()
+        }
+
         Log.d(TAG, "LocationService started in ${currentMode.name} mode")
         return START_STICKY
     }
@@ -281,6 +337,7 @@ class LocationService : Service() {
         stopLocationTracking()
         cancelAlarms()
         unregisterNetworkCallback()
+        unregisterActivityTransitions()
         serviceScope.cancel()
         Log.d(TAG, "LocationService destroyed")
     }
@@ -293,27 +350,41 @@ class LocationService : Service() {
     // ── Location request per mode ──────────────────────────────────────────
 
     private fun createLocationRequest(mode: PowerMode): LocationRequest {
+        // FINE 권한이 있을 때만 GRANULARITY_FINE을 명시적으로 요구한다.
+        // PERMISSION_LEVEL은 coarse-only 사용자에게 obfuscated/throttled 좌표를 내려줘
+        // Location.speed가 0/null로 들어오는 비율(실측 70%)을 키운다(FLP 공식 문서).
+        // coarse만 가진 사용자는 fallback으로 PERMISSION_LEVEL 사용 — 권한이 없는 채로
+        // GRANULARITY_FINE을 요구하면 SecurityException이 발생할 수 있다.
+        val granularity = if (
+            ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+            == PackageManager.PERMISSION_GRANTED
+        ) {
+            Granularity.GRANULARITY_FINE
+        } else {
+            Granularity.GRANULARITY_PERMISSION_LEVEL
+        }
+
         return when (mode) {
             PowerMode.STATIONARY -> LocationRequest.Builder(
                 // BALANCED_POWER는 네트워크 fix 위주라 Location.speed가 항상 0으로 내려와
                 // detectModeFromLocation이 WALKING으로 승급 못하고 STATIONARY에 갇힌다.
-                // 2분/5분 하한이 배터리를 이미 보호하므로 priority는 HIGH_ACCURACY 유지.
-                Priority.PRIORITY_HIGH_ACCURACY, 120_000L  // 2 min (desired)
+                // priority는 HIGH_ACCURACY 유지하되 interval/min은 시간 기반으로 보호한다.
+                Priority.PRIORITY_HIGH_ACCURACY, 60_000L  // 1 min (desired)
             )
-                // 정지 상태에서는 displacement 필터가 크면 콜백이 아예 오지 않아
-                // lastLocation/heartbeat가 stale해진다. 대신 시간 기반 하한을 걸어
-                // 센서 노이즈로 인한 과도한 콜백을 방지한다(최소 5분 간격).
+                // 정지 상태에서도 blind window를 짧게 두어 ActivityRecognition transition
+                // 신호 없이도 GPS 콜백 기반 escape 판정이 빠르게 일어나도록 한다.
+                // 5분 하한 → 1분 단축. 배터리는 ActivityRecognition Transition + STILL
+                // 상태에서 FLP 자체가 콜백을 드물게 내려주는 특성으로 보호된다.
                 .setMinUpdateDistanceMeters(20f)
-                .setMinUpdateIntervalMillis(300_000L) // 5 min lower bound
-                .setGranularity(Granularity.GRANULARITY_PERMISSION_LEVEL)
+                .setMinUpdateIntervalMillis(60_000L) // 1 min lower bound
+                .setGranularity(granularity)
                 .build()
 
             PowerMode.WALKING -> LocationRequest.Builder(
                 Priority.PRIORITY_HIGH_ACCURACY, 10_000L  // 10 sec
             ).setMinUpdateDistanceMeters(10f)
-                .setGranularity(Granularity.GRANULARITY_PERMISSION_LEVEL)
-                // interval과 displacement는 AND 평가이므로, 둘 다 좁게 두어야 iOS의
-                // distanceFilter 30m 단독 필터와 비슷한 콜백 빈도를 얻는다.
+                .setGranularity(granularity)
+                // 둘 다 좁게 두어야 iOS의 distanceFilter 30m 단독 필터와 비슷한 콜백 빈도.
                 // waitForAccurateLocation(true)는 첫 fix가 정확해질 때까지 대기해
                 // 도심 협곡/실내에서 콜백 자체가 수십 초~수 분 정지되므로 false로 둔다.
                 // 정확도 필터는 클라 isValidCoordinate + 서버 max_accuracy<50 에서 처리.
@@ -323,7 +394,7 @@ class LocationService : Service() {
             PowerMode.AUTOMOTIVE -> LocationRequest.Builder(
                 Priority.PRIORITY_HIGH_ACCURACY, 5_000L  // 5 sec
             ).setMinUpdateDistanceMeters(50f)
-                .setGranularity(Granularity.GRANULARITY_PERMISSION_LEVEL)
+                .setGranularity(granularity)
                 .setWaitForAccurateLocation(false)
                 .build()
         }
@@ -521,6 +592,76 @@ class LocationService : Service() {
         networkCallback = null
     }
 
+    // ── Activity Recognition Transition ────────────────────────────────────
+
+    private fun registerActivityTransitions() {
+        if (activityTransitionPendingIntent != null) return
+
+        // Android 10+(API 29+)부터 ACTIVITY_RECOGNITION은 dangerous permission이므로 런타임 부여 필요.
+        // 권한이 없으면 등록 자체가 실패한다 — 사용자가 추후 권한을 주면 다음 서비스 재시작에서 등록된다.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION)
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+                Log.d(TAG, "ACTIVITY_RECOGNITION permission missing — skipping transition updates")
+                return
+            }
+        }
+
+        val transitions = listOf(
+            DetectedActivity.STILL,
+            DetectedActivity.WALKING,
+            DetectedActivity.RUNNING,
+            DetectedActivity.IN_VEHICLE,
+            DetectedActivity.ON_BICYCLE
+        ).flatMap { activity ->
+            // ENTER만 구독하고 EXIT는 무시한다 — 모드 전환은 새 활동 진입 시점에만 의미가 있고,
+            // EXIT는 항상 짝지어 다른 ENTER와 함께 도착하므로 중복이 된다.
+            listOf(
+                ActivityTransition.Builder()
+                    .setActivityType(activity)
+                    .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_ENTER)
+                    .build()
+            )
+        }
+
+        val request = ActivityTransitionRequest(transitions)
+
+        val intent = Intent(this, ActivityTransitionReceiver::class.java)
+        // FLAG_MUTABLE: ActivityTransitionResult가 PendingIntent에 transition extras를 채워 넣을 수 있도록
+        // mutable이어야 한다(Android 12+ 기본은 immutable이라 명시 필요).
+        val pi = PendingIntent.getBroadcast(
+            this, REQUEST_CODE_ACTIVITY_TRANSITION, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+        )
+
+        runCatching {
+            ActivityRecognition.getClient(this)
+                .requestActivityTransitionUpdates(request, pi)
+                .addOnSuccessListener {
+                    Log.d(TAG, "Activity transition updates registered")
+                }
+                .addOnFailureListener { e ->
+                    Log.w(TAG, "Activity transition register failed: ${e.message}")
+                }
+            activityTransitionPendingIntent = pi
+        }.onFailure {
+            Log.w(TAG, "Failed to request activity transition updates", it)
+            pi.cancel()
+        }
+    }
+
+    private fun unregisterActivityTransitions() {
+        val pi = activityTransitionPendingIntent ?: return
+        runCatching {
+            ActivityRecognition.getClient(this).removeActivityTransitionUpdates(pi)
+        }.onFailure {
+            Log.w(TAG, "Failed to remove activity transition updates", it)
+        }
+        pi.cancel()
+        activityTransitionPendingIntent = null
+    }
+
     private fun flushPendingLocations() {
         val toSend: List<CreateLocationLogRequest>
         synchronized(pendingLocations) {
@@ -541,6 +682,10 @@ class LocationService : Service() {
      * 추가 송신을 생략한다. pending이 비어있던 경우에만 heartbeat 1건을 보낸다.
      * 또한 heartbeat은 "지금 시각"을 의미해야 하므로 mlt_timestamp를 현재로 덮어쓴다
      * (과거 GPS time 반복 전송으로 활동로그가 멈춰 보이는 문제 방지).
+     *
+     * 신선도 검증: lastLocation이 HEARTBEAT_LAST_LOC_MAX_AGE_MS 이상 오래된 경우 송신을 생략한다.
+     * 사용자가 이동 후 OS에 의해 서비스가 재기동되어 옛 좌표만 가진 채 STATIONARY로 깨어났을 때,
+     * 잘못된 위치를 "지금 시각"으로 반복 전송해 활동로그를 오염시키는 문제 방지.
      */
     private fun sendHeartbeat() {
         val hadPending: Boolean
@@ -550,6 +695,11 @@ class LocationService : Service() {
         if (hadPending) return
 
         val loc = lastLocation ?: return
+        val ageMs = System.currentTimeMillis() - loc.time
+        if (ageMs > HEARTBEAT_LAST_LOC_MAX_AGE_MS) {
+            Log.d(TAG, "Heartbeat skipped: lastLocation stale (${ageMs / 1000}s old)")
+            return
+        }
         val request = buildLocationLogRequest(loc, useNow = true) ?: return
         serviceScope.launch { sendLocationToServer(request) }
     }
@@ -771,16 +921,28 @@ class LocationService : Service() {
         runCatching {
             json.decodeFromString<CreateLocationLogRequest>(raw)
         }.onSuccess { restored ->
-            // 서비스 프로세스가 재기동될 때 Location 필드도 함께 복원해야
-            // STATIONARY 모드에서 콜백이 늦게 오는 동안에도 heartbeat가 즉시 송신할 수 있다.
+            // 서비스 프로세스가 재기동될 때 마지막 좌표를 메모리에 복원해 STATIONARY 모드의
+            // ESCAPE 거리 비교 기준점, computeSpeed 폴백의 prev 위치로만 사용한다.
+            // - time을 현재로 덮어쓰지 않는다: heartbeat의 신선도 검증(HEARTBEAT_LAST_LOC_MAX_AGE_MS)이
+            //   "옛 좌표가 지금 시각으로 반복 전송"되는 회귀를 막아주려면 원래 GPS time이 필요.
+            //   dt가 0이거나 음수가 되어 computeSpeed가 폴백을 안 쓰는 경우는 새 콜백 한 번에 즉시 회복.
+            // - enqueueLocation을 즉시 부르지 않는다: 옛 좌표가 첫 송신으로 활동로그에 찍히는 회귀를 차단.
+            //   heartbeat은 1시간 이내일 때만 송신하도록 별도 가드.
+            val cachedTime = if (restored.mltTimestamp.isNotBlank()) {
+                runCatching {
+                    SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+                        .parse(restored.mltTimestamp)?.time ?: System.currentTimeMillis()
+                }.getOrDefault(System.currentTimeMillis())
+            } else {
+                System.currentTimeMillis()
+            }
             lastLocation = Location("cached").apply {
                 latitude = restored.mltLat
                 longitude = restored.mltLong
                 accuracy = restored.mltAccuracy.toFloat()
                 altitude = restored.mltAltitude
-                time = System.currentTimeMillis()
+                time = cachedTime
             }
-            enqueueLocation(restored)
         }.onFailure {
             Log.w(TAG, "Failed to restore last location", it)
         }
@@ -788,7 +950,10 @@ class LocationService : Service() {
     }
 
     private fun scheduleRestart(reason: String) {
-        if (!isUserLoggedIn(this) || !hasRequiredPermissions(this)) return
+        // alarm은 background broadcast(LocationRestartReceiver)를 트리거하므로,
+        // 그 시점에 BG 권한이 없으면 어차피 receiver 단계에서 막힌다.
+        // 불필요한 alarm 예약을 줄이기 위해 사전에 BG 권한도 함께 검사한다.
+        if (!isUserLoggedIn(this) || !hasRequiredPermissions(this) || !hasBackgroundLocationPermission(this)) return
         val intent = Intent(this, LocationRestartReceiver::class.java).putExtra("restart_reason", reason)
         val pendingIntent = PendingIntent.getBroadcast(
             this,

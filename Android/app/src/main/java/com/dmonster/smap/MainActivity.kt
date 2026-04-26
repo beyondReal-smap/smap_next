@@ -72,6 +72,20 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                // ACTIVITY_RECOGNITION은 ActivityRecognition Transition API에서 motion 기반 모드 전환에 사용된다.
+                // 거부되어도 LocationService는 GPS 콜백 기반 fallback으로 동작하므로 치명적이지 않다.
+                val activityRecognitionLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.RequestPermission()
+                ) { isGranted ->
+                    Log.d(TAG, "[PERM] ACTIVITY_RECOGNITION granted=$isGranted")
+                    if (isGranted) {
+                        // 권한 부여 직후 LocationService가 이미 떠 있다면, startIfEligible이
+                        // onStartCommand를 재진입시켜 registerActivityTransitions()를 호출하게 한다.
+                        // (서비스가 안 떠 있으면 hasRequiredPermissions 통과 후 새로 시작됨)
+                        startLocationService()
+                    }
+                }
+
                 val locationPermissionLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestMultiplePermissions()
                 ) { permissions ->
@@ -80,6 +94,8 @@ class MainActivity : ComponentActivity() {
                     if (locationGranted) {
                         // Location granted ("앱을 사용할 때" 포함) -> 서비스 시작
                         startLocationService()
+                        // ACTIVITY_RECOGNITION 런타임 권한 요청 (Android 10+에서 dangerous)
+                        requestActivityRecognitionIfNeeded(activityRecognitionLauncher)
                         // "항상 허용"이 아니면 백그라운드 안내 (1회)
                         if (!hasBackgroundLocationPermission() && !hasShownBackgroundGuide()) {
                             showBackgroundGuide.value = true
@@ -101,6 +117,7 @@ class MainActivity : ComponentActivity() {
                     } else {
                         // Already has location — start service
                         startLocationService()
+                        requestActivityRecognitionIfNeeded(activityRecognitionLauncher)
                         if (!hasBackgroundLocationPermission() && !hasShownBackgroundGuide()) {
                             showBackgroundGuide.value = true
                         }
@@ -112,6 +129,7 @@ class MainActivity : ComponentActivity() {
                     if (hasLocationPermissions()) {
                         // "앱을 사용할 때" 또는 "항상 허용" — 서비스 시작
                         startLocationService()
+                        requestActivityRecognitionIfNeeded(activityRecognitionLauncher)
                         // "항상 허용"이 아니면 백그라운드 안내 (첫 1회만)
                         if (!hasBackgroundLocationPermission() && !hasShownBackgroundGuide()) {
                             showBackgroundGuide.value = true
@@ -167,10 +185,25 @@ class MainActivity : ComponentActivity() {
                         BackgroundLocationGuideDialog(
                             onConfirm = {
                                 showBackgroundGuide.value = false
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                                    backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-                                } else {
-                                    startLocationService()
+                                // Android 11+(API 30+)부터는 RequestPermission으로 ACCESS_BACKGROUND_LOCATION을
+                                // 직접 요청해도 시스템 다이얼로그에 "항상 허용" 옵션이 없다(공식 문서).
+                                // 사용자를 앱 설정으로 유도해 직접 "항상 허용"을 선택하게 한다.
+                                // Android 10(API 29)에서는 다이얼로그가 정상 동작하므로 기존 launcher 사용.
+                                when {
+                                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> {
+                                        // Android 11+ → 설정 화면으로 유도
+                                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                            data = Uri.fromParts("package", packageName, null)
+                                        }
+                                        startActivity(intent)
+                                    }
+                                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q -> {
+                                        // Android 10 → system dialog에 "항상 허용" 표시됨
+                                        backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                                    }
+                                    else -> {
+                                        startLocationService()
+                                    }
                                 }
                             },
                             onDismiss = {
@@ -213,6 +246,26 @@ class MainActivity : ComponentActivity() {
             ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED
         } else {
             true
+        }
+    }
+
+    private fun hasActivityRecognitionPermission(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
+    }
+
+    /**
+     * Android 10+(API 29+)에서 ACTIVITY_RECOGNITION은 dangerous permission이라 런타임 부여 필요.
+     * 거부되어도 LocationService는 GPS 콜백 fallback으로 작동하므로 critical은 아니다.
+     */
+    private fun requestActivityRecognitionIfNeeded(
+        launcher: androidx.activity.result.ActivityResultLauncher<String>
+    ) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !hasActivityRecognitionPermission()) {
+            launcher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
         }
     }
 

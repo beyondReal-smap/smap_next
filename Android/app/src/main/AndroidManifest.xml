@@ -158,6 +158,12 @@
             </intent-filter>
         </receiver>
 
+        <!-- ActivityRecognition Transition API 콜백 수신용. PendingIntent로 명시적 타겟 지정하므로 exported=false. -->
+        <receiver
+            android:name=".ActivityTransitionReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
         <meta-data
             android:name="com.naver.maps.map.NCP_KEY_ID"
             android:value="4e12mmctfk" />
