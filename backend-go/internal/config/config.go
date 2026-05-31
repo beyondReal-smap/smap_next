@@ -33,7 +33,19 @@ type Config struct {
 	DBPoolRecycle int `envconfig:"DB_POOL_RECYCLE" default:"3600"`
 
 	// Redis는 옵셔널. URL이 비어있으면 Redis 헬스체크는 비활성.
+	// 캐시 전용(db=0). REDIS_URL 기본값 예시: redis://127.0.0.1:6379/0.
 	RedisURL string `envconfig:"REDIS_URL" default:""`
+
+	// asynq 잡큐 전용 Redis 설정(Phase 3). 캐시(db=0)와 키스페이스를 분리하기 위해
+	// 잡큐는 db=1을 사용한다. 캐시용 RedisURL과 같은 호스트라도 DB 인덱스로 격리한다.
+	// cmd/worker·cmd/scheduler가 asynq.RedisClientOpt{Addr, DB}를 구성할 때 참조한다.
+	AsynqRedisAddr string `envconfig:"ASYNQ_REDIS_ADDR" default:"127.0.0.1:6379"`
+	AsynqRedisDB   int    `envconfig:"ASYNQ_REDIS_DB" default:"1"`
+
+	// 스케줄러 enqueue 가드(Phase 3). 기본 false면 cmd/scheduler가 기동되어도
+	// 주기 작업을 실제로 등록/enqueue 하지 않는다(이중 실행 방지). Python 스케줄러에서
+	// Go 스케줄러로 컷오버할 때만 true로 켠다.
+	SchedulerEnabled bool `envconfig:"SCHEDULER_ENABLED" default:"false"`
 
 	// JWT 검증은 admin 게이트/optional 인증에서 이미 사용 중이므로 시크릿은 필수다.
 	// Python config.py의 `JWT_SECRET_KEY: str = Field(default=...)`(필수)와 동일하게
