@@ -9,6 +9,8 @@ from typing import Any, Callable, Optional
 
 import redis
 
+from app.core.config import settings
+
 logger = logging.getLogger(__name__)
 
 # Redis 연결 (lazy init)
@@ -20,10 +22,11 @@ def get_redis() -> Optional[redis.Redis]:
     global _redis_client
     if _redis_client is None:
         try:
-            _redis_client = redis.Redis(
-                host="127.0.0.1",
-                port=6379,
-                db=0,
+            # 접속 정보는 settings.REDIS_URL에서 도출(기본값 redis://127.0.0.1:6379/0).
+            # 기존 하드코딩과 동일 기본값이라 동작은 보존되며, 잡큐(asynq, db=1)와
+            # 같은 호스트를 환경변수 한 곳에서 관리한다.
+            _redis_client = redis.from_url(
+                settings.REDIS_URL,
                 decode_responses=True,
                 socket_connect_timeout=2,
                 socket_timeout=2,

@@ -34,6 +34,7 @@ class Settings(BaseSettings):
         # 배포 도메인들
         "https://nextstep.smap.site",
         "https://smap.co.kr",
+        "https://hwgi-cstmer.vercel.app",  # 디지털화상창구 방문 점검 시스템 프론트
         # 추가 허용 도메인
         "http://api3.smap.site:3000",
         "https://api3.smap.site:3000",
@@ -43,6 +44,10 @@ class Settings(BaseSettings):
 
     # 프론트엔드 URL (비밀번호 재설정 링크용)
     FRONTEND_URL: str = "https://nextstep.smap.site"
+
+    # 프론트엔드가 이미지 등 정적 리소스를 가져올 때 사용할 공개 API base URL.
+    # 비어있으면 기존처럼 상대 경로(/uploads/...)를 그대로 반환한다.
+    PUBLIC_API_BASE_URL: str = ""
 
     # MySQL 데이터베이스 설정
     MYSQL_HOST: str = "127.0.0.1"
@@ -67,7 +72,22 @@ class Settings(BaseSettings):
     # JWT 설정
     JWT_SECRET_KEY: str = Field(default=..., validation_alias=AliasChoices("JWT_SECRET_KEY"))
     JWT_ALGORITHM: str = "HS256"
+    # 롤아웃 Phase D에서 60으로 전환 예정. 그 전까지는 구 클라이언트 호환을 위해 30일 유지.
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 43200  # 30일 (30 * 24 * 60)
+    # Refresh token 설정 (불투명 랜덤 문자열 + DB 해시 저장)
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 30
+    REFRESH_TOKEN_BYTES: int = 48  # secrets.token_urlsafe(48) → 64자
+
+    # 클라이언트 최소 지원 버전 — 구버전 즉시 강제 업데이트용.
+    # 배포 전 실제 신버전 번호로 업데이트.
+    MIN_APP_VERSION_ANDROID: str = Field(
+        default="3.1.0",
+        validation_alias=AliasChoices("MIN_APP_VERSION_ANDROID"),
+    )
+    MIN_APP_VERSION_IOS: str = Field(
+        default="3.1.0",
+        validation_alias=AliasChoices("MIN_APP_VERSION_IOS"),
+    )
 
     # Aligo SMS 설정
     ALIGO_USER_ID: str = Field(default="", validation_alias=AliasChoices("ALIGO_USER_ID"))
@@ -81,6 +101,13 @@ class Settings(BaseSettings):
     # iOS 푸시 설정
     IOS_BUNDLE_ID: str = "com.dmonster.smap"
     IOS_PUSH_RETRY_COUNT: int = 3
+
+    # Redis 설정 (캐시 + Phase3 잡큐 공유). 기본값은 기존 cache.py 하드코딩과 동일.
+    # 잡큐(asynq)는 동일 호스트의 db=1을 별도 사용(키스페이스 분리).
+    REDIS_URL: str = Field(
+        default="redis://127.0.0.1:6379/0",
+        validation_alias=AliasChoices("REDIS_URL"),
+    )
 
     # 기상청 API 설정
     KMA_SERVICE_KEY: str = Field(default="", validation_alias=AliasChoices("KMA_SERVICE_KEY"))
@@ -99,41 +126,6 @@ class Settings(BaseSettings):
     EMAIL_SMTP_SERVER: str = "smtp.gmail.com"
     EMAIL_SMTP_PORT: int = 465
 
-    # Firebase 인증 대체 수단 (파일이 없을 때 환경변수로 초기화)
-    FIREBASE_CREDENTIALS_JSON: str = ""
-    FIREBASE_PRIVATE_KEY: str = ""
-    FIREBASE_CLIENT_EMAIL: str = ""
-    FIREBASE_CLIENT_ID: str = ""
-
-    # 네이버웍스 설정
-    NAVERWORKS_CLIENT_ID: str = ""
-    NAVERWORKS_CLIENT_SECRET: str = ""
-    NAVERWORKS_DOMAIN: str = ""
-
-    # OpenAI 설정
-    OPENAI_API_KEY: str = ""
-    OPENAI_MODEL: str = "gpt-5.2-chat-latest"
-
-    # AI 메시지 캐시 설정
-    AI_MESSAGE_CACHE_TTL_SECONDS: int = 30 * 24 * 60 * 60  # 30일
-    AI_MESSAGE_FAILURE_CACHE_TTL_SECONDS: int = 24 * 60 * 60  # 1일
-    AI_MESSAGE_CACHE_PATH: str = ""
-
-    # Redis 설정
-    REDIS_URL: str = ""
-
-    # Fixie 프록시 (고정 IP)
-    FIXIE_URL: str = ""
-
-    # 환경 구분
-    NODE_ENV: str = "production"
-
-    # 스케줄러 비활성화
-    SMAP_SCHEDULER_DISABLED: str = Field(
-        default="",
-        validation_alias=AliasChoices("SMAP_SCHEDULER_DISABLED", "SMAP_DISABLE_SCHEDULER"),
-    )
-
     # 하위 호환성을 위한 별칭
     @property
     def SECRET_KEY(self) -> str:
@@ -142,11 +134,6 @@ class Settings(BaseSettings):
     @property
     def ALGORITHM(self) -> str:
         return self.JWT_ALGORITHM
-
-    @property
-    def scheduler_disabled(self) -> bool:
-        val = self.SMAP_SCHEDULER_DISABLED.strip().lower()
-        return val in {"1", "true", "yes"}
 
     @model_validator(mode="after")
     def _post_init(self):
@@ -159,11 +146,6 @@ class Settings(BaseSettings):
             )
         # Firebase 인증서 파일 경로를 절대 경로로 해석
         self.FIREBASE_CREDENTIALS_PATH = _resolve_path(self.FIREBASE_CREDENTIALS_PATH)
-        # AI 메시지 캐시 경로 기본값
-        if not self.AI_MESSAGE_CACHE_PATH:
-            self.AI_MESSAGE_CACHE_PATH = str(
-                _BACKEND_DIR / "storage" / "ai_message_cache.sqlite3"
-            )
         return self
 
     model_config = SettingsConfigDict(
