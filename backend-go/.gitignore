@@ -1,0 +1,8 @@
+bin/
+*.log
+.env
+.env.*
+!.env.example
+
+# Serena 도구 메타
+.serena/

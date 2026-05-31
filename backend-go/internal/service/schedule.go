@@ -1,0 +1,217 @@
+package service
+
+import (
+	"strconv"
+	"time"
+
+	"github.com/bluemusk/smap_next_go/internal/dto"
+	"github.com/bluemusk/smap_next_go/internal/model"
+)
+
+// hasZeroDate는 MySQL '0000-00-00 00:00:00'(드라이버가 time.Time{}=IsZero로 변환)이 하나라도
+// 있는지 검사한다. Python ScheduleResponse는 이를 datetime으로 파싱 못 해 ResponseValidationError
+// →500(plain text)이 되므로, 하나라도 있으면 응답 전체를 500으로 처리한다(NULL=nil은 정상).
+func hasZeroDate(times ...*time.Time) bool {
+	for _, t := range times {
+		if t != nil && t.IsZero() {
+			return true
+		}
+	}
+	return false
+}
+
+// scheduleRepo는 ScheduleService가 의존하는 데이터 접근 인터페이스.
+type scheduleRepo interface {
+	List(skip, limit int) ([]model.Schedule, error)
+	GetByID(id int) (*model.Schedule, error)
+	FindByMember(mtIdx int) ([]model.Schedule, error)
+	FindGroupSchedules(groupID int, days *int) ([]model.Schedule, error)
+}
+
+// ScheduleService는 Python `app/api/v1/endpoints/schedules.py`의 결정적 read 핸들러를 이식한다.
+// (now/* 시간창·group List[dict]는 별도 작업으로 보류.)
+type ScheduleService struct {
+	repo scheduleRepo
+}
+
+func NewSchedule(repo scheduleRepo) *ScheduleService {
+	return &ScheduleService{repo: repo}
+}
+
+// toScheduleResponse는 ScheduleResponse로 변환한다. zero date가 있으면 ok=false(→ Python 500).
+func toScheduleResponse(s *model.Schedule) (dto.ScheduleResponse, bool) {
+	if hasZeroDate(s.SstSdate, s.SstEdate, s.SstAdate, s.SstScheduleAlarm, s.SstWdate, s.SstUdate, s.SstDdate) {
+		return dto.ScheduleResponse{}, false
+	}
+	return dto.ScheduleResponse{
+		SstPidx:             s.SstPidx,
+		MtIdx:               s.MtIdx,
+		SstTitle:            s.SstTitle,
+		SstSdate:            pyISOPtr(s.SstSdate),
+		SstEdate:            pyISOPtr(s.SstEdate),
+		SstSedate:           s.SstSedate,
+		SstAllDay:           s.SstAllDay,
+		SstRepeatJSON:       s.SstRepeatJSON,
+		SstRepeatJSONV:      s.SstRepeatJSONV,
+		SgtIdx:              s.SgtIdx,
+		SgdtIdx:             s.SgdtIdx,
+		SgdtIdxT:            s.SgdtIdxT,
+		SstAlram:            s.SstAlram,
+		SstAlramT:           s.SstAlramT,
+		SstAdate:            pyISOPtr(s.SstAdate),
+		SltIdx:              s.SltIdx,
+		SltIdxT:             s.SltIdxT,
+		SstLocationTitle:    s.SstLocationTitle,
+		SstLocationAdd:      s.SstLocationAdd,
+		SstLocationLat:      pyDecimalStr(s.SstLocationLat),
+		SstLocationLong:     pyDecimalStr(s.SstLocationLong),
+		SstSupplies:         s.SstSupplies,
+		SstMemo:             s.SstMemo,
+		SstShow:             s.SstShow,
+		SstLocationAlarm:    s.SstLocationAlarm,
+		SstScheduleAlarmChk: s.SstScheduleAlarmChk,
+		SstPickType:         s.SstPickType,
+		SstPickResult:       s.SstPickResult,
+		SstScheduleAlarm:    pyISOPtr(s.SstScheduleAlarm),
+		SstUpdateChk:        s.SstUpdateChk,
+		SstInChk:            s.SstInChk,
+		SstScheduleChk:      s.SstScheduleChk,
+		SstEntryCnt:         s.SstEntryCnt,
+		SstExitCnt:          s.SstExitCnt,
+		SstIdx:              s.SstIdx,
+		SstWdate:            pyISOPtr(s.SstWdate),
+		SstUdate:            pyISOPtr(s.SstUdate),
+		SstDdate:            pyISOPtr(s.SstDdate),
+		// MtScheduleIdx: 모델 미매핑 → nil(null)
+	}, true
+}
+
+// toScheduleResponses는 변환 목록을 만든다. zero date 행이 있으면 ok=false(→ 500).
+func toScheduleResponses(items []model.Schedule) ([]dto.ScheduleResponse, bool) {
+	out := make([]dto.ScheduleResponse, 0, len(items))
+	for i := range items {
+		r, ok := toScheduleResponse(&items[i])
+		if !ok {
+			return nil, false
+		}
+		out = append(out, r)
+	}
+	return out, true
+}
+
+// ListSchedules는 전체 목록. ok=false면 500(레포 에러 또는 zero date → ResponseValidationError).
+func (s *ScheduleService) ListSchedules(skip, limit int) ([]dto.ScheduleResponse, bool) {
+	items, err := s.repo.List(skip, limit)
+	if err != nil {
+		return nil, false
+	}
+	return toScheduleResponses(items)
+}
+
+// GetSchedule은 단건. ok=false→500, found=false→404, 그 외 200.
+func (s *ScheduleService) GetSchedule(id int) (resp *dto.ScheduleResponse, found bool, ok bool) {
+	sc, err := s.repo.GetByID(id)
+	if err != nil {
+		return nil, false, false
+	}
+	if sc == nil {
+		return nil, false, true
+	}
+	r, valid := toScheduleResponse(sc)
+	if !valid {
+		return nil, true, false
+	}
+	return &r, true, true
+}
+
+// MemberSchedules는 회원의 일정 목록(sst_show='Y' ORDER BY sst_sdate). ok=false면 500.
+func (s *ScheduleService) MemberSchedules(mtIdx int) ([]dto.ScheduleResponse, bool) {
+	items, err := s.repo.FindByMember(mtIdx)
+	if err != nil {
+		return nil, false
+	}
+	return toScheduleResponses(items)
+}
+
+// groupDateStr은 /schedules/group의 날짜 규칙: 유효 datetime→isoformat(T), zero date(MySQL
+// '0000-00-00'→time.Time{})→Python이 str()한 "0000-00-00 00:00:00", nil→null.
+func groupDateStr(t *time.Time) *string {
+	if t == nil {
+		return nil
+	}
+	if t.IsZero() {
+		s := "0000-00-00 00:00:00"
+		return &s
+	}
+	s := pyISO(*t)
+	return &s
+}
+
+// decimalStrToFloatPtr은 Python `float(Decimal) if x else None`을 재현한다(DECIMAL 문자열→float,
+// 0은 null). ScheduleResponse는 Decimal→문자열이지만 group dict는 float(숫자)다.
+func decimalStrToFloatPtr(s *string) *float64 {
+	if s == nil {
+		return nil
+	}
+	f, err := strconv.ParseFloat(*s, 64)
+	if err != nil || f == 0 {
+		return nil
+	}
+	return &f
+}
+
+func toScheduleGroupItem(s *model.Schedule) dto.ScheduleGroupItem {
+	return dto.ScheduleGroupItem{
+		ID:                  s.SstIdx,
+		SstPidx:             s.SstPidx,
+		MtScheduleIdx:       s.MtIdx,
+		Title:               s.SstTitle,
+		Date:                groupDateStr(s.SstSdate),
+		SstEdate:            groupDateStr(s.SstEdate),
+		SstSedate:           s.SstSedate,
+		SstAllDay:           s.SstAllDay,
+		SstRepeatJSON:       s.SstRepeatJSON,
+		SstRepeatJSONV:      s.SstRepeatJSONV,
+		SgtIdx:              s.SgtIdx,
+		SgdtIdx:             s.SgdtIdx,
+		SgdtIdxT:            s.SgdtIdxT,
+		SstAlram:            s.SstAlram,
+		SstAlramT:           s.SstAlramT,
+		SstAdate:            groupDateStr(s.SstAdate),
+		SltIdx:              s.SltIdx,
+		SltIdxT:             s.SltIdxT,
+		Location:            s.SstLocationTitle,
+		SstLocationAdd:      s.SstLocationAdd,
+		SstLocationLat:      decimalStrToFloatPtr(s.SstLocationLat),
+		SstLocationLong:     decimalStrToFloatPtr(s.SstLocationLong),
+		SstSupplies:         s.SstSupplies,
+		SstMemo:             s.SstMemo,
+		SstShow:             s.SstShow,
+		SstLocationAlarm:    s.SstLocationAlarm,
+		SstScheduleAlarmChk: s.SstScheduleAlarmChk,
+		SstPickType:         s.SstPickType,
+		SstPickResult:       s.SstPickResult,
+		SstScheduleAlarm:    groupDateStr(s.SstScheduleAlarm),
+		SstUpdateChk:        s.SstUpdateChk,
+		SstWdate:            groupDateStr(s.SstWdate),
+		SstUdate:            groupDateStr(s.SstUdate),
+		SstDdate:            groupDateStr(s.SstDdate),
+		SstInChk:            s.SstInChk,
+		SstScheduleChk:      s.SstScheduleChk,
+		SstEntryCnt:         s.SstEntryCnt,
+		SstExitCnt:          s.SstExitCnt,
+	}
+}
+
+// GroupSchedules는 그룹 일정 목록(수동 dict). repo 에러는 전파(핸들러가 500).
+func (s *ScheduleService) GroupSchedules(groupID int, days *int) ([]dto.ScheduleGroupItem, error) {
+	items, err := s.repo.FindGroupSchedules(groupID, days)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]dto.ScheduleGroupItem, 0, len(items))
+	for i := range items {
+		out = append(out, toScheduleGroupItem(&items[i]))
+	}
+	return out, nil
+}
