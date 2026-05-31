@@ -115,3 +115,57 @@ type MemberGroupItem struct {
 	SgdtXdate     string  `json:"sgdt_xdate"`
 	SgdtAdate     string  `json:"sgdt_adate"`
 }
+
+// ProfileMeData는 GET /members/me 성공 응답의 data dict(12키, 순서 고정)와 동일하다.
+// Python members.py get_user_profile: response_model 없이 raw dict 반환이라 `or ""` 폴백이
+// 전혀 없다 → mt_id/mt_name/mt_nickname/mt_hp/mt_email/mt_file1/mt_gender/mt_type/mt_level은
+// DB 값 그대로(null 가능). mt_birth는 strftime('%Y-%m-%d')(*string), mt_wdate는 isoformat()(*string).
+type ProfileMeData struct {
+	MtIdx      int     `json:"mt_idx"`
+	MtID       *string `json:"mt_id"`
+	MtName     *string `json:"mt_name"`
+	MtNickname *string `json:"mt_nickname"`
+	MtHp       *string `json:"mt_hp"`
+	MtEmail    *string `json:"mt_email"`
+	MtBirth    *string `json:"mt_birth"`
+	MtGender   *int    `json:"mt_gender"`
+	MtType     *int    `json:"mt_type"`
+	MtLevel    *int    `json:"mt_level"`
+	MtFile1    *string `json:"mt_file1"`
+	MtWdate    *string `json:"mt_wdate"`
+}
+
+// ProfileMeResponse는 GET /members/me 성공 응답(키 순서 result, data, message, success)이다.
+// gin.H는 map이라 키 순서가 비결정이므로 ordered struct로 직렬화한다.
+type ProfileMeResponse struct {
+	Result  string        `json:"result"`
+	Data    ProfileMeData `json:"data"`
+	Message string        `json:"message"`
+	Success bool          `json:"success"`
+}
+
+// ProfileMeFail은 GET /members/me 실패(미인증/미발견/서버오류) 응답이다.
+// Python: {"result":"N","message":"...","success":false} — 3키, 순서 result/message/success.
+type ProfileMeFail struct {
+	Result  string `json:"result"`
+	Message string `json:"message"`
+	Success bool   `json:"success"`
+}
+
+// ConsentInfo는 Python ConsentInfo(schemas/member.py)와 동일하다.
+// mt_agree1~5(YNEnum: "Y"/"N"). 선언 순서 = 직렬화 키 순서.
+type ConsentInfo struct {
+	MtAgree1 string `json:"mt_agree1"`
+	MtAgree2 string `json:"mt_agree2"`
+	MtAgree3 string `json:"mt_agree3"`
+	MtAgree4 string `json:"mt_agree4"`
+	MtAgree5 string `json:"mt_agree5"`
+}
+
+// ConsentResponse는 Python ConsentResponse(schemas/member.py)와 동일하다.
+// 키 순서: success, message, data.
+type ConsentResponse struct {
+	Success bool         `json:"success"`
+	Message string       `json:"message"`
+	Data    *ConsentInfo `json:"data"`
+}

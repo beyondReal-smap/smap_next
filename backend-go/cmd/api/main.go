@@ -90,23 +90,23 @@ func main() {
 	adminH := handler.NewAdmin(adminSvc)
 	adminAuth := middleware.RequireAdmin(cfg, memberRepo)
 
-	// Phase 4 — groups read(무인증, GORM repository 패턴).
+	// Phase 4 — groups read. 무인증 read + current-user(2종)/stats. current-user는 JWT 필수.
 	groupRepo := repository.NewGroup(gdb)
 	groupSvc := service.NewGroup(groupRepo)
-	groupH := handler.NewGroup(groupSvc)
+	groupH := handler.NewGroup(groupSvc, cfg)
 
 	// Phase 4 — group-details read 4종(무인증).
 	groupDetailRepo := repository.NewGroupDetail(gdb)
 	groupDetailSvc := service.NewGroupDetail(groupDetailRepo)
 	groupDetailH := handler.NewGroupDetail(groupDetailSvc)
 
-	// Phase 4 — members 무인증 read 6종(check 3 + 목록 + 단건 + 그룹멤버). memberRepo 공유.
+	// Phase 4 — members read. 무인증 6종 + me/consent(JWT). memberRepo 공유.
 	memberSvc := service.NewMember(memberRepo)
-	memberH := handler.NewMember(memberSvc)
+	memberH := handler.NewMember(memberSvc, cfg)
 
-	// Phase 4 — users read 7종(auth 도메인, 무인증). memberRepo 공유.
+	// Phase 4 — users read 7종(auth 도메인, 무인증) + auth/me(JWT). memberRepo 공유.
 	userSvc := service.NewUser(memberRepo)
-	userH := handler.NewUser(userSvc)
+	userH := handler.NewUser(userSvc, cfg)
 
 	// Phase 4 — locations read 7종(무인증). slt_lat/long Decimal→문자열.
 	locationRepo := repository.NewLocation(gdb)

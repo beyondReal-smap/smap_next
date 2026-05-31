@@ -110,3 +110,13 @@ type UserFullDump struct {
 type UsersWrap struct {
 	Users []UserFullDump `json:"users"`
 }
+
+// UserIdentity는 Python UserIdentity(schemas/auth.py)와 키/순서·타입이 동일하다.
+// auth/me(read_users_me)가 create_user_identity_from_member로 반환한다.
+// 키 순서: mt_idx, mt_id, mt_name, mt_level. 전부 스칼라(int/str/str/int).
+type UserIdentity struct {
+	MtIdx   int    `json:"mt_idx"`
+	MtID    string `json:"mt_id"`
+	MtName  string `json:"mt_name"`
+	MtLevel int    `json:"mt_level"`
+}

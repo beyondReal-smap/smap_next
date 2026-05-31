@@ -80,11 +80,15 @@ func New(cfg *config.Config, logger *slog.Logger, deps Deps) http.Handler {
 		v1.GET("/weather/current", deps.Weather.Current)
 		v1.GET("/weather/member/:member_id", deps.Weather.Member)
 
-		// groups — read(전부 무인증). 정적 세그먼트(/hidden,/member,/code)가 파라미터(/:group_id)보다
-		// 우선 매칭된다. write·/current-user(JWT)·/join·/{id}/stats·/{id}/public 등은 후반 Phase.
+		// groups — read. 정적 세그먼트(/hidden,/current-user*,/member,/code)가 파라미터(/:group_id)보다
+		// 우선 매칭된다. /current-user·/current-user/summary는 JWT 필수(get_required_user_id).
+		// /:group_id/stats는 무인증. write·/join 등은 후반 Phase.
 		v1.GET("/groups/hidden", deps.Group.Hidden)
+		v1.GET("/groups/current-user/summary", deps.Group.CurrentUserSummary)
+		v1.GET("/groups/current-user", deps.Group.CurrentUser)
 		v1.GET("/groups/:group_id", deps.Group.Get)
 		v1.GET("/groups/:group_id/public", deps.Group.Public)
+		v1.GET("/groups/:group_id/stats", deps.Group.Stats)
 		v1.GET("/groups/", deps.Group.List)
 		v1.GET("/groups/member/:member_id", deps.Group.Member)
 		v1.GET("/groups/code/:code", deps.Group.ByCode)
@@ -96,12 +100,14 @@ func New(cfg *config.Config, logger *slog.Logger, deps Deps) http.Handler {
 		v1.GET("/group-details/member/:member_id", deps.GroupDetail.Member)
 		v1.GET("/group-details/group/:group_id", deps.GroupDetail.Group)
 
-		// members — 무인증 read만 이전. 정적(/check/*,/group)이 /:member_id보다 우선.
+		// members — read. 정적(/check/*,/me,/consent,/group)이 /:member_id보다 우선.
+		// /members/me(JWT)는 미인증도 200+result:N로 흡수. /members/consent/:member_id는 JWT.
 		// /members/terms는 Python에서 /{member_id}에 가려져 422(dead) → Go도 미등록으로 동일 재현.
-		// /members/me(JWT)·write·consent는 후반 Phase(게이트웨이가 Python으로 라우팅).
 		v1.GET("/members/check/phone/:phone", deps.Member.CheckPhone)
 		v1.GET("/members/check/email/:email", deps.Member.CheckEmail)
 		v1.GET("/members/check/nickname/:nickname", deps.Member.CheckNickname)
+		v1.GET("/members/me", deps.Member.Me)
+		v1.GET("/members/consent/:member_id", deps.Member.Consent)
 		v1.GET("/members/", deps.Member.List)
 		v1.GET("/members/:member_id", deps.Member.Get)
 		v1.GET("/members/group/:group_id", deps.Member.Group)
@@ -117,6 +123,10 @@ func New(cfg *config.Config, logger *slog.Logger, deps Deps) http.Handler {
 		v1.GET("/users/recent/signin/3h", deps.User.RecentSignin3h)
 		v1.GET("/users/recent/signin/24h", deps.User.RecentSignin24h)
 		v1.GET("/users/not-joined/11days", deps.User.NotJoined)
+
+		// auth/me — JWT(SECRET_KEY/ALGORITHM, claim mt_id). UserHandler에 Me 추가.
+		// 토큰 부재 401 "Not authenticated", 검증실패/회원없음 401 "Could not validate credentials".
+		v1.GET("/auth/me", deps.User.Me)
 
 		// locations — read 7종(전부 무인증). slt_lat/long은 Decimal→문자열. 정적(/member,
 		// /group-detail,/other-members,/myplays)이 /:location_id보다 우선. write는 후반 Phase.

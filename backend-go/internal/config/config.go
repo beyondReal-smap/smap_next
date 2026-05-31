@@ -41,6 +41,13 @@ type Config struct {
 	JWTSecretKey string `envconfig:"JWT_SECRET_KEY" required:"true"`
 	JWTAlgorithm string `envconfig:"JWT_ALGORITHM" default:"HS256"`
 
+	// auth/me(read_users_me)는 deps의 JWT_SECRET_KEY/JWT_ALGORITHM이 아니라 별도의
+	// SECRET_KEY/ALGORITHM 설정으로 토큰을 디코드한다(Python config.py: 두 시크릿의
+	// 기본값이 서로 다름). byte-동등을 위해 분리 필드로 보존한다.
+	// Python `SECRET_KEY: str = Field(default="smap_jwt_secret_key_2024_...")`와 동일 기본값.
+	SecretKey string `envconfig:"SECRET_KEY" default:"smap_jwt_secret_key_2024_very_secure_random_string_for_production"`
+	Algorithm string `envconfig:"ALGORITHM" default:"HS256"`
+
 	// 클라이언트 최소 지원 버전 — Python settings.MIN_APP_VERSION_*과 동일 env/기본값.
 	MinAppVersionAndroid string `envconfig:"MIN_APP_VERSION_ANDROID" default:"3.1.0"`
 	MinAppVersionIOS     string `envconfig:"MIN_APP_VERSION_IOS" default:"3.1.0"`

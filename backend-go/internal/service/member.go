@@ -11,6 +11,7 @@ import (
 type memberReadRepo interface {
 	List(skip, limit int) ([]model.Member, error)
 	GetByID(mtIdx int) (*model.Member, error)
+	GetByIdxActive(idx int) (*model.Member, error)
 	FindByGroup(groupID int) ([]model.MemberGroupRow, error)
 	ExistsByPhone(phone string) (bool, error)
 	ExistsByEmail(email string) (bool, error)
@@ -291,4 +292,68 @@ func (s *MemberService) CheckNickname(nickname string) (dto.MemberCheckResponse,
 		return dto.MemberCheckResponse{Available: false, Message: "이미 사용 중인 닉네임입니다."}, nil
 	}
 	return dto.MemberCheckResponse{Available: true, Message: "사용 가능한 닉네임입니다."}, nil
+}
+
+// pyDateStrPtr는 nullable DATE(*time.Time)을 Python strftime('%Y-%m-%d') 문자열로 변환.
+// nil이면 nil(→ JSON null). isoformat()이 아니라 date 포맷 전용(members/me의 mt_birth용).
+// (dateISOPtr와 동일 포맷이나 mt_birth 의미를 명확히 하기 위해 별칭으로 둔다.)
+func pyDateStrPtr(t *time.Time) *string {
+	return dateISOPtr(t)
+}
+
+// MyProfile은 GET /members/me 로직을 이식한다(Python get_user_profile).
+// 활성 필터(get_user_by_idx)로 조회 후 data dict(12키)로 매핑한다.
+// found=false면 핸들러가 "사용자를 찾을 수 없습니다." 흡수 응답을 낸다.
+// mt_birth: strftime('%Y-%m-%d'), mt_wdate: isoformat() — 둘 다 *string(null 가능), 폴백 없음.
+func (s *MemberService) MyProfile(idx int) (*dto.ProfileMeData, bool, error) {
+	m, err := s.repo.GetByIdxActive(idx)
+	if err != nil {
+		return nil, false, err
+	}
+	if m == nil {
+		return nil, false, nil
+	}
+	data := dto.ProfileMeData{
+		MtIdx:      m.MtIdx,
+		MtID:       m.MtID,
+		MtName:     m.MtName,
+		MtNickname: m.MtNickname,
+		MtHp:       m.MtHp,
+		MtEmail:    m.MtEmail,
+		MtBirth:    pyDateStrPtr(m.MtBirth),
+		MtGender:   m.MtGender,
+		MtType:     m.MtType,
+		MtLevel:    m.MtLevel,
+		MtFile1:    m.MtFile1,
+		MtWdate:    pyISOPtr(m.MtWdate),
+	}
+	return &data, true, nil
+}
+
+// ConsentInfo는 GET /members/consent/{member_id} 로직을 이식한다(Python get_consent_info).
+// crud_member.get_consent_info는 member_t를 mt_idx로 조회(필터 없음)해 mt_agree1~5 반환.
+// ConsentInfo(YNEnum)는 값이 nil이거나 "Y"/"N"이 아니면 ValidationError → 500.
+// 반환: found=false면 404, valid=false면 500(YNEnum 검증 실패 모사), 정상이면 info.
+func (s *MemberService) ConsentInfo(idx int) (info *dto.ConsentInfo, found bool, valid bool, err error) {
+	m, err := s.repo.GetByID(idx)
+	if err != nil {
+		return nil, false, false, err
+	}
+	if m == nil {
+		return nil, false, false, nil
+	}
+	agrees := []*string{m.MtAgree1, m.MtAgree2, m.MtAgree3, m.MtAgree4, m.MtAgree5}
+	for _, a := range agrees {
+		if a == nil || (*a != "Y" && *a != "N") {
+			// Pydantic YNEnum 검증 실패 → ConsentResponse 생성 단계에서 예외 → 500.
+			return nil, true, false, nil
+		}
+	}
+	return &dto.ConsentInfo{
+		MtAgree1: *m.MtAgree1,
+		MtAgree2: *m.MtAgree2,
+		MtAgree3: *m.MtAgree3,
+		MtAgree4: *m.MtAgree4,
+		MtAgree5: *m.MtAgree5,
+	}, true, true, nil
 }

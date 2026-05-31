@@ -45,6 +45,36 @@ func (r *MemberRepository) GetActiveByID(mtIdx int) (*model.Member, error) {
 	return &m, nil
 }
 
+// GetByIdxActive는 Python crud_auth.get_user_by_idx와 동등하다(members/me 전용).
+// mt_idx + 활성 필터(mt_level>=2 AND mt_status=1 AND mt_show='Y'). 없으면 (nil, nil).
+func (r *MemberRepository) GetByIdxActive(idx int) (*model.Member, error) {
+	var m model.Member
+	err := r.db.
+		Where("mt_idx = ? AND mt_level >= ? AND mt_status = ? AND mt_show = ?", idx, 2, 1, "Y").
+		First(&m).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
+// GetByMtID는 Python crud_auth.get_user_by_phone과 동등하다(auth/me 전용).
+// mt_id(전화/로그인 ID)로 단건 조회, 필터 없음(탈퇴/비노출 포함). 없으면 (nil, nil).
+func (r *MemberRepository) GetByMtID(mtID string) (*model.Member, error) {
+	var m model.Member
+	err := r.db.Where("mt_id = ?", mtID).First(&m).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
 // List는 필터 없는 offset/limit 목록(Python get_members). 정렬 없음(DB 기본 PK 순서).
 func (r *MemberRepository) List(skip, limit int) ([]model.Member, error) {
 	out := make([]model.Member, 0)

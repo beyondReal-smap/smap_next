@@ -21,6 +21,7 @@ func (f *fakeUserRepo) GetByEmail(email string) (*model.Member, error) { return 
 func (f *fakeUserRepo) GetByToken(token string) (*model.Member, error) { return f.one, f.err }
 func (f *fakeUserRepo) RecentSignin(h int) ([]model.Member, error)     { return f.many, f.err }
 func (f *fakeUserRepo) NotJoinedCount() (int64, error)                 { return f.cnt, f.err }
+func (f *fakeUserRepo) GetByMtID(mtID string) (*model.Member, error)   { return f.one, f.err }
 
 // TestUserResponseJSON은 /users/{id}의 MemberResponse-from-ORM 직렬화가 실측(/users/2584)과
 // byte-동등인지 검증한다(딕셔너리 폴백 없이 raw 값).

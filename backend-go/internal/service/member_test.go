@@ -10,17 +10,19 @@ import (
 )
 
 type fakeMemberReadRepo struct {
-	one   *model.Member
-	many  []model.Member
-	rows  []model.MemberGroupRow
-	phone bool
-	email bool
-	nick  bool
-	err   error
+	one    *model.Member
+	active *model.Member // GetByIdxActive 전용(활성 필터 결과)
+	many   []model.Member
+	rows   []model.MemberGroupRow
+	phone  bool
+	email  bool
+	nick   bool
+	err    error
 }
 
 func (f *fakeMemberReadRepo) List(skip, limit int) ([]model.Member, error)      { return f.many, f.err }
 func (f *fakeMemberReadRepo) GetByID(mtIdx int) (*model.Member, error)          { return f.one, f.err }
+func (f *fakeMemberReadRepo) GetByIdxActive(idx int) (*model.Member, error)     { return f.active, f.err }
 func (f *fakeMemberReadRepo) FindByGroup(g int) ([]model.MemberGroupRow, error) { return f.rows, f.err }
 func (f *fakeMemberReadRepo) ExistsByPhone(p string) (bool, error)              { return f.phone, f.err }
 func (f *fakeMemberReadRepo) ExistsByEmail(e string) (bool, error)              { return f.email, f.err }
@@ -151,6 +153,66 @@ func TestMemberNotFoundAndErr(t *testing.T) {
 		svc := NewMember(&fakeMemberReadRepo{err: errors.New("db down")})
 		if _, err := svc.ListMembers(0, 10); err == nil {
 			t.Error("expected error")
+		}
+	})
+}
+
+// TestMyProfileJSON은 GET /members/me data dict(12키, 순서)의 바이트 동등을 검증한다.
+func TestMyProfileJSON(t *testing.T) {
+	svc := NewMember(&fakeMemberReadRepo{active: member2584()})
+	data, found, err := svc.MyProfile(2584)
+	if err != nil || !found {
+		t.Fatalf("found=%v err=%v", found, err)
+	}
+	b, _ := json.Marshal(data)
+	// mt_birth=strftime('%Y-%m-%d'), mt_wdate=isoformat(); 폴백 없음(raw DB값).
+	want := `{"mt_idx":2584,"mt_id":"apple_000423.0341057b689b497ea6079afde9603b93.1431","mt_name":"Hyun ok Kwon","mt_nickname":"송지아","mt_hp":"","mt_email":"nd2zkd84p7@privaterelay.appleid.com","mt_birth":"2015-09-03","mt_gender":2,"mt_type":3,"mt_level":2,"mt_file1":"/images/avatar2.png","mt_wdate":"2026-05-17T14:32:21"}`
+	if string(b) != want {
+		t.Errorf("불일치\n got: %s\nwant: %s", b, want)
+	}
+}
+
+// TestMyProfileNotFound는 활성 필터 미통과(active=nil) 시 found=false를 검증한다.
+func TestMyProfileNotFound(t *testing.T) {
+	svc := NewMember(&fakeMemberReadRepo{active: nil})
+	_, found, err := svc.MyProfile(2584)
+	if err != nil || found {
+		t.Errorf("found=%v err=%v (둘 다 false/nil이어야 함)", found, err)
+	}
+}
+
+// TestConsentInfo는 동의 5필드 정상/검증실패/미발견을 검증한다.
+func TestConsentInfo(t *testing.T) {
+	t.Run("정상 Y/N", func(t *testing.T) {
+		m := &model.Member{
+			MtIdx:    2584,
+			MtAgree1: pStr("Y"), MtAgree2: pStr("N"), MtAgree3: pStr("Y"),
+			MtAgree4: pStr("Y"), MtAgree5: pStr("N"),
+		}
+		svc := NewMember(&fakeMemberReadRepo{one: m})
+		info, found, valid, err := svc.ConsentInfo(2584)
+		if err != nil || !found || !valid {
+			t.Fatalf("found=%v valid=%v err=%v", found, valid, err)
+		}
+		b, _ := json.Marshal(info)
+		want := `{"mt_agree1":"Y","mt_agree2":"N","mt_agree3":"Y","mt_agree4":"Y","mt_agree5":"N"}`
+		if string(b) != want {
+			t.Errorf("불일치\n got: %s\nwant: %s", b, want)
+		}
+	})
+	t.Run("nil 값 → 검증 실패(500 신호)", func(t *testing.T) {
+		m := &model.Member{MtIdx: 1, MtAgree1: pStr("Y")} // 2~5 nil
+		svc := NewMember(&fakeMemberReadRepo{one: m})
+		_, found, valid, _ := svc.ConsentInfo(1)
+		if !found || valid {
+			t.Errorf("found=%v valid=%v (found=true, valid=false여야 함)", found, valid)
+		}
+	})
+	t.Run("미발견 → found=false", func(t *testing.T) {
+		svc := NewMember(&fakeMemberReadRepo{one: nil})
+		_, found, _, _ := svc.ConsentInfo(99)
+		if found {
+			t.Errorf("found=true (false여야 함)")
 		}
 	})
 }

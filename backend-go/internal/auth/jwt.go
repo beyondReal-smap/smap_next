@@ -53,6 +53,45 @@ func ParseOptionalUserID(authHeader, secret, algorithm string) (int, bool) {
 	return 0, false
 }
 
+// ParseUserMtID는 Python `read_users_me`(auth/me)의 토큰 디코드와 동등하다.
+// deps의 ParseOptionalUserID와 달리 (1) secret/algorithm이 SECRET_KEY/ALGORITHM이고
+// (2) claim이 mt_id(전화/로그인 ID, 문자열)다. 검증 성공 + mt_id 존재 시 (mt_id, true),
+// 그 외(헤더 부재·형식 오류·서명/만료 실패·mt_id 누락)는 ("", false)로 신호한다.
+// Python: payload.get("mt_id"); None이면 credentials_exception(401).
+func ParseUserMtID(authHeader, secret, algorithm string) (string, bool) {
+	if secret == "" {
+		return "", false
+	}
+	if !strings.HasPrefix(authHeader, "Bearer ") {
+		return "", false
+	}
+	tokenStr := authHeader[len("Bearer "):]
+	if tokenStr == "" {
+		return "", false
+	}
+
+	claims := jwt.MapClaims{}
+	_, err := jwt.ParseWithClaims(tokenStr, claims, func(*jwt.Token) (interface{}, error) {
+		return []byte(secret), nil
+	}, jwt.WithValidMethods([]string{algorithm}))
+	if err != nil {
+		return "", false
+	}
+
+	// Python: mt_id: str = payload.get("mt_id"); if mt_id is None → 401.
+	// 문자열이 아니거나 빈 문자열이면 후속 get_user_by_phone에서 매칭 실패하므로
+	// Python None 처리와 동일하게 거부한다(빈 mt_id로 전체 회원 조회 방지).
+	raw, ok := claims["mt_id"]
+	if !ok || raw == nil {
+		return "", false
+	}
+	s, ok := raw.(string)
+	if !ok || s == "" {
+		return "", false
+	}
+	return s, true
+}
+
 // mtIdxClaim은 Python truthiness(`payload.get("mt_idx") or ...`)를 따른다.
 // 숫자 0은 falsy(→폴백), 비어있지 않은 문자열은 truthy(정수면 "0"도 사용).
 func mtIdxClaim(v interface{}) (int, bool) {

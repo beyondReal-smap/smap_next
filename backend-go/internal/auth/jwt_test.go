@@ -112,3 +112,60 @@ func TestParseOptionalUserID_EmptySecret(t *testing.T) {
 		t.Errorf("빈 시크릿에서 토큰이 수용됨: id=%d ok=%v (거부되어야 함)", id, ok)
 	}
 }
+
+// TestParseUserMtID는 auth/me(read_users_me)의 mt_id 클레임 디코드 경로를 검증한다.
+// SECRET_KEY/ALGORITHM 기반, claim=mt_id(문자열). mt_idx/sub와는 무관.
+func TestParseUserMtID(t *testing.T) {
+	future := time.Now().Add(time.Hour).Unix()
+	past := time.Now().Add(-time.Hour).Unix()
+
+	tests := []struct {
+		name     string
+		header   string
+		secret   string
+		wantMtID string
+		wantOK   bool
+	}{
+		{
+			name:     "유효한 mt_id 문자열",
+			header:   "Bearer " + makeToken(t, testSecret, jwt.SigningMethodHS256, jwt.MapClaims{"mt_id": "01012345678", "exp": future}),
+			secret:   testSecret, wantMtID: "01012345678", wantOK: true,
+		},
+		{
+			name:     "mt_id 누락 → 거부",
+			header:   "Bearer " + makeToken(t, testSecret, jwt.SigningMethodHS256, jwt.MapClaims{"sub": "1186", "exp": future}),
+			secret:   testSecret, wantMtID: "", wantOK: false,
+		},
+		{
+			name:     "mt_id 빈 문자열 → 거부(전체 회원 조회 방지)",
+			header:   "Bearer " + makeToken(t, testSecret, jwt.SigningMethodHS256, jwt.MapClaims{"mt_id": "", "exp": future}),
+			secret:   testSecret, wantMtID: "", wantOK: false,
+		},
+		{
+			name:     "숫자 mt_id → 거부(문자열만 허용)",
+			header:   "Bearer " + makeToken(t, testSecret, jwt.SigningMethodHS256, jwt.MapClaims{"mt_id": 1186, "exp": future}),
+			secret:   testSecret, wantMtID: "", wantOK: false,
+		},
+		{
+			name:     "만료 토큰 → 거부",
+			header:   "Bearer " + makeToken(t, testSecret, jwt.SigningMethodHS256, jwt.MapClaims{"mt_id": "x", "exp": past}),
+			secret:   testSecret, wantMtID: "", wantOK: false,
+		},
+		{
+			name:     "잘못된 시크릿 → 거부",
+			header:   "Bearer " + makeToken(t, "wrong", jwt.SigningMethodHS256, jwt.MapClaims{"mt_id": "x", "exp": future}),
+			secret:   testSecret, wantMtID: "", wantOK: false,
+		},
+		{name: "헤더 없음", header: "", secret: testSecret, wantMtID: "", wantOK: false},
+		{name: "Bearer 뒤 빈 토큰", header: "Bearer ", secret: testSecret, wantMtID: "", wantOK: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gotID, gotOK := ParseUserMtID(tc.header, tc.secret, "HS256")
+			if gotID != tc.wantMtID || gotOK != tc.wantOK {
+				t.Errorf("ParseUserMtID() = (%q, %v), want (%q, %v)", gotID, gotOK, tc.wantMtID, tc.wantOK)
+			}
+		})
+	}
+}

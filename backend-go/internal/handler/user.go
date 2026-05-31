@@ -6,16 +6,54 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/bluemusk/smap_next_go/internal/auth"
+	"github.com/bluemusk/smap_next_go/internal/config"
 	"github.com/bluemusk/smap_next_go/internal/dto"
 	"github.com/bluemusk/smap_next_go/internal/service"
 )
 
 type UserHandler struct {
 	svc *service.UserService
+	cfg *config.Config
 }
 
-func NewUser(svc *service.UserService) *UserHandler {
-	return &UserHandler{svc: svc}
+func NewUser(svc *service.UserService, cfg *config.Config) *UserHandler {
+	return &UserHandler{svc: svc, cfg: cfg}
+}
+
+// Me는 GET /api/v1/auth/me (Python read_users_me). ⚠️ deps와 다른 토큰 경로:
+// secret/algorithm = SECRET_KEY/ALGORITHM(JWT_SECRET_KEY와 별개), claim = mt_id(문자열).
+// 토큰 부재(헤더에 Bearer 없음)는 oauth2_scheme의 401 "Not authenticated",
+// 그 외 검증 실패·mt_id 누락·회원 없음은 credentials_exception
+// (401 "Could not validate credentials" + WWW-Authenticate: Bearer).
+func (h *UserHandler) Me(c *gin.Context) {
+	authHeader := c.GetHeader("Authorization")
+	// oauth2_scheme: 토큰 자체가 없으면 FastAPI 기본 401 "Not authenticated"(헤더 없음).
+	if len(authHeader) < len("Bearer ") || authHeader[:len("Bearer ")] != "Bearer " || authHeader[len("Bearer "):] == "" {
+		writeJSON(c, http.StatusUnauthorized, gin.H{"detail": "Not authenticated"})
+		return
+	}
+	mtID, ok := auth.ParseUserMtID(authHeader, h.cfg.SecretKey, h.cfg.Algorithm)
+	if !ok {
+		credentialsException(c)
+		return
+	}
+	res, found, err := h.svc.UserIdentity(mtID)
+	if err != nil {
+		writeJSON(c, http.StatusInternalServerError, gin.H{"detail": "Internal Server Error"})
+		return
+	}
+	if !found {
+		credentialsException(c)
+		return
+	}
+	writeJSON(c, http.StatusOK, res)
+}
+
+// credentialsException은 Python read_users_me의 credentials_exception(401 + Bearer 헤더)을 모사한다.
+func credentialsException(c *gin.Context) {
+	c.Header("WWW-Authenticate", "Bearer")
+	writeJSON(c, http.StatusUnauthorized, gin.H{"detail": "Could not validate credentials"})
 }
 
 // plainServerError는 FastAPI의 unhandled 예외(ResponseValidationError 등) 500 응답과 동일하게

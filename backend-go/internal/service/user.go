@@ -13,6 +13,7 @@ type userRepo interface {
 	GetByToken(token string) (*model.Member, error)
 	RecentSignin(hoursAgo int) ([]model.Member, error)
 	NotJoinedCount() (int64, error)
+	GetByMtID(mtID string) (*model.Member, error)
 }
 
 // UserService는 Python `app/api/v1/endpoints/users.py`의 read 핸들러를 이식한다.
@@ -206,4 +207,41 @@ func (s *UserService) RecentSignin(hoursAgo int) ([]dto.UserFullDump, error) {
 // >0→500(jsonable_encoder가 raw Row 직렬화 실패)으로 동작을 재현한다.
 func (s *UserService) NotJoinedCount() (int64, error) {
 	return s.repo.NotJoinedCount()
+}
+
+// UserIdentity는 GET /auth/me 로직을 이식한다(Python read_users_me).
+// mt_id(전화/로그인 ID)로 회원을 조회(필터 없음)하고 UserIdentity 4필드로 매핑한다.
+// found=false면 핸들러가 401 credentials_exception을 낸다.
+// create_user_identity_from_member는 mt_id/mt_name을 그대로 매핑하나, DB상 이 컬럼들은
+// 실데이터에서 채워져 있어 본 경로에서는 사실상 non-null — derefStrUser로 안전 변환.
+func (s *UserService) UserIdentity(mtID string) (*dto.UserIdentity, bool, error) {
+	m, err := s.repo.GetByMtID(mtID)
+	if err != nil {
+		return nil, false, err
+	}
+	if m == nil {
+		return nil, false, nil
+	}
+	return &dto.UserIdentity{
+		MtIdx:   m.MtIdx,
+		MtID:    derefStrUser(m.MtID),
+		MtName:  derefStrUser(m.MtName),
+		MtLevel: derefIntUser(m.MtLevel),
+	}, true, nil
+}
+
+// derefStrUser는 *string을 string으로(nil이면 ""). UserIdentity.mt_id/mt_name용.
+func derefStrUser(v *string) string {
+	if v == nil {
+		return ""
+	}
+	return *v
+}
+
+// derefIntUser는 *int을 int으로(nil이면 0). UserIdentity.mt_level용.
+func derefIntUser(v *int) int {
+	if v == nil {
+		return 0
+	}
+	return *v
 }

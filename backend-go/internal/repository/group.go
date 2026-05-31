@@ -2,6 +2,7 @@ package repository
 
 import (
 	"errors"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -76,4 +77,171 @@ func (r *GroupRepository) FindByCode(code string) (*model.Group, error) {
 		return nil, err
 	}
 	return &g, nil
+}
+
+// CurrentUserGroupCount는 Python get_current_user_group_summary의 group_count와 동등하다.
+// 사용자가 속한(sgdt_show='Y' AND sgdt_exit='N') sgt_idx 서브쿼리를 만들고,
+// 그 안에서 sgt_show='Y'인 smap_group_t 행 수를 센다.
+func (r *GroupRepository) CurrentUserGroupCount(mtIdx int) (int64, error) {
+	sub := r.db.Model(&model.GroupDetail{}).
+		Select("sgt_idx").
+		Where("mt_idx = ? AND sgdt_show = ? AND sgdt_exit = ?", mtIdx, "Y", "N")
+	var count int64
+	err := r.db.Model(&model.Group{}).
+		Where("sgt_idx IN (?) AND sgt_show = ?", sub, "Y").
+		Count(&count).Error
+	return count, err
+}
+
+// CurrentUserDistinctMemberCount는 summary의 distinct_member_count와 동등하다.
+// 동일 서브쿼리(사용자가 속한 그룹) 내에서 sgdt_show='Y' AND sgdt_exit='N'인
+// DISTINCT mt_idx 수를 센다.
+func (r *GroupRepository) CurrentUserDistinctMemberCount(mtIdx int) (int64, error) {
+	sub := r.db.Model(&model.GroupDetail{}).
+		Select("sgt_idx").
+		Where("mt_idx = ? AND sgdt_show = ? AND sgdt_exit = ?", mtIdx, "Y", "N")
+	var count int64
+	err := r.db.Model(&model.GroupDetail{}).
+		Where("sgt_idx IN (?) AND sgdt_show = ? AND sgdt_exit = ?", sub, "Y", "N").
+		Distinct("mt_idx").
+		Count(&count).Error
+	return count, err
+}
+
+// CurrentUserGroupRow는 get_current_user_groups가 반환하는 한 (group, group_detail) 쌍이다.
+// 멤버수는 별도 GROUP BY 쿼리(memberCounts)로 채워 N+1을 피한다.
+type CurrentUserGroupRow struct {
+	Group       model.Group
+	Detail      model.GroupDetail
+	MemberCount int64
+}
+
+// currentUserGroupPair는 한 SELECT로 group + group_detail 컬럼을 동시에 스캔하기 위한 평면 행이다.
+// Python의 db.query(Group, GroupDetail)에 대응한다. owner/leader/join_date는 GroupDetail 쪽 값이다.
+type currentUserGroupPair struct {
+	model.Group
+	SgdtOwnerChk  *string    `gorm:"column:sgdt_owner_chk"`
+	SgdtLeaderChk *string    `gorm:"column:sgdt_leader_chk"`
+	SgdtWdate     *time.Time `gorm:"column:gd_sgdt_wdate"`
+}
+
+// CurrentUserGroups는 사용자가 속한 (group, group_detail) 쌍을 조회한다(정렬 없음 → 서비스에서 sgt_title 정렬).
+// Python: db.query(Group, GroupDetail).join(...).filter(GroupDetail.mt_idx=user_id,
+// sgdt_exit='N', Group.sgt_show='Y').all() — ⚠️sgdt_show 필터 없음(member_counts 쿼리에만 있음).
+// member_counts는 group_ids 대상으로 GroupDetail JOIN Member ON mt_idx, sgdt_exit='N' AND
+// sgdt_show='Y' AND sgdt_discharge='N' AND Member.mt_status=1, GROUP BY sgt_idx → COUNT(sgdt_idx).
+func (r *GroupRepository) CurrentUserGroups(mtIdx int) ([]CurrentUserGroupRow, error) {
+	pairs := make([]currentUserGroupPair, 0)
+	err := r.db.Model(&model.Group{}).
+		Select("smap_group_t.*, smap_group_detail_t.sgdt_owner_chk AS sgdt_owner_chk, "+
+			"smap_group_detail_t.sgdt_leader_chk AS sgdt_leader_chk, "+
+			"smap_group_detail_t.sgdt_wdate AS gd_sgdt_wdate").
+		Joins("JOIN smap_group_detail_t ON smap_group_detail_t.sgt_idx = smap_group_t.sgt_idx").
+		Where("smap_group_detail_t.mt_idx = ? AND smap_group_detail_t.sgdt_exit = ? AND smap_group_t.sgt_show = ?",
+			mtIdx, "N", "Y").
+		Scan(&pairs).Error
+	if err != nil {
+		return nil, err
+	}
+
+	// group_ids 수집 후 member_counts를 한 번의 GROUP BY로 일괄 조회(N+1 방지). Python과 동일 필터.
+	groupIDs := make([]int, 0, len(pairs))
+	for i := range pairs {
+		groupIDs = append(groupIDs, pairs[i].SgtIdx)
+	}
+	memberCounts := map[int]int64{}
+	if len(groupIDs) > 0 {
+		type countRow struct {
+			SgtIdx int   `gorm:"column:sgt_idx"`
+			Cnt    int64 `gorm:"column:cnt"`
+		}
+		rows := make([]countRow, 0)
+		err = r.db.Model(&model.GroupDetail{}).
+			Select("smap_group_detail_t.sgt_idx AS sgt_idx, COUNT(smap_group_detail_t.sgdt_idx) AS cnt").
+			Joins("JOIN member_t ON member_t.mt_idx = smap_group_detail_t.mt_idx").
+			Where("smap_group_detail_t.sgt_idx IN ? AND smap_group_detail_t.sgdt_exit = ? AND "+
+				"smap_group_detail_t.sgdt_show = ? AND smap_group_detail_t.sgdt_discharge = ? AND member_t.mt_status = ?",
+				groupIDs, "N", "Y", "N", 1).
+			Group("smap_group_detail_t.sgt_idx").
+			Scan(&rows).Error
+		if err != nil {
+			return nil, err
+		}
+		for i := range rows {
+			memberCounts[rows[i].SgtIdx] = rows[i].Cnt
+		}
+	}
+
+	out := make([]CurrentUserGroupRow, 0, len(pairs))
+	for i := range pairs {
+		out = append(out, CurrentUserGroupRow{
+			Group: pairs[i].Group,
+			Detail: model.GroupDetail{
+				SgdtOwnerChk:  pairs[i].SgdtOwnerChk,
+				SgdtLeaderChk: pairs[i].SgdtLeaderChk,
+				SgdtWdate:     pairs[i].SgdtWdate,
+			},
+			MemberCount: memberCounts[pairs[i].SgtIdx],
+		})
+	}
+	return out, nil
+}
+
+// StatsGroupMembers는 stats의 group_members 전체 행과 동등하다.
+// GroupDetail WHERE sgt_idx=group_id AND sgdt_exit='N' AND sgdt_show='Y' (정렬 없음, all() 순서).
+// 서비스가 mt_idx 목록 추출과 owner/leader chk 집계(any(... for gm in group_members))에 모두 쓴다.
+// mt_idx/owner_chk/leader_chk만 필요하므로 컬럼을 한정해 조회한다.
+func (r *GroupRepository) StatsGroupMembers(groupID int) ([]model.GroupDetail, error) {
+	rows := make([]model.GroupDetail, 0)
+	err := r.db.Model(&model.GroupDetail{}).
+		Select("mt_idx", "sgdt_owner_chk", "sgdt_leader_chk").
+		Where("sgt_idx = ? AND sgdt_exit = ? AND sgdt_show = ?", groupID, "N", "Y").
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	return rows, nil
+}
+
+// StatsMember는 멤버 단건(Member WHERE mt_idx=member_id). 없으면 (nil, nil) → Python continue.
+func (r *GroupRepository) StatsMember(memberID int) (*model.Member, error) {
+	var m model.Member
+	err := r.db.Where("mt_idx = ?", memberID).First(&m).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
+// StatsWeeklySchedules는 멤버의 주간 일정 수와 동등하다.
+// COUNT(Schedule.sst_idx) WHERE mt_idx=member AND sst_show='Y' AND start<=sst_sdate<=end.
+func (r *GroupRepository) StatsWeeklySchedules(memberID int, start, end time.Time) (int64, error) {
+	var count int64
+	err := r.db.Model(&model.Schedule{}).
+		Where("mt_idx = ? AND sst_show = ? AND sst_sdate >= ? AND sst_sdate <= ?", memberID, "Y", start, end).
+		Count(&count).Error
+	return count, err
+}
+
+// StatsTotalLocations는 멤버의 전체 위치(장소) 수와 동등하다(total_locations).
+// COUNT(Location.slt_idx) WHERE mt_idx=member AND slt_show='Y' — ⚠️기간 필터 없음.
+func (r *GroupRepository) StatsTotalLocations(memberID int) (int64, error) {
+	var count int64
+	err := r.db.Model(&model.Location{}).
+		Where("mt_idx = ? AND slt_show = ?", memberID, "Y").
+		Count(&count).Error
+	return count, err
+}
+
+// StatsWeeklyLocations는 멤버의 주간 위치(장소) 수와 동등하다(weekly_locations).
+// COUNT(Location.slt_idx) WHERE mt_idx=member AND slt_show='Y' AND start<=slt_wdate<=end.
+func (r *GroupRepository) StatsWeeklyLocations(memberID int, start, end time.Time) (int64, error) {
+	var count int64
+	err := r.db.Model(&model.Location{}).
+		Where("mt_idx = ? AND slt_show = ? AND slt_wdate >= ? AND slt_wdate <= ?", memberID, "Y", start, end).
+		Count(&count).Error
+	return count, err
 }

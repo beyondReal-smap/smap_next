@@ -6,15 +6,19 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/bluemusk/smap_next_go/internal/auth"
+	"github.com/bluemusk/smap_next_go/internal/config"
+	"github.com/bluemusk/smap_next_go/internal/dto"
 	"github.com/bluemusk/smap_next_go/internal/service"
 )
 
 type MemberHandler struct {
 	svc *service.MemberService
+	cfg *config.Config
 }
 
-func NewMember(svc *service.MemberService) *MemberHandler {
-	return &MemberHandler{svc: svc}
+func NewMember(svc *service.MemberService, cfg *config.Config) *MemberHandler {
+	return &MemberHandler{svc: svc, cfg: cfg}
 }
 
 // CheckPhone은 GET /api/v1/members/check/phone/:phone — 무인증.
@@ -103,6 +107,86 @@ func (h *MemberHandler) Get(c *gin.Context) {
 		return
 	}
 	writeJSON(c, http.StatusOK, res)
+}
+
+// Me는 GET /api/v1/members/me (Python get_user_profile). Header 수동 파싱.
+// ⚠️ 미인증/미발견/오류 전부 HTTP 200 + result:N로 흡수(401 절대 안 냄).
+// 성공 응답 키 순서: result, data, message, success.
+func (h *MemberHandler) Me(c *gin.Context) {
+	uid, ok := auth.ParseOptionalUserID(c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
+	if !ok {
+		writeJSON(c, http.StatusOK, dto.ProfileMeFail{
+			Result:  "N",
+			Message: "인증이 필요합니다.",
+			Success: false,
+		})
+		return
+	}
+	data, found, err := h.svc.MyProfile(uid)
+	if err != nil {
+		// Python except Exception → 200 + 서버 오류 메시지(흡수).
+		writeJSON(c, http.StatusOK, dto.ProfileMeFail{
+			Result:  "N",
+			Message: "서버 오류가 발생했습니다.",
+			Success: false,
+		})
+		return
+	}
+	if !found {
+		writeJSON(c, http.StatusOK, dto.ProfileMeFail{
+			Result:  "N",
+			Message: "사용자를 찾을 수 없습니다.",
+			Success: false,
+		})
+		return
+	}
+	writeJSON(c, http.StatusOK, dto.ProfileMeResponse{
+		Result:  "Y",
+		Data:    *data,
+		Message: "프로필 조회가 성공했습니다.",
+		Success: true,
+	})
+}
+
+// Consent는 GET /api/v1/members/consent/:member_id (Python get_consent_info).
+// 미인증 401 "인증이 필요합니다."(마침표), 타인 403 "본인의 동의 정보만 조회할 수 있습니다.",
+// 미발견 404 "사용자를 찾을 수 없습니다.", YNEnum 검증 실패/오류 500 "서버 오류가 발생했습니다.".
+func (h *MemberHandler) Consent(c *gin.Context) {
+	idStr := c.Param("member_id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		pathIntErr(c, "member_id", idStr)
+		return
+	}
+	uid, ok := auth.ParseOptionalUserID(c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
+	if !ok {
+		writeJSON(c, http.StatusUnauthorized, gin.H{"detail": "인증이 필요합니다."})
+		return
+	}
+	if uid != id {
+		writeJSON(c, http.StatusForbidden, gin.H{"detail": "본인의 동의 정보만 조회할 수 있습니다."})
+		return
+	}
+	info, found, valid, err := h.svc.ConsentInfo(id)
+	if err != nil {
+		// Python except Exception → 500 detail "서버 오류가 발생했습니다.".
+		writeJSON(c, http.StatusInternalServerError, gin.H{"detail": "서버 오류가 발생했습니다."})
+		return
+	}
+	if !found {
+		writeJSON(c, http.StatusNotFound, gin.H{"detail": "사용자를 찾을 수 없습니다."})
+		return
+	}
+	if !valid {
+		// ConsentInfo(YNEnum) 검증 실패 → ConsentResponse 생성 예외 → 500.
+		writeJSON(c, http.StatusInternalServerError, gin.H{"detail": "서버 오류가 발생했습니다."})
+		return
+	}
+	writeJSON(c, http.StatusOK, dto.ConsentResponse{
+		Success: true,
+		Message: "동의 정보 조회 성공",
+		Data:    info,
+	})
 }
 
 // Group은 GET /api/v1/members/group/:group_id — 그룹 멤버 목록(Member+GroupDetail).
