@@ -53,6 +53,10 @@ type Handlers struct {
 	geofenceGroupRoleSrc   geofenceGroupRoleSource   // nil → repository.NewGroupMember(h.db)      (owner/leader fan-out)
 	geofenceMyLocationSrc  geofenceMyLocationSource  // nil → repository.NewLocation(h.db)         (내 장소 조회 + claim)
 	geofenceMemberSrc      geofenceMemberSource      // nil → repository.NewMember(h.db)           (회원 prefetch)
+
+	// daily:weather(weather:alert) 잡 전용 seam(테스트 주입용). nil이면 실 repository 폴백. weather_push.go가 사용한다.
+	weatherMemberSrc recentMemberLister // nil → repository.NewMember(h.db) (최근 1주일 접속자 조회)
+	weatherSrc       weatherSource      // nil → repository.NewMember(h.db) (좌표 근처 캐시 날씨 조회)
 }
 
 // NewHandlers는 핸들러 묶음을 생성한다. log가 nil이면 slog.Default를 쓴다.
@@ -76,7 +80,7 @@ func NewHandlers(db *gorm.DB, cfg *config.Config, fcmSender fcm.Sender, store *c
 }
 
 // NewMux는 12개 task type을 핸들러에 매핑한 asynq.ServeMux를 반환한다.
-// geofence 4종 포함 대부분이 실로직이고, weather:alert만 남은 stub이다.
+// 12개 잡 전부 실로직 포팅 완료(weather:alert가 마지막 누락잡이었고 이제 weather_push.go에 있다).
 func NewMux(h *Handlers) *asynq.ServeMux {
 	mux := asynq.NewServeMux()
 
@@ -103,20 +107,14 @@ func NewMux(h *Handlers) *asynq.ServeMux {
 	return mux
 }
 
-// --- stub 핸들러(다음 트랙) --------------------------------------------------
+// --- 실로직 핸들러 위치 안내 -------------------------------------------------
 
 // handleGeofenceEnter/Exit/MyEnter/MyExit 실로직은 geofence_push.go에 있다.
-
 // handleSchedule30Min 실로직은 schedule_push.go에 있다.
 // handleReservedPush 실로직은 reserved_push.go에 있다.
-
 // handleDailySilent 실로직은 silent_push.go에 있다.
 // handleDailyAppInduce / handleDailyBattery 실로직은 daily_push.go에 있다.
-
-func (h *Handlers) handleWeatherAlert(ctx context.Context, t *asynq.Task) error {
-	h.log.Info("TODO: job not implemented", slog.String("type", t.Type()))
-	return nil // TODO: send_daily_weather_notifications 포팅
-}
+// handleWeatherAlert 실로직은 weather_push.go에 있다(마지막 누락잡 포팅 완료).
 
 // --- 실로직 핸들러 -----------------------------------------------------------
 

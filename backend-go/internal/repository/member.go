@@ -149,6 +149,71 @@ func (r *MemberRepository) GetAllActive() ([]model.Member, error) {
 	return out, err
 }
 
+// GetRecentlyActive는 최근 N일 이내 접속(mt_ldate)한 활성 회원을 조회한다.
+// Python Member.get_recently_active(member.py:122, days 기본 7)와 동등:
+//
+//	mt_level>1 AND mt_status=1 AND mt_ldate >= (now - days*24h)
+//
+// 토큰/정렬 필터 없음(빈 토큰은 발송 단계에서 result=False 처리). daily:weather 잡이
+// 발송 대상으로 사용한다(GetAllActive와 달리 "최근 1주일 접속자"로 좁힌다).
+func (r *MemberRepository) GetRecentlyActive(days int) ([]model.Member, error) {
+	cutoff := time.Now().AddDate(0, 0, -days)
+	out := make([]model.Member, 0)
+	err := r.db.
+		Where("mt_level > ? AND mt_status = ? AND mt_ldate >= ?", 1, 1, cutoff).
+		Find(&out).Error
+	return out, err
+}
+
+// WeatherNear는 GetWeatherNear가 돌려주는 좌표 근처의 캐시된 날씨 1건이다.
+// Python get_weather_info(weather_service.py:215)의 SELECT 컬럼과 1:1 대응한다.
+type WeatherNear struct {
+	MtWeatherSky *int    `gorm:"column:mt_weather_sky"`
+	MtWeatherTmx *int    `gorm:"column:mt_weather_tmx"`
+	MtWeatherTmn *int    `gorm:"column:mt_weather_tmn"`
+	MtWeatherPop *string `gorm:"column:mt_weather_pop"`
+	MtSido       *string `gorm:"column:mt_sido"`
+	MtGu         *string `gorm:"column:mt_gu"`
+	MtDong       *string `gorm:"column:mt_dong"`
+}
+
+// GetWeatherNear는 (lat,long) 좌표 근처(±0.1°) 회원 중 24시간 이내 갱신된 날씨 캐시
+// 1건을 맨해튼 거리 최근접 순으로 빌려온다. Python get_weather_info(weather_service.py:215)의
+// raw SQL을 그대로 이식한다(호출 회원 자기 행이 아니라 좌표 근처 아무 회원 행을 사용).
+//
+//	WHERE mt_weather_sky IS NOT NULL AND mt_weather_tmx IS NOT NULL
+//	  AND mt_weather_date >= staleCutoff   -- 신선도(24h) 판정
+//	  AND mt_lat IS NOT NULL AND mt_status = 1
+//	  AND mt_lat  BETWEEN lat-0.1 AND lat+0.1
+//	  AND mt_long BETWEEN lng-0.1 AND lng+0.1
+//	ORDER BY ABS(mt_lat-lat) + ABS(mt_long-lng) LIMIT 1
+//
+// 결과가 없으면 (nil, nil) — Python의 "no fresh weather data, skipping"과 동등(호출자가 skip).
+func (r *MemberRepository) GetWeatherNear(lat, long float64, staleCutoff time.Time) (*WeatherNear, error) {
+	var out WeatherNear
+	// ORDER BY는 GORM Order가 인자 바인딩을 지원하지 않으므로 gorm.Expr로 파라미터를 바인딩한다
+	// (lat/long은 float64 — 문자열 연결 인젝션 위험 없음이지만 일관성을 위해 바인딩 유지).
+	err := r.db.
+		Table("member_t").
+		Select("mt_weather_sky, mt_weather_tmx, mt_weather_tmn, mt_weather_pop, mt_sido, mt_gu, mt_dong").
+		Where("mt_weather_sky IS NOT NULL AND mt_weather_tmx IS NOT NULL "+
+			"AND mt_weather_date >= ? AND mt_lat IS NOT NULL AND mt_status = ? "+
+			"AND mt_lat BETWEEN ? AND ? AND mt_long BETWEEN ? AND ?",
+			staleCutoff, 1, lat-0.1, lat+0.1, long-0.1, long+0.1).
+		Order(gorm.Expr("ABS(mt_lat - ?) + ABS(mt_long - ?)", lat, long)).
+		Limit(1).
+		Scan(&out).Error
+	if err != nil {
+		return nil, err
+	}
+	// Scan은 행이 없으면 out을 zero값으로 두고 에러를 주지 않는다. 필수 컬럼(tmx/sky)이
+	// NOT NULL 조건이므로 둘 다 nil이면 매칭 행이 없었던 것 → Python의 result is None과 동등.
+	if out.MtWeatherTmx == nil && out.MtWeatherSky == nil {
+		return nil, nil
+	}
+	return &out, nil
+}
+
 // FindByIDs는 mt_idx 목록으로 회원을 배치 조회한다(Python jobs/base.py prefetch_members:34).
 // Python은 500개씩 청크로 IN 조회 후 dict로 합치는데, GORM IN 절도 동일 결과이므로 한 번에
 // 조회한다(필터 없음 — prefetch_members와 동등). 빈 목록이면 빈 슬라이스를 돌려준다.
@@ -163,7 +228,7 @@ func (r *MemberRepository) FindByIDs(ids []int) ([]model.Member, error) {
 }
 
 // GetTokenList는 토큰 보유 활성 회원 전체(mt_level>1 AND mt_token_id NOT NULL AND
-// mt_token_id != '' AND mt_status=1)를 조회한다. Python Member.get_token_list(member.py:142)와
+// mt_token_id != ” AND mt_status=1)를 조회한다. Python Member.get_token_list(member.py:142)와
 // 동등 — 만료일 무관, 정렬 없음(expiry NULL 토큰도 포함). daily:silent 잡이 사용한다.
 func (r *MemberRepository) GetTokenList() ([]model.Member, error) {
 	out := make([]model.Member, 0)
@@ -176,7 +241,7 @@ func (r *MemberRepository) GetTokenList() ([]model.Member, error) {
 
 // GetTokenExpiringSoon은 만료 임박(mt_token_expiry_date <= threshold) 토큰 보유 활성 회원을
 // 만료일 오름차순으로 조회한다. Python Member.get_token_expiring_soon(member.py:151)와 동등 —
-// mt_level>1 AND mt_token_id NOT NULL AND mt_token_id != '' AND mt_status=1 AND
+// mt_level>1 AND mt_token_id NOT NULL AND mt_token_id != ” AND mt_status=1 AND
 // mt_token_expiry_date NOT NULL AND mt_token_expiry_date <= threshold, ORDER BY ASC.
 // daily:silent 잡이 우선순위 대상으로 사용한다.
 func (r *MemberRepository) GetTokenExpiringSoon(threshold time.Time) ([]model.Member, error) {
