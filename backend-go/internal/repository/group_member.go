@@ -61,6 +61,25 @@ func intsCSV(ids []int) string {
 	return strings.Join(parts, ", ")
 }
 
+// GetGroupMembersWithRoles는 Python GroupDetail.get_group_members_with_roles(group_detail.py:50)의
+// 단일 raw SQL을 그대로 이식한다(member_t JOIN, sgt_idx + show/discharge/exit 필터).
+// ⚠️ Python과 동일하게 mt_status 필터는 없다(FindGroupMembers와의 차이점). 토큰/언어/이름 메타를
+// 함께 조회해 schedule:30min 그룹 fan-out 대상 산정에 쓴다. 역할 분류(owner/leader/members)는
+// 호출자가 sgdt_owner_chk/sgdt_leader_chk로 수행한다(Python dict 분기 동등).
+func (r *GroupMemberRepository) GetGroupMembersWithRoles(sgtIdx int) ([]model.GroupRoleMember, error) {
+	out := make([]model.GroupRoleMember, 0)
+	err := r.db.Raw(`
+		SELECT gdt.sgdt_idx, gdt.mt_idx, gdt.sgdt_owner_chk, gdt.sgdt_leader_chk,
+		       mt.mt_lang, mt.mt_token_id, mt.mt_nickname, mt.mt_name
+		FROM smap_group_detail_t gdt
+		JOIN member_t mt ON gdt.mt_idx = mt.mt_idx
+		WHERE gdt.sgt_idx = ?
+		  AND gdt.sgdt_discharge = 'N'
+		  AND gdt.sgdt_exit = 'N'
+		  AND gdt.sgdt_show = 'Y'`, sgtIdx).Scan(&out).Error
+	return out, err
+}
+
 // FindGroupMembers는 Python get_group_members의 3단계 쿼리를 그대로 이식한다:
 // ①기본정보(JOIN, owner/leader/name 정렬) ②최신위치(self-join + MAX(mlt_gps_time))
 // ③위치 없는 멤버는 member_t.mt_lat/long fallback. IN 절은 정수만 결합(인젝션 안전).

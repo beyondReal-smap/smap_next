@@ -36,6 +36,11 @@ type Handlers struct {
 
 	// daily:silent 잡 전용 seam(테스트 주입용). nil이면 실 repository 폴백. silent_push.go가 사용한다.
 	silentSrc silentMemberLister // nil → repository.NewMember(h.db) (토큰 목록 2종 조회)
+
+	// schedule:30min 잡 전용 seam(테스트 주입용). nil이면 실 repository 폴백. schedule_push.go가 사용한다.
+	scheduleSrc       scheduleSource       // nil → repository.NewSchedule(h.db) (조회 + claim UPDATE)
+	scheduleMemberSrc scheduleMemberSource // nil → repository.NewMember(h.db) (소유자 prefetch)
+	scheduleGroupSrc  scheduleGroupSource  // nil → repository.NewGroupMember(h.db) (그룹 fan-out)
 }
 
 // NewHandlers는 핸들러 묶음을 생성한다. log가 nil이면 slog.Default를 쓴다.
@@ -108,10 +113,7 @@ func (h *Handlers) handleGeofenceMyExit(ctx context.Context, t *asynq.Task) erro
 	return nil // TODO: my_location_exit_alert_schedule 포팅
 }
 
-func (h *Handlers) handleSchedule30Min(ctx context.Context, t *asynq.Task) error {
-	h.log.Info("TODO: job not implemented", slog.String("type", t.Type()))
-	return nil // TODO: schedule_notification 포팅
-}
+// handleSchedule30Min 실로직은 schedule_push.go에 있다.
 
 func (h *Handlers) handleReservedPush(ctx context.Context, t *asynq.Task) error {
 	h.log.Info("TODO: job not implemented", slog.String("type", t.Type()))

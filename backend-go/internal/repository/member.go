@@ -149,6 +149,19 @@ func (r *MemberRepository) GetAllActive() ([]model.Member, error) {
 	return out, err
 }
 
+// FindByIDs는 mt_idx 목록으로 회원을 배치 조회한다(Python jobs/base.py prefetch_members:34).
+// Python은 500개씩 청크로 IN 조회 후 dict로 합치는데, GORM IN 절도 동일 결과이므로 한 번에
+// 조회한다(필터 없음 — prefetch_members와 동등). 빈 목록이면 빈 슬라이스를 돌려준다.
+// schedule:30min 잡이 일정 소유자 일괄 조회에 사용한다.
+func (r *MemberRepository) FindByIDs(ids []int) ([]model.Member, error) {
+	out := make([]model.Member, 0)
+	if len(ids) == 0 {
+		return out, nil
+	}
+	err := r.db.Where("mt_idx IN ?", ids).Find(&out).Error
+	return out, err
+}
+
 // GetTokenList는 토큰 보유 활성 회원 전체(mt_level>1 AND mt_token_id NOT NULL AND
 // mt_token_id != '' AND mt_status=1)를 조회한다. Python Member.get_token_list(member.py:142)와
 // 동등 — 만료일 무관, 정렬 없음(expiry NULL 토큰도 포함). daily:silent 잡이 사용한다.
