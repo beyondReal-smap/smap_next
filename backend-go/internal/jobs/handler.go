@@ -45,6 +45,14 @@ type Handlers struct {
 	// push:reserved 잡 전용 seam(테스트 주입용). nil이면 실 repository 폴백. reserved_push.go가 사용한다.
 	reservedSrc       reservedSource       // nil → repository.NewPushLog(h.db) (조회 + claim + 결과 전이 UPDATE)
 	reservedMemberSrc reservedMemberSource // nil → repository.NewMember(h.db) (발송 대상 prefetch)
+
+	// geofence 4종 잡 전용 seam(테스트 주입용). nil이면 실 repository 폴백. geofence_push.go가 사용한다.
+	geofenceScheduleSrc    geofenceScheduleSource    // nil → repository.NewSchedule(h.db)        (그룹 일정 조회 + claim)
+	geofenceGroupDetailSrc geofenceGroupDetailSource // nil → repository.NewGroupDetail(h.db)     (sgdt_idx→mt_idx 배치)
+	geofenceLocSrc         geofenceLocSource         // nil → repository.NewMemberLocationLog(h.db)(최신 위치 배치)
+	geofenceGroupRoleSrc   geofenceGroupRoleSource   // nil → repository.NewGroupMember(h.db)      (owner/leader fan-out)
+	geofenceMyLocationSrc  geofenceMyLocationSource  // nil → repository.NewLocation(h.db)         (내 장소 조회 + claim)
+	geofenceMemberSrc      geofenceMemberSource      // nil → repository.NewMember(h.db)           (회원 prefetch)
 }
 
 // NewHandlers는 핸들러 묶음을 생성한다. log가 nil이면 slog.Default를 쓴다.
@@ -68,7 +76,7 @@ func NewHandlers(db *gorm.DB, cfg *config.Config, fcmSender fcm.Sender, store *c
 }
 
 // NewMux는 12개 task type을 핸들러에 매핑한 asynq.ServeMux를 반환한다.
-// 이번 단계에서 location:sync / weather:refresh만 실로직이고 나머지는 stub.
+// geofence 4종 포함 대부분이 실로직이고, weather:alert만 남은 stub이다.
 func NewMux(h *Handlers) *asynq.ServeMux {
 	mux := asynq.NewServeMux()
 
@@ -97,25 +105,7 @@ func NewMux(h *Handlers) *asynq.ServeMux {
 
 // --- stub 핸들러(다음 트랙) --------------------------------------------------
 
-func (h *Handlers) handleGeofenceEnter(ctx context.Context, t *asynq.Task) error {
-	h.log.Info("TODO: job not implemented", slog.String("type", t.Type()))
-	return nil // TODO: location_entry_alert_schedule 포팅
-}
-
-func (h *Handlers) handleGeofenceExit(ctx context.Context, t *asynq.Task) error {
-	h.log.Info("TODO: job not implemented", slog.String("type", t.Type()))
-	return nil // TODO: location_exit_alert_schedule 포팅
-}
-
-func (h *Handlers) handleGeofenceMyEnter(ctx context.Context, t *asynq.Task) error {
-	h.log.Info("TODO: job not implemented", slog.String("type", t.Type()))
-	return nil // TODO: my_location_entry_alert_schedule 포팅
-}
-
-func (h *Handlers) handleGeofenceMyExit(ctx context.Context, t *asynq.Task) error {
-	h.log.Info("TODO: job not implemented", slog.String("type", t.Type()))
-	return nil // TODO: my_location_exit_alert_schedule 포팅
-}
+// handleGeofenceEnter/Exit/MyEnter/MyExit 실로직은 geofence_push.go에 있다.
 
 // handleSchedule30Min 실로직은 schedule_push.go에 있다.
 // handleReservedPush 실로직은 reserved_push.go에 있다.

@@ -17,6 +17,60 @@ func NewMemberLocationLog(db *gorm.DB) *MemberLocationLogRepository {
 	return &MemberLocationLogRepository{db: db}
 }
 
+// RecentLocation은 회원별 최신 위치 1행(get_recent_locations_batch 한 행)이다.
+// Python member_location_log.py:78-84의 dict({lat, long, accuracy, gps_time})와 1:1 대응한다.
+//   - Lat/Long: DECIMAL → Python은 float(...) if ... else 0(없으면 0 폴백)이라 *float64 nil→0 처리.
+//   - Accuracy: Python float(mlt_accuacy) if mlt_accuacy else None(없으면 None).
+//   - GpsTime : mlt_gps_time(없으면 nil).
+type RecentLocation struct {
+	MtIdx    int        `gorm:"column:mt_idx"`
+	Lat      *float64   `gorm:"column:mlt_lat"`
+	Long     *float64   `gorm:"column:mlt_long"`
+	Accuracy *float64   `gorm:"column:mlt_accuacy"` // 오타 컬럼명(원본 그대로)
+	GpsTime  *time.Time `gorm:"column:mlt_gps_time"`
+}
+
+// GetRecentLocationsBatch는 Python MemberLocationLog.get_recent_locations_batch(member_location_log.py:55)를
+// 이식한다. 회원별 MAX(mlt_idx)=최신 로그를 서브쿼리로 뽑아 본 테이블과 조인한다(500개 청크).
+// 반환은 {mt_idx: RecentLocation}. Python의 lat/long 0 폴백·accuracy None 폴백은 RecentLocation
+// 포인터 필드(nil)로 그대로 보존하고, 거리/필터 단계에서 Python과 동일하게 해석한다.
+func (r *MemberLocationLogRepository) GetRecentLocationsBatch(mtIdxList []int) (map[int]RecentLocation, error) {
+	out := make(map[int]RecentLocation)
+	if len(mtIdxList) == 0 {
+		return out, nil
+	}
+	const chunkSize = 500
+	for i := 0; i < len(mtIdxList); i += chunkSize {
+		end := i + chunkSize
+		if end > len(mtIdxList) {
+			end = len(mtIdxList)
+		}
+		chunk := mtIdxList[i:end]
+
+		// 서브쿼리: 각 회원별 최신 mlt_idx.
+		sub := r.db.Model(&model.MemberLocationLog{}).
+			Select("mt_idx, MAX(mlt_idx) AS max_idx").
+			Where("mt_idx IN ?", chunk).
+			Group("mt_idx")
+
+		var rows []RecentLocation
+		err := r.db.Model(&model.MemberLocationLog{}).
+			Select("member_location_log_t.mt_idx, member_location_log_t.mlt_lat, "+
+				"member_location_log_t.mlt_long, member_location_log_t.mlt_accuacy, "+
+				"member_location_log_t.mlt_gps_time").
+			Joins("JOIN (?) AS latest ON member_location_log_t.mlt_idx = latest.max_idx "+
+				"AND member_location_log_t.mt_idx = latest.mt_idx", sub).
+			Scan(&rows).Error
+		if err != nil {
+			return nil, err
+		}
+		for _, row := range rows {
+			out[row.MtIdx] = row
+		}
+	}
+	return out, nil
+}
+
 // GetMemberLogs는 mt_idx + (start>=)/(end<) 날짜창 + ORDER BY mlt_gps_time ASC + offset/limit
 // (Python crud.get_member_location_logs). start/end는 nil이면 미적용(end는 +1일 적용된 값).
 func (r *MemberLocationLogRepository) GetMemberLogs(mtIdx int, start, end *time.Time, limit, offset int) ([]model.MemberLocationLog, error) {

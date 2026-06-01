@@ -67,7 +67,9 @@ func (r *ScheduleRepository) GetNowSchedulePush() ([]model.Schedule, error) {
 }
 
 // ClaimSchedule은 일정 1건을 발송 대상으로 선점하는 조건부 UPDATE다(Go 전용 개선).
-//   UPDATE smap_schedule_t SET sst_schedule_chk='Y' WHERE sst_idx=? AND sst_schedule_chk='N'
+//
+//	UPDATE smap_schedule_t SET sst_schedule_chk='Y' WHERE sst_idx=? AND sst_schedule_chk='N'
+//
 // 영향 행 수(RowsAffected)를 돌려준다. 1이면 이 호출이 선점에 성공(발송), 0이면 다른
 // 워커/이전 틱이 이미 선점(중복 발송 방지로 skip)했음을 뜻한다.
 //
@@ -79,6 +81,88 @@ func (r *ScheduleRepository) ClaimSchedule(sstIdx int) (int64, error) {
 	res := r.db.Model(&model.Schedule{}).
 		Where("sst_idx = ? AND sst_schedule_chk = ?", sstIdx, "N").
 		Update("sst_schedule_chk", "Y")
+	return res.RowsAffected, res.Error
+}
+
+// GetNowScheduleInMembers는 Python Schedule.get_now_schedule_in_members(schedule.py:65)의
+// raw SQL을 그대로 이식한다(진입 알림 대상 일정).
+//   - 시간창: NOW() BETWEEN LEAST(DATE_SUB(sst_sdate, 30분), IFNULL(sst_adate, sst_sdate)) AND sst_edate
+//     (시작 30분 전 또는 sst_adate 중 더 이른 쪽 ~ 종료).
+//   - alarm 진입코드: sst_location_alarm IN (1, 4).
+//   - 미진입(sst_in_chk='N') + sst_entry_cnt=0 + sst_show='Y'만.
+//
+// Python은 sst.* + mt.mt_lat/mt_lang을 dict로 반환하나, 거리/상태 판정에 필요한 건 sst.* 뿐이므로
+// model.Schedule로 스캔한다(LEFT JOIN member_t는 시간창과 무관 — Python도 필터에 미사용).
+func (r *ScheduleRepository) GetNowScheduleInMembers() ([]model.Schedule, error) {
+	out := make([]model.Schedule, 0)
+	err := r.db.Raw(`
+		SELECT sst.*
+		FROM smap_schedule_t sst
+		WHERE NOW() BETWEEN
+			LEAST(
+				DATE_SUB(sst.sst_sdate, INTERVAL 30 MINUTE),
+				IFNULL(sst.sst_adate, sst.sst_sdate)
+			) AND sst.sst_edate
+		AND (sst.sst_location_alarm = 1 OR sst.sst_location_alarm = 4)
+		AND sst.sst_in_chk = 'N'
+		AND sst.sst_entry_cnt = 0
+		AND sst.sst_show = 'Y'`).Scan(&out).Error
+	return out, err
+}
+
+// GetNowScheduleOutMembers는 Python Schedule.get_now_schedule_out_members(schedule.py:89)의
+// raw SQL을 이식한다(이탈 알림 대상 일정). entry와 차이:
+//   - 시간창: NOW() BETWEEN sst_sdate AND sst_edate(단순 BETWEEN, 30분/LEAST/IFNULL 없음).
+//   - alarm 이탈코드: sst_location_alarm IN (2, 4).
+//   - 진입한 일정만(sst_in_chk='Y') + sst_exit_cnt=0 + sst_show='Y'.
+func (r *ScheduleRepository) GetNowScheduleOutMembers() ([]model.Schedule, error) {
+	out := make([]model.Schedule, 0)
+	err := r.db.Raw(`
+		SELECT sst.*
+		FROM smap_schedule_t sst
+		WHERE NOW() BETWEEN sst.sst_sdate AND sst.sst_edate
+		AND (sst.sst_location_alarm = 2 OR sst.sst_location_alarm = 4)
+		AND sst.sst_in_chk = 'Y'
+		AND sst.sst_exit_cnt = 0
+		AND sst.sst_show = 'Y'`).Scan(&out).Error
+	return out, err
+}
+
+// ClaimScheduleEntry는 진입 알림 1건을 발송 대상으로 선점하는 조건부 UPDATE다(Go 전용 개선).
+//
+//	UPDATE smap_schedule_t SET sst_in_chk='Y', sst_entry_cnt=sst_entry_cnt+1
+//	WHERE sst_idx=? AND sst_in_chk='N' AND sst_entry_cnt=0
+//
+// RowsAffected=1이면 이 워커가 선점(발송), 0이면 다른 워커/이전 틱이 이미 처리(skip)했음을 뜻한다.
+//
+// ★Python 충실 이식 주의: Python(location_alerts.py:179 _update_entry_status)은 "거리 판정 통과 →
+// 발송 → 발송 후 마킹(sst_in_chk='Y', entry_cnt+1)"이라 발송-마킹 사이 크래시·분산 환경에서
+// 중복(at-least-once)이 가능하다. 이 선점 UPDATE는 Python에 없는 Go 신규 개선으로, 거리 판정 통과
+// 직후·발송 전에 행을 원자적으로 선점해 그 레이스 윈도우를 제거한다. 마킹 컬럼/값/증분은 Python과 동일하다.
+func (r *ScheduleRepository) ClaimScheduleEntry(sstIdx int) (int64, error) {
+	res := r.db.Model(&model.Schedule{}).
+		Where("sst_idx = ? AND sst_in_chk = ? AND sst_entry_cnt = ?", sstIdx, "N", 0).
+		Updates(map[string]any{
+			"sst_in_chk":    "Y",
+			"sst_entry_cnt": gorm.Expr("sst_entry_cnt + 1"),
+		})
+	return res.RowsAffected, res.Error
+}
+
+// ClaimScheduleExit는 이탈 알림 1건을 선점하는 조건부 UPDATE다(Go 전용 개선, entry와 대칭).
+//
+//	UPDATE ... SET sst_in_chk='N', sst_exit_cnt=sst_exit_cnt+1
+//	WHERE sst_idx=? AND sst_in_chk='Y' AND sst_exit_cnt=0
+//
+// Python(_update_exit_status, location_alerts.py:195)의 발송 후 마킹(N으로 전이, exit_cnt+1)을
+// 발송 전 선점으로 대체한다.
+func (r *ScheduleRepository) ClaimScheduleExit(sstIdx int) (int64, error) {
+	res := r.db.Model(&model.Schedule{}).
+		Where("sst_idx = ? AND sst_in_chk = ? AND sst_exit_cnt = ?", sstIdx, "Y", 0).
+		Updates(map[string]any{
+			"sst_in_chk":   "N",
+			"sst_exit_cnt": gorm.Expr("sst_exit_cnt + 1"),
+		})
 	return res.RowsAffected, res.Error
 }
 

@@ -55,3 +55,31 @@ func (r *GroupDetailRepository) FindByGroup(sgtIdx int) ([]model.GroupDetail, er
 	).Find(&out).Error
 	return out, err
 }
+
+// FindByIDs는 sgdt_idx 목록으로 GroupDetail을 배치 조회한다(500개 청크).
+// Python geofence 잡(location_alerts.py:237)의 gd_map 사전로드와 동등:
+//
+//	db.query(GroupDetail).filter(GroupDetail.sgdt_idx.in_(chunk))  (show/exit/discharge 필터 없음)
+//
+// 반환은 {sgdt_idx: GroupDetail}. geofence 그룹 entry/exit 잡이 sgdt_idx→mt_idx 해석에 사용한다.
+func (r *GroupDetailRepository) FindByIDs(sgdtIdxList []int) (map[int]model.GroupDetail, error) {
+	out := make(map[int]model.GroupDetail)
+	if len(sgdtIdxList) == 0 {
+		return out, nil
+	}
+	const chunkSize = 500
+	for i := 0; i < len(sgdtIdxList); i += chunkSize {
+		end := i + chunkSize
+		if end > len(sgdtIdxList) {
+			end = len(sgdtIdxList)
+		}
+		var rows []model.GroupDetail
+		if err := r.db.Where("sgdt_idx IN ?", sgdtIdxList[i:end]).Find(&rows).Error; err != nil {
+			return nil, err
+		}
+		for j := range rows {
+			out[rows[j].SgdtIdx] = rows[j]
+		}
+	}
+	return out, nil
+}
