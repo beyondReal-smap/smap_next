@@ -69,3 +69,23 @@ func (s *Store) DeletePattern(ctx context.Context, pattern string) {
 	}
 	_ = s.client.Del(ctx, keys...).Err()
 }
+
+// TryLock은 Redis SET key val NX EX ttl 기반 분산락을 시도한다.
+// 반환 (acquired, err):
+//   - acquired=true  : 락 획득(키가 없었음). 호출자는 잡을 실행한다.
+//   - acquired=false : 다른 인스턴스가 이미 보유(키 존재). 잡 skip.
+//
+// 계약(중요): 캐시가 비활성(Redis 미연결)이면 (true, nil)을 반환한다 — Redis 없이도 잡이 동작해야 하기
+// 때문이다(Phase 3 무발송 단계 + SCHEDULER_ENABLED=false라 이중 실행 위험이 낮음). Redis 통신 자체가
+// 실패하면 (false, err)로 명시적 에러를 올려 호출자가 fail-safe(skip)하도록 한다 — 락 실패를 성공으로
+// 흡수하지 않는다.
+func (s *Store) TryLock(ctx context.Context, key string, ttl time.Duration) (bool, error) {
+	if !s.Enabled() {
+		return true, nil
+	}
+	ok, err := s.client.SetNX(ctx, key, "1", ttl).Result()
+	if err != nil {
+		return false, err
+	}
+	return ok, nil
+}

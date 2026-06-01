@@ -64,6 +64,27 @@ type Config struct {
 	MinAppVersionAndroid string `envconfig:"MIN_APP_VERSION_ANDROID" default:"3.1.0"`
 	MinAppVersionIOS     string `envconfig:"MIN_APP_VERSION_IOS" default:"3.1.0"`
 
+	// --- Phase 3 배치 잡 설정 ---------------------------------------------
+	// 기상청(KMA) 동네예보 서비스키. weather:refresh 잡의 fetch_kma_forecast가 사용한다.
+	// required로 두지 않는다: Python처럼 미설정 시 잡이 로그+skip만 하도록(워커 부팅은 성공해야 함).
+	// backend/.env에 KMA_SERVICE_KEY가 있으면 config.Load가 ../backend/.env를 읽어 자동 주입된다.
+	KMAServiceKey string `envconfig:"KMA_SERVICE_KEY"`
+
+	// OpenAI — 이번 단계(무발송)에선 미사용. 다음 FCM/AI 단계 대비 정의만. 결정: 정적 폴백만 쓰므로
+	// 모델 기본값은 비용 낮은 gpt-4o-mini로 둔다.
+	OpenAIAPIKey string `envconfig:"OPENAI_API_KEY"`
+	OpenAIModel  string `envconfig:"OPENAI_MODEL" default:"gpt-4o-mini"`
+
+	// Firebase 자격증명 — 이번 단계엔 fcm.New 초기화 입력으로만 쓰이고 실발송은 다음 단계.
+	// 3단 폴백: JSON(인라인) → Path(파일) → 개별 env(ProjectID 등). Path 기본값은 backend/ 디렉토리의 SDK 파일.
+	FirebaseCredentialsJSON string `envconfig:"FIREBASE_CREDENTIALS_JSON"`
+	FirebaseCredentialsPath string `envconfig:"FIREBASE_CREDENTIALS_PATH" default:"com-dmonster-smap-firebase-adminsdk-2zx5p-2610556cf5.json"`
+	FirebaseProjectID       string `envconfig:"FIREBASE_PROJECT_ID"`
+
+	// iOS APNs topic(apns-topic 헤더)·안드로이드 알림 채널 — fcm.buildMessage 페이로드용. 다음 단계에서 사용.
+	IOSBundleID         string `envconfig:"IOS_BUNDLE_ID"`
+	FCMAndroidChannelID string `envconfig:"FCM_ANDROID_CHANNEL_ID" default:"com.dmonster.smap-Smap"`
+
 	// Python의 BACKEND_CORS_ORIGINS와 동일한 정책.
 	// 콤마 분리 문자열 또는 환경변수 미설정 시 기본값 사용.
 	corsOriginsRaw string `envconfig:"BACKEND_CORS_ORIGINS" default:""`

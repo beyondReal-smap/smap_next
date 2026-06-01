@@ -3,6 +3,13 @@ bin/
 .env
 .env.*
 !.env.example
+.env.example
+.gitignore.bak
 
 # Serena 도구 메타
 .serena/
+
+# 에이전트/검증 임시 산출물 (작업 경로 오염 방지)
+ZZ_*
+zz_*_test.go
+.archive/
