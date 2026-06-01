@@ -41,6 +41,10 @@ type Handlers struct {
 	scheduleSrc       scheduleSource       // nil → repository.NewSchedule(h.db) (조회 + claim UPDATE)
 	scheduleMemberSrc scheduleMemberSource // nil → repository.NewMember(h.db) (소유자 prefetch)
 	scheduleGroupSrc  scheduleGroupSource  // nil → repository.NewGroupMember(h.db) (그룹 fan-out)
+
+	// push:reserved 잡 전용 seam(테스트 주입용). nil이면 실 repository 폴백. reserved_push.go가 사용한다.
+	reservedSrc       reservedSource       // nil → repository.NewPushLog(h.db) (조회 + claim + 결과 전이 UPDATE)
+	reservedMemberSrc reservedMemberSource // nil → repository.NewMember(h.db) (발송 대상 prefetch)
 }
 
 // NewHandlers는 핸들러 묶음을 생성한다. log가 nil이면 slog.Default를 쓴다.
@@ -114,11 +118,7 @@ func (h *Handlers) handleGeofenceMyExit(ctx context.Context, t *asynq.Task) erro
 }
 
 // handleSchedule30Min 실로직은 schedule_push.go에 있다.
-
-func (h *Handlers) handleReservedPush(ctx context.Context, t *asynq.Task) error {
-	h.log.Info("TODO: job not implemented", slog.String("type", t.Type()))
-	return nil // TODO: send_reserved_push_notifications 포팅
-}
+// handleReservedPush 실로직은 reserved_push.go에 있다.
 
 // handleDailySilent 실로직은 silent_push.go에 있다.
 // handleDailyAppInduce / handleDailyBattery 실로직은 daily_push.go에 있다.

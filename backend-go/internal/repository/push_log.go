@@ -76,3 +76,51 @@ func (r *PushLogRepository) FindUnread(mtIdx int) ([]model.PushLog, error) {
 	err := r.db.Where("mt_idx = ? AND plt_read_chk = ? AND plt_show = ?", mtIdx, "N", "Y").Find(&out).Error
 	return out, err
 }
+
+// GetReserved는 Python PushLog.get_reserved_pushes(push_log.py:54)를 이식한다.
+// 발송 시간이 도래한 미발송 예약 푸시를 조회한다(정렬 없음, .all() 동등).
+//   조건 3개 AND: plt_status=1 AND plt_sdate<=now AND plt_show='Y'.
+// now는 잡 진입 시 1회 캡처한 시각을 호출자가 전달한다(Python datetime.now() 1회 캡처 동등).
+// plt_status/plt_sdate는 nullable 포인터 컬럼이나, 비교는 값 바인딩이라 NULL 행은 자연 제외된다.
+// reserved 잡 전용 신규 메서드다(기존 read 메서드에 동등물이 없었음).
+func (r *PushLogRepository) GetReserved(now time.Time) ([]model.PushLog, error) {
+	out := make([]model.PushLog, 0)
+	err := r.db.
+		Where("plt_status = ? AND plt_sdate <= ? AND plt_show = ?", 1, now, "Y").
+		Find(&out).Error
+	return out, err
+}
+
+// ClaimReserved는 예약 푸시 1행을 발송 대상으로 선점하는 조건부 UPDATE다(★Go 전용 신규 개선).
+//   UPDATE push_log_t SET plt_status=3 WHERE plt_idx=? AND plt_status=1
+// 영향 행 수(RowsAffected)를 돌려준다. 1이면 이 호출이 선점에 성공(발송 권한 획득), 0이면 다른
+// 워커/이전 틱/asynq 재시도가 이미 선점(중복 발송 방지로 skip)했음을 뜻한다.
+//
+// ★Python 미인지 신규 상태값 plt_status=3(sending) 주의:
+// Python run_send_reserved_push_notifications(push_jobs.py:23)는 조회(plt_status=1)→발송→
+// 상태전이(2/4) 사이에 락/행 선점이 전무해, 멀티워커·asynq 재시도가 같은 plt_status=1 행을
+// 동시 조회→양쪽 발송(at-least-once 중복)할 수 있다. 이 행별 선점 UPDATE는 발송 전 원자적
+// 선점으로 그 레이스 윈도우를 제거한다.
+//   - get_reserved_pushes 필터는 plt_status==1만 보므로(=1 등호), status=3 행은 Python·Go
+//     혼재(컷오버 과도기)에도 재선택되지 않아 중복 안전하다. FindByMember(plt_status=2 알림
+//     목록)에도 잡히지 않는다.
+//   - ⚠️롤백/장애 복구: status=3 도중 크래시 시 행이 3에 고착(영구 미발송)된다. 컷오버 롤백 시
+//     "UPDATE push_log_t SET plt_status=1 WHERE plt_status=3 [AND plt_sdate 오래된 것]"
+//     정리 쿼리로 1로 되돌려 재시도 가능케 해야 한다(운영 메모리 기록 필요).
+func (r *PushLogRepository) ClaimReserved(pltIdx int) (int64, error) {
+	res := r.db.Model(&model.PushLog{}).
+		Where("plt_idx = ? AND plt_status = ?", pltIdx, 1).
+		Update("plt_status", 3)
+	return res.RowsAffected, res.Error
+}
+
+// MarkReservedSent는 선점(claim)·발송을 마친 예약 푸시 행의 결과를 영속화한다.
+// Python push_jobs.py:53-54의 상태 전이와 동등하되, 이미 존재하는 행을 UPDATE한다(신규 INSERT 아님).
+//   UPDATE push_log_t SET plt_status=?(2 성공/4 실패), plt_sdate=now WHERE plt_idx=?
+// now는 잡 진입 시 캡처한 동일 시각(Python now 재사용 동등). plt_rdate를 비롯한 다른 컬럼은
+// 절대 건드리지 않는다(Python도 plt_status/plt_sdate 2개만 변경).
+func (r *PushLogRepository) MarkReservedSent(pltIdx int, status int, now time.Time) error {
+	return r.db.Model(&model.PushLog{}).
+		Where("plt_idx = ?", pltIdx).
+		Updates(map[string]any{"plt_status": status, "plt_sdate": now}).Error
+}
