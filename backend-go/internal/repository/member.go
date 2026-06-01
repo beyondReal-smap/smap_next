@@ -149,6 +149,34 @@ func (r *MemberRepository) GetAllActive() ([]model.Member, error) {
 	return out, err
 }
 
+// GetTokenList는 토큰 보유 활성 회원 전체(mt_level>1 AND mt_token_id NOT NULL AND
+// mt_token_id != '' AND mt_status=1)를 조회한다. Python Member.get_token_list(member.py:142)와
+// 동등 — 만료일 무관, 정렬 없음(expiry NULL 토큰도 포함). daily:silent 잡이 사용한다.
+func (r *MemberRepository) GetTokenList() ([]model.Member, error) {
+	out := make([]model.Member, 0)
+	err := r.db.
+		Where("mt_level > ? AND mt_token_id IS NOT NULL AND mt_token_id <> ? AND mt_status = ?",
+			1, "", 1).
+		Find(&out).Error
+	return out, err
+}
+
+// GetTokenExpiringSoon은 만료 임박(mt_token_expiry_date <= threshold) 토큰 보유 활성 회원을
+// 만료일 오름차순으로 조회한다. Python Member.get_token_expiring_soon(member.py:151)와 동등 —
+// mt_level>1 AND mt_token_id NOT NULL AND mt_token_id != '' AND mt_status=1 AND
+// mt_token_expiry_date NOT NULL AND mt_token_expiry_date <= threshold, ORDER BY ASC.
+// daily:silent 잡이 우선순위 대상으로 사용한다.
+func (r *MemberRepository) GetTokenExpiringSoon(threshold time.Time) ([]model.Member, error) {
+	out := make([]model.Member, 0)
+	err := r.db.
+		Where("mt_level > ? AND mt_token_id IS NOT NULL AND mt_token_id <> ? AND mt_status = ? "+
+			"AND mt_token_expiry_date IS NOT NULL AND mt_token_expiry_date <= ?",
+			1, "", 1, threshold).
+		Order("mt_token_expiry_date ASC").
+		Find(&out).Error
+	return out, err
+}
+
 // RecentSignin은 (now-hoursAgo) ~ (+1h) 사이 가입(mt_wdate) + 토큰 보유 회원을 조회한다.
 // Python Member.get_sign_in_3(hoursAgo=3)/get_sign_in_24(24)와 동등. now는 로컬 시각, 초 단위.
 func (r *MemberRepository) RecentSignin(hoursAgo int) ([]model.Member, error) {

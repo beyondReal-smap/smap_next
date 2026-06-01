@@ -192,7 +192,10 @@ func (c *Client) apnsConfig(m Message, silent bool) *messaging.APNSConfig {
 	if silent {
 		aps.ContentAvailable = true
 		headers["apns-push-type"] = "background"
-		headers["apns-priority"] = "5"
+		// Python send_silent_push_notification(firebase_service.py:615)는 무음 토큰 갱신
+		// 푸시를 iOS가 무시하지 않도록 최고 우선순위(10)로 보낸다. 표준 background 권장값은
+		// 5이나 토큰 유지 목적상 Python 동등성을 위해 10으로 맞춘다.
+		headers["apns-priority"] = "10"
 	} else {
 		aps.Sound = "default"
 		if m.Badge != nil {

@@ -33,6 +33,9 @@ type Handlers struct {
 	// 운영 경로(NewHandlers)에서는 항상 nil이라 동작 변화가 없다. daily_push.go가 사용한다.
 	memberSrc  memberLister  // nil → repository.NewMember(h.db)
 	pushLogDst pushLogWriter // nil → repository.NewPushLog(h.db)
+
+	// daily:silent 잡 전용 seam(테스트 주입용). nil이면 실 repository 폴백. silent_push.go가 사용한다.
+	silentSrc silentMemberLister // nil → repository.NewMember(h.db) (토큰 목록 2종 조회)
 }
 
 // NewHandlers는 핸들러 묶음을 생성한다. log가 nil이면 slog.Default를 쓴다.
@@ -115,11 +118,7 @@ func (h *Handlers) handleReservedPush(ctx context.Context, t *asynq.Task) error 
 	return nil // TODO: send_reserved_push_notifications 포팅
 }
 
-func (h *Handlers) handleDailySilent(ctx context.Context, t *asynq.Task) error {
-	h.log.Info("TODO: job not implemented", slog.String("type", t.Type()))
-	return nil // TODO: send_silent_push_to_all_users 포팅
-}
-
+// handleDailySilent 실로직은 silent_push.go에 있다.
 // handleDailyAppInduce / handleDailyBattery 실로직은 daily_push.go에 있다.
 
 func (h *Handlers) handleWeatherAlert(ctx context.Context, t *asynq.Task) error {
