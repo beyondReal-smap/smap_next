@@ -139,6 +139,16 @@ func (r *MemberRepository) GetByToken(token string) (*model.Member, error) {
 	return &m, nil
 }
 
+// GetAllActive는 활성 회원 전체(mt_level>1 AND mt_status=1)를 조회한다.
+// Python Member.get_all_active(member.py:115)와 동등 — 토큰/최근접속 필터 없음.
+// daily:app_induce / daily:battery 잡이 발송 대상으로 사용한다(빈 토큰 처리는 호출자 책임,
+// Python도 루프에서 send_push가 빈 토큰을 result=False로 처리하므로 동등하게 구현한다).
+func (r *MemberRepository) GetAllActive() ([]model.Member, error) {
+	out := make([]model.Member, 0)
+	err := r.db.Where("mt_level > ? AND mt_status = ?", 1, 1).Find(&out).Error
+	return out, err
+}
+
 // RecentSignin은 (now-hoursAgo) ~ (+1h) 사이 가입(mt_wdate) + 토큰 보유 회원을 조회한다.
 // Python Member.get_sign_in_3(hoursAgo=3)/get_sign_in_24(24)와 동등. now는 로컬 시각, 초 단위.
 func (r *MemberRepository) RecentSignin(hoursAgo int) ([]model.Member, error) {

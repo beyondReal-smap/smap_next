@@ -28,6 +28,11 @@ type Handlers struct {
 	fcm  fcm.Sender
 	lock locker
 	kma  *service.KMAClient
+
+	// 데이터 접근 seam(테스트 주입용). nil이면 런타임에 h.db 기반 실 repository로 폴백한다.
+	// 운영 경로(NewHandlers)에서는 항상 nil이라 동작 변화가 없다. daily_push.go가 사용한다.
+	memberSrc  memberLister  // nil → repository.NewMember(h.db)
+	pushLogDst pushLogWriter // nil → repository.NewPushLog(h.db)
 }
 
 // NewHandlers는 핸들러 묶음을 생성한다. log가 nil이면 slog.Default를 쓴다.
@@ -115,15 +120,7 @@ func (h *Handlers) handleDailySilent(ctx context.Context, t *asynq.Task) error {
 	return nil // TODO: send_silent_push_to_all_users 포팅
 }
 
-func (h *Handlers) handleDailyAppInduce(ctx context.Context, t *asynq.Task) error {
-	h.log.Info("TODO: job not implemented", slog.String("type", t.Type()))
-	return nil // TODO: trigger_app_execution_at_7_30pm 포팅
-}
-
-func (h *Handlers) handleDailyBattery(ctx context.Context, t *asynq.Task) error {
-	h.log.Info("TODO: job not implemented", slog.String("type", t.Type()))
-	return nil // TODO: notify_low_battery_at_9pm 포팅
-}
+// handleDailyAppInduce / handleDailyBattery 실로직은 daily_push.go에 있다.
 
 func (h *Handlers) handleWeatherAlert(ctx context.Context, t *asynq.Task) error {
 	h.log.Info("TODO: job not implemented", slog.String("type", t.Type()))

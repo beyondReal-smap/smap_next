@@ -37,6 +37,21 @@ func (r *PushLogRepository) GetByID(id int) (*model.PushLog, error) {
 	return &p, nil
 }
 
+// Create는 push_log_t에 단건 INSERT한다(Python push_service.push_log_add와 동등).
+// 잡 핸들러가 FCM 발송 결과별 로그를 적재할 때 사용한다. autoIncrement plt_idx는 GORM이 채운다.
+func (r *PushLogRepository) Create(p *model.PushLog) error {
+	return r.db.Create(p).Error
+}
+
+// CreateBatch는 push_log_t에 다건 INSERT한다(회원 루프 1건씩 add 후 일괄 저장과 동등).
+// 빈 슬라이스면 no-op(GORM이 빈 슬라이스에 에러를 내지 않도록 가드).
+func (r *PushLogRepository) CreateBatch(logs []model.PushLog) error {
+	if len(logs) == 0 {
+		return nil
+	}
+	return r.db.Create(&logs).Error
+}
+
 // FindByMember는 mt_idx + plt_show='Y' + plt_status=2 + plt_sdate>=(now-7d) ORDER BY plt_sdate DESC
 // (Python get_member_push_logs, 최근 7일). recent/{id}도 동일.
 func (r *PushLogRepository) FindByMember(mtIdx int) ([]model.PushLog, error) {
