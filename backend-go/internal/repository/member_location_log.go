@@ -17,6 +17,48 @@ func NewMemberLocationLog(db *gorm.DB) *MemberLocationLogRepository {
 	return &MemberLocationLogRepository{db: db}
 }
 
+// GetLogByID는 mlt_idx 단건 조회. 없으면 (nil,nil).
+func (r *MemberLocationLogRepository) GetLogByID(mltIdx int) (*model.MemberLocationLog, error) {
+	var l model.MemberLocationLog
+	err := r.db.Where("mlt_idx = ?", mltIdx).First(&l).Error
+	if err == gorm.ErrRecordNotFound {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &l, nil
+}
+
+// CreateLog는 Python crud.create_location_log를 이식한다: 로그 INSERT + (mlt_lat/long이 nil 아니면)
+// member_t.mt_lat/mt_long/mt_udate 최신위치 갱신(부수효과). 둘을 단일 트랜잭션으로 묶는다(Python 단일 commit).
+func (r *MemberLocationLogRepository) CreateLog(l *model.MemberLocationLog, now time.Time) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(l).Error; err != nil {
+			return err
+		}
+		if l.MltLat != nil && l.MltLong != nil {
+			// member 존재 시에만 갱신(Python: member 있으면 갱신, 없으면 경고만).
+			if err := tx.Model(&model.Member{}).Where("mt_idx = ?", l.MtIdx).
+				Updates(map[string]interface{}{"mt_lat": *l.MltLat, "mt_long": *l.MltLong, "mt_udate": now}).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// UpdateLog는 mlt_idx 행의 지정 컬럼만 UPDATE한다(update_location_log exclude_unset). RowsAffected 반환.
+func (r *MemberLocationLogRepository) UpdateLog(mltIdx int, fields map[string]interface{}) (int64, error) {
+	res := r.db.Model(&model.MemberLocationLog{}).Where("mlt_idx = ?", mltIdx).Updates(fields)
+	return res.RowsAffected, res.Error
+}
+
+// DeleteLog는 mlt_idx 행을 하드 삭제한다(delete_location_log).
+func (r *MemberLocationLogRepository) DeleteLog(mltIdx int) error {
+	return r.db.Where("mlt_idx = ?", mltIdx).Delete(&model.MemberLocationLog{}).Error
+}
+
 // RecentLocation은 회원별 최신 위치 1행(get_recent_locations_batch 한 행)이다.
 // Python member_location_log.py:78-84의 dict({lat, long, accuracy, gps_time})와 1:1 대응한다.
 //   - Lat/Long: DECIMAL → Python은 float(...) if ... else 0(없으면 0 폴백)이라 *float64 nil→0 처리.

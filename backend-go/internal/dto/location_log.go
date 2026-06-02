@@ -1,19 +1,28 @@
 package dto
 
 import (
+	"math"
 	"strconv"
 	"strings"
 )
 
-// PyFloat은 Python의 float JSON 직렬화(repr)와 동일하게 직렬화한다. Go 기본 float64는 정수값을
-// "0"/"5"로 쓰지만 Python json은 "0.0"/"5.0"으로 쓰므로, 소수점/지수가 없으면 ".0"을 붙인다.
-// (lat/long/speed/accuracy 등 0~수천 범위 가정. 지수표기 범위는 그대로 둠.)
+// PyFloat은 Python의 float JSON 직렬화(repr)와 동일하게 직렬화한다.
+// Python json/repr 규칙: 1e-4 ≤ |x| < 1e16(및 0)는 위치표기(positional), 그 밖은 지수표기(scientific).
+// Go의 'g'는 ~1e6부터 지수표기로 전환돼 큰 거리값 등에서 Python(예: "4152770.96")과 어긋났다 →
+// 범위 판정 후 'f'(위치)/'e'(지수)를 선택하고, 위치표기에 소수점이 없으면 ".0"을 붙인다.
 type PyFloat float64
 
 func (f PyFloat) MarshalJSON() ([]byte, error) {
-	s := strconv.FormatFloat(float64(f), 'g', -1, 64)
-	if !strings.ContainsAny(s, ".eEnN") {
-		s += ".0"
+	x := float64(f)
+	abs := math.Abs(x)
+	var s string
+	if x == 0 || (abs >= 1e-4 && abs < 1e16) {
+		s = strconv.FormatFloat(x, 'f', -1, 64)
+		if !strings.ContainsAny(s, ".eEnN") {
+			s += ".0"
+		}
+	} else {
+		s = strconv.FormatFloat(x, 'e', -1, 64)
 	}
 	return []byte(s), nil
 }
@@ -194,6 +203,24 @@ type LocationPathData struct {
 type LocationPathResult struct {
 	Result string           `json:"result"`
 	Data   LocationPathData `json:"data"`
+}
+
+// DailyPathPoint는 get_member_daily_location_path의 포인트(범위 path와 달리 gps_time HH:MM:SS 포함).
+type DailyPathPoint struct {
+	Lat       PyFloat  `json:"lat"`
+	Lng       PyFloat  `json:"lng"`
+	Timestamp string   `json:"timestamp"`
+	Accuracy  *PyFloat `json:"accuracy"`
+	Speed     *PyFloat `json:"speed"`
+	Battery   *int     `json:"battery"`
+	Steps     *int     `json:"steps"`
+	GpsTime   string   `json:"gps_time"`
+}
+
+// DailyPathData는 get_member_daily_location_path 반환(points, summary).
+type DailyPathData struct {
+	Points  []DailyPathPoint    `json:"points"`
+	Summary LocationSummaryData `json:"summary"`
 }
 
 // StayTimeItem은 /stay-times의 한 행(crud dict 삽입 순서). start/end_time: strftime 공백.

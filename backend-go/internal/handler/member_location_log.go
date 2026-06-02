@@ -6,16 +6,18 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/bluemusk/smap_next_go/internal/config"
 	"github.com/bluemusk/smap_next_go/internal/dto"
 	"github.com/bluemusk/smap_next_go/internal/service"
 )
 
 type LocationLogHandler struct {
 	svc *service.LocationLogService
+	cfg *config.Config // create_location_log act의 토큰 기반 mt_idx 추출용
 }
 
-func NewLocationLog(svc *service.LocationLogService) *LocationLogHandler {
-	return &LocationLogHandler{svc: svc}
+func NewLocationLog(svc *service.LocationLogService, cfg *config.Config) *LocationLogHandler {
+	return &LocationLogHandler{svc: svc, cfg: cfg}
 }
 
 // MemberLogs는 GET /api/v1/logs/member-location-logs/:mt_idx — {"result":"Y","data":[...]}.

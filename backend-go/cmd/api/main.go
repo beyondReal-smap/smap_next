@@ -142,7 +142,7 @@ func main() {
 	// FCM/회원/푸시로그 의존이 있어 fcmClient 생성 이후에 와이어링한다(아래 참조).
 
 	// Phase 4 — logs(member_location_log) 단순 read 3종(무인증). to_dict(PyFloat).
-	locationLogH := handler.NewLocationLog(service.NewLocationLog(repository.NewMemberLocationLog(gdb)))
+	locationLogH := handler.NewLocationLog(service.NewLocationLog(repository.NewMemberLocationLog(gdb)), cfg)
 
 	// Phase 4 — orders read 5종(무인증). 금액 Double→PyFloat, summary 단일 집계.
 	orderH := handler.NewOrder(service.NewOrder(repository.NewOrder(gdb)), cfg)

@@ -285,6 +285,8 @@ func New(cfg *config.Config, logger *slog.Logger, deps Deps) http.Handler {
 		// logs(member_location_log) — read(무인증). to_dict 직렬화(mlt_speed 등 PyFloat).
 		// summary/path: 메모리 Haversine+round(banker's). stay-times/map-markers: raw CTE/GROUP BY를
 		// MariaDB에 그대로 위임(libm 차이 회피). path의 line 602 중복 라우트는 dead라 미등록.
+		// POST /logs/member-location-logs — body.act 기반 14종 RPC 디스패처(읽기 11 + 쓰기 3 create/update/delete).
+		v1.POST("/logs/member-location-logs", deps.LocationLog.MemberLocationLogsPost)
 		v1.GET("/logs/members-with-logs", deps.LocationLog.MembersWithLogs)
 		v1.GET("/logs/member-activity", deps.LocationLog.MemberActivity)
 		v1.GET("/logs/daily-counts", deps.LocationLog.DailyCounts)

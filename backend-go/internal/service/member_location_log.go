@@ -23,6 +23,10 @@ type locationLogRepo interface {
 	GpsDistanceAndTime(mtIdx int, dateStr string) (float64, float64, int, error)
 	StayTimes(mtIdx int, date string, minSpeed, maxAccuracy float64, minDuration int) ([]model.StayTimeRow, error)
 	MapMarkers(mtIdx int, date string, minSpeed, maxAccuracy float64) ([]model.MemberLocationLog, error)
+	GetLogByID(mltIdx int) (*model.MemberLocationLog, error)
+	CreateLog(l *model.MemberLocationLog, now time.Time) error
+	UpdateLog(mltIdx int, fields map[string]interface{}) (int64, error)
+	DeleteLog(mltIdx int) error
 }
 
 // todayLocal은 datetime.now().date()와 동등한 로컬 오늘 00:00.
