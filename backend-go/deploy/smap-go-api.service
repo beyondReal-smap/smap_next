@@ -14,6 +14,9 @@ WorkingDirectory=/data/wwwroot/smap_next/backend-go
 # SMS 인증상태(sms:verified:/sms:code:) interop — /sms(Python)가 쓰고 /auth(Go)가 읽음.
 # 미설정 시 Go 캐시 no-op → reset-password-by-phone의 SMS 인증 경로가 깨진다.
 Environment=REDIS_URL=redis://127.0.0.1:6379/0
+# Firebase 자격증명 — Go cwd(backend-go)에 파일이 없으므로 Python과 동일 파일의 절대경로를 지정.
+# 미설정 시 fcm 비활성("no firebase credentials configured") → /fcm_sendone·/schedule HTTP 알림 발송 불가.
+Environment=FIREBASE_CREDENTIALS_PATH=/data/wwwroot/smap_next/backend/com-dmonster-smap-firebase-adminsdk-2zx5p-2610556cf5.json
 ExecStart=/data/wwwroot/smap_next/backend-go/bin/api
 Restart=always
 RestartSec=5
