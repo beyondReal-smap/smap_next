@@ -163,6 +163,11 @@ func New(cfg *config.Config, logger *slog.Logger, deps Deps) http.Handler {
 		v1.GET("/users/recent/signin/3h", deps.User.RecentSignin3h)
 		v1.GET("/users/recent/signin/24h", deps.User.RecentSignin24h)
 		v1.GET("/users/not-joined/11days", deps.User.NotJoined)
+		// users write 3종(무인증, Python 충실): create(MemberCreate, mt_id 정규화·mt_pwd 평문 저장)·
+		// update(exclude_unset)·delete(하드 삭제 후 삭제 회원 반환).
+		v1.POST("/users/", deps.User.Create)
+		v1.PUT("/users/:user_id", deps.User.UpdateUser)
+		v1.DELETE("/users/:user_id", deps.User.DeleteUser)
 
 		// auth/me — JWT(SECRET_KEY/ALGORITHM, claim mt_id). UserHandler에 Me 추가.
 		// 토큰 부재 401 "Not authenticated", 검증실패/회원없음 401 "Could not validate credentials".

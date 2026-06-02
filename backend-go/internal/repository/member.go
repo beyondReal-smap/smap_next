@@ -334,6 +334,27 @@ func (r *MemberRepository) CreateMember(m *model.Member) (*model.Member, error) 
 	return r.GetByID(m.MtIdx)
 }
 
+// userCreateInsertColumns는 Python users.create_user의 Member(**MemberCreate.dict())가 넣는 21컬럼.
+// (registerInsertColumns와 달리 mt_push1/mt_onboarding 포함, mt_wdate/ldate/google/kakao/apple/token 제외.)
+var userCreateInsertColumns = []string{
+	"mt_type", "mt_level", "mt_status", "mt_id", "mt_name", "mt_nickname", "mt_hp", "mt_email",
+	"mt_birth", "mt_gender", "mt_show", "mt_agree1", "mt_agree2", "mt_agree3", "mt_agree4", "mt_agree5",
+	"mt_push1", "mt_lat", "mt_long", "mt_onboarding", "mt_pwd",
+}
+
+// CreateUserMember는 Python users.create_user(POST /users/)를 이식한다. MemberCreate 21컬럼만 INSERT 후 재조회.
+func (r *MemberRepository) CreateUserMember(m *model.Member) (*model.Member, error) {
+	if err := r.db.Select(userCreateInsertColumns).Create(m).Error; err != nil {
+		return nil, err
+	}
+	return r.GetByID(m.MtIdx)
+}
+
+// Delete는 mt_idx 회원을 하드 삭제한다(Python users.delete_user). ⚠️ 무인증 하드 삭제(Python 충실).
+func (r *MemberRepository) Delete(mtIdx int) error {
+	return r.db.Where("mt_idx = ?", mtIdx).Delete(&model.Member{}).Error
+}
+
 // UpdateColumns는 mt_idx 행의 지정 컬럼만 UPDATE한다(Python ORM의 "변경 attr만 UPDATE" 등가).
 // 로그인 시각/기기정보 갱신 등 부분 업데이트에 사용한다.
 func (r *MemberRepository) UpdateColumns(mtIdx int, fields map[string]interface{}) error {

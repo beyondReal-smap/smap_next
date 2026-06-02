@@ -14,6 +14,9 @@ type userRepo interface {
 	RecentSignin(hoursAgo int) ([]model.Member, error)
 	NotJoinedCount() (int64, error)
 	GetByMtID(mtID string) (*model.Member, error)
+	CreateUserMember(m *model.Member) (*model.Member, error)
+	UpdateColumns(mtIdx int, fields map[string]interface{}) error
+	Delete(mtIdx int) error
 }
 
 // UserService는 Python `app/api/v1/endpoints/users.py`의 read 핸들러를 이식한다.
