@@ -10,6 +10,10 @@ User=root
 # WorkingDirectory는 반드시 backend-go여야 한다.
 # config.Load("")가 ../backend/.env (Python과 동일 .env)를 상대경로로 탐색하기 때문.
 WorkingDirectory=/data/wwwroot/smap_next/backend-go
+# Redis는 Python(.env 기본값 redis://127.0.0.1:6379/0)과 동일 인스턴스를 공유해야 한다.
+# SMS 인증상태(sms:verified:/sms:code:) interop — /sms(Python)가 쓰고 /auth(Go)가 읽음.
+# 미설정 시 Go 캐시 no-op → reset-password-by-phone의 SMS 인증 경로가 깨진다.
+Environment=REDIS_URL=redis://127.0.0.1:6379/0
 ExecStart=/data/wwwroot/smap_next/backend-go/bin/api
 Restart=always
 RestartSec=5
