@@ -350,6 +350,51 @@ func (r *MemberRepository) CreateUserMember(m *model.Member) (*model.Member, err
 	return r.GetByID(m.MtIdx)
 }
 
+// createFromRegisterColumns는 Python crud_member.create_from_register가 Member(...)에 넣는 28컬럼.
+// (userCreateInsertColumns와 달리 mt_wdate/adate/google/kakao/apple/token_id 포함, mt_ldate 제외.)
+var createFromRegisterColumns = []string{
+	"mt_type", "mt_level", "mt_status", "mt_id", "mt_pwd", "mt_name", "mt_nickname", "mt_hp", "mt_email",
+	"mt_birth", "mt_gender", "mt_file1", "mt_show", "mt_agree1", "mt_agree2", "mt_agree3", "mt_agree4",
+	"mt_agree5", "mt_push1", "mt_lat", "mt_long", "mt_onboarding", "mt_wdate", "mt_adate",
+	"mt_google_id", "mt_kakao_id", "mt_apple_id", "mt_token_id",
+}
+
+// CreateFromRegister는 Python crud_member.create_from_register(POST /members/register)를 이식한다.
+func (r *MemberRepository) CreateFromRegister(m *model.Member) (*model.Member, error) {
+	if err := r.db.Select(createFromRegisterColumns).Create(m).Error; err != nil {
+		return nil, err
+	}
+	return r.GetByID(m.MtIdx)
+}
+
+// ExistsPhoneExcept는 Python crud_auth.check_phone_duplicate(자신 제외)와 동등하다.
+// mt_hp == cleanPhone AND mt_idx != exceptIdx AND mt_status == 1 AND mt_show == 'Y'.
+func (r *MemberRepository) ExistsPhoneExcept(cleanPhone string, exceptIdx int) (bool, error) {
+	var n int64
+	err := r.db.Model(&model.Member{}).
+		Where("mt_hp = ? AND mt_idx <> ? AND mt_status = ? AND mt_show = ?", cleanPhone, exceptIdx, 1, "Y").
+		Count(&n).Error
+	return n > 0, err
+}
+
+// ExistsEmailExcept는 Python crud_auth.check_email_duplicate(자신 제외)와 동등하다.
+func (r *MemberRepository) ExistsEmailExcept(email string, exceptIdx int) (bool, error) {
+	var n int64
+	err := r.db.Model(&model.Member{}).
+		Where("mt_email = ? AND mt_idx <> ? AND mt_status = ? AND mt_show = ?", email, exceptIdx, 1, "Y").
+		Count(&n).Error
+	return n > 0, err
+}
+
+// ExistsNicknameExcept는 Python crud_auth.check_nickname_duplicate(자신 제외)와 동등하다.
+func (r *MemberRepository) ExistsNicknameExcept(nickname string, exceptIdx int) (bool, error) {
+	var n int64
+	err := r.db.Model(&model.Member{}).
+		Where("mt_nickname = ? AND mt_idx <> ? AND mt_status = ? AND mt_show = ?", nickname, exceptIdx, 1, "Y").
+		Count(&n).Error
+	return n > 0, err
+}
+
 // Delete는 mt_idx 회원을 하드 삭제한다(Python users.delete_user). ⚠️ 무인증 하드 삭제(Python 충실).
 func (r *MemberRepository) Delete(mtIdx int) error {
 	return r.db.Where("mt_idx = ?", mtIdx).Delete(&model.Member{}).Error

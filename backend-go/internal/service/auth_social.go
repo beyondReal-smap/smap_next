@@ -143,7 +143,18 @@ type GoogleInput struct {
 	Image     string
 }
 
+// GoogleLogin은 /auth/google-login용(schemas.auth.GoogleLoginRequest, given_name 필드 있음) — 신규 정상.
 func (s *AuthService) GoogleLogin(in GoogleInput) dto.LoginHomeResponse {
+	return s.googleLogin(in, false)
+}
+
+// GoogleLoginNewAsError은 /members/google-login용(schemas.member.GoogleLoginRequest, given_name 없음).
+// member_service.py:354의 google_data.given_name 접근이 AttributeError → 신규 사용자는 항상 오류.
+func (s *AuthService) GoogleLoginNewAsError(in GoogleInput) dto.LoginHomeResponse {
+	return s.googleLogin(in, true)
+}
+
+func (s *AuthService) googleLogin(in GoogleInput, newUserAsError bool) dto.LoginHomeResponse {
 	errResp := func() dto.LoginHomeResponse {
 		return dto.LoginHomeResponse{Success: false, Message: "Google 로그인 처리 중 오류가 발생했습니다."}
 	}
@@ -218,7 +229,12 @@ func (s *AuthService) GoogleLogin(in GoogleInput) dto.LoginHomeResponse {
 		}
 	}
 
-	// 신규 사용자(DB 미저장)
+	// 신규 사용자(DB 미저장). ⚠️ /members는 newUserAsError=true: schemas.member.GoogleLoginRequest에
+	// given_name 필드가 없어 member_service.py:354 접근이 AttributeError → "Google 로그인 처리 중 오류".
+	// /auth는 schemas.auth.GoogleLoginRequest(given_name 있음)라 정상 신규 응답.
+	if newUserAsError {
+		return errResp()
+	}
 	temp := &dto.GoogleTempUser{
 		MtID: "google_" + in.GoogleID, MtName: orStr(in.Name, in.GivenName), MtNickname: orStr(in.GivenName, in.Name),
 		MtEmail: in.Email, MtGoogleID: in.GoogleID, MtType: 4, MtLevel: 2, MtFile1: in.Image,

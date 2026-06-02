@@ -35,6 +35,27 @@ func (h *AuthHandler) GoogleLogin(c *gin.Context) {
 	writeJSON(c, http.StatusOK, h.svc.GoogleLogin(in))
 }
 
+// GoogleLoginStrict은 POST /members/google-login. /auth(수동파싱)와 달리 Pydantic GoogleLoginRequest
+// 검증(google_id·email·name 필수 str → 422)을 거친 뒤 동일 service.GoogleLogin을 호출한다.
+// 신규 사용자는 service에서 given_name AttributeError 재현으로 "Google 로그인 처리 중 오류" 반환.
+func (h *AuthHandler) GoogleLoginStrict(c *gin.Context) {
+	body := bindJSONMap(c)
+	var errs []valErr
+	gid := uReqStr(body, "google_id", &errs)
+	email := uReqStr(body, "email", &errs)
+	name := uReqStr(body, "name", &errs)
+	img := uOptStr(body, "image", &errs)
+	if len(errs) > 0 {
+		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
+		return
+	}
+	in := service.GoogleInput{GoogleID: gid, Email: email, Name: name}
+	if img != nil {
+		in.Image = *img
+	}
+	writeJSON(c, http.StatusOK, h.svc.GoogleLoginNewAsError(in))
+}
+
 // AppleLogin은 POST /auth/apple-login. AppleLoginRequest 검증(userIdentifier 필수) → 항상 200.
 func (h *AuthHandler) AppleLogin(c *gin.Context) {
 	in, errs := parseAppleBody(c)

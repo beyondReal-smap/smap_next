@@ -22,6 +22,7 @@ type Deps struct {
 	Group          *handler.GroupHandler
 	GroupDetail    *handler.GroupDetailHandler
 	Member         *handler.MemberHandler
+	MemberWrite    *handler.MemberWriteHandler
 	User           *handler.UserHandler
 	Location       *handler.LocationHandler
 	Schedule       *handler.ScheduleHandler
@@ -142,15 +143,37 @@ func New(cfg *config.Config, logger *slog.Logger, deps Deps) http.Handler {
 
 		// members — read. 정적(/check/*,/me,/consent,/group)이 /:member_id보다 우선.
 		// /members/me(JWT)는 미인증도 200+result:N로 흡수. /members/consent/:member_id는 JWT.
-		// /members/terms는 Python에서 /{member_id}에 가려져 422(dead) → Go도 미등록으로 동일 재현.
 		v1.GET("/members/check/phone/:phone", deps.Member.CheckPhone)
 		v1.GET("/members/check/email/:email", deps.Member.CheckEmail)
 		v1.GET("/members/check/nickname/:nickname", deps.Member.CheckNickname)
 		v1.GET("/members/me", deps.Member.Me)
 		v1.GET("/members/consent/:member_id", deps.Member.Consent)
+		// ⚠️ /members/terms는 정상화 결정으로 약관 5종 200 반환(Python은 /{member_id}에 가려져 422였음).
+		// Gin은 정적>파라미터 우선이라 /:member_id보다 먼저 매칭된다.
+		v1.GET("/members/terms", deps.MemberWrite.Terms)
 		v1.GET("/members/", deps.Member.List)
 		v1.GET("/members/:member_id", deps.Member.Get)
 		v1.GET("/members/group/:group_id", deps.Member.Group)
+
+		// members — write 17종(register/login/비번/프로필/동의/탈퇴/CRUD/파일). 정적이 /:member_id보다 우선.
+		// google-login은 auth.GoogleLogin 재사용(동일 member_service.google_login). 비번/프로필/연락처/탈퇴는
+		// {result,message,success} 비표준 래핑(인증실패도 200). consent/consent-all은 미인증 401(차이).
+		v1.POST("/members/verify-password", deps.MemberWrite.VerifyPassword)
+		v1.POST("/members/change-password", deps.MemberWrite.ChangePassword)
+		v1.POST("/members/register", deps.MemberWrite.Register)
+		v1.POST("/members/login", deps.MemberWrite.Login)
+		v1.POST("/members/google-login", deps.Auth.GoogleLoginStrict)
+		v1.POST("/members/update-profile", deps.MemberWrite.UpdateProfile)
+		v1.POST("/members/update-contact", deps.MemberWrite.UpdateContact)
+		v1.POST("/members/withdraw", deps.MemberWrite.Withdraw)
+		v1.POST("/members/consent", deps.MemberWrite.Consent)
+		v1.POST("/members/consent/all", deps.MemberWrite.ConsentAll)
+		v1.POST("/members/upload-profile-image", deps.MemberWrite.UploadProfileImage)
+		v1.DELETE("/members/delete-profile-image", deps.MemberWrite.DeleteProfileImage)
+		v1.POST("/members/", deps.MemberWrite.Create)
+		v1.PUT("/members/:member_id", deps.MemberWrite.Update)
+		v1.DELETE("/members/:member_id", deps.MemberWrite.Delete)
+		v1.PATCH("/members/:member_id/location", deps.MemberWrite.UpdateLocation)
 
 		// users — read 7종(전부 무인증, auth 도메인). ⚠️ Python 동작 그대로 이식:
 		// /users/·/{id}는 MemberResponse라 mt_name/nickname null 멤버에서 500(plain text);

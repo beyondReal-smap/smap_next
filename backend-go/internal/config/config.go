@@ -76,6 +76,12 @@ type Config struct {
 	MinAppVersionAndroid string `envconfig:"MIN_APP_VERSION_ANDROID" default:"3.1.0"`
 	MinAppVersionIOS     string `envconfig:"MIN_APP_VERSION_IOS" default:"3.1.0"`
 
+	// 프로필 이미지 저장 디렉토리(members upload/delete-profile-image). Python은 cwd 기준 상대
+	// public/images에 저장하나, 실제 /images 서빙은 Python FastAPI StaticFiles(BASE_DIR/public/images,
+	// 절대경로)이다. Go cwd=backend-go라 상대경로를 쓰면 안 되고, Python과 동일한 절대경로에 써야
+	// 같은 /images URL로 서빙된다. 기본값=Python BASE_DIR/public/images.
+	ProfileImageDir string `envconfig:"PROFILE_IMAGE_DIR" default:"/data/wwwroot/smap_next/backend/public/images"`
+
 	// --- Phase 3 배치 잡 설정 ---------------------------------------------
 	// 기상청(KMA) 동네예보 서비스키. weather:refresh 잡의 fetch_kma_forecast가 사용한다.
 	// required로 두지 않는다: Python처럼 미설정 시 잡이 로그+skip만 하도록(워커 부팅은 성공해야 함).

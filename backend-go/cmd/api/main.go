@@ -112,6 +112,17 @@ func main() {
 	memberSvc := service.NewMember(memberRepo)
 	memberH := handler.NewMember(memberSvc, cfg)
 
+	// members write 17종(register/login/비번/프로필/동의/탈퇴/CRUD/약관/파일). memberRepo 공유.
+	// google-login은 auth.GoogleLogin 핸들러 재사용(동일 member_service.google_login). 비번정책=cfg.
+	memberWriteSvc := service.NewMemberWrite(memberRepo, cfg.PasswordBcryptCost, auth.PasswordPolicy{
+		MinLength:      cfg.PasswordMinLength,
+		RequireUpper:   cfg.PasswordRequireUpper,
+		RequireLower:   cfg.PasswordRequireLower,
+		RequireNumbers: cfg.PasswordRequireNumbers,
+		RequireSpecial: cfg.PasswordRequireSpecial,
+	})
+	memberWriteH := handler.NewMemberWrite(memberWriteSvc, cfg)
+
 	// Phase 4 — users read 7종(auth 도메인, 무인증) + auth/me(JWT). memberRepo 공유.
 	userSvc := service.NewUser(memberRepo)
 	userH := handler.NewUser(userSvc, cfg)
@@ -218,6 +229,7 @@ func main() {
 		Group:          groupH,
 		GroupDetail:    groupDetailH,
 		Member:         memberH,
+		MemberWrite:    memberWriteH,
 		User:           userH,
 		Location:       locationH,
 		Schedule:       scheduleH,
