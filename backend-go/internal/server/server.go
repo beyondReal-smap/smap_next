@@ -82,11 +82,17 @@ func New(cfg *config.Config, logger *slog.Logger, deps Deps) http.Handler {
 	{
 		v1.GET("/app/version-check", deps.AppVersion.VersionCheck)
 
-		// notices — read-only GET만 Go가 소유(POST/PUT/DELETE admin은 Phase 4 JWT 이후).
+		// notices — read GET 3종(무인증) + admin write 5종(RequireAdmin: JWT+mt_level=9).
+		// create/update/delete는 cache_delete_pattern("notices:*"), hide/show는 미무효화(Python 충실).
 		// /search(정적)는 /:id(파라미터)보다 우선 매칭된다.
 		v1.GET("/notices/", deps.Notice.List)
 		v1.GET("/notices/search", deps.Notice.Search)
 		v1.GET("/notices/:id", deps.Notice.Get)
+		v1.POST("/notices/", deps.AdminAuth, deps.Notice.Create)
+		v1.PUT("/notices/:id", deps.AdminAuth, deps.Notice.Update)
+		v1.DELETE("/notices/:id", deps.AdminAuth, deps.Notice.Delete)
+		v1.PATCH("/notices/:id/hide", deps.AdminAuth, deps.Notice.Hide)
+		v1.PATCH("/notices/:id/show", deps.AdminAuth, deps.Notice.Show)
 
 		// weather — GET만 이전. /member/:id는 무인증+캐시, /current는 optional JWT.
 		// PUT /member/:id(write)는 Phase 4.

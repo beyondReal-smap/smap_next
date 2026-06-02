@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
 
@@ -17,6 +18,183 @@ type NoticeHandler struct {
 
 func NewNotice(svc *service.NoticeService) *NoticeHandler {
 	return &NoticeHandler{svc: svc}
+}
+
+// noticePathID는 PATCH/PUT/DELETE의 :id 경로 정수를 파싱한다(비정수→422 loc=notice_id).
+func noticePathID(c *gin.Context) (int, bool) {
+	idStr := c.Param("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		pathIntErr(c, "notice_id", idStr)
+		return 0, false
+	}
+	return id, true
+}
+
+// Create는 POST /notices/ (RequireAdmin). NoticeCreate{nt_title 필수·max200, nt_content 필수,
+// nt_file1 max50, nt_show enum Y/N, mt_idx int}. 성공 시 NoticeResponse + cache 무효화.
+func (h *NoticeHandler) Create(c *gin.Context) {
+	in, title, content, errs := parseNoticeCreate(c)
+	if len(errs) > 0 {
+		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
+		return
+	}
+	resp, ok := h.svc.CreateNotice(in, title, content)
+	if !ok {
+		plainServerError(c)
+		return
+	}
+	writeJSON(c, http.StatusOK, resp)
+}
+
+// Update는 PUT /notices/:id (RequireAdmin). NoticeUpdate(전 Optional, exclude_unset). 404 "공지사항을 찾을 수 없습니다."
+func (h *NoticeHandler) Update(c *gin.Context) {
+	id, ok := noticePathID(c)
+	if !ok {
+		return
+	}
+	present, errs := parseNoticeUpdate(c)
+	if len(errs) > 0 {
+		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
+		return
+	}
+	resp, found, sok := h.svc.UpdateNotice(id, present)
+	if !sok {
+		plainServerError(c)
+		return
+	}
+	if !found {
+		writeJSON(c, http.StatusNotFound, gin.H{"detail": "공지사항을 찾을 수 없습니다."})
+		return
+	}
+	writeJSON(c, http.StatusOK, resp)
+}
+
+// Delete는 DELETE /notices/:id (RequireAdmin). 404 또는 {"message":"공지사항이 삭제되었습니다."}
+func (h *NoticeHandler) Delete(c *gin.Context) {
+	id, ok := noticePathID(c)
+	if !ok {
+		return
+	}
+	found, sok := h.svc.DeleteNotice(id)
+	if !sok {
+		plainServerError(c)
+		return
+	}
+	if !found {
+		writeJSON(c, http.StatusNotFound, gin.H{"detail": "공지사항을 찾을 수 없습니다."})
+		return
+	}
+	writeJSON(c, http.StatusOK, gin.H{"message": "공지사항이 삭제되었습니다."})
+}
+
+// Hide는 PATCH /notices/:id/hide (RequireAdmin). nt_show='N'.
+func (h *NoticeHandler) Hide(c *gin.Context) { h.setShow(c, "N") }
+
+// Show는 PATCH /notices/:id/show (RequireAdmin). nt_show='Y'.
+func (h *NoticeHandler) Show(c *gin.Context) { h.setShow(c, "Y") }
+
+func (h *NoticeHandler) setShow(c *gin.Context, target string) {
+	id, ok := noticePathID(c)
+	if !ok {
+		return
+	}
+	resp, found, sok := h.svc.SetNoticeShow(id, target)
+	if !sok {
+		plainServerError(c)
+		return
+	}
+	if !found {
+		writeJSON(c, http.StatusNotFound, gin.H{"detail": "공지사항을 찾을 수 없습니다."})
+		return
+	}
+	writeJSON(c, http.StatusOK, resp)
+}
+
+// parseNoticeCreate는 NoticeCreate를 Pydantic 필드 순서(nt_title, nt_file1, nt_content, nt_show, mt_idx)대로 검증한다.
+func parseNoticeCreate(c *gin.Context) (in service.NoticeWriteInput, title, content string, errs []valErr) {
+	var body map[string]interface{}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		body = map[string]interface{}{}
+	}
+	title = noticeReqStr(body, "nt_title", 200, &errs)
+	in.NtFile1 = noticeOptStr(body, "nt_file1", 50, &errs)
+	content = noticeReqStr(body, "nt_content", 0, &errs)
+	present := map[string]interface{}{}
+	in.NtShow = bodyOptEnum(body, "nt_show", ynEnumSet, "'Y' or 'N'", present, &errs)
+	in.MtIdx = bodyOptInt(body, "mt_idx", present, &errs)
+	in.NtTitle, in.NtContent = &title, &content
+	return
+}
+
+// parseNoticeUpdate는 NoticeUpdate(전 Optional, exclude_unset)를 검증해 present 맵(존재 컬럼만)을 만든다.
+// 순서: nt_title(max200), nt_file1(max50), nt_content, nt_show(enum).
+func parseNoticeUpdate(c *gin.Context) (map[string]interface{}, []valErr) {
+	var body map[string]interface{}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		body = map[string]interface{}{}
+	}
+	present := map[string]interface{}{}
+	var errs []valErr
+	noticeOptStrPresent(body, "nt_title", 200, present, &errs)
+	noticeOptStrPresent(body, "nt_file1", 50, present, &errs)
+	noticeOptStrPresent(body, "nt_content", 0, present, &errs)
+	bodyOptEnum(body, "nt_show", ynEnumSet, "'Y' or 'N'", present, &errs)
+	return present, errs
+}
+
+// noticeReqStr는 필수 문자열(maxLen>0이면 길이 제한). 미존재→missing, null/비문자열→string_type, 초과→string_too_long.
+func noticeReqStr(body map[string]interface{}, key string, maxLen int, errs *[]valErr) string {
+	raw, ok := body[key]
+	if !ok {
+		*errs = append(*errs, valErr{Type: "missing", Loc: []string{"body", key}, Msg: msgFieldRequired, Input: body})
+		return ""
+	}
+	s, oks := raw.(string)
+	if !oks {
+		*errs = append(*errs, valErr{Type: "string_type", Loc: []string{"body", key}, Msg: msgStringType, Input: raw})
+		return ""
+	}
+	if maxLen > 0 && utf8.RuneCountInString(s) > maxLen {
+		*errs = append(*errs, valErr{Type: "string_too_long", Loc: []string{"body", key},
+			Msg: "String should have at most " + strconv.Itoa(maxLen) + " characters", Input: s, Ctx: map[string]any{"max_length": maxLen}})
+		return ""
+	}
+	return s
+}
+
+// noticeOptStr는 Optional 문자열(maxLen 제한). 미존재/null→nil. 비문자열→string_type, 초과→string_too_long.
+func noticeOptStr(body map[string]interface{}, key string, maxLen int, errs *[]valErr) *string {
+	raw, ok := body[key]
+	if !ok || raw == nil {
+		return nil
+	}
+	s, oks := raw.(string)
+	if !oks {
+		*errs = append(*errs, valErr{Type: "string_type", Loc: []string{"body", key}, Msg: msgStringType, Input: raw})
+		return nil
+	}
+	if maxLen > 0 && utf8.RuneCountInString(s) > maxLen {
+		*errs = append(*errs, valErr{Type: "string_too_long", Loc: []string{"body", key},
+			Msg: "String should have at most " + strconv.Itoa(maxLen) + " characters", Input: s, Ctx: map[string]any{"max_length": maxLen}})
+		return nil
+	}
+	return &s
+}
+
+// noticeOptStrPresent는 noticeOptStr + present 기록(update exclude_unset용; null도 present에 기록→NULL UPDATE).
+func noticeOptStrPresent(body map[string]interface{}, key string, maxLen int, present map[string]interface{}, errs *[]valErr) {
+	raw, ok := body[key]
+	if !ok {
+		return
+	}
+	if raw == nil {
+		present[key] = nil
+		return
+	}
+	if v := noticeOptStr(body, key, maxLen, errs); v != nil {
+		present[key] = *v
+	}
 }
 
 // parseBool은 FastAPI(Pydantic v2)의 bool 쿼리 파싱 규칙을 따른다.

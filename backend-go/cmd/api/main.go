@@ -72,13 +72,13 @@ func main() {
 	appVersionSvc := service.NewAppVersion(cfg.MinAppVersionAndroid, cfg.MinAppVersionIOS)
 	appVersionH := handler.NewAppVersion(appVersionSvc)
 
-	// Phase 2 — notices (read-only GET, GORM repository 패턴).
-	noticeRepo := repository.NewNotice(gdb)
-	noticeSvc := service.NewNotice(noticeRepo)
-	noticeH := handler.NewNotice(noticeSvc)
-
 	// 캐시 저장소 — Redis nil 허용(미연결 시 모든 캐시 연산 no-op).
 	cacheStore := cache.NewStore(rds)
+
+	// Phase 2 — notices (read GET + admin write 5종). 캐시는 create/update/delete 시 notices:* 무효화용.
+	noticeRepo := repository.NewNotice(gdb)
+	noticeSvc := service.NewNotice(noticeRepo, cacheStore)
+	noticeH := handler.NewNotice(noticeSvc)
 
 	// Phase 2 — member 공유 리포지토리(weather 조회 + admin 인증 게이트).
 	memberRepo := repository.NewMember(gdb)

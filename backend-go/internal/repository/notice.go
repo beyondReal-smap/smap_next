@@ -17,6 +17,22 @@ func NewNotice(db *gorm.DB) *NoticeRepository {
 	return &NoticeRepository{db: db}
 }
 
+// Create는 새 공지를 INSERT한다(Python crud.create_notice). nt_hit/wdate/uwdate는 서비스가 설정.
+func (r *NoticeRepository) Create(n *model.Notice) error {
+	return r.db.Create(n).Error
+}
+
+// UpdateFields는 nt_idx 행의 지정 컬럼만 UPDATE한다(update/hide/show 공용). RowsAffected 반환.
+func (r *NoticeRepository) UpdateFields(id int, fields map[string]interface{}) (int64, error) {
+	res := r.db.Model(&model.Notice{}).Where("nt_idx = ?", id).Updates(fields)
+	return res.RowsAffected, res.Error
+}
+
+// Delete는 nt_idx 행을 하드 삭제한다(Python crud.delete_notice).
+func (r *NoticeRepository) Delete(id int) error {
+	return r.db.Where("nt_idx = ?", id).Delete(&model.Notice{}).Error
+}
+
 // GetByID는 nt_idx로 단건 조회. 없으면 (nil, nil) — Python crud.get_notice와 동등.
 func (r *NoticeRepository) GetByID(id int) (*model.Notice, error) {
 	var n model.Notice
