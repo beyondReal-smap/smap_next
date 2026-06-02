@@ -92,6 +92,7 @@ func New(cfg *config.Config, logger *slog.Logger, deps Deps) http.Handler {
 		// PUT /member/:id(write)는 Phase 4.
 		v1.GET("/weather/current", deps.Weather.Current)
 		v1.GET("/weather/member/:member_id", deps.Weather.Member)
+		v1.PUT("/weather/member/:member_id", deps.Weather.UpdateMember)
 
 		// groups — read. 정적 세그먼트(/hidden,/current-user*,/member,/code)가 파라미터(/:group_id)보다
 		// 우선 매칭된다. /current-user·/current-user/summary는 JWT 필수(get_required_user_id).

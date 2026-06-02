@@ -16,6 +16,11 @@ func (f *fakeMemberRepo) GetByID(mtIdx int) (*model.Member, error) {
 	return f.member, f.err
 }
 
+// UpdateColumns는 memberGetter 인터페이스 충족용 stub(GET 테스트는 미사용).
+func (f *fakeMemberRepo) UpdateColumns(mtIdx int, fields map[string]interface{}) error {
+	return f.err
+}
+
 func pInt(i int) *int       { return &i }
 func pStr(s string) *string { return &s }
 

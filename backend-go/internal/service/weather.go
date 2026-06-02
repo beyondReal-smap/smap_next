@@ -8,10 +8,11 @@ import (
 	"github.com/bluemusk/smap_next_go/internal/model"
 )
 
-// memberGetter는 WeatherService가 필요로 하는 회원 조회 동작(소비자 인터페이스).
+// memberGetter는 WeatherService가 필요로 하는 회원 조회/갱신 동작(소비자 인터페이스).
 // *repository.MemberRepository가 이를 만족하며, 테스트에서는 fake로 대체한다.
 type memberGetter interface {
 	GetByID(mtIdx int) (*model.Member, error)
+	UpdateColumns(mtIdx int, fields map[string]interface{}) error
 }
 
 // WeatherService는 Python `app/api/v1/endpoints/weather.py`의 GET 엔드포인트 로직을
@@ -157,4 +158,77 @@ func (s *WeatherService) GetMember(memberID int) (*dto.WeatherMemberResponse, bo
 		Location:  location,
 		UpdatedAt: updatedAt,
 	}, true, nil
+}
+
+// UpdateMember는 Python `PUT /weather/member/{member_id}`를 이식한다.
+// 반환 (resp, found, ok): found=false→404, ok=false→500.
+// 존재 키만 갱신(in weather_data) + mt_weather_date=utcnow(), 갱신 후 재조회(refresh)로 응답 구성.
+func (s *WeatherService) UpdateMember(memberID int, body map[string]interface{}) (*dto.WeatherUpdateResponse, bool, bool) {
+	member, err := s.repo.GetByID(memberID)
+	if err != nil {
+		return nil, false, false
+	}
+	if member == nil {
+		return nil, false, true // 404
+	}
+
+	fields := map[string]interface{}{}
+	// sky: int(data["sky"]) if data["sky"].isdigit() else None — Python은 sky를 문자열로 가정.
+	if v, ok := body["sky"]; ok {
+		str, isStr := v.(string)
+		if !isStr {
+			return nil, true, false // Python .isdigit() AttributeError → 500
+		}
+		if gsmIsAllDigits(str) {
+			n, _ := strconv.Atoi(str)
+			fields["mt_weather_sky"] = n
+		} else {
+			fields["mt_weather_sky"] = nil
+		}
+	}
+	// temp_max/temp_min/pop: 원본 값 그대로 바인딩(tinyint/varchar). strict 위반 시 UpdateColumns가 에러→500.
+	if v, ok := body["temp_max"]; ok {
+		fields["mt_weather_tmx"] = v
+	}
+	if v, ok := body["temp_min"]; ok {
+		fields["mt_weather_tmn"] = v
+	}
+	if v, ok := body["pop"]; ok {
+		fields["mt_weather_pop"] = v
+	}
+	fields["mt_weather_date"] = time.Now().UTC() // Python datetime.utcnow()
+
+	if err := s.repo.UpdateColumns(memberID, fields); err != nil {
+		return nil, true, false // 500 (예: tinyint 1366)
+	}
+
+	// db.refresh(member) 대응: 갱신 후 재조회해 DB 값(초 정밀도)으로 응답 구성.
+	m2, err := s.repo.GetByID(memberID)
+	if err != nil || m2 == nil {
+		return nil, true, false
+	}
+	sky := "default"
+	if m2.MtWeatherSky != nil {
+		sky = strconv.Itoa(*m2.MtWeatherSky)
+	}
+	pop := "0"
+	if nonEmpty(m2.MtWeatherPop) {
+		pop = *m2.MtWeatherPop
+	}
+	updatedAt := ""
+	if m2.MtWeatherDate != nil {
+		updatedAt = isoLocalDateTime(*m2.MtWeatherDate)
+	}
+	return &dto.WeatherUpdateResponse{
+		Success: true,
+		Message: "날씨 정보가 업데이트되었습니다.",
+		Data: dto.WeatherUpdateData{
+			MtIdx:     m2.MtIdx,
+			Sky:       sky,
+			TempMax:   m2.MtWeatherTmx,
+			TempMin:   m2.MtWeatherTmn,
+			Pop:       pop,
+			UpdatedAt: updatedAt,
+		},
+	}, true, true
 }

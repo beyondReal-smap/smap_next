@@ -95,3 +95,34 @@ func (h *WeatherHandler) Member(c *gin.Context) {
 	h.cache.SetRaw(ctx, cacheKey, b, 180*time.Second)
 	c.Data(http.StatusOK, "application/json; charset=utf-8", b)
 }
+
+// UpdateMember는 PUT /api/v1/weather/member/:member_id — 무인증. 존재 키만 갱신 + 캐시 무효화.
+// body는 Python `weather_data: dict`(필수). 갱신 성공 시 GET 캐시 키를 무효화한다.
+func (h *WeatherHandler) UpdateMember(c *gin.Context) {
+	idStr := c.Param("member_id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		pathIntErr(c, "member_id", idStr)
+		return
+	}
+	body, ok := parseGSMCreateBody(c) // 필수 JSON 객체(UseNumber, 비객체→422)
+	if !ok {
+		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": []valErr{{
+			Type: "dict_type", Loc: []string{"body"}, Msg: "Input should be a valid dictionary",
+		}}})
+		return
+	}
+
+	resp, found, sok := h.svc.UpdateMember(id, body)
+	if !sok {
+		writeJSON(c, http.StatusInternalServerError, gin.H{"detail": "날씨 정보 업데이트에 실패했습니다."})
+		return
+	}
+	if !found {
+		writeJSON(c, http.StatusNotFound, gin.H{"detail": "Member not found"})
+		return
+	}
+	// Python cache_delete(f'weather:member:{{"member_id": {id}}}')와 동일 키 무효화.
+	h.cache.Delete(c.Request.Context(), fmt.Sprintf(`weather:member:{"member_id": %d}`, id))
+	writeJSON(c, http.StatusOK, resp)
+}

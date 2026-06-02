@@ -32,3 +32,21 @@ type WeatherMemberResponse struct {
 	Location  string  `json:"location"`
 	UpdatedAt *string `json:"updated_at"`
 }
+
+// WeatherUpdateData는 PUT /weather/member/{member_id} 성공 응답의 data.
+// GET과 달리 mt_name/location이 없고, updated_at은 방금 설정되어 항상 문자열.
+type WeatherUpdateData struct {
+	MtIdx     int    `json:"mt_idx"`
+	Sky       string `json:"sky"`
+	TempMax   *int   `json:"temp_max"`
+	TempMin   *int   `json:"temp_min"`
+	Pop       string `json:"pop"`
+	UpdatedAt string `json:"updated_at"`
+}
+
+// WeatherUpdateResponse는 PUT /weather/member/{member_id}의 {success, message, data} 응답.
+type WeatherUpdateResponse struct {
+	Success bool              `json:"success"`
+	Message string            `json:"message"`
+	Data    WeatherUpdateData `json:"data"`
+}
