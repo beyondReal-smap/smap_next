@@ -112,11 +112,11 @@ func groupDetailPathID(c *gin.Context) (int, bool) {
 	return id, true
 }
 
-// gdYNSet/gdYNDSet은 GroupDetail enum 허용값(app/models/enums.py). 대부분 Y/N,
-// sgdt_group_chk(GroupCheckEnum)만 Y/N/D.
+// ynEnumSet/yndEnumSet은 package handler 공용 enum 허용값(app/models/enums.py 다수가 Y/N).
+// GroupCheckEnum(sgdt_group_chk)만 Y/N/D. push_log의 ReadCheckEnum/ShowEnum 등도 ynEnumSet 재사용.
 var (
-	gdYNSet  = map[string]bool{"Y": true, "N": true}
-	gdYNDSet = map[string]bool{"Y": true, "N": true, "D": true}
+	ynEnumSet  = map[string]bool{"Y": true, "N": true}
+	yndEnumSet = map[string]bool{"Y": true, "N": true, "D": true}
 )
 
 // parseGroupDetailUpdate는 GroupDetailUpdate(=GroupDetailBase) 13필드를 Pydantic 선언 순서대로
@@ -132,37 +132,39 @@ func parseGroupDetailUpdate(c *gin.Context) (map[string]interface{}, []valErr) {
 	const yn, ynd = "'Y' or 'N'", "'Y', 'N' or 'D'"
 	bodyOptInt(body, "sgt_idx", present, &errs)
 	bodyOptInt(body, "mt_idx", present, &errs)
-	bodyOptEnum(body, "sgdt_owner_chk", gdYNSet, yn, present, &errs)
-	bodyOptEnum(body, "sgdt_leader_chk", gdYNSet, yn, present, &errs)
-	bodyOptEnum(body, "sgdt_discharge_chk", gdYNSet, yn, present, &errs)
-	bodyOptEnum(body, "sgdt_group_chk", gdYNDSet, ynd, present, &errs)
-	bodyOptEnum(body, "sgdt_exit_chk", gdYNSet, yn, present, &errs)
-	bodyOptEnum(body, "sgdt_push_chk", gdYNSet, yn, present, &errs)
-	bodyOptEnum(body, "sgdt_in_chk", gdYNSet, yn, present, &errs)
-	bodyOptEnum(body, "sgdt_schedule_chk", gdYNSet, yn, present, &errs)
-	bodyOptEnum(body, "sgdt_read_chk", gdYNSet, yn, present, &errs)
-	bodyOptEnum(body, "sgdt_enter_alarm", gdYNSet, yn, present, &errs)
-	bodyOptEnum(body, "sgdt_enter_chk", gdYNSet, yn, present, &errs)
+	bodyOptEnum(body, "sgdt_owner_chk", ynEnumSet, yn, present, &errs)
+	bodyOptEnum(body, "sgdt_leader_chk", ynEnumSet, yn, present, &errs)
+	bodyOptEnum(body, "sgdt_discharge_chk", ynEnumSet, yn, present, &errs)
+	bodyOptEnum(body, "sgdt_group_chk", yndEnumSet, ynd, present, &errs)
+	bodyOptEnum(body, "sgdt_exit_chk", ynEnumSet, yn, present, &errs)
+	bodyOptEnum(body, "sgdt_push_chk", ynEnumSet, yn, present, &errs)
+	bodyOptEnum(body, "sgdt_in_chk", ynEnumSet, yn, present, &errs)
+	bodyOptEnum(body, "sgdt_schedule_chk", ynEnumSet, yn, present, &errs)
+	bodyOptEnum(body, "sgdt_read_chk", ynEnumSet, yn, present, &errs)
+	bodyOptEnum(body, "sgdt_enter_alarm", ynEnumSet, yn, present, &errs)
+	bodyOptEnum(body, "sgdt_enter_chk", ynEnumSet, yn, present, &errs)
 	return present, errs
 }
 
-// bodyOptEnum은 Optional Enum 필드를 검증한다(Pydantic str-Enum과 동등).
-// 미존재→무시, null→present[key]=nil(Optional None 허용), 허용값 문자열→통과,
-// 그 외(미허용 문자열·비문자열)→type:"enum" 422(ctx.expected=expected, input=원본 JSON값).
-func bodyOptEnum(body map[string]interface{}, key string, allowed map[string]bool, expected string, present map[string]interface{}, errs *[]valErr) {
+// bodyOptEnum은 Optional Enum 필드를 검증한다(Pydantic str-Enum과 동등). 검증 통과한 값의 포인터를 반환
+// (create처럼 입력 포인터가 필요한 호출용; 반환을 무시하면 present 맵만 채우는 호출도 가능).
+// 미존재→nil, null→present[key]=nil(Optional None 허용)·nil, 허용값 문자열→present 기록·&값,
+// 그 외(미허용 문자열·비문자열)→type:"enum" 422(ctx.expected=expected, input=원본 JSON값)·nil.
+func bodyOptEnum(body map[string]interface{}, key string, allowed map[string]bool, expected string, present map[string]interface{}, errs *[]valErr) *string {
 	raw, ok := body[key]
 	if !ok {
-		return
+		return nil
 	}
 	if raw == nil {
 		present[key] = nil
-		return
+		return nil
 	}
 	if s, oks := raw.(string); oks && allowed[s] {
 		present[key] = s
-		return
+		return &s
 	}
 	e := valErr{Type: "enum", Loc: []string{"body", key}, Msg: "Input should be " + expected, Input: raw}
 	e.Ctx = map[string]any{"expected": expected}
 	*errs = append(*errs, e)
+	return nil
 }

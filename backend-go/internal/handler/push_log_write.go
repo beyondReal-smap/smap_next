@@ -150,8 +150,9 @@ func parsePushLogBody(c *gin.Context) (in service.PushLogWriteInput, present map
 	in.PltContent = bodyOptStr(body, "plt_content", present, &errs)
 	in.PltSdate = bodyOptDatetime(body, "plt_sdate", present, &errs)
 	in.PltStatus = bodyOptInt(body, "plt_status", present, &errs)
-	in.PltReadChk = bodyOptStr(body, "plt_read_chk", present, &errs)
-	in.PltShow = bodyOptStr(body, "plt_show", present, &errs)
+	// plt_read_chk=ReadCheckEnum(Y/N), plt_show=ShowEnum(Y/N) — Pydantic enum 검증(invalid→422 enum).
+	in.PltReadChk = bodyOptEnum(body, "plt_read_chk", ynEnumSet, "'Y' or 'N'", present, &errs)
+	in.PltShow = bodyOptEnum(body, "plt_show", ynEnumSet, "'Y' or 'N'", present, &errs)
 	in.PushJSON = bodyOptStr(body, "push_json", present, &errs)
 	return in, present, errs
 }
