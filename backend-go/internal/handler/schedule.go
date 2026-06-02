@@ -55,6 +55,36 @@ func (h *ScheduleHandler) Get(c *gin.Context) {
 	writeJSON(c, http.StatusOK, res)
 }
 
+// NowInMembers는 GET /api/v1/schedules/now/in-members. 시간창 매칭 일정(zero date 행 있으면 500).
+func (h *ScheduleHandler) NowInMembers(c *gin.Context) {
+	res, ok := h.svc.NowScheduleInMembers()
+	if !ok {
+		plainServerError(c)
+		return
+	}
+	writeJSON(c, http.StatusOK, res)
+}
+
+// NowOutMembers는 GET /api/v1/schedules/now/out-members.
+func (h *ScheduleHandler) NowOutMembers(c *gin.Context) {
+	res, ok := h.svc.NowScheduleOutMembers()
+	if !ok {
+		plainServerError(c)
+		return
+	}
+	writeJSON(c, http.StatusOK, res)
+}
+
+// NowPush는 GET /api/v1/schedules/now/push.
+func (h *ScheduleHandler) NowPush(c *gin.Context) {
+	res, ok := h.svc.NowSchedulePush()
+	if !ok {
+		plainServerError(c)
+		return
+	}
+	writeJSON(c, http.StatusOK, res)
+}
+
 // Member는 GET /api/v1/schedules/member/:member_id.
 func (h *ScheduleHandler) Member(c *gin.Context) {
 	idStr := c.Param("member_id")

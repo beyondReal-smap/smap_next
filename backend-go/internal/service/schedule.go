@@ -26,6 +26,9 @@ type scheduleRepo interface {
 	GetByID(id int) (*model.Schedule, error)
 	FindByMember(mtIdx int) ([]model.Schedule, error)
 	FindGroupSchedules(groupID int, days *int) ([]model.Schedule, error)
+	GetNowScheduleInMembers() ([]model.Schedule, error)
+	GetNowScheduleOutMembers() ([]model.Schedule, error)
+	GetNowSchedulePush() ([]model.Schedule, error)
 	Create(s *model.Schedule) error
 	UpdateFields(id int, fields map[string]interface{}) error
 	Delete(id int) error
@@ -130,6 +133,34 @@ func (s *ScheduleService) GetSchedule(id int) (resp *dto.ScheduleResponse, found
 // MemberSchedules는 회원의 일정 목록(sst_show='Y' ORDER BY sst_sdate). ok=false면 500.
 func (s *ScheduleService) MemberSchedules(mtIdx int) ([]dto.ScheduleResponse, bool) {
 	items, err := s.repo.FindByMember(mtIdx)
+	if err != nil {
+		return nil, false
+	}
+	return toScheduleResponses(items)
+}
+
+// NowScheduleInMembers는 GET /schedules/now/in-members(진입 알림 대상). 시간창 필터 매칭 행을
+// ScheduleResponse로 반환. zero date(sst_schedule_alarm 등)가 있으면 ok=false→500(Python ResponseValidationError).
+func (s *ScheduleService) NowScheduleInMembers() ([]dto.ScheduleResponse, bool) {
+	items, err := s.repo.GetNowScheduleInMembers()
+	if err != nil {
+		return nil, false
+	}
+	return toScheduleResponses(items)
+}
+
+// NowScheduleOutMembers는 GET /schedules/now/out-members(이탈 알림 대상).
+func (s *ScheduleService) NowScheduleOutMembers() ([]dto.ScheduleResponse, bool) {
+	items, err := s.repo.GetNowScheduleOutMembers()
+	if err != nil {
+		return nil, false
+	}
+	return toScheduleResponses(items)
+}
+
+// NowSchedulePush는 GET /schedules/now/push(현재 분 발송 대상).
+func (s *ScheduleService) NowSchedulePush() ([]dto.ScheduleResponse, bool) {
+	items, err := s.repo.GetNowSchedulePush()
 	if err != nil {
 		return nil, false
 	}

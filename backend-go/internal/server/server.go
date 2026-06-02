@@ -205,9 +205,12 @@ func New(cfg *config.Config, logger *slog.Logger, deps Deps) http.Handler {
 		v1.POST("/locations/members/:member_id/locations", deps.Location.MemberCreate)
 
 		// schedules — 결정적 read 3종(무인증). sst_location_lat/long Decimal→문자열.
-		// /before-30min은 Python에서 /:schedule_id에 가려져 422(미등록으로 동일). now/*(시간창)·
-		// group(List[dict] day-window)은 별도 작업 보류 → 게이트웨이가 Python으로 라우팅.
+		// /before-30min은 Python에서 /:schedule_id에 가려져 422(미등록으로 동일).
+		// now/in-members·out-members·push(시간창, zero date 행 있으면 500=Python ResponseValidationError 재현) 이식.
 		v1.GET("/schedules/", deps.Schedule.List)
+		v1.GET("/schedules/now/in-members", deps.Schedule.NowInMembers)
+		v1.GET("/schedules/now/out-members", deps.Schedule.NowOutMembers)
+		v1.GET("/schedules/now/push", deps.Schedule.NowPush)
 		v1.GET("/schedules/:schedule_id", deps.Schedule.Get)
 		v1.GET("/schedules/member/:member_id", deps.Schedule.Member)
 		v1.GET("/schedules/group/:group_id", deps.Schedule.Group)
