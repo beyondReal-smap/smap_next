@@ -110,7 +110,8 @@ func parsePushFCMBody(c *gin.Context) (in service.PushFCMWriteInput, present map
 	in.PftRdate = bodyOptDatetime(body, "pft_rdate", present, &errs)
 	in.PftURL = bodyOptStr(body, "pft_url", present, &errs)
 	in.PftStatus = bodyOptInt(body, "pft_status", present, &errs)
-	in.PftShow = bodyOptStr(body, "pft_show", present, &errs)
+	// pft_show=ShowEnum(Y/N) — Pydantic enum 검증(invalid→422 enum). bodyOptStr는 임의문자열 통과→DB enum 위반 500.
+	in.PftShow = bodyOptEnum(body, "pft_show", ynEnumSet, "'Y' or 'N'", present, &errs)
 	in.PftSdate = bodyOptDatetime(body, "pft_sdate", present, &errs)
 	in.PftEdate = bodyOptDatetime(body, "pft_edate", present, &errs)
 	return in, present, errs
