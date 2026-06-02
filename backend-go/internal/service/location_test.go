@@ -19,6 +19,15 @@ func (f *fakeLocationRepo) List(skip, limit int) ([]model.Location, error)    { 
 func (f *fakeLocationRepo) GetByID(id int) (*model.Location, error)           { return f.one, f.err }
 func (f *fakeLocationRepo) FindByMember(mtIdx int) ([]model.Location, error)  { return f.many, f.err }
 func (f *fakeLocationRepo) FindByGroupDetail(s int) ([]model.Location, error) { return f.many, f.err }
+func (f *fakeLocationRepo) Create(l *model.Location) error                    { return f.err }
+func (f *fakeLocationRepo) UpdateFields(id int, fields map[string]interface{}) (int64, error) {
+	return 1, f.err
+}
+func (f *fakeLocationRepo) Delete(id int) error                  { return f.err }
+func (f *fakeLocationRepo) MemberExists(mtIdx int) (bool, error) { return true, f.err }
+func (f *fakeLocationRepo) FirstGroupForMember(mtIdx int) (*int, *int, error) {
+	return nil, nil, f.err
+}
 
 // TestLocationResponseJSON은 /locations/{id} 실측 바이트와 동일한지 검증한다.
 // 핵심: slt_lat/long은 Decimal→문자열("37.52460739277500"), 모델 미매핑 3필드는 항상 null.

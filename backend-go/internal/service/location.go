@@ -44,6 +44,11 @@ type locationRepo interface {
 	GetByID(id int) (*model.Location, error)
 	FindByMember(mtIdx int) ([]model.Location, error)
 	FindByGroupDetail(sgdtIdx int) ([]model.Location, error)
+	Create(l *model.Location) error
+	UpdateFields(id int, fields map[string]interface{}) (int64, error)
+	Delete(id int) error
+	MemberExists(mtIdx int) (bool, error)
+	FirstGroupForMember(mtIdx int) (*int, *int, error)
 }
 
 // LocationService는 Python `app/api/v1/endpoints/locations.py`의 read 핸들러를 이식한다.

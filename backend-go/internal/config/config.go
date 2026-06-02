@@ -14,8 +14,10 @@ import (
 // Python(`app/core/config.py`)의 Settings 클래스와 동일한 환경변수를 공유한다.
 type Config struct {
 	ProjectName string `envconfig:"PROJECT_NAME" default:"SMAP API"`
-	Version     string `envconfig:"VERSION" default:"1.0.0"`
-	APIV1Str    string `envconfig:"API_V1_STR" default:"/api/v1"`
+	// Debug는 Python settings.DEBUG(기본 False). member-fcm-token의 DEBUG 전용 4종은 false면 404.
+	Debug    bool   `envconfig:"DEBUG" default:"false"`
+	Version  string `envconfig:"VERSION" default:"1.0.0"`
+	APIV1Str string `envconfig:"API_V1_STR" default:"/api/v1"`
 
 	HTTPHost string `envconfig:"GO_HTTP_HOST" default:"127.0.0.1"`
 	HTTPPort int    `envconfig:"GO_HTTP_PORT" default:"9200"`
@@ -50,15 +52,25 @@ type Config struct {
 	// JWT 검증은 admin 게이트/optional 인증에서 이미 사용 중이므로 시크릿은 필수다.
 	// Python config.py의 `JWT_SECRET_KEY: str = Field(default=...)`(필수)와 동일하게
 	// 미설정 시 fail-fast 하도록 required로 둔다(빈 시크릿 = HS256 키 []byte("")로 토큰 위조 가능).
+	// auth/me(read_users_me)도 이 시크릿/알고리즘을 쓴다: Python settings.SECRET_KEY/ALGORITHM은
+	// config.py에서 JWT_SECRET_KEY/JWT_ALGORITHM의 @property 별칭이라 별도 SECRET_KEY env가 없고
+	// 값이 항상 동일하다. 따라서 별도 SecretKey/Algorithm 필드를 두지 않고 아래 둘만 사용한다.
 	JWTSecretKey string `envconfig:"JWT_SECRET_KEY" required:"true"`
 	JWTAlgorithm string `envconfig:"JWT_ALGORITHM" default:"HS256"`
 
-	// auth/me(read_users_me)는 deps의 JWT_SECRET_KEY/JWT_ALGORITHM이 아니라 별도의
-	// SECRET_KEY/ALGORITHM 설정으로 토큰을 디코드한다(Python config.py: 두 시크릿의
-	// 기본값이 서로 다름). byte-동등을 위해 분리 필드로 보존한다.
-	// Python `SECRET_KEY: str = Field(default="smap_jwt_secret_key_2024_...")`와 동일 기본값.
-	SecretKey string `envconfig:"SECRET_KEY" default:"smap_jwt_secret_key_2024_very_secure_random_string_for_production"`
-	Algorithm string `envconfig:"ALGORITHM" default:"HS256"`
+	// --- auth 도메인(토큰 수명·비밀번호 정책) — Python settings와 동일 env/기본값 ---
+	// access 토큰 TTL(분). Python ACCESS_TOKEN_EXPIRE_MINUTES=43200(30일).
+	AccessTokenExpireMinutes int `envconfig:"ACCESS_TOKEN_EXPIRE_MINUTES" default:"43200"`
+	// refresh 토큰 만료(일)·raw 바이트 수. Python REFRESH_TOKEN_EXPIRE_DAYS=30, REFRESH_TOKEN_BYTES=48.
+	RefreshTokenExpireDays int `envconfig:"REFRESH_TOKEN_EXPIRE_DAYS" default:"30"`
+	RefreshTokenBytes      int `envconfig:"REFRESH_TOKEN_BYTES" default:"48"`
+	// 비밀번호 정책 — Python PASSWORD_* 동일.
+	PasswordMinLength      int  `envconfig:"PASSWORD_MIN_LENGTH" default:"8"`
+	PasswordBcryptCost     int  `envconfig:"PASSWORD_BCRYPT_COST" default:"12"`
+	PasswordRequireUpper   bool `envconfig:"PASSWORD_REQUIRE_UPPERCASE" default:"true"`
+	PasswordRequireLower   bool `envconfig:"PASSWORD_REQUIRE_LOWERCASE" default:"true"`
+	PasswordRequireNumbers bool `envconfig:"PASSWORD_REQUIRE_NUMBERS" default:"true"`
+	PasswordRequireSpecial bool `envconfig:"PASSWORD_REQUIRE_SPECIAL" default:"true"`
 
 	// 클라이언트 최소 지원 버전 — Python settings.MIN_APP_VERSION_*과 동일 env/기본값.
 	MinAppVersionAndroid string `envconfig:"MIN_APP_VERSION_ANDROID" default:"3.1.0"`
@@ -84,6 +96,21 @@ type Config struct {
 	// iOS APNs topic(apns-topic 헤더)·안드로이드 알림 채널 — fcm.buildMessage 페이로드용. 다음 단계에서 사용.
 	IOSBundleID         string `envconfig:"IOS_BUNDLE_ID"`
 	FCMAndroidChannelID string `envconfig:"FCM_ANDROID_CHANNEL_ID" default:"com.dmonster.smap-Smap"`
+
+	// --- SMS/이메일 발송 도메인 -----------------------------------------
+	// Aligo SMS API 자격증명(Python settings.ALIGO_*). 미설정 시 발송은 실패 경로로 수렴(Python 동일).
+	AligoUserID string `envconfig:"ALIGO_USER_ID" default:""`
+	AligoKey    string `envconfig:"ALIGO_KEY" default:""`
+	AligoSender string `envconfig:"ALIGO_SENDER" default:""`
+	// Fixie 프록시(고정 IP). 설정 시 Aligo 호출을 프록시 경유(Python os.getenv('FIXIE_URL')).
+	FixieURL string `envconfig:"FIXIE_URL" default:""`
+	// Gmail SMTP 폴백 자격증명(Python settings.EMAIL_SENDER/PASSWORD). 미설정 시 SMTP 발송 실패.
+	EmailSender   string `envconfig:"EMAIL_SENDER" default:""`
+	EmailPassword string `envconfig:"EMAIL_PASSWORD" default:""`
+	// 네이버웍스 메일 API(우선 발송 경로). 미설정 시 Gmail SMTP로 폴백(Python os.getenv).
+	NaverworksClientID     string `envconfig:"NAVERWORKS_CLIENT_ID" default:""`
+	NaverworksClientSecret string `envconfig:"NAVERWORKS_CLIENT_SECRET" default:""`
+	NaverworksDomain       string `envconfig:"NAVERWORKS_DOMAIN" default:""`
 
 	// Python의 BACKEND_CORS_ORIGINS와 동일한 정책.
 	// 콤마 분리 문자열 또는 환경변수 미설정 시 기본값 사용.

@@ -46,3 +46,25 @@ type GroupDetailMemberItem struct {
 	SgdtXdate     string `json:"sgdt_xdate"`
 	SgdtAdate     string `json:"sgdt_adate"`
 }
+
+// GroupDetailWriteResponse는 role/remove의 {success, message, data} 응답(키 순서 고정).
+type GroupDetailWriteResponse struct {
+	Success bool        `json:"success"`
+	Message string      `json:"message"`
+	Data    interface{} `json:"data"`
+}
+
+// GroupDetailRoleData는 PUT /{id}/role의 data: {sgdt_idx, sgdt_leader_chk, sgdt_udate(isoformat)}.
+type GroupDetailRoleData struct {
+	SgdtIdx       int     `json:"sgdt_idx"`
+	SgdtLeaderChk *string `json:"sgdt_leader_chk"`
+	SgdtUdate     string  `json:"sgdt_udate"`
+}
+
+// GroupDetailRemoveData는 PUT /{id}/remove의 data: {sgdt_idx, sgdt_show, sgdt_exit, sgdt_udate(isoformat)}.
+type GroupDetailRemoveData struct {
+	SgdtIdx   int     `json:"sgdt_idx"`
+	SgdtShow  *string `json:"sgdt_show"`
+	SgdtExit  *string `json:"sgdt_exit"`
+	SgdtUdate string  `json:"sgdt_udate"`
+}

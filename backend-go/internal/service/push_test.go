@@ -19,6 +19,14 @@ func (f *fakePushLogRepo) GetByID(id int) (*model.PushLog, error)          { ret
 func (f *fakePushLogRepo) FindByMember(mtIdx int) ([]model.PushLog, error) { return f.many, f.err }
 func (f *fakePushLogRepo) FindBySchedule(s int) ([]model.PushLog, error)   { return f.many, f.err }
 func (f *fakePushLogRepo) FindUnread(mtIdx int) ([]model.PushLog, error)   { return f.many, f.err }
+func (f *fakePushLogRepo) Create(p *model.PushLog) error                   { return f.err }
+func (f *fakePushLogRepo) UpdateFields(id int, fields map[string]interface{}) error {
+	return f.err
+}
+func (f *fakePushLogRepo) Delete(id int) error                                   { return f.err }
+func (f *fakePushLogRepo) MarkReadByID(id int, now time.Time) error              { return f.err }
+func (f *fakePushLogRepo) SoftDeleteAllForMember(mtIdx int, now time.Time) error { return f.err }
+func (f *fakePushLogRepo) MarkReadAllForMember(mtIdx int, now time.Time) error   { return f.err }
 
 func TestPushLogResponseJSON(t *testing.T) {
 	svc := NewPushLog(&fakePushLogRepo{one: &model.PushLog{
@@ -60,6 +68,11 @@ func (f *fakePushFCMRepo) FindByCode(code string) ([]model.PushFCM, error) { ret
 func (f *fakePushFCMRepo) FindPending(mtIdx int, since *float64) ([]model.PushFCM, error) {
 	return f.many, f.err
 }
+func (f *fakePushFCMRepo) Create(p *model.PushFCM) error { return f.err }
+func (f *fakePushFCMRepo) UpdateFields(id int, fields map[string]interface{}) error {
+	return f.err
+}
+func (f *fakePushFCMRepo) Delete(id int) error { return f.err }
 
 func TestPushFCMResponseJSON(t *testing.T) {
 	svc := NewPushFCM(&fakePushFCMRepo{one: &model.PushFCM{

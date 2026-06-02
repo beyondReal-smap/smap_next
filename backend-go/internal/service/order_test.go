@@ -34,6 +34,7 @@ func (m *mockOrderRepo) FindRecentByMember(memberID, limit int) ([]model.Order, 
 func (m *mockOrderRepo) Summary(memberID int, startOfMonth string) (*repository.OrderSummaryRow, error) {
 	return m.summary(memberID, startOfMonth)
 }
+func (m *mockOrderRepo) UpdateFields(id int, fields map[string]interface{}) error { return nil }
 
 func oPtrInt(v int) *int              { return &v }
 func oPtrStr(v string) *string        { return &v }

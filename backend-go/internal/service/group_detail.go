@@ -13,6 +13,7 @@ type groupDetailRepo interface {
 	GetByID(id int) (*model.GroupDetail, error)
 	FindByMember(mtIdx int) ([]model.GroupDetail, error)
 	FindByGroup(sgtIdx int) ([]model.GroupDetail, error)
+	UpdateFields(id int, fields map[string]interface{}) error
 }
 
 // GroupDetailService는 Python `app/api/v1/endpoints/group_details.py`의 read 핸들러

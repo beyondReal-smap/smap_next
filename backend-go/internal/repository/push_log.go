@@ -52,6 +52,39 @@ func (r *PushLogRepository) CreateBatch(logs []model.PushLog) error {
 	return r.db.Create(&logs).Error
 }
 
+// UpdateFields는 plt_idx 행의 지정 컬럼만 UPDATE한다(Python update_push_log의 exclude_unset setattr 등가).
+func (r *PushLogRepository) UpdateFields(id int, fields map[string]interface{}) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	return r.db.Model(&model.PushLog{}).Where("plt_idx = ?", id).Updates(fields).Error
+}
+
+// Delete는 plt_idx 행을 하드 삭제한다(Python delete_push_log의 db.delete — 소프트삭제 아님).
+func (r *PushLogRepository) Delete(id int) error {
+	return r.db.Where("plt_idx = ?", id).Delete(&model.PushLog{}).Error
+}
+
+// MarkReadByID는 plt_read_chk='Y', plt_rdate=now로 읽음 처리(Python mark_push_log_as_read).
+func (r *PushLogRepository) MarkReadByID(id int, now time.Time) error {
+	return r.db.Model(&model.PushLog{}).Where("plt_idx = ?", id).
+		Updates(map[string]interface{}{"plt_read_chk": "Y", "plt_rdate": now}).Error
+}
+
+// SoftDeleteAllForMember는 회원의 노출 로그를 plt_show='N'으로 일괄 소프트삭제(Python delete_all_push_logs).
+func (r *PushLogRepository) SoftDeleteAllForMember(mtIdx int, now time.Time) error {
+	return r.db.Model(&model.PushLog{}).
+		Where("mt_idx = ? AND plt_show = ?", mtIdx, "Y").
+		Updates(map[string]interface{}{"plt_show": "N", "plt_rdate": now}).Error
+}
+
+// MarkReadAllForMember는 회원의 미읽음 노출 로그를 일괄 읽음 처리(Python read_all_push_logs).
+func (r *PushLogRepository) MarkReadAllForMember(mtIdx int, now time.Time) error {
+	return r.db.Model(&model.PushLog{}).
+		Where("mt_idx = ? AND plt_read_chk = ? AND plt_show = ?", mtIdx, "N", "Y").
+		Updates(map[string]interface{}{"plt_read_chk": "Y", "plt_rdate": now}).Error
+}
+
 // FindByMember는 mt_idx + plt_show='Y' + plt_status=2 + plt_sdate>=(now-7d) ORDER BY plt_sdate DESC
 // (Python get_member_push_logs, 최근 7일). recent/{id}도 동일.
 func (r *PushLogRepository) FindByMember(mtIdx int) ([]model.PushLog, error) {
@@ -79,7 +112,9 @@ func (r *PushLogRepository) FindUnread(mtIdx int) ([]model.PushLog, error) {
 
 // GetReserved는 Python PushLog.get_reserved_pushes(push_log.py:54)를 이식한다.
 // 발송 시간이 도래한 미발송 예약 푸시를 조회한다(정렬 없음, .all() 동등).
-//   조건 3개 AND: plt_status=1 AND plt_sdate<=now AND plt_show='Y'.
+//
+//	조건 3개 AND: plt_status=1 AND plt_sdate<=now AND plt_show='Y'.
+//
 // now는 잡 진입 시 1회 캡처한 시각을 호출자가 전달한다(Python datetime.now() 1회 캡처 동등).
 // plt_status/plt_sdate는 nullable 포인터 컬럼이나, 비교는 값 바인딩이라 NULL 행은 자연 제외된다.
 // reserved 잡 전용 신규 메서드다(기존 read 메서드에 동등물이 없었음).
@@ -92,7 +127,9 @@ func (r *PushLogRepository) GetReserved(now time.Time) ([]model.PushLog, error) 
 }
 
 // ClaimReserved는 예약 푸시 1행을 발송 대상으로 선점하는 조건부 UPDATE다(★Go 전용 신규 개선).
-//   UPDATE push_log_t SET plt_status=3 WHERE plt_idx=? AND plt_status=1
+//
+//	UPDATE push_log_t SET plt_status=3 WHERE plt_idx=? AND plt_status=1
+//
 // 영향 행 수(RowsAffected)를 돌려준다. 1이면 이 호출이 선점에 성공(발송 권한 획득), 0이면 다른
 // 워커/이전 틱/asynq 재시도가 이미 선점(중복 발송 방지로 skip)했음을 뜻한다.
 //
@@ -116,7 +153,9 @@ func (r *PushLogRepository) ClaimReserved(pltIdx int) (int64, error) {
 
 // MarkReservedSent는 선점(claim)·발송을 마친 예약 푸시 행의 결과를 영속화한다.
 // Python push_jobs.py:53-54의 상태 전이와 동등하되, 이미 존재하는 행을 UPDATE한다(신규 INSERT 아님).
-//   UPDATE push_log_t SET plt_status=?(2 성공/4 실패), plt_sdate=now WHERE plt_idx=?
+//
+//	UPDATE push_log_t SET plt_status=?(2 성공/4 실패), plt_sdate=now WHERE plt_idx=?
+//
 // now는 잡 진입 시 캡처한 동일 시각(Python now 재사용 동등). plt_rdate를 비롯한 다른 컬럼은
 // 절대 건드리지 않는다(Python도 plt_status/plt_sdate 2개만 변경).
 func (r *PushLogRepository) MarkReservedSent(pltIdx int, status int, now time.Time) error {

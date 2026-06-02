@@ -36,6 +36,14 @@ func (r *GroupDetailRepository) GetByID(id int) (*model.GroupDetail, error) {
 	return &gd, nil
 }
 
+// UpdateFields는 sgdt_idx 행의 지정 컬럼만 UPDATE한다(update/role/remove/delete write 공용).
+func (r *GroupDetailRepository) UpdateFields(id int, fields map[string]interface{}) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	return r.db.Model(&model.GroupDetail{}).Where("sgdt_idx = ?", id).Updates(fields).Error
+}
+
 // FindByMember는 mt_idx + show='Y' + exit='N' + discharge='N' 필터(Python get_member_group_details).
 func (r *GroupDetailRepository) FindByMember(mtIdx int) ([]model.GroupDetail, error) {
 	out := make([]model.GroupDetail, 0)

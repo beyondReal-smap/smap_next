@@ -14,15 +14,18 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/bluemusk/smap_next_go/internal/auth"
 	"github.com/bluemusk/smap_next_go/internal/cache"
 	"github.com/bluemusk/smap_next_go/internal/config"
 	"github.com/bluemusk/smap_next_go/internal/db"
+	"github.com/bluemusk/smap_next_go/internal/fcm"
 	"github.com/bluemusk/smap_next_go/internal/handler"
 	"github.com/bluemusk/smap_next_go/internal/middleware"
 	"github.com/bluemusk/smap_next_go/internal/observability"
 	"github.com/bluemusk/smap_next_go/internal/repository"
 	"github.com/bluemusk/smap_next_go/internal/server"
 	"github.com/bluemusk/smap_next_go/internal/service"
+	"github.com/bluemusk/smap_next_go/internal/ws"
 )
 
 func main() {
@@ -90,10 +93,15 @@ func main() {
 	adminH := handler.NewAdmin(adminSvc)
 	adminAuth := middleware.RequireAdmin(cfg, memberRepo)
 
+	// Phase 5 — chat 리포지토리. chat REST/WS + groups write의 그룹채팅 동기화가 공유한다.
+	chatRepo := repository.NewChat(gdb)
+
 	// Phase 4 — groups read. 무인증 read + current-user(2종)/stats. current-user는 JWT 필수.
+	// Phase 1 write(create/join 3종, JWT): GroupWriteService가 그룹채팅 동기화에 chatRepo를 사용.
 	groupRepo := repository.NewGroup(gdb)
 	groupSvc := service.NewGroup(groupRepo)
-	groupH := handler.NewGroup(groupSvc, cfg)
+	groupWriteSvc := service.NewGroupWrite(groupRepo, chatRepo)
+	groupH := handler.NewGroup(groupSvc, groupWriteSvc, cfg)
 
 	// Phase 4 — group-details read 4종(무인증).
 	groupDetailRepo := repository.NewGroupDetail(gdb)
@@ -125,7 +133,13 @@ func main() {
 	pushFCMH := handler.NewPushFCM(service.NewPushFCM(pushFCMRepo))
 
 	// Phase 4 — group-members read 1종(무인증, 3단계 쿼리: 기본정보+최신위치+fallback).
-	groupMemberH := handler.NewGroupMember(service.NewGroupMember(repository.NewGroupMember(gdb)))
+	gmRepo := repository.NewGroupMember(gdb)
+	gmSvc := service.NewGroupMember(gmRepo)
+	gmSvc.SetWriteRepo(gmRepo) // write(add/remove/role)용 repo 주입(동일 인스턴스)
+	groupMemberH := handler.NewGroupMember(gmSvc)
+
+	// group-schedule-manage(/schedule) — read 4종(Phase A) + 생성(Phase B).
+	// FCM/회원/푸시로그 의존이 있어 fcmClient 생성 이후에 와이어링한다(아래 참조).
 
 	// Phase 4 — logs(member_location_log) 단순 read 3종(무인증). to_dict(PyFloat).
 	locationLogH := handler.NewLocationLog(service.NewLocationLog(repository.NewMemberLocationLog(gdb)))
@@ -133,24 +147,93 @@ func main() {
 	// Phase 4 — orders read 5종(무인증). 금액 Double→PyFloat, summary 단일 집계.
 	orderH := handler.NewOrder(service.NewOrder(repository.NewOrder(gdb)), cfg)
 
+	// auth write — Phase A(비밀번호 로그인 + 토큰 수명주기 5종). memberRepo 공유 + refresh_tokens 신규 repo.
+	refreshRepo := repository.NewRefreshToken(gdb, cfg.RefreshTokenBytes, cfg.RefreshTokenExpireDays)
+	authSvc := service.NewAuth(memberRepo, refreshRepo, service.AuthConfig{
+		Secret:       cfg.JWTSecretKey,
+		Algorithm:    cfg.JWTAlgorithm,
+		AccessExpMin: cfg.AccessTokenExpireMinutes,
+		BcryptCost:   cfg.PasswordBcryptCost,
+		Policy: auth.PasswordPolicy{
+			MinLength:      cfg.PasswordMinLength,
+			RequireUpper:   cfg.PasswordRequireUpper,
+			RequireLower:   cfg.PasswordRequireLower,
+			RequireNumbers: cfg.PasswordRequireNumbers,
+			RequireSpecial: cfg.PasswordRequireSpecial,
+		},
+	})
+	// Phase B 소셜로그인 부가데이터(그룹·스케줄) repo 주입.
+	authSvc.SetSocial(repository.NewAuthSocial(gdb))
+	// Phase C SMS 인증상태(Redis sms:verified:/sms:code: interop) — reset-password-by-phone용.
+	authSvc.SetVerifyStore(cache.NewSMSVerifyStore(cacheStore))
+
+	// sms/email 발송 도메인 — Aligo SMS + Gmail/네이버웍스 이메일. forgot 발송 seam 연결.
+	smsSvc := service.NewSMS(service.SMSConfig{
+		UserID:   cfg.AligoUserID,
+		Key:      cfg.AligoKey,
+		Sender:   cfg.AligoSender,
+		FixieURL: cfg.FixieURL,
+	})
+	emailSvc := service.NewEmail(service.EmailConfig{
+		Sender:                 cfg.EmailSender,
+		Password:               cfg.EmailPassword,
+		NaverworksClientID:     cfg.NaverworksClientID,
+		NaverworksClientSecret: cfg.NaverworksClientSecret,
+		NaverworksDomain:       cfg.NaverworksDomain,
+	})
+	smsVerifySvc := service.NewSMSVerify(smsSvc, cache.NewSMSVerifyStore(cacheStore))
+	smsH := handler.NewSMS(smsVerifySvc, smsSvc, cfg)
+	// forgot-password 발송 연결(Phase C에서 미뤘던 seam).
+	authSvc.SetResetSender(service.NewResetNotifier(smsSvc, emailSvc, logger))
+
+	authH := handler.NewAuth(authSvc, cfg)
+
+	// Phase 5 — chat REST 3종(JWT) + WS 실시간(native). chatSvc를 핸들러·WS가 공유(chatRepo 재사용).
+	chatSvc := service.NewChat(chatRepo)
+	chatH := handler.NewChat(chatSvc, cfg)
+	// FCM(오프라인 푸시) — 자격증명 없으면 available=false(no-op). chat WS가 Sender로 사용.
+	fcmClient := fcm.New(cfg, logger)
+	chatHub := ws.NewHub()
+	chatWS := ws.NewChatWS(chatHub, chatSvc, fcmClient, cfg, logger)
+
+	// push 발송 Phase 1 — fcm_sendone 단건/전체발송. memberRepo·pushLogRepo·fcmClient 공유.
+	fcmSendoneH := handler.NewFCMSendone(service.NewPushSend(memberRepo, pushLogRepo, fcmClient))
+	// fcm-token — FCM 토큰 관리 3종(get_current_member 인증). memberRepo 공유.
+	fcmTokenH := handler.NewFCMToken(service.NewFCMToken(memberRepo), cfg)
+	// member-fcm-token — 회원 FCM 토큰 관리 12종. memberRepo 공유 + DEBUG test-ios-push용 fcmClient.
+	memberFCMTokenH := handler.NewMemberFCMToken(service.NewMemberFCMToken(memberRepo), cfg, fcmClient)
+
+	// group-schedule-manage 생성(Phase B) — memberRepo(editor/대상 조회)·pushLogRepo·fcmClient 공유.
+	groupScheduleH := handler.NewGroupScheduleManage(
+		service.NewGroupScheduleManage(repository.NewGroupScheduleManage(gdb), memberRepo, pushLogRepo, fcmClient),
+	)
+
 	httpHandler := server.New(cfg, logger, server.Deps{
-		Health:      healthH,
-		AppVersion:  appVersionH,
-		Notice:      noticeH,
-		Weather:     weatherH,
-		Admin:       adminH,
-		AdminAuth:   adminAuth,
-		Group:       groupH,
-		GroupDetail: groupDetailH,
-		Member:      memberH,
-		User:        userH,
-		Location:    locationH,
-		Schedule:    scheduleH,
-		PushLog:     pushLogH,
-		PushFCM:     pushFCMH,
-		GroupMember: groupMemberH,
-		LocationLog: locationLogH,
-		Order:       orderH,
+		Health:         healthH,
+		AppVersion:     appVersionH,
+		Notice:         noticeH,
+		Weather:        weatherH,
+		Admin:          adminH,
+		AdminAuth:      adminAuth,
+		Group:          groupH,
+		GroupDetail:    groupDetailH,
+		Member:         memberH,
+		User:           userH,
+		Location:       locationH,
+		Schedule:       scheduleH,
+		PushLog:        pushLogH,
+		PushFCM:        pushFCMH,
+		GroupMember:    groupMemberH,
+		GroupSchedule:  groupScheduleH,
+		LocationLog:    locationLogH,
+		Order:          orderH,
+		SMS:            smsH,
+		FCMSendone:     fcmSendoneH,
+		FCMToken:       fcmTokenH,
+		MemberFCMToken: memberFCMTokenH,
+		Chat:           chatH,
+		ChatWS:         chatWS,
+		Auth:           authH,
 	})
 
 	srv := &http.Server{

@@ -16,6 +16,14 @@ func NewOrder(db *gorm.DB) *OrderRepository {
 	return &OrderRepository{db: db}
 }
 
+// UpdateFields는 ot_idx 행의 지정 컬럼만 UPDATE한다(status update / cancel write 공용).
+func (r *OrderRepository) UpdateFields(id int, fields map[string]interface{}) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	return r.db.Model(&model.Order{}).Where("ot_idx = ?", id).Updates(fields).Error
+}
+
 // GetByID는 ot_idx 단건(Python crud_order.get). 없으면 (nil, nil).
 func (r *OrderRepository) GetByID(id int) (*model.Order, error) {
 	var o model.Order

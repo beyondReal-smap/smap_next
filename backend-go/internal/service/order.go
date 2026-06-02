@@ -19,6 +19,7 @@ type orderRepo interface {
 	FindByMember(memberID int, status *int, payType string, page, size int) ([]model.Order, int64, error)
 	FindRecentByMember(memberID, limit int) ([]model.Order, error)
 	Summary(memberID int, startOfMonth string) (*repository.OrderSummaryRow, error)
+	UpdateFields(id int, fields map[string]interface{}) error
 }
 
 // OrderService는 Python `app/api/v1/endpoints/orders.py`의 read 핸들러를 이식한다.

@@ -312,3 +312,111 @@ func (r *MemberRepository) FindByGroup(groupID int) ([]model.MemberGroupRow, err
 		Scan(&out).Error
 	return out, err
 }
+
+// registerInsertColumns는 Python crud_auth.create_user가 Member(...)에 명시적으로 넣는 컬럼만
+// 화이트리스트한다. 나머지 컬럼(mt_sido/onboarding/weather_*/adate 등)은 INSERT에서 제외해
+// DB default가 적용되도록 한다(Go가 nil→NULL로 덮으면 register 응답의 `or` 폴백 결과가 갈림).
+var registerInsertColumns = []string{
+	"mt_id", "mt_pwd", "mt_name", "mt_email", "mt_nickname", "mt_hp",
+	"mt_type", "mt_level", "mt_status", "mt_show", "mt_wdate", "mt_ldate",
+	"mt_agree1", "mt_agree2", "mt_agree3", "mt_agree4", "mt_agree5",
+	"mt_google_id", "mt_kakao_id", "mt_apple_id",
+	"mt_birth", "mt_gender", "mt_file1", "mt_lat", "mt_long", "mt_token_id",
+}
+
+// CreateMember는 Python crud_auth.create_user의 INSERT + db.refresh와 동등하다.
+// create_user가 설정하는 컬럼만 INSERT(나머지는 DB default), 이후 전체 행을 재조회해 반환한다.
+func (r *MemberRepository) CreateMember(m *model.Member) (*model.Member, error) {
+	if err := r.db.Select(registerInsertColumns).Create(m).Error; err != nil {
+		return nil, err
+	}
+	// db.refresh(db_user) 등가: INSERT 후 DB default가 채워진 전체 행을 재조회.
+	return r.GetByID(m.MtIdx)
+}
+
+// UpdateColumns는 mt_idx 행의 지정 컬럼만 UPDATE한다(Python ORM의 "변경 attr만 UPDATE" 등가).
+// 로그인 시각/기기정보 갱신 등 부분 업데이트에 사용한다.
+func (r *MemberRepository) UpdateColumns(mtIdx int, fields map[string]interface{}) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	return r.db.Model(&model.Member{}).Where("mt_idx = ?", mtIdx).Updates(fields).Error
+}
+
+// GetByKakaoID는 Python crud_auth.get_user_by_kakao_id(mt_kakao_id 단건, 필터 없음).
+func (r *MemberRepository) GetByKakaoID(kakaoID string) (*model.Member, error) {
+	return r.firstByColumn("mt_kakao_id", kakaoID)
+}
+
+// GetByGoogleID는 mt_google_id 단건(google_login 우선순위2 조회).
+func (r *MemberRepository) GetByGoogleID(googleID string) (*model.Member, error) {
+	return r.firstByColumn("mt_google_id", googleID)
+}
+
+// GetByAppleID는 mt_apple_id 단건(apple_login 우선순위1 조회).
+func (r *MemberRepository) GetByAppleID(appleID string) (*model.Member, error) {
+	return r.firstByColumn("mt_apple_id", appleID)
+}
+
+func (r *MemberRepository) firstByColumn(col, val string) (*model.Member, error) {
+	var m model.Member
+	err := r.db.Where(col+" = ?", val).First(&m).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
+// GetByPhoneOr는 Python crud_member.get_by_phone와 동등: 하이픈 제거 후 mt_id OR mt_hp 매칭 단건.
+func (r *MemberRepository) GetByPhoneOr(phone string) (*model.Member, error) {
+	clean := strings.ReplaceAll(phone, "-", "")
+	var m model.Member
+	err := r.db.Where("mt_id = ? OR mt_hp = ?", clean, clean).First(&m).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &m, nil
+}
+
+// CountExpiredTokens는 Python cleanup_expired_fcm_tokens의 만료 토큰 집계를 이식한다.
+// 조건: mt_token_id NOT NULL AND mt_token_expiry_date NOT NULL AND mt_token_expiry_date < now.
+// 반환: (만료 회원 수, 그 중 mt_push1='Y' 수). 실제 삭제는 하지 않는다(Python no-op).
+func (r *MemberRepository) CountExpiredTokens(now time.Time) (total int64, withPush1 int64, err error) {
+	base := r.db.Model(&model.Member{}).
+		Where("mt_token_id IS NOT NULL AND mt_token_expiry_date IS NOT NULL AND mt_token_expiry_date < ?", now)
+	if err = base.Count(&total).Error; err != nil {
+		return 0, 0, err
+	}
+	if err = base.Session(&gorm.Session{}).Where("mt_push1 = ?", "Y").Count(&withPush1).Error; err != nil {
+		return 0, 0, err
+	}
+	return total, withPush1, nil
+}
+
+// CountMembersWithToken은 Python reset_invalid_fcm_tokens의 total_checked를 이식한다(mt_token_id NOT NULL 수).
+func (r *MemberRepository) CountMembersWithToken() (int64, error) {
+	var n int64
+	err := r.db.Model(&model.Member{}).Where("mt_token_id IS NOT NULL").Count(&n).Error
+	return n, err
+}
+
+// GetByResetToken은 Python verify_reset_token/reset_password의 조회를 이식한다:
+// mt_reset_token 일치 AND mt_token_edate > now(미만료). 없으면 (nil, nil). 상태 필터 없음.
+// ⚠️ now는 dbUTCNow()(UTC 벽시계)를 받아야 한다 — 저장 시 utcnow()+1분과 동일 기준으로 비교.
+func (r *MemberRepository) GetByResetToken(token string, now time.Time) (*model.Member, error) {
+	var m model.Member
+	err := r.db.Where("mt_reset_token = ? AND mt_token_edate > ?", token, now).First(&m).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &m, nil
+}

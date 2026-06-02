@@ -169,3 +169,76 @@ func TestParseUserMtID(t *testing.T) {
 		})
 	}
 }
+
+// TestParseChatUserID는 chats.py get_current_user_id의 인증 분기를 검증한다.
+// 핵심: (1) SECRET_KEY+mt_idx claim, **sub 폴백 없음**(ParseOptionalUserID와 다름),
+// (2) 401 메시지 2분기("인증이 필요합니다."/"토큰 인증에 실패했습니다."),
+// (3) Python의 "유효하지 않은 토큰입니다."는 dead라 절대 반환 안 됨.
+func TestParseChatUserID(t *testing.T) {
+	future := time.Now().Add(time.Hour).Unix()
+	past := time.Now().Add(-time.Hour).Unix()
+
+	const needAuth = "인증이 필요합니다."
+	const authFailed = "토큰 인증에 실패했습니다."
+
+	tests := []struct {
+		name    string
+		header  string
+		wantID  int
+		wantMsg string
+		wantOK  bool
+	}{
+		{
+			name:   "유효한 mt_idx",
+			header: "Bearer " + makeToken(t, testSecret, jwt.SigningMethodHS256, jwt.MapClaims{"mt_idx": 1186, "exp": future}),
+			wantID: 1186, wantMsg: "", wantOK: true,
+		},
+		{name: "헤더 없음 → 인증 필요", header: "", wantMsg: needAuth},
+		{
+			name:    "Bearer 접두사 없음 → 인증 필요",
+			header:  makeToken(t, testSecret, jwt.SigningMethodHS256, jwt.MapClaims{"mt_idx": 1, "exp": future}),
+			wantMsg: needAuth,
+		},
+		{name: "Bearer 뒤 빈 토큰 → 인증 실패", header: "Bearer ", wantMsg: authFailed},
+		{
+			name:    "잘못된 서명 → 인증 실패",
+			header:  "Bearer " + makeToken(t, "wrong-secret", jwt.SigningMethodHS256, jwt.MapClaims{"mt_idx": 1, "exp": future}),
+			wantMsg: authFailed,
+		},
+		{
+			name:    "만료된 토큰 → 인증 실패",
+			header:  "Bearer " + makeToken(t, testSecret, jwt.SigningMethodHS256, jwt.MapClaims{"mt_idx": 1, "exp": past}),
+			wantMsg: authFailed,
+		},
+		{
+			name:    "alg=none confusion 차단 → 인증 실패",
+			header:  "Bearer " + makeToken(t, testSecret, jwt.SigningMethodNone, jwt.MapClaims{"mt_idx": 1, "exp": future}),
+			wantMsg: authFailed,
+		},
+		{
+			name:    "mt_idx claim 부재 → 인증 실패",
+			header:  "Bearer " + makeToken(t, testSecret, jwt.SigningMethodHS256, jwt.MapClaims{"exp": future}),
+			wantMsg: authFailed,
+		},
+		{
+			name:    "sub만 있고 mt_idx 없음 → 인증 실패 (sub 폴백 없음, ParseOptionalUserID와 차이)",
+			header:  "Bearer " + makeToken(t, testSecret, jwt.SigningMethodHS256, jwt.MapClaims{"sub": "200", "exp": future}),
+			wantMsg: authFailed,
+		},
+		{
+			name:    "mt_idx=0(falsy) → 인증 실패 (sub 있어도 폴백 안 함)",
+			header:  "Bearer " + makeToken(t, testSecret, jwt.SigningMethodHS256, jwt.MapClaims{"mt_idx": 0, "sub": "55", "exp": future}),
+			wantMsg: authFailed,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gotID, gotMsg, gotOK := ParseChatUserID(tc.header, testSecret, "HS256")
+			if gotID != tc.wantID || gotMsg != tc.wantMsg || gotOK != tc.wantOK {
+				t.Errorf("ParseChatUserID() = (%d, %q, %v), want (%d, %q, %v)",
+					gotID, gotMsg, gotOK, tc.wantID, tc.wantMsg, tc.wantOK)
+			}
+		})
+	}
+}

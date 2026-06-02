@@ -54,10 +54,11 @@ func ParseOptionalUserID(authHeader, secret, algorithm string) (int, bool) {
 }
 
 // ParseUserMtID는 Python `read_users_me`(auth/me)의 토큰 디코드와 동등하다.
-// deps의 ParseOptionalUserID와 달리 (1) secret/algorithm이 SECRET_KEY/ALGORITHM이고
-// (2) claim이 mt_id(전화/로그인 ID, 문자열)다. 검증 성공 + mt_id 존재 시 (mt_id, true),
-// 그 외(헤더 부재·형식 오류·서명/만료 실패·mt_id 누락)는 ("", false)로 신호한다.
-// Python: payload.get("mt_id"); None이면 credentials_exception(401).
+// deps의 ParseOptionalUserID와 다른 점은 claim뿐이다: mt_id(전화/로그인 ID, 문자열).
+// 시크릿은 동일하다 — Python settings.SECRET_KEY/ALGORITHM은 JWT_SECRET_KEY/JWT_ALGORITHM의
+// @property 별칭이므로 호출부는 JWTSecretKey/JWTAlgorithm을 넘긴다.
+// 검증 성공 + mt_id 존재 시 (mt_id, true), 그 외(헤더 부재·형식 오류·서명/만료 실패·mt_id 누락)는
+// ("", false)로 신호한다. Python: payload.get("mt_id"); None이면 credentials_exception(401).
 func ParseUserMtID(authHeader, secret, algorithm string) (string, bool) {
 	if secret == "" {
 		return "", false
@@ -90,6 +91,106 @@ func ParseUserMtID(authHeader, secret, algorithm string) (string, bool) {
 		return "", false
 	}
 	return s, true
+}
+
+// ParseChatUserID는 Python `chats.py get_current_user_id`와 동등하다.
+// orders(ParseOptionalUserID)·auth-me(ParseUserMtID)와 또 다른 JWT 경로:
+// SECRET_KEY/ALGORITHM(값은 JWTSecretKey와 동일) + mt_idx claim(정수, truthy 판정),
+// **sub 폴백 없음**.
+//
+// 반환 (mtIdx, errMsg, ok). 실패 시 errMsg로 401 detail을 구분한다:
+//   - 헤더 부재/"Bearer " 미접두 → "인증이 필요합니다."
+//   - 그 외(빈 토큰·서명/만료 실패·mt_idx falsy) → "토큰 인증에 실패했습니다."
+//
+// ※Python의 세 번째 메시지 "유효하지 않은 토큰입니다."는 `if not mt_idx: raise`가
+//   같은 try 블록 안이라 바로 아래 `except Exception`이 가로채 덮어쓰므로 절대 도달
+//   불가(dead code). 따라서 위 2분기만 재현한다.
+func ParseChatUserID(authHeader, secret, algorithm string) (int, string, bool) {
+	if !strings.HasPrefix(authHeader, "Bearer ") {
+		return 0, "인증이 필요합니다.", false
+	}
+	const authFailed = "토큰 인증에 실패했습니다."
+	// 빈 시크릿이면 HS256 키 위조를 차단(ParseOptionalUserID와 동일한 이중 안전장치).
+	if secret == "" {
+		return 0, authFailed, false
+	}
+	// Python: token = authorization.split(" ")[1].
+	// "Bearer " 접두가 보장되므로 분리 결과 [1]은 항상 존재한다("Bearer "만 있으면 "").
+	token := strings.Split(authHeader, " ")[1]
+
+	claims := jwt.MapClaims{}
+	_, err := jwt.ParseWithClaims(token, claims, func(*jwt.Token) (interface{}, error) {
+		return []byte(secret), nil
+	}, jwt.WithValidMethods([]string{algorithm}))
+	if err != nil {
+		return 0, authFailed, false
+	}
+
+	// Python: mt_idx = payload.get("mt_idx"); if not mt_idx → 인증 실패.
+	// truthy 판정은 ParseOptionalUserID와 동일한 mtIdxClaim 재사용(sub 폴백만 없음).
+	id, ok := mtIdxClaim(claims["mt_idx"])
+	if !ok {
+		return 0, authFailed, false
+	}
+	return id, "", true
+}
+
+// ParseWSToken은 Python `chat_ws.get_mt_idx_from_token`과 동등하다.
+// WebSocket 핸드셰이크는 auth.token에서 "Bearer "를 제거한 raw 토큰을 디코드한다
+// (REST의 "Bearer " 접두 검사 없음). SECRET_KEY(=JWTSecretKey) + mt_idx claim, sub 폴백 없음.
+// 실패(빈 시크릿/빈 토큰/서명·만료 실패/mt_idx falsy)는 모두 (0, false)로 신호해 연결을 거부한다
+// (Python connect 핸들러가 False를 반환해 거부하는 것과 동일).
+func ParseWSToken(tokenStr, secret, algorithm string) (int, bool) {
+	if secret == "" || tokenStr == "" {
+		return 0, false
+	}
+	claims := jwt.MapClaims{}
+	_, err := jwt.ParseWithClaims(tokenStr, claims, func(*jwt.Token) (interface{}, error) {
+		return []byte(secret), nil
+	}, jwt.WithValidMethods([]string{algorithm}))
+	if err != nil {
+		return 0, false
+	}
+	return mtIdxClaim(claims["mt_idx"])
+}
+
+// AccessClaims는 /refresh v1(access만 재발급) 경로가 필요로 하는 claim 묶음.
+type AccessClaims struct {
+	MtIdx    int     // mt_idx(truthy) 우선, 없으면 sub. 둘 다 없으면 HasMtIdx=false.
+	HasMtIdx bool    // Python `mt_idx = payload.get("mt_idx") or payload.get("sub")`가 None이 아닌지.
+	MtID     string  // payload.get("mt_id"); 문자열이 아니면 "".
+	MtName   *string // payload.get("mt_name"); 문자열이면 그 값, 아니면 nil.
+}
+
+// DecodeAccessClaims는 Python refresh v1의 `jwt.decode(...)` + claim 추출과 동등하다.
+// 서명·만료를 검증한다(golang-jwt v5 기본 exp 검증). 검증 실패면 (_, false)=JWTError 등가.
+// 성공이면 (claims, true); claims.HasMtIdx로 "토큰이 유효하지 않습니다."(mt_idx 부재) 분기를 구분한다.
+func DecodeAccessClaims(tokenStr, secret, algorithm string) (AccessClaims, bool) {
+	var out AccessClaims
+	if secret == "" || tokenStr == "" {
+		return out, false
+	}
+	claims := jwt.MapClaims{}
+	_, err := jwt.ParseWithClaims(tokenStr, claims, func(*jwt.Token) (interface{}, error) {
+		return []byte(secret), nil
+	}, jwt.WithValidMethods([]string{algorithm}))
+	if err != nil {
+		return out, false
+	}
+	// Python: payload.get("mt_idx") or payload.get("sub")
+	if id, ok := mtIdxClaim(claims["mt_idx"]); ok {
+		out.MtIdx, out.HasMtIdx = id, true
+	} else if id, ok := subClaim(claims["sub"]); ok {
+		out.MtIdx, out.HasMtIdx = id, true
+	}
+	if v, ok := claims["mt_id"].(string); ok {
+		out.MtID = v
+	}
+	if v, ok := claims["mt_name"].(string); ok {
+		mn := v
+		out.MtName = &mn
+	}
+	return out, true
 }
 
 // mtIdxClaim은 Python truthiness(`payload.get("mt_idx") or ...`)를 따른다.

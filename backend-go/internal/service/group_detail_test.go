@@ -25,6 +25,9 @@ func (f *fakeGroupDetailRepo) FindByMember(mtIdx int) ([]model.GroupDetail, erro
 func (f *fakeGroupDetailRepo) FindByGroup(sgtIdx int) ([]model.GroupDetail, error) {
 	return f.many, f.err
 }
+func (f *fakeGroupDetailRepo) UpdateFields(id int, fields map[string]interface{}) error {
+	return f.err
+}
 
 // TestGroupDetailResponseJSON은 스키마-모델 불일치(7개 _chk 항상 null)를 포함한
 // GroupDetailResponse 직렬화가 Python 실측 바이트와 동일한지 검증한다.

@@ -26,6 +26,9 @@ type scheduleRepo interface {
 	GetByID(id int) (*model.Schedule, error)
 	FindByMember(mtIdx int) ([]model.Schedule, error)
 	FindGroupSchedules(groupID int, days *int) ([]model.Schedule, error)
+	Create(s *model.Schedule) error
+	UpdateFields(id int, fields map[string]interface{}) error
+	Delete(id int) error
 }
 
 // ScheduleService는 Python `app/api/v1/endpoints/schedules.py`의 결정적 read 핸들러를 이식한다.

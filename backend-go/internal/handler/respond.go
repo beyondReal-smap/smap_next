@@ -21,6 +21,12 @@ func writeJSON(c *gin.Context, status int, obj interface{}) {
 	c.Data(status, "application/json; charset=utf-8", b)
 }
 
+// internalServerErrorPlain은 Starlette ServerErrorMiddleware의 기본 500 응답(plain text)을 재현한다.
+// FastAPI에서 ResponseValidationError 등 미처리 예외 발생 시 본문은 JSON이 아니라 평문 "Internal Server Error"다.
+func internalServerErrorPlain(c *gin.Context) {
+	c.Data(http.StatusInternalServerError, "text/plain; charset=utf-8", []byte("Internal Server Error"))
+}
+
 // marshalNoEscape는 HTML 이스케이프를 끈 JSON 바이트를 반환한다(캐시 저장/응답 공용).
 // Encoder.Encode가 덧붙이는 말미 개행은 제거해 JSONResponse와 바이트를 맞춘다.
 func marshalNoEscape(obj interface{}) ([]byte, error) {

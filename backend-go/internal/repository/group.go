@@ -245,3 +245,109 @@ func (r *GroupRepository) StatsWeeklyLocations(memberID int, start, end time.Tim
 		Count(&count).Error
 	return count, err
 }
+
+// --- write 메서드 (groups write 이식 Phase 1: create/join 3종) ---
+
+// MemberExists는 Python join 핸들러의 db.query(Member).filter(Member.mt_idx==id).first() 존재확인과 동등하다.
+// (mt_status 등 추가 필터 없음 — PK 존재 여부만 확인한다.)
+func (r *GroupRepository) MemberExists(mtIdx int) (bool, error) {
+	var count int64
+	err := r.db.Model(&model.Member{}).Where("mt_idx = ?", mtIdx).Count(&count).Error
+	return count > 0, err
+}
+
+// CodeExists는 generate_sgt_code의 중복 확인(db.query(Group).filter(sgt_code==uid).first())과 동등하다.
+// ⚠️ find_by_code(sgt_show='Y')와 달리 sgt_show 필터가 없다 — 숨김 그룹의 코드와도 충돌을 피한다.
+func (r *GroupRepository) CodeExists(code string) (bool, error) {
+	var count int64
+	err := r.db.Model(&model.Group{}).Where("sgt_code = ?", code).Count(&count).Error
+	return count > 0, err
+}
+
+// CreateGroup은 smap_group_t에 INSERT하고 자동 증가된 sgt_idx를 g에 채운다
+// (Python db.add(group)+commit+refresh). 실패 시 에러를 그대로 반환(핸들러가 미처리 500/plain).
+func (r *GroupRepository) CreateGroup(g *model.Group) error {
+	return r.db.Create(g).Error
+}
+
+// FindActiveMembership은 join 핸들러의 existing_membership 조회와 동등하다:
+// GroupDetail WHERE sgt_idx=? AND mt_idx=? AND sgdt_exit='N' first(). 없으면 (nil, nil).
+func (r *GroupRepository) FindActiveMembership(sgtIdx, mtIdx int) (*model.GroupDetail, error) {
+	var gd model.GroupDetail
+	err := r.db.Where("sgt_idx = ? AND mt_idx = ? AND sgdt_exit = ?", sgtIdx, mtIdx, "N").First(&gd).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &gd, nil
+}
+
+// CreateGroupDetail은 smap_group_detail_t에 INSERT하고 자동 증가된 sgdt_idx를 gd에 채운다.
+func (r *GroupRepository) CreateGroupDetail(gd *model.GroupDetail) error {
+	return r.db.Create(gd).Error
+}
+
+// ReactivateMembership은 재가입 처리(sgdt_show='Y', sgdt_exit='N', sgdt_udate=now)와 동등하다.
+// owner/leader/wdate는 보존(응답 data에 기존값 사용). map Update로 지정 컬럼만 갱신한다.
+func (r *GroupRepository) ReactivateMembership(gd *model.GroupDetail, now time.Time) error {
+	return r.db.Model(&model.GroupDetail{}).
+		Where("sgdt_idx = ?", gd.SgdtIdx).
+		Updates(map[string]interface{}{"sgdt_show": "Y", "sgdt_exit": "N", "sgdt_udate": now}).Error
+}
+
+// --- write 메서드 (groups write 이식 Phase 2: update/restore/emergency/join-new/remove) ---
+
+// SaveGroup은 그룹 행 전체를 갱신한다(Python update_group/restore_group의 commit+refresh).
+// GORM Save는 모델이 매핑한 컬럼만 기록하므로(sgt_content 등 미매핑 컬럼 불변) Python의
+// "변경 속성만 commit"과 DB 종단 상태가 동일하다(응답은 in-memory g로 빌드).
+func (r *GroupRepository) SaveGroup(g *model.Group) error {
+	return r.db.Save(g).Error
+}
+
+// FindMembershipAny는 join_new_member의 existing_membership 조회와 동등하다:
+// GroupDetail WHERE sgt_idx=? AND mt_idx=? first(). ⚠️ join_group(FindActiveMembership)과 달리
+// sgdt_exit 필터가 없다. 없으면 (nil, nil).
+func (r *GroupRepository) FindMembershipAny(sgtIdx, mtIdx int) (*model.GroupDetail, error) {
+	var gd model.GroupDetail
+	err := r.db.Where("sgt_idx = ? AND mt_idx = ?", sgtIdx, mtIdx).First(&gd).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &gd, nil
+}
+
+// ReactivateMembershipNewMember는 join_new_member 재가입과 동등하다:
+// sgdt_show='Y', sgdt_exit='N', sgdt_discharge='N', sgdt_udate=now.
+// ⚠️ join_group 재가입(ReactivateMembership)과 달리 sgdt_discharge도 'N'으로 리셋한다.
+func (r *GroupRepository) ReactivateMembershipNewMember(gd *model.GroupDetail, now time.Time) error {
+	return r.db.Model(&model.GroupDetail{}).
+		Where("sgdt_idx = ?", gd.SgdtIdx).
+		Updates(map[string]interface{}{"sgdt_show": "Y", "sgdt_exit": "N", "sgdt_discharge": "N", "sgdt_udate": now}).Error
+}
+
+// FindVisibleMembership은 remove_member의 group_detail 조회와 동등하다:
+// GroupDetail WHERE sgt_idx=? AND mt_idx=member_id AND sgdt_show='Y' first(). 없으면 (nil, nil).
+func (r *GroupRepository) FindVisibleMembership(sgtIdx, mtIdx int) (*model.GroupDetail, error) {
+	var gd model.GroupDetail
+	err := r.db.Where("sgt_idx = ? AND mt_idx = ? AND sgdt_show = ?", sgtIdx, mtIdx, "Y").First(&gd).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &gd, nil
+}
+
+// RemoveMembership은 remove_member의 소프트 탈퇴와 동등하다(sgdt_show='N', sgdt_exit='Y', sgdt_udate=now).
+// ⚠️ remove_data(body)의 sgdt_show/sgdt_exit는 Python에서 로깅만 되고 실제로는 무시되어 항상 'N'/'Y'로 고정.
+func (r *GroupRepository) RemoveMembership(gd *model.GroupDetail, now time.Time) error {
+	return r.db.Model(&model.GroupDetail{}).
+		Where("sgdt_idx = ?", gd.SgdtIdx).
+		Updates(map[string]interface{}{"sgdt_show": "N", "sgdt_exit": "Y", "sgdt_udate": now}).Error
+}

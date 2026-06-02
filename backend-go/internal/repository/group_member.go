@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 	"time"
@@ -164,4 +165,53 @@ func (r *GroupMemberRepository) FindGroupMembers(groupID int) ([]model.GroupMemb
 		})
 	}
 	return out, nil
+}
+
+// MemberExists는 member_t에 mt_idx가 존재하는지 확인한다(Python add의 Member 조회 → 404 분기).
+func (r *GroupMemberRepository) MemberExists(mtIdx int) (bool, error) {
+	var cnt int64
+	err := r.db.Table("member_t").Where("mt_idx = ?", mtIdx).Count(&cnt).Error
+	return cnt > 0, err
+}
+
+// FindGD는 (sgt_idx, mt_idx, sgdt_show) 조건으로 GroupDetail 1건을 조회한다(없으면 nil,nil).
+// Python add(show='Y'/'N')·remove·delete-path(show='Y')의 first() 쿼리와 동등.
+func (r *GroupMemberRepository) FindGD(sgtIdx, mtIdx int, show string) (*model.GroupDetail, error) {
+	var gd model.GroupDetail
+	err := r.db.Where("sgt_idx = ? AND mt_idx = ? AND sgdt_show = ?", sgtIdx, mtIdx, show).First(&gd).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &gd, nil
+}
+
+// FindGDActive는 (sgt_idx, mt_idx, sgdt_show='Y', sgdt_exit='N') 조건으로 1건 조회한다(role 전용).
+func (r *GroupMemberRepository) FindGDActive(sgtIdx, mtIdx int) (*model.GroupDetail, error) {
+	var gd model.GroupDetail
+	err := r.db.Where("sgt_idx = ? AND mt_idx = ? AND sgdt_show = ? AND sgdt_exit = ?",
+		sgtIdx, mtIdx, "Y", "N").First(&gd).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &gd, nil
+}
+
+// CreateGD는 GroupDetail 행을 INSERT한다(Python add 신규: sgt_idx/mt_idx/sgdt_show만, 나머지 NULL).
+func (r *GroupMemberRepository) CreateGD(gd *model.GroupDetail) error {
+	return r.db.Create(gd).Error
+}
+
+// UpdateGD는 sgdt_idx 행의 지정 컬럼만 UPDATE한다(add 복구·remove·delete-path·role 공용).
+// role의 잘못된 ENUM 값(예: 'LEADER')은 MySQL strict 모드가 거부 → error 반환(핸들러 500).
+func (r *GroupMemberRepository) UpdateGD(sgdtIdx int, fields map[string]interface{}) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	return r.db.Model(&model.GroupDetail{}).Where("sgdt_idx = ?", sgdtIdx).Updates(fields).Error
 }

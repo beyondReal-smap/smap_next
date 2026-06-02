@@ -13,9 +13,10 @@ type groupMemberRepo interface {
 	FindGroupMembers(groupID int) ([]model.GroupMemberRow, error)
 }
 
-// GroupMemberService는 Python `app/api/v1/endpoints/group_members.py`의 read 핸들러를 이식한다.
+// GroupMemberService는 Python `app/api/v1/endpoints/group_members.py`의 read/write 핸들러를 이식한다.
 type GroupMemberService struct {
-	repo groupMemberRepo
+	repo  groupMemberRepo
+	wrepo groupMemberWriteRepo
 }
 
 func NewGroupMember(repo groupMemberRepo) *GroupMemberService {

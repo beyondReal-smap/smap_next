@@ -37,6 +37,24 @@ func (r *PushFCMRepository) GetByID(id int) (*model.PushFCM, error) {
 	return &p, nil
 }
 
+// Create는 push_fcm_t에 단건 INSERT한다(Python create_push_fcm). autoIncrement pft_idx는 GORM이 채운다.
+func (r *PushFCMRepository) Create(p *model.PushFCM) error {
+	return r.db.Create(p).Error
+}
+
+// UpdateFields는 pft_idx 행의 지정 컬럼만 UPDATE한다(Python update_push_fcm의 exclude_unset setattr 등가).
+func (r *PushFCMRepository) UpdateFields(id int, fields map[string]interface{}) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	return r.db.Model(&model.PushFCM{}).Where("pft_idx = ?", id).Updates(fields).Error
+}
+
+// Delete는 pft_idx 행을 하드 삭제한다(Python delete_push_fcm의 db.delete).
+func (r *PushFCMRepository) Delete(id int) error {
+	return r.db.Where("pft_idx = ?", id).Delete(&model.PushFCM{}).Error
+}
+
 // FindByMember는 pft_send_mt_idx + pft_show='Y'(Python PushFCM.find_by_member).
 func (r *PushFCMRepository) FindByMember(mtIdx int) ([]model.PushFCM, error) {
 	out := make([]model.PushFCM, 0)

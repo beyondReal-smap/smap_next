@@ -1,5 +1,43 @@
 package dto
 
+// GroupJoinData는 join/join-by-code 성공 응답의 data 객체다(Python 반환 dict).
+// 키 순서: sgdt_idx, sgt_idx, mt_idx, sgdt_owner_chk, sgdt_leader_chk, sgdt_wdate.
+//   - sgdt_owner_chk/leader_chk: GroupDetail 값(신규=‘N’/‘N’, 재가입=기존값). nullable → *string.
+//   - sgdt_wdate: isoformat() if 값 else utcnow().isoformat() → 항상 문자열.
+type GroupJoinData struct {
+	SgdtIdx       int     `json:"sgdt_idx"`
+	SgtIdx        int     `json:"sgt_idx"`
+	MtIdx         int     `json:"mt_idx"`
+	SgdtOwnerChk  *string `json:"sgdt_owner_chk"`
+	SgdtLeaderChk *string `json:"sgdt_leader_chk"`
+	SgdtWdate     string  `json:"sgdt_wdate"`
+}
+
+// GroupJoinResponse는 그룹 가입/재가입 성공 응답 {success, message, data}이다(키 순서 고정).
+type GroupJoinResponse struct {
+	Success bool          `json:"success"`
+	Message string        `json:"message"`
+	Data    GroupJoinData `json:"data"`
+}
+
+// MemberRemoveData는 remove_member_from_group(groups.py:994) 성공 응답의 data 객체다.
+// 키 순서: sgdt_idx, sgdt_show, sgdt_exit, sgdt_udate.
+//   - sgdt_show/sgdt_exit: 탈퇴 후 고정값 'N'/'Y'(body 값은 무시됨).
+//   - sgdt_udate: 갱신 시각 isoformat() 문자열(항상 값 존재).
+type MemberRemoveData struct {
+	SgdtIdx   int    `json:"sgdt_idx"`
+	SgdtShow  string `json:"sgdt_show"`
+	SgdtExit  string `json:"sgdt_exit"`
+	SgdtUdate string `json:"sgdt_udate"`
+}
+
+// MemberRemoveResponse는 멤버 탈퇴 성공 응답 {success, message, data}이다(키 순서 고정).
+type MemberRemoveResponse struct {
+	Success bool             `json:"success"`
+	Message string           `json:"message"`
+	Data    MemberRemoveData `json:"data"`
+}
+
 // GroupResponse는 Python GroupResponse(GroupBase 상속)와 키/순서·타입이 동일하다.
 // Pydantic v2 직렬화 순서는 부모(GroupBase) 필드 먼저, 그 다음 자식(GroupResponse) 필드다
 // (실측: mt_idx, sgt_title, sgt_code, sgt_memo, sgt_show, sgt_idx, sgt_wdate, sgt_udate).

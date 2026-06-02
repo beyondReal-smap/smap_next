@@ -17,6 +17,24 @@ func NewSchedule(db *gorm.DB) *ScheduleRepository {
 	return &ScheduleRepository{db: db}
 }
 
+// Create는 smap_schedule_t에 단건 INSERT한다(Python create_schedule). autoIncrement sst_idx는 GORM이 채운다.
+func (r *ScheduleRepository) Create(s *model.Schedule) error {
+	return r.db.Create(s).Error
+}
+
+// UpdateFields는 sst_idx 행의 지정 컬럼만 UPDATE한다(Python update_schedule exclude_unset 등가).
+func (r *ScheduleRepository) UpdateFields(id int, fields map[string]interface{}) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	return r.db.Model(&model.Schedule{}).Where("sst_idx = ?", id).Updates(fields).Error
+}
+
+// Delete는 sst_idx 행을 하드 삭제한다(Python delete_schedule의 db.delete).
+func (r *ScheduleRepository) Delete(id int) error {
+	return r.db.Where("sst_idx = ?", id).Delete(&model.Schedule{}).Error
+}
+
 // List는 필터 없는 offset/limit 목록(Python get_schedules, sst_show 필터 없음). 정렬 없음.
 func (r *ScheduleRepository) List(skip, limit int) ([]model.Schedule, error) {
 	out := make([]model.Schedule, 0)

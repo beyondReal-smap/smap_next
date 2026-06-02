@@ -12,6 +12,10 @@ type pushFCMRepo interface {
 	FindByMember(mtIdx int) ([]model.PushFCM, error)
 	FindByCode(code string) ([]model.PushFCM, error)
 	FindPending(mtIdx int, since *float64) ([]model.PushFCM, error)
+	// Phase 3 write
+	Create(p *model.PushFCM) error
+	UpdateFields(id int, fields map[string]interface{}) error
+	Delete(id int) error
 }
 
 // PushFCMService는 Python `app/api/v1/endpoints/push_fcms.py`의 read 핸들러를 이식한다.

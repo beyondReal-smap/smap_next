@@ -17,6 +17,43 @@ func NewLocation(db *gorm.DB) *LocationRepository {
 	return &LocationRepository{db: db}
 }
 
+// Create는 smap_location_t에 단건 INSERT한다(autoIncrement slt_idx는 GORM이 채운다).
+func (r *LocationRepository) Create(l *model.Location) error {
+	return r.db.Create(l).Error
+}
+
+// UpdateFields는 slt_idx 행의 지정 컬럼만 UPDATE하고 영향 행 수를 반환한다(notification/update의 rowcount 분기용).
+func (r *LocationRepository) UpdateFields(id int, fields map[string]interface{}) (int64, error) {
+	res := r.db.Model(&model.Location{}).Where("slt_idx = ?", id).Updates(fields)
+	return res.RowsAffected, res.Error
+}
+
+// Delete는 slt_idx 행을 하드 삭제한다(Python delete_location의 db.delete).
+func (r *LocationRepository) Delete(id int) error {
+	return r.db.Where("slt_idx = ?", id).Delete(&model.Location{}).Error
+}
+
+// MemberExists는 member_t에 mt_idx가 존재하는지(Python member-create의 COUNT 검증).
+func (r *LocationRepository) MemberExists(mtIdx int) (bool, error) {
+	var n int64
+	err := r.db.Table("member_t").Where("mt_idx = ?", mtIdx).Count(&n).Error
+	return n > 0, err
+}
+
+// FirstGroupForMember는 회원의 첫 그룹(sgdt_idx, sgt_idx)을 반환한다(sgdt_show='Y' ORDER BY sgdt_idx LIMIT 1).
+// 없으면 (nil, nil, nil).
+func (r *LocationRepository) FirstGroupForMember(mtIdx int) (sgdtIdx, sgtIdx *int, err error) {
+	var row struct {
+		SgdtIdx *int `gorm:"column:sgdt_idx"`
+		SgtIdx  *int `gorm:"column:sgt_idx"`
+	}
+	e := r.db.Raw("SELECT sgdt_idx, sgt_idx FROM smap_group_detail_t WHERE mt_idx = ? AND sgdt_show = 'Y' ORDER BY sgdt_idx LIMIT 1", mtIdx).Scan(&row).Error
+	if e != nil {
+		return nil, nil, e
+	}
+	return row.SgdtIdx, row.SgtIdx, nil
+}
+
 // List는 필터 없는 offset/limit 목록(Python get_locations, slt_show 필터 없음). 정렬 없음.
 func (r *LocationRepository) List(skip, limit int) ([]model.Location, error) {
 	out := make([]model.Location, 0)

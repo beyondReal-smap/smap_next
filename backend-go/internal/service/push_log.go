@@ -1,6 +1,8 @@
 package service
 
 import (
+	"time"
+
 	"github.com/bluemusk/smap_next_go/internal/dto"
 	"github.com/bluemusk/smap_next_go/internal/model"
 )
@@ -12,6 +14,13 @@ type pushLogRepo interface {
 	FindByMember(mtIdx int) ([]model.PushLog, error)
 	FindBySchedule(sstIdx int) ([]model.PushLog, error)
 	FindUnread(mtIdx int) ([]model.PushLog, error)
+	// Phase 3 write
+	Create(p *model.PushLog) error
+	UpdateFields(id int, fields map[string]interface{}) error
+	Delete(id int) error
+	MarkReadByID(id int, now time.Time) error
+	SoftDeleteAllForMember(mtIdx int, now time.Time) error
+	MarkReadAllForMember(mtIdx int, now time.Time) error
 }
 
 // PushLogService는 Python `app/api/v1/endpoints/push_logs.py`의 read 핸들러를 이식한다.

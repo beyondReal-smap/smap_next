@@ -21,8 +21,10 @@ func NewUser(svc *service.UserService, cfg *config.Config) *UserHandler {
 	return &UserHandler{svc: svc, cfg: cfg}
 }
 
-// Me는 GET /api/v1/auth/me (Python read_users_me). ⚠️ deps와 다른 토큰 경로:
-// secret/algorithm = SECRET_KEY/ALGORITHM(JWT_SECRET_KEY와 별개), claim = mt_id(문자열).
+// Me는 GET /api/v1/auth/me (Python read_users_me). deps와 다른 점은 claim뿐이다:
+// Python settings.SECRET_KEY/ALGORITHM은 config.py에서 @property로 JWT_SECRET_KEY/JWT_ALGORITHM을
+// 그대로 반환하므로(별도 SECRET_KEY env 미사용 → 항상 동일 값) 토큰 시크릿은 deps와 같고,
+// claim만 mt_idx(정수)가 아니라 mt_id(문자열)다.
 // 토큰 부재(헤더에 Bearer 없음)는 oauth2_scheme의 401 "Not authenticated",
 // 그 외 검증 실패·mt_id 누락·회원 없음은 credentials_exception
 // (401 "Could not validate credentials" + WWW-Authenticate: Bearer).
@@ -33,7 +35,7 @@ func (h *UserHandler) Me(c *gin.Context) {
 		writeJSON(c, http.StatusUnauthorized, gin.H{"detail": "Not authenticated"})
 		return
 	}
-	mtID, ok := auth.ParseUserMtID(authHeader, h.cfg.SecretKey, h.cfg.Algorithm)
+	mtID, ok := auth.ParseUserMtID(authHeader, h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
 	if !ok {
 		credentialsException(c)
 		return

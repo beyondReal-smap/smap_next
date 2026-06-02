@@ -1,0 +1,20 @@
+[Unit]
+# SMAP Go 백엔드(Strangler Fig 이식 라우트 서빙, 포트 9200)
+# Python(api3.service, 9000)과 병행 운영. Nginx에서 라우트별로 점진 전환.
+Description=SMAP Go API (Strangler Fig migration, port 9200)
+After=network.target mysql.service
+
+[Service]
+Type=simple
+User=root
+# WorkingDirectory는 반드시 backend-go여야 한다.
+# config.Load("")가 ../backend/.env (Python과 동일 .env)를 상대경로로 탐색하기 때문.
+WorkingDirectory=/data/wwwroot/smap_next/backend-go
+ExecStart=/data/wwwroot/smap_next/backend-go/bin/api
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
