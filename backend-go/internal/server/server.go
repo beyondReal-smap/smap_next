@@ -32,6 +32,7 @@ type Deps struct {
 	GroupSchedule  *handler.GroupScheduleManageHandler
 	LocationLog    *handler.LocationLogHandler
 	Order          *handler.OrderHandler
+	Hwgi           *handler.HwgiHandler
 	SMS            *handler.SMSHandler
 	FCMSendone     *handler.FCMSendoneHandler
 	FCMToken       *handler.FCMTokenHandler
@@ -343,6 +344,14 @@ func New(cfg *config.Config, logger *slog.Logger, deps Deps) http.Handler {
 		v1.POST("/sms/send-verification-code", deps.SMS.SendVerificationCode)
 		v1.POST("/sms/verify-code", deps.SMS.VerifyCode)
 		v1.POST("/sms/send", deps.SMS.Send)
+
+		// hwgi(한화 디지털화상창구 점검) 5종(무인증). all-data(3테이블 동적dict)·bulk-save(upsert)·
+		// upload-photo(base64 파일저장 절대경로)·delete-photo/{id}(파일+DB)·generate-report(검증422+항상500).
+		v1.GET("/hwgi/all-data", deps.Hwgi.AllData)
+		v1.POST("/hwgi/bulk-save", deps.Hwgi.BulkSave)
+		v1.POST("/hwgi/upload-photo", deps.Hwgi.UploadPhoto)
+		v1.DELETE("/hwgi/delete-photo/:photo_id", deps.Hwgi.DeletePhoto)
+		v1.POST("/hwgi/generate-report", deps.Hwgi.GenerateReport)
 
 		// push 발송 — fcm_sendone 단건/전체발송(무인증). success는 문자열 "true"/"false".
 		// mt_idx==0이면 전체발송(N+1). 토큰 무효화는 no-op(Python DB변경부 주석처리). 폴백 미이식.

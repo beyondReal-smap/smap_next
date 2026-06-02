@@ -76,6 +76,12 @@ type Config struct {
 	MinAppVersionAndroid string `envconfig:"MIN_APP_VERSION_ANDROID" default:"3.1.0"`
 	MinAppVersionIOS     string `envconfig:"MIN_APP_VERSION_IOS" default:"3.1.0"`
 
+	// hwgi(한화 점검) 공개 API base — 사진 URL 절대화(_absolutize_photo_url) prefix. Python settings.PUBLIC_API_BASE_URL.
+	PublicAPIBaseURL string `envconfig:"PUBLIC_API_BASE_URL" default:""`
+	// hwgi 점검 사진 저장 디렉토리. Python BACKEND_DIR/storage/uploads/hwgi(절대). /uploads는 Python
+	// StaticFiles(backend/storage/uploads)가 서빙하므로 Go도 동일 절대경로에 써야 같은 URL로 서빙된다.
+	HwgiUploadDir string `envconfig:"HWGI_UPLOAD_DIR" default:"/data/wwwroot/smap_next/backend/storage/uploads/hwgi"`
+
 	// 프로필 이미지 저장 디렉토리(members upload/delete-profile-image). Python은 cwd 기준 상대
 	// public/images에 저장하나, 실제 /images 서빙은 Python FastAPI StaticFiles(BASE_DIR/public/images,
 	// 절대경로)이다. Go cwd=backend-go라 상대경로를 쓰면 안 되고, Python과 동일한 절대경로에 써야

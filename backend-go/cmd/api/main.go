@@ -158,6 +158,9 @@ func main() {
 	// Phase 4 — orders read 5종(무인증). 금액 Double→PyFloat, summary 단일 집계.
 	orderH := handler.NewOrder(service.NewOrder(repository.NewOrder(gdb)), cfg)
 
+	// hwgi(한화 점검) 5종(무인증). raw SQL 3테이블 + 파일I/O(절대경로) + generate-report(항상 500).
+	hwgiH := handler.NewHwgi(service.NewHwgi(gdb, cfg.PublicAPIBaseURL), cfg)
+
 	// auth write — Phase A(비밀번호 로그인 + 토큰 수명주기 5종). memberRepo 공유 + refresh_tokens 신규 repo.
 	refreshRepo := repository.NewRefreshToken(gdb, cfg.RefreshTokenBytes, cfg.RefreshTokenExpireDays)
 	authSvc := service.NewAuth(memberRepo, refreshRepo, service.AuthConfig{
@@ -239,6 +242,7 @@ func main() {
 		GroupSchedule:  groupScheduleH,
 		LocationLog:    locationLogH,
 		Order:          orderH,
+		Hwgi:           hwgiH,
 		SMS:            smsH,
 		FCMSendone:     fcmSendoneH,
 		FCMToken:       fcmTokenH,
