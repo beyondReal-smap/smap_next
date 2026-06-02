@@ -39,7 +39,29 @@ func (s *GroupDetailService) UpdateGroupDetail(id int, fields map[string]interfa
 		return nil, true, false
 	}
 	r := toGroupDetailResponse(saved)
+	// phantom 7필드는 DB 미매핑이라 saved엔 없지만, Python은 setattr→db.refresh 후에도
+	// from_attributes가 인스턴스 속성을 읽어 응답에 echo한다(DB엔 미영속). 요청에 존재한 값만 반영.
+	applyGroupDetailPhantomEcho(&r, fields)
 	return &r, true, true
+}
+
+// applyGroupDetailPhantomEcho는 모델 미매핑 phantom 필드를 응답에 echo한다(Python setattr 동작 재현).
+// 요청에 존재+문자열이면 그 값을, null(nil)이면 기본 nil(=Python None)을 유지한다.
+func applyGroupDetailPhantomEcho(r *dto.GroupDetailResponse, fields map[string]interface{}) {
+	echo := func(dst **string, key string) {
+		if v, ok := fields[key]; ok {
+			if s, oks := v.(string); oks {
+				*dst = &s
+			}
+		}
+	}
+	echo(&r.SgdtDischargeChk, "sgdt_discharge_chk")
+	echo(&r.SgdtExitChk, "sgdt_exit_chk")
+	echo(&r.SgdtInChk, "sgdt_in_chk")
+	echo(&r.SgdtScheduleChk, "sgdt_schedule_chk")
+	echo(&r.SgdtReadChk, "sgdt_read_chk")
+	echo(&r.SgdtEnterAlarm, "sgdt_enter_alarm")
+	echo(&r.SgdtEnterChk, "sgdt_enter_chk")
 }
 
 // UpdateRole은 Python update_member_role을 이식한다. sgdt_leader_chk='Y'/'N' + sgdt_udate=utcnow()(dbUTCNow).

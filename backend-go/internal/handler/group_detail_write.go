@@ -112,9 +112,16 @@ func groupDetailPathID(c *gin.Context) (int, bool) {
 	return id, true
 }
 
-// parseGroupDetailUpdate는 GroupDetailUpdate의 모델 매핑 가능 필드만 present-기반으로 파싱한다.
-// (sgt_idx/mt_idx=int, sgdt_owner_chk/leader_chk/group_chk/push_chk=string). 미매핑 스키마 필드는 무시
-// (Python setattr이 무영속하므로 동등). int 타입오류만 422.
+// gdYNSet/gdYNDSet은 GroupDetail enum 허용값(app/models/enums.py). 대부분 Y/N,
+// sgdt_group_chk(GroupCheckEnum)만 Y/N/D.
+var (
+	gdYNSet  = map[string]bool{"Y": true, "N": true}
+	gdYNDSet = map[string]bool{"Y": true, "N": true, "D": true}
+)
+
+// parseGroupDetailUpdate는 GroupDetailUpdate(=GroupDetailBase) 13필드를 Pydantic 선언 순서대로
+// 검증한다(sgt_idx/mt_idx=int, 나머지 11개=Enum). 모델 미매핑 phantom 7필드도 present에 담아
+// 응답 echo에 사용한다(Python setattr은 응답엔 반영되나 DB엔 미영속). 검증 실패는 선언 순서대로 422.
 func parseGroupDetailUpdate(c *gin.Context) (map[string]interface{}, []valErr) {
 	var body map[string]interface{}
 	if err := c.ShouldBindJSON(&body); err != nil {
@@ -122,11 +129,40 @@ func parseGroupDetailUpdate(c *gin.Context) (map[string]interface{}, []valErr) {
 	}
 	present := map[string]interface{}{}
 	var errs []valErr
+	const yn, ynd = "'Y' or 'N'", "'Y', 'N' or 'D'"
 	bodyOptInt(body, "sgt_idx", present, &errs)
 	bodyOptInt(body, "mt_idx", present, &errs)
-	bodyOptStr(body, "sgdt_owner_chk", present, &errs)
-	bodyOptStr(body, "sgdt_leader_chk", present, &errs)
-	bodyOptStr(body, "sgdt_group_chk", present, &errs)
-	bodyOptStr(body, "sgdt_push_chk", present, &errs)
+	bodyOptEnum(body, "sgdt_owner_chk", gdYNSet, yn, present, &errs)
+	bodyOptEnum(body, "sgdt_leader_chk", gdYNSet, yn, present, &errs)
+	bodyOptEnum(body, "sgdt_discharge_chk", gdYNSet, yn, present, &errs)
+	bodyOptEnum(body, "sgdt_group_chk", gdYNDSet, ynd, present, &errs)
+	bodyOptEnum(body, "sgdt_exit_chk", gdYNSet, yn, present, &errs)
+	bodyOptEnum(body, "sgdt_push_chk", gdYNSet, yn, present, &errs)
+	bodyOptEnum(body, "sgdt_in_chk", gdYNSet, yn, present, &errs)
+	bodyOptEnum(body, "sgdt_schedule_chk", gdYNSet, yn, present, &errs)
+	bodyOptEnum(body, "sgdt_read_chk", gdYNSet, yn, present, &errs)
+	bodyOptEnum(body, "sgdt_enter_alarm", gdYNSet, yn, present, &errs)
+	bodyOptEnum(body, "sgdt_enter_chk", gdYNSet, yn, present, &errs)
 	return present, errs
+}
+
+// bodyOptEnum은 Optional Enum 필드를 검증한다(Pydantic str-Enum과 동등).
+// 미존재→무시, null→present[key]=nil(Optional None 허용), 허용값 문자열→통과,
+// 그 외(미허용 문자열·비문자열)→type:"enum" 422(ctx.expected=expected, input=원본 JSON값).
+func bodyOptEnum(body map[string]interface{}, key string, allowed map[string]bool, expected string, present map[string]interface{}, errs *[]valErr) {
+	raw, ok := body[key]
+	if !ok {
+		return
+	}
+	if raw == nil {
+		present[key] = nil
+		return
+	}
+	if s, oks := raw.(string); oks && allowed[s] {
+		present[key] = s
+		return
+	}
+	e := valErr{Type: "enum", Loc: []string{"body", key}, Msg: "Input should be " + expected, Input: raw}
+	e.Ctx = map[string]any{"expected": expected}
+	*errs = append(*errs, e)
 }
