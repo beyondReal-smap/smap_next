@@ -35,7 +35,11 @@ def run_notify_low_battery_at_9pm(db: Session) -> None:
 
         members = Member.get_all_active(db)
 
+        seen_tokens: set = set()
         for member in members:
+            if not member.mt_token_id or member.mt_token_id in seen_tokens:
+                continue
+            seen_tokens.add(member.mt_token_id)
             mt_idx = str(member.mt_idx)
 
             messages = {
