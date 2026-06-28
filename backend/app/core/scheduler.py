@@ -41,12 +41,13 @@ def _get_job_func(job_name: str):
         )
         from app.jobs.daily_jobs import (
             run_notify_low_battery_at_9pm,
+            run_refresh_weather_data,
             run_send_daily_log_notifications,
             run_send_daily_weather_notifications,
             run_send_my_location_push_notifications,
             run_schedule_movement_alert,
-            run_refresh_weather_data,
         )
+        from app.jobs.engagement_jobs import run_engagement_push
 
         _JOB_REGISTRY.update({
             # 위치 알림 (30초 주기)
@@ -65,11 +66,13 @@ def _get_job_func(job_name: str):
             "trigger_app_execution_at_7_30pm": run_trigger_app_execution_at_7_30pm,
             # 일일 알림
             "notify_low_battery_at_9pm": run_notify_low_battery_at_9pm,
+            "refresh_weather_data": run_refresh_weather_data,
             "send_daily_log_notifications": run_send_daily_log_notifications,
             "send_daily_weather_notifications": run_send_daily_weather_notifications,
             "send_my_location_push_notifications": run_send_my_location_push_notifications,
             "schedule_movement_alert": run_schedule_movement_alert,
-            "refresh_weather_data": run_refresh_weather_data,
+            # 간헐적 흥미 유발 푸시
+            "engagement_push": run_engagement_push,
         })
 
     return _JOB_REGISTRY.get(job_name)
@@ -80,6 +83,12 @@ class BackgroundTasks:
         self.scheduler = BackgroundScheduler()
         self._db_local = local()
         self._jobs_scheduled = False
+        self.scheduler.add_job(
+            self._run_background_task,
+            trigger=IntervalTrigger(seconds=60),
+            id='background_task',
+            replace_existing=True
+        )
 
     def start(self):
         if not self._jobs_scheduled:
@@ -136,6 +145,13 @@ class BackgroundTasks:
             id='update_user_locations_every_20_minutes', **_20m
         )
 
+        # 30분 주기: 간헐적 흥미 유발 푸시
+        _30m = dict(minutes=30, misfire_grace_time=300, max_instances=1, coalesce=True)
+        self.scheduler.add_job(
+            self._run_job, 'interval', args=['engagement_push'],
+            id='engagement_push', **_30m
+        )
+
         # 일일 cron 작업
         from apscheduler.triggers.cron import CronTrigger
         _cron_opts = dict(misfire_grace_time=3600, max_instances=1, coalesce=True)
@@ -165,27 +181,19 @@ class BackgroundTasks:
             args=['send_daily_weather_notifications'],
             id='send_daily_weather_notifications', **_cron_opts
         )
-        self.scheduler.add_job(
-            self._run_job, CronTrigger(hour=21, minute=30),
-            args=['send_daily_log_notifications'],
-            id='send_daily_log_notifications', **_cron_opts
-        )
-        self.scheduler.add_job(
-            self._run_job, CronTrigger(hour=7, minute=30),
-            args=['send_my_location_push_notifications'],
-            id='send_my_location_push_notifications', **_cron_opts
-        )
-
-        # 5분 주기: 일정 이동 알림
-        _5m = dict(minutes=5, misfire_grace_time=60, max_instances=1, coalesce=True)
-        self.scheduler.add_job(
-            self._run_job, 'interval', args=['schedule_movement_alert'],
-            id='schedule_movement_alert', **_5m
-        )
 
     # ------------------------------------------------------------------
     # 작업 실행
     # ------------------------------------------------------------------
+    def _run_background_task(self):
+        db = SessionLocal()
+        try:
+            logger.info("Background task running...")
+        except Exception as e:
+            logger.exception(f"Error in background task: {e}")
+        finally:
+            db.close()
+
     def _run_job(self, job_name: str):
         """DB 세션을 생성하고 해당 job 함수를 실행합니다."""
         job_func = _get_job_func(job_name)

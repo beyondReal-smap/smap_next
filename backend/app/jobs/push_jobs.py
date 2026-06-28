@@ -12,9 +12,10 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
 from app.jobs.base import (
+    normalize_lang,
     prefetch_members,
+    render_push_message,
 )
-from app.services.notifications import dispatch_notification, dispatch_notifications_batch
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +66,7 @@ def run_schedule_notification(db: Session) -> None:
     """일정 알림 (배치 최적화)"""
     from app.models.schedule import Schedule
     from app.models.group_detail import GroupDetail
+    from app.services.push_service import send_push, push_log_add
 
     try:
         plt_condition = "1분 - 일정알림"
@@ -78,49 +80,97 @@ def run_schedule_notification(db: Session) -> None:
         owner_ids = list(set(int(s.mt_idx) for s in schedules if s.mt_idx))
         member_map = prefetch_members(db, owner_ids)
 
-        batch = []
-        schedules_to_mark = []
-
         for schedule in schedules:
             sst_idx = schedule.sst_idx
+            mt_idx = str(schedule.mt_idx)
             schedule_title = schedule.sst_title or "일정"
 
             owner = member_map.get(int(schedule.mt_idx))
             if not owner or not owner.mt_token_id:
                 continue
 
-            batch.append({
-                "recipient": owner,
-                "event_type": "schedule_start",
-                "variables": {"title": schedule_title},
-                "plt_condition": plt_condition,
-                "plt_memo": plt_memo,
-                "resource_id": sst_idx,
-                "push_json": {},
-            })
+            # 푸시 알림 메시지 생성 및 전송
+            messages = {
+                "ko": {
+                    "title": "일정 시작 알림 ⏰",
+                    "content": "'{title}' 일정이 30분 후에 시작해요!"
+                },
+                "en": {
+                    "title": "Schedule Start Alert ⏰",
+                    "content": "Schedule '{title}' starts in 30 minutes!"
+                }
+            }
+
+            owner_lang = normalize_lang(owner.mt_lang)
+            owner_fallback = messages.get(owner_lang, messages["ko"])
+            push_title, push_content = render_push_message(
+                event_type="schedule_start",
+                lang=owner_lang,
+                variables={"title": schedule_title},
+                fallback_template=owner_fallback,
+            )
+
+            push_result = send_push(
+                owner.mt_token_id,
+                push_title,
+                push_content
+            )
+
+            push_log_add(
+                db,
+                mt_idx,
+                sst_idx,
+                plt_condition,
+                plt_memo,
+                push_title,
+                push_content,
+                push_result,
+                {}
+            )
 
             # 그룹 일정인 경우 그룹 멤버들에게도 알림 (단일 쿼리)
             if schedule.sgt_idx is not None:
                 group_data = GroupDetail.get_group_members_with_roles(db, schedule.sgt_idx)
-                all_targets = [t for t in [group_data.get("owner"), group_data.get("leader")] + group_data.get("members", [])
-                               if t and str(t.get("mt_idx")) != str(owner.mt_idx) and t.get("mt_token_id")]
+                seen_targets: set = set()
+                raw_targets = [group_data.get("owner"), group_data.get("leader")] + group_data.get("members", [])
+                all_targets = []
+                for t in raw_targets:
+                    if not t or not t.get("mt_token_id"):
+                        continue
+                    t_idx = str(t.get("mt_idx", ""))
+                    if t_idx == str(owner.mt_idx) or t_idx in seen_targets:
+                        continue
+                    seen_targets.add(t_idx)
+                    all_targets.append(t)
 
                 for target in all_targets:
-                    batch.append({
-                        "recipient": target,
-                        "event_type": "schedule_start",
-                        "variables": {"title": schedule_title},
-                        "plt_condition": plt_condition,
-                        "plt_memo": plt_memo,
-                        "resource_id": sst_idx,
-                        "push_json": {},
-                    })
+                    target_lang = normalize_lang(target.get("mt_lang"))
+                    target_fallback = messages.get(target_lang, messages["ko"])
+                    member_title, member_content = render_push_message(
+                        event_type="schedule_start",
+                        lang=target_lang,
+                        variables={"title": schedule_title},
+                        fallback_template=target_fallback,
+                    )
 
-            schedules_to_mark.append(schedule)
+                    push_result = send_push(
+                        target.get("mt_token_id"),
+                        member_title,
+                        member_content
+                    )
 
-        dispatch_notifications_batch(db, batch)
+                    push_log_add(
+                        db,
+                        str(target.get("mt_idx")),
+                        sst_idx,
+                        plt_condition,
+                        plt_memo,
+                        member_title,
+                        member_content,
+                        push_result,
+                        {}
+                    )
 
-        for schedule in schedules_to_mark:
             schedule.sst_schedule_chk = "Y"
 
         # 루프 완료 후 단일 커밋
@@ -132,97 +182,67 @@ def run_schedule_notification(db: Session) -> None:
         db.rollback()
 
 
-_SILENT_BATCH_SIZE = 500
-
-
 def run_send_silent_push_to_all_users(db: Session) -> None:
-    """모든 FCM 토큰 보유 사용자에게 Silent 푸시 배치 전송 (백그라운드 토큰 유지용)
-
-    메모리 최적화: 전체 Message 리스트를 한번에 구성하지 않고
-    500건 청크 단위로 빌드→전송→해제를 반복합니다.
-    Config 객체는 한 번만 생성하여 재사용합니다.
-    """
-    import time as _time
-    from firebase_admin import messaging
-    from app.core.config import settings
+    """모든 FCM 토큰 보유 사용자에게 Silent 푸시 전송 (백그라운드 토큰 유지용)"""
     from app.models.member import Member
     from app.services.firebase_service import firebase_service
 
     try:
         logger.info("백그라운드 FCM 토큰 유지용 Silent 푸시 배치 전송 시작")
 
+        # FCM 토큰이 있는 모든 사용자 조회 (토큰 만료 임박 사용자 우선)
         current_time = datetime.now()
         expired_threshold = current_time + timedelta(days=30)
 
+        # 우선순위 1: 토큰 만료 임박 사용자
         priority_members = Member.get_token_expiring_soon(db, expired_threshold)
+        # 우선순위 2: 나머지 모든 토큰 보유 사용자
         all_members = Member.get_token_list(db)
 
+        # 중복 제거를 위해 우선순위 멤버들을 제외한 나머지 멤버들
         priority_mt_idxs = {member.mt_idx for member in priority_members}
-        remaining_members = [m for m in all_members if m.mt_idx not in priority_mt_idxs]
+        remaining_members = [member for member in all_members if member.mt_idx not in priority_mt_idxs]
 
+        # 우선순위 멤버 먼저, 나머지 멤버들 뒤에 추가
         target_members = priority_members + remaining_members
-        priority_count = len(priority_members)
 
-        logger.info(
-            f"FCM 토큰 보유 사용자 수: {len(target_members)} "
-            f"(우선순위: {priority_count}, 일반: {len(remaining_members)})"
-        )
+        logger.info(f"FCM 토큰 보유 사용자 수: {len(target_members)} (우선순위: {len(priority_members)}, 일반: {len(remaining_members)})")
 
-        if not target_members:
-            return
+        success_count = 0
+        fail_count = 0
+        priority_success_count = 0
+        priority_fail_count = 0
 
-        # 공유 config 객체를 한 번만 생성하여 재사용 (객체 할당 최소화)
-        android_cfg = messaging.AndroidConfig(priority="high")
-        apns_expiration = str(int(_time.time()) + 7776000)
-        apns_payload = messaging.APNSPayload(
-            aps=messaging.Aps(content_available=True, thread_id="silent"),
-        )
+        for i, member in enumerate(target_members):
+            try:
+                is_priority = i < len(priority_members)
+                reason = "priority_token_refresh" if is_priority else "scheduled_token_refresh"
+                priority = "high" if is_priority else "high"  # 모두 high로 설정하여 푸시 수신 보장
 
-        total_success = 0
-        total_fail = 0
+                # 각 사용자에게 silent push 전송 (priority를 높게 설정하여 iOS 무시 방지)
+                response = firebase_service.send_silent_push_notification(
+                    member.mt_token_id,
+                    reason,
+                    priority
+                )
 
-        # 청크 단위로 빌드→전송→해제 (메모리 피크 최소화)
-        for chunk_start in range(0, len(target_members), _SILENT_BATCH_SIZE):
-            chunk = target_members[chunk_start:chunk_start + _SILENT_BATCH_SIZE]
-            ts = str(int(_time.time() * 1000))
+                if is_priority:
+                    priority_success_count += 1
+                success_count += 1
 
-            messages = []
-            for i, member in enumerate(chunk, start=chunk_start):
-                reason = "priority_token_refresh" if i < priority_count else "scheduled_token_refresh"
-                try:
-                    messages.append(messaging.Message(
-                        data={
-                            "silent_push": "true",
-                            "reason": reason,
-                            "timestamp": ts,
-                            "token_refresh": "true",
-                            "background_wake": "true",
-                            "force_token_update": "true",
-                        },
-                        android=android_cfg,
-                        apns=messaging.APNSConfig(
-                            headers={
-                                "apns-push-type": "background",
-                                "apns-priority": "10",
-                                "apns-topic": settings.IOS_BUNDLE_ID,
-                                "apns-expiration": apns_expiration,
-                            },
-                            payload=apns_payload,
-                        ),
-                        token=member.mt_token_id,
-                    ))
-                except Exception as e:
-                    logger.warning(f"Silent 메시지 구성 실패 - mt_idx: {member.mt_idx}: {e}")
+                logger.debug(f"Silent 푸시 전송 성공 - mt_idx: {member.mt_idx}, 우선순위: {is_priority}, 토큰 만료일: {member.mt_token_expiry_date}")
 
-            if messages:
-                responses = firebase_service.send_batch_push(messages)
-                total_success += sum(1 for r in responses if r and r.success)
-                total_fail += sum(1 for r in responses if not r or not r.success)
+            except Exception as e:
+                if i < len(priority_members):
+                    priority_fail_count += 1
+                fail_count += 1
+                logger.error(f"Silent 푸시 전송 실패 - mt_idx: {member.mt_idx}, error: {str(e)}")
 
-        logger.info(
-            f"Silent 푸시 배치 전송 완료 - 성공: {total_success}, "
-            f"실패: {total_fail}, 전체: {total_success + total_fail}"
-        )
+        logger.info(f"Silent 푸시 배치 전송 완료 - 전체: {success_count}/{len(target_members)} 성공")
+        logger.info(f"우선순위 토큰: {priority_success_count}/{len(priority_members)} 성공, 일반 토큰: {success_count - priority_success_count}/{len(remaining_members)} 성공")
+
+        if fail_count > 0:
+            logger.warning(f"Silent 푸시 전송 실패: {fail_count}개 (우선순위 실패: {priority_fail_count})")
 
     except Exception as e:
         logger.error(f"Silent 푸시 배치 전송 중 오류 발생: {e}")
@@ -230,26 +250,51 @@ def run_send_silent_push_to_all_users(db: Session) -> None:
 
 
 def run_trigger_app_execution_at_7_30pm(db: Session) -> None:
-    """앱 실행 트리거 — 최근 1주일 내 접속자만 대상"""
+    """앱 실행 트리거"""
     from app.models.member import Member
+    from app.services.push_service import send_push, push_log_add
 
     try:
         plt_condition = "일일 - 앱실행알림"
         plt_memo = "저녁 7시 30분 앱 실행 알림"
 
-        members = Member.get_recently_active(db)
+        members = Member.get_all_active(db)
 
-        batch = [
-            {
-                "recipient": member,
-                "event_type": "app_reengagement",
-                "variables": {},
-                "plt_condition": plt_condition,
-                "plt_memo": plt_memo,
+        for member in members:
+            mt_idx = str(member.mt_idx)
+
+            messages = {
+                "ko": {
+                    "title": "오늘 하루는 어떠셨나요? 🌙",
+                    "content": "오늘의 일정과 위치 기록을 확인해보세요!"
+                },
+                "en": {
+                    "title": "How was your day? 🌙",
+                    "content": "Check your today's schedule and location records!"
+                }
             }
-            for member in members
-        ]
-        dispatch_notifications_batch(db, batch)
+
+            lang = normalize_lang(getattr(member, "mt_lang", None))
+            push_title = messages.get(lang, messages["ko"])["title"]
+            push_content = messages.get(lang, messages["ko"])["content"]
+
+            push_result = send_push(
+                member.mt_token_id,
+                push_title,
+                push_content
+            )
+
+            push_log_add(
+                db,
+                mt_idx,
+                None,
+                plt_condition,
+                plt_memo,
+                push_title,
+                push_content,
+                push_result,
+                {}
+            )
 
         logger.info("App execution trigger executed successfully")
 

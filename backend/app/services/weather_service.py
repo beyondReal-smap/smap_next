@@ -9,29 +9,27 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger(__name__)
 
 # 기상청 Lambert Conformal Conic 격자 변환 상수
-_KMA_RE = 6371.00877  # 지구 반경 (km)
-_KMA_GRID = 5.0       # 격자 간격 (km)
-_KMA_SLAT1 = 30.0     # 표준위도 1
-_KMA_SLAT2 = 60.0     # 표준위도 2
-_KMA_OLON = 126.0     # 기준점 경도
-_KMA_OLAT = 38.0      # 기준점 위도
-_KMA_XO = 210 / _KMA_GRID  # 기준점 X좌표
-_KMA_YO = 675 / _KMA_GRID  # 기준점 Y좌표
+_KMA_RE = 6371.00877
+_KMA_GRID = 5.0
+_KMA_SLAT1 = 30.0
+_KMA_SLAT2 = 60.0
+_KMA_OLON = 126.0
+_KMA_OLAT = 38.0
+_KMA_XO = 210 / _KMA_GRID
+_KMA_YO = 675 / _KMA_GRID
+_KMA_VILAGE_FCST_URL = "http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst"
+WEATHER_STALE_HOURS = 24
 
 
 def latlong_to_grid(lat: float, lon: float) -> tuple[int, int]:
-    """위경도를 기상청 격자 좌표(nx, ny)로 변환한다.
-
-    기상청 단기예보 API는 Lambert Conformal Conic 투영의
-    5km 격자 좌표를 사용한다. PHP weather.inc.php의 lamcproj 포팅.
-    """
-    DEGRAD = math.pi / 180.0
+    """위경도를 기상청 격자 좌표(nx, ny)로 변환한다."""
+    degrad = math.pi / 180.0
 
     re = _KMA_RE / _KMA_GRID
-    slat1 = _KMA_SLAT1 * DEGRAD
-    slat2 = _KMA_SLAT2 * DEGRAD
-    olon = _KMA_OLON * DEGRAD
-    olat = _KMA_OLAT * DEGRAD
+    slat1 = _KMA_SLAT1 * degrad
+    slat2 = _KMA_SLAT2 * degrad
+    olon = _KMA_OLON * degrad
+    olat = _KMA_OLAT * degrad
 
     sn = math.tan(math.pi * 0.25 + slat2 * 0.5) / math.tan(math.pi * 0.25 + slat1 * 0.5)
     sn = math.log(math.cos(slat1) / math.cos(slat2)) / math.log(sn)
@@ -40,9 +38,9 @@ def latlong_to_grid(lat: float, lon: float) -> tuple[int, int]:
     ro = math.tan(math.pi * 0.25 + olat * 0.5)
     ro = re * sf / math.pow(ro, sn)
 
-    ra = math.tan(math.pi * 0.25 + lat * DEGRAD * 0.5)
+    ra = math.tan(math.pi * 0.25 + lat * degrad * 0.5)
     ra = re * sf / math.pow(ra, sn)
-    theta = lon * DEGRAD - olon
+    theta = lon * degrad - olon
     if theta > math.pi:
         theta -= 2.0 * math.pi
     if theta < -math.pi:
@@ -75,53 +73,55 @@ def parse_kma_forecast(response: dict | None, target_date: str) -> dict | None:
             return None
 
         result = {}
-        tmp_today = None       # TMP(현재기온) 폴백용
-        next_date_tmx = None   # 다음날 TMX 폴백용
-        next_date_tmn = None   # 다음날 TMN 폴백용
+        tmp_today = None
+        next_date_tmx = None
+        next_date_tmn = None
+
+        # 우리가 사용하는 카테고리는 모두 숫자값.
+        # PCP('강수없음')·SNO('적설없음') 등 문자열 값 카테고리는 건너뛴다.
+        _NUMERIC_CATEGORIES = {"TMX", "TMN", "SKY", "POP", "TMP"}
 
         def _valid_temp(val) -> int | None:
-            """기상청 결측값(-999 등)을 필터링하고 정수 온도를 반환한다."""
-            v = int(float(val))
-            return v if -80 <= v <= 60 else None  # 지구상 기온 범위
+            value = int(float(val))
+            return value if -80 <= value <= 60 else None
 
         for item in items:
-            cat = item.get("category")
-            fdate = item.get("fcstDate")
-            val = item.get("fcstValue")
+            category = item.get("category")
+            if category not in _NUMERIC_CATEGORIES:
+                continue
+            forecast_date = item.get("fcstDate")
+            value = item.get("fcstValue")
 
-            # 기상청 결측값 스킵 (-999, -998 등)
-            if val is None or float(val) <= -900:
+            if value is None or float(value) <= -900:
                 continue
 
-            if fdate == target_date:
-                if cat == "TMX" and "tmx" not in result:
-                    t = _valid_temp(val)
-                    if t is not None:
-                        result["tmx"] = t
-                elif cat == "TMN" and "tmn" not in result:
-                    t = _valid_temp(val)
-                    if t is not None:
-                        result["tmn"] = t
-                elif cat == "SKY" and "sky" not in result:
-                    result["sky"] = int(val)
-                elif cat == "POP" and "pop" not in result:
-                    result["pop"] = f"{val}%"
-                elif cat == "TMP" and tmp_today is None:
-                    t = _valid_temp(val)
-                    if t is not None:
-                        tmp_today = t
+            if forecast_date == target_date:
+                if category == "TMX" and "tmx" not in result:
+                    temp = _valid_temp(value)
+                    if temp is not None:
+                        result["tmx"] = temp
+                elif category == "TMN" and "tmn" not in result:
+                    temp = _valid_temp(value)
+                    if temp is not None:
+                        result["tmn"] = temp
+                elif category == "SKY" and "sky" not in result:
+                    result["sky"] = int(value)
+                elif category == "POP" and "pop" not in result:
+                    result["pop"] = f"{value}%"
+                elif category == "TMP" and tmp_today is None:
+                    temp = _valid_temp(value)
+                    if temp is not None:
+                        tmp_today = temp
             else:
-                # 다음날 TMX/TMN (오후 발표 시 오늘 TMX/TMN 없을 때 폴백)
-                if cat == "TMX" and next_date_tmx is None:
-                    t = _valid_temp(val)
-                    if t is not None:
-                        next_date_tmx = t
-                elif cat == "TMN" and next_date_tmn is None:
-                    t = _valid_temp(val)
-                    if t is not None:
-                        next_date_tmn = t
+                if category == "TMX" and next_date_tmx is None:
+                    temp = _valid_temp(value)
+                    if temp is not None:
+                        next_date_tmx = temp
+                elif category == "TMN" and next_date_tmn is None:
+                    temp = _valid_temp(value)
+                    if temp is not None:
+                        next_date_tmn = temp
 
-        # 폴백 체인: 오늘 TMX/TMN → TMP → 내일 TMX/TMN
         if "tmx" not in result:
             if tmp_today is not None:
                 result["tmx"] = tmp_today
@@ -175,9 +175,6 @@ def _get_kma_base_datetime() -> tuple[str, str]:
     return base_date, base_time
 
 
-_KMA_VILAGE_FCST_URL = "http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst"
-
-
 def fetch_kma_forecast(nx: int, ny: int, retries: int = 3) -> dict | None:
     """기상청 단기예보 API를 호출하여 JSON 응답을 반환한다."""
     from app.core.config import settings
@@ -188,7 +185,6 @@ def fetch_kma_forecast(nx: int, ny: int, retries: int = 3) -> dict | None:
         return None
 
     base_date, base_time = _get_kma_base_datetime()
-
     params = {
         "serviceKey": service_key,
         "numOfRows": 1000,
@@ -203,9 +199,9 @@ def fetch_kma_forecast(nx: int, ny: int, retries: int = 3) -> dict | None:
     for attempt in range(retries):
         try:
             with httpx.Client(timeout=10.0) as client:
-                resp = client.get(_KMA_VILAGE_FCST_URL, params=params)
-                resp.raise_for_status()
-                return resp.json()
+                response = client.get(_KMA_VILAGE_FCST_URL, params=params)
+                response.raise_for_status()
+                return response.json()
         except Exception as e:
             logger.warning(f"KMA API attempt {attempt + 1}/{retries} failed for ({nx},{ny}): {e}")
             if attempt < retries - 1:
@@ -216,13 +212,11 @@ def fetch_kma_forecast(nx: int, ny: int, retries: int = 3) -> dict | None:
     return None
 
 
-WEATHER_STALE_HOURS = 24
-
-
-def get_weather_info(db: Session, lat, long) -> Optional[Dict]:
+def get_weather_info(db: Session, lat, long, mt_idx: int = None) -> Optional[Dict]:
     """회원의 위치 기반 날씨 정보를 반환합니다.
 
     24시간 이내에 갱신된 데이터만 사용합니다.
+    mt_idx가 주어지면 본인 데이터를 우선 조회하고, 없으면 위치 기반으로 폴백합니다.
     """
     if lat is None or long is None:
         return None
@@ -232,39 +226,85 @@ def get_weather_info(db: Session, lat, long) -> Optional[Dict]:
         lat_f, lng_f = float(lat), float(long)
         stale_cutoff = datetime.now() - timedelta(hours=WEATHER_STALE_HOURS)
 
-        result = db.execute(text("""
-            SELECT mt_weather_sky, mt_weather_tmx, mt_weather_tmn,
-                   mt_weather_pop, mt_weather_date,
-                   mt_sido, mt_gu, mt_dong
-            FROM member_t
-            WHERE mt_weather_sky IS NOT NULL
-              AND mt_weather_tmx IS NOT NULL
-              AND mt_weather_date >= :stale_cutoff
-              AND mt_lat IS NOT NULL
-              AND mt_status = 1
-              AND mt_lat BETWEEN :lat_min AND :lat_max
-              AND mt_long BETWEEN :lng_min AND :lng_max
-            ORDER BY ABS(mt_lat - :lat) + ABS(mt_long - :lng)
-            LIMIT 1
-        """), {
-            "lat": lat_f, "lng": lng_f,
-            "lat_min": lat_f - 0.1, "lat_max": lat_f + 0.1,
-            "lng_min": lng_f - 0.1, "lng_max": lng_f + 0.1,
-            "stale_cutoff": stale_cutoff,
-        }).first()
+        result = None
+
+        # 본인 날씨 데이터 우선 조회
+        if mt_idx:
+            result = db.execute(text("""
+                SELECT mt_weather_sky, mt_weather_tmx, mt_weather_tmn,
+                       mt_weather_pop, mt_weather_date,
+                       mt_sido, mt_gu, mt_dong
+                FROM member_t
+                WHERE mt_idx = :mt_idx
+                  AND mt_weather_sky IS NOT NULL
+                  AND mt_weather_tmx IS NOT NULL
+                  AND mt_weather_date >= :stale_cutoff
+            """), {"mt_idx": mt_idx, "stale_cutoff": stale_cutoff}).first()
+
+        # 없으면 위치 기반으로 가장 가까운 회원 데이터 사용
+        if not result:
+            result = db.execute(text("""
+                SELECT mt_weather_sky, mt_weather_tmx, mt_weather_tmn,
+                       mt_weather_pop, mt_weather_date,
+                       mt_sido, mt_gu, mt_dong
+                FROM member_t
+                WHERE mt_weather_sky IS NOT NULL
+                  AND mt_weather_tmx IS NOT NULL
+                  AND mt_weather_date >= :stale_cutoff
+                  AND mt_lat IS NOT NULL
+                  AND mt_status = 1
+                  AND mt_lat BETWEEN :lat_min AND :lat_max
+                  AND mt_long BETWEEN :lng_min AND :lng_max
+                ORDER BY ABS(mt_lat - :lat) + ABS(mt_long - :lng)
+                LIMIT 1
+            """), {
+                "lat": lat_f, "lng": lng_f,
+                "lat_min": lat_f - 0.1, "lat_max": lat_f + 0.1,
+                "lng_min": lng_f - 0.1, "lng_max": lng_f + 0.1,
+                "stale_cutoff": stale_cutoff,
+            }).first()
 
         if not result:
             return None
 
+        pop = str(result.mt_weather_pop or "0").rstrip("%")
         return {
             "temperature": result.mt_weather_tmx,
             "weather": _sky_to_text(result.mt_weather_sky),
-            "humidity": result.mt_weather_pop or "0",
+            "humidity": pop,
             "location": f"{result.mt_sido or ''} {result.mt_gu or ''} {result.mt_dong or ''}".strip(),
         }
     except Exception as e:
         logger.error(f"Error in get_weather_info: {e}")
         return None
+
+
+def reverse_geocode(lat: float, lon: float) -> dict:
+    """Nominatim(OpenStreetMap)으로 위경도 → 한국 행정구역(sido/gu/dong) 반환.
+
+    Nominatim 사용 정책상 1req/sec 제한 — 호출 측에서 sleep 필요.
+    실패 시 빈 dict 반환(날씨 데이터 갱신은 계속 진행).
+    """
+    try:
+        with httpx.Client(timeout=5.0, headers={
+            "User-Agent": "smap-app/1.0 (contact: admin@smap.site)"
+        }) as client:
+            resp = client.get(
+                "https://nominatim.openstreetmap.org/reverse",
+                params={"lat": lat, "lon": lon, "format": "json", "accept-language": "ko"},
+            )
+            resp.raise_for_status()
+            addr = resp.json().get("address", {})
+
+        # 한국 주소 구조: city=시도, borough=구군, suburb=동
+        # 지방의 경우 province=시도, county=시군, suburb=동
+        sido = addr.get("province") or addr.get("city") or addr.get("state") or ""
+        gu = addr.get("borough") or addr.get("county") or addr.get("city_district") or ""
+        dong = addr.get("suburb") or addr.get("quarter") or addr.get("neighbourhood") or ""
+        return {"sido": sido, "gu": gu, "dong": dong}
+    except Exception as e:
+        logger.warning(f"[Nominatim] reverse geocode failed ({lat},{lon}): {e}")
+        return {}
 
 
 def _sky_to_text(sky) -> str:
