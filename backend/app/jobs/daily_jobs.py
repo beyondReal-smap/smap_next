@@ -109,10 +109,14 @@ def run_send_daily_log_notifications(db: Session) -> None:
         # 로그가 있는 멤버만 배치 조회
         member_map = prefetch_members(db, list(log_count_map.keys()))
 
+        seen_tokens: set = set()
         for mt_idx, log_count in log_count_map.items():
             member = member_map.get(mt_idx)
             if not member or not member.mt_token_id:
                 continue
+            if member.mt_token_id in seen_tokens:
+                continue
+            seen_tokens.add(member.mt_token_id)
 
             total_distance = 0  # 실제 거리 계산은 별도 구현 필요
             formatted_distance = "{:,.1f}".format(total_distance)
@@ -172,8 +176,12 @@ def run_send_daily_weather_notifications(db: Session) -> None:
 
         members = Member.get_recently_active(db)
 
+        seen_tokens: set = set()
         batch = []
         for member in members:
+            if not member.mt_token_id or member.mt_token_id in seen_tokens:
+                continue
+            seen_tokens.add(member.mt_token_id)
             weather_info = get_weather_info(db, member.mt_lat, member.mt_long, member.mt_idx)
             if weather_info:
                 is_english = str(getattr(member, "mt_lang", "") or "").lower().startswith("en")
