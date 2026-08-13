@@ -6,7 +6,7 @@ export function resolveBackendBaseUrl(): string {
     const isIpHost = /^[0-9.]+$/.test(hostname);
 
     // IP 또는 http 스킴이면 강제로 공식 도메인 사용
-    if (isIpHost || hostname.includes('118.67.130.71') || parsed.protocol === 'http:') {
+    if (isIpHost || parsed.protocol === 'http:') {
       return 'https://api3.smap.site';
     }
     return envBase;

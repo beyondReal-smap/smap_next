@@ -112,7 +112,6 @@ export const MAP_CONFIG = {
       'app2.smap.site',
       'app.smap.site',
       'smap.site',
-      '118.67.130.71:3000',  // IP 주소 도메인
       // Vercel 환경
       '*.vercel.app',
       // 개발 환경

@@ -96,15 +96,6 @@
 		<false/>
 		<key>NSExceptionDomains</key>
 		<dict>
-			<key>118.67.130.71</key>
-			<dict>
-				<key>NSExceptionAllowsInsecureHTTPLoads</key>
-				<true/>
-				<key>NSExceptionMinimumTLSVersion</key>
-				<string>TLSv1.2</string>
-				<key>NSExceptionRequiresForwardSecrecy</key>
-				<false/>
-			</dict>
 			<key>accounts.kakao.com</key>
 			<dict>
 				<key>NSExceptionMinimumTLSVersion</key>

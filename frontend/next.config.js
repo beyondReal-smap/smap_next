@@ -105,7 +105,6 @@ const nextConfig = {
       'app2.smap.site',
       'app.smap.site',
       'smap.site',
-      '118.67.130.71',
       'api3.smap.site'
     ],
   },
