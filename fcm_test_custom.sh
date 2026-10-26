@@ -40,7 +40,7 @@ echo ""
 # FCM 발송 실행
 echo -e "${BLUE}📤 FCM 발송 중...${NC}"
 RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" \
-  -X POST "https://api3.smap.site/api/v1/fcm_sendone/" \
+  -X POST "https://api3.aiagnt.kr/api/v1/fcm_sendone/" \
   -H "Content-Type: application/json" \
   -d "$FCM_DATA")
 

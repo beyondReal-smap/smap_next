@@ -48,7 +48,7 @@
 NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID=91y2nh0yff
 NEXT_PUBLIC_GOOGLE_CLIENT_ID=283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com
 NEXTAUTH_SECRET=your_nextauth_secret
-NEXTAUTH_URL=https://nextstep.smap.site
+NEXTAUTH_URL=https://nextstep.aiagnt.kr
 ```
 
 ### API 키 설정
@@ -58,7 +58,7 @@ NEXTAUTH_URL=https://nextstep.smap.site
    - `NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID`: 네이버 지도 API 클라이언트 ID (91y2nh0yff)
    - `NEXT_PUBLIC_GOOGLE_CLIENT_ID`: Google OAuth 클라이언트 ID
    - `NEXTAUTH_SECRET`: NextAuth 시크릿 키
-   - `NEXTAUTH_URL`: 프로덕션 URL (https://nextstep.smap.site)
+   - `NEXTAUTH_URL`: 프로덕션 URL (https://nextstep.aiagnt.kr)
 
 ## 배포 후 확인 사항
 
@@ -134,7 +134,7 @@ git push origin main
 ```javascript
 // 환경 정보 확인
 console.log('Hostname:', window.location.hostname);
-console.log('Is Vercel:', window.location.hostname.includes('vercel.app') || window.location.hostname.includes('nextstep.smap.site'));
+console.log('Is Vercel:', window.location.hostname.includes('vercel.app') || window.location.hostname.includes('nextstep.aiagnt.kr'));
 
 // 네이버 지도 API 상태 확인
 console.log('Naver Maps:', window.naver?.maps);

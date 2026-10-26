@@ -245,7 +245,7 @@ struct NativeScheduleListView: View {
                             VStack(spacing: 8) {
                                 ZStack {
                                     if let photoUrl = member.mt_file1, !photoUrl.isEmpty {
-                                        AsyncImage(url: URL(string: photoUrl.hasPrefix("http") ? photoUrl : "https://nextstep.smap.site\(photoUrl)")) { phase in
+                                        AsyncImage(url: URL(string: photoUrl.hasPrefix("http") ? photoUrl : "https://nextstep.aiagnt.kr\(photoUrl)")) { phase in
                                             if let image = phase.image {
                                                 image.resizable().aspectRatio(contentMode: .fill)
                                             } else {
@@ -519,7 +519,7 @@ struct ScheduleEventCard: View {
                     if #available(iOS 15.0, *),
                        let photo = schedule.validMemberPhoto,
                        !photo.isEmpty,
-                       let url = URL(string: photo.hasPrefix("http") ? photo : "https://nextstep.smap.site\(photo)") {
+                       let url = URL(string: photo.hasPrefix("http") ? photo : "https://nextstep.aiagnt.kr\(photo)") {
 
                         AsyncImage(url: url) { phase in
                             if let image = phase.image {

@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
 
     // 백엔드 API로 토큰 전송
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api3.smap.site';
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api3.aiagnt.kr';
     console.log('[AUTH CALLBACK] 백엔드 URL:', backendUrl);
     
     try {

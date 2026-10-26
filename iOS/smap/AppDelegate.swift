@@ -5833,7 +5833,7 @@ extension AppDelegate {
             return
         }
         
-        let urlString = "https://api3.smap.site/api/v1/member-fcm-token/status/\(userIdx)"
+        let urlString = "https://api3.aiagnt.kr/api/v1/member-fcm-token/status/\(userIdx)"
         guard let url = URL(string: urlString) else {
             print("❌ [Background] 토큰 상태 확인 URL 생성 실패")
             completion(false)

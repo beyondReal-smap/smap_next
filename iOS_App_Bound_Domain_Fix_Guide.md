@@ -58,10 +58,10 @@ let hapticUserScriptEnd = WKUserScript(source: hapticEventScript, injectionTime:
 <!-- 🔐 App-Bound Domains 설정 -->
 <key>WKAppBoundDomains</key>
 <array>
-    <string>nextstep.smap.site</string>
-    <string>app2.smap.site</string>
-    <string>app.smap.site</string>
-    <string>smap.site</string>
+    <string>nextstep.aiagnt.kr</string>
+    <string>app2.aiagnt.kr</string>
+    <string>app.aiagnt.kr</string>
+    <string>aiagnt.kr</string>
     <string>localhost</string>
 </array>
 ```
@@ -75,7 +75,7 @@ let hapticUserScriptEnd = WKUserScript(source: hapticEventScript, injectionTime:
 if #available(iOS 14.0, *) {
     config.limitsNavigationsToAppBoundDomains = true
     print("🔐 [WebView] App-Bound Domain 제한 활성화")
-    print("🔐 [WebView] 허용된 도메인: nextstep.smap.site, smap.site, localhost")
+    print("🔐 [WebView] 허용된 도메인: nextstep.aiagnt.kr, aiagnt.kr, localhost")
     print("🔐 [WebView] Info.plist WKAppBoundDomains 설정 적용됨")
 }
 ```
@@ -106,7 +106,7 @@ window.SMAP_DEBUG_HAPTIC();              // 디버깅 및 테스트
 ║ 🔍 [App-Bound Domain] 진단 시작                                               ║
 ╠═══════════════════════════════════════════════════════════════════════════════╣
 ║ 📱 iOS 버전: 17.0                                                             ║
-║ 🌐 현재 URL: https://nextstep.smap.site                                       ║
+║ 🌐 현재 URL: https://nextstep.aiagnt.kr                                       ║
 ║ 🔐 App-Bound 제한: 활성화                                                     ║
 ║ 🔧 JavaScript: 활성화                                                         ║
 ║ 📬 User Scripts: 2                                                            ║
@@ -201,7 +201,7 @@ if #available(iOS 14.0, *) {
 #### **특정 도메인에서만 햅틱 활성화**
 ```javascript
 // 안전한 도메인 체크
-if (window.location.hostname.includes('smap.site')) {
+if (window.location.hostname.includes('aiagnt.kr')) {
     window.SMAP_HAPTIC('success');
 }
 ```

@@ -4,7 +4,7 @@ frontend 폴더의 Next.js 애플리케이션을 iOS 웹뷰로 감싸는 하이�
 
 ## 📱 프로젝트 개요
 
-- **웹 URL**: https://next.smap.site
+- **웹 URL**: https://next.aiagnt.kr
 - **Bundle ID**: com.dmonster.smap
 - **최소 iOS 버전**: 13.0
 - **아키텍처**: 웹뷰 하이브리드 앱
@@ -23,7 +23,7 @@ pod install
 ```
 
 ### 2. 웹 애플리케이션 확인
-- **next.smap.site**가 정상적으로 배포되어 있는지 확인
+- **next.aiagnt.kr**가 정상적으로 배포되어 있는지 확인
 - HTTPS 연결이 안정적인지 확인
 - 모바일 반응형 디자인이 적용되어 있는지 확인
 
@@ -65,7 +65,7 @@ open smap.xcworkspace  # .xcodeproj가 아닌 .xcworkspace 열기
   - localhost 접근 허용
   - 자세한 로그 출력
 - **Release**: 배포용
-  - next.smap.site만 허용
+  - next.aiagnt.kr만 허용
   - 최적화된 빌드
 
 ## 🚀 빌드 및 테스트

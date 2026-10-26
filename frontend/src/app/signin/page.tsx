@@ -1727,7 +1727,7 @@ const SignInPage = () => {
           usingClientId: clientId.substring(0, 12) + '...',
           clientIdLength: clientId.length,
           currentDomain: window.location.hostname,
-          isProduction: window.location.hostname.includes('.smap.site'),
+          isProduction: window.location.hostname.includes('.aiagnt.kr'),
           isHardcoded: !process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
         });
 
@@ -1738,11 +1738,11 @@ const SignInPage = () => {
         }
 
         // 프로덕션 환경에서 추가 도메인 검증 (안드로이드 WebView 차단 보강)
-        if (window.location.hostname.includes('.smap.site')) {
+        if (window.location.hostname.includes('.aiagnt.kr')) {
           console.log('🔐 [GOOGLE OAUTH] 프로덕션 환경 감지 - 도메인 검증 수행');
 
-          // Google Console에서 nextstep.smap.site 도메인이 등록되어 있는지 확인
-          const allowedDomains = ['nextstep.smap.site', 'app2.smap.site', 'app.smap.site'];
+          // Google Console에서 nextstep.aiagnt.kr 도메인이 등록되어 있는지 확인
+          const allowedDomains = ['nextstep.aiagnt.kr', 'app2.aiagnt.kr', 'app.aiagnt.kr'];
           const currentDomain = window.location.hostname;
 
           if (!allowedDomains.includes(currentDomain)) {
@@ -1895,7 +1895,7 @@ const SignInPage = () => {
 
             // 실제 에러 메시지 생성
             let errorMessage = 'Google 로그인에 실패했습니다.';
-            if (window.location.hostname.includes('.smap.site')) {
+            if (window.location.hostname.includes('.aiagnt.kr')) {
               errorMessage = 'Google 로그인을 사용할 수 없습니다.\n\n전화번호 로그인을 이용해주세요.';
             } else {
               errorMessage = 'Google 로그인에 실패했습니다.\n\n다시 시도하거나 전화번호 로그인을 사용해주세요.';
@@ -2194,7 +2194,7 @@ const SignInPage = () => {
       // 🚫 사용자가 명시적으로 signin 페이지를 방문한 경우 (직접 URL 입력, 북마크 등) 자동 리다이렉트 방지
       const referrer = document.referrer;
       const isDirectVisit = !referrer || referrer === window.location.href;
-      const isFromExternal = referrer && !referrer.includes('nextstep.smap.site');
+      const isFromExternal = referrer && !referrer.includes('nextstep.aiagnt.kr');
 
       if (isDirectVisit || isFromExternal) {
         console.log('[SIGNIN] 🚫 직접 방문 또는 외부에서 접근 - signin 페이지에 머물기');

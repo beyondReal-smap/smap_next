@@ -1,7 +1,7 @@
-# Google OAuth 설정 가이드 (nextstep.smap.site)
+# Google OAuth 설정 가이드 (nextstep.aiagnt.kr)
 
 ## 현재 문제
-`nextstep.smap.site`에서 Google 로그인 시 "Google Identity Services를 사용할 수 없습니다" 오류가 발생합니다.
+`nextstep.aiagnt.kr`에서 Google 로그인 시 "Google Identity Services를 사용할 수 없습니다" 오류가 발생합니다.
 
 ## 해결 방법
 
@@ -15,7 +15,7 @@
 3. **승인된 JavaScript 출처** 섹션에서 **URI 추가** 클릭
 4. 다음 URL을 추가:
    ```
-   https://nextstep.smap.site
+   https://nextstep.aiagnt.kr
    ```
 
 ### 3. 새 Client ID 발급 (권장)
@@ -23,14 +23,14 @@
 
 1. **사용자 인증 정보 만들기** > **OAuth 클라이언트 ID** 클릭
 2. 애플리케이션 유형: **웹 애플리케이션** 선택
-3. 이름: `SMAP Production (nextstep.smap.site)` 입력
+3. 이름: `SMAP Production (nextstep.aiagnt.kr)` 입력
 4. **승인된 JavaScript 출처**에 다음 추가:
    ```
-   https://nextstep.smap.site
+   https://nextstep.aiagnt.kr
    ```
 5. **승인된 리디렉션 URI**에 다음 추가 (필요시):
    ```
-   https://nextstep.smap.site/api/auth/callback/google
+   https://nextstep.aiagnt.kr/api/auth/callback/google
    ```
 6. **만들기** 클릭
 
@@ -39,8 +39,8 @@
 
 ```typescript
 CLIENT_IDS: {
-  'nextstep.smap.site': '새로_발급받은_Client_ID',  // 여기에 새 Client ID 입력
-  'app2.smap.site': '기존_Client_ID',
+  'nextstep.aiagnt.kr': '새로_발급받은_Client_ID',  // 여기에 새 Client ID 입력
+  'app2.aiagnt.kr': '기존_Client_ID',
   'localhost:3000': '기존_Client_ID',
 },
 ```
@@ -50,7 +50,7 @@ CLIENT_IDS: {
 - 즉시 테스트하려면 새 Client ID를 발급받는 것이 더 빠릅니다.
 
 ## 확인 방법
-1. `nextstep.smap.site`에서 Google 로그인 버튼 클릭
+1. `nextstep.aiagnt.kr`에서 Google 로그인 버튼 클릭
 2. Google 로그인 팝업이 정상적으로 열리는지 확인
 3. 로그인 성공 후 홈 페이지로 이동하는지 확인
 
@@ -60,12 +60,12 @@ CLIENT_IDS: {
 ## 기술 세부사항
 
 ### 현재 오류 원인
-- `nextstep.smap.site` 도메인이 Google OAuth 승인된 JavaScript 출처에 등록되지 않음
+- `nextstep.aiagnt.kr` 도메인이 Google OAuth 승인된 JavaScript 출처에 등록되지 않음
 - Google Identity Services가 보안상 미등록 도메인에서의 요청을 차단
 
 ### 설정 후 동작 방식
 1. 사용자가 Google 로그인 버튼 클릭
-2. `nextstep.smap.site`에서 Google OAuth 서버로 요청
+2. `nextstep.aiagnt.kr`에서 Google OAuth 서버로 요청
 3. Google에서 도메인 확인 후 로그인 팝업 표시
 4. 사용자 인증 완료 후 토큰 발급
 5. 백엔드로 토큰 전송하여 사용자 정보 획득

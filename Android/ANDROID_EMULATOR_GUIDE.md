@@ -25,7 +25,7 @@ npm run dev -- --host 0.0.0.0
 - 개발 서버가 없으면 운영 서버로 폴백
 
 **RELEASE 빌드 또는 실제 기기:**
-- 운영 서버 `https://nextstep.smap.site` 사용
+- 운영 서버 `https://nextstep.aiagnt.kr` 사용
 
 ## 🔧 네트워크 설정
 

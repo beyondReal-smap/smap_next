@@ -39,7 +39,7 @@ SEND_TIME=$(get_timestamp)
 echo -e "${BLUE}📤 [${SEND_TIME}] FCM 푸시 발송 중...${NC}"
 
 RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" \
-  -X POST "https://api3.smap.site/api/v1/member-fcm-token/test-ios-push" \
+  -X POST "https://api3.aiagnt.kr/api/v1/member-fcm-token/test-ios-push" \
   -H "Content-Type: application/json" \
   -d "$TEST_DATA")
 

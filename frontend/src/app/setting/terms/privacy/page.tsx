@@ -341,7 +341,7 @@ export default function PrivacyPolicyPage() {
                   <div className="space-y-1 text-sm text-gray-700">
                     <p><strong>성명:</strong> 정진</p>
                     <p><strong>전화:</strong> 070-8065-2207</p>
-                    <p><strong>이메일:</strong> admin@smap.site</p>
+                    <p><strong>이메일:</strong> admin@aiagnt.kr</p>
                   </div>
                 </div>
               </div>

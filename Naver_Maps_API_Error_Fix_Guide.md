@@ -3,13 +3,13 @@
 ## 📋 현재 발생 중인 문제
 
 ```
-❌ GET https://oapi.map.naver.com/v3/auth?ncpKeyId=91y2nh0yff&url=https%3A%2F%2Fnextstep.smap.site%2Fhome&time=1750116168886&callback=__naver_maps_callback__0 
+❌ GET https://oapi.map.naver.com/v3/auth?ncpKeyId=91y2nh0yff&url=https%3A%2F%2Fnextstep.aiagnt.kr%2Fhome&time=1750116168886&callback=__naver_maps_callback__0 
    net::ERR_ABORTED 401 (Unauthorized)
 
 ❌ NAVER Maps JavaScript API v3 잠시 후에 다시 요청해 주세요.
    Error Code / Error Message: 500 / Internal Server Error (내부 서버 오류)
    Client ID: 91y2nh0yff
-   URI: https://nextstep.smap.site/home
+   URI: https://nextstep.aiagnt.kr/home
 
 ⚠️ 안드로이드 9 이상에서는 HTTP 평문 통신이 기본적으로 사용되지 않습니다.
    앱에서 네트워크 보안 구성을 통해 *.map.naver.com, *.map.naver.net 에 대한 평문 통신을 허용해 주세요.
@@ -46,8 +46,8 @@
 
 ```
 ✅ 운영 도메인:
-- https://nextstep.smap.site
-- https://smap.site
+- https://nextstep.aiagnt.kr
+- https://aiagnt.kr
 
 ✅ 개발 도메인:
 - http://localhost:3000
@@ -56,7 +56,7 @@
 
 ✅ 모바일 WebView:
 - file://
-- https://nextstep.smap.site/*
+- https://nextstep.aiagnt.kr/*
 ```
 
 #### 3. **API 사용량 및 요금 확인**
@@ -157,8 +157,8 @@ function loadNaverMapsWithRetry() {
         <domain includeSubdomains="true">map.naver.com</domain>
         <domain includeSubdomains="true">map.naver.net</domain>
         <domain includeSubdomains="true">oapi.map.naver.com</domain>
-        <domain includeSubdomains="true">nextstep.smap.site</domain>
-        <domain includeSubdomains="true">smap.site</domain>
+        <domain includeSubdomains="true">nextstep.aiagnt.kr</domain>
+        <domain includeSubdomains="true">aiagnt.kr</domain>
     </domain-config>
     
     <!-- 개발용 localhost 허용 -->
@@ -261,9 +261,9 @@ function tryNextApiKey() {
 ✅ API 키 설정: 91y2nh0yff
 ✅ API Secret: bKRzkFBbAvfdHDTZB0mJ81jmO8ufULvQavQIQZmp
 ✅ 등록된 도메인:
-   - https://nextstep.smap.site ✅
-   - https://app2.smap.site ✅
-   - https://app.smap.site ✅
+   - https://nextstep.aiagnt.kr ✅
+   - https://app2.aiagnt.kr ✅
+   - https://app.aiagnt.kr ✅
    - http://118.67.130.71:3000/ ✅
    - http://localhost:3000 ✅
 ✅ 모바일 앱:

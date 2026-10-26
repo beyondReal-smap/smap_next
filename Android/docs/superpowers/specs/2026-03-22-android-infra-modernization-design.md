@@ -253,9 +253,9 @@ suspend fun <T> safeApiCall(call: suspend () -> T): ApiResult<T> {
 android {
     defaultConfig {
         minSdk = 28
-        buildConfigField("String", "API_BASE_URL", "\"https://api3.smap.site/api/v1/\"")
-        buildConfigField("String", "IMAGE_BASE_URL", "\"https://api3.smap.site\"")
-        buildConfigField("String", "WEB_BASE_URL", "\"https://nextstep.smap.site\"")
+        buildConfigField("String", "API_BASE_URL", "\"https://api3.aiagnt.kr/api/v1/\"")
+        buildConfigField("String", "IMAGE_BASE_URL", "\"https://api3.aiagnt.kr\"")
+        buildConfigField("String", "WEB_BASE_URL", "\"https://nextstep.aiagnt.kr\"")
         buildConfigField("String", "KAKAO_API_KEY", "\"...\"")
     }
     buildFeatures {
@@ -296,7 +296,7 @@ class GroupService private constructor(private val context: Context) {
         return withContext(Dispatchers.IO) {
             val client = OkHttpClient()
             val request = Request.Builder()
-                .url("https://api3.smap.site/api/v1/groups/current-user")
+                .url("https://api3.aiagnt.kr/api/v1/groups/current-user")
                 .addHeader("Authorization", "Bearer ${authService.getToken()}")
                 .get().build()
             val response = client.newCall(request).execute()

@@ -32,9 +32,9 @@ android {
 
         // 기기 지원 범위 명시
 
-        buildConfigField("String", "API_BASE_URL", "\"https://api3.smap.site/api/v1/\"")
-        buildConfigField("String", "IMAGE_BASE_URL", "\"https://api3.smap.site\"")
-        buildConfigField("String", "WEB_BASE_URL", "\"https://nextstep.smap.site\"")
+        buildConfigField("String", "API_BASE_URL", "\"https://api3.aiagnt.kr/api/v1/\"")
+        buildConfigField("String", "IMAGE_BASE_URL", "\"https://api3.aiagnt.kr\"")
+        buildConfigField("String", "WEB_BASE_URL", "\"https://nextstep.aiagnt.kr\"")
 
         // API keys — values loaded from local.properties (우선) or gradle.properties
         // project.findProperty 만 사용하면 local.properties 가 읽히지 않아 빈 값이 되므로

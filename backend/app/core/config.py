@@ -32,17 +32,17 @@ class Settings(BaseSettings):
         "http://localhost:3000",  # Next.js 개발 서버
         "http://localhost:8000",  # FastAPI 개발 서버
         # 배포 도메인들
-        "https://nextstep.smap.site",
+        "https://nextstep.aiagnt.kr",
         "https://smap.co.kr",
         # 추가 허용 도메인
-        "http://api3.smap.site:3000",
-        "https://api3.smap.site:3000",
+        "http://api3.aiagnt.kr:3000",
+        "https://api3.aiagnt.kr:3000",
         # 레거시 IP는 제거 (iOS에서 인증서 경고 유발)
         "http://127.0.0.1:3000",  # 로컬 IP
     ]
 
     # 프론트엔드 URL (비밀번호 재설정 링크용)
-    FRONTEND_URL: str = "https://nextstep.smap.site"
+    FRONTEND_URL: str = "https://nextstep.aiagnt.kr"
 
     # MySQL 데이터베이스 설정
     MYSQL_HOST: str = "127.0.0.1"

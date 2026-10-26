@@ -9,7 +9,7 @@ export async function GET(
     console.log(`[API] 그룹 통계 조회 요청 - groupId: ${groupId}`);
 
     // 백엔드 API 호출
-    const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api3.smap.site'}/api/v1/groups/${groupId}/stats`;
+    const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api3.aiagnt.kr'}/api/v1/groups/${groupId}/stats`;
     console.log(`[API] 백엔드 요청 URL: ${backendUrl}`);
 
     try {

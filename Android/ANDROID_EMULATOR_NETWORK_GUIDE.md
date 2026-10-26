@@ -29,14 +29,14 @@ private val fallbackUrls: List<String> get() {
     return if (isEmulator() && BuildConfig.DEBUG) {
         listOf(
             "http://10.0.2.2:3000/",          // 에뮬레이터용 로컬 개발서버
-            "https://nextstep.smap.site/",     // 운영서버 (Primary)
+            "https://nextstep.aiagnt.kr/",     // 운영서버 (Primary)
             "https://smap-next.vercel.app/",   // Vercel 백업
             "http://localhost:3000/",          // 로컬백업
             "http://192.168.1.100:3000/"      // 네트워크 로컬 IP
         )
     } else if (isEmulator()) {
         listOf(
-            "https://nextstep.smap.site/",     // 운영서버 (Primary)
+            "https://nextstep.aiagnt.kr/",     // 운영서버 (Primary)
             "https://smap-next.vercel.app/",   // Vercel 백업
             "http://10.0.2.2:3000/",          // 에뮬레이터용 로컬 개발서버
             "http://localhost:3000/"          // 로컬백업

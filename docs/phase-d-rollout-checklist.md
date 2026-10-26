@@ -90,7 +90,7 @@ MIN_APP_VERSION_IOS=3.2.0
 ## 검증 cURL
 
 ```bash
-BASE=https://api3.smap.site/api/v1
+BASE=https://api3.aiagnt.kr/api/v1
 
 # 1. 로그인 — refresh_token, expires_in 포함 확인
 curl -s -X POST $BASE/auth/login \

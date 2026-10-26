@@ -1119,7 +1119,7 @@
     });
     
     // 13. 프로덕션 환경용 강제 햅틱 함수 추가
-    if (window.location.hostname.includes('.smap.site')) {
+    if (window.location.hostname.includes('.aiagnt.kr')) {
       console.log('[iOS WebView] 프로덕션 환경 - 강제 햅틱 함수 설정');
       
       // 강제 햅틱 실행 함수

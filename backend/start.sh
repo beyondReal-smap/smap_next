@@ -92,7 +92,7 @@ start_log_monitor() {
 
 LOG_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 MAX_SIZE_MB=100
-ALERT_EMAIL="admin@smap.site"
+ALERT_EMAIL="admin@aiagnt.kr"
 
 monitor_logs() {
     for log_file in "$LOG_DIR"/*.log; do
@@ -326,7 +326,7 @@ fi
 # 애플리케이션 실행
 echo -e "${GREEN}FastAPI 애플리케이션을 백그라운드에서 시작합니다...${NC}"
 echo "바인딩: ${APP_HOST}:${APP_PORT} (비SSL)"
-echo "API 문서(프록시 경유): https://api3.smap.site:8000/docs"
+echo "API 문서(프록시 경유): https://api3.aiagnt.kr:8000/docs"
 echo "로그 파일: $LOG_FILE"
 echo "PID 파일: $PID_FILE"
 
@@ -396,9 +396,9 @@ if ps -p $PID > /dev/null; then
     
     echo ""
     echo -e "${GREEN}=== 접속 가능한 URL ===${NC}"
-    echo "• https://api3.smap.site/docs (443 포트)"
-    echo "• https://api3.smap.site:8000/docs (8000 포트)"
-    echo "• https://api3.smap.site:3000/docs (3000 포트)"
+    echo "• https://api3.aiagnt.kr/docs (443 포트)"
+    echo "• https://api3.aiagnt.kr:8000/docs (8000 포트)"
+    echo "• https://api3.aiagnt.kr:3000/docs (3000 포트)"
     echo ""
     echo -e "${BLUE}=== 로그 관리 기능 ===${NC}"
     echo "• 로그 통계: http://$APP_HOST:$APP_PORT/api/v1/log-management/stats"

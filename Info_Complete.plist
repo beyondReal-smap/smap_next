@@ -32,8 +32,8 @@
         <!-- SMAP 도메인 예외 설정 -->
         <key>NSExceptionDomains</key>
         <dict>
-            <!-- nextstep.smap.site 도메인 -->
-            <key>nextstep.smap.site</key>
+            <!-- nextstep.aiagnt.kr 도메인 -->
+            <key>nextstep.aiagnt.kr</key>
             <dict>
                 <key>NSExceptionAllowsInsecureHTTPLoads</key>
                 <true/>
@@ -45,8 +45,8 @@
                 <true/>
             </dict>
             
-            <!-- smap.site 서브도메인 -->
-            <key>smap.site</key>
+            <!-- aiagnt.kr 서브도메인 -->
+            <key>aiagnt.kr</key>
             <dict>
                 <key>NSExceptionAllowsInsecureHTTPLoads</key>
                 <true/>
@@ -59,7 +59,7 @@
             </dict>
             
             <!-- API 서버 도메인 (필요시) -->
-            <key>api.smap.site</key>
+            <key>api.aiagnt.kr</key>
             <dict>
                 <key>NSExceptionAllowsInsecureHTTPLoads</key>
                 <true/>
@@ -131,10 +131,10 @@
     <!-- 🔐 App-Bound Domains 설정 (JavaScript 실행 허용) -->
     <key>WKAppBoundDomains</key>
     <array>
-        <string>nextstep.smap.site</string>
-        <string>app2.smap.site</string>
-        <string>app.smap.site</string>
-        <string>smap.site</string>
+        <string>nextstep.aiagnt.kr</string>
+        <string>app2.aiagnt.kr</string>
+        <string>app.aiagnt.kr</string>
+        <string>aiagnt.kr</string>
         <string>localhost</string>
         <string>accounts.google.com</string>
         <string>kauth.kakao.com</string>

@@ -30,12 +30,12 @@ adb shell ping -c 3 8.8.8.8 | head -5
 
 # 4. 도메인 해석 테스트
 echo "🔍 도메인 해석 테스트..."
-echo "  nextstep.smap.site 해석 테스트:"
-adb shell nslookup nextstep.smap.site 8.8.8.8 2>/dev/null || echo "   DNS 해석 실패 - IP 주소 직접 사용 권장"
+echo "  nextstep.aiagnt.kr 해석 테스트:"
+adb shell nslookup nextstep.aiagnt.kr 8.8.8.8 2>/dev/null || echo "   DNS 해석 실패 - IP 주소 직접 사용 권장"
 
 # 5. IP 주소로 직접 연결 테스트
 echo "📡 IP 주소 직접 연결 테스트..."
-echo "  216.198.79.65 (nextstep.smap.site) 연결 테스트:"
+echo "  216.198.79.65 (nextstep.aiagnt.kr) 연결 테스트:"
 timeout 5 adb shell "echo -n | nc -w 3 216.198.79.65 443" && echo "   ✅ HTTPS 포트 연결 성공" || echo "   ⚠️ HTTPS 포트 연결 실패"
 
 # 6. WebView 캐시 초기화

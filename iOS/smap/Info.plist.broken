@@ -96,7 +96,7 @@
 		<false/>
 		<key>NSExceptionDomains</key>
 		<dict>
-			<key>nextstep.smap.site</key>
+			<key>nextstep.aiagnt.kr</key>
 			<dict>
 				<key>NSExceptionAllowsInsecureHTTPLoads</key>
 				<true/>
@@ -109,7 +109,7 @@
 				<key>NSThirdPartyExceptionAllowsInsecureHTTPLoads</key>
 				<true/>
 			</dict>
-			<key>smap.site</key>
+			<key>aiagnt.kr</key>
 			<dict>
 				<key>NSExceptionAllowsInsecureHTTPLoads</key>
 				<true/>

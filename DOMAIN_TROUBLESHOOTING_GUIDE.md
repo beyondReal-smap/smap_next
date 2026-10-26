@@ -1,7 +1,7 @@
 # 🌐 도메인별 지도 로딩 문제 해결 가이드
 
 ## 📋 문제 상황
-**현상**: localhost:3000에서는 지도가 정상 작동하지만, nextstep.smap.site에서는 지도가 표시되지 않는 문제
+**현상**: localhost:3000에서는 지도가 정상 작동하지만, nextstep.aiagnt.kr에서는 지도가 표시되지 않는 문제
 
 ## 🔍 주요 원인 분석
 
@@ -15,7 +15,7 @@ script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${API_KEY}`
 ```
 
 ### 2. 도메인별 환경 차이
-| 환경 | localhost:3000 | nextstep.smap.site |
+| 환경 | localhost:3000 | nextstep.aiagnt.kr |
 |------|----------------|---------------------|
 | 프로토콜 | HTTP/HTTPS | HTTPS |
 | CORS 정책 | 완화됨 | 엄격함 |
@@ -25,9 +25,9 @@ script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${API_KEY}`
 
 ### 3. 네이버 클라우드 플랫폼 도메인 등록
 현재 등록된 도메인:
-- ✅ https://nextstep.smap.site
-- ✅ https://app2.smap.site  
-- ✅ https://app.smap.site
+- ✅ https://nextstep.aiagnt.kr
+- ✅ https://app2.aiagnt.kr  
+- ✅ https://app.aiagnt.kr
 - ✅ http://118.67.130.71:3000/
 - ✅ http://localhost:3000
 
@@ -67,7 +67,7 @@ const naverMapUrl = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${NA
 export function detectEnvironment(): EnvironmentConfig {
   const hostname = window.location.hostname;
   const isLocalhost = hostname === 'localhost';
-  const isProduction = hostname.includes('smap.site');
+  const isProduction = hostname.includes('aiagnt.kr');
   
   return {
     domain: hostname,
@@ -124,7 +124,7 @@ console.log(results);
 ### 네이버 지도 API 설정
 - [ ] API 키: `91y2nh0yff` 사용 확인
 - [ ] 파라미터명: `ncpKeyId` 사용 확인 
-- [ ] 도메인 등록: nextstep.smap.site 등록 확인
+- [ ] 도메인 등록: nextstep.aiagnt.kr 등록 확인
 - [ ] 서브모듈: geocoder,drawing,visualization 로드 확인
 
 ### 환경별 설정
@@ -143,7 +143,7 @@ console.log(results);
 
 ### 401 Unauthorized
 ```
-GET https://oapi.map.naver.com/v3/auth?ncpKeyId=91y2nh0yff&url=https%3A%2F%2Fnextstep.smap.site%2Fhome&time=1750116168886&callback=__naver_maps_callback__0 net::ERR_ABORTED 401 (Unauthorized)
+GET https://oapi.map.naver.com/v3/auth?ncpKeyId=91y2nh0yff&url=https%3A%2F%2Fnextstep.aiagnt.kr%2Fhome&time=1750116168886&callback=__naver_maps_callback__0 net::ERR_ABORTED 401 (Unauthorized)
 ```
 
 **원인**: API 키 또는 도메인 등록 문제  
@@ -190,8 +190,8 @@ config.limitsNavigationsToAppBoundDomains = true
 ```xml
 <key>WKAppBoundDomains</key>
 <array>
-    <string>nextstep.smap.site</string>
-    <string>app2.smap.site</string>
+    <string>nextstep.aiagnt.kr</string>
+    <string>app2.aiagnt.kr</string>
     <string>localhost</string>
 </array>
 ```
@@ -200,7 +200,7 @@ config.limitsNavigationsToAppBoundDomains = true
 **파일**: `network_security_config.xml`
 ```xml
 <domain-config cleartextTrafficPermitted="true">
-    <domain includeSubdomains="true">nextstep.smap.site</domain>
+    <domain includeSubdomains="true">nextstep.aiagnt.kr</domain>
     <domain includeSubdomains="true">oapi.map.naver.com</domain>
 </domain-config>
 ```
@@ -228,4 +228,4 @@ config.limitsNavigationsToAppBoundDomains = true
 ✅ **iOS WebView 호환성**: App-Bound Domain 설정 완료  
 ✅ **실시간 진단 도구**: 브라우저 콘솔 및 디버깅 패널 제공  
 
-모든 설정이 완료되어 localhost와 nextstep.smap.site에서 동일하게 지도가 표시됩니다! 🗺️✨ 
+모든 설정이 완료되어 localhost와 nextstep.aiagnt.kr에서 동일하게 지도가 표시됩니다! 🗺️✨ 

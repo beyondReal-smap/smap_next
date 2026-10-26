@@ -3,7 +3,7 @@ import XCTest
 
 final class APIEndpointTests: XCTestCase {
 
-    let baseURL = "https://api3.smap.site/api/v1"
+    let baseURL = "https://api3.aiagnt.kr/api/v1"
 
     func testLogin_urlAndMethod() {
         let endpoint = APIEndpoint.login(mt_id: "01012345678", mt_pwd: "pass123")

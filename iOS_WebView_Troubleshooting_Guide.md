@@ -1,8 +1,8 @@
 # iOS WebView 트러블슈팅 가이드 📱
-## nextstep.smap.site 데이터 로딩 및 화면 전환 문제 해결
+## nextstep.aiagnt.kr 데이터 로딩 및 화면 전환 문제 해결
 
 ### 🚨 현재 문제 상황
-- ✅ 일반 웹브라우저에서는 nextstep.smap.site가 정상 작동
+- ✅ 일반 웹브라우저에서는 nextstep.aiagnt.kr가 정상 작동
 - ❌ iOS WebView에서는 데이터 로딩이 안되고 화면 전환이 원활하지 않음
 
 ### 🔍 문제 진단 체크리스트
@@ -172,7 +172,7 @@ override func viewDidLoad() {
     view.addSubview(webView)
     
     // 🌐 SMAP 사이트 로드
-    if let url = URL(string: "https://nextstep.smap.site") {
+    if let url = URL(string: "https://nextstep.aiagnt.kr") {
         let request = URLRequest(url: url)
         webView.load(request)
     }
@@ -190,7 +190,7 @@ func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigatio
     }
     
     // SMAP 도메인인 경우 헤더 최적화
-    if url.host?.contains("smap.site") == true {
+    if url.host?.contains("aiagnt.kr") == true {
         var request = navigationAction.request
         
         // 🔧 중요 헤더들 추가
@@ -355,7 +355,7 @@ private func addFixingScript() {
     <!-- 또는 특정 도메인만 허용 -->
     <key>NSExceptionDomains</key>
     <dict>
-        <key>smap.site</key>
+        <key>aiagnt.kr</key>
         <dict>
             <key>NSExceptionAllowsInsecureHTTPLoads</key>
             <true/>
@@ -385,7 +385,7 @@ if let url = URL(string: "https://httpbin.org/user-agent") {
 #### 2단계: SMAP 도메인 직접 접근
 ```swift
 // SMAP API 직접 호출 테스트
-if let url = URL(string: "https://nextstep.smap.site/api/health") {
+if let url = URL(string: "https://nextstep.aiagnt.kr/api/health") {
     URLSession.shared.dataTask(with: url) { data, response, error in
         DispatchQueue.main.async {
             if let error = error {

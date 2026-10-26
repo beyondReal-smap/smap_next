@@ -5,28 +5,28 @@ enum AppConfiguration {
 
     static let apiBaseURL: String = {
         guard let url = Bundle.main.infoDictionary?["API_BASE_URL"] as? String, !url.isEmpty else {
-            return "https://api3.smap.site/api/"
+            return "https://api3.aiagnt.kr/api/"
         }
         return url
     }()
 
     static let webBaseURL: String = {
         guard let url = Bundle.main.infoDictionary?["WEB_BASE_URL"] as? String, !url.isEmpty else {
-            return "https://nextstep.smap.site/"
+            return "https://nextstep.aiagnt.kr/"
         }
         return url
     }()
 
     static let fileAPIURL: String = {
         guard let url = Bundle.main.infoDictionary?["FILE_API_URL"] as? String, !url.isEmpty else {
-            return "https://nextstep.smap.site/api/"
+            return "https://nextstep.aiagnt.kr/api/"
         }
         return url
     }()
 
     static let imageBaseURL: String = {
         guard let url = Bundle.main.infoDictionary?["IMAGE_BASE_URL"] as? String, !url.isEmpty else {
-            return "https://api3.smap.site"
+            return "https://api3.aiagnt.kr"
         }
         return url
     }()

@@ -2314,7 +2314,7 @@ export default function LocationPage() {
       console.log(`🗺️ [LOCATION] 네이버 지도 Client ID 사용: ${dynamicClientId}`);
       
       // 프로덕션 환경에서는 서브모듈 최소화 (로딩 속도 최적화)
-      const isProduction = window.location.hostname.includes('.smap.site');
+      const isProduction = window.location.hostname.includes('.aiagnt.kr');
       const isIOSWebView = typeof window !== 'undefined' && 
                           window.webkit && 
                           window.webkit.messageHandlers;

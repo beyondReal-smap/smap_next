@@ -288,7 +288,7 @@ fun PrivacyPolicyScreen(onBack: () -> Unit) {
 
 성명: 정진
 전화: 070-8065-2207
-이메일: admin@smap.site"""
+이메일: admin@aiagnt.kr"""
         )
     }
 }

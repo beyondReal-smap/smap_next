@@ -20,7 +20,7 @@ final class ChatSocketManager: ObservableObject {
     private var token: String?
     private var sid: String?
 
-    private let baseURL = "wss://api3.smap.site"
+    private let baseURL = "wss://api3.aiagnt.kr"
 
     struct ReadReceiptEvent {
         let scrIdx: Int
@@ -53,7 +53,7 @@ final class ChatSocketManager: ObservableObject {
 
     private func performHandshake(token: String) {
         // Engine.IO polling handshake to get sid
-        let handshakeURL = "https://api3.smap.site/ws/socket.io/?EIO=4&transport=polling"
+        let handshakeURL = "https://api3.aiagnt.kr/ws/socket.io/?EIO=4&transport=polling"
         guard let url = URL(string: handshakeURL) else { return }
 
         var request = URLRequest(url: url)
@@ -89,7 +89,7 @@ final class ChatSocketManager: ObservableObject {
     // MARK: - WebSocket Connection
 
     private func connectWebSocket(sid: String, token: String) {
-        let wsURL = "wss://api3.smap.site/ws/socket.io/?EIO=4&transport=websocket&sid=\(sid)"
+        let wsURL = "wss://api3.aiagnt.kr/ws/socket.io/?EIO=4&transport=websocket&sid=\(sid)"
         guard let url = URL(string: wsURL) else { return }
 
         let session = URLSession(configuration: .default)

@@ -1,5 +1,5 @@
 // iOS WebView 캐시 및 데이터 관리자
-// nextstep.smap.site의 데이터 로딩 문제 해결을 위한 캐시 최적화
+// nextstep.aiagnt.kr의 데이터 로딩 문제 해결을 위한 캐시 최적화
 
 import WebKit
 import UIKit
@@ -93,7 +93,7 @@ class WebViewCacheManager {
         
         // SMAP 사이트를 위한 쿠키 설정
         let smapCookie = HTTPCookie(properties: [
-            .domain: ".smap.site",
+            .domain: ".aiagnt.kr",
             .path: "/",
             .name: "smap_session_cache",
             .value: "optimized",
@@ -446,10 +446,10 @@ class WebViewCacheManager {
         
         // SMAP 주요 API 엔드포인트들을 사전 로드
         let criticalURLs = [
-            "https://nextstep.smap.site/api/auth/session",
-            "https://nextstep.smap.site/api/user/profile", 
-            "https://nextstep.smap.site/api/groups/list",
-            "https://nextstep.smap.site/api/locations/recent"
+            "https://nextstep.aiagnt.kr/api/auth/session",
+            "https://nextstep.aiagnt.kr/api/user/profile", 
+            "https://nextstep.aiagnt.kr/api/groups/list",
+            "https://nextstep.aiagnt.kr/api/locations/recent"
         ]
         
         for urlString in criticalURLs {

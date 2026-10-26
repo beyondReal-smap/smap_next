@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const BACKEND_HOST = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api3.smap.site';
+const BACKEND_HOST = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api3.aiagnt.kr';
 
 async function postToBackend(url: string, body: unknown) {
   const response = await fetch(url, {

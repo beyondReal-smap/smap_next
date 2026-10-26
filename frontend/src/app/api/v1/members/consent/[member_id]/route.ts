@@ -43,7 +43,7 @@ export async function GET(
     }
 
     // 백엔드 API 호출
-    const backendUrl = process.env.BACKEND_URL || 'https://api3.smap.site';
+    const backendUrl = process.env.BACKEND_URL || 'https://api3.aiagnt.kr';
     const response = await fetch(`${backendUrl}/api/v1/members/consent/${requestedUserId}`, {
       headers: {
         'Authorization': `Bearer ${token}`,

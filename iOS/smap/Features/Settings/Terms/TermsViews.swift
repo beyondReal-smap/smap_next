@@ -219,7 +219,7 @@ struct PrivacyPolicyView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("성명: 정진").font(.suite(size: 14))
                             Text("전화: 070-8065-2207").font(.suite(size: 14))
-                            Text("이메일: admin@smap.site").font(.suite(size: 14))
+                            Text("이메일: admin@aiagnt.kr").font(.suite(size: 14))
                         }.foregroundColor(.gray)
                     }
                     .padding(16).frame(maxWidth: .infinity, alignment: .leading)

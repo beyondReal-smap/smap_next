@@ -1079,7 +1079,7 @@ if ($userLang == 'ko' && $mem_row['mt_map'] == 'N') {
                     <div class="map_user">
                         <div class="map_rt_img rounded_14">
                             <div class="rect_square">
-                                <img src="${imageUrl}" alt="<?= $translations['txt_image'] ?>" onerror="this.src='https://app2.smap.site/img/no_image.png';" />
+                                <img src="${imageUrl}" alt="<?= $translations['txt_image'] ?>" onerror="this.src='https://app2.aiagnt.kr/img/no_image.png';" />
                             </div>
                         </div>
                     </div>

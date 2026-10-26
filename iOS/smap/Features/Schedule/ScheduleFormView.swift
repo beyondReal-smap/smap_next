@@ -229,7 +229,7 @@ struct ScheduleFormView: View {
                                         // Avatar and Selection indicator
                                         ZStack {
                                             if let photoUrl = member.mt_file1, !photoUrl.isEmpty {
-                                                AsyncImage(url: URL(string: photoUrl.hasPrefix("http") ? photoUrl : "https://nextstep.smap.site\(photoUrl)")) { phase in
+                                                AsyncImage(url: URL(string: photoUrl.hasPrefix("http") ? photoUrl : "https://nextstep.aiagnt.kr\(photoUrl)")) { phase in
                                                     if let image = phase.image {
                                                         image.resizable().aspectRatio(contentMode: .fill)
                                                     } else {

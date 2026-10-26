@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
           }
         };
 
-const BACKEND_URL = process.env.BACKEND_URL || 'https://api3.smap.site';
+const BACKEND_URL = process.env.BACKEND_URL || 'https://api3.aiagnt.kr';
         const backendData = await fetchWithFallback(`${BACKEND_URL}/api/v1/members/me`, {
           method: 'GET',
           headers: {

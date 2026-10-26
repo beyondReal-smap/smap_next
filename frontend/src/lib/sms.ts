@@ -1,7 +1,7 @@
 // Fixie 프록시를 통한 고정 IP SMS 발송
 // 백엔드 API를 통해 SMS 발송 (Fixie 프록시 사용)
 
-const BACKEND_API_URL = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'https://api3.smap.site/api/v1';
+const BACKEND_API_URL = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'https://api3.aiagnt.kr/api/v1';
 
 interface SMSResponse {
   success: boolean;

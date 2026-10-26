@@ -5,11 +5,11 @@
 
 // 앱 정보
 export const APP_INFO = {
-  DOMAIN: 'https://app2.smap.site',
-  CDN_HTTP: 'https://app2.smap.site',
-  DESIGN_HTTP: 'https://app2.smap.site/design',
+  DOMAIN: 'https://app2.aiagnt.kr',
+  CDN_HTTP: 'https://app2.aiagnt.kr',
+  DESIGN_HTTP: 'https://app2.aiagnt.kr/design',
   ADMIN_NAME: 'SMAP',
-  OG_IMAGE: 'https://app2.smap.site/img/og-image.png',
+  OG_IMAGE: 'https://app2.aiagnt.kr/img/og-image.png',
   VERSION: '20240522_8', // CSS, JS 캐시 리셋용 버전
 };
 
@@ -54,7 +54,7 @@ export const API_KEYS = {
       const domainClientId = MAP_CONFIG.NAVER.CLIENT_IDS[currentDomain as keyof typeof MAP_CONFIG.NAVER.CLIENT_IDS];
       
       // Vercel 환경 감지 및 로깅
-      const isVercel = currentDomain.includes('vercel.app') || currentDomain.includes('nextstep.smap.site');
+      const isVercel = currentDomain.includes('vercel.app') || currentDomain.includes('nextstep.aiagnt.kr');
       console.log(`🗺️ [NAVER MAPS] 도메인: ${currentDomain}, Vercel: ${isVercel}, Client ID: ${domainClientId || '기본값'}`);
       
       // Vercel 환경에서는 환경 변수 우선 사용
@@ -83,7 +83,7 @@ export const API_KEYS = {
       const domainClientId = GOOGLE_CONFIG.OAUTH.CLIENT_IDS[currentDomain as keyof typeof GOOGLE_CONFIG.OAUTH.CLIENT_IDS];
       
       // Vercel 환경 감지 및 로깅
-      const isVercel = currentDomain.includes('vercel.app') || currentDomain.includes('nextstep.smap.site');
+      const isVercel = currentDomain.includes('vercel.app') || currentDomain.includes('nextstep.aiagnt.kr');
       console.log(`🔐 [GOOGLE OAUTH] 도메인: ${currentDomain}, Vercel: ${isVercel}, Client ID: ${domainClientId ? domainClientId.substring(0, 12) + '...' : '기본값'}`);
       
       // Vercel 환경에서는 환경 변수 우선 사용
@@ -108,10 +108,10 @@ export const MAP_CONFIG = {
   NAVER: {
     // 네이버 지도 API에 등록된 도메인 목록 (실제 네이버 클라우드 플랫폼 설정과 일치)
     ALLOWED_DOMAINS: [
-      'nextstep.smap.site',  // 현재 운영 도메인
-      'app2.smap.site',
-      'app.smap.site',
-      'smap.site',
+      'nextstep.aiagnt.kr',  // 현재 운영 도메인
+      'app2.aiagnt.kr',
+      'app.aiagnt.kr',
+      'aiagnt.kr',
       // Vercel 환경
       '*.vercel.app',
       // 개발 환경
@@ -120,8 +120,8 @@ export const MAP_CONFIG = {
     ],
     // 프로덕션 환경별 Client ID 설정
     CLIENT_IDS: {
-      'nextstep.smap.site': '91y2nh0yff',  // 운영 환경용
-      'app2.smap.site': '91y2nh0yff',      // 스테이징용
+      'nextstep.aiagnt.kr': '91y2nh0yff',  // 운영 환경용
+      'app2.aiagnt.kr': '91y2nh0yff',      // 스테이징용
       'localhost:3000': '91y2nh0yff',      // 개발용
       // Vercel 환경은 환경 변수에서 가져옴
     },
@@ -141,10 +141,10 @@ export const GOOGLE_CONFIG = {
   OAUTH: {
     // Google Console에 등록된 도메인별 Client ID
     ALLOWED_DOMAINS: [
-      'nextstep.smap.site',  // 현재 운영 도메인
-      'app2.smap.site',
-      'app.smap.site',
-      'smap.site',
+      'nextstep.aiagnt.kr',  // 현재 운영 도메인
+      'app2.aiagnt.kr',
+      'app.aiagnt.kr',
+      'aiagnt.kr',
       // Vercel 환경
       '*.vercel.app',
       // 개발 환경
@@ -153,11 +153,11 @@ export const GOOGLE_CONFIG = {
     ],
     // 프로덕션 환경별 Google OAuth Client ID 설정
     CLIENT_IDS: {
-      // ✅ nextstep.smap.site용 Google Client ID (2025년 6월 15일 생성)
-      // 이 Client ID는 nextstep.smap.site 도메인에 대해 승인된 JavaScript 출처로 등록되어 있음
+      // ✅ nextstep.aiagnt.kr용 Google Client ID (2025년 6월 15일 생성)
+      // 이 Client ID는 nextstep.aiagnt.kr 도메인에 대해 승인된 JavaScript 출처로 등록되어 있음
       // iOS URL 스키마: com.googleusercontent.apps.283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm
-      'nextstep.smap.site': '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com',  // ✅ 실제 등록된 Client ID
-      'app2.smap.site': '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com',      // 스테이징용
+      'nextstep.aiagnt.kr': '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com',  // ✅ 실제 등록된 Client ID
+      'app2.aiagnt.kr': '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com',      // 스테이징용
       'localhost:3000': '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com',      // 개발용
       // Vercel 환경은 환경 변수에서 가져옴
     },
@@ -175,7 +175,7 @@ export const GOOGLE_CONFIG = {
 export const KAKAO_SHARE = {
   TITLE: 'SMAP, 친구와 가족을 더 가까이',
   DESC: 'SMAP으로 가족, 친구와 일정, 위치를 실시간 공유하세요!',
-  IMG: 'https://app2.smap.site/img/kakao_link_img.png',
+  IMG: 'https://app2.aiagnt.kr/img/kakao_link_img.png',
 };
 
 // 위치 관련 설정
@@ -184,9 +184,9 @@ export const LOCATION_CONFIG = {
   LOCATION_MEMBER_NUM: 10, // 위치 그룹원 추가 최대값
   ACCURACY: 50,
   SPEED: 1,
-  NO_PROFILE_IMG_URL: 'https://app2.smap.site/img/no_profile.png',
-  MAP_RECOM_POINT_IMG_URL: 'https://app2.smap.site/img/map_recom_point.png',
-  INVITE_URL: 'https://app2.smap.site/invite?sit_code=',
+  NO_PROFILE_IMG_URL: 'https://app2.aiagnt.kr/img/no_profile.png',
+  MAP_RECOM_POINT_IMG_URL: 'https://app2.aiagnt.kr/img/map_recom_point.png',
+  INVITE_URL: 'https://app2.aiagnt.kr/invite?sit_code=',
 };
 
 // 게시판 설정
@@ -199,10 +199,10 @@ export const BOARD_CONFIG = {
 // 이미지 및 파일 관련 설정
 export const FILE_CONFIG = {
   IMAGE_EXTENSIONS: ["jpg", "png", "gif", "jpeg", "bmp"],
-  NO_IMAGE_URL: 'https://app2.smap.site/img/no_image.png',
-  UPLOADS_URL: 'https://app2.smap.site/img/uploads',
-  PDF_URL: 'https://app2.smap.site/img/pdf',
-  EXCEL_URL: 'https://app2.smap.site/img/excel',
+  NO_IMAGE_URL: 'https://app2.aiagnt.kr/img/no_image.png',
+  UPLOADS_URL: 'https://app2.aiagnt.kr/img/uploads',
+  PDF_URL: 'https://app2.aiagnt.kr/img/pdf',
+  EXCEL_URL: 'https://app2.aiagnt.kr/img/excel',
 };
 
 // 기본 렌더링 언어 감지
@@ -216,7 +216,7 @@ export const detectLanguage = (): string => {
 // 환경 변수 (Next.js의 환경 변수와 통합)
 export const ENV = {
   NODE_ENV: process.env.NODE_ENV || 'development',
-  API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.smap.site',
+  API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.aiagnt.kr',
 };
 
 export default {

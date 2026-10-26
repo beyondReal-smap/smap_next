@@ -15,7 +15,7 @@ const FeatureFlagsEmitter: React.FC = () => {
   const flags = useMemo(() => {
     const isClient = typeof window !== 'undefined'
     const isIOSWebView = isClient && /iPad|iPhone|iPod/.test(navigator.userAgent) && !!(window as any).webkit?.messageHandlers
-    const isVercelEnv = isClient && (location.host.includes('vercel.app') || location.host.includes('nextstep.smap.site'))
+    const isVercelEnv = isClient && (location.host.includes('vercel.app') || location.host.includes('nextstep.aiagnt.kr'))
 
     const strToBool = (val?: string) => (val || '').toLowerCase() === 'true' || val === '1'
 

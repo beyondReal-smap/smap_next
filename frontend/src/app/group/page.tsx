@@ -169,7 +169,7 @@ body {
 `;
 
 // 백엔드 이미지 저장 경로의 기본 URL
-const BACKEND_STORAGE_BASE_URL = 'https://api3.smap.site/storage/';
+const BACKEND_STORAGE_BASE_URL = 'https://api3.aiagnt.kr/storage/';
 
 // 초대 코드 입력 컴포넌트 메모이제이션
 const InviteCodeSection = memo<{

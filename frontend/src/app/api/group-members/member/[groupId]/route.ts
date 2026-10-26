@@ -45,7 +45,7 @@ export async function GET(
     console.log('[Group Members API] 요청 시간:', new Date().toISOString());
 
     // 정확한 백엔드 엔드포인트 사용
-    const backendUrl = `https://api3.smap.site/api/v1/group-members/member/${groupId}`;
+    const backendUrl = `https://api3.aiagnt.kr/api/v1/group-members/member/${groupId}`;
     
     console.log('[Group Members API] 🔄 백엔드 API 호출:', backendUrl);
     

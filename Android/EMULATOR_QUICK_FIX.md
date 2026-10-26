@@ -57,7 +57,7 @@ adb logcat | grep -E "(ERR_NAME_NOT_RESOLVED|DNS)"
 adb shell ping -c 3 8.8.8.8
 
 # 도메인 해석 테스트
-adb shell nslookup nextstep.smap.site 8.8.8.8
+adb shell nslookup nextstep.aiagnt.kr 8.8.8.8
 
 # IP 직접 연결 테스트
 adb shell "echo -n | nc -w 3 216.198.79.65 443"
@@ -67,8 +67,8 @@ adb shell "echo -n | nc -w 3 216.198.79.65 443"
 
 앱이 정상적으로 작동하면 다음과 같은 로그가 나타납니다:
 ```
-SmapApplication: ✅ DNS 해석 성공: nextstep.smap.site -> 216.198.79.65
-SMAP_WebView: Page loaded successfully: https://nextstep.smap.site/
+SmapApplication: ✅ DNS 해석 성공: nextstep.aiagnt.kr -> 216.198.79.65
+SMAP_WebView: Page loaded successfully: https://nextstep.aiagnt.kr/
 DevServer: ✅ 서버 연결 성공
 ```
 

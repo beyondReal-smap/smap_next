@@ -19,8 +19,8 @@
 - ✅ 자동 캐시 정리 메커니즘
 
 ### 3. 🔒 Info.plist 최적화
-- ✅ **next.smap.site 도메인 네트워크 보안 설정**
-- ✅ smap.site 서브도메인 허용
+- ✅ **next.aiagnt.kr 도메인 네트워크 보안 설정**
+- ✅ aiagnt.kr 서브도메인 허용
 - ✅ WebView 디버깅 활성화
 - ✅ iOS 15+ WebKit 최적화 설정
 
@@ -62,7 +62,7 @@ Xcode 콘솔에서 다음 로그들을 확인하세요:
 🚀 [SMAP-CACHE] 캐시 매니저 초기화 완료
 🛠️ [SMAP-CACHE] WebView 캐시 최적화 시작
 ✅ [SMAP-CACHE] WebView 캐시 설정 완료
-🌐 [SMAP] 웹사이트 로드 시작: https://next.smap.site
+🌐 [SMAP] 웹사이트 로드 시작: https://next.aiagnt.kr
 ```
 
 ### JavaScript 콘솔 로그
@@ -80,7 +80,7 @@ Xcode 콘솔에서 다음 로그들을 확인하세요:
 ## 🧪 테스트 방법
 
 ### 1. 기본 동작 확인
-1. ✅ 앱 실행 → next.smap.site 정상 로딩
+1. ✅ 앱 실행 → next.aiagnt.kr 정상 로딩
 2. ✅ 화면 전환 → 부드러운 애니메이션
 3. ✅ 데이터 로딩 → 빠른 응답 속도
 4. ✅ 스크롤 → 매끄러운 동작
@@ -163,7 +163,7 @@ func application(_ application: UIApplication,
 - [✅] Info.plist 네트워크 보안 설정
 - [✅] SMAP_WebView_Cache_Manager.swift 추가
 - [✅] 프로젝트 빌드 성공
-- [✅] next.smap.site 정상 로딩
+- [✅] next.aiagnt.kr 정상 로딩
 - [✅] 로그 확인 완료
 
 ---
@@ -172,7 +172,7 @@ func application(_ application: UIApplication,
 
 **SMAP iOS 앱이 완전히 최적화되었습니다!**
 
-이제 next.smap.site가 일반 웹브라우저와 동일하게 iOS WebView에서도 완벽하게 작동합니다.
+이제 next.aiagnt.kr가 일반 웹브라우저와 동일하게 iOS WebView에서도 완벽하게 작동합니다.
 
 📞 **문의사항이 있으시면 언제든 연락주세요!**
 

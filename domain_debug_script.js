@@ -1,5 +1,5 @@
 // 도메인별 지도 로딩 문제 진단 스크립트
-// nextstep.smap.site vs localhost:3000 차이점 분석
+// nextstep.aiagnt.kr vs localhost:3000 차이점 분석
 
 (function() {
     'use strict';
@@ -11,7 +11,7 @@
     const currentProtocol = window.location.protocol;
     const currentPort = window.location.port;
     const isLocalhost = currentDomain === 'localhost' || currentDomain === '127.0.0.1';
-    const isProduction = currentDomain.includes('smap.site');
+    const isProduction = currentDomain.includes('aiagnt.kr');
     
     console.log('🌐 [DOMAIN DEBUG] 현재 환경:', {
         domain: currentDomain,

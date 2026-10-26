@@ -132,7 +132,7 @@ export async function GET(
     queryParams.append('min_speed', minSpeed);
     queryParams.append('max_accuracy', maxAccuracy);
     
-    const backendUrl = `https://api3.smap.site/api/v1/logs/member-location-logs`;
+    const backendUrl = `https://api3.aiagnt.kr/api/v1/logs/member-location-logs`;
     
     const requestBody = {
       act: 'get_map_markers',

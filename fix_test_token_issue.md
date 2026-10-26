@@ -61,7 +61,7 @@ UPDATE member_t SET mt_token_id = '실제_FCM_토큰_여기에_입력' WHERE mt_
 
 ### 1. 현재 토큰 상태 확인
 ```bash
-curl -s "https://api3.smap.site/api/v1/member-fcm-token/status/1186" | jq .
+curl -s "https://api3.aiagnt.kr/api/v1/member-fcm-token/status/1186" | jq .
 ```
 
 ### 2. iOS 앱에서 새 토큰 생성

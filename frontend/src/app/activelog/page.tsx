@@ -832,7 +832,7 @@ export default function ActivelogPage() {
   // Vercel 환경 감지
   const isVercel = typeof window !== 'undefined' &&
     (window.location.hostname.includes('vercel.app') ||
-      window.location.hostname.includes('nextstep.smap.site'));
+      window.location.hostname.includes('nextstep.aiagnt.kr'));
 
   // 인증 관련 상태 추가 (home/page.tsx와 동일)
   const { user, isLoggedIn = false, loading: authLoading = false } = useAuth() || {};
@@ -1282,7 +1282,7 @@ export default function ActivelogPage() {
     const timestamp = new Date().toISOString();
     const isVercel = typeof window !== 'undefined' &&
       (window.location.hostname.includes('vercel.app') ||
-        window.location.hostname.includes('nextstep.smap.site'));
+        window.location.hostname.includes('nextstep.aiagnt.kr'));
 
     console.error(`[${context}] 💥 데이터 로딩 오류 발생:`, {
       error,
@@ -1451,7 +1451,7 @@ export default function ActivelogPage() {
     // Vercel 환경에서는 더 짧은 백업 타이머 사용
     const isVercel = typeof window !== 'undefined' &&
       (window.location.hostname.includes('vercel.app') ||
-        window.location.hostname.includes('nextstep.smap.site'));
+        window.location.hostname.includes('nextstep.aiagnt.kr'));
     const backupTimeout = isVercel ? 8000 : 10000; // Vercel: 8초, 기타: 10초
 
     const backupTimer = setTimeout(() => {
@@ -1511,8 +1511,8 @@ export default function ActivelogPage() {
 
     // Vercel 환경 감지 및 최적화
     const isVercel = window.location.hostname.includes('vercel.app') ||
-      window.location.hostname.includes('nextstep.smap.site');
-    const isProduction = window.location.hostname.includes('.smap.site');
+      window.location.hostname.includes('nextstep.aiagnt.kr');
+    const isProduction = window.location.hostname.includes('.aiagnt.kr');
     const isIOSWebView = typeof window !== 'undefined' &&
       window.webkit &&
       window.webkit.messageHandlers;
@@ -3607,7 +3607,7 @@ export default function ActivelogPage() {
         // Vercel 환경에서는 더 긴 지연 시간 사용
         const isVercel = typeof window !== 'undefined' &&
           (window.location.hostname.includes('vercel.app') ||
-            window.location.hostname.includes('nextstep.smap.site'));
+            window.location.hostname.includes('nextstep.aiagnt.kr'));
 
         // 적응적 지연 (Vercel: 첫 번째 3초, 두 번째 8초 / 기타: 첫 번째 2초, 두 번째 5초)
         const retryDelay = isVercel
@@ -4645,7 +4645,7 @@ export default function ActivelogPage() {
       // Vercel 환경에서는 더 짧은 안전장치 타이머 사용
       const isVercel = typeof window !== 'undefined' &&
         (window.location.hostname.includes('vercel.app') ||
-          window.location.hostname.includes('nextstep.smap.site'));
+          window.location.hostname.includes('nextstep.aiagnt.kr'));
       const safetyTimeout = isVercel ? 20000 : 30000; // Vercel: 20초, 기타: 30초
 
       const timeoutId = setTimeout(() => {
@@ -5565,7 +5565,7 @@ export default function ActivelogPage() {
       // Vercel 환경에서는 더 짧은 재시도 간격 사용
       const isVercel = typeof window !== 'undefined' &&
         (window.location.hostname.includes('vercel.app') ||
-          window.location.hostname.includes('nextstep.smap.site'));
+          window.location.hostname.includes('nextstep.aiagnt.kr'));
       const retryDelay = isVercel ? 500 : 1000; // Vercel: 0.5초, 기타: 1초
 
       const retryTimer = setTimeout(() => {

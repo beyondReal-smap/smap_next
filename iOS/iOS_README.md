@@ -97,4 +97,4 @@ Xcode에서 빌드 타겟을 `smap`으로 선택 후 빌드합니다.
 
 ## API
 
-백엔드: `https://api3.smap.site/api/v1/`
+백엔드: `https://api3.aiagnt.kr/api/v1/`

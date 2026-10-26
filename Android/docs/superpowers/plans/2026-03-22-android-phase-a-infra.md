@@ -97,9 +97,9 @@ Add BuildConfig fields to defaultConfig:
 ```kotlin
 defaultConfig {
     // ... existing
-    buildConfigField("String", "API_BASE_URL", "\"https://api3.smap.site/api/v1/\"")
-    buildConfigField("String", "IMAGE_BASE_URL", "\"https://api3.smap.site\"")
-    buildConfigField("String", "WEB_BASE_URL", "\"https://nextstep.smap.site\"")
+    buildConfigField("String", "API_BASE_URL", "\"https://api3.aiagnt.kr/api/v1/\"")
+    buildConfigField("String", "IMAGE_BASE_URL", "\"https://api3.aiagnt.kr\"")
+    buildConfigField("String", "WEB_BASE_URL", "\"https://nextstep.aiagnt.kr\"")
 }
 ```
 
@@ -549,14 +549,14 @@ git commit -m "refactor: migrate ViewModels to @HiltViewModel with constructor i
 - [ ] **Step 1: 하드코딩 URL 찾기**
 
 ```bash
-grep -rn "api3.smap.site\|nextstep.smap.site" app/src/main/java/ --include="*.kt" | grep -v "service/" | grep -v "BuildConfig"
+grep -rn "api3.aiagnt.kr\|nextstep.aiagnt.kr" app/src/main/java/ --include="*.kt" | grep -v "service/" | grep -v "BuildConfig"
 ```
 
 - [ ] **Step 2: 각 참조를 BuildConfig로 교체**
 
 ```kotlin
 // Before
-"https://api3.smap.site/images/$path"
+"https://api3.aiagnt.kr/images/$path"
 
 // After
 "${BuildConfig.IMAGE_BASE_URL}/images/$path"
@@ -564,7 +564,7 @@ grep -rn "api3.smap.site\|nextstep.smap.site" app/src/main/java/ --include="*.kt
 
 ```kotlin
 // Before
-"https://nextstep.smap.site$path"
+"https://nextstep.aiagnt.kr$path"
 
 // After
 "${BuildConfig.WEB_BASE_URL}$path"

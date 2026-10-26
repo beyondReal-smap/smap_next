@@ -270,7 +270,7 @@ export async function GET(
     queryParams.append('max_accuracy', maxAccuracy);
     queryParams.append('min_duration', minDuration);
     
-    const backendUrl = `https://api3.smap.site/api/v1/logs/member-location-logs`;
+    const backendUrl = `https://api3.aiagnt.kr/api/v1/logs/member-location-logs`;
     
     const requestBody = {
       act: 'get_stay_times',

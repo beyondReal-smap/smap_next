@@ -16,7 +16,7 @@ class ActivityLogService {
     private var cancellables = Set<AnyCancellable>()
 
     private init() {
-        self.baseURL = "https://api3.smap.site/api/v1"
+        self.baseURL = "https://api3.aiagnt.kr/api/v1"
     }
 
     // MARK: - Private Helpers

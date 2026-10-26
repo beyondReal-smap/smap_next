@@ -51,7 +51,7 @@ else:
 # 백엔드 API로 토큰 업데이트
 print("
 🔄 백엔드 API로 토큰 업데이트 시도..."try:
-    api_url = "https://api3.smap.site/api/v1/member-fcm-token/register"
+    api_url = "https://api3.aiagnt.kr/api/v1/member-fcm-token/register"
 
     payload = {
         "mt_idx": int(mt_idx),

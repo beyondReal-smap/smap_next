@@ -72,7 +72,7 @@
 IP 등록 후 다음 명령어로 테스트:
 
 ```bash
-curl -X POST https://api3.smap.site/api/v1/sms/send-verification-code \
+curl -X POST https://api3.aiagnt.kr/api/v1/sms/send-verification-code \
   -H "Content-Type: application/json" \
   -d '{"phone_number": "본인_휴대폰_번호"}'
 ```

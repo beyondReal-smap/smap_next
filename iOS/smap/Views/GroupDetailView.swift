@@ -60,7 +60,7 @@ struct GroupDetailView: View {
         }
         .sheet(isPresented: $showingQRCode) {
             QRCodeView(
-                data: "https://nextstep.smap.site/group/\(group.sgt_idx)/join",
+                data: "https://nextstep.aiagnt.kr/group/\(group.sgt_idx)/join",
                 size: 250
             )
         }
@@ -94,7 +94,7 @@ struct GroupDetailView: View {
                         .fill(Color.white.opacity(0.15))
                         .frame(width: 76, height: 76)
                     
-                    let iconUrl = URL(string: "https://nextstep.smap.site/images/group\(((groupIndex ?? 0) % 2) + 1).webp")
+                    let iconUrl = URL(string: "https://nextstep.aiagnt.kr/images/group\(((groupIndex ?? 0) % 2) + 1).webp")
                     
                     AsyncImage(url: iconUrl) { phase in
                         switch phase {

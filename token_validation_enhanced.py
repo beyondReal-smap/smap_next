@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 class EnhancedTokenValidator:
-    def __init__(self, base_url="https://api3.smap.site/api/v1"):
+    def __init__(self, base_url="https://api3.aiagnt.kr/api/v1"):
         self.base_url = base_url
         self.session = requests.Session()
         

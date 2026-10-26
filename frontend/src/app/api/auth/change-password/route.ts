@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const BACKEND_URL = process.env.BACKEND_URL || 'https://api3.smap.site';
+const BACKEND_URL = process.env.BACKEND_URL || 'https://api3.aiagnt.kr';
 
 // node-fetch를 대안으로 사용
 let nodeFetch: any = null;

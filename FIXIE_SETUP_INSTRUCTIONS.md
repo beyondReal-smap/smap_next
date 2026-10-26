@@ -76,7 +76,7 @@ vercel --prod
 
 ```bash
 # 인증번호 발송 테스트
-curl -X POST https://api3.smap.site/api/v1/sms/send-verification-code \
+curl -X POST https://api3.aiagnt.kr/api/v1/sms/send-verification-code \
   -H "Content-Type: application/json" \
   -d '{"phone_number": "01012345678"}'
 

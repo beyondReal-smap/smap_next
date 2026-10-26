@@ -1178,7 +1178,7 @@ async def forgot_password(
         logger.info(f"💾 토큰 데이터베이스 저장 완료: 사용자 {user.mt_idx}, 토큰: {short_token}, 만료시간: {token_expires}")
         
         # 비밀번호 재설정 링크 생성 (운영환경 도메인 적용, URL 단축)
-        reset_url = f"https://nextstep.smap.site/r?t={short_token}"
+        reset_url = f"https://nextstep.aiagnt.kr/r?t={short_token}"
         
         logger.info(f"🔗 [테스트] 비밀번호 재설정 링크: {reset_url}")
         logger.info(f"🔗 [테스트] 토큰: {short_token}")

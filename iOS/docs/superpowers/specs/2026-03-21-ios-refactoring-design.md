@@ -256,13 +256,13 @@ struct MainTabView: View {
 ```
 # Config/Debug.xcconfig
 KAKAO_API_KEY = 7fbf60571daf54ca5bee8373a1f31d2d
-API_BASE_URL = https:$(/)$(/)api3.smap.site$(/)api$(/)
-WEB_BASE_URL = https:$(/)$(/)nextstep.smap.site$(/)
+API_BASE_URL = https:$(/)$(/)api3.aiagnt.kr$(/)api$(/)
+WEB_BASE_URL = https:$(/)$(/)nextstep.aiagnt.kr$(/)
 
 # Config/Release.xcconfig
 KAKAO_API_KEY = $(KAKAO_API_KEY)
-API_BASE_URL = https:$(/)$(/)api3.smap.site$(/)api$(/)
-WEB_BASE_URL = https:$(/)$(/)nextstep.smap.site$(/)
+API_BASE_URL = https:$(/)$(/)api3.aiagnt.kr$(/)api$(/)
+WEB_BASE_URL = https:$(/)$(/)nextstep.aiagnt.kr$(/)
 ```
 
 Info.plist에서 `$(KAKAO_API_KEY)` 등으로 참조. `.xcconfig` 파일은 `.gitignore`에 추가하고 `.xcconfig.example` 템플릿을 커밋.
@@ -270,7 +270,7 @@ Info.plist에서 `$(KAKAO_API_KEY)` 등으로 참조. `.xcconfig` 파일은 `.gi
 ```swift
 enum AppConfiguration {
     static let apiBaseURL: String = {
-        Bundle.main.infoDictionary?["API_BASE_URL"] as? String ?? "https://api3.smap.site/api/"
+        Bundle.main.infoDictionary?["API_BASE_URL"] as? String ?? "https://api3.aiagnt.kr/api/"
     }()
     static let kakaoAPIKey: String = {
         Bundle.main.infoDictionary?["KAKAO_API_KEY"] as? String ?? ""

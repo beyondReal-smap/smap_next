@@ -135,8 +135,8 @@ export default function RootLayout({
         {/* NOTE: 로컬 폰트는 next/font(localFont)에서 자동 preload 처리 (해시 경로) */}
         
         {/* 성능 최적화 리소스 힌트 */}
-        <link rel="dns-prefetch" href="//nextstep.smap.site" />
-        <link rel="preconnect" href="https://nextstep.smap.site" />
+        <link rel="dns-prefetch" href="//nextstep.aiagnt.kr" />
+        <link rel="preconnect" href="https://nextstep.aiagnt.kr" />
         
         {/* Critical CSS inline - LCP 개선 */}
         <style dangerouslySetInnerHTML={{

@@ -377,7 +377,7 @@ class GroupService {
       
       // 환경 감지
       const isProduction = typeof window !== 'undefined' && 
-        (window.location.hostname.includes('smap.site') || window.location.hostname.includes('vercel.app'));
+        (window.location.hostname.includes('aiagnt.kr') || window.location.hostname.includes('vercel.app'));
       const environment = process.env.NODE_ENV || 'development';
       
       console.log('[GroupService] 현재 사용자 그룹 목록 조회 시작', ignoreCache ? '(캐시 무시)' : '', {

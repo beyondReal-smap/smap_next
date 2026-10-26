@@ -36,7 +36,7 @@ SEND_TIME=$(get_timestamp)
 echo -e "${BLUE}📤 [${SEND_TIME}] FCM 토큰 새로고침 요청 중...${NC}"
 
 RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" \
-  -X POST "https://api3.smap.site/api/v1/member-fcm-token/refresh-token" \
+  -X POST "https://api3.aiagnt.kr/api/v1/member-fcm-token/refresh-token" \
   -H "Content-Type: application/json" \
   -d "$REFRESH_DATA")
 

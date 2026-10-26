@@ -163,7 +163,7 @@ struct ShareOptionsView: View {
     // MARK: - Helper Functions
     
     private func generateInviteLink() -> String {
-        return "https://nextstep.smap.site/group/\(group.sgt_idx)/join"
+        return "https://nextstep.aiagnt.kr/group/\(group.sgt_idx)/join"
     }
     
     private func generateInviteMessage() -> String {

@@ -306,10 +306,10 @@ Create: `Config/Shared.xcconfig`
 ```
 // Shared configuration for SMAP iOS app
 // API URLs
-API_BASE_URL = https:/$()/api3.smap.site/api/
-WEB_BASE_URL = https:/$()/nextstep.smap.site/
-FILE_API_URL = https:/$()/nextstep.smap.site/api/
-IMAGE_BASE_URL = https:/$()/api3.smap.site
+API_BASE_URL = https:/$()/api3.aiagnt.kr/api/
+WEB_BASE_URL = https:/$()/nextstep.aiagnt.kr/
+FILE_API_URL = https:/$()/nextstep.aiagnt.kr/api/
+IMAGE_BASE_URL = https:/$()/api3.aiagnt.kr
 
 // App Info
 PRODUCT_BUNDLE_IDENTIFIER = com.dmonster.smap
@@ -383,28 +383,28 @@ enum AppConfiguration {
 
     static let apiBaseURL: String = {
         guard let url = Bundle.main.infoDictionary?["API_BASE_URL"] as? String, !url.isEmpty else {
-            return "https://api3.smap.site/api/"
+            return "https://api3.aiagnt.kr/api/"
         }
         return url
     }()
 
     static let webBaseURL: String = {
         guard let url = Bundle.main.infoDictionary?["WEB_BASE_URL"] as? String, !url.isEmpty else {
-            return "https://nextstep.smap.site/"
+            return "https://nextstep.aiagnt.kr/"
         }
         return url
     }()
 
     static let fileAPIURL: String = {
         guard let url = Bundle.main.infoDictionary?["FILE_API_URL"] as? String, !url.isEmpty else {
-            return "https://nextstep.smap.site/api/"
+            return "https://nextstep.aiagnt.kr/api/"
         }
         return url
     }()
 
     static let imageBaseURL: String = {
         guard let url = Bundle.main.infoDictionary?["IMAGE_BASE_URL"] as? String, !url.isEmpty else {
-            return "https://api3.smap.site"
+            return "https://api3.aiagnt.kr"
         }
         return url
     }()
@@ -422,7 +422,7 @@ enum AppConfiguration {
     // MARK: - API v1 Base URL (Services에서 사용)
 
     static let apiV1BaseURL: String = {
-        // apiBaseURL이 "https://api3.smap.site/api/"이면 v1은 "https://api3.smap.site/api/v1"
+        // apiBaseURL이 "https://api3.aiagnt.kr/api/"이면 v1은 "https://api3.aiagnt.kr/api/v1"
         let base = apiBaseURL.hasSuffix("/") ? String(apiBaseURL.dropLast()) : apiBaseURL
         return "\(base)/v1"
     }()
@@ -722,7 +722,7 @@ import XCTest
 
 final class APIEndpointTests: XCTestCase {
 
-    let baseURL = "https://api3.smap.site/api/v1"
+    let baseURL = "https://api3.aiagnt.kr/api/v1"
 
     // MARK: - URL 구성 테스트
 

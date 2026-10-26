@@ -29,8 +29,8 @@
 #### 적용된 최적화:
 ```html
 <link rel="preload" href="/fonts/LINESeedKR-Rg.woff2" as="font" type="font/woff2" crossOrigin="" />
-<link rel="dns-prefetch" href="//nextstep.smap.site" />
-<link rel="preconnect" href="https://nextstep.smap.site" />
+<link rel="dns-prefetch" href="//nextstep.aiagnt.kr" />
+<link rel="preconnect" href="https://nextstep.aiagnt.kr" />
 ```
 
 ### 3. 이미지 최적화

@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
       // 개발 환경에서 SSL 문제 회피
       (process as any).env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
-      const resp = await fetch('https://api3.smap.site/api/v1/auth/find-user-by-email', {
+      const resp = await fetch('https://api3.aiagnt.kr/api/v1/auth/find-user-by-email', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

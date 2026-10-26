@@ -823,7 +823,7 @@ const loadingTextVariants = {
 // ... existing code ...
 
 // Helper 함수들 추가
-const BACKEND_STORAGE_BASE_URL = 'https://api3.smap.site/storage/';
+const BACKEND_STORAGE_BASE_URL = 'https://api3.aiagnt.kr/storage/';
 
 // iOS WebView에서 안전한 배열 체크 유틸리티 함수
 const safeIsArray = (value: any): value is any[] => {
@@ -3649,7 +3649,7 @@ export default function HomePage() {
           // 보강: 보장 로더로 강제 로딩 (지수 백오프 + 에러리스너)
           const { ensureNaverMapsLoaded } = await import('../../services/ensureNaverMaps');
           try {
-            const isProd = window.location.hostname.includes('.smap.site');
+            const isProd = window.location.hostname.includes('.aiagnt.kr');
             await ensureNaverMapsLoaded({ maxRetries: 6, initialDelayMs: 300, submodules: isProd ? 'geocoder' : 'geocoder,drawing,visualization' });
             apiLoadStatus.naver = true;
             setNaverMapsLoaded(true);
@@ -3667,7 +3667,7 @@ export default function HomePage() {
     console.log('[HOME] 프리로드 스크립트 없음 - 백업 로딩 시작');
     try {
       const { ensureNaverMapsLoaded } = await import('../../services/ensureNaverMaps');
-      const isProd = window.location.hostname.includes('.smap.site');
+      const isProd = window.location.hostname.includes('.aiagnt.kr');
       await ensureNaverMapsLoaded({ maxRetries: 6, initialDelayMs: 300, submodules: isProd ? 'geocoder' : 'geocoder,drawing,visualization' });
       apiLoadStatus.naver = true;
       setNaverMapsLoaded(true);
@@ -3687,7 +3687,7 @@ export default function HomePage() {
       naverMapUrl.searchParams.append('ncpKeyId', dynamicClientId); // 동적 Client ID 사용
 
       // 프로덕션 환경에서는 서브모듈 최소화 (로딩 속도 최적화)
-      const isProduction = window.location.hostname.includes('.smap.site');
+      const isProduction = window.location.hostname.includes('.aiagnt.kr');
       if (!isIOSWebView && !isProduction) {
         // 개발 환경에서만 전체 서브모듈 로드
         naverMapUrl.searchParams.append('submodules', 'geocoder,drawing,visualization');

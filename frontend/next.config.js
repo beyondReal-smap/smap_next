@@ -101,11 +101,11 @@ const nextConfig = {
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
     domains: [
       'localhost',
-      'nextstep.smap.site', 
-      'app2.smap.site',
-      'app.smap.site',
-      'smap.site',
-      'api3.smap.site'
+      'nextstep.aiagnt.kr', 
+      'app2.aiagnt.kr',
+      'app.aiagnt.kr',
+      'aiagnt.kr',
+      'api3.aiagnt.kr'
     ],
   },
   
@@ -220,8 +220,8 @@ const nextConfig = {
             value: [
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval' *.map.naver.com *.googleapis.com *.gstatic.com *.google.com *.navercorp.com *.naver.net *.pstatic.net *.vercel-scripts.com *.vercel.com appleid.cdn-apple.com",
-              "connect-src 'self' *.map.naver.com *.apigw.ntruss.com dapi.kakao.com *.googleapis.com *.google.com *.firebaseapp.com *.navercorp.com *.naver.net *.pstatic.net kr-col-ext.nelo.navercorp.com *.vercel-scripts.com *.vercel.com https://api3.smap.site https://nextstep.smap.site wss: ws: data: blob:",
-              "img-src 'self' data: blob: api3.smap.site https://api3.smap.site *.map.naver.com *.googleapis.com *.gstatic.com *.google.com *.navercorp.com *.naver.net *.pstatic.net *.vercel-scripts.com *.vercel.com",
+              "connect-src 'self' *.map.naver.com *.apigw.ntruss.com dapi.kakao.com *.googleapis.com *.google.com *.firebaseapp.com *.navercorp.com *.naver.net *.pstatic.net kr-col-ext.nelo.navercorp.com *.vercel-scripts.com *.vercel.com https://api3.aiagnt.kr https://nextstep.aiagnt.kr wss: ws: data: blob:",
+              "img-src 'self' data: blob: api3.aiagnt.kr https://api3.aiagnt.kr *.map.naver.com *.googleapis.com *.gstatic.com *.google.com *.navercorp.com *.naver.net *.pstatic.net *.vercel-scripts.com *.vercel.com",
               "style-src 'self' 'unsafe-inline' *.googleapis.com *.gstatic.com *.google.com accounts.google.com *.navercorp.com *.naver.net *.pstatic.net *.vercel-scripts.com *.vercel.com",
               "font-src 'self' *.gstatic.com *.googleapis.com *.navercorp.com *.naver.net *.pstatic.net *.vercel-scripts.com *.vercel.com",
               "frame-src 'self' *.google.com *.firebaseapp.com *.navercorp.com *.naver.net *.pstatic.net *.vercel-scripts.com *.vercel.com smap:",
@@ -322,7 +322,7 @@ const nextConfig = {
   //           value: 'http',
   //         },
   //       ],
-  //       destination: 'https://nextstep.smap.site/:path*',
+  //       destination: 'https://nextstep.aiagnt.kr/:path*',
   //       permanent: true,
   //     },
   //   ];

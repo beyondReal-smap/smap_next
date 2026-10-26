@@ -6,7 +6,7 @@ import { FiTrash2, FiShield, FiInfo, FiArrowRight, FiMail, FiSmartphone } from '
 
 export default function AccountDeletionPage() {
     const appName = "SMAP";
-    const supportEmail = "admin@smap.site"; // 실제 고객센터 이메일로 수정 필요
+    const supportEmail = "admin@aiagnt.kr"; // 실제 고객센터 이메일로 수정 필요
 
     return (
         <div className="min-h-screen bg-gray-50 font-sans text-gray-900">

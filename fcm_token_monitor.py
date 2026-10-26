@@ -13,7 +13,7 @@ print("=" * 50)
 
 class FCMTokenMonitor:
     def __init__(self):
-        self.backend_url = "https://api3.smap.site"
+        self.backend_url = "https://api3.aiagnt.kr"
         self.check_interval = 300  # 5분마다 체크
         self.warning_days = 3      # 만료 3일 전부터 경고
         self.max_retries = 3       # 최대 재시도 횟수

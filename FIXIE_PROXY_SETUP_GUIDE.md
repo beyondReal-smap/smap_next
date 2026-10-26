@@ -47,7 +47,7 @@ ALIGO_SENDER=070-8065-2207
 
 ```bash
 # 백엔드 API URL
-NEXT_PUBLIC_BACKEND_API_URL=https://api3.smap.site/api/v1
+NEXT_PUBLIC_BACKEND_API_URL=https://api3.aiagnt.kr/api/v1
 ```
 
 ### 4단계: 로컬 개발 환경 설정
@@ -95,12 +95,12 @@ NEXT_PUBLIC_BACKEND_API_URL=http://localhost:8000/api/v1
 
 ```bash
 # 인증번호 발송 테스트
-curl -X POST https://api3.smap.site/api/v1/sms/send-verification-code \
+curl -X POST https://api3.aiagnt.kr/api/v1/sms/send-verification-code \
   -H "Content-Type: application/json" \
   -d '{"phone_number": "01012345678"}'
 
 # 일반 SMS 발송 테스트
-curl -X POST https://api3.smap.site/api/v1/sms/send \
+curl -X POST https://api3.aiagnt.kr/api/v1/sms/send \
   -H "Content-Type: application/json" \
   -d '{
     "phone_number": "01012345678",

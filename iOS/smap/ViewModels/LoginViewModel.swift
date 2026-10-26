@@ -141,7 +141,7 @@ class LoginViewModel: ObservableObject {
                 }
             } else {
                 // iOS 13/14에서는 URLSession을 직접 사용
-                let url = URL(string: "https://api3.smap.site/api/v1/auth/login-home")!
+                let url = URL(string: "https://api3.aiagnt.kr/api/v1/auth/login-home")!
                 var request = URLRequest(url: url)
                 request.httpMethod = "POST"
                 request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -599,8 +599,8 @@ class RegisterViewModel: ObservableObject {
     private var timerCancellable: AnyCancellable?
     private let authService = AuthService.shared
     
-    private let smsAPIURL = "https://api3.smap.site/api/v1/sms/send-verification-code"
-    private let checkPhoneAPIURL = "https://api3.smap.site/api/v1/members/check/phone/"
+    private let smsAPIURL = "https://api3.aiagnt.kr/api/v1/sms/send-verification-code"
+    private let checkPhoneAPIURL = "https://api3.aiagnt.kr/api/v1/members/check/phone/"
     
     // MARK: - Initialization & Social Data
     
@@ -1165,9 +1165,9 @@ class ForgotPasswordViewModel: ObservableObject {
     private var timerCancellable: AnyCancellable?
     
     private let authService = AuthService.shared
-    private let smsAPIURL = "https://api3.smap.site/api/v1/sms/send-verification-code"
-    private let checkPhoneAPIURL = "https://api3.smap.site/api/v1/members/check/phone/"
-    private let resetPasswordAPIURL = "https://api3.smap.site/api/v1/auth/reset-password-by-phone"
+    private let smsAPIURL = "https://api3.aiagnt.kr/api/v1/sms/send-verification-code"
+    private let checkPhoneAPIURL = "https://api3.aiagnt.kr/api/v1/members/check/phone/"
+    private let resetPasswordAPIURL = "https://api3.aiagnt.kr/api/v1/auth/reset-password-by-phone"
     
     // MARK: - Helper Methods
     

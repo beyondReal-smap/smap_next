@@ -1,5 +1,5 @@
 // 도메인별 환경 감지 및 설정 유틸리티
-// nextstep.smap.site vs localhost 차이점 해결
+// nextstep.aiagnt.kr vs localhost 차이점 해결
 
 export interface EnvironmentConfig {
   domain: string;
@@ -22,7 +22,7 @@ export function detectEnvironment(): EnvironmentConfig {
   if (typeof window === 'undefined') {
     // 서버 사이드에서는 기본값 반환
     return {
-      domain: 'nextstep.smap.site',
+      domain: 'nextstep.aiagnt.kr',
       isLocalhost: false,
       isProduction: true,
       isSecure: true,
@@ -45,7 +45,7 @@ export function detectEnvironment(): EnvironmentConfig {
                      hostname.startsWith('192.168.') ||
                      hostname.startsWith('10.0.');
   
-  const isProduction = hostname.includes('smap.site');
+  const isProduction = hostname.includes('aiagnt.kr');
   const isSecure = protocol === 'https:' || isLocalhost;
 
   // 환경별 지도 API 설정

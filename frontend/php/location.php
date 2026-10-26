@@ -1433,7 +1433,7 @@ if ($userLang == 'ko' && $mem_row['mt_map'] == 'N') {
             img.src = imageUrl;
             img.alt = '이미지';
             img.onerror = function() {
-                this.src = 'https://app2.smap.site/img/no_image.png';
+                this.src = 'https://app2.aiagnt.kr/img/no_image.png';
             };
             rectSquareDiv.appendChild(img);
 

@@ -11,12 +11,12 @@ echo ""
 
 # 1. 토큰 상태 확인
 echo "1️⃣ 토큰 상태 확인:"
-curl -s "https://api3.smap.site/api/v1/member-fcm-token/status/${USER_ID}" | jq .
+curl -s "https://api3.aiagnt.kr/api/v1/member-fcm-token/status/${USER_ID}" | jq .
 echo ""
 
 # 2. FCM 발송 (일반 푸시)
 echo "2️⃣ FCM 발송 (일반 푸시):"
-curl -X POST "https://api3.smap.site/api/v1/fcm_sendone/" \
+curl -X POST "https://api3.aiagnt.kr/api/v1/fcm_sendone/" \
   -H "Content-Type: application/json" \
   -d "{
     \"plt_type\": \"TEST\",
@@ -31,7 +31,7 @@ echo ""
 
 # 3. 백그라운드 푸시 발송
 echo "3️⃣ 백그라운드 푸시 발송:"
-curl -X POST "https://api3.smap.site/api/v1/fcm_sendone/background" \
+curl -X POST "https://api3.aiagnt.kr/api/v1/fcm_sendone/background" \
   -H "Content-Type: application/json" \
   -d "{
     \"plt_type\": \"BACKGROUND_TEST\",
@@ -44,14 +44,14 @@ curl -X POST "https://api3.smap.site/api/v1/fcm_sendone/background" \
     \"content_available\": true,
     \"priority\": \"normal\",
     \"show_notification\": false,
-    \"event_url\": \"https://smap.site/test/123\",
+    \"event_url\": \"https://aiagnt.kr/test/123\",
     \"schedule_id\": \"test_schedule_456\"
   }" | jq .
 echo ""
 
 # 4. 긴급 백그라운드 푸시 발송
 echo "4️⃣ 긴급 백그라운드 푸시 발송:"
-curl -X POST "https://api3.smap.site/api/v1/fcm_sendone/background" \
+curl -X POST "https://api3.aiagnt.kr/api/v1/fcm_sendone/background" \
   -H "Content-Type: application/json" \
   -d "{
     \"plt_type\": \"URGENT_BACKGROUND_TEST\",
@@ -64,7 +64,7 @@ curl -X POST "https://api3.smap.site/api/v1/fcm_sendone/background" \
     \"content_available\": true,
     \"priority\": \"high\",
     \"show_notification\": true,
-    \"event_url\": \"https://smap.site/urgent/789\",
+    \"event_url\": \"https://aiagnt.kr/urgent/789\",
     \"schedule_id\": \"urgent_schedule_101\"
   }" | jq .
 echo ""

@@ -415,8 +415,8 @@ const detectIOSEnvironment = () => {
   
   // 프로덕션 환경별 추가 감지
   const currentHost = window.location.hostname;
-  const isProductionDomain = currentHost.includes('.smap.site');
-  const isNexStepDomain = currentHost === 'nextstep.smap.site';
+  const isProductionDomain = currentHost.includes('.aiagnt.kr');
+  const isNexStepDomain = currentHost === 'nextstep.aiagnt.kr';
   
   // 프로덕션 환경에서는 더 적극적인 WebView 감지
   let finalIsIOSApp = isIOSApp;

@@ -94,7 +94,7 @@ window.__updateFCMTokenStatus__ = function(isRegistered, isError = false) {
     const currentURL = window.location.href;
     const isIOSWebView = /iPad|iPhone|iPod/.test(navigator.userAgent);
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const isProduction = window.location.hostname === 'nextstep.smap.site';
+    const isProduction = window.location.hostname === 'nextstep.aiagnt.kr';
     const isSimulator = /Simulator/.test(navigator.userAgent);
     const isDevelopment = isLocalhost || !isProduction;
     
@@ -1081,7 +1081,7 @@ window.SMAP_DEBUG_INFO = function() {
     return debugInfo;
 };
 
-// 🚨 강력한 테스트 함수들 추가 (nextstep.smap.site용)
+// 🚨 강력한 테스트 함수들 추가 (nextstep.aiagnt.kr용)
 window.TEST_ENV = function() {
     const info = {
         url: window.location.href,
@@ -1213,9 +1213,9 @@ setTimeout(() => {
         console.log('   SMAP_DEBUG_INFO() - 상세 디버그 정보');
 
         
-        // nextstep.smap.site에서 자동 디버그 정보 출력
-        if (window.location.hostname === 'nextstep.smap.site') {
-            console.log('🚨 [AUTO-DEBUG] nextstep.smap.site 감지 - 자동 환경 체크');
+        // nextstep.aiagnt.kr에서 자동 디버그 정보 출력
+        if (window.location.hostname === 'nextstep.aiagnt.kr') {
+            console.log('🚨 [AUTO-DEBUG] nextstep.aiagnt.kr 감지 - 자동 환경 체크');
             setTimeout(() => {
                 window.TEST_ENV();
             }, 2000);

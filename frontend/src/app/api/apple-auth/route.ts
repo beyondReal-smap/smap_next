@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
       };
 
       try {
-        const backendUrl = 'https://api3.smap.site/api/v1/members/register';
+        const backendUrl = 'https://api3.aiagnt.kr/api/v1/members/register';
         const backendResponse = await fetch(backendUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

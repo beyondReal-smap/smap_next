@@ -297,7 +297,7 @@ struct GroupCard: View {
                     .frame(width: 52, height: 52)
                     .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
                 
-                let iconUrl = URL(string: "https://nextstep.smap.site/images/group\((index % 2) + 1).webp")
+                let iconUrl = URL(string: "https://nextstep.aiagnt.kr/images/group\((index % 2) + 1).webp")
                 
                 AsyncImage(url: iconUrl) { phase in
                     switch phase {

@@ -82,7 +82,7 @@ class EmailService:
             mail_url = f"https://www.worksapis.com/v1.0/domains/{self.naverworks_domain}/mail"
             
             mail_data = {
-                "senderAddress": "admin@smap.site",
+                "senderAddress": "admin@aiagnt.kr",
                 "senderName": "SMAP",
                 "title": subject,
                 "body": html_content,

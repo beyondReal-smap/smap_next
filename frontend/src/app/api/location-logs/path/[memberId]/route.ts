@@ -92,7 +92,7 @@ export async function GET(
     }
 
     // 백엔드 API 호출
-    const backendUrl = `https://api3.smap.site/api/v1/logs/member-location-logs/${memberId}/path?date=${date}`;
+    const backendUrl = `https://api3.aiagnt.kr/api/v1/logs/member-location-logs/${memberId}/path?date=${date}`;
     console.log('[Location Path API] 백엔드 API 호출:', backendUrl);
     
     const data = await fetchWithFallback(backendUrl);

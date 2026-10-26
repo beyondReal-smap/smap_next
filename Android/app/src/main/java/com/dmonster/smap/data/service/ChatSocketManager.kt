@@ -27,8 +27,8 @@ class ChatSocketManager(
 ) {
     companion object {
         private const val TAG = "ChatSocketManager"
-        private const val BASE_URL = "https://api3.smap.site"
-        private const val WS_URL = "wss://api3.smap.site"
+        private const val BASE_URL = "https://api3.aiagnt.kr"
+        private const val WS_URL = "wss://api3.aiagnt.kr"
     }
 
     data class ReadReceiptEvent(val scrIdx: Int, val scmsgIdx: Int, val unreadCount: Int)

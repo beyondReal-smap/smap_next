@@ -125,4 +125,4 @@ KAKAO_API_KEY=your_kakao_key
 
 ## API
 
-백엔드: `https://api3.smap.site/api/v1/`
+백엔드: `https://api3.aiagnt.kr/api/v1/`

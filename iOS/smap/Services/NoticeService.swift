@@ -11,7 +11,7 @@ import Foundation
 class NoticeService {
     static let shared = NoticeService()
     private let authService = AuthService.shared
-    private let baseURL = "https://api3.smap.site/api/v1"
+    private let baseURL = "https://api3.aiagnt.kr/api/v1"
 
     private init() {}
 

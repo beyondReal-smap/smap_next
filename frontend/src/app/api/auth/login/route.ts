@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     // 백엔드 API 호출
     console.log('[LOGIN API] 백엔드 API 호출 시작');
     try {
-      const backendUrl = 'https://api3.smap.site/api/v1/members/login';
+      const backendUrl = 'https://api3.aiagnt.kr/api/v1/members/login';
       
       console.log('[LOGIN API] 백엔드 URL:', backendUrl);
       console.log('[LOGIN API] 요청 데이터:', { mt_id: cleanPhoneNumber, mt_pwd: '***' });

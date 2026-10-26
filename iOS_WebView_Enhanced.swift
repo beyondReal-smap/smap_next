@@ -1,5 +1,5 @@
 // iOS WebView 종합 최적화 - 데이터 로딩 및 화면 전환 문제 해결
-// nextstep.smap.site 웹사이트와 iOS WebView 간의 호환성 개선
+// nextstep.aiagnt.kr 웹사이트와 iOS WebView 간의 호환성 개선
 
 import WebKit
 import UIKit
@@ -40,7 +40,7 @@ class EnhancedWebViewController: UIViewController {
     private let maxRetryCount = 3
     
     // MARK: - 🛠️ 설정 상수
-    private let targetURL = "https://nextstep.smap.site"
+    private let targetURL = "https://nextstep.aiagnt.kr"
     private let requestTimeout: TimeInterval = 30.0
     private let cachePolicy: URLRequest.CachePolicy = .useProtocolCachePolicy
     
@@ -245,7 +245,7 @@ class EnhancedWebViewController: UIViewController {
             return
         }
         
-        let allowedDomains = ["nextstep.smap.site", "app2.smap.site", "app.smap.site", "smap.site", "localhost"]
+        let allowedDomains = ["nextstep.aiagnt.kr", "app2.aiagnt.kr", "app.aiagnt.kr", "aiagnt.kr", "localhost"]
         let currentDomain = currentURL.host ?? ""
         
         print("🔍 [App-Bound] 현재 도메인: \(currentDomain)")
@@ -624,7 +624,7 @@ class EnhancedWebViewController: UIViewController {
         if #available(iOS 14.0, *) {
             config.limitsNavigationsToAppBoundDomains = true
             print("🔐 [WebView] App-Bound Domain 제한 활성화")
-            print("🔐 [WebView] 허용된 도메인: nextstep.smap.site, smap.site, localhost")
+            print("🔐 [WebView] 허용된 도메인: nextstep.aiagnt.kr, aiagnt.kr, localhost")
             print("🔐 [WebView] Info.plist WKAppBoundDomains 설정 적용됨")
         }
         
@@ -1851,7 +1851,7 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
             }
         ]
 
-        var request = URLRequest(url: URL(string: "https://api3.smap.site/api/v1/logs/member-location-logs")!)
+        var request = URLRequest(url: URL(string: "https://api3.aiagnt.kr/api/v1/logs/member-location-logs")!)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -2372,7 +2372,7 @@ extension EnhancedWebViewController: WKNavigationDelegate {
         print("🧭 [Navigation] 내비게이션 요청: \(url.absoluteString)")
         
         // SMAP 도메인이거나 localhost인 경우에만 허용
-        if url.host?.contains("smap.site") == true || 
+        if url.host?.contains("aiagnt.kr") == true || 
            url.host?.contains("localhost") == true ||
            url.scheme == "data" {
             decisionHandler(.allow)

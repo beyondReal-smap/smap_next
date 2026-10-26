@@ -17,7 +17,7 @@ NC='\033[0m' # No Color
 
 # 설정값
 USER_ID=${1:-1186}
-BASE_URL="https://api3.smap.site/api/v1"
+BASE_URL="https://api3.aiagnt.kr/api/v1"
 TEST_MESSAGE="Enhanced FCM Test - $(date '+%Y-%m-%d %H:%M:%S')"
 
 echo -e "${CYAN}╔══════════════════════════════════════════════════════════════╗${NC}"

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const BACKEND_URL = process.env.BACKEND_URL || 'https://api3.smap.site';
+const BACKEND_URL = process.env.BACKEND_URL || 'https://api3.aiagnt.kr';
 
 async function fetchWithFallback(url: string, options: any = {}): Promise<any> {
   // Node.js 환경 변수로 SSL 검증 비활성화
