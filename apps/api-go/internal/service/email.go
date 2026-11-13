@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"mime"
 	"net/http"
+	"net/mail"
 	"net/smtp"
 	"net/url"
 	"os"
@@ -103,29 +106,30 @@ func (s *EmailService) SendPasswordResetEmail(email, resetURL string) EmailResul
 // ErrMailNotConfigured는 네이버웍스·Gmail SMTP 자격증명이 하나도 없어 메일을 보낼 수 없음을 뜻한다.
 var ErrMailNotConfigured = errors.New("mail delivery not configured")
 
-const verificationEmailSubject = "[SMAP] 이메일 인증번호"
-
 // SendVerificationCode는 이메일 인증번호 메일을 보낸다(FastAPI send_verification_code와 같은 경로:
 // 네이버웍스 우선 → 실패 시 Gmail SMTP 폴백). 비밀번호 재설정 메일과 달리 개발환경 Mock으로 성공을 위장하지 않는다:
 // 설정이 없으면 ErrMailNotConfigured, 모든 경로가 실패하면 일반 에러를 반환한다.
+// purpose(register/reset_password/change_email)에 따라 제목·문구가 달라지며 알 수 없는 값은 에러다.
 // 인증번호·수신 주소는 에러 메시지에 넣지 않는다.
-func (s *EmailService) SendVerificationCode(email, code string) error {
+func (s *EmailService) SendVerificationCode(email, code, purpose string) error {
+	msg, err := buildVerificationMessage(purpose, code)
+	if err != nil {
+		return err
+	}
 	nwConfigured := s.nwClientID != "" && s.nwSecret != "" && s.nwDomain != ""
 	gmailConfigured := s.sender != "" && s.password != ""
 	if !nwConfigured && !gmailConfigured {
 		return ErrMailNotConfigured
 	}
-	text := fmt.Sprintf("[SMAP] 인증번호는 %s입니다. 10분 이내에 입력해주세요.", code)
-	html := "<p>" + text + "</p>"
 	if nwConfigured {
-		if s.deliverNaverworks(email, verificationEmailSubject, html) {
+		if s.deliverNaverworks(email, msg.Subject, msg.HTML) {
 			return nil
 		}
 		if !gmailConfigured {
 			return errors.New("naverworks send failed")
 		}
 	}
-	if err := s.deliverSMTP(email, verificationEmailSubject, html, text); err != nil {
+	if err := s.deliverSMTP(email, msg.Subject, msg.HTML, msg.Text); err != nil {
 		return fmt.Errorf("smtp send failed: %w", err)
 	}
 	return nil
@@ -268,16 +272,27 @@ func (s *EmailService) sendGmail(to, subject, htmlContent, textContent string) e
 }
 
 // buildMIME은 multipart/alternative(text+html) MIME 메시지를 만든다(Python MIMEMultipart 등가).
+// From은 표시 이름 "SMAP"을 붙이고(받은편지함에 주소만 보이는 것 방지), 제목은 RFC 2047로 인코딩하며,
+// 본문은 base64로 보내 8bit/긴 줄 제약에 걸리지 않게 한다. SMTP 봉투 발신자는 호출부(client.Mail)가 주소만 쓴다.
 func buildMIME(from, to, subject, text, html string) []byte {
 	boundary := "smapmixed0000boundary"
 	var b strings.Builder
-	fmt.Fprintf(&b, "From: %s\r\n", from)
+	fmt.Fprintf(&b, "From: %s\r\n", (&mail.Address{Name: "SMAP", Address: from}).String())
 	fmt.Fprintf(&b, "To: %s\r\n", to)
-	fmt.Fprintf(&b, "Subject: %s\r\n", subject)
+	fmt.Fprintf(&b, "Subject: %s\r\n", mime.BEncoding.Encode("UTF-8", subject))
 	b.WriteString("MIME-Version: 1.0\r\n")
 	fmt.Fprintf(&b, "Content-Type: multipart/alternative; boundary=%s\r\n\r\n", boundary)
-	fmt.Fprintf(&b, "--%s\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n%s\r\n", boundary, text)
-	fmt.Fprintf(&b, "--%s\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n%s\r\n", boundary, html)
+	writePart := func(contentType, body string) {
+		fmt.Fprintf(&b, "--%s\r\nContent-Type: %s; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n", boundary, contentType)
+		enc := base64.StdEncoding.EncodeToString([]byte(body))
+		for len(enc) > 76 {
+			b.WriteString(enc[:76] + "\r\n")
+			enc = enc[76:]
+		}
+		b.WriteString(enc + "\r\n")
+	}
+	writePart("text/plain", text)
+	writePart("text/html", html)
 	fmt.Fprintf(&b, "--%s--\r\n", boundary)
 	return []byte(b.String())
 }

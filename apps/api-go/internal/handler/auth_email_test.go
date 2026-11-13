@@ -66,7 +66,7 @@ func (s *hStore) DelKeys(_ context.Context, keys ...string) (int64, error) {
 
 type hMailer struct{ codes []string }
 
-func (m *hMailer) SendVerificationCode(_, code string) error {
+func (m *hMailer) SendVerificationCode(_, code, _ string) error {
 	m.codes = append(m.codes, code)
 	return nil
 }

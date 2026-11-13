@@ -102,7 +102,7 @@ type fakeMailer struct {
 	codes []string
 }
 
-func (m *fakeMailer) SendVerificationCode(email, code string) error {
+func (m *fakeMailer) SendVerificationCode(email, code, _ string) error {
 	if m.err != nil {
 		return m.err
 	}
@@ -478,12 +478,12 @@ func TestEmailAuthMailFailureIs502AndKeepsExistingCode(t *testing.T) {
 // 실제 EmailService는 설정이 없으면 외부 호출 없이 ErrMailNotConfigured를 반환한다.
 func TestEmailServiceSendVerificationCodeNotConfigured(t *testing.T) {
 	svc := NewEmail(EmailConfig{})
-	if err := svc.SendVerificationCode("a@example.com", "123456"); !errors.Is(err, ErrMailNotConfigured) {
+	if err := svc.SendVerificationCode("a@example.com", "123456", EmailPurposeRegister); !errors.Is(err, ErrMailNotConfigured) {
 		t.Fatalf("ErrMailNotConfigured 기대: %v", err)
 	}
 	// NODE_ENV=development여도 성공을 위장하지 않는다.
 	t.Setenv("NODE_ENV", "development")
-	if err := svc.SendVerificationCode("a@example.com", "123456"); !errors.Is(err, ErrMailNotConfigured) {
+	if err := svc.SendVerificationCode("a@example.com", "123456", EmailPurposeRegister); !errors.Is(err, ErrMailNotConfigured) {
 		t.Fatalf("개발환경에서도 실패해야 함: %v", err)
 	}
 }
