@@ -69,3 +69,31 @@ func TestLoadRouteAuthMode(t *testing.T) {
 		t.Errorf("enforce Load 실패: %v", err)
 	}
 }
+
+// G6 위치 설정: 기본값(inherit, 업로드 토큰 불요, 방장·리더 장소 관리 허용)과 잘못된 값의 시작 실패.
+func TestLoadLocationSettings(t *testing.T) {
+	t.Setenv("MYSQL_USER", "u")
+	t.Setenv("MYSQL_PASSWORD", "p")
+	t.Setenv("JWT_SECRET_KEY", "test-secret")
+
+	c, err := Load("")
+	if err != nil {
+		t.Fatalf("기본 Load 실패: %v", err)
+	}
+	if m, _ := c.LocationAuthMode(); m != "inherit" || c.LocationWriteRequireToken || !c.LocationPlaceLeaderManage {
+		t.Errorf("기본값 불일치: %q %v %v", m, c.LocationWriteRequireToken, c.LocationPlaceLeaderManage)
+	}
+	for _, bad := range []string{"enforced", "off", ""} {
+		t.Setenv("LOCATION_AUTH_MODE", bad)
+		if _, err := Load(""); err == nil {
+			t.Errorf("LOCATION_AUTH_MODE=%q 는 Load 에러여야 함", bad)
+		}
+	}
+	t.Setenv("LOCATION_AUTH_MODE", "enforce")
+	t.Setenv("LOCATION_WRITE_REQUIRE_TOKEN", "true")
+	t.Setenv("LOCATION_PLACE_LEADER_MANAGE", "false")
+	c, err = Load("")
+	if err != nil || !c.LocationWriteRequireToken || c.LocationPlaceLeaderManage {
+		t.Errorf("설정 읽기 실패: %v", err)
+	}
+}

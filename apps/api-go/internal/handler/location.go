@@ -11,6 +11,31 @@ import (
 
 type LocationHandler struct {
 	svc *service.LocationService
+	// guard: 내 장소 조회·변경 인가(nil이면 500, fail-closed).
+	guard *LocationGuard
+}
+
+// SetGuard는 위치 인가 가드를 주입한다.
+func (h *LocationHandler) SetGuard(g *LocationGuard) { h.guard = g }
+
+// manageExisting은 기존 장소를 수정·삭제·알림 변경하려는 요청을 인가한다.
+// 장소가 없으면 통과시켜 핸들러의 기존 404 흐름을 유지한다. 토큰이 없는 요청은 신원을 알 수 없어 건너뛴다.
+func (h *LocationHandler) manageExisting(c *gin.Context, id int) bool {
+	if !h.guard.ready(c) {
+		return false
+	}
+	if !h.guard.Viewer(c).Authenticated {
+		return true
+	}
+	owner, found, err := h.svc.LocationOwner(id)
+	if err != nil {
+		writeJSON(c, http.StatusInternalServerError, gin.H{"detail": "Internal Server Error"})
+		return false
+	}
+	if !found {
+		return true
+	}
+	return h.guard.ManagePlace(c, owner)
 }
 
 func NewLocation(svc *service.LocationService) *LocationHandler {
@@ -19,6 +44,10 @@ func NewLocation(svc *service.LocationService) *LocationHandler {
 
 // List는 GET /api/v1/locations/ — skip(0)/limit(100), 필터 없음.
 func (h *LocationHandler) List(c *gin.Context) {
+	// 전 회원 장소 덤프: 토큰이 있는 요청에는 열지 않는다(앱 미사용).
+	if !h.guard.NoBulkDump(c) {
+		return
+	}
 	errs := make([]valErr, 0)
 	skip := parseIntQuery(c, &errs, "skip", 0, false, 0, false, 0)
 	limit := parseIntQuery(c, &errs, "limit", 100, false, 0, false, 0)
@@ -51,6 +80,13 @@ func (h *LocationHandler) Get(c *gin.Context) {
 		writeJSON(c, http.StatusNotFound, gin.H{"detail": "Location not found"})
 		return
 	}
+	owner := 0
+	if res.MtIdx != nil {
+		owner = *res.MtIdx
+	}
+	if !h.guard.ViewMember(c, owner) {
+		return
+	}
 	writeJSON(c, http.StatusOK, res)
 }
 
@@ -71,6 +107,9 @@ func (h *LocationHandler) byMember(c *gin.Context, loc string) {
 		pathIntErr(c, loc, idStr)
 		return
 	}
+	if !h.guard.ViewMember(c, id) {
+		return
+	}
 	res, err := h.svc.MemberLocations(id)
 	if err != nil {
 		writeJSON(c, http.StatusInternalServerError, gin.H{"detail": "Internal Server Error"})
@@ -85,6 +124,9 @@ func (h *LocationHandler) GroupDetail(c *gin.Context) {
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		pathIntErr(c, "group_detail_id", idStr)
+		return
+	}
+	if !h.guard.ViewGroupDetail(c, id) {
 		return
 	}
 	res, err := h.svc.GroupDetailLocations(id)

@@ -9,7 +9,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/bluemusk/smap_next_go/internal/auth"
 	"github.com/bluemusk/smap_next_go/internal/dto"
 	"github.com/bluemusk/smap_next_go/internal/service"
 )
@@ -17,18 +16,18 @@ import (
 // --- 순서 고정 응답 struct(기존 dto에 없는 act 전용) ---
 
 type mllMembersWithLogsResult struct {
-	Result string             `json:"result"`
-	Data   mllMemberIDsWrap   `json:"data"`
+	Result string           `json:"result"`
+	Data   mllMemberIDsWrap `json:"data"`
 }
 type mllMemberIDsWrap struct {
 	MemberIDs []int `json:"member_ids"`
 }
 type mllDailyPathResult struct {
-	Result string             `json:"result"`
-	Data   dto.DailyPathData  `json:"data"`
+	Result string            `json:"result"`
+	Data   dto.DailyPathData `json:"data"`
 }
 type mllSingleLogResult struct {
-	Result string             `json:"result"`
+	Result string              `json:"result"`
 	Data   dto.LocationLogDict `json:"data"`
 }
 type mllDeleteResult struct {
@@ -67,6 +66,9 @@ func (h *LocationLogHandler) MemberLocationLogsPost(c *gin.Context) {
 		if !ok {
 			return
 		}
+		if !h.guard.ViewMember(c, mt) {
+			return
+		}
 		logs, err := h.svc.MemberLogs(mt, mllStr(body, "start_date"), mllStr(body, "end_date"), mllIntDef(body, "limit", 100), mllIntDef(body, "offset", 0))
 		if err != nil {
 			mll500(c, err)
@@ -79,6 +81,9 @@ func (h *LocationLogHandler) MemberLocationLogsPost(c *gin.Context) {
 		if !ok {
 			return
 		}
+		if !h.guard.ViewMember(c, mt) {
+			return
+		}
 		sum, err := h.svc.SummaryByRange(mt, mllStr(body, "start_date"), mllStr(body, "end_date"))
 		if err != nil {
 			mll500(c, err)
@@ -89,6 +94,9 @@ func (h *LocationLogHandler) MemberLocationLogsPost(c *gin.Context) {
 	case "get_location_path":
 		mt, ok := mllReqInt(c, body, "mt_idx")
 		if !ok {
+			return
+		}
+		if !h.guard.ViewMember(c, mt) {
 			return
 		}
 		p, err := h.svc.Path(mt, mllStr(body, "start_date"), mllStr(body, "end_date"))
@@ -109,7 +117,15 @@ func (h *LocationLogHandler) MemberLocationLogsPost(c *gin.Context) {
 		if !ok {
 			return
 		}
-		found, sok := h.svc.DeleteLog(mt)
+		// 앱이 쓰지 않는 파괴적 쓰기: 유효 토큰 없이는 항상 401, 기록 소유자만 삭제.
+		if !h.guard.RequireToken(c) {
+			return
+		}
+		found, sok, forbidden := h.svc.DeleteLog(h.guard.Viewer(c), mt)
+		if forbidden {
+			writeJSON(c, http.StatusForbidden, gin.H{"detail": "접근 권한이 없습니다."})
+			return
+		}
 		if !sok || !found {
 			// Python: 404 raise가 act except에 흡수돼 500-wrap. str(e)="404: Location log not found".
 			writeJSON(c, http.StatusInternalServerError, gin.H{"detail": "404: Location log not found"})
@@ -122,16 +138,34 @@ func (h *LocationLogHandler) MemberLocationLogsPost(c *gin.Context) {
 		if !ok {
 			return
 		}
+		// 전 회원 번호 덤프 방지: 토큰이 있으면 group_id(또는 sgt_idx) 그룹의 현재 멤버만, 그룹 지정이 없으면 403.
+		gid, hasGid := mllAnyInt(mllFirst(body["group_id"], body["sgt_idx"]))
+		if h.guard.Viewer(c).Authenticated && !hasGid {
+			writeJSON(c, http.StatusForbidden, gin.H{"detail": "접근 권한이 없습니다."})
+			return
+		}
+		if hasGid && !h.guard.ViewGroup(c, gid) {
+			return
+		}
 		ids, err := h.svc.MembersWithLogs(date)
 		if err != nil {
 			mll500(c, err)
 			return
+		}
+		if hasGid {
+			var fok bool
+			if ids, fok = h.guard.FilterGroupMembers(c, gid, ids); !fok {
+				return
+			}
 		}
 		writeJSON(c, http.StatusOK, mllMembersWithLogsResult{Result: "Y", Data: mllMemberIDsWrap{MemberIDs: ids}})
 
 	case "get_daily_location_logs":
 		mt, ok := mllReqInt(c, body, "mt_idx")
 		if !ok {
+			return
+		}
+		if !h.guard.ViewMember(c, mt) {
 			return
 		}
 		date, ok := mllReqStr(c, body, "date", "date is required (YYYY-MM-DD format)")
@@ -150,6 +184,9 @@ func (h *LocationLogHandler) MemberLocationLogsPost(c *gin.Context) {
 		if !ok {
 			return
 		}
+		if !h.guard.ViewMember(c, mt) {
+			return
+		}
 		date, ok := mllReqStr(c, body, "date", "date is required (YYYY-MM-DD format)")
 		if !ok {
 			return
@@ -166,6 +203,9 @@ func (h *LocationLogHandler) MemberLocationLogsPost(c *gin.Context) {
 		if !ok {
 			return
 		}
+		if !h.guard.ViewMember(c, mt) {
+			return
+		}
 		date, ok := mllReqStr(c, body, "date", "date is required (YYYY-MM-DD format)")
 		if !ok {
 			return
@@ -180,6 +220,9 @@ func (h *LocationLogHandler) MemberLocationLogsPost(c *gin.Context) {
 	case "get_daily_summary_by_range", "get_daily_summary":
 		mt, ok := mllReqInt(c, body, "mt_idx")
 		if !ok {
+			return
+		}
+		if !h.guard.ViewMember(c, mt) {
 			return
 		}
 		start, ok := mllReqStr(c, body, "start_date", "start_date is required (YYYY-MM-DD format)")
@@ -202,6 +245,9 @@ func (h *LocationLogHandler) MemberLocationLogsPost(c *gin.Context) {
 		if !ok {
 			return
 		}
+		if !h.guard.ViewMember(c, mt) {
+			return
+		}
 		date, ok := mllReqStr(c, body, "date", "date is required (YYYY-MM-DD format)")
 		if !ok {
 			return
@@ -216,6 +262,9 @@ func (h *LocationLogHandler) MemberLocationLogsPost(c *gin.Context) {
 	case "get_map_markers":
 		mt, ok := mllReqInt(c, body, "mt_idx")
 		if !ok {
+			return
+		}
+		if !h.guard.ViewMember(c, mt) {
 			return
 		}
 		date, ok := mllReqStr(c, body, "date", "date is required (YYYY-MM-DD format)")
@@ -234,6 +283,9 @@ func (h *LocationLogHandler) MemberLocationLogsPost(c *gin.Context) {
 		if !ok {
 			return
 		}
+		if !h.guard.ViewMember(c, mt) {
+			return
+		}
 		date, ok := mllReqStr(c, body, "date", "date is required (YYYY-MM-DD format)")
 		if !ok {
 			return
@@ -248,8 +300,18 @@ func (h *LocationLogHandler) MemberLocationLogsPost(c *gin.Context) {
 
 // actCreateLog는 create_location_log act(토큰/body mt_idx, 동의, 배치/단건).
 func (h *LocationLogHandler) actCreateLog(c *gin.Context, body map[string]interface{}) {
-	tokenMt, tokOK := auth.ParseOptionalUserID(c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
+	// 토큰의 회원(미들웨어가 검증)이 기록 주체다. 본문 mt_idx가 다르면 403.
+	// 유효 토큰이 없을 때는 LOCATION_WRITE_REQUIRE_TOKEN에 따라 401 또는 (계측 후) 기존대로 본문 mt_idx를 쓴다.
+	if !h.guard.UploadTokenGate(c) {
+		return
+	}
+	viewer := h.guard.Viewer(c)
+	tokenMt, tokOK := viewer.MtIdx, viewer.Authenticated
 	bodyMt, bodyHas := mllAnyInt(body["mt_idx"])
+	if tokOK && bodyHas && bodyMt != tokenMt {
+		writeJSON(c, http.StatusForbidden, gin.H{"detail": "접근 권한이 없습니다."})
+		return
+	}
 	if !tokOK && !bodyHas {
 		// 토큰 에러 + body mt_idx 없음 → 401. (no-header 메시지로 대표 — 토큰 검증 실패 상세는 엣지)
 		writeJSON(c, http.StatusUnauthorized, gin.H{"detail": "Authorization 헤더가 필요합니다 (Bearer 토큰)."})
@@ -276,6 +338,10 @@ func (h *LocationLogHandler) actCreateLog(c *gin.Context, body map[string]interf
 		errs := make([]mllBatchErr, 0)
 		for idx, it := range arr {
 			item, _ := it.(map[string]interface{})
+			if im, has := mllAnyInt(item["mt_idx"]); tokOK && has && im != finalMt {
+				writeJSON(c, http.StatusForbidden, gin.H{"detail": "접근 권한이 없습니다."})
+				return
+			}
 			in, perr := mllItemToInput(finalMt, item)
 			if perr != "" {
 				errs = append(errs, mllBatchErr{Index: idx, Error: perr})
@@ -319,6 +385,10 @@ func (h *LocationLogHandler) actUpdateLog(c *gin.Context, body map[string]interf
 		writeJSON(c, http.StatusInternalServerError, gin.H{"detail": "400: mlt_idx is required"})
 		return
 	}
+	// 앱이 쓰지 않는 쓰기: 유효 토큰 없이는 항상 401, 기록 소유자만 수정, 소유자(mt_idx) 변경은 금지.
+	if !h.guard.RequireToken(c) {
+		return
+	}
 	present := map[string]interface{}{}
 	for k, v := range body {
 		if k == "act" || k == "mlt_idx" {
@@ -326,7 +396,11 @@ func (h *LocationLogHandler) actUpdateLog(c *gin.Context, body map[string]interf
 		}
 		present[k] = v // MemberLocationLogUpdate 매핑은 단순 setattr — 검증 최소(컬럼 키만 사용됨)
 	}
-	resp, found, sok := h.svc.UpdateLog(mt, mllFilterLogCols(present))
+	resp, found, sok, forbidden := h.svc.UpdateLog(h.guard.Viewer(c), mt, mllFilterLogCols(present))
+	if forbidden {
+		writeJSON(c, http.StatusForbidden, gin.H{"detail": "접근 권한이 없습니다."})
+		return
+	}
 	if !sok || !found {
 		// update act는 except HTTPException 없이 except Exception만 → 404 raise가 500 "404: ..."로 wrap.
 		writeJSON(c, http.StatusInternalServerError, gin.H{"detail": "404: Location log not found"})

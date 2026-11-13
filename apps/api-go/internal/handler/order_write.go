@@ -11,7 +11,7 @@ import (
 
 // orderUserID는 Python deps.get_current_user_id(수동 추출): 없으면/실패면 nil → 401 "인증이 필요합니다"(마침표·헤더 없음).
 func (h *OrderHandler) orderUserID(c *gin.Context) (int, bool) {
-	uid, ok := auth.ParseOptionalUserID(c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
+	uid, ok := auth.ParseOptionalUserIDChecked(h.revocation, nil, c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
 	if !ok {
 		writeJSON(c, http.StatusUnauthorized, gin.H{"detail": "인증이 필요합니다"})
 		return 0, false

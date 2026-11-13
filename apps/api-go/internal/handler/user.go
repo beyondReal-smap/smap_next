@@ -13,8 +13,9 @@ import (
 )
 
 type UserHandler struct {
-	svc *service.UserService
-	cfg *config.Config
+	revocable // 비밀번호 변경 이전 토큰 무효 기준(SetRevocation)
+	svc       *service.UserService
+	cfg       *config.Config
 }
 
 func NewUser(svc *service.UserService, cfg *config.Config) *UserHandler {
@@ -35,7 +36,7 @@ func (h *UserHandler) Me(c *gin.Context) {
 		writeJSON(c, http.StatusUnauthorized, gin.H{"detail": "Not authenticated"})
 		return
 	}
-	mtID, ok := auth.ParseUserMtID(authHeader, h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
+	mtID, ok := auth.ParseUserMtIDChecked(h.revocation, nil, authHeader, h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
 	if !ok {
 		credentialsException(c)
 		return

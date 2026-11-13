@@ -17,8 +17,15 @@ import (
 //
 // 통과 시 user_id를 gin 컨텍스트에 저장한다.
 func RequireAdmin(cfg *config.Config, memberRepo *repository.MemberRepository) gin.HandlerFunc {
+	return RequireAdminChecked(cfg, memberRepo, nil)
+}
+
+// RequireAdminChecked는 RequireAdmin에 "비밀번호 변경 이전에 발급된 토큰 무효" 기준을 더한 것이다.
+// 무효 토큰은 서명·만료 실패와 같은 401 "인증이 필요합니다."로 처리한다. checker가 nil이면 RequireAdmin과 같다.
+// Redis 조회 실패는 통과 + 경고 로그(auth.AccessRevoked 정책).
+func RequireAdminChecked(cfg *config.Config, memberRepo *repository.MemberRepository, checker auth.AccessRevocationChecker) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		uid, ok := auth.ParseOptionalUserID(c.GetHeader("Authorization"), cfg.JWTSecretKey, cfg.JWTAlgorithm)
+		uid, ok := auth.ParseOptionalUserIDChecked(checker, nil, c.GetHeader("Authorization"), cfg.JWTSecretKey, cfg.JWTAlgorithm)
 		if !ok {
 			c.Header("WWW-Authenticate", "Bearer")
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"detail": "인증이 필요합니다."})

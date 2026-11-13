@@ -11,7 +11,12 @@ import (
 
 type GroupMemberHandler struct {
 	svc *service.GroupMemberService
+	// guard: 그룹 멤버 위치 목록은 그 그룹의 현재 멤버에게만 연다(nil이면 500, fail-closed).
+	guard *LocationGuard
 }
+
+// SetGuard는 위치 인가 가드를 주입한다.
+func (h *GroupMemberHandler) SetGuard(g *LocationGuard) { h.guard = g }
 
 func NewGroupMember(svc *service.GroupMemberService) *GroupMemberHandler {
 	return &GroupMemberHandler{svc: svc}
@@ -24,6 +29,9 @@ func (h *GroupMemberHandler) Member(c *gin.Context) {
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		pathIntErr(c, "group_id", idStr)
+		return
+	}
+	if !h.guard.ViewGroup(c, id) {
 		return
 	}
 	res, err := h.svc.GroupMembers(id)

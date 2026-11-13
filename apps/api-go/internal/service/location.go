@@ -88,6 +88,21 @@ func toLocationResponses(items []model.Location) []dto.LocationResponse {
 	return out
 }
 
+// LocationOwner는 장소의 소유자 회원 번호를 돌려준다. 장소가 없으면 found=false, 소유자 미지정이면 0.
+func (s *LocationService) LocationOwner(id int) (owner int, found bool, err error) {
+	l, err := s.repo.GetByID(id)
+	if err != nil {
+		return 0, false, err
+	}
+	if l == nil {
+		return 0, false, nil
+	}
+	if l.MtIdx == nil {
+		return 0, true, nil
+	}
+	return *l.MtIdx, true, nil
+}
+
 // ListLocations는 전체 목록.
 func (s *LocationService) ListLocations(skip, limit int) ([]dto.LocationResponse, error) {
 	items, err := s.repo.List(skip, limit)

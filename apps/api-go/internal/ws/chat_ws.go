@@ -43,7 +43,12 @@ type ChatWS struct {
 	fcm fcm.Sender
 	cfg *config.Config
 	log *slog.Logger
+	// revocation: 비밀번호 변경 이전에 발급된 토큰의 핸드셰이크를 거부한다(SetRevocation). nil이면 보지 않는다.
+	revocation auth.AccessRevocationChecker
 }
+
+// SetRevocation은 구 access token 무효 기준 조회기를 주입한다.
+func (w *ChatWS) SetRevocation(r auth.AccessRevocationChecker) { w.revocation = r }
 
 func NewChatWS(hub *Hub, svc chatWSService, sender fcm.Sender, cfg *config.Config, log *slog.Logger) *ChatWS {
 	if log == nil {
@@ -82,7 +87,7 @@ func (w *ChatWS) Handle(c *gin.Context) {
 // authToken은 Python get_mt_idx_from_token: "Bearer " 제거 후 mt_idx 디코드.
 func (w *ChatWS) authToken(raw string) (int, bool) {
 	token := strings.ReplaceAll(raw, "Bearer ", "")
-	return auth.ParseWSToken(token, w.cfg.JWTSecretKey, w.cfg.JWTAlgorithm)
+	return auth.ParseWSTokenChecked(w.revocation, w.log, token, w.cfg.JWTSecretKey, w.cfg.JWTAlgorithm)
 }
 
 // readPump는 수신 루프다. 연결 종료 시 Hub에서 정리한다(Python disconnect).

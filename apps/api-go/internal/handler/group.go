@@ -15,9 +15,10 @@ import (
 )
 
 type GroupHandler struct {
-	svc  *service.GroupService
-	wsvc *service.GroupWriteService
-	cfg  *config.Config
+	revocable // 비밀번호 변경 이전 토큰 무효 기준(SetRevocation)
+	svc       *service.GroupService
+	wsvc      *service.GroupWriteService
+	cfg       *config.Config
 }
 
 func NewGroup(svc *service.GroupService, wsvc *service.GroupWriteService, cfg *config.Config) *GroupHandler {
@@ -38,7 +39,7 @@ func coerceJSONString(v interface{}) (string, bool) {
 // requireUserID는 Python deps.get_required_user_id를 적용한다.
 // 유효 토큰이 없으면 401 detail "인증이 필요합니다." + WWW-Authenticate: Bearer 응답 후 (0, false).
 func (h *GroupHandler) requireUserID(c *gin.Context) (int, bool) {
-	uid, ok := auth.ParseOptionalUserID(c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
+	uid, ok := auth.ParseOptionalUserIDChecked(h.revocation, nil, c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
 	if !ok {
 		c.Header("WWW-Authenticate", "Bearer")
 		writeJSON(c, http.StatusUnauthorized, gin.H{"detail": "인증이 필요합니다."})
@@ -157,7 +158,7 @@ func (h *GroupHandler) ByCode(c *gin.Context) {
 // CurrentUserSummary는 GET /api/v1/groups/current-user/summary (Python get_current_user_group_summary).
 // get_required_user_id: 미인증 시 401 detail "인증이 필요합니다."(마침표 포함). 무파라미터.
 func (h *GroupHandler) CurrentUserSummary(c *gin.Context) {
-	uid, ok := auth.ParseOptionalUserID(c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
+	uid, ok := auth.ParseOptionalUserIDChecked(h.revocation, nil, c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
 	if !ok {
 		writeJSON(c, http.StatusUnauthorized, gin.H{"detail": "인증이 필요합니다."})
 		return
@@ -173,7 +174,7 @@ func (h *GroupHandler) CurrentUserSummary(c *gin.Context) {
 // CurrentUser는 GET /api/v1/groups/current-user (Python get_current_user_groups).
 // get_required_user_id: 미인증 시 401 "인증이 필요합니다."(마침표). List[dict] 반환.
 func (h *GroupHandler) CurrentUser(c *gin.Context) {
-	uid, ok := auth.ParseOptionalUserID(c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
+	uid, ok := auth.ParseOptionalUserIDChecked(h.revocation, nil, c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
 	if !ok {
 		writeJSON(c, http.StatusUnauthorized, gin.H{"detail": "인증이 필요합니다."})
 		return

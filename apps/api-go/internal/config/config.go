@@ -96,6 +96,16 @@ type Config struct {
 	// warn 계측 카운터를 요약 로그로 내보내는 주기(초).
 	RouteAuthSummaryIntervalSeconds int `envconfig:"ROUTE_AUTH_SUMMARY_INTERVAL_SECONDS" default:"60"`
 
+	// --- 위치 정보 보호(G6) ---
+	// LOCATION_AUTH_MODE: inherit | warn | enforce. 위치 라우트의 무토큰 요청 처리. inherit이면 ROUTE_AUTH_MODE를 따른다.
+	// 토큰이 있는 요청에는 모드와 무관하게 항상 소유권·멤버십 검사(403)를 한다. 잘못된 값은 Load에서 에러.
+	LocationAuthModeRaw string `envconfig:"LOCATION_AUTH_MODE" default:"inherit"`
+	// 켜면 위치 업로드(create_location_log)에 유효한 토큰이 없을 때 401. 꺼져 있으면 기존대로 본문 mt_idx로 기록하되 계측한다.
+	LocationWriteRequireToken bool `envconfig:"LOCATION_WRITE_REQUIRE_TOKEN" default:"false"`
+	// 켜면(기본, 구버전 앱 호환) 내 장소 생성·수정·삭제·알림 변경을 소유자 외에 같은 그룹의 방장
+	// (리더는 방장이 아닌 대상만)에게도 허용한다. 끄면 소유자 본인만. 구버전 앱이 방장·리더 대리 편집을 한다.
+	LocationPlaceLeaderManage bool `envconfig:"LOCATION_PLACE_LEADER_MANAGE" default:"true"`
+
 	// --- 소셜 로그인 공급자 토큰 검증(G5) ---
 	// SOCIAL_TOKEN_VERIFICATION: off | when_present | required. 기본 when_present
 	// (토큰이 있으면 검증·실패 시 거부, 없으면 기존 동작 + 경고 계측). 잘못된 값은 Load에서 에러.
@@ -247,6 +257,9 @@ func Load(envPath string) (*Config, error) {
 	if err := c.validateRouteAuth(); err != nil {
 		return nil, err
 	}
+	if _, err := auth.ParseLocationAuthMode(c.LocationAuthModeRaw); err != nil {
+		return nil, fmt.Errorf("config load: %w", err)
+	}
 	if err := c.validateSocial(); err != nil {
 		return nil, err
 	}
@@ -259,6 +272,11 @@ func Load(envPath string) (*Config, error) {
 // RouteAuthMode는 검증된 ROUTE_AUTH_MODE를 반환한다. Load가 값을 검증하므로 정상 경로에선 에러가 없다.
 func (c *Config) RouteAuthMode() (auth.RouteMode, error) {
 	return auth.ParseRouteMode(c.RouteAuthModeRaw)
+}
+
+// LocationAuthMode는 검증된 LOCATION_AUTH_MODE를 반환한다.
+func (c *Config) LocationAuthMode() (auth.LocationAuthMode, error) {
+	return auth.ParseLocationAuthMode(c.LocationAuthModeRaw)
 }
 
 // validateRouteAuth는 인증 미들웨어 설정을 시작 시 검증한다(잘못된 값은 명확히 실패).

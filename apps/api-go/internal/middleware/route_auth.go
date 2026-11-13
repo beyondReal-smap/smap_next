@@ -54,6 +54,8 @@ type RouteAuthOptions struct {
 	// Revocation은 비밀번호 변경 후 구 access token 무효화 기준(nil이면 비교하지 않는다).
 	// 조회 실패(Redis 장애)는 통과 + 경고 로그다.
 	Revocation auth.AccessRevocationChecker
+	// Scope는 요약 로그에 scope 필드로 찍는 이 인스턴스의 이름이다(예: "location"). 비면 필드를 생략한다.
+	Scope string
 	// Now는 캐시 만료 판정용 시계다. nil이면 time.Now(). 테스트에서 주입한다.
 	Now func() time.Time
 }
@@ -304,6 +306,10 @@ func clientLabel(ua string) string {
 	return b.String()
 }
 
+// RecordEvent는 핸들러가 판단한 추가 계측(예: 위치 업로드 무토큰 통과)을 같은 카운터에 올린다.
+// kind·action은 호출 측 상수이며 토큰·회원 번호·좌표를 넘기면 안 된다.
+func (r *RouteAuth) RecordEvent(c *gin.Context, kind, action string) { r.record(c, kind, action) }
+
 // record는 계측 카운터를 올린다. 토큰·회원 번호·쿼리 값은 어디에도 남기지 않는다.
 func (r *RouteAuth) record(c *gin.Context, kind, action string) {
 	k := summaryKey{
@@ -351,7 +357,12 @@ func (r *RouteAuth) flushSummary(window time.Duration) {
 		return rows[i].k.method < rows[j].k.method
 	})
 	for _, rw := range rows {
+		scope := r.opts.Scope
+		if scope == "" {
+			scope = "default"
+		}
 		r.logger.Warn("route_auth_summary",
+			slog.String("scope", scope),
 			slog.String("mode", string(r.opts.Mode)),
 			slog.String("route", rw.k.route),
 			slog.String("method", rw.k.method),

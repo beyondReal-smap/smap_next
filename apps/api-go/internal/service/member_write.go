@@ -39,7 +39,11 @@ type MemberWriteService struct {
 	policy  auth.PasswordPolicy
 	revoker accessRevoker // 비밀번호 변경·탈퇴 시 구 access token 무효 기준(SetAccessRevoker)
 	logger  *slog.Logger
+	pwGuard *PasswordAttemptGuard // verify-password 실패 한도(SetPasswordGuard). nil이면 제한 없음.
 }
+
+// SetPasswordGuard는 verify-password 실패 횟수 제한을 주입한다.
+func (s *MemberWriteService) SetPasswordGuard(g *PasswordAttemptGuard) { s.pwGuard = g }
 
 // SetAccessRevoker는 구 access token 무효 기준 기록기를 주입한다.
 func (s *MemberWriteService) SetAccessRevoker(r accessRevoker, l *slog.Logger) {
@@ -263,6 +267,20 @@ func (s *MemberWriteService) VerifyPassword(uid int, currentPwd string) bool {
 		return false
 	}
 	return auth.VerifyPassword(currentPwd, *u.MtPwd)
+}
+
+// CheckPassword는 verify-password용이다: 실패 한도 초과면 비밀번호를 비교하지 않고 429 거부를 돌려준다.
+// 실패하면 카운터를 올리고 성공하면 지운다. Redis 오류는 로그인과 같이 허용 + 경고 로그(PasswordAttemptGuard).
+func (s *MemberWriteService) CheckPassword(ctx context.Context, uid int, currentPwd string) (bool, *AuthRejection) {
+	if rej := s.pwGuard.Blocked(ctx, uid); rej != nil {
+		return false, rej
+	}
+	if s.VerifyPassword(uid, currentPwd) {
+		s.pwGuard.Clear(ctx, uid)
+		return true, nil
+	}
+	s.pwGuard.RecordFailure(ctx, uid)
+	return false, nil
 }
 
 // ChangePassword는 Python crud_auth.change_user_password를 이식한다(정책검증+bcrypt → mt_pwd/mt_udate).

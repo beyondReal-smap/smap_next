@@ -21,7 +21,12 @@ type MemberWriteHandler struct {
 	svc        *service.MemberWriteService
 	cfg        *config.Config
 	revocation auth.AccessRevocationChecker
+	// guard: PUT /members/:id, PATCH /members/:id/location(회원 위치 덮어쓰기)는 토큰 회원 본인만(nil이면 500).
+	guard *LocationGuard
 }
+
+// SetGuard는 위치 인가 가드를 주입한다.
+func (h *MemberWriteHandler) SetGuard(g *LocationGuard) { h.guard = g }
 
 // SetRevocation은 구 access token 무효 기준 조회기를 주입한다(비밀번호 변경 이전 토큰 거부).
 func (h *MemberWriteHandler) SetRevocation(r auth.AccessRevocationChecker) { h.revocation = r }
@@ -31,16 +36,8 @@ func NewMemberWrite(svc *service.MemberWriteService, cfg *config.Config) *Member
 }
 
 func (h *MemberWriteHandler) optUID(c *gin.Context) (int, bool) {
-	uid, ok := auth.ParseOptionalUserID(c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
-	if !ok {
-		return 0, false
-	}
 	// 비밀번호 변경 이전에 발급된 토큰은 인증 실패로 취급한다(Redis 장애 시에는 통과 + 경고 로그).
-	if ident, state := auth.VerifyAccessTokenIdentity(c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm); state == auth.TokenValid &&
-		auth.AccessRevoked(h.revocation, nil, ident) {
-		return 0, false
-	}
-	return uid, true
+	return auth.ParseOptionalUserIDChecked(h.revocation, nil, c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
 }
 
 // ======================= 비밀번호 (verify/change) =======================
@@ -59,7 +56,12 @@ func (h *MemberWriteHandler) VerifyPassword(c *gin.Context) {
 		writeJSON(c, http.StatusOK, dto.MemberResultMsg{Result: "N", Message: "인증이 필요합니다.", Success: false})
 		return
 	}
-	if h.svc.VerifyPassword(uid, cur) {
+	ok, rej := h.svc.CheckPassword(c.Request.Context(), uid, cur)
+	if rej != nil {
+		writeAuthRejection(c, rej) // 실패 한도 초과: 429 + Retry-After, 로그인과 같은 {"detail": ...} 형식
+		return
+	}
+	if ok {
 		writeJSON(c, http.StatusOK, dto.MemberResultMsg{Result: "Y", Message: "비밀번호가 확인되었습니다.", Success: true})
 		return
 	}
@@ -339,6 +341,10 @@ func (h *MemberWriteHandler) Update(c *gin.Context) {
 		pathIntErr(c, "member_id", idStr)
 		return
 	}
+	// 앱이 호출하지 않는 경로(앱은 update-profile 사용). 위경도 덮어쓰기(P0-5)를 막기 위해 본인 토큰 필수.
+	if !h.guard.RequireToken(c) || !h.guard.Self(c, id) {
+		return
+	}
 	present, errs := parseMemberUpdate(c)
 	if len(errs) > 0 {
 		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
@@ -382,6 +388,10 @@ func (h *MemberWriteHandler) UpdateLocation(c *gin.Context) {
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		pathIntErr(c, "member_id", idStr)
+		return
+	}
+	// 앱이 호출하지 않는 경로. member_t 현재 위치는 토큰 회원 본인만 갱신한다(위치 업로드 경로로 일원화).
+	if !h.guard.RequireToken(c) || !h.guard.Self(c, id) {
 		return
 	}
 	var errs []valErr

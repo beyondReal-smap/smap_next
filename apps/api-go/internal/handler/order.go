@@ -12,8 +12,9 @@ import (
 )
 
 type OrderHandler struct {
-	svc *service.OrderService
-	cfg *config.Config
+	revocable // 비밀번호 변경 이전 토큰 무효 기준(SetRevocation)
+	svc       *service.OrderService
+	cfg       *config.Config
 }
 
 func NewOrder(svc *service.OrderService, cfg *config.Config) *OrderHandler {
@@ -29,7 +30,7 @@ func (h *OrderHandler) Summary(c *gin.Context) {
 		pathIntErr(c, "member_id", idStr)
 		return
 	}
-	uid, ok := auth.ParseOptionalUserID(c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
+	uid, ok := auth.ParseOptionalUserIDChecked(h.revocation, nil, c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
 	if !ok {
 		writeJSON(c, http.StatusUnauthorized, gin.H{"detail": "인증이 필요합니다"})
 		return
@@ -81,7 +82,7 @@ func (h *OrderHandler) MemberOrders(c *gin.Context) {
 	}
 
 	// 인증/소유권은 쿼리검증(422) 통과 후, svc 호출 앞에서 검사한다(Python 순서).
-	uid, ok := auth.ParseOptionalUserID(c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
+	uid, ok := auth.ParseOptionalUserIDChecked(h.revocation, nil, c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
 	if !ok {
 		writeJSON(c, http.StatusUnauthorized, gin.H{"detail": "인증이 필요합니다"})
 		return
@@ -108,7 +109,7 @@ func (h *OrderHandler) Detail(c *gin.Context) {
 		pathIntErr(c, "order_id", idStr)
 		return
 	}
-	uid, ok := auth.ParseOptionalUserID(c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
+	uid, ok := auth.ParseOptionalUserIDChecked(h.revocation, nil, c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
 	if !ok {
 		writeJSON(c, http.StatusUnauthorized, gin.H{"detail": "인증이 필요합니다"})
 		return
@@ -137,7 +138,7 @@ func (h *OrderHandler) Detail(c *gin.Context) {
 // order_code는 str이라 422 없음. 그 외 순서는 Detail과 동일(401→500→404→403→500→200).
 func (h *OrderHandler) ByCode(c *gin.Context) {
 	code := c.Param("order_code")
-	uid, ok := auth.ParseOptionalUserID(c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
+	uid, ok := auth.ParseOptionalUserIDChecked(h.revocation, nil, c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
 	if !ok {
 		writeJSON(c, http.StatusUnauthorized, gin.H{"detail": "인증이 필요합니다"})
 		return
@@ -178,7 +179,7 @@ func (h *OrderHandler) Recent(c *gin.Context) {
 		return
 	}
 	// 인증/소유권은 쿼리검증(422) 통과 후, svc 호출 앞에서 검사한다(Python 순서).
-	uid, ok := auth.ParseOptionalUserID(c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
+	uid, ok := auth.ParseOptionalUserIDChecked(h.revocation, nil, c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
 	if !ok {
 		writeJSON(c, http.StatusUnauthorized, gin.H{"detail": "인증이 필요합니다"})
 		return

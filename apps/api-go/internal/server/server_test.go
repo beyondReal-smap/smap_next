@@ -176,7 +176,6 @@ func newEnv(t *testing.T, mode auth.RouteMode) *testEnv {
 	userSvc.SetBcryptCost(4)
 	sender := &fakeSender{}
 	sendone := handler.NewFCMSendone(service.NewPushSend(&fakeSendMembers{tokens: 3}, fakeLogWriter{}, sender))
-	sendone.SetAdminGate(stubAdmin)
 
 	r := New(cfg, logger, Deps{
 		AppVersion:  handler.NewAppVersion(service.NewAppVersion("3.1.0", "3.1.0")),
@@ -222,6 +221,7 @@ var adminOnlyRoutes = []struct{ method, path, body string }{
 	{"PUT", "/users/77", `{"mt_name":"zzz"}`},
 	{"DELETE", "/users/77", ""},
 	{"POST", "/sms/send", `{"phone_number":"01011112222","message":"hi"}`},
+	{"POST", "/fcm_sendone/", `{"plt_type":"1","sst_idx":"0","plt_condition":"c","plt_memo":"m","mt_idx":5,"plt_title":"t","plt_content":"c"}`},
 	{"POST", "/fcm_sendone/test", `{}`},
 	{"POST", "/fcm_sendone/test-send/1", ``},
 	{"POST", "/fcm_sendone/silent", `{"mt_idx":1}`},
@@ -286,43 +286,39 @@ func TestUsersResponsesHaveNoSecrets(t *testing.T) {
 	}
 }
 
-// --- fcm_sendone 루트: 특정 회원 대상은 기존대로, 전체 발송(mt_idx=0)은 관리자만 ---
+// --- fcm_sendone 루트: 특정 회원 대상·전체 발송 모두 관리자 전용(18단계 B) ---
 
-func TestFCMSendoneBroadcastAdminOnly(t *testing.T) {
+func TestFCMSendoneRootAdminOnly(t *testing.T) {
 	const payload = `{"plt_type":"1","sst_idx":"0","plt_condition":"c","plt_memo":"m","mt_idx":%d,"plt_title":"t","plt_content":"c"}`
 	body := func(idx string) string { return strings.Replace(payload, "%d", idx, 1) }
 
+	for _, mode := range []auth.RouteMode{auth.RouteModeOff, auth.RouteModeWarn, auth.RouteModeEnforce} {
+		e := newEnv(t, mode)
+		for _, idx := range []string{"0", "5"} { // 전체 발송, 특정 회원 대상
+			if w := e.do("POST", v1+"/fcm_sendone/", bearer(t, 2), body(idx)); w.Code != http.StatusForbidden {
+				t.Errorf("[%s] 일반 회원의 발송(mt_idx=%s)은 403: %d", mode, idx, w.Code)
+			}
+			if w := e.do("POST", v1+"/fcm_sendone/", "", body(idx)); w.Code != http.StatusUnauthorized {
+				t.Errorf("[%s] 무토큰 발송(mt_idx=%s)은 401: %d", mode, idx, w.Code)
+			}
+		}
+		if e.sender.sent != 0 {
+			t.Errorf("[%s] 거부된 요청이 발송에 도달함: %d", mode, e.sender.sent)
+		}
+	}
+
 	e := newEnv(t, auth.RouteModeWarn)
-	if w := e.do("POST", v1+"/fcm_sendone/", bearer(t, 2), body("0")); w.Code != http.StatusForbidden || e.sender.sent != 0 {
-		t.Errorf("일반 회원의 전체 발송은 403이고 발송 0건이어야 함: %d sent=%d", w.Code, e.sender.sent)
+	// 관리자는 특정 회원 대상 발송과 전체 발송(토큰 보유 3명) 모두 기존 응답으로 동작.
+	if w := e.do("POST", v1+"/fcm_sendone/", bearer(t, 1), body("5")); w.Code != http.StatusOK || e.sender.sent != 1 {
+		t.Errorf("관리자 단건 발송: %d sent=%d %s", w.Code, e.sender.sent, w.Body.String())
 	}
-	if w := e.do("POST", v1+"/fcm_sendone/", "", body("0")); w.Code != http.StatusUnauthorized || e.sender.sent != 0 {
-		t.Errorf("무토큰 전체 발송은 401(warn 모드 통과 후 관리자 게이트)이어야 함: %d", w.Code)
-	}
-	// 특정 회원 대상 발송은 기존 호출처(웹 일정 알림)가 깨지지 않게 일반 회원도 가능.
-	if w := e.do("POST", v1+"/fcm_sendone/", bearer(t, 2), body("5")); w.Code != http.StatusOK || e.sender.sent != 1 {
-		t.Errorf("일반 회원의 단건 발송은 기존대로 동작해야 함: %d sent=%d %s", w.Code, e.sender.sent, w.Body.String())
-	}
-	// 관리자는 전체 발송 가능(토큰 보유 3명).
 	before := e.sender.sent
 	if w := e.do("POST", v1+"/fcm_sendone/", bearer(t, 1), body("0")); w.Code != http.StatusOK || e.sender.sent-before != 3 {
 		t.Errorf("관리자 전체 발송: %d sent=%d %s", w.Code, e.sender.sent-before, w.Body.String())
 	}
-	// 검증 실패(422)는 게이트보다 먼저: 기존 응답 형식 유지.
-	if w := e.do("POST", v1+"/fcm_sendone/", bearer(t, 2), `{"mt_idx":0}`); w.Code != http.StatusUnprocessableEntity {
+	// 검증 실패(422) 응답 형식은 기존 그대로.
+	if w := e.do("POST", v1+"/fcm_sendone/", bearer(t, 1), `{"mt_idx":0}`); w.Code != http.StatusUnprocessableEntity {
 		t.Errorf("검증 실패는 기존대로 422: %d", w.Code)
-	}
-}
-
-func TestFCMSendoneBroadcastFailsClosedWithoutGate(t *testing.T) {
-	h := handler.NewFCMSendone(service.NewPushSend(&fakeSendMembers{tokens: 3}, fakeLogWriter{}, &fakeSender{}))
-	r := gin.New()
-	r.POST("/x", h.Send)
-	req := httptest.NewRequest("POST", "/x", strings.NewReader(`{"plt_type":"1","sst_idx":"0","plt_condition":"c","plt_memo":"m","mt_idx":0,"plt_title":"t","plt_content":"c"}`))
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-	if w.Code != http.StatusForbidden {
-		t.Errorf("게이트 미주입이면 전체 발송은 거부해야 함: %d", w.Code)
 	}
 }
 
@@ -362,7 +358,6 @@ var attachedRoutes = []struct{ method, path string }{
 	{"PATCH", "/members/5/location"},
 	{"GET", "/weather/member/5"},
 	{"PUT", "/weather/member/5"},
-	{"POST", "/fcm_sendone/"},
 }
 
 // 공개로 남겨야 하는 라우트(로그인·가입·SMS·비밀번호 찾기·버전·공지·소셜·refresh·hwgi 등)와
@@ -380,11 +375,6 @@ var publicRoutes = []struct{ method, path string }{
 	{"POST", "/auth/kakao-login"},
 	{"POST", "/auth/google-login"},
 	{"POST", "/auth/apple-login"},
-	{"POST", "/auth/find-user-by-email"},
-	{"POST", "/auth/find-user-by-phone"},
-	{"POST", "/auth/forgot-password"},
-	{"POST", "/auth/verify-reset-token"},
-	{"POST", "/auth/reset-password"},
 	{"POST", "/auth/reset-password-by-phone"},
 	{"GET", "/auth/me"},
 	{"POST", "/sms/send-verification-code"},

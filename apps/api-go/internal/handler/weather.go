@@ -15,9 +15,10 @@ import (
 )
 
 type WeatherHandler struct {
-	svc   *service.WeatherService
-	cfg   *config.Config
-	cache *cache.Store
+	revocable // 비밀번호 변경 이전 토큰 무효 기준(SetRevocation)
+	svc       *service.WeatherService
+	cfg       *config.Config
+	cache     *cache.Store
 }
 
 func NewWeather(svc *service.WeatherService, cfg *config.Config, store *cache.Store) *WeatherHandler {
@@ -48,7 +49,7 @@ func (h *WeatherHandler) Current(c *gin.Context) {
 		return
 	}
 
-	uid, hasUser := auth.ParseOptionalUserID(c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
+	uid, hasUser := auth.ParseOptionalUserIDChecked(h.revocation, nil, c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
 	resp, err := h.svc.GetCurrent(uid, hasUser)
 	if err != nil {
 		// Python: try 블록 전체를 except로 감싸 success:false 반환(상태코드 200).

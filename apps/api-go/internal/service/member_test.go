@@ -52,7 +52,7 @@ func member2584() *model.Member {
 // TestMemberListItemJSON은 _member_to_dict(/members/?id=) 실측 바이트와 동일한지 검증한다.
 func TestMemberListItemJSON(t *testing.T) {
 	svc := NewMember(&fakeMemberReadRepo{one: member2584()})
-	res, _ := svc.MemberForList(2584)
+	res, _ := svc.MemberForList(Viewer{MtIdx: 2584, Authenticated: true}, 2584)
 	b, _ := json.Marshal(res)
 	want := `[{"mt_idx":2584,"mt_type":3,"mt_level":2,"mt_status":1,"mt_id":"apple_000423.0341057b689b497ea6079afde9603b93.1431","mt_name":"Hyun ok Kwon","mt_nickname":"송지아","mt_hp":"","mt_email":"nd2zkd84p7@privaterelay.appleid.com","mt_birth":"2015-09-03","mt_gender":2,"mt_file1":"/images/avatar2.png","mt_show":"Y","mt_agree1":"Y","mt_agree2":"Y","mt_agree3":"Y","mt_agree4":"Y","mt_agree5":"Y","mt_lat":37.70771506644053,"mt_long":126.7573401655983,"mt_wdate":"2026-05-17T14:32:21","mt_ldate":"2026-05-17T14:32:21","mt_udate":"2026-05-17T14:33:37"}]`
 	if string(b) != want {
@@ -64,7 +64,7 @@ func TestMemberListItemJSON(t *testing.T) {
 // (mt_show=Y, mt_agree1~5=N 기본값, mt_udate=null)
 func TestMemberDetailJSON(t *testing.T) {
 	svc := NewMember(&fakeMemberReadRepo{one: member2584()})
-	res, _ := svc.GetMemberDetail(2584)
+	res, _ := svc.GetMemberDetail(Viewer{MtIdx: 2584, Authenticated: true}, 2584)
 	b, _ := json.Marshal(res)
 	want := `{"mt_type":3,"mt_level":2,"mt_status":1,"mt_id":"apple_000423.0341057b689b497ea6079afde9603b93.1431","mt_name":"Hyun ok Kwon","mt_nickname":"송지아","mt_hp":"","mt_email":"nd2zkd84p7@privaterelay.appleid.com","mt_birth":"2015-09-03","mt_gender":2,"mt_show":"Y","mt_agree1":"N","mt_agree2":"N","mt_agree3":"N","mt_agree4":"N","mt_agree5":"N","mt_push1":"N","mt_lat":37.70771506644053,"mt_long":126.7573401655983,"mt_onboarding":"N","mt_idx":2584,"mt_file1":"/images/avatar2.png","mt_wdate":"2026-05-17T14:32:21","mt_ldate":"2026-05-17T14:32:21","mt_udate":null}`
 	if string(b) != want {
@@ -76,7 +76,7 @@ func TestMemberDetailJSON(t *testing.T) {
 func TestMemberDefaultsAndFalsy(t *testing.T) {
 	// 전부 nil + lat=0 → 리스트: lat/long null, 기본값
 	svc := NewMember(&fakeMemberReadRepo{one: &model.Member{MtIdx: 7, MtLat: pFloat(0)}})
-	res, _ := svc.MemberForList(7)
+	res, _ := svc.MemberForList(Viewer{MtIdx: 7, Authenticated: true}, 7)
 	it := res[0]
 	if it.MtType != 1 || it.MtLevel != 2 || it.MtStatus != 1 || it.MtGender != 1 {
 		t.Errorf("int 기본값 불일치: %+v", it)
@@ -91,7 +91,7 @@ func TestMemberDefaultsAndFalsy(t *testing.T) {
 		t.Errorf("null 날짜는 nil이어야 함: %+v", it)
 	}
 	// 단건(detail): lat=0 → 기본값 37.5642
-	d, _ := svc.GetMemberDetail(7)
+	d, _ := svc.GetMemberDetail(Viewer{MtIdx: 7, Authenticated: true}, 7)
 	if d.MtLat != 37.5642 || d.MtLong != 127.0016 {
 		t.Errorf("detail lat/long 기본값 불일치: %v %v", d.MtLat, d.MtLong)
 	}
@@ -136,14 +136,14 @@ func TestMemberChecks(t *testing.T) {
 func TestMemberNotFoundAndErr(t *testing.T) {
 	t.Run("detail 없음 → (nil,nil)", func(t *testing.T) {
 		svc := NewMember(&fakeMemberReadRepo{one: nil})
-		res, err := svc.GetMemberDetail(99)
+		res, err := svc.GetMemberDetail(Viewer{}, 99)
 		if err != nil || res != nil {
 			t.Errorf("res=%v err=%v", res, err)
 		}
 	})
 	t.Run("?id 없음 → 빈 목록", func(t *testing.T) {
 		svc := NewMember(&fakeMemberReadRepo{one: nil})
-		res, _ := svc.MemberForList(99)
+		res, _ := svc.MemberForList(Viewer{}, 99)
 		b, _ := json.Marshal(res)
 		if string(b) != "[]" {
 			t.Errorf("빈 목록 []: %s", b)
@@ -151,7 +151,7 @@ func TestMemberNotFoundAndErr(t *testing.T) {
 	})
 	t.Run("repo 에러 전파", func(t *testing.T) {
 		svc := NewMember(&fakeMemberReadRepo{err: errors.New("db down")})
-		if _, err := svc.ListMembers(0, 10); err == nil {
+		if _, err := svc.ListMembers(Viewer{}, 0, 10); err == nil {
 			t.Error("expected error")
 		}
 	})

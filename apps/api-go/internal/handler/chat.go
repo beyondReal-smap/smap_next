@@ -29,8 +29,9 @@ func coerceJSONInt(v interface{}) (int, bool) {
 // ChatHandler는 Python `app/api/v1/endpoints/chats.py`의 REST 3종을 이식한다.
 // 인증은 chat 전용 경로(SECRET_KEY + mt_idx claim, sub 폴백 없음).
 type ChatHandler struct {
-	svc *service.ChatService
-	cfg *config.Config
+	revocable // 비밀번호 변경 이전 토큰 무효 기준(SetRevocation)
+	svc       *service.ChatService
+	cfg       *config.Config
 }
 
 func NewChat(svc *service.ChatService, cfg *config.Config) *ChatHandler {
@@ -44,7 +45,7 @@ const msgFieldRequired = "Field required"
 // 그대로 반환한다(SECRET_KEY/ALGORITHM env는 미사용 — 둘은 항상 동일 값). 따라서 Go도
 // cfg.JWTSecretKey/JWTAlgorithm을 사용해야 토큰 시크릿이 일치한다.
 func (h *ChatHandler) chatAuth(c *gin.Context) (int, bool) {
-	mtIdx, msg, ok := auth.ParseChatUserID(c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
+	mtIdx, msg, ok := auth.ParseChatUserIDChecked(h.revocation, nil, c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
 	if !ok {
 		writeJSON(c, http.StatusUnauthorized, gin.H{"detail": msg})
 		return 0, false

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/bluemusk/smap_next_go/internal/dto"
@@ -88,37 +89,66 @@ func (s *LocationLogService) CreateLog(in LocationLogCreateInput) (dto.LocationL
 	return toLocationLogDict(saved), true
 }
 
+// logOwnerChange는 update 요청이 기록 소유자(mt_idx)를 바꾸려는지 판정한다. 같은 값으로의 "변경"은 허용(무시)한다.
+// 해석할 수 없는 값도 소유자 변경 시도로 본다.
+func logOwnerChange(present map[string]interface{}, cur int) (attempt bool) {
+	v, has := present["mt_idx"]
+	if !has {
+		return false
+	}
+	switch t := v.(type) {
+	case float64:
+		return int(t) != cur
+	case string:
+		n, err := strconv.Atoi(t)
+		return err != nil || n != cur
+	}
+	return true
+}
+
 // UpdateLog는 act update_location_log를 이식한다(exclude_unset). found=false→404.
-func (s *LocationLogService) UpdateLog(mltIdx int, present map[string]interface{}) (resp *dto.LocationLogDict, found, ok bool) {
+// 요청자가 인증돼 있으면 기록 소유자만 수정할 수 있고(forbidden), 소유자(mt_idx) 변경은 인증 여부와 무관하게 금지한다.
+func (s *LocationLogService) UpdateLog(v Viewer, mltIdx int, present map[string]interface{}) (resp *dto.LocationLogDict, found, ok, forbidden bool) {
 	cur, err := s.repo.GetLogByID(mltIdx)
 	if err != nil {
-		return nil, false, false
+		return nil, false, false, false
 	}
 	if cur == nil {
-		return nil, false, true
+		return nil, false, true, false
 	}
+	if v.Authenticated && cur.MtIdx != v.MtIdx {
+		return nil, true, true, true
+	}
+	if logOwnerChange(present, cur.MtIdx) {
+		return nil, true, true, true
+	}
+	delete(present, "mt_idx")
 	if _, err := s.repo.UpdateLog(mltIdx, present); err != nil {
-		return nil, true, false
+		return nil, true, false, false
 	}
 	saved, err := s.repo.GetLogByID(mltIdx)
 	if err != nil || saved == nil {
-		return nil, true, false
+		return nil, true, false, false
 	}
 	d := toLocationLogDict(saved)
-	return &d, true, true
+	return &d, true, true, false
 }
 
 // DeleteLog는 act delete_location_log를 이식한다(하드 삭제). found=false→404.
-func (s *LocationLogService) DeleteLog(mltIdx int) (found, ok bool) {
+// 요청자가 인증돼 있으면 기록 소유자만 삭제할 수 있다(forbidden).
+func (s *LocationLogService) DeleteLog(v Viewer, mltIdx int) (found, ok, forbidden bool) {
 	cur, err := s.repo.GetLogByID(mltIdx)
 	if err != nil {
-		return false, false
+		return false, false, false
 	}
 	if cur == nil {
-		return false, true
+		return false, true, false
+	}
+	if v.Authenticated && cur.MtIdx != v.MtIdx {
+		return true, true, true
 	}
 	if err := s.repo.DeleteLog(mltIdx); err != nil {
-		return true, false
+		return true, false, false
 	}
-	return true, true
+	return true, true, false
 }

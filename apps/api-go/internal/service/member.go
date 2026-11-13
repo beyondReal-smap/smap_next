@@ -205,23 +205,51 @@ func toMemberGroupItem(r *model.MemberGroupRow) dto.MemberGroupItem {
 	}
 }
 
+// --- 타인 응답의 개인정보 비우기 ---
+//
+// 위치 공유에 필요 없는 연락처(mt_hp), 이메일(mt_email), 로그인 ID(mt_id, 전화번호 형태)는 본인 응답이 아니면
+// 값을 빈 문자열로 비운다. 키는 유지한다(필수 필드 디코딩 보호). 요청자를 알 수 없는(무토큰) 응답도 본인이 아니므로 비운다.
+// 좌표·이름·사진 등 위치 공유 자체에 쓰이는 필드는 그대로 둔다.
+
+func (v Viewer) isSelf(mtIdx int) bool { return v.Authenticated && v.MtIdx == mtIdx }
+
+func redactListItem(i *dto.MemberListItem, v Viewer) {
+	if !v.isSelf(i.MtIdx) {
+		i.MtID, i.MtHp, i.MtEmail = "", "", ""
+	}
+}
+
+func redactDetail(i *dto.MemberDetailResponse, v Viewer) {
+	if !v.isSelf(i.MtIdx) {
+		i.MtID, i.MtHp, i.MtEmail = "", "", ""
+	}
+}
+
+func redactGroupItem(i *dto.MemberGroupItem, v Viewer) {
+	if !v.isSelf(i.MtIdx) {
+		i.MtID, i.MtHp, i.MtEmail = "", "", ""
+	}
+}
+
 // --- 서비스 메서드 ---
 
 // ListMembers는 전체 목록(List[_member_to_dict]).
-func (s *MemberService) ListMembers(skip, limit int) ([]dto.MemberListItem, error) {
+func (s *MemberService) ListMembers(v Viewer, skip, limit int) ([]dto.MemberListItem, error) {
 	members, err := s.repo.List(skip, limit)
 	if err != nil {
 		return nil, err
 	}
 	out := make([]dto.MemberListItem, 0, len(members))
 	for i := range members {
-		out = append(out, toMemberListItem(&members[i]))
+		it := toMemberListItem(&members[i])
+		redactListItem(&it, v)
+		out = append(out, it)
 	}
 	return out, nil
 }
 
 // MemberForList는 ?id= 단건 필터 결과(없으면 빈 목록, 있으면 1건 목록).
-func (s *MemberService) MemberForList(id int) ([]dto.MemberListItem, error) {
+func (s *MemberService) MemberForList(v Viewer, id int) ([]dto.MemberListItem, error) {
 	m, err := s.repo.GetByID(id)
 	if err != nil {
 		return nil, err
@@ -229,11 +257,13 @@ func (s *MemberService) MemberForList(id int) ([]dto.MemberListItem, error) {
 	if m == nil {
 		return []dto.MemberListItem{}, nil
 	}
-	return []dto.MemberListItem{toMemberListItem(m)}, nil
+	it := toMemberListItem(m)
+	redactListItem(&it, v)
+	return []dto.MemberListItem{it}, nil
 }
 
 // GetMemberDetail은 /members/{id}(MemberResponse). 없으면 (nil, nil)로 404 신호.
-func (s *MemberService) GetMemberDetail(id int) (*dto.MemberDetailResponse, error) {
+func (s *MemberService) GetMemberDetail(v Viewer, id int) (*dto.MemberDetailResponse, error) {
 	m, err := s.repo.GetByID(id)
 	if err != nil {
 		return nil, err
@@ -242,18 +272,21 @@ func (s *MemberService) GetMemberDetail(id int) (*dto.MemberDetailResponse, erro
 		return nil, nil
 	}
 	r := toMemberDetail(m)
+	redactDetail(&r, v)
 	return &r, nil
 }
 
 // GroupMembers는 /members/group/{id}(Member+GroupDetail 수동 dict 목록).
-func (s *MemberService) GroupMembers(groupID int) ([]dto.MemberGroupItem, error) {
+func (s *MemberService) GroupMembers(v Viewer, groupID int) ([]dto.MemberGroupItem, error) {
 	rows, err := s.repo.FindByGroup(groupID)
 	if err != nil {
 		return nil, err
 	}
 	out := make([]dto.MemberGroupItem, 0, len(rows))
 	for i := range rows {
-		out = append(out, toMemberGroupItem(&rows[i]))
+		it := toMemberGroupItem(&rows[i])
+		redactGroupItem(&it, v)
+		out = append(out, it)
 	}
 	return out, nil
 }

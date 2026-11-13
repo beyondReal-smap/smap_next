@@ -91,7 +91,6 @@ func main() {
 	adminRepo := repository.NewAdmin(gdb)
 	adminSvc := service.NewAdmin(adminRepo)
 	adminH := handler.NewAdmin(adminSvc)
-	adminAuth := middleware.RequireAdmin(cfg, memberRepo)
 
 	// G1 — 일반 사용자 인증 미들웨어(ROUTE_AUTH_MODE off|warn|enforce). 회원 상태는 memberRepo로 조회한다.
 	// 모드 값은 config.Load가 이미 검증했다(잘못된 값이면 여기까지 오지 못한다).
@@ -102,6 +101,7 @@ func main() {
 	}
 	// 비밀번호 변경·재설정·탈퇴 후 구 access token 무효 기준(Redis, TTL=access 수명). 조회 실패는 통과 + 경고.
 	accessRevocation := cache.NewAccessRevocation(cacheStore, time.Duration(cfg.AccessTokenExpireMinutes)*time.Minute)
+	adminAuth := middleware.RequireAdminChecked(cfg, memberRepo, accessRevocation) // 관리자 게이트도 구 토큰 무효 기준 적용
 	routeAuth, err := middleware.NewRouteAuth(middleware.RouteAuthOptions{
 		Revocation:      accessRevocation,
 		Mode:            routeMode,
@@ -119,6 +119,40 @@ func main() {
 		slog.Int("status_cache_ttl_sec", cfg.RouteAuthStatusCacheTTLSeconds),
 		slog.Int("summary_interval_sec", cfg.RouteAuthSummaryIntervalSeconds),
 	)
+
+	// G6 — 위치 라우트용 인증 미들웨어. 무토큰 처리만 LOCATION_AUTH_MODE로 따로 정한다(inherit이면 ROUTE_AUTH_MODE를 따름).
+	// 별도 인스턴스라 계측 요약 로그에 scope=location으로 구분되어 찍힌다.
+	locationMode, err := cfg.LocationAuthMode()
+	if err != nil {
+		logger.Error("location auth mode invalid", slog.String("err", err.Error()))
+		os.Exit(1)
+	}
+	locationRouteMode := locationMode.EffectiveRouteMode(routeMode)
+	locationAuth, err := middleware.NewRouteAuth(middleware.RouteAuthOptions{
+		Revocation:      accessRevocation,
+		Mode:            locationRouteMode,
+		Secret:          cfg.JWTSecretKey,
+		Algorithm:       cfg.JWTAlgorithm,
+		StatusCacheTTL:  time.Duration(cfg.RouteAuthStatusCacheTTLSeconds) * time.Second,
+		SummaryInterval: time.Duration(cfg.RouteAuthSummaryIntervalSeconds) * time.Second,
+		Scope:           "location",
+	}, memberRepo, logger)
+	if err != nil {
+		logger.Error("location auth init failed", slog.String("err", err.Error()))
+		os.Exit(1)
+	}
+	locationGuard := handler.NewLocationGuard(
+		service.NewLocationAuthz(repository.NewMembership(gdb), cfg.LocationPlaceLeaderManage),
+		locationAuth, cfg.LocationWriteRequireToken)
+	logger.Info("location auth configured",
+		slog.String("location_auth_mode", string(locationMode)),
+		slog.String("effective_unauthenticated_mode", string(locationRouteMode)),
+		slog.Bool("write_require_token", cfg.LocationWriteRequireToken),
+		slog.Bool("place_leader_manage", cfg.LocationPlaceLeaderManage),
+	)
+	if locationRouteMode != auth.RouteModeEnforce {
+		logger.Warn("location routes accept requests without a token (warn): others' locations are readable without a token until LOCATION_AUTH_MODE/ROUTE_AUTH_MODE is enforce")
+	}
 
 	// Phase 5 — chat 리포지토리. chat REST/WS + groups write의 그룹채팅 동기화가 공유한다.
 	chatRepo := repository.NewChat(gdb)
@@ -151,6 +185,9 @@ func main() {
 	memberWriteSvc.SetAccessRevoker(accessRevocation, logger)
 	memberWriteH := handler.NewMemberWrite(memberWriteSvc, cfg)
 	memberWriteH.SetRevocation(accessRevocation)
+	// verify-password 실패 한도: 로그인과 같은 LOGIN_FAIL_LIMIT_PER_ACCOUNT / LOGIN_FAIL_WINDOW_SECONDS 재사용(키는 분리).
+	memberWriteSvc.SetPasswordGuard(service.NewPasswordAttemptGuard(cacheStore, cfg.LoginFailLimitPerAccount,
+		time.Duration(cfg.LoginFailWindowSeconds)*time.Second, logger))
 
 	// Phase 4 — users read 7종(auth 도메인, 무인증) + auth/me(JWT). memberRepo 공유.
 	userSvc := service.NewUser(memberRepo)
@@ -328,7 +365,6 @@ func main() {
 
 	// push 발송 Phase 1 — fcm_sendone 단건/전체발송. memberRepo·pushLogRepo·fcmClient 공유.
 	fcmSendoneH := handler.NewFCMSendone(service.NewPushSend(memberRepo, pushLogRepo, fcmClient))
-	fcmSendoneH.SetAdminGate(adminAuth) // 전체 발송(mt_idx==0)은 관리자만
 	// fcm-token — FCM 토큰 관리 3종(get_current_member 인증). memberRepo 공유.
 	fcmTokenSvc := service.NewFCMToken(memberRepo)
 	fcmTokenSvc.SetUnregisterRepo(memberRepo)
@@ -336,11 +372,26 @@ func main() {
 	fcmTokenH.SetRevocation(accessRevocation)
 	// member-fcm-token — 회원 FCM 토큰 관리 12종. memberRepo 공유 + DEBUG test-ios-push용 fcmClient.
 	memberFCMTokenH := handler.NewMemberFCMToken(service.NewMemberFCMToken(memberRepo), cfg, fcmClient)
+	// 토큰을 직접 파싱하는 핸들러·WebSocket에도 "비밀번호 변경 이전 토큰 무효" 기준을 적용한다(공통 auth.Parse*Checked).
+	// (member_location_log*의 직접 파싱은 G6 담당 파일이라 여기서 주입하지 않는다.)
+	for _, h := range []interface {
+		SetRevocation(auth.AccessRevocationChecker)
+	}{
+		userH, memberH, weatherH, memberFCMTokenH, orderH, chatH, groupH, smsH, chatWS,
+	} {
+		h.SetRevocation(accessRevocation)
+	}
 
 	// group-schedule-manage 생성(Phase B) — memberRepo(editor/대상 조회)·pushLogRepo·fcmClient 공유.
 	groupScheduleH := handler.NewGroupScheduleManage(
 		service.NewGroupScheduleManage(repository.NewGroupScheduleManage(gdb), memberRepo, pushLogRepo, fcmClient),
 	)
+
+	memberH.SetGuard(locationGuard)
+	memberWriteH.SetGuard(locationGuard)
+	locationH.SetGuard(locationGuard)
+	groupMemberH.SetGuard(locationGuard)
+	locationLogH.SetGuard(locationGuard)
 
 	httpHandler := server.New(cfg, logger, server.Deps{
 		Health:         healthH,
@@ -351,6 +402,7 @@ func main() {
 		AdminAuth:      adminAuth,
 		UserAuth:       routeAuth.Required(),
 		UserAuthOpt:    routeAuth.Optional(),
+		LocationAuth:   locationAuth.Required(),
 		Group:          groupH,
 		GroupDetail:    groupDetailH,
 		Member:         memberH,
@@ -394,6 +446,11 @@ func main() {
 		defer close(routeAuthDone)
 		routeAuth.Run(ctx)
 	}()
+	locationAuthDone := make(chan struct{})
+	go func() {
+		defer close(locationAuthDone)
+		locationAuth.Run(ctx)
+	}()
 
 	go func() {
 		logger.Info("http server listening", slog.String("addr", srv.Addr))
@@ -419,5 +476,6 @@ func main() {
 		_ = rds.Close()
 	}
 	<-routeAuthDone
+	<-locationAuthDone
 	logger.Info("shutdown complete")
 }

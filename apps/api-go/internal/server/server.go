@@ -49,6 +49,8 @@ type Deps struct {
 	UserAuth gin.HandlerFunc
 	// UserAuthOpt은 선택 인증 변형(토큰이 없어도 통과, 있으면 검증·상태 확인)이다. nil이면 붙이지 않는다.
 	UserAuthOpt gin.HandlerFunc
+	// LocationAuth는 위치 라우트용 인증 미들웨어(LOCATION_AUTH_MODE로 무토큰 처리 결정)다. nil이면 UserAuth를 쓴다.
+	LocationAuth gin.HandlerFunc
 }
 
 // New는 gin 엔진을 구성한다. 라우트는 Python `app/main.py` + `app/api/v1/api.py` 와
@@ -97,12 +99,20 @@ func New(cfg *config.Config, logger *slog.Logger, deps Deps) http.Handler {
 		if deps.UserAuth != nil {
 			ua.Use(deps.UserAuth)
 		}
+		// la: 위치 라우트 그룹(/logs/*, /locations/*, /group-members/member/:gid, /members/ 조회, 회원 위치 덮어쓰기).
+		// 무토큰 처리만 LOCATION_AUTH_MODE로 따로 정하고, 토큰이 있는 요청의 소유권·멤버십 검사(403)는 핸들러가 한다.
+		la := v1.Group("")
+		if deps.LocationAuth != nil {
+			la.Use(deps.LocationAuth)
+		} else if deps.UserAuth != nil {
+			la.Use(deps.UserAuth)
+		}
 		// uo: 선택 인증 변형(토큰이 없어도 통과).
 		uo := v1.Group("")
 		if deps.UserAuthOpt != nil {
 			uo.Use(deps.UserAuthOpt)
 		}
-		// adm: 관리자 전용 라우트(RequireAdmin: JWT + mt_level=9). /users/*, /fcm_sendone 하위, /sms/send.
+		// adm: 관리자 전용 라우트(RequireAdmin: JWT + mt_level=9). /users/*, /fcm_sendone 전부, /sms/send, find-user-by-*, 링크 재설정 3종, DELETE /members/:id.
 		adm := v1.Group("")
 		adm.Use(deps.AdminAuth)
 
@@ -176,9 +186,9 @@ func New(cfg *config.Config, logger *slog.Logger, deps Deps) http.Handler {
 		// ⚠️ /members/terms는 정상화 결정으로 약관 5종 200 반환(Python은 /{member_id}에 가려져 422였음).
 		// Gin은 정적>파라미터 우선이라 /:member_id보다 먼저 매칭된다.
 		v1.GET("/members/terms", deps.MemberWrite.Terms)
-		ua.GET("/members/", deps.Member.List)
-		ua.GET("/members/:member_id", deps.Member.Get)
-		ua.GET("/members/group/:group_id", deps.Member.Group)
+		la.GET("/members/", deps.Member.List)
+		la.GET("/members/:member_id", deps.Member.Get)
+		la.GET("/members/group/:group_id", deps.Member.Group)
 
 		// members — write 17종(register/login/비번/프로필/동의/탈퇴/CRUD/파일). 정적이 /:member_id보다 우선.
 		// google-login은 auth.GoogleLogin 재사용(동일 member_service.google_login). 비번/프로필/연락처/탈퇴는
@@ -196,9 +206,11 @@ func New(cfg *config.Config, logger *slog.Logger, deps Deps) http.Handler {
 		v1.POST("/members/upload-profile-image", deps.MemberWrite.UploadProfileImage)
 		v1.DELETE("/members/delete-profile-image", deps.MemberWrite.DeleteProfileImage)
 		v1.POST("/members/", deps.MemberWrite.Create)
-		ua.PUT("/members/:member_id", deps.MemberWrite.Update)
-		ua.DELETE("/members/:member_id", deps.MemberWrite.Delete)
-		ua.PATCH("/members/:member_id/location", deps.MemberWrite.UpdateLocation)
+		la.PUT("/members/:member_id", deps.MemberWrite.Update)
+		// 하드 삭제(15단계 탈퇴 정리를 거치지 않는다). Android/iOS(현재·스토어 버전)·apps/web·apps/mcp 모두 호출하지 않아
+		// 관리자 전용으로 닫는다. 앱의 탈퇴는 POST /members/withdraw.
+		adm.DELETE("/members/:member_id", deps.MemberWrite.Delete)
+		la.PATCH("/members/:member_id/location", deps.MemberWrite.UpdateLocation)
 
 		// users — read 7종(관리자 전용: adm, auth 도메인). ⚠️ Python 동작 그대로 이식(단 비밀 필드는 제거):
 		// /users/·/{id}는 MemberResponse라 mt_name/nickname null 멤버에서 500(plain text);
@@ -234,15 +246,19 @@ func New(cfg *config.Config, logger *slog.Logger, deps Deps) http.Handler {
 		v1.POST("/auth/kakao-login", deps.Auth.KakaoLogin)
 		v1.POST("/auth/google-login", deps.Auth.GoogleLogin)
 		v1.POST("/auth/apple-login", deps.Auth.AppleLogin)
-		v1.POST("/auth/find-user-by-email", deps.Auth.FindUserByEmail)
-		v1.POST("/auth/find-user-by-phone", deps.Auth.FindUserByPhone)
+		// find-user-by-*: 계정 존재 조회(사용자 열거). 레거시 웹 전용이라 관리자 전용으로 닫았다.
+		adm.POST("/auth/find-user-by-email", deps.Auth.FindUserByEmail)
+		adm.POST("/auth/find-user-by-phone", deps.Auth.FindUserByPhone)
 
 		// auth Phase C — 비밀번호 재설정 4종(무인증). 전부 200+success(검증 실패 422 제외).
 		// 실제 SMS/이메일 발송은 sms/email 도메인 트랙 소관(forgot은 토큰 저장+응답만, 발송과 무관).
 		// reset-password-by-phone은 Redis(sms:verified:/sms:code:) interop로 SMS 인증상태를 읽는다.
-		v1.POST("/auth/forgot-password", deps.Auth.ForgotPassword)
-		v1.POST("/auth/verify-reset-token", deps.Auth.VerifyResetToken)
-		v1.POST("/auth/reset-password", deps.Auth.ResetPassword)
+		// 링크(토큰) 기반 재설정 3종(forgot-password, verify-reset-token, reset-password)은 레거시 웹 전용이고
+		// 앱·apps/web·apps/mcp는 호출하지 않는다(8자리 토큰·시도 제한 없음). 관리자 전용으로 닫았다.
+		// 앱이 쓰는 인증번호 방식(reset-password-by-phone, /auth/email/*, reset-password-by-email)은 공개 유지.
+		adm.POST("/auth/forgot-password", deps.Auth.ForgotPassword)
+		adm.POST("/auth/verify-reset-token", deps.Auth.VerifyResetToken)
+		adm.POST("/auth/reset-password", deps.Auth.ResetPassword)
 		v1.POST("/auth/reset-password-by-phone", deps.Auth.ResetPasswordByPhone)
 
 		// auth 이메일 인증(G3) — 공개 라우트. change_email 흐름(send-code/verify-code의 purpose=change_email,
@@ -256,21 +272,21 @@ func New(cfg *config.Config, logger *slog.Logger, deps Deps) http.Handler {
 
 		// locations — read 7종(전부 무인증). slt_lat/long은 Decimal→문자열. 정적(/member,
 		// /group-detail,/other-members,/myplays)이 /:location_id보다 우선. write는 후반 Phase.
-		ua.GET("/locations/", deps.Location.List)
-		ua.GET("/locations/:location_id", deps.Location.Get)
-		ua.GET("/locations/member/:member_id", deps.Location.Member)
-		ua.GET("/locations/group-detail/:group_detail_id", deps.Location.GroupDetail)
-		ua.GET("/locations/other-members/:member_id", deps.Location.OtherMembers)
-		ua.GET("/locations/myplays/in", deps.Location.MyplaysIn)
-		ua.GET("/locations/myplays/out", deps.Location.MyplaysOut)
+		la.GET("/locations/", deps.Location.List)
+		la.GET("/locations/:location_id", deps.Location.Get)
+		la.GET("/locations/member/:member_id", deps.Location.Member)
+		la.GET("/locations/group-detail/:group_detail_id", deps.Location.GroupDetail)
+		la.GET("/locations/other-members/:member_id", deps.Location.OtherMembers)
+		la.GET("/locations/myplays/in", deps.Location.MyplaysIn)
+		la.GET("/locations/myplays/out", deps.Location.MyplaysOut)
 		// locations write 5종(무인증, raw SQL). create는 기본값(mt_idx=282·좌표 37.5665)·절단·커스텀응답(slt_lat float).
 		// notification은 Y/N 검증·rowcount 404. ⚠️update의 404는 except 흡수로 500-wrap. delete는 LocationResponse 반환.
 		// member-create는 member존재 404 + 그룹조회. 정적 /members/.../locations + 파라미터 공존.
-		ua.POST("/locations/", deps.Location.Create)
-		ua.PUT("/locations/:location_id/notification", deps.Location.Notification)
-		ua.PUT("/locations/:location_id", deps.Location.Update)
-		ua.DELETE("/locations/:location_id", deps.Location.Delete)
-		ua.POST("/locations/members/:member_id/locations", deps.Location.MemberCreate)
+		la.POST("/locations/", deps.Location.Create)
+		la.PUT("/locations/:location_id/notification", deps.Location.Notification)
+		la.PUT("/locations/:location_id", deps.Location.Update)
+		la.DELETE("/locations/:location_id", deps.Location.Delete)
+		la.POST("/locations/members/:member_id/locations", deps.Location.MemberCreate)
 
 		// schedules — 결정적 read 3종(무인증). sst_location_lat/long Decimal→문자열.
 		// /before-30min은 Python에서 /:schedule_id에 가려져 422(미등록으로 동일).
@@ -318,7 +334,7 @@ func New(cfg *config.Config, logger *slog.Logger, deps Deps) http.Handler {
 		ua.DELETE("/push-fcms/:push_fcm_id", deps.PushFCM.Delete)
 
 		// group-members — read 1종(무인증). 3단계 쿼리(기본정보+최신위치 self-join+fallback).
-		ua.GET("/group-members/member/:group_id", deps.GroupMember.Member)
+		la.GET("/group-members/member/:group_id", deps.GroupMember.Member)
 		// group-members write(무인증): add/remove(query param)·remove-path·role.
 		// role의 is_leader는 bool→Y/N, 그 외 str(x).upper()→MySQL ENUM 위반 시 500.
 		ua.POST("/group-members/add", deps.GroupMember.Add)
@@ -343,18 +359,18 @@ func New(cfg *config.Config, logger *slog.Logger, deps Deps) http.Handler {
 		// summary/path: 메모리 Haversine+round(banker's). stay-times/map-markers: raw CTE/GROUP BY를
 		// MariaDB에 그대로 위임(libm 차이 회피). path의 line 602 중복 라우트는 dead라 미등록.
 		// POST /logs/member-location-logs — body.act 기반 14종 RPC 디스패처(읽기 11 + 쓰기 3 create/update/delete).
-		ua.POST("/logs/member-location-logs", deps.LocationLog.MemberLocationLogsPost)
-		ua.GET("/logs/members-with-logs", deps.LocationLog.MembersWithLogs)
-		ua.GET("/logs/member-activity", deps.LocationLog.MemberActivity)
-		ua.GET("/logs/daily-counts", deps.LocationLog.DailyCounts)
-		ua.GET("/logs/daily-counts-simple", deps.LocationLog.DailyCountsSimple)
-		ua.GET("/logs/member-location-logs/:mt_idx", deps.LocationLog.MemberLogs)
-		ua.GET("/logs/member-location-logs/:mt_idx/daily", deps.LocationLog.DailyLogs)
-		ua.GET("/logs/member-location-logs/:mt_idx/daily-summary", deps.LocationLog.DailySummary)
-		ua.GET("/logs/member-location-logs/:mt_idx/summary", deps.LocationLog.Summary)
-		ua.GET("/logs/member-location-logs/:mt_idx/path", deps.LocationLog.Path)
-		ua.GET("/logs/member-location-logs/:mt_idx/stay-times", deps.LocationLog.StayTimes)
-		ua.GET("/logs/member-location-logs/:mt_idx/map-markers", deps.LocationLog.MapMarkers)
+		la.POST("/logs/member-location-logs", deps.LocationLog.MemberLocationLogsPost)
+		la.GET("/logs/members-with-logs", deps.LocationLog.MembersWithLogs)
+		la.GET("/logs/member-activity", deps.LocationLog.MemberActivity)
+		la.GET("/logs/daily-counts", deps.LocationLog.DailyCounts)
+		la.GET("/logs/daily-counts-simple", deps.LocationLog.DailyCountsSimple)
+		la.GET("/logs/member-location-logs/:mt_idx", deps.LocationLog.MemberLogs)
+		la.GET("/logs/member-location-logs/:mt_idx/daily", deps.LocationLog.DailyLogs)
+		la.GET("/logs/member-location-logs/:mt_idx/daily-summary", deps.LocationLog.DailySummary)
+		la.GET("/logs/member-location-logs/:mt_idx/summary", deps.LocationLog.Summary)
+		la.GET("/logs/member-location-logs/:mt_idx/path", deps.LocationLog.Path)
+		la.GET("/logs/member-location-logs/:mt_idx/stay-times", deps.LocationLog.StayTimes)
+		la.GET("/logs/member-location-logs/:mt_idx/map-markers", deps.LocationLog.MapMarkers)
 
 		// orders — read 5종(무인증). 금액 Double→PyFloat, 날짜 ISO8601, summary 단일 집계.
 		// 정적 세그먼트(summary/detail/code/recent)를 catch-all /:member_id보다 먼저 등록해
@@ -387,10 +403,9 @@ func New(cfg *config.Config, logger *slog.Logger, deps Deps) http.Handler {
 		v1.POST("/hwgi/generate-report", deps.Hwgi.GenerateReport)
 
 		// push 발송 — fcm_sendone 단건/전체발송. success는 문자열 "true"/"false".
-		// 루트(/fcm_sendone/)는 사용자 인증(ua) + 전체발송(mt_idx==0)은 핸들러에서 관리자만(레거시 웹 일정 알림이 사용).
-		// 하위 test/silent/background 등은 사용처가 없어 관리자 전용(adm).
+		// 루트(/fcm_sendone/) 포함 fcm_sendone 전부 관리자 전용(adm). 레거시 웹이 유일한 사용처였고 폐기가 확정됐다.
 		// mt_idx==0이면 전체발송(N+1). 토큰 무효화는 no-op(Python DB변경부 주석처리). 폴백 미이식.
-		ua.POST("/fcm_sendone/", deps.FCMSendone.Send)
+		adm.POST("/fcm_sendone/", deps.FCMSendone.Send)
 		// Phase 2 변형 5종: test(무발송 echo)·test-send(path int)·silent·silent-batch(무body)·background(전 분기 push_log).
 		adm.POST("/fcm_sendone/test", deps.FCMSendone.Test)
 		adm.POST("/fcm_sendone/test-send/:mt_idx", deps.FCMSendone.TestSend)

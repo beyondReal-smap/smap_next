@@ -130,45 +130,49 @@ func loginFailKeys(id, ip string) (acct, ipKey string) {
 	return "auth:login:fail:acct:" + sha256Hex(id), "auth:login:fail:ip:" + sha256Hex(ip)
 }
 
+// failLimitRejection은 고정 창 실패 카운터(key)가 limit 이상이면 429 거부(남은 시간 포함)를 돌려준다.
+// 로그인 실패 한도와 비밀번호 확인(verify-password) 한도가 함께 쓴다. 문구는 what + " 시도 횟수를 초과했습니다. 약 N분 후 ...".
+// Redis 오류는 가용성을 위해 통과 + 경고 로그다(op 필드로 구분). guard가 nil이거나 limit<=0이면 판정하지 않는다.
+func failLimitRejection(ctx context.Context, guard securityStore, log *slog.Logger, key string, limit int, what string) *AuthRejection {
+	if guard == nil || limit <= 0 {
+		return nil
+	}
+	v, found, err := guard.GetString(ctx, key)
+	if err != nil {
+		log.Warn("login_limit_store_unavailable_allowing", slog.String("op", "get"), slog.String("err", err.Error()))
+		return nil
+	}
+	if !found {
+		return nil
+	}
+	var n int
+	if _, err := fmt.Sscanf(v, "%d", &n); err != nil || n < limit {
+		return nil
+	}
+	ttl, err := guard.TTL(ctx, key)
+	if err != nil {
+		log.Warn("login_limit_store_unavailable_allowing", slog.String("op", "ttl"), slog.String("err", err.Error()))
+		return nil
+	}
+	secs := int(math.Ceil(ttl.Seconds()))
+	if secs < 1 {
+		secs = 1
+	}
+	mins := (secs + 59) / 60
+	return &AuthRejection{Status: http.StatusTooManyRequests, RetryAfter: secs,
+		Detail: fmt.Sprintf("%s 시도 횟수를 초과했습니다. 약 %d분 후 다시 시도해주세요.", what, mins)}
+}
+
 // checkLoginBlocked는 실패 한도 초과 여부를 확인한다. Redis 오류는 로그인 가용성을 위해 통과 + 경고 로그다
 // (이메일 인증 발송 한도는 보안 우선이라 503이지만, 로그인은 Redis 장애가 전체 로그인 불능이 되면 안 된다).
 func (s *AuthService) checkLoginBlocked(ctx context.Context, acctKey, ipKey string) *AuthRejection {
 	if s.guard == nil {
 		return nil
 	}
-	check := func(key string, limit int) *AuthRejection {
-		if limit <= 0 {
-			return nil
-		}
-		v, found, err := s.guard.GetString(ctx, key)
-		if err != nil {
-			s.log().Warn("login_limit_store_unavailable_allowing", slog.String("op", "get"), slog.String("err", err.Error()))
-			return nil
-		}
-		if !found {
-			return nil
-		}
-		var n int
-		if _, err := fmt.Sscanf(v, "%d", &n); err != nil || n < limit {
-			return nil
-		}
-		ttl, err := s.guard.TTL(ctx, key)
-		if err != nil {
-			s.log().Warn("login_limit_store_unavailable_allowing", slog.String("op", "ttl"), slog.String("err", err.Error()))
-			return nil
-		}
-		secs := int(math.Ceil(ttl.Seconds()))
-		if secs < 1 {
-			secs = 1
-		}
-		mins := (secs + 59) / 60
-		return &AuthRejection{Status: http.StatusTooManyRequests, RetryAfter: secs,
-			Detail: fmt.Sprintf("로그인 시도 횟수를 초과했습니다. 약 %d분 후 다시 시도해주세요.", mins)}
-	}
-	if r := check(acctKey, s.policy.LoginFailPerAccount); r != nil {
+	if r := failLimitRejection(ctx, s.guard, s.log(), acctKey, s.policy.LoginFailPerAccount, "로그인"); r != nil {
 		return r
 	}
-	return check(ipKey, s.policy.LoginFailPerIP)
+	return failLimitRejection(ctx, s.guard, s.log(), ipKey, s.policy.LoginFailPerIP, "로그인")
 }
 
 func (s *AuthService) recordLoginFailure(ctx context.Context, acctKey, ipKey string) {

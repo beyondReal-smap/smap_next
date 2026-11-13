@@ -13,9 +13,15 @@ import (
 )
 
 type MemberHandler struct {
-	svc *service.MemberService
-	cfg *config.Config
+	revocable // 비밀번호 변경 이전 토큰 무효 기준(SetRevocation)
+	svc       *service.MemberService
+	cfg       *config.Config
+	// guard: 회원/그룹 멤버 조회의 위치·연락처 보호(nil이면 500, fail-closed).
+	guard *LocationGuard
 }
+
+// SetGuard는 위치 인가 가드를 주입한다.
+func (h *MemberHandler) SetGuard(g *LocationGuard) { h.guard = g }
 
 func NewMember(svc *service.MemberService, cfg *config.Config) *MemberHandler {
 	return &MemberHandler{svc: svc, cfg: cfg}
@@ -72,7 +78,10 @@ func (h *MemberHandler) List(c *gin.Context) {
 	}
 
 	if idVal != nil && *idVal != 0 {
-		res, err := h.svc.MemberForList(*idVal)
+		if !h.guard.ViewMember(c, *idVal) {
+			return
+		}
+		res, err := h.svc.MemberForList(h.guard.Viewer(c), *idVal)
 		if err != nil {
 			writeJSON(c, http.StatusInternalServerError, gin.H{"detail": "Internal Server Error"})
 			return
@@ -81,7 +90,11 @@ func (h *MemberHandler) List(c *gin.Context) {
 		return
 	}
 
-	res, err := h.svc.ListMembers(skip, limit)
+	// 전체 회원 덤프: 토큰이 있는 요청에는 열지 않는다(앱 미사용, 관리자는 /users·/admin 사용).
+	if !h.guard.NoBulkDump(c) {
+		return
+	}
+	res, err := h.svc.ListMembers(h.guard.Viewer(c), skip, limit)
 	if err != nil {
 		writeJSON(c, http.StatusInternalServerError, gin.H{"detail": "Internal Server Error"})
 		return
@@ -97,7 +110,10 @@ func (h *MemberHandler) Get(c *gin.Context) {
 		pathIntErr(c, "member_id", idStr)
 		return
 	}
-	res, err := h.svc.GetMemberDetail(id)
+	if !h.guard.ViewMember(c, id) {
+		return
+	}
+	res, err := h.svc.GetMemberDetail(h.guard.Viewer(c), id)
 	if err != nil {
 		writeJSON(c, http.StatusInternalServerError, gin.H{"detail": "Internal Server Error"})
 		return
@@ -113,7 +129,7 @@ func (h *MemberHandler) Get(c *gin.Context) {
 // ⚠️ 미인증/미발견/오류 전부 HTTP 200 + result:N로 흡수(401 절대 안 냄).
 // 성공 응답 키 순서: result, data, message, success.
 func (h *MemberHandler) Me(c *gin.Context) {
-	uid, ok := auth.ParseOptionalUserID(c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
+	uid, ok := auth.ParseOptionalUserIDChecked(h.revocation, nil, c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
 	if !ok {
 		writeJSON(c, http.StatusOK, dto.ProfileMeFail{
 			Result:  "N",
@@ -158,7 +174,7 @@ func (h *MemberHandler) Consent(c *gin.Context) {
 		pathIntErr(c, "member_id", idStr)
 		return
 	}
-	uid, ok := auth.ParseOptionalUserID(c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
+	uid, ok := auth.ParseOptionalUserIDChecked(h.revocation, nil, c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
 	if !ok {
 		writeJSON(c, http.StatusUnauthorized, gin.H{"detail": "인증이 필요합니다."})
 		return
@@ -197,7 +213,10 @@ func (h *MemberHandler) Group(c *gin.Context) {
 		pathIntErr(c, "group_id", idStr)
 		return
 	}
-	res, err := h.svc.GroupMembers(id)
+	if !h.guard.ViewGroup(c, id) {
+		return
+	}
+	res, err := h.svc.GroupMembers(h.guard.Viewer(c), id)
 	if err != nil {
 		writeJSON(c, http.StatusInternalServerError, gin.H{"detail": "Internal Server Error"})
 		return

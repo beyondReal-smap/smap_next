@@ -17,9 +17,10 @@ import (
 
 // MemberFCMTokenHandler는 Python app/api/v1/endpoints/member_fcm_token.py(/member-fcm-token, 12종)를 이식한다.
 type MemberFCMTokenHandler struct {
-	svc *service.MemberFCMTokenService
-	cfg *config.Config
-	fcm fcm.Sender // DEBUG test-ios-push 전용(DEBUG=false면 미사용)
+	revocable // 비밀번호 변경 이전 토큰 무효 기준(SetRevocation)
+	svc       *service.MemberFCMTokenService
+	cfg       *config.Config
+	fcm       fcm.Sender // DEBUG test-ios-push 전용(DEBUG=false면 미사용)
 }
 
 func NewMemberFCMToken(svc *service.MemberFCMTokenService, cfg *config.Config, sender fcm.Sender) *MemberFCMTokenHandler {
@@ -28,7 +29,7 @@ func NewMemberFCMToken(svc *service.MemberFCMTokenService, cfg *config.Config, s
 
 // requireUserID는 Python deps.get_required_user_id: 미인증 시 401 "인증이 필요합니다." + WWW-Authenticate: Bearer.
 func (h *MemberFCMTokenHandler) requireUserID(c *gin.Context) (int, bool) {
-	uid, ok := auth.ParseOptionalUserID(c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
+	uid, ok := auth.ParseOptionalUserIDChecked(h.revocation, nil, c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
 	if !ok {
 		c.Header("WWW-Authenticate", "Bearer")
 		writeJSON(c, http.StatusUnauthorized, gin.H{"detail": "인증이 필요합니다."})

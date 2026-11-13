@@ -26,8 +26,24 @@ func (h *LocationHandler) Create(c *gin.Context) {
 		return
 	}
 	lat, long := locCoords(body)
+	mtIdx := locIntDefault(body, "mt_idx", 282)
+	if viewer := h.guard.Viewer(c); viewer.Authenticated {
+		// 토큰이 있으면 본인 명의가 기본이고, 다른 회원 명의는 같은 그룹 방장/리더 권한이 있을 때만(LOCATION_PLACE_LEADER_MANAGE).
+		mtIdx = viewer.MtIdx
+		if raw, has := body["mt_idx"]; has {
+			n, ok := mllAnyInt(raw)
+			if !ok {
+				writeJSON(c, http.StatusBadRequest, gin.H{"detail": "Invalid field: mt_idx"})
+				return
+			}
+			mtIdx = n
+		}
+	}
+	if !h.guard.ManagePlace(c, mtIdx) {
+		return
+	}
 	in := service.LocationCreateInput{
-		MtIdx:    locIntDefault(body, "mt_idx", 282),
+		MtIdx:    mtIdx,
 		SltTitle: truncRunes(toStr(title), 100),
 		SltAdd:   truncRunes(toStr(add), 200),
 		SltLat:   lat, SltLong: long,
@@ -47,6 +63,9 @@ func (h *LocationHandler) Create(c *gin.Context) {
 func (h *LocationHandler) Notification(c *gin.Context) {
 	id, ok := locationPathID(c)
 	if !ok {
+		return
+	}
+	if !h.manageExisting(c, id) {
 		return
 	}
 	body := bindBodyMap(c)
@@ -77,6 +96,9 @@ func (h *LocationHandler) Notification(c *gin.Context) {
 func (h *LocationHandler) Update(c *gin.Context) {
 	id, ok := locationPathID(c)
 	if !ok {
+		return
+	}
+	if !h.manageExisting(c, id) {
 		return
 	}
 	raw := bindBodyRaw(c)
@@ -133,6 +155,9 @@ func (h *LocationHandler) Delete(c *gin.Context) {
 	if !ok {
 		return
 	}
+	if !h.manageExisting(c, id) {
+		return
+	}
 	resp, found, sok := h.svc.DeleteLocation(id)
 	if !sok {
 		plainServerError(c)
@@ -149,6 +174,9 @@ func (h *LocationHandler) Delete(c *gin.Context) {
 func (h *LocationHandler) MemberCreate(c *gin.Context) {
 	mid, ok := memberLocPathID(c)
 	if !ok {
+		return
+	}
+	if !h.guard.ManagePlace(c, mid) {
 		return
 	}
 	body := bindBodyMap(c)

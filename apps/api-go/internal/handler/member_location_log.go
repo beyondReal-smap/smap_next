@@ -13,12 +13,17 @@ import (
 
 type LocationLogHandler struct {
 	svc *service.LocationLogService
-	cfg *config.Config // create_location_log act의 토큰 기반 mt_idx 추출용
+	cfg *config.Config
+	// guard는 위치 정보 인가(본인/같은 그룹 멤버/소유자) 진입점이다. nil이면 모든 요청이 500(fail-closed).
+	guard *LocationGuard
 }
 
 func NewLocationLog(svc *service.LocationLogService, cfg *config.Config) *LocationLogHandler {
 	return &LocationLogHandler{svc: svc, cfg: cfg}
 }
+
+// SetGuard는 위치 인가 가드를 주입한다.
+func (h *LocationLogHandler) SetGuard(g *LocationGuard) { h.guard = g }
 
 // MemberLogs는 GET /api/v1/logs/member-location-logs/:mt_idx — {"result":"Y","data":[...]}.
 // start_date/end_date(optional, 빈문자열=미적용), limit(100)/offset(0). 에러는 500 {"detail":str(e)}.
@@ -27,6 +32,9 @@ func (h *LocationLogHandler) MemberLogs(c *gin.Context) {
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		pathIntErr(c, "mt_idx", idStr)
+		return
+	}
+	if !h.guard.ViewMember(c, id) {
 		return
 	}
 	errs := make([]valErr, 0)
@@ -50,6 +58,9 @@ func (h *LocationLogHandler) DailyLogs(c *gin.Context) {
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		pathIntErr(c, "mt_idx", idStr)
+		return
+	}
+	if !h.guard.ViewMember(c, id) {
 		return
 	}
 	errs := make([]valErr, 0)
@@ -95,6 +106,9 @@ func (h *LocationLogHandler) DailySummary(c *gin.Context) {
 		pathIntErr(c, "mt_idx", idStr)
 		return
 	}
+	if !h.guard.ViewMember(c, id) {
+		return
+	}
 	errs := make([]valErr, 0)
 	start, hasStart := c.GetQuery("start_date")
 	if !hasStart {
@@ -136,6 +150,9 @@ func (h *LocationLogHandler) MemberActivity(c *gin.Context) {
 	}
 	if len(errs) > 0 {
 		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
+		return
+	}
+	if !h.guard.ViewGroup(c, groupID) {
 		return
 	}
 
@@ -182,6 +199,9 @@ func (h *LocationLogHandler) DailyCounts(c *gin.Context) {
 		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
 		return
 	}
+	if !h.guard.ViewGroup(c, groupID) {
+		return
+	}
 	res, empty, err := h.svc.DailyCounts(groupID, days)
 	if err != nil {
 		writeJSON(c, http.StatusInternalServerError,
@@ -211,6 +231,9 @@ func (h *LocationLogHandler) DailyCountsSimple(c *gin.Context) {
 		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
 		return
 	}
+	if !h.guard.ViewGroup(c, groupID) {
+		return
+	}
 	res, empty, err := h.svc.DailyCountsSimple(groupID, days)
 	if err != nil {
 		writeJSON(c, http.StatusInternalServerError,
@@ -232,6 +255,9 @@ func (h *LocationLogHandler) Summary(c *gin.Context) {
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		pathIntErr(c, "mt_idx", idStr)
+		return
+	}
+	if !h.guard.ViewMember(c, id) {
 		return
 	}
 	if date := c.Query("date"); date != "" {
@@ -258,6 +284,9 @@ func (h *LocationLogHandler) Path(c *gin.Context) {
 		pathIntErr(c, "mt_idx", idStr)
 		return
 	}
+	if !h.guard.ViewMember(c, id) {
+		return
+	}
 	data, err := h.svc.Path(id, c.Query("start_date"), c.Query("end_date"))
 	if err != nil {
 		writeJSON(c, http.StatusInternalServerError, gin.H{"detail": err.Error()})
@@ -273,6 +302,9 @@ func (h *LocationLogHandler) StayTimes(c *gin.Context) {
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		pathIntErr(c, "mt_idx", idStr)
+		return
+	}
+	if !h.guard.ViewMember(c, id) {
 		return
 	}
 	errs := make([]valErr, 0)
@@ -304,6 +336,9 @@ func (h *LocationLogHandler) MapMarkers(c *gin.Context) {
 		pathIntErr(c, "mt_idx", idStr)
 		return
 	}
+	if !h.guard.ViewMember(c, id) {
+		return
+	}
 	errs := make([]valErr, 0)
 	date, hasDate := c.GetQuery("date")
 	if !hasDate {
@@ -326,10 +361,13 @@ func (h *LocationLogHandler) MapMarkers(c *gin.Context) {
 // MembersWithLogs는 GET /api/v1/logs/members-with-logs — [int]. group_id(필수,미사용)·date(필수).
 func (h *LocationLogHandler) MembersWithLogs(c *gin.Context) {
 	errs := make([]valErr, 0)
+	groupID := 0
 	if gid, ok := c.GetQuery("group_id"); !ok {
 		errs = append(errs, qErr("missing", "group_id", "Field required", nil))
-	} else if _, valid := coerceInt(gid); !valid {
+	} else if n, valid := coerceInt(gid); !valid {
 		errs = append(errs, qErr("int_parsing", "group_id", msgIntParse, gid))
+	} else {
+		groupID = n
 	}
 	date, hasDate := c.GetQuery("date")
 	if !hasDate {
@@ -339,9 +377,17 @@ func (h *LocationLogHandler) MembersWithLogs(c *gin.Context) {
 		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
 		return
 	}
+	if !h.guard.ViewGroup(c, groupID) {
+		return
+	}
 	res, err := h.svc.MembersWithLogs(date)
 	if err != nil {
 		writeJSON(c, http.StatusInternalServerError, gin.H{"detail": err.Error()})
+		return
+	}
+	// 전 회원 번호가 아니라 그 그룹 멤버의 번호만 내보낸다(토큰이 있을 때).
+	res, ok := h.guard.FilterGroupMembers(c, groupID, res)
+	if !ok {
 		return
 	}
 	writeJSON(c, http.StatusOK, res)

@@ -13,9 +13,10 @@ import (
 
 // SMSHandler는 Python app/api/v1/endpoints/sms.py의 인증번호/일반 SMS 발송 핸들러.
 type SMSHandler struct {
-	verify *service.SMSVerifyService
-	sms    *service.SMSService
-	cfg    *config.Config
+	revocable // 비밀번호 변경 이전 토큰 무효 기준(SetRevocation)
+	verify    *service.SMSVerifyService
+	sms       *service.SMSService
+	cfg       *config.Config
 }
 
 func NewSMS(verify *service.SMSVerifyService, sms *service.SMSService, cfg *config.Config) *SMSHandler {
@@ -24,7 +25,7 @@ func NewSMS(verify *service.SMSVerifyService, sms *service.SMSService, cfg *conf
 
 // requireUserID는 Python deps.get_required_user_id: 토큰 없으면 401 "인증이 필요합니다." + WWW-Authenticate: Bearer.
 func (h *SMSHandler) requireUserID(c *gin.Context) (int, bool) {
-	uid, ok := auth.ParseOptionalUserID(c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
+	uid, ok := auth.ParseOptionalUserIDChecked(h.revocation, nil, c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
 	if !ok {
 		c.Header("WWW-Authenticate", "Bearer")
 		writeJSON(c, http.StatusUnauthorized, gin.H{"detail": "인증이 필요합니다."})
