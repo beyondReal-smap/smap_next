@@ -40,7 +40,6 @@ android {
         // API keys — values loaded from local.properties (우선) or gradle.properties
         // project.findProperty 만 사용하면 local.properties 가 읽히지 않아 빈 값이 되므로
         // 시크릿은 반드시 localOrGradleProp 을 경유시킨다.
-        buildConfigField("String", "GOOGLE_OAUTH_CLIENT_ID", "\"${localOrGradleProp("GOOGLE_OAUTH_CLIENT_ID") ?: ""}\"")
         buildConfigField("String", "TELEGRAM_BOT_TOKEN", "\"${localOrGradleProp("TELEGRAM_BOT_TOKEN") ?: ""}\"")
         buildConfigField("String", "TELEGRAM_CHAT_ID", "\"${localOrGradleProp("TELEGRAM_CHAT_ID") ?: ""}\"")
         buildConfigField("String", "KAKAO_API_KEY", "\"${localOrGradleProp("KAKAO_API_KEY") ?: ""}\"")

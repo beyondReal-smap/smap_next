@@ -118,13 +118,10 @@ class LoginActivity : ComponentActivity() {
     }
     
     private fun setupGoogleSignIn() {
-        // Web OAuth 클라이언트 ID (requestIdToken에는 반드시 Web Client ID를 사용해야 함)
-        val serverClientId = BuildConfig.GOOGLE_OAUTH_CLIENT_ID
-
-        if (serverClientId.isNullOrBlank()) {
-            Log.w(TAG, "Google Sign-In 설정 건너뜀: GOOGLE_OAUTH_CLIENT_ID가 설정되지 않음")
-            return
-        }
+        // Web OAuth 클라이언트 ID (requestIdToken에는 반드시 Web Client ID를 사용해야 함).
+        // google-services 플러그인이 google-services.json 의 웹 클라이언트(client_type 3)로 생성한 리소스.
+        // 리소스가 없으면 컴파일 단계에서 실패한다(값이 비어 조용히 건너뛰지 않도록 단일 출처로 둔다).
+        val serverClientId = getString(R.string.default_web_client_id)
 
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestIdToken(serverClientId)
@@ -139,7 +136,7 @@ class LoginActivity : ComponentActivity() {
     private fun startGoogleSignIn() {
         val client = googleSignInClient
         if (client == null) {
-            Log.e(TAG, "❌ Google Sign-In이 설정되지 않았습니다. GOOGLE_OAUTH_CLIENT_ID를 확인하세요.")
+            Log.e(TAG, "❌ Google Sign-In이 초기화되지 않았습니다.")
             viewModel.showErrorMessage("Google 로그인이 설정되지 않았습니다.")
             return
         }
