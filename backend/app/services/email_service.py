@@ -129,6 +129,21 @@ class EmailService:
                 "provider": "naverworks"
             }
         
+    async def send_verification_code(self, email: str, code: str) -> bool:
+        import asyncio
+
+        def send():
+            message = MIMEText(f"[SMAP] 인증번호는 {code}입니다. 10분 이내에 입력해주세요.", "plain", "utf-8")
+            message["Subject"] = "[SMAP] 이메일 인증번호"
+            message["From"] = self.sender_email
+            message["To"] = email
+            with smtplib.SMTP_SSL(settings.EMAIL_SMTP_SERVER, settings.EMAIL_SMTP_PORT, context=ssl.create_default_context(), timeout=10) as server:
+                server.login(self.sender_email, self.sender_password)
+                server.send_message(message)
+            return True
+
+        return await asyncio.to_thread(send)
+
     async def send_password_reset_email(self, email: str, reset_url: str) -> Dict[str, Any]:
         """
         비밀번호 재설정 이메일 발송 (네이버웍스 우선, Gmail 폴백)

@@ -17,10 +17,102 @@ from app.crud import crud_refresh_token
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 import logging
+import threading
+import time
 import jwt
+import httpx
+from jose import jwt as jose_jwt, jwk, JWTError
+from jose.exceptions import JWKError
+from fastapi import HTTPException
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+_provider_client = httpx.Client(timeout=5.0)
+_jwks_cache: dict = {}
+_jwks_lock = threading.Lock()
+_jwks_ttl_seconds = 3600
+
+
+def _provider_keys(provider: str, kid: str) -> dict:
+    key_url = "https://www.googleapis.com/oauth2/v3/certs" if provider == "google" else "https://appleid.apple.com/auth/keys"
+    with _jwks_lock:
+        cached = _jwks_cache.get(provider)
+        if cached and cached[0] > time.monotonic():
+            if any(key.get("kid") == kid for key in cached[1]["keys"]):
+                return cached[1]
+        try:
+            response = _provider_client.get(key_url)
+            response.raise_for_status()
+            keys = response.json()
+            if not isinstance(keys, dict) or not isinstance(keys.get("keys"), list) or not keys["keys"] or not all(isinstance(key, dict) and isinstance(key.get("kid"), str) for key in keys["keys"]):
+                raise ValueError("invalid JWKS")
+            rsa_keys = [key for key in keys["keys"] if key.get("kty") == "RSA"]
+            if not rsa_keys:
+                raise ValueError("invalid JWKS")
+            for key in rsa_keys:
+                jwk.construct(key, algorithm="RS256")
+        except (httpx.HTTPError, JWKError, ValueError, TypeError, KeyError) as exc:
+            raise HTTPException(status_code=503, detail="소셜 인증 서비스를 사용할 수 없습니다.") from exc
+        _jwks_cache[provider] = (time.monotonic() + _jwks_ttl_seconds, keys)
+        return keys
+
+
+def verify_provider_identity(token: str, provider: str) -> dict:
+    allowed = settings.GOOGLE_ALLOWED_CLIENT_IDS if provider == "google" else settings.APPLE_ALLOWED_BUNDLE_IDS
+    audiences = {value.strip() for value in allowed.split(",") if value.strip()}
+    if not audiences:
+        raise HTTPException(status_code=503, detail="소셜 로그인 설정이 필요합니다.")
+    if not token:
+        raise HTTPException(status_code=401, detail="소셜 인증 토큰이 필요합니다.")
+    try:
+        header = jose_jwt.get_unverified_header(token)
+        kid = header.get("kid")
+        if not isinstance(kid, str) or not kid or header.get("alg") != "RS256":
+            raise JWTError("invalid header")
+    except (JWTError, TypeError, ValueError) as exc:
+        raise HTTPException(status_code=401, detail="소셜 인증 토큰이 유효하지 않습니다.") from exc
+    keys = _provider_keys(provider, kid)
+    if not any(key.get("kid") == kid for key in keys["keys"]):
+        raise HTTPException(status_code=401, detail="소셜 인증 토큰이 유효하지 않습니다.")
+    try:
+        claims = jose_jwt.decode(token, keys, algorithms=["RS256"], options={"verify_aud": False, "require_exp": True, "require_sub": True, "require_iss": True})
+        issuers = {"accounts.google.com", "https://accounts.google.com"} if provider == "google" else {"https://appleid.apple.com"}
+        if claims.get("iss") not in issuers or claims.get("aud") not in audiences or not isinstance(claims.get("sub"), str) or not claims["sub"]:
+            raise JWTError("invalid claims")
+        return claims
+    except (JWTError, TypeError, ValueError) as exc:
+        raise HTTPException(status_code=401, detail="소셜 인증 토큰이 유효하지 않습니다.") from exc
+
+
+def verify_kakao_identity(token: str) -> str:
+    allowed_app_id = settings.KAKAO_ALLOWED_APP_ID.strip()
+    if not allowed_app_id or not allowed_app_id.isascii() or not allowed_app_id.isdigit():
+        raise HTTPException(status_code=503, detail="소셜 로그인 설정이 필요합니다.")
+    if not token:
+        raise HTTPException(status_code=401, detail="소셜 인증 토큰이 필요합니다.")
+    try:
+        headers = {"Authorization": f"Bearer {token}"}
+        token_info = _provider_client.get("https://kapi.kakao.com/v1/user/access_token_info", headers=headers)
+        if token_info.status_code in (401, 403):
+            raise HTTPException(status_code=401, detail="소셜 인증 토큰이 유효하지 않습니다.")
+        token_info.raise_for_status()
+        token_data = token_info.json()
+        app_id = token_data.get("app_id")
+        token_user_id = token_data.get("id")
+        if isinstance(app_id, bool) or str(app_id) != allowed_app_id:
+            raise HTTPException(status_code=401, detail="소셜 인증 토큰이 유효하지 않습니다.")
+        response = _provider_client.get("https://kapi.kakao.com/v2/user/me", headers=headers)
+        if response.status_code in (401, 403):
+            raise HTTPException(status_code=401, detail="소셜 인증 토큰이 유효하지 않습니다.")
+        response.raise_for_status()
+        user_id = response.json().get("id")
+        if not isinstance(user_id, int) or isinstance(user_id, bool) or user_id <= 0 or not isinstance(token_user_id, int) or isinstance(token_user_id, bool) or user_id != token_user_id:
+            raise ValueError("invalid provider identity")
+        return str(user_id)
+    except (httpx.HTTPError, ValueError, TypeError, AttributeError) as exc:
+        raise HTTPException(status_code=503, detail="소셜 인증 서비스를 사용할 수 없습니다.") from exc
+
 
 def create_access_token_for_social(user_id: int, expires_delta: Optional[timedelta] = None) -> str:
     """소셜 로그인용 JWT 토큰 생성"""
@@ -252,13 +344,15 @@ class MemberService:
 
     def google_login(self, db: Session, google_data: GoogleLoginRequest) -> GoogleLoginResponse:
         """Google 로그인 처리"""
+        claims = verify_provider_identity(getattr(google_data, "id_token", None) or getattr(google_data, "access_token", None), "google")
+        google_data = google_data.model_copy(update={"google_id": claims["sub"], "email": claims.get("email") if claims.get("email_verified") is True else None, "name": claims.get("name"), "given_name": claims.get("given_name"), "image": claims.get("picture")})
         try:
             # 1. 이메일로 기존 사용자 우선 확인 (이메일 기반 조회 우선)
             existing_member = None
             is_new_user = True
             lookup_method = "none"
             
-            logger.info(f"🔍 Google 로그인 시작 - email: {google_data.email}, google_id: {google_data.google_id}")
+            logger.info("Google 로그인 시작")
 
             # 필수 데이터 검증
             if not google_data.google_id and not google_data.email:
@@ -267,21 +361,6 @@ class MemberService:
                     success=False,
                     message="Google ID 또는 이메일이 필요합니다."
                 )
-
-            # 이메일로 기존 사용자 조회 (우선순위 1)
-            if google_data.email:
-                existing_member = self.crud.get_by_email(db, google_data.email)
-                if existing_member:
-                    logger.info(f"✅ 이메일로 기존 사용자 발견 - mt_idx: {existing_member.mt_idx}, email: {existing_member.mt_email}")
-                    is_new_user = False
-                    lookup_method = "email"
-
-                    # Google ID가 없는 경우 추가
-                    if google_data.google_id and not existing_member.mt_google_id:
-                        existing_member.mt_google_id = google_data.google_id
-                        existing_member.mt_type = 4  # Google 로그인 타입
-                        db.commit()
-                        logger.info(f"🔗 기존 사용자에 Google ID 연결 완료")
 
             # Google ID로 사용자 조회 (우선순위 2)
             if not existing_member and google_data.google_id:
@@ -359,7 +438,7 @@ class MemberService:
                     "mt_file1": google_data.image or "",
                 }
                 
-                logger.info(f"✅ 신규 사용자 정보 반환 (DB 저장 없음) - email: {google_data.email}")
+                logger.info("신규 소셜 사용자")
                 
                 return GoogleLoginResponse(
                     success=True,
@@ -390,13 +469,15 @@ class MemberService:
 
     def apple_login(self, db: Session, apple_data: AppleLoginRequest) -> AppleLoginResponse:
         """Apple 로그인 처리"""
+        claims = verify_provider_identity(apple_data.identityToken, "apple")
+        apple_data = apple_data.model_copy(update={"userIdentifier": claims["sub"], "email": claims.get("email") if claims.get("email_verified") in (True, "true") else None})
         try:
             # 1. Apple ID로 기존 사용자 우선 확인
             existing_member = None
             is_new_user = True
             lookup_method = "none"
             
-            logger.info(f"🔍 Apple 로그인 시작 - userIdentifier: {apple_data.userIdentifier}, email: {apple_data.email}")
+            logger.info("Apple 로그인 시작")
 
             # Apple ID로 사용자 조회 (우선순위 1)
             existing_member = db.query(Member).filter(Member.mt_apple_id == apple_data.userIdentifier).first()
@@ -405,20 +486,6 @@ class MemberService:
                 is_new_user = False
                 lookup_method = "apple_id"
             
-            # 이메일로 기존 사용자 조회 (우선순위 2)
-            if not existing_member and apple_data.email:
-                existing_member = self.crud.get_by_email(db, apple_data.email)
-                if existing_member:
-                    logger.info(f"✅ 이메일로 기존 사용자 발견 - mt_idx: {existing_member.mt_idx}, email: {existing_member.mt_email}")
-                    is_new_user = False
-                    lookup_method = "email"
-
-                    # Apple ID 연결
-                    existing_member.mt_apple_id = apple_data.userIdentifier
-                    existing_member.mt_type = 5  # Apple 로그인 타입 (임의 지정, 프로젝트 규칙에 따라 조정 가능)
-                    db.commit()
-                    logger.info(f"🔗 기존 사용자에 Apple ID 연결 완료")
-
             if existing_member:
                 # 기존 사용자 로그인 처리
                 if not self.crud.is_active(existing_member):
@@ -654,4 +721,4 @@ class MemberService:
         }
 
 # 서비스 인스턴스 생성
-member_service = MemberService() 
+member_service = MemberService()

@@ -566,7 +566,7 @@ def create_recurring_schedules(db: Session, parent_schedule_id: int, base_params
         db.rollback()
         raise e
 
-@router.get("/test-all-columns")
+@router.get("/test-all-columns", dependencies=[Depends(deps.get_required_admin_id)])
 def test_all_columns(
     current_user_id: int = Query(1186, description="현재 사용자 ID"),
     db: Session = Depends(deps.get_db)
@@ -2033,7 +2033,7 @@ def create_new_schedule(db: Session, group_id: int, current_user_id: int, schedu
         logger.error(f"💥 [CREATE_NEW_SCHEDULE] 스케줄 생성 오류: {e}")
         raise
 
-@router.get("/debug/schedule/{schedule_id}")
+@router.get("/debug/schedule/{schedule_id}", dependencies=[Depends(deps.get_required_admin_id)])
 def debug_schedule_info(
     schedule_id: int,
     current_user_id: int = Query(1186, description="현재 사용자 ID"),

@@ -82,13 +82,13 @@ class MemberLoginResponse(BaseModel):
 # 회원가입 요청 스키마 (프론트엔드와 호환)
 class RegisterRequest(BaseModel):
     mt_type: Optional[int] = 1
-    mt_level: Optional[int] = 2
-    mt_status: Optional[int] = 1
     mt_id: str  # 전화번호 (소셜 로그인은 이메일 또는 ID)
     mt_pwd: Optional[str] = None  # 소셜 로그인은 비밀번호 없음
     mt_name: str
     mt_nickname: str
     mt_email: Optional[str] = None
+    mt_hp: Optional[str] = None
+    email_verification_token: Optional[str] = None
     mt_birth: Optional[str] = None  # YYYY-MM-DD 형식
     mt_gender: Optional[int] = None
     mt_file1: Optional[str] = None  # 프로필 이미지 경로
@@ -107,6 +107,8 @@ class RegisterRequest(BaseModel):
     mt_google_id: Optional[str] = None
     mt_kakao_id: Optional[str] = None
     mt_apple_id: Optional[str] = None
+    social_provider: Optional[str] = None
+    social_token: Optional[str] = None
 
 class RegisterResponse(BaseModel):
     success: bool
@@ -115,11 +117,12 @@ class RegisterResponse(BaseModel):
 
 # Google 로그인 요청 스키마
 class GoogleLoginRequest(BaseModel):
-    google_id: str
-    email: str
-    name: str
+    google_id: Optional[str] = None
+    email: Optional[str] = None
+    name: Optional[str] = None
     image: Optional[str] = None
     access_token: Optional[str] = None
+    id_token: Optional[str] = None
 
 # Google 로그인 응답 스키마
 class GoogleLoginResponse(BaseModel):

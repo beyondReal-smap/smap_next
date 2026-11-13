@@ -9,7 +9,9 @@ from typing import Optional, Tuple
 from jose import jwt, JWTError
 from fastapi import APIRouter, Depends, HTTPException, status, Body, Request
 from fastapi.security import OAuth2PasswordBearer
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from app.db.session import get_db
 from app.crud import crud_auth, crud_refresh_token
 from app.schemas.auth import (
@@ -38,11 +40,14 @@ from app.schemas.member import AppleLoginRequest, AppleLoginResponse
 from app.core.config import settings
 from app.api.v1.endpoints.sms import (
     _get_verification_code, _delete_verification_code,
-    _is_verified, _clear_verified,
+    _is_verified, _clear_verified, _check_verification_attempts,
 )
-from app.models.member import Member
+from app.models.member import Member, is_active_member, active_member_conditions
+from app.api.v1.endpoints.email_auth import router as email_auth_router, verify_email_token
+from app.api import deps
 
 router = APIRouter()
+router.include_router(email_auth_router)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # 로거 설정
@@ -98,15 +103,21 @@ def login_for_home_page(
     home/page.tsx의 AuthContext에서 사용하는 로그인 API
     """
     try:
-        # 이메일 또는 전화번호로 사용자 조회
-        user = None
-        if "@" in login_request.mt_id:
-            # 이메일로 조회
-            user = crud_auth.get_user_by_email(db, login_request.mt_id)
+        login_id = login_request.mt_id.strip()
+        if '@' in login_id:
+            login_id = login_id.lower()
         else:
-            # 전화번호로 조회 (하이픈 제거)
-            user = crud_auth.get_user_by_phone(db, login_request.mt_id.replace("-", ""))
-        
+            login_id = login_id.replace('-', '')
+        user = crud_auth.get_user_by_phone(db, login_id)
+        if not user and '@' in login_id:
+            matches = db.query(Member).filter(
+                func.lower(func.trim(Member.mt_email)) == login_id,
+                *active_member_conditions()
+            ).limit(2).all()
+            if len(matches) > 1:
+                logger.warning('[LOGIN] 이메일에 일치하는 활성 회원이 중복됩니다.')
+                raise HTTPException(status_code=400, detail='계정을 특정할 수 없습니다. 고객센터에 문의해주세요.')
+            user = matches[0] if matches else None
         logger.info(f"[LOGIN] 사용자 조회 결과: {user.mt_idx if user else 'None'}, mt_id: {login_request.mt_id}")
         
         if not user:
@@ -128,6 +139,9 @@ def login_for_home_page(
                 success=False,
                 message="아이디 또는 비밀번호가 올바르지 않습니다."
             )
+
+        if not is_active_member(user):
+            return LoginResponseHome(success=False, message='비활성화된 계정입니다. 고객센터에 문의해주세요.')
 
         # 토큰 생성
         access_token = create_access_token(
@@ -202,7 +216,10 @@ def login_for_home_page(
             }
         )
 
-    except Exception as e:
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("[LOGIN] 로그인 처리 실패")
         return LoginResponseHome(
             success=False,
             message="서버 오류가 발생했습니다."
@@ -238,8 +255,7 @@ def refresh_token(
     토큰 갱신.
     - v2 (권장): body `{"refresh_token": "..."}` → rotation.
       새 access + 새 refresh를 반환한다. reuse 감지 시 해당 체인 전체 revoke.
-    - v1 (하위 호환): Authorization: Bearer <access_token> → access만 재발급.
-      구 클라이언트 호환용. Phase D에서 최소 버전 상향으로 차단 예정.
+    - access token 단독 갱신은 허용하지 않습니다.
     """
     # ── v2 경로 ─────────────────────────────────────────────────────────
     if body and isinstance(body, dict):
@@ -255,7 +271,7 @@ def refresh_token(
                 )
             new_raw, mt_idx, _chain = result
             user = db.query(Member).filter(Member.mt_idx == mt_idx).first()
-            if user is None:
+            if not is_active_member(user):
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="사용자를 찾을 수 없습니다.",
@@ -275,39 +291,7 @@ def refresh_token(
                 "message": "토큰이 갱신되었습니다.",
             }
 
-    # ── v1 경로 (하위 호환) ─────────────────────────────────────────────
-    auth_header = request.headers.get("authorization", "") if request else ""
-    if not auth_header.lower().startswith("bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="토큰이 필요합니다.",
-        )
-    access = auth_header[7:].strip()
-    try:
-        payload = jwt.decode(access, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        mt_idx: Optional[int] = payload.get("mt_idx") or payload.get("sub")
-        if mt_idx is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="토큰이 유효하지 않습니다.",
-            )
-        new_token = create_access_token(
-            data={
-                "mt_idx": mt_idx,
-                "mt_id": payload.get("mt_id"),
-                "mt_name": payload.get("mt_name"),
-            }
-        )
-        return {
-            "success": True,
-            "token": new_token,
-            "message": "토큰이 갱신되었습니다.",
-        }
-    except JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="토큰 갱신에 실패했습니다.",
-        )
+    raise HTTPException(status_code=401, detail="Refresh token이 필요합니다.")
 
 # 기존 로그인 API (하위 호환성을 위해 유지)
 @router.post("/login-original", response_model=LoginResponse)
@@ -353,38 +337,57 @@ def login_for_access_token_custom(
 @router.post("/register", response_model=LoginResponseHome, status_code=status.HTTP_201_CREATED)
 async def register_user(
     request: Request,
+    user_in: RegisterRequest,
     db: Session = Depends(get_db)
 ):
-    # 요청 본문 로깅
-    try:
-        body = await request.json()
-        logger.info(f"📝 Register request body: {body}")
-    except Exception as e:
-        logger.error(f"❌ Failed to parse request body: {e}")
-        raise HTTPException(status_code=400, detail="Invalid request body")
-    
-    # 수동으로 RegisterRequest 생성
-    try:
-        user_in = RegisterRequest(**body)
-    except Exception as e:
-        logger.error(f"❌ Pydantic validation error: {e}")
-        raise HTTPException(status_code=422, detail="요청 데이터 형식이 올바르지 않습니다.")
-    
-    existing_user_by_phone = crud_auth.get_user_by_phone(db, user_in.mt_id.replace("-", ""))
-    if existing_user_by_phone:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="이미 등록된 전화번호입니다.",
-        )
-    
-    if user_in.mt_email and user_in.mt_email.strip():
-        existing_user_by_email = crud_auth.get_user_by_email(db, user_in.mt_email)
-        if existing_user_by_email:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="이미 등록된 이메일입니다.",
-            )
-    
+    if user_in.email_verification_token:
+        email = (user_in.mt_email or '').strip().lower()
+        verify_email_token(user_in.email_verification_token, email, 'register')
+        user_in.mt_email = email
+        user_in.mt_id = email
+        if db.query(Member).filter(func.lower(func.trim(Member.mt_email)) == email).first() or crud_auth.get_user_by_phone(db, email):
+            raise HTTPException(status_code=409, detail="이미 가입된 이메일입니다.")
+    else:
+        phone = (user_in.mt_hp or user_in.mt_id).replace('-', '').replace(' ', '')
+        if not phone.isdigit() or not _is_verified(phone):
+            raise HTTPException(status_code=400, detail="본인인증이 필요합니다.")
+        user_in.mt_id = phone
+        user_in.mt_hp = phone
+        if crud_auth.get_user_by_phone(db, phone):
+            raise HTTPException(status_code=409, detail="이미 등록된 전화번호입니다.")
+        if user_in.mt_email:
+            user_in.mt_email = user_in.mt_email.strip().lower()
+            if db.query(Member).filter(func.lower(func.trim(Member.mt_email)) == user_in.mt_email).first():
+                raise HTTPException(status_code=409, detail="이미 등록된 이메일입니다.")
+
+    supplied_social_ids = (user_in.mt_google_id, user_in.mt_apple_id, user_in.mt_kakao_id)
+    if user_in.social_provider:
+        from app.services.member_service import verify_provider_identity, verify_kakao_identity
+        provider = user_in.social_provider.lower()
+        if provider not in ("google", "apple", "kakao"):
+            raise HTTPException(status_code=400, detail="지원하지 않는 소셜 공급자입니다.")
+        if provider == "kakao":
+            verified_id = await run_in_threadpool(verify_kakao_identity, user_in.social_token)
+        else:
+            claims = await run_in_threadpool(verify_provider_identity, user_in.social_token, provider)
+            verified_id = claims["sub"]
+        claimed = {"google": user_in.mt_google_id, "apple": user_in.mt_apple_id, "kakao": user_in.mt_kakao_id}
+        if any(value and (key != provider or value != verified_id) for key, value in claimed.items()):
+            raise HTTPException(status_code=400, detail="소셜 계정 정보가 일치하지 않습니다.")
+        column = {"google": Member.mt_google_id, "apple": Member.mt_apple_id, "kakao": Member.mt_kakao_id}[provider]
+        if db.query(Member).filter(column == verified_id).first():
+            raise HTTPException(status_code=409, detail="이미 연결된 소셜 계정입니다.")
+        setattr(user_in, f"mt_{provider}_id", verified_id)
+    elif any(supplied_social_ids) or user_in.social_token:
+        raise HTTPException(status_code=400, detail="소셜 계정 연결은 공급자 인증이 필요합니다.")
+    user_in.mt_type = 1
+
+    if not user_in.mt_pwd:
+        raise HTTPException(status_code=400, detail="비밀번호가 필요합니다.")
+    valid, errors = crud_auth.validate_password_policy(user_in.mt_pwd)
+    if not valid:
+        raise HTTPException(status_code=400, detail=', '.join(errors))
+
     try:
         created_user = crud_auth.create_user(db=db, user_in=user_in)
         
@@ -429,11 +432,17 @@ async def register_user(
             "mt_adate": created_user.mt_adate.isoformat() if created_user.mt_adate else datetime.utcnow().isoformat()
         }
         
+        refresh_raw = _issue_refresh_for(db, created_user.mt_idx, request)
+        if not user_in.email_verification_token:
+            _clear_verified(user_in.mt_id)
+
         return LoginResponseHome(
             success=True,
             message="회원가입 성공",
             data={
                 "token": access_token,
+                "refresh_token": refresh_raw,
+                "expires_in": _access_expires_in_seconds(),
                 "user": user_data
             }
         )
@@ -448,27 +457,11 @@ async def register_user(
         )
 
 @router.get("/me", response_model=UserIdentity)
-def read_users_me(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        mt_id: Optional[str] = payload.get("mt_id")
-        if mt_id is None:
-            raise credentials_exception
-        
-        user = crud_auth.get_user_by_phone(db, mt_id)
-        if user is None:
-            raise credentials_exception
-        
-        user_identity = crud_auth.create_user_identity_from_member(user)
-        return user_identity
-        
-    except JWTError:
-        raise credentials_exception 
+def read_users_me(user_id: int = Depends(deps.get_required_user_id), db: Session = Depends(get_db)):
+    user = crud_auth.get_user_by_idx(db, user_id)
+    if not user:
+        raise HTTPException(status_code=401, detail="인증이 필요합니다.")
+    return crud_auth.create_user_identity_from_member(user)
 
 @router.post("/kakao-login", response_model=KakaoLoginResponse)
 def kakao_login(
@@ -479,8 +472,10 @@ def kakao_login(
     """
     카카오 로그인 API
     """
+    from app.services.member_service import verify_kakao_identity
+    verified_id = verify_kakao_identity(kakao_request.access_token)
+    kakao_request = kakao_request.model_copy(update={"kakao_id": verified_id, "email": None, "profile_image": None})
     try:
-        logger.info(f"[KAKAO LOGIN] 카카오 로그인 요청: kakao_id={kakao_request.kakao_id}")
         
         # 기존 카카오 사용자 조회
         existing_user = crud_auth.get_user_by_kakao_id(db, kakao_request.kakao_id)
@@ -497,7 +492,7 @@ def kakao_login(
                 )
 
             # 차단/비노출 사용자 확인
-            if existing_user.mt_status != 1 or existing_user.mt_show != 'Y':
+            if not is_active_member(existing_user):
                 logger.warning(f"[KAKAO LOGIN] 비활성 사용자 로그인 시도: mt_idx={existing_user.mt_idx}")
                 return KakaoLoginResponse(
                     success=False,
@@ -508,50 +503,7 @@ def kakao_login(
             logger.info(f"[KAKAO LOGIN] 기존 카카오 사용자 로그인: mt_idx={existing_user.mt_idx}")
             user = existing_user
         else:
-            # 이메일로 기존 계정 조회 (이메일이 있는 경우)
-            if kakao_request.email:
-                email_user = crud_auth.get_user_by_email(db, kakao_request.email)
-                if email_user:
-                    # 탈퇴한 사용자인지 확인
-                    if email_user.mt_level == 1:
-                        logger.warning(f"[KAKAO LOGIN] 탈퇴한 이메일 계정 로그인 시도: mt_idx={email_user.mt_idx}")
-                        return KakaoLoginResponse(
-                            success=False,
-                            message="탈퇴한 계정입니다. 새로운 계정으로 가입해주세요."
-                        )
-                    
-                    # 기존 계정에 카카오 ID 연결
-                    logger.info(f"[KAKAO LOGIN] 기존 이메일 계정에 카카오 연결: mt_idx={email_user.mt_idx}")
-                    email_user.mt_kakao_id = kakao_request.kakao_id
-                    email_user.mt_type = 2  # 카카오 로그인
-                    if kakao_request.profile_image:
-                        email_user.mt_file1 = kakao_request.profile_image
-                    db.commit()
-                    user = email_user
-                else:
-                    # 신규 사용자 - 회원가입 필요 (자동 생성하지 않음)
-                    logger.info(f"[KAKAO LOGIN] 신규 카카오 사용자 - 회원가입 필요: email={kakao_request.email}")
-                    return KakaoLoginResponse(
-                        success=True,
-                        message="신규 사용자입니다. 회원가입을 진행해주세요.",
-                        data={
-                            "is_new_user": True,
-                            "user": None,
-                            "token": None
-                        }
-                    )
-            else:
-                # 이메일 없이 신규 사용자 - 회원가입 필요 (자동 생성하지 않음)
-                logger.info(f"[KAKAO LOGIN] 신규 카카오 사용자 (이메일 없음) - 회원가입 필요: kakao_id={kakao_request.kakao_id}")
-                return KakaoLoginResponse(
-                    success=True,
-                    message="신규 사용자입니다. 회원가입을 진행해주세요.",
-                    data={
-                        "is_new_user": True,
-                        "user": None,
-                        "token": None
-                    }
-                )
+            return KakaoLoginResponse(success=True, message="신규 사용자입니다. 회원가입을 진행해주세요.", data={"is_new_user": True, "user": None, "token": None})
 
         # 로그인 시간 업데이트
         user.mt_ldate = datetime.utcnow()
@@ -637,7 +589,7 @@ def kakao_login(
             message="카카오 로그인 처리 중 오류가 발생했습니다."
         ) 
 
-@router.post("/find-user-by-email", response_model=GoogleUserDataResponse)
+@router.post("/find-user-by-email", response_model=GoogleUserDataResponse, dependencies=[Depends(deps.get_required_admin_id)])
 def find_user_by_email(
     request: GoogleUserDataRequest,
     db: Session = Depends(get_db)
@@ -838,7 +790,7 @@ def find_user_by_email(
             message="서버 오류가 발생했습니다."
                 )
 
-@router.post("/find-user-by-phone", response_model=GoogleUserDataResponse)
+@router.post("/find-user-by-phone", response_model=GoogleUserDataResponse, dependencies=[Depends(deps.get_required_admin_id)])
 def find_user_by_phone(
     request: PhoneUserDataRequest,
     db: Session = Depends(get_db)
@@ -1048,97 +1000,16 @@ def find_user_by_phone(
         )
 
 @router.post("/google-login", response_model=GoogleLoginResponse)
-async def google_login(
-    request: Request,
-    db: Session = Depends(get_db)
-):
-    """
-    Google 로그인 처리 (422 에러 방지용으로 request 객체 직접 사용)
-    """
-    try:
-        from app.services.member_service import member_service
+def google_login(google_data: GoogleLoginRequest, db: Session = Depends(get_db)):
+    from app.services.member_service import member_service
+    return member_service.google_login(db, google_data)
 
-        # 요청 본문 직접 파싱 (Pydantic 검증 우회)
-        try:
-            body = await request.json()
-            logger.info(f"🔍 Google 로그인 원본 요청 데이터: {body}")
-        except Exception as e:
-            logger.error(f"요청 본문 파싱 실패: {e}")
-            body = {}
-
-        # 필수 필드 검증
-        google_id = body.get('google_id')
-        email = body.get('email')
-        name = body.get('name')
-        id_token = body.get('id_token')
-
-        logger.info("🔍 Google 로그인 요청 데이터 검증:")
-        logger.info(f"   - google_id: {'있음' if google_id else '없음'} ({len(str(google_id)) if google_id else 0}자)")
-        logger.info(f"   - email: {email}")
-        logger.info(f"   - name: {name}")
-        logger.info(f"   - id_token: {'있음' if id_token else '없음'} ({len(str(id_token)) if id_token else 0}자)")
-
-        # 최소한의 필수 데이터 검증
-        if not google_id and not email:
-            logger.error("❌ Google ID와 이메일 모두 누락")
-            return GoogleLoginResponse(
-                success=False,
-                message="Google ID 또는 이메일이 필요합니다."
-            )
-
-        # Pydantic 모델 생성 (안전하게)
-        try:
-            google_data = GoogleLoginRequest(**body)
-            logger.info("✅ Google 로그인 데이터 모델 생성 성공")
-        except Exception as model_error:
-            logger.warning(f"⚠️ 모델 생성 실패 (무시하고 진행): {model_error}")
-            # 모델 생성 실패해도 계속 진행
-            google_data = GoogleLoginRequest(
-                google_id=google_id,
-                email=email,
-                name=name,
-                id_token=id_token
-            )
-
-        logger.info(f"✅ Google 로그인 데이터 검증 통과: {email or '이메일 없음'}")
-
-        # MemberService의 google_login 메소드 호출
-        result = member_service.google_login(db, google_data)
-
-        return result
-
-    except Exception as e:
-        logger.error(f"Google 로그인 실패: {str(e)}")
-        logger.error(f"에러 타입: {type(e)}")
-        import traceback
-        logger.error(f"스택 트레이스:\n{traceback.format_exc()}")
-
-        return GoogleLoginResponse(
-            success=False,
-            message="Google 로그인 처리 중 오류가 발생했습니다."
-        )
 
 @router.post("/apple-login", response_model=AppleLoginResponse)
-def apple_login(
-    apple_request: AppleLoginRequest,
-    db: Session = Depends(get_db)
-):
-    """
-    Apple 로그인 처리
-    """
-    try:
-        from app.services.member_service import member_service
-        logger.info(f"🔍 Apple 로그인 요청 수신: {apple_request.userIdentifier}")
-        
-        result = member_service.apple_login(db, apple_request)
-        return result
+def apple_login(apple_request: AppleLoginRequest, db: Session = Depends(get_db)):
+    from app.services.member_service import member_service
+    return member_service.apple_login(db, apple_request)
 
-    except Exception as e:
-        logger.error(f"Apple 로그인 실패: {str(e)}")
-        return AppleLoginResponse(
-            success=False,
-            message="Apple 로그인 처리 중 오류가 발생했습니다."
-        )
 
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)
 async def forgot_password(
@@ -1175,13 +1046,11 @@ async def forgot_password(
         user.mt_token_edate = token_expires
         db.commit()
         
-        logger.info(f"💾 토큰 데이터베이스 저장 완료: 사용자 {user.mt_idx}, 토큰: {short_token}, 만료시간: {token_expires}")
+        logger.info("비밀번호 재설정 토큰이 저장되었습니다.")
         
         # 비밀번호 재설정 링크 생성 (운영환경 도메인 적용, URL 단축)
         reset_url = f"https://nextstep.aiagnt.kr/r?t={short_token}"
         
-        logger.info(f"🔗 [테스트] 비밀번호 재설정 링크: {reset_url}")
-        logger.info(f"🔗 [테스트] 토큰: {short_token}")
         
         # 실제 SMS/이메일 전송 구현
         if forgot_data.type == 'phone':
@@ -1257,7 +1126,7 @@ def verify_reset_token(
         ).first()
         
         if not user:
-            logger.warning(f"토큰 검증 실패: 유효하지 않은 토큰 {token_data.token}")
+            logger.warning("토큰 검증 실패: 유효하지 않은 토큰")
             return VerifyResetTokenResponse(
                 success=False,
                 message="토큰이 만료되었거나 유효하지 않습니다."
@@ -1311,7 +1180,7 @@ def reset_password(
         ).first()
         
         if not user:
-            logger.warning(f"비밀번호 재설정: 유효하지 않은 토큰 {reset_data.token}")
+            logger.warning("비밀번호 재설정: 유효하지 않은 토큰")
             return ResetPasswordResponse(
                 success=False,
                 message="토큰이 만료되었거나 유효하지 않습니다."
@@ -1390,6 +1259,8 @@ def reset_password_by_phone(
         verified_by_state = _is_verified(clean_phone)
         if not verified_by_state:
             # 단독 호출 지원: 인증 완료 상태가 없으면 인증코드 직접 검증
+            if not _check_verification_attempts(clean_phone):
+                raise HTTPException(status_code=400, detail="인증번호가 만료되었습니다. 다시 요청해주세요.")
             stored_code = _get_verification_code(clean_phone)
             if not stored_code:
                 raise HTTPException(status_code=400, detail="SMS 인증을 먼저 완료해주세요.")
@@ -1449,6 +1320,8 @@ def reset_password_by_phone(
             }
         )
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"전화번호 기반 비밀번호 재설정 실패: {str(e)}")
         return ResetPasswordResponse(

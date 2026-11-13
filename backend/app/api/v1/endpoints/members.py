@@ -1,11 +1,15 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Header, UploadFile, File
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, or_
 from app.api import deps
 from app.core.config import settings
 from app.models.member import Member
 from app.models.group_detail import GroupDetail
+from app.models.group import Group
+from app.models.location import Location
+from app.models.enums import ShowEnum
+from app.crud import crud_refresh_token
 from app.schemas.member import (
     MemberCreate,
     MemberUpdate,
@@ -40,6 +44,7 @@ from app.models.enums import StatusEnum
 from datetime import datetime
 import logging
 import os
+import uuid
 import shutil
 from pathlib import Path
 
@@ -187,7 +192,7 @@ def change_password(
             "success": False
         }
 
-@router.post("/register", response_model=RegisterResponse)
+@router.post("/register", response_model=RegisterResponse, dependencies=[Depends(deps.get_required_admin_id)])
 def register_member(
     register_data: RegisterRequest,
     db: Session = Depends(deps.get_db)
@@ -770,99 +775,54 @@ def update_contact(
 @router.post("/withdraw")
 def withdraw_member(
     request: WithdrawRequest,
-    authorization: str = Header(None),
-    db: Session = Depends(deps.get_db)
+    user_id: int = Depends(deps.get_required_user_id),
+    db: Session = Depends(deps.get_db),
 ):
-    """
-    회원 탈퇴를 처리합니다.
-    실제 삭제가 아닌 mt_level을 1로 변경하고 탈퇴 관련 정보를 저장합니다.
-    """
-    logger.info("[WITHDRAW] 회원 탈퇴 요청 시작")
-
     try:
-        # 토큰에서 사용자 ID 추출
-        user_id = deps.get_current_user_id(authorization)
-        if not user_id:
-            logger.warning("[WITHDRAW] 인증 토큰이 없거나 유효하지 않음")
-            return {
-                "result": "N",
-                "message": "인증이 필요합니다.",
-                "success": False
-            }
-
-        logger.info(f"[WITHDRAW] 회원 탈퇴 요청 - user_id: {user_id}")
-        logger.info(f"[WITHDRAW] 탈퇴 사유: {request.mt_retire_chk}, 기타 사유: {request.mt_retire_etc}")
-
-        # 사용자 정보 확인
-        user = crud_auth.get_user_by_idx(db, user_id)
+        user = db.query(Member).filter(Member.mt_idx == user_id).with_for_update().first()
         if not user:
-            logger.warning(f"[WITHDRAW] 사용자를 찾을 수 없음 - user_id: {user_id}")
-            return {
-                "result": "N",
-                "message": "사용자를 찾을 수 없습니다.",
-                "success": False
-            }
-
-        # 이미 탈퇴한 회원인지 확인
-        if user.mt_level == 1:
-            logger.warning(f"[WITHDRAW] 이미 탈퇴한 회원 - user_id: {user_id}")
-            return {
-                "result": "N",
-                "message": "이미 탈퇴한 회원입니다.",
-                "success": False
-            }
-
-        # 탈퇴 처리
-        # 1. 이전 레벨 저장
+            raise HTTPException(status_code=401, detail="인증이 필요합니다.")
+        now = datetime.utcnow()
+        # 기존 그룹 삭제와 동일하게 소유 그룹을 비노출 처리합니다.
+        owned_ids = db.query(GroupDetail.sgt_idx).filter(
+            GroupDetail.mt_idx == user_id, GroupDetail.sgdt_owner_chk == "Y", GroupDetail.sgdt_show == "Y"
+        )
+        db.query(Group).filter(or_(Group.mt_idx == user_id, Group.sgt_idx.in_(owned_ids))).update(
+            {Group.sgt_show: ShowEnum.N, Group.sgt_udate: now}, synchronize_session=False
+        )
+        db.query(GroupDetail).filter(GroupDetail.mt_idx == user_id).update(
+            {GroupDetail.sgdt_show: "N", GroupDetail.sgdt_exit: "Y", GroupDetail.sgdt_udate: now}, synchronize_session=False
+        )
+        db.query(Location).filter(Location.mt_idx == user_id).update(
+            {Location.slt_show: ShowEnum.N, Location.slt_udate: now}, synchronize_session=False
+        )
+        crud_refresh_token.revoke_all_for_member(db, user_id, commit=False)
         user.mt_retire_level = user.mt_level
-
-        # 2. 탈퇴 레벨로 변경
         user.mt_level = 1
-
-        # 3. 탈퇴 사유 저장
+        user.mt_show = "N"
         user.mt_retire_chk = request.mt_retire_chk
         user.mt_retire_etc = request.mt_retire_etc
-
-        # 4. 탈퇴 일시 저장
-        user.mt_rdate = datetime.utcnow()
-
-        # 5. 탈퇴 아이디 저장 (기존 아이디를 탈퇴 아이디로 이동)
+        user.mt_rdate = now
         user.mt_id_retire = user.mt_id
-
-        # 6. 수정 일시 업데이트
-        user.mt_udate = datetime.utcnow()
-
-        # 데이터베이스에 저장
-        db.add(user)
+        user.mt_id = f"retired_{user_id}_{uuid.uuid4().hex}"
+        user.mt_email = None
+        user.mt_hp = None
+        user.mt_google_id = None
+        user.mt_apple_id = None
+        user.mt_kakao_id = None
+        user.mt_token_id = None
+        user.mt_token_updated_at = None
+        user.mt_token_expiry_date = None
+        user.mt_udate = now
         db.commit()
-
-        logger.info(f"[WITHDRAW] 회원 탈퇴 처리 완료 - user_id: {user_id}")
-        logger.info(f"[WITHDRAW] 탈퇴 정보 - 사유: {request.mt_retire_chk}, 기타: {request.mt_retire_etc}, 탈퇴일: {user.mt_rdate}")
-
-        return {
-            "result": "Y",
-            "message": "회원 탈퇴가 완료되었습니다.",
-            "success": True
-        }
-
-    except ValueError as e:
-        # 유효성 검사 오류
-        logger.warning(f"[WITHDRAW] 유효성 검사 오류 - user_id: {user_id if 'user_id' in locals() else 'unknown'}, error: {str(e)}")
-        return {
-            "result": "N",
-            "message": str(e),
-            "success": False
-        }
-
-    except Exception as e:
-        logger.error(f"[WITHDRAW] 서버 오류: {str(e)}")
-        import traceback
-        logger.error(traceback.format_exc())
-        return {
-            "result": "N",
-            "message": "서버 오류가 발생했습니다.",
-            "success": False
-        }
+        return {"result": "Y", "message": "회원 탈퇴가 완료되었습니다.", "success": True}
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception:
+        db.rollback()
+        logger.exception("회원 탈퇴 처리 실패")
+        raise HTTPException(status_code=500, detail="회원 탈퇴 처리에 실패했습니다.")
 
 # ==================== 동의 관리 엔드포인트 ====================
 

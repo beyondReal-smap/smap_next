@@ -12,113 +12,84 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Redis 불가 시 인메모리 fallback
-_verification_codes: dict[str, tuple[str, float]] = {}
-_verified_phones: dict[str, float] = {}  # 인증 완료 상태 인메모리 fallback
+def _required_redis():
+    try:
+        client = get_redis()
+        if client is None:
+            raise HTTPException(status_code=503, detail="인증 서비스를 사용할 수 없습니다.")
+        return client
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("SMS 인증 저장소 오류: %s", type(exc).__name__)
+        raise HTTPException(status_code=503, detail="인증 서비스를 사용할 수 없습니다.") from exc
 
-
-# ---------------------------------------------------------------------------
-# Redis 기반 인증코드 저장/조회/삭제 + 레이트리밋
-# ---------------------------------------------------------------------------
 
 def _store_verification_code(phone: str, code: str):
-    """인증코드를 Redis에 저장 (3분 TTL)"""
-    r = get_redis()
-    if r:
-        try:
-            r.setex(f"sms:code:{phone}", 180, code)
-            return
-        except Exception:
-            logger.warning("Redis 저장 실패, 인메모리 fallback 사용")
-    # Redis 불가 시 인메모리 fallback
-    _verification_codes[phone] = (code, time.time() + 180)
+    try:
+        _required_redis().setex(f"sms:code:{phone}", 180, code)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="인증 서비스를 사용할 수 없습니다.") from exc
 
 
 def _get_verification_code(phone: str) -> str | None:
-    """Redis에서 인증코드 조회"""
-    r = get_redis()
-    if r:
-        try:
-            code = r.get(f"sms:code:{phone}")
-            return code if code else None
-        except Exception:
-            logger.warning("Redis 조회 실패, 인메모리 fallback 사용")
-    # 인메모리 fallback
-    entry = _verification_codes.get(phone)
-    if entry and entry[1] > time.time():
-        return entry[0]
-    return None
+    try:
+        return _required_redis().get(f"sms:code:{phone}")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="인증 서비스를 사용할 수 없습니다.") from exc
 
 
 def _delete_verification_code(phone: str):
-    """인증코드 삭제"""
-    r = get_redis()
-    if r:
-        try:
-            r.delete(f"sms:code:{phone}")
-        except Exception:
-            pass
-    _verification_codes.pop(phone, None)
+    try:
+        _required_redis().delete(f"sms:code:{phone}")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="인증 서비스를 사용할 수 없습니다.") from exc
 
-
-# ---------------------------------------------------------------------------
-# 인증 완료 상태 저장/조회/삭제 (verify-code → reset-password 플로우 지원)
-# ---------------------------------------------------------------------------
 
 def _mark_verified(phone: str):
-    """인증 완료 상태를 Redis에 저장 (5분 TTL)"""
-    r = get_redis()
-    if r:
-        try:
-            r.setex(f"sms:verified:{phone}", 300, "1")
-            return
-        except Exception:
-            logger.warning("Redis 인증 완료 상태 저장 실패, 인메모리 fallback 사용")
-    # Redis 불가 시 인메모리 fallback
-    _verified_phones[phone] = time.time() + 300
+    try:
+        _required_redis().setex(f"sms:verified:{phone}", 300, "1")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="인증 서비스를 사용할 수 없습니다.") from exc
 
 
 def _is_verified(phone: str) -> bool:
-    """인증 완료 상태 확인"""
-    r = get_redis()
-    if r:
-        try:
-            result = r.get(f"sms:verified:{phone}")
-            if result:
-                return True
-        except Exception:
-            logger.warning("Redis 인증 완료 상태 조회 실패, 인메모리 fallback 사용")
-    # 인메모리 fallback
-    expiry = _verified_phones.get(phone)
-    if expiry and expiry > time.time():
-        return True
-    return False
+    try:
+        return bool(_required_redis().get(f"sms:verified:{phone}"))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="인증 서비스를 사용할 수 없습니다.") from exc
 
 
 def _clear_verified(phone: str):
-    """인증 완료 상태 삭제"""
-    r = get_redis()
-    if r:
-        try:
-            r.delete(f"sms:verified:{phone}")
-        except Exception:
-            pass
-    _verified_phones.pop(phone, None)
+    try:
+        _required_redis().delete(f"sms:verified:{phone}")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="인증 서비스를 사용할 수 없습니다.") from exc
 
 
 def _check_rate_limit(phone: str) -> bool:
-    """SMS 발송 레이트리밋 (시간당 5회)"""
-    r = get_redis()
-    if r:
-        try:
-            key = f"sms:rate:{phone}"
-            count = r.incr(key)
-            if count == 1:
-                r.expire(key, 3600)
-            return count <= 5
-        except Exception:
-            logger.warning("Redis 레이트리밋 체크 실패, 허용 처리")
-    return True
+    r = _required_redis()
+    try:
+        key = f"sms:rate:{phone}"
+        count = r.incr(key)
+        if count == 1:
+            r.expire(key, 3600)
+        return count <= 5
+    except Exception as exc:
+        logger.error("SMS 레이트리밋 저장소 오류: %s", type(exc).__name__)
+        raise HTTPException(status_code=503, detail="인증 서비스를 사용할 수 없습니다.") from exc
 
 
 # ---------------------------------------------------------------------------
@@ -186,6 +157,10 @@ async def send_verification_code(request: VerificationCodeRequest):
         if result['success']:
             # 서버 측에 코드 저장 (Redis 3분 TTL)
             _store_verification_code(clean_phone, code)
+            try:
+                _required_redis().delete(f"sms:attempts:{clean_phone}")
+            except Exception as exc:
+                raise HTTPException(status_code=503, detail="인증 서비스를 사용할 수 없습니다.") from exc
             return VerificationCodeResponse(success=True)
         else:
             return VerificationCodeResponse(
@@ -193,6 +168,8 @@ async def send_verification_code(request: VerificationCodeRequest):
                 error=result['message']
             )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"인증번호 발송 중 오류: {e}")
         return VerificationCodeResponse(
@@ -200,10 +177,27 @@ async def send_verification_code(request: VerificationCodeRequest):
             error="인증번호 발송 중 오류가 발생했습니다."
         )
 
+def _check_verification_attempts(clean_phone: str) -> bool:
+    r = _required_redis()
+    try:
+        attempts = r.incr(f"sms:attempts:{clean_phone}")
+        if attempts == 1:
+            r.expire(f"sms:attempts:{clean_phone}", 180)
+        if attempts > 5:
+            _delete_verification_code(clean_phone)
+            return False
+    except Exception as exc:
+        logger.error("SMS 인증 시도 저장소 오류: %s", type(exc).__name__)
+        raise HTTPException(status_code=503, detail="인증 서비스를 사용할 수 없습니다.") from exc
+    return True
+
+
 @router.post("/verify-code", response_model=VerifyCodeResponse)
 async def verify_code(request: VerifyCodeRequest):
     """인증번호 검증 API — 서버에 저장된 코드와 비교합니다."""
     clean_phone = request.phone_number.replace('-', '').replace(' ', '')
+    if not _check_verification_attempts(clean_phone):
+        return VerifyCodeResponse(success=False, error="인증번호가 만료되었습니다. 다시 요청해주세요.")
     stored_code = _get_verification_code(clean_phone)
 
     if not stored_code:
@@ -220,7 +214,7 @@ async def verify_code(request: VerifyCodeRequest):
 @router.post("/send", response_model=SMSResponse)
 async def send_sms(
     request: SMSRequest,
-    user_id: int = Depends(deps.get_required_user_id),
+    user_id: int = Depends(deps.get_required_admin_id),
 ):
     """
     일반 SMS 발송 API (Fixie 프록시를 통해 고정 IP 사용)

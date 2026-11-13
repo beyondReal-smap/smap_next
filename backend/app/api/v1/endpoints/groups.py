@@ -6,6 +6,8 @@ import hashlib
 import random
 import string
 from app.api import deps
+from app.core.config import settings
+import hmac
 from app.models.group import Group
 from app.models.group_detail import GroupDetail
 from app.models.schedule import Schedule
@@ -27,18 +29,28 @@ router = APIRouter()
 class GroupJoinRequest(BaseModel):
     mt_idx: int
     sgt_idx: int
+    sgt_code: Optional[str] = None
 
 # 초대 코드로 그룹 가입을 위한 스키마
 class GroupJoinByCodeRequest(BaseModel):
     mt_idx: int
     sgt_code: str
 
+def _check_invite_code(group: Group, code: Optional[str]) -> None:
+    if not code:
+        if settings.REQUIRE_GROUP_INVITE_CODE:
+            raise HTTPException(status_code=403, detail="초대 코드가 필요합니다.")
+        logger.warning("초대 코드 없이 그룹 가입 요청을 허용했습니다. group_id=%s", group.sgt_idx)
+        return
+    if not group.sgt_code or not hmac.compare_digest(code.upper().encode(), group.sgt_code.upper().encode()):
+        raise HTTPException(status_code=403, detail="초대 코드가 올바르지 않습니다.")
+
 # 멤버 탈퇴를 위한 스키마
 class MemberRemoveRequest(BaseModel):
     sgdt_show: str = 'N'
     sgdt_exit: str = 'Y'
 
-@router.get("/hidden", response_model=List[GroupResponse])
+@router.get("/hidden", response_model=List[GroupResponse], dependencies=[Depends(deps.get_required_admin_id)])
 def get_hidden_groups(
     db: Session = Depends(deps.get_db)
 ):
@@ -173,12 +185,13 @@ def join_group_by_code(
     """
     초대 코드를 사용하여 그룹에 가입합니다.
     """
-    logger.info(f"[JOIN_GROUP_BY_CODE] 그룹 가입 요청 - mt_idx: {request.mt_idx}, code: {request.sgt_code}")
+    if request.mt_idx != int(user_id):
+        raise HTTPException(status_code=403, detail="본인만 가입할 수 있습니다.")
     
     # 코드로 그룹 찾기
     group = Group.find_by_code(db, request.sgt_code.upper())
     if not group:
-        logger.error(f"[JOIN_GROUP_BY_CODE] 그룹을 찾을 수 없음 - code: {request.sgt_code}")
+        logger.warning("[JOIN_GROUP_BY_CODE] 유효하지 않은 초대 코드")
         raise HTTPException(status_code=404, detail="유효하지 않은 초대 코드입니다.")
         
     logger.info(f"[JOIN_GROUP_BY_CODE] 그룹 확인 완료 - sgt_idx: {group.sgt_idx}, title: {group.sgt_title}")
@@ -437,7 +450,7 @@ def update_group(
     그룹 정보를 업데이트합니다. (sgt_show='N'이면 소프트 삭제)
     """
     try:
-        logger.info(f"[UPDATE_GROUP] 그룹 업데이트 요청 시작 - group_id: {group_id}, data: {group_in.dict()}")
+        logger.info("[UPDATE_GROUP] 그룹 업데이트 요청 시작 - group_id: %s", group_id)
         
         # 먼저 그룹이 존재하는지 확인
         group = db.query(Group).filter(Group.sgt_idx == group_id).first()
@@ -476,7 +489,7 @@ def update_group(
         if group_in.sgt_code is not None:
             group.sgt_code = group_in.sgt_code
             updated = True
-            logger.info(f"[UPDATE_GROUP] sgt_code 업데이트: {group_in.sgt_code}")
+            logger.info("[UPDATE_GROUP] 초대 코드 업데이트")
             
         if group_in.mt_idx is not None:
             group.mt_idx = group_in.mt_idx
@@ -538,7 +551,7 @@ def restore_group(
     
     return group
 
-@router.post("/emergency-restore", response_model=GroupResponse)
+@router.post("/emergency-restore", response_model=GroupResponse, dependencies=[Depends(deps.get_required_admin_id)])
 def emergency_restore_group(
     db: Session = Depends(deps.get_db)
 ):
@@ -735,7 +748,8 @@ def join_group(
     그룹에 가입합니다.
     """
     logger.info(f"[JOIN_GROUP] 그룹 가입 요청 시작 - group_id: {group_id}, mt_idx: {join_request.mt_idx}")
-    logger.info(f"[JOIN_GROUP] 요청 상세 정보: {join_request.dict()}")
+    if join_request.mt_idx != int(user_id):
+        raise HTTPException(status_code=403, detail="본인만 가입할 수 있습니다.")
     
     # 그룹 존재 확인
     group = db.query(Group).filter(Group.sgt_idx == group_id).first()
@@ -749,6 +763,8 @@ def join_group(
         logger.error(f"[JOIN_GROUP] 숨겨진 그룹 - group_id: {group_id}, sgt_show: {group.sgt_show}")
         raise HTTPException(status_code=404, detail="존재하지 않는 그룹입니다.")
     
+    _check_invite_code(group, join_request.sgt_code)
+
     # 사용자 존재 확인
     member = db.query(Member).filter(Member.mt_idx == join_request.mt_idx).first()
     if not member:
@@ -850,12 +866,14 @@ def join_group(
 def join_new_member_to_group(
     group_id: int,
     join_request: GroupJoinRequest,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
-    새로 가입한 회원을 그룹에 가입시킵니다. (인증 없이 호출 가능)
+    인증된 회원 본인을 그룹에 가입시킵니다.
     """
-    logger.info(f"[JOIN_NEW_MEMBER] 새 회원 그룹 가입 요청 - group_id: {group_id}, mt_idx: {join_request.mt_idx}")
+    if join_request.mt_idx != int(user_id):
+        raise HTTPException(status_code=403, detail="본인만 가입할 수 있습니다.")
     
     # 그룹 존재 확인
     group = db.query(Group).filter(Group.sgt_idx == group_id).first()
@@ -865,6 +883,8 @@ def join_new_member_to_group(
     if group.sgt_show != 'Y':
         raise HTTPException(status_code=404, detail="존재하지 않는 그룹입니다.")
     
+    _check_invite_code(group, join_request.sgt_code)
+
     # 사용자 존재 확인
     member = db.query(Member).filter(Member.mt_idx == join_request.mt_idx).first()
     if not member:
@@ -983,10 +1003,6 @@ def get_group_public_info(
         "data": {
             "sgt_idx": group.sgt_idx,
             "sgt_title": group.sgt_title,
-            "sgt_content": group.sgt_content,
-            "sgt_memo": group.sgt_memo,
-            "sgt_show": group.sgt_show,
-            "sgt_wdate": group.sgt_wdate.isoformat() if group.sgt_wdate else None,
             "memberCount": member_count
         }
     }
@@ -1055,4 +1071,4 @@ def remove_member_from_group(
             "sgdt_exit": group_detail.sgdt_exit,
             "sgdt_udate": group_detail.sgdt_udate.isoformat()
         }
-    } 
+    }

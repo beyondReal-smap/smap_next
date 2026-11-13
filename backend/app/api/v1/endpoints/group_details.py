@@ -107,16 +107,14 @@ def get_group_member_details(
 @router.post("/", response_model=GroupDetailResponse)
 def create_group_detail(
     group_detail_in: GroupDetailCreate,
-    db: Session = Depends(deps.get_db)
+    user_id: int = Depends(deps.get_required_user_id),
+    db: Session = Depends(deps.get_db),
 ):
-    """
-    새로운 그룹 상세 정보를 생성합니다.
-    """
-    group_detail = GroupDetail(**group_detail_in.dict())
-    db.add(group_detail)
-    db.commit()
-    db.refresh(group_detail)
-    return group_detail
+    from app.api.v1.endpoints.groups import GroupJoinRequest, join_group
+    if group_detail_in.mt_idx != int(user_id) or group_detail_in.sgt_idx is None:
+        raise HTTPException(status_code=403, detail="본인만 가입할 수 있습니다.")
+    join_group(group_detail_in.sgt_idx, GroupJoinRequest(mt_idx=user_id, sgt_idx=group_detail_in.sgt_idx, sgt_code=group_detail_in.sgt_code), user_id, db)
+    return db.query(GroupDetail).filter(GroupDetail.mt_idx == user_id, GroupDetail.sgt_idx == group_detail_in.sgt_idx, GroupDetail.sgdt_show == "Y").first()
 
 @router.put("/{group_detail_id}", response_model=GroupDetailResponse)
 def update_group_detail(
@@ -132,6 +130,8 @@ def update_group_detail(
         raise HTTPException(status_code=404, detail="GroupDetail not found")
     
     update_data = group_detail_in.dict(exclude_unset=True)
+    if "mt_idx" in update_data or "sgt_idx" in update_data:
+        raise HTTPException(status_code=403, detail="그룹 또는 회원 식별자를 변경할 수 없습니다.")
     for field, value in update_data.items():
         setattr(group_detail, field, value)
     
@@ -221,4 +221,4 @@ def delete_group_detail(
     group_detail.sgdt_show = 'N'
     db.add(group_detail)
     db.commit()
-    return {"success": True, "message": "GroupDetail deleted successfully"} 
+    return {"success": True, "message": "GroupDetail deleted successfully"}

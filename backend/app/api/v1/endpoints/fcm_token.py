@@ -5,11 +5,28 @@ from app.models.member import Member
 from app.crud.crud_auth import get_current_member
 from app.schemas.fcm_token import FCMTokenUpdateRequest, FCMTokenResponse
 from app.core.response import create_response, SUCCESS, FAILURE
+from pydantic import BaseModel, Field
+import hmac
 import logging
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+class FCMUnregisterRequest(BaseModel):
+    fcm_token: str = Field(min_length=1, max_length=4096)
+
+
+@router.post("/unregister")
+def unregister_fcm_token(request: FCMUnregisterRequest, user_id: int = Depends(deps.get_required_user_id), db: Session = Depends(deps.get_db)):
+    user = db.query(Member).filter(Member.mt_idx == user_id).with_for_update().first()
+    if user and user.mt_token_id and hmac.compare_digest(user.mt_token_id.encode(), request.fcm_token.encode()):
+        user.mt_token_id = None
+        user.mt_token_updated_at = None
+        user.mt_token_expiry_date = None
+        db.commit()
+    return {"success": True}
+
 
 @router.post("/update", response_model=FCMTokenResponse)
 def update_fcm_token(
@@ -29,7 +46,7 @@ def update_fcm_token(
         FCMTokenResponse: 업데이트 결과
     """
     try:
-        logger.info(f"FCM 토큰 업데이트 요청 - 회원 ID: {current_member.mt_idx}, 토큰: {request.fcm_token[:50]}...")
+        logger.info("FCM 토큰 업데이트 요청 - 회원 ID: %s", current_member.mt_idx)
         
         # 토큰 변경 여부 확인
         token_changed = current_member.mt_token_id != request.fcm_token
@@ -52,7 +69,7 @@ def update_fcm_token(
             while silent_push_attempts < max_attempts:
                 try:
                     silent_push_attempts += 1
-                    logger.info(f"🤫 Silent Push 시도 {silent_push_attempts}/{max_attempts} - 토큰: {old_token[:30]}...")
+                    logger.info("Silent Push 시도 %s/%s", silent_push_attempts, max_attempts)
 
                     # 이전 토큰으로 Silent Push 전송하여 백그라운드 앱 깨우기
                     silent_response = firebase_service.send_silent_push_notification(
@@ -75,7 +92,7 @@ def update_fcm_token(
 
             # 새로운 토큰으로도 Silent Push 전송 (안전장치)
             try:
-                logger.info(f"🛡️ 새로운 토큰으로 추가 Silent Push 전송 - 토큰: {request.fcm_token[:30]}...")
+                logger.info("새 토큰으로 Silent Push 전송")
                 additional_response = firebase_service.send_silent_push_notification(
                     request.fcm_token,
                     reason="token_update_confirmation",
@@ -171,7 +188,7 @@ def notify_fcm_token_change(
 
         # 기존 토큰으로 Silent Push 전송하여 백그라운드 앱 깨우기
         try:
-            logger.info(f"🤫 Silent Push 전송 시작 - 토큰: {current_member.mt_token_id[:30]}...")
+            logger.info("Silent Push 전송 시작")
             response = firebase_service.send_silent_push_notification(
                 current_member.mt_token_id,
                 reason="token_change_notification",

@@ -1,9 +1,21 @@
-from sqlalchemy import Column, Integer, String, DateTime, Numeric, Enum, text, Date
+from sqlalchemy import Column, Integer, String, DateTime, Numeric, Enum, text, Date, or_
 from sqlalchemy.dialects.mysql import DECIMAL, TINYINT
 from app.models.base import BaseModel
 from datetime import datetime, date, timedelta
 from sqlalchemy.orm import Session
 from typing import Optional, List
+
+
+def is_active_member(member) -> bool:
+    return member is not None and member.mt_level != 1 and member.mt_status != 2 and member.mt_show != 'N'
+
+
+def active_member_conditions():
+    return (
+        or_(Member.mt_level.is_(None), Member.mt_level != 1),
+        or_(Member.mt_status.is_(None), Member.mt_status != 2),
+        or_(Member.mt_show.is_(None), Member.mt_show != 'N'),
+    )
 
 class Member(BaseModel):
     __tablename__ = "member_t"
@@ -115,8 +127,7 @@ class Member(BaseModel):
     def get_all_active(cls, db: Session) -> List['Member']:
         """활성 상태의 모든 회원을 조회합니다."""
         return db.query(cls).filter(
-            cls.mt_level > 1,
-            cls.mt_status == 1
+            *active_member_conditions()
         ).all()
 
     @classmethod
@@ -126,25 +137,23 @@ class Member(BaseModel):
             cls.mt_idx, cls.mt_nickname, cls.mt_name,
             cls.mt_lang, cls.mt_token_id, cls.mt_lat, cls.mt_long,
             cls.mt_level, cls.mt_status
-        ).filter(cls.mt_level > 1, cls.mt_status == 1).all()
+        ).filter(*active_member_conditions()).all()
 
     @classmethod
     def get_token_list(cls, db: Session) -> List['Member']:
         return db.query(cls).filter(
-            cls.mt_level > 1,
+            *active_member_conditions(),
             cls.mt_token_id.isnot(None),
-            cls.mt_token_id != "",
-            cls.mt_status == 1
+            cls.mt_token_id != ""
         ).all()
 
     @classmethod
     def get_token_expiring_soon(cls, db: Session, expiry_threshold: datetime) -> List['Member']:
         """만료 임박한 FCM 토큰을 가진 사용자 목록 조회"""
         return db.query(cls).filter(
-            cls.mt_level > 1,
+            *active_member_conditions(),
             cls.mt_token_id.isnot(None),
             cls.mt_token_id != "",
-            cls.mt_status == 1,
             cls.mt_token_expiry_date.isnot(None),
             cls.mt_token_expiry_date <= expiry_threshold
         ).order_by(cls.mt_token_expiry_date.asc()).all()
@@ -173,4 +182,4 @@ class Member(BaseModel):
             cls.mt_wdate.between(now_stime, now_etime),
             cls.mt_token_id.isnot(None),
             cls.mt_token_id != ""
-        ).all() 
+        ).all()

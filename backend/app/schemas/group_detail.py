@@ -31,7 +31,7 @@ class GroupDetailBase(BaseModel):
     sgdt_enter_chk: Optional[EnterCheckEnum] = None
 
 class GroupDetailCreate(GroupDetailBase):
-    pass
+    sgt_code: Optional[str] = None
 
 class GroupDetailUpdate(GroupDetailBase):
     pass

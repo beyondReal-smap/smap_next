@@ -23,9 +23,15 @@ class Settings(BaseSettings):
     VERSION: str = "1.0.0"
     # API 설정
     API_V1_STR: str = "/api/v1"
+    TRUSTED_CLIENT_IP_HEADER: str = ""
 
     # 디버그 모드 (테스트/디버그 엔드포인트 활성화)
     DEBUG: bool = False
+    EXPOSE_API_DOCS: bool = False
+    GOOGLE_ALLOWED_CLIENT_IDS: str = ""
+    APPLE_ALLOWED_BUNDLE_IDS: str = ""
+    KAKAO_ALLOWED_APP_ID: str = ""
+    REQUIRE_GROUP_INVITE_CODE: bool = False
 
     # CORS 설정
     BACKEND_CORS_ORIGINS: List[str] = [

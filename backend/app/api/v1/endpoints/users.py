@@ -2,11 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.api import deps
 from app.models.member import Member
+from app.crud.crud_auth import get_hashed_password
 from app.schemas.member import MemberCreate, MemberUpdate, MemberResponse
 from typing import List
 from datetime import datetime
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(deps.get_required_admin_id)])
 
 @router.get("/", response_model=List[MemberResponse])
 def get_users(db: Session = Depends(deps.get_db), skip: int = 0, limit: int = 100):
@@ -15,7 +16,9 @@ def get_users(db: Session = Depends(deps.get_db), skip: int = 0, limit: int = 10
 
 @router.post("/", response_model=MemberResponse)
 def create_user(user: MemberCreate, db: Session = Depends(deps.get_db)):
-    db_user = Member(**user.dict())
+    values = user.model_dump()
+    values["mt_pwd"] = get_hashed_password(values["mt_pwd"])
+    db_user = Member(**values)
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
@@ -48,7 +51,7 @@ def delete_user(user_id: int, db: Session = Depends(deps.get_db)):
     db.commit()
     return db_user
 
-@router.get("/email/{email}")
+@router.get("/email/{email}", response_model=MemberResponse)
 def get_user_by_email(email: str, db: Session = Depends(deps.get_db)):
     try:
         user = Member.find_by_email(db, email)
@@ -58,7 +61,7 @@ def get_user_by_email(email: str, db: Session = Depends(deps.get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/token/{token}")
+@router.get("/token/{token}", response_model=MemberResponse)
 def get_user_by_token(token: str, db: Session = Depends(deps.get_db)):
     try:
         user = Member.find_by_token(db, token)
@@ -72,7 +75,7 @@ def get_user_by_token(token: str, db: Session = Depends(deps.get_db)):
 def get_recent_signin_3h(db: Session = Depends(deps.get_db)):
     try:
         users = Member.get_sign_in_3(db)
-        return {"users": users}
+        return {"users": [MemberResponse.model_validate(user).model_dump() for user in users]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -80,7 +83,7 @@ def get_recent_signin_3h(db: Session = Depends(deps.get_db)):
 def get_recent_signin_24h(db: Session = Depends(deps.get_db)):
     try:
         users = Member.get_sign_in_24(db)
-        return {"users": users}
+        return {"users": [MemberResponse.model_validate(user).model_dump() for user in users]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -88,6 +91,6 @@ def get_recent_signin_24h(db: Session = Depends(deps.get_db)):
 def get_not_joined_11days(db: Session = Depends(deps.get_db)):
     try:
         users = Member.get_not_join_group_11(db)
-        return {"users": users}
+        return {"users": [MemberResponse.model_validate(user).model_dump() for user in users]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) 

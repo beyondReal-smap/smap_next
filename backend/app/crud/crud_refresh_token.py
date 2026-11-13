@@ -124,12 +124,13 @@ def revoke_by_raw(db: Session, raw_token: str) -> bool:
     return True
 
 
-def revoke_all_for_member(db: Session, mt_idx: int) -> int:
+def revoke_all_for_member(db: Session, mt_idx: int, *, commit: bool = True) -> int:
     """해당 회원의 모든 활성 refresh token을 revoke. `logout-all` 등에서 사용."""
     now = datetime.utcnow()
     result = db.query(RefreshToken).filter(
         RefreshToken.mt_idx == mt_idx,
         RefreshToken.revoked_at.is_(None),
     ).update({RefreshToken.revoked_at: now}, synchronize_session=False)
-    db.commit()
+    if commit:
+        db.commit()
     return int(result or 0)

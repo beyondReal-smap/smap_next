@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 import bcrypt
 from datetime import datetime # mt_wdate 등 날짜 필드용
-from app.models.member import Member  # member_t 테이블에 매핑된 모델
+from app.models.member import Member, active_member_conditions  # member_t 테이블에 매핑된 모델
 from app.schemas.auth import UserIdentity, RegisterRequest # RegisterRequest 임포트
 from app.core.config import settings
 from typing import Optional
@@ -30,9 +30,7 @@ def get_user_by_idx(db: Session, mt_idx: int) -> Optional[Member]:
     """사용자 인덱스로 사용자를 조회합니다."""
     return db.query(Member).filter(
         Member.mt_idx == mt_idx,
-        Member.mt_level >= 2, # 정상회원 레벨 이상 (탈퇴회원 mt_level=1 제외)
-        Member.mt_status == 1, # 정상상태
-        Member.mt_show == 'Y' # 노출여부
+        *active_member_conditions()
     ).first()
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -163,9 +161,9 @@ def create_user(db: Session, user_in: RegisterRequest) -> Member:
         hashed_password = get_hashed_password(user_in.mt_pwd)
         
     # mt_hp (전화번호) 처리 - mt_id가 전화번호 형식이면 mt_hp로 사용
-    mt_hp_val = ""
-    clean_id = user_in.mt_id.replace("-", "")
-    if clean_id.isdigit():
+    clean_id = user_in.mt_id if "@" in user_in.mt_id else user_in.mt_id.replace("-", "")
+    mt_hp_val = (user_in.mt_hp or "").replace("-", "").replace(" ", "")
+    if not mt_hp_val and clean_id.isdigit():
         mt_hp_val = clean_id
     
     # 프로필 이미지 처리 - mt_file1 컬럼이 50자 제한이므로 긴 URL은 랜덤 아바타로 대체
@@ -186,9 +184,9 @@ def create_user(db: Session, user_in: RegisterRequest) -> Member:
         mt_email=user_in.mt_email,
         mt_nickname=user_in.mt_nickname,
         mt_hp=mt_hp_val, # mt_hp 설정
-        mt_type=user_in.mt_type or 1,
-        mt_level=user_in.mt_level or 2, # 기본값: 일반(무료)
-        mt_status=user_in.mt_status or 1, # 기본값: 정상
+        mt_type=1,
+        mt_level=2, # 기본값: 일반(무료)
+        mt_status=1, # 기본값: 정상
         mt_show='Y', # 기본값: 노출
         mt_wdate=datetime.utcnow(), # 등록일시
         mt_ldate=datetime.utcnow(), # 마지막 로그인 일시 (회원가입 시 현재로)
@@ -341,8 +339,7 @@ def check_phone_duplicate(db: Session, mt_idx: int, phone: str) -> bool:
     existing_user = db.query(Member).filter(
         Member.mt_hp == clean_phone,
         Member.mt_idx != mt_idx,
-        Member.mt_status == 1,
-        Member.mt_show == 'Y'
+        *active_member_conditions()
     ).first()
     return existing_user is not None
 
@@ -351,8 +348,7 @@ def check_email_duplicate(db: Session, mt_idx: int, email: str) -> bool:
     existing_user = db.query(Member).filter(
         Member.mt_email == email,
         Member.mt_idx != mt_idx,
-        Member.mt_status == 1,
-        Member.mt_show == 'Y'
+        *active_member_conditions()
     ).first()
     return existing_user is not None
 
@@ -361,8 +357,7 @@ def check_nickname_duplicate(db: Session, mt_idx: int, nickname: str) -> bool:
     existing_user = db.query(Member).filter(
         Member.mt_nickname == nickname,
         Member.mt_idx != mt_idx,
-        Member.mt_status == 1,
-        Member.mt_show == 'Y'
+        *active_member_conditions()
     ).first()
     return existing_user is not None
 

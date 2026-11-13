@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
-from app.models.member import Member
+from sqlalchemy import or_
+from app.models.member import Member, is_active_member, active_member_conditions
 from app.schemas.member import MemberCreate, MemberUpdate, RegisterRequest
 from typing import Optional, List
 from datetime import datetime, date
@@ -138,8 +138,8 @@ class CRUDMember:
              
         db_obj = self.model(
             mt_type=obj_in.mt_type,
-            mt_level=obj_in.mt_level,
-            mt_status=obj_in.mt_status,
+            mt_level=2,
+            mt_status=1,
             mt_id=clean_phone,
             mt_pwd=hashed_password,
             mt_name=obj_in.mt_name,
@@ -213,7 +213,7 @@ class CRUDMember:
 
     def is_active(self, user: Member) -> bool:
         """회원 활성 상태 확인"""
-        return user.mt_status == 1 and user.mt_level > 1
+        return is_active_member(user)
 
     def is_superuser(self, user: Member) -> bool:
         """관리자 권한 확인"""
@@ -268,10 +268,7 @@ class CRUDMember:
                 self.model.mt_email.contains(query)
             )
         ).filter(
-            and_(
-                self.model.mt_status == 1,
-                self.model.mt_level > 1
-            )
+            *active_member_conditions()
         ).offset(skip).limit(limit).all()
 
     # 약관 동의 관련 CRUD 함수들
@@ -350,8 +347,7 @@ class CRUDMember:
                 func.count().label('total'),
                 func.sum(func.case([(getattr(self.model, field) == 'Y', 1)], else_=0)).label('agreed')
             ).filter(
-                self.model.mt_level > 1,  # 탈퇴하지 않은 회원만
-                self.model.mt_status == 1  # 정상 상태 회원만
+                *active_member_conditions()
             ).first()
             
             stats[field] = {
@@ -381,8 +377,7 @@ class CRUDMember:
         
         return db.query(self.model).filter(
             getattr(self.model, field) == value,
-            self.model.mt_level > 1,
-            self.model.mt_status == 1
+            *active_member_conditions()
         ).offset(skip).limit(limit).all()
 
     def update_password(self, db: Session, *, user_id: int, new_password: str) -> Optional[Member]:
@@ -403,4 +398,4 @@ class CRUDMember:
         return user
 
 # 인스턴스 생성
-crud_member = CRUDMember(Member) 
+crud_member = CRUDMember(Member)

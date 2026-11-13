@@ -14,7 +14,7 @@ from firebase_admin import messaging
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(deps.get_required_admin_id)])
 
 SUCCESS = "true"
 FAILURE = "false"

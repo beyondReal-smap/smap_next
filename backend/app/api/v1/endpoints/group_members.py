@@ -182,48 +182,12 @@ def get_group_members(
 def add_member_to_group(
     group_id: int,
     member_id: int,
-    db: Session = Depends(deps.get_db)
+    sgt_code: Optional[str] = None,
+    user_id: int = Depends(deps.get_required_user_id),
+    db: Session = Depends(deps.get_db),
 ):
-    """
-    그룹에 멤버를 추가합니다.
-    """
-    # 그룹과 멤버가 존재하는지 확인
-    member = db.query(Member).filter(Member.mt_idx == member_id).first()
-    if not member:
-        raise HTTPException(status_code=404, detail="Member not found")
-    
-    # 이미 그룹에 멤버가 존재하는지 확인
-    exists = db.query(GroupDetail).filter(
-        GroupDetail.sgt_idx == group_id,
-        GroupDetail.mt_idx == member_id,
-        GroupDetail.sgdt_show == ShowEnum.Y
-    ).first()
-    
-    if exists:
-        return {"success": False, "message": "Member is already in the group"}
-    
-    # 이전에 삭제된 멤버인 경우 상태만 업데이트
-    deleted_member = db.query(GroupDetail).filter(
-        GroupDetail.sgt_idx == group_id,
-        GroupDetail.mt_idx == member_id,
-        GroupDetail.sgdt_show == ShowEnum.N
-    ).first()
-    
-    if deleted_member:
-        deleted_member.sgdt_show = ShowEnum.Y
-        db.add(deleted_member)
-        db.commit()
-    else:
-        # 새 그룹 멤버 생성
-        group_detail = GroupDetail(
-            sgt_idx=group_id,
-            mt_idx=member_id,
-            sgdt_show=ShowEnum.Y
-        )
-        db.add(group_detail)
-        db.commit()
-    
-    return {"success": True, "message": "Member added to group successfully"}
+    from app.api.v1.endpoints.groups import GroupJoinRequest, join_group
+    return join_group(group_id, GroupJoinRequest(mt_idx=member_id, sgt_idx=group_id, sgt_code=sgt_code), user_id, db)
 
 @router.delete("/remove")
 def remove_member_from_group(
