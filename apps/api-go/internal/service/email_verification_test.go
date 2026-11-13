@@ -16,7 +16,7 @@ func TestBuildVerificationMessagePerPurpose(t *testing.T) {
 	cases := []struct {
 		purpose, subject, title, desc string
 	}{
-		{EmailPurposeRegister, "[SMAP] 회원가입 인증번호", "이메일 인증번호를 확인해 주세요", "SMAP 가입을 계속하려면 아래 인증번호를 앱에 입력해 주세요."},
+		{EmailPurposeRegister, "[SMAP] 회원가입 인증번호", "이메일 인증번호를 입력해 주세요", "SMAP 가입을 계속하려면 아래 인증번호를 앱에 입력해 주세요."},
 		{EmailPurposeResetPassword, "[SMAP] 비밀번호 재설정 인증번호", "비밀번호 재설정 인증번호예요", "비밀번호를 다시 설정하려면 아래 인증번호를 앱에 입력해 주세요."},
 		{EmailPurposeChangeEmail, "[SMAP] 이메일 등록 인증번호", "이메일 등록 인증번호예요", "이 이메일을 SMAP 계정에 등록하려면 아래 인증번호를 앱에 입력해 주세요."},
 	}
@@ -39,6 +39,13 @@ func TestBuildVerificationMessagePerPurpose(t *testing.T) {
 			if !strings.Contains(body, code) {
 				t.Errorf("%s/%s에 인증번호가 한 덩어리로 없음", c.purpose, name)
 			}
+		}
+		wantNote := "계정에는 아무 변화도 생기지 않아요."
+		if c.purpose == EmailPurposeChangeEmail {
+			wantNote = "계정에 이 이메일이 등록되지 않아요."
+		}
+		if !strings.Contains(m.HTML, "직접 요청하지 않았다면 이 메일을 무시해 주세요. "+wantNote) {
+			t.Errorf("%s: 안내 둘째 줄 불일치", c.purpose)
 		}
 		if !strings.Contains(m.HTML, ">"+code+"</td>") {
 			t.Errorf("%s: 인증번호 칸이 코드만 담고 있지 않음", c.purpose)
