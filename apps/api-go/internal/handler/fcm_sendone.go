@@ -14,13 +14,19 @@ import (
 // FCMSendoneHandler는 Python app/api/v1/endpoints/fcm_sendone.py의 발송 핸들러.
 type FCMSendoneHandler struct {
 	svc *service.PushSendService
+	// adminGate는 전체 발송(mt_idx==0)에만 적용하는 관리자 게이트(RequireAdmin 미들웨어)다.
+	// nil이면 전체 발송을 거부한다(fail-closed).
+	adminGate gin.HandlerFunc
 }
 
 func NewFCMSendone(svc *service.PushSendService) *FCMSendoneHandler {
 	return &FCMSendoneHandler{svc: svc}
 }
 
-// Send는 POST /fcm_sendone/ (무인증). FCMSendRequest 검증 → 항상 200(success는 문자열 "true"/"false").
+// SetAdminGate는 전체 발송(mt_idx==0) 관리자 게이트를 주입한다(NewFCMSendone 시그니처 보존용).
+func (h *FCMSendoneHandler) SetAdminGate(gate gin.HandlerFunc) { h.adminGate = gate }
+
+// Send는 POST /fcm_sendone/. FCMSendRequest 검증 → 항상 200(success는 문자열 "true"/"false").
 // mt_idx==0이면 전체발송. 검증 실패만 422.
 func (h *FCMSendoneHandler) Send(c *gin.Context) {
 	var body map[string]interface{}
@@ -41,10 +47,22 @@ func (h *FCMSendoneHandler) Send(c *gin.Context) {
 		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
 		return
 	}
+	// 전체 발송(mt_idx==0)은 관리자만. 특정 회원 대상 발송은 기존 호출(웹 일정 알림 등)을 깨지 않도록
+	// 여기서는 막지 않는다(대상·문구 제한은 G7 범위).
+	if in.MtIdx == 0 {
+		if h.adminGate == nil {
+			writeJSON(c, http.StatusForbidden, gin.H{"detail": "관리자 권한이 필요합니다."})
+			return
+		}
+		h.adminGate(c) // RequireAdmin: 미인증 401 / 비관리자 403으로 c를 중단시킨다.
+		if c.IsAborted() {
+			return
+		}
+	}
 	writeJSON(c, http.StatusOK, h.svc.SendOne(in))
 }
 
-// Test는 POST /fcm_sendone/test (무인증). FCMSendRequest 검증 후 실발송 없이 args를 data에 반향.
+// Test는 POST /fcm_sendone/test (관리자 전용). FCMSendRequest 검증 후 실발송 없이 args를 data에 반향.
 func (h *FCMSendoneHandler) Test(c *gin.Context) {
 	var body map[string]interface{}
 	if err := c.ShouldBindJSON(&body); err != nil {
@@ -67,7 +85,7 @@ func (h *FCMSendoneHandler) Test(c *gin.Context) {
 	writeJSON(c, http.StatusOK, h.svc.TestEcho(echo))
 }
 
-// TestSend는 POST /fcm_sendone/test-send/{mt_idx} (무인증). path 정수 mt_idx로 테스트 푸시 실발송.
+// TestSend는 POST /fcm_sendone/test-send/{mt_idx} (관리자 전용). path 정수 mt_idx로 테스트 푸시 실발송.
 func (h *FCMSendoneHandler) TestSend(c *gin.Context) {
 	idStr := c.Param("mt_idx")
 	id, err := strconv.Atoi(idStr)
@@ -78,7 +96,7 @@ func (h *FCMSendoneHandler) TestSend(c *gin.Context) {
 	writeJSON(c, http.StatusOK, h.svc.TestSendToUser(id))
 }
 
-// Silent는 POST /fcm_sendone/silent (무인증). SilentPushRequest{mt_idx 필수, reason/priority 옵션}.
+// Silent는 POST /fcm_sendone/silent (관리자 전용). SilentPushRequest{mt_idx 필수, reason/priority 옵션}.
 func (h *FCMSendoneHandler) Silent(c *gin.Context) {
 	var body map[string]interface{}
 	if err := c.ShouldBindJSON(&body); err != nil {
@@ -98,12 +116,12 @@ func (h *FCMSendoneHandler) Silent(c *gin.Context) {
 	writeJSON(c, http.StatusOK, h.svc.SendSilent(mtIdx, reason))
 }
 
-// SilentBatch는 POST /fcm_sendone/silent-batch (무인증, 무body). 전체 토큰 보유자 Silent 발송.
+// SilentBatch는 POST /fcm_sendone/silent-batch (관리자 전용, 무body). 전체 토큰 보유자 Silent 발송.
 func (h *FCMSendoneHandler) SilentBatch(c *gin.Context) {
 	writeJSON(c, http.StatusOK, h.svc.SendSilentBatch())
 }
 
-// Background는 POST /fcm_sendone/background (무인증). BackgroundPushRequest(코어 7 필수 + 옵션).
+// Background는 POST /fcm_sendone/background (관리자 전용). BackgroundPushRequest(코어 7 필수 + 옵션).
 func (h *FCMSendoneHandler) Background(c *gin.Context) {
 	var body map[string]interface{}
 	if err := c.ShouldBindJSON(&body); err != nil {

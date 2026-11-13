@@ -3,6 +3,7 @@ package service
 import (
 	"time"
 
+	"github.com/bluemusk/smap_next_go/internal/auth"
 	"github.com/bluemusk/smap_next_go/internal/dto"
 	"github.com/bluemusk/smap_next_go/internal/model"
 )
@@ -19,11 +20,19 @@ type MemberCreateInput struct {
 }
 
 // CreateUser는 Python users.create_user를 이식한다(Member(**MemberCreate.dict()) + commit + refresh).
-// mt_pwd는 평문 저장(Python 충실 — bcrypt 아님), mt_wdate/ldate/udate는 미설정(NULL). ok=false→500.
+// mt_pwd는 bcrypt 해시로 저장한다(Python은 평문 저장이었으나 이식하지 않는다). 라우트는 관리자 전용이라
+// mt_level/mt_status는 요청 값을 그대로 쓴다. mt_wdate/ldate/udate는 미설정(NULL). ok=false→500.
 func (s *UserService) CreateUser(in MemberCreateInput) (dto.UserResponse, bool) {
+	if s.bcryptCost == 0 {
+		return dto.UserResponse{}, false // cost 미주입 시 평문 저장으로 빠지지 않고 실패시킨다.
+	}
+	hashed, err := auth.HashPassword(in.MtPwd, s.bcryptCost)
+	if err != nil {
+		return dto.UserResponse{}, false
+	}
 	m := &model.Member{
 		MtType: in.MtType, MtLevel: in.MtLevel, MtStatus: in.MtStatus,
-		MtID: &in.MtID, MtName: &in.MtName, MtNickname: &in.MtNickname, MtPwd: &in.MtPwd,
+		MtID: &in.MtID, MtName: &in.MtName, MtNickname: &in.MtNickname, MtPwd: &hashed,
 		MtHp: in.MtHp, MtEmail: in.MtEmail, MtBirth: in.MtBirth, MtGender: in.MtGender,
 		MtShow: in.MtShow, MtAgree1: in.MtAgree1, MtAgree2: in.MtAgree2, MtAgree3: in.MtAgree3,
 		MtAgree4: in.MtAgree4, MtAgree5: in.MtAgree5, MtPush1: in.MtPush1, MtOnboarding: in.MtOnboarding,

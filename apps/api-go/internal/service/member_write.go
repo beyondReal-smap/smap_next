@@ -169,8 +169,10 @@ func (s *MemberWriteService) buildRegisterMember(in MemberRegisterInput) (*model
 	push1 := ynBool(in.MtPush1)
 	show, onboarding := in.MtShow, in.MtOnboarding
 
+	// 권한·상태 값은 요청 본문(in.MtType/MtLevel/MtStatus)을 무시하고 서버가 일반 회원 값으로 정한다.
+	mtType, mtLevel, mtStatus := newMemberType, newMemberLevel, newMemberStatus
 	return &model.Member{
-		MtType: in.MtType, MtLevel: in.MtLevel, MtStatus: in.MtStatus,
+		MtType: &mtType, MtLevel: &mtLevel, MtStatus: &mtStatus,
 		MtID: &clean, MtPwd: pwd, MtName: &in.MtName, MtNickname: &in.MtNickname,
 		MtHp: hp, MtEmail: in.MtEmail, MtBirth: birth, MtGender: in.MtGender,
 		MtFile1: &file1, MtShow: &show,
@@ -199,7 +201,8 @@ func (s *MemberWriteService) Login(mtID, mtPwd string) dto.MemberLoginResponse {
 		return dto.MemberLoginResponse{Success: false, Message: "아이디 또는 비밀번호가 올바르지 않습니다."}
 	}
 	// is_active: mt_status==1 AND mt_level>1
-	if !(derefIntUser(user.MtStatus) == 1 && derefIntUser(user.MtLevel) > 1) {
+	// 비노출(mt_show='N')도 거부한다(탈퇴·정지는 아래 기존 조건이 이미 거른다).
+	if user.IsBlocked() || !(derefIntUser(user.MtStatus) == 1 && derefIntUser(user.MtLevel) > 1) {
 		return dto.MemberLoginResponse{Success: false, Message: "비활성화된 계정입니다. 고객센터에 문의해주세요."}
 	}
 	// update_login_time: mt_ldate=mt_adate=utcnow
@@ -398,12 +401,18 @@ func nilOrStr(p *string) interface{} {
 // CRUD (create/put/delete/location).
 // ===========================================================================
 
-// Create는 Python members.create_member(POST /)를 이식한다. MemberCreate(평문 mt_pwd) → MemberResponse.
+// Create는 Python members.create_member(POST /)를 이식한다. MemberCreate(mt_pwd는 해시해 저장) → MemberResponse.
 // users.create_user와 동일 컬럼(CreateUserMember)·동일 응답(toUserResponse). ok=false→500.
 func (s *MemberWriteService) Create(in MemberCreateInput) (dto.UserResponse, bool) {
+	// 평문 비밀번호를 저장하지 않는다(bcrypt 해시). 권한·상태 값은 본문을 무시하고 일반 회원 값으로 강제한다.
+	hashed, err := auth.HashPassword(in.MtPwd, s.cost)
+	if err != nil {
+		return dto.UserResponse{}, false
+	}
+	mtType, mtLevel, mtStatus := newMemberType, newMemberLevel, newMemberStatus
 	m := &model.Member{
-		MtType: in.MtType, MtLevel: in.MtLevel, MtStatus: in.MtStatus,
-		MtID: &in.MtID, MtName: &in.MtName, MtNickname: &in.MtNickname, MtPwd: &in.MtPwd,
+		MtType: &mtType, MtLevel: &mtLevel, MtStatus: &mtStatus,
+		MtID: &in.MtID, MtName: &in.MtName, MtNickname: &in.MtNickname, MtPwd: &hashed,
 		MtHp: in.MtHp, MtEmail: in.MtEmail, MtBirth: in.MtBirth, MtGender: in.MtGender,
 		MtShow: in.MtShow, MtAgree1: in.MtAgree1, MtAgree2: in.MtAgree2, MtAgree3: in.MtAgree3,
 		MtAgree4: in.MtAgree4, MtAgree5: in.MtAgree5, MtPush1: in.MtPush1, MtOnboarding: in.MtOnboarding,

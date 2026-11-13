@@ -303,7 +303,7 @@ func (h *MemberWriteHandler) Terms(c *gin.Context) {
 
 // ======================= CRUD (create/put/delete/location) =======================
 
-// Create은 POST /members/. MemberCreate(평문 mt_pwd) → MemberResponse. users.create와 동일.
+// Create은 POST /members/. MemberCreate(mt_pwd는 해시 저장, mt_type/level/status는 서버 강제) → MemberResponse.
 func (h *MemberWriteHandler) Create(c *gin.Context) {
 	in, errs := parseMemberCreate(c)
 	if len(errs) > 0 {

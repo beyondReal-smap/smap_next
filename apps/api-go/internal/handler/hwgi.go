@@ -1,12 +1,17 @@
 package handler
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
+	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -19,6 +24,8 @@ import (
 )
 
 // HwgiHandler는 Python hwgi.py(한화 점검) 5종을 이식한다. 전부 무인증.
+// hwgi는 외부 프론트엔드(hwgi-cstmer.vercel.app, 한화 디지털화상창구 방문 점검 시스템)가 로그인 없이
+// 호출하는 별도 시스템이라 사용자 인증을 붙이지 않는다. 대신 업로드 경로·크기를 서버에서 제한한다.
 type HwgiHandler struct {
 	svc *service.HwgiService
 	cfg *config.Config
@@ -63,8 +70,48 @@ func (h *HwgiHandler) BulkSave(c *gin.Context) {
 	writeJSON(c, http.StatusOK, dto.HwgiSimpleResponse{Success: true})
 }
 
+// hwgiItemIDPattern은 item_id 화이트리스트다: 글자·숫자·`_`·`-`·`.` 1~100자.
+// item_id는 업로드 디렉터리 이름으로 쓰이므로 경로 구분자(슬래시·역슬래시)와 NUL, 공백은 허용하지 않는다.
+var hwgiItemIDPattern = regexp.MustCompile(`^[\p{L}\p{N}_.\-]{1,100}$`)
+
+// validHwgiItemID는 item_id가 디렉터리 이름으로 안전한지 검사한다(경로 순회 차단).
+func validHwgiItemID(id string) bool {
+	if !hwgiItemIDPattern.MatchString(id) || id == "." || strings.Contains(id, "..") {
+		return false
+	}
+	return filepath.Base(id) == id
+}
+
+// readLimitedBody는 요청 본문을 maxBytes까지만 읽는다. 초과하면 tooLarge=true를 반환한다.
+// 읽은 본문은 이후 bindJSONMap이 다시 읽을 수 있게 복원한다.
+func readLimitedBody(c *gin.Context, maxBytes int64) (tooLarge bool, err error) {
+	raw, err := io.ReadAll(http.MaxBytesReader(c.Writer, c.Request.Body, maxBytes))
+	if err != nil {
+		var mbe *http.MaxBytesError
+		if errors.As(err, &mbe) {
+			return true, nil
+		}
+		return false, err
+	}
+	c.Request.Body = io.NopCloser(bytes.NewReader(raw))
+	return false, nil
+}
+
 // UploadPhoto는 POST /hwgi/upload-photo: base64 디코드 → 파일 저장 → DB 기록.
+// 요청 본문은 HWGI_MAX_UPLOAD_BYTES(디코드 후 크기 기준, base64 오버헤드 포함해 환산)를 넘으면 413,
+// item_id가 화이트리스트를 벗어나면 422로 거부한다.
 func (h *HwgiHandler) UploadPhoto(c *gin.Context) {
+	maxDecoded := int64(h.cfg.HwgiMaxUploadBytes)
+	// base64는 3바이트를 4글자로 늘리므로 본문 상한은 환산값 + JSON 여유분(64KiB).
+	tooLarge, rerr := readLimitedBody(c, maxDecoded/3*4+4+64*1024)
+	if rerr != nil {
+		writeJSON(c, http.StatusBadRequest, gin.H{"detail": "요청 본문을 읽을 수 없습니다."})
+		return
+	}
+	if tooLarge {
+		writeJSON(c, http.StatusRequestEntityTooLarge, gin.H{"detail": "업로드 크기 제한을 초과했습니다."})
+		return
+	}
 	body := bindJSONMap(c)
 	var errs []valErr
 	btIdx := requiredIntField(body, "bt_idx", &errs)
@@ -72,6 +119,12 @@ func (h *HwgiHandler) UploadPhoto(c *gin.Context) {
 	imgB64 := uReqStr(body, "image_base64", &errs)
 	if len(errs) > 0 {
 		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
+		return
+	}
+	if !validHwgiItemID(itemID) {
+		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": []valErr{
+			valueErr("item_id", "item_id에 사용할 수 없는 문자가 있습니다.", itemID),
+		}})
 		return
 	}
 	// base64 디코드(data URI prefix 제거)
@@ -82,6 +135,10 @@ func (h *HwgiHandler) UploadPhoto(c *gin.Context) {
 	raw, err := base64.StdEncoding.DecodeString(img)
 	if err != nil {
 		writeJSON(c, http.StatusInternalServerError, gin.H{"detail": err.Error()})
+		return
+	}
+	if int64(len(raw)) > maxDecoded {
+		writeJSON(c, http.StatusRequestEntityTooLarge, gin.H{"detail": "업로드 크기 제한을 초과했습니다."})
 		return
 	}
 	// 파일명: {ts(ms)}_{uuid8}.jpg
@@ -133,7 +190,11 @@ func (h *HwgiHandler) DeletePhoto(c *gin.Context) {
 	// 파일 삭제(Python BACKEND_DIR/storage + ip_file_path.lstrip('/') = HwgiUploadDir + /uploads/hwgi 제거분).
 	rel := strings.TrimPrefix(filePath, "/uploads/hwgi")
 	full := filepath.Join(h.cfg.HwgiUploadDir, rel)
-	if _, statErr := os.Stat(full); statErr == nil {
+	if !pathWithin(h.cfg.HwgiUploadDir, full) {
+		// 과거 업로드(item_id 검증 도입 전)가 DB에 남긴 경로가 업로드 디렉터리 밖을 가리키는 경우:
+		// 임의 파일 삭제를 막기 위해 파일은 건드리지 않고 DB 행만 지운다.
+		slog.Warn("hwgi_delete_photo_path_outside_upload_dir", slog.Int("photo_id", id))
+	} else if _, statErr := os.Stat(full); statErr == nil {
 		_ = os.Remove(full)
 	}
 	if err := h.svc.DeletePhotoDB(id); err != nil {
@@ -205,4 +266,13 @@ func nestedReqStr(m map[string]interface{}, key string, idx int, errs *[]valErr)
 		return ""
 	}
 	return s
+}
+
+// pathWithin은 target이 base 디렉터리 안(자기 자신 제외)에 있는지 검사한다.
+func pathWithin(base, target string) bool {
+	rel, err := filepath.Rel(filepath.Clean(base), filepath.Clean(target))
+	if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return false
+	}
+	return true
 }

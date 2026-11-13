@@ -12,7 +12,7 @@ import (
 	"github.com/bluemusk/smap_next_go/internal/service"
 )
 
-// Create는 POST /users/ (무인증). MemberCreate(검증+mt_id 정규화+mt_email @검증). mt_pwd 평문 저장.
+// Create는 POST /users/ (무인증). MemberCreate(검증+mt_id 정규화+mt_email @검증). mt_pwd는 해시해 저장(관리자 전용 라우트).
 func (h *UserHandler) Create(c *gin.Context) {
 	in, errs := parseMemberCreate(c)
 	if len(errs) > 0 {

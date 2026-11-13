@@ -22,6 +22,11 @@ func (f *fakeUserRepo) GetByToken(token string) (*model.Member, error) { return 
 func (f *fakeUserRepo) RecentSignin(h int) ([]model.Member, error)     { return f.many, f.err }
 func (f *fakeUserRepo) NotJoinedCount() (int64, error)                 { return f.cnt, f.err }
 func (f *fakeUserRepo) GetByMtID(mtID string) (*model.Member, error)   { return f.one, f.err }
+func (f *fakeUserRepo) CreateUserMember(m *model.Member) (*model.Member, error) {
+	return f.one, f.err
+}
+func (f *fakeUserRepo) UpdateColumns(mtIdx int, fields map[string]interface{}) error { return f.err }
+func (f *fakeUserRepo) Delete(mtIdx int) error                                       { return f.err }
 
 // TestUserResponseJSON은 /users/{id}의 MemberResponse-from-ORM 직렬화가 실측(/users/2584)과
 // byte-동등인지 검증한다(딕셔너리 폴백 없이 raw 값).
@@ -54,7 +59,9 @@ func TestUserResponseNullName500(t *testing.T) {
 	}
 }
 
-// TestUserFullDumpStructure는 full-dump이 65개 키 + 고정 순서 시작 + 시크릿 포함을 확인한다.
+// TestUserFullDumpStructure는 full-dump이 57개 키 + 고정 순서 시작 + 비밀 필드 제거를 확인한다.
+// (G2: 기존 65개 중 mt_pwd·mt_reset_token·mt_token_id·mt_remember_token·mt_last_receipt_token·
+// 소셜 식별자 3종 = 8개를 관리자 응답에서도 제거했다.)
 // (키 순서는 Python에서 비결정적이라 byte-동등 검증은 런타임 deep-equal로 대체)
 func TestUserFullDumpStructure(t *testing.T) {
 	d := toUserFullDump(member2584())
@@ -63,13 +70,14 @@ func TestUserFullDumpStructure(t *testing.T) {
 	if err := json.Unmarshal(b, &m); err != nil {
 		t.Fatal(err)
 	}
-	if len(m) != 65 {
-		t.Errorf("full-dump 키 수 65 기대, got %d", len(m))
+	if len(m) != 57 {
+		t.Errorf("full-dump 키 수 57 기대, got %d", len(m))
 	}
-	// 시크릿/전체컬럼 노출 확인(Python 동작 그대로)
-	for _, k := range []string{"mt_pwd", "mt_reset_token", "mt_token_id", "mt_remember_token", "mt_apple_id"} {
-		if _, present := m[k]; !present {
-			t.Errorf("full-dump에 %s 키가 있어야 함(시크릿 노출 이식)", k)
+	// 비밀 값은 응답에 키 자체가 없어야 한다.
+	for _, k := range []string{"mt_pwd", "mt_reset_token", "mt_token_id", "mt_remember_token",
+		"mt_last_receipt_token", "mt_google_id", "mt_kakao_id", "mt_apple_id"} {
+		if _, present := m[k]; present {
+			t.Errorf("full-dump에 비밀 필드 %s 가 있으면 안 됨", k)
 		}
 	}
 	// Go 고정 순서: mt_id로 시작

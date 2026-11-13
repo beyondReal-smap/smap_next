@@ -25,6 +25,16 @@ type fakeLocationLogRepo struct {
 	err        error
 }
 
+func (f *fakeLocationLogRepo) GetLogByID(mltIdx int) (*model.MemberLocationLog, error) {
+	return nil, f.err
+}
+func (f *fakeLocationLogRepo) CreateLog(l *model.MemberLocationLog, now time.Time) error {
+	return f.err
+}
+func (f *fakeLocationLogRepo) UpdateLog(mltIdx int, fields map[string]interface{}) (int64, error) {
+	return 0, f.err
+}
+func (f *fakeLocationLogRepo) DeleteLog(mltIdx int) error { return f.err }
 func (f *fakeLocationLogRepo) GetMemberLogs(mtIdx int, start, end *time.Time, limit, offset int) ([]model.MemberLocationLog, error) {
 	return f.logs, f.err
 }

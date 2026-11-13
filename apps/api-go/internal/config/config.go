@@ -8,6 +8,8 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
+
+	"github.com/bluemusk/smap_next_go/internal/auth"
 )
 
 // Config는 backend-go 전체 런타임 설정을 담는다.
@@ -81,6 +83,18 @@ type Config struct {
 	// hwgi 점검 사진 저장 디렉토리. Python BACKEND_DIR/storage/uploads/hwgi(절대). /uploads는 Python
 	// StaticFiles(backend/storage/uploads)가 서빙하므로 Go도 동일 절대경로에 써야 같은 URL로 서빙된다.
 	HwgiUploadDir string `envconfig:"HWGI_UPLOAD_DIR" default:"/data/wwwroot/smap_next/backend/storage/uploads/hwgi"`
+	// hwgi 사진 업로드 1건의 디코드 후 최대 크기(바이트). 초과하면 413. 기본 10MiB.
+	HwgiMaxUploadBytes int `envconfig:"HWGI_MAX_UPLOAD_BYTES" default:"10485760"`
+
+	// --- 일반 사용자 인증 미들웨어(G1) ---
+	// ROUTE_AUTH_MODE: off | warn | enforce. 기본 warn(통과시키되 무토큰/무효 호출을 계측).
+	// 잘못된 값은 Load에서 에러로 시작을 막는다(기본값으로 대체하지 않음).
+	RouteAuthModeRaw string `envconfig:"ROUTE_AUTH_MODE" default:"warn"`
+	// 회원 상태(탈퇴·정지·비노출) 조회 결과를 프로세스 내에 캐시하는 시간(초). 0이면 캐시 안 함.
+	// 캐시를 쓰면 탈퇴·정지가 최대 이 시간만큼 늦게 반영된다.
+	RouteAuthStatusCacheTTLSeconds int `envconfig:"ROUTE_AUTH_STATUS_CACHE_TTL_SECONDS" default:"30"`
+	// warn 계측 카운터를 요약 로그로 내보내는 주기(초).
+	RouteAuthSummaryIntervalSeconds int `envconfig:"ROUTE_AUTH_SUMMARY_INTERVAL_SECONDS" default:"60"`
 
 	// 프로필 이미지 저장 디렉토리(members upload/delete-profile-image). Python은 cwd 기준 상대
 	// public/images에 저장하나, 실제 /images 서빙은 Python FastAPI StaticFiles(BASE_DIR/public/images,
@@ -198,5 +212,30 @@ func Load(envPath string) (*Config, error) {
 	}
 	// envconfig가 unexported 필드를 채울 수 없으므로 수동 보강.
 	c.corsOriginsRaw = os.Getenv("BACKEND_CORS_ORIGINS")
+	if err := c.validateRouteAuth(); err != nil {
+		return nil, err
+	}
 	return &c, nil
+}
+
+// RouteAuthMode는 검증된 ROUTE_AUTH_MODE를 반환한다. Load가 값을 검증하므로 정상 경로에선 에러가 없다.
+func (c *Config) RouteAuthMode() (auth.RouteMode, error) {
+	return auth.ParseRouteMode(c.RouteAuthModeRaw)
+}
+
+// validateRouteAuth는 인증 미들웨어 설정을 시작 시 검증한다(잘못된 값은 명확히 실패).
+func (c *Config) validateRouteAuth() error {
+	if _, err := auth.ParseRouteMode(c.RouteAuthModeRaw); err != nil {
+		return fmt.Errorf("config load: %w", err)
+	}
+	if c.RouteAuthStatusCacheTTLSeconds < 0 || c.RouteAuthStatusCacheTTLSeconds > 300 {
+		return fmt.Errorf("config load: ROUTE_AUTH_STATUS_CACHE_TTL_SECONDS는 0~300이어야 합니다: %d", c.RouteAuthStatusCacheTTLSeconds)
+	}
+	if c.RouteAuthSummaryIntervalSeconds < 5 || c.RouteAuthSummaryIntervalSeconds > 3600 {
+		return fmt.Errorf("config load: ROUTE_AUTH_SUMMARY_INTERVAL_SECONDS는 5~3600이어야 합니다: %d", c.RouteAuthSummaryIntervalSeconds)
+	}
+	if c.HwgiMaxUploadBytes < 1 {
+		return fmt.Errorf("config load: HWGI_MAX_UPLOAD_BYTES는 1 이상이어야 합니다: %d", c.HwgiMaxUploadBytes)
+	}
+	return nil
 }

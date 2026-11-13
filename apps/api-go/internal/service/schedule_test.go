@@ -23,6 +23,15 @@ func (f *fakeScheduleRepo) FindGroupSchedules(g int, days *int) ([]model.Schedul
 func (f *fakeScheduleRepo) Create(s *model.Schedule) error                           { return f.err }
 func (f *fakeScheduleRepo) UpdateFields(id int, fields map[string]interface{}) error { return f.err }
 func (f *fakeScheduleRepo) Delete(id int) error                                      { return f.err }
+func (f *fakeScheduleRepo) GetNowScheduleInMembers() ([]model.Schedule, error) {
+	return f.many, f.err
+}
+func (f *fakeScheduleRepo) GetNowScheduleOutMembers() ([]model.Schedule, error) {
+	return f.many, f.err
+}
+func (f *fakeScheduleRepo) GetNowSchedulePush() ([]model.Schedule, error) {
+	return f.many, f.err
+}
 
 // TestScheduleResponseJSON은 /schedules/{id} 실측 바이트와 동일한지 검증한다.
 func TestScheduleResponseJSON(t *testing.T) {

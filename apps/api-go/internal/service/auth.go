@@ -33,6 +33,14 @@ type authRefreshRepo interface {
 	RevokeByRaw(rawToken string) (bool, error)
 }
 
+// 신규 일반 회원의 서버 강제 값. 가입 경로(/auth/register, /members/register, POST /members/)는
+// 요청 본문의 mt_type/mt_level/mt_status를 신뢰하지 않고 이 값으로 저장한다.
+const (
+	newMemberType   = 1 // 일반 가입
+	newMemberLevel  = 2 // 일반(무료) 회원
+	newMemberStatus = 1 // 정상
+)
+
 // AuthConfig는 service가 config 패키지에 직접 의존하지 않도록 필요한 설정만 담는다.
 type AuthConfig struct {
 	Secret       string
@@ -116,6 +124,11 @@ func (s *AuthService) LoginHome(in LoginInput, userAgent, ipHash string) dto.Log
 	// 비밀번호 검증. mt_pwd 없으면(소셜) 실패.
 	pwd := derefStr(user.MtPwd)
 	if pwd == "" || !auth.VerifyPassword(in.MtPwd, pwd) {
+		return fail()
+	}
+	// 탈퇴(mt_level=1)·정지(mt_status=2)·비노출(mt_show='N') 회원은 로그인 거부. NULL은 통과(기존 회원 잠금 방지).
+	// 계정 존재·상태 노출을 막으려고 비밀번호 검증 뒤에, 비밀번호 오류와 같은 응답으로 거부한다.
+	if user.IsBlocked() {
 		return fail()
 	}
 
@@ -208,7 +221,8 @@ func (s *AuthService) RefreshV2(rawOld, userAgent, ipHash string) (RefreshOutcom
 	if err != nil {
 		return RefreshServerErr, nil
 	}
-	if user == nil {
+	if user == nil || user.IsBlocked() {
+		// 탈퇴·정지·비노출 회원은 refresh로 access를 다시 받을 수 없다(없는 회원과 같은 401).
 		return RefreshUserGone, nil
 	}
 	accessToken, err := s.issueAccessToken(user)
@@ -227,6 +241,14 @@ func (s *AuthService) RefreshV2(rawOld, userAgent, ipHash string) (RefreshOutcom
 // RefreshV1은 Authorization Bearer access 토큰으로 access만 재발급. Python refresh의 v1 경로.
 // mtIdx/mtID/mtName은 기존 토큰 claim에서 추출해 전달받는다(핸들러가 디코드).
 func (s *AuthService) RefreshV1(mtIdx int, mtID string, mtName *string) (RefreshOutcome, *dto.RefreshV1Response) {
+	// 탈퇴·정지·비노출 회원은 access를 연장할 수 없다. 회원 행이 없는 경우는 기존 동작(발급)을 유지한다.
+	member, err := s.members.GetByID(mtIdx)
+	if err != nil {
+		return RefreshServerErr, nil
+	}
+	if member != nil && member.IsBlocked() {
+		return RefreshV1Fail, nil
+	}
 	token, err := auth.CreateAccessToken(mtIdx, mtID, mtName, s.cfg.Secret, s.cfg.Algorithm, s.cfg.AccessExpMin)
 	if err != nil {
 		return RefreshServerErr, nil
@@ -259,6 +281,9 @@ func (s *AuthService) LoginOriginal(mtHp, mtPass string) (LoginOriginalOutcome, 
 	pwd := derefStr(user.MtPwd)
 	if pwd == "" || !auth.VerifyPassword(mtPass, pwd) {
 		return LoginOrigUnauthorized, nil
+	}
+	if user.IsBlocked() {
+		return LoginOrigUnauthorized, nil // 탈퇴·정지·비노출 회원 거부(비밀번호 오류와 같은 응답)
 	}
 
 	// create_user_identity_from_member → UserIdentity(mt_idx, mt_id, mt_name, mt_level)
@@ -401,9 +426,12 @@ func (s *AuthService) createUser(in RegisterInput) (*model.Member, error) {
 		return &v
 	}
 	show := "Y"
-	mtType := orInt(in.MtType, 1)
-	mtLevel := orInt(in.MtLevel, 2)
-	mtStatus := orInt(in.MtStatus, 1)
+	// 권한·상태 값은 요청 본문(in.MtType/MtLevel/MtStatus)을 무시하고 서버가 일반 회원 값으로 정한다.
+	// 무인증 가입에서 mt_level=9 등을 주입해 관리자 계정을 만드는 것을 막기 위함이다
+	// (FastAPI 일반 가입과 동일: mt_type=1, mt_level=2, mt_status=1).
+	mtType := newMemberType
+	mtLevel := newMemberLevel
+	mtStatus := newMemberStatus
 
 	// mt_birth: strptime('%Y-%m-%d') → 실패 시 ValueError(→500).
 	var birth *time.Time
@@ -549,14 +577,6 @@ func derefInt(p *int) int {
 		return 0
 	}
 	return *p
-}
-
-// orInt는 Python `x or default`(0이면 default).
-func orInt(v, def int) int {
-	if v == 0 {
-		return def
-	}
-	return v
 }
 
 func isAllDigits(s string) bool {

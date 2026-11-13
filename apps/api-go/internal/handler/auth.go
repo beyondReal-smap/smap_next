@@ -102,6 +102,11 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		return
 	}
 	outcome, resp := h.svc.RefreshV1(claims.MtIdx, claims.MtID, claims.MtName)
+	if outcome == service.RefreshV1Fail {
+		// 탈퇴·정지·비노출 회원: 기존 v1 실패 응답 형식과 동일한 401.
+		writeJSON(c, http.StatusUnauthorized, gin.H{"detail": "토큰 갱신에 실패했습니다."})
+		return
+	}
 	if outcome != service.RefreshV1OK {
 		plainServerError(c)
 		return

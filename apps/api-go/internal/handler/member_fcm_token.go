@@ -94,9 +94,10 @@ func (h *MemberFCMTokenHandler) CheckAndUpdate(c *gin.Context) {
 	h.writeResult(c, resp, e)
 }
 
-// ValidateAndRefresh는 POST /validate-and-refresh(인증, 수평인가 없음).
+// ValidateAndRefresh는 POST /validate-and-refresh(인증+수평인가).
 func (h *MemberFCMTokenHandler) ValidateAndRefresh(c *gin.Context) {
-	if _, ok := h.requireUserID(c); !ok {
+	uid, ok := h.requireUserID(c)
+	if !ok {
 		return
 	}
 	in, errs := parseMemberFCMReq(c)
@@ -104,18 +105,28 @@ func (h *MemberFCMTokenHandler) ValidateAndRefresh(c *gin.Context) {
 		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
 		return
 	}
+	// 토큰의 회원과 요청 대상(mt_idx)이 다르면 거부(관리자는 허용). 타인의 push 토큰 교체 방지.
+	// 토큰이 없는 호출은 위 requireUserID가 이미 401로 거른다.
+	if !h.horizontalAuth(c, uid, in.MtIdx) {
+		return
+	}
 	resp, e := h.svc.ValidateAndRefresh(in.MtIdx, in.FcmToken, in.ForceRefresh)
 	h.writeResult(c, resp, e)
 }
 
-// BackgroundCheck는 POST /background-check(인증, 수평인가 없음).
+// BackgroundCheck는 POST /background-check(인증+수평인가).
 func (h *MemberFCMTokenHandler) BackgroundCheck(c *gin.Context) {
-	if _, ok := h.requireUserID(c); !ok {
+	uid, ok := h.requireUserID(c)
+	if !ok {
 		return
 	}
 	in, errs := parseBackgroundCheckReq(c)
 	if len(errs) > 0 {
 		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
+		return
+	}
+	// 토큰의 회원과 요청 대상(mt_idx)이 다르면 거부(관리자는 허용).
+	if !h.horizontalAuth(c, uid, in.MtIdx) {
 		return
 	}
 	resp, e := h.svc.BackgroundCheck(in.MtIdx, in.FcmToken, in.CheckType, in.ForceRefresh)

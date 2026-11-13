@@ -486,3 +486,21 @@ func (r *MemberRepository) GetByResetToken(token string, now time.Time) (*model.
 	}
 	return &m, nil
 }
+
+// GetAccessState는 일반 사용자 인증 미들웨어용 회원 상태 조회다.
+// mt_level/mt_status/mt_show 3개 컬럼만 PK로 읽는다. 없으면 (nil, nil).
+// 탈퇴/정지/비노출 판정은 호출 측이 model.MemberAccessState.IsBlocked로 한다(NULL은 통과).
+func (r *MemberRepository) GetAccessState(mtIdx int) (*model.MemberAccessState, error) {
+	var rows []model.MemberAccessState
+	if err := r.db.Model(&model.Member{}).
+		Select("mt_level", "mt_status", "mt_show").
+		Where("mt_idx = ?", mtIdx).
+		Limit(1).
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, nil
+	}
+	return &rows[0], nil
+}

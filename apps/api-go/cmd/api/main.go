@@ -93,6 +93,30 @@ func main() {
 	adminH := handler.NewAdmin(adminSvc)
 	adminAuth := middleware.RequireAdmin(cfg, memberRepo)
 
+	// G1 — 일반 사용자 인증 미들웨어(ROUTE_AUTH_MODE off|warn|enforce). 회원 상태는 memberRepo로 조회한다.
+	// 모드 값은 config.Load가 이미 검증했다(잘못된 값이면 여기까지 오지 못한다).
+	routeMode, err := cfg.RouteAuthMode()
+	if err != nil {
+		logger.Error("route auth mode invalid", slog.String("err", err.Error()))
+		os.Exit(1)
+	}
+	routeAuth, err := middleware.NewRouteAuth(middleware.RouteAuthOptions{
+		Mode:            routeMode,
+		Secret:          cfg.JWTSecretKey,
+		Algorithm:       cfg.JWTAlgorithm,
+		StatusCacheTTL:  time.Duration(cfg.RouteAuthStatusCacheTTLSeconds) * time.Second,
+		SummaryInterval: time.Duration(cfg.RouteAuthSummaryIntervalSeconds) * time.Second,
+	}, memberRepo, logger)
+	if err != nil {
+		logger.Error("route auth init failed", slog.String("err", err.Error()))
+		os.Exit(1)
+	}
+	logger.Info("route auth configured",
+		slog.String("mode", string(routeMode)),
+		slog.Int("status_cache_ttl_sec", cfg.RouteAuthStatusCacheTTLSeconds),
+		slog.Int("summary_interval_sec", cfg.RouteAuthSummaryIntervalSeconds),
+	)
+
 	// Phase 5 — chat 리포지토리. chat REST/WS + groups write의 그룹채팅 동기화가 공유한다.
 	chatRepo := repository.NewChat(gdb)
 
@@ -125,6 +149,7 @@ func main() {
 
 	// Phase 4 — users read 7종(auth 도메인, 무인증) + auth/me(JWT). memberRepo 공유.
 	userSvc := service.NewUser(memberRepo)
+	userSvc.SetBcryptCost(cfg.PasswordBcryptCost) // /users/ 생성 시 비밀번호 해시(평문 저장 금지)
 	userH := handler.NewUser(userSvc, cfg)
 
 	// Phase 4 — locations read 7종(무인증). slt_lat/long Decimal→문자열.
@@ -212,6 +237,7 @@ func main() {
 
 	// push 발송 Phase 1 — fcm_sendone 단건/전체발송. memberRepo·pushLogRepo·fcmClient 공유.
 	fcmSendoneH := handler.NewFCMSendone(service.NewPushSend(memberRepo, pushLogRepo, fcmClient))
+	fcmSendoneH.SetAdminGate(adminAuth) // 전체 발송(mt_idx==0)은 관리자만
 	// fcm-token — FCM 토큰 관리 3종(get_current_member 인증). memberRepo 공유.
 	fcmTokenH := handler.NewFCMToken(service.NewFCMToken(memberRepo), cfg)
 	// member-fcm-token — 회원 FCM 토큰 관리 12종. memberRepo 공유 + DEBUG test-ios-push용 fcmClient.
@@ -229,6 +255,8 @@ func main() {
 		Weather:        weatherH,
 		Admin:          adminH,
 		AdminAuth:      adminAuth,
+		UserAuth:       routeAuth.Required(),
+		UserAuthOpt:    routeAuth.Optional(),
 		Group:          groupH,
 		GroupDetail:    groupDetailH,
 		Member:         memberH,
@@ -265,6 +293,13 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	// 인증 미들웨어의 warn 계측 요약 로그 루프. ctx 취소(종료 신호) 시 마지막 요약을 내보내고 끝난다.
+	routeAuthDone := make(chan struct{})
+	go func() {
+		defer close(routeAuthDone)
+		routeAuth.Run(ctx)
+	}()
+
 	go func() {
 		logger.Info("http server listening", slog.String("addr", srv.Addr))
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -288,5 +323,6 @@ func main() {
 	if rds != nil {
 		_ = rds.Close()
 	}
+	<-routeAuthDone
 	logger.Info("shutdown complete")
 }
