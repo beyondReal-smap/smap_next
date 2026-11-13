@@ -38,6 +38,7 @@ fun ForgotPasswordScreen(
 ) {
     val currentStep by viewModel.currentStep.collectAsState()
     val phoneNumber by viewModel.phoneNumber.collectAsState()
+    val sentKind by viewModel.sentKind.collectAsState()
     val verificationCode by viewModel.verificationCode.collectAsState()
     val verificationTimer by viewModel.verificationTimer.collectAsState()
     val newPassword by viewModel.newPassword.collectAsState()
@@ -94,7 +95,7 @@ fun ForgotPasswordScreen(
                     .padding(horizontal = 24.dp)
             ) {
                 // Title Section
-                TitleSection(currentStep)
+                TitleSection(currentStep, sentKind)
                 
                 Spacer(modifier = Modifier.height(30.dp))
                 
@@ -140,6 +141,7 @@ fun ForgotPasswordScreen(
                             isLoading = isLoading
                         )
                         ForgotPasswordViewModel.Step.COMPLETE -> CompleteStepContent(
+                            showEmailHint = sentKind == ForgotPasswordViewModel.InputKind.PHONE,
                             onDismiss = onDismiss
                         )
                     }
@@ -171,10 +173,10 @@ fun ForgotPasswordScreen(
 }
 
 @Composable
-private fun TitleSection(currentStep: ForgotPasswordViewModel.Step) {
+private fun TitleSection(currentStep: ForgotPasswordViewModel.Step, sentKind: ForgotPasswordViewModel.InputKind) {
     val (title, description) = when (currentStep) {
-        ForgotPasswordViewModel.Step.PHONE -> "비밀번호 찾기" to "가입하실 때 사용한 이메일을 입력해주세요."
-        ForgotPasswordViewModel.Step.VERIFICATION -> "인증번호 입력" to "이메일로 발송된 6자리 인증번호를 입력해주세요."
+        ForgotPasswordViewModel.Step.PHONE -> "비밀번호 찾기" to "가입하실 때 사용한 이메일 또는 전화번호를 입력해주세요."
+        ForgotPasswordViewModel.Step.VERIFICATION -> "인증번호 입력" to (if (sentKind == ForgotPasswordViewModel.InputKind.PHONE) "문자로 보낸 6자리 인증번호를 입력해주세요." else "메일로 보낸 6자리 인증번호를 입력해주세요.")
         ForgotPasswordViewModel.Step.NEW_PASSWORD -> "새 비밀번호 설정" to "새로운 비밀번호를 설정해주세요."
         ForgotPasswordViewModel.Step.COMPLETE -> "설정 완료" to "비밀번호가 성공적으로 변경되었습니다."
     }
@@ -205,10 +207,11 @@ private fun PhoneStepContent(
     onSendCode: () -> Unit,
     isLoading: Boolean
 ) {
+    val canSend = ForgotPasswordViewModel.classify(phoneNumber) != ForgotPasswordViewModel.InputKind.INVALID
     Column(verticalArrangement = Arrangement.spacedBy(40.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(
-                text = "이메일",
+                text = "이메일 또는 전화번호",
                 fontSize = 14.sp,
                 fontFamily = SuiteFont,
                 fontWeight = FontWeight.SemiBold,
@@ -218,13 +221,13 @@ private fun PhoneStepContent(
             OutlinedTextField(
                 value = phoneNumber,
                 onValueChange = onPhoneChange,
-                placeholder = { Text("이메일 주소", fontFamily = SuiteFont) },
+                placeholder = { Text("이메일 주소 또는 전화번호", fontFamily = SuiteFont) },
                 keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Email,
+                    keyboardType = KeyboardType.Text,
                     imeAction = ImeAction.Done
                 ),
                 keyboardActions = KeyboardActions(
-                    onDone = { if (phoneNumber.contains("@") && !isLoading) onSendCode() }
+                    onDone = { if (canSend && !isLoading) onSendCode() }
                 ),
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -240,7 +243,7 @@ private fun PhoneStepContent(
         
         Button(
             onClick = onSendCode,
-            enabled = phoneNumber.contains("@") && !isLoading,
+            enabled = canSend && !isLoading,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
@@ -520,7 +523,7 @@ private fun PasswordRuleRow(text: String, isValid: Boolean) {
 }
 
 @Composable
-private fun CompleteStepContent(onDismiss: () -> Unit) {
+private fun CompleteStepContent(showEmailHint: Boolean, onDismiss: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -551,6 +554,17 @@ private fun CompleteStepContent(onDismiss: () -> Unit) {
             color = Color.Gray,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )
+
+        // 전화번호로 재설정한 경우: 이메일 등록 유도 (다음에는 이메일로 찾을 수 있음)
+        if (showEmailHint) {
+            Text(
+                text = "이메일을 등록해 두면 다음에는 이메일로 찾을 수 있어요",
+                fontSize = 14.sp,
+                fontFamily = SuiteFont,
+                color = Color.Gray,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+        }
         
         Spacer(modifier = Modifier.height(20.dp))
         

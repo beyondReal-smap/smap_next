@@ -344,7 +344,9 @@ class ScheduleViewModel @Inject constructor(
     ) {
         val group = _selectedGroup.value ?: return
         val user = authService.getUserData() ?: return
-        val userId = targetMemberId ?: user.mtIdx ?: return
+        val currentUserId = user.mtIdx ?: return
+        // 일반 멤버는 항상 본인, 그룹장·리더만 허용된 타인을 대상으로 할 수 있다
+        val userId = ScheduleTargetPolicy.resolveCreateTargetId(_members.value, currentUserId, targetMemberId)
 
         if (title.isBlank()) return
 
@@ -463,6 +465,9 @@ class ScheduleViewModel @Inject constructor(
     }
 
     // MARK: - Permissions
+
+    /** 로그인한 본인 mt_idx (일정 생성 기본 대상). 로그인 상태면 항상 존재 */
+    val currentUserId: Int get() = authService.getUserData()?.mtIdx ?: 0
 
     fun canManageSchedule(schedule: SmapSchedule): Boolean {
         val currentUser = authService.getUserData() ?: return false

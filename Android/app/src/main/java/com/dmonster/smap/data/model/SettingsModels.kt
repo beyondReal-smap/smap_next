@@ -29,8 +29,8 @@ data class ApiResponse<T>(
  */
 @Serializable
 data class ChangePasswordRequest(
-    @SerialName("current_password") val currentPassword: String,
-    @SerialName("new_password") val newPassword: String
+    @SerialName("currentPassword") val currentPassword: String,
+    @SerialName("newPassword") val newPassword: String
 )
 
 /**
@@ -110,7 +110,7 @@ data class TelegramMessageRequest(
  */
 @Serializable
 data class VerifyPasswordRequest(
-    @SerialName("current_password") val currentPassword: String
+    @SerialName("currentPassword") val currentPassword: String
 )
 
 /**

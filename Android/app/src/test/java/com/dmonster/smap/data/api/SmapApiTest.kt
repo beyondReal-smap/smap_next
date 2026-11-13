@@ -171,4 +171,22 @@ class SmapApiTest {
         assertNull(profile.mtEmail)
         assertNull(profile.mtBirth)
     }
+
+    @Test
+    fun `changePassword sends camelCase keys matching server schema`() = runTest {
+        server.enqueue(MockResponse().setBody("""{"success":true}"""))
+        api.changePassword(com.dmonster.smap.data.model.ChangePasswordRequest("Old1pass!", "New1pass!"))
+        val body = server.takeRequest().body.readUtf8()
+        val obj = Json.parseToJsonElement(body) as kotlinx.serialization.json.JsonObject
+        assertEquals(setOf("currentPassword", "newPassword"), obj.keys)
+    }
+
+    @Test
+    fun `verifyPassword sends camelCase key matching server schema`() = runTest {
+        server.enqueue(MockResponse().setBody("""{"success":true}"""))
+        api.verifyPassword(com.dmonster.smap.data.model.VerifyPasswordRequest("Old1pass!"))
+        val body = server.takeRequest().body.readUtf8()
+        val obj = Json.parseToJsonElement(body) as kotlinx.serialization.json.JsonObject
+        assertEquals(setOf("currentPassword"), obj.keys)
+    }
 }

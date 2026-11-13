@@ -63,6 +63,8 @@ fun MyPlaceScreen(
     val selectedGroup by viewModel.selectedGroup.collectAsState()
     val members by viewModel.members.collectAsState()
     val selectedMember by viewModel.selectedMember.collectAsState()
+    // 다른 멤버를 선택한 경우 장소는 보기만 가능 (추가 UI 숨김)
+    val canAddLocation = selectedMember != null && viewModel.canAddLocation()
     val locations by viewModel.locations.collectAsState()
     val selectedLocation by viewModel.selectedLocation.collectAsState()
     
@@ -176,8 +178,10 @@ fun MyPlaceScreen(
                         isLogoClickEnabled = false
                     ),
                     onMapLongClick = { _, coord ->
-                        haptics.warning()
-                        viewModel.showAddDialog(coord.latitude, coord.longitude)
+                        if (canAddLocation) {
+                            haptics.warning()
+                            viewModel.showAddDialog(coord.latitude, coord.longitude)
+                        }
                     },
                     onMapClick = { _, _ ->
                         viewModel.clearSelection()
@@ -250,6 +254,7 @@ fun MyPlaceScreen(
 
                 // Top Bar (Overlay)
                 MyPlaceTopBar(
+                    showSearch = canAddLocation,
                     onSearchClick = { viewModel.showSearchScreen() }
                 )
                 
@@ -457,6 +462,7 @@ fun MyPlaceScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MyPlaceTopBar(
+    showSearch: Boolean,
     onSearchClick: () -> Unit
 ) {
     Surface(
@@ -486,16 +492,18 @@ private fun MyPlaceTopBar(
                 )
             }
             
-            IconButton(
-                onClick = onSearchClick,
-                modifier = Modifier.size(48.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = "장소 검색",
-                    tint = BrandColors.Primary,
-                    modifier = Modifier.size(28.dp)
-                )
+            if (showSearch) {
+                IconButton(
+                    onClick = onSearchClick,
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = "장소 검색",
+                        tint = BrandColors.Primary,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
             }
         }
     }

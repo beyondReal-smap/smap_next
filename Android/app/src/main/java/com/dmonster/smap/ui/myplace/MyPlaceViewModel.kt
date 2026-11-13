@@ -40,6 +40,7 @@ class MyPlaceViewModel @Inject constructor(
 
     companion object {
         private const val TAG = "MyPlaceViewModel"
+        const val NOT_OWNER_MESSAGE = "본인의 장소만 추가·수정할 수 있어요"
         private val httpClient = OkHttpClient()
     }
 
@@ -330,6 +331,7 @@ class MyPlaceViewModel @Inject constructor(
     }
 
     fun showAddDialog(lat: Double, lng: Double) {
+        if (!canAddLocation()) { _errorMessage.value = NOT_OWNER_MESSAGE; return }
         _pendingLocation.value = lat to lng
         _showAddDialog.value = true
         
@@ -374,6 +376,8 @@ class MyPlaceViewModel @Inject constructor(
     // MARK: - Search Actions
 
     fun showSearchScreen() {
+        // 기존 장소 편집(본인 장소) 중의 검색은 허용, 그 외에는 본인 선택 시에만
+        if (_showEditDialog.value == null && !canAddLocation()) { _errorMessage.value = NOT_OWNER_MESSAGE; return }
         _showSearchScreen.value = true
         _searchQuery.value = ""
         _searchResults.value = emptyList()
@@ -504,6 +508,7 @@ class MyPlaceViewModel @Inject constructor(
     ) {
         val group = _selectedGroup.value ?: return
         val member = _selectedMember.value ?: return
+        if (!canAddLocation()) { _errorMessage.value = NOT_OWNER_MESSAGE; return }
 
         if (title.isBlank()) return
 
@@ -587,6 +592,7 @@ class MyPlaceViewModel @Inject constructor(
     // TODO: Replace with a dedicated PATCH endpoint for notification toggle when available.
     // Currently sends a full update with all fields from the existing location.
     fun toggleLocationNotification(location: SavedLocation) {
+        if (!canManageLocation(location)) { _errorMessage.value = NOT_OWNER_MESSAGE; return }
         viewModelScope.launch {
             val newStatus = if (location.sltEnterAlarm == "Y") "N" else "Y"
             when (val result = safeApiCall {
@@ -649,27 +655,13 @@ class MyPlaceViewModel @Inject constructor(
 
     // MARK: - Permissions
 
-    fun canManageLocation(location: SavedLocation): Boolean {
-        val currentUser = authService.getUserData() ?: return false
-        
-        // 1. Own data
-        if (location.mtIdx == currentUser.mtIdx) return true
-        
-        val currentMember = _members.value.find { it.mtIdx == currentUser.mtIdx } ?: return false
-        
-        // 2. Owner can manage anything
-        if (currentMember.sgdtOwnerChk == "Y") return true
-        
-        // 3. Leader can manage anything except Owner's data
-        if (currentMember.sgdtLeaderChk == "Y") {
-            val targetMember = _members.value.find { it.mtIdx == location.mtIdx }
-            // If target is Owner, leader cannot manage
-            if (targetMember?.sgdtOwnerChk == "Y") return false
-            return true
-        }
-        
-        return false
-    }
+    /** 판정 기준은 MyPlaceManagePolicy 한 곳에 둔다 (현재: 소유자 본인만) */
+    fun canManageLocation(location: SavedLocation): Boolean =
+        MyPlaceManagePolicy.canManageLocation(authService.getUserData()?.mtIdx, location.mtIdx)
+
+    /** 선택된 멤버가 본인일 때만 장소 추가 UI를 노출 */
+    fun canAddLocation(): Boolean =
+        MyPlaceManagePolicy.canAddLocation(authService.getUserData()?.mtIdx, _selectedMember.value?.mtIdx)
 
     // MARK: - Helpers
 

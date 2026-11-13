@@ -108,6 +108,17 @@ data class EmailChangeRequest(val email: String, @SerialName("verification_token
 @Serializable
 data class EmailResetRequest(val email: String, @SerialName("verification_token") val verificationToken: String, @SerialName("new_password") val newPassword: String)
 
+/** POST /auth/reset-password-by-phone — SMS 인증(/sms/verify-code) 성공 후 호출. 인증 여부는 서버가 판정한다. */
+@Serializable
+data class PhoneResetRequest(
+    val phone: String,
+    @SerialName("new_password") val newPassword: String,
+    @SerialName("verification_code") val verificationCode: String = ""
+)
+
+@Serializable
+data class PhoneResetResponse(val success: Boolean = false, val message: String? = null)
+
 fun isServerPasswordValid(password: String): Boolean = password.length >= 8 &&
     password.any { it in 'A'..'Z' } && password.any { it in 'a'..'z' } &&
     password.any { it.isDigit() } && password.any { it in "!@#\$%^&*(),.?\":{}|<>" }

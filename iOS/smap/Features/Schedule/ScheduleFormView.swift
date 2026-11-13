@@ -332,8 +332,8 @@ struct ScheduleFormView: View {
                 }
             }
 
-            // Member Selection (Avatar Grid)
-            if !members.isEmpty {
+            // Member Selection (Avatar Grid) — 타인 대상 선택은 그룹장·리더에게만 보인다 (서버: 본인 일정은 누구나, 타인 일정은 그룹장·리더만)
+            if selectableMembers.count > 1 {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("대상 멤버")
                         .font(.suite(size: 14, weight: .medium))
@@ -341,7 +341,7 @@ struct ScheduleFormView: View {
 
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 16) {
-                            ForEach(members) { member in
+                            ForEach(selectableMembers) { member in
                                 Button(action: {
                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                         targetMemberId = member.mt_idx
@@ -1102,6 +1102,14 @@ struct ScheduleFormView: View {
         case "1일 전": return 1440
         default: return 0
         }
+    }
+
+    /// 대상으로 고를 수 있는 멤버 — 요청자가 그룹장·리더면 전원, 아니면 본인만
+    private var selectableMembers: [SmapGroupMember] {
+        guard let mtIdxStr = UserDefaults.standard.string(forKey: "mt_idx"), let me = Int(mtIdxStr),
+              let myMember = members.first(where: { $0.mt_idx == me }) else { return [] }
+        if myMember.sgdt_owner_chk == "Y" || myMember.sgdt_leader_chk == "Y" { return members }
+        return [myMember]
     }
 
     private func loadMembers(groupId: Int) {

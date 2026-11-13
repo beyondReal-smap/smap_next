@@ -30,6 +30,10 @@ interface SmapApi {
     @POST("auth/reset-password-by-email")
     suspend fun resetPasswordByEmail(@Body request: EmailResetRequest): EmailCodeResponse
 
+    /** POST /auth/reset-password-by-phone — 전화번호(SMS 인증) 기반 비밀번호 재설정 */
+    @POST("auth/reset-password-by-phone")
+    suspend fun resetPasswordByPhone(@Body request: PhoneResetRequest): PhoneResetResponse
+
     /** POST /auth/login */
     @POST("auth/login")
     suspend fun login(@Body request: LoginRequest): LoginResponse

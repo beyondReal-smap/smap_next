@@ -163,6 +163,10 @@ class AuthService(
         prefs.edit().putString(KEY_USER_DATA, json.encodeToString(user.copy(mtEmail = email))).commit()
     }
 
+    suspend fun sendSmsCode(phone: String) = api.sendSmsVerification(SmsVerificationRequest(phone))
+    suspend fun verifySmsCode(phone: String, code: String) = api.verifySmsCode(VerifySmsCodeRequest(phone, code))
+    suspend fun resetPasswordByPhone(phone: String, password: String) = api.resetPasswordByPhone(PhoneResetRequest(phone, newPassword = password))
+
     suspend fun resetPasswordByEmail(email: String, token: String, password: String) = api.resetPasswordByEmail(EmailResetRequest(email, token, password))
 
     /**
@@ -190,7 +194,8 @@ class AuthService(
             loginResponse
         } catch (e: Exception) {
             Log.e(TAG, "Login failed", e)
-            LoginResponse(success = false, message = "로그인 요청에 실패했습니다. 네트워크 연결을 확인해주세요.", data = null)
+            // 400(계정 특정 불가 등)·429(시도 횟수 제한)는 서버가 준 안내 문구를 그대로 보여 준다
+            LoginResponse(success = false, message = serverGuidanceMessage(e) ?: "로그인 요청에 실패했습니다. 네트워크 연결을 확인해주세요.", data = null)
         }
     }
 
@@ -228,8 +233,8 @@ class AuthService(
             Log.e(TAG, "Google login failed", e)
             SocialLoginResponse(
                 success = false,
-                message = "Network error: ${e.message}",
-                error = e.message
+                message = "네트워크 연결을 확인해주세요.",
+                error = e.javaClass.simpleName
             )
         }
     }
@@ -270,8 +275,8 @@ class AuthService(
             Log.e(TAG, "Kakao login failed", e)
             SocialLoginResponse(
                 success = false,
-                message = "Network error: ${e.message}",
-                error = e.message
+                message = "네트워크 연결을 확인해주세요.",
+                error = e.javaClass.simpleName
             )
         }
     }
@@ -318,7 +323,7 @@ class AuthService(
             api.changePassword(request)
         } catch (e: Exception) {
             Log.e(TAG, "Change password failed", e)
-            ChangePasswordResponse(false, "비밀번호 변경에 실패했습니다. 네트워크 연결을 확인해주세요.")
+            ChangePasswordResponse(false, serverGuidanceMessage(e) ?: "비밀번호 변경에 실패했습니다. 네트워크 연결을 확인해주세요.")
         }
     }
 
@@ -331,7 +336,7 @@ class AuthService(
             api.verifyPassword(request)
         } catch (e: Exception) {
             Log.e(TAG, "Verify password failed", e)
-            VerifyPasswordResponse(false, "Network error: ${e.message}")
+            VerifyPasswordResponse(false, serverGuidanceMessage(e) ?: "네트워크 연결을 확인해주세요.")
         }
     }
 
@@ -423,4 +428,22 @@ fun emailAuthError(error: Throwable): String {
         }
     }
     return "네트워크 연결을 확인해주세요."
+}
+
+/**
+ * 400/429 응답의 detail 문구를 사용자 안내로 쓴다. 문자열 detail 이 없으면 429 는 일반 대기 안내,
+ * 그 외(401/422/5xx/네트워크)는 null 을 돌려 호출부가 기존 문구를 쓰게 한다.
+ */
+internal fun serverGuidanceMessage(error: Throwable): String? {
+    if (error !is retrofit2.HttpException) return null
+    if (error.code() != 400 && error.code() != 429) return null
+    val detail = try {
+        val body = error.response()?.errorBody()?.string().orEmpty()
+        (Json.parseToJsonElement(body) as? kotlinx.serialization.json.JsonObject)
+            ?.get("detail")
+            ?.let { it as? kotlinx.serialization.json.JsonPrimitive }
+            ?.takeIf { it.isString }?.content
+    } catch (_: kotlinx.serialization.SerializationException) { null }
+    return detail?.takeIf { it.isNotBlank() }
+        ?: if (error.code() == 429) "시도 횟수가 많습니다. 잠시 후 다시 시도해주세요." else null
 }

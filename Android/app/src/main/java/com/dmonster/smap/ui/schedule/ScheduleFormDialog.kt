@@ -46,6 +46,7 @@ fun CreateEditEventDialog(
     groups: List<SmapGroup>,
     selectedGroup: SmapGroup?,
     members: List<SmapGroupMember>,
+    currentUserId: Int,
     onGroupSelect: (SmapGroup) -> Unit,
     onDismiss: () -> Unit,
     initialEditOption: String? = null,
@@ -82,7 +83,15 @@ fun CreateEditEventDialog(
     var alarmTime by rememberSaveable { mutableStateOf("없음") }
     var repeatConfig by rememberSaveable { mutableStateOf(schedule?.repeatDescription ?: "반복 안함") }
     var editOptionState by rememberSaveable { mutableStateOf(initialEditOption ?: "this") }
-    var targetMember by remember { mutableStateOf<SmapGroupMember?>(members.find { it.mtIdx == (schedule?.mtScheduleIdx ?: schedule?.mtIdx) } ?: members.firstOrNull()) }
+    // 생성 시 기본 대상은 로그인한 본인 (그룹장 명의로 요청이 가서 403 나는 문제 방지)
+    var targetMember by remember(members, currentUserId) {
+        mutableStateOf<SmapGroupMember?>(
+            if (isEdit) members.find { it.mtIdx == (schedule?.mtScheduleIdx ?: schedule?.mtIdx) }
+            else ScheduleTargetPolicy.defaultTarget(members, currentUserId)
+        )
+    }
+    // 수정 모드는 기존 표시 유지, 생성 모드는 권한에 따라 대상 선택지 제한
+    val targetCandidates = if (isEdit) members else ScheduleTargetPolicy.selectableMembers(members, currentUserId)
 
     // Date/Time State
     var showStartDatePicker by remember { mutableStateOf(false) }
@@ -461,7 +470,7 @@ fun CreateEditEventDialog(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         contentPadding = PaddingValues(end = 16.dp)
                     ) {
-                        items(members) { member ->
+                        items(targetCandidates) { member ->
                             MemberItem(
                                 member = member,
                                 isSelected = targetMember?.mtIdx == member.mtIdx,

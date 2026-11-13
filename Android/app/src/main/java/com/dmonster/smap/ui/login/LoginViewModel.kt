@@ -221,7 +221,8 @@ class LoginViewModel @Inject constructor(
                 android.util.Log.d("LoginViewModel", "✅ 기존 ${provider.uppercase()} 회원 로그인")
             }
         } else {
-            showErrorMessage(response.message ?: "${provider.uppercase()} 로그인에 실패했습니다.")
+            // 서버가 준 안내 문구(예: 같은 이메일의 기존 계정 안내)를 그대로 보여 주고, 가입 화면으로는 넘어가지 않는다
+            showErrorMessage(socialLoginFailureMessage(response, provider))
         }
     }
     
@@ -282,3 +283,9 @@ class LoginViewModel @Inject constructor(
         }
     }
 }
+
+/** 소셜 로그인 success=false 응답에서 사용자에게 보여 줄 문구. 서버 message 를 우선한다. */
+internal fun socialLoginFailureMessage(response: SocialLoginResponse, provider: String): String =
+    response.message?.takeIf { it.isNotBlank() }
+        ?: response.error?.takeIf { it.isNotBlank() }
+        ?: "${provider.uppercase()} 로그인에 실패했습니다."

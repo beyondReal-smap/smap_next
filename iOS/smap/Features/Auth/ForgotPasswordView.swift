@@ -113,8 +113,11 @@ struct ForgotPasswordView: View {
     
     private var stepDescription: String {
         switch viewModel.currentStep {
-        case .phone: return "가입하실 때 사용한 이메일을 입력해주세요."
-        case .verification: return "\(viewModel.phoneNumber)로 발송된\n6자리 인증번호를 입력해주세요."
+        case .phone: return "가입하실 때 사용한 이메일 또는 전화번호를 입력해주세요."
+        case .verification:
+            return viewModel.isPhoneInput
+                ? "\(viewModel.phoneNumber)로 문자로 보낸\n6자리 인증번호를 입력해주세요."
+                : "\(viewModel.phoneNumber)로 메일로 보낸\n6자리 인증번호를 입력해주세요."
         case .newPassword: return "새로운 비밀번호를 설정해주세요."
         case .complete: return "비밀번호가 성공적으로 변경되었습니다."
         }
@@ -125,11 +128,11 @@ struct ForgotPasswordView: View {
     private var phoneStepView: some View {
         VStack(spacing: 40) {
             VStack(alignment: .leading, spacing: 10) {
-                Text("이메일")
+                Text("이메일 또는 전화번호")
                     .font(.suite(size: 14, weight: .semibold))
                     .foregroundColor(.gray)
                 
-                TextField("이메일 주소", text: $viewModel.phoneNumber, onEditingChanged: { editing in
+                TextField("이메일 주소 또는 전화번호", text: $viewModel.phoneNumber, onEditingChanged: { editing in
                     withAnimation(.easeInOut(duration: 0.2)) {
                         isFocused = editing
                     }
@@ -155,10 +158,10 @@ struct ForgotPasswordView: View {
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 56)
-                    .background(viewModel.phoneNumber.contains("@") ? SMAPTheme.Color.primary : Color.gray.opacity(0.3))
+                    .background(viewModel.isIdentifierValid ? SMAPTheme.Color.primary : Color.gray.opacity(0.3))
                     .cornerRadius(12)
             }
-            .disabled(!viewModel.phoneNumber.contains("@") || viewModel.isLoading)
+            .disabled(!viewModel.isIdentifierValid || viewModel.isLoading)
         }
     }
     
@@ -337,6 +340,12 @@ struct ForgotPasswordView: View {
                 Text("이제 새로운 비밀번호로 로그인해주세요.")
                     .font(.suite(size: 16, weight: .medium))
                     .foregroundColor(.gray)
+                if viewModel.isPhoneInput {
+                    Text("이메일을 등록해 두면 다음에는 이메일로 찾을 수 있어요.")
+                        .font(.suite(size: 14, weight: .medium))
+                        .foregroundColor(.gray)
+                        .multilineTextAlignment(.center)
+                }
             }
             
             Spacer()

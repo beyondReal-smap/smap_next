@@ -385,7 +385,26 @@ class AuthService: ObservableObject {
         let verification_token: String?
     }
 
+    /// SMS 인증·전화번호 재설정 응답 — 실패 사유는 서버의 error/message 를 그대로 쓴다.
+    struct PhoneAuthResult: Decodable {
+        let success: Bool
+        let error: String?
+        let message: String?
+
+        /// 사용자에게 보여 줄 서버 문구 (없으면 nil)
+        var serverMessage: String? { error ?? message }
+    }
+
     func emailAuth(path: String, body: [String: String]) async throws -> EmailCodeResult {
+        try await unauthenticatedPost(path: path, body: body)
+    }
+
+    /// 전화번호 비밀번호 찾기용 호출 (/sms/send-verification-code, /sms/verify-code, /auth/reset-password-by-phone)
+    func phoneAuth(path: String, body: [String: String]) async throws -> PhoneAuthResult {
+        try await unauthenticatedPost(path: path, body: body)
+    }
+
+    private func unauthenticatedPost<T: Decodable>(path: String, body: [String: String]) async throws -> T {
         guard let url = URL(string: baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + path) else {
             throw NetworkError.badRequest("인증 요청을 처리할 수 없습니다.")
         }
@@ -397,7 +416,7 @@ class AuthService: ObservableObject {
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let http = response as? HTTPURLResponse else { throw NetworkError.badRequest("서버 응답을 확인해주세요.") }
             guard (200...299).contains(http.statusCode) else { throw NetworkError.fromHTTPStatus(http.statusCode, data: data) }
-            return try JSONDecoder().decode(EmailCodeResult.self, from: data)
+            return try JSONDecoder().decode(T.self, from: data)
         } catch let error as NetworkError { throw error }
         catch { throw NetworkError.badRequest("네트워크 연결을 확인해주세요.") }
     }

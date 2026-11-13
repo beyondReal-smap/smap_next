@@ -320,6 +320,9 @@ class LoginViewModel: ObservableObject {
                     }
                 } else if let error = loginError {
                     self.showErrorMessage("Google 로그인/가입에 실패했습니다: \(error.localizedDescription)")
+                } else if let response = loginResponse, let serverMessage = response.message ?? response.error, !serverMessage.isEmpty {
+                    // success=false — 서버 안내 문구(예: 같은 이메일의 기존 계정 안내)를 그대로 보여 주고 가입 화면으로 넘기지 않는다.
+                    self.showErrorMessage(serverMessage)
                 } else {
                      if #available(iOS 15.0, *) {
                          self.showErrorMessage("Google 로그인에 실패했습니다.")
@@ -591,6 +594,8 @@ class LoginViewModel: ObservableObject {
                     }
                 } else if let error = loginError {
                     self.showErrorMessage("Apple 로그인에 실패했습니다: \(error.localizedDescription)")
+                } else if let serverMessage = loginResponse?.message, !serverMessage.isEmpty {
+                    self.showErrorMessage(serverMessage)
                 } else {
                     self.showErrorMessage("Apple 로그인에 실패했습니다.")
                 }
@@ -1127,6 +1132,7 @@ class ForgotPasswordViewModel: ObservableObject {
         didSet {
             if phoneNumber != oldValue {
                 verificationToken = nil
+                phoneVerified = false
                 verificationSent = false
                 verificationTimer = 0
                 lastSentTime = nil
@@ -1152,15 +1158,30 @@ class ForgotPasswordViewModel: ObservableObject {
     @Published var verificationTimer: Int = 0
     @Published var lastSentTime: Date? = nil
     private var verificationToken: String? = nil
+    /// 전화번호 경로: 서버가 verify-code 에서 성공을 돌려줬는지 (앱이 코드를 직접 비교하지 않는다)
+    private var phoneVerified = false
     private var timerCancellable: AnyCancellable?
     
     private let authService = AuthService.shared
-    private let smsAPIURL = "https://api3.aiagnt.kr/api/v1/sms/send-verification-code"
-    private let checkPhoneAPIURL = "https://api3.aiagnt.kr/api/v1/members/check/phone/"
-    private let resetPasswordAPIURL = "https://api3.aiagnt.kr/api/v1/auth/reset-password-by-phone"
     
     // MARK: - Helper Methods
     
+    /// 입력값이 전화번호 형식(하이픈 제거 후 숫자 10~11자리)인지 — 맞으면 SMS 경로, 아니면 이메일 경로
+    var isPhoneInput: Bool {
+        formatPhoneForAPI(phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines))
+            .range(of: "^[0-9]{10,11}$", options: .regularExpression) != nil
+    }
+    
+    var isEmailInput: Bool {
+        phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            .range(of: "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$", options: .regularExpression) != nil
+    }
+    
+    /// 첫 단계 버튼 활성 조건
+    var isIdentifierValid: Bool { isPhoneInput || isEmailInput }
+    
+    /// 전화번호 인증번호 유효 시간(서버 3분), 이메일은 10분
+    private var codeLifetimeSeconds: Int { isPhoneInput ? 180 : 600 }
     
     private func formatPhoneForAPI(_ phone: String) -> String {
         return phone.replacingOccurrences(of: "-", with: "")
@@ -1200,7 +1221,7 @@ class ForgotPasswordViewModel: ObservableObject {
     }
     
     func startTimer() {
-        verificationTimer = 600
+        verificationTimer = codeLifetimeSeconds
         timerCancellable?.cancel()
         timerCancellable = Timer.publish(every: 1, on: .main, in: .common)
             .autoconnect()
@@ -1216,12 +1237,16 @@ class ForgotPasswordViewModel: ObservableObject {
     
     // MARK: - Actions
     
-    /// 사용자 존재 여부 확인 후 인증번호 발송
+    /// 입력 종류(이메일/전화번호)에 맞춰 인증번호 발송
     func checkUserAndSendCode() {
-        let email = phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !isLoading else { return }
-        guard email.range(of: "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$", options: .regularExpression) != nil else { errorMessage = "올바른 이메일을 입력해주세요."; showError = true; return }
+        guard isIdentifierValid else { errorMessage = "올바른 이메일 또는 전화번호를 입력해주세요."; showError = true; return }
         guard canResend() else { errorMessage = "잠시 후 다시 시도해주세요."; showError = true; return }
+        if isPhoneInput { sendPhoneCode() } else { sendEmailCode() }
+    }
+
+    private func sendEmailCode() {
+        let email = phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         isLoading = true
         Task {
             defer { isLoading = false }
@@ -1238,10 +1263,30 @@ class ForgotPasswordViewModel: ObservableObject {
         }
     }
 
+    /// SMS 인증번호 발송 — 코드는 서버에만 저장되고 응답에 오지 않는다.
+    private func sendPhoneCode() {
+        let phone = formatPhoneForAPI(phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines))
+        isLoading = true
+        Task {
+            defer { isLoading = false }
+            do {
+                let response = try await authService.phoneAuth(path: "/sms/send-verification-code", body: ["phone_number": phone])
+                guard formatPhoneForAPI(phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines)) == phone else { return }
+                guard response.success else { throw NetworkError.badRequest(response.serverMessage ?? "인증번호 발송에 실패했습니다.") }
+                phoneVerified = false
+                verificationSent = true
+                lastSentTime = Date()
+                startTimer()
+                currentStep = .verification
+            } catch { errorMessage = (error as? NetworkError)?.userMessage ?? "네트워크 연결을 확인해주세요."; showError = true }
+        }
+    }
+
     func verifyCode() {
         guard !isLoading else { return }
-        if verificationToken != nil { currentStep = .newPassword; return }
+        if verificationToken != nil || phoneVerified { currentStep = .newPassword; return }
         guard verificationCode.count == 6, verificationTimer > 0 else { errorMessage = "인증번호를 확인해주세요."; showError = true; return }
+        if isPhoneInput { verifyPhoneCode(); return }
         let email = phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         isLoading = true
         Task {
@@ -1257,9 +1302,44 @@ class ForgotPasswordViewModel: ObservableObject {
         }
     }
 
+    /// SMS 인증 확인 — 성공 여부는 서버 응답으로만 판정한다.
+    private func verifyPhoneCode() {
+        let phone = formatPhoneForAPI(phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines))
+        let code = verificationCode
+        isLoading = true
+        Task {
+            defer { isLoading = false }
+            do {
+                let response = try await authService.phoneAuth(path: "/sms/verify-code", body: ["phone_number": phone, "code": code])
+                guard formatPhoneForAPI(phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines)) == phone else { return }
+                guard response.success else { throw NetworkError.badRequest(response.serverMessage ?? "인증번호 확인에 실패했습니다.") }
+                phoneVerified = true
+                timerCancellable?.cancel()
+                currentStep = .newPassword
+            } catch { errorMessage = (error as? NetworkError)?.userMessage ?? "네트워크 연결을 확인해주세요."; showError = true }
+        }
+    }
+
+    private func resetPasswordByPhone() {
+        guard phoneVerified else { errorMessage = "문자 인증이 필요합니다."; showError = true; return }
+        let phone = formatPhoneForAPI(phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines))
+        isLoading = true
+        Task {
+            defer { isLoading = false }
+            do {
+                // verification_code 는 서버의 단독 호출 호환용 필드 — 인증 판정은 서버의 verify-code 결과(인증 완료 상태)가 우선이다.
+                let response = try await authService.phoneAuth(path: "/auth/reset-password-by-phone", body: ["phone": phone, "new_password": newPassword, "verification_code": verificationCode])
+                guard response.success else { throw NetworkError.badRequest(response.serverMessage ?? "비밀번호 변경에 실패했습니다.") }
+                phoneVerified = false
+                currentStep = .complete
+            } catch { errorMessage = (error as? NetworkError)?.userMessage ?? "네트워크 연결을 확인해주세요."; showError = true }
+        }
+    }
+
     func resetPassword() {
         guard !isLoading else { return }
         guard isPasswordRulesSatisfied, newPassword == confirmPassword else { errorMessage = "비밀번호 규칙과 확인값을 확인해주세요."; showError = true; return }
+        if isPhoneInput { resetPasswordByPhone(); return }
         guard let token = verificationToken else { errorMessage = "이메일 인증이 필요합니다."; showError = true; return }
         let email = phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         isLoading = true
