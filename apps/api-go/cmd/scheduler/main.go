@@ -20,6 +20,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/hibiken/asynq"
 
@@ -95,9 +96,17 @@ func main() {
 	}
 
 	// 활성 모드 — 잡큐 Redis(db=1)에 cron 등록 후 enqueue 루프를 돈다.
+	// 일일 cron 5종(03:00/06:30/07:00/19:30/21:00)은 KST 기준이어야 Python APScheduler
+	// (BackgroundScheduler → tzlocal=Asia/Seoul)와 동일 시각에 발화한다. asynq 기본 Location은
+	// UTC라 미지정 시 9시간 밀리므로 명시적으로 KST를 고정한다(@every 주기 잡은 타임존 무관).
+	loc, err := time.LoadLocation("Asia/Seoul")
+	if err != nil {
+		logger.Error("load KST location failed", slog.String("err", err.Error()))
+		os.Exit(1)
+	}
 	sch := asynq.NewScheduler(jobs.RedisOpt(cfg), &asynq.SchedulerOpts{
-		// Location은 다음 트랙에서 KST 등으로 확정한다. 골격은 기본(UTC).
-		Logger: jobs.NewLogAdapter(logger),
+		Location: loc,
+		Logger:   jobs.NewLogAdapter(logger),
 	})
 
 	for _, e := range schedule {

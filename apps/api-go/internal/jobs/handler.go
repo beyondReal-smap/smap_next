@@ -18,7 +18,7 @@ import (
 //   - db    : 잡의 DB 접근(GORM)
 //   - log   : 구조적 로깅
 //   - cfg   : 외부 API 키 등 설정(weather:refresh가 KMAServiceKey 사용)
-//   - fcm   : FCM 발송기(이번 무발송 단계엔 배선만, 발송 잡은 다음 단계)
+//   - fcm   : FCM 발송기(발송 잡이 SendEach/Send로 실발송에 사용)
 //   - lock  : 멱등 분산락(*cache.Store, nil 허용 — 락 없이도 동작)
 //   - kma   : 기상청 클라이언트(앱 수명주기 HTTP client 1개 공유)
 type Handlers struct {

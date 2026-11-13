@@ -176,7 +176,8 @@ func (c *Config) CORSOrigins() []string {
 func Load(envPath string) (*Config, error) {
 	if envPath == "" {
 		candidates := []string{
-			filepath.Join("..", "backend", ".env"),
+			filepath.Join("..", "api", ".env"),     // 모노레포 구조: apps/api-go → apps/api
+			filepath.Join("..", "backend", ".env"), // 구 구조 호환
 			".env",
 		}
 		for _, p := range candidates {

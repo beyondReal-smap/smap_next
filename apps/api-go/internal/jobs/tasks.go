@@ -1,7 +1,6 @@
-// Package jobs는 backend-go의 asynq 백그라운드 잡 레지스트리(Phase 3 골격)다.
+// Package jobs는 backend-go의 asynq 백그라운드 잡 레지스트리(Phase 3)다.
 //
-// 현재는 task type 상수 + 핸들러 stub + 클라이언트 래퍼 골격만 제공한다.
-// 실제 잡 로직(FCM 발송, 위치 동기화, 날씨 갱신 등)은 다음 트랙에서 구현한다.
+// task type 상수 + 12종 잡 핸들러(FCM 발송·위치 동기화·날씨 갱신 등) 실로직 + 클라이언트 래퍼를 제공한다.
 // Python `app/jobs/*` + `app/core/scheduler.py`의 12개 작업과 1:1 대응한다.
 package jobs
 
