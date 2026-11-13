@@ -81,7 +81,7 @@ type emailAuthMembers interface {
 
 // verificationMailer는 인증번호 메일 발송기다(구현은 *EmailService). 설정이 없으면 ErrMailNotConfigured.
 type verificationMailer interface {
-	SendVerificationCode(email, code string) error
+	SendVerificationCode(email, code, purpose string) error
 }
 
 // EmailAuthConfig는 서비스가 쓰는 설정만 담는다.
@@ -265,7 +265,7 @@ func (s *EmailAuthService) SendCode(ctx context.Context, email, purpose, ip stri
 		s.logger.Error("email_auth_code_gen_failed", slog.String("err", err.Error()))
 		return emailErr(500, "Internal Server Error")
 	}
-	if err := s.mailer.SendVerificationCode(email, code); err != nil {
+	if err := s.mailer.SendVerificationCode(email, code, purpose); err != nil {
 		if errors.Is(err, ErrMailNotConfigured) {
 			s.logger.Error("email_auth_mail_not_configured")
 			return emailErr(503, "인증 메일 발송이 설정되지 않았습니다.")

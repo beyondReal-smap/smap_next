@@ -11,7 +11,7 @@ func TestEmailPathSkipsNaverworksWhenUnset(t *testing.T) {
 	nwCalled, smtpCalled := false, false
 	svc.nwSendFn = func(string, string, string) bool { nwCalled = true; return true }
 	svc.smtpSendFn = func(string, string, string, string) error { smtpCalled = true; return nil }
-	if err := svc.SendVerificationCode("u@x.test", "123456"); err != nil {
+	if err := svc.SendVerificationCode("u@x.test", "123456", EmailPurposeRegister); err != nil {
 		t.Fatal(err)
 	}
 	if nwCalled || !smtpCalled {
@@ -30,16 +30,16 @@ func TestEmailPathNaverworksFirstThenSMTP(t *testing.T) {
 	smtpCalled := false
 	svc.nwSendFn = func(string, string, string) bool { return true }
 	svc.smtpSendFn = func(string, string, string, string) error { smtpCalled = true; return nil }
-	if err := svc.SendVerificationCode("u@x.test", "1"); err != nil || smtpCalled {
+	if err := svc.SendVerificationCode("u@x.test", "1", EmailPurposeRegister); err != nil || smtpCalled {
 		t.Fatalf("API 성공 시 SMTP 미사용: %v %v", err, smtpCalled)
 	}
 	svc.nwSendFn = func(string, string, string) bool { return false }
-	if err := svc.SendVerificationCode("u@x.test", "1"); err != nil || !smtpCalled {
+	if err := svc.SendVerificationCode("u@x.test", "1", EmailPurposeRegister); err != nil || !smtpCalled {
 		t.Fatalf("API 실패 시 SMTP 폴백: %v", err)
 	}
 	only := NewEmail(EmailConfig{NaverworksClientID: "i", NaverworksClientSecret: "s", NaverworksDomain: "d"})
 	only.nwSendFn = func(string, string, string) bool { return false }
-	if err := only.SendVerificationCode("u@x.test", "1"); err == nil || errors.Is(err, ErrMailNotConfigured) {
+	if err := only.SendVerificationCode("u@x.test", "1", EmailPurposeRegister); err == nil || errors.Is(err, ErrMailNotConfigured) {
 		t.Fatalf("API만 있고 실패하면 일반 에러: %v", err)
 	}
 }
