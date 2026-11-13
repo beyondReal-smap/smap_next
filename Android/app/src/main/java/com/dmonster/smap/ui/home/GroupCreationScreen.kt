@@ -1,37 +1,46 @@
 package com.dmonster.smap.ui.home
 
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Groups
-import androidx.compose.material.icons.filled.Lightbulb
-import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.Tag
-import androidx.compose.material.icons.filled.TextSnippet
+import androidx.compose.material.icons.outlined.Badge
+import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.Notes
+import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.dmonster.smap.ui.theme.BrandColors
-import com.dmonster.smap.ui.theme.SuiteFont
+import com.dmonster.smap.ui.components.SmapBanner
+import com.dmonster.smap.ui.components.SmapBannerTone
+import com.dmonster.smap.ui.components.SmapButton
+import com.dmonster.smap.ui.components.SmapTextField
+import com.dmonster.smap.ui.theme.SmapRadius
+import com.dmonster.smap.ui.theme.SmapSpacing
+import com.dmonster.smap.ui.theme.SmapText
 
 /**
- * 그룹 생성/가입 화면 (신규 가입자용 전체 화면 모달)
- * 그룹 만들기 또는 초대코드로 가입 선택 가능
+ * 그룹 생성/가입 화면 (그룹이 없는 회원용 전체 화면 모달)
+ * 그룹 만들기 또는 초대 코드로 참여를 고른다.
+ *
+ * 디자인 시스템 정돈:
+ * - 그라데이션 원형 아이콘, 칸마다 다른 강조색(남색·분홍·주황), 노란 팁 상자를 걷어내고
+ *   공용 SmapTextField / SmapButton / SmapBanner 로 로그인·가입 화면과 같은 규격을 쓴다.
+ * - 배경을 Surface 로 깔아 빈 곳을 눌러도 뒤의 지도가 반응하지 않게 한다(이전에는 터치가 지도로 새어
+ *   NAVER 지도 정보 창이 열렸다).
+ * - 키보드가 올라와도 버튼이 가리지 않게 본문은 스크롤, 버튼은 아래에 고정한다.
  */
 @Composable
 fun GroupCreationScreen(
@@ -44,404 +53,156 @@ fun GroupCreationScreen(
     var groupName by remember { mutableStateOf("") }
     var groupDescription by remember { mutableStateOf("") }
     var inviteCode by remember { mutableStateOf("") }
-    
+
     // Tab Selection: 0 = Create, 1 = Join
     var selectedTab by remember { mutableIntStateOf(0) }
-    
-    // Animation
-    val animationScale by animateFloatAsState(
-        targetValue = 1f,
-        label = "iconScale"
-    )
-    
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFFFAFAFA),
-                        Color.White
-                    )
-                )
-            )
-    ) {
+    val isCreateTab = selectedTab == 0
+    val canSubmit = (if (isCreateTab) groupName.isNotBlank() else inviteCode.isNotBlank()) && !isCreating
+    val submit = {
+        if (isCreateTab) onCreateGroup(groupName, groupDescription) else onJoinGroup(inviteCode)
+    }
+    val colors = MaterialTheme.colorScheme
+
+    Surface(modifier = Modifier.fillMaxSize(), color = colors.surface) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .imePadding()
         ) {
-            Spacer(modifier = Modifier.height(40.dp))
-            
-            // Header Icon
+            // 닫기 — 오른쪽 위. 닫을 수 없는 흐름이면 같은 높이의 빈 공간만 둔다.
             Box(
-                contentAlignment = Alignment.Center
-            ) {
-                // Outer Circle
-                Box(
-                    modifier = Modifier
-                        .size(120.dp)
-                        .scale(animationScale)
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(
-                                    BrandColors.Primary.copy(alpha = 0.1f),
-                                    Color(0xFFEC4899).copy(alpha = 0.1f)
-                                )
-                            ),
-                            CircleShape
-                        )
-                )
-                // Inner Circle
-                Box(
-                    modifier = Modifier
-                        .size(80.dp)
-                        .scale(animationScale)
-                        .shadow(16.dp, CircleShape, spotColor = BrandColors.Primary.copy(alpha = 0.3f))
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(BrandColors.Primary, Color(0xFFEC4899))
-                            ),
-                            CircleShape
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = if (selectedTab == 0) Icons.Filled.Groups else Icons.Filled.PersonAdd,
-                        contentDescription = if (selectedTab == 0) "그룹 생성" else "그룹 참여",
-                        tint = Color.White,
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(20.dp))
-            
-            // Title
-            Text(
-                text = "그룹 시작하기",
-                fontSize = 24.sp,
-                fontFamily = SuiteFont,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Text(
-                text = "새 그룹을 만들거나 초대코드로 가입하세요",
-                fontSize = 14.sp,
-                fontFamily = SuiteFont,
-                color = Color.Gray,
-                textAlign = TextAlign.Center
-            )
-            
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            // Tab Selector
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color.Gray.copy(alpha = 0.1f))
-                    .padding(4.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                TabButton(
-                    text = "그룹 만들기",
-                    isSelected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    modifier = Modifier.weight(1f)
-                )
-                TabButton(
-                    text = "초대코드 입력",
-                    isSelected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-            
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            // Form Card
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .shadow(8.dp, RoundedCornerShape(20.dp)),
-                shape = RoundedCornerShape(20.dp),
-                color = Color.White
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(24.dp)
-                ) {
-                    if (selectedTab == 0) {
-                        // === Create Group Form ===
-                        Text(
-                            text = "그룹 이름",
-                            fontSize = 14.sp,
-                            fontFamily = SuiteFont,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.Gray
-                        )
-                        
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        OutlinedTextField(
-                            value = groupName,
-                            onValueChange = { groupName = it },
-                            placeholder = { 
-                                Text(
-                                    "예: 우리 가족, 회사 동료",
-                                    fontFamily = SuiteFont,
-                                    color = Color.Gray.copy(alpha = 0.6f)
-                                ) 
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Filled.Tag,
-                                    contentDescription = null,
-                                    tint = BrandColors.Primary
-                                )
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = Color.White,
-                                unfocusedContainerColor = Color.White,
-                                focusedBorderColor = BrandColors.Primary,
-                                unfocusedBorderColor = Color.Gray.copy(alpha = 0.3f)
-                            ),
-                            singleLine = true
-                        )
-                        
-                        Spacer(modifier = Modifier.height(20.dp))
-                        
-                        Text(
-                            text = "그룹 설명 (선택)",
-                            fontSize = 14.sp,
-                            fontFamily = SuiteFont,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.Gray
-                        )
-                        
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        OutlinedTextField(
-                            value = groupDescription,
-                            onValueChange = { groupDescription = it },
-                            placeholder = { 
-                                Text(
-                                    "그룹에 대한 간단한 설명",
-                                    fontFamily = SuiteFont,
-                                    color = Color.Gray.copy(alpha = 0.6f)
-                                ) 
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Filled.TextSnippet,
-                                    contentDescription = null,
-                                    tint = Color(0xFFEC4899)
-                                )
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = Color.White,
-                                unfocusedContainerColor = Color.White,
-                                focusedBorderColor = Color(0xFFEC4899),
-                                unfocusedBorderColor = Color.Gray.copy(alpha = 0.3f)
-                            ),
-                            singleLine = true
-                        )
-                    } else {
-                        // === Join Group Form ===
-                        Text(
-                            text = "초대 코드",
-                            fontSize = 14.sp,
-                            fontFamily = SuiteFont,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.Gray
-                        )
-                        
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        OutlinedTextField(
-                            value = inviteCode,
-                            onValueChange = { inviteCode = it.uppercase() },
-                            placeholder = { 
-                                Text(
-                                    "초대 코드를 입력하세요",
-                                    fontFamily = SuiteFont,
-                                    color = Color.Gray.copy(alpha = 0.6f)
-                                ) 
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Filled.PersonAdd,
-                                    contentDescription = null,
-                                    tint = Color(0xFFF59E0B)
-                                )
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = Color.White,
-                                unfocusedContainerColor = Color.White,
-                                focusedBorderColor = Color(0xFFF59E0B),
-                                unfocusedBorderColor = Color.Gray.copy(alpha = 0.3f)
-                            ),
-                            singleLine = true
-                        )
-                        
-                        Spacer(modifier = Modifier.height(16.dp))
-                        
-                        Text(
-                            text = "그룹 초대 코드를 받으셨나요?\n코드를 입력하면 해당 그룹에 가입됩니다.",
-                            fontSize = 13.sp,
-                            fontFamily = SuiteFont,
-                            color = Color.Gray,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                }
-            }
-            
-            // Error Message
-            if (errorMessage != null) {
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = errorMessage,
-                    fontSize = 13.sp,
-                    fontFamily = SuiteFont,
-                    color = BrandColors.Error
-                )
-            }
-            
-            Spacer(modifier = Modifier.weight(1f))
-            
-            // Action Button
-            Button(
-                onClick = { 
-                    if (selectedTab == 0) {
-                        onCreateGroup(groupName, groupDescription)
-                    } else {
-                        onJoinGroup(inviteCode)
-                    }
-                },
-                enabled = ((selectedTab == 0 && groupName.isNotBlank()) ||
-                           (selectedTab == 1 && inviteCode.isNotBlank())) && !isCreating,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (selectedTab == 0) BrandColors.Primary else Color(0xFFF59E0B),
-                    disabledContainerColor = Color.Gray.copy(alpha = 0.3f)
-                )
+                contentAlignment = Alignment.CenterEnd
             ) {
-                if (isCreating) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = Color.White,
-                        strokeWidth = 2.dp
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                }
-                Text(
-                    text = if (selectedTab == 0) "그룹 만들기" else "그룹 가입하기",
-                    fontSize = 16.sp,
-                    fontFamily = SuiteFont,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-            }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // Tip
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (selectedTab == 0) Color(0xFFFFF9E6) else Color(0xFFFEF3C7)
-                )
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // 장식 이모지를 Material 아이콘으로 교체(인접 안내 문구가 의미를 전달하므로 contentDescription=null)
-                    Icon(
-                        imageVector = Icons.Filled.Lightbulb,
-                        contentDescription = null,
-                        tint = Color(0xFFF59E0B),
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (selectedTab == 0) 
-                            "그룹을 만들면 멤버들을 초대할 수 있는 코드가 생성됩니다"
-                        else 
-                            "초대 코드는 그룹 관리자에게 받을 수 있습니다",
-                        fontSize = 12.sp,
-                        fontFamily = SuiteFont,
-                        color = Color.Gray
-                    )
+                if (onDismiss != null) {
+                    IconButton(onClick = onDismiss, modifier = Modifier.padding(end = SmapSpacing.xs)) {
+                        Icon(Icons.Default.Close, contentDescription = "닫기", tint = colors.onSurfaceVariant)
+                    }
                 }
             }
-            
-            Spacer(modifier = Modifier.height(32.dp))
-        }
 
-        // Close/Dismiss button in top-right corner
-        if (onDismiss != null) {
-            IconButton(
-                onClick = onDismiss,
+            Column(
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(16.dp)
-                    .size(36.dp)
-                    .background(Color.Gray.copy(alpha = 0.1f), CircleShape)
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = SmapSpacing.screenHorizontal),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(SmapSpacing.md)
             ) {
-                Icon(
-                    Icons.Default.Close,
-                    contentDescription = "닫기",
-                    tint = Color.Gray,
-                    modifier = Modifier.size(20.dp)
-                )
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .background(colors.primary.copy(alpha = 0.08f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (isCreateTab) Icons.Outlined.Groups else Icons.Outlined.PersonAdd,
+                        contentDescription = null,
+                        tint = colors.primary,
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(text = "그룹 시작하기", style = SmapText.title, color = colors.onSurface)
+                    Spacer(Modifier.height(SmapSpacing.xs))
+                    Text(
+                        text = "가족·친구와 위치를 함께 보려면 그룹이 필요해요.",
+                        style = SmapText.secondary,
+                        color = colors.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                // 만들기 / 참여 전환 — 낭독기에 "탭, 선택됨"으로 읽히도록 selectable + Role.Tab
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = SmapSpacing.sm)
+                        .background(colors.surfaceVariant, RoundedCornerShape(SmapRadius.md))
+                        .padding(4.dp)
+                        .selectableGroup()
+                ) {
+                    ModeTab("새 그룹 만들기", isCreateTab, { selectedTab = 0 }, Modifier.weight(1f))
+                    ModeTab("초대 코드로 참여", !isCreateTab, { selectedTab = 1 }, Modifier.weight(1f))
+                }
+
+                if (isCreateTab) {
+                    SmapTextField(
+                        value = groupName,
+                        onValueChange = { groupName = it },
+                        label = "그룹 이름",
+                        placeholder = "예: 우리 가족, 회사 동료",
+                        leadingIcon = Icons.Outlined.Badge,
+                        imeAction = ImeAction.Next
+                    )
+                    SmapTextField(
+                        value = groupDescription,
+                        onValueChange = { groupDescription = it },
+                        label = "그룹 설명 (선택)",
+                        leadingIcon = Icons.Outlined.Notes,
+                        imeAction = ImeAction.Done
+                    )
+                    SmapBanner(message = "그룹을 만들면 멤버를 초대할 수 있는 코드가 생겨요.")
+                } else {
+                    SmapTextField(
+                        value = inviteCode,
+                        // 초대 코드는 영문 대문자·숫자로만 이뤄진다(그룹 탭 입력과 같은 규칙).
+                        onValueChange = { v -> inviteCode = v.uppercase().filter { it in 'A'..'Z' || it in '0'..'9' } },
+                        label = "초대 코드",
+                        leadingIcon = Icons.Outlined.PersonAdd,
+                        helperText = "그룹장에게 받은 코드를 입력해 주세요.",
+                        keyboardType = KeyboardType.Ascii,
+                        imeAction = ImeAction.Done
+                    )
+                }
+
+                if (errorMessage != null) {
+                    SmapBanner(message = errorMessage, tone = SmapBannerTone.Error)
+                }
+
+                Spacer(Modifier.height(SmapSpacing.md))
             }
+
+            SmapButton(
+                text = if (isCreateTab) "그룹 만들기" else "그룹에 참여하기",
+                onClick = submit,
+                enabled = canSubmit,
+                isLoading = isCreating,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = SmapSpacing.screenHorizontal, vertical = SmapSpacing.md)
+            )
         }
     }
 }
 
 @Composable
-private fun TabButton(
+private fun ModeTab(
     text: String,
     isSelected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = MaterialTheme.colorScheme
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(10.dp))
+            .heightIn(min = 44.dp)
             .background(
-                if (isSelected) Color.White else Color.Transparent
+                if (isSelected) colors.surface else androidx.compose.ui.graphics.Color.Transparent,
+                RoundedCornerShape(SmapRadius.sm)
             )
-            .clickable(onClick = onClick)
-            .padding(vertical = 12.dp),
+            .selectable(selected = isSelected, onClick = onClick, role = Role.Tab),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = text,
-            fontSize = 14.sp,
-            fontFamily = SuiteFont,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-            color = if (isSelected) BrandColors.Primary else Color.Gray
+            style = if (isSelected) SmapText.captionBold else SmapText.captionMedium,
+            color = if (isSelected) colors.primary else colors.onSurfaceVariant
         )
     }
 }
-

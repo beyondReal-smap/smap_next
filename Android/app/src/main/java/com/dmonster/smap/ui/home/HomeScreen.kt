@@ -322,7 +322,10 @@ fun HomeScreen(
                         uiSettings = MapUiSettings(
                             isZoomControlEnabled = false,
                             isLocationButtonEnabled = false,
-                            isLogoClickEnabled = false
+                            isLogoClickEnabled = false,
+                            // 오른쪽 아래 떠 있는 멤버 버튼과 축척 막대가 겹쳐 둘 다 가려졌다. 가족 위치 확인에는
+                            // 축척이 거의 쓰이지 않아 축척만 끈다(NAVER 로고는 약관상 유지, 왼쪽 아래라 겹치지 않음).
+                            isScaleBarEnabled = false
                         ),
                         contentPadding = PaddingValues(top = 60.dp)
                     ) {

@@ -124,7 +124,7 @@ fun LocationSearchDialog(
                                     throw e
                                 } catch (e: Exception) {
                                     places = emptyList()
-                                    searchError = "장소 검색에 실패했습니다. 다시 시도해주세요."
+                                    searchError = "장소를 검색하지 못했어요. 다시 시도해 주세요."
                                 } finally {
                                     isLoading = false
                                 }
@@ -181,7 +181,7 @@ fun LocationSearchDialog(
                         Text(
                             text = if (query.isEmpty()) 
                                 "지번, 도로명 혹은 건물명을 입력하여\n원하는 장소를 검색해 보세요."
-                                else "'$query'에 대한 검색 결과가 없습니다.\n다른 검색어를 입력해 보세요.",
+                                else "'$query' 검색 결과가 없어요.\n다른 검색어를 입력해 보세요.",
                             fontFamily = SuiteFont,
                             fontSize = 14.sp,
                             color = Color.Gray,

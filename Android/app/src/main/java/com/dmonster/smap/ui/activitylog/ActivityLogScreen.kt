@@ -1,5 +1,6 @@
 package com.dmonster.smap.ui.activitylog
 
+import com.dmonster.smap.ui.components.SmapEmptyState
 import androidx.activity.compose.BackHandler
 
 import com.dmonster.smap.AppConstants
@@ -22,6 +23,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.dmonster.smap.ui.common.rememberSmapHaptics
 import com.dmonster.smap.ui.theme.ActivityLogColors
 import com.dmonster.smap.ui.theme.BrandColors
+import com.dmonster.smap.ui.theme.SmapSize
 import com.dmonster.smap.ui.theme.SuiteFont
 import com.dmonster.smap.ui.myplace.FloatingActionPlaceButton
 import com.dmonster.smap.ui.home.MapLoadingOverlay
@@ -169,7 +171,10 @@ fun ActivityLogScreen(
             uiSettings = MapUiSettings(
                 isZoomControlEnabled = false,
                 isLocationButtonEnabled = false,
-                isLogoClickEnabled = false
+                isLogoClickEnabled = false,
+                // 오른쪽 아래 떠 있는 멤버 버튼과 축척 막대가 겹쳐 둘 다 가려졌다. 가족 위치 확인에는
+                // 축척이 거의 쓰이지 않아 축척만 끈다(NAVER 로고는 약관상 유지, 왼쪽 아래라 겹치지 않음).
+                isScaleBarEnabled = false
             )
         ) {
             // Path Overlay
@@ -358,7 +363,8 @@ fun ActivityLogScreen(
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(top = 85.dp) // Below Header
+                // 공용 머리글 높이(56dp) + 간격 12dp
+                .padding(top = SmapSize.topBarHeight + 12.dp)
         ) {
             ActivityLogFloatingCard(
                 member = selectedMember,
@@ -467,7 +473,7 @@ fun ActivityLogScreen(
                     modifier = Modifier
                         .fillMaxWidth(0.85f)
                         .height(260.dp)
-                        .background(Color.White.copy(alpha = 0.95f), RoundedCornerShape(16.dp)),
+                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp)),
                     title = "활동 기록을 불러오지 못했어요",
                     onRetry = { viewModel.retryLoad() }
                 )
@@ -480,35 +486,18 @@ fun ActivityLogScreen(
                 modifier = Modifier.fillMaxSize().zIndex(5f),
                 contentAlignment = Alignment.Center
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
+                // 반투명 큰 원 위에 글자를 얹던 방식은 뒤 지도 글자와 섞여 읽기 어려웠다.
+                // 바로 위 조회 실패 상태와 같은 불투명 카드 + 공용 빈 상태로 맞춘다.
+                SmapEmptyState(
+                    title = "이 날은 활동 기록이 없어요",
+                    description = "다른 날짜나 멤버를 선택해 보세요.",
+                    icon = Icons.AutoMirrored.Filled.DirectionsWalk,
+                    // 상태 뷰는 주어진 영역을 채우므로 높이를 정해 카드 크기를 고정한다(오류 카드와 같은 크기).
                     modifier = Modifier
-                        .background(Color.White.copy(alpha = 0.9f), CircleShape)
-                        .padding(32.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.DirectionsWalk,
-                        contentDescription = null,
-                        tint = BrandColors.TextSecondary.copy(alpha = 0.5f),
-                        modifier = Modifier.size(48.dp)
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "활동 데이터가 없어요",
-                        fontSize = 15.sp,
-                        fontFamily = SuiteFont,
-                        fontWeight = FontWeight.SemiBold,
-                        color = BrandColors.TextPrimary
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "선택한 날짜에 기록된 활동이 없습니다.\n다른 날짜를 선택하거나 멤버를 변경해보세요.",
-                        fontSize = 12.sp,
-                        fontFamily = SuiteFont,
-                        color = BrandColors.TextSecondary,
-                        textAlign = TextAlign.Center
-                    )
-                }
+                        .fillMaxWidth(0.85f)
+                        .height(240.dp)
+                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+                )
             }
         }
         

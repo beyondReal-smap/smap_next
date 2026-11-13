@@ -1,5 +1,10 @@
 package com.dmonster.smap.ui.schedule
 
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.material.icons.outlined.EventAvailable
+import com.dmonster.smap.ui.theme.SmapText
+import com.dmonster.smap.ui.theme.SmapSpacing
+import com.dmonster.smap.ui.components.SmapEmptyState
 import com.dmonster.smap.BuildConfig
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
@@ -617,56 +622,29 @@ fun GroupSelectorDropdown(
 
 // MARK: - Empty State
 
+/**
+ * 선택한 날짜에 일정이 없을 때 — 공용 빈 상태(SmapEmptyState)로 다른 화면과 같은 모양을 쓴다.
+ */
 @Composable
 fun ScheduleEmptyState(
     onAddClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 60.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            imageVector = Icons.Default.CalendarToday, // Using a similar icon as calendar.badge.plus isn't directly in Material Icons default
-            contentDescription = null,
-            tint = Color.Gray.copy(alpha = 0.2f),
-            modifier = Modifier.size(64.dp)
-        )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Text(
-            text = "등록된 일정이 없습니다",
-            fontSize = 16.sp,
-            fontFamily = SuiteFont,
-            color = Color.Gray
-        )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Button(
-            onClick = onAddClick,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = BrandColors.Primary.copy(alpha = 0.1f),
-                contentColor = BrandColors.Primary
-            ),
-            shape = RoundedCornerShape(20.dp),
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
-            elevation = null
-        ) {
-            Text(
-                text = "일정 추가하기",
-                fontSize = 14.sp,
-                fontFamily = SuiteFont,
-                fontWeight = FontWeight.Medium
-            )
-        }
-    }
+    SmapEmptyState(
+        title = "이 날은 일정이 없어요",
+        icon = Icons.Outlined.EventAvailable,
+        actionText = "일정 추가",
+        onAction = onAddClick,
+        modifier = modifier.padding(vertical = 24.dp)
+    )
 }
 
+/**
+ * 달력 아래 선택 날짜 제목 줄 — "11월 13일 금요일 · 일정 2개".
+ *
+ * 이전에는 남색 큰 카드(그림자 포함)가 날짜 한 줄을 보여 주느라 달력만큼 눈에 띄었다.
+ * 목록 섹션 제목 수준의 무게로 줄여 일정 카드가 주인공이 되게 했다.
+ */
 @Composable
 fun DateHeader(
     date: LocalDate,
@@ -674,33 +652,24 @@ fun DateHeader(
     modifier: Modifier = Modifier
 ) {
     val formatter = DateTimeFormatter.ofPattern("M월 d일 EEEE", Locale.KOREA)
-    
-    Card(
+    Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = BrandColors.PrimaryDark),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            .padding(horizontal = SmapSpacing.screenHorizontal)
+            .semantics(mergeDescendants = true) {},
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp)
-        ) {
+        Text(
+            text = date.format(formatter),
+            style = SmapText.headline,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f)
+        )
+        if (scheduleCount > 0) {
             Text(
-                text = date.format(formatter),
-                fontSize = 20.responsiveSp(),
-                fontFamily = SuiteFont,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "${scheduleCount}개의 일정",
-                fontSize = 15.sp,
-                fontFamily = SuiteFont,
-                color = Color.White.copy(alpha = 0.8f)
+                text = "일정 ${scheduleCount}개",
+                style = SmapText.captionMedium,
+                color = MaterialTheme.colorScheme.primary
             )
         }
     }

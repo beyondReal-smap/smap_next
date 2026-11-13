@@ -1,5 +1,8 @@
 package com.dmonster.smap.ui.group
 
+import androidx.compose.material.icons.outlined.Groups
+import com.dmonster.smap.ui.components.SmapEmptyState
+import com.dmonster.smap.ui.components.SmapTabHeader
 import com.dmonster.smap.BuildConfig
 import android.content.Intent
 import androidx.activity.compose.BackHandler
@@ -193,7 +196,7 @@ fun GroupScreen(
                                 onCopyCode = {
                                     group.sgtCode?.let {
                                         clipboardManager.setText(AnnotatedString(it))
-                                        viewModel.showSuccess("초대 코드가 복사되었습니다")
+                                        viewModel.showSuccess("초대 코드를 복사했어요")
                                     }
                                 },
                                 onMemberClick = { member ->
@@ -253,14 +256,14 @@ fun GroupScreen(
                 onCopyCode = {
                     group.sgtCode?.let {
                         clipboardManager.setText(AnnotatedString(it))
-                        viewModel.showSuccess("초대 코드가 복사되었습니다")
+                        viewModel.showSuccess("초대 코드를 복사했어요")
                     }
                     viewModel.hideShareDialog()
                 },
                 onCopyLink = {
                     val link = inviteLink(group.sgtIdx, group.sgtCode)
                     clipboardManager.setText(AnnotatedString(link))
-                    viewModel.showSuccess("초대 링크가 복사되었습니다")
+                    viewModel.showSuccess("초대 링크를 복사했어요")
                     viewModel.hideShareDialog()
                 },
                 onSMS = {
@@ -301,7 +304,7 @@ fun GroupScreen(
                 onCopyLink = {
                     val link = inviteLink(group.sgtIdx, group.sgtCode)
                     clipboardManager.setText(AnnotatedString(link))
-                    viewModel.showSuccess("초대 링크가 복사되었습니다")
+                    viewModel.showSuccess("초대 링크를 복사했어요")
                     viewModel.hideInviteBottomSheet()
                 },
                 onShowQRCode = {
@@ -339,7 +342,7 @@ fun GroupScreen(
                 onCopyCode = {
                     // BottomSheet 내부 IconButton 에서 이미 클립보드 복사 + Haptic 처리됨.
                     // 상위에서는 Snackbar 피드백만 발행.
-                    viewModel.showSuccess("초대 코드가 복사되었습니다")
+                    viewModel.showSuccess("초대 코드를 복사했어요")
                 }
             )
         }
@@ -380,7 +383,7 @@ fun GroupScreen(
                             context.startActivity(Intent.createChooser(shareIntent, "QR 코드 공유"))
                         } catch (e: Exception) {
                             if (BuildConfig.DEBUG) android.util.Log.e("GroupScreen", "Failed to start activity", e)
-                            viewModel.showError("QR 코드를 공유하지 못했습니다.")
+                            viewModel.showError("QR 코드를 공유하지 못했어요.")
                         }
                     }
                 }
@@ -461,80 +464,32 @@ private fun GroupListView(
     ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 32.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        // 아래 여백은 오른쪽 아래 + 버튼(FAB)이 마지막 항목을 가리지 않도록 넉넉히 둔다.
+        contentPadding = PaddingValues(bottom = 96.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // iOS Style Large Title
+        // 탭 공용 머리글(목록과 함께 스크롤된다)
         item {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-            ) {
-                Text(
-                    text = "그룹",
-                    fontSize = 22.responsiveSp(),
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = SuiteFont,
-                    color = Color.Black
-                )
-                Text(
-                    text = "그룹과 멤버를 한눈에 관리하세요",
-                    fontSize = 13.responsiveSp(),
-                    fontFamily = SuiteFont,
-                    color = BrandColors.TextSecondary
-                )
+            SmapTabHeader(title = "그룹")
+        }
+
+        // 한 줄 요약(그룹 수 · 멤버 수)
+        if (!isLoading && groups.isNotEmpty()) {
+            item {
+                GroupSummaryLine(groupsCount = groups.size, totalMembers = totalMembers)
             }
         }
 
-        // Stats Cards
-        item {
-            if (isLoading) {
-                // Skeleton
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    repeat(2) {
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(115.dp)
-                                .clip(RoundedCornerShape(24.dp))
-                                .background(Color.Gray.copy(alpha = 0.1f))
-                        )
-                    }
-                }
-            } else {
-                GroupStatsCards(
-                    groupsCount = groups.size,
-                    totalMembers = totalMembers
-                )
-            }
-        }
-
-        // Invite Code Section
-        item {
-            InviteCodeSection(
-                inviteCode = inviteCode,
-                onCodeChange = onInviteCodeChange,
-                onJoin = onJoinGroup,
-                isLoading = isJoining
-            )
-        }
-        
-        // Group Cards
+        // Group Cards — 목록이 이 화면의 주인공
         if (isLoading) {
             items(2) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 20.dp)
-                        .height(100.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(Color.Gray.copy(alpha = 0.1f))
+                        .height(88.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                 )
             }
         } else {
@@ -547,39 +502,28 @@ private fun GroupListView(
                 )
             }
         }
-        
-        // Empty State
+
+        // Empty State — 공용 빈 상태
         if (!isLoading && groups.isEmpty()) {
             item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(48.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Groups,
-                        contentDescription = "그룹 없음",
-                        tint = BrandColors.TextSecondary.copy(alpha = 0.3f),
-                        modifier = Modifier.size(64.dp)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "아직 그룹이 없습니다",
-                        fontSize = 16.sp,
-                        fontFamily = SuiteFont,
-                        fontWeight = FontWeight.Bold,
-                        color = BrandColors.TextSecondary
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "새 그룹을 만들거나 초대 코드로 가입해보세요",
-                        fontSize = 14.sp,
-                        fontFamily = SuiteFont,
-                        color = BrandColors.TextSecondary.copy(alpha = 0.6f)
-                    )
-                }
+                SmapEmptyState(
+                    title = "아직 그룹이 없어요",
+                    description = "오른쪽 아래 + 버튼으로 새 그룹을 만들거나\n초대 코드로 참여해 보세요.",
+                    icon = Icons.Outlined.Groups,
+                    modifier = Modifier.padding(vertical = 24.dp)
+                )
             }
+        }
+
+        // 초대 코드로 참여 — 목록 아래에 둔다(가장 자주 쓰는 건 목록이므로)
+        item {
+            InviteCodeSection(
+                inviteCode = inviteCode,
+                onCodeChange = onInviteCodeChange,
+                onJoin = onJoinGroup,
+                isLoading = isJoining,
+                modifier = Modifier.padding(top = 8.dp)
+            )
         }
     }
     } // PullToRefreshBox
@@ -685,7 +629,7 @@ private fun GroupDetailView(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = "그룹원이 없습니다",
+                        text = "아직 멤버가 없어요",
                         fontSize = 16.sp,
                         fontFamily = SuiteFont,
                         fontWeight = FontWeight.Medium,
@@ -693,7 +637,7 @@ private fun GroupDetailView(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "새로운 멤버를 초대해보세요",
+                        text = "멤버를 초대해 보세요",
                         fontSize = 14.sp,
                         fontFamily = SuiteFont,
                         color = BrandColors.TextSecondary.copy(alpha = 0.7f)

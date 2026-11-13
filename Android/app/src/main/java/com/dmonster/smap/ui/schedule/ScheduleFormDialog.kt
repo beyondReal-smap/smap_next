@@ -289,7 +289,7 @@ fun CreateEditEventDialog(
     if (showDiscardConfirm) {
         AlertDialog(
             onDismissRequest = { showDiscardConfirm = false },
-            title = { Text("변경사항이 저장되지 않았습니다", fontFamily = SuiteFont) },
+            title = { Text("변경 사항이 저장되지 않았어요", fontFamily = SuiteFont) },
             text = { Text("수정 중인 내용을 버리고 닫으시겠습니까?", fontFamily = SuiteFont) },
             confirmButton = {
                 TextButton(onClick = {

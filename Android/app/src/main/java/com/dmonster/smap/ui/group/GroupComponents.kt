@@ -1,5 +1,11 @@
 package com.dmonster.smap.ui.group
 
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.material.icons.outlined.PersonAdd
+import com.dmonster.smap.ui.theme.SmapText
+import com.dmonster.smap.ui.theme.SmapSpacing
+import com.dmonster.smap.ui.components.SmapTextField
+import com.dmonster.smap.ui.components.SmapButton
 import com.dmonster.smap.BuildConfig
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -8,7 +14,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -21,7 +26,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -38,84 +42,34 @@ import coil.compose.AsyncImage
 
 // MARK: - Stats Cards
 
+/**
+ * 그룹 목록 위 한 줄 요약 — "그룹 2개 · 멤버 5명".
+ *
+ * 이전에는 남색·분홍 그라데이션 카드 두 장이 숫자 두 개를 보여 주느라 첫 화면 절반을 차지했고,
+ * 디자인 시스템에 없는 색이었다. 목록이 주인공이 되도록 텍스트 한 줄로 줄였다.
+ */
 @Composable
-fun GroupStatsCards(
+fun GroupSummaryLine(
     groupsCount: Int,
     totalMembers: Int,
     modifier: Modifier = Modifier
 ) {
-    Row(
+    Text(
+        text = "그룹 ${groupsCount}개 · 멤버 ${totalMembers}명",
+        style = SmapText.caption,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // Total Groups Card
-        StatsCard(
-            title = "총 그룹",
-            value = "${groupsCount}개",
-            icon = Icons.Filled.Layers,
-            gradientColors = listOf(BrandColors.PrimaryDark, BrandColors.Primary),
-            modifier = Modifier.weight(1f)
-        )
-        
-        // Total Members Card
-        StatsCard(
-            title = "총 멤버",
-            value = "${totalMembers}명",
-            icon = Icons.Filled.Groups,
-            gradientColors = listOf(AccentColors.PinkDeep, AccentColors.Pink),
-            modifier = Modifier.weight(1f)
-        )
-    }
+            .padding(horizontal = SmapSpacing.screenHorizontal)
+    )
 }
 
-@Composable
-private fun StatsCard(
-    title: String,
-    value: String,
-    icon: ImageVector,
-    gradientColors: List<Color>,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .height(90.dp)
-            .clip(RoundedCornerShape(24.dp))
-            .background(Brush.linearGradient(gradientColors))
-            .padding(16.dp)
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            Text(
-                text = title,
-                fontSize = 14.responsiveSp(),
-                fontFamily = SuiteFont,
-                fontWeight = FontWeight.Bold,
-                color = Color.White.copy(alpha = 0.9f)
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = value,
-                fontSize = 28.responsiveSp(),
-                fontFamily = SuiteFont,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-        }
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = Color.White.copy(alpha = 0.3f),
-            modifier = Modifier
-                .size(48.dp)
-                .align(Alignment.BottomEnd)
-                .offset(x = 8.dp, y = 8.dp)
-        )
-    }
-}
-
-// MARK: - Invite Code Section
-
+/**
+ * 초대 코드로 그룹에 참여하는 영역 — 제목 + 공용 입력칸 + 참여 버튼.
+ *
+ * 공용 SmapTextField / SmapButton 을 써서 로그인·가입 화면과 같은 입력 규격을 따른다.
+ * 코드는 영문 대문자·숫자만 받는다(기존 필터 유지).
+ */
 @Composable
 fun InviteCodeSection(
     inviteCode: String,
@@ -125,75 +79,51 @@ fun InviteCodeSection(
     modifier: Modifier = Modifier
 ) {
     val focusManager = LocalFocusManager.current
-    
-    Row(
+
+    Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = SmapSpacing.screenHorizontal),
+        verticalArrangement = Arrangement.spacedBy(SmapSpacing.sm)
     ) {
-        OutlinedTextField(
-            value = inviteCode,
-            onValueChange = { newValue ->
-                // UI 레벨에서도 즉시 필터링 (영문 대문자와 숫자만)
-                val filtered = newValue.uppercase().filter { it in 'A'..'Z' || it in '0'..'9' }
-                onCodeChange(filtered)
-            },
-            placeholder = { Text("초대 코드 입력", style = TextStyle(color = Color.Gray, fontSize = 14.sp)) },
-            singleLine = true,
-            leadingIcon = {
-                Icon(Icons.Filled.PersonAdd, null, tint = Color.Gray, modifier = Modifier.size(20.dp))
-            },
-            keyboardOptions = KeyboardOptions(
-                capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Characters,
-                keyboardType = androidx.compose.ui.text.input.KeyboardType.Ascii, // 영문 키보드 권장
-                imeAction = ImeAction.Done
-            ),
-            keyboardActions = KeyboardActions(onDone = {
-                focusManager.clearFocus()
-                if (inviteCode.isNotBlank()) onJoin()
-            }),
-            modifier = Modifier
-                .weight(1f)
-                .height(60.dp),
-            shape = RoundedCornerShape(14.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = BrandColors.Primary.copy(alpha = 0.5f),
-                unfocusedBorderColor = BrandColors.Primary.copy(alpha = 0.2f),
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White
-            )
+        Text(
+            text = "초대 코드로 참여",
+            style = SmapText.subheadline,
+            color = MaterialTheme.colorScheme.onSurface
         )
-
-        // iOS 스타일: 단색 Primary 가입 버튼 — 입력이 비어있을 때는 Gray 0.4
-        Box(
-            modifier = Modifier
-                .height(60.dp)
-                .width(80.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(
-                    if (inviteCode.isBlank()) Color.Gray.copy(alpha = 0.4f)
-                    else BrandColors.Primary
-                )
-                .clickable(enabled = inviteCode.isNotBlank() && !isLoading) { onJoin() },
-            contentAlignment = Alignment.Center
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(SmapSpacing.sm),
+            verticalAlignment = Alignment.Top
         ) {
-            if (isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    color = Color.White,
-                    strokeWidth = 2.dp
-                )
-            } else {
-                Text(
-                    text = "가입",
-                    fontFamily = SuiteFont,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    fontSize = 17.responsiveSp()
-                )
-            }
+            SmapTextField(
+                value = inviteCode,
+                onValueChange = { newValue ->
+                    // UI 레벨에서도 즉시 필터링 (영문 대문자와 숫자만)
+                    onCodeChange(newValue.uppercase().filter { it in 'A'..'Z' || it in '0'..'9' })
+                },
+                label = "초대 코드",
+                leadingIcon = Icons.Outlined.PersonAdd,
+                keyboardType = KeyboardType.Ascii,
+                imeAction = ImeAction.Done,
+                keyboardActions = KeyboardActions(onDone = {
+                    focusManager.clearFocus()
+                    if (inviteCode.isNotBlank()) onJoin()
+                }),
+                modifier = Modifier.weight(1f)
+            )
+            SmapButton(
+                text = "참여",
+                onClick = {
+                    focusManager.clearFocus()
+                    onJoin()
+                },
+                enabled = inviteCode.isNotBlank(),
+                isLoading = isLoading,
+                // 입력칸(OutlinedTextField 56dp)과 윗선을 맞추기 위해 위쪽 여백을 둔다.
+                modifier = Modifier
+                    .padding(top = SmapSpacing.sm)
+                    .width(88.dp)
+            )
         }
     }
 }
@@ -252,14 +182,17 @@ fun GroupCard(
                     overflow = TextOverflow.Ellipsis
                 )
 
-                Text(
-                    text = group.sgtMemo?.takeIf { it.isNotBlank() } ?: "그룹 설명이 없습니다",
-                    fontSize = 13.responsiveSp(),
-                    fontFamily = SuiteFont,
-                    color = BrandColors.TextSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                // 설명이 없으면 "그룹 설명이 없습니다" 같은 빈 문구 대신 줄을 비운다.
+                group.sgtMemo?.takeIf { it.isNotBlank() }?.let { memo ->
+                    Text(
+                        text = memo,
+                        fontSize = 13.responsiveSp(),
+                        fontFamily = SuiteFont,
+                        color = BrandColors.TextSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(4.dp))
 

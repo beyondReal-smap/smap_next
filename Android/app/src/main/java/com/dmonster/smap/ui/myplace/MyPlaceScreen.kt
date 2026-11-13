@@ -1,5 +1,6 @@
 package com.dmonster.smap.ui.myplace
 
+import com.dmonster.smap.ui.components.SmapTabHeader
 import androidx.activity.compose.BackHandler
 
 import com.dmonster.smap.AppConstants
@@ -178,7 +179,10 @@ fun MyPlaceScreen(
                     uiSettings = MapUiSettings(
                         isZoomControlEnabled = false,
                         isLocationButtonEnabled = false,
-                        isLogoClickEnabled = false
+                        isLogoClickEnabled = false,
+                        // 오른쪽 아래 떠 있는 멤버 버튼과 축척 막대가 겹쳐 둘 다 가려졌다. 가족 위치 확인에는
+                        // 축척이 거의 쓰이지 않아 축척만 끈다(NAVER 로고는 약관상 유지, 왼쪽 아래라 겹치지 않음).
+                        isScaleBarEnabled = false
                     ),
                     onMapLongClick = { _, coord ->
                         if (canAddLocation) {
@@ -471,45 +475,19 @@ private fun MyPlaceTopBar(
     showSearch: Boolean,
     onSearchClick: () -> Unit
 ) {
-    Surface(
-        color = Color.White.copy(alpha = 0.95f),
-        shadowElevation = 2.dp
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(
-                    text = "내장소",
-                    fontSize = 22.sp,
-                    fontFamily = SuiteFont,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Black
+    // 탭 공용 머리글 — 지도 위에 얹히므로 overMap.
+    SmapTabHeader(title = "내장소", overMap = true) {
+        if (showSearch) {
+            IconButton(
+                onClick = onSearchClick,
+                modifier = Modifier.size(48.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = "장소 검색",
+                    tint = BrandColors.Primary,
+                    modifier = Modifier.size(26.dp)
                 )
-                Text(
-                    text = "장소를 등록하고 관리하세요",
-                    fontSize = 13.sp,
-                    fontFamily = SuiteFont,
-                    color = BrandColors.TextSecondary
-                )
-            }
-            
-            if (showSearch) {
-                IconButton(
-                    onClick = onSearchClick,
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "장소 검색",
-                        tint = BrandColors.Primary,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
             }
         }
     }

@@ -109,7 +109,9 @@ fun MainTabScreen(
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0), // 시스템 인셋 수동 제어
         bottomBar = {
-            if (!showSubscriptionScreen && !(selectedTabIndex == 0 && homeOverlayOpen)) NavigationBar(
+            // 그룹 시작 화면(전체 화면 모달)이 떠 있을 때도 탭바를 숨긴다. 이전에는 모달 아래로 탭바가 보여
+            // 눌러도 선택 표시만 바뀌고 화면은 그대로여서 고장 난 것처럼 보였다.
+            if (!showSubscriptionScreen && !showGroupCreationModal && !(selectedTabIndex == 0 && homeOverlayOpen)) NavigationBar(
                 modifier = Modifier, // Remove fixed height to allow flexible inset-based taller height on gesture nav
                 containerColor = Color.White,
                 tonalElevation = 0.dp,

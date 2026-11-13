@@ -120,7 +120,7 @@ fun InviteMemberBottomSheet(
                         icon = Icons.Default.QrCode2,
                         iconTint = Color.Black,
                         title = "QR 코드 보기",
-                        subtitle = "QR 코드로 쉽게 초대하세요",
+                        subtitle = "QR 코드로 쉽게 초대해요",
                         onClick = onShowQRCode
                     )
 
@@ -142,7 +142,7 @@ fun InviteMemberBottomSheet(
                         icon = Icons.Default.Share,
                         iconTint = Color.Black,
                         title = "기본 공유",
-                        subtitle = "다양한 앱으로 공유할 수 있습니다",
+                        subtitle = "다양한 앱으로 공유할 수 있어요",
                         onClick = onDefaultShare
                     )
                 }
@@ -325,7 +325,7 @@ fun QRCodeDialog(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "QR 코드를 스캔하여 그룹에 참여하세요",
+                text = "QR 코드를 스캔하면 그룹에 참여해요",
                 fontSize = 14.sp,
                 fontFamily = SuiteFont,
                 color = Color.Gray
@@ -377,7 +377,7 @@ fun QRCodeDialog(
             ) {
                 InstructionRow(number = "1", text = "카메라 앱을 열어주세요")
                 InstructionRow(number = "2", text = "QR 코드를 스캔해주세요")
-                InstructionRow(number = "3", text = "링크를 탭하여 그룹에 참여하세요")
+                InstructionRow(number = "3", text = "링크를 누르면 그룹에 참여해요")
             }
 
             Spacer(modifier = Modifier.height(24.dp))

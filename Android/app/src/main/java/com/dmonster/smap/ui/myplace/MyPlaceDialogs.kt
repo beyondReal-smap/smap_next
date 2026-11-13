@@ -482,7 +482,7 @@ fun LocationDetailSheet(
                                  }
                                  Spacer(modifier = Modifier.height(4.dp))
                                  Text(
-                                     text = "멤버가 도착하면 푸시 알림을 받습니다",
+                                     text = "멤버가 도착하면 알림을 받아요",
                                      fontSize = 13.sp,
                                      color = Color.Gray,
                                      fontFamily = SuiteFont,
@@ -681,7 +681,7 @@ fun DeleteLocationDialog(
         },
         text = {
             Text(
-                text = "'${location.name}'을(를) 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.",
+                text = "'${location.name}'을(를) 삭제할까요?\n삭제하면 되돌릴 수 없어요.",
                 fontFamily = SuiteFont,
                 textAlign = TextAlign.Center
             )
@@ -840,7 +840,7 @@ fun LocationSearchSheet(
                     SearchEmptyState(
                         icon = Icons.Default.Search,
                         title = "검색 결과 없음",
-                        message = "'$query'에 대한 검색 결과가 없습니다.\n다른 검색어를 입력해 보세요.",
+                        message = "'$query' 검색 결과가 없어요.\n다른 검색어를 입력해 보세요.",
                         modifier = Modifier.weight(1f)
                     )
                 }

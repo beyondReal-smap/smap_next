@@ -118,11 +118,6 @@ object ActivityLogColors {
     val StayBrief = Color(0xFF4CAF50)   // 30초+ Green
     val StayInstant = Color(0xFF2196F3) // 즉시 Blue
 
-    // 요약 카드 통계 아이콘
-    val StatDistance = Color(0xFFEF4444) // 이동거리 Red
-    val StatTime = Color(0xFFF59E0B)     // 이동시간 Orange
-    val StatSteps = Color(0xFF3B82F6)    // 걸음수 Blue
-
     // 히트맵
     val HeatmapActive = Color(0xFF6366F1)       // Indigo-500
     val HeatmapSelectedStart = Color(0xFFEC4899) // Pink

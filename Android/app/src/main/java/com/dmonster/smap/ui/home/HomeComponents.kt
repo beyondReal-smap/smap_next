@@ -1,5 +1,6 @@
 package com.dmonster.smap.ui.home
 
+import com.dmonster.smap.ui.components.SmapTabHeader
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -127,31 +128,8 @@ fun HomeHeaderView(
     onNotificationTap: () -> Unit = {},
     onSettingsTap: () -> Unit = {}
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                Color.White.copy(alpha = 0.9f)
-            )
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = SuiteFont,
-                color = Color.Black
-            )
-            Text(
-                text = "그룹 멤버들과 실시간으로 소통해보세요",
-                fontSize = 13.sp,
-                fontFamily = SuiteFont,
-                color = Color.Gray
-            )
-        }
-        
+    // 탭 공용 머리글로 통일 — 지도 위에 얹히므로 overMap.
+    SmapTabHeader(title = title, overMap = true) {
         Row(horizontalArrangement = Arrangement.spacedBy(0.dp)) {
             // Notification Button with Badge — 읽지 않음 dot 는 AccentColors 토큰
             IconButton(
@@ -173,7 +151,7 @@ fun HomeHeaderView(
                     Icon(
                         imageVector = Icons.Filled.Notifications,
                         contentDescription = if (hasUnread) "알림, 읽지 않은 알림 있음" else "알림",
-                        tint = Color.Gray,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -187,7 +165,7 @@ fun HomeHeaderView(
                 Icon(
                     imageVector = Icons.Filled.Settings,
                     contentDescription = "설정",
-                    tint = Color.Gray,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -206,14 +184,14 @@ fun MemberInfoWindow(
     val batteryLevel = member.mltBattery
     val speed = member.mltSpeed ?: 0.0
     
-    // 배터리 표시 문자열 (null이거나 음수면 "정보없음")
-    val batteryText = if (batteryLevel == null || batteryLevel < 0) "정보없음" else "$batteryLevel%"
-    
-    // GPS 시간 포맷팅 (iOS 스타일: 16:46)
-    val gpsTimeStr = remember(member.mltGpsTime) {
+    // 값이 없는 항목은 "정보없음"을 보여 주는 대신 줄 자체를 숨긴다(빈 값이 정보처럼 보이지 않게).
+    val batteryText = batteryLevel?.takeIf { it >= 0 }?.let { "$it%" }
+
+    // GPS 시간 포맷팅 (iOS 스타일: 16:46). 파싱할 수 없으면 null — 줄을 숨긴다.
+    val gpsTimeStr: String? = remember(member.mltGpsTime) {
         val gpsTime = member.mltGpsTime
         if (gpsTime.isNullOrBlank()) {
-            "정보 없음"
+            null
         } else {
             try {
                 // Input format: 2024-01-03T16:46:00Z or similar
@@ -224,9 +202,9 @@ fun MemberInfoWindow(
                     val outputSdf = SimpleDateFormat("HH:mm", Locale.KOREA)
                     outputSdf.timeZone = TimeZone.getDefault()
                     outputSdf.format(date)
-                } else "정보 없음"
+                } else null
             } catch (e: Exception) {
-                "정보 없음"
+                null
             }
         }
     }
@@ -266,29 +244,33 @@ fun MemberInfoWindow(
                 )
             }
             
-            // Battery Row
-            InfoRow(
-                icon = Icons.Filled.BatteryFull, // Ideally should change based on level, but matches screenshot type
-                label = "배터리:",
-                value = batteryText,
-                iconTint = SemanticColors.StatCompleted
-            )
+            // Battery Row — 값이 있을 때만
+            if (batteryText != null) {
+                InfoRow(
+                    icon = Icons.Filled.BatteryFull,
+                    label = "배터리",
+                    value = batteryText,
+                    iconTint = SemanticColors.StatCompleted
+                )
+            }
 
             // Speed Row
             InfoRow(
                 icon = Icons.Filled.DirectionsWalk,
-                label = "속도:",
-                value = "${String.format(Locale.US, "%.1f", speed)}km/h",
+                label = "속도",
+                value = "${String.format(Locale.US, "%.1f", speed)} km/h",
                 iconTint = AccentColors.Orange
             )
 
-            // GPS Update Row
-            InfoRow(
-                icon = Icons.Filled.AccessTime,
-                label = "GPS 업데이트:",
-                value = gpsTimeStr,
-                iconTint = BrandColors.TextSecondary
-            )
+            // GPS Update Row — 값이 있을 때만
+            if (gpsTimeStr != null) {
+                InfoRow(
+                    icon = Icons.Filled.AccessTime,
+                    label = "위치 갱신",
+                    value = gpsTimeStr,
+                    iconTint = BrandColors.TextSecondary
+                )
+            }
         }
     }
 }
@@ -300,9 +282,10 @@ private fun InfoRow(
     value: String,
     iconTint: Color
 ) {
+    // "라벨 값" 형식으로 통일(이전: "배터리:"·"GPS 업데이트:" 처럼 콜론·띄어쓰기가 제각각).
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp)
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Icon(
             imageVector = icon,
@@ -315,14 +298,14 @@ private fun InfoRow(
             fontSize = 12.sp,
             fontFamily = SuiteFont,
             color = BrandColors.TextSecondary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            maxLines = 1
         )
         Text(
             text = value,
             fontSize = 12.sp,
             fontFamily = SuiteFont,
-            color = BrandColors.TextSecondary,
+            fontWeight = FontWeight.Medium,
+            color = BrandColors.TextPrimary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)

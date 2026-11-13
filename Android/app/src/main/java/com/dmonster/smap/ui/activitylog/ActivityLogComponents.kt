@@ -1,5 +1,6 @@
 package com.dmonster.smap.ui.activitylog
 
+import com.dmonster.smap.ui.components.SmapTabHeader
 import com.dmonster.smap.BuildConfig
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -41,31 +42,8 @@ import androidx.compose.ui.semantics.Role
 fun ActivityLogHeader(
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(Color.White.copy(alpha = 0.9f))
-            .statusBarsPadding()
-            .padding(top = 8.dp, start = 16.dp, end = 16.dp, bottom = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "활동 로그",
-                fontSize = 22.responsiveSp(),
-                fontFamily = SuiteFont,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black
-            )
-            Text(
-                text = "그룹 멤버들의 활동 기록을 확인해보세요",
-                fontSize = 13.sp,
-                fontFamily = SuiteFont,
-                color = Color.Gray
-            )
-        }
-    }
+    // 탭 공용 머리글. 이 화면은 지도가 상태바 아래까지 그려지므로 상태바 영역도 채운다.
+    SmapTabHeader(title = "활동 로그", modifier = modifier, overMap = true, insetStatusBar = true)
 }
 
 // MARK: - Floating Info Card
@@ -97,8 +75,9 @@ fun ActivityLogFloatingCard(
     ) {
         Row(
             modifier = Modifier
-                .height(80.dp)
-                .padding(14.dp),
+                // 통계마다 라벨 줄이 생겨 80dp 고정 높이에서는 라벨이 잘렸다 → 최소 높이로 바꾸고 위아래 여백을 줄인다.
+                .heightIn(min = 80.dp)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Member Info (Compact)
@@ -203,21 +182,21 @@ fun ActivityLogFloatingCard(
                 ) {
                     SummaryStatItem(
                         icon = Icons.AutoMirrored.Filled.ArrowForward,
-                        color = ActivityLogColors.StatDistance,
+                        color = MaterialTheme.colorScheme.primary,
                         value = summary?.distanceFormatted ?: "0 m",
                         label = "이동거리",
                         modifier = Modifier.weight(1f)
                     )
                     SummaryStatItem(
                         icon = Icons.Default.AccessTime,
-                        color = ActivityLogColors.StatTime,
+                        color = MaterialTheme.colorScheme.primary,
                         value = summary?.timeFormatted ?: "0분",
                         label = "이동시간",
                         modifier = Modifier.weight(1f)
                     )
                     SummaryStatItem(
                         icon = Icons.AutoMirrored.Filled.DirectionsWalk,
-                        color = ActivityLogColors.StatSteps,
+                        color = MaterialTheme.colorScheme.primary,
                         value = summary?.stepsFormatted ?: "0",
                         label = "걸음수",
                         modifier = Modifier.weight(1f)
@@ -245,28 +224,30 @@ fun SummaryStatItem(
                 contentDescription = "$label $value"
             }
     ) {
-        Box(
-            modifier = Modifier
-                .size(24.dp)
-                .background(color.copy(alpha = 0.8f), CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(12.dp)
-            )
-        }
+        // 빨강·노랑·파랑 원 배경 대신 한 가지 색 아이콘으로, 값 아래에 무엇의 값인지 라벨을 보인다
+        // (이전에는 "0분"만 보여 이동 시간인지 알 수 없었다).
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = color,
+            modifier = Modifier.size(16.dp)
+        )
 
         Text(
             text = value,
-            fontSize = 11.sp,
+            fontSize = 13.sp,
             fontFamily = SuiteFont,
             fontWeight = FontWeight.SemiBold,
-            color = Color.Gray,
+            color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            fontFamily = SuiteFont,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1
         )
     }
 }
@@ -438,7 +419,7 @@ fun ActivityEmptyState(
         Spacer(modifier = Modifier.height(4.dp))
 
         Text(
-            text = "선택한 날짜에 기록된 활동이 없습니다.\n다른 날짜나 멤버를 선택해보세요.",
+            text = "선택한 날짜에 기록된 활동이 없어요.\n다른 날짜나 멤버를 선택해 보세요.",
             fontSize = 12.sp,
             fontFamily = SuiteFont,
             color = BrandColors.TextSecondary,

@@ -92,7 +92,7 @@ fun NotificationScreen(
                     } else if (logs.isEmpty()) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Text(
-                                text = "최근 7일간의 알림이 없습니다",
+                                text = "최근 7일 동안 받은 알림이 없어요",
                                 fontFamily = SuiteFont,
                                 color = BrandColors.TextSecondary
                             )
@@ -148,7 +148,7 @@ fun NotificationHeader(onClose: () -> Unit, viewModel: NotificationViewModel) {
                 color = Color.Black
             )
             Text(
-                text = "최근 7일간의 알림을 확인하세요",
+                text = "최근 7일 동안 받은 알림이에요",
                 fontSize = 12.sp,
                 fontFamily = SuiteFont,
                 color = BrandColors.TextSecondary

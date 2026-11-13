@@ -1,5 +1,6 @@
 package com.dmonster.smap.ui.schedule
 
+import com.dmonster.smap.ui.components.SmapTabHeader
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -107,48 +108,22 @@ fun ScheduleScreen(
                 .padding(paddingValues)
                 .background(Color.White)
         ) {
-            // Header - same as Group page style
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "일정",
-                        fontSize = 22.responsiveSp(),
-                        fontFamily = SuiteFont,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black
-                    )
-                    Text(
-                        text = "그룹 멤버들과 일정을 공유해보세요",
-                        fontSize = 13.responsiveSp(),
-                        fontFamily = SuiteFont,
-                        color = BrandColors.TextSecondary
-                    )
-                }
+            // 탭 공용 머리글 — 그룹 선택과 일정 추가를 오른쪽 동작으로 둔다.
+            // 부제를 빼서 그룹 이름이 길어도 제목·선택 칩이 겹치지 않는다.
+            SmapTabHeader(title = "일정") {
+                // Fix #11: Group selector button to toggle the dropdown
+                GroupSelectorButton(
+                    selectedGroup = selectedGroup,
+                    onClick = { viewModel.toggleGroupSelector() }
+                )
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    // Fix #11: Group selector button to toggle the dropdown
-                    GroupSelectorButton(
-                        selectedGroup = selectedGroup,
-                        onClick = { viewModel.toggleGroupSelector() }
+                IconButton(onClick = { viewModel.showCreateDialog() }) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "일정 추가",
+                        tint = BrandColors.Primary,
+                        modifier = Modifier.size(28.dp)
                     )
-
-                    IconButton(onClick = { viewModel.showCreateDialog() }) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "일정 추가",
-                            tint = BrandColors.Primary,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
                 }
             }
             
