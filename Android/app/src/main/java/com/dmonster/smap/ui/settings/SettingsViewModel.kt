@@ -55,6 +55,11 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    /** 저장소의 사용자 정보를 화면 상태에 다시 반영한다(이메일 등록·변경 직후). */
+    fun reloadStoredUser() {
+        _user.value = authService.getUserData()
+    }
+
     fun updateProfile(name: String, nickname: String, birth: String?, gender: Int?) {
         viewModelScope.launch {
             setLoading("updateProfile", true)

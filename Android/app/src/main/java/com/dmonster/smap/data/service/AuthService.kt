@@ -153,6 +153,15 @@ class AuthService(
 
     suspend fun sendEmailCode(email: String, purpose: String) = api.sendEmailCode(EmailCodeRequest(email, purpose))
     suspend fun verifyEmailCode(email: String, purpose: String, code: String) = api.verifyEmailCode(EmailCodeRequest(email, purpose, code))
+    suspend fun changeEmail(email: String, token: String) = api.changeEmail(EmailChangeRequest(email, token))
+
+    /** 서버에서 이메일 변경이 끝난 뒤, 저장된 사용자 정보의 이메일만 갱신한다. */
+    fun updateStoredEmail(email: String) {
+        val user = getUserData() ?: throw IllegalStateException("저장된 사용자 정보가 없습니다.")
+        // mt_idx 등 다른 값은 그대로 두고 사용자 JSON 만 갱신한다.
+        prefs.edit().putString(KEY_USER_DATA, json.encodeToString(user.copy(mtEmail = email))).commit()
+    }
+
     suspend fun resetPasswordByEmail(email: String, token: String, password: String) = api.resetPasswordByEmail(EmailResetRequest(email, token, password))
 
     /**

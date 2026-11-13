@@ -402,6 +402,21 @@ class AuthService: ObservableObject {
         catch { throw NetworkError.badRequest("네트워크 연결을 확인해주세요.") }
     }
 
+    // MARK: - 이메일 등록·변경 (로그인 상태, purpose: change_email)
+
+    /// 인증번호 발송 — 401 시 APIClient 가 토큰 갱신 후 재시도한다.
+    func sendChangeEmailCode(email: String) async throws -> EmailCodeResult {
+        try await apiClient.request(.authedEmail(path: "/auth/email/send-code", body: ["email": email, "purpose": "change_email"]))
+    }
+
+    func verifyChangeEmailCode(email: String, code: String) async throws -> EmailCodeResult {
+        try await apiClient.request(.authedEmail(path: "/auth/email/verify-code", body: ["email": email, "purpose": "change_email", "code": code]))
+    }
+
+    func changeEmail(email: String, verificationToken: String) async throws -> EmailCodeResult {
+        try await apiClient.request(.authedEmail(path: "/auth/email/change", body: ["email": email, "verification_token": verificationToken]))
+    }
+
     // MARK: - Registration
 
     /// 회원가입

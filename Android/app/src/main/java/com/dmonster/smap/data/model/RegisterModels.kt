@@ -103,6 +103,9 @@ data class EmailCodeRequest(val email: String, val purpose: String, val code: St
 data class EmailCodeResponse(val success: Boolean, @SerialName("verification_token") val verificationToken: String? = null)
 
 @Serializable
+data class EmailChangeRequest(val email: String, @SerialName("verification_token") val verificationToken: String)
+
+@Serializable
 data class EmailResetRequest(val email: String, @SerialName("verification_token") val verificationToken: String, @SerialName("new_password") val newPassword: String)
 
 fun isServerPasswordValid(password: String): Boolean = password.length >= 8 &&

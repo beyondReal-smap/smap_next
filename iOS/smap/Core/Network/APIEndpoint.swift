@@ -21,6 +21,8 @@ enum APIEndpoint {
     case verifyPassword(VerifyPasswordRequest)
 
     // MARK: - Subscription (계약: .claude/plans/subscription_contract.md)
+    /// 로그인 상태의 이메일 등록·변경 (send-code / verify-code / change) — Bearer 인증 JSON POST
+    case authedEmail(path: String, body: [String: String])
     case subscriptionMe
     case subscriptionVerify(signedTransaction: String)
     case withdraw(WithdrawRequest)
@@ -126,6 +128,7 @@ enum APIEndpoint {
         case .changePassword: return "/members/change-password"
         case .uploadProfileImage: return "/members/upload-profile-image"
         case .verifyPassword: return "/members/verify-password"
+        case .authedEmail(let path, _): return path
         case .subscriptionMe: return "/subscriptions/me"
         case .subscriptionVerify: return "/subscriptions/verify"
         case .withdraw: return "/members/withdraw"
@@ -188,7 +191,7 @@ enum APIEndpoint {
             return .GET
         case .login, .googleLogin, .appleLogin, .kakaoLogin, .register,
              .createGroup, .joinGroupById, .createLocation,
-             .updateProfile, .changePassword, .verifyPassword, .subscriptionVerify, .withdraw,
+             .updateProfile, .changePassword, .verifyPassword, .subscriptionVerify, .authedEmail, .withdraw,
              .uploadProfileImage, .createLocationLog, .registerFCMToken, .unregisterFCMToken,
              .markAllNotificationsRead, .deleteAllNotifications,
              .createDMRoom, .createSchedule,
@@ -227,6 +230,8 @@ enum APIEndpoint {
         case .updateProfile(let req): return try? JSONEncoder().encode(req)
         case .changePassword(let req): return try? JSONEncoder().encode(req)
         case .verifyPassword(let req): return try? JSONEncoder().encode(req)
+        case .authedEmail(_, let body):
+            return try? JSONSerialization.data(withJSONObject: body)
         case .subscriptionVerify(let jws):
             return try? JSONSerialization.data(withJSONObject: ["platform": "ios", "signed_transaction": jws])
         case .withdraw(let req): return try? JSONEncoder().encode(req)

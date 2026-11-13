@@ -11,6 +11,8 @@ enum NetworkError: Error, LocalizedError {
     case conflict(serverMessage: String?)
     /// 502/503 — 서버 또는 외부(스토어) 검증 서버 일시 장애. 재시도 가능한 오류.
     case unavailable
+    /// 429 — 요청 과다
+    case rateLimited
     /// 403 + 객체형 detail 중 구독 제한 코드(PLACE_LIMIT_EXCEEDED, LOG_RETENTION_EXCEEDED).
     case subscriptionLimit(code: String, message: String)
     case serverError(Int, String?)
@@ -35,6 +37,8 @@ enum NetworkError: Error, LocalizedError {
             return "이미 가입된 이메일입니다."
         case .unavailable:
             return "일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+        case .rateLimited:
+            return "요청이 너무 많습니다. 잠시 후 다시 시도해주세요."
         case .subscriptionLimit(_, let message):
             return message
         case .serverError:
@@ -67,7 +71,7 @@ enum NetworkError: Error, LocalizedError {
         case 422:
             return .badRequest("입력한 정보를 확인해주세요.")
         case 429:
-            return .badRequest("요청이 너무 많습니다. 잠시 후 다시 시도해주세요.")
+            return .rateLimited
         case 400:
             let message = data.flatMap { try? JSONDecoder().decode(ErrorDetail.self, from: $0) }?.detail
             return .badRequest(message)

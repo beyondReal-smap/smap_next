@@ -23,6 +23,10 @@ interface SmapApi {
     @POST("auth/email/verify-code")
     suspend fun verifyEmailCode(@Body request: EmailCodeRequest): EmailCodeResponse
 
+    /** POST /auth/email/change — 로그인한 회원의 이메일 등록·변경(Bearer 필요) */
+    @POST("auth/email/change")
+    suspend fun changeEmail(@Body request: EmailChangeRequest): EmailCodeResponse
+
     @POST("auth/reset-password-by-email")
     suspend fun resetPasswordByEmail(@Body request: EmailResetRequest): EmailCodeResponse
 

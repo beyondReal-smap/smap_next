@@ -35,13 +35,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.dmonster.smap.ui.components.SmapBanner
+import com.dmonster.smap.ui.components.SmapBannerTone
+import com.dmonster.smap.ui.components.SmapTextButton
+import com.dmonster.smap.ui.theme.SmapText
 import com.dmonster.smap.ui.theme.AccentColors
 import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.SettingsColors
 import com.dmonster.smap.ui.theme.SuiteFont
 
 enum class AccountSubScreen {
-    NONE, EDIT_PROFILE, CHANGE_PASSWORD, WITHDRAW
+    NONE, EDIT_PROFILE, CHANGE_PASSWORD, WITHDRAW, EMAIL
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -157,6 +161,19 @@ fun AccountSettingsScreen(
                             .padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
+                        // 이메일 미등록 회원 안내(비밀번호 찾기에 필요)
+                        if (user != null && user?.mtEmail.isNullOrBlank()) {
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                SmapBanner(
+                                    message = "이메일을 등록해 주세요. 비밀번호를 잊었을 때 필요해요.",
+                                    tone = SmapBannerTone.Info,
+                                )
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                    SmapTextButton(text = "등록하기", onClick = { currentScreen = AccountSubScreen.EMAIL })
+                                }
+                            }
+                        }
+
                         // Profile Header Card with Photo Upload
                         ProfileHeaderWithUpload(
                             name = user?.displayName ?: "사용자",
@@ -180,6 +197,16 @@ fun AccountSettingsScreen(
                                 iconColor = Color(0xFFF06292),
                                 title = "비밀번호 변경",
                                 onClick = { currentScreen = AccountSubScreen.CHANGE_PASSWORD }
+                            )
+                            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), thickness = 0.5.dp, color = Color.Gray.copy(alpha = 0.1f))
+                            val registeredEmail = user?.mtEmail
+                            AccountSettingsRow(
+                                icon = Icons.Default.Email,
+                                iconColor = BrandColors.Primary,
+                                title = "이메일",
+                                value = if (registeredEmail.isNullOrBlank()) "등록 필요" else registeredEmail,
+                                valueColor = if (registeredEmail.isNullOrBlank()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                                onClick = { currentScreen = AccountSubScreen.EMAIL }
                             )
                         }
 
@@ -280,6 +307,27 @@ fun AccountSettingsScreen(
             ChangePasswordScreen(
                 onBack = { currentScreen = AccountSubScreen.NONE },
                 viewModel = viewModel
+            )
+        }
+
+        // Email Register/Change Screen with Animation
+        AnimatedVisibility(
+            visible = currentScreen == AccountSubScreen.EMAIL,
+            enter = slideInHorizontally(
+                initialOffsetX = { fullWidth -> fullWidth },
+                animationSpec = tween(300)
+            ),
+            exit = slideOutHorizontally(
+                targetOffsetX = { fullWidth -> fullWidth },
+                animationSpec = tween(300)
+            )
+        ) {
+            EmailChangeScreen(
+                onBack = { currentScreen = AccountSubScreen.NONE },
+                onCompleted = {
+                    viewModel.reloadStoredUser()
+                    currentScreen = AccountSubScreen.NONE
+                }
             )
         }
 
@@ -445,7 +493,9 @@ fun AccountSettingsRow(
     icon: ImageVector,
     iconColor: Color,
     title: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    value: String? = null,
+    valueColor: Color = Color.Gray
 ) {
     Row(
         modifier = Modifier
@@ -471,6 +521,16 @@ fun AccountSettingsRow(
             color = Color.Black,
             modifier = Modifier.weight(1f)
         )
+        if (value != null) {
+            Text(
+                text = value,
+                style = SmapText.caption,
+                color = valueColor,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 160.dp)
+            )
+        }
         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = Color.Gray.copy(alpha = 0.3f), modifier = Modifier.size(16.dp))
     }
 }

@@ -8,14 +8,20 @@
 
 import SwiftUI
 import WebKit
+import Combine
 
 // MARK: - Settings Menu View
 
 public struct SettingMenuView: View {
     @Environment(\.presentationMode) var presentationMode
     @ObservedObject var authService = AuthService.shared
+    @State private var showEmailChange = false
 
-    
+    /// 로그인한 회원의 이메일이 비어 있으면 미등록 (전화번호 가입 회원·소셜 회원 공통)
+    private var isEmailMissing: Bool {
+        guard let user = authService.currentUser else { return false }
+        return (user.mt_email ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 
     public init() {}
 
@@ -26,6 +32,16 @@ public struct SettingMenuView: View {
 
                 ScrollView {
                     VStack(spacing: 24) {
+                        // 이메일 미등록 안내 — 설정 화면 상단에만 표시한다(홈·다른 탭에는 띄우지 않음).
+                        if isEmailMissing {
+                            VStack(spacing: SMAPTheme.Spacing.sm) {
+                                SMAPBanner(message: "이메일을 등록해 주세요. 비밀번호를 잊었을 때 필요해요.")
+                                SMAPButton("등록하기", style: .outline) { showEmailChange = true }
+                                    .frame(maxWidth: 200)
+                            }
+                            .padding(.horizontal)
+                        }
+
                         // Menu Sections
                         VStack(spacing: 24) {
                             SettingsMenuSectionView(title: "계정 관리", items: [
@@ -79,6 +95,17 @@ public struct SettingMenuView: View {
                         }
                         .foregroundColor(.primary)
                     }
+                }
+            }
+            .navigationDestination(isPresented: $showEmailChange) {
+                EmailChangeView()
+            }
+            .task {
+                // 이메일 등록 여부(미등록 배너)가 최신 서버 값을 따르도록 프로필을 갱신한다.
+                do {
+                    _ = try await authService.fetchUserProfile()
+                } catch {
+                    print("[SettingMenuView] 프로필 갱신 실패: \(type(of: error))")
                 }
             }
         }
@@ -409,6 +436,12 @@ struct AccountSettingsView: View {
 
             NavigationLink(destination: ChangePasswordView()) {
                 SettingsRowView(icon: "lock.fill", iconColor: .pink, title: "비밀번호 변경")
+            }
+
+            Divider().padding(.leading, 52)
+
+            NavigationLink(destination: EmailChangeView()) {
+                EmailSettingsRowView(email: authService.currentUser?.mt_email)
             }
         }
     }
@@ -841,3 +874,403 @@ struct WebViewWrapper: UIViewRepresentable {
         }
     }
 }
+
+
+// MARK: - 이메일 등록·변경 (로그인 상태)
+// 전화번호로 가입한 기존 회원이 이메일을 등록하거나 바꾼다. 가입 화면의 이메일 인증 단계(RegisterPhoneView/
+// RegisterVerificationView)와 같은 문구 톤·컴포넌트·간격을 쓴다. 새 Swift 파일을 추가할 수 없어 이 파일에 둔다.
+
+/// 계정설정 목록의 "이메일" 행 — 현재 이메일을 오른쪽에 보여 주고, 없으면 "등록 필요"를 강조한다.
+struct EmailSettingsRowView: View {
+    let email: String?
+
+    private var trimmedEmail: String { (email ?? "").trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "envelope.fill")
+                .font(.suite(size: 15, weight: .medium))
+                .foregroundColor(.white)
+                .frame(width: 28, height: 28)
+                .background(Color.blue)
+                .cornerRadius(6)
+                .accessibilityHidden(true)
+
+            Text("이메일")
+                .font(SMAPTheme.Font.body)
+                .foregroundStyle(SMAPTheme.Color.textPrimary)
+
+            Spacer(minLength: SMAPTheme.Spacing.sm)
+
+            if trimmedEmail.isEmpty {
+                Text("등록 필요")
+                    .font(SMAPTheme.Font.captionBold)
+                    .foregroundStyle(SMAPTheme.Color.primary)
+            } else {
+                Text(trimmedEmail)
+                    .font(SMAPTheme.Font.caption)
+                    .foregroundStyle(SMAPTheme.Color.textSecondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+
+            Image(systemName: "chevron.right")
+                .font(.suite(size: 13, weight: .semibold))
+                .foregroundColor(Color(UIColor.tertiaryLabel))
+                .accessibilityHidden(true)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(trimmedEmail.isEmpty ? "이메일, 등록 필요" : "이메일, \(trimmedEmail)")
+    }
+}
+
+/// 이메일 등록·변경 상태 관리 — 발송 여부, 쿨다운, 검증 토큰을 이 화면 안에서만 가진다.
+/// 가입 ViewModel 규칙을 따른다: 이메일을 고치면 인증 상태 초기화, 늦게 온 이전 이메일의 응답은 무시.
+@MainActor
+final class EmailChangeViewModel: ObservableObject {
+    enum Step { case enterEmail, enterCode }
+
+    static let codeLifetimeSeconds = 600
+    static let resendCooldownSeconds = 60
+
+    @Published private(set) var step: Step = .enterEmail
+    @Published private(set) var email = ""
+    @Published private(set) var code = ""
+    @Published private(set) var remainingSeconds = 0
+    @Published private(set) var resendWaitSeconds = 0
+    @Published private(set) var isLoading = false
+    @Published private(set) var errorMessage: String?
+    @Published private(set) var isCompleted = false
+
+    /// 현재 등록된 이메일(없으면 빈 문자열)
+    let currentEmail: String
+
+    private let authService: AuthService
+    /// 인증 성공 후 받은 토큰 — 메모리에만 둔다. change 실패 시 재시도에 쓰고, 이메일 수정·화면 이탈 시 폐기.
+    private var verificationToken: String?
+    private var timer: AnyCancellable?
+
+    init(authService: AuthService? = nil) {
+        let authService = authService ?? AuthService.shared
+        self.authService = authService
+        self.currentEmail = (authService.currentUser?.mt_email ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    deinit { timer?.cancel() }
+
+    var normalizedEmail: String { email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+
+    var isEmailFormatValid: Bool {
+        normalizedEmail.range(of: "^[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$", options: .regularExpression) != nil
+    }
+
+    var isSameAsCurrent: Bool { !currentEmail.isEmpty && normalizedEmail == currentEmail }
+
+    var canSend: Bool { isEmailFormatValid && !isSameAsCurrent && !isLoading }
+    var canResend: Bool { step == .enterCode && resendWaitSeconds == 0 && !isLoading }
+    var canConfirm: Bool { step == .enterCode && code.count == 6 && !isLoading }
+
+    var helperTextForEmail: String? {
+        if isSameAsCurrent { return "현재 사용 중인 이메일이에요." }
+        return nil
+    }
+
+    // MARK: 입력
+
+    /// 이메일을 고치면 인증 상태를 모두 초기화한다.
+    func updateEmail(_ value: String) {
+        guard email != value else { return }
+        email = value
+        resetVerification()
+        errorMessage = nil
+    }
+
+    func updateCode(_ value: String) {
+        code = String(value.filter { $0.isNumber }.prefix(6))
+    }
+
+    /// 2단계 → 1단계 (이메일 수정). 인증 상태는 초기화된다.
+    func backToEmail() {
+        guard !isLoading else { return }
+        resetVerification()
+        errorMessage = nil
+    }
+
+    // MARK: 요청
+
+    func sendCode() {
+        guard canSend else { return }
+        requestCode()
+    }
+
+    func resendCode() {
+        guard canResend else { return }
+        requestCode()
+    }
+
+    private func requestCode() {
+        let target = normalizedEmail
+        isLoading = true
+        errorMessage = nil
+        Task {
+            defer { isLoading = false }
+            do {
+                let response = try await authService.sendChangeEmailCode(email: target)
+                guard normalizedEmail == target else { return } // 그 사이 이메일이 바뀌었으면 무시
+                guard response.success else { throw NetworkError.badRequest(nil) }
+                verificationToken = nil
+                code = ""
+                step = .enterCode
+                startTimers()
+            } catch {
+                guard normalizedEmail == target else { return }
+                errorMessage = Self.message(for: error)
+            }
+        }
+    }
+
+    func confirm() {
+        guard step == .enterCode, !isLoading else { return }
+        guard remainingSeconds > 0 else {
+            errorMessage = "인증번호가 만료됐어요. 다시 받아 주세요."
+            return
+        }
+        guard code.count == 6 else {
+            errorMessage = "인증번호 6자리를 입력해 주세요."
+            return
+        }
+        let target = normalizedEmail
+        let enteredCode = code
+        isLoading = true
+        errorMessage = nil
+        Task {
+            defer { isLoading = false }
+            do {
+                if verificationToken == nil {
+                    let verified = try await authService.verifyChangeEmailCode(email: target, code: enteredCode)
+                    guard normalizedEmail == target else { return }
+                    guard verified.success, let token = verified.verification_token, !token.isEmpty else {
+                        throw NetworkError.badRequest(nil)
+                    }
+                    verificationToken = token
+                }
+                guard let token = verificationToken else { return }
+                let changed = try await authService.changeEmail(email: target, verificationToken: token)
+                guard normalizedEmail == target else { return }
+                guard changed.success else { throw NetworkError.badRequest(nil) }
+
+                verificationToken = nil
+                timer?.cancel()
+                // 저장된 사용자 정보의 이메일을 서버 값으로 갱신해 설정 화면에 바로 반영한다.
+                do {
+                    _ = try await authService.fetchUserProfile()
+                } catch {
+                    print("[EmailChange] 프로필 갱신 실패(설정 화면 진입 시 다시 갱신됨): \(type(of: error))")
+                }
+                isCompleted = true
+            } catch {
+                guard normalizedEmail == target else { return }
+                // 토큰이 거절된 경우(400/403)에는 새 인증이 필요하므로 폐기한다.
+                if case NetworkError.badRequest? = error as? NetworkError { verificationToken = nil }
+                if case NetworkError.forbidden? = error as? NetworkError { verificationToken = nil }
+                errorMessage = Self.message(for: error)
+            }
+        }
+    }
+
+    // MARK: 내부
+
+    private func resetVerification() {
+        step = .enterEmail
+        code = ""
+        verificationToken = nil
+        remainingSeconds = 0
+        resendWaitSeconds = 0
+        timer?.cancel()
+    }
+
+    private func startTimers() {
+        remainingSeconds = Self.codeLifetimeSeconds
+        resendWaitSeconds = Self.resendCooldownSeconds
+        timer?.cancel()
+        timer = Timer.publish(every: 1, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                guard let self else { return }
+                if self.remainingSeconds > 0 { self.remainingSeconds -= 1 }
+                if self.resendWaitSeconds > 0 { self.resendWaitSeconds -= 1 }
+                if self.remainingSeconds == 0 && self.resendWaitSeconds == 0 { self.timer?.cancel() }
+            }
+    }
+
+    /// 사용자에게 보이는 오류 문구 — HTTP 코드나 영문 예외를 노출하지 않는다.
+    static func message(for error: Error) -> String {
+        let temporary = "일시적인 오류예요. 잠시 후 다시 시도해 주세요."
+        guard let networkError = error as? NetworkError else { return temporary }
+        switch networkError {
+        case .conflict:
+            return "이미 다른 계정에서 사용 중인 이메일이에요."
+        case .rateLimited:
+            return "요청이 많아요. 잠시 후 다시 시도해 주세요."
+        case .badRequest(let detail):
+            if let detail, !detail.isEmpty { return detail }
+            return "요청을 처리하지 못했어요. 다시 시도해 주세요."
+        case .unauthorized:
+            return "로그인이 만료됐어요. 다시 로그인해 주세요."
+        case .forbidden:
+            return "인증 정보가 올바르지 않아요. 인증번호를 다시 받아 주세요."
+        default:
+            return temporary
+        }
+    }
+}
+
+struct EmailChangeView: View {
+    @StateObject private var viewModel = EmailChangeViewModel()
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: SMAPTheme.Spacing.sm) {
+                switch viewModel.step {
+                case .enterEmail: emailStep
+                case .enterCode: codeStep
+                }
+
+                if viewModel.isCompleted {
+                    SMAPBanner(message: "이메일을 등록했어요.", tone: .success)
+                        .padding(.top, SMAPTheme.Spacing.sm)
+                } else if let message = viewModel.errorMessage {
+                    SMAPBanner(message: message, tone: .error)
+                        .padding(.top, SMAPTheme.Spacing.sm)
+                }
+            }
+            .padding(SMAPTheme.Spacing.lg)
+        }
+        .background(SMAPTheme.Adaptive.pageBackground.ignoresSafeArea())
+        .navigationTitle("이메일")
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: goBack) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                        Text("뒤로")
+                    }
+                    .foregroundStyle(SMAPTheme.Color.textPrimary)
+                }
+                .disabled(viewModel.isLoading)
+            }
+        }
+        // 성공 안내를 잠깐 보여 준 뒤 이전 화면으로 돌아간다.
+        .task(id: viewModel.isCompleted) {
+            guard viewModel.isCompleted else { return }
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
+            dismiss()
+        }
+    }
+
+    /// 상단 뒤로 — 2단계면 1단계로, 1단계면 화면을 닫는다.
+    private func goBack() {
+        if viewModel.step == .enterCode {
+            viewModel.backToEmail()
+        } else {
+            dismiss()
+        }
+    }
+
+    private var emailStep: some View {
+        Group {
+            Text(viewModel.currentEmail.isEmpty ? "이메일을 등록해 주세요" : "이메일을 변경해 주세요")
+                .font(SMAPTheme.Font.title)
+                .foregroundStyle(SMAPTheme.Color.textPrimary)
+            Text(viewModel.currentEmail.isEmpty
+                 ? "이메일을 등록하면 비밀번호를 잊었을 때 계정을 되찾을 수 있어요. 등록한 이메일로도 로그인할 수 있어요."
+                 : "새 이메일로 인증하면 이메일이 변경돼요.")
+                .font(SMAPTheme.Font.secondary)
+                .foregroundStyle(SMAPTheme.Color.textSecondary)
+
+            SMAPTextField(
+                "name@example.com",
+                text: Binding(get: { viewModel.email }, set: { viewModel.updateEmail($0) }),
+                label: "이메일",
+                helperText: viewModel.helperTextForEmail,
+                keyboardType: .emailAddress,
+                textContentType: .emailAddress
+            )
+            .disabled(viewModel.isLoading)
+            .padding(.top, SMAPTheme.Spacing.md)
+
+            SMAPButton("인증번호 받기", isLoading: viewModel.isLoading, isDisabled: !viewModel.canSend) {
+                viewModel.sendCode()
+            }
+            .padding(.top, SMAPTheme.Spacing.md)
+        }
+    }
+
+    private var codeStep: some View {
+        let expired = viewModel.remainingSeconds <= 0
+        return Group {
+            Text("인증번호를 입력해 주세요")
+                .font(SMAPTheme.Font.title)
+                .foregroundStyle(SMAPTheme.Color.textPrimary)
+            Text("\(viewModel.normalizedEmail)\n위 주소로 보낸 6자리 숫자를 입력해 주세요.")
+                .font(SMAPTheme.Font.secondary)
+                .foregroundStyle(SMAPTheme.Color.textSecondary)
+
+            SMAPTextField(
+                "6자리 숫자",
+                text: Binding(get: { viewModel.code }, set: { viewModel.updateCode($0) }),
+                label: "인증번호",
+                helperText: expired ? nil : "남은 시간 \(timeString(viewModel.remainingSeconds))",
+                errorMessage: expired ? "인증번호가 만료됐어요. 다시 받아 주세요." : nil,
+                keyboardType: .numberPad,
+                textContentType: .oneTimeCode
+            )
+            .padding(.top, SMAPTheme.Spacing.md)
+
+            HStack {
+                Text("메일이 오지 않았나요?")
+                    .font(SMAPTheme.Font.caption)
+                    .foregroundStyle(SMAPTheme.Color.textSecondary)
+                Spacer()
+                Button {
+                    viewModel.resendCode()
+                } label: {
+                    Text(viewModel.resendWaitSeconds > 0 ? "다시 받기 (\(viewModel.resendWaitSeconds)초)" : "인증번호 다시 받기")
+                        .font(SMAPTheme.Font.secondaryMedium)
+                        .foregroundStyle(viewModel.canResend ? SMAPTheme.Color.primary : SMAPTheme.Color.textSecondary)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .disabled(!viewModel.canResend)
+            }
+
+            SMAPBanner(message: "메일이 보이지 않으면 스팸함을 확인해 주세요.")
+
+            SMAPButton("확인", isLoading: viewModel.isLoading, isDisabled: !viewModel.canConfirm || expired) {
+                viewModel.confirm()
+            }
+            .padding(.top, SMAPTheme.Spacing.md)
+
+            Button {
+                viewModel.backToEmail()
+            } label: {
+                Text("이메일 수정")
+                    .font(SMAPTheme.Font.secondaryMedium)
+                    .foregroundStyle(SMAPTheme.Color.primary)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .disabled(viewModel.isLoading)
+        }
+    }
+
+    private func timeString(_ time: Int) -> String {
+        String(format: "%d:%02d", time / 60, time % 60)
+    }
+}
+
