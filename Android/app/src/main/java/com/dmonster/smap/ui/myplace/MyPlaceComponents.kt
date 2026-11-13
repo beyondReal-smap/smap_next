@@ -35,6 +35,7 @@ import coil.compose.AsyncImage
 import com.dmonster.smap.data.model.SmapGroup
 import com.dmonster.smap.data.model.SmapGroupMember
 import com.dmonster.smap.data.model.SavedLocation
+import com.dmonster.smap.ui.components.SmapBanner
 import com.dmonster.smap.ui.theme.AccentColors
 import com.dmonster.smap.ui.theme.AdaptiveColors
 import com.dmonster.smap.ui.theme.BrandColors
@@ -56,6 +57,7 @@ fun MemberSidebar(
     onLocationClick: (SavedLocation) -> Unit,
     onLocationNotification: (SavedLocation) -> Unit,
     canManageLocation: (SavedLocation) -> Boolean,
+    canAddLocation: Boolean,
     onClose: () -> Unit,
     isLoading: Boolean = false,
     isLoadingLocations: Boolean = false,
@@ -302,6 +304,14 @@ fun MemberSidebar(
                     }
                 }
                 
+                // 추가 권한이 없는 멤버의 장소는 보기만 가능
+                if (selectedMember != null && !canAddLocation) {
+                    SmapBanner(
+                        message = "다른 멤버의 장소는 볼 수만 있어요.",
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                    )
+                }
+
                 if (isLoadingLocations) {
                     Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(modifier = Modifier.size(24.dp), color = BrandColors.Primary)
@@ -357,13 +367,15 @@ fun MemberSidebar(
                                 color = BrandColors.TextPrimary
                             )
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text(
+                            if (canAddLocation) {
+Text(
                                 text = "지도를 길게 눌러 새 장소를 추가하거나\n주소 검색으로 장소를 찾아보세요",
                                 fontSize = 12.sp,
                                 fontFamily = SuiteFont,
                                 color = BrandColors.TextSecondary,
                                 textAlign = TextAlign.Center
                             )
+                            }
                         }
                     }
                 } else {

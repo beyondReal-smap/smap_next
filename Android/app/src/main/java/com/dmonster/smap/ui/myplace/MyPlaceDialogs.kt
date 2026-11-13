@@ -77,7 +77,9 @@ fun LocationDetailSheet(
     onDelete: (SavedLocation) -> Unit,
     onNotificationToggle: (SavedLocation) -> Unit,
     isLoading: Boolean,
-    canManage: Boolean = true
+    canManage: Boolean = true,
+    /** 본인이 아닌 멤버의 장소를 다룰 때 그 멤버 이름 (제목에 명시해 본인 장소로 착각하지 않게 한다) */
+    targetMemberName: String? = null
 ) {
     val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false) // 전체 화면 확장을 위해 false로 설정
@@ -184,9 +186,9 @@ fun LocationDetailSheet(
                 
                 Text(
                     text = when {
-                        isNew -> "새 장소 등록"
-                        isEditMode -> "장소 편집"
-                        else -> "장소 정보"
+                        isNew -> if (targetMemberName != null) "${targetMemberName}님의 장소 추가" else "새 장소 등록"
+                        isEditMode -> if (targetMemberName != null) "${targetMemberName}님의 장소 편집" else "장소 편집"
+                        else -> if (targetMemberName != null) "${targetMemberName}님의 장소" else "장소 정보"
                     },
                     fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,

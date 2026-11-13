@@ -63,8 +63,11 @@ fun MyPlaceScreen(
     val selectedGroup by viewModel.selectedGroup.collectAsState()
     val members by viewModel.members.collectAsState()
     val selectedMember by viewModel.selectedMember.collectAsState()
-    // 다른 멤버를 선택한 경우 장소는 보기만 가능 (추가 UI 숨김)
-    val canAddLocation = selectedMember != null && viewModel.canAddLocation()
+    // 선택한 멤버의 장소를 추가할 권한이 없으면 보기만 가능 (추가 UI 숨김).
+    // members 를 읽어 두어 역할 변경 시 재계산되게 한다.
+    val canAddLocation = selectedMember != null && members.isNotEmpty() && viewModel.canAddLocation()
+    val currentUserIdx = viewModel.getCurrentUserIdx()
+    val otherMemberName = selectedMember?.takeIf { it.mtIdx != currentUserIdx }?.displayName
     val locations by viewModel.locations.collectAsState()
     val selectedLocation by viewModel.selectedLocation.collectAsState()
     
@@ -322,6 +325,7 @@ fun MyPlaceScreen(
                 },
                 onLocationNotification = { viewModel.toggleLocationNotification(it) },
                 canManageLocation = { viewModel.canManageLocation(it) },
+                canAddLocation = canAddLocation,
                 onClose = { viewModel.hideMemberSidebar() },
                 isLoading = isLoading,
                 isLoadingLocations = isLoadingLocations
@@ -361,8 +365,9 @@ fun MyPlaceScreen(
     if (showAddDialog && (pendingLocation != null || pendingPlaceInfo != null)) {
         LocationDetailSheet(
             location = null,
-            members = members,
+            members = viewModel.addableMembers(),
             selectedMember = selectedMember,
+            targetMemberName = otherMemberName,
             pendingInfo = pendingPlaceInfo,
             pendingLocation = pendingLocation,
             isNew = true,
@@ -382,6 +387,7 @@ fun MyPlaceScreen(
             LocationDetailSheet(
                 location = location,
                 canManage = canManage,
+                targetMemberName = otherMemberName,
                 pendingInfo = pendingPlaceInfo,
                 pendingLocation = pendingLocation,
                 isNew = false,

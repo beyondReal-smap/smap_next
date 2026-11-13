@@ -40,7 +40,7 @@ class MyPlaceViewModel @Inject constructor(
 
     companion object {
         private const val TAG = "MyPlaceViewModel"
-        const val NOT_OWNER_MESSAGE = "본인의 장소만 추가·수정할 수 있어요"
+        const val NO_PERMISSION_MESSAGE = "이 멤버의 장소를 관리할 권한이 없어요."
         private val httpClient = OkHttpClient()
     }
 
@@ -331,7 +331,7 @@ class MyPlaceViewModel @Inject constructor(
     }
 
     fun showAddDialog(lat: Double, lng: Double) {
-        if (!canAddLocation()) { _errorMessage.value = NOT_OWNER_MESSAGE; return }
+        if (!canAddLocation()) { _errorMessage.value = NO_PERMISSION_MESSAGE; return }
         _pendingLocation.value = lat to lng
         _showAddDialog.value = true
         
@@ -376,8 +376,8 @@ class MyPlaceViewModel @Inject constructor(
     // MARK: - Search Actions
 
     fun showSearchScreen() {
-        // 기존 장소 편집(본인 장소) 중의 검색은 허용, 그 외에는 본인 선택 시에만
-        if (_showEditDialog.value == null && !canAddLocation()) { _errorMessage.value = NOT_OWNER_MESSAGE; return }
+        // 기존 장소 편집 중의 검색은 허용, 그 외에는 추가 권한이 있는 멤버를 선택했을 때만
+        if (_showEditDialog.value == null && !canAddLocation()) { _errorMessage.value = NO_PERMISSION_MESSAGE; return }
         _showSearchScreen.value = true
         _searchQuery.value = ""
         _searchResults.value = emptyList()
@@ -508,7 +508,7 @@ class MyPlaceViewModel @Inject constructor(
     ) {
         val group = _selectedGroup.value ?: return
         val member = _selectedMember.value ?: return
-        if (!canAddLocation()) { _errorMessage.value = NOT_OWNER_MESSAGE; return }
+        if (!canAddLocation()) { _errorMessage.value = NO_PERMISSION_MESSAGE; return }
 
         if (title.isBlank()) return
 
@@ -538,7 +538,14 @@ class MyPlaceViewModel @Inject constructor(
                 is ApiResult.Error -> {
                     if (result.code == 403 && result.detailCode == SubscriptionErrorCodes.PLACE_LIMIT_EXCEEDED) {
                         hideAddDialog()
-                        _limitExceededMessage.value = result.detailMessage ?: "무료 회원은 내 장소를 2개까지 등록할 수 있어요."
+                        if (member.mtIdx == authService.getUserData()?.mtIdx) {
+                            _limitExceededMessage.value = result.detailMessage ?: "무료 회원은 내 장소를 2개까지 등록할 수 있어요."
+                        } else {
+                            // 한도는 장소 소유자 기준이라 내 구독 화면으로 안내하지 않는다
+                            _errorMessage.value = "${member.displayName}님은 장소를 2개까지 등록할 수 있어요."
+                        }
+                    } else if (result.code == 403) {
+                        handleForbidden(onClose = { hideAddDialog() })
                     } else {
                         _errorMessage.value = result.detailMessage ?: "장소 저장에 실패했습니다 (${result.code})"
                     }
@@ -582,7 +589,11 @@ class MyPlaceViewModel @Inject constructor(
                         _errorMessage.value = "장소 수정에 실패했습니다"
                     }
                 }
-                is ApiResult.Error -> _errorMessage.value = "장소 수정에 실패했습니다 (${result.code})"
+                is ApiResult.Error -> if (result.code == 403) {
+                    handleForbidden(onClose = { hideEditDialog() })
+                } else {
+                    _errorMessage.value = "장소 수정에 실패했습니다 (${result.code})"
+                }
                 is ApiResult.NetworkError -> _errorMessage.value = "네트워크 연결을 확인해주세요"
             }
             _isLoading.value = false
@@ -592,7 +603,7 @@ class MyPlaceViewModel @Inject constructor(
     // TODO: Replace with a dedicated PATCH endpoint for notification toggle when available.
     // Currently sends a full update with all fields from the existing location.
     fun toggleLocationNotification(location: SavedLocation) {
-        if (!canManageLocation(location)) { _errorMessage.value = NOT_OWNER_MESSAGE; return }
+        if (!canManageLocation(location)) { _errorMessage.value = NO_PERMISSION_MESSAGE; return }
         viewModelScope.launch {
             val newStatus = if (location.sltEnterAlarm == "Y") "N" else "Y"
             when (val result = safeApiCall {
@@ -623,7 +634,11 @@ class MyPlaceViewModel @Inject constructor(
                         _errorMessage.value = "알림 설정 변경에 실패했습니다"
                     }
                 }
-                is ApiResult.Error -> _errorMessage.value = "알림 설정 변경에 실패했습니다 (${result.code})"
+                is ApiResult.Error -> if (result.code == 403) {
+                    handleForbidden()
+                } else {
+                    _errorMessage.value = "알림 설정 변경에 실패했습니다 (${result.code})"
+                }
                 is ApiResult.NetworkError -> _errorMessage.value = "네트워크 연결을 확인해주세요"
             }
         }
@@ -646,7 +661,11 @@ class MyPlaceViewModel @Inject constructor(
                         _errorMessage.value = "장소 삭제에 실패했습니다"
                     }
                 }
-                is ApiResult.Error -> _errorMessage.value = "장소 삭제에 실패했습니다 (${result.code})"
+                is ApiResult.Error -> if (result.code == 403) {
+                    handleForbidden(onClose = { hideDeleteDialog(); hideEditDialog() })
+                } else {
+                    _errorMessage.value = "장소 삭제에 실패했습니다 (${result.code})"
+                }
                 is ApiResult.NetworkError -> _errorMessage.value = "네트워크 연결을 확인해주세요"
             }
             _isLoading.value = false
@@ -655,13 +674,28 @@ class MyPlaceViewModel @Inject constructor(
 
     // MARK: - Permissions
 
-    /** 판정 기준은 MyPlaceManagePolicy 한 곳에 둔다 (현재: 소유자 본인만) */
+    /** 판정 기준은 MyPlaceManagePolicy 한 곳에 둔다 (서버 CanManagePlace 와 동일) */
     fun canManageLocation(location: SavedLocation): Boolean =
-        MyPlaceManagePolicy.canManageLocation(authService.getUserData()?.mtIdx, location.mtIdx)
+        MyPlaceManagePolicy.canManageLocation(authService.getUserData()?.mtIdx, location.mtIdx, _members.value)
 
-    /** 선택된 멤버가 본인일 때만 장소 추가 UI를 노출 */
+    /** 선택된 멤버의 장소를 추가할 수 있을 때만 장소 추가 UI를 노출 */
     fun canAddLocation(): Boolean =
-        MyPlaceManagePolicy.canAddLocation(authService.getUserData()?.mtIdx, _selectedMember.value?.mtIdx)
+        MyPlaceManagePolicy.canAddLocation(authService.getUserData()?.mtIdx, _selectedMember.value?.mtIdx, _members.value)
+
+    /** 장소를 추가할 수 있는 대상 멤버 목록 (추가 시트의 대상 선택용) */
+    fun addableMembers(): List<SmapGroupMember> =
+        _members.value.filter {
+            MyPlaceManagePolicy.canAddLocation(authService.getUserData()?.mtIdx, it.mtIdx, _members.value)
+        }
+
+    /**
+     * 서버 403: 권한이 중간에 바뀐 경우. 오류를 알리고, 역할 변경을 반영하도록 멤버·장소 목록을 다시 불러온다.
+     */
+    private fun handleForbidden(onClose: () -> Unit = {}) {
+        onClose()
+        _errorMessage.value = NO_PERMISSION_MESSAGE
+        performInitialLoad()
+    }
 
     // MARK: - Helpers
 

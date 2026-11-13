@@ -123,10 +123,52 @@ class MyPlaceViewModel: ObservableObject {
         }
     }
 
+    /// 장소 관리(추가·수정·삭제·알림 변경) 권한의 단일 판정 규칙. 서버 `ManagesMemberInSharedGroup`과 동일.
+    /// 본인 → 허용 / 그룹장 → 모두 허용 / 리더 → 그룹장 대상만 제외 / 일반 멤버 → 본인만.
+    nonisolated static func canManagePlace(
+        requesterId: Int,
+        requesterIsOwner: Bool,
+        requesterIsLeader: Bool,
+        targetId: Int,
+        targetIsOwner: Bool
+    ) -> Bool {
+        if requesterId == targetId { return true }
+        if requesterIsOwner { return true }
+        if requesterIsLeader { return !targetIsOwner }
+        return false
+    }
+
+    /// 현재 사용자가 `targetMemberId` 멤버의 장소를 관리할 수 있는지 (역할은 서버 멤버 목록의 sgdt_owner_chk/sgdt_leader_chk 기준)
+    func canManagePlace(ofMember targetMemberId: Int) -> Bool {
+        guard let currentUserId = AuthService.shared.getUserData()?.mt_idx else { return false }
+        if currentUserId == targetMemberId { return true }
+        guard let requester = members.first(where: { $0.mt_idx == currentUserId }),
+              let target = members.first(where: { $0.mt_idx == targetMemberId }) else { return false }
+        return Self.canManagePlace(
+            requesterId: currentUserId,
+            requesterIsOwner: requester.isOwner,
+            requesterIsLeader: requester.isLeader,
+            targetId: targetMemberId,
+            targetIsOwner: target.isOwner
+        )
+    }
+
     func canManageLocation(_ location: SavedLocation) -> Bool {
-        guard let currentUserId = AuthService.shared.getUserData()?.mt_idx,
-              let ownerId = location.mt_idx else { return false }
-        return currentUserId == ownerId
+        guard let ownerId = location.mt_idx else { return false }
+        return canManagePlace(ofMember: ownerId)
+    }
+
+    /// 선택된 멤버에게 장소를 추가할 수 있는지
+    var canAddToSelectedMember: Bool {
+        guard let member = selectedMember else { return false }
+        return canManagePlace(ofMember: member.mt_idx)
+    }
+
+    /// 본인이 아닌 다른 멤버를 선택 중인지
+    var isViewingOtherMember: Bool {
+        guard let member = selectedMember,
+              let currentUserId = AuthService.shared.getUserData()?.mt_idx else { return false }
+        return member.mt_idx != currentUserId
     }
 
     func selectGroup(_ group: SmapGroup) {
@@ -180,6 +222,7 @@ class MyPlaceViewModel: ObservableObject {
     }
 
     func startNewLocation(latitude: Double, longitude: Double) {
+        guard canAddToSelectedMember else { return }
         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
             selectedLocation = nil
             isEditMode = true
@@ -189,6 +232,7 @@ class MyPlaceViewModel: ObservableObject {
 
     func saveLocation(title: String, address: String, latitude: Double, longitude: Double, notifications: Bool) async -> Bool {
         guard let memberId = selectedMember?.mt_idx else { return false }
+        if selectedLocation == nil && !canAddToSelectedMember { return false }
         isSaving = true
         do {
             if let existingLocation = selectedLocation {
@@ -222,7 +266,7 @@ class MyPlaceViewModel: ObservableObject {
             isEditMode = false
             return true
         } catch {
-            handleError(error)
+            handleError(error, isWrite: true)
             isSaving = false
             return false
         }
@@ -240,7 +284,7 @@ class MyPlaceViewModel: ObservableObject {
             isLocationPanelOpen = false
             return true
         } catch {
-            handleError(error)
+            handleError(error, isWrite: true)
             isSaving = false
             return false
         }
@@ -272,7 +316,7 @@ class MyPlaceViewModel: ObservableObject {
                     selectedLocation = locations[index]
                 }
             }
-            handleError(error)
+            handleError(error, isWrite: true)
             return false
         }
     }
@@ -281,7 +325,27 @@ class MyPlaceViewModel: ObservableObject {
     func openSidebar() { withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { isSidebarOpen = true } }
     func closeSidebar() { withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { isSidebarOpen = false } }
 
-    private func handleError(_ error: Error) {
+    /// `isWrite`: 장소 추가·수정·삭제·알림 변경 요청의 오류일 때만 true (권한/한도 안내가 쓰기 요청에만 해당)
+    private func handleError(_ error: Error, isWrite: Bool = false) {
+        if isWrite, let networkError = error as? NetworkError {
+            switch networkError {
+            case .forbidden:
+                // 권한이 중간에 바뀐 경우 — 오류를 알리고 최신 목록을 다시 불러온다
+                errorMessage = "이 멤버의 장소를 관리할 권한이 없어요."
+                showError = true
+                if let memberId = selectedMember?.mt_idx {
+                    Task { await loadMemberLocations(memberId: memberId) }
+                }
+                return
+            case .subscriptionLimit(let code, _) where code == "PLACE_LIMIT_EXCEEDED" && isViewingOtherMember:
+                // 한도는 장소 소유자 기준이므로 다른 멤버의 한도는 본인의 프리미엄 안내(구독 유도)가 아닌 사실 안내로 처리
+                errorMessage = "\(selectedMember?.displayName ?? "이 멤버")님은 장소를 2개까지 등록할 수 있어요."
+                showError = true
+                return
+            default:
+                break
+            }
+        }
         if case NetworkError.subscriptionLimit(_, let message)? = error as? NetworkError {
             subscriptionLimitMessage = message
             return

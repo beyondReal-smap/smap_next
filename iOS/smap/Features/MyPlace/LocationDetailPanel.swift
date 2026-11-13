@@ -123,7 +123,15 @@ struct LocationDetailPanel: View {
         }
     }
     
-    private var panelTitle: String { viewModel.selectedLocation != nil ? (viewModel.isEditMode ? "장소 편집" : "장소 정보") : "새 장소 등록" }
+    private var panelTitle: String {
+        // 다른 멤버의 장소를 편집 중이면 대상이 누구인지 제목에 드러낸다 (본인 장소로 착각 방지)
+        let owner = viewModel.isViewingOtherMember ? viewModel.selectedMember?.displayName : nil
+        if viewModel.selectedLocation != nil {
+            guard viewModel.isEditMode else { return "장소 정보" }
+            return owner.map { "\($0)님의 장소 편집" } ?? "장소 편집"
+        }
+        return owner.map { "\($0)님의 장소 추가" } ?? "새 장소 등록"
+    }
     
     private func locationInfoView(location: SavedLocation) -> some View {
         VStack(spacing: 24) {

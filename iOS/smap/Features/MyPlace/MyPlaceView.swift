@@ -31,6 +31,8 @@ struct MyPlaceView: View {
                     initialCenter: viewModel.initialMapCenter,
                     onLocationTap: { viewModel.selectLocationFromMarker($0) },
                     onMapTap: { lat, lng in 
+                        // 선택한 멤버의 장소를 관리할 권한이 없으면 장소 추가 흐름을 시작하지 않는다
+                        guard viewModel.canAddToSelectedMember else { return }
                         Task {
                             do {
                                 let address = try await KakaoLocationSearchService.shared.reverseGeocode(latitude: lat, longitude: lng)
@@ -103,10 +105,12 @@ struct MyPlaceView: View {
                         newLocationAddress = place.road_address_name.isEmpty ? place.address_name : place.road_address_name
                         
                         viewModel.targetCoordinate = (lat: lat, lng: lng)
+                        viewModel.isHeaderSearchPresented = false
+                        // 권한이 없으면 지도만 이동하고 장소 등록 패널은 열지 않는다
+                        guard viewModel.canAddToSelectedMember else { return }
                         viewModel.selectedLocation = nil
                         viewModel.isEditMode = true
                         viewModel.isLocationPanelOpen = true
-                        viewModel.isHeaderSearchPresented = false
                     }
                 }
                 .navigationBarItems(leading: Button(action: { viewModel.isHeaderSearchPresented = false }) {
@@ -383,6 +387,10 @@ struct MyPlaceSidebarView: View {
                 }
             }
             
+            if viewModel.isViewingOtherMember && !viewModel.canAddToSelectedMember {
+                SMAPBanner(message: "다른 멤버의 장소는 볼 수만 있어요.")
+            }
+            
             if viewModel.isLoadingLocations {
                 HStack { Spacer(); ProgressView().padding(); Spacer() }
             } else if viewModel.locations.isEmpty {
@@ -396,7 +404,7 @@ struct MyPlaceSidebarView: View {
                     Text("등록된 장소가 없어요")
                         .font(.suite(size: 15, weight: .semibold))
                         .foregroundColor(.primary)
-                    Text("지도를 길게 눌러 새 장소를 추가하거나\n주소 검색으로 장소를 찾아보세요")
+                    Text(viewModel.canAddToSelectedMember ? "지도를 길게 눌러 새 장소를 추가하거나\n주소 검색으로 장소를 찾아보세요" : "이 멤버가 등록한 장소가 아직 없어요")
                         .font(.suite(size: 12))
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
