@@ -1,6 +1,8 @@
 package com.dmonster.smap.ui.register
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -80,7 +82,9 @@ internal fun TermsCheckItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onCheckedChange(!isChecked) }
+            // 약관 동의는 법적 동의 컨트롤이므로 toggleable + Role.Checkbox 로 체크 상태를
+            // TalkBack 에 전달한다. (아이콘 모양/색만으로는 스크린리더가 상태를 알 수 없음)
+            .toggleable(value = isChecked, role = Role.Checkbox, onValueChange = onCheckedChange)
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -103,11 +107,11 @@ internal fun TermsCheckItem(
             Spacer(modifier = Modifier.weight(1f))
             IconButton(
                 onClick = onDetailClick,
-                modifier = Modifier.size(32.dp)
+                modifier = Modifier.size(48.dp) // 터치타깃 48dp 확보(아이콘 시각 크기는 24dp 유지)
             ) {
                 Icon(
                     imageVector = Icons.Default.ChevronRight,
-                    contentDescription = "상세보기",
+                    contentDescription = "약관 상세보기",
                     tint = BrandColors.TextSecondary
                 )
             }

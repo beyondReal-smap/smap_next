@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.dmonster.smap.data.model.SmapGroup
+import com.dmonster.smap.ui.theme.AccentColors
 import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.SuiteFont
 
@@ -42,7 +43,7 @@ fun ShareGroupDialog(
                 Icon(
                     imageVector = Icons.Default.Share,
                     contentDescription = null,
-                    tint = Color(0xFF1F2937),
+                    tint = BrandColors.TextPrimary,
                     modifier = Modifier.size(48.dp)
                 )
 
@@ -70,7 +71,7 @@ fun ShareGroupDialog(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = Color(0xFFF3F4F6)
+                            containerColor = BrandColors.InputBackground
                         )
                     ) {
                         Column(
@@ -141,7 +142,7 @@ fun ShareGroupDialog(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF22C55E)
+                        containerColor = BrandColors.Success
                     )
                 ) {
                     Icon(

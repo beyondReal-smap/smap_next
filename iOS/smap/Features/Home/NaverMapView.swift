@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 import NMapsMap
 
 struct NaverMapView: UIViewRepresentable {
@@ -99,8 +100,8 @@ struct NaverMapView: UIViewRepresentable {
 
             // 이름 라벨
             let nameLabel = UILabel()
-            nameLabel.font = UIFont(name: "SUITE-SemiBold", size: 14) ?? .systemFont(ofSize: 14, weight: .semibold)
-            nameLabel.text = "👤 \(name)"
+            nameLabel.font = UIFont.suite(size: 14, weight: .semibold)
+            nameLabel.attributedText = calloutLine(symbol: "person.fill", text: name, font: nameLabel.font, color: .black)
             nameLabel.textColor = .black
             nameLabel.frame = CGRect(x: padding, y: yOffset, width: width - padding * 2, height: 20)
             containerView.addSubview(nameLabel)
@@ -108,10 +109,10 @@ struct NaverMapView: UIViewRepresentable {
 
             // 배터리 라벨
             let batteryLabel = UILabel()
-            batteryLabel.font = UIFont(name: "SUITE-Regular", size: 12) ?? .systemFont(ofSize: 12)
+            batteryLabel.font = UIFont.suite(size: 12)
             let batteryLevel = member.mlt_battery ?? -1
             let batteryText = batteryLevel < 0 ? "확인 불가" : "\(batteryLevel)%"
-            batteryLabel.text = "🔋 배터리: \(batteryText)"
+            batteryLabel.attributedText = calloutLine(symbol: "battery.100", text: "배터리: \(batteryText)", font: batteryLabel.font, color: .gray)
             batteryLabel.textColor = .gray
             batteryLabel.frame = CGRect(x: padding, y: yOffset, width: width - padding * 2, height: 18)
             containerView.addSubview(batteryLabel)
@@ -119,8 +120,8 @@ struct NaverMapView: UIViewRepresentable {
 
             // 속도 라벨
             let speedLabel = UILabel()
-            speedLabel.font = UIFont(name: "SUITE-Regular", size: 12) ?? .systemFont(ofSize: 12)
-            speedLabel.text = "🚶 속도: \(String(format: "%.1f", speed))km/h"
+            speedLabel.font = UIFont.suite(size: 12)
+            speedLabel.attributedText = calloutLine(symbol: "figure.walk", text: "속도: \(String(format: "%.1f", speed))km/h", font: speedLabel.font, color: .gray)
             speedLabel.textColor = .gray
             speedLabel.frame = CGRect(x: padding, y: yOffset, width: width - padding * 2, height: 18)
             containerView.addSubview(speedLabel)
@@ -128,8 +129,8 @@ struct NaverMapView: UIViewRepresentable {
 
             // GPS 시간 라벨
             let timeLabel = UILabel()
-            timeLabel.font = UIFont(name: "SUITE-Regular", size: 11) ?? .systemFont(ofSize: 11)
-            timeLabel.text = "🕒 GPS 업데이트: \(formatGpsTime(gpsTime))"
+            timeLabel.font = UIFont.suite(size: 11)
+            timeLabel.attributedText = calloutLine(symbol: "clock", text: "GPS 업데이트: \(formatGpsTime(gpsTime))", font: timeLabel.font, color: .lightGray)
             timeLabel.textColor = .lightGray
             timeLabel.frame = CGRect(x: padding, y: yOffset, width: width - padding * 2, height: 16)
             containerView.addSubview(timeLabel)
@@ -147,6 +148,21 @@ struct NaverMapView: UIViewRepresentable {
                 return String(timeStr[start..<end])
             }
             return timeStr
+        }
+
+        // 콜아웃 라인 — 이모지 대신 SF Symbol 을 텍스트 앞에 붙여 시각 일관성 확보 (새 에셋 불필요)
+        private func calloutLine(symbol: String, text: String, font: UIFont, color: UIColor) -> NSAttributedString {
+            let result = NSMutableAttributedString()
+            let config = UIImage.SymbolConfiguration(pointSize: font.pointSize, weight: .regular)
+            if let image = UIImage(systemName: symbol, withConfiguration: config)?
+                .withTintColor(color, renderingMode: .alwaysOriginal) {
+                let attachment = NSTextAttachment()
+                attachment.image = image
+                result.append(NSAttributedString(attachment: attachment))
+                result.append(NSAttributedString(string: " ", attributes: [.font: font, .foregroundColor: color]))
+            }
+            result.append(NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: color]))
+            return result
         }
 
         func updateMarkers(mapView: NMFMapView, members: [SmapGroupMember], schedules: [SmapSchedule]) {
@@ -281,7 +297,7 @@ struct NaverMapView: UIViewRepresentable {
 
                 let orderText = "\(order)"
                 let orderAttr: [NSAttributedString.Key: Any] = [
-                    .font: UIFont(name: "SUITE-Bold", size: 11) ?? UIFont.boldSystemFont(ofSize: 11),
+                    .font: UIFont.suite(size: 11, weight: .bold),
                     .foregroundColor: UIColor.white
                 ]
                 let orderTextSize = orderText.size(withAttributes: orderAttr)
@@ -305,7 +321,7 @@ struct NaverMapView: UIViewRepresentable {
 
                 let displayTitle = title.count > 10 ? String(title.prefix(10)) + "..." : title
                 let titleAttr: [NSAttributedString.Key: Any] = [
-                    .font: UIFont(name: "SUITE-SemiBold", size: 12) ?? UIFont.systemFont(ofSize: 12, weight: .semibold),
+                    .font: UIFont.suite(size: 12, weight: .semibold),
                     .foregroundColor: UIColor.white
                 ]
                 let titleTextSize = displayTitle.size(withAttributes: titleAttr)
@@ -331,7 +347,7 @@ struct NaverMapView: UIViewRepresentable {
                 ctx.fillPath()
 
                 let timeAttr: [NSAttributedString.Key: Any] = [
-                    .font: UIFont(name: "SUITE-Regular", size: 10) ?? UIFont.systemFont(ofSize: 10),
+                    .font: UIFont.suite(size: 10),
                     .foregroundColor: UIColor.white
                 ]
                 let timeTextSize = timeText.size(withAttributes: timeAttr)
@@ -462,7 +478,7 @@ struct MarkerFactory {
                 paragraphStyle.alignment = .center
 
                 let attrs: [NSAttributedString.Key: Any] = [
-                    .font: UIFont.systemFont(ofSize: 10, weight: .medium),
+                    .font: UIFont.suite(size: 10, weight: .medium),
                     .foregroundColor: UIColor.white,
                     .paragraphStyle: paragraphStyle
                 ]
@@ -542,7 +558,7 @@ struct MarkerFactory {
             paragraphStyle.alignment = .center
 
             let attrs: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 10, weight: .medium),
+                .font: UIFont.suite(size: 10, weight: .medium),
                 .foregroundColor: UIColor.white,
                 .paragraphStyle: paragraphStyle
             ]

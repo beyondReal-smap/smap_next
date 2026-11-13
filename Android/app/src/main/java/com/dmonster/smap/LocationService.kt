@@ -15,6 +15,7 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.os.Build
+import android.os.HandlerThread
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
@@ -74,6 +75,19 @@ class LocationService : Service() {
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var locationRequest: LocationRequest
 
+    // GPS 콜백을 메인 스레드에서 받으면 enqueueLocation/persistPendingLocations(SharedPrefs write,
+    // Json encode)가 메인을 블로킹해 콜백 누적/UI 버벅임이 발생한다. 별도 HandlerThread에서 받아
+    // detectModeFromLocation까지 background에서 처리한다.
+    private var locationThread: HandlerThread? = null
+    private val locationLooper: Looper
+        get() {
+            val existing = locationThread
+            if (existing != null && existing.isAlive) return existing.looper
+            val thread = HandlerThread("LocationServiceCallback").apply { start() }
+            locationThread = thread
+            return thread.looper
+        }
+
     // ── Activity / mode detection ──────────────────────────────────────────
 
     private var stationaryStartTime: Long = 0L
@@ -84,8 +98,13 @@ class LocationService : Service() {
     // requestLocationUpdates 성공 여부. AlarmManager로 서비스가 부활했을 때
     // 위치 구독이 유실된 상태인지 판별하는 데 쓴다.
     @Volatile private var isTracking = false
+    // 401 카운터는 SharedPreferences에 영속화한다. 그렇지 않으면 OS가 서비스를 강제 종료하고
+    // AlarmManager로 부활할 때마다 0으로 리셋되어 maxAuthFailures(3) 한도가 무력화된다.
     private var consecutiveAuthFailures = 0
     private val maxAuthFailures = 3
+    // 429 Retry-After 응답 시 다음 flush까지 보류할 시각(epoch ms). 이 시각 전에 flush가
+    // 호출되면 즉시 return 하여 rate-limit 폭주를 방지한다.
+    @Volatile private var rateLimitedUntilMs: Long = 0L
 
     // ── Location batching ──────────────────────────────────────────────────
 
@@ -121,6 +140,7 @@ class LocationService : Service() {
         private const val KEY_PENDING_QUEUE = "pending_queue"
         private const val KEY_LAST_LOCATION = "last_location"
         private const val KEY_CURRENT_MODE = "current_mode"
+        private const val KEY_AUTH_FAIL_COUNT = "consecutive_auth_failures"
         private const val RESTART_DELAY_MS = 5_000L
 
         private const val STATIONARY_DWELL_MS = 5 * 60 * 1000L  // 5 min before entering stationary
@@ -133,9 +153,10 @@ class LocationService : Service() {
         // 폴백 speed 계산 시 너무 오래된 lastLocation과의 gap은 신뢰할 수 없어 무시.
         private const val SPEED_FALLBACK_MAX_GAP_MS = 10 * 60 * 1000L  // 10 min
         // heartbeat 송신 시 lastLocation 신선도 상한. 이보다 오래된 좌표는 보내지 않는다.
-        // STATIONARY heartbeat이 15분 간격이고, 새 콜백이 60초 STATIONARY interval로 들어오므로
-        // 1시간이면 충분히 보수적인 상한.
-        private const val HEARTBEAT_LAST_LOC_MAX_AGE_MS = 60 * 60 * 1000L  // 1 hour
+        // STATIONARY heartbeat이 15분 간격이고 새 콜백이 60초 STATIONARY interval로 들어오므로,
+        // 30분 이상 콜백이 없으면 사실상 GPS가 잡히지 않는 환경(터널/지하/실내 깊숙)이라 보고
+        // 옛 좌표를 "지금 시각"으로 반복 전송해 활동로그를 오염시키지 않도록 보수화.
+        private const val HEARTBEAT_LAST_LOC_MAX_AGE_MS = 30 * 60 * 1000L  // 30 min
 
         private const val ACTION_HEARTBEAT = "com.dmonster.smap.ACTION_HEARTBEAT"
         private const val REQUEST_CODE_HEARTBEAT = 2002
@@ -220,6 +241,9 @@ class LocationService : Service() {
 
     private val locationCallback: LocationCallback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
+            // 콜백은 LocationServiceCallback HandlerThread에서 도착한다(requestLocationUpdates의
+            // Looper로 전달). 메인 스레드 블로킹 없이 SharedPreferences write/json encode가 안전하게
+            // 수행되므로 추가 dispatch 없이 바로 처리한다.
             var latestValid: Location? = null
             for (location in result.locations) {
                 if (!isValidCoordinate(location)) continue
@@ -240,8 +264,10 @@ class LocationService : Service() {
     override fun onCreate() {
         super.onCreate()
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
-        // 프로세스 부활 시 마지막 모드를 복원해야 올바른 LocationRequest/알림 텍스트로 시작한다.
+        // 프로세스 부활 시 마지막 모드/인증 실패 카운터를 복원해야 올바른 LocationRequest/알림 텍스트로 시작하고
+        // maxAuthFailures(3)에 도달했던 세션이 재시작 한 번으로 카운터가 0으로 리셋되며 무한 재시도되는 회귀를 막는다.
         restoreCurrentMode()
+        restoreAuthFailureCount()
         locationRequest = createLocationRequest(currentMode)
         restorePendingLocations()
         restoreLastLocation()
@@ -339,6 +365,9 @@ class LocationService : Service() {
         unregisterNetworkCallback()
         unregisterActivityTransitions()
         serviceScope.cancel()
+        // GPS 콜백용 HandlerThread 정리. quitSafely()는 큐의 메시지를 처리한 뒤 종료.
+        locationThread?.quitSafely()
+        locationThread = null
         Log.d(TAG, "LocationService destroyed")
     }
 
@@ -409,7 +438,7 @@ class LocationService : Service() {
             fusedLocationClient.requestLocationUpdates(
                 locationRequest,
                 locationCallback,
-                Looper.getMainLooper()
+                locationLooper
             )
             isTracking = true
         } catch (e: SecurityException) {
@@ -558,6 +587,23 @@ class LocationService : Service() {
         cancelHeartbeatAlarm()
     }
 
+    // ── Auth failure persistence ───────────────────────────────────────────
+
+    private fun restoreAuthFailureCount() {
+        val prefs = getSharedPreferences(QUEUE_PREFS, Context.MODE_PRIVATE)
+        consecutiveAuthFailures = prefs.getInt(KEY_AUTH_FAIL_COUNT, 0)
+        if (consecutiveAuthFailures > 0) {
+            Log.d(TAG, "Restored auth failure count: $consecutiveAuthFailures")
+        }
+    }
+
+    private fun persistAuthFailureCount() {
+        getSharedPreferences(QUEUE_PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putInt(KEY_AUTH_FAIL_COUNT, consecutiveAuthFailures)
+            .apply()
+    }
+
     // ── Connectivity callback ──────────────────────────────────────────────
 
     private fun registerNetworkCallback() {
@@ -663,6 +709,13 @@ class LocationService : Service() {
     }
 
     private fun flushPendingLocations() {
+        // 429 Retry-After 응답 직후에는 보류 시각이 지날 때까지 큐를 비우지 않는다.
+        // pendingLocations는 그대로 둬 다음 batch/network-recovery 시점에 다시 시도되도록 한다.
+        val now = System.currentTimeMillis()
+        if (now < rateLimitedUntilMs) {
+            Log.d(TAG, "Flush deferred ${rateLimitedUntilMs - now}ms (rate-limited)")
+            return
+        }
         val toSend: List<CreateLocationLogRequest>
         synchronized(pendingLocations) {
             if (pendingLocations.isEmpty()) return
@@ -760,13 +813,18 @@ class LocationService : Service() {
         try {
             val response = smapApi.createLocationLog(request)
             if (response.isSuccessful) {
-                consecutiveAuthFailures = 0
+                if (consecutiveAuthFailures != 0) {
+                    consecutiveAuthFailures = 0
+                    persistAuthFailureCount()
+                }
                 Log.d(TAG, "Location sent: (${request.mltLat}, ${request.mltLong}) mode=${currentMode.name}")
             } else {
                 Log.w(TAG, "Location upload failed: HTTP ${response.code()}")
                 when (response.code()) {
                     401 -> {
                         consecutiveAuthFailures++
+                        // 카운터를 디스크에 저장해 OS 재시작/AlarmManager 부활 후에도 누적 유지.
+                        persistAuthFailureCount()
                         if (consecutiveAuthFailures >= maxAuthFailures) {
                             // 토큰 폐기 책임은 인증 flow(AuthService.logout / 로그인 재진입)에 위임한다.
                             // 여기서는 재시도 루프를 멈추고 서비스만 중단 → 사용자 재진입 시점에
@@ -782,6 +840,15 @@ class LocationService : Service() {
                         // 403 may be rate-limit or authorization issue, not necessarily auth failure
                         Log.w(TAG, "403 Forbidden — dropping location, not clearing token")
                     }
+                    429 -> {
+                        // Rate-limit. Retry-After 헤더(seconds 또는 HTTP-date)를 우선하고,
+                        // 없으면 보수적으로 60초 보류. flushPendingLocations가 이 시각을 보고 보류한다.
+                        val retryAfterMs = parseRetryAfterMs(response.headers().get("Retry-After"))
+                            ?: 60_000L
+                        rateLimitedUntilMs = System.currentTimeMillis() + retryAfterMs
+                        Log.w(TAG, "429 Too Many Requests — backing off for ${retryAfterMs}ms")
+                        enqueueLocation(request)
+                    }
                     in 500..599 -> {
                         // Re-enqueue on server error for retry
                         enqueueLocation(request)
@@ -793,6 +860,24 @@ class LocationService : Service() {
             // Re-enqueue on network error for retry
             enqueueLocation(request)
         }
+    }
+
+    /**
+     * Retrofit Headers의 Retry-After 값을 ms로 파싱한다.
+     * - 정수: seconds 단위(가장 일반적)
+     * - HTTP-date: epoch와의 차이를 ms로 환산
+     * 둘 다 실패하면 null. 음수는 0으로 클램프.
+     */
+    private fun parseRetryAfterMs(value: String?): Long? {
+        if (value.isNullOrBlank()) return null
+        val asSeconds = value.toLongOrNull()
+        if (asSeconds != null) return (asSeconds.coerceAtLeast(0L)) * 1000L
+        return runCatching {
+            val format = java.text.SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.US)
+            format.timeZone = java.util.TimeZone.getTimeZone("GMT")
+            val date = format.parse(value) ?: return@runCatching null
+            (date.time - System.currentTimeMillis()).coerceAtLeast(0L)
+        }.getOrNull()
     }
 
     // ── Coordinate validation ──────────────────────────────────────────────

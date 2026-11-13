@@ -11,7 +11,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.FlightTakeoff
 import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
@@ -26,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.dmonster.smap.data.model.PushLog
+import com.dmonster.smap.ui.theme.AccentColors
 import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.SuiteFont
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -82,7 +87,7 @@ fun NotificationScreen(
                 ) {
                     if (isLoading && logs.isEmpty()) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(color = Color(0xFFF06292))
+                            CircularProgressIndicator(color = AccentColors.Pink)
                         }
                     } else if (logs.isEmpty()) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -128,8 +133,8 @@ fun NotificationHeader(onClose: () -> Unit, viewModel: NotificationViewModel) {
         IconButton(
             onClick = onClose,
             modifier = Modifier
-                .size(36.dp)
-                .background(Color(0xFFF5F5F5), CircleShape)
+                .size(48.dp) // 터치타깃 48dp 확보(접근성), 내부 아이콘 시각크기는 20dp 유지
+                .background(BrandColors.InputBackground, CircleShape)
         ) {
             Icon(Icons.Default.Close, contentDescription = "닫기", tint = Color.LightGray, modifier = Modifier.size(20.dp))
         }
@@ -154,8 +159,8 @@ fun NotificationHeader(onClose: () -> Unit, viewModel: NotificationViewModel) {
             IconButton(
                 onClick = { showMenu = true },
                 modifier = Modifier
-                    .size(36.dp)
-                    .border(1.dp, Color(0xFFEEEEEE), CircleShape)
+                    .size(48.dp) // 터치타깃 48dp 확보(접근성), 내부 아이콘 시각크기는 20dp 유지
+                    .border(1.dp, BrandColors.Border, CircleShape)
             ) {
                 Icon(Icons.Default.MoreHoriz, contentDescription = "메뉴", tint = Color.LightGray, modifier = Modifier.size(20.dp))
             }
@@ -286,8 +291,8 @@ fun SummaryCard(count: Int, label: String, bgColor: Color, textColor: Color, mod
 @Composable
 fun NotificationItem(log: PushLog) {
     val isUnread = log.pltReadChk == "N"
-    val pinkBorder = Color(0xFFFFD1DC)
-    val lightGreyBorder = Color(0xFFEEEEEE)
+    val pinkBorder = AccentColors.Pink.copy(alpha = 0.3f)
+    val lightGreyBorder = BrandColors.Border
     
     // Parse timestamp (plt_sdate)
     val formattedTime = remember(log.pltSdate) {
@@ -304,19 +309,15 @@ fun NotificationItem(log: PushLog) {
         } ?: ""
     }
     
-    // Determine icon/emoji - Only add if NOT already in the title
-    val emoji = when {
-        log.pltTitle?.contains("방문") == true -> "🚩"
-        log.pltTitle?.contains("이탈") == true -> "🚀"
-        log.pltTitle?.contains("시작") == true -> "⏰"
-        else -> "🔔"
+    // 알림 타입을 이모지 inline append 대신 Material 아이콘으로 표시(스크린리더 오독 방지 + 접근성)
+    val (typeIcon, typeIconDesc) = when {
+        log.pltTitle?.contains("방문") == true -> Icons.Default.Flag to "방문 알림"
+        log.pltTitle?.contains("이탈") == true -> Icons.Default.FlightTakeoff to "이탈 알림"
+        log.pltTitle?.contains("시작") == true -> Icons.Default.Schedule to "시작 알림"
+        else -> Icons.Default.Notifications to "알림"
     }
-    
-    val displayTitle = if (log.pltTitle?.contains(emoji) == true) {
-        log.pltTitle
-    } else {
-        "${log.pltTitle ?: "알림"} $emoji"
-    }
+
+    val displayTitle = log.pltTitle ?: "알림"
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -334,8 +335,16 @@ fun NotificationItem(log: PushLog) {
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                Icon(
+                    imageVector = typeIcon,
+                    contentDescription = typeIconDesc,
+                    tint = AccentColors.Pink,
+                    modifier = Modifier
+                        .padding(end = 6.dp)
+                        .size(18.dp)
+                )
                 Text(
-                    text = displayTitle ?: "알림",
+                    text = displayTitle,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = SuiteFont,

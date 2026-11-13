@@ -3,6 +3,7 @@ package com.dmonster.smap.ui.activitylog
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.dmonster.smap.ui.theme.ActivityLogColors
 import com.naver.maps.geometry.LatLng
 import com.naver.maps.map.compose.PolylineOverlay
 import com.naver.maps.map.compose.Marker
@@ -10,20 +11,10 @@ import com.naver.maps.map.compose.MarkerState
 import com.naver.maps.map.compose.ExperimentalNaverMapApi
 import com.naver.maps.map.overlay.OverlayImage
 import com.dmonster.smap.R
-import kotlin.math.*
 
 // MARK: - Gradient Path Utilities (iOS Style - 7 Pastel Colors)
 
-// iOS와 동일한 선명한 파스텔 무지개색 배열 (Muted Pastel -> Vivid Pastel)
-private val RainbowColors = listOf(
-    Color(0xFFFF8585), // Vivid Red
-    Color(0xFFFFB366), // Vivid Orange
-    Color(0xFFFFE066), // Vivid Yellow
-    Color(0xFF85E085), // Vivid Green
-    Color(0xFF85C2FF), // Vivid Blue
-    Color(0xFFA3A3FF), // Vivid Indigo
-    Color(0xFFD6A3FF)  // Vivid Violet
-)
+private val RainbowColors = ActivityLogColors.PathRainbow
 
 private fun interpolateColor(color1: Color, color2: Color, factor: Float): Color {
     val r = (color1.red + (color2.red - color1.red) * factor).coerceIn(0f, 1f)

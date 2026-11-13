@@ -32,6 +32,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import com.dmonster.smap.ui.theme.rememberReduceMotion
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -221,7 +222,7 @@ private fun LogoSection() {
         // 앱 아이콘 (AppNoBg)
         Image(
             painter = painterResource(id = R.drawable.app_no_bg),
-            contentDescription = "smap logo",
+            contentDescription = "smap 로고",
             modifier = Modifier.size(80.dp)
         )
         
@@ -276,7 +277,7 @@ private fun LoginForm(
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Default.Phone,
-                    contentDescription = "Phone",
+                    contentDescription = "전화번호",
                     tint = if (isPhoneFocused) BrandColors.Primary else BrandColors.TextSecondary
                 )
             },
@@ -309,7 +310,7 @@ private fun LoginForm(
             leadingIcon = {
                 Icon(
                     imageVector = Icons.Default.Lock,
-                    contentDescription = "Password",
+                    contentDescription = "비밀번호",
                     tint = if (isPasswordFocused) BrandColors.Primary else BrandColors.TextSecondary
                 )
             },
@@ -318,7 +319,7 @@ private fun LoginForm(
                     Icon(
                         imageVector = if (showPassword) Icons.Default.Visibility
                                      else Icons.Default.VisibilityOff,
-                        contentDescription = "Toggle password visibility",
+                        contentDescription = if (showPassword) "비밀번호 숨기기" else "비밀번호 표시",
                         tint = BrandColors.TextSecondary
                     )
                 }
@@ -361,7 +362,7 @@ private fun ErrorMessage(message: String) {
     ) {
         Icon(
             imageVector = Icons.Default.Warning,
-            contentDescription = "Error",
+            contentDescription = "오류",
             tint = BrandColors.Error,
             modifier = Modifier.size(20.dp)
         )
@@ -477,7 +478,7 @@ private fun SocialLoginSection(
             // Google 로고
             Image(
                 painter = painterResource(id = R.drawable.ic_google_logo),
-                contentDescription = "Google Logo",
+                contentDescription = "Google 로고",
                 modifier = Modifier.size(24.dp)
             )
             Spacer(modifier = Modifier.width(12.dp))
@@ -506,7 +507,7 @@ private fun SocialLoginSection(
             // 카카오 로고
             Image(
                 painter = painterResource(id = R.drawable.ic_kakao_logo),
-                contentDescription = "Kakao Logo",
+                contentDescription = "카카오 로고",
                 modifier = Modifier.size(24.dp),
                 colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color(0xFF3A1D1D)) // Kakao Brown/Black
             )
@@ -555,9 +556,11 @@ private fun SignUpSection(onClick: () -> Unit) {
  */
 @Composable
 private fun FloatingBackground() {
+    // 접근성 "애니메이션 제거" 활성 시 무한 반복 부유 애니메이션을 정지하고 정적 배경으로 렌더한다(WCAG 2.3.3).
+    val reduceMotion = rememberReduceMotion()
     val infiniteTransition = rememberInfiniteTransition(label = "floating")
-    
-    val offset1 by infiniteTransition.animateFloat(
+
+    val animOffset1 by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 30f,
         animationSpec = infiniteRepeatable(
@@ -566,8 +569,8 @@ private fun FloatingBackground() {
         ),
         label = "offset1"
     )
-    
-    val offset2 by infiniteTransition.animateFloat(
+
+    val animOffset2 by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = -20f,
         animationSpec = infiniteRepeatable(
@@ -576,6 +579,9 @@ private fun FloatingBackground() {
         ),
         label = "offset2"
     )
+
+    val offset1 = if (reduceMotion) 0f else animOffset1
+    val offset2 = if (reduceMotion) 0f else animOffset2
     
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp

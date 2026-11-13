@@ -63,9 +63,11 @@ struct WithdrawView: View {
                         }
                     }) {
                         Image(systemName: "chevron.left")
-                            .font(.system(size: 18, weight: .semibold))
+                            .font(.suite(size: 18, weight: .semibold))
                             .foregroundColor(.primary)
                             .padding(8)
+                            .frame(width: 44, height: 44) // 터치타깃 44pt 확보
+                            .contentShape(Rectangle())
                     }
                     .accessibilityLabel("뒤로")
                     
@@ -78,9 +80,10 @@ struct WithdrawView: View {
                     
                     // Invisible spacer for balance
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.suite(size: 18, weight: .semibold))
                         .foregroundColor(.clear)
                         .padding(8)
+                        .frame(width: 44, height: 44) // 좌측 버튼과 폭 균형 유지 (제목 중앙 정렬)
                 }
                 .padding(.horizontal)
                 .padding(.vertical, 12)
@@ -97,7 +100,7 @@ struct WithdrawView: View {
                                 
                                 if step < currentStep {
                                     Image(systemName: "check")
-                                        .font(.system(size: 12, weight: .bold))
+                                        .font(.suite(size: 12, weight: .bold))
                                         .foregroundColor(.white)
                                 } else {
                                     Text("\(step)")
@@ -219,21 +222,21 @@ struct WithdrawView: View {
                     Group {
                         if userType == 3 { // Apple
                             Image(systemName: "applelogo")
-                                .font(.system(size: 24))
+                                .font(.suite(size: 24))
                             Text("Apple ID로 로그인됨")
                         } else if userType == 4 { // Google
                             Image(systemName: "person.circle.fill") // Fallback
-                                .font(.system(size: 24))
+                                .font(.suite(size: 24))
                                 .foregroundColor(.blue)
                             Text("Google 계정으로 로그인됨")
                         } else if userType == 2 { // Kakao
                             Image(systemName: "person.circle.fill") // Fallback
-                                .font(.system(size: 24))
+                                .font(.suite(size: 24))
                                 .foregroundColor(.yellow)
                             Text("카카오 계정으로 로그인됨")
                         } else {
                             Image(systemName: "person.badge.key.fill")
-                                .font(.system(size: 24))
+                                .font(.suite(size: 24))
                             Text("소셜 계정으로 로그인됨")
                         }
                     }
@@ -276,7 +279,7 @@ struct WithdrawView: View {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "shield.lefthalf.filled")
                     .foregroundColor(SMAPTheme.Color.primary)
-                    .font(.system(size: 18))
+                    .font(.suite(size: 18))
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("보안 강화")
@@ -315,7 +318,7 @@ struct WithdrawView: View {
                     }) {
                         HStack {
                             Text(reason.icon)
-                                .font(.system(size: 20))
+                                .font(.suite(size: 20))
                                 .frame(width: 32)
                             
                             Text(reason.text)
@@ -407,7 +410,7 @@ struct WithdrawView: View {
             Button(action: { agreement.toggle() }) {
                 HStack(spacing: 12) {
                     Image(systemName: agreement ? "checkmark.square.fill" : "square")
-                        .font(.system(size: 20))
+                        .font(.suite(size: 20))
                         .foregroundColor(agreement ? SMAPTheme.Color.primary : .gray)
                     
                     Text("안내사항을 모두 확인하였으며, 이에 동의합니다.")

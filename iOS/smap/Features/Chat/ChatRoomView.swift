@@ -75,9 +75,12 @@ struct ChatRoomView: View {
         HStack(spacing: 12) {
             Button(action: { dismiss() }) {
                 Image(systemName: "chevron.left")
-                    .font(.system(size: 18, weight: .medium))
+                    .font(.suite(size: 18, weight: .medium))
                     .foregroundColor(.primary)
+                    .frame(width: 44, height: 44) // 최소 44pt 터치타깃 확보
+                    .contentShape(Rectangle())
             }
+            .accessibilityLabel("뒤로")
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(room.displayTitle)
@@ -111,10 +114,13 @@ struct ChatRoomView: View {
 
             Button(action: { viewModel.sendMessage() }) {
                 Image(systemName: "paperplane.fill")
-                    .font(.system(size: 18))
+                    .font(.suite(size: 18))
                     .foregroundColor(viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                                      ? .gray : SMAPTheme.Color.primary)
+                    .frame(width: 44, height: 44) // 최소 44pt 터치타깃 확보
+                    .contentShape(Rectangle())
             }
+            .accessibilityLabel("메시지 전송")
             .disabled(viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
         .padding(.horizontal, 12)
@@ -195,11 +201,11 @@ struct MessageBubble: View {
         VStack(alignment: isMyMessage ? .trailing : .leading, spacing: 1) {
             if message.unread_count > 0 {
                 Text("\(message.unread_count)")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.suite(size: 10, weight: .bold))
                     .foregroundColor(SMAPTheme.Color.primary)
             }
             Text(message.formattedTime)
-                .font(.system(size: 10))
+                .font(.suite(size: 10))
                 .foregroundColor(.gray)
         }
     }
@@ -226,7 +232,7 @@ struct MessageBubble: View {
         Circle()
             .fill(Color.gray.opacity(0.2))
             .frame(width: 32, height: 32)
-            .overlay(Image(systemName: "person.fill").font(.system(size: 14)).foregroundColor(.gray))
+            .overlay(Image(systemName: "person.fill").font(.suite(size: 14)).foregroundColor(.gray))
     }
 }
 

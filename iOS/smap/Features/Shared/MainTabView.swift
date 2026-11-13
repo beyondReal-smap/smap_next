@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 // MARK: - MainTabView & Subviews (Consolidated for Compilation)
 
@@ -24,14 +25,10 @@ struct MainTabView: View {
         let appearance = UITabBarAppearance()
         appearance.configureWithOpaqueBackground()
         appearance.backgroundColor = .white
-        
-        // 아이콘 + 텍스트 색상
-        let _ = UIColor(red: 1/255, green: 19/255, blue: 163/255, alpha: 1.0)
-        let _ = UIColor.systemGray
-        
-        // 폰트 설정 (SUITE-Medium, 10pt)
+
+        // 폰트 설정 (AtoZ Medium, 10pt)
         let fontAttributes: [NSAttributedString.Key: Any] = [
-            .font: UIFont(name: "SUITE-Medium", size: 10) ?? UIFont.systemFont(ofSize: 10, weight: .medium)
+            .font: UIFont.suite(size: 10, weight: .medium)
         ]
         
         appearance.stackedLayoutAppearance.normal.titleTextAttributes = fontAttributes
@@ -99,6 +96,7 @@ struct MainTabView: View {
             //     .accessibilityLabel("채팅 탭")
             //     .tag(5)
         }
+        .tint(SMAPTheme.Color.primary) // 선택 탭 강조색을 브랜드색(#0113A3)으로 고정
         .onChange(of: selectedTab) { _, _ in
             HapticManager.shared.selection()
             // 탭 전환 시 모든 사이드바 닫기 알림 발생 (현재 선택된 탭 인덱스 전달)

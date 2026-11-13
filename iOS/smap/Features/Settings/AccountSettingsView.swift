@@ -22,7 +22,7 @@ public struct SettingMenuView: View {
     public var body: some View {
         NavigationStack {
             ZStack {
-                Color(red: 0.98, green: 0.98, blue: 1.0).ignoresSafeArea()
+                SMAPTheme.Adaptive.pageBackground.ignoresSafeArea()
 
                 ScrollView {
                     VStack(spacing: 24) {
@@ -36,7 +36,7 @@ public struct SettingMenuView: View {
                                 SettingsMenuItem(title: "서비스 이용약관", icon: "doc.text.fill", color: .teal, destination: AnyView(ServiceTermsView())),
                                 SettingsMenuItem(title: "개인정보 처리방침", icon: "shield.fill", color: .cyan, destination: AnyView(PrivacyPolicyView())),
                                 SettingsMenuItem(title: "위치기반서비스 이용약관", icon: "location.fill", color: .purple, destination: AnyView(LocationTermsView())),
-                                SettingsMenuItem(title: "마케팅 정보 수집 및 이용 동의", icon: "star.fill", color: Color(red: 1/255, green: 20/255, blue: 162/255), destination: AnyView(MarketingConsentView())),
+                                SettingsMenuItem(title: "마케팅 정보 수집 및 이용 동의", icon: "star.fill", color: SMAPTheme.Color.primary, destination: AnyView(MarketingConsentView())),
                                 SettingsMenuItem(title: "개인정보 제3자 제공 동의", icon: "person.2.fill", color: .pink, destination: AnyView(ThirdPartyProvisionView()))
                             ])
 
@@ -53,7 +53,9 @@ public struct SettingMenuView: View {
                             Text("SMAP")
                                 .font(.suite(size: 14, weight: .semibold))
                                 .foregroundColor(.gray)
-                            Text("버전 3.0.4")
+                            // Bundle에서 직접 읽어 빌드 버전(MARKETING_VERSION)과 항상 일치시킨다.
+                            // 하드코딩 시 버전 업마다 두 곳을 동기화해야 해 누락 위험.
+                            Text("버전 \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")")
                                 .font(.suite(size: 12))
                                 .foregroundColor(.gray.opacity(0.8))
                         }
@@ -138,7 +140,7 @@ struct ProfileSummaryCard: View {
         .padding(20)
         .background(
             LinearGradient(
-                gradient: Gradient(colors: [SMAPTheme.Color.primary, Color(red: 102/255, green: 126/255, blue: 234/255)]),
+                gradient: Gradient(colors: [SMAPTheme.Color.primary, SMAPTheme.Accent.primarySoft]),
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
@@ -229,6 +231,8 @@ struct AccountSettingsView: View {
     @ObservedObject var authService = AuthService.shared
 
     @State private var showingLogoutAlert = false
+    @State private var showingWithdrawConfirm = false // 회원탈퇴 사전 확인
+    @State private var isWithdrawActive = false       // 확인 후 이동 플래그
 
     @State private var showingImagePicker = false
     @State private var inputImage: UIImage?
@@ -288,6 +292,7 @@ struct AccountSettingsView: View {
         .alert("로그아웃", isPresented: $showingLogoutAlert) {
             Button("취소", role: .cancel) {}
             Button("로그아웃", role: .destructive) {
+                HapticManager.shared.notification(type: .warning)
                 authService.logout()
                 NotificationCenter.default.post(name: NSNotification.Name("logout"), object: nil)
             }
@@ -301,12 +306,7 @@ struct AccountSettingsView: View {
         }
         .task {
             // 서버에서 최신 사용자 정보 가져오기
-            do {
-                _ = try await authService.fetchUserProfile()
-                print("✅ [AccountSettingsView] 사용자 프로필 갱신 완료")
-            } catch {
-                print("⚠️ [AccountSettingsView] 사용자 프로필 갱신 실패: \(error)")
-            }
+            _ = try? await authService.fetchUserProfile()
         }
         .alert("이미지 업로드 실패", isPresented: $showingImageUploadError) {
             Button("확인", role: .cancel) { }
@@ -352,7 +352,7 @@ struct AccountSettingsView: View {
 
                 Button(action: { showingImagePicker = true }) {
                     Image(systemName: "camera.fill")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.suite(size: 10, weight: .semibold))
                         .foregroundColor(.white)
                         .padding(6)
                         .background(SMAPTheme.Color.primary)
@@ -384,7 +384,7 @@ struct AccountSettingsView: View {
         .frame(maxWidth: .infinity)
         .background(
             LinearGradient(
-                gradient: Gradient(colors: [SMAPTheme.Color.primary, Color(red: 102/255, green: 126/255, blue: 234/255)]),
+                gradient: Gradient(colors: [SMAPTheme.Color.primary, SMAPTheme.Accent.primarySoft]),
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
@@ -436,20 +436,20 @@ struct AccountSettingsView: View {
                 HStack(spacing: 12) {
                     // 로그아웃 아이콘
                     Image(systemName: "rectangle.portrait.and.arrow.right")
-                        .font(.system(size: 15, weight: .medium))
+                        .font(.suite(size: 15, weight: .medium))
                         .foregroundColor(.white)
                         .frame(width: 28, height: 28)
-                        .background(Color.red.opacity(0.8))
+                        .background(SMAPTheme.Color.error.opacity(0.8))
                         .cornerRadius(6)
 
                     Text("로그아웃")
                         .font(.suite(size: 16))
-                        .foregroundColor(.red)
+                        .foregroundColor(SMAPTheme.Color.error)
 
                     Spacer()
 
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.suite(size: 13, weight: .semibold))
                         .foregroundColor(Color(UIColor.tertiaryLabel))
                 }
                 .padding(.horizontal, 16)
@@ -462,12 +462,39 @@ struct AccountSettingsView: View {
     }
 
     private var withdrawLink: some View {
-        NavigationLink(destination: WithdrawView()) {
-            Text("회원탈퇴")
-                .font(.suite(size: 14))
-                .foregroundColor(.secondary)
+        // Destructive 액션 — 실수로 탭하지 않도록 confirmation 경유.
+        // 숨겨진 NavigationLink 를 통해 isActive 플래그로 이동 제어.
+        ZStack {
+            NavigationLink(isActive: $isWithdrawActive) {
+                WithdrawView()
+            } label: {
+                EmptyView()
+            }
+            .hidden()
+
+            Button {
+                HapticManager.shared.impact(style: .medium)
+                showingWithdrawConfirm = true
+            } label: {
+                Text("회원탈퇴")
+                    .font(.suite(size: 14))
+                    .foregroundColor(.secondary)
+                    .underline()
+                    .frame(minHeight: 44) // HIG 터치 타겟
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel("회원탈퇴")
+            .accessibilityHint("계정 영구 삭제 화면으로 이동 전 확인이 표시됩니다")
         }
         .padding(.top, 8)
+        .alert("회원탈퇴", isPresented: $showingWithdrawConfirm) {
+            Button("취소", role: .cancel) {}
+            Button("계속", role: .destructive) {
+                isWithdrawActive = true
+            }
+        } message: {
+            Text("계정 영구 삭제는 되돌릴 수 없습니다. 계속 진행하시겠습니까?")
+        }
     }
 
     private var defaultAvatar: some View {
@@ -478,17 +505,13 @@ struct AccountSettingsView: View {
     }
 
     private func uploadImage() {
-        guard let image = inputImage else {
-            print("❌ [AccountSettingsView] inputImage가 nil")
-            return
-        }
-        guard let imageData = image.jpegData(compressionQuality: 0.7) else {
-            print("❌ [AccountSettingsView] JPEG 변환 실패")
+        guard let image = inputImage,
+              let imageData = image.jpegData(compressionQuality: 0.7) else {
             return
         }
 
-        print("📸 [AccountSettingsView] 이미지 업로드 시작 - 크기: \(imageData.count) bytes")
         isLoadingImage = true
+        HapticManager.shared.impact(style: .light)
 
         Task {
             do {
@@ -496,11 +519,10 @@ struct AccountSettingsView: View {
                 await MainActor.run {
                     isLoadingImage = false
                     if response.success {
-                        print("✅ [AccountSettingsView] 이미지 업로드 성공")
+                        HapticManager.shared.notification(type: .success)
                         inputImage = nil
-                        // selectedImage는 유지 (성공 시 즉시 표시 유지)
                     } else {
-                        print("❌ [AccountSettingsView] 서버 응답 실패: \(response.message)")
+                        HapticManager.shared.notification(type: .error)
                         selectedImage = nil
                         inputImage = nil
                         imageUploadErrorMessage = response.message
@@ -511,8 +533,8 @@ struct AccountSettingsView: View {
                 await MainActor.run {
                     isLoadingImage = false
                     inputImage = nil
-                    selectedImage = nil // Revert on failure
-                    print("❌ [AccountSettingsView] 프로필 이미지 업로드 실패: \(error)")
+                    selectedImage = nil
+                    HapticManager.shared.notification(type: .error)
                     imageUploadErrorMessage = error.localizedDescription
                     showingImageUploadError = true
                 }
@@ -573,7 +595,7 @@ struct SettingsRowView: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 15, weight: .medium))
+                .font(.suite(size: 15, weight: .medium))
                 .foregroundColor(.white)
                 .frame(width: 28, height: 28)
                 .background(iconColor)
@@ -586,7 +608,7 @@ struct SettingsRowView: View {
             Spacer()
 
             Image(systemName: "chevron.right")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.suite(size: 13, weight: .semibold))
                 .foregroundColor(Color(UIColor.tertiaryLabel))
         }
         .padding(.horizontal, 16)
@@ -603,7 +625,7 @@ struct SettingsInfoRowView: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 14, weight: .medium))
+                .font(.suite(size: 14, weight: .medium))
                 .foregroundColor(.white)
                 .frame(width: 28, height: 28)
                 .background(iconColor)
@@ -634,7 +656,7 @@ struct PremiumBadgeCard: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .bold))
+                    .font(.suite(size: 12, weight: .bold))
                 Text(title)
                     .font(.suite(size: 12, weight: .medium))
             }
@@ -663,7 +685,7 @@ struct PremiumActionRow: View {
     var body: some View {
         HStack(spacing: 14) {
             Image(systemName: icon)
-                .font(.system(size: 20))
+                .font(.suite(size: 20))
                 .foregroundColor(iconColor)
                 .frame(width: 36, height: 36)
                 .background(iconColor.opacity(0.12))
@@ -681,7 +703,7 @@ struct PremiumActionRow: View {
             Spacer()
 
             Image(systemName: "chevron.right")
-                .font(.system(size: 14, weight: .semibold))
+                .font(.suite(size: 14, weight: .semibold))
                 .foregroundColor(.gray.opacity(0.4))
         }
         .padding(14)
@@ -696,7 +718,7 @@ struct AccountInfoRowV2: View {
     var body: some View {
         HStack(spacing: 14) {
             Image(systemName: icon)
-                .font(.system(size: 14))
+                .font(.suite(size: 14))
                 .foregroundColor(.gray)
                 .frame(width: 36, height: 36)
                 .background(Color.gray.opacity(0.08))
@@ -724,7 +746,7 @@ struct AccountActionRow: View {
     var body: some View {
         HStack {
             Image(systemName: icon)
-                .font(.system(size: 16))
+                .font(.suite(size: 16))
                 .foregroundColor(.indigo)
                 .frame(width: 24)
 
@@ -735,7 +757,7 @@ struct AccountActionRow: View {
             Spacer()
 
             Image(systemName: "chevron.right")
-                .font(.system(size: 14, weight: .semibold))
+                .font(.suite(size: 14, weight: .semibold))
                 .foregroundColor(.gray.opacity(0.3))
         }
         .padding()

@@ -18,16 +18,25 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -39,6 +48,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
+import com.dmonster.smap.ui.common.rememberSmapHaptics
+import com.dmonster.smap.ui.theme.AccentColors
 import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.SuiteFont
 import android.util.Log
@@ -70,6 +81,7 @@ fun LocationDetailSheet(
 ) {
     val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false) // 전체 화면 확장을 위해 false로 설정
+    val haptics = rememberSmapHaptics()
     
     // Helper to close with animation
     val closeWithAnimation: (onComplete: () -> Unit) -> Unit = { onComplete ->
@@ -82,44 +94,80 @@ fun LocationDetailSheet(
         }
     }
 
-    var isEditMode by remember { mutableStateOf(isNew) }
-    
-    // Form States
-    var name by remember(location, pendingInfo) { 
-        mutableStateOf(pendingInfo?.first ?: location?.name ?: "") 
+    var isEditMode by rememberSaveable { mutableStateOf(isNew) }
+
+    // Form States (rememberSaveable: 회전/프로세스 복귀 시 입력 보존)
+    // location/pendingInfo 가 바뀌면 키가 달라지며 자동으로 재초기화된다.
+    val locationKey = location?.sltIdx?.toString() ?: "new"
+    var name by rememberSaveable(locationKey, pendingInfo) {
+        mutableStateOf(pendingInfo?.first ?: location?.name ?: "")
     }
-    var address by remember(location, pendingInfo) { 
-        mutableStateOf(pendingInfo?.second ?: location?.address ?: "") 
+    var address by rememberSaveable(locationKey, pendingInfo) {
+        mutableStateOf(pendingInfo?.second ?: location?.address ?: "")
     }
-    var lat by remember(location, pendingLocation) {
+    var lat by rememberSaveable(locationKey, pendingLocation) {
         mutableStateOf(pendingLocation?.first ?: location?.latitude ?: 0.0)
     }
-    var lng by remember(location, pendingLocation) {
+    var lng by rememberSaveable(locationKey, pendingLocation) {
         mutableStateOf(pendingLocation?.second ?: location?.longitude ?: 0.0)
     }
-    var memo by remember(location) { mutableStateOf(location?.memo ?: pendingInfo?.third ?: "") }
-    var enterAlarm by remember(location) { mutableStateOf(location?.sltEnterAlarm ?: "Y") }
-    
-    var showMemberSelector by remember { mutableStateOf(false) }
+    var memo by rememberSaveable(locationKey) { mutableStateOf(location?.memo ?: pendingInfo?.third ?: "") }
+    var enterAlarm by rememberSaveable(locationKey) { mutableStateOf(location?.sltEnterAlarm ?: "Y") }
+
+    var showMemberSelector by rememberSaveable { mutableStateOf(false) }
+    var showUnsavedChangesDialog by rememberSaveable { mutableStateOf(false) }
+
+    // 변경사항 감지 — 닫기 확인용
+    val hasUnsavedChanges: () -> Boolean = {
+        when {
+            !(isEditMode || isNew) -> false
+            isNew -> name.isNotBlank() || address.isNotBlank() || memo.isNotBlank()
+            else -> {
+                val orig = location
+                orig != null && (
+                    name != (orig.name) ||
+                    address != (orig.address) ||
+                    (memo.ifBlank { null }) != orig.memo ||
+                    enterAlarm != orig.sltEnterAlarm
+                )
+            }
+        }
+    }
+
+    val attemptDismiss: () -> Unit = {
+        if (hasUnsavedChanges()) {
+            showUnsavedChangesDialog = true
+        } else {
+            closeWithAnimation(onDismiss)
+        }
+    }
     
 
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {
+            // 스와이프/스크림 탭으로 닫힐 때도 미저장 변경 확인
+            if (hasUnsavedChanges()) {
+                showUnsavedChangesDialog = true
+            } else {
+                onDismiss()
+            }
+        },
         sheetState = sheetState,
         dragHandle = { BottomSheetDefaults.DragHandle() },
-        containerColor = Color(0xFFF2F2F7),
+        containerColor = BrandColors.InputBackground,
         tonalElevation = 0.dp,
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     ) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            color = Color(0xFFF2F2F7),
+            color = BrandColors.InputBackground,
             tonalElevation = 0.dp
         ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
+                .imePadding()
                 .padding(bottom = 40.dp)
         ) {
             // Header Actions
@@ -130,7 +178,7 @@ fun LocationDetailSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(onClick = { closeWithAnimation(onDismiss) }) {
+                TextButton(onClick = { attemptDismiss() }) {
                     Text("닫기", color = BrandColors.Primary, fontSize = 16.sp, fontFamily = SuiteFont)
                 }
                 
@@ -147,7 +195,8 @@ fun LocationDetailSheet(
                 
                 if ((isEditMode || isNew) && canManage) {
                     TextButton(
-                        onClick = { 
+                        onClick = {
+                            haptics.medium()
                             onSave(name, address, lat, lng, memo.ifBlank { null }, enterAlarm)
                         },
                         enabled = name.isNotBlank() && address.isNotBlank() && !isLoading
@@ -186,7 +235,7 @@ fun LocationDetailSheet(
                         modifier = Modifier
                             .size(72.dp)
                             .background(
-                                Brush.linearGradient(listOf(BrandColors.Primary, Color(0xFF9333EA))),
+                                Brush.linearGradient(listOf(BrandColors.Primary, AccentColors.PrimarySoft)),
                                 CircleShape
                             ),
                         contentAlignment = Alignment.Center
@@ -209,7 +258,7 @@ fun LocationDetailSheet(
                     ) {
                         Column {
                             InfoRow(icon = Icons.Default.Public, title = "좌표", value = "${String.format("%.6f", loc.latitude)}, ${String.format("%.6f", loc.longitude)}")
-                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Color(0xFFF3F4F6))
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = BrandColors.InputBackground)
                             InfoRow(
                                 icon = Icons.Default.Notifications, 
                                 title = "도착 알림", 
@@ -230,10 +279,10 @@ fun LocationDetailSheet(
                             ActionButton(
                                 text = if (loc.sltEnterAlarm == "Y") "알림 끄기" else "알림 켜기", 
                                 icon = if (loc.sltEnterAlarm == "Y") Icons.Default.NotificationsOff else Icons.Default.NotificationsActive, 
-                                bgColor = Color(0xFFF97316)
+                                bgColor = AccentColors.Orange
                             ) { onNotificationToggle(loc) }
                             Spacer(modifier = Modifier.height(12.dp))
-                            ActionButton(text = "삭제", icon = Icons.Default.Delete, bgColor = Color.Red) { onDelete(loc) }
+                            ActionButton(text = "삭제", icon = Icons.Default.Delete, bgColor = BrandColors.Error) { onDelete(loc) }
                         }
                     }
                 } else {
@@ -253,13 +302,27 @@ fun LocationDetailSheet(
                             ) {
                                 Icon(Icons.Default.Person, null, tint = BrandColors.Primary, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("등록 대상 멤버", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF1F2937), fontFamily = SuiteFont)
+                                Text("등록 대상 멤버", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = BrandColors.TextPrimary, fontFamily = SuiteFont)
                             }
                             
+                            val memberSelectClickable = isNew && members.size > 1
                             Surface(
-                                modifier = Modifier.fillMaxWidth().clickable { 
-                                    if (isNew && members.size > 1) showMemberSelector = true 
-                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .alpha(if (memberSelectClickable) 1f else 0.6f)
+                                    .clickable(
+                                        enabled = memberSelectClickable,
+                                        role = Role.Button
+                                    ) {
+                                        showMemberSelector = true
+                                    }
+                                    .semantics {
+                                        contentDescription = if (memberSelectClickable) {
+                                            "등록 대상 멤버 선택, 현재 ${selectedMember?.displayName ?: "미선택"}"
+                                        } else {
+                                            "등록 대상 멤버 ${selectedMember?.displayName ?: "없음"} (변경 불가)"
+                                        }
+                                    },
                                 shape = RoundedCornerShape(16.dp),
                                 color = Color.White,
                                 shadowElevation = 2.dp,
@@ -288,11 +351,11 @@ fun LocationDetailSheet(
                                                     .data(imageUrl)
                                                     .crossfade(true)
                                                     .build(),
-                                                contentDescription = null,
+                                                contentDescription = "${selectedMember?.displayName ?: "멤버"} 프로필 사진",
                                                 modifier = Modifier.fillMaxSize(),
                                                 contentScale = ContentScale.Crop,
                                                 onState = { state ->
-                                                    if (state is coil.compose.AsyncImagePainter.State.Error) {
+                                                    if (state is coil.compose.AsyncImagePainter.State.Error && BuildConfig.DEBUG) {
                                                         Log.e("LocationDetailSheet", "Avatar Load Error: ${state.result.throwable.message}")
                                                     }
                                                 }
@@ -310,7 +373,7 @@ fun LocationDetailSheet(
                                     }
                                     
                                     if (isNew && members.size > 1) {
-                                        Icon(Icons.Default.ExpandMore, null, tint = Color.Gray)
+                                        Icon(Icons.Default.ExpandMore, contentDescription = null, tint = Color.Gray)
                                     }
                                 }
                             }
@@ -325,11 +388,14 @@ fun LocationDetailSheet(
                          ) {
                             Icon(Icons.Default.Map, null, tint = BrandColors.Primary, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("장소 정보", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF1F2937), fontFamily = SuiteFont)
+                            Text("장소 정보", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = BrandColors.TextPrimary, fontFamily = SuiteFont)
                         }
 
                         Surface(
-                            modifier = Modifier.fillMaxWidth().clickable { onSearchClick() },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(role = Role.Button) { onSearchClick() }
+                                .semantics { contentDescription = "주소 검색으로 장소 찾기" },
                             shape = RoundedCornerShape(12.dp),
                             color = Color.White,
                             shadowElevation = 2.dp,
@@ -339,18 +405,36 @@ fun LocationDetailSheet(
                                 modifier = Modifier.padding(16.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(Icons.Default.Search, null, tint = BrandColors.Primary)
+                                Icon(Icons.Default.Search, contentDescription = null, tint = BrandColors.Primary)
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Text("주소 검색으로 찾기", fontSize = 16.sp, fontWeight = FontWeight.Medium, fontFamily = SuiteFont)
                                 Spacer(modifier = Modifier.weight(1f))
-                                Icon(Icons.Default.ChevronRight, null, tint = Color.Gray)
+                                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.Gray)
                             }
                         }
                         
-                        // Inputs
-                        InputSection(title = "장소 이름 *", value = name, placeholder = "장소 이름을 입력하세요") { name = it }
-                        InputSection(title = "상세 주소 *", value = address, placeholder = "주소를 입력하세요") { address = it }
-                        InputSection(title = "메모", value = memo, placeholder = "메모를 입력하세요 (선택)") { memo = it }
+                        // Inputs — imeAction 연쇄로 키보드 플로우 자연스럽게
+                        InputSection(
+                            title = "장소 이름 *",
+                            value = name,
+                            placeholder = "장소 이름을 입력하세요",
+                            imeAction = ImeAction.Next,
+                            onValueChange = { name = it }
+                        )
+                        InputSection(
+                            title = "상세 주소 *",
+                            value = address,
+                            placeholder = "주소를 입력하세요",
+                            imeAction = ImeAction.Next,
+                            onValueChange = { address = it }
+                        )
+                        InputSection(
+                            title = "메모",
+                            value = memo,
+                            placeholder = "메모를 입력하세요 (선택)",
+                            imeAction = ImeAction.Done,
+                            onValueChange = { memo = it }
+                        )
                     }
                     
                     // Coordinates (Read-only)
@@ -358,12 +442,12 @@ fun LocationDetailSheet(
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 4.dp)) {
                             Icon(Icons.Default.Public, null, tint = BrandColors.Primary, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("좌표", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF1F2937), fontFamily = SuiteFont)
+                            Text("좌표", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = BrandColors.TextPrimary, fontFamily = SuiteFont)
                         }
                         Surface(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
-                            color = Color(0xFFE5E7EB)
+                            color = BrandColors.Border
                         ) {
                             Text(
                                 text = if (lat != 0.0 && lng != 0.0) {
@@ -392,7 +476,7 @@ fun LocationDetailSheet(
                                  Row(verticalAlignment = Alignment.CenterVertically) {
                                      Icon(Icons.Default.Notifications, null, tint = BrandColors.Primary, modifier = Modifier.size(18.dp))
                                      Spacer(modifier = Modifier.width(8.dp))
-                                     Text("도착 알림", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF1F2937), fontFamily = SuiteFont)
+                                     Text("도착 알림", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = BrandColors.TextPrimary, fontFamily = SuiteFont)
                                  }
                                  Spacer(modifier = Modifier.height(4.dp))
                                  Text(
@@ -423,7 +507,7 @@ fun LocationDetailSheet(
                         members = members,
                         selectedMemberId = selectedMember?.mtIdx,
                         onDismiss = { showMemberSelector = false },
-                        onSelect = { 
+                        onSelect = {
                             onMemberSelect(it)
                             showMemberSelector = false
                         }
@@ -432,7 +516,53 @@ fun LocationDetailSheet(
             }
         }
     }
-}
+    }
+
+    if (showUnsavedChangesDialog) {
+        AlertDialog(
+            onDismissRequest = { showUnsavedChangesDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = AccentColors.Orange,
+                    modifier = Modifier.size(36.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "저장하지 않은 변경사항이 있어요",
+                    fontFamily = SuiteFont,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Text(
+                    text = "지금 닫으면 입력한 내용이 사라집니다.\n그래도 닫으시겠습니까?",
+                    fontFamily = SuiteFont,
+                    textAlign = TextAlign.Center
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showUnsavedChangesDialog = false
+                        haptics.warning()
+                        closeWithAnimation(onDismiss)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = BrandColors.Error)
+                ) {
+                    Text("버리기", fontFamily = SuiteFont, color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUnsavedChangesDialog = false }) {
+                    Text("계속 편집", fontFamily = SuiteFont)
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -450,7 +580,7 @@ private fun InfoRow(
     ) {
         Icon(icon, null, tint = BrandColors.Primary, modifier = Modifier.size(24.dp))
         Spacer(modifier = Modifier.width(12.dp))
-        Text(text = title, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF1F2937), fontFamily = SuiteFont)
+        Text(text = title, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = BrandColors.TextPrimary, fontFamily = SuiteFont)
         Spacer(modifier = Modifier.weight(1f))
         if (isToggle) {
             Switch(
@@ -486,22 +616,37 @@ private fun ActionButton(text: String, icon: ImageVector, bgColor: Color, onClic
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun InputSection(title: String, value: String, placeholder: String, onValueChange: (String) -> Unit) {
+private fun InputSection(
+    title: String,
+    value: String,
+    placeholder: String,
+    imeAction: ImeAction = ImeAction.Next,
+    onValueChange: (String) -> Unit
+) {
+    val focusManager = LocalFocusManager.current
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
-            OutlinedTextField(
-                value = value,
-                onValueChange = onValueChange,
-                placeholder = { Text(placeholder, color = Color.Gray.copy(alpha = 0.7f)) },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White,
-                    focusedBorderColor = BrandColors.Primary,
-                    unfocusedBorderColor = Color.Transparent
-                )
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            placeholder = { Text(placeholder, color = Color.Gray.copy(alpha = 0.7f)) },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            keyboardOptions = KeyboardOptions(
+                imeAction = imeAction,
+                keyboardType = KeyboardType.Text
+            ),
+            keyboardActions = KeyboardActions(
+                onNext = { focusManager.moveFocus(androidx.compose.ui.focus.FocusDirection.Down) },
+                onDone = { focusManager.clearFocus() }
+            ),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = Color.White,
+                unfocusedContainerColor = Color.White,
+                focusedBorderColor = BrandColors.Primary,
+                unfocusedBorderColor = Color.Transparent
             )
+        )
     }
 }
 
@@ -520,7 +665,7 @@ fun DeleteLocationDialog(
             Icon(
                 imageVector = Icons.Default.Warning,
                 contentDescription = null,
-                tint = Color.Red,
+                tint = BrandColors.Error,
                 modifier = Modifier.size(48.dp)
             )
         },
@@ -543,12 +688,22 @@ fun DeleteLocationDialog(
             Button(
                 onClick = onConfirm,
                 enabled = !isLoading,
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                colors = ButtonDefaults.buttonColors(containerColor = BrandColors.Error)
             ) {
                 if (isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                        Text("삭제 중...", fontFamily = SuiteFont, color = Color.White)
+                    }
                 } else {
-                    Text("삭제", fontFamily = SuiteFont)
+                    Text("삭제", fontFamily = SuiteFont, color = Color.White)
                 }
             }
         },
@@ -586,7 +741,7 @@ fun LocationSearchSheet(
     ) {
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = Color(0xFFF2F2F7),
+            color = BrandColors.InputBackground,
             tonalElevation = 0.dp
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
@@ -630,12 +785,15 @@ fun LocationSearchSheet(
                     trailingIcon = {
                         if (query.isNotEmpty()) {
                             IconButton(onClick = { onQueryChange("") }) {
-                                Icon(Icons.Default.Clear, null, tint = Color.Gray, modifier = Modifier.size(18.dp))
+                                Icon(Icons.Default.Clear, "검색어 지우기", tint = Color.Gray, modifier = Modifier.size(18.dp))
                             }
                         }
                     },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardOptions = KeyboardOptions(
+                        imeAction = ImeAction.Search,
+                        keyboardType = KeyboardType.Text
+                    ),
                     keyboardActions = KeyboardActions(onSearch = { onSearch() }),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = Color.White,
@@ -756,16 +914,20 @@ private fun MemberSelectorDialog(
                 )
                 
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(members) { member ->
+                    items(members, key = { it.mtIdx }) { member ->
                         val isSelected = member.mtIdx == selectedMemberId
-                        
+
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(if (isSelected) BrandColors.Primary.copy(alpha = 0.1f) else Color.Transparent)
-                                .clickable { onSelect(member) }
+                                .heightIn(min = 48.dp)
+                                .clickable(role = Role.Button) { onSelect(member) }
+                                .semantics {
+                                    contentDescription = "${member.displayName}${if (isSelected) " 선택됨" else ""}"
+                                }
                                 .padding(12.dp)
                         ) {
                             val imageUrl = remember(member.mtFile1) {
@@ -784,12 +946,12 @@ private fun MemberSelectorDialog(
                                 if (imageUrl != null) {
                                     AsyncImage(
                                         model = ImageRequest.Builder(LocalContext.current).data(imageUrl).build(),
-                                        contentDescription = null,
+                                        contentDescription = "${member.displayName} 프로필 사진",
                                         modifier = Modifier.fillMaxSize(),
                                         contentScale = ContentScale.Crop
                                     )
                                 } else {
-                                    Icon(Icons.Default.Person, null, tint = Color.Gray, modifier = Modifier.align(Alignment.Center))
+                                    Icon(Icons.Default.Person, contentDescription = null, tint = Color.Gray, modifier = Modifier.align(Alignment.Center))
                                 }
                             }
                             

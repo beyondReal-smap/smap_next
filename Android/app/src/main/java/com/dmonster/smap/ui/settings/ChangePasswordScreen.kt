@@ -4,22 +4,32 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.dmonster.smap.ui.theme.AccentColors
 import com.dmonster.smap.ui.theme.BrandColors
+import com.dmonster.smap.ui.theme.SettingsColors
 import com.dmonster.smap.ui.theme.SuiteFont
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -32,13 +42,14 @@ fun ChangePasswordScreen(
     val isLoading by viewModel.isLoading.collectAsState()
     val userMessage by viewModel.userMessage.collectAsState()
     
-    var currentPassword by remember { mutableStateOf("") }
-    var newPassword by remember { mutableStateOf("") }
-    var confirmPassword by remember { mutableStateOf("") }
-    
-    var showCurrentPassword by remember { mutableStateOf(false) }
-    var showNewPassword by remember { mutableStateOf(false) }
-    var showConfirmPassword by remember { mutableStateOf(false) }
+    // 입력값은 민감 정보라 세션 동안 유지되더라도 회전 시에는 보존되어야 한다 (rememberSaveable)
+    var currentPassword by rememberSaveable { mutableStateOf("") }
+    var newPassword by rememberSaveable { mutableStateOf("") }
+    var confirmPassword by rememberSaveable { mutableStateOf("") }
+
+    var showCurrentPassword by rememberSaveable { mutableStateOf(false) }
+    var showNewPassword by rememberSaveable { mutableStateOf(false) }
+    var showConfirmPassword by rememberSaveable { mutableStateOf(false) }
     
     var showResultDialog by remember { mutableStateOf(false) }
     var dialogMessage by remember { mutableStateOf("") }
@@ -68,7 +79,8 @@ fun ChangePasswordScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF7F7F7))
+            .background(SettingsColors.PageBackground)
+            .imePadding()
     ) {
         Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
             // Header
@@ -185,7 +197,7 @@ private fun SocialUserNotice(onBack: () -> Unit) {
             Icon(
                 Icons.Default.Shield,
                 contentDescription = null,
-                tint = Color(0xFFFFA726),
+                tint = AccentColors.Orange,
                 modifier = Modifier.size(60.dp)
             )
             Text(
@@ -246,7 +258,7 @@ private fun PasswordChangeForm(
         modifier = Modifier
             .fillMaxWidth()
             .background(
-                Brush.linearGradient(listOf(BrandColors.Primary, Color(0xFF667EEA))),
+                Brush.linearGradient(listOf(BrandColors.Primary, AccentColors.PrimarySoft)),
                 RoundedCornerShape(20.dp)
             )
             .padding(24.dp)
@@ -281,15 +293,17 @@ private fun PasswordChangeForm(
                 value = currentPassword,
                 onValueChange = onCurrentPasswordChange,
                 showPassword = showCurrentPassword,
-                onTogglePassword = onToggleCurrentPassword
+                onTogglePassword = onToggleCurrentPassword,
+                imeAction = ImeAction.Next
             )
-            
+
             PasswordField(
                 label = "새 비밀번호",
                 value = newPassword,
                 onValueChange = onNewPasswordChange,
                 showPassword = showNewPassword,
-                onTogglePassword = onToggleNewPassword
+                onTogglePassword = onToggleNewPassword,
+                imeAction = ImeAction.Next
             )
             
             // Password Strength Indicators
@@ -307,7 +321,8 @@ private fun PasswordChangeForm(
                 value = confirmPassword,
                 onValueChange = onConfirmPasswordChange,
                 showPassword = showConfirmPassword,
-                onTogglePassword = onToggleConfirmPassword
+                onTogglePassword = onToggleConfirmPassword,
+                imeAction = ImeAction.Done
             )
             
             if (confirmPassword.isNotEmpty()) {
@@ -318,14 +333,14 @@ private fun PasswordChangeForm(
                     Icon(
                         if (isPasswordMatch) Icons.Default.CheckCircle else Icons.Default.Cancel,
                         contentDescription = null,
-                        tint = if (isPasswordMatch) Color(0xFF4CAF50) else Color(0xFFE53935),
+                        tint = if (isPasswordMatch) BrandColors.Success else BrandColors.Error,
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
                         text = if (isPasswordMatch) "비밀번호가 일치합니다" else "비밀번호가 일치하지 않습니다",
                         fontFamily = SuiteFont,
                         fontSize = 12.sp,
-                        color = if (isPasswordMatch) Color(0xFF4CAF50) else Color(0xFFE53935)
+                        color = if (isPasswordMatch) BrandColors.Success else BrandColors.Error
                     )
                 }
             }
@@ -354,8 +369,10 @@ private fun PasswordField(
     value: String,
     onValueChange: (String) -> Unit,
     showPassword: Boolean,
-    onTogglePassword: () -> Unit
+    onTogglePassword: () -> Unit,
+    imeAction: ImeAction = ImeAction.Next
 ) {
+    val focusManager = LocalFocusManager.current
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(label, fontFamily = SuiteFont, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.Black)
         OutlinedTextField(
@@ -364,14 +381,27 @@ private fun PasswordField(
             singleLine = true,
             visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
             trailingIcon = {
-                IconButton(onClick = onTogglePassword) {
+                IconButton(
+                    onClick = onTogglePassword,
+                    modifier = Modifier.size(48.dp)
+                ) {
                     Icon(
                         if (showPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                        contentDescription = null,
+                        contentDescription = if (showPassword) "$label 숨기기" else "$label 표시",
                         tint = Color.Gray
                     )
                 }
             },
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Password,
+                imeAction = imeAction,
+                autoCorrectEnabled = false,
+                capitalization = KeyboardCapitalization.None
+            ),
+            keyboardActions = KeyboardActions(
+                onNext = { focusManager.moveFocus(FocusDirection.Down) },
+                onDone = { focusManager.clearFocus() }
+            ),
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
@@ -391,14 +421,14 @@ private fun PasswordRequirement(text: String, met: Boolean) {
         Icon(
             if (met) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
             contentDescription = null,
-            tint = if (met) Color(0xFF4CAF50) else Color.Gray.copy(alpha = 0.4f),
+            tint = if (met) BrandColors.Success else Color.Gray.copy(alpha = 0.4f),
             modifier = Modifier.size(14.dp)
         )
         Text(
             text = text,
             fontFamily = SuiteFont,
             fontSize = 12.sp,
-            color = if (met) Color(0xFF4CAF50) else Color.Gray.copy(alpha = 0.6f)
+            color = if (met) BrandColors.Success else Color.Gray.copy(alpha = 0.6f)
         )
     }
 }

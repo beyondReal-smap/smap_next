@@ -22,7 +22,17 @@ actor LocationUploader {
     private var pending: [LocationData] = []
     private let maxQueueSize = 100
     private var lastHeartbeatLocation: LocationData?
+    // heartbeat 좌표가 갱신된 시각. 너무 오래된 좌표를 "지금"으로 반복 전송해
+    // 활동로그가 멈춰 있는 곳을 잘못 표시하지 않도록 신선도 검증에 사용. (Android HEARTBEAT_LAST_LOC_MAX_AGE_MS 대응)
+    private var lastHeartbeatLocationAt: Date?
+    // Android LocationService.HEARTBEAT_LAST_LOC_MAX_AGE_MS와 동일한 30분 정책.
+    // 이 시각보다 오래된 좌표는 "지금"으로 잘못 표시될 수 있어 송신을 생략한다.
+    private let heartbeatLocationMaxAge: TimeInterval = 30 * 60   // 30 min
     private let pedometer = CMPedometer()
+
+    // flush가 진행 중일 때 중복 진입을 막아 같은 데이터를 두 번 보내거나
+    // pending에서 두 번 제거되는 경합을 차단한다.
+    private var isFlushing = false
 
     private var batchTask: Task<Void, Never>?
     private var heartbeatTask: Task<Void, Never>?
@@ -44,6 +54,7 @@ actor LocationUploader {
     func enqueue(_ location: LocationData) {
         pending.append(location)
         lastHeartbeatLocation = location
+        lastHeartbeatLocationAt = Date()
         if pending.count > maxQueueSize {
             pending.removeFirst(pending.count - maxQueueSize)
         }
@@ -94,6 +105,13 @@ actor LocationUploader {
             if mtIdx.isEmpty { print("[LocationUploader] flush 스킵 - mtIdx 비어있음") }
             return
         }
+        guard !isFlushing else {
+            print("[LocationUploader] flush 스킵 - 이전 flush 진행 중")
+            return
+        }
+        isFlushing = true
+        defer { isFlushing = false }
+
         print("[LocationUploader] flush 시작 - \(pending.count)건 전송 (mtIdx: \(mtIdx))")
 
         let toSend = pending
@@ -110,6 +128,13 @@ actor LocationUploader {
 
     private func sendHeartbeat() async {
         guard let location = lastHeartbeatLocation, !mtIdx.isEmpty else { return }
+        // 신선도 검증: 좌표가 너무 오래되었으면 "지금"으로 잘못 표시하지 않기 위해 송신 생략.
+        // (서비스가 정지 후 깨어나 옛 좌표만 가진 채 STATIONARY로 유지되는 케이스 방지)
+        if let updatedAt = lastHeartbeatLocationAt,
+           Date().timeIntervalSince(updatedAt) > heartbeatLocationMaxAge {
+            print("[LocationUploader] heartbeat 스킵 - lastLocation stale (\(Int(Date().timeIntervalSince(updatedAt)))s old)")
+            return
+        }
         let _ = await sendSingle(location)
     }
 

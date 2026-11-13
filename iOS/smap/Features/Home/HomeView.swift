@@ -30,7 +30,6 @@ struct HomeView: View {
                 .task {
                     // 최초 진입 시에만 데이터 로드
                     if viewModel.groups.isEmpty {
-                        print("👀 [HomeView] View appeared - triggering fetchInitialData")
                         await viewModel.fetchInitialData()
                     }
                 }
@@ -38,8 +37,8 @@ struct HomeView: View {
                     viewModel.resumeUpdates()
                 }
 
-            // 2. Header
-            VStack {
+            // 2. Header + 오늘 일정 미리보기
+            VStack(spacing: 8) {
                 HomeHeaderView(
                     groups: viewModel.groups,
                     selectedGroup: $viewModel.selectedGroup,
@@ -55,6 +54,12 @@ struct HomeView: View {
                         showSettings = true
                     }
                 )
+
+                // 일정·위치 공유 앱 성격 강화 — 홈에서 오늘의 진행 중/다음 일정 바로 확인.
+                TodaySchedulePreviewView(schedules: viewModel.homePreviewSchedules) { _ in
+                    HapticManager.shared.impact(style: .light)
+                }
+
                 Spacer()
             }
             .sheet(isPresented: $showNotifications, onDismiss: {

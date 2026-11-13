@@ -11,13 +11,22 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import android.graphics.Color as AndroidColor
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.dmonster.smap.ui.common.rememberSmapHaptics
+import com.dmonster.smap.ui.theme.ActivityLogColors
 import com.dmonster.smap.ui.theme.BrandColors
+import com.dmonster.smap.ui.theme.SuiteFont
 import com.dmonster.smap.ui.myplace.FloatingActionPlaceButton
 import com.dmonster.smap.ui.home.MapLoadingOverlay
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
@@ -36,6 +45,8 @@ import com.dmonster.smap.R
 fun ActivityLogScreen(
     viewModel: ActivityLogViewModel = hiltViewModel()
 ) {
+    val haptics = rememberSmapHaptics()
+
     // Collect States
     val groups by viewModel.groups.collectAsState()
     val selectedGroup by viewModel.selectedGroup.collectAsState()
@@ -70,8 +81,7 @@ fun ActivityLogScreen(
         isMapLoading = false
     }
     
-    // UI States
-    val showGroupSelector by viewModel.showGroupSelector.collectAsState()
+    // UI States — showGroupSelector 는 사이드바 내부에서 직접 제어하므로 여기서 구독 불필요
     val showMemberSidebar by viewModel.showMemberSidebar.collectAsState()
     val memberActivityStats by viewModel.memberActivityStats.collectAsState()
     val selectedDate by viewModel.selectedDate.collectAsState()
@@ -132,10 +142,11 @@ fun ActivityLogScreen(
         }
     }
 
-    // Handle error messages via snackbar
+    // Handle error messages via snackbar — Haptic 동반
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(errorMessage) {
         errorMessage?.let {
+            haptics.error()
             snackbarHostState.showSnackbar(it)
             viewModel.clearError()
         }
@@ -172,11 +183,11 @@ fun ActivityLogScreen(
                         if (stayLat != null && stayLng != null && stayLat != 0.0 && stayLng != 0.0) {
                             val duration = stay.duration
                             val colorInt = when {
-                                duration >= 300 -> AndroidColor.parseColor("#FF6B6B") // Vivid Red
-                                duration >= 120 -> AndroidColor.parseColor("#FF9F43") // Vivid Orange
-                                duration >= 60 -> AndroidColor.parseColor("#FFD600") // Vivid Yellow
-                                duration >= 30 -> AndroidColor.parseColor("#4CAF50") // Vivid Green
-                                else -> AndroidColor.parseColor("#2196F3") // Vivid Blue
+                                duration >= 300 -> ActivityLogColors.StayLong.toArgb()
+                                duration >= 120 -> ActivityLogColors.StayMedium.toArgb()
+                                duration >= 60 -> ActivityLogColors.StayShort.toArgb()
+                                duration >= 30 -> ActivityLogColors.StayBrief.toArgb()
+                                else -> ActivityLogColors.StayInstant.toArgb()
                             }
                             
                             val baseSizePx = when {
@@ -434,22 +445,39 @@ fun ActivityLogScreen(
             )
         }
         
-        // Empty state overlay for map when no location data
+        // Empty state overlay for map when no location data — 2줄 가이드 패턴
         if (locationLogs.isEmpty() && selectedMember != null && !isLoading && !isLoadingLogs && !isMapLoading) {
             Box(
                 modifier = Modifier.fillMaxSize().zIndex(5f),
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        "활동 데이터가 없습니다",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = Color.DarkGray
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .background(Color.White.copy(alpha = 0.9f), CircleShape)
+                        .padding(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.DirectionsWalk,
+                        contentDescription = null,
+                        tint = BrandColors.TextSecondary.copy(alpha = 0.5f),
+                        modifier = Modifier.size(48.dp)
                     )
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        "선택한 날짜에 기록된 활동이 없습니다",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.Gray
+                        text = "활동 데이터가 없어요",
+                        fontSize = 15.sp,
+                        fontFamily = SuiteFont,
+                        fontWeight = FontWeight.SemiBold,
+                        color = BrandColors.TextPrimary
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "선택한 날짜에 기록된 활동이 없습니다.\n다른 날짜를 선택하거나 멤버를 변경해보세요.",
+                        fontSize = 12.sp,
+                        fontFamily = SuiteFont,
+                        color = BrandColors.TextSecondary,
+                        textAlign = TextAlign.Center
                     )
                 }
             }

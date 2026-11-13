@@ -59,7 +59,7 @@ struct GroupListView: View {
                         viewModel.fetchGroups()
                     }
                     
-                    // Floating Action Button for Create Group
+                    // Floating Action Button for Create Group — 타 화면 FAB(홈/내장소/위치기록)와 위치·그림자 통일.
                     Button(action: {
                         showCreateModal = true
                     }) {
@@ -68,13 +68,19 @@ struct GroupListView: View {
                             .foregroundColor(.white)
                             .frame(width: 56, height: 56)
                             .background(
-                                LinearGradient(gradient: Gradient(colors: [Color.yellow, Color.orange]), startPoint: .topLeading, endPoint: .bottomTrailing)
+                                LinearGradient(
+                                    gradient: Gradient(colors: [SMAPTheme.Color.primary, SMAPTheme.Color.primaryDark]),
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
                             )
                             .clipShape(Circle())
-                            .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 5)
+                            .shadow(color: SMAPTheme.Color.primary.opacity(0.3), radius: 12, x: 0, y: 8)
                     }
                     .accessibilityLabel("그룹 추가")
-                    .padding()
+                    .accessibilityAddTraits(.isButton)
+                    .padding(.trailing, 20)
+                    .padding(.bottom, 20)
                 }
             }
             .background(Color(white: 0.98)) // Light gray background
@@ -179,7 +185,7 @@ struct StatsCardsView: View {
                     }
                     Spacer()
                     Image(systemName: "square.stack.3d.up.fill")
-                        .font(.custom("SUITE-Bold", size: 28))
+                        .font(.suite(size: 28, weight: .bold))
                         .foregroundColor(Color(red: 191/255, green: 219/255, blue: 254/255).opacity(0.5)) // text-blue-200
                 }
             }
@@ -189,8 +195,8 @@ struct StatsCardsView: View {
                 LinearGradient(gradient: Gradient(colors: [SMAPTheme.Color.primary, SMAPTheme.Color.primaryDark]), startPoint: .leading, endPoint: .trailing)
             )
             .cornerRadius(16)
-            .shadow(color: Color.blue.opacity(0.3), radius: 8, x: 0, y: 4)
-            
+            .shadow(color: SMAPTheme.Color.primary.opacity(0.25), radius: 4, x: 0, y: 2)
+
             // Total Members Card
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
@@ -204,17 +210,17 @@ struct StatsCardsView: View {
                     }
                     Spacer()
                     Image(systemName: "person.2.fill")
-                        .font(.custom("SUITE-Bold", size: 28))
+                        .font(.suite(size: 28, weight: .bold))
                         .foregroundColor(Color(red: 251/255, green: 207/255, blue: 232/255).opacity(0.5)) // text-pink-200
                 }
             }
             .padding()
             .frame(maxWidth: .infinity)
             .background(
-                LinearGradient(gradient: Gradient(colors: [Color(red: 219/255, green: 39/255, blue: 119/255), Color(red: 190/255, green: 24/255, blue: 93/255)]), startPoint: .leading, endPoint: .trailing)
+                LinearGradient(gradient: Gradient(colors: [SMAPTheme.Accent.pink, SMAPTheme.Accent.pinkDeep]), startPoint: .leading, endPoint: .trailing)
             )
             .cornerRadius(16)
-            .shadow(color: Color.pink.opacity(0.3), radius: 8, x: 0, y: 4)
+            .shadow(color: SMAPTheme.Accent.pink.opacity(0.25), radius: 4, x: 0, y: 2)
         }
         .padding(.horizontal)
     }
@@ -251,23 +257,26 @@ struct InviteCodeSection: View {
             .background(Color.white)
             .cornerRadius(12)
             .overlay(
+                // 입력 영역 stroke — 브랜드 primary tint로 통일 (FAB/가입 버튼과 조화)
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+                    .stroke(SMAPTheme.Color.primary.opacity(0.2), lineWidth: 1)
             )
             
             Button(action: onJoin) {
                 Text("가입")
                     .font(.suite(size: 16, weight: .bold))
                     .foregroundColor(.white)
+                    .frame(minHeight: 44) // HIG 터치 타겟
                     .padding(.horizontal, 24)
-                    .padding(.vertical, 16)
+                    .padding(.vertical, 12)
                     .background(
-                        LinearGradient(gradient: Gradient(colors: [Color.orange, Color.yellow]), startPoint: .leading, endPoint: .trailing)
+                        inviteCode.isEmpty ? Color.gray.opacity(0.4) : SMAPTheme.Color.primary
                     )
                     .cornerRadius(12)
-                    .shadow(color: Color.orange.opacity(0.3), radius: 4, x: 0, y: 2)
+                    .shadow(color: SMAPTheme.Color.primary.opacity(0.2), radius: 4, x: 0, y: 2)
             }
             .disabled(inviteCode.isEmpty)
+            .accessibilityHint(inviteCode.isEmpty ? "초대 코드를 먼저 입력하세요" : "입력한 코드로 그룹에 가입")
         }
         .padding(.horizontal)
     }
@@ -276,29 +285,17 @@ struct InviteCodeSection: View {
 struct GroupCard: View {
     let group: SmapGroup
     let index: Int
-    
-    // Random gradient for visual variety (deterministic based on ID)
-    private var cardGradient: LinearGradient {
-        let colors = [
-            [Color(red: 240/255, green: 249/255, blue: 255/255), Color(red: 219/255, green: 234/255, blue: 254/255)], // Blueish
-            [Color(red: 240/255, green: 253/255, blue: 244/255), Color(red: 220/255, green: 252/255, blue: 231/255)], // Greenish
-            [Color(red: 255/255, green: 247/255, blue: 237/255), Color(red: 255/255, green: 237/255, blue: 213/255)]  // Orangish
-        ]
-        let index = abs(group.sgt_idx) % colors.count
-        return LinearGradient(gradient: Gradient(colors: colors[index]), startPoint: .topLeading, endPoint: .bottomTrailing)
-    }
-    
+
     var body: some View {
-        HStack(spacing: 16) {
-            // Icon
+        HStack(spacing: 14) {
+            // Icon — flat 스타일, 브랜드 tint 배경
             ZStack {
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.white)
+                    .fill(SMAPTheme.Color.primary.opacity(0.08))
                     .frame(width: 52, height: 52)
-                    .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
-                
+
                 let iconUrl = URL(string: "https://nextstep.aiagnt.kr/images/group\((index % 2) + 1).webp")
-                
+
                 AsyncImage(url: iconUrl) { phase in
                     switch phase {
                     case .success(let image):
@@ -306,7 +303,8 @@ struct GroupCard: View {
                             .aspectRatio(contentMode: .fill)
                     case .failure(_):
                         Image(systemName: "person.3.fill")
-                            .foregroundColor(.blue.opacity(0.6))
+                            .foregroundColor(SMAPTheme.Color.primary.opacity(0.8))
+                            .font(.suite(size: 22))
                     case .empty:
                         ProgressView()
                     @unknown default:
@@ -316,45 +314,64 @@ struct GroupCard: View {
                 .frame(width: 48, height: 48)
                 .cornerRadius(10)
             }
-            
-            // Info
-            VStack(alignment: .leading, spacing: 4) {
+            .accessibilityHidden(true)
+
+            // Info — 제목 / 메모 / 보조정보 3단 위계
+            VStack(alignment: .leading, spacing: 3) {
                 Text(group.sgt_title ?? "이름 없음")
-                    .font(.suite(size: 18, weight: .bold)) // Using Suite font as per design
+                    .font(.suite(size: 17, weight: .bold))
                     .foregroundColor(.primary)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                
+                    .minimumScaleFactor(0.9)
+
                 Text(group.sgt_memo ?? "그룹 설명이 없습니다")
-                    .font(.suite(size: 14))
+                    .font(.suite(size: 13))
                     .foregroundColor(.secondary)
                     .lineLimit(1)
-                
-                HStack(spacing: 12) {
-                    Label("\(group.member_count ?? 0)명", systemImage: "person.2.fill")
-                        .font(.suite(size: 14))
-                    
+
+                // 보조정보: 멤버수(좌) + 날짜(우). Spacer 로 자연 분리되어 짤림 방지.
+                HStack(spacing: 6) {
+                    Image(systemName: "person.2.fill")
+                        .font(.suite(size: 11, weight: .semibold))
+                    Text("\(group.member_count ?? 0)명")
+                        .font(.suite(size: 12, weight: .medium))
+                        .monospacedDigit()
+
                     if let dateStr = group.sgt_wdate {
-                        // Simple date formatting
-                        let formattedDate = dateStr.components(separatedBy: "T").first ?? dateStr
-                        Text(formattedDate)
-                            .font(.suite(size: 14))
-                            .foregroundColor(.blue)
+                        Text("·")
+                            .font(.suite(size: 12))
+                            .foregroundColor(.secondary)
+                        Text(dateStr.components(separatedBy: "T").first ?? dateStr)
+                            .font(.suite(size: 12))
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
                     }
                 }
                 .foregroundColor(SMAPTheme.Color.primary)
                 .padding(.top, 4)
             }
-            
-            Spacer()
-            
+
+            Spacer(minLength: 4)
+
             Image(systemName: "chevron.right")
-                .foregroundColor(.secondary)
+                .font(.suite(size: 13, weight: .semibold))
+                .foregroundColor(Color.secondary.opacity(0.6))
         }
-        .padding()
-        .background(cardGradient)
-        .cornerRadius(16)
-        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 4)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 14)
+        .frame(minHeight: 80) // 안정적인 Row 높이, 멤버 몇 명이든 레이아웃 일관
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white)
+        )
+        .overlay(
+            // 그림자 대신 가벼운 stroke로 분리감. iOS 최신 flat 트렌드와 정합.
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.black.opacity(0.06), lineWidth: 1)
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(group.sgt_title ?? "이름 없음") 그룹, 멤버 \(group.member_count ?? 0)명")
+        .accessibilityHint("상세 보기")
     }
 }
 
@@ -396,7 +413,7 @@ struct CreateGroupView: View {
     enum Field { case title, memo }
     
     
-    private let pinkColor = Color(red: 236/255, green: 72/255, blue: 153/255)
+    private var pinkColor: Color { SMAPTheme.Accent.pink }
     
     var body: some View {
         NavigationStack {
@@ -600,7 +617,7 @@ struct CreateGroupView: View {
                     }
                     .padding(.horizontal, 20)
                     .padding(.vertical, 12)
-                    .background(Color.yellow.opacity(0.1))
+                    .background(SMAPTheme.Accent.crown.opacity(0.1))
                     .cornerRadius(12)
                     .padding(.horizontal, 24)
                     .padding(.bottom, 30)

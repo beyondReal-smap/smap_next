@@ -58,6 +58,13 @@ class MainActivity : ComponentActivity() {
         // 딥링크 처리
         handleDeepLink(intent)
 
+        // 🔥 [FCM] 로그인 상태로 앱에 진입할 때마다 최신 FCM 토큰을 서버에 멱등 재등록한다.
+        // 기존 구조는 onNewToken(토큰 회전 시에만 발화, 수개월 주기)에만 의존하여
+        // 이미 로그인된 사용자의 죽은 토큰(UnregisteredError)을 갱신하지 못했고,
+        // 그 결과 푸시 전송이 전체적으로 중단됐다(서버 토큰 보유율 15.6%).
+        // 앱 진입마다 getToken→/member-fcm-token/register 를 호출해 등록 파이프라인을 복구한다.
+        ensureFcmTokenRegistered()
+
         setContent {
             SmapTheme {
                 val locationDeniedOverlay by showLocationDeniedOverlay
@@ -106,6 +113,15 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                // 알림 권한을 위치 권한 흐름과 독립적으로 요청하기 위한 런처
+                // (위치 권한을 이미 보유한 사용자는 기존 흐름상 알림 권한을 영영 요청받지 못해
+                //  토큰이 등록돼도 푸시가 표시되지 않는 2차 장애가 발생했다.)
+                val notificationOnlyLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.RequestPermission()
+                ) { granted ->
+                    Log.d(TAG, "[PERM] POST_NOTIFICATIONS(독립 요청) granted=$granted")
+                }
+
                 val notificationPermissionLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestPermission()
                 ) { _ ->
@@ -130,6 +146,17 @@ class MainActivity : ComponentActivity() {
                         // "앱을 사용할 때" 또는 "항상 허용" — 서비스 시작
                         startLocationService()
                         requestActivityRecognitionIfNeeded(activityRecognitionLauncher)
+                        // Android 13+ 알림 권한을 위치 권한과 독립적으로 보장한다.
+                        // 위치 권한을 이미 보유한 사용자는 기존 흐름(else 분기)을 타지 않아
+                        // 알림 권한을 영영 요청받지 못했고, FCM 토큰이 등록돼도 푸시가 표시되지 않았다.
+                        // (첫 실행·위치 미보유 경로는 아래 else의 순차 요청이 담당하므로 중복되지 않는다.)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                            ContextCompat.checkSelfPermission(
+                                this@MainActivity, Manifest.permission.POST_NOTIFICATIONS
+                            ) != PackageManager.PERMISSION_GRANTED
+                        ) {
+                            notificationOnlyLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
                         // "항상 허용"이 아니면 백그라운드 안내 (첫 1회만)
                         if (!hasBackgroundLocationPermission() && !hasShownBackgroundGuide()) {
                             showBackgroundGuide.value = true
@@ -320,6 +347,20 @@ class MainActivity : ComponentActivity() {
             overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
         }
         finish()
+    }
+
+    /**
+     * 로그인 상태에서 앱 진입 시 현재 FCM 토큰을 서버에 등록한다.
+     * FirebaseMessaging.getToken()으로 최신 토큰을 받아 forceUpdateTokenToServer로 전송하며,
+     * SharedPreferences(smap_auth_prefs)의 auth_token/mt_idx 가드를 통과해야 실제 전송된다.
+     * 멱등 호출이며 서버측 중복방지 로직과 충돌하지 않는다.
+     */
+    private fun ensureFcmTokenRegistered() {
+        runCatching {
+            MyFirebaseMessagingService.triggerTokenUpdate(this)
+        }.onFailure {
+            Log.w(TAG, "[FCM] 토큰 등록 트리거 실패", it)
+        }
     }
 
     override fun onNewIntent(intent: Intent) {

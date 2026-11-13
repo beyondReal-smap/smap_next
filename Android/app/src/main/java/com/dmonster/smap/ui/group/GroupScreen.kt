@@ -25,7 +25,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.dmonster.smap.ui.theme.AccentColors
 import com.dmonster.smap.ui.theme.BrandColors
+import com.dmonster.smap.ui.theme.SemanticColors
+import com.dmonster.smap.ui.theme.SmapMotion
+import androidx.compose.ui.unit.IntOffset
 import com.dmonster.smap.ui.theme.SuiteFont
 import com.dmonster.smap.ui.theme.responsiveSp
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -112,7 +116,7 @@ fun GroupScreen(
                     onClick = { viewModel.showCreateDialog() },
                     modifier = Modifier.size(64.dp),
                     shape = CircleShape,
-                    containerColor = Color(0xFFF59E0B),
+                    containerColor = com.dmonster.smap.ui.theme.BrandColors.Primary,
                     contentColor = Color.White
                 ) {
                     Icon(
@@ -133,12 +137,21 @@ fun GroupScreen(
             AnimatedContent(
                 targetState = currentView,
                 transitionSpec = {
+                    // 리스트↔상세 전환 — 350ms enter / 245ms exit (Material Motion 표준)
+                    val enter = SmapMotion.enter<IntOffset>(SmapMotion.ScreenTransitionMs)
+                    val exit = SmapMotion.exit<IntOffset>()
+                    val fadeEnter = SmapMotion.enter<Float>(SmapMotion.ScreenTransitionMs)
+                    val fadeExit = SmapMotion.exit<Float>()
                     if (targetState == GroupViewModel.ViewState.DETAIL) {
-                        slideInHorizontally { it } + fadeIn() togetherWith
-                            slideOutHorizontally { -it } + fadeOut()
+                        (slideInHorizontally(animationSpec = enter) { it } +
+                            fadeIn(animationSpec = fadeEnter)) togetherWith
+                            (slideOutHorizontally(animationSpec = exit) { -it } +
+                                fadeOut(animationSpec = fadeExit))
                     } else {
-                        slideInHorizontally { -it } + fadeIn() togetherWith
-                            slideOutHorizontally { it } + fadeOut()
+                        (slideInHorizontally(animationSpec = enter) { -it } +
+                            fadeIn(animationSpec = fadeEnter)) togetherWith
+                            (slideOutHorizontally(animationSpec = exit) { it } +
+                                fadeOut(animationSpec = fadeExit))
                     }
                 },
                 label = "viewTransition"
@@ -178,6 +191,7 @@ fun GroupScreen(
                                 onCopyCode = {
                                     group.sgtCode?.let {
                                         clipboardManager.setText(AnnotatedString(it))
+                                        viewModel.showSuccess("초대 코드가 복사되었습니다")
                                     }
                                 },
                                 onMemberClick = { member ->
@@ -237,12 +251,14 @@ fun GroupScreen(
                 onCopyCode = {
                     group.sgtCode?.let {
                         clipboardManager.setText(AnnotatedString(it))
+                        viewModel.showSuccess("초대 코드가 복사되었습니다")
                     }
                     viewModel.hideShareDialog()
                 },
                 onCopyLink = {
                     val link = "${BuildConfig.WEB_BASE_URL}/group/${group.sgtIdx}/join"
                     clipboardManager.setText(AnnotatedString(link))
+                    viewModel.showSuccess("초대 링크가 복사되었습니다")
                     viewModel.hideShareDialog()
                 },
                 onSMS = {
@@ -254,7 +270,7 @@ fun GroupScreen(
                     try {
                         context.startActivity(intent)
                     } catch (e: Exception) {
-                        android.util.Log.e("GroupScreen", "Failed to start activity", e)
+                        if (BuildConfig.DEBUG) android.util.Log.e("GroupScreen", "Failed to start activity", e)
                     }
                     viewModel.hideShareDialog()
                 }
@@ -283,6 +299,7 @@ fun GroupScreen(
                 onCopyLink = {
                     val link = "${BuildConfig.WEB_BASE_URL}/group/${group.sgtIdx}/join"
                     clipboardManager.setText(AnnotatedString(link))
+                    viewModel.showSuccess("초대 링크가 복사되었습니다")
                     viewModel.hideInviteBottomSheet()
                 },
                 onShowQRCode = {
@@ -298,7 +315,7 @@ fun GroupScreen(
                     try {
                         context.startActivity(intent)
                     } catch (e: Exception) {
-                        android.util.Log.e("GroupScreen", "Failed to start activity", e)
+                        if (BuildConfig.DEBUG) android.util.Log.e("GroupScreen", "Failed to start activity", e)
                     }
                     viewModel.hideInviteBottomSheet()
                 },
@@ -313,12 +330,14 @@ fun GroupScreen(
                     try {
                         context.startActivity(Intent.createChooser(shareIntent, "공유하기"))
                     } catch (e: Exception) {
-                        android.util.Log.e("GroupScreen", "Failed to start activity", e)
+                        if (BuildConfig.DEBUG) android.util.Log.e("GroupScreen", "Failed to start activity", e)
                     }
                     viewModel.hideInviteBottomSheet()
                 },
                 onCopyCode = {
-                    // Code is already copied inside the composable
+                    // BottomSheet 내부 IconButton 에서 이미 클립보드 복사 + Haptic 처리됨.
+                    // 상위에서는 Snackbar 피드백만 발행.
+                    viewModel.showSuccess("초대 코드가 복사되었습니다")
                 }
             )
         }
@@ -358,7 +377,7 @@ fun GroupScreen(
                         try {
                             context.startActivity(Intent.createChooser(shareIntent, "QR 코드 공유"))
                         } catch (e: Exception) {
-                            android.util.Log.e("GroupScreen", "Failed to start activity", e)
+                            if (BuildConfig.DEBUG) android.util.Log.e("GroupScreen", "Failed to start activity", e)
                         }
                     }
                 }
@@ -383,7 +402,7 @@ private fun GroupTopBar(
                     fontSize = 18.responsiveSp(),
                     fontFamily = SuiteFont,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1F2937)
+                    color = BrandColors.TextPrimary
                 )
             },
             navigationIcon = {
@@ -613,7 +632,7 @@ private fun GroupDetailView(
                 fontSize = 18.sp,
                 fontFamily = SuiteFont,
                 fontWeight = FontWeight.Medium,
-                color = Color(0xFF1F2937),
+                color = BrandColors.TextPrimary,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
             )
         }
@@ -675,7 +694,7 @@ private fun GroupDetailView(
                     Button(
                         onClick = onShareClick,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF22C55E)
+                            containerColor = BrandColors.Success
                         ),
                         shape = RoundedCornerShape(12.dp)
                     ) {

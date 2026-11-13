@@ -31,7 +31,9 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.dmonster.smap.data.model.SmapGroup
 import com.dmonster.smap.data.model.SmapSchedule
+import com.dmonster.smap.ui.theme.AccentColors
 import com.dmonster.smap.ui.theme.BrandColors
+import com.dmonster.smap.ui.theme.SemanticColors
 import com.dmonster.smap.ui.theme.SuiteFont
 import com.dmonster.smap.ui.theme.responsiveSp
 import java.time.LocalDate
@@ -44,8 +46,8 @@ import java.util.*
 // MARK: - Schedule Status
 
 enum class ScheduleStatusUI(val label: String, val color: Color, val bgColor: Color) {
-    UPCOMING("예정", Color(0xFF2563EB), Color(0xFFDBEAFE)),
-    ONGOING("진행중", Color(0xFF16A34A), Color(0xFFDCFCE7)),
+    UPCOMING("예정", SemanticColors.StatUpcoming, SemanticColors.StatUpcoming.copy(alpha = 0.12f)),
+    ONGOING("진행중", SemanticColors.StatCompleted, SemanticColors.StatCompleted.copy(alpha = 0.12f)),
     COMPLETED("완료", Color(0xFF6B7280), Color(0xFFF3F4F6))
 }
 
@@ -121,7 +123,7 @@ fun MonthCalendar(
                         fontSize = 18.responsiveSp(),
                         fontFamily = SuiteFont,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF1F2937)
+                        color = BrandColors.TextPrimary
                     )
                     Text(
                         text = "오늘로 이동",
@@ -156,8 +158,8 @@ fun MonthCalendar(
                             fontFamily = SuiteFont,
                             fontWeight = FontWeight.Medium,
                             color = when (index) {
-                                0 -> Color.Red
-                                6 -> Color.Blue
+                                0 -> SemanticColors.CalendarSunday
+                                6 -> SemanticColors.CalendarSaturday
                                 else -> Color.Gray
                             }
                         )
@@ -239,7 +241,7 @@ private fun CalendarDay(
             color = when {
                 isSelected -> Color.White
                 isToday -> BrandColors.Primary
-                else -> Color(0xFF374151)
+                else -> BrandColors.TextPrimary
             },
             lineHeight = 14.sp // Remove extra line height
         )
@@ -250,7 +252,7 @@ private fun CalendarDay(
                     .offset(y = (-2).dp) // Move dot closer to the number
                     .size(4.dp)
                     .clip(CircleShape)
-                    .background(if (isSelected) Color.White else Color.Red)
+                    .background(if (isSelected) Color.White else AccentColors.NotificationDot)
             )
         }
     }
@@ -327,7 +329,7 @@ fun EventCard(
                         Icon(
                             imageVector = Icons.Default.Repeat,
                             contentDescription = null,
-                            tint = Color(0xFF3B82F6),
+                            tint = SemanticColors.IndicatorMember,
                             modifier = Modifier.size(12.dp)
                         )
                         Spacer(modifier = Modifier.width(3.dp))
@@ -335,7 +337,7 @@ fun EventCard(
                             text = repeatText ?: "반복",
                             fontSize = 12.sp,
                             fontFamily = SuiteFont,
-                            color = Color(0xFF3B82F6),
+                            color = SemanticColors.IndicatorMember,
                             lineHeight = 12.sp
                         )
                     }
@@ -387,7 +389,7 @@ fun EventCard(
                         fontSize = 14.sp,
                         fontFamily = SuiteFont,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF00148C)
+                        color = BrandColors.PrimaryDark
                     )
                     
                     // Fix #14: Removed hardcoded " · family" text
@@ -455,11 +457,12 @@ fun EventCard(
                     Box {
                         IconButton(
                             onClick = { showMenu = true },
-                            modifier = Modifier.size(24.dp)
+                            // 터치영역 48dp 확보(아이콘 시각 크기 18dp 유지)
+                            modifier = Modifier.size(48.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.MoreHoriz,
-                                contentDescription = "메뉴",
+                                contentDescription = "일정 메뉴",
                                 tint = Color.Gray,
                                 modifier = Modifier.size(18.dp)
                             )
@@ -524,7 +527,7 @@ fun GroupSelectorButton(
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFFF3F4F6))
+            .background(BrandColors.InputBackground)
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -594,7 +597,7 @@ fun GroupSelectorDropdown(
                         fontSize = 15.sp,
                         fontFamily = SuiteFont,
                         fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                        color = Color(0xFF1F2937),
+                        color = BrandColors.TextPrimary,
                         modifier = Modifier.weight(1f)
                     )
                     
@@ -677,7 +680,7 @@ fun DateHeader(
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF00148C)),
+        colors = CardDefaults.cardColors(containerColor = BrandColors.PrimaryDark),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(

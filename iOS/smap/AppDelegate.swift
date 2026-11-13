@@ -61,6 +61,21 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     private var currentAPNSToken: String?
     private var currentFCMToken: String?
 
+    /// FCM에 APNs 토큰을 등록할 때 사용할 APNs 환경 타입.
+    ///
+    /// 기존에는 모든 `setAPNSToken` 호출이 `.unknown`(자동감지)을 사용해, 임베드된
+    /// `aps-environment` 엔타이틀먼트에 환경 판별을 위임했다. 소스 엔타이틀먼트가
+    /// `development`이라 배포 서명이 잘못되면 sandbox 토큰으로 등록 → 프로덕션 APNs
+    /// 발송이 `NotRegistered`로 실패할 수 있다. 빌드 구성별로 명시하여 모호성을 제거한다.
+    /// (Debug=개발 실행→sandbox, Release=TestFlight/App Store=프로덕션 APNs→prod)
+    static let apnsTokenType: MessagingAPNSTokenType = {
+        #if DEBUG
+        return .sandbox
+        #else
+        return .prod
+        #endif
+    }()
+
     // 중복 FCM 알림 표시 방지용 프로퍼티
     private var lastProcessedFCMMessageId: String?
     private var lastFCMNotificationTime: Date?
@@ -685,9 +700,34 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         // 기존의 forceUpdateFCMTokenOnLogin 메소드 호출
         forceUpdateFCMTokenOnLogin()
 
+        // 🔑 [FCM 복구] 레거시 경로와 별개로, 깨끗한 인증 경로(FCMService)로도 등록을 보장한다.
+        registerFCMTokenViaService()
+
         // 로그인/가입 직후 권한 온보딩 트리거 (첫 로그인 시 applicationDidBecomeActive가 이미 지나간 경우)
         waitForPushPermissionSettlement { [weak self] in
             self?.runPermissionOnboardingIfNeeded()
+        }
+    }
+
+    /// 🔑 [FCM 복구] 깨끗한 인증 경로(FCMService → APIClient)로 FCM 토큰을 서버에 멱등 등록한다.
+    ///
+    /// 레거시 `sendFCMTokenToServer` 경로는 APNs 토큰이 캐시에 없으면 등록을 취소(하드 게이트)하고
+    /// 실패를 조용히 삼켜, 토큰 등록이 광범위하게 누락되는 원인이 됐다(서버 토큰 보유율 15.6%).
+    /// `FCMService`는 Keychain JWT 첨부 + 401 자동 refresh + APNs 선택 처리로 더 견고하며,
+    /// 로그인 직후·앱 포그라운드 진입마다 호출해 등록 파이프라인을 복구한다. (서버측 2시간 중복방지로 과호출 방지)
+    private func registerFCMTokenViaService() {
+        guard KeychainManager.shared.getToken() != nil,
+              let mtIdx = UserDefaultsManager.shared.mtIdx, !mtIdx.isEmpty else {
+            print("🔒 [FCM] FCMService 등록 스킵 - 미로그인(JWT/mt_idx 없음)")
+            return
+        }
+        Task {
+            guard let token = await FCMService.shared.getCurrentToken(), !token.isEmpty else {
+                print("⚠️ [FCM] FCMService 등록 스킵 - FCM 토큰 미발급(APNs 미준비 가능)")
+                return
+            }
+            let ok = await FCMService.shared.registerTokenWithServer(token: token)
+            print(ok ? "✅ [FCM] FCMService 토큰 등록 성공" : "❌ [FCM] FCMService 토큰 등록 실패")
         }
     }
 
@@ -778,7 +818,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
         if apnsToken != nil {
             print("📱 [LOGIN] APNs 토큰 존재 - FCM 토큰 재생성")
-            Messaging.messaging().setAPNSToken(apnsToken!.data(using: .utf8) ?? Data(), type: .unknown)
+            Messaging.messaging().setAPNSToken(apnsToken!.data(using: .utf8) ?? Data(), type: Self.apnsTokenType)
         } else {
             print("⚠️ [LOGIN] APNs 토큰 없음 - FCM 토큰 재생성 시도")
         }
@@ -995,7 +1035,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             // 2. APNs 토큰 재설정 (있는 경우)
             if let apnsToken = self.currentAPNSToken {
                 print("📱 [FCM Force] APNs 토큰 재설정: \(apnsToken.prefix(20))...")
-                Messaging.messaging().setAPNSToken(apnsToken.data(using: .utf8) ?? Data(), type: .unknown)
+                Messaging.messaging().setAPNSToken(apnsToken.data(using: .utf8) ?? Data(), type: Self.apnsTokenType)
             } else {
                 print("⚠️ [FCM Force] APNs 토큰 없음 - FCM 재등록에 영향 가능")
             }
@@ -1041,7 +1081,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                     // APNs 토큰 재설정 (있는 경우)
                     if let apnsToken = self.currentAPNSToken ?? UserDefaults.standard.string(forKey: "last_apns_token") {
                         print("📱 [FCM Service] APNs 토큰 재설정")
-                        Messaging.messaging().setAPNSToken(apnsToken.data(using: .utf8) ?? Data(), type: .unknown)
+                        Messaging.messaging().setAPNSToken(apnsToken.data(using: .utf8) ?? Data(), type: Self.apnsTokenType)
                     }
 
                     // 새로운 FCM 토큰 요청
@@ -1642,7 +1682,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
                 // APNs 토큰 재설정 (가능한 경우)
                 if let apnsToken = self.currentAPNSToken {
-                    Messaging.messaging().setAPNSToken(apnsToken.data(using: .utf8) ?? Data(), type: .unknown)
+                    Messaging.messaging().setAPNSToken(apnsToken.data(using: .utf8) ?? Data(), type: Self.apnsTokenType)
                     print("✅ [FCM Background] APNs 토큰 백그라운드 재설정 완료")
                 }
 
@@ -2217,6 +2257,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             // 🔄 FCM 토큰 DB 동기화 (토큰 불일치 문제 해결)
             print("🔄 [앱 시작] FCM 토큰 DB 동기화 시작")
             forceSyncFCMTokenWithDB()
+
+            // 🔑 [FCM 복구] 깨끗한 인증 경로로도 등록을 보장한다(레거시 APNs 하드 게이트 우회).
+            // 기존 로그인 사용자가 앱을 열 때마다 죽은 토큰이 갱신되도록 한다.
+            registerFCMTokenViaService()
 
             checkPushNotificationStatus()
             // 로그인 후 권한 온보딩/보완 실행 - 반드시 푸시 권한 요청이 끝난 다음에 진행
@@ -3039,7 +3083,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         }
 
         // FCM에 APNS 토큰 설정 (강화된 등록)
-        Messaging.messaging().setAPNSToken(deviceToken as Data, type: .unknown)
+        Messaging.messaging().setAPNSToken(deviceToken as Data, type: Self.apnsTokenType)
         print("✅ [APNS] APNS 디바이스 토큰 FCM에 등록 완료")
 
         // 🔄 APNs 토큰 변경 감지 - FCM 토큰도 함께 갱신되어야 함
@@ -3047,7 +3091,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         print("🎯 [이벤트 기반] FCM SDK가 자동으로 새로운 토큰을 생성할 때까지 대기")
 
         // FCM 서비스에 APNs 토큰 설정 (토큰 갱신 트리거)
-        Messaging.messaging().setAPNSToken(deviceToken as Data, type: .unknown)
+        Messaging.messaging().setAPNSToken(deviceToken as Data, type: Self.apnsTokenType)
 
         // 🎯 이벤트 기반 토큰 관리 시스템
         // FCM 토큰 갱신 이벤트 기반 처리로 전환

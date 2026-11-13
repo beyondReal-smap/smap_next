@@ -31,8 +31,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.dmonster.smap.ui.theme.SuiteFont
+import com.dmonster.smap.ui.theme.AccentColors
 import com.dmonster.smap.ui.theme.BrandColors
+import com.dmonster.smap.ui.theme.SettingsColors
+import com.dmonster.smap.ui.theme.SuiteFont
 
 enum class AccountSubScreen {
     NONE, EDIT_PROFILE, CHANGE_PASSWORD, WITHDRAW
@@ -91,7 +93,7 @@ fun AccountSettingsScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0xFFF7F7F7))
+                    .background(SettingsColors.PageBackground)
             ) {
                 Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
                     // Header
@@ -292,7 +294,7 @@ fun AccountSettingsScreen(
                     showingLogoutAlert = false
                     viewModel.logout(onLogout)
                 }) {
-                    Text("로그아웃", color = Color.Red, fontFamily = SuiteFont, fontWeight = FontWeight.Bold)
+                    Text("로그아웃", color = BrandColors.Error, fontFamily = SuiteFont, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -318,7 +320,7 @@ fun ProfileHeaderWithUpload(
             .clip(RoundedCornerShape(24.dp))
             .background(
                 Brush.linearGradient(
-                    colors = listOf(BrandColors.Primary, Color(0xFF667EEA))
+                    colors = listOf(BrandColors.Primary, AccentColors.PrimarySoft)
                 )
             )
             .padding(24.dp)
@@ -345,7 +347,7 @@ fun ProfileHeaderWithUpload(
                     }
                     AsyncImage(
                         model = imageUrl,
-                        contentDescription = null,
+                        contentDescription = "${name.ifBlank { "사용자" }} 프로필 사진",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .size(80.dp)

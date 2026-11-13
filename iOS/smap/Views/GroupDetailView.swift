@@ -19,6 +19,13 @@ struct GroupDetailView: View {
     @State private var selectedMember: SmapGroupMember?
     @State private var showingMemberActionSheet = false
     @State private var showingCopiedAlert = false
+
+    // 멤버 리스트 축약 표시 — 많을 때 첫 페이지에 과다 노출되지 않도록.
+    private let memberPreviewLimit = 6
+    @State private var showAllMembers = false
+
+    // 편집 시트의 미저장 변경 Confirmation
+    @State private var showUnsavedEditsAlert = false
     
     
     
@@ -33,7 +40,7 @@ struct GroupDetailView: View {
             }
             .padding(.vertical)
         }
-        .background(Color(white: 0.98))
+        .background(SMAPTheme.Adaptive.pageBackground)
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Text("그룹 상세")
@@ -50,6 +57,18 @@ struct GroupDetailView: View {
             CreateGroupView(isPresented: $showingEditSheet, title: $editTitle, memo: $editMemo) {
                 viewModel.updateGroup(sgtIdx: group.sgt_idx, title: editTitle, memo: editMemo)
             }
+            // 미저장 변경이 있을 때 스와이프로 실수 dismiss 방지. Alert 로 명시적 확인.
+            .interactiveDismissDisabled(hasUnsavedEdits)
+        }
+        .alert("변경사항이 저장되지 않았습니다", isPresented: $showUnsavedEditsAlert) {
+            Button("계속 편집", role: .cancel) {}
+            Button("버리기", role: .destructive) {
+                editTitle = group.sgt_title ?? ""
+                editMemo = group.sgt_memo ?? ""
+                showingEditSheet = false
+            }
+        } message: {
+            Text("수정 중인 내용을 버리시겠습니까?")
         }
         .sheet(isPresented: $showingShareOptions) {
             ShareOptionsView(
@@ -155,14 +174,18 @@ struct GroupDetailView: View {
                         }
                     }
                 } label: {
+                    // HIG 최소 터치 타겟 44pt 확보. 시각 원은 36pt로 유지하되 히트 영역은 44pt.
                     Image(systemName: "ellipsis")
                         .font(.suite(size: 18, weight: .medium))
-                        .foregroundColor(.white.opacity(0.8))
-                        .frame(width: 32, height: 32)
+                        .foregroundColor(.white.opacity(0.9))
+                        .frame(width: 36, height: 36)
                         .background(Color.white.opacity(0.15))
                         .clipShape(Circle())
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .accessibilityLabel("그룹 설정")
+                .accessibilityHint("멤버 초대, 정보 수정, 그룹 삭제/나가기")
             }
             
             Divider().background(Color.white.opacity(0.2))
@@ -220,28 +243,28 @@ struct GroupDetailView: View {
     private var statsSection: some View {
         if let stats = viewModel.groupStats {
             HStack(spacing: 12) {
-                // 멤버 Card (Red/Pink)
+                // 멤버 Card — 핑크 Accent
                 StatsCardView(
                     value: "\(stats.member_count)",
                     title: "멤버",
                     icon: "person.2.fill",
-                    gradientColors: [Color(red: 251/255, green: 113/255, blue: 133/255), Color(red: 244/255, green: 63/255, blue: 94/255)]
+                    gradientColors: [SMAPTheme.Accent.pink, SMAPTheme.Accent.pinkDeep]
                 )
-                
-                // 주간 일정 Card (Yellow)
+
+                // 주간 일정 Card — 크라운(옐로우 계열)
                 StatsCardView(
                     value: "\(stats.weekly_schedules)",
                     title: "주간 일정",
                     icon: "calendar",
-                    gradientColors: [Color(red: 253/255, green: 224/255, blue: 71/255), Color(red: 250/255, green: 204/255, blue: 21/255)]
+                    gradientColors: [SMAPTheme.Accent.crown.opacity(0.9), SMAPTheme.Accent.orange]
                 )
-                
-                // 총 위치 Card (Blue)
+
+                // 총 위치 Card — 브랜드 primary
                 StatsCardView(
                     value: "\(stats.total_locations)",
                     title: "총 위치",
                     icon: "location.fill",
-                    gradientColors: [Color(red: 96/255, green: 165/255, blue: 250/255), Color(red: 59/255, green: 130/255, blue: 246/255)]
+                    gradientColors: [SMAPTheme.Color.primary, SMAPTheme.Color.primaryDark]
                 )
             }
             .padding(.horizontal)
@@ -250,20 +273,59 @@ struct GroupDetailView: View {
     
     @ViewBuilder
     private var memberListSection: some View {
+        // 멤버 섹션 — 제목 옆 카운트 + "초대" CTA 를 표면화해 "설정 메뉴 안에 숨은 액션" 문제 해결.
+        let allMembers = viewModel.groupMembers
+        let visibleMembers = showAllMembers
+            ? allMembers
+            : Array(allMembers.prefix(memberPreviewLimit))
+        let hiddenCount = max(0, allMembers.count - visibleMembers.count)
+
         VStack(spacing: 12) {
-            // Header with Invite Button
-            HStack {
+            // Section Header
+            HStack(alignment: .center, spacing: 8) {
                 Text("그룹 멤버")
                     .font(.suite(size: 18, weight: .bold))
                     .foregroundColor(.primary)
-                
+
+                Text("\(allMembers.count)명")
+                    .font(.suite(size: 13, weight: .medium))
+                    .foregroundColor(SMAPTheme.Color.primary)
+                    .monospacedDigit()
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .background(SMAPTheme.Color.primary.opacity(0.1))
+                    .clipShape(Capsule())
+                    .accessibilityLabel("\(allMembers.count)명")
+
                 Spacer()
+
+                // 초대 CTA — 주요 액션을 메뉴에서 꺼내 표면화
+                Button {
+                    HapticManager.shared.impact(style: .light)
+                    showingShareOptions = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "person.crop.circle.badge.plus")
+                            .font(.suite(size: 14, weight: .semibold))
+                        Text("초대")
+                            .font(.suite(size: 13, weight: .semibold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 32)
+                    .background(SMAPTheme.Color.primary)
+                    .clipShape(Capsule())
+                }
+                .frame(minWidth: 44, minHeight: 44) // HIG 터치 영역
+                .contentShape(Rectangle())
+                .accessibilityLabel("멤버 초대")
+                .accessibilityHint("초대 코드 또는 링크 공유")
             }
             .padding(.horizontal, 20)
-            
+
             // Member Cards
             VStack(spacing: 0) {
-                ForEach(viewModel.groupMembers) { member in
+                ForEach(visibleMembers) { member in
                     MemberRowNew(
                         member: member,
                         isCurrentUserOwner: isCurrentUserOwner,
@@ -274,19 +336,49 @@ struct GroupDetailView: View {
                             viewModel.removeMember(member: member)
                         }
                     )
-                    
-                    if member.id != viewModel.groupMembers.last?.id {
+
+                    if member.id != visibleMembers.last?.id {
                         Divider().padding(.leading, 80)
                     }
+                }
+
+                // 축약 표시 — N명 더 or 접기
+                if hiddenCount > 0 || (showAllMembers && allMembers.count > memberPreviewLimit) {
+                    Divider().padding(.leading, 80)
+
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showAllMembers.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: showAllMembers ? "chevron.up" : "chevron.down")
+                                .font(.suite(size: 12, weight: .semibold))
+                            Text(showAllMembers ? "접기" : "\(hiddenCount)명 더보기")
+                                .font(.suite(size: 14, weight: .medium))
+                        }
+                        .foregroundColor(SMAPTheme.Color.primary)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .contentShape(Rectangle())
+                    }
+                    .accessibilityLabel(showAllMembers ? "멤버 목록 접기" : "멤버 \(hiddenCount)명 더보기")
                 }
             }
             .padding(.vertical, 8)
             .background(Color.white)
             .cornerRadius(16)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.black.opacity(0.06), lineWidth: 1)
+            )
             .padding(.horizontal)
         }
     }
     
+    private var hasUnsavedEdits: Bool {
+        (editTitle != (group.sgt_title ?? "")) || (editMemo != (group.sgt_memo ?? ""))
+    }
+
     private var isCurrentUserOwner: Bool {
         guard let currentUser = AuthService.shared.getUserData() else { return false }
         // Find current user in member list and check owner status
@@ -432,15 +524,16 @@ struct MemberRowNew: View {
                         .frame(width: 52, height: 52)
                 }
                 
-                // Crown for Owner/Leader
+                // Crown for Owner/Leader — 오너는 노란 왕관, 리더는 파란 왕관.
                 if member.sgdt_owner_chk == "Y" || member.sgdt_leader_chk == "Y" {
                     Image(systemName: "crown.fill")
                         .font(.suite(size: 10))
                         .foregroundColor(.white)
                         .padding(4)
-                        .background(member.sgdt_owner_chk == "Y" ? Color.yellow : Color.blue)
+                        .background(member.sgdt_owner_chk == "Y" ? SMAPTheme.Accent.crown : SMAPTheme.Semantic.indicatorMember)
                         .clipShape(Circle())
                         .offset(x: 4, y: 4)
+                        .accessibilityLabel(member.sgdt_owner_chk == "Y" ? "그룹 오너" : "그룹 리더")
                 }
             }
             
@@ -486,9 +579,11 @@ struct MemberRowNew: View {
                     Image(systemName: "gearshape")
                         .font(.suite(size: 18))
                         .foregroundColor(.gray)
-                        .padding(4)
+                        .frame(width: 44, height: 44) // HIG 터치 타겟
+                        .contentShape(Rectangle())
                 }
                 .accessibilityLabel("멤버 관리")
+                .accessibilityHint("리더 지정 또는 그룹에서 내보내기")
             }
         }
         .padding(.horizontal, 20)
@@ -525,9 +620,9 @@ struct MemberRowNew: View {
     
     private func getRoleColor() -> Color {
         if member.sgdt_owner_chk == "Y" {
-            return .orange
+            return SMAPTheme.Accent.crown
         } else if member.sgdt_leader_chk == "Y" {
-            return .blue
+            return SMAPTheme.Semantic.indicatorMember
         } else {
             return .secondary
         }

@@ -20,6 +20,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.dmonster.smap.data.model.SmapGroupMember
+import com.dmonster.smap.ui.theme.BrandColors
+import com.dmonster.smap.ui.theme.SemanticColors
 import com.dmonster.smap.ui.theme.SuiteFont
 
 // MARK: - Member Manage Dialog
@@ -130,7 +132,7 @@ fun MemberManageDialog(
                     modifier = Modifier.fillMaxWidth().height(44.dp),
                     shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isLeader) Color.Gray else Color(0xFF3B82F6)
+                        containerColor = if (isLeader) BrandColors.TextSecondary else SemanticColors.IndicatorMember
                     )
                 ) {
                     Icon(

@@ -204,10 +204,11 @@ struct LocationDetailPanel: View {
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 50)
-                        .background(Color.red)
+                        .background(SMAPTheme.Color.error)
                         .cornerRadius(12)
                     }
                     .accessibilityLabel("장소 삭제")
+                    .accessibilityAddTraits(.isButton)
                 }
             }
         }
@@ -269,7 +270,7 @@ struct LocationDetailPanel: View {
                     .cornerRadius(12)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(locationName.isEmpty ? Color.red.opacity(0.5) : Color.clear, lineWidth: 1)
+                            .stroke(locationName.isEmpty ? SMAPTheme.Color.error.opacity(0.5) : Color.clear, lineWidth: 1)
                     )
             }
             
@@ -286,7 +287,7 @@ struct LocationDetailPanel: View {
                     .cornerRadius(12)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(locationAddress.isEmpty ? Color.red.opacity(0.5) : Color.clear, lineWidth: 1)
+                            .stroke(locationAddress.isEmpty ? SMAPTheme.Color.error.opacity(0.5) : Color.clear, lineWidth: 1)
                     )
             }
             

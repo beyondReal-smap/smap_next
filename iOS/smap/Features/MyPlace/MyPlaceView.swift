@@ -206,7 +206,7 @@ struct FloatingActionPlaceButton: View {
     let count: Int
     let action: () -> Void
     
-    private let pinkColor = Color(red: 236/255, green: 72/255, blue: 153/255) // Pink-500
+    private var pinkColor: Color { SMAPTheme.Accent.pink }
     
     var body: some View {
         Button(action: action) {
@@ -234,7 +234,8 @@ struct FloatingActionPlaceButton: View {
                 }
             }
         }
-        .accessibilityLabel("멤버 조회")
+        .accessibilityLabel(count > 0 ? "멤버 선택 및 장소 보기, \(count)명" : "멤버 선택 및 장소 보기")
+        .accessibilityHint("사이드바를 열어 그룹 멤버와 등록된 장소를 확인")
     }
 }
 
@@ -266,7 +267,7 @@ struct MyPlaceSidebarView: View {
         }
         .frame(width: 320)
         .background(
-            Color(red: 245/255, green: 247/255, blue: 250/255)
+            SMAPTheme.Adaptive.sidebarBackground
                 .ignoresSafeArea()
         )
         .cornerRadius(24, corners: [.topRight, .bottomRight])
@@ -275,8 +276,9 @@ struct MyPlaceSidebarView: View {
     
     // MARK: - Sections
     
+    // 헤더 — 3개 사이드바 공통 spacing 16pt
     private var sidebarHeader: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 16) {
             ZStack {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(SMAPTheme.Color.primary)
@@ -297,7 +299,7 @@ struct MyPlaceSidebarView: View {
     private var groupSelectorSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Circle().fill(Color.red).frame(width: 8, height: 8)
+                Circle().fill(SMAPTheme.Semantic.indicatorGroup).frame(width: 8, height: 8)
                 Text("그룹 선택").font(.suite(size: 16, weight: .bold))
             }
             
@@ -331,7 +333,7 @@ struct MyPlaceSidebarView: View {
     private var memberSelectorSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                Circle().fill(Color.blue).frame(width: 8, height: 8)
+                Circle().fill(SMAPTheme.Semantic.indicatorMember).frame(width: 8, height: 8)
                 Text("멤버 선택").font(.suite(size: 16, weight: .bold))
                 Spacer()
                 Text("\(viewModel.members.count)명")
@@ -365,7 +367,7 @@ struct MyPlaceSidebarView: View {
     private var locationListSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                Circle().fill(Color.green).frame(width: 8, height: 8)
+                Circle().fill(SMAPTheme.Semantic.indicatorLocation).frame(width: 8, height: 8)
                 Text("장소 목록").font(.suite(size: 16, weight: .bold))
                 Spacer()
                 if let selected = viewModel.selectedMember {
@@ -378,16 +380,25 @@ struct MyPlaceSidebarView: View {
             if viewModel.isLoadingLocations {
                 HStack { Spacer(); ProgressView().padding(); Spacer() }
             } else if viewModel.locations.isEmpty {
-                VStack(spacing: 12) {
-                    Image(systemName: "mappin.slash")
-                        .font(.system(size: 30))
-                        .foregroundColor(.gray.opacity(0.4))
-                    Text("등록된 장소가 없습니다")
-                        .font(.suite(size: 15))
+                // 빈 상태 — 단순 메시지 대신 액션 유도.
+                // 핵심 interaction (지도 롱프레스로 장소 추가)이 숨겨져 있으므로 명시적으로 안내.
+                VStack(spacing: 10) {
+                    Image(systemName: "mappin.and.ellipse")
+                        .font(.suite(size: 32, weight: .light))
+                        .foregroundColor(SMAPTheme.Semantic.indicatorLocation.opacity(0.5))
+                        .accessibilityHidden(true)
+                    Text("등록된 장소가 없어요")
+                        .font(.suite(size: 15, weight: .semibold))
+                        .foregroundColor(.primary)
+                    Text("지도를 길게 눌러 새 장소를 추가하거나\n주소 검색으로 장소를 찾아보세요")
+                        .font(.suite(size: 12))
                         .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 30)
+                .padding(.vertical, 28)
+                .accessibilityElement(children: .combine)
             } else {
                 VStack(spacing: 10) {
                     ForEach(viewModel.locations) { location in
@@ -457,16 +468,18 @@ struct PlaceMemberCell: View {
                     // Crown/Star Icon
                     if member.isOwner {
                         Circle()
-                            .fill(Color.yellow)
+                            .fill(SMAPTheme.Accent.crown)
                             .frame(width: 16, height: 16)
                             .overlay(Image(systemName: "crown.fill").font(.suite(size: 8)).foregroundColor(.white))
                             .offset(x: 4, y: 4)
+                            .accessibilityLabel("그룹 오너")
                     } else if member.isLeader {
                         Circle()
-                            .fill(Color.orange)
-                            .frame(width: 16, height: 16) 
+                            .fill(SMAPTheme.Accent.orange)
+                            .frame(width: 16, height: 16)
                             .overlay(Image(systemName: "star.fill").font(.suite(size: 8)).foregroundColor(.white))
                             .offset(x: 4, y: 4)
+                            .accessibilityLabel("그룹 리더")
                     }
                 }
                 .frame(width: 52, height: 52)
@@ -559,16 +572,18 @@ struct PlaceMemberCircleCell: View {
                     // Owner/Leader Badge
                     if member.isOwner {
                         Circle()
-                            .fill(Color.yellow)
+                            .fill(SMAPTheme.Accent.crown)
                             .frame(width: 14, height: 14)
-                            .overlay(Image(systemName: "crown.fill").font(.system(size: 7)).foregroundColor(.white))
+                            .overlay(Image(systemName: "crown.fill").font(.suite(size: 7)).foregroundColor(.white))
                             .offset(x: 2, y: 2)
+                            .accessibilityLabel("그룹 오너")
                     } else if member.isLeader {
                         Circle()
-                            .fill(Color.orange)
+                            .fill(SMAPTheme.Accent.orange)
                             .frame(width: 14, height: 14)
-                            .overlay(Image(systemName: "star.fill").font(.system(size: 7)).foregroundColor(.white))
+                            .overlay(Image(systemName: "star.fill").font(.suite(size: 7)).foregroundColor(.white))
                             .offset(x: 2, y: 2)
+                            .accessibilityLabel("그룹 리더")
                     }
                 }
                 
@@ -647,7 +662,7 @@ struct PlaceLocationCell: View {
             if canManage {
                 Button(action: onToggleNotification) {
                     Image(systemName: location.notifications ? "bell.fill" : "bell.slash")
-                        .font(.system(size: 14))
+                        .font(.suite(size: 14))
                         .foregroundColor(location.notifications ? .orange : .gray.opacity(0.4))
                         .frame(width: 36, height: 36)
                         .background(Color.white)

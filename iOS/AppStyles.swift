@@ -9,6 +9,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 // MARK: - Brand Colors
 
@@ -20,29 +21,42 @@ public struct BrandColors {
     public static let textSecondary = Color(UIColor.systemGray)
     public static let inputBackground = Color(UIColor.systemGray6)
     public static let border = Color(UIColor.systemGray4)
-    public static let error = Color.red
-    public static let success = Color.green
-    public static let warning = Color.orange
+    // 시스템 색상 — iOS 다크모드/접근성 고대비 자동 대응.
+    public static let error = Color(UIColor.systemRed)
+    public static let success = Color(UIColor.systemGreen)
+    public static let warning = Color(UIColor.systemOrange)
 }
 
-// MARK: - Custom Font Extension (SUITE)
+// MARK: - Custom Font Extension (AtoZ / A2Z)
+// 함수명 `suite`는 기존 호출 사이트(수백 곳) 호환성을 위해 유지. 실제 반환 폰트는 A2Z 패밀리.
+// A2Z 폰트는 weight 별로 독립 family로 등록되어 있어 PostScript 이름을 런타임에 조회한다.
 
 public extension Font {
+    /// 고정 크기(Font.custom) 앱 기본 폰트. 내부적으로 A2Z 패밀리 사용.
     static func suite(size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        var fontName = "SUITE-Regular"
+        Font.custom(appFontName(for: weight), size: size)
+    }
+
+    /// Dynamic Type 지원 앱 기본 폰트. `relativeTo` textStyle에 연동되어 접근성 > 텍스트 크기 설정에 자동 스케일.
+    /// 사용 예: `.font(.suite(size: 16, weight: .medium, relativeTo: .body))`
+    static func suite(size: CGFloat, weight: Font.Weight = .regular, relativeTo textStyle: Font.TextStyle) -> Font {
+        Font.custom(appFontName(for: weight), size: size, relativeTo: textStyle)
+    }
+
+    private static func appFontName(for weight: Font.Weight) -> String {
+        let family: String
         switch weight {
-        case .ultraLight: fontName = "SUITE-Light"
-        case .thin: fontName = "SUITE-Light"
-        case .light: fontName = "SUITE-Light"
-        case .regular: fontName = "SUITE-Regular"
-        case .medium: fontName = "SUITE-Medium"
-        case .semibold: fontName = "SUITE-SemiBold"
-        case .bold: fontName = "SUITE-Bold"
-        case .heavy: fontName = "SUITE-Heavy"
-        case .black: fontName = "SUITE-ExtraBold"
-        default: fontName = "SUITE-Regular"
+        case .ultraLight, .thin: family = "A2Z 1 Thin"
+        case .light: family = "A2Z 3 Light"
+        case .regular: family = "A2Z 4 Regular"
+        case .medium: family = "A2Z 5 Medium"
+        case .semibold: family = "A2Z 6 SemiBold"
+        case .bold: family = "A2Z 7 Bold"
+        case .heavy: family = "A2Z 8 ExtraBold"
+        case .black: family = "A2Z 9 Black"
+        default: family = "A2Z 4 Regular"
         }
-        return Font.custom(fontName, size: size)
+        return UIFont.fontNames(forFamilyName: family).first ?? family
     }
 }
 
@@ -127,26 +141,21 @@ public struct AppFonts {
 // MARK: - UIFont Extension (UIKit 호환)
 
 public extension UIFont {
+    /// 앱 기본 폰트(A2Z). 함수명 `suite`는 호출 사이트 호환을 위해 유지.
     static func suite(size: CGFloat, weight: UIFont.Weight = .regular) -> UIFont {
-        var fontName = "SUITE-Regular"
+        let family: String
         switch weight {
-        case .ultraLight, .thin, .light:
-            fontName = "SUITE-Light"
-        case .regular:
-            fontName = "SUITE-Regular"
-        case .medium:
-            fontName = "SUITE-Medium"
-        case .semibold:
-            fontName = "SUITE-SemiBold"
-        case .bold:
-            fontName = "SUITE-Bold"
-        case .heavy:
-            fontName = "SUITE-Heavy"
-        case .black:
-            fontName = "SUITE-ExtraBold"
-        default:
-            fontName = "SUITE-Regular"
+        case .ultraLight, .thin: family = "A2Z 1 Thin"
+        case .light: family = "A2Z 3 Light"
+        case .regular: family = "A2Z 4 Regular"
+        case .medium: family = "A2Z 5 Medium"
+        case .semibold: family = "A2Z 6 SemiBold"
+        case .bold: family = "A2Z 7 Bold"
+        case .heavy: family = "A2Z 8 ExtraBold"
+        case .black: family = "A2Z 9 Black"
+        default: family = "A2Z 4 Regular"
         }
-        return UIFont(name: fontName, size: size) ?? UIFont.systemFont(ofSize: size, weight: weight)
+        let psName = UIFont.fontNames(forFamilyName: family).first ?? family
+        return UIFont(name: psName, size: size) ?? UIFont.systemFont(ofSize: size, weight: weight)
     }
 }

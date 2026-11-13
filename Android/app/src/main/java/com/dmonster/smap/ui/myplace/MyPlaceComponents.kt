@@ -22,6 +22,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -31,7 +35,10 @@ import coil.compose.AsyncImage
 import com.dmonster.smap.data.model.SmapGroup
 import com.dmonster.smap.data.model.SmapGroupMember
 import com.dmonster.smap.data.model.SavedLocation
+import com.dmonster.smap.ui.theme.AccentColors
+import com.dmonster.smap.ui.theme.AdaptiveColors
 import com.dmonster.smap.ui.theme.BrandColors
+import com.dmonster.smap.ui.theme.SemanticColors
 import com.dmonster.smap.ui.theme.SuiteFont
 
 // MARK: - Member Sidebar
@@ -59,7 +66,7 @@ fun MemberSidebar(
             .fillMaxHeight()
             .width(320.dp),
         shape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp),
-        color = Color(0xFFF5F7FA),
+        color = AdaptiveColors.SidebarBackgroundLight,
         shadowElevation = 8.dp
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -116,7 +123,7 @@ fun MemberSidebar(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(bottom = 12.dp)
                 ) {
-                    Box(modifier = Modifier.size(8.dp).background(Color.Red, CircleShape))
+                    Box(modifier = Modifier.size(8.dp).background(SemanticColors.IndicatorGroup, CircleShape))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "그룹 선택",
@@ -187,7 +194,7 @@ fun MemberSidebar(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(modifier = Modifier.size(8.dp).background(Color.Blue, CircleShape))
+                        Box(modifier = Modifier.size(8.dp).background(SemanticColors.IndicatorMember, CircleShape))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "멤버 선택",
@@ -256,7 +263,7 @@ fun MemberSidebar(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(modifier = Modifier.size(8.dp).background(Color(0xFF10B981), CircleShape))
+                        Box(modifier = Modifier.size(8.dp).background(SemanticColors.IndicatorLocation, CircleShape))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "장소목록",
@@ -282,14 +289,14 @@ fun MemberSidebar(
                         }
                         Box(
                             modifier = Modifier
-                                .background(Color(0xFF10B981).copy(alpha = 0.1f), CircleShape)
+                                .background(SemanticColors.IndicatorLocation.copy(alpha = 0.1f), CircleShape)
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
                             Text(
                                 text = "${locations.size}개",
                                 fontSize = 14.sp,
                                 fontFamily = SuiteFont,
-                                color = Color(0xFF10B981)
+                                color = SemanticColors.IndicatorLocation
                             )
                         }
                     }
@@ -301,29 +308,61 @@ fun MemberSidebar(
                     }
                 } else if (selectedMember == null) {
                     Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                        Text(
-                            text = "멤버를 선택해주세요",
-                            fontSize = 14.sp,
-                            fontFamily = SuiteFont,
-                            color = Color.Gray,
-                            textAlign = TextAlign.Center
-                        )
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(horizontal = 24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PersonOutline,
+                                contentDescription = null,
+                                tint = SemanticColors.IndicatorMember.copy(alpha = 0.5f),
+                                modifier = Modifier.size(36.dp)
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = "먼저 멤버를 선택해주세요",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                fontFamily = SuiteFont,
+                                color = BrandColors.TextPrimary
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "위 멤버 목록에서 사용자를 고르면\n해당 사용자의 장소가 표시됩니다",
+                                fontSize = 12.sp,
+                                fontFamily = SuiteFont,
+                                color = BrandColors.TextSecondary,
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
                 } else if (locations.isEmpty()) {
                     Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(horizontal = 24.dp)
+                        ) {
                             Icon(
-                                imageVector = Icons.Default.LocationOff,
+                                imageVector = Icons.Default.LocationOn,
                                 contentDescription = null,
-                                tint = Color.Gray.copy(alpha = 0.4f),
-                                modifier = Modifier.size(48.dp)
+                                tint = SemanticColors.IndicatorLocation.copy(alpha = 0.5f),
+                                modifier = Modifier.size(36.dp)
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
                             Text(
                                 text = "등록된 장소가 없어요",
-                                fontSize = 14.sp,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold,
                                 fontFamily = SuiteFont,
-                                color = Color.Gray
+                                color = BrandColors.TextPrimary
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "지도를 길게 눌러 새 장소를 추가하거나\n주소 검색으로 장소를 찾아보세요",
+                                fontSize = 12.sp,
+                                fontFamily = SuiteFont,
+                                color = BrandColors.TextSecondary,
+                                textAlign = TextAlign.Center
                             )
                         }
                     }
@@ -336,7 +375,7 @@ fun MemberSidebar(
                         contentPadding = PaddingValues(bottom = 12.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        items(locations) { location ->
+                        items(locations, key = { it.sltIdx }) { location ->
                             LocationListItem(
                                 location = location,
                                 canManage = canManageLocation(location),
@@ -373,9 +412,21 @@ private fun MemberAvatarItem(
         } else null
     }
 
+    val badgeSuffix = when {
+        member.sgdtOwnerChk == "Y" -> " (방장)"
+        member.sgdtLeaderChk == "Y" -> " (리더)"
+        else -> ""
+    }
+    val selfSuffix = if (isSelf) " (나)" else ""
     Column(
         modifier = Modifier
-            .clickable(onClick = onClick)
+            .heightIn(min = 72.dp)
+            .widthIn(min = 56.dp)
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics {
+                contentDescription = "${member.displayName}$selfSuffix$badgeSuffix"
+                selected = isSelected
+            }
             .padding(4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -417,7 +468,7 @@ private fun MemberAvatarItem(
                     modifier = Modifier
                         .size(18.dp)
                         .align(Alignment.BottomEnd)
-                        .background(Color(0xFFFFD700), CircleShape),
+                        .background(AccentColors.Crown, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(Icons.Default.Star, null, tint = Color.White, modifier = Modifier.size(10.dp))
@@ -427,7 +478,7 @@ private fun MemberAvatarItem(
                     modifier = Modifier
                         .size(18.dp)
                         .align(Alignment.BottomEnd)
-                        .background(Color(0xFFFFA500), CircleShape),
+                        .background(AccentColors.Orange, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(Icons.Default.Grade, null, tint = Color.White, modifier = Modifier.size(10.dp))
@@ -460,9 +511,14 @@ private fun LocationListItem(
 ) {
     Surface(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .semantics(mergeDescendants = true) {
+                contentDescription = "${location.name}, ${location.address}"
+            },
         shape = RoundedCornerShape(10.dp),
-        color = Color(0xFFF9FAFB),
+        color = BrandColors.InputBackground,
         border = BorderStroke(0.5.dp, Color.Gray.copy(alpha = 0.15f))
     ) {
         Row(
@@ -491,14 +547,18 @@ private fun LocationListItem(
                 )
             }
             
-            // Notification Bell Button
+            // Notification Bell Button — 48dp 최소 터치 타겟 확보
             if (canManage) {
-                IconButton(onClick = onNotification, modifier = Modifier.size(28.dp)) {
+                val alarmOn = location.sltEnterAlarm == "Y"
+                IconButton(
+                    onClick = onNotification,
+                    modifier = Modifier.size(48.dp)
+                ) {
                     Icon(
-                        imageVector = Icons.Default.Notifications,
-                        contentDescription = "알림",
-                        tint = if (location.sltEnterAlarm == "Y") Color(0xFFFF9500) else Color.Gray.copy(alpha = 0.4f),
-                        modifier = Modifier.size(18.dp)
+                        imageVector = if (alarmOn) Icons.Default.Notifications else Icons.Default.NotificationsNone,
+                        contentDescription = if (alarmOn) "${location.name} 도착 알림 켜짐, 끄기" else "${location.name} 도착 알림 꺼짐, 켜기",
+                        tint = if (alarmOn) AccentColors.Orange else BrandColors.TextSecondary.copy(alpha = 0.5f),
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }
@@ -517,8 +577,12 @@ fun MyPlaceGroupSelector(
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFFF3F4F6))
-            .clickable(onClick = onClick)
+            .background(BrandColors.InputBackground)
+            .heightIn(min = 48.dp)
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics {
+                contentDescription = "그룹 선택, 현재 ${selectedGroup?.sgtTitle ?: "미선택"}"
+            }
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -527,7 +591,7 @@ fun MyPlaceGroupSelector(
             fontSize = 14.sp,
             fontFamily = SuiteFont,
             fontWeight = FontWeight.Medium,
-            color = Color(0xFF1F2937)
+            color = BrandColors.TextPrimary
         )
         Spacer(modifier = Modifier.width(4.dp))
         Icon(

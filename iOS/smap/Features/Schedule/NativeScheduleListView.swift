@@ -28,7 +28,7 @@ struct NativeScheduleListView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(red: 0.98, green: 0.98, blue: 1.0).ignoresSafeArea()
+                SMAPTheme.Adaptive.pageBackground.ignoresSafeArea()
 
 
                 VStack(spacing: 0) {
@@ -141,12 +141,28 @@ struct NativeScheduleListView: View {
                     .foregroundColor(.gray)
             }
             Spacer()
-            Button(action: { showingAddSchedule = true }) {
-                Image(systemName: "plus")
-                    .font(.suite(size: 22, weight: .bold)) // Larger Plus
-                    .foregroundColor(SMAPTheme.Color.primary)
+            // 일정 추가 CTA — 기존엔 Plus 아이콘만 있어 발견성이 낮았음.
+            // 아이콘 + 텍스트 조합으로 명확화 + 44pt 터치 타겟 확보.
+            Button(action: {
+                HapticManager.shared.impact(style: .light)
+                showingAddSchedule = true
+            }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.suite(size: 20, weight: .semibold))
+                    Text("추가")
+                        .font(.suite(size: 14, weight: .semibold))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 12)
+                .frame(height: 36)
+                .background(SMAPTheme.Color.primary)
+                .clipShape(Capsule())
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
             }
             .accessibilityLabel("일정 추가")
+            .accessibilityHint("새 일정 작성 화면 열기")
         }
 
         .padding(.vertical, 8)
@@ -164,6 +180,8 @@ struct NativeScheduleListView: View {
                         .font(.suite(size: 16, weight: .semibold))
                         .foregroundColor(.gray)
                         .padding(.horizontal)
+                        .padding(.vertical, 12) // 아이콘 시각크기 유지 + 터치영역 44pt 확보
+                        .contentShape(Rectangle())
                 }
                 .accessibilityLabel("이전 달")
                 Text(formatMonth(viewModel.currentMonth))
@@ -174,6 +192,8 @@ struct NativeScheduleListView: View {
                         .font(.suite(size: 16, weight: .semibold))
                         .foregroundColor(.gray)
                         .padding(.horizontal)
+                        .padding(.vertical, 12) // 아이콘 시각크기 유지 + 터치영역 44pt 확보
+                        .contentShape(Rectangle())
                 }
                 .accessibilityLabel("다음 달")
                 Spacer()
@@ -198,10 +218,13 @@ struct NativeScheduleListView: View {
         VStack(spacing: 0) { // Reduced spacing
             let days = ["일", "월", "화", "수", "목", "금", "토"]
             HStack {
+                // 캘린더 관례 — 다크모드 자동 대응 위해 systemRed/systemBlue 사용.
+                let sundayColor = Color(UIColor.systemRed)
+                let saturdayColor = Color(UIColor.systemBlue)
                 ForEach(days, id: \.self) { day in
                     Text(day)
                         .font(.suite(size: 12))
-                        .foregroundColor(day == "일" ? .red : (day == "토" ? .blue : .gray))
+                        .foregroundColor(day == "일" ? sundayColor : (day == "토" ? saturdayColor : .gray))
                         .frame(maxWidth: .infinity)
                 }
             }
@@ -307,32 +330,49 @@ struct NativeScheduleListView: View {
             .padding(20)
             .background(
                 RoundedRectangle(cornerRadius: 24)
-                    .fill(Color(red: 0/255, green: 20/255, blue: 140/255)) // Dark Brand Color
+                    .fill(
+                        LinearGradient(
+                            gradient: Gradient(colors: [SMAPTheme.Color.primary, SMAPTheme.Color.primaryDark]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
             )
             .padding(.horizontal, 16)
             .padding(.bottom, 16)
 
             VStack(alignment: .leading, spacing: 8) {
                 if viewModel.filteredSchedules.isEmpty {
-                    VStack(spacing: 12) {
-                        Image(systemName: "calendar.badge.plus")
-                            .font(.suite(size: 48))
-                            .foregroundColor(.gray.opacity(0.2))
-                        Text("등록된 일정이 없습니다")
-                            .font(.suite(size: 16))
-                            .foregroundColor(.gray)
-                        Button(action: { showingAddSchedule = true }) {
-                            Text("일정 추가하기")
-                                .font(.suite(size: 14, weight: .medium))
-                                .foregroundColor(SMAPTheme.Color.primary)
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 10)
-                                .background(SMAPTheme.Color.primary.opacity(0.1))
-                                .cornerRadius(20)
+                    // 빈 상태 — 모바일 밀도에 맞춰 아이콘 축소, 톤은 친근하게, CTA 는 44pt 확보.
+                    VStack(spacing: 10) {
+                        Image(systemName: "calendar")
+                            .font(.suite(size: 36, weight: .light))
+                            .foregroundColor(SMAPTheme.Color.primary.opacity(0.45))
+                        Text("이 날짜에 등록된 일정이 없어요")
+                            .font(.suite(size: 15, weight: .medium))
+                            .foregroundColor(.secondary)
+                        Button(action: {
+                            HapticManager.shared.impact(style: .light)
+                            showingAddSchedule = true
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "plus")
+                                    .font(.suite(size: 13, weight: .semibold))
+                                Text("일정 추가하기")
+                                    .font(.suite(size: 14, weight: .semibold))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 18)
+                            .frame(height: 40)
+                            .background(SMAPTheme.Color.primary)
+                            .clipShape(Capsule())
+                            .frame(minHeight: 44) // HIG
+                            .contentShape(Rectangle())
                         }
+                        .accessibilityHint("선택된 날짜에 새 일정 작성")
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 40)
+                    .padding(.vertical, 32)
                 } else {
                     ForEach(viewModel.filteredSchedules) { schedule in
                         ScheduleEventCard(
@@ -443,10 +483,12 @@ struct CalendarDateCell: View {
                 )
 
             if hasEvent {
+                // 일정이 있는 날짜 표시 점 — 알림 dot과 동일 의미
                 Circle()
-                    .fill(Color.red) // Red Dot
+                    .fill(SMAPTheme.Accent.notificationDot)
                     .frame(width: 4, height: 4)
                     .padding(.top, -8) // Pull closer to the number
+                    .accessibilityHidden(true)
             } else {
                 Spacer().frame(height: 4) // Mantain height consistency
             }
@@ -466,8 +508,9 @@ struct CalendarDateCell: View {
         if isSelected { return .white }
         if isToday { return SMAPTheme.Color.primary }
         let weekday = Calendar.current.component(.weekday, from: date)
-        if weekday == 1 { return .red.opacity(isCurrentMonth ? 1.0 : 0.5) }
-        if weekday == 7 { return .blue.opacity(isCurrentMonth ? 1.0 : 0.5) }
+        // 캘린더 관례 — 일요일 빨강, 토요일 파랑. 다크모드 대응 위해 systemRed/systemBlue 사용.
+        if weekday == 1 { return Color(UIColor.systemRed).opacity(isCurrentMonth ? 1.0 : 0.5) }
+        if weekday == 7 { return Color(UIColor.systemBlue).opacity(isCurrentMonth ? 1.0 : 0.5) }
         return .primary
     }
 }
@@ -505,8 +548,9 @@ struct ScheduleEventCard: View {
                         Text(repeatText)
                             .font(.suite(size: 11))
                     }
-                    .foregroundColor(.blue.opacity(0.8))
+                    .foregroundColor(SMAPTheme.Color.primary.opacity(0.8))
                     .padding(.top, 4)
+                    .accessibilityLabel("반복 \(repeatText)")
                 }
             }
             .frame(width: 70, alignment: .leading)
@@ -595,17 +639,27 @@ struct ScheduleEventCard: View {
                         Image(systemName: "ellipsis")
                             .font(.suite(size: 14))
                             .foregroundColor(.gray)
-                            .padding(8)
+                            .frame(width: 44, height: 32) // HIG 터치 타겟 (가로 44pt)
+                            .contentShape(Rectangle())
                     }
                     .accessibilityLabel("일정 관리")
+                    .accessibilityHint("수정 또는 삭제")
                 }
             }
         }
-        .padding(.vertical, 10)
-        .padding(.horizontal, 16)
-        .background(Color.white)
-        .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+        .padding(.vertical, 12)
+        .padding(.horizontal, 14)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.white)
+        )
+        .overlay(
+            // 카드 구분은 얇은 border로. 그림자 남발 제거 — iOS flat 트렌드.
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.black.opacity(0.06), lineWidth: 1)
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(schedule.sst_title ?? "제목 없음"), \(schedule.status.text)")
     }
 
     private func formatTime(_ date: Date) -> String {
@@ -626,9 +680,9 @@ struct ScheduleEventCard: View {
 
     private var statusColor: Color {
         switch schedule.status {
-        case .completed: return .green
-        case .ongoing: return .orange
-        case .upcoming: return .blue
+        case .completed: return SMAPTheme.Semantic.statCompleted
+        case .ongoing: return SMAPTheme.Semantic.statOngoing
+        case .upcoming: return SMAPTheme.Semantic.statUpcoming
         case .defaultStatus: return .gray
         }
     }

@@ -78,7 +78,7 @@ fun EventDetailDialog(
                                 fontSize = 20.sp,
                                 fontFamily = SuiteFont,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF1F2937)
+                                color = BrandColors.TextPrimary
                             )
                         }
                         IconButton(onClick = onDismiss) {
@@ -103,7 +103,7 @@ fun EventDetailDialog(
                                 fontSize = 15.sp,
                                 fontFamily = SuiteFont,
                                 fontWeight = FontWeight.Medium,
-                                color = Color(0xFF1F2937)
+                                color = BrandColors.TextPrimary
                             )
                             Text(
                                 text = if (schedule.sstAllDay == "Y") "종일" else "$startTime${if (endTime.isNotEmpty()) " - $endTime" else ""}",
@@ -129,7 +129,7 @@ fun EventDetailDialog(
                                 text = location,
                                 fontSize = 15.sp,
                                 fontFamily = SuiteFont,
-                                color = Color(0xFF1F2937)
+                                color = BrandColors.TextPrimary
                             )
                         }
                     }
@@ -150,7 +150,7 @@ fun EventDetailDialog(
                                     text = memo,
                                     fontSize = 15.sp,
                                     fontFamily = SuiteFont,
-                                    color = Color(0xFF1F2937)
+                                    color = BrandColors.TextPrimary
                                 )
                             }
                         }
@@ -170,7 +170,7 @@ fun EventDetailDialog(
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = Color.Red
+                                contentColor = BrandColors.Error
                             )
                         ) {
                             Icon(Icons.Default.Delete, null, modifier = Modifier.size(18.dp))

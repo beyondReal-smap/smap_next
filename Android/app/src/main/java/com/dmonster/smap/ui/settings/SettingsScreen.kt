@@ -20,14 +20,19 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.dmonster.smap.BuildConfig
 import com.dmonster.smap.data.model.SmapNotice
-import com.dmonster.smap.ui.theme.SuiteFont
+import com.dmonster.smap.ui.common.rememberSmapHaptics
 import com.dmonster.smap.ui.theme.BrandColors
+import com.dmonster.smap.ui.theme.SettingsColors
+import com.dmonster.smap.ui.theme.SuiteFont
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,7 +66,7 @@ fun SettingsScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF7F7F7)) // iOS style light gray background
+            .background(SettingsColors.PageBackground)
     ) {
         // Main Settings Content with Slide Animation
         AnimatedVisibility(
@@ -122,31 +127,31 @@ fun SettingsScreen(
                     SettingsMenuSection(title = "계정 관리") {
                         SettingsMenuItem(
                             icon = Icons.Default.Person,
-                            iconColor = Color(0xFF6271D8),
-                            iconBg = Color(0xFFE8EAF6),
+                            iconColor = SettingsColors.AccountIcon,
+                            iconBg = SettingsColors.AccountBg,
                             title = "계정설정",
                             onClick = { isAccountSettingsVisible = true }
                         )
                     }
 
                     SettingsMenuSection(title = "약관 & 정책") {
-                        SettingsMenuItem(icon = Icons.Default.Description, iconColor = Color(0xFF00BCD4), iconBg = Color(0xFFE0F7FA), title = "서비스 이용약관", onClick = { selectedTermsScreen = "service" })
-                        HorizontalDivider(color = Color(0xFFF5F5F5), thickness = 1.dp, modifier = Modifier.padding(start = 56.dp))
-                        SettingsMenuItem(icon = Icons.Default.Shield, iconColor = Color(0xFF03A9F4), iconBg = Color(0xFFE1F5FE), title = "개인정보 처리방침", onClick = { selectedTermsScreen = "privacy" })
-                        HorizontalDivider(color = Color(0xFFF5F5F5), thickness = 1.dp, modifier = Modifier.padding(start = 56.dp))
-                        SettingsMenuItem(icon = Icons.Default.NearMe, iconColor = Color(0xFF9C27B0), iconBg = Color(0xFFF3E5F5), title = "위치기반서비스 이용약관", onClick = { selectedTermsScreen = "location" })
-                        HorizontalDivider(color = Color(0xFFF5F5F5), thickness = 1.dp, modifier = Modifier.padding(start = 56.dp))
-                        SettingsMenuItem(icon = Icons.Default.Star, iconColor = Color(0xFF3F51B5), iconBg = Color(0xFFE8EAF6), title = "마케팅 정보 수집 및 이용 동의", onClick = { selectedTermsScreen = "marketing" })
-                        HorizontalDivider(color = Color(0xFFF5F5F5), thickness = 1.dp, modifier = Modifier.padding(start = 56.dp))
-                        SettingsMenuItem(icon = Icons.Default.Groups, iconColor = Color(0xFFE91E63), iconBg = Color(0xFFFCE4EC), title = "개인정보 제3자 제공 동의", onClick = { selectedTermsScreen = "thirdparty" })
+                        SettingsMenuItem(icon = Icons.Default.Description, iconColor = SettingsColors.TermsServiceIcon, iconBg = SettingsColors.TermsServiceBg, title = "서비스 이용약관", onClick = { selectedTermsScreen = "service" })
+                        HorizontalDivider(color = SettingsColors.Divider, thickness = 1.dp, modifier = Modifier.padding(start = 56.dp))
+                        SettingsMenuItem(icon = Icons.Default.Shield, iconColor = SettingsColors.TermsPrivacyIcon, iconBg = SettingsColors.TermsPrivacyBg, title = "개인정보 처리방침", onClick = { selectedTermsScreen = "privacy" })
+                        HorizontalDivider(color = SettingsColors.Divider, thickness = 1.dp, modifier = Modifier.padding(start = 56.dp))
+                        SettingsMenuItem(icon = Icons.Default.NearMe, iconColor = SettingsColors.TermsLocationIcon, iconBg = SettingsColors.TermsLocationBg, title = "위치기반서비스 이용약관", onClick = { selectedTermsScreen = "location" })
+                        HorizontalDivider(color = SettingsColors.Divider, thickness = 1.dp, modifier = Modifier.padding(start = 56.dp))
+                        SettingsMenuItem(icon = Icons.Default.Star, iconColor = SettingsColors.TermsMarketingIcon, iconBg = SettingsColors.TermsMarketingBg, title = "마케팅 정보 수집 및 이용 동의", onClick = { selectedTermsScreen = "marketing" })
+                        HorizontalDivider(color = SettingsColors.Divider, thickness = 1.dp, modifier = Modifier.padding(start = 56.dp))
+                        SettingsMenuItem(icon = Icons.Default.Groups, iconColor = SettingsColors.TermsThirdpartyIcon, iconBg = SettingsColors.TermsThirdpartyBg, title = "개인정보 제3자 제공 동의", onClick = { selectedTermsScreen = "thirdparty" })
                     }
 
                     SettingsMenuSection(title = "고객 지원") {
-                        SettingsMenuItem(icon = Icons.AutoMirrored.Filled.MenuBook, iconColor = Color(0xFFFFB300), iconBg = Color(0xFFFFFDE7), title = "사용 가이드", onClick = { isUserGuideVisible = true })
-                        HorizontalDivider(color = Color(0xFFF5F5F5), thickness = 1.dp, modifier = Modifier.padding(start = 56.dp))
-                        SettingsMenuItem(icon = Icons.Default.Email, iconColor = Color(0xFFFF9800), iconBg = Color(0xFFFFF3E0), title = "1:1 문의", onClick = { isInquiryVisible = true })
-                        HorizontalDivider(color = Color(0xFFF5F5F5), thickness = 1.dp, modifier = Modifier.padding(start = 56.dp))
-                        SettingsMenuItem(icon = Icons.Default.Notifications, iconColor = Color(0xFFF44336), iconBg = Color(0xFFFFEBEE), title = "공지사항", onClick = { isNoticeListVisible = true })
+                        SettingsMenuItem(icon = Icons.AutoMirrored.Filled.MenuBook, iconColor = SettingsColors.SupportGuideIcon, iconBg = SettingsColors.SupportGuideBg, title = "사용 가이드", onClick = { isUserGuideVisible = true })
+                        HorizontalDivider(color = SettingsColors.Divider, thickness = 1.dp, modifier = Modifier.padding(start = 56.dp))
+                        SettingsMenuItem(icon = Icons.Default.Email, iconColor = SettingsColors.SupportInquiryIcon, iconBg = SettingsColors.SupportInquiryBg, title = "1:1 문의", onClick = { isInquiryVisible = true })
+                        HorizontalDivider(color = SettingsColors.Divider, thickness = 1.dp, modifier = Modifier.padding(start = 56.dp))
+                        SettingsMenuItem(icon = Icons.Default.Notifications, iconColor = SettingsColors.SupportNoticeIcon, iconBg = SettingsColors.SupportNoticeBg, title = "공지사항", onClick = { isNoticeListVisible = true })
                     }
                     
                     // Version Info
@@ -407,10 +412,16 @@ fun SettingsMenuItem(
     title: String,
     onClick: () -> Unit
 ) {
+    val haptics = rememberSmapHaptics()
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .heightIn(min = 48.dp)
+            .clickable(role = Role.Button) {
+                haptics.light()
+                onClick()
+            }
+            .semantics(mergeDescendants = true) { contentDescription = title }
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -423,9 +434,9 @@ fun SettingsMenuItem(
         ) {
             Icon(
                 icon,
-                contentDescription = title,
+                contentDescription = null, // Row 에서 contentDescription 병합
                 tint = iconColor,
-                modifier = Modifier.size(22.dp) // Slightly larger icon
+                modifier = Modifier.size(22.dp)
             )
         }
 
@@ -434,14 +445,14 @@ fun SettingsMenuItem(
             fontFamily = SuiteFont,
             fontWeight = FontWeight.Medium,
             fontSize = 16.sp,
-            color = Color(0xFF333333),
+            color = SettingsColors.TextBodyPrimary,
             modifier = Modifier.weight(1f)
         )
 
         Icon(
             Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            contentDescription = title,
-            tint = BrandColors.Border, // iOS systemGray4
+            contentDescription = null,
+            tint = BrandColors.Border,
             modifier = Modifier.size(20.dp)
         )
     }

@@ -17,6 +17,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -25,11 +27,13 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.dmonster.smap.data.model.LocationSummary
 import com.dmonster.smap.data.model.SmapGroupMember
+import com.dmonster.smap.ui.common.rememberSmapHaptics
+import com.dmonster.smap.ui.theme.ActivityLogColors
 import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.SuiteFont
 import com.dmonster.smap.ui.theme.responsiveSp
-import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
+import androidx.compose.ui.semantics.Role
 
 // MARK: - ActivityLog Header
 
@@ -75,11 +79,18 @@ fun ActivityLogFloatingCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val haptics = rememberSmapHaptics()
     Surface(
-        onClick = onClick,
+        onClick = {
+            haptics.light()
+            onClick()
+        },
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 16.dp)
+            .semantics {
+                contentDescription = "${member?.displayName ?: "멤버"}의 $displayDate 활동 기록, 탭하여 멤버 선택"
+            },
         shape = RoundedCornerShape(16.dp),
         color = Color.White,
         shadowElevation = 8.dp
@@ -116,7 +127,7 @@ fun ActivityLogFloatingCard(
                         if (imageUrl != null) {
                             AsyncImage(
                                 model = imageUrl,
-                                contentDescription = null,
+                                contentDescription = "${member?.displayName ?: "멤버"} 프로필 사진",
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
                             )
@@ -190,9 +201,27 @@ fun ActivityLogFloatingCard(
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    SummaryStatItem(icon = Icons.AutoMirrored.Filled.ArrowForward, color = Color(0xFFEF4444), value = summary?.distanceFormatted ?: "0 m", modifier = Modifier.weight(1f))
-                    SummaryStatItem(icon = Icons.Default.AccessTime, color = Color(0xFFF59E0B), value = summary?.timeFormatted ?: "0분", modifier = Modifier.weight(1f))
-                    SummaryStatItem(icon = Icons.Default.DirectionsWalk, color = Color(0xFF3B82F6), value = summary?.stepsFormatted ?: "0", modifier = Modifier.weight(1f))
+                    SummaryStatItem(
+                        icon = Icons.AutoMirrored.Filled.ArrowForward,
+                        color = ActivityLogColors.StatDistance,
+                        value = summary?.distanceFormatted ?: "0 m",
+                        label = "이동거리",
+                        modifier = Modifier.weight(1f)
+                    )
+                    SummaryStatItem(
+                        icon = Icons.Default.AccessTime,
+                        color = ActivityLogColors.StatTime,
+                        value = summary?.timeFormatted ?: "0분",
+                        label = "이동시간",
+                        modifier = Modifier.weight(1f)
+                    )
+                    SummaryStatItem(
+                        icon = Icons.AutoMirrored.Filled.DirectionsWalk,
+                        color = ActivityLogColors.StatSteps,
+                        value = summary?.stepsFormatted ?: "0",
+                        label = "걸음수",
+                        modifier = Modifier.weight(1f)
+                    )
                 }
             }
         }
@@ -204,12 +233,17 @@ fun SummaryStatItem(
     icon: ImageVector,
     color: Color,
     value: String,
+    label: String,
     modifier: Modifier = Modifier
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
-        modifier = modifier.padding(top = 1.dp)
+        modifier = modifier
+            .padding(top = 1.dp)
+            .semantics(mergeDescendants = true) {
+                contentDescription = "$label $value"
+            }
     ) {
         Box(
             modifier = Modifier
@@ -281,7 +315,7 @@ fun PathSlider(
                 ) {
                     Icon(
                         imageVector = Icons.Default.PlayArrow,
-                        contentDescription = null,
+                        contentDescription = null, // 옆 "경로 따라가기" 텍스트로 의미 전달
                         tint = Color.White,
                         modifier = Modifier.size(16.dp)
                     )
@@ -384,30 +418,30 @@ fun ActivityEmptyState(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Icon(
-            imageVector = Icons.Default.DirectionsWalk,
+            imageVector = Icons.AutoMirrored.Filled.DirectionsWalk,
             contentDescription = null,
-            tint = Color.Gray.copy(alpha = 0.4f),
-            modifier = Modifier.size(64.dp)
+            tint = BrandColors.TextSecondary.copy(alpha = 0.4f),
+            modifier = Modifier.size(48.dp)
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         Text(
-            text = "이동 기록이 없습니다",
-            fontSize = 16.sp,
+            text = "이동 기록이 없어요",
+            fontSize = 15.sp,
             fontFamily = SuiteFont,
-            fontWeight = FontWeight.Medium,
-            color = Color.Gray,
+            fontWeight = FontWeight.SemiBold,
+            color = BrandColors.TextPrimary,
             textAlign = TextAlign.Center
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(4.dp))
 
         Text(
-            text = "선택한 날짜에 이동 기록이 없어요",
-            fontSize = 14.sp,
+            text = "선택한 날짜에 기록된 활동이 없습니다.\n다른 날짜나 멤버를 선택해보세요.",
+            fontSize = 12.sp,
             fontFamily = SuiteFont,
-            color = Color.Gray.copy(alpha = 0.7f),
+            color = BrandColors.TextSecondary,
             textAlign = TextAlign.Center
         )
     }

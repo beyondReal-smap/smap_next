@@ -56,51 +56,91 @@ struct ScheduleFormView: View {
         _selectedGroupId = State(initialValue: startGroupId)
     }
 
-    // Section colors (matching Next.js design)
-    private var section1BgColor: Color { Color(red: 254/255, green: 226/255, blue: 226/255) } // Red 50
-    private var section2BgColor: Color { Color(red: 219/255, green: 234/255, blue: 254/255) } // Blue 50
-    private var section3BgColor: Color { Color(red: 220/255, green: 252/255, blue: 231/255) } // Green 50
-    private var section4BgColor: Color { Color(red: 255/255, green: 251/255, blue: 235/255) } // Amber 50
+    // Section colors — SMAPTheme.ScheduleSection 토큰을 뷰 내부 이름에 매핑.
+    // 내부 뷰 구성 코드 가독성을 위해 섹션 번호로 접근하고, 실제 값은 디자인 시스템에 단일화.
+    private var section1BgColor: Color { SMAPTheme.ScheduleSection.bgGroup }
+    private var section2BgColor: Color { SMAPTheme.ScheduleSection.bgContent }
+    private var section3BgColor: Color { SMAPTheme.ScheduleSection.bgDateTime }
+    private var section4BgColor: Color { SMAPTheme.ScheduleSection.bgExtra }
 
-    private var section1BadgeColor: Color { Color(red: 220/255, green: 38/255, blue: 38/255) }  // Red 600
-    private var section2BadgeColor: Color { Color(red: 37/255, green: 99/255, blue: 235/255) }  // Blue 600
-    private var section3BadgeColor: Color { Color(red: 22/255, green: 163/255, blue: 74/255) }  // Green 600
-    private var section4BadgeColor: Color { Color(red: 217/255, green: 119/255, blue: 6/255) }  // Amber 600
+    private var section1BadgeColor: Color { SMAPTheme.ScheduleSection.badgeGroup }
+    private var section2BadgeColor: Color { SMAPTheme.ScheduleSection.badgeContent }
+    private var section3BadgeColor: Color { SMAPTheme.ScheduleSection.badgeDateTime }
+    private var section4BadgeColor: Color { SMAPTheme.ScheduleSection.badgeExtra }
 
     // Alarm options
     private var alarmOptions: [(String, Int)] {
         [("없음", 0), ("정시", 1), ("5분 전", 5), ("10분 전", 10), ("15분 전", 15), ("30분 전", 30), ("1시간 전", 60), ("1일 전", 1440)]
     }
 
-    @State private var showingAlarmSheet: Bool = false
-    @State private var showingRepeatSheet: Bool = false
-    @State private var showingDateTimeSheet: Bool = false
+    // UX 피드백 상태
+    @State private var showTitleError: Bool = false          // 저장 시도 후 제목 빈 경우만 노출
+    @State private var showCancelConfirmation: Bool = false  // 변경사항 있을 때 취소 확인
+
+    // 키보드 회피 — 포커스된 필드를 sticky footer 위로 자동 스크롤.
+    private enum FormField: Hashable { case title, memo, supplies }
+    @FocusState private var focusedField: FormField?
+
+    // Draft 복구 — 신규 작성 중 실수로 닫거나 앱이 종료돼도 내용을 살려준다.
+    @State private var showDraftRestoreAlert: Bool = false
+    @State private var pendingDraft: ScheduleDraft?  // onAppear 에서 감지한 draft
+    @State private var didSaveOrDiscard: Bool = false // 저장 성공/명시적 버리기 시 true → onDisappear 의 재저장 스킵
+    private let draftUserDefaultsKey = "ScheduleFormView.draft.v1"
+
+    // 초기값 스냅샷 — 취소 시 "진짜 변경사항이 있는지" 판단.
+    @State private var initialTitleSnapshot: String = ""
+    @State private var initialMemoSnapshot: String = ""
+    @State private var initialStartDateSnapshot: Date = Date()
+    @State private var initialEndDateSnapshot: Date = Date()
+    @State private var initialLocationSnapshot: String = ""
+    @State private var initialSuppliesSnapshot: String = ""
+    @State private var initialRepeatOptionSnapshot: String = "안함"
+    @State private var initialWeekdaysSnapshot: Set<Int> = []
+    @State private var initialAlarmSnapshot: Int = 0
+    @State private var initialIsAllDaySnapshot: Bool = false
+    @State private var initialTargetMemberIdSnapshot: Int = 0
 
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(red: 0.98, green: 0.98, blue: 1.0).ignoresSafeArea()
+                SMAPTheme.Adaptive.pageBackground.ignoresSafeArea()
 
-                ScrollView {
-                    VStack(spacing: 16) {
-                        // Section 1: 그룹 및 멤버 선택
-                        modernSection1
+                // ScrollView + Sticky Footer 구조
+                // 폼이 길어도 저장/취소 CTA 가 항상 손가락이 닿는 바닥에 상주.
+                VStack(spacing: 0) {
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            VStack(spacing: 16) {
+                                // Section 1: 그룹 및 멤버 선택
+                                modernSection1
 
-                        // Section 2: 일정 제목 및 내용
-                        modernSection2
+                                // Section 2: 일정 제목 및 내용
+                                modernSection2
+                                    .id(FormField.title) // 포커스 시 scrollTo 대상
 
-                        // Section 3: 날짜 및 시간
-                        modernSection3
+                                // Section 3: 날짜 및 시간
+                                modernSection3
 
-                        // Section 4: 추가 설정
-                        modernSection4
-
-                        // 저장 버튼
-                        saveButton
-                            .padding(.top, 8)
+                                // Section 4: 추가 설정
+                                modernSection4
+                                    .id(FormField.supplies)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.top, 16)
+                            .padding(.bottom, 24) // footer 영역 여유
+                        }
+                        // 포커스 변경 시 해당 섹션을 상단으로 스크롤해 키보드 가림 방지.
+                        .onChange(of: focusedField) { _, newValue in
+                            guard let field = newValue else { return }
+                            let anchor: FormField = (field == .memo) ? .title : field
+                            withAnimation(.easeOut(duration: 0.25)) {
+                                proxy.scrollTo(anchor, anchor: .top)
+                            }
+                        }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 16)
+
+                    // Sticky footer — 저장 버튼을 하단에 고정
+                    stickyFooter
                 }
 
                 if isLoading {
@@ -126,16 +166,71 @@ struct ScheduleFormView: View {
                     Text(schedule == nil ? "일정 추가" : "일정 수정")
                         .font(.suite(size: 17, weight: .semibold))
                 }
+                // 키보드 상단 완료 버튼 — 다음 필드가 없을 때 손쉽게 키보드 내릴 수 있도록.
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("완료") { focusedField = nil }
+                        .font(.suite(size: 16, weight: .semibold))
+                        .foregroundColor(SMAPTheme.Color.primary)
+                }
             }
             .navigationBarTitleDisplayMode(.inline)
+            // 미저장 변경이 있으면 시트 스와이프 dismiss 를 막아, '취소' 버튼의 확인 가드를
+            // 우회한 채 작성 내용이 유실되는 것을 방지한다(GroupDetail 등 기존 모범 패턴과 일관).
+            .interactiveDismissDisabled(hasUnsavedChanges)
             .navigationBarItems(
                 leading: Button("취소") {
-                    presentationMode.wrappedValue.dismiss()
+                    if hasUnsavedChanges {
+                        showCancelConfirmation = true
+                    } else {
+                        presentationMode.wrappedValue.dismiss()
+                    }
                 }
                 .font(.suite(size: 16))
                 .foregroundColor(.gray)
+                .accessibilityHint(hasUnsavedChanges ? "변경사항 확인 후 닫기" : "닫기")
             )
-            .onAppear(perform: setupInitialValues)
+            .confirmationDialog(
+                "변경사항이 저장되지 않았습니다",
+                isPresented: $showCancelConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("변경사항 버리기", role: .destructive) {
+                    clearDraft() // 명시적으로 버리기 선택 — draft 도 함께 제거
+                    didSaveOrDiscard = true
+                    presentationMode.wrappedValue.dismiss()
+                }
+                Button("계속 편집", role: .cancel) {}
+            } message: {
+                Text("수정 중인 내용을 버리고 닫으시겠습니까?")
+            }
+            .alert("이전 작성 내용이 있어요", isPresented: $showDraftRestoreAlert, presenting: pendingDraft) { draft in
+                Button("불러오기") {
+                    applyDraft(draft)
+                    HapticManager.shared.impact(style: .light)
+                    pendingDraft = nil
+                }
+                Button("새로 작성", role: .destructive) {
+                    clearDraft()
+                    pendingDraft = nil
+                }
+            } message: { draft in
+                Text("마지막 작성: \(draft.summaryLabel)\n이어서 작성할까요?")
+            }
+            .onAppear {
+                setupInitialValues()
+                // 신규 작성 모드에서만 draft 복구 제안
+                if schedule == nil, let draft = loadDraft() {
+                    pendingDraft = draft
+                    showDraftRestoreAlert = true
+                }
+            }
+            .onDisappear {
+                // 실수 dismiss / 앱 종료 대비 — 변경사항이 있으면 draft 저장.
+                // 저장 성공 또는 명시적 버리기 경로는 이미 clearDraft() 되었고 플래그로 스킵.
+                guard !didSaveOrDiscard else { return }
+                saveDraftIfNeeded()
+            }
             .alert("오류", isPresented: Binding(
                 get: { errorMessage != nil },
                 set: { if !$0 { errorMessage = nil } }
@@ -145,13 +240,16 @@ struct ScheduleFormView: View {
             } message: {
                 Text(errorMessage ?? "")
             }
-            .sheet(isPresented: $showingAlarmSheet) {
-                alarmSelectionSheet
-            }
-            .sheet(isPresented: $showingRepeatSheet) {
-                repeatSelectionSheet
-            }
         }
+    }
+
+    // 반복 표시 텍스트 — Menu 라벨에 표시. 매주+요일 선택 있으면 풀어서 표시.
+    private var repeatDisplayText: String {
+        if repeatOption == "매주", !selectedWeekdays.isEmpty {
+            let dayList = selectedWeekdays.sorted().map { weekdays[$0] }.joined(separator: ",")
+            return "매주 \(dayList)"
+        }
+        return repeatOption
     }
 
     // MARK: - Section 1: 그룹 및 멤버 선택
@@ -172,42 +270,66 @@ struct ScheduleFormView: View {
                     .foregroundColor(.primary)
             }
 
-            // Group Picker
+            // Group Picker — 편집 모드에서는 수정 불가. "수정 불가" 라벨과 lock 아이콘으로 의도 명시.
             if !viewModel.groups.isEmpty {
-                Menu {
-                    ForEach(viewModel.groups, id: \.sgt_idx) { group in
-                        Button(action: {
-                            selectedGroupId = group.sgt_idx
-                            loadMembers(groupId: group.sgt_idx)
-                        }) {
-                            HStack {
-                                Text(group.sgt_title ?? "알 수 없는 그룹")
-                                if selectedGroupId == group.sgt_idx {
-                                    Image(systemName: "checkmark")
+                let isEditMode = schedule != nil
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 4) {
+                        Text("그룹")
+                            .font(.suite(size: 14, weight: .medium))
+                            .foregroundColor(.gray)
+                        if isEditMode {
+                            HStack(spacing: 2) {
+                                Image(systemName: "lock.fill")
+                                    .font(.suite(size: 10, weight: .semibold))
+                                Text("수정 불가")
+                                    .font(.suite(size: 11, weight: .medium))
+                            }
+                            .foregroundColor(.gray)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.gray.opacity(0.12))
+                            .clipShape(Capsule())
+                        }
+                    }
+
+                    Menu {
+                        ForEach(viewModel.groups, id: \.sgt_idx) { group in
+                            Button(action: {
+                                selectedGroupId = group.sgt_idx
+                                loadMembers(groupId: group.sgt_idx)
+                            }) {
+                                HStack {
+                                    Text(group.sgt_title ?? "알 수 없는 그룹")
+                                    if selectedGroupId == group.sgt_idx {
+                                        Image(systemName: "checkmark")
+                                    }
                                 }
                             }
                         }
+                    } label: {
+                        HStack {
+                            Text(viewModel.groups.first(where: { $0.sgt_idx == selectedGroupId })?.sgt_title ?? "그룹 선택")
+                                .font(.suite(size: 15))
+                                .foregroundColor(isEditMode ? .secondary : .primary)
+                            Spacer()
+                            Image(systemName: isEditMode ? "lock.fill" : "chevron.down")
+                                .font(.suite(size: 13))
+                                .foregroundColor(.gray)
+                        }
+                        .padding(14)
+                        .background(isEditMode ? Color.gray.opacity(0.08) : Color.white)
+                        .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                        )
                     }
-                } label: {
-                    HStack {
-                        Text(viewModel.groups.first(where: { $0.sgt_idx == selectedGroupId })?.sgt_title ?? "그룹 선택")
-                            .font(.suite(size: 15))
-                            .foregroundColor(.primary)
-                        Spacer()
-                        Image(systemName: "chevron.down")
-                            .font(.suite(size: 14))
-                            .foregroundColor(.gray)
-                    }
-                    .padding(14)
-                    .background(Color.white)
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-                    )
-                    .opacity(schedule != nil ? 0.6 : 1.0)
+                    .disabled(isEditMode)
+                    .accessibilityLabel("그룹 선택")
+                    .accessibilityHint(isEditMode ? "편집 중에는 그룹을 바꿀 수 없습니다" : "그룹 선택")
                 }
-                .disabled(schedule != nil)
             }
 
             // Member Selection (Avatar Grid)
@@ -288,8 +410,14 @@ struct ScheduleFormView: View {
             }
         }
         .padding(16)
-        .background(section1BgColor)
-        .cornerRadius(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(section1BgColor)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(SMAPTheme.ScheduleSection.strokeGroup, lineWidth: 1)
+        )
     }
 
     // MARK: - Section 2: 일정 제목 및 내용
@@ -312,33 +440,57 @@ struct ScheduleFormView: View {
 
             // Title Input
             VStack(alignment: .leading, spacing: 6) {
-                HStack {
+                HStack(spacing: 2) {
                     Text("일정 제목")
                         .font(.suite(size: 14, weight: .medium))
                         .foregroundColor(.gray)
                     Text("*")
-                        .foregroundColor(.red)
+                        .foregroundColor(SMAPTheme.Color.error)
+                        .accessibilityLabel("필수")
                 }
 
                 TextField("일정 제목을 입력하세요", text: $title)
                     .font(.suite(size: 15))
+                    .focused($focusedField, equals: .title)
+                    .submitLabel(.next)
+                    .onSubmit { focusedField = .memo }
                     .padding(.horizontal, 14)
                     .frame(height: 52) // 고정 높이
                     .background(Color.white)
                     .cornerRadius(12)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(title.isEmpty ? Color.red.opacity(0.3) : Color.gray.opacity(0.3), lineWidth: 1)
+                            .stroke(
+                                showTitleError ? SMAPTheme.Color.error.opacity(0.6) : Color.gray.opacity(0.3),
+                                lineWidth: showTitleError ? 1.5 : 1
+                            )
                     )
+                    .accessibilityLabel("일정 제목")
+                    .accessibilityValue(title.isEmpty ? "비어 있음" : title)
 
-                HStack {
-                    Text("예) 팀 회의, 프로젝트 미팅 등")
-                        .font(.suite(size: 12))
-                        .foregroundColor(.gray)
-                    Spacer()
-                    Text("\(title.count)/100")
-                        .font(.suite(size: 12))
-                        .foregroundColor(.gray)
+                // 실시간 검증 피드백 — 저장 시도 후 비어있을 때만 경고 노출 (과도한 경고 방지)
+                if showTitleError {
+                    HStack(spacing: 4) {
+                        Image(systemName: "exclamationmark.circle.fill")
+                            .font(.suite(size: 12, weight: .semibold))
+                        Text("필수 입력 항목입니다")
+                            .font(.suite(size: 12, weight: .medium))
+                        Spacer()
+                    }
+                    .foregroundColor(SMAPTheme.Color.error)
+                    .padding(.horizontal, 4)
+                    .accessibilityElement(children: .combine)
+                } else {
+                    HStack {
+                        Text("예) 팀 회의, 프로젝트 미팅 등")
+                            .font(.suite(size: 12))
+                            .foregroundColor(.gray)
+                        Spacer()
+                        Text("\(title.count)/100")
+                            .font(.suite(size: 12))
+                            .foregroundColor(.gray)
+                            .monospacedDigit()
+                    }
                 }
             }
 
@@ -350,6 +502,8 @@ struct ScheduleFormView: View {
 
                 TextEditor(text: $memo)
                     .font(.suite(size: 15))
+                    .focused($focusedField, equals: .memo)
+                    .scrollContentBackground(.hidden)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 8)
                     .frame(height: 100) // 고정 높이 (멀티라인)
@@ -359,6 +513,7 @@ struct ScheduleFormView: View {
                         RoundedRectangle(cornerRadius: 12)
                             .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                     )
+                    .accessibilityLabel("일정 내용")
 
                 HStack {
                     Text("예) 회의 안건, 준비물, 참고사항 등")
@@ -372,8 +527,14 @@ struct ScheduleFormView: View {
             }
         }
         .padding(16)
-        .background(section2BgColor)
-        .cornerRadius(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(section2BgColor)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(SMAPTheme.ScheduleSection.strokeContent, lineWidth: 1)
+        )
     }
 
     // MARK: - Section 3: 날짜 및 시간
@@ -417,19 +578,12 @@ struct ScheduleFormView: View {
                         .foregroundColor(.gray)
                         .frame(width: 50, alignment: .leading)
 
-                    if isAllDay {
-                        DatePicker("", selection: $startDate, displayedComponents: [.date])
-                            .labelsHidden()
-                            .datePickerStyle(CompactDatePickerStyle())
-                            .accentColor(section3BadgeColor)
-                    } else {
-                        DatePickerWith10MinInterval(
-                            selection: $startDate,
-                            displayedComponents: [.date, .hourAndMinute],
-                            accentColor: section3BadgeColor
-                        )
-                        .frame(height: 35)
-                    }
+                    DatePickerWith10MinInterval(
+                        selection: $startDate,
+                        displayedComponents: isAllDay ? [.date] : [.date, .hourAndMinute],
+                        accentColor: section3BadgeColor
+                    )
+                    .frame(height: 35)
                 }
                 .frame(minHeight: 40)
 
@@ -442,19 +596,12 @@ struct ScheduleFormView: View {
                         .foregroundColor(.gray)
                         .frame(width: 50, alignment: .leading)
 
-                    if isAllDay {
-                        DatePicker("", selection: $endDate, displayedComponents: [.date])
-                            .labelsHidden()
-                            .datePickerStyle(CompactDatePickerStyle())
-                            .accentColor(section3BadgeColor)
-                    } else {
-                        DatePickerWith10MinInterval(
-                            selection: $endDate,
-                            displayedComponents: [.date, .hourAndMinute],
-                            accentColor: section3BadgeColor
-                        )
-                        .frame(height: 35)
-                    }
+                    DatePickerWith10MinInterval(
+                        selection: $endDate,
+                        displayedComponents: isAllDay ? [.date] : [.date, .hourAndMinute],
+                        accentColor: section3BadgeColor
+                    )
+                    .frame(height: 35)
                 }
                 .frame(minHeight: 40)
             }
@@ -462,21 +609,39 @@ struct ScheduleFormView: View {
             .background(Color.white)
             .cornerRadius(12)
 
-            // Repeat & Alarm Row (moved from section 4)
+            // Repeat & Alarm Row — Sheet 대신 Menu 로 즉시 선택. 컨텍스트 전환 최소화.
             HStack(spacing: 12) {
-                // Repeat Button
+                // Repeat Menu
                 VStack(alignment: .leading, spacing: 6) {
                     Text("반복")
                         .font(.suite(size: 14, weight: .medium))
                         .foregroundColor(.gray)
 
-                    Button(action: { showingRepeatSheet = true }) {
+                    Menu {
+                        ForEach(repeatOptions, id: \.self) { option in
+                            Button(action: {
+                                repeatOption = option
+                                if option != "매주" {
+                                    selectedWeekdays.removeAll()
+                                }
+                            }) {
+                                HStack {
+                                    Text(option)
+                                    if repeatOption == option {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
                         HStack {
-                            Text(repeatOption == "매주" && !selectedWeekdays.isEmpty ? "매주 \(selectedWeekdays.sorted().map { weekdays[$0] }.joined(separator: ","))" : repeatOption)
+                            Text(repeatDisplayText)
                                 .font(.suite(size: 14))
                                 .foregroundColor(.primary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
                             Spacer()
-                            Image(systemName: "chevron.right")
+                            Image(systemName: "chevron.down")
                                 .font(.suite(size: 12))
                                 .foregroundColor(.gray)
                         }
@@ -488,22 +653,36 @@ struct ScheduleFormView: View {
                                 .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                         )
                     }
+                    .accessibilityLabel("반복 설정")
+                    .accessibilityValue(repeatDisplayText)
                 }
                 .frame(maxWidth: .infinity)
 
-                // Alarm Button
+                // Alarm Menu
                 VStack(alignment: .leading, spacing: 6) {
                     Text("알림")
                         .font(.suite(size: 14, weight: .medium))
                         .foregroundColor(.gray)
 
-                    Button(action: { showingAlarmSheet = true }) {
+                    Menu {
+                        ForEach(alarmOptions, id: \.1) { option in
+                            Button(action: { alarm = option.1 }) {
+                                HStack {
+                                    Text(option.0)
+                                    if alarm == option.1 {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
                         HStack {
                             Text(alarmOptions.first(where: { $0.1 == alarm })?.0 ?? "없음")
                                 .font(.suite(size: 14))
                                 .foregroundColor(.primary)
+                                .lineLimit(1)
                             Spacer()
-                            Image(systemName: "chevron.right")
+                            Image(systemName: "chevron.down")
                                 .font(.suite(size: 12))
                                 .foregroundColor(.gray)
                         }
@@ -515,13 +694,65 @@ struct ScheduleFormView: View {
                                 .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                         )
                     }
+                    .accessibilityLabel("알림 설정")
+                    .accessibilityValue(alarmOptions.first(where: { $0.1 == alarm })?.0 ?? "없음")
                 }
                 .frame(maxWidth: .infinity)
             }
+
+            // "매주" 선택 시에만 요일 버튼 inline 노출 — Sheet 없이 그 자리에서 바로 선택.
+            if repeatOption == "매주" {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("반복 요일")
+                        .font(.suite(size: 13, weight: .medium))
+                        .foregroundColor(.gray)
+
+                    HStack(spacing: 6) {
+                        ForEach(0..<7, id: \.self) { index in
+                            let isSelected = selectedWeekdays.contains(index)
+                            Button(action: {
+                                withAnimation(.easeInOut(duration: 0.15)) {
+                                    if isSelected {
+                                        selectedWeekdays.remove(index)
+                                    } else {
+                                        selectedWeekdays.insert(index)
+                                    }
+                                }
+                            }) {
+                                Text(weekdays[index])
+                                    .font(.suite(size: 13, weight: isSelected ? .bold : .medium))
+                                    .foregroundColor(isSelected ? .white : .primary)
+                                    .frame(maxWidth: .infinity, minHeight: 36)
+                                    .background(
+                                        isSelected ? section3BadgeColor : Color.white
+                                    )
+                                    .cornerRadius(8)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(
+                                                isSelected ? Color.clear : Color.gray.opacity(0.3),
+                                                lineWidth: 1
+                                            )
+                                    )
+                            }
+                            .accessibilityLabel("\(weekdays[index])요일")
+                            .accessibilityValue(isSelected ? "선택됨" : "선택 안됨")
+                            .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : [.isButton])
+                        }
+                    }
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
         .padding(16)
-        .background(section3BgColor)
-        .cornerRadius(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(section3BgColor)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(SMAPTheme.ScheduleSection.strokeDateTime, lineWidth: 1)
+        )
         .onChange(of: startDate) { _, newStartDate in
             // 시작일시가 종료일시 이후로 변경되면 종료일시를 시작일시 + 1시간으로 자동 조정
             if newStartDate >= endDate {
@@ -548,23 +779,43 @@ struct ScheduleFormView: View {
                     .foregroundColor(.primary)
             }
 
-            // Location
+            // Location — 장소 검색 버튼은 선택 상태를 명확히 보여주고, 선택 후 자동 dismiss + Haptic.
             VStack(alignment: .leading, spacing: 6) {
                 Text("장소 정보 (선택)")
                     .font(.suite(size: 14, weight: .medium))
                     .foregroundColor(.gray)
 
-                Button(action: { showingLocationSearch = true }) {
+                Button(action: {
+                    HapticManager.shared.impact(style: .light)
+                    showingLocationSearch = true
+                }) {
                     VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Image(systemName: "mappin.and.ellipse")
-                                .foregroundColor(section4BadgeColor)
+                        HStack(spacing: 8) {
+                            // 선택 전: 아웃라인 핀, 보조 tint / 선택 후: 채워진 핀, 섹션 accent 색
+                            Image(systemName: location.isEmpty ? "mappin.and.ellipse" : "mappin.circle.fill")
+                                .foregroundColor(location.isEmpty ? Color.gray : section4BadgeColor)
+                                .font(.suite(size: 16, weight: .semibold))
                             Text(location.isEmpty ? "장소를 검색하세요" : location)
-                                .font(.suite(size: 14))
+                                .font(.suite(size: 14, weight: location.isEmpty ? .regular : .semibold))
                                 .foregroundColor(location.isEmpty ? .gray : .primary)
+                                .lineLimit(1)
                             Spacer()
-                            Image(systemName: "magnifyingglass")
-                                .foregroundColor(.gray)
+                            if !location.isEmpty {
+                                // 선택 완료 배지 — "방금 선택한 게 반영됐나?" 불안 해소
+                                Text("선택됨")
+                                    .font(.suite(size: 11, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .background(section4BadgeColor)
+                                    .clipShape(Capsule())
+                                Image(systemName: "chevron.right")
+                                    .font(.suite(size: 12, weight: .semibold))
+                                    .foregroundColor(.gray)
+                            } else {
+                                Image(systemName: "magnifyingglass")
+                                    .foregroundColor(.gray)
+                            }
                         }
 
                         if let addr = locationAddress, !addr.isEmpty {
@@ -575,12 +826,42 @@ struct ScheduleFormView: View {
                         }
                     }
                     .padding(12)
-                    .background(Color.white)
+                    .frame(minHeight: 48)
+                    .background(location.isEmpty ? Color.white : section4BadgeColor.opacity(0.06))
                     .cornerRadius(10)
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                            .stroke(
+                                location.isEmpty ? Color.gray.opacity(0.3) : section4BadgeColor.opacity(0.3),
+                                lineWidth: 1
+                            )
                     )
+                }
+                .accessibilityLabel(location.isEmpty ? "장소 검색" : "선택된 장소: \(location)")
+                .accessibilityHint(location.isEmpty ? "장소 검색 시트 열기" : "다른 장소로 변경하려면 탭")
+
+                if !location.isEmpty {
+                    // 빠르게 장소를 비우는 보조 액션
+                    Button {
+                        HapticManager.shared.impact(style: .light)
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            location = ""
+                            locationAddress = nil
+                            locationLat = nil
+                            locationLong = nil
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.suite(size: 12))
+                            Text("장소 지우기")
+                                .font(.suite(size: 12, weight: .medium))
+                        }
+                        .foregroundColor(.gray)
+                        .padding(.horizontal, 8)
+                        .frame(minHeight: 30)
+                    }
+                    .accessibilityLabel("선택된 장소 지우기")
                 }
             }
             .sheet(isPresented: $showingLocationSearch) {
@@ -592,6 +873,9 @@ struct ScheduleFormView: View {
                             self.locationLong = x
                             self.locationLat = y
                         }
+                        // 선택 성공 피드백 + sheet 명시적 dismiss로 체감 응답성 향상.
+                        HapticManager.shared.notification(type: .success)
+                        showingLocationSearch = false
                     }
                 }
             }
@@ -604,6 +888,9 @@ struct ScheduleFormView: View {
 
                 TextField("준비물을 입력하세요", text: $supplies)
                     .font(.suite(size: 14))
+                    .focused($focusedField, equals: .supplies)
+                    .submitLabel(.done)
+                    .onSubmit { focusedField = nil }
                     .padding(.horizontal, 12)
                     .frame(height: 48) // 고정 높이
                     .background(Color.white)
@@ -612,23 +899,69 @@ struct ScheduleFormView: View {
                         RoundedRectangle(cornerRadius: 10)
                             .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                     )
+                    .accessibilityLabel("준비물")
             }
         }
         .padding(16)
-        .background(section4BgColor)
-        .cornerRadius(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(section4BgColor)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(SMAPTheme.ScheduleSection.strokeExtra, lineWidth: 1)
+        )
     }
 
     // MARK: - Save Button
 
     /// 시작일시와 종료일시 유효성 검사
+    // 변경 여부 — 취소 confirmation 조건.
+    // 사용자가 실질적으로 손댄 적 있는 필드 전부를 포함해야 "변경사항 버리기" 경고가 의미 있음.
+    private var hasUnsavedChanges: Bool {
+        title != initialTitleSnapshot
+            || memo != initialMemoSnapshot
+            || startDate != initialStartDateSnapshot
+            || endDate != initialEndDateSnapshot
+            || location != initialLocationSnapshot
+            || supplies != initialSuppliesSnapshot
+            || repeatOption != initialRepeatOptionSnapshot
+            || selectedWeekdays != initialWeekdaysSnapshot
+            || alarm != initialAlarmSnapshot
+            || isAllDay != initialIsAllDaySnapshot
+            || targetMemberId != initialTargetMemberIdSnapshot
+    }
+
     private var isDateValid: Bool {
         endDate > startDate
     }
 
     /// 저장 버튼 활성화 조건
+    // "매주" 반복을 선택했는데 요일이 하나도 없으면 서버 포맷이 비어버리므로 저장 차단.
+    private var isRepeatValid: Bool {
+        repeatOption != "매주" || !selectedWeekdays.isEmpty
+    }
+
     private var canSave: Bool {
-        !title.isEmpty && isDateValid && !isLoading
+        !title.isEmpty && isDateValid && isRepeatValid && !isLoading
+    }
+
+    // 화면 하단 고정 footer. 스크롤 여부와 무관하게 항상 저장 CTA 가 도달 가능한 거리에 있도록.
+    private var stickyFooter: some View {
+        VStack(spacing: 0) {
+            // 배경 위로 얇은 divider — 콘텐츠와 경계 구분
+            Divider()
+                .background(Color.black.opacity(0.05))
+
+            saveButton
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                .padding(.bottom, 8)
+        }
+        .background(
+            SMAPTheme.Adaptive.pageBackground
+                .ignoresSafeArea(edges: .bottom)
+        )
     }
 
     private var saveButton: some View {
@@ -637,14 +970,30 @@ struct ScheduleFormView: View {
             if !isDateValid {
                 HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.orange)
+                        .foregroundColor(SMAPTheme.Color.warning)
                         .font(.suite(size: 14))
                     Text("종료 일시는 시작 일시보다 이후여야 합니다.")
                         .font(.suite(size: 13))
-                        .foregroundColor(.orange)
+                        .foregroundColor(SMAPTheme.Color.warning)
                     Spacer()
                 }
                 .padding(.horizontal, 4)
+                .accessibilityElement(children: .combine)
+            }
+
+            // 반복 유효성 — 매주 선택했는데 요일 0개일 때 가이드
+            if !isRepeatValid {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(SMAPTheme.Color.warning)
+                        .font(.suite(size: 14))
+                    Text("매주 반복할 요일을 1개 이상 선택하세요.")
+                        .font(.suite(size: 13))
+                        .foregroundColor(SMAPTheme.Color.warning)
+                    Spacer()
+                }
+                .padding(.horizontal, 4)
+                .accessibilityElement(children: .combine)
             }
 
             Button(action: saveSchedule) {
@@ -671,120 +1020,6 @@ struct ScheduleFormView: View {
                 .shadow(color: canSave ? SMAPTheme.Color.primary.opacity(0.3) : Color.clear, radius: 8, x: 0, y: 4)
             }
             .disabled(!canSave)
-        }
-    }
-
-    // MARK: - Alarm Selection Sheet
-    private var alarmSelectionSheet: some View {
-        NavigationStack {
-            List {
-                ForEach(alarmOptions, id: \.1) { option in
-                    Button(action: {
-                        alarm = option.1
-                        showingAlarmSheet = false
-                    }) {
-                        HStack {
-                            Text(option.0)
-                                .font(.suite(size: 16))
-                                .foregroundColor(.primary)
-                            Spacer()
-                            if alarm == option.1 {
-                                Image(systemName: "checkmark")
-                                    .foregroundColor(section4BadgeColor)
-                            }
-                        }
-                    }
-                }
-            }
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Text("알림 설정")
-                        .font(.suite(size: 17, weight: .semibold))
-                }
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .navigationBarItems(trailing: Button("완료") { showingAlarmSheet = false }.font(.suite(size: 16)))
-        }
-    }
-
-    // MARK: - Repeat Selection Sheet
-    private var repeatSelectionSheet: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                List {
-                    ForEach(repeatOptions, id: \.self) { option in
-                        Button(action: {
-                            repeatOption = option
-                            if option != "매주" {
-                                selectedWeekdays.removeAll()
-                                showingRepeatSheet = false
-                            }
-                        }) {
-                            HStack {
-                                Text(option)
-                                    .font(.suite(size: 16))
-                                    .foregroundColor(.primary)
-                                Spacer()
-                                if repeatOption == option {
-                                    Image(systemName: "checkmark")
-                                        .foregroundColor(section3BadgeColor)
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Weekday Selection (if 매주 selected)
-                if repeatOption == "매주" {
-                    VStack(spacing: 12) {
-                        Text("반복할 요일 선택")
-                            .font(.suite(size: 14, weight: .medium))
-                            .foregroundColor(.gray)
-
-                        HStack(spacing: 10) {
-                            ForEach(0..<7) { index in
-                                Button(action: {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                        if selectedWeekdays.contains(index) {
-                                            selectedWeekdays.remove(index)
-                                        } else {
-                                            selectedWeekdays.insert(index)
-                                        }
-                                    }
-                                }) {
-                                    Text(weekdays[index])
-                                        .font(.suite(size: 14, weight: .bold))
-                                        .frame(width: 38, height: 38)
-                                        .background(selectedWeekdays.contains(index) ? section3BadgeColor : Color.gray.opacity(0.1))
-                                        .foregroundColor(selectedWeekdays.contains(index) ? .white : .primary)
-                                        .clipShape(Circle())
-                                }
-                            }
-                        }
-
-                        Button("완료") {
-                            showingRepeatSheet = false
-                        }
-                        .font(.suite(size: 16, weight: .bold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 40)
-                        .padding(.vertical, 12)
-                        .background(section3BadgeColor)
-                        .cornerRadius(10)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 20)
-                    .background(section3BgColor)
-                }
-            }
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Text("반복 설정")
-                        .font(.suite(size: 17, weight: .semibold))
-                }
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .navigationBarItems(trailing: Button("완료") { showingRepeatSheet = false }.font(.suite(size: 16)))
         }
     }
 
@@ -840,6 +1075,19 @@ struct ScheduleFormView: View {
                 targetMemberId = mtIdx
             }
         }
+
+        // 변경 여부 판단을 위한 초기 스냅샷 — 모든 편집 가능 필드 포함.
+        initialTitleSnapshot = title
+        initialMemoSnapshot = memo
+        initialStartDateSnapshot = startDate
+        initialEndDateSnapshot = endDate
+        initialLocationSnapshot = location
+        initialSuppliesSnapshot = supplies
+        initialRepeatOptionSnapshot = repeatOption
+        initialWeekdaysSnapshot = selectedWeekdays
+        initialAlarmSnapshot = alarm
+        initialIsAllDaySnapshot = isAllDay
+        initialTargetMemberIdSnapshot = targetMemberId
     }
 
     // Helper function to convert alarm text to minutes
@@ -880,15 +1128,20 @@ struct ScheduleFormView: View {
     private func saveSchedule() {
         // 유효성 검사
         guard !title.isEmpty else {
+            showTitleError = true
+            HapticManager.shared.notification(type: .warning)
             errorMessage = "일정 제목을 입력해주세요."
             return
         }
 
         guard endDate > startDate else {
+            HapticManager.shared.notification(type: .warning)
             errorMessage = "종료 일시는 시작 일시보다 이후여야 합니다."
             return
         }
 
+        // 입력 통과 — 에러 표시 해제
+        showTitleError = false
         isLoading = true
 
         let formatter = DateFormatter()
@@ -1036,19 +1289,128 @@ struct ScheduleFormView: View {
                         NotificationCenter.default.post(name: NSNotification.Name("scheduleDataChanged"), object: nil)
                         print("📢 [ScheduleFormView] Posted scheduleDataChanged notification")
 
+                        // 저장 성공 피드백 — "정말 저장됐나?" 불안감 해소
+                        HapticManager.shared.notification(type: .success)
+                        clearDraft() // 저장 성공 → draft 제거 (onDisappear 에서 재저장되지 않도록)
+                        didSaveOrDiscard = true
                         onSave()
                         presentationMode.wrappedValue.dismiss()
                     } else {
+                        HapticManager.shared.notification(type: .error)
                         errorMessage = "저장에 실패했습니다."
                     }
                     isLoading = false
                 }
             } catch {
                 DispatchQueue.main.async {
+                    HapticManager.shared.notification(type: .error)
                     errorMessage = error.localizedDescription
                     isLoading = false
                 }
             }
         }
+    }
+
+    // MARK: - Draft Persistence (신규 작성 한정)
+
+    /// 현재 폼 상태를 UserDefaults draft 로 저장.
+    /// - 편집 모드(schedule != nil) 에서는 저장하지 않음 (원본과 충돌 방지).
+    /// - `hasUnsavedChanges == false` 이면 호출 의미 없음.
+    private func saveDraftIfNeeded() {
+        guard schedule == nil, hasUnsavedChanges else { return }
+        let draft = ScheduleDraft(
+            title: title,
+            memo: memo,
+            startDate: startDate,
+            endDate: endDate,
+            isAllDay: isAllDay,
+            location: location,
+            locationAddress: locationAddress,
+            locationLat: locationLat,
+            locationLong: locationLong,
+            supplies: supplies,
+            repeatOption: repeatOption,
+            selectedWeekdays: Array(selectedWeekdays),
+            alarm: alarm,
+            targetMemberId: targetMemberId,
+            selectedGroupId: selectedGroupId,
+            savedAt: Date()
+        )
+        if let data = try? JSONEncoder().encode(draft) {
+            UserDefaults.standard.set(data, forKey: draftUserDefaultsKey)
+        }
+    }
+
+    /// 저장된 draft 를 로드. 없거나 파싱 실패 시 nil.
+    private func loadDraft() -> ScheduleDraft? {
+        guard schedule == nil,
+              let data = UserDefaults.standard.data(forKey: draftUserDefaultsKey),
+              let draft = try? JSONDecoder().decode(ScheduleDraft.self, from: data) else {
+            return nil
+        }
+        // 24시간 넘은 draft 는 노이즈 — 자동 폐기.
+        if Date().timeIntervalSince(draft.savedAt) > 60 * 60 * 24 {
+            clearDraft()
+            return nil
+        }
+        return draft
+    }
+
+    /// draft 를 폼 상태로 복원.
+    private func applyDraft(_ draft: ScheduleDraft) {
+        title = draft.title
+        memo = draft.memo
+        startDate = draft.startDate
+        endDate = draft.endDate
+        isAllDay = draft.isAllDay
+        location = draft.location
+        locationAddress = draft.locationAddress
+        locationLat = draft.locationLat
+        locationLong = draft.locationLong
+        supplies = draft.supplies
+        repeatOption = draft.repeatOption
+        selectedWeekdays = Set(draft.selectedWeekdays)
+        alarm = draft.alarm
+        targetMemberId = draft.targetMemberId
+        if draft.selectedGroupId > 0 {
+            selectedGroupId = draft.selectedGroupId
+            loadMembers(groupId: draft.selectedGroupId)
+        }
+    }
+
+    /// draft 제거.
+    private func clearDraft() {
+        UserDefaults.standard.removeObject(forKey: draftUserDefaultsKey)
+    }
+}
+
+// 신규 일정 작성 draft. 편집 모드에서는 사용하지 않음.
+private struct ScheduleDraft: Codable {
+    var title: String
+    var memo: String
+    var startDate: Date
+    var endDate: Date
+    var isAllDay: Bool
+    var location: String
+    var locationAddress: String?
+    var locationLat: Double?
+    var locationLong: Double?
+    var supplies: String
+    var repeatOption: String
+    var selectedWeekdays: [Int]
+    var alarm: Int
+    var targetMemberId: Int
+    var selectedGroupId: Int
+    var savedAt: Date
+
+    /// 복구 제안 Alert 에 쓰일 요약 — 제목이 있으면 그걸, 없으면 날짜/시간으로.
+    var summaryLabel: String {
+        if !title.trimmingCharacters(in: .whitespaces).isEmpty {
+            return title
+        }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.dateFormat = "M월 d일 HH:mm"
+        return formatter.string(from: startDate)
     }
 }

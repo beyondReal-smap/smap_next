@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.dmonster.smap.data.model.SmapSchedule
+import com.dmonster.smap.ui.common.rememberSmapHaptics
 import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.SuiteFont
 import com.dmonster.smap.ui.theme.responsiveSp
@@ -34,6 +35,8 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 fun ScheduleScreen(
     viewModel: ScheduleViewModel = hiltViewModel()
 ) {
+    val haptics = rememberSmapHaptics()
+
     // Collect States
     val currentMonth by viewModel.currentMonth.collectAsState()
     val selectedDate by viewModel.selectedDate.collectAsState()
@@ -78,16 +81,18 @@ fun ScheduleScreen(
     // Snackbar
     val snackbarHostState = remember { SnackbarHostState() }
     
-    // Handle messages
+    // Handle messages — 피드백에 Haptic 동반
     LaunchedEffect(errorMessage) {
         errorMessage?.let {
+            haptics.error()
             snackbarHostState.showSnackbar(it, duration = SnackbarDuration.Short)
             viewModel.clearError()
         }
     }
-    
+
     LaunchedEffect(successMessage) {
         successMessage?.let {
+            haptics.success()
             snackbarHostState.showSnackbar(it, duration = SnackbarDuration.Short)
             viewModel.clearSuccess()
         }
@@ -220,7 +225,7 @@ fun ScheduleScreen(
                         )
                     }
                 } else {
-                    items(selectedDateSchedules) { schedule ->
+                    items(selectedDateSchedules, key = { it.sstIdx }) { schedule ->
                         val canManage = viewModel.canManageSchedule(schedule)
                         EventCard(
                             schedule = schedule,
@@ -360,6 +365,7 @@ fun ScheduleScreen(
             isRepeat = isRepeat,
             onDismiss = { viewModel.hideDeleteDialog() },
             onConfirm = { deleteOption ->
+                haptics.warning() // 삭제 확정 피드백
                 viewModel.deleteSchedule(schedule.sstIdx, schedule.sgtIdx ?: 0, deleteOption)
             },
             isLoading = isActionLoading

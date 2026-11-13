@@ -27,10 +27,17 @@ import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.dmonster.smap.ui.common.rememberSmapHaptics
+import com.dmonster.smap.ui.theme.AccentColors
 import com.dmonster.smap.ui.theme.BrandColors
+import com.dmonster.smap.ui.theme.SettingsColors
 import com.dmonster.smap.ui.theme.SuiteFont
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.foundation.text.KeyboardActions
 
-data class WithdrawReasonData(val id: Int, val icon: String, val text: String)
+data class WithdrawReasonData(val id: Int, val icon: ImageVector, val text: String)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,12 +58,13 @@ fun WithdrawScreen(
     var errorMessage by remember { mutableStateOf("") }
     var showConfirmWithdrawAlert by remember { mutableStateOf(false) }
     
+    // 이모지 대신 Material 아이콘 사용(시각 일관성·접근성). 사유 텍스트가 의미를 전달하므로 아이콘은 장식.
     val reasonsArr = listOf(
-        WithdrawReasonData(1, "😴", "자주 사용하지 않아요"),
-        WithdrawReasonData(2, "🚫", "원하는 기능 부족"),
-        WithdrawReasonData(3, "😕", "서비스가 불편해요"),
-        WithdrawReasonData(4, "🔒", "개인정보 우려"),
-        WithdrawReasonData(5, "❓", "기타 이유")
+        WithdrawReasonData(1, Icons.Filled.Bedtime, "자주 사용하지 않아요"),
+        WithdrawReasonData(2, Icons.Filled.Block, "원하는 기능 부족"),
+        WithdrawReasonData(3, Icons.Filled.SentimentDissatisfied, "서비스가 불편해요"),
+        WithdrawReasonData(4, Icons.Filled.Lock, "개인정보 우려"),
+        WithdrawReasonData(5, Icons.Filled.HelpOutline, "기타 이유")
     )
     
     val isSocialLogin = user?.mtType in listOf(2, 3, 4)
@@ -100,7 +108,7 @@ fun WithdrawScreen(
                     if (errorMessage.isNotEmpty()) {
                         Text(
                             text = errorMessage,
-                            color = Color(0xFFDC2626),
+                            color = BrandColors.Error,
                             fontSize = 13.sp,
                             fontFamily = SuiteFont,
                             modifier = Modifier.padding(bottom = 12.dp)
@@ -134,7 +142,7 @@ fun WithdrawScreen(
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (canProceed) {
-                                if (currentStep == 3) Color(0xFFDC2626) else BrandColors.Primary
+                                if (currentStep == 3) BrandColors.Error else BrandColors.Primary
                             } else Color.Gray.copy(alpha = 0.3f),
                             contentColor = Color.White
                         ),
@@ -154,7 +162,7 @@ fun WithdrawScreen(
                 }
             }
         },
-        containerColor = Color(0xFFF7F7F7)
+        containerColor = SettingsColors.PageBackground
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -208,6 +216,7 @@ fun WithdrawScreen(
         }
     }
 
+    val withdrawHaptics = rememberSmapHaptics()
     if (showConfirmWithdrawAlert) {
         AlertDialog(
             onDismissRequest = { showConfirmWithdrawAlert = false },
@@ -217,6 +226,7 @@ fun WithdrawScreen(
                 TextButton(
                     onClick = {
                         showConfirmWithdrawAlert = false
+                        withdrawHaptics.warning()
                         val primaryReason = selectedReasons.firstOrNull() ?: "기타 이유"
                         val reasonMapping = mapOf(
                             "자주 사용하지 않아요" to 1,
@@ -235,7 +245,7 @@ fun WithdrawScreen(
                         )
                     }
                 ) {
-                    Text("탈퇴", color = Color(0xFFDC2626), fontFamily = SuiteFont, fontWeight = FontWeight.Bold)
+                    Text("탈퇴", color = BrandColors.Error, fontFamily = SuiteFont, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -338,6 +348,7 @@ fun StepOneContent(
                 }
             }
         } else {
+            val focusManager = LocalFocusManager.current
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("비밀번호", fontFamily = SuiteFont, fontSize = 14.sp, color = Color.Gray)
                 OutlinedTextField(
@@ -348,21 +359,31 @@ fun StepOneContent(
                     placeholder = { Text("현재 비밀번호", fontFamily = SuiteFont) },
                     visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
-                        IconButton(onClick = { onToggleShowPassword(!showPassword) }) {
+                        IconButton(
+                            onClick = { onToggleShowPassword(!showPassword) },
+                            modifier = Modifier.size(48.dp)
+                        ) {
                             Icon(
                                 imageVector = if (showPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                contentDescription = null,
+                                contentDescription = if (showPassword) "비밀번호 숨기기" else "비밀번호 표시",
                                 tint = Color.Gray
                             )
                         }
                     },
+                    singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = Color.White,
                         unfocusedContainerColor = Color.White,
                         focusedBorderColor = BrandColors.Primary,
                         unfocusedBorderColor = Color.Transparent
                     ),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Password,
+                        imeAction = ImeAction.Done,
+                        autoCorrectEnabled = false,
+                        capitalization = KeyboardCapitalization.None
+                    ),
+                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
                 )
             }
         }
@@ -439,7 +460,7 @@ fun StepTwoContent(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Text(reason.icon, fontSize = 20.sp)
+                        androidx.compose.material3.Icon(reason.icon, contentDescription = null, modifier = Modifier.size(22.dp), tint = if (isSelected) BrandColors.Primary else BrandColors.TextSecondary)
                         Text(
                             text = reason.text,
                             fontFamily = SuiteFont,
@@ -506,7 +527,7 @@ fun StepThreeContent(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
-                    androidx.compose.material3.Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(20.dp), tint = Color(0xFFF59E0B))
+                    androidx.compose.material3.Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(20.dp), tint = AccentColors.Orange)
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text("계정 정보 및 데이터 영구 삭제", fontFamily = SuiteFont, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                         Text(
@@ -522,7 +543,7 @@ fun StepThreeContent(
                 }
                 
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
-                    androidx.compose.material3.Icon(Icons.AutoMirrored.Filled.EventNote, contentDescription = null, modifier = Modifier.size(20.dp), tint = Color(0xFFF59E0B))
+                    androidx.compose.material3.Icon(Icons.AutoMirrored.Filled.EventNote, contentDescription = null, modifier = Modifier.size(20.dp), tint = AccentColors.Orange)
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text("재가입 제한 안내", fontFamily = SuiteFont, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                         Text(
@@ -542,7 +563,10 @@ fun StepThreeContent(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { onAgreementChange(!agreement) }
+                .heightIn(min = 48.dp)
+                .clickable(
+                    role = androidx.compose.ui.semantics.Role.Checkbox
+                ) { onAgreementChange(!agreement) }
                 .padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically

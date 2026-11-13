@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 import NMapsMap
 
 // MARK: - ActivityLog Implementation (Consolidated)
@@ -38,17 +39,19 @@ struct ActivityLogSidebarView: View {
         }
         .frame(width: 320)
         .background(
-            Color(red: 245/255, green: 247/255, blue: 250/255)
+            SMAPTheme.Adaptive.sidebarBackground
                 .ignoresSafeArea()
         )
         .cornerRadius(24, corners: [.topRight, .bottomRight])
+        // Home/MyPlace 사이드바와 동일한 depth
         .shadow(color: Color.black.opacity(0.15), radius: 20, x: 5, y: 0)
     }
     
     // MARK: - Header
-    
+    // 홈·MyPlace 사이드바와 동일한 2요소 구조 + spacing 16pt 통일.
+    // 닫기는 dim 오버레이 탭·드래그로 가능.
     private var sidebarHeader: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 16) {
             ZStack {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(SMAPTheme.Color.primary)
@@ -56,7 +59,7 @@ struct ActivityLogSidebarView: View {
                 Image(systemName: "clock.arrow.circlepath")
                     .foregroundColor(.white)
             }
-            
+
             VStack(alignment: .leading, spacing: 2) {
                 Text("로그 조회")
                     .font(.suite(size: 20, weight: .bold))
@@ -64,20 +67,6 @@ struct ActivityLogSidebarView: View {
                     .font(.suite(size: 15))
                     .foregroundColor(.secondary)
             }
-            
-            Spacer()
-            
-            Button(action: {
-                viewModel.closeSidebar()
-            }) {
-                Image(systemName: "xmark")
-                    .font(.suite(size: 16, weight: .medium))
-                    .foregroundColor(.gray)
-                    .frame(width: 32, height: 32)
-                    .background(Color.white.opacity(0.6))
-                    .clipShape(Circle())
-            }
-            .accessibilityLabel("닫기")
         }
     }
     
@@ -86,7 +75,7 @@ struct ActivityLogSidebarView: View {
     private var groupSelectorSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Circle().fill(Color.red).frame(width: 8, height: 8)
+                Circle().fill(SMAPTheme.Semantic.indicatorGroup).frame(width: 8, height: 8)
                 Text("그룹 목록")
                     .font(.suite(size: 16, weight: .bold))
             }
@@ -181,25 +170,23 @@ struct ActivityLogSidebarView: View {
     }
     
     private var emptyMemberView: some View {
-        VStack(spacing: 12) {
-            Circle()
-                .fill(Color.gray.opacity(0.1))
-                .frame(width: 48, height: 48)
-                .overlay(
-                    Image(systemName: "person.fill")
-                        .foregroundColor(.gray)
-                )
-            
-            Text("그룹 멤버가 없습니다")
-                .font(.suite(size: 16, weight: .medium))
-                .foregroundColor(.gray)
-            
-            Text("그룹을 선택하거나 멤버를 초대해보세요")
-                .font(.suite(size: 14))
+        VStack(spacing: 10) {
+            Image(systemName: "person.2.slash")
+                .font(.suite(size: 28, weight: .light))
+                .foregroundColor(SMAPTheme.Color.primary.opacity(0.4))
+                .accessibilityHidden(true)
+            Text("아직 그룹 멤버가 없어요")
+                .font(.suite(size: 15, weight: .semibold))
+                .foregroundColor(.primary)
+            Text("그룹을 선택하거나\n새 멤버를 초대해보세요")
+                .font(.suite(size: 12))
                 .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 24)
+        .padding(.vertical, 20)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -214,12 +201,12 @@ struct ActivityLogMemberCell: View {
     let onDateTap: (String) -> Void
     
     
-    private let pinkColor = Color(red: 236/255, green: 72/255, blue: 153/255)
-    private let indigoColor = Color(red: 99/255, green: 102/255, blue: 241/255)
+    private var pinkColor: Color { SMAPTheme.Accent.pink }
+    private var indigoColor: Color { SMAPTheme.Accent.indigo }
     
     var body: some View {
         Button(action: onMemberTap) {
-            HStack(spacing: 16) {
+            HStack(spacing: 12) {
                 // Left: Avatar + Nickname
                 VStack(spacing: 8) {
                     // Avatar
@@ -249,10 +236,12 @@ struct ActivityLogMemberCell: View {
                     
                     // Display Name (Nickname below Avatar)
                     Text(isSelf ? "\(member.displayName) (나)" : member.displayName)
-                        .font(.suite(size: 14, weight: .medium))
+                        .font(.suite(size: 13, weight: .medium))
                         .foregroundColor(.primary)
                         .lineLimit(1)
-                        .frame(width: 65) // Limit text width to align with avatar column
+                        .truncationMode(.tail)
+                        .minimumScaleFactor(0.75)
+                        .frame(width: 52) // 캘린더 오버플로우 방지 — 52pt 로 축소
                 }
                 
                 // Right: 14-Day Calendar
@@ -278,28 +267,39 @@ struct ActivityLogMemberCell: View {
                 Text("2주간 활동")
                     .font(.suite(size: 13))
                     .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
                 Spacer()
                 Text("\(member.activeDaysCount)/14일")
                     .font(.suite(size: 13))
                     .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .monospacedDigit()
             }
             
-            // Day of Week Headers
-            HStack(spacing: 6) {
+            // Day of Week Headers — 캘린더 셀(20pt 히트·시각)과 가로 정렬 맞춤
+            HStack(spacing: 3) {
                 ForEach(0..<7) { index in
                     let dayInfo = getDayInfo(for: 13 - index)
-                    
+
+                    // 캘린더 관례: 일요일 빨강, 토요일 파랑. 다크모드 자동 대응 위해 systemRed/systemBlue 사용.
+                    let sundayColor = Color(UIColor.systemRed)
+                    let saturdayColor = Color(UIColor.systemBlue)
                     Text(dayInfo.dayOfWeek)
                         .font(.suite(size: 11, weight: .bold))
-                        .foregroundColor(dayInfo.isWeekend ? (dayInfo.isSunday ? .red : .blue) : .gray)
-                        .frame(width: 16)
-                        .background(dayInfo.isWeekend ? (dayInfo.isSunday ? Color.red.opacity(0.1) : Color.blue.opacity(0.1)) : Color.gray.opacity(0.05))
+                        .foregroundColor(dayInfo.isWeekend ? (dayInfo.isSunday ? sundayColor : saturdayColor) : .gray)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                        .frame(width: 20)
+                        .background(dayInfo.isWeekend ? (dayInfo.isSunday ? sundayColor.opacity(0.1) : saturdayColor.opacity(0.1)) : Color.gray.opacity(0.05))
                         .cornerRadius(2)
+                        .accessibilityHidden(true)
                 }
             }
             
             // First Row (7 days ago to 13 days ago)
-            HStack(spacing: 6) {
+            HStack(spacing: 3) {
                 ForEach(0..<7) { col in
                     let dayIndex = col  // 0-6: 13일전 ~ 7일전
                     let offset = 13 - col
@@ -307,18 +307,19 @@ struct ActivityLogMemberCell: View {
                     let hasActivity = member.activityDistribution[dayIndex]
                     let isSelectedDate = dateString == selectedDate && isSelected
                     let isToday = offset == 0
-                    
+
                     CalendarDayCell(
                         hasActivity: hasActivity,
                         isSelected: isSelectedDate,
                         isToday: isToday,
+                        dayLabel: isToday ? "오늘" : "\(offset)일 전",
                         onTap: hasActivity ? { onDateTap(dateString) } : nil
                     )
                 }
             }
-            
+
             // Second Row (Today to 6 days ago)
-            HStack(spacing: 6) {
+            HStack(spacing: 3) {
                 ForEach(0..<7) { col in
                     let dayIndex = 7 + col  // 7-13: 6일전 ~ 오늘
                     let offset = 6 - col
@@ -326,11 +327,12 @@ struct ActivityLogMemberCell: View {
                     let hasActivity = member.activityDistribution[dayIndex]
                     let isSelectedDate = dateString == selectedDate && isSelected
                     let isToday = offset == 0
-                    
+
                     CalendarDayCell(
                         hasActivity: hasActivity,
                         isSelected: isSelectedDate,
                         isToday: isToday,
+                        dayLabel: isToday ? "오늘" : "\(offset)일 전",
                         onTap: hasActivity ? { onDateTap(dateString) } : nil
                     )
                 }
@@ -341,10 +343,14 @@ struct ActivityLogMemberCell: View {
                 Text("1주전")
                     .font(.suite(size: 12))
                     .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
                 Spacer()
                 Text("오늘")
                     .font(.suite(size: 12, weight: .semibold))
                     .foregroundColor(indigoColor)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
             }
         }
         .padding(8)
@@ -395,62 +401,71 @@ struct CalendarDayCell: View {
     let hasActivity: Bool
     let isSelected: Bool
     let isToday: Bool
+    var dayLabel: String = "" // VoiceOver 용 — "N일 전" / "오늘" 등
     let onTap: (() -> Void)?
-    
-    private let pinkColor = Color(red: 236/255, green: 72/255, blue: 153/255)
-    private let indigoColor = Color(red: 99/255, green: 102/255, blue: 241/255)
-    
+
+    private var pinkColor: Color { SMAPTheme.Accent.pink }
+    private var indigoColor: Color { SMAPTheme.Accent.indigo }
+
     var body: some View {
         Button(action: {
             onTap?()
         }) {
             ZStack {
                 if isSelected {
-                    RoundedRectangle(cornerRadius: 4)
+                    RoundedRectangle(cornerRadius: 5)
                         .fill(
                             LinearGradient(
-                                gradient: Gradient(colors: [pinkColor, Color(red: 244/255, green: 63/255, blue: 94/255)]),
+                                gradient: Gradient(colors: [pinkColor, SMAPTheme.Accent.pinkDeep]),
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
                         .overlay(
-                            RoundedRectangle(cornerRadius: 4)
+                            RoundedRectangle(cornerRadius: 5)
                                 .stroke(pinkColor.opacity(0.6), lineWidth: 1)
                         )
                         .shadow(color: pinkColor.opacity(0.3), radius: 2)
                 } else if hasActivity {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(indigoColor.opacity(0.8))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 4)
-                                .stroke(indigoColor.opacity(0.3), lineWidth: 0.5)
-                        )
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(indigoColor.opacity(0.85))
                 } else {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.gray.opacity(0.1))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 4)
-                                .stroke(Color.gray.opacity(0.2), lineWidth: 0.5)
-                        )
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(Color.gray.opacity(0.12))
                 }
-                
+
                 if isToday {
+                    // "오늘" 식별성 강화 — 점 유지 + 외곽 테두리 (아래 overlay)
                     Text("●")
                         .font(.suite(size: 8))
-                        .foregroundColor(isSelected || hasActivity ? .white : .gray)
+                        .foregroundColor(isSelected || hasActivity ? .white : indigoColor)
                 }
             }
-            .frame(width: 16, height: 16)
+            .frame(width: 18, height: 18)
             .overlay(
-                isToday ?
-                RoundedRectangle(cornerRadius: 4)
-                    .stroke(indigoColor, lineWidth: 1.5)
-                : nil
+                isToday
+                    ? RoundedRectangle(cornerRadius: 5).stroke(indigoColor, lineWidth: 1.5)
+                    : nil
             )
+            // 시각 18pt + 주변 4pt spacing = 실질 히트 영역 ~22pt. 사이드바 폭(320pt)을 넘지 않도록 제한.
+            .frame(minWidth: 20, minHeight: 20)
+            .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
         .disabled(onTap == nil)
+        .accessibilityLabel(accessibilityDescription)
+        .accessibilityAddTraits(
+            onTap == nil ? [] : (isSelected ? [.isButton, .isSelected] : [.isButton])
+        )
+    }
+
+    private var accessibilityDescription: String {
+        var parts: [String] = []
+        if !dayLabel.isEmpty { parts.append(dayLabel) }
+        parts.append(hasActivity ? "활동 있음" : "활동 없음")
+        if isToday { parts.append("오늘") }
+        if isSelected { parts.append("선택됨") }
+        return parts.joined(separator: ", ")
     }
 }
 
@@ -494,34 +509,46 @@ struct ActivityLogView: View {
                 Spacer()
             }
             
-            // 3. Empty State (no member selected)
+            // 3. Empty State (no member selected) — 사용자 action CTA 명확화 + 44pt 터치 타겟
             if viewModel.selectedMemberId == nil && !viewModel.isLoading {
                 VStack {
                     Spacer()
-                    VStack(spacing: 16) {
-                        Image(systemName: "clock.arrow.circlepath")
-                            .font(.system(size: 40))
-                            .foregroundColor(.gray.opacity(0.4))
-                        Text("멤버를 선택하면\n활동 로그를 확인할 수 있습니다")
-                            .font(.suite(size: 15))
+                    VStack(spacing: 14) {
+                        Image(systemName: "figure.walk.motion")
+                            .font(.suite(size: 36, weight: .light))
+                            .foregroundColor(SMAPTheme.Accent.indigo.opacity(0.5))
+                            .accessibilityHidden(true)
+                        Text("누구의 활동을 볼까요?")
+                            .font(.suite(size: 17, weight: .bold))
+                            .foregroundColor(.primary)
+                        Text("사이드바에서 그룹 멤버를 선택하면\n14일간의 이동 경로와 활동 요약을 볼 수 있어요")
+                            .font(.suite(size: 13))
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
-                        Button(action: { viewModel.toggleSidebar() }) {
+                            .fixedSize(horizontal: false, vertical: true)
+                        Button(action: {
+                            HapticManager.shared.impact(style: .light)
+                            viewModel.toggleSidebar()
+                        }) {
                             HStack(spacing: 6) {
-                                Image(systemName: "person.fill")
+                                Image(systemName: "person.2.fill")
                                 Text("멤버 선택하기")
+                                    .font(.suite(size: 14, weight: .semibold))
                             }
-                            .font(.suite(size: 14, weight: .medium))
                             .foregroundColor(.white)
                             .padding(.horizontal, 20)
-                            .padding(.vertical, 10)
+                            .frame(height: 44) // HIG 터치 타겟
                             .background(SMAPTheme.Color.primary)
-                            .cornerRadius(20)
+                            .clipShape(Capsule())
+                            .contentShape(Rectangle())
                         }
+                        .accessibilityHint("그룹 멤버 목록 열기")
                     }
+                    .padding(.horizontal, 24)
                     Spacer()
                 }
                 .frame(maxWidth: .infinity)
+                .accessibilityElement(children: .contain)
             }
 
             // 4. Floating Info Card
@@ -809,14 +836,20 @@ struct ActivityLogFloatingCard: View {
                             Text(memberName)
                                 .font(.suite(size: 14, weight: .bold))
                                 .foregroundColor(.black)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
                             Text("의 기록")
                                 .font(.suite(size: 12))
                                 .foregroundColor(.gray)
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
                         }
-                        
+
                         Text(displayDate)
                             .font(.suite(size: 12, weight: .medium))
                             .foregroundColor(SMAPTheme.Color.primary)
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
                     }
                 }
                 
@@ -825,15 +858,15 @@ struct ActivityLogFloatingCard: View {
                     .fill(Color.gray.opacity(0.2))
                     .frame(width: 1, height: 32)
                 
-                // Stats
+                // Stats — 의미 기반 색상(systemRed/Orange/Blue)으로 다크모드 대응 + 접근성 라벨 명시
                 if isLoading {
                     ProgressView()
                         .frame(width: 100)
                 } else {
                     HStack(spacing: 12) {
-                        StatItem(icon: "arrow.up.right", color: .red, value: distance)
-                        StatItem(icon: "clock", color: .yellow, value: duration)
-                        StatItem(icon: "figure.walk", color: .blue, value: steps)
+                        StatItem(icon: "arrow.up.right", color: Color(UIColor.systemRed), value: distance, label: "이동 거리")
+                        StatItem(icon: "clock", color: Color(UIColor.systemOrange), value: duration, label: "소요 시간")
+                        StatItem(icon: "figure.walk", color: Color(UIColor.systemBlue), value: steps, label: "걸음 수")
                     }
                 }
             }
@@ -866,25 +899,30 @@ struct StatItem: View {
     let icon: String
     let color: Color
     let value: String
-    
+    var label: String = "" // VoiceOver 용 — 시각 라벨은 유지하지 않음 (공간 절약)
+
     var body: some View {
         VStack(spacing: 4) {
             Circle()
-                .fill(color.opacity(0.8))
+                .fill(color.opacity(0.85))
                 .frame(width: 24, height: 24)
                 .overlay(
                     Image(systemName: icon)
                         .font(.suite(size: 12, weight: .bold))
                         .foregroundColor(.white)
                 )
-            
+                .accessibilityHidden(true)
+
             Text(value)
                 .font(.suite(size: 12, weight: .semibold))
                 .foregroundColor(.gray)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
+                .monospacedDigit()
         }
         .frame(minWidth: 50)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(label.isEmpty ? value : "\(label) \(value)")
     }
 }
 
@@ -907,7 +945,7 @@ struct PathSliderView: View {
                     .frame(width: 28, height: 28)
                     .overlay(
                         Image(systemName: "play.fill")
-                            .font(.system(size: 12))
+                            .font(.suite(size: 12))
                             .foregroundColor(.white)
                     )
                 
@@ -1015,8 +1053,8 @@ struct FloatingActionLogButton: View {
     let action: () -> Void
     
     
-    private let pinkColor = Color(red: 236/255, green: 72/255, blue: 153/255)
-    
+    private var pinkColor: Color { SMAPTheme.Accent.pink }
+
     var body: some View {
         Button(action: action) {
             ZStack(alignment: .topTrailing) {
@@ -1338,7 +1376,7 @@ struct ActivityLogMapView: UIViewRepresentable {
     }
     
     private func generateStayMarkerImage(number: Int, duration: String, color: UIColor, size: CGFloat = 30) -> (image: UIImage, anchor: CGPoint) {
-        let bubbleFont = UIFont(name: "SUITE-Medium", size: 11) ?? UIFont.systemFont(ofSize: 11, weight: .medium)
+        let bubbleFont = UIFont.suite(size: 11, weight: .medium)
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.alignment = .center
         let bubbleAttrs: [NSAttributedString.Key: Any] = [
@@ -1381,7 +1419,7 @@ struct ActivityLogMapView: UIViewRepresentable {
             borderPath.lineWidth = 3
             borderPath.stroke()
             let numberStr = "\(number)"
-            let numberFont = UIFont(name: "SUITE-Bold", size: 12) ?? UIFont.boldSystemFont(ofSize: 12)
+            let numberFont = UIFont.suite(size: 12, weight: .bold)
             let numberAttrs: [NSAttributedString.Key: Any] = [.font: numberFont, .foregroundColor: UIColor.white, .paragraphStyle: paragraphStyle]
             let numberSize = numberStr.size(withAttributes: numberAttrs)
             let numberRect = CGRect(x: markerRect.midX - numberSize.width/2, y: markerRect.midY - numberSize.height/2, width: numberSize.width, height: numberSize.height)
@@ -1459,7 +1497,7 @@ struct ActivityLogMapView: UIViewRepresentable {
     }
     
     private func generateCurrentPositionInfoImage(time: String, speed: String) -> UIImage {
-        let font = UIFont(name: "SUITE-Bold", size: 12) ?? UIFont.boldSystemFont(ofSize: 12)
+        let font = UIFont.suite(size: 12, weight: .bold)
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.alignment = .center
         let attrs: [NSAttributedString.Key: Any] = [

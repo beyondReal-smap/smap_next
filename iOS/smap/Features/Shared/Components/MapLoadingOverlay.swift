@@ -33,7 +33,7 @@ struct MapLoadingOverlay: View {
                         .frame(width: 90, height: 90)
 
                     Image(systemName: "map.fill")
-                        .font(.system(size: 36))
+                        .font(.suite(size: 36))
                         .foregroundColor(.white)
                 }
 

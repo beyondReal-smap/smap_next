@@ -50,10 +50,14 @@ struct ToggleRow: View {
                 }
             }
             Spacer()
+            // 약관 상세 화면이 아직 없어 링크 연결은 보류 — 최소한 터치영역 44pt + 라벨만 적용
             Button(action: { /* Open URL */ }) {
                 Image(systemName: "chevron.right")
                     .foregroundColor(.gray)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
+            .accessibilityLabel("약관 보기")
         }
     }
 }
@@ -118,7 +122,8 @@ struct RegisterVerificationView: View {
                     placeholder: "인증번호 6자리",
                     text: $viewModel.verificationCode,
                     icon: "lock.shield",
-                    keyboardType: .numberPad
+                    keyboardType: .numberPad,
+                    textContentType: .oneTimeCode // 키보드 상단 '코드 자동 채우기' 활성화
                 )
                 
                 // 타이머 표시
@@ -370,7 +375,7 @@ struct RegisterProfileView: View {
                     .cornerRadius(12)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color(hex: "#0113A3").opacity(0.1), lineWidth: 1)
+                            .stroke(SMAPTheme.Color.primary.opacity(0.1), lineWidth: 1)
                     )
                     .transition(.opacity.combined(with: .move(edge: .top)))
                 } else {

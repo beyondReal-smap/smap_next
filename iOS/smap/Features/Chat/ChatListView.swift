@@ -68,7 +68,7 @@ struct ChatListView: View {
 
             Button(action: { showNewDM = true }) {
                 Image(systemName: "square.and.pencil")
-                    .font(.system(size: 20))
+                    .font(.suite(size: 20))
                     .foregroundColor(SMAPTheme.Color.primary)
             }
             .accessibilityLabel("새 채팅")
@@ -132,7 +132,7 @@ struct ChatListView: View {
     private var emptyState: some View {
         VStack(spacing: 16) {
             Image(systemName: "bubble.left.and.bubble.right")
-                .font(.system(size: 48))
+                .font(.suite(size: 48))
                 .foregroundColor(.gray.opacity(0.4))
             Text("채팅이 없습니다")
                 .font(.suite(size: 17, weight: .medium))
@@ -160,7 +160,7 @@ struct ChatRoomCell: View {
 
                 if room.isGroupChat {
                     Image(systemName: "person.3.fill")
-                        .font(.system(size: 18))
+                        .font(.suite(size: 18))
                         .foregroundColor(SMAPTheme.Color.primary)
                 } else if let photoPath = room.dm_target_file1, !photoPath.isEmpty,
                           let url = AuthService.getProfileImageURL(photoPath) {
@@ -214,8 +214,9 @@ struct ChatRoomCell: View {
                             .foregroundColor(.white)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 3)
-                            .background(Color.red)
+                            .background(SMAPTheme.Accent.notificationDot)
                             .clipShape(Capsule())
+                            .accessibilityLabel("읽지 않은 메시지 \(room.unread_count)건")
                     }
                 }
             }
@@ -226,7 +227,7 @@ struct ChatRoomCell: View {
 
     private var dmDefaultAvatar: some View {
         Image(systemName: "person.fill")
-            .font(.system(size: 20))
+            .font(.suite(size: 20))
             .foregroundColor(.orange)
     }
 }

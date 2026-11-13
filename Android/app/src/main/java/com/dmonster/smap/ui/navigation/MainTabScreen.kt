@@ -78,7 +78,14 @@ fun MainTabScreen(
         TabItem.ActivityLog
         // TabItem.Chat  // TODO: 채팅 기능 완성 후 활성화
     )
-    
+
+    // 보조 탭에서 시스템 Back 시 앱 종료 대신 홈 탭으로 복귀(Android 관례).
+    // 홈 탭(0)에서는 비활성화하여 기본 동작을 따른다. 내부(모달 등)의 BackHandler가
+    // 더 안쪽에 컴포즈되면 그쪽이 우선 처리한다.
+    BackHandler(enabled = selectedTabIndex != 0) {
+        selectedTabIndex = 0
+    }
+
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0), // 시스템 인셋 수동 제어
         bottomBar = {
@@ -96,7 +103,10 @@ fun MainTabScreen(
                         icon = {
                             Icon(
                                 imageVector = if (isSelected) tab.selectedIcon else tab.unselectedIcon,
-                                contentDescription = tab.title
+                                // 라벨 Text 가 탭 이름을 읽어주므로 아이콘은 null 로 두어
+                                // TalkBack 의 "홈 홈" 이중 읽기를 방지한다. 선택 상태는
+                                // NavigationBarItem 의 selected 시맨틱이 전달한다.
+                                contentDescription = null
                             )
                         },
                         label = {

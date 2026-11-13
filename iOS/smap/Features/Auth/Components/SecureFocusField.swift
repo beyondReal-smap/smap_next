@@ -6,12 +6,14 @@
 //
 
 import SwiftUI
+import UIKit
 
 // MARK: - SecureField with Focus handling (iOS 13+)
 struct SecureFocusField: UIViewRepresentable {
     let placeholder: String
     @Binding var text: String
     var onFocusChange: (Bool) -> Void
+    var textContentType: UITextContentType? = nil // 자동완성/강력암호 힌트 전달(기본 nil로 기존 호출부 호환)
 
     func makeUIView(context: Context) -> UITextField {
         let textField = UITextField()
@@ -20,10 +22,11 @@ struct SecureFocusField: UIViewRepresentable {
         textField.delegate = context.coordinator
         textField.isSecureTextEntry = true
         textField.delegate = context.coordinator
-        textField.font = UIFont(name: "SUITE-Regular", size: 16)
+        textField.font = UIFont.suite(size: 16)
         textField.autocapitalizationType = .none
         textField.autocorrectionType = .no
         textField.returnKeyType = .done
+        textField.textContentType = textContentType // 시스템 자동완성/강력암호 제안 활성화
 
         textField.addTarget(context.coordinator, action: #selector(Coordinator.textFieldDidChange(_:)), for: .editingChanged)
 
@@ -106,6 +109,8 @@ struct FocusableSecureField: View {
                 Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
                     .foregroundColor(SMAPTheme.Color.textSecondary)
                     .frame(width: 20)
+                    .frame(width: 44, height: 44) // 터치영역 44pt 확보(아이콘 시각 크기는 유지)
+                    .contentShape(Rectangle())
             }
             .accessibilityLabel(showPassword ? "비밀번호 숨기기" : "비밀번호 보기")
         }

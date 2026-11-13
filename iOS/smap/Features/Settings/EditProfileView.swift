@@ -53,6 +53,8 @@ struct EditProfileView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
+                // spacer — keyboard 해제 시 활용
+                Color.clear.frame(height: 0)
                 // Profile Avatar Section
                 VStack(spacing: 12) {
                     if let user = authService.currentUser {
@@ -96,7 +98,7 @@ struct EditProfileView: View {
                 VStack(spacing: 0) {
                     HStack(spacing: 12) {
                         Image(systemName: "calendar")
-                            .font(.system(size: 15, weight: .medium))
+                            .font(.suite(size: 15, weight: .medium))
                             .foregroundColor(.white)
                             .frame(width: 28, height: 28)
                             .background(Color.pink)
@@ -113,6 +115,7 @@ struct EditProfileView: View {
 
                         Toggle("", isOn: $provideBirthDate)
                             .labelsHidden()
+                            .accessibilityLabel("생년월일 제공")
                             .scaleEffect(0.8)
                     }
                     .padding(.horizontal, 16)
@@ -136,7 +139,7 @@ struct EditProfileView: View {
 
                     HStack(spacing: 12) {
                         Image(systemName: "person.2.fill")
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.suite(size: 13, weight: .medium))
                             .foregroundColor(.white)
                             .frame(width: 28, height: 28)
                             .background(Color.purple)
@@ -153,6 +156,7 @@ struct EditProfileView: View {
 
                         Toggle("", isOn: $provideGender)
                             .labelsHidden()
+                            .accessibilityLabel("성별 제공")
                             .scaleEffect(0.8)
                     }
                     .padding(.horizontal, 16)
@@ -198,18 +202,20 @@ struct EditProfileView: View {
                 .padding(.bottom, 30)
             }
         }
+        .scrollDismissesKeyboard(.interactively)
         .background(Color(UIColor.secondarySystemBackground).ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Text("프로필 편집")
                     .font(.suite(size: 18, weight: .bold))
             }
-        }
-        .navigationBarBackButtonHidden(true)
-        .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
-                Button(action: { presentationMode.wrappedValue.dismiss() }) {
+                Button(action: {
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    presentationMode.wrappedValue.dismiss()
+                }) {
                     HStack(spacing: 4) {
                         Image(systemName: "chevron.left")
                             .font(.suite(size: 18, weight: .semibold))
@@ -218,6 +224,12 @@ struct EditProfileView: View {
                     }
                     .foregroundColor(.primary)
                 }
+            }
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("완료") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }
+                    .font(.suite(size: 16, weight: .semibold))
+                    .foregroundColor(SMAPTheme.Color.primary)
             }
         }
         .alert("알림", isPresented: $showAlert) {
@@ -237,6 +249,8 @@ struct EditProfileView: View {
 
     private func handleSave() {
         isLoading = true
+        HapticManager.shared.impact(style: .light)
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
         let birthStr = provideBirthDate ? dateFormatter.string(from: birthDate) : nil
         let genderVal = provideGender ? gender : nil
 
@@ -251,12 +265,14 @@ struct EditProfileView: View {
 
                 await MainActor.run {
                     isLoading = false
+                    HapticManager.shared.notification(type: response.success ? .success : .error)
                     alertMessage = response.message
                     showAlert = true
                 }
             } catch {
                 await MainActor.run {
                     isLoading = false
+                    HapticManager.shared.notification(type: .error)
                     alertMessage = error.localizedDescription
                     showAlert = true
                 }
@@ -275,7 +291,7 @@ struct ProfileFormRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 15, weight: .medium))
+                .font(.suite(size: 15, weight: .medium))
                 .foregroundColor(.white)
                 .frame(width: 28, height: 28)
                 .background(iconColor)

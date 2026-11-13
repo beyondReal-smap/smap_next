@@ -140,7 +140,7 @@ fun NoticeListScreen(onBack: () -> Unit, onNoticeClick: (SmapNotice) -> Unit) {
                         }
                     }
 
-                    items(notices) { notice ->
+                    items(notices, key = { it.ntIdx }) { notice ->
                         NoticeItem(notice = notice, onClick = { onNoticeClick(notice) })
                     }
                 }

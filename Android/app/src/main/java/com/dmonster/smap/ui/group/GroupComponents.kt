@@ -29,7 +29,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dmonster.smap.data.model.SmapGroup
 import com.dmonster.smap.data.model.SmapGroupMember
+import com.dmonster.smap.ui.theme.AccentColors
 import com.dmonster.smap.ui.theme.BrandColors
+import com.dmonster.smap.ui.theme.SemanticColors
 import com.dmonster.smap.ui.theme.SuiteFont
 import com.dmonster.smap.ui.theme.responsiveSp
 import coil.compose.AsyncImage
@@ -53,7 +55,7 @@ fun GroupStatsCards(
             title = "총 그룹",
             value = "${groupsCount}개",
             icon = Icons.Filled.Layers,
-            gradientColors = listOf(Color(0xFF001A8E), Color(0xFF0113A3)),
+            gradientColors = listOf(BrandColors.PrimaryDark, BrandColors.Primary),
             modifier = Modifier.weight(1f)
         )
         
@@ -62,7 +64,7 @@ fun GroupStatsCards(
             title = "총 멤버",
             value = "${totalMembers}명",
             icon = Icons.Filled.Groups,
-            gradientColors = listOf(Color(0xFFBE185D), Color(0xFFDB2777)),
+            gradientColors = listOf(AccentColors.PinkDeep, AccentColors.Pink),
             modifier = Modifier.weight(1f)
         )
     }
@@ -157,22 +159,22 @@ fun InviteCodeSection(
                 .height(60.dp),
             shape = RoundedCornerShape(14.dp),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Color(0xFFF59E0B).copy(alpha = 0.5f),
-                unfocusedBorderColor = Color.Gray.copy(alpha = 0.1f),
+                focusedBorderColor = BrandColors.Primary.copy(alpha = 0.5f),
+                unfocusedBorderColor = BrandColors.Primary.copy(alpha = 0.2f),
                 focusedContainerColor = Color.White,
                 unfocusedContainerColor = Color.White
             )
         )
-        
+
+        // iOS 스타일: 단색 Primary 가입 버튼 — 입력이 비어있을 때는 Gray 0.4
         Box(
             modifier = Modifier
                 .height(60.dp)
                 .width(80.dp)
                 .clip(RoundedCornerShape(14.dp))
                 .background(
-                    Brush.linearGradient(
-                        colors = listOf(Color(0xFFFBBF24), Color(0xFFF59E0B))
-                    )
+                    if (inviteCode.isBlank()) Color.Gray.copy(alpha = 0.4f)
+                    else BrandColors.Primary
                 )
                 .clickable(enabled = inviteCode.isNotBlank() && !isLoading) { onJoin() },
             contentAlignment = Alignment.Center
@@ -210,91 +212,94 @@ fun GroupCard(
             .fillMaxWidth()
             .padding(vertical = 4.dp)
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color(0xFFFFF7ED) // Very light orange/beige
-        ),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = androidx.compose.foundation.BorderStroke(0.5.dp, BrandColors.Border.copy(alpha = 0.5f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
+                .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Group Avatar Grid Placeholder (iOS style)
+            // iOS 스타일: Primary 톤 배경 + 하얀색 아이콘 한 개
             Box(
                 modifier = Modifier
-                    .size(64.dp)
+                    .size(52.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color.White),
+                    .background(BrandColors.Primary.copy(alpha = 0.08f)),
                 contentAlignment = Alignment.Center
             ) {
-                // Simplified 4-dot grid for now to match screenshot 0 look
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Box(modifier = Modifier.size(12.dp).background(Color(0xFFFDE68A), CircleShape))
-                        Box(modifier = Modifier.size(12.dp).background(Color(0xFFFCA5A5), CircleShape))
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Box(modifier = Modifier.size(12.dp).background(Color(0xFF93C5FD), CircleShape))
-                        Box(modifier = Modifier.size(12.dp).background(Color(0xFFD1D5DB), CircleShape))
-                    }
-                }
+                Icon(
+                    imageVector = Icons.Filled.Groups,
+                    contentDescription = null,
+                    tint = BrandColors.Primary.copy(alpha = 0.8f),
+                    modifier = Modifier.size(26.dp)
+                )
             }
-            
-            Spacer(modifier = Modifier.width(20.dp))
-            
+
+            Spacer(modifier = Modifier.width(14.dp))
+
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = group.sgtTitle ?: "이름 없음",
-                    fontSize = 20.responsiveSp(),
+                    fontSize = 17.responsiveSp(),
                     fontFamily = SuiteFont,
                     fontWeight = FontWeight.Bold,
-                    color = Color.Black
-                )
-                
-                Text(
-                    text = group.sgtMemo ?: "",
-                    fontSize = 15.responsiveSp(),
-                    fontFamily = SuiteFont,
-                    color = Color.Gray,
+                    color = BrandColors.TextPrimary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
+
+                Text(
+                    text = group.sgtMemo?.takeIf { it.isNotBlank() } ?: "그룹 설명이 없습니다",
+                    fontSize = 13.responsiveSp(),
+                    fontFamily = SuiteFont,
+                    color = BrandColors.TextSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // 보조정보 — 멤버수 · 생성일, 모두 Primary tint 로 통일
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Filled.Groups,
-                            contentDescription = null,
-                            tint = Color(0xFF001A8E),
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
+                    Icon(
+                        imageVector = Icons.Filled.Groups,
+                        contentDescription = null,
+                        tint = BrandColors.Primary,
+                        modifier = Modifier.size(12.dp)
+                    )
+                    Text(
+                        text = "${memberCount}명",
+                        fontSize = 12.responsiveSp(),
+                        fontFamily = SuiteFont,
+                        fontWeight = FontWeight.Medium,
+                        color = BrandColors.Primary
+                    )
+                    val dateStr = group.sgtWdate?.take(10).orEmpty()
+                    if (dateStr.isNotEmpty()) {
                         Text(
-                            text = "${memberCount}명",
-                            fontSize = 14.responsiveSp(),
+                            text = "·",
+                            fontSize = 12.responsiveSp(),
                             fontFamily = SuiteFont,
-                            fontWeight = FontWeight.Medium,
-                            color = Color(0xFF001A8E)
+                            color = BrandColors.TextSecondary
+                        )
+                        Text(
+                            text = dateStr,
+                            fontSize = 12.responsiveSp(),
+                            fontFamily = SuiteFont,
+                            color = BrandColors.TextSecondary,
+                            maxLines = 1
                         )
                     }
-                    
-                    Text(
-                        text = group.sgtWdate?.take(10) ?: "",
-                        fontSize = 14.responsiveSp(),
-                        fontFamily = SuiteFont,
-                        color = Color(0xFF0EA5E9)
-                    )
                 }
             }
-            
+
             Icon(
                 imageVector = Icons.Filled.ChevronRight,
                 contentDescription = "상세 보기",
@@ -320,14 +325,21 @@ fun GroupHeaderCard(
 ) {
     var showMenu by remember { mutableStateOf(false) }
     
+    // iOS 스타일: Primary→PrimaryDark 대각선 그라디언트
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF001A8E))
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(BrandColors.Primary, BrandColors.PrimaryDark)
+                    )
+                )
                 .padding(20.dp)
         ) {
             // Menu Button (Three dots horizontal)
@@ -336,12 +348,12 @@ fun GroupHeaderCard(
             ) {
                 IconButton(
                     onClick = { showMenu = true },
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(48.dp) // HIG/Material 권장 터치 타겟
                 ) {
                     Icon(
                         imageVector = Icons.Filled.MoreHoriz,
-                        contentDescription = "메뉴",
-                        tint = Color.White.copy(alpha = 0.5f),
+                        contentDescription = "그룹 관리 메뉴",
+                        tint = Color.White.copy(alpha = 0.7f),
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -396,25 +408,20 @@ fun GroupHeaderCard(
             
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Grid Avatar Placeholder
+                    // iOS 스타일: 반투명 흰색 박스 + 하얀 그룹 아이콘
                     Box(
                         modifier = Modifier
-                            .size(70.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color.White.copy(alpha = 0.1f))
-                            .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
+                            .size(68.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color.White.copy(alpha = 0.15f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Box(modifier = Modifier.size(14.dp).background(Color(0xFFFDE68A), CircleShape))
-                                Box(modifier = Modifier.size(14.dp).background(Color(0xFFFCA5A5), CircleShape))
-                            }
-                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Box(modifier = Modifier.size(14.dp).background(Color(0xFF93C5FD), CircleShape))
-                                Box(modifier = Modifier.size(14.dp).background(Color(0xFFD1D5DB), CircleShape))
-                            }
-                        }
+                        Icon(
+                            imageVector = Icons.Filled.Groups,
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.85f),
+                            modifier = Modifier.size(36.dp)
+                        )
                     }
                     
                     Spacer(modifier = Modifier.width(16.dp))
@@ -501,6 +508,7 @@ fun DetailStatsCards(
     isLoading: Boolean,
     modifier: Modifier = Modifier
 ) {
+    // iOS SMAPTheme 그라디언트 3종 — Pink / Crown→Orange / Primary→PrimaryDark
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -511,8 +519,7 @@ fun DetailStatsCards(
             title = "멤버",
             value = memberCount.toString(),
             icon = Icons.Default.Person,
-            backgroundColor = Color(0xFFFCA5A5),
-            iconColor = Color(0xFF991B1B),
+            gradient = listOf(AccentColors.Pink, AccentColors.PinkDeep),
             isLoading = isLoading,
             modifier = Modifier.weight(1f)
         )
@@ -520,8 +527,7 @@ fun DetailStatsCards(
             title = "주간 일정",
             value = scheduleCount.toString(),
             icon = Icons.Default.CalendarMonth,
-            backgroundColor = Color(0xFFFDE047),
-            iconColor = Color(0xFF854D0E),
+            gradient = listOf(AccentColors.Crown.copy(alpha = 0.9f), AccentColors.Orange),
             isLoading = isLoading,
             modifier = Modifier.weight(1f)
         )
@@ -529,8 +535,7 @@ fun DetailStatsCards(
             title = "총 위치",
             value = locationCount.toString(),
             icon = Icons.Default.LocationOn,
-            backgroundColor = Color(0xFF93C5FD),
-            iconColor = Color(0xFF1E40AF),
+            gradient = listOf(BrandColors.Primary, BrandColors.PrimaryDark),
             isLoading = isLoading,
             modifier = Modifier.weight(1f)
         )
@@ -542,53 +547,60 @@ private fun DetailStatCard(
     title: String,
     value: String,
     icon: ImageVector,
-    backgroundColor: Color,
-    iconColor: Color,
+    gradient: List<Color>,
     isLoading: Boolean,
     modifier: Modifier = Modifier
 ) {
+    // iOS 스타일: 그라디언트 배경 + 흰색 텍스트/아이콘 — 대비 높고 세련된 톤
     Card(
         modifier = modifier.height(110.dp),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = backgroundColor)
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
+                .background(Brush.linearGradient(colors = gradient))
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = iconColor,
-                modifier = Modifier.size(28.dp)
-            )
-            
-            if (isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp),
-                    strokeWidth = 2.dp,
-                    color = iconColor
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(26.dp)
                 )
-            } else {
+
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(22.dp),
+                        strokeWidth = 2.dp,
+                        color = Color.White
+                    )
+                } else {
+                    Text(
+                        text = value,
+                        fontSize = 26.responsiveSp(),
+                        fontFamily = SuiteFont,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+
                 Text(
-                    text = value,
-                    fontSize = 28.responsiveSp(),
+                    text = title,
+                    fontSize = 13.responsiveSp(),
                     fontFamily = SuiteFont,
-                    fontWeight = FontWeight.Bold,
-                    color = iconColor
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White.copy(alpha = 0.95f)
                 )
             }
-
-            Text(
-                text = title,
-                fontSize = 14.responsiveSp(),
-                fontFamily = SuiteFont,
-                fontWeight = FontWeight.Bold,
-                color = iconColor
-            )
         }
     }
 }
@@ -621,10 +633,12 @@ fun MemberListItem(
         modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
-            .clickable(enabled = canManage && !isOwnerMember, onClick = onClick),
+            .clickable(enabled = canManage && !isOwnerMember, onClick = onClick)
+            .border(1.dp, BrandColors.Border.copy(alpha = 0.5f), RoundedCornerShape(16.dp)),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        // flat 스타일 — elevation 제거, 경계는 stroke 로 표현
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
             modifier = Modifier
@@ -673,7 +687,7 @@ fun MemberListItem(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .background(
-                                    if (isOwnerMember) Color(0xFFFBBF24) else Color(0xFF3B82F6),
+                                    if (isOwnerMember) AccentColors.Crown else SemanticColors.IndicatorMember,
                                     CircleShape
                                 ),
                             contentAlignment = Alignment.Center
@@ -697,10 +711,15 @@ fun MemberListItem(
                     fontSize = 18.responsiveSp(),
                     fontFamily = SuiteFont,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1F2937)
+                    color = BrandColors.TextPrimary
                 )
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    // iOS: 소유주=Crown(Yellow), 리더·멤버=indicatorMember(Blue)
+                    val roleColor = when {
+                        isOwnerMember -> AccentColors.Crown
+                        else -> SemanticColors.IndicatorMember
+                    }
                     Text(
                         text = when {
                             isOwnerMember -> "그룹 관리자"
@@ -709,15 +728,15 @@ fun MemberListItem(
                         },
                         fontSize = 14.responsiveSp(),
                         fontFamily = SuiteFont,
-                        color = if (isOwnerMember) Color(0xFFF59E0B) else if (isLeader) Color(0xFF3B82F6) else Color.Gray
+                        color = if (isOwnerMember || isLeader) roleColor else BrandColors.TextSecondary
                     )
-                    
+
                     if (isOwnerMember || isLeader) {
                         Spacer(modifier = Modifier.width(8.dp))
                         Box(
                             modifier = Modifier
                                 .background(
-                                    if (isOwnerMember) Color(0xFFFEF3C7) else Color(0xFFDBEAFE),
+                                    roleColor.copy(alpha = 0.15f),
                                     RoundedCornerShape(6.dp)
                                 )
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
@@ -727,7 +746,7 @@ fun MemberListItem(
                                 fontSize = 11.responsiveSp(),
                                 fontFamily = SuiteFont,
                                 fontWeight = FontWeight.Bold,
-                                color = if (isOwnerMember) Color(0xFFB45309) else Color(0xFF1E40AF)
+                                color = roleColor
                             )
                         }
                     }

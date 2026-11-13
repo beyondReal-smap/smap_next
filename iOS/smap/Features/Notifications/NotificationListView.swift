@@ -13,8 +13,8 @@ struct NotificationListView: View {
     @StateObject var viewModel = NotificationViewModel()
     @Environment(\.dismiss) var dismiss
 
-    
-    private let pinkColor = Color(red: 236/255, green: 72/255, blue: 153/255)
+    // 색상은 디자인 시스템에서 단일 참조 (SMAPTheme.Accent.pink)
+    private var pinkColor: Color { SMAPTheme.Accent.pink }
 
     var body: some View {
         NavigationStack {
@@ -82,6 +82,8 @@ struct NotificationListView: View {
                     .frame(width: 36, height: 36)
                     .background(Color.gray.opacity(0.1))
                     .clipShape(Circle())
+                    .frame(width: 44, height: 44) // 터치타깃 44pt 확보 (시각 크기 36 유지)
+                    .contentShape(Rectangle())
             }
             .accessibilityLabel("닫기")
 

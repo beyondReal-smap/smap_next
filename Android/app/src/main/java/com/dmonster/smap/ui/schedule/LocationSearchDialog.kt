@@ -41,14 +41,14 @@ fun LocationSearchDialog(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = Color(0xFFF2F2F7),
+        containerColor = BrandColors.InputBackground,
         tonalElevation = 0.dp,
         dragHandle = { BottomSheetDefaults.DragHandle() },
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     ) {
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = Color(0xFFF2F2F7),
+            color = BrandColors.InputBackground,
             tonalElevation = 0.dp
         ) {
             Column(
@@ -98,7 +98,7 @@ fun LocationSearchDialog(
                     trailingIcon = {
                         if (query.isNotEmpty()) {
                             IconButton(onClick = { query = "" }) {
-                                Icon(Icons.Default.Close, null, tint = Color.Gray, modifier = Modifier.size(20.dp))
+                                Icon(Icons.Default.Close, "검색어 지우기", tint = Color.Gray, modifier = Modifier.size(20.dp))
                             }
                         }
                     },

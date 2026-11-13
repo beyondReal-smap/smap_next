@@ -30,7 +30,8 @@ struct HomeHeaderView: View {
 
             Spacer()
 
-            HStack(spacing: 0) {
+            // HIG: 최소 터치 타겟 44x44pt. 아이콘은 20pt지만 히트 영역은 Rectangle 로 확장.
+            HStack(spacing: 4) {
                 Button(action: {
                     onNotificationTap()
                 }) {
@@ -41,14 +42,17 @@ struct HomeHeaderView: View {
 
                         if hasUnread {
                             Circle()
-                                .fill(Color.red)
+                                .fill(SMAPTheme.Accent.notificationDot)
                                 .frame(width: 8, height: 8)
                                 .offset(x: 2, y: -2)
+                                .accessibilityHidden(true)
                         }
                     }
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
                 }
-                .frame(width: 36, height: 44)
                 .accessibilityLabel("알림")
+                .accessibilityValue(hasUnread ? "읽지 않은 알림 있음" : "")
 
                 Button(action: {
                     onSettingsTap()
@@ -56,8 +60,9 @@ struct HomeHeaderView: View {
                     Image(systemName: "gearshape.fill")
                         .font(.suite(size: 20))
                         .foregroundColor(.gray)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
-                .frame(width: 36, height: 44)
                 .accessibilityLabel("설정")
             }
         }

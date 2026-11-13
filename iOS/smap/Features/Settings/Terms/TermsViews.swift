@@ -124,7 +124,7 @@ struct ServiceTermsView: View {
             }
             .padding(.horizontal, 20)
         }
-        .background(Color(red: 0.98, green: 0.98, blue: 1.0).ignoresSafeArea())
+        .background(SMAPTheme.Adaptive.pageBackground.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar {
@@ -230,7 +230,7 @@ struct PrivacyPolicyView: View {
             }
             .padding(.horizontal, 20)
         }
-        .background(Color(red: 0.98, green: 0.98, blue: 1.0).ignoresSafeArea())
+        .background(SMAPTheme.Adaptive.pageBackground.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar {
@@ -271,7 +271,7 @@ struct LocationTermsView: View {
                 }.padding(.bottom, 40)
             }.padding(.horizontal, 20)
         }
-        .background(Color(red: 0.98, green: 0.98, blue: 1.0).ignoresSafeArea())
+        .background(SMAPTheme.Adaptive.pageBackground.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline).navigationBarBackButtonHidden(true)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
@@ -303,7 +303,7 @@ struct MarketingConsentView: View {
                 }.padding(.bottom, 40)
             }.padding(.horizontal, 20)
         }
-        .background(Color(red: 0.98, green: 0.98, blue: 1.0).ignoresSafeArea())
+        .background(SMAPTheme.Adaptive.pageBackground.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline).navigationBarBackButtonHidden(true)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
@@ -335,7 +335,7 @@ struct ThirdPartyProvisionView: View {
                 }.padding(.bottom, 40)
             }.padding(.horizontal, 20)
         }
-        .background(Color(red: 0.98, green: 0.98, blue: 1.0).ignoresSafeArea())
+        .background(SMAPTheme.Adaptive.pageBackground.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline).navigationBarBackButtonHidden(true)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {

@@ -19,8 +19,8 @@ struct GroupCreationView: View {
     @State private var selectedTab: Int = 0 // 0 = Create, 1 = Join
     
     
-    private let pinkColor = Color(red: 236/255, green: 72/255, blue: 153/255)
-    private let orangeColor = Color(red: 245/255, green: 158/255, blue: 11/255)
+    private var pinkColor: Color { SMAPTheme.Accent.pink }
+    private var orangeColor: Color { SMAPTheme.Accent.orange }
     
     var body: some View {
         ZStack {
@@ -57,7 +57,7 @@ struct GroupCreationView: View {
                         .shadow(color: SMAPTheme.Color.primary.opacity(0.3), radius: 16, x: 0, y: 8)
                     
                     Image(systemName: selectedTab == 0 ? "person.3.fill" : "person.badge.plus")
-                        .font(.system(size: 32))
+                        .font(.suite(size: 32))
                         .foregroundColor(.white)
                 }
                 .padding(.top, 40)
@@ -73,20 +73,15 @@ struct GroupCreationView: View {
                     .foregroundColor(.gray)
                     .padding(.top, 8)
                 
-                // Tab Selector
-                HStack(spacing: 0) {
-                    TabButton(text: "그룹 만들기", isSelected: selectedTab == 0) {
-                        withAnimation { selectedTab = 0 }
-                    }
-                    TabButton(text: "초대코드 입력", isSelected: selectedTab == 1) {
-                        withAnimation { selectedTab = 1 }
-                    }
+                // Tab Selector — 네이티브 Segmented Picker. HIG 권장 + Dynamic Type 자동 대응 + 터치 영역 보장.
+                Picker("그룹 작업 선택", selection: $selectedTab) {
+                    Text("그룹 만들기").tag(0)
+                    Text("초대코드 입력").tag(1)
                 }
-                .padding(4)
-                .background(Color.gray.opacity(0.1))
-                .cornerRadius(12)
+                .pickerStyle(.segmented)
                 .padding(.horizontal, 24)
                 .padding(.top, 24)
+                .accessibilityLabel("그룹 작업 선택")
                 
                 // Form Card
                 VStack(spacing: 20) {
@@ -163,9 +158,10 @@ struct GroupCreationView: View {
                 if let error = errorMessage {
                     Text(error)
                         .font(.suite(size: 13))
-                        .foregroundColor(.red)
+                        .foregroundColor(SMAPTheme.Color.error)
                         .padding(.top, 16)
                         .padding(.horizontal, 24)
+                        .accessibilityAddTraits(.isStaticText)
                 }
                 
                 Spacer()
@@ -205,38 +201,29 @@ struct GroupCreationView: View {
                 .disabled((selectedTab == 0 && groupName.isEmpty) || (selectedTab == 1 && inviteCode.isEmpty) || isCreating)
                 .padding(.horizontal, 24)
                 
-                // Tip
-                HStack(spacing: 8) {
-                    Text("💡")
-                        .font(.system(size: 16))
+                // Tip — 이모지 대신 SF Symbols 사용, 접근성 확보.
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "lightbulb.fill")
+                        .font(.suite(size: 14, weight: .semibold))
+                        .foregroundColor(SMAPTheme.Accent.crown)
+                        .padding(.top, 1)
+                        .accessibilityHidden(true)
                     Text(selectedTab == 0
                         ? "그룹을 만들면 멤버들을 초대할 수 있는 코드가 생성됩니다"
                         : "초대 코드는 그룹 관리자에게 받을 수 있습니다")
                         .font(.suite(size: 12))
                         .foregroundColor(.gray)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 12)
-                .background(selectedTab == 0 ? Color.yellow.opacity(0.1) : Color.orange.opacity(0.1))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(selectedTab == 0 ? SMAPTheme.Accent.crown.opacity(0.1) : SMAPTheme.Accent.orange.opacity(0.1))
                 .cornerRadius(12)
                 .padding(.horizontal, 24)
                 .padding(.top, 16)
                 .padding(.bottom, 32)
             }
-        }
-    }
-    
-    // Tab Button Component
-    @ViewBuilder
-    private func TabButton(text: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(text)
-                .font(.suite(size: 14, weight: isSelected ? .bold : .medium))
-                .foregroundColor(isSelected ? SMAPTheme.Color.primary : .gray)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(isSelected ? Color.white : Color.clear)
-                .cornerRadius(10)
         }
     }
     

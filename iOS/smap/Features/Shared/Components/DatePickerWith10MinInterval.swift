@@ -6,10 +6,11 @@
 //
 
 import SwiftUI
+import UIKit
 
 // MARK: - Custom DatePicker with 10-minute intervals
 
-/// UIKit의 UIDatePicker를 래핑하여 10분 단위 시간 선택 지원 + SUITE 폰트 적용
+/// UIKit의 UIDatePicker를 래핑하여 10분 단위 시간 선택 지원 + AtoZ(A2Z) 폰트 적용
 struct DatePickerWith10MinInterval: UIViewRepresentable {
     @Binding var selection: Date
     var displayedComponents: DatePickerComponents
@@ -27,8 +28,7 @@ struct DatePickerWith10MinInterval: UIViewRepresentable {
         picker.preferredDatePickerStyle = .compact
         picker.addTarget(context.coordinator, action: #selector(Coordinator.dateChanged(_:)), for: .valueChanged)
 
-        // SUITE 폰트를 DatePicker 내부 라벨에 적용
-        applySuiteFont(to: picker)
+        applyAppFont(to: picker)
 
         return picker
     }
@@ -45,20 +45,19 @@ struct DatePickerWith10MinInterval: UIViewRepresentable {
             uiView.datePickerMode = .time
         }
 
-        // accentColor 적용
         uiView.tintColor = UIColor(accentColor)
 
-        // 폰트 재적용 (상태 변경 시)
-        applySuiteFont(to: uiView)
+        applyAppFont(to: uiView)
     }
 
-    /// SUITE 폰트를 DatePicker의 모든 UILabel에 적용
-    private func applySuiteFont(to view: UIView) {
+    /// DatePicker 내부 UILabel에 앱 기본 폰트(AtoZ) Medium 적용.
+    /// UIFont.suite는 AppStyles에서 A2Z 패밀리를 반환한다.
+    private func applyAppFont(to view: UIView) {
         for subview in view.subviews {
             if let label = subview as? UILabel {
-                label.font = UIFont(name: "SUITE-Medium", size: label.font.pointSize) ?? label.font
+                label.font = .suite(size: label.font.pointSize, weight: .medium)
             }
-            applySuiteFont(to: subview)
+            applyAppFont(to: subview)
         }
     }
 
@@ -75,8 +74,7 @@ struct DatePickerWith10MinInterval: UIViewRepresentable {
 
         @objc func dateChanged(_ sender: UIDatePicker) {
             parent.selection = sender.date
-            // 값 변경 후 폰트 재적용
-            parent.applySuiteFont(to: sender)
+            parent.applyAppFont(to: sender)
         }
     }
 }

@@ -5,10 +5,11 @@ import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -21,6 +22,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -29,7 +35,11 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.dmonster.smap.data.model.SmapGroup
 import com.dmonster.smap.data.model.SmapGroupMember
+import com.dmonster.smap.ui.common.rememberSmapHaptics
+import com.dmonster.smap.ui.theme.AccentColors
+import com.dmonster.smap.ui.theme.AdaptiveColors
 import com.dmonster.smap.ui.theme.BrandColors
+import com.dmonster.smap.ui.theme.SemanticColors
 import com.dmonster.smap.ui.theme.SuiteFont
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -49,7 +59,8 @@ fun HomeSidebar(
     getMemberStats: (Int) -> MemberStats = { MemberStats(0, 0, 0) }
 ) {
     var isGroupSelectorExpanded by remember { mutableStateOf(false) }
-    val sidebarBackground = Color(0xFFF5F7FA) // Light gray background matching iOS
+    val sidebarBackground = AdaptiveColors.SidebarBackgroundLight
+    val haptics = rememberSmapHaptics()
 
     Column(
         modifier = Modifier
@@ -102,14 +113,14 @@ fun HomeSidebar(
             item {
                 SectionCard {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        SectionHeader(title = "그룹 목록", color = BrandColors.Error)
+                        SectionHeader(title = "그룹 목록", color = SemanticColors.IndicatorGroup)
                         
                         Box {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(Color(0xFFF9FAFB))
+                                    .background(BrandColors.InputBackground)
                                     .clickable { isGroupSelectorExpanded = true }
                                     .padding(16.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -136,6 +147,7 @@ fun HomeSidebar(
                                     DropdownMenuItem(
                                         text = { Text(text = group.sgtTitle ?: "이름 없음", fontFamily = SuiteFont) },
                                         onClick = {
+                                            haptics.light()
                                             onGroupSelected(group)
                                             isGroupSelectorExpanded = false
                                         },
@@ -154,39 +166,53 @@ fun HomeSidebar(
             item {
                 SectionCard {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        SectionHeader(title = "날짜 선택", color = Color(0xFFFBBF24)) // Yellow
+                        SectionHeader(title = "날짜 선택", color = SemanticColors.IndicatorDate)
                         
-                        LazyRow(
+                        // 14일 고정 → LazyRow 중첩 대신 Row + horizontalScroll 로 스크롤 충돌 제거
+                        val dateScrollState = rememberScrollState()
+                        Row(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            contentPadding = PaddingValues(vertical = 4.dp)
+                            modifier = Modifier
+                                .horizontalScroll(dateScrollState)
+                                .padding(vertical = 4.dp)
                         ) {
-                            items(calendarDays) { (fullDate, dayDisplay) ->
-                                val isSelected = fullDate == selectedDate
-                                val dayOfWeek = getDayOfWeek(fullDate)
-                                
-                                Column(
-                                    modifier = Modifier
-                                        .width(50.dp)
-                                        .height(60.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(if (isSelected) BrandColors.Primary else Color(0xFFF9FAFB))
-                                        .clickable { onDateSelected(fullDate) },
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.spacedBy((-3).dp, Alignment.CenterVertically)
-                                ) {
-                                    Text(
-                                        text = dayOfWeek,
-                                        fontSize = 11.sp,
-                                        color = if (isSelected) Color.White.copy(alpha = 0.8f) else BrandColors.TextSecondary,
-                                        fontFamily = SuiteFont
-                                    )
-                                    Text(
-                                        text = dayDisplay,
-                                        fontSize = 16.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (isSelected) Color.White else Color.Black,
-                                        fontFamily = SuiteFont
-                                    )
+                            calendarDays.forEach { (fullDate, dayDisplay) ->
+                                key(fullDate) {
+                                    val isSelected = fullDate == selectedDate
+                                    val dayOfWeek = getDayOfWeek(fullDate)
+
+                                    Column(
+                                        modifier = Modifier
+                                            .width(50.dp)
+                                            .height(60.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(if (isSelected) BrandColors.Primary else BrandColors.InputBackground)
+                                            .clickable {
+                                                haptics.light()
+                                                onDateSelected(fullDate)
+                                            }
+                                            .semantics {
+                                                contentDescription = "$fullDate $dayOfWeek"
+                                                if (isSelected) selected = true
+                                                role = Role.Button
+                                            },
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy((-3).dp, Alignment.CenterVertically)
+                                    ) {
+                                        Text(
+                                            text = dayOfWeek,
+                                            fontSize = 11.sp,
+                                            color = if (isSelected) Color.White.copy(alpha = 0.8f) else BrandColors.TextSecondary,
+                                            fontFamily = SuiteFont
+                                        )
+                                        Text(
+                                            text = dayDisplay,
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isSelected) Color.White else Color.Black,
+                                            fontFamily = SuiteFont
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -202,7 +228,7 @@ fun HomeSidebar(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.padding(bottom = 5.dp)
                         ) {
-                            Box(modifier = Modifier.size(8.dp).background(Color.Blue, CircleShape))
+                            Box(modifier = Modifier.size(8.dp).background(SemanticColors.IndicatorMember, CircleShape))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = "멤버 목록",
@@ -228,7 +254,10 @@ fun HomeSidebar(
                                     member = member,
                                     isSelf = member.mtIdx == currentUserIdx,
                                     stats = getMemberStats(member.mtIdx),
-                                    onClick = { onMemberSelected(member.mtIdx) }
+                                    onClick = {
+                                        haptics.light()
+                                        onMemberSelected(member.mtIdx)
+                                    }
                                 )
                             }
                         }
@@ -278,10 +307,12 @@ fun MemberVerticalItem(
     onClick: () -> Unit
 ) {
     val isSelected = member.isSelected
-    
+
     val backgroundColor = if (isSelected) BrandColors.Primary.copy(alpha = 0.05f) else Color.White.copy(alpha = 0.6f)
     val borderColor = if (isSelected) BrandColors.Primary.copy(alpha = 0.3f) else Color.Transparent
-    
+
+    val accessibilityName = if (isSelf) "${member.displayName} (나)" else member.displayName
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -289,7 +320,12 @@ fun MemberVerticalItem(
             .background(backgroundColor)
             .border(1.dp, borderColor, RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
-            .padding(12.dp),
+            .padding(12.dp)
+            .semantics {
+                contentDescription = "$accessibilityName, 완료 ${stats.completed}, 진행 ${stats.ongoing}, 예정 ${stats.upcoming}"
+                if (isSelected) selected = true
+                role = Role.Button
+            },
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Avatar with selection border
@@ -312,7 +348,9 @@ fun MemberVerticalItem(
                     member.mtFile1.startsWith("/") -> "${BuildConfig.IMAGE_BASE_URL}/images${member.mtFile1}"
                     else -> "${BuildConfig.IMAGE_BASE_URL}/images/${member.mtFile1}"
                 }
-                Log.d("HomeSidebar", "🖼️ Loading avatar for ${member.displayName}: $imageUrl")
+                if (BuildConfig.DEBUG) {
+                    Log.d("HomeSidebar", "🖼️ Loading avatar for ${member.displayName}: $imageUrl")
+                }
                 
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
@@ -323,7 +361,7 @@ fun MemberVerticalItem(
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,
                     onState = { state ->
-                        if (state is coil.compose.AsyncImagePainter.State.Error) {
+                        if (state is coil.compose.AsyncImagePainter.State.Error && BuildConfig.DEBUG) {
                             Log.e("HomeSidebar", "❌ Coil Error for ${member.displayName}: ${state.result.throwable.message}")
                         }
                     }
@@ -346,11 +384,11 @@ fun MemberVerticalItem(
                 fontFamily = SuiteFont
             )
             
-            // Schedule Stats Row (matching iOS)
+            // Schedule Stats Row — iOS SemanticColors 와 동일 매핑
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatItemView(label = "완료", count = stats.completed, color = Color(0xFF22C55E)) // Green
-                StatItemView(label = "진행", count = stats.ongoing, color = Color(0xFFF97316)) // Orange
-                StatItemView(label = "예정", count = stats.upcoming, color = Color(0xFF3B82F6)) // Blue
+                StatItemView(label = "완료", count = stats.completed, color = SemanticColors.StatCompleted)
+                StatItemView(label = "진행", count = stats.ongoing, color = SemanticColors.StatOngoing)
+                StatItemView(label = "예정", count = stats.upcoming, color = SemanticColors.StatUpcoming)
             }
         }
     }

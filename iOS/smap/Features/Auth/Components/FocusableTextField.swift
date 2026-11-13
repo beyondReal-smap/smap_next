@@ -32,6 +32,9 @@ struct FocusableTextField: View {
             })
             .font(.suite(size: 16))
             .keyboardType(keyboardType)
+            // 선언만 되고 적용되지 않던 버그 수정 — 호출부가 넘긴 값(.oneTimeCode/.emailAddress 등)을
+            // 실제로 적용해 iOS 자동완성(코드 자동 채우기/이메일·비밀번호 autofill)이 동작하도록 한다.
+            .textContentType(textContentType)
             .autocapitalization(autocapitalizationType) // use older API for better FocusableTextField compatibility if needed, or textInputAutocapitalization
             .disableAutocorrection(autocorrectionDisabled)
         }

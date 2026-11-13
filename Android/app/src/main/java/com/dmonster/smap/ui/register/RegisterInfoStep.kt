@@ -149,7 +149,7 @@ internal fun BasicInfoContent(
                         Icon(
                             imageVector = if (uiState.showPassword) Icons.Default.Visibility
                                          else Icons.Default.VisibilityOff,
-                            contentDescription = null,
+                            contentDescription = if (uiState.showPassword) "비밀번호 숨기기" else "비밀번호 표시",
                             tint = if (isFocusedPwd) BrandColors.Primary else BrandColors.TextSecondary
                         )
                     }
@@ -208,7 +208,7 @@ internal fun BasicInfoContent(
                         Icon(
                             imageVector = if (uiState.showPasswordConfirm) Icons.Default.Visibility
                                          else Icons.Default.VisibilityOff,
-                            contentDescription = null,
+                            contentDescription = if (uiState.showPasswordConfirm) "비밀번호 확인 숨기기" else "비밀번호 확인 표시",
                             tint = if (isFocusedPwdConfirm) BrandColors.Primary else BrandColors.TextSecondary
                         )
                     }

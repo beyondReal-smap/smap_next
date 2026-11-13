@@ -13,8 +13,8 @@ struct SidebarView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Sidebar Header
-            HStack(spacing: 12) {
+            // Sidebar Header — 아이콘과 타이틀 간격을 여유 있게 (3개 사이드바 공통 16pt)
+            HStack(spacing: 16) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 12)
                         .fill(SMAPTheme.Color.primary)
@@ -40,7 +40,7 @@ struct SidebarView: View {
                     // Group Selector Section
                     VStack(alignment: .leading, spacing: 8) { // Reduced spacing from 12
                         HStack(spacing: 8) {
-                            Circle().fill(Color.red).frame(width: 8, height: 8)
+                            Circle().fill(SMAPTheme.Semantic.indicatorGroup).frame(width: 8, height: 8)
                             Text("그룹 목록").font(.suite(size: 16, weight: .bold))
                         }
 
@@ -75,7 +75,7 @@ struct SidebarView: View {
                     // Date Selector Section
                     VStack(alignment: .leading, spacing: 8) { // Reduced spacing from 12
                         HStack(spacing: 8) {
-                            Circle().fill(Color.yellow).frame(width: 8, height: 8)
+                            Circle().fill(SMAPTheme.Semantic.indicatorDate).frame(width: 8, height: 8)
                             Text("날짜 선택").font(.suite(size: 16, weight: .bold))
                         }
 
@@ -99,7 +99,7 @@ struct SidebarView: View {
                     // Member List Section
                     VStack(alignment: .leading, spacing: 10) { // Reduced spacing from 12
                         HStack(spacing: 8) {
-                            Circle().fill(Color.blue).frame(width: 8, height: 8)
+                            Circle().fill(SMAPTheme.Semantic.indicatorMember).frame(width: 8, height: 8)
                             Text("멤버 목록").font(.suite(size: 16, weight: .bold))
                             Spacer()
                             Text("\(viewModel.members.count)명")
@@ -137,7 +137,7 @@ struct SidebarView: View {
         }
         .frame(width: 320)
         .background(
-            Color(red: 245/255, green: 247/255, blue: 250/255)
+            SMAPTheme.Adaptive.sidebarBackground
                 .ignoresSafeArea()
         )
         .cornerRadius(24, corners: [.topRight, .bottomRight])
@@ -155,27 +155,42 @@ struct DateCell: View {
             VStack(spacing: 4) {
                 Text(dayOfWeek)
                     .font(.suite(size: 10))
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
                 Text(dayOfMonth)
                     .font(.suite(size: 14, weight: .bold))
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .monospacedDigit()
             }
             .frame(width: 50, height: 50)
             .background(isSelected ? SMAPTheme.Color.primary : Color.white)
             .foregroundColor(isSelected ? .white : .primary)
             .cornerRadius(12)
             .shadow(color: Color.black.opacity(0.05), radius: 5)
+            .contentShape(Rectangle())
         }
+        .accessibilityLabel(accessibilityDateString)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : [.isButton])
     }
 
-    var dayOfWeek: String {
+    private var dayOfWeek: String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ko_KR")
         formatter.dateFormat = "E"
         return formatter.string(from: date)
     }
 
-    var dayOfMonth: String {
+    private var dayOfMonth: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "d"
+        return formatter.string(from: date)
+    }
+
+    private var accessibilityDateString: String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.dateFormat = "M월 d일 EEEE"
         return formatter.string(from: date)
     }
 }
@@ -186,14 +201,18 @@ struct SidebarMemberCell: View {
     var isSelf: Bool = false
     let onTap: () -> Void
 
+    private var displayName: String {
+        isSelf ? "\(member.displayName) (나)" : member.displayName
+    }
+
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 12) {
                 MemberAvatarView(member: member, isSelf: isSelf)
 
-                MemberStatsView(name: isSelf ? "\(member.displayName) (나)" : member.displayName, stats: stats)
+                MemberStatsView(name: displayName, stats: stats)
 
-                Spacer()
+                Spacer(minLength: 0)
             }
             .padding(12)
             .background(member.isSelected ? SMAPTheme.Color.primary.opacity(0.05) : Color.white.opacity(0.6))
@@ -202,7 +221,12 @@ struct SidebarMemberCell: View {
                 RoundedRectangle(cornerRadius: 12)
                     .stroke(member.isSelected ? SMAPTheme.Color.primary.opacity(0.3) : Color.clear, lineWidth: 1)
             )
+            .contentShape(Rectangle())
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(displayName), 완료 \(stats.completed), 진행 \(stats.ongoing), 예정 \(stats.upcoming)")
+        .accessibilityHint("지도에서 이 멤버 위치로 이동")
+        .accessibilityAddTraits(member.isSelected ? [.isButton, .isSelected] : [.isButton])
     }
 }
 
@@ -212,7 +236,6 @@ struct MemberAvatarView: View {
     
 
     var body: some View {
-        let _ = print("🔍 [MemberAvatarView] \(member.mt_name ?? "unknown"): mt_file1 = '\(member.mt_file1 ?? "nil")', URL = \(getProfileImageUrl(member.mt_file1)?.absoluteString ?? "nil")")
         ZStack(alignment: .bottomTrailing) {
             // Profile Image with Selection Border
             Group {
@@ -246,10 +269,11 @@ struct MemberAvatarView: View {
             // Crown Icon (Owner) - 테두리 위에 표시
             if member.sgdt_owner_chk == "Y" {
                 Circle()
-                    .fill(Color.yellow)
+                    .fill(SMAPTheme.Accent.crown)
                     .frame(width: 16, height: 16)
                     .overlay(Image(systemName: "crown.fill").font(.suite(size: 8)).foregroundColor(.white))
                     .offset(x: 4, y: 4)
+                    .accessibilityLabel("그룹 오너")
             }
         }
         .frame(width: 52, height: 52)
@@ -261,13 +285,9 @@ struct MemberAvatarView: View {
             .frame(width: 44, height: 44)
             .overlay(
                 Image(systemName: "person.fill")
-                    .font(.system(size: 20))
+                    .font(.suite(size: 20))
                     .foregroundColor(.gray)
             )
-    }
-
-    var placeholderView: some View {
-        placeholderCircle
     }
 
     func getProfileImageUrl(_ path: String?) -> URL? {
@@ -284,11 +304,14 @@ struct MemberStatsView: View {
             Text(name)
                 .font(.suite(size: 17, weight: .medium))
                 .foregroundColor(.primary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .minimumScaleFactor(0.8)
 
             HStack(spacing: 8) {
-                StatItemView(label: "완료", count: stats.completed, color: .green)
-                StatItemView(label: "진행", count: stats.ongoing, color: .orange)
-                StatItemView(label: "예정", count: stats.upcoming, color: .blue)
+                StatItemView(label: "완료", count: stats.completed, color: SMAPTheme.Semantic.statCompleted)
+                StatItemView(label: "진행", count: stats.ongoing, color: SMAPTheme.Semantic.statOngoing)
+                StatItemView(label: "예정", count: stats.upcoming, color: SMAPTheme.Semantic.statUpcoming)
             }
         }
     }
@@ -301,18 +324,25 @@ struct StatItemView: View {
 
     var body: some View {
         HStack(spacing: 2) {
-            Text(label).font(.suite(size: 10)).foregroundColor(.gray)
-            Text("\(count)").font(.suite(size: 13, weight: .bold)).foregroundColor(color)
+            Text(label)
+                .font(.suite(size: 10))
+                .foregroundColor(.gray)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+            Text("\(count)")
+                .font(.suite(size: 13, weight: .bold))
+                .foregroundColor(color)
+                .lineLimit(1)
+                .monospacedDigit()
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(label) \(count)")
     }
 }
 
 struct FloatingActionHomeButton: View {
     let count: Int
     let action: () -> Void
-
-    
-    private let pinkColor = Color(red: 236/255, green: 72/255, blue: 153/255) // Pink-500
 
     var body: some View {
         Button(action: {
@@ -331,18 +361,21 @@ struct FloatingActionHomeButton: View {
                             .foregroundColor(.white)
                     )
 
-                // Badge (Pink)
+                // Badge (Pink) — 멤버 수 표시
                 if count > 0 {
                     Text(count > 99 ? "99+" : "\(count)")
-                        .font(.suite(size: 12, weight: .bold)) // Size increased from 10
+                        .font(.suite(size: 12, weight: .bold))
                         .foregroundColor(.white)
-                        .frame(minWidth: 24, minHeight: 24) // Dimension increased from 20
-                        .background(pinkColor)
+                        .frame(minWidth: 24, minHeight: 24)
+                        .background(SMAPTheme.Accent.pink)
                         .clipShape(Circle())
                         .offset(x: 4, y: -4)
+                        .monospacedDigit()
+                        .accessibilityHidden(true) // label 에서 통합 읽기
                 }
             }
         }
-        .accessibilityLabel("멤버 조회")
+        .accessibilityLabel(count > 0 ? "멤버 조회, \(count)명" : "멤버 조회")
+        .accessibilityHint("사이드바를 열어 그룹/날짜/멤버를 선택")
     }
 }

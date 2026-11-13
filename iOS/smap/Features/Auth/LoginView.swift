@@ -11,21 +11,56 @@ import AuthenticationServices
 
 
 // MARK: - Custom Font Extension
+//
+// 앱 전반에서 `.font(.suite(size:weight:))` 로 호출되는 폰트 팩토리.
+// 시그니처·이름은 그대로 두고 내부 구현만 AtoZ(A2Z) 패밀리로 교체해 호출부 파급을 제거.
+// AtoZ ttf 는 각 weight 가 독립 family 로 등록되어 있어 UIFont 로 실제 PostScript 이름을 조회해 전달.
 extension Font {
     static func suite(size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        var fontName = "SUITE-Regular"
+        // 기존 동작(+2pt 보정) 그대로 유지해 레이아웃 회귀 없음
+        Font.custom(atozPostScriptName(for: weight), size: size + 2)
+    }
+
+    fileprivate static func atozPostScriptName(for weight: Font.Weight) -> String {
+        let family: String
         switch weight {
-        case .light: fontName = "SUITE-Light"
-        case .regular: fontName = "SUITE-Regular"
-        case .medium: fontName = "SUITE-Medium"
-        case .semibold: fontName = "SUITE-SemiBold"
-        case .bold: fontName = "SUITE-Bold"
-        case .heavy: fontName = "SUITE-Heavy"
-        case .black: fontName = "SUITE-ExtraBold"
-        default: fontName = "SUITE-Regular"
+        case .ultraLight, .thin: family = "A2Z 1 Thin"
+        case .light: family = "A2Z 3 Light"
+        case .regular: family = "A2Z 4 Regular"
+        case .medium: family = "A2Z 5 Medium"
+        case .semibold: family = "A2Z 6 SemiBold"
+        case .bold: family = "A2Z 7 Bold"
+        case .heavy: family = "A2Z 8 ExtraBold"
+        case .black: family = "A2Z 9 Black"
+        default: family = "A2Z 4 Regular"
         }
-        // 전체 폰트 크기를 2포인트 증가
-        return Font.custom(fontName, size: size + 2)
+        // 각 weight 가 별도 family 로 분리돼 있어 PostScript 이름을 런타임에 조회.
+        if let ps = UIFont.fontNames(forFamilyName: family).first {
+            return ps
+        }
+        // fallback — family 그대로 시도 (iOS 가 내부 매칭)
+        return family
+    }
+}
+
+// UIKit 경로(UILabel/UITextField/NSAttributedString 등)에서도 동일 AtoZ 폰트를 쓰도록 UIFont에 대응 팩토리 제공.
+// SwiftUI 쪽 `Font.suite` 와 동일한 family 매핑을 사용한다.
+extension UIFont {
+    static func suite(size: CGFloat, weight: UIFont.Weight = .regular) -> UIFont {
+        let family: String
+        switch weight {
+        case .ultraLight, .thin: family = "A2Z 1 Thin"
+        case .light: family = "A2Z 3 Light"
+        case .regular: family = "A2Z 4 Regular"
+        case .medium: family = "A2Z 5 Medium"
+        case .semibold: family = "A2Z 6 SemiBold"
+        case .bold: family = "A2Z 7 Bold"
+        case .heavy: family = "A2Z 8 ExtraBold"
+        case .black: family = "A2Z 9 Black"
+        default: family = "A2Z 4 Regular"
+        }
+        let psName = UIFont.fontNames(forFamilyName: family).first ?? family
+        return UIFont(name: psName, size: size) ?? UIFont.systemFont(ofSize: size, weight: weight)
     }
 }
 

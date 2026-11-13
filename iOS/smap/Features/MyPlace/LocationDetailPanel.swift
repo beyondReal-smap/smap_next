@@ -21,6 +21,14 @@ struct LocationDetailPanel: View {
     @State private var notificationsEnabled: Bool = true
     @State private var showLocationSearch: Bool = false
     @State private var isInitialized: Bool = false
+
+    // 파괴적 액션 보호 — 실수 삭제 방지
+    @State private var showDeleteConfirmation: Bool = false
+    @State private var locationPendingDelete: SavedLocation?
+
+    // 키보드 회피 — 입력 필드에 focused modifier 로 연결
+    private enum PanelField: Hashable { case name, address }
+    @FocusState private var focusedField: PanelField?
     
     
     
@@ -39,17 +47,19 @@ struct LocationDetailPanel: View {
                 .padding(20)
             }
             .background(Color(UIColor.systemGroupedBackground))
+            .scrollDismissesKeyboard(.interactively)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) { Text(panelTitle).font(.suite(size: 17, weight: .bold)) }
-                ToolbarItem(placement: .navigationBarLeading) { 
-                    Button(action: { 
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        focusedField = nil
                         viewModel.closeLocationPanel()
                         presentationMode.wrappedValue.dismiss()
                     }) {
                         Text("닫기").font(.suite(size: 16, weight: .medium))
                     }
-                    .foregroundColor(SMAPTheme.Color.primary) 
+                    .foregroundColor(SMAPTheme.Color.primary)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     if viewModel.isEditMode {
@@ -58,6 +68,13 @@ struct LocationDetailPanel: View {
                             .foregroundColor(SMAPTheme.Color.primary)
                             .disabled(viewModel.isSaving || locationName.isEmpty || locationAddress.isEmpty)
                     }
+                }
+                // 키보드 상단 완료 버튼 — 다음 필드가 없을 때 손쉽게 키보드 내리기
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("완료") { focusedField = nil }
+                        .font(.suite(size: 16, weight: .semibold))
+                        .foregroundColor(SMAPTheme.Color.primary)
                 }
             }
         }
@@ -72,11 +89,37 @@ struct LocationDetailPanel: View {
                         locationLongitude = lng 
                     }
                     showLocationSearch = false // Explicitly close and prevent refresh
+                    HapticManager.shared.notification(type: .success)
                 }.navigationBarItems(leading: Button(action: { showLocationSearch = false }) {
                     Text("취소")
                         .font(.suite(size: 16))
                 })
             }
+        }
+        .confirmationDialog(
+            "이 장소를 삭제할까요?",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible,
+            presenting: locationPendingDelete
+        ) { location in
+            Button("삭제", role: .destructive) {
+                Task {
+                    HapticManager.shared.notification(type: .warning)
+                    let success = await viewModel.deleteLocation(location)
+                    if success {
+                        HapticManager.shared.notification(type: .success)
+                        presentationMode.wrappedValue.dismiss()
+                    } else {
+                        HapticManager.shared.notification(type: .error)
+                    }
+                    locationPendingDelete = nil
+                }
+            }
+            Button("취소", role: .cancel) {
+                locationPendingDelete = nil
+            }
+        } message: { location in
+            Text("\"\(location.slt_title ?? "이 장소")\" 은(는) 삭제 후 복구할 수 없습니다.")
         }
     }
     
@@ -150,24 +193,25 @@ struct LocationDetailPanel: View {
                 HStack(spacing: 16) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(location.notifications ? Color.orange.opacity(0.1) : Color.gray.opacity(0.1))
+                            .fill(location.notifications ? SMAPTheme.Accent.orange.opacity(0.12) : Color.gray.opacity(0.1))
                             .frame(width: 44, height: 44)
                         Image(systemName: location.notifications ? "bell.fill" : "bell.slash.fill")
                             .font(.suite(size: 20))
-                            .foregroundColor(location.notifications ? .orange : .gray)
+                            .foregroundColor(location.notifications ? SMAPTheme.Accent.orange : .gray)
                     }
-                    
+
                     VStack(alignment: .leading, spacing: 2) {
                         Text("알림 상태").font(.suite(size: 12, weight: .bold)).foregroundColor(.secondary)
                         Text(location.notifications ? "도착 알림 활성화됨" : "알림 꺼짐")
                             .font(.suite(size: 15, weight: .semibold))
-                            .foregroundColor(location.notifications ? .orange : .secondary)
+                            .foregroundColor(location.notifications ? SMAPTheme.Accent.orange : .secondary)
                     }
                     Spacer()
-                    
+
                     Circle()
-                        .fill(location.notifications ? Color.orange : Color.gray.opacity(0.3))
+                        .fill(location.notifications ? SMAPTheme.Accent.orange : Color.gray.opacity(0.3))
                         .frame(width: 8, height: 8)
+                        .accessibilityHidden(true)
                 }
                 .padding(16)
                 .background(Color.white)
@@ -193,14 +237,17 @@ struct LocationDetailPanel: View {
                     }
                     .accessibilityLabel("정보 수정")
                     
-                    Button(action: { Task { _ = await viewModel.toggleNotification(for: location) } }) {
+                    Button(action: {
+                        HapticManager.shared.impact(style: .light)
+                        Task { _ = await viewModel.toggleNotification(for: location) }
+                    }) {
                         VStack(spacing: 4) {
                             Image(systemName: location.notifications ? "bell.slash.fill" : "bell.fill")
                                 .font(.suite(size: 18))
                             Text(location.notifications ? "알림 끄기" : "알림 켜기")
                                 .font(.suite(size: 11, weight: .bold))
                         }
-                        .foregroundColor(location.notifications ? .orange : .green)
+                        .foregroundColor(location.notifications ? SMAPTheme.Accent.orange : SMAPTheme.Color.success)
                         .frame(width: 80, height: 56)
                         .background(Color.white)
                         .cornerRadius(16)
@@ -209,19 +256,25 @@ struct LocationDetailPanel: View {
                     .accessibilityLabel(location.notifications ? "알림 끄기" : "알림 켜기")
                 }
                 
-                Button(action: { Task { let success = await viewModel.deleteLocation(location); if success { presentationMode.wrappedValue.dismiss() } } }) {
+                Button(action: {
+                    // 즉시 삭제 금지 — confirmation 다이얼로그로 실수 방지.
+                    HapticManager.shared.impact(style: .medium)
+                    locationPendingDelete = location
+                    showDeleteConfirmation = true
+                }) {
                     HStack {
                         Image(systemName: "trash")
                         Text("이 장소 삭제")
                     }
                     .font(.suite(size: 15, weight: .medium))
-                    .foregroundColor(.red)
+                    .foregroundColor(SMAPTheme.Color.error)
                     .frame(maxWidth: .infinity)
                     .frame(height: 50)
-                    .background(Color.red.opacity(0.05))
+                    .background(SMAPTheme.Color.error.opacity(0.05))
                     .cornerRadius(16)
                 }
                 .accessibilityLabel("이 장소 삭제")
+                .accessibilityHint("삭제 전 확인 단계가 있습니다")
             }
             .padding(.top, 8)
             
@@ -305,28 +358,40 @@ struct LocationDetailPanel: View {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Text("장소 이름").font(.suite(size: 13, weight: .semibold)).foregroundColor(.secondary)
-                            Text("*").foregroundColor(.red)
+                            Text("*")
+                                .foregroundColor(SMAPTheme.Color.error)
+                                .accessibilityLabel("필수")
                         }
                         TextField("나만의 장소 이름을 지어주세요", text: $locationName)
                             .font(.suite(size: 16))
+                            .focused($focusedField, equals: .name)
+                            .submitLabel(.next)
+                            .onSubmit { focusedField = .address }
                             .padding(14)
                             .background(Color(UIColor.secondarySystemBackground))
                             .cornerRadius(12)
-                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(locationName.isEmpty ? Color.orange.opacity(0.3) : Color.clear, lineWidth: 1))
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(locationName.isEmpty ? SMAPTheme.Color.warning.opacity(0.5) : Color.clear, lineWidth: 1))
+                            .accessibilityLabel("장소 이름")
                     }
                     
                     // Address Input (Can be filled manually or via search)
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Text("상세 주소").font(.suite(size: 13, weight: .semibold)).foregroundColor(.secondary)
-                            Text("*").foregroundColor(.red)
+                            Text("*")
+                                .foregroundColor(SMAPTheme.Color.error)
+                                .accessibilityLabel("필수")
                         }
                         TextField("상세 주소를 입력하거나 검색하세요", text: $locationAddress)
                             .font(.suite(size: 15))
+                            .focused($focusedField, equals: .address)
+                            .submitLabel(.done)
+                            .onSubmit { focusedField = nil }
                             .padding(14)
                             .background(Color(UIColor.secondarySystemBackground))
                             .cornerRadius(12)
-                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(locationAddress.isEmpty ? Color.orange.opacity(0.3) : Color.clear, lineWidth: 1))
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(locationAddress.isEmpty ? SMAPTheme.Color.warning.opacity(0.5) : Color.clear, lineWidth: 1))
+                            .accessibilityLabel("상세 주소")
                     }
                     
                     // Coordinates Display
@@ -399,7 +464,24 @@ struct LocationDetailPanel: View {
         isInitialized = true
     }
     
-    private func saveLocation() { Task { let success = await viewModel.saveLocation(title: locationName, address: locationAddress, latitude: locationLatitude, longitude: locationLongitude, notifications: notificationsEnabled); if success { presentationMode.wrappedValue.dismiss() } } }
+    private func saveLocation() {
+        focusedField = nil // 저장 누르면 키보드 내리기
+        Task {
+            let success = await viewModel.saveLocation(
+                title: locationName,
+                address: locationAddress,
+                latitude: locationLatitude,
+                longitude: locationLongitude,
+                notifications: notificationsEnabled
+            )
+            if success {
+                HapticManager.shared.notification(type: .success)
+                presentationMode.wrappedValue.dismiss()
+            } else {
+                HapticManager.shared.notification(type: .error)
+            }
+        }
+    }
     
     private func getProfileImageUrl(_ path: String?) -> URL? {
         return AuthService.getProfileImageURL(path)

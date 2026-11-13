@@ -1,6 +1,7 @@
 package com.dmonster.smap.ui.myplace
 
 import com.dmonster.smap.AppConstants
+import com.dmonster.smap.BuildConfig
 import android.util.Log
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
@@ -26,6 +27,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.dmonster.smap.ui.common.rememberSmapHaptics
+import com.dmonster.smap.ui.theme.AccentColors
 import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.SuiteFont
 import com.naver.maps.geometry.LatLng
@@ -49,7 +52,8 @@ fun MyPlaceScreen(
     viewModel: MyPlaceViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
-    
+    val haptics = rememberSmapHaptics()
+
     // Collect States
     val groups by viewModel.groups.collectAsState()
     val selectedGroup by viewModel.selectedGroup.collectAsState()
@@ -96,16 +100,18 @@ fun MyPlaceScreen(
         viewModel.performInitialLoad()
     }
     
-    // Handle messages
+    // Handle messages — Haptic 동반
     LaunchedEffect(errorMessage) {
         errorMessage?.let {
+            haptics.error()
             snackbarHostState.showSnackbar(it, duration = SnackbarDuration.Short)
             viewModel.clearError()
         }
     }
-    
+
     LaunchedEffect(successMessage) {
         successMessage?.let {
+            haptics.success()
             snackbarHostState.showSnackbar(it, duration = SnackbarDuration.Short)
             viewModel.clearSuccess()
         }
@@ -155,6 +161,7 @@ fun MyPlaceScreen(
                         isLogoClickEnabled = false
                     ),
                     onMapLongClick = { _, coord ->
+                        haptics.warning()
                         viewModel.showAddDialog(coord.latitude, coord.longitude)
                     },
                     onMapClick = { _, _ ->
@@ -171,14 +178,14 @@ fun MyPlaceScreen(
                             nativeOverlays.forEach { it.map = null }
                             nativeOverlays.clear()
                             
-                            Log.d("MyPlaceScreen", "Re-creating ${locations.size} native overlays")
+                            if (BuildConfig.DEBUG) Log.d("MyPlaceScreen", "Re-creating ${locations.size} native overlays")
                             
                             locations.filter { it.hasValidCoordinates }.forEach { location ->
                                 val lat = location.latitude
                                 val lng = location.longitude
                                 
                                 if (lat.isNaN() || lng.isNaN()) {
-                                    Log.e("MyPlaceScreen", "Skipping location with NaN coordinates: ${location.name}")
+                                    if (BuildConfig.DEBUG) Log.e("MyPlaceScreen", "Skipping location with NaN coordinates: ${location.name}")
                                     return@forEach
                                 }
 
@@ -219,7 +226,7 @@ fun MyPlaceScreen(
                                 }
                             }
                         } catch (e: Exception) {
-                            Log.e("MyPlaceScreen", "Error managing map overlays: ${e.message}", e)
+                            if (BuildConfig.DEBUG) Log.e("MyPlaceScreen", "Error managing map overlays: ${e.message}", e)
                         }
                     }
                 }
@@ -377,7 +384,10 @@ fun MyPlaceScreen(
         DeleteLocationDialog(
             location = location,
             onDismiss = { viewModel.hideDeleteDialog() },
-            onConfirm = { viewModel.deleteLocation(location.sltIdx) },
+            onConfirm = {
+                haptics.warning() // 삭제 확정 피드백
+                viewModel.deleteLocation(location.sltIdx)
+            },
             isLoading = isLoading
         )
     }
@@ -436,7 +446,7 @@ fun FloatingActionPlaceButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val pinkColor = Color(0xFFEC4899)
+    val pinkColor = AccentColors.Pink
     
     Box(modifier = modifier) {
         FloatingActionButton(

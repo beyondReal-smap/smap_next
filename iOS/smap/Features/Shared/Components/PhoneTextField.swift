@@ -78,7 +78,7 @@ struct PhoneTextField: UIViewRepresentable {
         textField.placeholder = placeholder
         textField.keyboardType = .numberPad
         textField.delegate = context.coordinator
-        textField.font = UIFont(name: "SUITE-Regular", size: 16)
+        textField.font = UIFont.suite(size: 16)
         textField.addTarget(context.coordinator, action: #selector(Coordinator.textFieldDidChange(_:)), for: .editingChanged)
 
         // Initial text

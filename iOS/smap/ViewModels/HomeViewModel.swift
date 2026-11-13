@@ -260,6 +260,37 @@ class HomeViewModel: ObservableObject {
         return filtered
     }
 
+    /// 홈 화면 "오늘 일정 미리보기" 카드에 노출할 일정.
+    /// 진행 중 1건 우선, 그 다음 가장 가까운 예정 1건. 최대 2건.
+    /// 선택된 멤버가 있으면 해당 멤버 기준 filteredSchedules, 없으면 전체 schedules 중 오늘 기준.
+    var homePreviewSchedules: [SmapSchedule] {
+        let pool: [SmapSchedule]
+        if members.contains(where: { $0.isSelected }) {
+            pool = filteredSchedules
+        } else {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            let targetDateStr = formatter.string(from: selectedDate)
+            let scheduleFmt = DateFormatter()
+            scheduleFmt.dateFormat = "yyyy-MM-dd HH:mm:ss"
+            pool = schedules.filter { schedule in
+                guard schedule.sst_show == "Y", let sDateStr = schedule.date else { return false }
+                if let scheduleDate = scheduleFmt.date(from: sDateStr) {
+                    return formatter.string(from: scheduleDate) == targetDateStr
+                }
+                return sDateStr.hasPrefix(targetDateStr)
+            }
+        }
+
+        let ongoing = pool.first(where: { $0.status == .ongoing })
+        let nextUpcoming = pool
+            .filter { $0.status == .upcoming }
+            .sorted(by: { ($0.date ?? "") < ($1.date ?? "") })
+            .first
+
+        return [ongoing, nextUpcoming].compactMap { $0 }
+    }
+
     func selectMember(_ member: SmapGroupMember) {
         HapticManager.shared.selection()
         for i in 0..<members.count {

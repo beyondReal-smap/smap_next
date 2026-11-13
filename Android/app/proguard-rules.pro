@@ -190,6 +190,11 @@
 -keepclassmembers class * {
     @dagger.hilt.android.lifecycle.HiltViewModel <init>(...);
 }
+# R8 full-mode가 Hilt 생성/집계 클래스를 missing 으로 오탐(실제로는 KSP가 생성·컴파일함)하여
+# minifyReleaseWithR8 가 실패하던 문제 수정. AGP가 생성한 missing_rules.txt 권고 규칙.
+-dontwarn com.dmonster.smap.SmapApplication_GeneratedInjector
+-dontwarn dagger.hilt.internal.aggregatedroot.codegen.**
+-dontwarn hilt_aggregated_deps.**
 
 # ==========================================
 # Kotlinx Serialization

@@ -22,7 +22,7 @@ struct LocationPermissionView: View {
                     .frame(width: 140, height: 140)
 
                 Image(systemName: "location.circle.fill")
-                    .font(.system(size: 72))
+                    .font(.suite(size: 72))
                     .foregroundStyle(.blue)
             }
             .padding(.bottom, 32)

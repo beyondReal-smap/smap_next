@@ -46,18 +46,20 @@ struct ChangePasswordView: View {
             }
             .padding(.top, 20)
         }
+        .scrollDismissesKeyboard(.interactively)
         .background(Color(UIColor.secondarySystemBackground).ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Text("비밀번호 변경")
                     .font(.suite(size: 18, weight: .bold))
             }
-        }
-        .navigationBarBackButtonHidden(true)
-        .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
-                Button(action: { presentationMode.wrappedValue.dismiss() }) {
+                Button(action: {
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    presentationMode.wrappedValue.dismiss()
+                }) {
                     HStack(spacing: 4) {
                         Image(systemName: "chevron.left")
                             .font(.suite(size: 18, weight: .semibold))
@@ -66,6 +68,14 @@ struct ChangePasswordView: View {
                     }
                     .foregroundColor(.primary)
                 }
+            }
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("완료") {
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                }
+                .font(.suite(size: 16, weight: .semibold))
+                .foregroundColor(SMAPTheme.Color.primary)
             }
         }
         .alert("알림", isPresented: $showAlert) {
@@ -82,7 +92,7 @@ struct ChangePasswordView: View {
     private var socialUserView: some View {
         VStack(spacing: 24) {
             Image(systemName: "shield.slash")
-                .font(.system(size: 60))
+                .font(.suite(size: 60))
                 .foregroundColor(.orange)
 
             Text("소셜 로그인 사용자는\n비밀번호를 변경할 수 없습니다.")
@@ -132,7 +142,7 @@ struct ChangePasswordView: View {
                     }
                     Spacer()
                     Image(systemName: "lock.shield.fill")
-                        .font(.system(size: 44))
+                        .font(.suite(size: 44))
                         .foregroundColor(.white.opacity(0.3))
                 }
             }
@@ -140,7 +150,7 @@ struct ChangePasswordView: View {
             .frame(maxWidth: .infinity)
             .background(
                 LinearGradient(
-                    gradient: Gradient(colors: [SMAPTheme.Color.primary, Color(red: 102/255, green: 126/255, blue: 234/255)]),
+                    gradient: Gradient(colors: [SMAPTheme.Color.primary, SMAPTheme.Accent.primarySoft]),
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
@@ -152,11 +162,11 @@ struct ChangePasswordView: View {
 
             // Input Fields Card
             VStack(spacing: 20) {
-                PasswordFormRow(icon: "lock.fill", iconColor: SMAPTheme.Color.primary, label: "현재 비밀번호", text: $currentPassword, placeholder: "현재 비밀번호를 입력하세요")
+                PasswordFormRow(icon: "lock.fill", iconColor: SMAPTheme.Color.primary, label: "현재 비밀번호", text: $currentPassword, placeholder: "현재 비밀번호를 입력하세요", textContentType: .password)
 
-                PasswordFormRow(icon: "key.fill", iconColor: SMAPTheme.Color.primary, label: "새 비밀번호", text: $newPassword, placeholder: "새 비밀번호 (8-20자)")
+                PasswordFormRow(icon: "key.fill", iconColor: SMAPTheme.Color.primary, label: "새 비밀번호", text: $newPassword, placeholder: "새 비밀번호 (8-20자)", textContentType: .newPassword)
 
-                PasswordFormRow(icon: "checkmark.circle.fill", iconColor: .green, label: "새 비밀번호 확인", text: $confirmPassword, placeholder: "비밀번호를 한번 더 입력해 주세요")
+                PasswordFormRow(icon: "checkmark.circle.fill", iconColor: .green, label: "새 비밀번호 확인", text: $confirmPassword, placeholder: "비밀번호를 한번 더 입력해 주세요", textContentType: .newPassword)
             }
             .padding(20)
             .background(Color(UIColor.systemBackground))
@@ -220,6 +230,8 @@ struct ChangePasswordView: View {
 
     private func handleSave() {
         isLoading = true
+        HapticManager.shared.impact(style: .light)
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
 
         Task {
             do {
@@ -230,12 +242,14 @@ struct ChangePasswordView: View {
 
                 await MainActor.run {
                     isLoading = false
+                    HapticManager.shared.notification(type: response.success ? .success : .error)
                     alertMessage = response.message
                     showAlert = true
                 }
             } catch {
                 await MainActor.run {
                     isLoading = false
+                    HapticManager.shared.notification(type: .error)
                     alertMessage = error.localizedDescription
                     showAlert = true
                 }
@@ -250,13 +264,14 @@ struct PasswordFormRow: View {
     let label: String
     @Binding var text: String
     let placeholder: String
+    var textContentType: UITextContentType? = nil // 자동완성/강력암호 제안 힌트
     @State private var isVisible: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 14))
+                    .font(.suite(size: 14))
                     .foregroundColor(iconColor)
                 Text(label)
                     .font(.suite(size: 14, weight: .bold))
@@ -268,14 +283,16 @@ struct PasswordFormRow: View {
                 if isVisible {
                     TextField(placeholder, text: $text)
                         .autocapitalization(.none)
+                        .textContentType(textContentType)
                 } else {
                     SecureField(placeholder, text: $text)
                         .autocapitalization(.none)
+                        .textContentType(textContentType)
                 }
 
                 Button(action: { isVisible.toggle() }) {
                     Image(systemName: isVisible ? "eye.slash.fill" : "eye.fill")
-                        .font(.system(size: 14))
+                        .font(.suite(size: 14))
                         .foregroundColor(.gray.opacity(0.5))
                         .padding(10)
                 }
@@ -301,7 +318,7 @@ struct StrengthRow: View {
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: isValid ? "checkmark.circle.fill" : "circle")
-                .font(.system(size: 12))
+                .font(.suite(size: 12))
                 .foregroundColor(isValid ? .green : .gray.opacity(0.5))
             Text(title)
                 .font(.suite(size: 12))

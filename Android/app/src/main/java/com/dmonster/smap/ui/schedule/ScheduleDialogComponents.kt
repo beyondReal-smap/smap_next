@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.dmonster.smap.data.model.SmapGroupMember
+import com.dmonster.smap.ui.theme.BrandColors
+import com.dmonster.smap.ui.theme.ScheduleSectionColors
 import com.dmonster.smap.ui.theme.SuiteFont
 
 @Composable
@@ -36,13 +38,17 @@ fun ScheduleSection(
     iconColor: Color,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    // iOS ScheduleSection 과 동등한 구조:
+    //  - 카드 배경은 white 유지
+    //  - border 는 badge(iconColor) 색의 알파 25% 로 섹션별 시각 정체성 부여
+    //  - shadow 완화 (stroke 만으로 충분한 구분감)
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
         color = Color.White,
-        border = BorderStroke(1.dp, Color.Gray.copy(alpha = 0.1f)),
+        border = BorderStroke(1.dp, iconColor.copy(alpha = 0.25f)),
         tonalElevation = 0.dp,
-        shadowElevation = 2.dp
+        shadowElevation = 1.dp
     ) {
         Column(
             modifier = Modifier.padding(16.dp).background(Color.White)
@@ -134,7 +140,7 @@ fun MemberItem(
                 Box(
                     modifier = Modifier
                         .size(60.dp)
-                        .border(2.dp, Color(0xFFEF4444), CircleShape)
+                        .border(2.dp, ScheduleSectionColors.BadgeGroup, CircleShape)
                 )
             }
 
@@ -151,7 +157,7 @@ fun MemberItem(
                     Icon(
                         imageVector = Icons.Default.CheckCircle,
                         contentDescription = null,
-                        tint = Color(0xFFEF4444),
+                        tint = ScheduleSectionColors.BadgeGroup,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -162,7 +168,7 @@ fun MemberItem(
             text = member.displayName,
             fontSize = 12.sp,
             fontFamily = SuiteFont,
-            color = if (isSelected) Color(0xFFEF4444) else Color.Gray,
+            color = if (isSelected) ScheduleSectionColors.BadgeGroup else BrandColors.TextSecondary,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

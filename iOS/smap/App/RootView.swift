@@ -167,7 +167,7 @@ private struct ForceUpdateView: View {
         VStack(spacing: 24) {
             Spacer()
             Image(systemName: "arrow.up.circle.fill")
-                .font(.system(size: 64))
+                .font(.suite(size: 64))
                 .foregroundColor(.accentColor)
             Text("업데이트가 필요합니다")
                 .font(.title2.bold())

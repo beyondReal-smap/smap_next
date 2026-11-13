@@ -81,6 +81,7 @@ struct FloatingCircle: View {
     let duration: Double
     var delay: Double = 0
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var animate = false
 
     var body: some View {
@@ -92,6 +93,9 @@ struct FloatingCircle: View {
             .offset(x: animate ? moveX : 0, y: animate ? moveY : 0)
             .scaleEffect(animate ? 1.2 : 1.0)
             .onAppear {
+                // 접근성 "동작 줄이기"(Reduce Motion) 활성 시 무한 반복 부유 애니메이션을
+                // 생략하고 정적 배경으로 렌더한다(WCAG 2.3.3 — 전정기관 민감 사용자 보호).
+                guard !reduceMotion else { return }
                 withAnimation(Animation.easeInOut(duration: duration).repeatForever(autoreverses: true).delay(delay)) {
                     animate.toggle()
                 }

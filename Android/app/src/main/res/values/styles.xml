@@ -19,13 +19,14 @@
 
     <!--
       MainActivity 전용 테마.
-      SplashActivity → MainActivity 전환 직후 Compose setContent 첫 프레임 전까지는
-      windowBackground가 그대로 노출된다. 스플래시와 동일한 drawable(배경+아이콘)을
-      사용해 전환 구간에도 아이콘이 같은 자리에 유지되고, Compose의 Surface(fillMaxSize)가
-      로드되면 아이콘이 자연스럽게 덮인다.
+      Compose setContent 첫 프레임 전까지는 windowBackground가 그대로 노출되므로,
+      SplashActivity → MainActivity 전환 직후 "흰색 깜빡임"을 방지하기 위해
+      브랜드 배경색(BrandColors.Background = #FEF8F9)을 명시한다.
+      아이콘을 포함한 drawable을 넣으면 Compose 로드 전까지 "작은 로고 + 흰 배경"이
+      사용자에게 수백 ms 노출되어 오히려 어색하므로 단색만 사용한다.
       statusBar/navigationBar는 enableEdgeToEdge()가 런타임에 재설정하므로 생략.
     -->
     <style name="Theme.Smap.Main" parent="Theme.SmapWebView">
-        <item name="android:windowBackground">@drawable/splash_background</item>
+        <item name="android:windowBackground">@color/background</item>
     </style>
 </resources>

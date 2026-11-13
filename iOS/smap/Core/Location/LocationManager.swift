@@ -97,21 +97,26 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
     // MARK: - Mode Switching
 
     func switchToMode(_ newMode: PowerMode) {
-        guard newMode != currentMode else { return }
-
-        // Block stationary mode if only whenInUse permission
+        // WhenInUse 권한일 때 STATIONARY로 진입하면 desiredAccuracy=ThreeKilometers + heartbeat만으로
+        // 백그라운드에서는 콜백이 거의 들어오지 않아 "정지된 듯"보이는 회귀가 발생한다.
+        // 이를 강제 차단(return)하면 모드 전환 자체가 실패하므로, WALKING으로 graceful fallback해
+        // 추적은 계속 유지한다(Always 권한 부여 시 다음 motion change에서 STATIONARY 진입).
+        var effectiveMode = newMode
         if newMode == .stationary {
             let status: CLAuthorizationStatus
             if #available(iOS 14.0, *) { status = clManager.authorizationStatus }
             else { status = CLLocationManager.authorizationStatus() }
             if status != .authorizedAlways {
-                print("[LocationManager] No Always permission - cannot enter Stationary mode")
-                return
+                print("[LocationManager] No Always permission - falling back to walking instead of stationary")
+                effectiveMode = .walking
             }
         }
 
+        guard effectiveMode != currentMode else { return }
+
         let oldMode = currentMode
-        currentMode = newMode
+        currentMode = effectiveMode
+        let newMode = effectiveMode
         print("[LocationManager] Mode switch: \(oldMode.rawValue) -> \(newMode.rawValue)")
 
         // Clean up previous timers and flush pending data on mode transition
@@ -192,8 +197,8 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
 
-        // Validate location
-        guard isValidLocation(location) else { return }
+        // Validate location with mode-specific accuracy threshold
+        guard isValidLocation(location, forMode: currentMode) else { return }
 
         lastLocation = location
         enqueueLocation(location)
@@ -215,11 +220,31 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
     // MARK: - Private
 
     private func handleAuthChange(_ status: CLAuthorizationStatus) {
+        let previousStatus = locationAuthStatus
         locationAuthStatus = status
-        if status == .authorizedAlways || status == .authorizedWhenInUse {
+
+        switch status {
+        case .authorizedAlways, .authorizedWhenInUse:
             startTracking()
             pendingAuthCompletion?()
             pendingAuthCompletion = nil
+
+        case .denied, .restricted:
+            // 권한이 박탈되면 즉시 추적 중단. 그렇지 않으면 batchTask가 계속 돌면서
+            // sendSingle을 시도하다 401/네트워크 에러로 배터리만 소모한다.
+            if isTracking {
+                print("[LocationManager] Permission revoked (\(status.rawValue)) - stopping tracking")
+                stopTracking()
+            }
+            pendingAuthCompletion?()
+            pendingAuthCompletion = nil
+
+        case .notDetermined:
+            // 사용자가 아직 응답하지 않은 상태. 시스템 다이얼로그 결과를 기다린다.
+            break
+
+        @unknown default:
+            print("[LocationManager] Unknown auth status: \(status.rawValue), previous: \(String(describing: previousStatus))")
         }
     }
 
@@ -251,12 +276,21 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
         }
     }
 
-    private func isValidLocation(_ location: CLLocation) -> Bool {
+    private func isValidLocation(_ location: CLLocation, forMode mode: PowerMode) -> Bool {
         let c = location.coordinate
         if c.latitude == 0.0 && c.longitude == 0.0 { return false }
         if c.latitude < -90 || c.latitude > 90 { return false }
         if c.longitude < -180 || c.longitude > 180 { return false }
-        if location.horizontalAccuracy > 500 { return false }
+        if location.horizontalAccuracy < 0 { return false }   // invalid fix per Apple docs
+        // 모드별 정확도 임계값. STATIONARY는 desiredAccuracy=ThreeKilometers라 큰 오차가 정상이지만,
+        // WALKING/AUTOMOTIVE는 NearestTenMeters/BestForNavigation이라 큰 오차는 노이즈로 보고 차단.
+        let accuracyThreshold: CLLocationDistance
+        switch mode {
+        case .walking:    accuracyThreshold = 100
+        case .automotive: accuracyThreshold = 150
+        case .stationary: accuracyThreshold = 1000
+        }
+        if location.horizontalAccuracy > accuracyThreshold { return false }
         if abs(location.timestamp.timeIntervalSinceNow) > 300 { return false }
         return true
     }

@@ -19,6 +19,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -28,7 +32,12 @@ import coil.compose.AsyncImage
 import com.dmonster.smap.data.model.DailyCount
 import com.dmonster.smap.data.model.SmapGroup
 import com.dmonster.smap.data.model.SmapGroupMember
+import com.dmonster.smap.ui.common.rememberSmapHaptics
+import com.dmonster.smap.ui.theme.AccentColors
+import com.dmonster.smap.ui.theme.ActivityLogColors
+import com.dmonster.smap.ui.theme.AdaptiveColors
 import com.dmonster.smap.ui.theme.BrandColors
+import com.dmonster.smap.ui.theme.SemanticColors
 import com.dmonster.smap.ui.theme.SuiteFont
 import com.dmonster.smap.ui.theme.responsiveSp
 import androidx.compose.foundation.BorderStroke
@@ -47,7 +56,7 @@ fun ActivityMemberSidebar(
     onGroupSelect: (SmapGroup) -> Unit,
     onMemberSelect: (SmapGroupMember) -> Unit,
     onMemberAndDateSelect: (SmapGroupMember, java.time.LocalDate) -> Unit,
-    onClose: () -> Unit,
+    @Suppress("UNUSED_PARAMETER") onClose: () -> Unit, // 닫기 로직은 스크림 탭으로 대신 처리 — 시그니처 유지
     modifier: Modifier = Modifier
 ) {
     // Calculate last 14 days for heatmap (recalculates across midnight)
@@ -61,7 +70,7 @@ fun ActivityMemberSidebar(
             .fillMaxHeight()
             .width(320.dp),
         shape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp),
-        color = Color(0xFFF3F4F6), // Light Gray background
+        color = AdaptiveColors.SidebarBackgroundLight,
         shadowElevation = 8.dp
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -83,7 +92,7 @@ fun ActivityMemberSidebar(
                     ) {
                         Icon(
                             imageVector = Icons.Default.History,
-                            contentDescription = null,
+                            contentDescription = "활동 로그",
                             tint = Color.White,
                             modifier = Modifier.size(20.dp)
                         )
@@ -130,7 +139,7 @@ fun ActivityMemberSidebar(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(bottom = 12.dp)
                     ) {
-                        Box(modifier = Modifier.size(6.dp).background(Color.Red, CircleShape))
+                        Box(modifier = Modifier.size(6.dp).background(SemanticColors.IndicatorGroup, CircleShape))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "그룹 목록",
@@ -147,9 +156,13 @@ fun ActivityMemberSidebar(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .heightIn(min = 48.dp)
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(Color(0xFFF9FAFB))
-                                .clickable { isGroupSelectorExpanded = true }
+                                .background(BrandColors.InputBackground)
+                                .clickable(role = Role.Button) { isGroupSelectorExpanded = true }
+                                .semantics {
+                                    contentDescription = "그룹 선택, 현재 ${selectedGroup?.sgtTitle ?: "미선택"}"
+                                }
                                 .padding(16.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
@@ -206,7 +219,7 @@ fun ActivityMemberSidebar(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(6.dp).background(Color(0xFF10B981), CircleShape))
+                            Box(modifier = Modifier.size(6.dp).background(SemanticColors.IndicatorMember, CircleShape))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = "멤버 목록",
@@ -283,11 +296,20 @@ fun ActivityMemberCard(
         heatmapDates.count { it in activeDates }
     }
 
+    val haptics = rememberSmapHaptics()
     Surface(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
+        onClick = {
+            haptics.medium()
+            onClick()
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics {
+                contentDescription = "${member.displayName}${if (isSelf) " (나)" else ""}, 2주간 활동 ${activeDaysCount}일"
+                selected = isSelected
+            },
         shape = RoundedCornerShape(16.dp),
-        color = if (isSelected) Color(0xFFEFF6FF) else Color.White, // Light Blue vs White
+        color = if (isSelected) BrandColors.Primary.copy(alpha = 0.06f) else Color.White,
         border = if (isSelected) BorderStroke(1.dp, BrandColors.Primary.copy(alpha = 0.5f)) else null,
         shadowElevation = if (isSelected) 4.dp else 1.dp
     ) {
@@ -320,7 +342,7 @@ fun ActivityMemberCard(
                             if (imageUrl != null) {
                                 AsyncImage(
                                     model = imageUrl,
-                                    contentDescription = null,
+                                    contentDescription = "${member.displayName} 프로필 사진",
                                     modifier = Modifier.fillMaxSize(),
                                     contentScale = ContentScale.Crop
                                 )
@@ -411,9 +433,6 @@ fun ActivityHeatmap(
     // Row 0: Day headers (S M T W T F S)
     // Row 1: Week 1 Activity (13-7 days ago)
     // Row 2: Week 2 Activity (6-0 days ago, ending today)
-
-    val indigoColor = Color(0xFF6366F1)
-    val pinkColor = Color(0xFFEC4899)
     val today = remember(System.currentTimeMillis() / 86400000) { java.time.LocalDate.now() }
 
     Column(
@@ -446,8 +465,8 @@ fun ActivityHeatmap(
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = when {
-                        isSunday -> Color.Red
-                        isSaturday -> Color.Blue
+                        isSunday -> SemanticColors.CalendarSunday
+                        isSaturday -> SemanticColors.CalendarSaturday
                         else -> Color.Gray
                     },
                     textAlign = TextAlign.Center,
@@ -455,8 +474,8 @@ fun ActivityHeatmap(
                         .width(17.dp)
                         .background(
                             when {
-                                isSunday -> Color.Red.copy(alpha = 0.1f)
-                                isSaturday -> Color.Blue.copy(alpha = 0.1f)
+                                isSunday -> SemanticColors.CalendarSunday.copy(alpha = 0.1f)
+                                isSaturday -> SemanticColors.CalendarSaturday.copy(alpha = 0.1f)
                                 else -> Color.Gray.copy(alpha = 0.05f)
                             },
                             RoundedCornerShape(2.dp)
@@ -515,17 +534,33 @@ fun HeatmapCell(
     isToday: Boolean,
     onClick: (() -> Unit)?
 ) {
-    val indigoColor = Color(0xFF6366F1)
-    val pinkColor = Color(0xFFEC4899)
-    val roseColor = Color(0xFFF43F5E)
+    val indigoColor = ActivityLogColors.HeatmapActive
+    val pinkColor = ActivityLogColors.HeatmapSelectedStart
+    val roseColor = ActivityLogColors.HeatmapSelectedEnd
+    val haptics = rememberSmapHaptics()
+
+    val cellStatusLabel = when {
+        isSelectedDate -> "선택됨"
+        isActive -> "기록 있음"
+        else -> "기록 없음"
+    }
+    val dateLabel = "${date.monthValue}월 ${date.dayOfMonth}일${if (isToday) ", 오늘" else ""}, $cellStatusLabel"
 
     Box(
         modifier = Modifier
             .size(17.dp)
             .clip(RoundedCornerShape(4.dp))
             .then(
-                if (onClick != null) Modifier.clickable { onClick() }
-                else Modifier
+                if (onClick != null) {
+                    Modifier
+                        .clickable(role = Role.Button) {
+                            haptics.light()
+                            onClick()
+                        }
+                        .semantics { contentDescription = dateLabel }
+                } else {
+                    Modifier.semantics { contentDescription = dateLabel }
+                }
             )
             .background(
                 when {

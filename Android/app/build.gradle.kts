@@ -18,14 +18,15 @@ fun localOrGradleProp(key: String): String? =
 
 android {
     namespace = "com.dmonster.smap"
-    compileSdk = 35
+    // Google Play 2026-08-31 정책: Android 16(API 36) 이상 타겟팅 필수
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.dmonster.smap"
         minSdk = 28
-        targetSdk = 35
-        versionCode = 64
-        versionName = "3.2.7"
+        targetSdk = 36
+        versionCode = 68
+        versionName = "3.3.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         resourceConfigurations += setOf("ko", "en")
@@ -101,7 +102,9 @@ android {
     }
     packaging {
         jniLibs {
-            useLegacyPackaging = true
+            // 16KB 페이지 크기 지원: .so 를 비압축·16KB 정렬로 APK에 두고 직접 mmap 한다.
+            // true(레거시: 압축 후 설치 시 추출)는 16KB 기기에서 비호환/크래시를 유발하므로 false 필수.
+            useLegacyPackaging = false
         }
     }
 }

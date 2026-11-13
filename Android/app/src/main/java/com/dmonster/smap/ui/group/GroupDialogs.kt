@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dmonster.smap.data.model.SmapGroup
+import com.dmonster.smap.ui.common.rememberSmapHaptics
 import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.SuiteFont
 import kotlinx.coroutines.Dispatchers
@@ -44,10 +45,11 @@ fun InviteMemberBottomSheet(
 ) {
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
+    val haptics = rememberSmapHaptics()
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = Color(0xFFF5F5F5),
+        containerColor = BrandColors.InputBackground,
         shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
         dragHandle = null
     ) {
@@ -194,7 +196,8 @@ fun InviteMemberBottomSheet(
                         onClick = {
                             group.sgtCode?.let {
                                 clipboardManager.setText(AnnotatedString(it))
-                                Toast.makeText(context, "초대 코드가 복사되었습니다", Toast.LENGTH_SHORT).show()
+                                // Haptic 피드백만 — Snackbar 메시지는 상위(GroupScreen) 에서 ViewModel.showSuccess 경로로 발행
+                                haptics.success()
                             }
                             onCopyCode()
                         }

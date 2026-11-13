@@ -28,7 +28,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.widthIn
 import com.dmonster.smap.data.model.SmapSchedule
+import com.dmonster.smap.ui.common.rememberSmapHaptics
+import com.dmonster.smap.ui.theme.AccentColors
 import com.dmonster.smap.ui.theme.BrandColors
+import com.dmonster.smap.ui.theme.SemanticColors
 import com.dmonster.smap.ui.theme.SuiteFont
 import kotlinx.coroutines.delay
 import java.util.TimeZone
@@ -55,7 +58,7 @@ fun MapLoadingOverlay() {
                 Brush.linearGradient(
                     colors = listOf(
                         BrandColors.Primary.copy(alpha = 0.95f),
-                        Color(0xFF667EEA).copy(alpha = 0.95f)
+                        AccentColors.PrimarySoft.copy(alpha = 0.95f)
                     )
                 )
             ),
@@ -74,7 +77,7 @@ fun MapLoadingOverlay() {
             ) {
                 Icon(
                     imageVector = Icons.Filled.Map,
-                    contentDescription = "Map",
+                    contentDescription = "지도",
                     tint = Color.White,
                     modifier = Modifier.size(44.dp)
                 )
@@ -150,7 +153,7 @@ fun HomeHeaderView(
         }
         
         Row(horizontalArrangement = Arrangement.spacedBy(0.dp)) {
-            // Notification Button with Badge
+            // Notification Button with Badge — 읽지 않음 dot 는 AccentColors 토큰
             IconButton(
                 onClick = onNotificationTap,
                 modifier = Modifier.size(48.dp)
@@ -162,14 +165,14 @@ fun HomeHeaderView(
                                 modifier = Modifier
                                     .size(8.dp)
                                     .offset(x = 2.dp, y = (-2).dp),
-                                containerColor = Color.Red
+                                containerColor = AccentColors.NotificationDot
                             )
                         }
                     }
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Notifications,
-                        contentDescription = "Notifications",
+                        contentDescription = if (hasUnread) "알림, 읽지 않은 알림 있음" else "알림",
                         tint = Color.Gray,
                         modifier = Modifier.size(24.dp)
                     )
@@ -183,7 +186,7 @@ fun HomeHeaderView(
             ) {
                 Icon(
                     imageVector = Icons.Filled.Settings,
-                    contentDescription = "Settings",
+                    contentDescription = "설정",
                     tint = Color.Gray,
                     modifier = Modifier.size(24.dp)
                 )
@@ -248,7 +251,7 @@ fun MemberInfoWindow(
                 Icon(
                     imageVector = Icons.Filled.Person,
                     contentDescription = null,
-                    tint = Color(0xFF6366F1),
+                    tint = AccentColors.Indigo,
                     modifier = Modifier.size(16.dp)
                 )
                 Text(
@@ -268,23 +271,23 @@ fun MemberInfoWindow(
                 icon = Icons.Filled.BatteryFull, // Ideally should change based on level, but matches screenshot type
                 label = "배터리:",
                 value = batteryText,
-                iconTint = Color(0xFF22C55E)
+                iconTint = SemanticColors.StatCompleted
             )
-            
+
             // Speed Row
             InfoRow(
                 icon = Icons.Filled.DirectionsWalk,
                 label = "속도:",
                 value = "${String.format(Locale.US, "%.1f", speed)}km/h",
-                iconTint = Color(0xFFF59E0B)
+                iconTint = AccentColors.Orange
             )
-            
+
             // GPS Update Row
             InfoRow(
                 icon = Icons.Filled.AccessTime,
                 label = "GPS 업데이트:",
                 value = gpsTimeStr,
-                iconTint = Color(0xFF94A3B8)
+                iconTint = BrandColors.TextSecondary
             )
         }
     }
@@ -311,7 +314,7 @@ private fun InfoRow(
             text = label,
             fontSize = 12.sp,
             fontFamily = SuiteFont,
-            color = Color(0xFF64748B),
+            color = BrandColors.TextSecondary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -319,7 +322,7 @@ private fun InfoRow(
             text = value,
             fontSize = 12.sp,
             fontFamily = SuiteFont,
-            color = Color(0xFF64748B),
+            color = BrandColors.TextSecondary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
@@ -335,29 +338,33 @@ fun FloatingActionHomeButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val pinkColor = Color(0xFFEC4899)
-    
+    val pinkColor = AccentColors.Pink
+    val haptics = rememberSmapHaptics()
+
     Box(modifier = modifier) {
         FloatingActionButton(
-            onClick = onClick,
+            onClick = {
+                haptics.medium()
+                onClick()
+            },
             containerColor = BrandColors.Primary,
             contentColor = Color.White,
-            shape = CircleShape, // Explicitly set CircleShape
+            shape = CircleShape,
             modifier = Modifier.size(64.dp)
         ) {
             Icon(
                 imageVector = Icons.Filled.Person,
-                contentDescription = "Members",
+                contentDescription = if (memberCount > 0) "멤버 조회, ${memberCount}명" else "멤버 조회",
                 modifier = Modifier.size(32.dp)
             )
         }
-        
-        // Member Count Badge
+
+        // Member Count Badge — 접근성 라벨은 FAB 에 통합, 배지는 장식적 표시
         if (memberCount > 0) {
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .offset(x = 4.dp, y = (-4).dp) // Adjust offset for reverted button size
+                    .offset(x = 4.dp, y = (-4).dp)
                     .size(26.dp)
                     .background(pinkColor, CircleShape),
                 contentAlignment = Alignment.Center

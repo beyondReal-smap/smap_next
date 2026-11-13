@@ -270,7 +270,7 @@ struct FloatingActionPlaceButton: View {
     let action: () -> Void
     
     
-    private let pinkColor = Color(red: 236/255, green: 72/255, blue: 153/255) // Pink-500
+    private var pinkColor: Color { SMAPTheme.Accent.pink }
     
     var body: some View {
         Button(action: action) {
@@ -337,7 +337,7 @@ struct MyPlaceSidebarView: View {
                     // Group Selector Section
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 8) {
-                            Circle().fill(Color.red).frame(width: 8, height: 8)
+                            Circle().fill(SMAPTheme.Semantic.indicatorGroup).frame(width: 8, height: 8)
                             Text("그룹 선택").font(.suite(size: 16, weight: .bold))
                         }
                         
@@ -479,7 +479,7 @@ struct LocationListCell: View {
                             .fill(isSelected ? SMAPTheme.Color.primary.opacity(0.1) : Color.gray.opacity(0.05))
                             .frame(width: 40, height: 40)
                         Image(systemName: "mappin.and.ellipse")
-                            .font(.system(size: 18))
+                            .font(.suite(size: 18))
                             .foregroundColor(isSelected ? SMAPTheme.Color.primary : .gray)
                     }
                     
@@ -515,7 +515,7 @@ struct LocationListCell: View {
             // Top layer: Bell button (separate from main button's touch area)
             Button(action: onToggleNotification) {
                 Image(systemName: location.notifications ? "bell.fill" : "bell.slash")
-                    .font(.system(size: 16))
+                    .font(.suite(size: 16))
                     .foregroundColor(location.notifications ? .orange : .gray.opacity(0.4))
                     .frame(width: 44, height: 44)
                     .background(Color.white)
@@ -575,10 +575,11 @@ struct PlaceMemberCell: View {
                     // Crown/Star Icon
                     if member.isOwner {
                         Circle()
-                            .fill(Color.yellow)
+                            .fill(SMAPTheme.Accent.crown)
                             .frame(width: 16, height: 16)
                             .overlay(Image(systemName: "crown.fill").font(.suite(size: 8)).foregroundColor(.white))
                             .offset(x: 4, y: 4)
+                            .accessibilityLabel("그룹 오너")
                     } else if member.isLeader {
                         Circle()
                             .fill(Color.orange)

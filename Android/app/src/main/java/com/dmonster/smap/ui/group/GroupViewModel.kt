@@ -482,4 +482,9 @@ class GroupViewModel @Inject constructor(
 
     fun clearError() { _errorMessage.value = null }
     fun clearSuccess() { _successMessage.value = null }
+
+    /** UI 레이어에서 임시 성공 Snackbar 발행용. Toast 대체. */
+    fun showSuccess(message: String) { _successMessage.value = message }
+    /** UI 레이어에서 임시 에러 Snackbar 발행용. */
+    fun showError(message: String) { _errorMessage.value = message }
 }

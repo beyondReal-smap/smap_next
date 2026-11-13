@@ -37,7 +37,7 @@ fun DeleteScheduleDialog(
             Icon(
                 imageVector = Icons.Default.Warning,
                 contentDescription = null,
-                tint = Color.Red,
+                tint = BrandColors.Error,
                 modifier = Modifier.size(32.dp)
             )
         },
@@ -92,7 +92,7 @@ fun DeleteScheduleDialog(
             Button(
                 onClick = { onConfirm(selectedOption) },
                 enabled = !isLoading,
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                colors = ButtonDefaults.buttonColors(containerColor = BrandColors.Error)
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(
@@ -126,7 +126,7 @@ fun RecurringScheduleActionDialog(
     onAll: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val buttonColor = if (isDestructive) Color.Red else BrandColors.Primary
+    val buttonColor = if (isDestructive) BrandColors.Error else BrandColors.Primary
 
     AlertDialog(
         onDismissRequest = onDismiss,

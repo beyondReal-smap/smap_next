@@ -394,6 +394,14 @@ class MyPlaceViewModel @Inject constructor(
         val query = _searchQuery.value
         if (query.isBlank()) return
 
+        // API 키 미설정 시 network 호출 전에 즉시 가드 — 빈 키로 호출하면 401 이 내려와
+        // "검색에 실패했습니다" 로만 표시되어 원인 파악이 어렵기 때문이다.
+        if (KAKAO_API_KEY.isBlank()) {
+            if (BuildConfig.DEBUG) Log.e(TAG, "KAKAO_API_KEY is empty — check local.properties")
+            _errorMessage.value = "주소 검색 키가 설정되지 않았습니다. 앱 재설치 후 다시 시도해주세요."
+            return
+        }
+
         viewModelScope.launch {
             _isSearching.value = true
             try {
@@ -415,15 +423,20 @@ class MyPlaceViewModel @Inject constructor(
                         _searchResults.value = result.documents
                         _hasSearched.value = true
                     } catch (e: Exception) {
-                        Log.e(TAG, "Failed to parse search response", e)
+                        if (BuildConfig.DEBUG) Log.e(TAG, "Failed to parse search response", e)
                         _errorMessage.value = "검색 결과 처리에 실패했습니다"
                     }
                 } else {
-                    _errorMessage.value = "검색에 실패했습니다"
+                    if (BuildConfig.DEBUG) Log.e(TAG, "Search HTTP ${response.code}: ${response.body?.string()?.take(200)}")
+                    _errorMessage.value = when (response.code) {
+                        401, 403 -> "주소 검색 인증에 실패했습니다 (키 확인 필요)"
+                        429 -> "요청이 너무 많습니다. 잠시 후 다시 시도해주세요."
+                        else -> "검색에 실패했습니다 (${response.code})"
+                    }
                 }
             } catch (e: Exception) {
                 if (BuildConfig.DEBUG) Log.e(TAG, "Search failed", e)
-                _errorMessage.value = "검색 중 오류가 발생했습니다"
+                _errorMessage.value = "검색 중 오류가 발생했습니다: ${e.message ?: ""}".trim()
             } finally {
                 _isSearching.value = false
             }

@@ -19,7 +19,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.dmonster.smap.data.model.SmapGroup
+import com.dmonster.smap.ui.common.rememberSmapHaptics
+import com.dmonster.smap.ui.theme.AccentColors
 import com.dmonster.smap.ui.theme.BrandColors
+import com.dmonster.smap.ui.theme.SemanticColors
 import com.dmonster.smap.ui.theme.SuiteFont
 
 // MARK: - Create Group Dialog
@@ -32,6 +35,7 @@ fun CreateGroupDialog(
 ) {
     var name by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
+    val haptics = rememberSmapHaptics()
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -56,7 +60,7 @@ fun CreateGroupDialog(
                                 .size(40.dp)
                                 .background(
                                     Brush.linearGradient(
-                                        listOf(Color(0xFF3B82F6), Color(0xFF2563EB))
+                                        listOf(SemanticColors.IndicatorMember, BrandColors.Primary)
                                     ),
                                     RoundedCornerShape(10.dp)
                                 ),
@@ -76,7 +80,7 @@ fun CreateGroupDialog(
                                 fontSize = 18.sp,
                                 fontFamily = SuiteFont,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF1F2937)
+                                color = BrandColors.TextPrimary
                             )
                             Text(
                                 text = "함께할 멤버들을 초대해보세요",
@@ -154,7 +158,10 @@ fun CreateGroupDialog(
 
                 // Create Button
                 Button(
-                    onClick = { onCreate(name, description) },
+                    onClick = {
+                        haptics.medium()
+                        onCreate(name, description)
+                    },
                     enabled = name.isNotBlank() && !isLoading,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -198,10 +205,43 @@ fun EditGroupDialog(
     onUpdate: (String, String) -> Unit,
     isLoading: Boolean
 ) {
-    var name by remember(group.sgtIdx) { mutableStateOf(group.sgtTitle ?: "") }
-    var description by remember(group.sgtIdx) { mutableStateOf(group.sgtMemo ?: "") }
+    val initialName = group.sgtTitle ?: ""
+    val initialDesc = group.sgtMemo ?: ""
+    var name by remember(group.sgtIdx) { mutableStateOf(initialName) }
+    var description by remember(group.sgtIdx) { mutableStateOf(initialDesc) }
+    val hasUnsavedChanges = name != initialName || description != initialDesc
+    var showDiscardConfirm by remember { mutableStateOf(false) }
+    val editHaptics = rememberSmapHaptics()
 
-    Dialog(onDismissRequest = onDismiss) {
+    val safeDismiss: () -> Unit = {
+        if (hasUnsavedChanges) {
+            editHaptics.warning()
+            showDiscardConfirm = true
+        } else {
+            onDismiss()
+        }
+    }
+
+    if (showDiscardConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDiscardConfirm = false },
+            title = { Text("변경사항이 저장되지 않았습니다", fontFamily = SuiteFont) },
+            text = { Text("수정 중인 내용을 버리고 닫으시겠습니까?", fontFamily = SuiteFont) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDiscardConfirm = false
+                    onDismiss()
+                }) { Text("변경사항 버리기", color = BrandColors.Error, fontFamily = SuiteFont) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDiscardConfirm = false }) {
+                    Text("계속 편집", fontFamily = SuiteFont)
+                }
+            }
+        )
+    }
+
+    Dialog(onDismissRequest = safeDismiss) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -223,7 +263,7 @@ fun EditGroupDialog(
                             modifier = Modifier
                                 .size(40.dp)
                                 .background(
-                                    Color(0xFFFBBF24),
+                                    AccentColors.Crown,
                                     RoundedCornerShape(10.dp)
                                 ),
                             contentAlignment = Alignment.Center
@@ -241,11 +281,11 @@ fun EditGroupDialog(
                             fontSize = 18.sp,
                             fontFamily = SuiteFont,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF1F2937)
+                            color = BrandColors.TextPrimary
                         )
                     }
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, "닫기", tint = Color.Gray)
+                    IconButton(onClick = safeDismiss) {
+                        Icon(Icons.Default.Close, "닫기", tint = BrandColors.TextSecondary)
                     }
                 }
 
@@ -292,14 +332,17 @@ fun EditGroupDialog(
 
                 // Update Button
                 Button(
-                    onClick = { onUpdate(name, description) },
+                    onClick = {
+                        editHaptics.medium()
+                        onUpdate(name, description)
+                    },
                     enabled = name.isNotBlank() && !isLoading,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFFBBF24)
+                        containerColor = AccentColors.Crown
                     )
                 ) {
                     if (isLoading) {
@@ -368,10 +411,14 @@ fun DeleteConfirmDialog(
             )
         },
         confirmButton = {
+            val deleteHaptics = rememberSmapHaptics()
             Button(
-                onClick = onConfirm,
+                onClick = {
+                    deleteHaptics.warning()
+                    onConfirm()
+                },
                 enabled = !isLoading,
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                colors = ButtonDefaults.buttonColors(containerColor = BrandColors.Error)
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(
