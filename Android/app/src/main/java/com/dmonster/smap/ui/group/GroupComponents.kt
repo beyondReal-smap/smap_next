@@ -1,702 +1,387 @@
 package com.dmonster.smap.ui.group
 
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.material.icons.outlined.PersonAdd
-import com.dmonster.smap.ui.theme.SmapText
-import com.dmonster.smap.ui.theme.SmapSpacing
-import com.dmonster.smap.ui.components.SmapTextField
-import com.dmonster.smap.ui.components.SmapButton
-import com.dmonster.smap.BuildConfig
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.automirrored.outlined.ExitToApp
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.PersonAdd
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.dmonster.smap.data.model.SmapGroup
 import com.dmonster.smap.data.model.SmapGroupMember
-import com.dmonster.smap.ui.theme.AccentColors
-import com.dmonster.smap.ui.theme.BrandColors
-import com.dmonster.smap.ui.theme.SemanticColors
-import com.dmonster.smap.ui.theme.SuiteFont
-import com.dmonster.smap.ui.theme.responsiveSp
-import coil.compose.AsyncImage
+import com.dmonster.smap.ui.components.SmapAvatar
+import com.dmonster.smap.ui.components.SmapButton
+import com.dmonster.smap.ui.components.SmapListRow
+import com.dmonster.smap.ui.components.SmapRowDivider
+import com.dmonster.smap.ui.components.SmapRowIcon
+import com.dmonster.smap.ui.components.SmapSection
+import com.dmonster.smap.ui.components.SmapTextField
+import com.dmonster.smap.ui.theme.SmapRadius
+import com.dmonster.smap.ui.theme.SmapSpacing
+import com.dmonster.smap.ui.theme.SmapText
 
-// MARK: - Stats Cards
-
-/**
- * 그룹 목록 위 한 줄 요약 — "그룹 2개 · 멤버 5명".
- *
- * 이전에는 남색·분홍 그라데이션 카드 두 장이 숫자 두 개를 보여 주느라 첫 화면 절반을 차지했고,
- * 디자인 시스템에 없는 색이었다. 목록이 주인공이 되도록 텍스트 한 줄로 줄였다.
+/*
+ * 36단계 재설계 — 그룹 탭.
+ * 이전: 흰 바탕 위 카드 목록 + 오른쪽 아래 + 버튼, 상세는 남색 큰 카드와 분홍·노랑·남색 통계 타일.
+ * 지금: 회색 바탕 위 "구역 제목 + 흰 묶음" 목록. 새 그룹은 제목 옆 + 버튼, 상세는 요약·초대·멤버·관리 4구역.
  */
+
+/** 그룹 목록 화면. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GroupSummaryLine(
-    groupsCount: Int,
-    totalMembers: Int,
-    modifier: Modifier = Modifier
+fun GroupListContent(
+    groups: List<SmapGroup>,
+    groupMemberCounts: Map<Int, Int>,
+    inviteCode: String,
+    isLoading: Boolean,
+    isJoining: Boolean,
+    isRefreshing: Boolean,
+    onGroupClick: (SmapGroup) -> Unit,
+    onCreateClick: () -> Unit,
+    onInviteCodeChange: (String) -> Unit,
+    onJoinGroup: () -> Unit,
+    onRefresh: () -> Unit,
 ) {
-    Text(
-        text = "그룹 ${groupsCount}개 · 멤버 ${totalMembers}명",
-        style = SmapText.caption,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = SmapSpacing.screenHorizontal)
-    )
+    val colors = MaterialTheme.colorScheme
+    PullToRefreshBox(isRefreshing = isRefreshing, onRefresh = onRefresh, modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(colors.background),
+            contentPadding = PaddingValues(start = SmapSpacing.md, end = SmapSpacing.md, bottom = SmapSpacing.xl),
+            verticalArrangement = Arrangement.spacedBy(SmapSpacing.lg),
+        ) {
+            item {
+                LargeTitle("그룹") {
+                    FilledTonalIconButton(
+                        onClick = onCreateClick,
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = colors.primaryContainer,
+                            contentColor = colors.primary,
+                        ),
+                    ) { Icon(Icons.Outlined.Add, contentDescription = "새 그룹 만들기") }
+                }
+            }
+
+            item {
+                SmapSection(title = if (groups.isEmpty()) "내 그룹" else "내 그룹 ${groups.size}") {
+                    when {
+                        isLoading -> repeat(2) { i ->
+                            if (i > 0) SmapRowDivider()
+                            SkeletonRow()
+                        }
+                        groups.isEmpty() -> SmapListRow(
+                            title = "아직 그룹이 없어요",
+                            subtitle = "가족·친구와 위치를 함께 보려면 그룹을 만들거나 초대 코드로 참여하세요.",
+                            leading = { SmapRowIcon(Icons.Outlined.Groups) },
+                            trailing = {
+                                Text("만들기", style = SmapText.captionBold, color = colors.primary)
+                            },
+                            onClick = onCreateClick,
+                        )
+                        else -> groups.forEachIndexed { i, g ->
+                            if (i > 0) SmapRowDivider()
+                            val count = groupMemberCounts[g.sgtIdx] ?: g.memberCount ?: 0
+                            SmapListRow(
+                                title = g.sgtTitle ?: "이름 없는 그룹",
+                                subtitle = listOfNotNull("멤버 ${count}명", g.sgtMemo?.takeIf { it.isNotBlank() }).joinToString(" · "),
+                                leading = { SmapRowIcon(Icons.Outlined.Groups) },
+                                trailing = { Chevron() },
+                                onClick = { onGroupClick(g) },
+                            )
+                        }
+                    }
+                }
+            }
+
+            item { InviteJoinSection(inviteCode, onInviteCodeChange, onJoinGroup, isJoining) }
+        }
+    }
 }
 
-/**
- * 초대 코드로 그룹에 참여하는 영역 — 제목 + 공용 입력칸 + 참여 버튼.
- *
- * 공용 SmapTextField / SmapButton 을 써서 로그인·가입 화면과 같은 입력 규격을 따른다.
- * 코드는 영문 대문자·숫자만 받는다(기존 필터 유지).
- */
+/** 큰 제목 줄(탭 첫 화면용). */
 @Composable
-fun InviteCodeSection(
+private fun LargeTitle(title: String, action: @Composable () -> Unit = {}) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 4.dp, top = SmapSpacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            title,
+            style = SmapText.title.copy(fontSize = androidx.compose.ui.unit.TextUnit(28f, androidx.compose.ui.unit.TextUnitType.Sp)),
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier
+                .weight(1f)
+                .semantics { heading() },
+        )
+        action()
+    }
+}
+
+@Composable
+private fun InviteJoinSection(
     inviteCode: String,
     onCodeChange: (String) -> Unit,
     onJoin: () -> Unit,
-    isLoading: Boolean,
-    modifier: Modifier = Modifier
+    isJoining: Boolean,
 ) {
-    val focusManager = LocalFocusManager.current
-
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = SmapSpacing.screenHorizontal),
-        verticalArrangement = Arrangement.spacedBy(SmapSpacing.sm)
-    ) {
-        Text(
-            text = "초대 코드로 참여",
-            style = SmapText.subheadline,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(SmapSpacing.sm),
-            verticalAlignment = Alignment.Top
-        ) {
-            SmapTextField(
-                value = inviteCode,
-                onValueChange = { newValue ->
-                    // UI 레벨에서도 즉시 필터링 (영문 대문자와 숫자만)
-                    onCodeChange(newValue.uppercase().filter { it in 'A'..'Z' || it in '0'..'9' })
-                },
-                label = "초대 코드",
-                leadingIcon = Icons.Outlined.PersonAdd,
-                keyboardType = KeyboardType.Ascii,
-                imeAction = ImeAction.Done,
-                keyboardActions = KeyboardActions(onDone = {
-                    focusManager.clearFocus()
-                    if (inviteCode.isNotBlank()) onJoin()
-                }),
-                modifier = Modifier.weight(1f)
-            )
-            SmapButton(
-                text = "참여",
-                onClick = {
-                    focusManager.clearFocus()
-                    onJoin()
-                },
-                enabled = inviteCode.isNotBlank(),
-                isLoading = isLoading,
-                // 입력칸(OutlinedTextField 56dp)과 윗선을 맞추기 위해 위쪽 여백을 둔다.
-                modifier = Modifier
-                    .padding(top = SmapSpacing.sm)
-                    .width(88.dp)
-            )
+    val focus = LocalFocusManager.current
+    SmapSection(title = "초대 코드로 참여") {
+        Column(Modifier.padding(SmapSpacing.md), verticalArrangement = Arrangement.spacedBy(SmapSpacing.sm)) {
+            Row(verticalAlignment = Alignment.Top) {
+                SmapTextField(
+                    value = inviteCode,
+                    // 초대 코드는 영문 대문자·숫자로만 이뤄진다.
+                    onValueChange = { v -> onCodeChange(v.uppercase().filter { it in 'A'..'Z' || it in '0'..'9' }) },
+                    label = "초대 코드",
+                    placeholder = "예: 5JDZRMNVEV",
+                    leadingIcon = Icons.Outlined.PersonAdd,
+                    keyboardType = KeyboardType.Ascii,
+                    imeAction = ImeAction.Done,
+                    keyboardActions = KeyboardActions(onDone = { focus.clearFocus(); if (inviteCode.isNotBlank()) onJoin() }),
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(SmapSpacing.sm))
+                SmapButton(
+                    text = "참여",
+                    onClick = { focus.clearFocus(); onJoin() },
+                    enabled = inviteCode.isNotBlank() && !isJoining,
+                    isLoading = isJoining,
+                    modifier = Modifier
+                        .padding(top = 26.dp)
+                        .width(80.dp),
+                )
+            }
         }
     }
 }
 
-// MARK: - Group Card
-
+/** 그룹 상세 화면 — 요약 · 초대 · 멤버 · 관리. */
 @Composable
-fun GroupCard(
+fun GroupDetailContent(
     group: SmapGroup,
-    memberCount: Int,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = androidx.compose.foundation.BorderStroke(0.5.dp, BrandColors.Border.copy(alpha = 0.5f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // iOS 스타일: Primary 톤 배경 + 하얀색 아이콘 한 개
-            Box(
-                modifier = Modifier
-                    .size(52.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(BrandColors.Primary.copy(alpha = 0.08f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Groups,
-                    contentDescription = null,
-                    tint = BrandColors.Primary.copy(alpha = 0.8f),
-                    modifier = Modifier.size(26.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(14.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = group.sgtTitle ?: "이름 없음",
-                    fontSize = 17.responsiveSp(),
-                    fontFamily = SuiteFont,
-                    fontWeight = FontWeight.Bold,
-                    color = BrandColors.TextPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                // 설명이 없으면 "그룹 설명이 없습니다" 같은 빈 문구 대신 줄을 비운다.
-                group.sgtMemo?.takeIf { it.isNotBlank() }?.let { memo ->
-                    Text(
-                        text = memo,
-                        fontSize = 13.responsiveSp(),
-                        fontFamily = SuiteFont,
-                        color = BrandColors.TextSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // 보조정보 — 멤버수 · 생성일, 모두 Primary tint 로 통일
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Groups,
-                        contentDescription = null,
-                        tint = BrandColors.Primary,
-                        modifier = Modifier.size(12.dp)
-                    )
-                    Text(
-                        text = "${memberCount}명",
-                        fontSize = 12.responsiveSp(),
-                        fontFamily = SuiteFont,
-                        fontWeight = FontWeight.Medium,
-                        color = BrandColors.Primary
-                    )
-                    val dateStr = group.sgtWdate?.take(10).orEmpty()
-                    if (dateStr.isNotEmpty()) {
-                        Text(
-                            text = "·",
-                            fontSize = 12.responsiveSp(),
-                            fontFamily = SuiteFont,
-                            color = BrandColors.TextSecondary
-                        )
-                        Text(
-                            text = dateStr,
-                            fontSize = 12.responsiveSp(),
-                            fontFamily = SuiteFont,
-                            color = BrandColors.TextSecondary,
-                            maxLines = 1
-                        )
-                    }
-                }
-            }
-
-            Icon(
-                imageVector = Icons.Filled.ChevronRight,
-                contentDescription = "상세 보기",
-                tint = BrandColors.TextSecondary.copy(alpha = 0.5f),
-                modifier = Modifier.size(24.dp)
-            )
-        }
-    }
-}
-
-// MARK: - Group Header Card (Detail View)
-
-@Composable
-fun GroupHeaderCard(
-    group: SmapGroup,
-    isOwner: Boolean,
-    onEditClick: () -> Unit,
-    onDeleteClick: () -> Unit,
-    onLeaveClick: () -> Unit,
-    onCopyCode: () -> Unit,
-    onInviteClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    var showMenu by remember { mutableStateOf(false) }
-    
-    // iOS 스타일: Primary→PrimaryDark 대각선 그라디언트
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(BrandColors.Primary, BrandColors.PrimaryDark)
-                    )
-                )
-                .padding(20.dp)
-        ) {
-            // Menu Button (Three dots horizontal)
-            Box(
-                modifier = Modifier.align(Alignment.TopEnd)
-            ) {
-                IconButton(
-                    onClick = { showMenu = true },
-                    modifier = Modifier.size(48.dp) // HIG/Material 권장 터치 타겟
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.MoreHoriz,
-                        contentDescription = "그룹 관리 메뉴",
-                        tint = Color.White.copy(alpha = 0.7f),
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-                
-                DropdownMenu(
-                    expanded = showMenu,
-                    onDismissRequest = { showMenu = false }
-                ) {
-                    if (isOwner) {
-                        DropdownMenuItem(
-                            text = { Text("그룹 정보 수정", fontFamily = SuiteFont) },
-                            onClick = {
-                                showMenu = false
-                                onEditClick()
-                            },
-                            leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = "수정") }
-                        )
-                    }
-                    
-                    DropdownMenuItem(
-                        text = { Text("멤버 초대하기", fontFamily = SuiteFont) },
-                        onClick = {
-                            showMenu = false
-                            onInviteClick()
-                        },
-                        leadingIcon = { Icon(Icons.Filled.PersonAdd, contentDescription = "초대") }
-                    )
-                    
-                    HorizontalDivider()
-
-                    if (isOwner) {
-                        DropdownMenuItem(
-                            text = { Text("그룹 삭제", fontFamily = SuiteFont, color = BrandColors.Error) },
-                            onClick = {
-                                showMenu = false
-                                onDeleteClick()
-                            },
-                            leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = "삭제", tint = BrandColors.Error) }
-                        )
-                    } else {
-                        DropdownMenuItem(
-                            text = { Text("그룹 나가기", fontFamily = SuiteFont, color = BrandColors.Error) },
-                            onClick = {
-                                showMenu = false
-                                onLeaveClick()
-                            },
-                            leadingIcon = { Icon(Icons.Filled.ExitToApp, contentDescription = "나가기", tint = BrandColors.Error) }
-                        )
-                    }
-                }
-            }
-            
-            Column {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    // iOS 스타일: 반투명 흰색 박스 + 하얀 그룹 아이콘
-                    Box(
-                        modifier = Modifier
-                            .size(68.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(Color.White.copy(alpha = 0.15f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Groups,
-                            contentDescription = null,
-                            tint = Color.White.copy(alpha = 0.85f),
-                            modifier = Modifier.size(36.dp)
-                        )
-                    }
-                    
-                    Spacer(modifier = Modifier.width(16.dp))
-                    
-                    Column {
-                        Text(
-                            text = group.sgtTitle ?: "그룹",
-                            fontSize = 24.responsiveSp(),
-                            fontFamily = SuiteFont,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Text(
-                            text = group.sgtMemo ?: "",
-                            fontSize = 15.responsiveSp(),
-                            fontFamily = SuiteFont,
-                            color = Color.White.copy(alpha = 0.7f)
-                        )
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(14.dp))
-                HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
-                Spacer(modifier = Modifier.height(14.dp))
-                
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "초대 코드",
-                            fontSize = 14.responsiveSp(),
-                            fontFamily = SuiteFont,
-                            color = Color.White.copy(alpha = 0.5f)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Box(
-                            // clickable 을 맨 앞에 두고 minimumInteractiveComponentSize 로 터치 영역을 48dp 이상 확보한다.
-                            // (padding 뒤에 clickable 이 있으면 터치 영역이 칩 크기에 그쳐 48dp 에 못 미침) 시각 크기는 그대로.
-                            modifier = Modifier
-                                .clickable { onCopyCode() }
-                                .minimumInteractiveComponentSize()
-                                .background(Color.Black.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = group.sgtCode ?: "N/A",
-                                    fontSize = 16.responsiveSp(),
-                                    fontFamily = SuiteFont,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Icon(
-                                    imageVector = Icons.Filled.ContentCopy,
-                                    contentDescription = "복사",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-                    }
-                    
-                    Text(
-                        text = "생성일: ${group.sgtWdate?.take(10) ?: ""}",
-                        fontSize = 13.responsiveSp(),
-                        fontFamily = SuiteFont,
-                        color = Color.White.copy(alpha = 0.4f)
-                    )
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Detail Stats Cards
-
-@Composable
-fun DetailStatsCards(
+    members: List<SmapGroupMember>,
     memberCount: Int,
     scheduleCount: Int,
     locationCount: Int,
     isLoading: Boolean,
-    modifier: Modifier = Modifier
+    isOwner: Boolean,
+    currentUserIdx: Int?,
+    onEditClick: () -> Unit,
+    onDeleteClick: () -> Unit,
+    onLeaveClick: () -> Unit,
+    onInviteClick: () -> Unit,
+    onCopyCode: () -> Unit,
+    onMemberClick: (SmapGroupMember) -> Unit,
 ) {
-    // iOS SMAPTheme 그라디언트 3종 — Pink / Crown→Orange / Primary→PrimaryDark
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    val colors = MaterialTheme.colorScheme
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.background),
+        contentPadding = PaddingValues(SmapSpacing.md),
+        verticalArrangement = Arrangement.spacedBy(SmapSpacing.lg),
     ) {
-        DetailStatCard(
-            title = "멤버",
-            value = memberCount.toString(),
-            icon = Icons.Default.Person,
-            gradient = listOf(AccentColors.Pink, AccentColors.PinkDeep),
-            isLoading = isLoading,
-            modifier = Modifier.weight(1f)
-        )
-        DetailStatCard(
-            title = "주간 일정",
-            value = scheduleCount.toString(),
-            icon = Icons.Default.CalendarMonth,
-            gradient = listOf(AccentColors.Crown.copy(alpha = 0.9f), AccentColors.Orange),
-            isLoading = isLoading,
-            modifier = Modifier.weight(1f)
-        )
-        DetailStatCard(
-            title = "총 위치",
-            value = locationCount.toString(),
-            icon = Icons.Default.LocationOn,
-            gradient = listOf(BrandColors.Primary, BrandColors.PrimaryDark),
-            isLoading = isLoading,
-            modifier = Modifier.weight(1f)
-        )
-    }
-}
-
-@Composable
-private fun DetailStatCard(
-    title: String,
-    value: String,
-    icon: ImageVector,
-    gradient: List<Color>,
-    isLoading: Boolean,
-    modifier: Modifier = Modifier
-) {
-    // iOS 스타일: 그라디언트 배경 + 흰색 텍스트/아이콘 — 대비 높고 세련된 톤
-    Card(
-        modifier = modifier.height(110.dp),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Brush.linearGradient(colors = gradient))
-        ) {
+        // 요약
+        item {
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(12.dp),
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(SmapRadius.lg))
+                    .background(colors.surface)
+                    .padding(SmapSpacing.lg),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceBetween
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(26.dp)
-                )
+                Box(
+                    Modifier
+                        .size(64.dp)
+                        .background(colors.primaryContainer, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) { Icon(Icons.Outlined.Groups, contentDescription = null, tint = colors.primary, modifier = Modifier.size(32.dp)) }
+                Spacer(Modifier.height(SmapSpacing.md))
+                Text(group.sgtTitle ?: "이름 없는 그룹", style = SmapText.title, color = colors.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                group.sgtMemo?.takeIf { it.isNotBlank() }?.let {
+                    Spacer(Modifier.height(4.dp))
+                    Text(it, style = SmapText.secondary, color = colors.onSurfaceVariant)
+                }
+                Spacer(Modifier.height(SmapSpacing.lg))
+                Row(Modifier.fillMaxWidth()) {
+                    Stat("멤버", "${memberCount}명", Modifier.weight(1f))
+                    Stat("이번 주 일정", "${scheduleCount}개", Modifier.weight(1f))
+                    Stat("등록 장소", "${locationCount}곳", Modifier.weight(1f))
+                }
+            }
+        }
 
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(22.dp),
-                        strokeWidth = 2.dp,
-                        color = Color.White
+        // 초대
+        item {
+            SmapSection(title = "초대") {
+                SmapListRow(
+                    title = group.sgtCode ?: "초대 코드 없음",
+                    subtitle = "이 코드를 받은 사람은 그룹에 참여할 수 있어요",
+                    leading = { SmapRowIcon(Icons.Outlined.PersonAdd) },
+                    trailing = if (group.sgtCode != null) {
+                        { IconButton(onClick = onCopyCode) { Icon(Icons.Outlined.ContentCopy, contentDescription = "초대 코드 복사", tint = colors.onSurfaceVariant) } }
+                    } else null,
+                )
+                SmapButton(
+                    text = "멤버 초대하기",
+                    onClick = onInviteClick,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = SmapSpacing.md, end = SmapSpacing.md, bottom = SmapSpacing.md),
+                )
+            }
+        }
+
+        // 멤버
+        item {
+            SmapSection(title = "멤버 ${if (isLoading) "" else members.size}".trim()) {
+                when {
+                    isLoading -> repeat(3) { i -> if (i > 0) SmapRowDivider(); SkeletonRow() }
+                    members.isEmpty() -> SmapListRow(
+                        title = "아직 멤버가 없어요",
+                        subtitle = "초대 코드를 보내 멤버를 초대해 보세요",
+                        leading = { SmapRowIcon(Icons.Outlined.PersonAdd) },
+                    )
+                    else -> members.forEachIndexed { i, m ->
+                        if (i > 0) SmapRowDivider()
+                        val role = when {
+                            m.sgdtOwnerChk == "Y" -> "그룹장"
+                            m.sgdtLeaderChk == "Y" -> "리더"
+                            else -> null
+                        }
+                        val manageable = isOwner && m.sgdtOwnerChk != "Y"
+                        SmapListRow(
+                            title = if (m.mtIdx == currentUserIdx) "${m.displayName} (나)" else m.displayName,
+                            // 역할은 오른쪽 배지로만 보여 준다(보조 줄과 배지에 "그룹장"이 두 번 나오던 문제).
+                            subtitle = if (role == null && !manageable) "멤버" else null,
+                            leading = { SmapAvatar(name = m.displayName, imagePath = m.mtFile1) },
+                            trailing = if (role != null || manageable) {
+                                {
+                                    if (role != null) RoleBadge(role)
+                                    if (manageable) Chevron()
+                                }
+                            } else null,
+                            onClick = if (manageable) ({ onMemberClick(m) }) else null,
+                        )
+                    }
+                }
+            }
+        }
+
+        // 관리
+        item {
+            SmapSection(title = "관리") {
+                if (isOwner) {
+                    SmapListRow(title = "그룹 정보 수정", leading = { SmapRowIcon(Icons.Outlined.Edit) }, trailing = { Chevron() }, onClick = onEditClick)
+                    SmapRowDivider()
+                    SmapListRow(
+                        title = "그룹 삭제",
+                        subtitle = "모든 멤버가 그룹에서 빠지고 되돌릴 수 없어요",
+                        leading = { DangerIcon(Icons.Outlined.DeleteOutline) },
+                        destructive = true,
+                        onClick = onDeleteClick,
                     )
                 } else {
-                    Text(
-                        text = value,
-                        fontSize = 26.responsiveSp(),
-                        fontFamily = SuiteFont,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
+                    SmapListRow(
+                        title = "그룹 나가기",
+                        leading = { DangerIcon(Icons.AutoMirrored.Outlined.ExitToApp) },
+                        destructive = true,
+                        onClick = onLeaveClick,
                     )
                 }
-
-                Text(
-                    text = title,
-                    fontSize = 13.responsiveSp(),
-                    fontFamily = SuiteFont,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White.copy(alpha = 0.95f)
-                )
             }
         }
     }
 }
 
-// MARK: - Member List Item
+@Composable
+private fun Stat(label: String, value: String, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, style = SmapText.headline, color = colors.onSurface)
+        Text(label, style = SmapText.captionSmall, color = colors.onSurfaceVariant)
+    }
+}
 
 @Composable
-fun MemberListItem(
-    member: SmapGroupMember,
-    canManage: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val isOwnerMember = member.sgdtOwnerChk == "Y"
-    val isLeader = member.sgdtLeaderChk == "Y"
-    
-    // Resolve avatar URL
-    val imageUrl = remember(member.mtFile1) {
-        if (!member.mtFile1.isNullOrBlank()) {
-            when {
-                member.mtFile1.startsWith("http") -> member.mtFile1
-                member.mtFile1.startsWith("/images/") -> "${BuildConfig.IMAGE_BASE_URL}${member.mtFile1}"
-                member.mtFile1.startsWith("/") -> "${BuildConfig.IMAGE_BASE_URL}/images${member.mtFile1}"
-                else -> "${BuildConfig.IMAGE_BASE_URL}/images/${member.mtFile1}"
-            }
-        } else null
-    }
+private fun RoleBadge(text: String) {
+    Text(
+        text,
+        style = SmapText.captionBold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier
+            .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(50))
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+    )
+}
 
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .clickable(enabled = canManage && !isOwnerMember, onClick = onClick)
-            .border(1.dp, BrandColors.Border.copy(alpha = 0.5f), RoundedCornerShape(16.dp)),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        // flat 스타일 — elevation 제거, 경계는 stroke 로 표현
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Avatar with crown badge
-            Box {
-                Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(CircleShape)
-                        .background(Color.Gray.copy(alpha = 0.05f))
-                        .border(1.dp, Color.Gray.copy(alpha = 0.1f), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (imageUrl != null) {
-                        AsyncImage(
-                            model = imageUrl,
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Filled.Person,
-                            contentDescription = null,
-                            tint = Color.Gray.copy(alpha = 0.3f),
-                            modifier = Modifier.size(32.dp)
-                        )
-                    }
-                }
-                
-                // Crown badge for owner/leader
-                if (isOwnerMember || isLeader) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .size(24.dp)
-                            .background(Color.White, CircleShape)
-                            .padding(2.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    if (isOwnerMember) AccentColors.Crown else SemanticColors.IndicatorMember,
-                                    CircleShape
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = if (isOwnerMember) Icons.Filled.Star else Icons.Filled.Verified,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        }
-                    }
-                }
-            }
-            
-            Spacer(modifier = Modifier.width(16.dp))
-            
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = member.displayName,
-                    fontSize = 18.responsiveSp(),
-                    fontFamily = SuiteFont,
-                    fontWeight = FontWeight.Bold,
-                    color = BrandColors.TextPrimary
-                )
+@Composable
+private fun Chevron() {
+    Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.outline)
+}
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    // iOS: 소유주=Crown(Yellow), 리더·멤버=indicatorMember(Blue)
-                    val roleColor = when {
-                        isOwnerMember -> AccentColors.Crown
-                        else -> SemanticColors.IndicatorMember
-                    }
-                    Text(
-                        text = when {
-                            isOwnerMember -> "그룹 관리자"
-                            isLeader -> "리더"
-                            else -> "멤버"
-                        },
-                        fontSize = 14.responsiveSp(),
-                        fontFamily = SuiteFont,
-                        color = if (isOwnerMember || isLeader) roleColor else BrandColors.TextSecondary
-                    )
+@Composable
+private fun DangerIcon(icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    val colors = MaterialTheme.colorScheme
+    Box(
+        Modifier
+            .size(40.dp)
+            .background(colors.error.copy(alpha = 0.08f), CircleShape),
+        contentAlignment = Alignment.Center,
+    ) { Icon(icon, contentDescription = null, tint = colors.error, modifier = Modifier.size(20.dp)) }
+}
 
-                    if (isOwnerMember || isLeader) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Box(
-                            modifier = Modifier
-                                .background(
-                                    roleColor.copy(alpha = 0.15f),
-                                    RoundedCornerShape(6.dp)
-                                )
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = if (isOwnerMember) "그룹장" else "리더",
-                                fontSize = 11.responsiveSp(),
-                                fontFamily = SuiteFont,
-                                fontWeight = FontWeight.Bold,
-                                color = roleColor
-                            )
-                        }
-                    }
-                }
-            }
-            
-            if (canManage && !isOwnerMember) {
-                Icon(
-                    imageVector = Icons.Filled.Settings,
-                    contentDescription = "관리",
-                    tint = Color.Gray.copy(alpha = 0.5f),
-                    modifier = Modifier.size(22.dp)
-                )
-            }
+@Composable
+private fun SkeletonRow() {
+    val c = MaterialTheme.colorScheme.surfaceVariant
+    Row(Modifier.fillMaxWidth().padding(SmapSpacing.md), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(40.dp).background(c, CircleShape))
+        Spacer(Modifier.width(12.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Box(Modifier.size(width = 140.dp, height = 14.dp).background(c, RoundedCornerShape(4.dp)))
+            Box(Modifier.size(width = 90.dp, height = 10.dp).background(c, RoundedCornerShape(4.dp)))
         }
     }
 }

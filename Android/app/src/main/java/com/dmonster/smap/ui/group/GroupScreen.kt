@@ -1,42 +1,22 @@
 package com.dmonster.smap.ui.group
 
-import androidx.compose.material.icons.outlined.Groups
-import com.dmonster.smap.ui.components.SmapEmptyState
-import com.dmonster.smap.ui.components.SmapTabHeader
+import com.dmonster.smap.ui.components.SmapTopBar
 import com.dmonster.smap.BuildConfig
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.dmonster.smap.ui.theme.AccentColors
-import com.dmonster.smap.ui.theme.BrandColors
-import com.dmonster.smap.ui.theme.SemanticColors
 import com.dmonster.smap.ui.theme.SmapMotion
 import androidx.compose.ui.unit.IntOffset
-import com.dmonster.smap.ui.theme.SuiteFont
-import com.dmonster.smap.ui.theme.responsiveSp
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -109,27 +89,10 @@ fun GroupScreen(
     
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            GroupTopBar(
-                currentView = currentView,
-                onBackClick = { viewModel.backToList() }
-            )
-        },
-        floatingActionButton = {
-            if (currentView == GroupViewModel.ViewState.LIST) {
-                FloatingActionButton(
-                    onClick = { viewModel.showCreateDialog() },
-                    modifier = Modifier.size(64.dp),
-                    shape = CircleShape,
-                    containerColor = com.dmonster.smap.ui.theme.BrandColors.Primary,
-                    contentColor = Color.White
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Add,
-                        contentDescription = "그룹 추가",
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
+            if (currentView == GroupViewModel.ViewState.DETAIL) {
+                SmapTopBar(title = "그룹", onBack = { viewModel.backToList() })
             }
         }
     ) { paddingValues ->
@@ -137,7 +100,6 @@ fun GroupScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(Color.White)
         ) {
             AnimatedContent(
                 targetState = currentView,
@@ -163,7 +125,7 @@ fun GroupScreen(
             ) { view ->
                 when (view) {
                     GroupViewModel.ViewState.LIST -> {
-                        GroupListView(
+                        GroupListContent(
                             groups = groups,
                             groupMemberCounts = groupMemberCounts,
                             inviteCode = inviteCode,
@@ -171,27 +133,27 @@ fun GroupScreen(
                             isJoining = isJoining,
                             isRefreshing = isRefreshing,
                             onGroupClick = { viewModel.selectGroup(it) },
+                            onCreateClick = { viewModel.showCreateDialog() },
                             onInviteCodeChange = { viewModel.updateInviteCode(it) },
                             onJoinGroup = { viewModel.joinGroupByCode() },
-                            onRefresh = { viewModel.refresh() },
-                            totalMembers = groupMemberCounts.values.sum()
+                            onRefresh = { viewModel.refresh() }
                         )
                     }
                     GroupViewModel.ViewState.DETAIL -> {
                         selectedGroup?.let { group ->
-                            GroupDetailView(
+                            GroupDetailContent(
                                 group = group,
                                 members = groupMembers,
-                                memberCount = groupMemberCounts[group.sgtIdx] ?: 0,
+                                memberCount = groupMemberCounts[group.sgtIdx] ?: groupMembers.size,
                                 scheduleCount = weeklyScheduleCount,
                                 locationCount = totalLocationCount,
                                 isLoading = isMembersLoading,
                                 isOwner = viewModel.isCurrentUserOwner(),
+                                currentUserIdx = viewModel.currentUserIdx(),
                                 onEditClick = { viewModel.showEditDialog() },
                                 onDeleteClick = { viewModel.showDeleteDialog() },
-                                // Both delete and leave show the same dialog; isLeave flag differentiates behavior
+                                // 삭제와 나가기는 같은 확인 대화상자를 쓰고 isLeave 로 구분한다.
                                 onLeaveClick = { viewModel.showDeleteDialog() },
-                                onShareClick = { viewModel.showShareDialog() },
                                 onInviteClick = { viewModel.showInviteBottomSheet() },
                                 onCopyCode = {
                                     group.sgtCode?.let {
@@ -199,11 +161,7 @@ fun GroupScreen(
                                         viewModel.showSuccess("초대 코드를 복사했어요")
                                     }
                                 },
-                                onMemberClick = { member ->
-                                    if (viewModel.isCurrentUserOwner() && member.sgdtOwnerChk != "Y") {
-                                        viewModel.showMemberManageDialog(member)
-                                    }
-                                }
+                                onMemberClick = { member -> viewModel.showMemberManageDialog(member) }
                             )
                         }
                     }
@@ -397,265 +355,3 @@ private fun inviteLink(groupId: Int, code: String?): String {
     return if (code.isNullOrBlank()) base else "$base?code=${java.net.URLEncoder.encode(code, "UTF-8")}"
 }
 
-// MARK: - Top Bar
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun GroupTopBar(
-    currentView: GroupViewModel.ViewState,
-    onBackClick: () -> Unit
-) {
-    if (currentView == GroupViewModel.ViewState.DETAIL) {
-        CenterAlignedTopAppBar(
-            title = {
-                Text(
-                    text = "그룹 상세",
-                    fontSize = 18.responsiveSp(),
-                    fontFamily = SuiteFont,
-                    fontWeight = FontWeight.Bold,
-                    color = BrandColors.TextPrimary
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = onBackClick) {
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .background(Color.White, CircleShape)
-                            .border(1.dp, Color.Gray.copy(alpha = 0.1f), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.ChevronLeft,
-                            contentDescription = "뒤로",
-                            tint = Color.Black
-                        )
-                    }
-                }
-            },
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = Color.Transparent
-            )
-        )
-    }
-}
-
-// MARK: - List View
-
-@Composable
-@OptIn(ExperimentalMaterial3Api::class)
-private fun GroupListView(
-    groups: List<com.dmonster.smap.data.model.SmapGroup>,
-    groupMemberCounts: Map<Int, Int>,
-    inviteCode: String,
-    isLoading: Boolean,
-    isJoining: Boolean,
-    isRefreshing: Boolean,
-    onGroupClick: (com.dmonster.smap.data.model.SmapGroup) -> Unit,
-    onInviteCodeChange: (String) -> Unit,
-    onJoinGroup: () -> Unit,
-    onRefresh: () -> Unit,
-    totalMembers: Int
-) {
-    PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = onRefresh,
-        modifier = Modifier.fillMaxSize()
-    ) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        // 아래 여백은 오른쪽 아래 + 버튼(FAB)이 마지막 항목을 가리지 않도록 넉넉히 둔다.
-        contentPadding = PaddingValues(bottom = 96.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        // 탭 공용 머리글(목록과 함께 스크롤된다)
-        item {
-            SmapTabHeader(title = "그룹")
-        }
-
-        // 한 줄 요약(그룹 수 · 멤버 수)
-        if (!isLoading && groups.isNotEmpty()) {
-            item {
-                GroupSummaryLine(groupsCount = groups.size, totalMembers = totalMembers)
-            }
-        }
-
-        // Group Cards — 목록이 이 화면의 주인공
-        if (isLoading) {
-            items(2) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp)
-                        .height(88.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                )
-            }
-        } else {
-            items(groups, key = { it.sgtIdx }) { group ->
-                GroupCard(
-                    group = group,
-                    memberCount = groupMemberCounts[group.sgtIdx] ?: 0,
-                    onClick = { onGroupClick(group) },
-                    modifier = Modifier.padding(horizontal = 20.dp)
-                )
-            }
-        }
-
-        // Empty State — 공용 빈 상태
-        if (!isLoading && groups.isEmpty()) {
-            item {
-                SmapEmptyState(
-                    title = "아직 그룹이 없어요",
-                    description = "오른쪽 아래 + 버튼으로 새 그룹을 만들거나\n초대 코드로 참여해 보세요.",
-                    icon = Icons.Outlined.Groups,
-                    modifier = Modifier.padding(vertical = 24.dp)
-                )
-            }
-        }
-
-        // 초대 코드로 참여 — 목록 아래에 둔다(가장 자주 쓰는 건 목록이므로)
-        item {
-            InviteCodeSection(
-                inviteCode = inviteCode,
-                onCodeChange = onInviteCodeChange,
-                onJoin = onJoinGroup,
-                isLoading = isJoining,
-                modifier = Modifier.padding(top = 8.dp)
-            )
-        }
-    }
-    } // PullToRefreshBox
-}
-
-// MARK: - Detail View
-
-@Composable
-private fun GroupDetailView(
-    group: com.dmonster.smap.data.model.SmapGroup,
-    members: List<com.dmonster.smap.data.model.SmapGroupMember>,
-    memberCount: Int,
-    scheduleCount: Int,
-    locationCount: Int,
-    isLoading: Boolean,
-    isOwner: Boolean,
-    onEditClick: () -> Unit,
-    onDeleteClick: () -> Unit,
-    onLeaveClick: () -> Unit,
-    onShareClick: () -> Unit,
-    onInviteClick: () -> Unit,
-    onCopyCode: () -> Unit,
-    onMemberClick: (com.dmonster.smap.data.model.SmapGroupMember) -> Unit
-) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        // Group Header Card
-        item {
-            GroupHeaderCard(
-                group = group,
-                isOwner = isOwner,
-                onEditClick = onEditClick,
-                onDeleteClick = onDeleteClick,
-                onLeaveClick = onLeaveClick,
-                onCopyCode = onCopyCode,
-                onInviteClick = onInviteClick,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-        }
-        
-        // Stats Cards
-        item {
-            DetailStatsCards(
-                memberCount = memberCount,
-                scheduleCount = scheduleCount,
-                locationCount = locationCount,
-                isLoading = isLoading
-            )
-        }
-        
-        // Member Section Header
-        item {
-            Text(
-                text = "그룹 멤버",
-                fontSize = 18.sp,
-                fontFamily = SuiteFont,
-                fontWeight = FontWeight.Medium,
-                color = BrandColors.TextPrimary,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
-            )
-        }
-        
-        // Member List
-        if (isLoading) {
-            items(3) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                        .height(72.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color.Gray.copy(alpha = 0.1f))
-                )
-            }
-        } else {
-            items(members) { member ->
-                MemberListItem(
-                    member = member,
-                    canManage = isOwner,
-                    onClick = { onMemberClick(member) },
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
-            }
-        }
-        
-        // Empty Members State
-        if (!isLoading && members.isEmpty()) {
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = "멤버 없음",
-                        tint = BrandColors.Primary.copy(alpha = 0.3f),
-                        modifier = Modifier.size(48.dp)
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "아직 멤버가 없어요",
-                        fontSize = 16.sp,
-                        fontFamily = SuiteFont,
-                        fontWeight = FontWeight.Medium,
-                        color = BrandColors.TextSecondary
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "멤버를 초대해 보세요",
-                        fontSize = 14.sp,
-                        fontFamily = SuiteFont,
-                        color = BrandColors.TextSecondary.copy(alpha = 0.7f)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(
-                        onClick = onShareClick,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = BrandColors.Success
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Default.GroupAdd, null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("멤버 초대", fontFamily = SuiteFont)
-                    }
-                }
-            }
-        }
-    }
-}

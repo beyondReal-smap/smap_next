@@ -33,7 +33,8 @@ import com.dmonster.smap.ui.theme.SmapText
 import com.dmonster.smap.ui.theme.SmapTextStyle
 
 /** 버튼의 시각적 위계. 한 화면에 Primary 는 하나만 둔다. */
-enum class SmapButtonStyle { Primary, Secondary, Destructive }
+/** Neutral: 회색 바탕 — 확인창의 "취소"처럼 주 동작 옆에 같은 크기로 놓는 보조 동작. */
+enum class SmapButtonStyle { Primary, Secondary, Destructive, Neutral }
 
 /**
  * 앱 공용 버튼.
@@ -65,7 +66,11 @@ fun SmapButton(
                 CircularProgressIndicator(
                     modifier = Modifier.size(20.dp),
                     strokeWidth = 2.dp,
-                    color = if (style == SmapButtonStyle.Secondary) colors.primary else colors.onPrimary,
+                    color = when (style) {
+                        SmapButtonStyle.Secondary -> colors.primary
+                        SmapButtonStyle.Neutral -> colors.onSurface
+                        else -> colors.onPrimary
+                    },
                 )
                 Spacer(Modifier.width(8.dp))
             } else if (leadingIcon != null) {
@@ -92,6 +97,22 @@ fun SmapButton(
                     disabledContainerColor = if (isLoading) container else colors.onSurface.copy(alpha = 0.12f),
                     disabledContentColor = if (isLoading) onContainer else colors.onSurface.copy(alpha = 0.38f),
                 ),
+                contentPadding = PaddingValues(horizontal = 16.dp),
+            ) { content() }
+        }
+        SmapButtonStyle.Neutral -> {
+            Button(
+                onClick = onClick,
+                modifier = buttonModifier,
+                enabled = clickable,
+                shape = shape,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = colors.surfaceVariant,
+                    contentColor = colors.onSurface,
+                    disabledContainerColor = colors.surfaceVariant,
+                    disabledContentColor = colors.onSurface.copy(alpha = 0.38f),
+                ),
+                elevation = null,
                 contentPadding = PaddingValues(horizontal = 16.dp),
             ) { content() }
         }

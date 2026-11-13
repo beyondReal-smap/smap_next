@@ -210,7 +210,7 @@ interface SmapApi {
 
     /** POST /schedules */
     @POST("schedules")
-    suspend fun createSchedule(@Body body: CreateScheduleRequest): SmapSchedule
+    suspend fun createSchedule(@Body body: CreateScheduleRequest): CreatedScheduleResponse
 
     /** PUT /schedule/group/{groupId}/schedules/{scheduleId}?current_user_id={currentUserId} */
     @PUT("schedule/group/{groupId}/schedules/{scheduleId}")
@@ -219,7 +219,7 @@ interface SmapApi {
         @Path("scheduleId") scheduleId: String,
         @Query("current_user_id") currentUserId: String,
         @Body body: UpdateScheduleRequest
-    ): SmapSchedule
+    ): ScheduleMutationResponse
 
     /** DELETE /schedule/group/{groupId}/schedules/{scheduleId}?current_user_id={currentUserId} */
     @HTTP(method = "DELETE", path = "schedule/group/{groupId}/schedules/{scheduleId}", hasBody = true)

@@ -77,7 +77,7 @@ class ScheduleService(
         locationLng: Double? = null,
         alarmTime: String? = null,
         repeatConfig: String? = null
-    ): SmapSchedule? {
+    ): Int {
         val body = CreateScheduleRequest(
             sgtIdx = groupId,
             mtIdx = memberId,
@@ -93,9 +93,9 @@ class ScheduleService(
             sstRepeatJsonV = repeatConfig
         )
 
-        val schedule = api.createSchedule(body)
-        Log.d(TAG, "[createSchedule] created: ${schedule.displayTitle}")
-        return schedule
+        val created = api.createSchedule(body)
+        Log.d(TAG, "[createSchedule] created: ${created.sstIdx}")
+        return created.sstIdx
     }
 
     /**
@@ -138,12 +138,13 @@ class ScheduleService(
             sstLocationLat = locationLat,
             sstLocationLong = locationLng,
             sstRepeatJson = repeatJson,
-            sstRepeatJsonV = repeatConfig
+            sstRepeatJsonV = repeatConfig,
+            sstLocationAlarm = if (locationName.isNullOrBlank()) null else 4
         )
 
-        api.updateSchedule(groupId, scheduleId, currentUserId, body)
-        Log.d(TAG, "[updateSchedule] updated")
-        return true
+        val response = api.updateSchedule(groupId, scheduleId, currentUserId, body)
+        Log.d(TAG, "[updateSchedule] success=${response.success} ${response.message.orEmpty()}")
+        return response.success
     }
 
     /**

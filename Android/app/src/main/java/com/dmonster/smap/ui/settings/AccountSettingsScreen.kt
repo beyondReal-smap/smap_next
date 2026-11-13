@@ -1,5 +1,6 @@
 package com.dmonster.smap.ui.settings
 
+import com.dmonster.smap.ui.components.SmapDialogActions
 import com.dmonster.smap.BuildConfig
 import android.net.Uri
 import kotlinx.coroutines.Dispatchers
@@ -357,17 +358,15 @@ fun AccountSettingsScreen(
             title = { Text("로그아웃", fontFamily = SuiteFont, fontWeight = FontWeight.Bold) },
             text = { Text("정말로 로그아웃 하시겠습니까?", fontFamily = SuiteFont) },
             confirmButton = {
-                TextButton(onClick = {
-                    showingLogoutAlert = false
-                    viewModel.logout(onLogout)
-                }) {
-                    Text("로그아웃", color = BrandColors.Error, fontFamily = SuiteFont, fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showingLogoutAlert = false }) {
-                    Text("취소", fontFamily = SuiteFont)
-                }
+                SmapDialogActions(
+                    confirmText = "로그아웃",
+                    onConfirm = {
+                        showingLogoutAlert = false
+                        viewModel.logout(onLogout)
+                    },
+                    onDismiss = { showingLogoutAlert = false },
+                    destructive = true
+                )
             }
         )
     }

@@ -101,7 +101,9 @@ data class UpdateScheduleRequest(
     @SerialName("sst_location_lat") val sstLocationLat: Double? = null,
     @SerialName("sst_location_long") val sstLocationLong: Double? = null,
     @SerialName("sst_repeat_json") val sstRepeatJson: String? = null,
-    @SerialName("sst_repeat_json_v") val sstRepeatJsonV: String? = null
+    @SerialName("sst_repeat_json_v") val sstRepeatJsonV: String? = null,
+    // 서버는 이 키가 없으면 정수 칼럼에 'N' 을 넣으려다 500 을 낸다 — 항상 보낸다(장소 있으면 4, iOS 와 같은 값).
+    @SerialName("sst_location_alarm") val sstLocationAlarm: Int? = null
 )
 
 @Serializable

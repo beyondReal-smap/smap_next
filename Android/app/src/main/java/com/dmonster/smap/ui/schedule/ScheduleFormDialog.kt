@@ -1,11 +1,8 @@
 package com.dmonster.smap.ui.schedule
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -13,24 +10,44 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.dmonster.smap.data.model.SmapGroup
 import com.dmonster.smap.data.model.SmapGroupMember
 import com.dmonster.smap.data.model.SmapSchedule
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import com.dmonster.smap.ui.common.rememberSmapHaptics
-import com.dmonster.smap.ui.theme.AccentColors
 import com.dmonster.smap.ui.theme.BrandColors
-import com.dmonster.smap.ui.theme.ScheduleSectionColors
-import com.dmonster.smap.ui.theme.SemanticColors
 import com.dmonster.smap.ui.theme.SuiteFont
+import com.dmonster.smap.ui.theme.SmapRadius
+import com.dmonster.smap.ui.theme.SmapSpacing
+import com.dmonster.smap.ui.theme.SmapText
+import com.dmonster.smap.ui.components.GroupPickerSheet
+import com.dmonster.smap.ui.components.MemberStrip
+import com.dmonster.smap.ui.components.SmapButton
+import com.dmonster.smap.ui.components.SmapListRow
+import com.dmonster.smap.ui.components.SmapRowDivider
+import com.dmonster.smap.ui.components.SmapRowIcon
+import com.dmonster.smap.ui.components.SmapSection
+import com.dmonster.smap.ui.components.SmapTextField
+import com.dmonster.smap.ui.components.SmapTopBar
+import androidx.compose.foundation.background
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Flag
+import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.NotificationsNone
+import androidx.compose.material.icons.outlined.Place
+import androidx.compose.material.icons.outlined.Repeat
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.WbSunny
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.DpOffset
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -122,14 +139,14 @@ fun CreateEditEventDialog(
     // Date Picker Dialogs
     if (showStartDatePicker) {
         val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = LocalDate.parse(startDate).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+            initialSelectedDateMillis = LocalDate.parse(startDate).atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
         )
         DatePickerDialog(
             onDismissRequest = { showStartDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let {
-                        startDate = java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalDate().format(dateFormatter)
+                        startDate = java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneOffset.UTC).toLocalDate().format(dateFormatter)
                     }
                     showStartDatePicker = false
                 }) { Text("확인") }
@@ -144,14 +161,14 @@ fun CreateEditEventDialog(
 
     if (showEndDatePicker) {
         val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = LocalDate.parse(endDate).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+            initialSelectedDateMillis = LocalDate.parse(endDate).atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
         )
         DatePickerDialog(
             onDismissRequest = { showEndDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let {
-                        endDate = java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalDate().format(dateFormatter)
+                        endDate = java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneOffset.UTC).toLocalDate().format(dateFormatter)
                     }
                     showEndDatePicker = false
                 }) { Text("확인") }
@@ -208,7 +225,6 @@ fun CreateEditEventDialog(
 
     // 키보드 체인 — 제목 → 메모 포커스 이동
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
-    val memoFocusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
 
     // 실시간 제목 검증 — 저장 시도 후에만 경고 노출해 과도한 방해 방지
     var showTitleError by remember { mutableStateOf(false) }
@@ -332,456 +348,215 @@ fun CreateEditEventDialog(
         }
     }
 
+    // 작성 화면 — 36단계 재설계.
+    // 이전: 번호 매긴 4색 구역(1 그룹·2 제목·3 날짜·4 추가) + 색마다 다른 입력칸 테두리.
+    // 지금: 회색 바탕 위 "무엇 / 누구 / 언제 / 어디" 흰 묶음, 저장 버튼은 아래 고정.
+    val colors = MaterialTheme.colorScheme
+    var showGroupPicker by remember { mutableStateOf(false) }
+    var dateValidationError by remember { mutableStateOf<String?>(null) }
+    if (showGroupPicker) {
+        GroupPickerSheet(
+            groups = groups,
+            selectedGroupId = selectedGroup?.sgtIdx,
+            onSelect = { onGroupSelect(it); showGroupPicker = false },
+            onDismiss = { showGroupPicker = false }
+        )
+    }
+
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = BrandColors.InputBackground
+        color = colors.background
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
                 .imePadding() // 키보드 올라올 때 저장 버튼이 가려지지 않도록
-                .padding(bottom = 24.dp)
         ) {
-            // Header
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "취소",
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .clickable { safeDismiss() }
-                        .padding(8.dp),
-                    fontFamily = SuiteFont,
-                    color = BrandColors.TextSecondary,
-                    fontSize = 16.sp
-                )
-                Text(
-                    text = if (isEdit) "일정 수정" else "일정 추가",
-                    fontSize = 18.sp,
-                    fontFamily = SuiteFont,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Black
-                )
-            }
+            SmapTopBar(
+                title = if (isEdit) "일정 수정" else "새 일정",
+                onBack = null,
+                actions = {
+                    IconButton(onClick = safeDismiss) {
+                        Icon(Icons.Outlined.Close, contentDescription = "닫기")
+                    }
+                }
+            )
 
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(SmapSpacing.md),
+                verticalArrangement = Arrangement.spacedBy(SmapSpacing.lg)
             ) {
-                // Section 1: Group & Member
-                ScheduleSection(
-                    number = "1",
-                    title = "그룹 및 멤버 선택",
-                    bgColor = Color.White,
-                    iconColor = ScheduleSectionColors.BadgeGroup
-                ) {
-                    // Group Selector Dropdown (Simplified for sheet)
-                    var expanded by remember { mutableStateOf(false) }
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        OutlinedCard(
-                            onClick = { if (!isEdit) expanded = true },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.outlinedCardColors(
-                                containerColor = if (isEdit) BrandColors.InputBackground else Color.White
-                            ),
-                            border = BorderStroke(
-                                width = 0.5.dp,
-                                color = if (isEdit) Color.LightGray.copy(alpha = 0.5f) else Color.Gray.copy(alpha = 0.3f)
-                            )
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                                    .fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    if (isEdit) {
-                                        // 편집 모드 명시 — "수정 불가" 라벨 + 자물쇠 아이콘
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(
-                                                Icons.Default.Lock,
-                                                contentDescription = null,
-                                                tint = BrandColors.TextSecondary,
-                                                modifier = Modifier.size(10.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text(
-                                                text = "수정 불가",
-                                                fontFamily = SuiteFont,
-                                                fontSize = 10.sp,
-                                                color = BrandColors.TextSecondary
-                                            )
-                                        }
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                    }
-                                    Text(
-                                        text = selectedGroup?.sgtTitle ?: "그룹 선택",
-                                        fontFamily = SuiteFont,
-                                        fontSize = 15.sp,
-                                        color = if (isEdit) BrandColors.TextSecondary else BrandColors.TextPrimary
-                                    )
-                                }
-                                Icon(
-                                    if (isEdit) Icons.Default.Lock else Icons.Default.KeyboardArrowDown,
-                                    contentDescription = if (isEdit) "수정 불가" else "그룹 선택",
-                                    tint = BrandColors.TextSecondary
-                                )
-                            }
-                        }
-                        DropdownMenu(
-                            expanded = expanded,
-                            onDismissRequest = { expanded = false },
-                            modifier = Modifier.fillMaxWidth(0.9f)
-                        ) {
-                            groups.forEach { group ->
-                                DropdownMenuItem(
-                                    text = { Text(group.sgtTitle ?: "", fontFamily = SuiteFont) },
-                                    onClick = {
-                                        onGroupSelect(group)
-                                        expanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
-                        text = "대상 멤버",
-                        fontSize = 13.sp,
-                        fontFamily = SuiteFont,
-                        color = Color.Gray
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        contentPadding = PaddingValues(end = 16.dp)
+                // 무엇
+                SmapSection(title = "무엇") {
+                    Column(
+                        Modifier.padding(SmapSpacing.md),
+                        verticalArrangement = Arrangement.spacedBy(SmapSpacing.sm)
                     ) {
-                        items(targetCandidates) { member ->
-                            MemberItem(
-                                member = member,
-                                isSelected = targetMember?.mtIdx == member.mtIdx,
-                                isEdit = isEdit,
-                                onClick = {
-                                    if (!isEdit) {
-                                        targetMember = member
-                                    }
-                                }
-                            )
-                        }
+                        SmapTextField(
+                            value = title,
+                            onValueChange = {
+                                title = it
+                                if (it.isNotBlank()) showTitleError = false // 입력 시작하면 경고 해제
+                            },
+                            label = "제목",
+                            placeholder = "예: 병원 예약, 학원 픽업",
+                            errorText = if (showTitleError) "제목을 입력해 주세요" else null,
+                            imeAction = ImeAction.Next,
+                            keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
+                        )
+                        SmapTextField(
+                            value = memo,
+                            onValueChange = { memo = it },
+                            label = "메모 (선택)",
+                            placeholder = "준비물, 참고할 내용",
+                            singleLine = false,
+                            imeAction = ImeAction.Done,
+                            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
+                        )
                     }
                 }
 
-                // Section 2: Title & Content
-                ScheduleSection(
-                    number = "2",
-                    title = "일정 제목 및 내용",
-                    bgColor = Color.White,
-                    iconColor = ScheduleSectionColors.BadgeContent
-                ) {
-                    Text(
-                        text = "일정 제목 *",
-                        fontSize = 14.sp,
-                        fontFamily = SuiteFont,
-                        color = Color.Gray
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = title,
-                        onValueChange = {
-                            title = it
-                            if (it.isNotBlank()) showTitleError = false // 입력 시작하면 경고 해제
+                // 누구
+                SmapSection(title = "누구의 일정") {
+                    SmapListRow(
+                        title = selectedGroup?.sgtTitle ?: "그룹을 골라 주세요",
+                        subtitle = if (isEdit) "그룹은 바꿀 수 없어요" else "그룹",
+                        leading = { SmapRowIcon(Icons.Outlined.Groups) },
+                        trailing = when {
+                            isEdit -> { { Icon(Icons.Outlined.Lock, contentDescription = null, tint = colors.outline) } }
+                            groups.size >= 2 -> { { Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = colors.outline) } }
+                            else -> null
                         },
-                        placeholder = { Text("일정 제목을 입력하세요", fontFamily = SuiteFont) },
-                        isError = showTitleError,
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                            imeAction = androidx.compose.ui.text.input.ImeAction.Next,
-                            capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences
-                        ),
-                        keyboardActions = androidx.compose.foundation.text.KeyboardActions(
-                            onNext = { memoFocusRequester.requestFocus() }
-                        ),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color.White,
-                            unfocusedContainerColor = Color.White,
-                            focusedBorderColor = ScheduleSectionColors.BadgeContent,
-                            unfocusedBorderColor = ScheduleSectionColors.BadgeContent.copy(alpha = 0.5f),
-                            errorBorderColor = BrandColors.Error,
-                            errorContainerColor = BrandColors.Error.copy(alpha = 0.05f)
-                        )
+                        onClick = if (isEdit || groups.size < 2) null else ({ showGroupPicker = true })
                     )
-                    if (showTitleError) {
-                        Row(
-                            modifier = Modifier.padding(top = 4.dp, start = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Default.ErrorOutline,
-                                contentDescription = null,
-                                tint = BrandColors.Error,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "필수 입력 항목입니다",
-                                fontSize = 12.sp,
-                                fontFamily = SuiteFont,
-                                color = BrandColors.Error
-                            )
-                        }
-                    } else {
-                        Text(
-                            text = "예) 팀 회의, 프로젝트 미팅 등",
-                            fontSize = 12.sp,
-                            fontFamily = SuiteFont,
-                            color = BrandColors.TextSecondary,
-                            modifier = Modifier.padding(top = 4.dp)
+                    if (targetCandidates.isNotEmpty()) {
+                        SmapRowDivider()
+                        MemberStrip(
+                            members = targetCandidates,
+                            selectedMemberId = targetMember?.mtIdx,
+                            currentUserIdx = currentUserId,
+                            onSelect = { if (!isEdit) targetMember = it },
+                            modifier = Modifier.padding(vertical = SmapSpacing.md)
                         )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
-                        text = "일정 내용 (선택)",
-                        fontSize = 14.sp,
-                        fontFamily = SuiteFont,
-                        color = Color.Gray
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = memo,
-                        onValueChange = { memo = it },
-                        placeholder = { Text("예) 회의 안건, 준비물, 참고사항 등", fontFamily = SuiteFont) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .focusRequester(memoFocusRequester),
-                        minLines = 3,
-                        maxLines = 5,
-                        shape = RoundedCornerShape(12.dp),
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                            imeAction = androidx.compose.ui.text.input.ImeAction.Done,
-                            capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences
-                        ),
-                        keyboardActions = androidx.compose.foundation.text.KeyboardActions(
-                            onDone = { focusManager.clearFocus() }
-                        ),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color.White,
-                            unfocusedContainerColor = Color.White,
-                            focusedBorderColor = ScheduleSectionColors.BadgeContent,
-                            unfocusedBorderColor = Color.Gray.copy(alpha = 0.2f)
-                        )
-                    )
-                }
-
-                // Section 3: Date & Time
-                ScheduleSection(
-                    number = "3",
-                    title = "날짜 및 시간",
-                    bgColor = Color.White,
-                    iconColor = ScheduleSectionColors.BadgeDateTime
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "하루 종일",
-                            fontSize = 15.sp,
-                            fontFamily = SuiteFont,
-                            color = Color.Black
-                        )
-                        Switch(
-                            checked = isAllDay,
-                            onCheckedChange = { isAllDay = it },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = ScheduleSectionColors.BadgeDateTime
-                            )
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-                    HorizontalDivider(color = Color.Gray.copy(alpha = 0.1f))
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Start Time Row
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("시작", fontFamily = SuiteFont, fontSize = 14.sp, color = Color.Gray)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            TimeChip(text = startDate, onClick = { showStartDatePicker = true })
-                            if (!isAllDay) TimeChip(text = startTime, onClick = { showStartTimePicker = true })
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-                    HorizontalDivider(color = Color.Gray.copy(alpha = 0.1f))
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // End Time Row
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("종료", fontFamily = SuiteFont, fontSize = 14.sp, color = Color.Gray)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            TimeChip(text = endDate, onClick = { showEndDatePicker = true })
-                            if (!isAllDay) TimeChip(text = endTime, onClick = { showEndTimePicker = true })
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        // 반복 — DropdownMenu inline, ModalBottomSheet 제거로 맥락 유지
-                        Box(modifier = Modifier.weight(1f)) {
-                            SelectionField(
-                                label = "반복",
-                                value = repeatConfig,
-                                onClick = { showRepeatSheet = true }
-                            )
-                            DropdownMenu(
-                                expanded = showRepeatSheet,
-                                onDismissRequest = { showRepeatSheet = false }
-                            ) {
-                                listOf("반복 안함", "매일", "매주", "매월", "매년").forEach { option ->
-                                    DropdownMenuItem(
-                                        text = { Text(option, fontFamily = SuiteFont) },
-                                        onClick = {
-                                            repeatConfig = option
-                                            haptics.light()
-                                            showRepeatSheet = false
-                                        },
-                                        trailingIcon = if (repeatConfig == option) {
-                                            { Icon(Icons.Default.Check, null, tint = BrandColors.Primary) }
-                                        } else null
-                                    )
-                                }
-                            }
-                        }
-                        // 알림 — 동일 패턴
-                        Box(modifier = Modifier.weight(1f)) {
-                            SelectionField(
-                                label = "알림",
-                                value = alarmTime,
-                                onClick = { showAlarmSheet = true }
-                            )
-                            DropdownMenu(
-                                expanded = showAlarmSheet,
-                                onDismissRequest = { showAlarmSheet = false }
-                            ) {
-                                listOf("없음", "정시", "5분 전", "10분 전", "15분 전", "30분 전", "1시간 전", "1일 전").forEach { option ->
-                                    DropdownMenuItem(
-                                        text = { Text(option, fontFamily = SuiteFont) },
-                                        onClick = {
-                                            alarmTime = option
-                                            haptics.light()
-                                            showAlarmSheet = false
-                                        },
-                                        trailingIcon = if (alarmTime == option) {
-                                            { Icon(Icons.Default.Check, null, tint = BrandColors.Primary) }
-                                        } else null
-                                    )
-                                }
-                            }
-                        }
                     }
                 }
 
-                // Section 4: Additional Settings
-                ScheduleSection(
-                    number = "4",
-                    title = "추가 설정",
-                    bgColor = Color.White,
-                    iconColor = ScheduleSectionColors.BadgeExtra
-                ) {
-                    Text(
-                        text = "장소 정보 (선택)",
-                        fontSize = 14.sp,
-                        fontFamily = SuiteFont,
-                        color = Color.Gray
+                // 언제
+                SmapSection(title = "언제") {
+                    SmapListRow(
+                        title = "하루 종일",
+                        leading = { SmapRowIcon(Icons.Outlined.WbSunny) },
+                        trailing = { Switch(checked = isAllDay, onCheckedChange = { isAllDay = it }) },
+                        onClick = { isAllDay = !isAllDay }
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedCard(
-                        onClick = { showLocationSearch = true },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.outlinedCardColors(containerColor = Color.White),
-                        border = BorderStroke(1.dp, Color.Gray.copy(alpha = 0.2f))
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .padding(horizontal = 16.dp, vertical = 14.dp)
-                                .fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Icon(Icons.Default.PinDrop, null, tint = ScheduleSectionColors.BadgeExtra, modifier = Modifier.size(20.dp))
-                            Text(
-                                text = locationName.ifBlank { "장소를 입력하세요" },
-                                fontFamily = SuiteFont,
-                                fontSize = 15.sp,
-                                color = if (locationName.isBlank()) Color.Gray else Color.Black,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Icon(Icons.Default.Search, null, tint = Color.Gray, modifier = Modifier.size(20.dp))
+                    SmapRowDivider()
+                    SmapListRow(
+                        title = "시작",
+                        leading = { SmapRowIcon(Icons.Outlined.Schedule) },
+                        trailing = {
+                            ValueChip(formatFormDate(startDate)) { showStartDatePicker = true }
+                            if (!isAllDay) ValueChip(startTime) { showStartTimePicker = true }
                         }
+                    )
+                    SmapRowDivider()
+                    SmapListRow(
+                        title = "종료",
+                        leading = { SmapRowIcon(Icons.Outlined.Flag) },
+                        trailing = {
+                            ValueChip(formatFormDate(endDate)) { showEndDatePicker = true }
+                            if (!isAllDay) ValueChip(endTime) { showEndTimePicker = true }
+                        }
+                    )
+                    SmapRowDivider()
+                    // 반복 — 행을 누르면 바로 옆에 목록이 뜬다.
+                    Box {
+                        SmapListRow(
+                            title = "반복",
+                            leading = { SmapRowIcon(Icons.Outlined.Repeat) },
+                            trailing = { Text(repeatConfig, style = SmapText.secondary, color = colors.onSurfaceVariant) },
+                            onClick = { showRepeatSheet = true }
+                        )
+                        OptionMenu(
+                            expanded = showRepeatSheet,
+                            options = listOf("반복 안함", "매일", "매주", "매월", "매년"),
+                            selected = repeatConfig,
+                            onSelect = { repeatConfig = it; haptics.light(); showRepeatSheet = false },
+                            onDismiss = { showRepeatSheet = false }
+                        )
                     }
+                    SmapRowDivider()
+                    Box {
+                        SmapListRow(
+                            title = "알림",
+                            leading = { SmapRowIcon(Icons.Outlined.NotificationsNone) },
+                            trailing = { Text(alarmTime, style = SmapText.secondary, color = colors.onSurfaceVariant) },
+                            onClick = { showAlarmSheet = true }
+                        )
+                        OptionMenu(
+                            expanded = showAlarmSheet,
+                            options = listOf("없음", "정시", "5분 전", "10분 전", "15분 전", "30분 전", "1시간 전", "1일 전"),
+                            selected = alarmTime,
+                            onSelect = { alarmTime = it; haptics.light(); showAlarmSheet = false },
+                            onDismiss = { showAlarmSheet = false }
+                        )
+                    }
+                }
+
+                // 어디
+                SmapSection(title = "어디") {
+                    SmapListRow(
+                        title = locationName.ifBlank { "장소 추가" },
+                        subtitle = if (locationName.isBlank()) "검색해서 고를 수 있어요 (선택)" else null,
+                        leading = { SmapRowIcon(Icons.Outlined.Place) },
+                        trailing = {
+                            if (locationName.isNotBlank()) {
+                                IconButton(onClick = {
+                                    locationName = ""
+                                    locationLat = null
+                                    locationLng = null
+                                }) { Icon(Icons.Outlined.Close, contentDescription = "장소 지우기", tint = colors.onSurfaceVariant) }
+                            } else {
+                                Icon(Icons.Outlined.Search, contentDescription = null, tint = colors.outline)
+                            }
+                        },
+                        onClick = { showLocationSearch = true }
+                    )
                 }
             }
 
-            // Fix #9: Date validation error state
-            var dateValidationError by remember { mutableStateOf<String?>(null) }
-
-            dateValidationError?.let { error ->
-                Text(
-                    text = error,
-                    color = BrandColors.Error,
-                    fontSize = 13.sp,
-                    fontFamily = SuiteFont,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
-                )
-            }
-
-            // Save Button
-            Button(
+            // 아래 고정 — 검증 문구 + 저장 버튼
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .background(colors.surface)
+                    .padding(horizontal = SmapSpacing.md, vertical = SmapSpacing.sm)
+            ) {
+                dateValidationError?.let { error ->
+                    Text(
+                        text = error,
+                        color = colors.error,
+                        style = SmapText.caption,
+                        modifier = Modifier.padding(start = 4.dp, bottom = SmapSpacing.sm)
+                    )
+                }
+                SmapButton(
+                    text = if (isEdit) "저장" else "일정 추가",
                     onClick = {
                         // 실시간 제목 검증 — 저장 시도 시 활성화
                         if (title.isBlank()) {
                             showTitleError = true
                             haptics.warning()
-                            return@Button
+                            return@SmapButton
                         }
                         // Fix #9: Validate start/end dates before saving
                         if (endDate < startDate || (endDate == startDate && endTime <= startTime && !isAllDay)) {
-                            dateValidationError = "종료 시간은 시작 시간 이후여야 합니다"
+                            dateValidationError = "끝나는 시각이 시작 시각보다 뒤여야 해요"
                             haptics.warning()
-                            return@Button
+                            return@SmapButton
                         }
                         dateValidationError = null
                         showTitleError = false
@@ -790,13 +565,12 @@ fun CreateEditEventDialog(
                         if (!isEdit) draftStore.clear()
                         didSaveOrDiscard = true
 
-                        val startDateTime = "$startDate $startTime"
-                        val endDateTime = "$endDate $endTime"
                         onSave(
                             targetMember?.mtIdx ?: 0,
                             title,
-                            startDateTime,
-                            endDateTime,
+                            // 운영 서버(pydantic)는 초가 없는 "yyyy-MM-dd HH:mm" 을 422 로 거절한다 — 초까지 보낸다(iOS 와 같은 형식).
+                            "$startDate $startTime:00",
+                            "$endDate $endTime:00",
                             isAllDay,
                             memo.ifBlank { null },
                             locationName.ifBlank { null },
@@ -809,28 +583,53 @@ fun CreateEditEventDialog(
                             editOptionState
                         )
                     },
-                    enabled = title.isNotBlank() && !isLoading,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                        .padding(top = 8.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (title.isNotBlank()) BrandColors.Primary else BrandColors.Border,
-                        contentColor = Color.White
-                    )
-                ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
-                    } else {
-                        Text(
-                            text = if (isEdit) "일정 수정" else "일정 추가",
-                            fontFamily = SuiteFont,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
-                        )
-                }
+                    enabled = !isLoading,
+                    isLoading = isLoading,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
     }
 }
+
+/** 시작·종료 행 오른쪽의 눌러서 바꾸는 값(날짜·시각). */
+@Composable
+private fun ValueChip(text: String, onClick: () -> Unit) {
+    Text(
+        text,
+        style = SmapText.captionBold,
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier
+            .clip(RoundedCornerShape(SmapRadius.sm))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    )
+}
+
+@Composable
+private fun OptionMenu(
+    expanded: Boolean,
+    options: List<String>,
+    selected: String,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss, offset = DpOffset(68.dp, 0.dp)) {
+        options.forEach { option ->
+            DropdownMenuItem(
+                text = { Text(option, style = SmapText.body) },
+                onClick = { onSelect(option) },
+                trailingIcon = if (selected == option) {
+                    { Icon(Icons.Filled.Check, contentDescription = "선택됨", tint = MaterialTheme.colorScheme.primary) }
+                } else null
+            )
+        }
+    }
+}
+
+/** "2026-11-13" → "11월 13일 (금)" */
+private fun formatFormDate(raw: String): String =
+    runCatching {
+        LocalDate.parse(raw).format(DateTimeFormatter.ofPattern("M월 d일 (E)", Locale.KOREAN))
+    }.getOrDefault(raw)

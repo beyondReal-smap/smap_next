@@ -1,6 +1,5 @@
 package com.dmonster.smap.ui.group
 
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -16,9 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -27,11 +24,26 @@ import com.dmonster.smap.data.model.SmapGroup
 import com.dmonster.smap.ui.common.rememberSmapHaptics
 import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.SuiteFont
+import com.dmonster.smap.ui.theme.SmapSpacing
+import com.dmonster.smap.ui.theme.SmapText
+import com.dmonster.smap.ui.components.SmapListRow
+import com.dmonster.smap.ui.components.SmapRowDivider
+import com.dmonster.smap.ui.components.SmapRowIcon
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Link
+import androidx.compose.material.icons.outlined.QrCode2
+import androidx.compose.material.icons.outlined.Sms
+import androidx.compose.material.icons.outlined.Share
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 // MARK: - Invite Member Bottom Sheet
 
+/**
+ * 멤버 초대 시트 — 36단계 재설계.
+ * 코드를 크게 보여 주고(눌러서 복사), 그 아래 보내는 방법을 공용 행으로 나열한다.
+ * 이전에는 회색 바탕에 회색 아이콘 카드가 이어져 "무엇을 보내는지"(코드)가 보이지 않았다.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InviteMemberBottomSheet(
@@ -44,213 +56,65 @@ fun InviteMemberBottomSheet(
     onCopyCode: () -> Unit
 ) {
     val clipboardManager = LocalClipboardManager.current
-    val context = LocalContext.current
     val haptics = rememberSmapHaptics()
+    val colors = MaterialTheme.colorScheme
+    val code = group.sgtCode
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = BrandColors.InputBackground,
-        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-        dragHandle = null
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = colors.surface,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 32.dp)
+                .navigationBarsPadding()
+                .padding(bottom = SmapSpacing.md)
         ) {
-            // Header
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Spacer(modifier = Modifier.width(48.dp))
-                Text(
-                    text = "그룹 초대",
-                    fontSize = 17.sp,
-                    fontFamily = SuiteFont,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.Black
-                )
-                TextButton(onClick = onDismiss) {
-                    Text(
-                        text = "완료",
-                        fontSize = 16.sp,
-                        fontFamily = SuiteFont,
-                        fontWeight = FontWeight.Medium,
-                        color = BrandColors.Primary
-                    )
-                }
-            }
-
-            // Section Header
             Text(
-                text = "그룹 초대 방법",
-                fontSize = 13.sp,
-                fontFamily = SuiteFont,
-                color = Color.Gray,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+                "멤버 초대",
+                style = SmapText.headline,
+                color = colors.onSurface,
+                modifier = Modifier.padding(horizontal = SmapSpacing.screenHorizontal)
             )
-
-            // Invite Options Card
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-            ) {
-                Column {
-                    // Link Copy Option
-                    InviteOptionItem(
-                        icon = Icons.Default.ContentCopy,
-                        iconTint = BrandColors.Primary,
-                        title = "링크 복사",
-                        subtitle = "초대 링크를 복사합니다",
-                        onClick = onCopyLink
-                    )
-
-                    HorizontalDivider(color = Color.Gray.copy(alpha = 0.1f))
-
-                    // QR Code Option
-                    InviteOptionItem(
-                        icon = Icons.Default.QrCode2,
-                        iconTint = Color.Black,
-                        title = "QR 코드 보기",
-                        subtitle = "QR 코드로 쉽게 초대해요",
-                        onClick = onShowQRCode
-                    )
-
-                    HorizontalDivider(color = Color.Gray.copy(alpha = 0.1f))
-
-                    // SMS Share Option
-                    InviteOptionItem(
-                        icon = Icons.Default.ChatBubbleOutline,
-                        iconTint = Color.Black,
-                        title = "문자로 공유",
-                        subtitle = "문자 메시지로 초대 링크를 전송합니다",
-                        onClick = onShareSMS
-                    )
-
-                    HorizontalDivider(color = Color.Gray.copy(alpha = 0.1f))
-
-                    // Default Share Option
-                    InviteOptionItem(
-                        icon = Icons.Default.Share,
-                        iconTint = Color.Black,
-                        title = "기본 공유",
-                        subtitle = "다양한 앱으로 공유할 수 있어요",
-                        onClick = onDefaultShare
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Invite Code Section Header
             Text(
-                text = "초대 코드",
-                fontSize = 13.sp,
-                fontFamily = SuiteFont,
-                color = Color.Gray,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+                "${group.sgtTitle ?: "그룹"}에 함께할 사람에게 초대 코드를 보내세요.",
+                style = SmapText.caption,
+                color = colors.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = SmapSpacing.screenHorizontal)
             )
-
-            // Invite Code Card
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-            ) {
+            if (code != null) {
                 Row(
                     modifier = Modifier
+                        .padding(SmapSpacing.screenHorizontal)
                         .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = "복사하여 편한 방법으로 공유하세요.",
-                            fontSize = 13.sp,
-                            fontFamily = SuiteFont,
-                            color = Color.Gray
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = group.sgtCode ?: "N/A",
-                            fontSize = 24.sp,
-                            fontFamily = SuiteFont,
-                            fontWeight = FontWeight.Bold,
-                            color = BrandColors.Primary
-                        )
-                    }
-
-                    IconButton(
-                        onClick = {
-                            group.sgtCode?.let {
-                                clipboardManager.setText(AnnotatedString(it))
-                                // Haptic 피드백만 — Snackbar 메시지는 상위(GroupScreen) 에서 ViewModel.showSuccess 경로로 발행
-                                haptics.success()
-                            }
+                        .background(colors.primaryContainer, RoundedCornerShape(16.dp))
+                        .clickable {
+                            clipboardManager.setText(AnnotatedString(code))
+                            haptics.success()
                             onCopyCode()
                         }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ContentCopy,
-                            contentDescription = "복사",
-                            tint = BrandColors.Primary,
-                            modifier = Modifier.size(24.dp)
+                        .padding(horizontal = SmapSpacing.lg, vertical = SmapSpacing.md),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("초대 코드", style = SmapText.captionSmall, color = colors.primary)
+                        Text(
+                            code,
+                            style = SmapText.title.copy(letterSpacing = 2.sp),
+                            color = colors.primary
                         )
                     }
+                    Icon(Icons.Outlined.ContentCopy, contentDescription = "초대 코드 복사", tint = colors.primary)
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun InviteOptionItem(
-    icon: ImageVector,
-    iconTint: Color,
-    title: String,
-    subtitle: String,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = iconTint,
-            modifier = Modifier.size(24.dp)
-        )
-        Spacer(modifier = Modifier.width(14.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                fontSize = 16.sp,
-                fontFamily = SuiteFont,
-                fontWeight = FontWeight.Medium,
-                color = Color.Black
-            )
-            Text(
-                text = subtitle,
-                fontSize = 13.sp,
-                fontFamily = SuiteFont,
-                color = Color.Gray
-            )
+            SmapListRow(title = "링크 복사", subtitle = "누르면 바로 참여하는 링크예요", leading = { SmapRowIcon(Icons.Outlined.Link) }, onClick = onCopyLink)
+            SmapRowDivider()
+            SmapListRow(title = "QR 코드 보여 주기", subtitle = "옆 사람이 카메라로 찍으면 참여해요", leading = { SmapRowIcon(Icons.Outlined.QrCode2) }, onClick = onShowQRCode)
+            SmapRowDivider()
+            SmapListRow(title = "문자로 보내기", leading = { SmapRowIcon(Icons.Outlined.Sms) }, onClick = onShareSMS)
+            SmapRowDivider()
+            SmapListRow(title = "다른 앱으로 공유", leading = { SmapRowIcon(Icons.Outlined.Share) }, onClick = onDefaultShare)
         }
     }
 }

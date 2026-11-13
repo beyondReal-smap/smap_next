@@ -164,9 +164,17 @@ fun ActivityLogScreen(
     var showGroupPicker by remember { mutableStateOf(false) }
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
+    // 경로 따라가기 — 이동 점이 2개 이상일 때만. 막대 위치의 시각과 하루의 처음·끝 시각을 함께 보여 준다.
+    val hasRoute = totalPoints >= 2
+    val routeTimes = remember(validLogs) { validLogs.map { gpsHourMinute(it.mltGpsTime) } }
+    val currentRouteTime = if (hasRoute) {
+        routeTimes.getOrNull(((totalPoints - 1) * (uiSliderValue / 100f)).toInt().coerceIn(0, totalPoints - 1))
+    } else null
+    val sheetPeek = if (hasRoute) ActivityLogSheetPeekHeight + ActivityLogRouteControlHeight else ActivityLogSheetPeekHeight
+
     Box(modifier = Modifier.fillMaxSize()) {
         SmapMapSheetScaffold(
-            peekHeight = ActivityLogSheetPeekHeight,
+            peekHeight = sheetPeek,
             scaffoldState = sheetScaffoldState,
             snackbarHostState = snackbarHostState,
             sheetContent = {
@@ -185,7 +193,25 @@ fun ActivityLogScreen(
                         scope.launch { sheetScaffoldState.bottomSheetState.partialExpand() }
                     },
                     onSelectDate = { viewModel.selectDate(it) },
-                    onLockedDate = { viewModel.onLockedDateClicked(it) }
+                    onLockedDate = { viewModel.onLockedDateClicked(it) },
+                    routeControl = if (hasRoute) {
+                        {
+                            RouteScrubber(
+                                value = uiSliderValue,
+                                currentTime = currentRouteTime,
+                                startTime = routeTimes.firstOrNull(),
+                                endTime = routeTimes.lastOrNull(),
+                                onValueChange = { uiSliderValue = it },
+                                onDraggingChange = { dragging ->
+                                    if (isLocalDragging != dragging) {
+                                        isLocalDragging = dragging
+                                        viewModel.setSliderDragging(dragging)
+                                        if (!dragging) viewModel.setSliderValue(uiSliderValue.toDouble())
+                                    }
+                                }
+                            )
+                        }
+                    } else null
                 )
             },
             overlay = {
@@ -207,7 +233,7 @@ fun ActivityLogScreen(
                     isScaleBarEnabled = false
                 ),
                 // 위 조작 줄과 아래 접힌 시트만큼 비워 경로가 가려지지 않게 한다.
-                contentPadding = PaddingValues(top = statusBarTop + 64.dp, bottom = ActivityLogSheetPeekHeight)
+                contentPadding = PaddingValues(top = statusBarTop + 64.dp, bottom = sheetPeek)
             ) {
                 // Path Overlay
                 if (totalPoints >= 2) {
@@ -377,36 +403,6 @@ fun ActivityLogScreen(
                     }
                 }
 
-            // 4. Path Slider Overlay
-            AnimatedVisibility(
-                visible = locationLogs.isNotEmpty(),
-                enter = fadeIn() + slideInVertically { it },
-                exit = fadeOut() + slideOutVertically { it },
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(start = 16.dp, bottom = ActivityLogSheetPeekHeight + 12.dp)
-                    .zIndex(8f)
-            ) {
-                PathSlider(
-                    sliderValue = uiSliderValue.toDouble(),
-                    isDragging = isSliderDragging,
-                    onValueChange = {
-                        if (BuildConfig.DEBUG) android.util.Log.d("ActivityLogScreen", "PathSlider onValueChange: $it")
-                        uiSliderValue = it.toFloat()
-                    },
-                    onDraggingChange = { dragging ->
-                        if (BuildConfig.DEBUG) android.util.Log.d("ActivityLogScreen", "PathSlider onDraggingChange: $dragging")
-                        if (isLocalDragging != dragging) {
-                            isLocalDragging = dragging
-                            viewModel.setSliderDragging(dragging)
-                            if (!dragging) {
-                                viewModel.setSliderValue(uiSliderValue.toDouble())
-                            }
-                        }
-                    }
-                )
-            }
-        
         }
 
         if (showGroupPicker) {
@@ -481,4 +477,10 @@ fun ActivityLogScreen(
             )
         }
     }
+}
+
+/** 서버 GPS 시각 문자열("2026-11-13 09:12:30" / "...T09:12:30.000Z")에서 "HH:mm". */
+private fun gpsHourMinute(raw: String?): String? {
+    val m = Regex("""[T ](\d{2}):(\d{2})""").find(raw.orEmpty()) ?: return null
+    return "${m.groupValues[1]}:${m.groupValues[2]}"
 }

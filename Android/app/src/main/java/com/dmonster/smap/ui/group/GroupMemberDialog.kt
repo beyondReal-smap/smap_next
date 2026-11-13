@@ -1,31 +1,45 @@
 package com.dmonster.smap.ui.group
 
-import com.dmonster.smap.BuildConfig
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.outlined.PersonRemove
+import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import coil.compose.AsyncImage
 import com.dmonster.smap.data.model.SmapGroupMember
-import com.dmonster.smap.ui.theme.BrandColors
-import com.dmonster.smap.ui.theme.SemanticColors
-import com.dmonster.smap.ui.theme.SuiteFont
+import com.dmonster.smap.ui.components.SmapAvatar
+import com.dmonster.smap.ui.components.SmapDialogActions
+import com.dmonster.smap.ui.components.SmapListRow
+import com.dmonster.smap.ui.components.SmapRowDivider
+import com.dmonster.smap.ui.components.SmapRowIcon
+import com.dmonster.smap.ui.theme.SmapSpacing
+import com.dmonster.smap.ui.theme.SmapText
 
-// MARK: - Member Manage Dialog
-
+/**
+ * 멤버 관리 시트(그룹장 전용) — 36단계 재설계.
+ * 이전: 가운데 대화상자에 큰 사진·버튼 세 개. 지금: 시트 머리(얼굴·이름) + "리더" 스위치 행 + 빨간 "내보내기" 행.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MemberManageDialog(
     member: SmapGroupMember,
@@ -34,154 +48,67 @@ fun MemberManageDialog(
     onRemove: () -> Unit,
     isLoading: Boolean
 ) {
+    val colors = MaterialTheme.colorScheme
     val isLeader = member.sgdtLeaderChk == "Y"
     var showRemoveConfirm by remember { mutableStateOf(false) }
 
-    // Resolve avatar URL
-    val imageUrl = androidx.compose.runtime.remember(member.mtFile1) {
-        if (!member.mtFile1.isNullOrBlank()) {
-            when {
-                member.mtFile1.startsWith("http") -> member.mtFile1
-                member.mtFile1.startsWith("/images/") -> "${BuildConfig.IMAGE_BASE_URL}${member.mtFile1}"
-                member.mtFile1.startsWith("/") -> "${BuildConfig.IMAGE_BASE_URL}/images${member.mtFile1}"
-                else -> "${BuildConfig.IMAGE_BASE_URL}/images/${member.mtFile1}"
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = colors.surface,
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(bottom = SmapSpacing.md)
+        ) {
+            Row(
+                Modifier.padding(horizontal = SmapSpacing.screenHorizontal, vertical = SmapSpacing.sm),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SmapAvatar(name = member.displayName, imagePath = member.mtFile1, size = 52.dp)
+                Spacer(Modifier.width(SmapSpacing.md))
+                Column(Modifier.weight(1f)) {
+                    Text(member.displayName, style = SmapText.headline, color = colors.onSurface)
+                    Text(if (isLeader) "리더" else "멤버", style = SmapText.caption, color = colors.onSurfaceVariant)
+                }
+                if (isLoading) CircularProgressIndicator(Modifier.padding(4.dp), strokeWidth = 2.dp)
             }
-        } else null
+            Spacer(Modifier.padding(top = SmapSpacing.sm))
+            SmapListRow(
+                title = "리더로 지정",
+                subtitle = "리더는 다른 멤버의 장소를 관리할 수 있어요",
+                leading = { SmapRowIcon(Icons.Outlined.Shield) },
+                trailing = {
+                    Switch(checked = isLeader, onCheckedChange = { onChangeRole(it) }, enabled = !isLoading)
+                },
+                onClick = if (isLoading) null else ({ onChangeRole(!isLeader) }),
+            )
+            SmapRowDivider()
+            SmapListRow(
+                title = "그룹에서 내보내기",
+                leading = { SmapRowIcon(Icons.Outlined.PersonRemove) },
+                destructive = true,
+                onClick = if (isLoading) null else ({ showRemoveConfirm = true }),
+            )
+        }
     }
 
-    // Remove confirmation dialog
     if (showRemoveConfirm) {
         AlertDialog(
             onDismissRequest = { showRemoveConfirm = false },
-            title = { Text("멤버 내보내기", fontFamily = SuiteFont, fontWeight = FontWeight.Bold) },
-            text = { Text("${member.displayName}님을 그룹에서 내보내시겠습니까?", fontFamily = SuiteFont) },
+            containerColor = colors.surface,
+            title = { Text("${member.displayName}님을 내보낼까요?", style = SmapText.headline) },
+            text = { Text("다시 들어오려면 초대 코드가 필요해요.", style = SmapText.secondary, color = colors.onSurfaceVariant) },
             confirmButton = {
-                TextButton(onClick = {
-                    onRemove()
-                    showRemoveConfirm = false
-                }) { Text("내보내기", fontFamily = SuiteFont, color = Color.Red) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showRemoveConfirm = false }) {
-                    Text("취소", fontFamily = SuiteFont)
-                }
+                SmapDialogActions(
+                    confirmText = "내보내기",
+                    onConfirm = { showRemoveConfirm = false; onRemove() },
+                    onDismiss = { showRemoveConfirm = false },
+                    destructive = true,
+                )
             }
         )
-    }
-
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .wrapContentHeight(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White)
-        ) {
-            Column(
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Member Avatar
-                Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .background(Color.Gray.copy(alpha = 0.1f), shape = CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (imageUrl != null) {
-                        AsyncImage(
-                            model = imageUrl,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(CircleShape),
-                            contentScale = ContentScale.Crop
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = null,
-                            tint = Color.Gray,
-                            modifier = Modifier.size(32.dp)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Text(
-                    text = member.displayName,
-                    fontSize = 18.sp,
-                    fontFamily = SuiteFont,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Text(
-                    text = if (isLeader) "리더" else "멤버",
-                    fontSize = 13.sp,
-                    fontFamily = SuiteFont,
-                    color = Color.Gray
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Role Toggle
-                Button(
-                    onClick = { onChangeRole(!isLeader) },
-                    enabled = !isLoading,
-                    modifier = Modifier.fillMaxWidth().height(44.dp),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isLeader) BrandColors.TextSecondary else SemanticColors.IndicatorMember
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Star,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (isLeader) "리더 해제" else "리더로 지정",
-                        fontFamily = SuiteFont
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Remove Button - now shows confirmation dialog first
-                OutlinedButton(
-                    onClick = { showRemoveConfirm = true },
-                    enabled = !isLoading,
-                    modifier = Modifier.fillMaxWidth().height(44.dp),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = Color.Red
-                    )
-                ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            color = Color.Red,
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.PersonRemove,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("그룹에서 내보내기", fontFamily = SuiteFont)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                TextButton(onClick = onDismiss) {
-                    Text("닫기", fontFamily = SuiteFont, color = Color.Gray)
-                }
-            }
-        }
     }
 }

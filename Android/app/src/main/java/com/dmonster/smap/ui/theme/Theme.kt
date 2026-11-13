@@ -32,7 +32,18 @@ private val LightColorScheme = lightColorScheme(
     onError = Color.White,
 
     outline = Color(0xFFD5D9E0),
-    outlineVariant = Color(0xFFE8EAEF)
+    outlineVariant = Color(0xFFE8EAEF),
+
+    // 대화상자·날짜 선택기·메뉴·시트가 쓰는 바탕. 지정하지 않으면 머티리얼 기본(보라빛)이 나와
+    // 확인창만 연보라로 떠 보였다. 모두 흰색으로, 가장 진한 단계만 입력칸·스위치 바탕용 회색으로 둔다.
+    surfaceTint = Color.White,
+    surfaceContainerLowest = Color.White,
+    surfaceContainerLow = Color.White,
+    surfaceContainer = Color.White,
+    surfaceContainerHigh = Color.White,
+    surfaceContainerHighest = Color(0xFFEEF0F4),
+    secondaryContainer = Color(0xFFE8EBFB),
+    onSecondaryContainer = BrandColors.Primary,
 )
 
 /**

@@ -44,6 +44,7 @@ fun SmapListRow(
     leading: (@Composable () -> Unit)? = null,
     trailing: (@Composable RowScope.() -> Unit)? = null,
     selected: Boolean = false,
+    destructive: Boolean = false,
     onClick: (() -> Unit)? = null,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -64,7 +65,7 @@ fun SmapListRow(
             Text(
                 title,
                 style = SmapText.bodyBold,
-                color = colors.onSurface,
+                color = if (destructive) colors.error else colors.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

@@ -15,7 +15,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
@@ -42,6 +44,9 @@ import java.util.Locale
 
 val ActivityLogSheetPeekHeight = 174.dp
 
+/** 경로 따라가기 줄이 있을 때 접힌 시트에 더하는 높이. */
+val ActivityLogRouteControlHeight = 76.dp
+
 /**
  * 활동 로그 지도 시트 — 사이드바("로그 조회")와 지도 위 요약 카드를 대신한다.
  *
@@ -62,6 +67,8 @@ fun ColumnScope.ActivityLogSheetContent(
     onSelectMember: (SmapGroupMember) -> Unit,
     onSelectDate: (LocalDate) -> Unit,
     onLockedDate: (LocalDate) -> Unit,
+    // 이동 경로가 있을 때만 머리 줄 아래에 놓는 "경로 따라가기" 줄(접힌 상태에서도 보인다).
+    routeControl: (@Composable () -> Unit)? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     val today = remember(System.currentTimeMillis() / 86_400_000) { LocalDate.now() }
@@ -96,7 +103,8 @@ fun ColumnScope.ActivityLogSheetContent(
                 when {
                     isLoadingLogs -> "기록을 불러오는 중…"
                     // 지도 가운데 큰 카드 대신 여기서 알린다(카드는 펼친 시트를 가렸다).
-                    !hasLogs || summary == null -> "이 날은 이동 기록이 없어요 · 다른 날을 골라 보세요"
+                    !hasLogs -> "이 날은 이동 기록이 없어요 · 다른 날을 골라 보세요"
+                    summary == null -> "이동 기록이 있어요 · 아래 막대로 따라가 보세요"
                     else -> "${summary.distanceFormatted} 이동 · ${summary.timeFormatted} · ${summary.stepsFormatted}"
                 },
                 style = SmapText.caption,
@@ -105,6 +113,7 @@ fun ColumnScope.ActivityLogSheetContent(
             )
         }
     }
+    if (routeControl != null) routeControl()
     Spacer(Modifier.height(SmapSpacing.sm))
     DateStrip(
         items = dateItems,
@@ -163,3 +172,50 @@ private fun activeDatesOf(counts: List<DailyCount>): Set<LocalDate> =
     counts.filter { (it.count ?: 0) > 0 }.mapNotNull { c ->
         c.date?.take(10)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
     }.toSet()
+
+/**
+ * 경로 따라가기 — 막대를 밀면 지도 위 표시가 그 시각 위치로 움직인다.
+ * 이전에는 접힌 시트 위에 떠 있는 작은 카드라 시트를 올리면 가려졌다. 이제 시트 머리 줄 아래에 늘 보인다.
+ * 값 범위 0~100(기존 지도 연동 계약 유지).
+ */
+@Composable
+fun RouteScrubber(
+    value: Float,
+    currentTime: String?,
+    startTime: String?,
+    endTime: String?,
+    onValueChange: (Float) -> Unit,
+    onDraggingChange: (Boolean) -> Unit,
+) {
+    val colors = MaterialTheme.colorScheme
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val dragging by interaction.collectIsDraggedAsState()
+    androidx.compose.runtime.LaunchedEffect(dragging) { onDraggingChange(dragging) }
+
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .height(ActivityLogRouteControlHeight)
+            .padding(horizontal = SmapSpacing.screenHorizontal),
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("경로 따라가기", style = SmapText.captionBold, color = colors.onSurfaceVariant, modifier = Modifier.weight(1f))
+            Text(currentTime ?: "--:--", style = SmapText.bodyBold, color = colors.primary)
+        }
+        androidx.compose.material3.Slider(
+            value = value,
+            onValueChange = onValueChange,
+            valueRange = 0f..100f,
+            interactionSource = interaction,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(32.dp)
+                .semantics { contentDescription = "경로 따라가기, 현재 ${currentTime ?: "알 수 없음"}" },
+        )
+        Row {
+            Text(startTime ?: "", style = SmapText.captionSmall, color = colors.onSurfaceVariant, modifier = Modifier.weight(1f))
+            Text(endTime ?: "", style = SmapText.captionSmall, color = colors.onSurfaceVariant)
+        }
+    }
+}

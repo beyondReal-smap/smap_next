@@ -369,13 +369,9 @@ class ScheduleViewModel @Inject constructor(
                 )
             }) {
                 is ApiResult.Success -> {
-                    if (result.data != null) {
-                        _successMessage.value = "일정이 생성되었습니다"
-                        hideCreateDialog()
-                        loadSchedules()
-                    } else {
-                        _errorMessage.value = "일정 생성에 실패했습니다"
-                    }
+                    _successMessage.value = "일정을 추가했어요"
+                    hideCreateDialog()
+                    loadSchedules()
                 }
                 is ApiResult.Error -> _errorMessage.value = "일정 생성에 실패했습니다 (${result.code})"
                 is ApiResult.NetworkError -> _errorMessage.value = "네트워크 연결을 확인해주세요"

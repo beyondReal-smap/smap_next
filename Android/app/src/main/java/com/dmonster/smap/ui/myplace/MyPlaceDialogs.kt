@@ -1,5 +1,6 @@
 package com.dmonster.smap.ui.myplace
 
+import com.dmonster.smap.ui.components.SmapDialogActions
 import com.dmonster.smap.BuildConfig
 import kotlinx.coroutines.launch
 import androidx.compose.animation.*
@@ -661,58 +662,25 @@ fun DeleteLocationDialog(
     onConfirm: () -> Unit,
     isLoading: Boolean
 ) {
+    // 그룹·일정 삭제 확인과 같은 모양 — 경고 아이콘 없이 문장 + [취소][삭제] 같은 크기 버튼.
     AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = {
-            Icon(
-                imageVector = Icons.Default.Warning,
-                contentDescription = null,
-                tint = BrandColors.Error,
-                modifier = Modifier.size(48.dp)
-            )
-        },
-        title = {
-            Text(
-                text = "장소 삭제",
-                fontFamily = SuiteFont,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            )
-        },
+        onDismissRequest = { if (!isLoading) onDismiss() },
+        title = { Text("'${location.name}'을(를) 삭제할까요?", style = com.dmonster.smap.ui.theme.SmapText.headline) },
         text = {
             Text(
-                text = "'${location.name}'을(를) 삭제할까요?\n삭제하면 되돌릴 수 없어요.",
-                fontFamily = SuiteFont,
-                textAlign = TextAlign.Center
+                "삭제하면 되돌릴 수 없어요.",
+                style = com.dmonster.smap.ui.theme.SmapText.secondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         },
         confirmButton = {
-            Button(
-                onClick = onConfirm,
-                enabled = !isLoading,
-                colors = ButtonDefaults.buttonColors(containerColor = BrandColors.Error)
-            ) {
-                if (isLoading) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            color = Color.White,
-                            strokeWidth = 2.dp
-                        )
-                        Text("삭제 중...", fontFamily = SuiteFont, color = Color.White)
-                    }
-                } else {
-                    Text("삭제", fontFamily = SuiteFont, color = Color.White)
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("취소", fontFamily = SuiteFont)
-            }
+            SmapDialogActions(
+                confirmText = "삭제",
+                onConfirm = onConfirm,
+                onDismiss = onDismiss,
+                destructive = true,
+                isLoading = isLoading
+            )
         }
     )
 }

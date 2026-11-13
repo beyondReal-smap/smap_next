@@ -56,13 +56,15 @@ fun SmapMapSheetScaffold(
     ),
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     overlay: @Composable BoxScope.() -> Unit = {},
+    maxHeightFraction: Float = 0.55f,
     map: @Composable BoxScope.() -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
     BoxWithConstraints(modifier.fillMaxSize()) {
         val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-        // 지도 위 조작 줄(상태 표시줄 + 56dp + 여백)만큼은 남겨 둔다.
-        val sheetMaxHeight = maxHeight - topInset - 76.dp
+        // 끝까지 올려도 화면의 [maxHeightFraction] 까지만 — 지도의 절반가량은 늘 보이게 한다.
+        // (이전에는 위쪽 조작 줄만 남기고 지도를 거의 다 가렸다.) 내용이 더 길면 시트 안에서 스크롤된다.
+        val sheetMaxHeight = minOf(maxHeight * maxHeightFraction, maxHeight - topInset - 76.dp)
         BottomSheetScaffold(
             scaffoldState = scaffoldState,
             sheetPeekHeight = peekHeight,

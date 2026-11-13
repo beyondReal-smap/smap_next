@@ -471,6 +471,9 @@ class GroupViewModel @Inject constructor(
 
     // MARK: - Helpers
 
+    /** 멤버 목록에서 "(나)" 표시용. */
+    fun currentUserIdx(): Int? = authService.getUserData()?.mtIdx
+
     fun isCurrentUserOwner(): Boolean {
         val user = authService.getUserData() ?: return false
         val userMtIdx = user.mtIdx ?: return false

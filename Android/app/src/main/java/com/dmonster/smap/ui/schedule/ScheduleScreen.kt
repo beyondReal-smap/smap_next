@@ -1,31 +1,30 @@
 package com.dmonster.smap.ui.schedule
 
-import com.dmonster.smap.ui.components.SmapTabHeader
 import androidx.compose.animation.*
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.EventAvailable
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.dmonster.smap.data.model.SmapSchedule
 import com.dmonster.smap.ui.common.rememberSmapHaptics
-import com.dmonster.smap.ui.theme.BrandColors
-import com.dmonster.smap.ui.theme.SuiteFont
-import com.dmonster.smap.ui.theme.responsiveSp
+import com.dmonster.smap.ui.components.GroupPickerSheet
+import com.dmonster.smap.ui.components.GroupSwitcherPill
+import com.dmonster.smap.ui.components.SmapListRow
+import com.dmonster.smap.ui.components.SmapRowDivider
+import com.dmonster.smap.ui.components.SmapRowIcon
+import com.dmonster.smap.ui.components.SmapSection
+import com.dmonster.smap.ui.theme.SmapSpacing
+import com.dmonster.smap.ui.theme.SmapText
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 
 /**
@@ -100,137 +99,104 @@ fun ScheduleScreen(
     }
     
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
-        Column(
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { viewModel.refresh() },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(Color.White)
         ) {
-            // 탭 공용 머리글 — 그룹 선택과 일정 추가를 오른쪽 동작으로 둔다.
-            // 부제를 빼서 그룹 이름이 길어도 제목·선택 칩이 겹치지 않는다.
-            SmapTabHeader(title = "일정") {
-                // Fix #11: Group selector button to toggle the dropdown
-                GroupSelectorButton(
-                    selectedGroup = selectedGroup,
-                    onClick = { viewModel.toggleGroupSelector() }
-                )
-
-                IconButton(onClick = { viewModel.showCreateDialog() }) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "일정 추가",
-                        tint = BrandColors.Primary,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-            }
-            
-            // Content below Header with gradient background
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.White)
-            ) {
-                // Group Selector Dropdown
-                AnimatedVisibility(
-                    visible = showGroupSelector,
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically()
-                ) {
-                    GroupSelectorDropdown(
-                        groups = groups,
-                        selectedGroup = selectedGroup,
-                        onGroupSelect = { viewModel.selectGroup(it) },
-                        onDismiss = { viewModel.hideGroupSelector() },
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                    )
-                }
-            
-            // Calendar - Fixed at top
-            MonthCalendar(
-                currentMonth = currentMonth,
-                selectedDate = selectedDate,
-                eventDates = eventDates,
-                onDateSelect = { viewModel.selectDate(it) },
-                onPreviousMonth = { viewModel.goToPreviousMonth() },
-                onNextMonth = { viewModel.goToNextMonth() },
-                onToday = { viewModel.goToToday() },
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-            )
-            
-            // Scrollable Content Below Calendar
-            PullToRefreshBox(
-                isRefreshing = isRefreshing,
-                onRefresh = { viewModel.refresh() },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-            ) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 16.dp)
+                contentPadding = PaddingValues(start = SmapSpacing.md, end = SmapSpacing.md, bottom = SmapSpacing.xl),
+                verticalArrangement = Arrangement.spacedBy(SmapSpacing.md)
             ) {
-                // Date Header
+                // 제목 줄 — 그룹 전환 알약(지도 탭과 같은 모양)과 일정 추가 버튼.
                 item {
-                    DateHeader(
-                        date = selectedDate,
-                        scheduleCount = selectedDateSchedules.size,
-                        modifier = Modifier.padding(top = 12.dp, bottom = 12.dp)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 4.dp, top = SmapSpacing.md),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "일정",
+                            style = SmapText.title.copy(fontSize = 28.sp),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.semantics { heading() }
+                        )
+                        Spacer(Modifier.width(SmapSpacing.sm))
+                        Box(Modifier.weight(1f)) {
+                            GroupSwitcherPill(
+                                groupName = selectedGroup?.sgtTitle,
+                                onClick = { viewModel.toggleGroupSelector() }
+                            )
+                        }
+                        FilledTonalIconButton(
+                            onClick = { viewModel.showCreateDialog() },
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) { Icon(Icons.Outlined.Add, contentDescription = "일정 추가") }
+                    }
+                }
+
+                item {
+                    MonthCalendar(
+                        currentMonth = currentMonth,
+                        selectedDate = selectedDate,
+                        eventDates = eventDates,
+                        onDateSelect = { viewModel.selectDate(it) },
+                        onPreviousMonth = { viewModel.goToPreviousMonth() },
+                        onNextMonth = { viewModel.goToNextMonth() },
+                        onToday = { viewModel.goToToday() }
                     )
                 }
-                
-                // Event List
-                if (isLoading || isLoadingSchedules) {
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(120.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator(color = BrandColors.Primary)
+
+                item {
+                    val count = selectedDateSchedules.size
+                    SmapSection(
+                        modifier = Modifier.padding(top = SmapSpacing.sm),
+                        title = scheduleDateTitle(selectedDate) + if (count > 0) " · ${count}개" else ""
+                    ) {
+                        when {
+                            isLoading || isLoadingSchedules -> Box(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(96.dp),
+                                contentAlignment = Alignment.Center
+                            ) { CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 2.5.dp) }
+                            selectedDateSchedules.isEmpty() -> SmapListRow(
+                                title = "이 날은 일정이 없어요",
+                                subtitle = "새 일정을 만들면 멤버에게 알려 드려요",
+                                leading = { SmapRowIcon(Icons.Outlined.EventAvailable) },
+                                trailing = { Text("추가", style = SmapText.captionBold, color = MaterialTheme.colorScheme.primary) },
+                                onClick = { viewModel.showCreateDialog() }
+                            )
+                            else -> selectedDateSchedules.forEachIndexed { i, schedule ->
+                                if (i > 0) SmapRowDivider()
+                                ScheduleRow(schedule = schedule, onClick = { viewModel.showEventDetail(schedule) })
+                            }
                         }
-                    }
-                } else if (selectedDateSchedules.isEmpty()) {
-                    item {
-                        ScheduleEmptyState(
-                            onAddClick = { viewModel.showCreateDialog() }
-                        )
-                    }
-                } else {
-                    items(selectedDateSchedules, key = { it.sstIdx }) { schedule ->
-                        val canManage = viewModel.canManageSchedule(schedule)
-                        EventCard(
-                            schedule = schedule,
-                            canManage = canManage,
-                            onClick = { viewModel.showEventDetail(schedule) },
-                            onEdit = {
-                                if (schedule.isRecurring) {
-                                    selectedScheduleForAction = schedule
-                                    showRecurringEditDialog = true
-                                } else {
-                                    viewModel.showEditDialog(schedule)
-                                }
-                            },
-                            onDelete = {
-                                if (schedule.isRecurring) {
-                                    selectedScheduleForAction = schedule
-                                    showRecurringDeleteDialog = true
-                                } else {
-                                    viewModel.showDeleteDialog(schedule)
-                                }
-                            },
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-                        )
                     }
                 }
             }
-            } // PullToRefreshBox
         }
     }
-}
+
+    // 그룹 선택 — 지도 탭과 같은 아래 시트.
+    if (showGroupSelector) {
+        GroupPickerSheet(
+            groups = groups,
+            selectedGroupId = selectedGroup?.sgtIdx,
+            onSelect = { viewModel.selectGroup(it) },
+            onDismiss = { viewModel.hideGroupSelector() }
+        )
+    }
 
     // Fix #5: Route recurring events through RecurringScheduleActionDialog from EventDetailDialog
     showEventDetail?.let { schedule ->

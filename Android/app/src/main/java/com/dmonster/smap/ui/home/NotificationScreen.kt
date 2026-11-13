@@ -1,5 +1,6 @@
 package com.dmonster.smap.ui.home
 
+import com.dmonster.smap.ui.components.SmapDialogActions
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -204,26 +205,15 @@ fun NotificationHeader(onClose: () -> Unit, viewModel: NotificationViewModel) {
                 )
             },
             confirmButton = {
-                TextButton(onClick = {
-                    showDeleteConfirmation = false
-                    viewModel.deleteAllLogs()
-                }) {
-                    Text(
-                        text = "삭제",
-                        fontFamily = SuiteFont,
-                        fontWeight = FontWeight.Bold,
-                        color = BrandColors.Error
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteConfirmation = false }) {
-                    Text(
-                        text = "취소",
-                        fontFamily = SuiteFont,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                SmapDialogActions(
+                    confirmText = "삭제",
+                    onConfirm = {
+                        showDeleteConfirmation = false
+                        viewModel.deleteAllLogs()
+                    },
+                    onDismiss = { showDeleteConfirmation = false },
+                    destructive = true
+                )
             },
             shape = RoundedCornerShape(16.dp),
             containerColor = Color.White

@@ -263,3 +263,19 @@ data class GroupStatsResponse(
     @SerialName("data") val data: GroupStats? = null,
     @SerialName("message") val message: String? = null
 )
+
+/**
+ * POST /schedules 응답 — 서버 ScheduleResponse 중 앱이 쓰는 값만.
+ * 목록용 [SmapSchedule] 은 "id" 가 필수라 이 응답(sst_idx)을 읽지 못해, 서버에 저장된 일정이 앱에서 실패로 보였다.
+ */
+@Serializable
+data class CreatedScheduleResponse(
+    @SerialName("sst_idx") val sstIdx: Int
+)
+
+/** 그룹 일정 수정 응답 — {"success": true, "data": {...}} 또는 {"success": false, "message": "..."} */
+@Serializable
+data class ScheduleMutationResponse(
+    @SerialName("success") val success: Boolean,
+    @SerialName("message") val message: String? = null
+)

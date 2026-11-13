@@ -1,25 +1,33 @@
 package com.dmonster.smap.ui.schedule
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.dmonster.smap.data.model.SmapSchedule
-import com.dmonster.smap.ui.theme.BrandColors
-import com.dmonster.smap.ui.theme.SuiteFont
+import com.dmonster.smap.ui.components.SmapDialogActions
+import com.dmonster.smap.ui.theme.SmapText
 
-// MARK: - Delete Confirm Dialog
+/*
+ * 일정 삭제·반복 범위 확인 — 36단계 재설계.
+ * 이전: 빨간 경고 삼각형 + 가운데 정렬 + 빨간·옅은 빨강 버튼 두 개.
+ * 지금: 그룹 삭제 확인과 같은 모양(왼쪽 정렬 문장 + 빨간 확인 버튼 하나). 범위는 라디오로 고른다.
+ */
 
 @Composable
 fun DeleteScheduleDialog(
@@ -30,91 +38,36 @@ fun DeleteScheduleDialog(
     isLoading: Boolean
 ) {
     var selectedOption by remember { mutableStateOf("this") }
+    val colors = MaterialTheme.colorScheme
 
     AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = {
-            Icon(
-                imageVector = Icons.Default.Warning,
-                contentDescription = null,
-                tint = BrandColors.Error,
-                modifier = Modifier.size(32.dp)
-            )
-        },
-        title = {
-            Text(
-                text = "일정 삭제",
-                fontFamily = SuiteFont,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            )
-        },
+        onDismissRequest = { if (!isLoading) onDismiss() },
+        title = { Text("'${schedule.displayTitle}'을(를) 삭제할까요?", style = SmapText.headline) },
         text = {
             Column {
-                Text(
-                    text = "'${schedule.title}'을(를) 삭제하시겠습니까?",
-                    fontFamily = SuiteFont,
-                    textAlign = TextAlign.Center
-                )
-
+                Text("삭제하면 되돌릴 수 없어요.", style = SmapText.secondary, color = colors.onSurfaceVariant)
                 if (isRepeat) {
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    listOf(
-                        "this" to "이 일정만",
-                        "future" to "이후 모든 일정",
-                        "all" to "모든 반복 일정"
-                    ).forEach { (value, label) ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { selectedOption = value }
-                                .padding(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = selectedOption == value,
-                                onClick = { selectedOption = value }
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = label,
-                                fontFamily = SuiteFont,
-                                fontSize = 14.sp
-                            )
-                        }
-                    }
+                    ScopeOptions(
+                        options = listOf("this" to "이 일정만", "future" to "이후 모든 일정", "all" to "모든 반복 일정"),
+                        selected = selectedOption,
+                        onSelect = { selectedOption = it },
+                    )
                 }
             }
         },
         confirmButton = {
-            Button(
-                onClick = { onConfirm(selectedOption) },
-                enabled = !isLoading,
-                colors = ButtonDefaults.buttonColors(containerColor = BrandColors.Error)
-            ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = Color.White,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Text("삭제", fontFamily = SuiteFont)
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("취소", fontFamily = SuiteFont)
-            }
+            SmapDialogActions(
+                confirmText = "삭제",
+                onConfirm = { onConfirm(selectedOption) },
+                onDismiss = onDismiss,
+                destructive = true,
+                isLoading = isLoading,
+            )
         }
     )
 }
 
-// MARK: - Recurring Schedule Action Dialog
-
+/** 반복 일정을 수정·삭제할 때 범위를 고른다. 호출부 계약(onThisOnly/onAll)은 그대로 둔다. */
 @Composable
 fun RecurringScheduleActionDialog(
     title: String,
@@ -126,90 +79,51 @@ fun RecurringScheduleActionDialog(
     onAll: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    val buttonColor = if (isDestructive) BrandColors.Error else BrandColors.Primary
+    var selected by remember { mutableStateOf("this") }
+    val colors = MaterialTheme.colorScheme
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = title,
-                fontFamily = SuiteFont,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
-        },
+        title = { Text(title, style = SmapText.headline) },
         text = {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = message,
-                    fontFamily = SuiteFont,
-                    textAlign = TextAlign.Center,
-                    color = Color.Gray
+            Column {
+                Text(message, style = SmapText.secondary, color = colors.onSurfaceVariant)
+                ScopeOptions(
+                    options = listOf("this" to thisOnlyLabel, "all" to allLabel),
+                    selected = selected,
+                    onSelect = { selected = it },
                 )
             }
         },
         confirmButton = {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // "이 일정만" option
-                Button(
-                    onClick = onThisOnly,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = buttonColor
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text(
-                        text = thisOnlyLabel,
-                        fontFamily = SuiteFont,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // "모든 반복 일정" option
-                Button(
-                    onClick = onAll,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = buttonColor.copy(alpha = 0.8f)
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text(
-                        text = allLabel,
-                        fontFamily = SuiteFont,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Cancel button
-                TextButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = "취소",
-                        fontFamily = SuiteFont,
-                        color = Color.Gray
-                    )
-                }
-            }
-        },
-        dismissButton = {}
+            SmapDialogActions(
+                confirmText = if (isDestructive) "삭제" else "다음",
+                onConfirm = { if (selected == "all") onAll() else onThisOnly() },
+                onDismiss = onDismiss,
+                destructive = isDestructive,
+            )
+        }
     )
+}
+
+@Composable
+private fun ScopeOptions(
+    options: List<Pair<String, String>>,
+    selected: String,
+    onSelect: (String) -> Unit,
+) {
+    Column(Modifier.padding(top = 12.dp).selectableGroup()) {
+        options.forEach { (value, label) ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(role = Role.RadioButton) { onSelect(value) }
+                    .padding(vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RadioButton(selected = selected == value, onClick = null, modifier = Modifier.padding(12.dp))
+                Text(label, style = SmapText.body, color = MaterialTheme.colorScheme.onSurface)
+            }
+        }
+    }
 }
