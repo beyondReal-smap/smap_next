@@ -5,6 +5,7 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -57,6 +58,10 @@ func (h *LocationLogHandler) MemberLocationLogsPost(c *gin.Context) {
 	act, _ := body["act"].(string)
 	if act == "" {
 		writeJSON(c, http.StatusBadRequest, gin.H{"detail": "'act' parameter is required"})
+		return
+	}
+
+	if !h.applyRetention(c, act, body) { // 구독: 조회(get_*) act 의 날짜를 요청자 보존 기간으로 제한(강제 꺼짐이면 계측만)
 		return
 	}
 
@@ -598,3 +603,37 @@ func mllFilterLogCols(present map[string]interface{}) map[string]interface{} {
 }
 
 var _ = json.Marshal
+
+// retentionRangeActs는 start_date/end_date(선택)를 받는 조회 act 다. 시작일이 비어 있으면 "전체 기간"이라 보존 기간으로 시작일을 채워야 한다.
+var retentionRangeActs = map[string]bool{
+	"get_location_logs": true, "get_location_summary": true, "get_location_path": true,
+	"get_daily_summary_by_range": true, "get_daily_summary": true,
+}
+
+// applyRetention은 POST act 디스패처의 조회 act 에 요청자 보존 기간(구독)을 적용한다.
+// 단일 date 는 기간 밖이면 403, 기간 조회는 start_date 를 끌어올려 body 에 되쓴다. get_ 이 아닌 act 와 위치 로그 수집·저장은 영향이 없다.
+func (h *LocationLogHandler) applyRetention(c *gin.Context, act string, body map[string]interface{}) bool {
+	if h.benefits == nil || !strings.HasPrefix(act, "get_") {
+		return true
+	}
+	if d, ok := body["date"].(string); ok {
+		if !h.benefits.LogDate(c, d) {
+			return false
+		}
+	}
+	_, hasStart := body["start_date"]
+	_, hasEnd := body["end_date"]
+	if retentionRangeActs[act] || hasStart || hasEnd {
+		s, e, ok := h.benefits.LogRange(c, mllStr(body, "start_date"), mllStr(body, "end_date"))
+		if !ok {
+			return false
+		}
+		if s != "" {
+			body["start_date"] = s
+		}
+		if e != "" {
+			body["end_date"] = e
+		}
+	}
+	return true
+}

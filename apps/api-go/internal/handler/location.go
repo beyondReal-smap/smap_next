@@ -13,10 +13,15 @@ type LocationHandler struct {
 	svc *service.LocationService
 	// guard: 내 장소 조회·변경 인가(nil이면 500, fail-closed).
 	guard *LocationGuard
+	// benefits: 내 장소 생성 시 무료 한도(구독) 판정. nil이면 적용하지 않는다. 강제 스위치가 꺼져 있으면 막지 않고 계측만 한다.
+	benefits *BenefitGuard
 }
 
 // SetGuard는 위치 인가 가드를 주입한다.
 func (h *LocationHandler) SetGuard(g *LocationGuard) { h.guard = g }
+
+// SetBenefits는 혜택 강제 가드를 주입한다(위치 인가 뒤에 덧붙는다).
+func (h *LocationHandler) SetBenefits(b *BenefitGuard) { h.benefits = b }
 
 // manageExisting은 기존 장소를 수정·삭제·알림 변경하려는 요청을 인가한다.
 // 장소가 없으면 통과시켜 핸들러의 기존 404 흐름을 유지한다. 토큰이 없는 요청은 신원을 알 수 없어 건너뛴다.

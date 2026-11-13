@@ -27,6 +27,7 @@ import (
 	"github.com/bluemusk/smap_next_go/internal/repository"
 	"github.com/bluemusk/smap_next_go/internal/server"
 	"github.com/bluemusk/smap_next_go/internal/service"
+	"github.com/bluemusk/smap_next_go/internal/subscription/store"
 	"github.com/bluemusk/smap_next_go/internal/ws"
 )
 
@@ -424,8 +425,69 @@ func main() {
 	)
 	locationLogH.SetGuard(locationGuard)
 
+	// G10 — 프리미엄 구독. 스토어 호출은 store.Verifier/NotificationVerifier 인터페이스 뒤(HTTP 클라이언트는 앱 수명주기로 하나).
+	// 스토어 설정이 비어 있어도 시작되며 해당 경로만 503이다. 값이 있는데 형식이 잘못된 경우(PEM·서비스 계정 JSON·핀 불일치)는 시작을 막는다.
+	subRepo := repository.NewSubscription(gdb)
+	storeSvc, err := store.New(cfg.SubscriptionStoreConfig(), store.Options{})
+	if err != nil {
+		logger.Error("subscription store init failed", slog.String("err", err.Error()))
+		os.Exit(1)
+	}
+	subPolicy := service.SubscriptionPolicy{
+		EnforcementEnabled: cfg.SubscriptionEnforcementEnabled,
+		FreeMaxPlaces:      cfg.SubscriptionFreeMaxPlaces,
+		FreeLogDays:        cfg.SubscriptionFreeLogDays,
+		PremiumLogDays:     cfg.SubscriptionPremiumLogDays,
+	}
+	benefits := service.NewSubscriptionBenefits(subRepo, subPolicy, observability.NewEnforcementMeter(reg, logger), logger)
+	benefitGuard := handler.NewBenefitGuard(benefits)
+	locationH.SetBenefits(benefitGuard)
+	locationLogH.SetBenefits(benefitGuard)
+	subscriptionSvc := service.NewSubscription(subRepo, service.SubscriptionOptions{
+		Verifier: storeSvc, Notifier: storeSvc, Policy: subPolicy, AllowSandbox: cfg.SubscriptionAllowSandbox, Logger: logger,
+		Plans: service.SubscriptionPlanMap{
+			AppleMonthProductID: cfg.SubscriptionAppleMonthProductID, AppleYearProductID: cfg.SubscriptionAppleYearProductID,
+			GoogleMonthBasePlan: cfg.SubscriptionGoogleMonthBasePlan, GoogleYearBasePlan: cfg.SubscriptionGoogleYearBasePlan,
+		},
+	})
+	subscriptionH := handler.NewSubscription(subscriptionSvc)
+	// 구독 me·verify 는 새 경로라 ROUTE_AUTH_MODE와 무관하게 무토큰이면 401(enforce 고정, scope=subscription).
+	subscriptionAuth, err := middleware.NewRouteAuth(middleware.RouteAuthOptions{
+		Revocation:      accessRevocation,
+		Mode:            auth.RouteModeEnforce,
+		Secret:          cfg.JWTSecretKey,
+		Algorithm:       cfg.JWTAlgorithm,
+		StatusCacheTTL:  time.Duration(cfg.RouteAuthStatusCacheTTLSeconds) * time.Second,
+		SummaryInterval: time.Duration(cfg.RouteAuthSummaryIntervalSeconds) * time.Second,
+		Scope:           "subscription",
+	}, memberRepo, logger)
+	if err != nil {
+		logger.Error("subscription auth init failed", slog.String("err", err.Error()))
+		os.Exit(1)
+	}
+	logger.Info("subscription configured",
+		slog.Bool("enforcement_enabled", cfg.SubscriptionEnforcementEnabled),
+		slog.Bool("allow_sandbox", cfg.SubscriptionAllowSandbox),
+		slog.Bool("apple_configured", cfg.AppleStoreConfigured()),
+		slog.Bool("google_configured", cfg.GoogleStoreConfigured()),
+		slog.Bool("google_rtdn_configured", cfg.GoogleRTDNConfigured()),
+		slog.Int("lapse_sync_interval_sec", cfg.SubscriptionLapseSyncIntervalSeconds),
+	)
+
 	// 시작 시 설정 점검(G8): 운영에 필요한 설정이 비었거나 위험한 값이면 한 곳에서 경고한다. 시작은 막지 않는다.
 	for _, w := range config.StartupWarnings(cfg, config.RuntimeFacts{RedisConnected: rds != nil}) {
+		logger.Warn("startup_check", slog.String("code", w.Code), slog.String("msg", w.Message))
+	}
+	// 구독 점검(G10): 테이블 존재는 시작 시 한 번 확인한다. 확인에 실패하면(권한 등) 테이블 경고는 내지 않고 확인 실패만 알린다.
+	subFacts := config.SubscriptionFacts{}
+	checkCtx, checkCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	if exists, terr := subRepo.TableExists(checkCtx); terr != nil {
+		logger.Warn("subscription table check failed", slog.String("err", terr.Error()))
+	} else {
+		subFacts.TableChecked, subFacts.TableMissing = true, !exists
+	}
+	checkCancel()
+	for _, w := range config.SubscriptionStartupWarnings(cfg, subFacts) {
 		logger.Warn("startup_check", slog.String("code", w.Code), slog.String("msg", w.Message))
 	}
 
@@ -462,6 +524,10 @@ func main() {
 		ChatWS:         chatWS,
 		Auth:           authH,
 		EmailAuth:      emailAuthH,
+
+		Subscription:     subscriptionH,
+		SubscriptionAuth: subscriptionAuth.Required(),
+
 		CheckLimit: func(kind string) gin.HandlerFunc {
 			return middleware.IPLimit(middleware.IPLimitOptions{
 				Name: "check_" + kind, Store: cacheStore,
@@ -501,6 +567,32 @@ func main() {
 		scheduleAuth.Run(ctx)
 	}()
 
+	subscriptionAuthDone := make(chan struct{})
+	go func() {
+		defer close(subscriptionAuthDone)
+		subscriptionAuth.Run(ctx)
+	}()
+	// 알림 누락 보정(기본 꺼짐): 만료된 mt_level=5 회원을 2로 되돌린다. 켜면 만료 상태로 남은 기존 유료 회원의 표시 등급이 일괄 변경된다.
+	if sec := cfg.SubscriptionLapseSyncIntervalSeconds; sec > 0 {
+		go func() {
+			t := time.NewTicker(time.Duration(sec) * time.Second)
+			defer t.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-t.C:
+					n, lerr := subscriptionSvc.ExpireLapsed(ctx)
+					if lerr != nil {
+						logger.Error("subscription lapse sync failed", slog.String("err", lerr.Error()))
+					} else if n > 0 {
+						logger.Info("subscription lapse sync", slog.Int64("downgraded", n))
+					}
+				}
+			}
+		}()
+	}
+
 	go func() {
 		logger.Info("http server listening", slog.String("addr", srv.Addr))
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -527,5 +619,6 @@ func main() {
 	<-routeAuthDone
 	<-locationAuthDone
 	<-scheduleAuthDone
+	<-subscriptionAuthDone
 	logger.Info("shutdown complete")
 }

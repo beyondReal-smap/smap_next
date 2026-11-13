@@ -42,6 +42,9 @@ func (h *LocationHandler) Create(c *gin.Context) {
 	if !h.guard.ManagePlace(c, mtIdx) {
 		return
 	}
+	if !h.benefits.PlaceCreate(c, mtIdx) { // 구독: 무료 회원의 내 장소 한도(강제 꺼짐이면 계측만)
+		return
+	}
 	in := service.LocationCreateInput{
 		MtIdx:    mtIdx,
 		SltTitle: truncRunes(toStr(title), 100),
@@ -177,6 +180,9 @@ func (h *LocationHandler) MemberCreate(c *gin.Context) {
 		return
 	}
 	if !h.guard.ManagePlace(c, mid) {
+		return
+	}
+	if !h.benefits.PlaceCreate(c, mid) { // 구독: 무료 회원의 내 장소 한도(강제 꺼짐이면 계측만)
 		return
 	}
 	body := bindBodyMap(c)

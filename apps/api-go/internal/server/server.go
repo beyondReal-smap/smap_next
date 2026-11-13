@@ -43,6 +43,11 @@ type Deps struct {
 	// EmailAuth는 이메일 인증 4종(/auth/email/*, /auth/reset-password-by-email). 라우트는 공개이고
 	// 로그인이 필요한 경우는 핸들러가 직접 Bearer 토큰을 검증한다.
 	EmailAuth *handler.EmailAuthHandler
+	// Subscription은 프리미엄 구독 4경로(/subscriptions/me·verify·apple/notifications·google/notifications)다.
+	// nil이면 등록하지 않는다. SubscriptionAuth는 me·verify 에 붙는 인증 미들웨어(ROUTE_AUTH_MODE와 무관하게 enforce 고정);
+	// 비어 있어도 핸들러가 신원이 없으면 401 이라 열리지 않는다. 알림 두 경로는 인증 밖이며 자체 서명·발신자 검증으로 보호한다.
+	Subscription     *handler.SubscriptionHandler
+	SubscriptionAuth gin.HandlerFunc
 	// AdminAuth는 /admin 그룹에 적용되는 RequireAdmin 미들웨어(JWT + mt_level=9).
 	AdminAuth gin.HandlerFunc
 	// UserAuth는 일반 사용자 인증 미들웨어(ROUTE_AUTH_MODE off|warn|enforce)다. nil이면 붙이지 않는다.
@@ -467,6 +472,19 @@ func New(cfg *config.Config, logger *slog.Logger, deps Deps) http.Handler {
 		v1.GET("/chats/rooms", deps.Chat.Rooms)
 		v1.POST("/chats/rooms/dm", deps.Chat.CreateDM)
 		v1.GET("/chats/rooms/:scr_idx/messages", deps.Chat.Messages)
+
+		// subscriptions — 프리미엄 구독. me·verify 는 새 경로라 구버전 호환 대상이 아니므로 무토큰은 모드와 무관하게 401.
+		// 알림 두 경로는 스토어가 호출하므로 사용자 인증을 붙이지 않고, 서명(Apple JWS 체인)·발신자(Google OIDC) 검증으로 보호한다.
+		if deps.Subscription != nil {
+			subAuth := []gin.HandlerFunc{}
+			if deps.SubscriptionAuth != nil {
+				subAuth = append(subAuth, deps.SubscriptionAuth)
+			}
+			v1.GET("/subscriptions/me", append(subAuth, deps.Subscription.Me)...)
+			v1.POST("/subscriptions/verify", append(subAuth, deps.Subscription.Verify)...)
+			v1.POST("/subscriptions/apple/notifications", deps.Subscription.AppleNotification)
+			v1.POST("/subscriptions/google/notifications", deps.Subscription.GoogleNotification)
+		}
 
 		// admin — read 통계/그룹. RequireAdmin(JWT + mt_level=9) 게이트 적용.
 		admin := v1.Group("/admin")

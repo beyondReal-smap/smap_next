@@ -162,6 +162,35 @@ type Config struct {
 	LoginFailLimitPerIP      int `envconfig:"LOGIN_FAIL_LIMIT_PER_IP" default:"100"`
 	LoginFailWindowSeconds   int `envconfig:"LOGIN_FAIL_WINDOW_SECONDS" default:"900"`
 
+	// --- 프리미엄 구독(G10) ---
+	// 혜택 강제 스위치. false(기본)면 무료 제한(내 장소 2개, 활동 기록 2일)을 적용하지 않고 "강제했다면 막혔을 요청" 수만 센다.
+	// 스토어 상품 등록과 새 앱 배포가 끝난 뒤에 켠다. /subscriptions/me의 enforcement_enabled도 이 값이다.
+	SubscriptionEnforcementEnabled bool `envconfig:"SUBSCRIPTION_ENFORCEMENT_ENABLED" default:"false"`
+	// 샌드박스(테스트) 거래를 받을지. 기본 false(운영 보호). App Store 심사는 샌드박스 거래로 진행되므로 심사 기간에만 켠다.
+	SubscriptionAllowSandbox bool `envconfig:"SUBSCRIPTION_ALLOW_SANDBOX" default:"false"`
+	// 혜택 한도(계약 4절). 무료 장소 수 / 무료·프리미엄 활동 기록 조회 일수(오늘 포함).
+	SubscriptionFreeMaxPlaces  int `envconfig:"SUBSCRIPTION_FREE_MAX_PLACES" default:"2"`
+	SubscriptionFreeLogDays    int `envconfig:"SUBSCRIPTION_FREE_LOG_DAYS" default:"2"`
+	SubscriptionPremiumLogDays int `envconfig:"SUBSCRIPTION_PREMIUM_LOG_DAYS" default:"14"`
+	// 상품 → 플랜(month/year) 매핑(계약 1절 기본값). Apple은 상품 ID, Google은 기본 요금제(base plan) ID로 구분한다.
+	SubscriptionAppleMonthProductID string `envconfig:"SUBSCRIPTION_APPLE_MONTH_PRODUCT_ID" default:"com.dmonster.smap.sub_month"`
+	SubscriptionAppleYearProductID  string `envconfig:"SUBSCRIPTION_APPLE_YEAR_PRODUCT_ID" default:"com.dmonster.smap.sub_year"`
+	SubscriptionGoogleMonthBasePlan string `envconfig:"SUBSCRIPTION_GOOGLE_MONTH_BASE_PLAN" default:"monthly"`
+	SubscriptionGoogleYearBasePlan  string `envconfig:"SUBSCRIPTION_GOOGLE_YEAR_BASE_PLAN" default:"yearly"`
+	// 만료된 프리미엄 회원의 mt_level(5→2) 보정 주기(초). 0(기본)이면 끈다 — 켜면 만료 상태로 남은 기존 유료 회원의 표시 등급이
+	// 일괄로 2가 된다. 꺼져 있어도 구독 검증·알림·/subscriptions/me 때 해당 회원은 보정된다.
+	SubscriptionLapseSyncIntervalSeconds int `envconfig:"SUBSCRIPTION_LAPSE_SYNC_INTERVAL_SECONDS" default:"0"`
+	// 스토어 검증 설정(internal/subscription/store.Config와 1:1). 값은 로그에 남기지 않는다. 비어 있으면 해당 스토어 경로는 503.
+	AppleBundleID                  string `envconfig:"APPLE_BUNDLE_ID" default:""`
+	AppleRootCAPath                string `envconfig:"APPLE_ROOT_CA_PATH" default:""`
+	AppleRootCASHA256              string `envconfig:"APPLE_ROOT_CA_SHA256" default:""`
+	GooglePlayPackageName          string `envconfig:"GOOGLE_PLAY_PACKAGE_NAME" default:""`
+	GooglePlayProductIDsRaw        string `envconfig:"GOOGLE_PLAY_PRODUCT_IDS" default:""`
+	GooglePlayServiceAccount       string `envconfig:"GOOGLE_PLAY_SERVICE_ACCOUNT_JSON" default:""`
+	GooglePlayServiceAccountInline string `envconfig:"GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_B64" default:""`
+	GoogleRTDNAudience             string `envconfig:"GOOGLE_RTDN_AUDIENCE" default:""`
+	GoogleRTDNServiceAccount       string `envconfig:"GOOGLE_RTDN_SERVICE_ACCOUNT_EMAIL" default:""`
+
 	// 프로필 이미지 저장 디렉토리(members upload/delete-profile-image). Python은 cwd 기준 상대
 	// public/images에 저장하나, 실제 /images 서빙은 Python FastAPI StaticFiles(BASE_DIR/public/images,
 	// 절대경로)이다. Go cwd=backend-go라 상대경로를 쓰면 안 되고, Python과 동일한 절대경로에 써야
@@ -297,6 +326,9 @@ func Load(envPath string) (*Config, error) {
 		return nil, err
 	}
 	if err := c.validateGroupPolicy(); err != nil {
+		return nil, err
+	}
+	if err := c.validateSubscription(); err != nil {
 		return nil, err
 	}
 	return &c, nil

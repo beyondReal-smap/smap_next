@@ -16,6 +16,8 @@ type LocationLogHandler struct {
 	cfg *config.Config
 	// guard는 위치 정보 인가(본인/같은 그룹 멤버/소유자) 진입점이다. nil이면 모든 요청이 500(fail-closed).
 	guard *LocationGuard
+	// benefits: 활동 기록 조회 기간(구독) 제한. nil이면 적용하지 않는다. 강제 스위치가 꺼져 있으면 막지 않고 계측만 한다.
+	benefits *BenefitGuard
 }
 
 func NewLocationLog(svc *service.LocationLogService, cfg *config.Config) *LocationLogHandler {
@@ -24,6 +26,9 @@ func NewLocationLog(svc *service.LocationLogService, cfg *config.Config) *Locati
 
 // SetGuard는 위치 인가 가드를 주입한다.
 func (h *LocationLogHandler) SetGuard(g *LocationGuard) { h.guard = g }
+
+// SetBenefits는 혜택 강제 가드를 주입한다(위치 인가 뒤에 덧붙는다).
+func (h *LocationLogHandler) SetBenefits(b *BenefitGuard) { h.benefits = b }
 
 // MemberLogs는 GET /api/v1/logs/member-location-logs/:mt_idx — {"result":"Y","data":[...]}.
 // start_date/end_date(optional, 빈문자열=미적용), limit(100)/offset(0). 에러는 500 {"detail":str(e)}.
@@ -44,7 +49,11 @@ func (h *LocationLogHandler) MemberLogs(c *gin.Context) {
 		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
 		return
 	}
-	res, err := h.svc.MemberLogs(id, c.Query("start_date"), c.Query("end_date"), limit, offset)
+	startQ, endQ, bok := h.benefits.LogRange(c, c.Query("start_date"), c.Query("end_date")) // 구독: 요청자 보존 기간으로 제한
+	if !bok {
+		return
+	}
+	res, err := h.svc.MemberLogs(id, startQ, endQ, limit, offset)
 	if err != nil {
 		writeJSON(c, http.StatusInternalServerError, gin.H{"detail": err.Error()})
 		return
@@ -61,6 +70,9 @@ func (h *LocationLogHandler) DailyLogs(c *gin.Context) {
 		return
 	}
 	if !h.guard.ViewMember(c, id) {
+		return
+	}
+	if !h.benefits.LogDate(c, c.Query("date")) { // 구독: 요청자 보존 기간 밖 날짜 거부
 		return
 	}
 	errs := make([]valErr, 0)
@@ -124,6 +136,10 @@ func (h *LocationLogHandler) DailySummary(c *gin.Context) {
 		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
 		return
 	}
+	start, end, bok := h.benefits.LogRange(c, start, end) // 구독: 요청자 보존 기간으로 제한
+	if !bok {
+		return
+	}
 	res, err := h.svc.DailySummary(id, start, end, maxAcc, minSpeed)
 	if err != nil {
 		writeJSON(c, http.StatusInternalServerError, gin.H{"detail": err.Error()})
@@ -156,6 +172,9 @@ func (h *LocationLogHandler) MemberActivity(c *gin.Context) {
 		return
 	}
 
+	if !h.benefits.LogDate(c, date) { // 구독: 요청자 보존 기간 밖 날짜 거부
+		return
+	}
 	items, badDate, err := h.svc.MemberActivity(groupID, date)
 	if badDate {
 		writeJSON(c, http.StatusBadRequest,
@@ -202,6 +221,10 @@ func (h *LocationLogHandler) DailyCounts(c *gin.Context) {
 	if !h.guard.ViewGroup(c, groupID) {
 		return
 	}
+	days, bok := h.benefits.LogDays(c, days) // 구독: 요청자 보존 일수로 제한
+	if !bok {
+		return
+	}
 	res, empty, err := h.svc.DailyCounts(groupID, days)
 	if err != nil {
 		writeJSON(c, http.StatusInternalServerError,
@@ -234,6 +257,10 @@ func (h *LocationLogHandler) DailyCountsSimple(c *gin.Context) {
 	if !h.guard.ViewGroup(c, groupID) {
 		return
 	}
+	days, bok := h.benefits.LogDays(c, days) // 구독: 요청자 보존 일수로 제한
+	if !bok {
+		return
+	}
 	res, empty, err := h.svc.DailyCountsSimple(groupID, days)
 	if err != nil {
 		writeJSON(c, http.StatusInternalServerError,
@@ -261,13 +288,20 @@ func (h *LocationLogHandler) Summary(c *gin.Context) {
 		return
 	}
 	if date := c.Query("date"); date != "" {
+		if !h.benefits.LogDate(c, date) { // 구독: 요청자 보존 기간 밖 날짜 거부
+			return
+		}
 		data := h.svc.SummaryByDate(id, date)
 		writeJSON(c, http.StatusOK, dto.LocationLogSummaryResult{
 			Result: "Y", Data: data, Message: "위치 로그 요약 조회 성공",
 		})
 		return
 	}
-	data, err := h.svc.SummaryByRange(id, c.Query("start_date"), c.Query("end_date"))
+	startQ, endQ, bok := h.benefits.LogRange(c, c.Query("start_date"), c.Query("end_date")) // 구독: 요청자 보존 기간으로 제한
+	if !bok {
+		return
+	}
+	data, err := h.svc.SummaryByRange(id, startQ, endQ)
 	if err != nil {
 		writeJSON(c, http.StatusInternalServerError, gin.H{"detail": err.Error()})
 		return
@@ -287,7 +321,11 @@ func (h *LocationLogHandler) Path(c *gin.Context) {
 	if !h.guard.ViewMember(c, id) {
 		return
 	}
-	data, err := h.svc.Path(id, c.Query("start_date"), c.Query("end_date"))
+	startQ, endQ, bok := h.benefits.LogRange(c, c.Query("start_date"), c.Query("end_date")) // 구독: 요청자 보존 기간으로 제한
+	if !bok {
+		return
+	}
+	data, err := h.svc.Path(id, startQ, endQ)
 	if err != nil {
 		writeJSON(c, http.StatusInternalServerError, gin.H{"detail": err.Error()})
 		return
@@ -317,6 +355,9 @@ func (h *LocationLogHandler) StayTimes(c *gin.Context) {
 	minDuration := parseIntQuery(c, &errs, "min_duration", 5, false, 0, false, 0)
 	if len(errs) > 0 {
 		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
+		return
+	}
+	if !h.benefits.LogDate(c, date) { // 구독: 요청자 보존 기간 밖 날짜 거부
 		return
 	}
 	res, err := h.svc.StayTimes(id, date, minSpeed, maxAcc, minDuration)
@@ -350,6 +391,9 @@ func (h *LocationLogHandler) MapMarkers(c *gin.Context) {
 		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
 		return
 	}
+	if !h.benefits.LogDate(c, date) { // 구독: 요청자 보존 기간 밖 날짜 거부
+		return
+	}
 	res, err := h.svc.MapMarkers(id, date, minSpeed, maxAcc)
 	if err != nil {
 		writeJSON(c, http.StatusInternalServerError, gin.H{"detail": err.Error()})
@@ -378,6 +422,9 @@ func (h *LocationLogHandler) MembersWithLogs(c *gin.Context) {
 		return
 	}
 	if !h.guard.ViewGroup(c, groupID) {
+		return
+	}
+	if !h.benefits.LogDate(c, date) { // 구독: 요청자 보존 기간 밖 날짜 거부
 		return
 	}
 	res, err := h.svc.MembersWithLogs(date)
