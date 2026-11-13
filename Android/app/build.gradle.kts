@@ -106,6 +106,10 @@ android {
             useLegacyPackaging = false
         }
     }
+    testOptions {
+        // 서비스/ViewModel 단위 테스트에서 android.util.Log 호출이 "not mocked"로 실패하지 않게 한다.
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {

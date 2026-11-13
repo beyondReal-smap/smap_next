@@ -24,13 +24,17 @@ object ServiceModule {
         tokenStore: TokenStore
     ): AuthService = AuthService(api, prefs, tokenStore)
 
+    // 그룹 목록/멤버 조회처럼 여러 화면이 동시에 부르는 요청을 하나로 합치기 위해 서비스들이 같은 인스턴스를 공유한다.
     @Provides @Singleton
-    fun provideGroupService(api: SmapApi, authService: AuthService): GroupService =
-        GroupService(api, authService)
+    fun provideRequestCoalescer(): RequestCoalescer = RequestCoalescer()
 
     @Provides @Singleton
-    fun provideHomeService(api: SmapApi, authService: AuthService): HomeService =
-        HomeService(api, authService)
+    fun provideGroupService(api: SmapApi, authService: AuthService, coalescer: RequestCoalescer): GroupService =
+        GroupService(api, authService, coalescer)
+
+    @Provides @Singleton
+    fun provideHomeService(api: SmapApi, authService: AuthService, coalescer: RequestCoalescer): HomeService =
+        HomeService(api, authService, coalescer)
 
     @Provides @Singleton
     fun provideScheduleService(api: SmapApi, authService: AuthService): ScheduleService =

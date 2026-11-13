@@ -121,6 +121,19 @@ class GroupViewModel @Inject constructor(
 
     init {
         loadGroups()
+
+        // 홈·알림 등 다른 화면에서 그룹을 만들거나 참여/탈퇴해도 그룹 탭이 같은 목록을 보여주도록 구독한다.
+        // (이전에는 이벤트를 발행만 하고 구독하지 않아, 그룹 생성 후에도 "아직 그룹이 없습니다"가 남았다.)
+        // 이 ViewModel 자신의 변경도 같은 이벤트를 발행하지만, 같은 시점의 loadGroups()와 겹치면
+        // GroupService가 요청 1건으로 합쳐 주므로 중복 네트워크 호출은 생기지 않는다.
+        viewModelScope.launch {
+            GlobalEventBus.events.collect { event ->
+                if (event is GlobalEvent.GroupsChanged) {
+                    Log.d(TAG, "🔄 [Event] Groups changed event received, refreshing groups")
+                    loadGroups()
+                }
+            }
+        }
     }
 
     // MARK: - Data Loading

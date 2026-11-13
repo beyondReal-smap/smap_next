@@ -30,6 +30,7 @@ import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
@@ -108,8 +109,11 @@ class LocationService : Service() {
 
     // ── Location batching ──────────────────────────────────────────────────
 
-    private val pendingLocations = mutableListOf<CreateLocationLogRequest>()
     private val maxQueueSize = 100
+    // 같은 위치 중복 적재 방지 + 시간순 보존 (PendingLocationQueue.kt)
+    private val pendingQueue = PendingLocationQueue(maxQueueSize)
+    // 동시에 여러 flush(배치 타이머·네트워크 복구·모드 전환·heartbeat)가 겹쳐도 전송은 한 번에 하나씩만 진행한다.
+    private val flushMutex = kotlinx.coroutines.sync.Mutex()
     private var batchJob: Job? = null
     private var heartbeatPendingIntent: PendingIntent? = null
 
@@ -247,6 +251,8 @@ class LocationService : Service() {
             var latestValid: Location? = null
             for (location in result.locations) {
                 if (!isValidCoordinate(location)) continue
+                // 같은 fix가 다시 전달되면(콜백 재등록·모드 전환 직후 등) 같은 위치를 두 번 올리지 않는다.
+                if (isSameFix(lastLocation, location)) continue
 
                 // Build request and enqueue all valid locations
                 val request = buildLocationLogRequest(location) ?: continue
@@ -535,14 +541,13 @@ class LocationService : Service() {
     // ── Batching ───────────────────────────────────────────────────────────
 
     private fun enqueueLocation(data: CreateLocationLogRequest) {
-        synchronized(pendingLocations) {
-            pendingLocations.add(data)
-            if (pendingLocations.size > maxQueueSize) {
-                pendingLocations.removeAt(0)  // evict oldest
-            }
-        }
-        persistPendingLocations()
+        // 이미 같은 위치가 대기 중이면 쌓지 않는다(중복 업로드 방지). 용량 초과 시 오래된 것부터 버리는 정책은 큐가 처리.
+        if (pendingQueue.add(data)) persistPendingLocations()
     }
+
+    private fun isSameFix(prev: Location?, next: Location): Boolean =
+        prev != null && prev.time == next.time &&
+            prev.latitude == next.latitude && prev.longitude == next.longitude
 
     private fun startBatchTimer() {
         batchJob?.cancel()
@@ -716,15 +721,22 @@ class LocationService : Service() {
             Log.d(TAG, "Flush deferred ${rateLimitedUntilMs - now}ms (rate-limited)")
             return
         }
-        val toSend: List<CreateLocationLogRequest>
-        synchronized(pendingLocations) {
-            if (pendingLocations.isEmpty()) return
-            toSend = pendingLocations.toList()
-            pendingLocations.clear()
-        }
-        persistPendingLocations()
-        toSend.forEach { request ->
-            serviceScope.launch { sendLocationToServer(request) }
+        if (pendingQueue.size == 0) return
+        // 이전에는 큐의 N건을 항목마다 코루틴으로 한꺼번에 쏴서 같은 시각에 N건이 동시에 나갔다.
+        // 이제는 하나의 전송 작업이 시간순으로 한 건씩 보내고, 일시 실패 시 나머지를 큐에 되돌리고 멈춘다.
+        serviceScope.launch {
+            flushMutex.withLock {
+                // 락을 기다리는 동안 429 보류가 걸렸을 수 있다.
+                if (System.currentTimeMillis() < rateLimitedUntilMs) return@withLock
+                val toSend = pendingQueue.drain()
+                if (toSend.isEmpty()) return@withLock
+                persistPendingLocations()
+                val leftover = uploadInOrder(toSend) { sendLocationToServer(it) }
+                if (leftover.isNotEmpty()) {
+                    pendingQueue.addFirst(leftover)
+                    persistPendingLocations()
+                }
+            }
         }
     }
 
@@ -741,8 +753,7 @@ class LocationService : Service() {
      * 잘못된 위치를 "지금 시각"으로 반복 전송해 활동로그를 오염시키는 문제 방지.
      */
     private fun sendHeartbeat() {
-        val hadPending: Boolean
-        synchronized(pendingLocations) { hadPending = pendingLocations.isNotEmpty() }
+        val hadPending = pendingQueue.size > 0
 
         flushPendingLocations()
         if (hadPending) return
@@ -754,7 +765,11 @@ class LocationService : Service() {
             return
         }
         val request = buildLocationLogRequest(loc, useNow = true) ?: return
-        serviceScope.launch { sendLocationToServer(request) }
+        serviceScope.launch {
+            flushMutex.withLock {
+                if (sendLocationToServer(request) == UploadOutcome.RETRY_LATER) enqueueLocation(request)
+            }
+        }
     }
 
     // ── Build request model ────────────────────────────────────────────────
@@ -809,7 +824,7 @@ class LocationService : Service() {
 
     // ── Server communication (Retrofit) ────────────────────────────────────
 
-    private suspend fun sendLocationToServer(request: CreateLocationLogRequest) {
+    private suspend fun sendLocationToServer(request: CreateLocationLogRequest): UploadOutcome {
         try {
             val response = smapApi.createLocationLog(request)
             if (response.isSuccessful) {
@@ -818,6 +833,7 @@ class LocationService : Service() {
                     persistAuthFailureCount()
                 }
                 Log.d(TAG, "Location sent: (${request.mltLat}, ${request.mltLong}) mode=${currentMode.name}")
+                return UploadOutcome.DELIVERED
             } else {
                 Log.w(TAG, "Location upload failed: HTTP ${response.code()}")
                 when (response.code()) {
@@ -831,14 +847,17 @@ class LocationService : Service() {
                             // 스플래시/메인이 /members/me 등으로 세션 유효성을 재확인한다.
                             Log.w(TAG, "Auth failed $maxAuthFailures times — stopping service (token kept)")
                             stopSelf()
+                            // 서비스가 멈추는 중이므로 이 항목부터 나머지를 큐에 되돌려(디스크 저장) 더 보내지 않는다.
+                            return UploadOutcome.RETRY_LATER
                         } else {
                             Log.w(TAG, "Auth failed ($consecutiveAuthFailures/$maxAuthFailures) — will retry")
-                            enqueueLocation(request)
+                            return UploadOutcome.RETRY_LATER
                         }
                     }
                     403 -> {
                         // 403 may be rate-limit or authorization issue, not necessarily auth failure
                         Log.w(TAG, "403 Forbidden — dropping location, not clearing token")
+                        return UploadOutcome.DROPPED
                     }
                     429 -> {
                         // Rate-limit. Retry-After 헤더(seconds 또는 HTTP-date)를 우선하고,
@@ -847,18 +866,22 @@ class LocationService : Service() {
                             ?: 60_000L
                         rateLimitedUntilMs = System.currentTimeMillis() + retryAfterMs
                         Log.w(TAG, "429 Too Many Requests — backing off for ${retryAfterMs}ms")
-                        enqueueLocation(request)
+                        return UploadOutcome.RETRY_LATER
                     }
                     in 500..599 -> {
-                        // Re-enqueue on server error for retry
-                        enqueueLocation(request)
+                        // 서버 오류: 호출자가 이 항목부터 큐에 되돌려 재시도한다
+                        return UploadOutcome.RETRY_LATER
                     }
                 }
+                // 그 밖의 4xx는 기존과 같이 재시도하지 않고 버린다
+                return UploadOutcome.DROPPED
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.w(TAG, "Location upload error: ${e.message}")
-            // Re-enqueue on network error for retry
-            enqueueLocation(request)
+            // 네트워크 오류: 호출자가 큐에 되돌려 재시도한다
+            return UploadOutcome.RETRY_LATER
         }
     }
 
@@ -959,7 +982,7 @@ class LocationService : Service() {
 
     private fun persistPendingLocations() {
         val prefs = getSharedPreferences(QUEUE_PREFS, Context.MODE_PRIVATE)
-        val queueSnapshot = synchronized(pendingLocations) { pendingLocations.toList() }
+        val queueSnapshot = pendingQueue.snapshot()
         prefs.edit().putString(KEY_PENDING_QUEUE, json.encodeToString(queueSnapshot)).apply()
     }
 
@@ -969,10 +992,7 @@ class LocationService : Service() {
         runCatching {
             json.decodeFromString<List<CreateLocationLogRequest>>(raw)
         }.onSuccess { restored ->
-            synchronized(pendingLocations) {
-                pendingLocations.clear()
-                pendingLocations.addAll(restored.takeLast(maxQueueSize))
-            }
+            pendingQueue.restore(restored.takeLast(maxQueueSize))
         }.onFailure {
             Log.w(TAG, "Failed to restore pending queue", it)
         }

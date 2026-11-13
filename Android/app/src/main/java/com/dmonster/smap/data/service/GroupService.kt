@@ -12,7 +12,8 @@ import com.dmonster.smap.data.model.*
  */
 class GroupService(
     private val api: SmapApi,
-    private val authService: AuthService
+    private val authService: AuthService,
+    private val coalescer: RequestCoalescer
 ) {
 
     companion object {
@@ -22,20 +23,21 @@ class GroupService(
     /**
      * GET /groups/current-user
      */
-    suspend fun getGroups(): List<SmapGroup> {
+    suspend fun getGroups(): List<SmapGroup> = coalescer.share(RequestKeys.GROUPS) {
         val groups = api.getCurrentUserGroups()
         Log.d(TAG, "[getGroups] ${groups.size} groups loaded")
-        return groups
+        groups
     }
 
     /**
      * GET /group-members/member/{groupId}
      */
-    suspend fun getGroupMembers(groupId: Int): List<SmapGroupMember> {
-        val members = api.getGroupMembers(groupId)
-        Log.d(TAG, "[getGroupMembers] ${members.size} members loaded")
-        return members
-    }
+    suspend fun getGroupMembers(groupId: Int): List<SmapGroupMember> =
+        coalescer.share(RequestKeys.members(groupId)) {
+            val members = api.getGroupMembers(groupId)
+            Log.d(TAG, "[getGroupMembers] ${members.size} members loaded")
+            members
+        }
 
     /**
      * GET /groups/{groupId}/stats
@@ -74,6 +76,7 @@ class GroupService(
             sgtShow = "Y"
         )
         val group = api.createGroup(body)
+        coalescer.invalidate() // 이후 그룹 목록 조회가 생성 전 요청에 합류하지 않게
         Log.d(TAG, "[createGroup] created: ${group.sgtTitle}")
         return group
     }
@@ -87,6 +90,7 @@ class GroupService(
             sgtMemo = memo ?: ""
         )
         api.updateGroup(groupId, body)
+        coalescer.invalidate()
         Log.d(TAG, "[updateGroup] updated")
         return true
     }
@@ -96,6 +100,7 @@ class GroupService(
      */
     suspend fun deleteGroup(groupId: Int): Boolean {
         api.deleteGroup(groupId, DeleteGroupRequest())
+        coalescer.invalidate()
         Log.d(TAG, "[deleteGroup] deleted")
         return true
     }
@@ -113,6 +118,7 @@ class GroupService(
             sgtCode = code.uppercase()
         )
         api.joinGroupByCode(body)
+        coalescer.invalidate()
         Log.d(TAG, "[joinGroupByCode] joined")
         return true
     }
@@ -126,6 +132,7 @@ class GroupService(
             isLeader = isLeader
         )
         api.updateMemberRole(groupId, body)
+        coalescer.invalidate()
         return true
     }
 
@@ -134,6 +141,7 @@ class GroupService(
      */
     suspend fun removeMember(groupId: Int, memberId: Int): Boolean {
         api.removeMember(groupId, memberId)
+        coalescer.invalidate()
         return true
     }
 }

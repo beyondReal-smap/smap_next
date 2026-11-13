@@ -615,12 +615,16 @@ class HomeService {
 
     /// 내 그룹 목록 가져오기
     func getMyGroups() async throws -> [SmapGroup] {
-        try await apiClient.request(.getCurrentUserGroups, token: token)
+        try await InFlightRequestCoalescer.shared.share(InFlightRequestKey.groups) { [apiClient, token] in
+            try await apiClient.request(.getCurrentUserGroups, token: token)
+        }
     }
 
     /// 그룹 멤버 및 위치 정보 가져오기
     func getGroupMembers(sgtIdx: Int) async throws -> [SmapGroupMember] {
-        try await apiClient.request(.getGroupMembers(sgtIdx: sgtIdx), token: token)
+        try await InFlightRequestCoalescer.shared.share(InFlightRequestKey.members(sgtIdx)) { [apiClient, token] in
+            try await apiClient.request(.getGroupMembers(sgtIdx: sgtIdx), token: token)
+        }
     }
 
     /// 그룹 일정 목록 가져오기 (홈 화면용 — 간략 응답)
