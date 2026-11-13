@@ -1,13 +1,10 @@
 package com.dmonster.smap.ui.activitylog
 
-import com.dmonster.smap.ui.components.SmapEmptyState
-import androidx.activity.compose.BackHandler
 
 import com.dmonster.smap.AppConstants
 import com.dmonster.smap.BuildConfig
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -23,15 +20,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.dmonster.smap.ui.common.rememberSmapHaptics
 import com.dmonster.smap.ui.theme.ActivityLogColors
 import com.dmonster.smap.ui.theme.BrandColors
-import com.dmonster.smap.ui.theme.SmapSize
-import com.dmonster.smap.ui.theme.SuiteFont
-import com.dmonster.smap.ui.myplace.FloatingActionPlaceButton
+import com.dmonster.smap.ui.components.GroupPickerSheet
+import com.dmonster.smap.ui.components.MapTopControls
+import com.dmonster.smap.ui.components.SmapMapSheetScaffold
 import com.dmonster.smap.ui.home.MapLoadingOverlay
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.awaitCancellation
@@ -46,7 +39,7 @@ import com.dmonster.smap.R
 /**
  * 활동로그 화면 - 지도 + 이동경로 + 요약 (iOS 스타일)
  */
-@OptIn(ExperimentalNaverMapApi::class)
+@OptIn(ExperimentalNaverMapApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ActivityLogScreen(
     viewModel: ActivityLogViewModel = hiltViewModel(),
@@ -82,9 +75,6 @@ fun ActivityLogScreen(
     
     val isMapLoading = isLoading
     
-    // UI States — showGroupSelector 는 사이드바 내부에서 직접 제어하므로 여기서 구독 불필요
-    val showMemberSidebar by viewModel.showMemberSidebar.collectAsState()
-    BackHandler(enabled = isVisible && showMemberSidebar) { viewModel.hideMemberSidebar() }
     val memberActivityStats by viewModel.memberActivityStats.collectAsState()
     val selectedDate by viewModel.selectedDate.collectAsState()
     val stayTimes by viewModel.stayTimes.collectAsState()
@@ -163,310 +153,275 @@ fun ActivityLogScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        // 1. Map Layer
-        NaverMap(
-            modifier = Modifier.fillMaxSize(),
-            cameraPositionState = cameraPositionState,
-            uiSettings = MapUiSettings(
-                isZoomControlEnabled = false,
-                isLocationButtonEnabled = false,
-                isLogoClickEnabled = false,
-                // 오른쪽 아래 떠 있는 멤버 버튼과 축척 막대가 겹쳐 둘 다 가려졌다. 가족 위치 확인에는
-                // 축척이 거의 쓰이지 않아 축척만 끈다(NAVER 로고는 약관상 유지, 왼쪽 아래라 겹치지 않음).
-                isScaleBarEnabled = false
-            )
-        ) {
-            // Path Overlay
-            if (totalPoints >= 2) {
-                // 1. Full Path (Always visible)
-                androidx.compose.runtime.key(totalPoints) {
-                    GradientPathOverlay(
-                        coords = allCoords,
-                        width = 6.dp
-                    )
-                }
-                    
-                    // Stay Markers
-                    val stayContext = androidx.compose.ui.platform.LocalContext.current
-                    val stayDensity = stayContext.resources.displayMetrics.density
-                    
-                    mapStayTimes.forEachIndexed { index, stay ->
-                        val stayLat = stay.stayLatitude
-                        val stayLng = stay.stayLongitude
-                        if (stayLat != null && stayLng != null && stayLat != 0.0 && stayLng != 0.0) {
-                            val duration = stay.duration
-                            val colorInt = when {
-                                duration >= 300 -> ActivityLogColors.StayLong.toArgb()
-                                duration >= 120 -> ActivityLogColors.StayMedium.toArgb()
-                                duration >= 60 -> ActivityLogColors.StayShort.toArgb()
-                                duration >= 30 -> ActivityLogColors.StayBrief.toArgb()
-                                else -> ActivityLogColors.StayInstant.toArgb()
-                            }
-                            
-                            val baseSizePx = when {
-                                duration >= 300 -> 40f
-                                duration >= 120 -> 36f
-                                duration >= 60 -> 32f
-                                duration >= 30 -> 28f
-                                else -> 26f
-                            } * stayDensity
+    // 지도 시트 상태 / 그룹 선택
+    val sheetScaffoldState = rememberBottomSheetScaffoldState(
+        bottomSheetState = rememberStandardBottomSheetState(
+            initialValue = SheetValue.PartiallyExpanded,
+            skipHiddenState = true
+        )
+    )
+    val scope = rememberCoroutineScope()
+    var showGroupPicker by remember { mutableStateOf(false) }
+    val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
-                            val markerBitmap = remember(stay.startTime, stay.endTime, colorInt, baseSizePx) {
-                                ActivityLogMarkerUtils.createStayMarkerBitmap(
-                                    stayContext,
-                                    index + 1,
-                                    stay.formattedDuration,
-                                    colorInt,
-                                    baseSizePx
+    Box(modifier = Modifier.fillMaxSize()) {
+        SmapMapSheetScaffold(
+            peekHeight = ActivityLogSheetPeekHeight,
+            scaffoldState = sheetScaffoldState,
+            snackbarHostState = snackbarHostState,
+            sheetContent = {
+                ActivityLogSheetContent(
+                    members = members,
+                    selectedMember = selectedMember,
+                    currentUserIdx = viewModel.getCurrentUserIdx(),
+                    selectedDate = selectedDate,
+                    summary = locationSummary,
+                    hasLogs = locationLogs.isNotEmpty(),
+                    isLoadingLogs = isLoadingLogs,
+                    activityStats = memberActivityStats,
+                    subscriptionStatus = subscriptionStatus,
+                    onSelectMember = {
+                        viewModel.selectMember(it)
+                        scope.launch { sheetScaffoldState.bottomSheetState.partialExpand() }
+                    },
+                    onSelectDate = { viewModel.selectDate(it) },
+                    onLockedDate = { viewModel.onLockedDateClicked(it) }
+                )
+            },
+            overlay = {
+                MapTopControls(
+                    groupName = selectedGroup?.sgtTitle,
+                    onGroupClick = { showGroupPicker = true }
+                )
+            }
+        ) {
+            NaverMap(
+                modifier = Modifier.fillMaxSize(),
+                cameraPositionState = cameraPositionState,
+                uiSettings = MapUiSettings(
+                    isZoomControlEnabled = false,
+                    isLocationButtonEnabled = false,
+                    isLogoClickEnabled = false,
+                    // 오른쪽 아래 떠 있는 멤버 버튼과 축척 막대가 겹쳐 둘 다 가려졌다. 가족 위치 확인에는
+                    // 축척이 거의 쓰이지 않아 축척만 끈다(NAVER 로고는 약관상 유지, 왼쪽 아래라 겹치지 않음).
+                    isScaleBarEnabled = false
+                ),
+                // 위 조작 줄과 아래 접힌 시트만큼 비워 경로가 가려지지 않게 한다.
+                contentPadding = PaddingValues(top = statusBarTop + 64.dp, bottom = ActivityLogSheetPeekHeight)
+            ) {
+                // Path Overlay
+                if (totalPoints >= 2) {
+                    // 1. Full Path (Always visible)
+                    androidx.compose.runtime.key(totalPoints) {
+                        GradientPathOverlay(
+                            coords = allCoords,
+                            width = 6.dp
+                        )
+                    }
+                    
+                        // Stay Markers
+                        val stayContext = androidx.compose.ui.platform.LocalContext.current
+                        val stayDensity = stayContext.resources.displayMetrics.density
+                    
+                        mapStayTimes.forEachIndexed { index, stay ->
+                            val stayLat = stay.stayLatitude
+                            val stayLng = stay.stayLongitude
+                            if (stayLat != null && stayLng != null && stayLat != 0.0 && stayLng != 0.0) {
+                                val duration = stay.duration
+                                val colorInt = when {
+                                    duration >= 300 -> ActivityLogColors.StayLong.toArgb()
+                                    duration >= 120 -> ActivityLogColors.StayMedium.toArgb()
+                                    duration >= 60 -> ActivityLogColors.StayShort.toArgb()
+                                    duration >= 30 -> ActivityLogColors.StayBrief.toArgb()
+                                    else -> ActivityLogColors.StayInstant.toArgb()
+                                }
+                            
+                                val baseSizePx = when {
+                                    duration >= 300 -> 40f
+                                    duration >= 120 -> 36f
+                                    duration >= 60 -> 32f
+                                    duration >= 30 -> 28f
+                                    else -> 26f
+                                } * stayDensity
+
+                                val markerBitmap = remember(stay.startTime, stay.endTime, colorInt, baseSizePx) {
+                                    ActivityLogMarkerUtils.createStayMarkerBitmap(
+                                        stayContext,
+                                        index + 1,
+                                        stay.formattedDuration,
+                                        colorInt,
+                                        baseSizePx
+                                    )
+                                }
+
+                                Marker(
+                                    state = MarkerState(position = LatLng(stayLat, stayLng)),
+                                    icon = OverlayImage.fromBitmap(markerBitmap),
+                                    anchor = androidx.compose.ui.geometry.Offset(0.2f, 0.5f), // Adjusted anchor based on circle position in bitmap
+                                    zIndex = 70
                                 )
                             }
-
+                        }
+                    
+                        // 2. Start Marker (iOS: "S" green circle)
+                        if (allCoords.isNotEmpty()) {
                             Marker(
-                                state = MarkerState(position = LatLng(stayLat, stayLng)),
-                                icon = OverlayImage.fromBitmap(markerBitmap),
-                                anchor = androidx.compose.ui.geometry.Offset(0.2f, 0.5f), // Adjusted anchor based on circle position in bitmap
-                                zIndex = 70
+                                state = MarkerState(position = allCoords.first()),
+                                icon = OverlayImage.fromResource(R.drawable.ic_marker_start),
+                                width = 28.dp,
+                                height = 28.dp,
+                                zIndex = 60
                             )
                         }
-                    }
-                    
-                    // 2. Start Marker (iOS: "S" green circle)
-                    if (allCoords.isNotEmpty()) {
-                        Marker(
-                            state = MarkerState(position = allCoords.first()),
-                            icon = OverlayImage.fromResource(R.drawable.ic_marker_start),
-                            width = 28.dp,
-                            height = 28.dp,
-                            zIndex = 60
-                        )
-                    }
 
-                    // 3. End Marker (iOS: "E" red circle) - higher zIndex than start
-                    if (allCoords.isNotEmpty()) {
-                        Marker(
-                            state = MarkerState(position = allCoords.last()),
-                            icon = OverlayImage.fromResource(R.drawable.ic_marker_end),
-                            width = 28.dp,
-                            height = 28.dp,
-                            zIndex = 61
-                        )
-                    }
-                    
-                    // 4. Current Position Marker & Camera Control (Native for Performance)
-                    val context = androidx.compose.ui.platform.LocalContext.current
-                    val density = context.resources.displayMetrics.density
-                    
-                    MapEffect(validLogs) { map ->
-                        if (totalPoints < 1) return@MapEffect
-                        
-                        // Current position marker (blue circle)
-                        val marker = com.naver.maps.map.overlay.Marker()
-                        marker.zIndex = 100
-                        marker.width = (24 * density).toInt()
-                        marker.height = (24 * density).toInt()
+                        // 3. End Marker (iOS: "E" red circle) - higher zIndex than start
                         if (allCoords.isNotEmpty()) {
-                            marker.position = allCoords.first()
+                            Marker(
+                                state = MarkerState(position = allCoords.last()),
+                                icon = OverlayImage.fromResource(R.drawable.ic_marker_end),
+                                width = 28.dp,
+                                height = 28.dp,
+                                zIndex = 61
+                            )
                         }
-                        marker.map = map
+                    
+                        // 4. Current Position Marker & Camera Control (Native for Performance)
+                        val context = androidx.compose.ui.platform.LocalContext.current
+                        val density = context.resources.displayMetrics.density
+                    
+                        MapEffect(validLogs) { map ->
+                            if (totalPoints < 1) return@MapEffect
                         
-                        // Info capsule marker (time + speed)
-                        val infoMarker = com.naver.maps.map.overlay.Marker()
-                        infoMarker.zIndex = 101
-                        infoMarker.anchor = android.graphics.PointF(0.5f, 1.0f) // Bottom center
-                        if (allCoords.isNotEmpty()) {
-                            infoMarker.position = allCoords.first()
-                        }
-                        infoMarker.map = map
+                            // Current position marker (blue circle)
+                            val marker = com.naver.maps.map.overlay.Marker()
+                            marker.zIndex = 100
+                            marker.width = (24 * density).toInt()
+                            marker.height = (24 * density).toInt()
+                            if (allCoords.isNotEmpty()) {
+                                marker.position = allCoords.first()
+                            }
+                            marker.map = map
                         
-                        val currentIcon = OverlayImage.fromResource(R.drawable.ic_marker_current_circle)
+                            // Info capsule marker (time + speed)
+                            val infoMarker = com.naver.maps.map.overlay.Marker()
+                            infoMarker.zIndex = 101
+                            infoMarker.anchor = android.graphics.PointF(0.5f, 1.0f) // Bottom center
+                            if (allCoords.isNotEmpty()) {
+                                infoMarker.position = allCoords.first()
+                            }
+                            infoMarker.map = map
                         
-                        // Capture current coords and logs for use in flow
-                        val capturedCoords = allCoords
-                        val capturedLogs = validLogs
-                        val capturedTotalPoints = totalPoints
+                            val currentIcon = OverlayImage.fromResource(R.drawable.ic_marker_current_circle)
                         
-                        val job = launch {
-                            // Watch slider value changes
-                            snapshotFlow { uiSliderValue }
-                                .collect { value ->
-                                    if (!currentVisibility.value) return@collect
-                                    if (capturedTotalPoints < 1) return@collect
+                            // Capture current coords and logs for use in flow
+                            val capturedCoords = allCoords
+                            val capturedLogs = validLogs
+                            val capturedTotalPoints = totalPoints
+                        
+                            val job = launch {
+                                // Watch slider value changes
+                                snapshotFlow { uiSliderValue }
+                                    .collect { value ->
+                                        if (!currentVisibility.value) return@collect
+                                        if (capturedTotalPoints < 1) return@collect
                                     
-                                    val idx = ((capturedTotalPoints - 1) * (value / 100.0)).toInt()
-                                        .coerceIn(0, capturedTotalPoints - 1)
+                                        val idx = ((capturedTotalPoints - 1) * (value / 100.0)).toInt()
+                                            .coerceIn(0, capturedTotalPoints - 1)
                                     
-                                    if (idx < capturedCoords.size && idx < capturedLogs.size) {
-                                        val pos = capturedCoords[idx]
-                                        val currentLog = capturedLogs[idx]
+                                        if (idx < capturedCoords.size && idx < capturedLogs.size) {
+                                            val pos = capturedCoords[idx]
+                                            val currentLog = capturedLogs[idx]
                                         
-                                        // Update position marker
-                                        marker.position = pos
-                                        marker.icon = currentIcon
+                                            // Update position marker
+                                            marker.position = pos
+                                            marker.icon = currentIcon
                                         
-                                        // Extract time from GPS time string
-                                        val timeStr = currentLog.mltGpsTime?.let { gpsTime ->
-                                            val cleanedTime = gpsTime.replace("Z", "").split(".").firstOrNull() ?: gpsTime
-                                            if (cleanedTime.length >= 16) {
-                                                cleanedTime.substring(11, 16)
-                                            } else {
-                                                "--:--"
-                                            }
-                                        } ?: "--:--"
+                                            // Extract time from GPS time string
+                                            val timeStr = currentLog.mltGpsTime?.let { gpsTime ->
+                                                val cleanedTime = gpsTime.replace("Z", "").split(".").firstOrNull() ?: gpsTime
+                                                if (cleanedTime.length >= 16) {
+                                                    cleanedTime.substring(11, 16)
+                                                } else {
+                                                    "--:--"
+                                                }
+                                            } ?: "--:--"
                                         
-                                        val speed = currentLog.mltSpeed ?: 0.0
-                                        val speedStr = String.format("%.1f km/h", speed)
+                                            val speed = currentLog.mltSpeed ?: 0.0
+                                            val speedStr = String.format("%.1f km/h", speed)
                                         
-                                        // Update info marker
-                                        infoMarker.position = pos
-                                        val infoBitmap = ActivityLogMarkerUtils.createCurrentPositionInfoBitmap(context, timeStr, speedStr)
-                                        infoMarker.icon = OverlayImage.fromBitmap(infoBitmap)
-                                        infoMarker.width = infoBitmap.width
-                                        infoMarker.height = infoBitmap.height
+                                            // Update info marker
+                                            infoMarker.position = pos
+                                            val infoBitmap = ActivityLogMarkerUtils.createCurrentPositionInfoBitmap(context, timeStr, speedStr)
+                                            infoMarker.icon = OverlayImage.fromBitmap(infoBitmap)
+                                            infoMarker.width = infoBitmap.width
+                                            infoMarker.height = infoBitmap.height
                                         
-                                        // Always move camera to follow slider position (match iOS behavior)
-                                        val update = CameraUpdate.scrollTo(pos)
-                                        update.animate(com.naver.maps.map.CameraAnimation.None)
-                                        map.moveCamera(update)
+                                            // Always move camera to follow slider position (match iOS behavior)
+                                            val update = CameraUpdate.scrollTo(pos)
+                                            update.animate(com.naver.maps.map.CameraAnimation.None)
+                                            map.moveCamera(update)
+                                        }
                                     }
-                                }
-                        }
+                            }
                         
-                        try {
-                            awaitCancellation()
-                        } finally {
-                            marker.map = null
-                            infoMarker.map = null
-                            job.cancel()
+                            try {
+                                awaitCancellation()
+                            } finally {
+                                marker.map = null
+                                infoMarker.map = null
+                                job.cancel()
+                            }
+                        }
+                    
+                        // Camera Follow Logic removed (Handled by snapshotFlow above)
+                    }
+                }
+
+            // 4. Path Slider Overlay
+            AnimatedVisibility(
+                visible = locationLogs.isNotEmpty(),
+                enter = fadeIn() + slideInVertically { it },
+                exit = fadeOut() + slideOutVertically { it },
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 16.dp, bottom = ActivityLogSheetPeekHeight + 12.dp)
+                    .zIndex(8f)
+            ) {
+                PathSlider(
+                    sliderValue = uiSliderValue.toDouble(),
+                    isDragging = isSliderDragging,
+                    onValueChange = {
+                        if (BuildConfig.DEBUG) android.util.Log.d("ActivityLogScreen", "PathSlider onValueChange: $it")
+                        uiSliderValue = it.toFloat()
+                    },
+                    onDraggingChange = { dragging ->
+                        if (BuildConfig.DEBUG) android.util.Log.d("ActivityLogScreen", "PathSlider onDraggingChange: $dragging")
+                        if (isLocalDragging != dragging) {
+                            isLocalDragging = dragging
+                            viewModel.setSliderDragging(dragging)
+                            if (!dragging) {
+                                viewModel.setSliderValue(uiSliderValue.toDouble())
+                            }
                         }
                     }
-                    
-                    // Camera Follow Logic removed (Handled by snapshotFlow above)
-                }
+                )
             }
         
-        // 2. Header Overlay
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-        ) {
-            ActivityLogHeader()
         }
-        
-        // 3. Floating Summary Card Overlay
-        AnimatedVisibility(
-            visible = selectedMember != null && !showMemberSidebar,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .statusBarsPadding()
-                // 공용 머리글 높이(56dp) + 간격 12dp
-                .padding(top = SmapSize.topBarHeight + 12.dp)
-        ) {
-            ActivityLogFloatingCard(
-                member = selectedMember,
-                displayDate = viewModel.getFormattedDate(),
-                summary = locationSummary,
-                isLoading = isLoadingLogs,
-                onClick = { viewModel.toggleMemberSidebar() }
-            )
-        }
-        
-        // 4. Path Slider Overlay
-        AnimatedVisibility(
-            visible = locationLogs.isNotEmpty() && !showMemberSidebar,
-            enter = fadeIn() + slideInVertically { it },
-            exit = fadeOut() + slideOutVertically { it },
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(start = 16.dp, bottom = 20.dp)
-                .zIndex(8f)
-        ) {
-            PathSlider(
-                sliderValue = uiSliderValue.toDouble(),
-                isDragging = isSliderDragging,
-                onValueChange = {
-                    if (BuildConfig.DEBUG) android.util.Log.d("ActivityLogScreen", "PathSlider onValueChange: $it")
-                    uiSliderValue = it.toFloat()
-                },
-                onDraggingChange = { dragging ->
-                    if (BuildConfig.DEBUG) android.util.Log.d("ActivityLogScreen", "PathSlider onDraggingChange: $dragging")
-                    if (isLocalDragging != dragging) {
-                        isLocalDragging = dragging
-                        viewModel.setSliderDragging(dragging)
-                        if (!dragging) {
-                            viewModel.setSliderValue(uiSliderValue.toDouble())
-                        }
-                    }
-                }
-            )
-        }
-        
-        // 5. FAB Overlay (Members Selection)
-        AnimatedVisibility(
-            visible = !showMemberSidebar,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 20.dp, bottom = 20.dp)
-                .zIndex(10f)
-        ) {
-            FloatingActionPlaceButton(
-                count = members.size,
-                onClick = { viewModel.toggleMemberSidebar() }
-            )
-        }
-        
-        // 6. Sidebar Overlay
-        // 6. Sidebar Overlay System
-        
-        // 6.1 Dim Overlay (Fade In/Out)
-        AnimatedVisibility(
-            visible = showMemberSidebar,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier.zIndex(5f)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.5f))
-                    .clickable { viewModel.hideMemberSidebar() }
-            )
-        }
-        
-        // 6.2 Sidebar Content (Slide In/Out)
-        AnimatedVisibility(
-            visible = showMemberSidebar,
-            enter = slideInHorizontally { -it } + fadeIn(),
-            exit = slideOutHorizontally { -it } + fadeOut(),
-            modifier = Modifier.zIndex(15f) // Ensure it is above everything
-        ) {
-            ActivityMemberSidebar(
+
+        if (showGroupPicker) {
+            GroupPickerSheet(
                 groups = groups,
-                selectedGroup = selectedGroup,
-                members = members,
-                selectedMember = selectedMember,
-                currentUserIdx = viewModel.getCurrentUserIdx(),
-                selectedDate = selectedDate,
-                activityStats = memberActivityStats,
-                onGroupSelect = { viewModel.selectGroup(it) },
-                onMemberSelect = { viewModel.selectMember(it) },
-                onMemberAndDateSelect = { member, date -> viewModel.selectMemberAndDate(member, date) },
-                onClose = { viewModel.hideMemberSidebar() },
-                subscriptionStatus = subscriptionStatus,
-                onLockedDateClick = { date -> viewModel.onLockedDateClicked(date) }
+                selectedGroupId = selectedGroup?.sgtIdx,
+                onSelect = { viewModel.selectGroup(it) },
+                onDismiss = { showGroupPicker = false }
             )
         }
-        
+
         // 조회 실패 — "활동 데이터 없음"과 구분해 다시 시도 가능하게 한다(지도는 유지).
         if (loadFailed && !isLoading && !isLoadingLogs && !isMapLoading) {
             Box(
-                modifier = Modifier.fillMaxSize().zIndex(5f),
+                modifier = Modifier.fillMaxSize().padding(top = statusBarTop + 64.dp, bottom = ActivityLogSheetPeekHeight).zIndex(5f),
                 contentAlignment = Alignment.Center
             ) {
                 SmapErrorState(
@@ -480,27 +435,6 @@ fun ActivityLogScreen(
             }
         }
 
-        // Empty state overlay for map when no location data — 2줄 가이드 패턴
-        if (!loadFailed && locationLogs.isEmpty() && selectedMember != null && !isLoading && !isLoadingLogs && !isMapLoading) {
-            Box(
-                modifier = Modifier.fillMaxSize().zIndex(5f),
-                contentAlignment = Alignment.Center
-            ) {
-                // 반투명 큰 원 위에 글자를 얹던 방식은 뒤 지도 글자와 섞여 읽기 어려웠다.
-                // 바로 위 조회 실패 상태와 같은 불투명 카드 + 공용 빈 상태로 맞춘다.
-                SmapEmptyState(
-                    title = "이 날은 활동 기록이 없어요",
-                    description = "다른 날짜나 멤버를 선택해 보세요.",
-                    icon = Icons.AutoMirrored.Filled.DirectionsWalk,
-                    // 상태 뷰는 주어진 영역을 채우므로 높이를 정해 카드 크기를 고정한다(오류 카드와 같은 크기).
-                    modifier = Modifier
-                        .fillMaxWidth(0.85f)
-                        .height(240.dp)
-                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
-                )
-            }
-        }
-        
         // 7. Map Loading Overlay
         if (isMapLoading) {
             Box(modifier = Modifier.fillMaxSize().zIndex(20f)) {
@@ -514,20 +448,13 @@ fun ActivityLogScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .zIndex(25f)
-                    .background(Color.White.copy(alpha = 0.5f)),
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator(color = BrandColors.Primary)
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             }
         }
 
-        // Snackbar Host (inside main Box with proper zIndex)
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .zIndex(100f)
-        )
 
         retentionExceededMessage?.let { message ->
             AlertDialog(

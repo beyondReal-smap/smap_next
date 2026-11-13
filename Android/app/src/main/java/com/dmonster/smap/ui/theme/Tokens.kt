@@ -25,6 +25,8 @@ object SmapRadius {
     val sm = 8.dp
     val md = 12.dp
     val lg = 16.dp
+    /** 아래에서 올라오는 시트 위쪽 모서리 */
+    val sheet = 28.dp
 }
 
 /** 크기 토큰 — 터치 타깃과 공용 컴포넌트 높이. */

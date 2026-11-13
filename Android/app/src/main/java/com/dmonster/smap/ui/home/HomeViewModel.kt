@@ -305,6 +305,11 @@ class HomeViewModel @Inject constructor(
         _showGroupCreationModal.value = false
     }
 
+    /** 그룹 선택 시트의 "새 그룹 만들기"에서 연다(이전에는 그룹이 하나도 없을 때만 자동으로 열렸다). */
+    fun openGroupCreationModal() {
+        _showGroupCreationModal.value = true
+    }
+
     /**
      * 선택된 그룹의 멤버 및 일정 로드
      */

@@ -11,27 +11,28 @@ import androidx.compose.ui.graphics.Color
  * 라이트 모드 색상 스키마
  */
 private val LightColorScheme = lightColorScheme(
+    // SMAP 2.0 — 브랜드 남색 하나 + 차가운 회색 계열. 화면 배경은 연회색, 묶음(카드·시트)은 흰색으로 층을 나눈다.
     primary = BrandColors.Primary,
     onPrimary = Color.White,
-    primaryContainer = BrandColors.Primary.copy(alpha = 0.1f),
+    primaryContainer = Color(0xFFE8EBFB),
     onPrimaryContainer = BrandColors.Primary,
-    
+
     secondary = BrandColors.Primary,
     onSecondary = Color.White,
-    
-    background = BrandColors.Background,
-    onBackground = BrandColors.TextPrimary,
-    
+
+    background = Color(0xFFF4F5F8),
+    onBackground = Color(0xFF111827),
+
     surface = Color.White,
-    onSurface = BrandColors.TextPrimary,
-    surfaceVariant = BrandColors.InputBackground,
-    onSurfaceVariant = BrandColors.TextSecondary,
-    
+    onSurface = Color(0xFF111827),
+    surfaceVariant = Color(0xFFEEF0F4),
+    onSurfaceVariant = Color(0xFF6B7280),
+
     error = BrandColors.Error,
     onError = Color.White,
-    
-    outline = BrandColors.Border,
-    outlineVariant = BrandColors.Border.copy(alpha = 0.5f)
+
+    outline = Color(0xFFD5D9E0),
+    outlineVariant = Color(0xFFE8EAEF)
 )
 
 /**

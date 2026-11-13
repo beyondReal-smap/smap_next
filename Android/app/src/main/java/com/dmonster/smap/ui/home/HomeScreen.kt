@@ -4,21 +4,25 @@ import com.dmonster.smap.BuildConfig
 import com.dmonster.smap.AppConstants
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.dmonster.smap.ui.settings.SettingsScreen
+import com.dmonster.smap.ui.components.GroupPickerSheet
+import com.dmonster.smap.ui.components.MapCircleButton
+import com.dmonster.smap.ui.components.MapTopControls
 import com.dmonster.smap.ui.components.SmapErrorState
+import com.dmonster.smap.ui.components.SmapMapSheetScaffold
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import android.graphics.PointF
 import com.naver.maps.geometry.LatLng
 import com.naver.maps.map.CameraPosition
 import com.naver.maps.map.CameraUpdate
@@ -39,6 +43,12 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.repeatOnLifecycle
 
+/**
+ * 홈 — 지도 전체 + 아래 시트(멤버·일정) + 위 조작 줄(그룹 전환·알림·설정).
+ *
+ * 36단계 재설계: 왼쪽 사이드바("멤버 조회")·오른쪽 아래 멤버 버튼·지도 위 말풍선을 없애고
+ * [HomeSheetContent] 한 곳으로 모았다. 접힌 시트에서도 멤버 얼굴 줄이 보여 바로 고를 수 있다.
+ */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalNaverMapApi::class)
 @Composable
 fun HomeScreen(
@@ -55,7 +65,6 @@ fun HomeScreen(
     val filteredSchedules by viewModel.filteredSchedules.collectAsState()
     val calendarDays by viewModel.daysForCalendar.collectAsState()
     val selectedDate by viewModel.selectedDate.collectAsState()
-    val isSidebarOpen by viewModel.isSidebarOpen.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
     val loadFailed by viewModel.loadFailed.collectAsState()
@@ -80,10 +89,10 @@ fun HomeScreen(
 
     // Map Loading State - Show overlay initially and for minimum 1 second
     var isMapLoading by remember { mutableStateOf(true) }
-    
+
     // Notification Screen State
     var isNotificationVisible by remember { mutableStateOf(false) }
-    
+
     // Settings Screen State
     var isSettingsVisible by remember { mutableStateOf(false) }
     val showGroupCreationModal by viewModel.showGroupCreationModal.collectAsState()
@@ -95,12 +104,12 @@ fun HomeScreen(
     }
     val isOverlayOpen = isSettingsVisible || isNotificationVisible
     LaunchedEffect(isOverlayOpen) { onOverlayVisibleChange(isOverlayOpen) }
-    
+
     // Notification ViewModel
     val notiViewModel: NotificationViewModel = hiltViewModel()
     val unreadCount by notiViewModel.summary.collectAsState()
     val hasUnread = unreadCount.unread > 0
-    
+
     // 앱이 foreground로 돌아올 때 데이터 새로고침 (ON_RESUME handles initial load too)
     val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(lifecycleOwner, isVisible, isSettingsVisible, isNotificationVisible, showGroupCreationModal) {
@@ -127,43 +136,31 @@ fun HomeScreen(
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
-    
+
     LaunchedEffect(isLoading) {
         if (!isLoading && isMapLoading) {
             isMapLoading = false
         }
     }
 
-    // Drawer State
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-
-    // Sync Drawer State with ViewModel
-    LaunchedEffect(isSidebarOpen) {
-        if (isSidebarOpen) {
-            drawerState.open()
-        } else {
-            drawerState.close()
-        }
-    }
-    
-    // Reverse Sync: Drawer gesture close -> ViewModel
-    LaunchedEffect(drawerState.isOpen) {
-        if (drawerState.isOpen != isSidebarOpen) {
-            viewModel.setSidebarOpen(drawerState.isOpen)
-        }
-    }
+    // 지도 시트 상태 — 멤버를 고르면 시트를 접어 지도가 보이게 한다.
+    val sheetScaffoldState = rememberBottomSheetScaffoldState(
+        bottomSheetState = rememberStandardBottomSheetState(
+            initialValue = SheetValue.PartiallyExpanded,
+            skipHiddenState = true
+        )
+    )
+    var showGroupPicker by remember { mutableStateOf(false) }
+    val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
     // Naver Map Camera State
     val cameraPositionState = rememberCameraPositionState {
         // Default position (Seoul City Hall) - 위치 권한이 없을 때 기본값
         position = CameraPosition(
-            LatLng(AppConstants.DefaultLocation.LATITUDE, AppConstants.DefaultLocation.LONGITUDE), 
+            LatLng(AppConstants.DefaultLocation.LATITUDE, AppConstants.DefaultLocation.LONGITUDE),
             AppConstants.MapZoom.DEFAULT
         )
     }
-
-    // Info Window Position (Screen Coordinates)
-    var markerScreenPosition by remember { mutableStateOf<PointF?>(null) }
 
     // Member Avatars — Coil MemoryCache 에 위임해 Compose state 바깥에서 관리.
     // 변경 감지는 version int 증가로 트리거 (State 에 Bitmap 을 보관하지 않음 → recomposition 폭발 방지).
@@ -188,19 +185,11 @@ fun HomeScreen(
     LaunchedEffect(isVisible, avatarLoadSignature) {
         if (!isVisible) return@LaunchedEffect
         members.forEach { member ->
-            val photo = member.mtFile1
-            if (photo.isNullOrBlank()) return@forEach
+            val imageUrl = com.dmonster.smap.ui.components.profileImageUrl(member.mtFile1) ?: return@forEach
 
             val key = MemoryCache.Key(avatarCacheKey(member.mtIdx))
             // 이미 캐시에 있으면 스킵
             if (imageLoader.memoryCache?.get(key) != null) return@forEach
-
-            val imageUrl = when {
-                photo.startsWith("http") -> photo
-                photo.startsWith("/images/") -> "${BuildConfig.IMAGE_BASE_URL}$photo"
-                photo.startsWith("/") -> "${BuildConfig.IMAGE_BASE_URL}/images$photo"
-                else -> "${BuildConfig.IMAGE_BASE_URL}/images/$photo"
-            }
 
             try {
                 val request = ImageRequest.Builder(context)
@@ -219,15 +208,6 @@ fun HomeScreen(
                     Log.e("HomeScreen", "Error loading marker avatar for ${member.displayName}: ${e.message}")
                 }
             }
-        }
-    }
-
-    // 화면 완전 종료 시 아바타 캐시 비우기 (다른 화면 Coil 캐시에는 영향 없음 — 키 prefix 기반)
-    DisposableEffect(Unit) {
-        onDispose {
-            val cache = imageLoader.memoryCache ?: return@onDispose
-            // Coil 은 개별 key remove API 를 공개하지 않으므로 명시적 clear 는 생략 (LRU 가 정리)
-            // 필요 시 imageLoader.memoryCache?.clear() 로 전체 비우기 가능.
         }
     }
 
@@ -285,145 +265,115 @@ fun HomeScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        ModalNavigationDrawer(
-            drawerState = drawerState,
-            drawerContent = {
-                ModalDrawerSheet(
-                    drawerContainerColor = Color.White,
-                    modifier = Modifier.width(320.dp)
-                ) {
-                    HomeSidebar(
-                        groups = groups,
-                        selectedGroup = selectedGroup,
-                        onGroupSelected = { viewModel.selectGroup(it) },
-                        calendarDays = calendarDays,
-                        selectedDate = selectedDate,
-                        onDateSelected = { viewModel.selectDate(it) },
-                        members = members,
-                        onMemberSelected = { memberId ->
-                            viewModel.selectMember(memberId)
-                            scope.launch { drawerState.close() }
-                        },
-                        currentUserIdx = viewModel.getCurrentUserIdx(),
-                        getMemberStats = { mtIdx -> viewModel.getMemberTodayStats(mtIdx) }
-                    )
-                }
+        SmapMapSheetScaffold(
+            peekHeight = HomeSheetPeekHeight,
+            scaffoldState = sheetScaffoldState,
+            snackbarHostState = snackbarHostState,
+            sheetContent = {
+                HomeSheetContent(
+                    members = members,
+                    selectedMemberId = selectedMemberId,
+                    currentUserIdx = viewModel.getCurrentUserIdx(),
+                    calendarDays = calendarDays,
+                    selectedDate = selectedDate,
+                    schedules = filteredSchedules,
+                    memberStats = { viewModel.getMemberTodayStats(it) },
+                    onSelectMember = { m ->
+                        viewModel.selectMember(m.mtIdx)
+                        scope.launch { sheetScaffoldState.bottomSheetState.partialExpand() }
+                    },
+                    onShowAll = { viewModel.deselectAllMembers() },
+                    onSelectDate = { viewModel.selectDate(it) }
+                )
             },
-            gesturesEnabled = false
-        ) {
-            Scaffold(
-                snackbarHost = { SnackbarHost(snackbarHostState) }
-            ) { paddingValues ->
-                Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-                    // 1. Naver Map Layer
-                    NaverMap(
-                        modifier = Modifier.fillMaxSize(),
-                        cameraPositionState = cameraPositionState,
-                        uiSettings = MapUiSettings(
-                            isZoomControlEnabled = false,
-                            isLocationButtonEnabled = false,
-                            isLogoClickEnabled = false,
-                            // 오른쪽 아래 떠 있는 멤버 버튼과 축척 막대가 겹쳐 둘 다 가려졌다. 가족 위치 확인에는
-                            // 축척이 거의 쓰이지 않아 축척만 끈다(NAVER 로고는 약관상 유지, 왼쪽 아래라 겹치지 않음).
-                            isScaleBarEnabled = false
-                        ),
-                        contentPadding = PaddingValues(top = 60.dp)
-                    ) {
-                        // Member Markers — key 고정으로 Compose diff 최적화
-                        mapMembers.forEach { member ->
-                            key(member.mtIdx) {
-                                val memberLat = member.mltLat
-                                val memberLng = member.mltLong
-                                if (memberLat != null && memberLng != null) {
-                                    val avatar = avatarBitmap(member.mtIdx)
-                                    val memberMarkerBitmap = remember(member.displayName, member.isSelected, avatar) {
-                                        MarkerUtils.createMemberMarkerBitmap(context, member.displayName, member.isSelected, avatar)
-                                    }
-
-                                    Marker(
-                                        state = MarkerState(position = LatLng(memberLat, memberLng)),
-                                        icon = OverlayImage.fromBitmap(memberMarkerBitmap),
-                                        zIndex = if (member.isSelected) 2000 else 100,
-                                        onClick = {
-                                            viewModel.selectMember(member.mtIdx)
-                                            true
-                                        }
-                                    )
-                                }
-                            }
-                        }
-
-                        // Schedule Markers — sstIdx 로 key 고정
-                        mapSchedules.forEachIndexed { index, schedule ->
-                            key(schedule.sstIdx) {
-                                val lat = schedule.sstLocationLat
-                                val lng = schedule.sstLocationLong
-                                if (lat != null && lng != null) {
-                                    val markerBitmap = remember(schedule.sstIdx, schedule.sstTitle, index) {
-                                        MarkerUtils.createScheduleMarkerBitmap(context, schedule, index)
-                                    }
-
-                                    Marker(
-                                        state = MarkerState(position = LatLng(lat, lng)),
-                                        icon = OverlayImage.fromBitmap(markerBitmap),
-                                        zIndex = 1000,
-                                        onClick = {
-                                            // TODO: Show Schedule Detail InfoWindow
-                                            true
-                                        }
-                                    )
-                                }
-                            }
-                        }
-
-                        // Effect: Update InfoWindow screen position
-                        // 키를 선택 멤버 id + 위치만으로 압축해 불필요 재실행 제거
-                        val mapSelectedMember = mapMembers.find { it.isSelected }
-                        MapEffect(
-                            mapSelectedMember?.mtIdx,
-                            mapSelectedMember?.mltLat,
-                            mapSelectedMember?.mltLong,
-                            cameraPositionState.position,
-                            cameraPositionState.isMoving
-                        ) { map ->
-                            val m = mapSelectedMember
-                            val lat = m?.mltLat
-                            val lng = m?.mltLong
-                            markerScreenPosition = if (m != null && lat != null && lng != null) {
-                                map.projection.toScreenLocation(LatLng(lat, lng))
-                            } else null
-                        }
-                    }
-                    
-                    // 2. Member Info Window (Anchored Overlay) — 캐시된 selectedMemberState 재사용
-                    val selectedMember = selectedMemberState
-                    val screenPos = markerScreenPosition
-                    if (selectedMember != null && screenPos != null) {
-                        Box(
-                            modifier = Modifier
-                                .offset(
-                                    x = with(LocalDensity.current) { (screenPos.x / density).dp } - 90.dp,
-                                    y = with(LocalDensity.current) { (screenPos.y / density).dp } - 180.dp
-                                )
-                        ) {
-                            MemberInfoWindow(
-                                member = selectedMember,
-                                onClose = { viewModel.deselectAllMembers() }
-                            )
-                        }
-                    }
-
-                    // 3. Header
-                    HomeHeaderView(
-                        title = "홈",
-                        hasUnread = hasUnread,
-                        onNotificationTap = { isNotificationVisible = true },
-                        onSettingsTap = { isSettingsVisible = true }
+            overlay = {
+                MapTopControls(
+                    groupName = selectedGroup?.sgtTitle,
+                    onGroupClick = { showGroupPicker = true }
+                ) {
+                    MapCircleButton(
+                        icon = Icons.Outlined.Notifications,
+                        contentDescription = if (hasUnread) "알림, 읽지 않은 알림 있음" else "알림",
+                        onClick = { isNotificationVisible = true },
+                        badge = hasUnread
+                    )
+                    MapCircleButton(
+                        icon = Icons.Outlined.Settings,
+                        contentDescription = "설정",
+                        onClick = { isSettingsVisible = true }
                     )
                 }
             }
+        ) {
+            NaverMap(
+                modifier = Modifier.fillMaxSize(),
+                cameraPositionState = cameraPositionState,
+                uiSettings = MapUiSettings(
+                    isZoomControlEnabled = false,
+                    isLocationButtonEnabled = false,
+                    isLogoClickEnabled = false,
+                    // 축척 막대는 가족 위치 확인에 거의 쓰이지 않고 시트와 겹친다(NAVER 로고는 약관상 유지).
+                    isScaleBarEnabled = false
+                ),
+                // 위 조작 줄과 아래 접힌 시트만큼 비워, 전체 보기·멤버 이동 때 마커가 가려지지 않게 한다.
+                contentPadding = PaddingValues(top = statusBarTop + 64.dp, bottom = HomeSheetPeekHeight)
+            ) {
+                // Member Markers — key 고정으로 Compose diff 최적화
+                mapMembers.forEach { member ->
+                    key(member.mtIdx) {
+                        val memberLat = member.mltLat
+                        val memberLng = member.mltLong
+                        if (memberLat != null && memberLng != null) {
+                            val avatar = avatarBitmap(member.mtIdx)
+                            val memberMarkerBitmap = remember(member.displayName, member.isSelected, avatar) {
+                                MarkerUtils.createMemberMarkerBitmap(context, member.displayName, member.isSelected, avatar)
+                            }
+
+                            Marker(
+                                state = MarkerState(position = LatLng(memberLat, memberLng)),
+                                icon = OverlayImage.fromBitmap(memberMarkerBitmap),
+                                zIndex = if (member.isSelected) 2000 else 100,
+                                onClick = {
+                                    viewModel.selectMember(member.mtIdx)
+                                    true
+                                }
+                            )
+                        }
+                    }
+                }
+
+                // Schedule Markers — sstIdx 로 key 고정
+                mapSchedules.forEachIndexed { index, schedule ->
+                    key(schedule.sstIdx) {
+                        val lat = schedule.sstLocationLat
+                        val lng = schedule.sstLocationLong
+                        if (lat != null && lng != null) {
+                            val markerBitmap = remember(schedule.sstIdx, schedule.sstTitle, index) {
+                                MarkerUtils.createScheduleMarkerBitmap(context, schedule, index)
+                            }
+
+                            Marker(
+                                state = MarkerState(position = LatLng(lat, lng)),
+                                icon = OverlayImage.fromBitmap(markerBitmap),
+                                zIndex = 1000,
+                                onClick = { true }
+                            )
+                        }
+                    }
+                }
+            }
         }
-        
+
+        if (showGroupPicker) {
+            GroupPickerSheet(
+                groups = groups,
+                selectedGroupId = selectedGroup?.sgtIdx,
+                onSelect = { viewModel.selectGroup(it) },
+                onDismiss = { showGroupPicker = false },
+                onCreateGroup = { viewModel.openGroupCreationModal() }
+            )
+        }
+
         // 조회 실패 — 빈 지도와 구분해 다시 시도 가능하게 한다(지도는 유지).
         if (loadFailed && !isMapLoading) {
             Box(
@@ -434,26 +384,11 @@ fun HomeScreen(
                     modifier = Modifier
                         .fillMaxWidth(0.85f)
                         .height(260.dp)
-                        .background(Color.White.copy(alpha = 0.95f), RoundedCornerShape(16.dp)),
+                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp)),
                     title = "그룹 정보를 불러오지 못했어요",
                     onRetry = { viewModel.retryLoad() }
                 )
             }
-        }
-
-        // 4. Floating Action Button (Hidden during map loading)
-        AnimatedVisibility(
-            visible = !isMapLoading,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 20.dp, bottom = 20.dp)
-        ) {
-            FloatingActionHomeButton(
-                memberCount = members.size,
-                onClick = { viewModel.toggleSidebar() }
-            )
         }
 
         // BackHandler for overlay screens
@@ -500,7 +435,7 @@ fun HomeScreen(
                 }
             )
         }
-        
+
         // 7. Map Loading Overlay (Covers entire screen including header)
         AnimatedVisibility(
             visible = isMapLoading,
