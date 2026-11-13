@@ -35,6 +35,15 @@ func (s *OrderService) UpdateStatus(orderID, status int) (found bool, dbErr erro
 // Cancel은 Python cancel_order 엔드포인트를 이식한다(소유자 체크 + 이미취소 검사).
 // ⚠️ 성공(CancelDone)도 Python은 모델 직렬화 실패로 500 plain → 핸들러가 500을 낸다(DB는 커밋됨).
 func (s *OrderService) Cancel(orderID, uid int, reason string, amount *float64, refund *string) CancelOutcome {
+	return s.cancel(orderID, uid, true, reason, amount, refund)
+}
+
+// CancelAsAdmin은 관리자의 주문 취소다(G7: 상태 변경·취소는 관리자 전용 라우트). 소유자 검사를 건너뛴다.
+func (s *OrderService) CancelAsAdmin(orderID int, reason string, amount *float64, refund *string) CancelOutcome {
+	return s.cancel(orderID, 0, false, reason, amount, refund)
+}
+
+func (s *OrderService) cancel(orderID, uid int, ownerOnly bool, reason string, amount *float64, refund *string) CancelOutcome {
 	o, err := s.repo.GetByID(orderID)
 	if err != nil {
 		return CancelDBErr
@@ -42,7 +51,7 @@ func (s *OrderService) Cancel(orderID, uid int, reason string, amount *float64, 
 	if o == nil {
 		return CancelNotFound
 	}
-	if o.MtIdx == nil || *o.MtIdx != uid {
+	if ownerOnly && (o.MtIdx == nil || *o.MtIdx != uid) {
 		return CancelForbidden
 	}
 	if o.OtStatus != nil && *o.OtStatus == 99 {

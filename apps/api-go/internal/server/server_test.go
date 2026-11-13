@@ -325,32 +325,24 @@ func TestFCMSendoneRootAdminOnly(t *testing.T) {
 // --- 인증 미들웨어 부착 범위 ---
 
 // 사용자 인증(ua)이 붙은 대표 라우트. enforce에서 무토큰이면 401, warn에서는 핸들러까지 도달(401 아님).
+// (일정 라우트는 G7에서 모드와 무관하게 무토큰 401인 별도 그룹이라 schedule_chat_authz_test.go에서 검증한다.)
 var attachedRoutes = []struct{ method, path string }{
 	{"GET", "/logs/member-location-logs/1/daily-summary"},
 	{"POST", "/logs/member-location-logs"},
 	{"GET", "/logs/members-with-logs"},
 	{"GET", "/group-members/member/1"},
-	{"POST", "/group-members/add"},
-	{"GET", "/group-details/"},
-	{"PUT", "/group-details/1/role"},
 	{"GET", "/groups/"},
 	{"GET", "/groups/1"},
 	{"GET", "/groups/current-user"},
+	{"GET", "/groups/code/ABC"}, // G7: 초대 코드 조회는 호출 한도 대상이라 ua
 	{"POST", "/groups/join"},
 	{"PUT", "/groups/1"},
 	{"PUT", "/groups/1/members/2/remove"},
-	{"POST", "/groups/1/join-new-member"},
 	{"GET", "/locations/"},
 	{"GET", "/locations/member/1"},
 	{"POST", "/locations/"},
 	{"DELETE", "/locations/1"},
-	{"GET", "/schedules/"},
-	{"POST", "/schedules/"},
-	{"GET", "/schedule/group/1/schedules"},
-	{"POST", "/schedule/group/1/schedules"},
-	{"GET", "/push-logs/"},
 	{"POST", "/push-logs/delete-all"},
-	{"GET", "/push-fcms/"},
 	{"GET", "/members/"},
 	{"GET", "/members/5"},
 	{"GET", "/members/group/1"},
@@ -359,6 +351,8 @@ var attachedRoutes = []struct{ method, path string }{
 	{"GET", "/weather/member/5"},
 	{"PUT", "/weather/member/5"},
 }
+
+// G7: 앱이 쓰지 않아 관리자 전용(adm)으로 옮긴 라우트. 관리자 판정 자체는 group_authz_test.go가 검증한다.
 
 // 공개로 남겨야 하는 라우트(로그인·가입·SMS·비밀번호 찾기·버전·공지·소셜·refresh·hwgi 등)와
 // 핸들러가 자체 JWT 처리를 하는 라우트. 어떤 모드에서도 미들웨어가 401을 내면 안 된다.
@@ -388,7 +382,6 @@ var publicRoutes = []struct{ method, path string }{
 	{"POST", "/members/google-login"},
 	{"POST", "/members/"},
 	{"GET", "/groups/1/public"},
-	{"GET", "/groups/code/ABC"},
 	{"GET", "/hwgi/all-data"},
 	{"POST", "/hwgi/bulk-save"},
 	{"POST", "/hwgi/upload-photo"},

@@ -105,6 +105,22 @@ type Config struct {
 	// 켜면(기본, 구버전 앱 호환) 내 장소 생성·수정·삭제·알림 변경을 소유자 외에 같은 그룹의 방장
 	// (리더는 방장이 아닌 대상만)에게도 허용한다. 끄면 소유자 본인만. 구버전 앱이 방장·리더 대리 편집을 한다.
 	LocationPlaceLeaderManage bool `envconfig:"LOCATION_PLACE_LEADER_MANAGE" default:"true"`
+	// 일정 인가(G7). SCHEDULE_NONLEADER_TARGET_OTHERS=true(기본, 구버전 호환): 일반 멤버도 같은 그룹 현재 멤버를 대상으로
+	// 일정을 만들 수 있다(구버전 Android 기본 대상이 그룹장). false면 타인 일정은 그룹장·리더만.
+	// SCHEDULE_LEADER_MANAGE_OWNER=false(기본): 리더는 그룹장의 일정을 수정·삭제·대상 지정할 수 없다(앱 규칙).
+	ScheduleNonleaderTargetOthers bool `envconfig:"SCHEDULE_NONLEADER_TARGET_OTHERS" default:"true"`
+	ScheduleLeaderManageOwner     bool `envconfig:"SCHEDULE_LEADER_MANAGE_OWNER" default:"false"`
+	// 채팅 소켓 수신 시점 멤버십 확인 캐시 수명(초). 허용 결과만 캐시. 0이면 매번 조회.
+	ChatMembershipCacheTTLSeconds int `envconfig:"CHAT_MEMBERSHIP_CACHE_TTL_SECONDS" default:"10"`
+
+	// --- 그룹 권한(G7) ---
+	// 켜면 초대 코드 없는 그룹 가입(POST /groups/:id/join에 sgt_code 없음)을 403으로 거부한다. 기본 false:
+	// 구버전 앱(Android 3.2.7, iOS 3.2.0)은 코드 조회 후 그룹 번호만으로 가입한다. 코드가 요청에 있으면 이 값과 무관하게 항상 검증한다.
+	RequireGroupInviteCode bool `envconfig:"REQUIRE_GROUP_INVITE_CODE" default:"false"`
+	// 초대 코드 조회(GET /groups/code/:code)·코드 가입·코드가 담긴 가입의 호출 한도: 회원당 / IP당, 고정 창(초). 초과 시 429, Redis 장애 시 503.
+	GroupCodeLimitPerMember int `envconfig:"GROUP_CODE_LIMIT_PER_MEMBER" default:"30"`
+	GroupCodeLimitPerIP     int `envconfig:"GROUP_CODE_LIMIT_PER_IP" default:"300"`
+	GroupCodeWindowSeconds  int `envconfig:"GROUP_CODE_WINDOW_SECONDS" default:"3600"`
 
 	// --- 소셜 로그인 공급자 토큰 검증(G5) ---
 	// SOCIAL_TOKEN_VERIFICATION: off | when_present | required. 기본 when_present
@@ -120,6 +136,17 @@ type Config struct {
 	// 직접 접속 상대가 loopback/사설 대역일 때만 이 헤더를 믿는다. 비어 있으면 직접 접속 주소만 사용한다
 	// (터널·프록시 뒤에서는 모든 사용자가 한 주소로 합산되므로 운영에서는 반드시 설정).
 	TrustedClientIPHeader string `envconfig:"TRUSTED_CLIENT_IP_HEADER" default:""`
+
+	// --- 남용 방지(G8) ---
+	// SMS 인증번호 발송 한도: 번호당 / IP당, 고정 창(초). 초과 시 429. SMS는 건당 과금이라 Redis 장애 시에는 503이다.
+	SMSSendLimitPerPhone int `envconfig:"SMS_SEND_LIMIT_PER_PHONE" default:"5"`
+	SMSSendLimitPerIP    int `envconfig:"SMS_SEND_LIMIT_PER_IP" default:"20"`
+	SMSSendWindowSeconds int `envconfig:"SMS_SEND_WINDOW_SECONDS" default:"3600"`
+	// 인증번호 하나에 허용하는 검증 시도 횟수. 초과하면 코드를 폐기한다(재요청 필요).
+	SMSVerifyMaxAttempts int `envconfig:"SMS_VERIFY_MAX_ATTEMPTS" default:"5"`
+	// 가입 여부 확인(/members/check/*) IP당 한도, 고정 창(초). 초과 시 429. 종류(phone/email/nickname)별로 따로 센다.
+	MemberCheckLimitPerIP    int `envconfig:"MEMBER_CHECK_LIMIT_PER_IP" default:"60"`
+	MemberCheckWindowSeconds int `envconfig:"MEMBER_CHECK_WINDOW_SECONDS" default:"60"`
 
 	// --- 가입·로그인 정책(G4) ---
 	// 토큰(email_verification_token) 없는 구버전 호환 가입(전화번호/소셜 ID 평문)을 허용할지. 꺼지면 400 "본인인증이 필요합니다.".
@@ -264,6 +291,12 @@ func Load(envPath string) (*Config, error) {
 		return nil, err
 	}
 	if err := c.validateAuthPolicy(); err != nil {
+		return nil, err
+	}
+	if err := c.validateAbuse(); err != nil {
+		return nil, err
+	}
+	if err := c.validateGroupPolicy(); err != nil {
 		return nil, err
 	}
 	return &c, nil

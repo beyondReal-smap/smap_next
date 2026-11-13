@@ -114,6 +114,8 @@ type CurrentUserGroupRow struct {
 	Group       model.Group
 	Detail      model.GroupDetail
 	MemberCount int64
+	// IsOwner는 그룹장 판정(groupOwnerSQL: owner_chk='Y' 또는 owner 표식이 없는 그룹의 생성자)의 결과다.
+	IsOwner bool
 }
 
 // currentUserGroupPair는 한 SELECT로 group + group_detail 컬럼을 동시에 스캔하기 위한 평면 행이다.
@@ -123,6 +125,7 @@ type currentUserGroupPair struct {
 	SgdtOwnerChk  *string    `gorm:"column:sgdt_owner_chk"`
 	SgdtLeaderChk *string    `gorm:"column:sgdt_leader_chk"`
 	SgdtWdate     *time.Time `gorm:"column:gd_sgdt_wdate"`
+	IsOwnerCalc   int        `gorm:"column:is_owner_calc"`
 }
 
 // CurrentUserGroups는 사용자가 속한 (group, group_detail) 쌍을 조회한다(정렬 없음 → 서비스에서 sgt_title 정렬).
@@ -135,7 +138,8 @@ func (r *GroupRepository) CurrentUserGroups(mtIdx int) ([]CurrentUserGroupRow, e
 	err := r.db.Model(&model.Group{}).
 		Select("smap_group_t.*, smap_group_detail_t.sgdt_owner_chk AS sgdt_owner_chk, "+
 			"smap_group_detail_t.sgdt_leader_chk AS sgdt_leader_chk, "+
-			"smap_group_detail_t.sgdt_wdate AS gd_sgdt_wdate").
+			"smap_group_detail_t.sgdt_wdate AS gd_sgdt_wdate, "+
+			"CASE WHEN "+groupOwnerSQL("smap_group_detail_t")+" THEN 1 ELSE 0 END AS is_owner_calc").
 		Joins("JOIN smap_group_detail_t ON smap_group_detail_t.sgt_idx = smap_group_t.sgt_idx").
 		Where("smap_group_detail_t.mt_idx = ? AND smap_group_detail_t.sgdt_exit = ? AND smap_group_t.sgt_show = ?",
 			mtIdx, "N", "Y").
@@ -182,6 +186,7 @@ func (r *GroupRepository) CurrentUserGroups(mtIdx int) ([]CurrentUserGroupRow, e
 				SgdtWdate:     pairs[i].SgdtWdate,
 			},
 			MemberCount: memberCounts[pairs[i].SgtIdx],
+			IsOwner:     pairs[i].IsOwnerCalc == 1,
 		})
 	}
 	return out, nil

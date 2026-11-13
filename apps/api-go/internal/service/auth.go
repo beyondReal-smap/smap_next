@@ -74,6 +74,8 @@ type AuthService struct {
 	dummyMu  sync.Once
 	dummyPwd string
 	identMu  [64]sync.Mutex // 같은 식별자의 동시 가입 직렬화(프로세스 내)
+
+	smsMaxAttempts int // 인증번호 검증 시도 허용 횟수(SetSMSVerifyMaxAttempts; G8)
 }
 
 // resetSender는 forgot-password의 비번재설정 링크 발송(SMS/이메일) seam이다.

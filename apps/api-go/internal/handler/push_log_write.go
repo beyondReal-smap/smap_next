@@ -55,6 +55,9 @@ func (h *PushLogHandler) Delete(c *gin.Context) {
 	if !ok {
 		return
 	}
+	if !h.ownLog(c, id) {
+		return
+	}
 	found, sok := h.svc.DeletePushLog(id)
 	if !sok {
 		plainServerError(c)
@@ -71,6 +74,9 @@ func (h *PushLogHandler) Delete(c *gin.Context) {
 func (h *PushLogHandler) MarkRead(c *gin.Context) {
 	id, ok := pushLogPathID(c)
 	if !ok {
+		return
+	}
+	if !h.ownLog(c, id) {
 		return
 	}
 	found, sok := h.svc.MarkPushLogRead(id)
@@ -93,6 +99,9 @@ func (h *PushLogHandler) DeleteAll(c *gin.Context) {
 		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
 		return
 	}
+	if !h.self.Self(c, mtIdx) { // 대상은 토큰 회원 본인뿐
+		return
+	}
 	if !h.svc.DeleteAllPushLogs(mtIdx) {
 		plainServerError(c)
 		return
@@ -106,6 +115,9 @@ func (h *PushLogHandler) ReadAll(c *gin.Context) {
 	mtIdx := requiredQueryInt(c, "mt_idx", &errs)
 	if len(errs) > 0 {
 		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
+		return
+	}
+	if !h.self.Self(c, mtIdx) {
 		return
 	}
 	if !h.svc.ReadAllPushLogs(mtIdx) {

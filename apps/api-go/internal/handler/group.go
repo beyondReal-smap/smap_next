@@ -11,6 +11,7 @@ import (
 	"github.com/bluemusk/smap_next_go/internal/auth"
 	"github.com/bluemusk/smap_next_go/internal/config"
 	"github.com/bluemusk/smap_next_go/internal/dto"
+	"github.com/bluemusk/smap_next_go/internal/netutil"
 	"github.com/bluemusk/smap_next_go/internal/service"
 )
 
@@ -19,6 +20,27 @@ type GroupHandler struct {
 	svc       *service.GroupService
 	wsvc      *service.GroupWriteService
 	cfg       *config.Config
+	// guard: 그룹 인가(현재 멤버·그룹장). nil이면 인가가 필요한 요청은 500(fail-closed).
+	guard *GroupGuard
+	// codes: 초대 코드 호출 한도(회원·IP). nil이면 코드 관련 요청은 503(fail-closed).
+	codes *service.GroupCodeGuard
+}
+
+// SetGuard는 그룹 인가 가드를 주입한다.
+func (h *GroupHandler) SetGuard(g *GroupGuard) { h.guard = g }
+
+// SetCodeGuard는 초대 코드 호출 한도를 주입한다.
+func (h *GroupHandler) SetCodeGuard(g *service.GroupCodeGuard) { h.codes = g }
+
+// codeLimit은 초대 코드를 다루는 호출 1회를 한도에 기록한다. 거부면 응답을 쓰고 false(429, Redis 장애 시 503).
+// mtIdx<=0(무토큰 warn 통과)이면 IP 기준만 적용된다.
+func (h *GroupHandler) codeLimit(c *gin.Context, mtIdx int) bool {
+	rej := h.codes.Check(c.Request.Context(), mtIdx, netutil.ClientIP(c.Request, h.cfg.TrustedClientIPHeader))
+	if rej != nil {
+		writeAuthRejection(c, rej)
+		return false
+	}
+	return true
 }
 
 func NewGroup(svc *service.GroupService, wsvc *service.GroupWriteService, cfg *config.Config) *GroupHandler {
@@ -67,6 +89,10 @@ func (h *GroupHandler) Get(c *gin.Context) {
 		pathIntErr(c, "group_id", idStr)
 		return
 	}
+	// 앱이 쓰지 않는 경로: 토큰 필수 + 그 그룹의 현재 멤버만(초대 코드가 응답에 포함된다).
+	if !h.guard.RequireToken(c) || !h.guard.ViewGroup(c, id) {
+		return
+	}
 	res, err := h.svc.GetGroup(id)
 	if err != nil {
 		writeJSON(c, http.StatusInternalServerError, gin.H{"detail": "Internal Server Error"})
@@ -106,6 +132,7 @@ func (h *GroupHandler) Public(c *gin.Context) {
 }
 
 // List는 GET /api/v1/groups/ — skip(default 0)/limit(default 10000)/show_hidden(default false).
+// G7: 요청자가 현재 멤버인 그룹만(이전에는 전체 그룹과 초대 코드를 내려줬다).
 // Python get_groups는 skip/limit에 ge/le 제약이 없으므로 범위 검증도 하지 않는다.
 func (h *GroupHandler) List(c *gin.Context) {
 	errs := make([]valErr, 0)
@@ -116,7 +143,11 @@ func (h *GroupHandler) List(c *gin.Context) {
 		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
 		return
 	}
-	res, err := h.svc.ListGroups(skip, limit, showHidden)
+	// 앱이 쓰지 않는 경로(앱은 같은 경로의 POST로 그룹을 만든다): 토큰 필수, 요청자가 현재 멤버인 그룹만 돌려준다.
+	if !h.guard.RequireToken(c) {
+		return
+	}
+	res, err := h.svc.ListGroupsForMember(h.guard.Viewer(c).MtIdx, skip, limit, showHidden)
 	if err != nil {
 		writeJSON(c, http.StatusInternalServerError, gin.H{"detail": "Internal Server Error"})
 		return
@@ -132,6 +163,10 @@ func (h *GroupHandler) Member(c *gin.Context) {
 		pathIntErr(c, "member_id", idStr)
 		return
 	}
+	// 앱이 쓰지 않는 경로: 토큰 필수 + 본인만(앱은 /groups/current-user를 쓴다).
+	if !h.guard.RequireToken(c) || !h.guard.Self(c, id) {
+		return
+	}
 	res, err := h.svc.MemberGroups(id)
 	if err != nil {
 		writeJSON(c, http.StatusInternalServerError, gin.H{"detail": "Internal Server Error"})
@@ -143,6 +178,9 @@ func (h *GroupHandler) Member(c *gin.Context) {
 // ByCode는 GET /api/v1/groups/code/:code — 코드로 단건 조회. 없으면 404 "Group not found".
 func (h *GroupHandler) ByCode(c *gin.Context) {
 	code := c.Param("code")
+	if !h.codeLimit(c, h.guard.Viewer(c).MtIdx) {
+		return
+	}
 	res, err := h.svc.GroupByCode(code)
 	if err != nil {
 		writeJSON(c, http.StatusInternalServerError, gin.H{"detail": "Internal Server Error"})
@@ -199,6 +237,10 @@ func (h *GroupHandler) Stats(c *gin.Context) {
 		pathIntErr(c, "group_id", idStr)
 		return
 	}
+	// G7: 그 그룹의 현재 멤버만(멤버 이름·일정/장소 수 집계). 무토큰은 ROUTE_AUTH_MODE를 따른다(앱 사용 경로).
+	if !h.guard.ViewGroup(c, id) {
+		return
+	}
 	// 그룹 존재 확인(sgt_show 무관 단건). 미발견 → 404 "Group not found"(except HTTPException:raise).
 	grp, err := h.svc.GetGroup(id)
 	if err != nil {
@@ -245,12 +287,21 @@ func (h *GroupHandler) Create(c *gin.Context) {
 
 // JoinByCode는 POST /api/v1/groups/join (Python join_group_by_code). 검증: 인증 401 → body 422.
 func (h *GroupHandler) JoinByCode(c *gin.Context) {
-	if _, ok := h.requireUserID(c); !ok {
+	uid, ok := h.requireUserID(c)
+	if !ok {
 		return
 	}
 	mtIdx, code, errs := parseJoinByCodeBody(c)
 	if len(errs) > 0 {
 		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
+		return
+	}
+	// G7: 가입 대상은 토큰의 회원 본인뿐이다(남을 가입시키지 못한다).
+	if mtIdx != uid {
+		writeJoinNotSelf(c)
+		return
+	}
+	if !h.codeLimit(c, uid) {
 		return
 	}
 	res, err := h.wsvc.JoinByCode(mtIdx, code)
@@ -272,7 +323,8 @@ func (h *GroupHandler) JoinByCode(c *gin.Context) {
 // 한 422 배열로 수집(FastAPI는 모든 요청부의 오류를 모음; loc 순서는 path 먼저, body 뒤).
 // body sgt_idx는 받기만 하고(필수 검증) 가입 로직엔 미사용.
 func (h *GroupHandler) Join(c *gin.Context) {
-	if _, ok := h.requireUserID(c); !ok {
+	uid, ok := h.requireUserID(c)
+	if !ok {
 		return
 	}
 	var errs []valErr
@@ -281,13 +333,26 @@ func (h *GroupHandler) Join(c *gin.Context) {
 	if perr != nil {
 		errs = append(errs, valErr{Type: "int_parsing", Loc: []string{"path", "group_id"}, Msg: msgIntParse, Input: idStr})
 	}
-	mtIdx, _, berrs := parseJoinBody(c) // sgt_idx는 검증만(필수), 가입 로직 미사용
+	mtIdx, _, code, berrs := parseJoinBodyWithCode(c) // sgt_idx는 검증만(필수), 가입 로직 미사용. sgt_code는 선택.
 	errs = append(errs, berrs...)
 	if len(errs) > 0 {
 		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
 		return
 	}
-	res, err := h.wsvc.Join(groupID, mtIdx)
+	// G7: 가입 대상은 토큰의 회원 본인뿐이다.
+	if mtIdx != uid {
+		writeJoinNotSelf(c)
+		return
+	}
+	// 코드가 담긴 요청은 코드 대입 경로이므로 한도에 기록한다. 코드 없는 가입은 REQUIRE_GROUP_INVITE_CODE에 따른다.
+	if code != "" {
+		if !h.codeLimit(c, uid) {
+			return
+		}
+	} else if !h.cfg.RequireGroupInviteCode {
+		h.guard.RecordJoinWithoutCode(c)
+	}
+	res, err := h.wsvc.Join(groupID, mtIdx, code, h.cfg.RequireGroupInviteCode)
 	if err != nil {
 		h.writeJoinError(c, err)
 		return
@@ -325,6 +390,12 @@ func (h *GroupHandler) writeJoinResult(c *gin.Context, res service.JoinResult, m
 		writeJSON(c, http.StatusNotFound, gin.H{"detail": m.memberNotFound})
 	case service.JoinAlready:
 		writeJSON(c, http.StatusBadRequest, gin.H{"detail": m.already})
+	case service.JoinKicked:
+		writeJSON(c, http.StatusForbidden, gin.H{"detail": "이 그룹에는 다시 가입할 수 없습니다."})
+	case service.JoinCodeRequired:
+		writeJSON(c, http.StatusForbidden, gin.H{"detail": "초대 코드가 필요합니다."})
+	case service.JoinCodeMismatch:
+		writeJSON(c, http.StatusForbidden, gin.H{"detail": "초대 코드가 올바르지 않습니다."})
 	case service.JoinReactivated:
 		writeJSON(c, http.StatusOK, dto.GroupJoinResponse{
 			Success: true, Message: m.reactivated, Data: res.Data})
@@ -332,6 +403,14 @@ func (h *GroupHandler) writeJoinResult(c *gin.Context, res service.JoinResult, m
 		writeJSON(c, http.StatusOK, dto.GroupJoinResponse{
 			Success: true, Message: m.created, Data: res.Data})
 	}
+}
+
+// ownerCannotLeaveDetail: 그룹장은 승계(PUT /groups/:id의 mt_idx) 없이 탈퇴·제거될 수 없다.
+const ownerCannotLeaveDetail = "그룹장은 다른 멤버에게 그룹장을 넘기기 전에는 그룹을 나갈 수 없습니다."
+
+// writeJoinNotSelf: 본문 mt_idx가 토큰의 회원과 다른 가입 요청(타인 명의 가입) 거부.
+func writeJoinNotSelf(c *gin.Context) {
+	writeJSON(c, http.StatusForbidden, gin.H{"detail": "본인만 그룹에 가입할 수 있습니다."})
 }
 
 // writeJoinError는 가입 중 에러를 Python의 두 500 경로로 구분 매핑한다.
@@ -363,8 +442,23 @@ func (h *GroupHandler) Update(c *gin.Context) {
 		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
 		return
 	}
+	// G7: 그룹장만 수정·삭제(sgt_show='N')·그룹장 변경·초대 코드 변경을 할 수 있다. 무토큰은 ROUTE_AUTH_MODE를 따른다(앱 사용 경로).
+	if !h.guard.ManageGroup(c, groupID) {
+		return
+	}
 	resp, err := h.wsvc.UpdateGroup(groupID, mtIdx, title, code, memo, show)
 	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrNewOwnerNotMember):
+			writeJSON(c, http.StatusBadRequest, gin.H{"detail": "새 그룹장은 이 그룹의 현재 멤버여야 합니다."})
+			return
+		case errors.Is(err, service.ErrInvalidGroupCode):
+			writeJSON(c, http.StatusBadRequest, gin.H{"detail": "초대 코드는 영문 대문자와 숫자 10자여야 합니다."})
+			return
+		case errors.Is(err, service.ErrGroupCodeTaken):
+			writeJSON(c, http.StatusBadRequest, gin.H{"detail": "이미 사용 중인 초대 코드입니다."})
+			return
+		}
 		// Python except Exception → 500 detail에 str(e) 포함. ⚠️GORM 에러 텍스트는 SQLAlchemy와 달라
 		// 이 경로(DB 장애)는 본질적으로 byte-동등 불가(상태코드·prefix만 일치).
 		writeJSON(c, http.StatusInternalServerError, gin.H{"detail": "그룹 업데이트 중 오류가 발생했습니다: " + err.Error()})
@@ -384,6 +478,10 @@ func (h *GroupHandler) Restore(c *gin.Context) {
 	groupID, err := strconv.Atoi(idStr)
 	if err != nil {
 		pathIntErr(c, "group_id", idStr)
+		return
+	}
+	// 앱이 쓰지 않는 쓰기 경로: 토큰 필수(ROUTE_AUTH_MODE와 무관하게 401) + 그룹장만.
+	if !h.guard.RequireToken(c) || !h.guard.ManageGroup(c, groupID) {
 		return
 	}
 	resp, serr := h.wsvc.RestoreGroup(groupID)
@@ -459,8 +557,20 @@ func (h *GroupHandler) RemoveMember(c *gin.Context) {
 		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
 		return
 	}
-	res, err := h.wsvc.RemoveMember(groupID, memberID)
+	// 앱이 쓰지 않는 쓰기 경로(앱은 DELETE /group-members/...를 쓴다): 토큰 필수 + 본인 제거(탈퇴) 또는 그룹장의 강퇴만.
+	if !h.guard.RequireToken(c) {
+		return
+	}
+	kind, ok := h.guard.Removal(c, groupID, memberID)
+	if !ok {
+		return
+	}
+	res, err := h.wsvc.RemoveMember(groupID, memberID, kind)
 	if err != nil {
+		if errors.Is(err, service.ErrOwnerCannotLeave) {
+			writeJSON(c, http.StatusBadRequest, gin.H{"detail": ownerCannotLeaveDetail})
+			return
+		}
 		plainServerError(c)
 		return
 	}
@@ -545,6 +655,14 @@ func parseJoinByCodeBody(c *gin.Context) (mtIdx int, code string, errs []valErr)
 // parseJoinBody는 GroupJoinRequest{mt_idx:int, sgt_idx:int}(둘 다 필수)를 파싱한다.
 // sgt_idx는 필수 검증만 하고 가입 로직엔 쓰지 않는다(path group_id 사용).
 func parseJoinBody(c *gin.Context) (mtIdx, sgtIdx int, errs []valErr) {
+	mtIdx, sgtIdx, _, errs = parseJoinBodyWithCode(c)
+	return mtIdx, sgtIdx, errs
+}
+
+// parseJoinBodyWithCode는 parseJoinBody에 선택 필드 sgt_code(초대 코드)를 더한 것이다.
+// 미제공/null이면 ""(코드 없음), 문자열이면 그 값, 그 외 타입은 string_type 422. 앱(Android sgtCode / iOS sgt_code)은
+// 코드를 알 때만 보낸다.
+func parseJoinBodyWithCode(c *gin.Context) (mtIdx, sgtIdx int, code string, errs []valErr) {
 	var body map[string]interface{}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		body = map[string]interface{}{}
@@ -563,7 +681,10 @@ func parseJoinBody(c *gin.Context) (mtIdx, sgtIdx int, errs []valErr) {
 	} else {
 		errs = append(errs, valErr{Type: "int_parsing", Loc: []string{"body", "sgt_idx"}, Msg: msgIntParse, Input: raw})
 	}
-	return mtIdx, sgtIdx, errs
+	if p := optStringField(body, "sgt_code", &errs); p != nil {
+		code = *p
+	}
+	return mtIdx, sgtIdx, code, errs
 }
 
 // parseGroupUpdateBody는 GroupUpdate(전 필드 optional)를 파싱한다. update_group은 create와 달리

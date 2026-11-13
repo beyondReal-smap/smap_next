@@ -2,12 +2,14 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/bluemusk/smap_next_go/internal/auth"
 	"github.com/bluemusk/smap_next_go/internal/config"
 	"github.com/bluemusk/smap_next_go/internal/dto"
+	"github.com/bluemusk/smap_next_go/internal/netutil"
 	"github.com/bluemusk/smap_next_go/internal/service"
 )
 
@@ -46,8 +48,8 @@ func (h *SMSHandler) SendVerificationCode(c *gin.Context) {
 		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
 		return
 	}
-	r := h.verify.SendVerificationCode(phone)
-	writeJSON(c, http.StatusOK, dto.SMSVerificationResponse{Success: r.Success, Error: r.Error})
+	r := h.verify.SendVerificationCode(c.Request.Context(), phone, netutil.ClientIP(c.Request, h.cfg.TrustedClientIPHeader))
+	writeVerificationResult(c, r)
 }
 
 // VerifyCode는 POST /sms/verify-code (무인증). VerifyCodeRequest{phone_number, code 필수}.
@@ -63,8 +65,22 @@ func (h *SMSHandler) VerifyCode(c *gin.Context) {
 		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
 		return
 	}
-	r := h.verify.VerifyCode(phone, code)
-	writeJSON(c, http.StatusOK, dto.SMSVerificationResponse{Success: r.Success, Error: r.Error})
+	r := h.verify.VerifyCode(c.Request.Context(), phone, code)
+	writeVerificationResult(c, r)
+}
+
+// writeVerificationResult는 {success, error} 응답을 쓴다. 한도 초과(429, Retry-After 포함)·저장소 장애(503)는
+// 같은 본문에 FastAPI/이메일 인증과 같은 detail 키를 더한다. 구버전 Android는 비정상 상태에서도 본문의
+// "error" 값을 정규식으로 읽어 보여 주고(발송은 상태만 보고 일반 문구), iOS는 상태 코드만 본다.
+func writeVerificationResult(c *gin.Context, r service.VerificationResult) {
+	if r.Status == 0 || r.Status == http.StatusOK {
+		writeJSON(c, http.StatusOK, dto.SMSVerificationResponse{Success: r.Success, Error: r.Error})
+		return
+	}
+	if r.Status == http.StatusTooManyRequests && r.RetryAfter > 0 {
+		c.Header("Retry-After", strconv.Itoa(r.RetryAfter))
+	}
+	writeJSON(c, r.Status, gin.H{"success": false, "error": r.Error, "detail": r.Error})
 }
 
 // Send는 POST /sms/send (인증 필수). SMSRequest{phone_number, message 필수, subject 기본 "SMAP"}.

@@ -30,15 +30,46 @@ type gsmFCMSender interface {
 // GroupScheduleManageService는 Python group_schedule_manage.py read/write 핸들러를 이식한다.
 // Phase B(생성)부터 회원 조회·푸시 로그·FCM 발송 의존성이 추가된다.
 type GroupScheduleManageService struct {
-	repo    *repository.GroupScheduleManageRepository
+	repo    gsmRepo
 	members gsmMemberRepo
 	logs    pushLogWriter
 	fcm     gsmFCMSender
+	authz   *ScheduleAuthz
 }
 
-func NewGroupScheduleManage(repo *repository.GroupScheduleManageRepository, members gsmMemberRepo, logs pushLogWriter, sender gsmFCMSender) *GroupScheduleManageService {
+// gsmRepo는 GroupScheduleManageService가 쓰는 데이터 접근이다(구현: *repository.GroupScheduleManageRepository).
+// 권한 판정(현재 멤버·그룹장·리더)은 여기가 아니라 ScheduleAuthz가 한다.
+type gsmRepo interface {
+	GetGroupMembers(groupID int) []repository.GSMMemberRow
+	TestSchedule(userID int) (*model.Schedule, error)
+	UserLocation(userID int) *repository.GSMUserLocRow
+	OwnerGroups(userID int) ([]repository.GSMOwnerGroupRow, error)
+	OwnerSchedules(groupIDs []int, userLat, userLng *float64, startDate, endDate string) ([]repository.GSMOwnerScheduleRow, error)
+	GroupSchedules(groupID int, startDate, endDate *string, memberID *int) ([]repository.GSMGroupScheduleRow, error)
+	BeginTx() (*sql.Tx, error)
+	InsertSchedule(p map[string]interface{}) (int64, error)
+	InsertScheduleFullTx(ex repository.SQLExecer, p map[string]interface{}) (int64, error)
+	InsertRecurring(p map[string]interface{}) error
+	InsertRecurringTx(ex repository.SQLExecer, p map[string]interface{}) error
+	GetScheduleShownInGroup(scheduleID, groupID int) (*model.Schedule, error)
+	SoftDeleteFamilyTx(ex repository.SQLExecer, parentID, groupID int) error
+	SoftDeleteSingleDdate(scheduleID, groupID int) (int64, error)
+	SoftDeleteAllDdate(parentID, groupID int) (int64, error)
+	SoftDeleteFutureDdate(parentID, groupID int, since string) (int64, error)
+	SelectFamilyTargets(parentID, groupID int, since *string) ([]repository.GSMTargetRow, error)
+	UpdateScheduleDynamic(scheduleID, groupID int, cols []string, vals []interface{}) error
+	DebugSchedule(scheduleID int) (*model.Schedule, error)
+	DebugRelated(scheduleID, parentID int) ([]repository.GSMRelatedRow, error)
+}
+
+func NewGroupScheduleManage(repo gsmRepo, members gsmMemberRepo, logs pushLogWriter, sender gsmFCMSender) *GroupScheduleManageService {
 	return &GroupScheduleManageService{repo: repo, members: members, logs: logs, fcm: sender}
 }
+
+// SetAuthz는 일정 인가기를 주입한다. 주입되지 않으면 인가가 필요한 메서드는 오류(500)를 낸다(조용히 허용하지 않는다).
+func (s *GroupScheduleManageService) SetAuthz(a *ScheduleAuthz) { s.authz = a }
+
+var errGSMAuthzMissing = errors.New("group schedule: authz not configured")
 
 // gsmColumnNames는 BASE38 키 목록(test-all-columns의 column_names).
 var gsmColumnNames = []string{
@@ -96,11 +127,6 @@ func gsmStrInt(p *int) string {
 		return "None"
 	}
 	return strconv.Itoa(*p)
-}
-
-// ptrEqStr은 *string == 값 비교.
-func ptrEqStr(p *string, v string) bool {
-	return p != nil && *p == v
 }
 
 // gsmBase는 model.Schedule → BASE38 변환. iso=true면 adate/schedule_alarm/wdate/udate/ddate를
@@ -286,7 +312,7 @@ func toOwnerSchedule(row *repository.GSMOwnerScheduleRow) dto.GSMOwnerSchedule {
 
 // GroupSchedules는 GET /group/{group_id}/schedules를 이식한다.
 // found=false → 403, err != nil → 500.
-func (s *GroupScheduleManageService) GroupSchedules(groupID int, startDate, endDate *string, days, memberID *int, userID int) (*dto.GSMGroupSchedulesResponse, bool, error) {
+func (s *GroupScheduleManageService) GroupSchedules(ctx context.Context, groupID int, startDate, endDate *string, days, memberID *int, userID int) (*dto.GSMGroupSchedulesResponse, bool, error) {
 	// member_id는 Python `if member_id:` truthy 조건 — 0이면 WHERE에서 제외
 	if memberID != nil && *memberID == 0 {
 		memberID = nil
@@ -300,8 +326,14 @@ func (s *GroupScheduleManageService) GroupSchedules(groupID int, startDate, endD
 		startDate, endDate = &sd, &ed
 	}
 
-	auth := s.repo.CheckGroupPermission(userID, groupID)
-	if auth == nil {
+	if s.authz == nil {
+		return nil, true, errGSMAuthzMissing
+	}
+	role, rerr := s.authz.Role(ctx, userID, groupID)
+	if rerr != nil {
+		return nil, true, rerr // 500
+	}
+	if !role.Found {
 		return nil, false, nil // 403
 	}
 	memberRows := s.repo.GetGroupMembers(groupID)
@@ -328,9 +360,9 @@ func (s *GroupScheduleManageService) GroupSchedules(groupID int, startDate, endD
 			Schedules:    schedules,
 			GroupMembers: members,
 			UserPermission: dto.GSMUserPermission{
-				CanManage: ptrEqStr(auth.SgdtOwnerChk, "Y") || ptrEqStr(auth.SgdtLeaderChk, "Y"),
-				IsOwner:   ptrEqStr(auth.SgdtOwnerChk, "Y"),
-				IsLeader:  ptrEqStr(auth.SgdtLeaderChk, "Y"),
+				CanManage: role.CanManage(),
+				IsOwner:   role.Owner,
+				IsLeader:  role.Leader,
 			},
 		},
 	}, true, nil
@@ -404,13 +436,20 @@ const (
 	GSMCreate403ManageDenied
 	GSMCreate400NoStartDate
 	GSMCreate500
+	GSMCreate403TargetInvalid // 대상 회원이 그 그룹의 현재 멤버가 아니다
 )
 
 // gsmResolveEditor는 editorId+editorName이 둘 다 truthy면 body값을, 아니면 current_user_id +
 // Member.mt_name 조회 결과를 (editorID, editorName)로 반환한다(POST/PUT 공유).
+//
+// 작업자는 항상 토큰의 회원이다: 본문 editorId가 본인 번호와 같을 때만 그 값을 그대로 돌려주고(앱은 문자열로 보낸다 —
+// 응답 형식 유지), 다르면 무시한다. 이름은 본문 값을 믿지 않고 DB의 회원 이름을 쓴다(푸시 문구 위조 방지).
 func (s *GroupScheduleManageService) gsmResolveEditor(body map[string]interface{}, userID int) (interface{}, interface{}) {
-	if gsmPyTruthy(body["editorId"]) && gsmPyTruthy(body["editorName"]) {
-		return body["editorId"], body["editorName"]
+	var editorID interface{} = userID
+	if gsmPyTruthy(body["editorId"]) {
+		if id, err := gsmPyInt(body["editorId"]); err == nil && id == userID {
+			editorID = body["editorId"]
+		}
 	}
 	var editorName interface{} = "알 수 없음"
 	if m, err := s.members.GetByID(userID); err == nil && m != nil {
@@ -420,7 +459,7 @@ func (s *GroupScheduleManageService) gsmResolveEditor(body map[string]interface{
 			editorName = nil // Python None → JSON null
 		}
 	}
-	return userID, editorName
+	return editorID, editorName
 }
 
 // gsmComputeAlarm은 alarm_chk=='Y' && pick_type && pick_result일 때 sdate 기준 알림 문자열을, 아니면 nil.
@@ -535,29 +574,45 @@ func gsmBuildScheduleParams(groupID, targetMemberID, targetSgdtIdx int, body map
 
 // CreateGroupSchedule은 POST /group/{group_id}/schedules를 이식한다.
 // 반환 string은 500일 때 "Internal server error: " 뒤에 붙일 메시지(드라이버별 상이 — status만 충실).
-func (s *GroupScheduleManageService) CreateGroupSchedule(groupID int, body map[string]interface{}, userID int) (*dto.GSMCreateResponse, GSMCreateOutcome, string) {
+//
+// 신원(userID)은 토큰의 회원이다. 본문 targetMemberId가 없거나 본인이면 본인 일정(그 그룹 현재 멤버면 누구나 — iOS는 본인 번호를
+// targetMemberId로 보낸다, B-1). 타인이면 요청자가 그룹장·리더이고 대상이 현재 멤버일 때만(리더는 그룹장 대상 제외).
+func (s *GroupScheduleManageService) CreateGroupSchedule(ctx context.Context, groupID int, body map[string]interface{}, userID int) (*dto.GSMCreateResponse, GSMCreateOutcome, string) {
+	if s.authz == nil {
+		return nil, GSMCreate500, errGSMAuthzMissing.Error()
+	}
 	editorID, editorName := s.gsmResolveEditor(body, userID)
 
-	auth := s.repo.CheckGroupPermission(userID, groupID)
-	if auth == nil {
+	role, rerr := s.authz.Role(ctx, userID, groupID)
+	if rerr != nil {
+		return nil, GSMCreate500, rerr.Error()
+	}
+	if !role.Found {
 		return nil, GSMCreate403GroupDenied, ""
 	}
 
-	targetMemberID := userID
-	targetSgdtIdx := auth.SgdtIdx
+	var requested *int
 	if gsmPyTruthy(body["targetMemberId"]) {
 		tid, err := gsmPyInt(body["targetMemberId"])
 		if err != nil {
 			return nil, GSMCreate500, err.Error()
 		}
-		targetMemberID = tid
-		if !(gsmEqY(auth.SgdtOwnerChk) || gsmEqY(auth.SgdtLeaderChk)) {
-			return nil, GSMCreate403ManageDenied, ""
-		}
-		if ta := s.repo.CheckGroupPermission(targetMemberID, groupID); ta != nil {
-			targetSgdtIdx = ta.SgdtIdx
-		}
+		requested = &tid
 	}
+	target, terr := s.authz.ResolveCreateTarget(ctx, userID, groupID, role, requested, nil)
+	switch {
+	case terr == nil:
+	case errors.Is(terr, ErrScheduleManageDenied):
+		return nil, GSMCreate403ManageDenied, ""
+	case errors.Is(terr, ErrScheduleTargetInvalid):
+		return nil, GSMCreate403TargetInvalid, ""
+	case errors.Is(terr, ErrScheduleNotMember):
+		return nil, GSMCreate403GroupDenied, ""
+	default:
+		return nil, GSMCreate500, terr.Error()
+	}
+	targetMemberID := target.MtIdx
+	targetSgdtIdx := target.SgdtIdx
 
 	params, outcome, msg := gsmBuildScheduleParams(groupID, targetMemberID, targetSgdtIdx, body)
 	if outcome != GSMCreateOK {
@@ -605,19 +660,27 @@ const (
 	GSMUpdate404
 	GSMUpdate400NoStartDate
 	GSMUpdate500
+	GSMUpdate403TargetInvalid // 대상 회원이 그 그룹의 현재 멤버가 아니다
 )
 
 // UpdateGroupSchedule은 PUT /group/{group_id}/schedules/{schedule_id}를 이식한다(반복옵션 this/all/future).
 // 500 응답 메시지는 항상 "Internal server error"(POST와 달리 접미사 없음).
-func (s *GroupScheduleManageService) UpdateGroupSchedule(groupID, scheduleID int, body map[string]interface{}, userID int) (*dto.GSMUpdateResponse, GSMUpdateOutcome) {
+func (s *GroupScheduleManageService) UpdateGroupSchedule(ctx context.Context, groupID, scheduleID int, body map[string]interface{}, userID int) (*dto.GSMUpdateResponse, GSMUpdateOutcome) {
+	if s.authz == nil {
+		return nil, GSMUpdate500
+	}
 	editorID, editorName := s.gsmResolveEditor(body, userID)
 
-	auth := s.repo.CheckGroupPermission(userID, groupID)
-	if auth == nil {
+	role, rerr := s.authz.Role(ctx, userID, groupID)
+	if rerr != nil {
+		return nil, GSMUpdate500
+	}
+	if !role.Found {
 		return nil, GSMUpdate403GroupDenied
 	}
 
-	existing, err := s.repo.GetScheduleShown(scheduleID)
+	// 경로의 그룹에 속한 일정만 다룬다(다른 그룹 일정 번호를 넣어도 404).
+	existing, err := s.repo.GetScheduleShownInGroup(scheduleID, groupID)
 	if err != nil {
 		return nil, GSMUpdate500
 	}
@@ -625,11 +688,60 @@ func (s *GroupScheduleManageService) UpdateGroupSchedule(groupID, scheduleID int
 		return nil, GSMUpdate404
 	}
 
-	// can_edit: 본인 스케줄이거나 owner/leader
-	canEdit := (existing.MtIdx != nil && *existing.MtIdx == userID) ||
-		gsmEqY(auth.SgdtOwnerChk) || gsmEqY(auth.SgdtLeaderChk)
-	if !canEdit {
-		return nil, GSMUpdate403EditDenied
+	// 작성자 본인 또는 그 그룹의 그룹장·리더(리더는 그룹장의 일정 제외).
+	if cerr := s.authz.CanModify(ctx, userID, groupID, role, existing.MtIdx); cerr != nil {
+		if errors.Is(cerr, ErrScheduleManageDenied) {
+			return nil, GSMUpdate403EditDenied
+		}
+		return nil, GSMUpdate500
+	}
+
+	// 클라이언트가 보낸 반복 부모 번호는 쓰지 않는다. 부모는 DB의 기존 행(existing.SstPidx)에서만 얻는다(S-1).
+	body = gsmCopyMap(body)
+	delete(body, "sst_pidx")
+
+	// 소유자는 확정된 대상으로만 바뀐다: 본문 targetMemberId/sgdt_idx가 있으면 그 그룹의 현재 멤버인지 확인하고
+	// 본문 값을 확정 값으로 덮어쓴다. 없으면 소유자는 그대로(기존 행의 값).
+	target := ScheduleTarget{}
+	if existing.MtIdx != nil {
+		target.MtIdx = *existing.MtIdx
+	}
+	if existing.SgdtIdx != nil {
+		target.SgdtIdx = *existing.SgdtIdx
+	}
+	if gsmPyTruthy(body["targetMemberId"]) || gsmPyTruthy(body["sgdt_idx"]) {
+		cur := target.MtIdx
+		requested := &cur
+		if gsmPyTruthy(body["targetMemberId"]) {
+			tid, perr := gsmPyInt(body["targetMemberId"])
+			if perr != nil {
+				return nil, GSMUpdate500
+			}
+			requested = &tid
+		}
+		var sgdt *int
+		if gsmPyTruthy(body["sgdt_idx"]) {
+			v, perr := gsmPyInt(body["sgdt_idx"])
+			if perr != nil {
+				return nil, GSMUpdate500
+			}
+			sgdt = &v
+		}
+		t, terr := s.authz.ResolveTarget(ctx, userID, groupID, role, requested, sgdt)
+		switch {
+		case terr == nil:
+		case errors.Is(terr, ErrScheduleManageDenied):
+			return nil, GSMUpdate403EditDenied
+		case errors.Is(terr, ErrScheduleTargetInvalid):
+			return nil, GSMUpdate403TargetInvalid
+		case errors.Is(terr, ErrScheduleNotMember):
+			return nil, GSMUpdate403GroupDenied
+		default:
+			return nil, GSMUpdate500
+		}
+		target = t
+		body["targetMemberId"] = t.MtIdx
+		body["sgdt_idx"] = t.SgdtIdx
 	}
 
 	editOptionRaw := gsmGetOr(body, "editOption", "this")
@@ -651,7 +763,7 @@ func (s *GroupScheduleManageService) UpdateGroupSchedule(groupID, scheduleID int
 			// Path 4: 반복패턴 변경 → 패밀리 soft-delete + 새 부모 + 반복 재생성.
 			// Python은 단일 세션(create_recurring의 commit/rollback)으로 원자적이므로 트랜잭션으로 감싼다.
 			// create_recurring의 bind 누락(불완전 body) 또는 INSERT 실패 시 전체 rollback → 구 패밀리 보존.
-			count, outc := s.updateRepeatPatternTx(parentID, groupID, userID, body, newRepeatRaw)
+			count, outc := s.updateRepeatPatternTx(parentID, groupID, target, body, newRepeatRaw)
 			if outc != GSMUpdateOK {
 				return nil, outc
 			}
@@ -663,14 +775,14 @@ func (s *GroupScheduleManageService) UpdateGroupSchedule(groupID, scheduleID int
 				sd := existing.SstSdate.Format(gsmDTLayout)
 				since = &sd
 			}
-			targets, err := s.repo.SelectFamilyTargets(parentID, since)
+			targets, err := s.repo.SelectFamilyTargets(parentID, groupID, since)
 			if err != nil {
 				return nil, GSMUpdate500
 			}
 			for _, t := range targets {
 				targetData := gsmCopyMap(body)
 				gsmApplyDateKeeping(targetData, body, t.SstSdate)
-				if uerr := s.updateSingleSchedule(t.SstIdx, targetData); uerr != nil {
+				if uerr := s.updateSingleSchedule(t.SstIdx, groupID, targetData); uerr != nil {
 					return nil, GSMUpdate500
 				}
 				updatedCount++
@@ -678,7 +790,7 @@ func (s *GroupScheduleManageService) UpdateGroupSchedule(groupID, scheduleID int
 		}
 	} else {
 		// 일반/this 단일 수정
-		if uerr := s.updateSingleSchedule(scheduleID, body); uerr != nil {
+		if uerr := s.updateSingleSchedule(scheduleID, groupID, body); uerr != nil {
 			return nil, GSMUpdate500
 		}
 		updatedCount = 1
@@ -707,7 +819,7 @@ func (s *GroupScheduleManageService) UpdateGroupSchedule(groupID, scheduleID int
 // updateSingleSchedule은 update_single_schedule(부분 UPDATE)를 이식한다.
 // 누락 sdate → 에러(Python ValueError → PUT 500). UPDATE는 non-None 필드만 + sst_udate=NOW().
 // ⚠️ sst_location_alarm 기본값 'N'(POST는 '4') + sst_alram 'N' → tinyint(1) 1366 → 둘 다 정수 미제공 시 500.
-func (s *GroupScheduleManageService) updateSingleSchedule(scheduleID int, body map[string]interface{}) error {
+func (s *GroupScheduleManageService) updateSingleSchedule(scheduleID, groupID int, body map[string]interface{}) error {
 	titleRaw := body["sst_title"]
 	titleStr, isStr := titleRaw.(string)
 	if titleRaw != nil && !isStr {
@@ -796,14 +908,14 @@ func (s *GroupScheduleManageService) updateSingleSchedule(scheduleID int, body m
 			vals = append(vals, f.v)
 		}
 	}
-	return s.repo.UpdateScheduleDynamic(scheduleID, cols, vals)
+	return s.repo.UpdateScheduleDynamic(scheduleID, groupID, cols, vals)
 }
 
 // updateRepeatPatternTx는 PUT Path4(반복패턴 변경)를 단일 트랜잭션으로 수행한다.
 // 패밀리 soft-delete → 새 부모(create_new_schedule) → 반복 재생성(create_recurring) 중 하나라도 실패하면
 // 전체 rollback(구 패밀리 'Y' 보존)하여 Python의 세션 commit/rollback 원자성을 충실 재현한다.
 // 반환: (updated_count, outcome). outcome!=GSMUpdateOK면 핸들러가 상태로 변환(누락 sdate→400, 그 외→500).
-func (s *GroupScheduleManageService) updateRepeatPatternTx(parentID, groupID, userID int, body map[string]interface{}, newRepeatRaw interface{}) (int, GSMUpdateOutcome) {
+func (s *GroupScheduleManageService) updateRepeatPatternTx(parentID, groupID int, target ScheduleTarget, body map[string]interface{}, newRepeatRaw interface{}) (int, GSMUpdateOutcome) {
 	tx, err := s.repo.BeginTx()
 	if err != nil {
 		return 0, GSMUpdate500
@@ -815,10 +927,10 @@ func (s *GroupScheduleManageService) updateRepeatPatternTx(parentID, groupID, us
 		}
 	}()
 
-	if err := s.repo.SoftDeleteFamilyTx(tx, parentID); err != nil {
+	if err := s.repo.SoftDeleteFamilyTx(tx, parentID, groupID); err != nil {
 		return 0, GSMUpdate500
 	}
-	newParentID, cerr := s.createNewScheduleTx(tx, groupID, userID, body)
+	newParentID, cerr := s.createNewScheduleTx(tx, groupID, target, body)
 	if cerr != nil {
 		if errors.Is(cerr, errGSMStartDate) {
 			return 0, GSMUpdate400NoStartDate
@@ -841,26 +953,14 @@ func (s *GroupScheduleManageService) updateRepeatPatternTx(parentID, groupID, us
 // createNewScheduleTx는 create_new_schedule(PUT Path4 새 부모 생성)을 트랜잭션 ex로 이식한다.
 // Python처럼 body를 변형(title/edate 기본값)해 후속 create_recurring(body)가 동일 값을 읽게 한다.
 // 누락 sdate → errGSMStartDate(400), 그 외 실패 → 일반 error(500).
-func (s *GroupScheduleManageService) createNewScheduleTx(tx *sql.Tx, groupID, userID int, body map[string]interface{}) (int64, error) {
-	auth := s.repo.CheckGroupPermission(userID, groupID)
-	if auth == nil {
-		return 0, fmt.Errorf("Group access denied for user %d in group %d", userID, groupID)
-	}
-	targetMemberID := userID
-	targetSgdtIdx := auth.SgdtIdx
-	if gsmPyTruthy(body["targetMemberId"]) {
-		tid, err := gsmPyInt(body["targetMemberId"])
-		if err != nil {
-			return 0, err
-		}
-		targetMemberID = tid
-		if !(gsmEqY(auth.SgdtOwnerChk) || gsmEqY(auth.SgdtLeaderChk)) {
-			return 0, fmt.Errorf("Only group owners or leaders can create schedules for other members")
-		}
-		if ta := s.repo.CheckGroupPermission(targetMemberID, groupID); ta != nil {
-			targetSgdtIdx = ta.SgdtIdx
-		}
-	}
+func (s *GroupScheduleManageService) createNewScheduleTx(tx *sql.Tx, groupID int, target ScheduleTarget, body map[string]interface{}) (int64, error) {
+	// 권한과 대상은 호출 전에 확정됐다(UpdateGroupSchedule). 반복 자식 생성이 body를 base로 읽으므로 소유자·그룹을
+	// 확정 값으로 고정한다 — 본문에 다른 mt_idx/sgt_idx/sgdt_idx가 들어 있어도 쓰이지 않는다.
+	body["mt_idx"] = target.MtIdx
+	body["sgdt_idx"] = target.SgdtIdx
+	body["sgt_idx"] = groupID
+	targetMemberID := target.MtIdx
+	targetSgdtIdx := target.SgdtIdx
 	// create_recurring가 body를 base로 읽으므로 Python schedule_data 변형 재현(title/edate 기본값).
 	if ts, ok := body["sst_title"].(string); (ok && strings.TrimSpace(ts) == "") || body["sst_title"] == nil {
 		body["sst_title"] = "제목 없음"
@@ -875,7 +975,7 @@ func (s *GroupScheduleManageService) createNewScheduleTx(tx *sql.Tx, groupID, us
 	if outcome != GSMCreateOK {
 		return 0, fmt.Errorf("build schedule params failed")
 	}
-	params["sst_pidx"] = body["sst_pidx"]
+	params["sst_pidx"] = nil // 새 부모 행: 클라이언트가 보낸 sst_pidx는 쓰지 않는다
 	return s.repo.InsertScheduleFullTx(tx, params)
 }
 
@@ -892,25 +992,34 @@ const (
 
 // DeleteGroupSchedule은 DELETE /group/{group_id}/schedules/{schedule_id}를 이식한다(this/all/future).
 // body는 Optional(nil 가능). soft-delete(sst_show='N', sst_ddate=NOW()). 500 메시지는 "Internal server error".
-func (s *GroupScheduleManageService) DeleteGroupSchedule(groupID, scheduleID int, body map[string]interface{}, userID int) (*dto.GSMDeleteResponse, GSMDeleteOutcome) {
+func (s *GroupScheduleManageService) DeleteGroupSchedule(ctx context.Context, groupID, scheduleID int, body map[string]interface{}, userID int) (*dto.GSMDeleteResponse, GSMDeleteOutcome) {
+	if s.authz == nil {
+		return nil, GSMDelete500
+	}
 	// editor 추출(body nil이면 nil 읽기 → current_user). gsmResolveEditor가 nil body 안전 처리.
 	editorID, editorName := s.gsmResolveEditor(body, userID)
 
-	auth := s.repo.CheckGroupPermission(userID, groupID)
-	if auth == nil {
+	role, rerr := s.authz.Role(ctx, userID, groupID)
+	if rerr != nil {
+		return nil, GSMDelete500
+	}
+	if !role.Found {
 		return nil, GSMDelete403GroupDenied
 	}
-	existing, err := s.repo.GetScheduleShown(scheduleID)
+	// 경로의 그룹에 속한 일정만 다룬다(다른 그룹 일정 번호를 넣어도 404).
+	existing, err := s.repo.GetScheduleShownInGroup(scheduleID, groupID)
 	if err != nil {
 		return nil, GSMDelete500
 	}
 	if existing == nil {
 		return nil, GSMDelete404
 	}
-	canDelete := (existing.MtIdx != nil && *existing.MtIdx == userID) ||
-		gsmEqY(auth.SgdtOwnerChk) || gsmEqY(auth.SgdtLeaderChk)
-	if !canDelete {
-		return nil, GSMDelete403DeleteDenied
+	// 작성자 본인 또는 그 그룹의 그룹장·리더(리더는 그룹장의 일정 제외).
+	if cerr := s.authz.CanModify(ctx, userID, groupID, role, existing.MtIdx); cerr != nil {
+		if errors.Is(cerr, ErrScheduleManageDenied) {
+			return nil, GSMDelete403DeleteDenied
+		}
+		return nil, GSMDelete500
 	}
 
 	// delete_option: 'this' 기본. body에 deleteOption 키가 있으면(값이 null이어도) 그 값(Python `in` 검사).
@@ -931,7 +1040,7 @@ func (s *GroupScheduleManageService) DeleteGroupSchedule(groupID, scheduleID int
 			parentID = *existing.SstPidx
 		}
 		if gsmStrEq(deleteOptionRaw, "all") {
-			n, derr := s.repo.SoftDeleteAllDdate(parentID)
+			n, derr := s.repo.SoftDeleteAllDdate(parentID, groupID)
 			if derr != nil {
 				return nil, GSMDelete500
 			}
@@ -941,7 +1050,7 @@ func (s *GroupScheduleManageService) DeleteGroupSchedule(groupID, scheduleID int
 			if existing.SstSdate != nil {
 				since = existing.SstSdate.Format(gsmDTLayout)
 			}
-			n, derr := s.repo.SoftDeleteFutureDdate(parentID, since)
+			n, derr := s.repo.SoftDeleteFutureDdate(parentID, groupID, since)
 			if derr != nil {
 				return nil, GSMDelete500
 			}
@@ -949,7 +1058,7 @@ func (s *GroupScheduleManageService) DeleteGroupSchedule(groupID, scheduleID int
 		}
 		// 그 외 옵션(예: 'xyz')은 all/future 어디에도 안 걸려 deletedCount=0(Python 동일).
 	} else {
-		n, derr := s.repo.SoftDeleteSingleDdate(scheduleID)
+		n, derr := s.repo.SoftDeleteSingleDdate(scheduleID, groupID)
 		if derr != nil {
 			return nil, GSMDelete500
 		}

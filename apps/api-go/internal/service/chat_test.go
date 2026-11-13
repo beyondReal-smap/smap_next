@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -10,34 +11,55 @@ import (
 
 // --- mock chatRepo (함수 필드 주입식) ---
 type mockChatRepo struct {
-	roomsFn   func(int) ([]model.ChatRoom, error)
-	membFn    func(int, int) (*model.ChatMember, error)
-	unreadFn  func(int, int) (int64, error)
-	latestFn  func(int) (*model.ChatMessage, error)
-	membersFn func(int) ([]model.ChatMember, error)
-	dmFn      func(int, int) (*model.ChatRoom, error)
-	msgsFn    func(int, int, int) ([]model.ChatMessage, error)
-	cUnreadFn func(int, int) (int, error)
+	roomsFn     func(int) ([]model.ChatRoom, error)
+	membFn      func(int, int) (*model.ChatMember, error)
+	unreadFn    func(int, int) (int64, error)
+	latestFn    func(int) (*model.ChatMessage, error)
+	membersFn   func(int) ([]model.ChatMember, error)
+	dmFn        func(int, int) (*model.ChatRoom, error)
+	msgsFn      func(int, int, int) ([]model.ChatMessage, error)
+	cUnreadFn   func(int, int) (int, error)
 	createFn    func(int, int, time.Time) (int, error)
 	byIDsFn     func([]int) ([]model.Member, error)
 	createMsgFn func(int, int, string, time.Time) (*model.ChatMessage, error)
 	updLastFn   func(int, int, int) error
+	shareFn     func(int, int) (bool, error) // nil이면 항상 같은 그룹
+	removed     [][2]int
+	removedAll  []int
 }
 
-func (m *mockChatRepo) GetRoomsForMember(mtIdx int) ([]model.ChatRoom, error)  { return m.roomsFn(mtIdx) }
-func (m *mockChatRepo) FindMembership(s, mt int) (*model.ChatMember, error)    { return m.membFn(s, mt) }
-func (m *mockChatRepo) UnreadCount(s, lr int) (int64, error)                   { return m.unreadFn(s, lr) }
-func (m *mockChatRepo) GetLatest(s int) (*model.ChatMessage, error)            { return m.latestFn(s) }
-func (m *mockChatRepo) GetRoomMembers(s int) ([]model.ChatMember, error)       { return m.membersFn(s) }
-func (m *mockChatRepo) FindDM(a, b int) (*model.ChatRoom, error)               { return m.dmFn(a, b) }
-func (m *mockChatRepo) GetMessages(s, b, l int) ([]model.ChatMessage, error)   { return m.msgsFn(s, b, l) }
-func (m *mockChatRepo) CountUnread(s, mi int) (int, error)                     { return m.cUnreadFn(s, mi) }
-func (m *mockChatRepo) CreateDMRoom(a, b int, t time.Time) (int, error)        { return m.createFn(a, b, t) }
-func (m *mockChatRepo) GetMembersByIDs(ids []int) ([]model.Member, error)      { return m.byIDsFn(ids) }
+func (m *mockChatRepo) GetRoomsForMember(mtIdx int) ([]model.ChatRoom, error) {
+	return m.roomsFn(mtIdx)
+}
+func (m *mockChatRepo) FindMembership(s, mt int) (*model.ChatMember, error) { return m.membFn(s, mt) }
+func (m *mockChatRepo) UnreadCount(s, lr int) (int64, error)                { return m.unreadFn(s, lr) }
+func (m *mockChatRepo) GetLatest(s int) (*model.ChatMessage, error)         { return m.latestFn(s) }
+func (m *mockChatRepo) GetRoomMembers(s int) ([]model.ChatMember, error)    { return m.membersFn(s) }
+func (m *mockChatRepo) FindDM(a, b int) (*model.ChatRoom, error)            { return m.dmFn(a, b) }
+func (m *mockChatRepo) GetMessages(s, b, l int) ([]model.ChatMessage, error) {
+	return m.msgsFn(s, b, l)
+}
+func (m *mockChatRepo) CountUnread(s, mi int) (int, error)                { return m.cUnreadFn(s, mi) }
+func (m *mockChatRepo) CreateDMRoom(a, b int, t time.Time) (int, error)   { return m.createFn(a, b, t) }
+func (m *mockChatRepo) GetMembersByIDs(ids []int) ([]model.Member, error) { return m.byIDsFn(ids) }
 func (m *mockChatRepo) CreateMessageTx(s, mt int, c string, t time.Time) (*model.ChatMessage, error) {
 	return m.createMsgFn(s, mt, c, t)
 }
 func (m *mockChatRepo) UpdateLastRead(s, mt, si int) error { return m.updLastFn(s, mt, si) }
+func (m *mockChatRepo) ShareActiveGroup(a, b int) (bool, error) {
+	if m.shareFn == nil {
+		return true, nil
+	}
+	return m.shareFn(a, b)
+}
+func (m *mockChatRepo) RemoveMemberFromGroupChat(sgt, mt int) error {
+	m.removed = append(m.removed, [2]int{sgt, mt})
+	return nil
+}
+func (m *mockChatRepo) RemoveAllFromGroupChat(sgt int) error {
+	m.removedAll = append(m.removedAll, sgt)
+	return nil
+}
 
 func sp(s string) *string { return &s }
 
@@ -125,7 +147,9 @@ func TestGetRoomsForMember_DM(t *testing.T) {
 		roomsFn: func(mt int) ([]model.ChatRoom, error) {
 			return []model.ChatRoom{{ScrIdx: 10, ScrType: "dm", ScrShow: "Y", ScrUdate: wdate}}, nil
 		},
-		membFn:   func(s, mt int) (*model.ChatMember, error) { return &model.ChatMember{ScrIdx: s, MtIdx: mt, ScmLastReadIdx: 5}, nil },
+		membFn: func(s, mt int) (*model.ChatMember, error) {
+			return &model.ChatMember{ScrIdx: s, MtIdx: mt, ScmLastReadIdx: 5}, nil
+		},
 		unreadFn: func(s, lr int) (int64, error) { return 3, nil },
 		latestFn: func(s int) (*model.ChatMessage, error) {
 			return &model.ChatMessage{ScmsgIdx: 8, ScrIdx: s, MtIdx: 2, ScmsgContent: "안녕하세요", ScmsgWdate: wdate}, nil
@@ -172,5 +196,76 @@ func TestCreateDMRoom(t *testing.T) {
 	}
 	if res, err := NewChat(fresh).CreateDMRoom(1, 2); err != nil || res.ScrIdx != 123 || !res.IsNew {
 		t.Errorf("신규 DM → {123,true} 기대, got %+v err=%v", res, err)
+	}
+}
+
+// C-2: DM은 같은 그룹의 활성 회원끼리만 만들 수 있다(없는 회원·다른 그룹 회원이면 거부, DB 쓰기 없음).
+func TestCreateDMRoom_RequiresSharedActiveGroup(t *testing.T) {
+	created := false
+	repo := &mockChatRepo{
+		shareFn:  func(a, b int) (bool, error) { return false, nil },
+		dmFn:     func(a, b int) (*model.ChatRoom, error) { return nil, nil },
+		createFn: func(a, b int, t time.Time) (int, error) { created = true; return 1, nil },
+	}
+	if _, err := NewChat(repo).CreateDMRoom(1, 2); err != ErrChatDMNotAllowed {
+		t.Fatalf("ErrChatDMNotAllowed 기대: %v", err)
+	}
+	if created {
+		t.Error("거부된 요청이 방을 만들었다")
+	}
+}
+
+// C-1: 그룹 멤버십이 없어진 방은 방 목록에서 제외된다.
+func TestGetRoomsForMember_SkipsRoomsWithoutValidMembership(t *testing.T) {
+	repo := &mockChatRepo{
+		roomsFn: func(int) ([]model.ChatRoom, error) { return []model.ChatRoom{{ScrIdx: 1, ScrType: "group"}}, nil },
+		membFn:  func(s, mt int) (*model.ChatMember, error) { return nil, nil },
+	}
+	res, err := NewChat(repo).GetRoomsForMember(3)
+	if err != nil || len(res.Rooms) != 0 {
+		t.Errorf("멤버십 없는 방은 제외돼야 함: %+v err=%v", res, err)
+	}
+}
+
+// 비활성화 함수는 repo를 호출하고 수신 시점 확인 캐시를 비운다(캐시된 허용이 남지 않는다).
+func TestDeactivateChatMembershipClearsCache(t *testing.T) {
+	member := true
+	repo := &mockChatRepo{membFn: func(s, mt int) (*model.ChatMember, error) {
+		if member {
+			return &model.ChatMember{ScrIdx: s, MtIdx: mt}, nil
+		}
+		return nil, nil
+	}}
+	svc := NewChat(repo)
+	svc.SetMembershipCacheTTL(time.Minute)
+	if ok, _ := svc.IsRoomMember(1, 3); !ok {
+		t.Fatal("멤버여야 함")
+	}
+	member = false // 그룹 멤버십 상실
+	if ok, _ := svc.IsRoomMember(1, 3); !ok {
+		t.Error("TTL 안에서는 캐시된 허용(최대 TTL 지연)")
+	}
+	if err := svc.DeactivateChatMembership(context.Background(), 10, 3); err != nil {
+		t.Fatal(err)
+	}
+	if len(repo.removed) != 1 || repo.removed[0] != [2]int{10, 3} {
+		t.Errorf("repo 비활성화 호출 불일치: %v", repo.removed)
+	}
+	if ok, _ := svc.IsRoomMember(1, 3); ok {
+		t.Error("비활성화 직후에는 즉시 거부돼야 함")
+	}
+	if err := svc.DeactivateGroupChat(context.Background(), 10); err != nil || len(repo.removedAll) != 1 {
+		t.Errorf("그룹 삭제 비활성화: %v %v", err, repo.removedAll)
+	}
+}
+
+func TestIsRoomMemberNoCacheWhenTTLZero(t *testing.T) {
+	calls := 0
+	repo := &mockChatRepo{membFn: func(s, mt int) (*model.ChatMember, error) { calls++; return &model.ChatMember{}, nil }}
+	svc := NewChat(repo)
+	svc.IsRoomMember(1, 1)
+	svc.IsRoomMember(1, 1)
+	if calls != 2 {
+		t.Errorf("TTL 0이면 매번 조회: %d", calls)
 	}
 }

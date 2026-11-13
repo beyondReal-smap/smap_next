@@ -12,9 +12,12 @@ import (
 
 // sqlExecer는 *sql.DB(pool)과 *sql.Tx(트랜잭션)가 모두 만족하는 실행 인터페이스.
 // PUT Path4는 단일 트랜잭션이 필요하므로 쓰기 메서드를 pool/tx 양쪽에서 재사용한다.
-type sqlExecer interface {
+type SQLExecer interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)
 }
+
+// sqlExecer는 SQLExecer의 이전 이름이다(저장소 내부 시그니처 호환).
+type sqlExecer = SQLExecer
 
 // GroupScheduleManageRepository는 Python group_schedule_manage.py의 raw SQL을 이식한다.
 type GroupScheduleManageRepository struct {
@@ -26,18 +29,6 @@ func NewGroupScheduleManage(db *gorm.DB) *GroupScheduleManageRepository {
 }
 
 // === 결과 struct ===
-
-// GSMPermissionRow는 check_group_permission 결과.
-type GSMPermissionRow struct {
-	MtIdx         int     `gorm:"column:mt_idx"`
-	MtName        *string `gorm:"column:mt_name"`
-	SgtIdx        *int    `gorm:"column:sgt_idx"`
-	SgdtIdx       int     `gorm:"column:sgdt_idx"`
-	SgdtOwnerChk  *string `gorm:"column:sgdt_owner_chk"`
-	SgdtLeaderChk *string `gorm:"column:sgdt_leader_chk"`
-	SgdtDischarge *string `gorm:"column:sgdt_discharge"`
-	SgdtExit      *string `gorm:"column:sgdt_exit"`
-}
 
 // GSMMemberRow는 get_group_members 결과(mt_file1은 COALESCE ”).
 type GSMMemberRow struct {
@@ -97,24 +88,6 @@ type GSMRelatedRow struct {
 
 // === 쿼리 메서드 ===
 
-// CheckGroupPermission은 Python check_group_permission을 이식한다(except→nil).
-func (r *GroupScheduleManageRepository) CheckGroupPermission(userID, groupID int) *GSMPermissionRow {
-	var rows []GSMPermissionRow
-	err := r.db.Raw(`
-		SELECT m.mt_idx, m.mt_name, sgd.sgt_idx, sgd.sgdt_idx,
-		       sgd.sgdt_owner_chk, sgd.sgdt_leader_chk, sgd.sgdt_discharge, sgd.sgdt_exit
-		FROM member_t m
-		JOIN smap_group_detail_t sgd ON m.mt_idx = sgd.mt_idx
-		JOIN smap_group_t sg ON sgd.sgt_idx = sg.sgt_idx
-		WHERE m.mt_idx = ? AND sgd.sgt_idx = ?
-		  AND sgd.sgdt_discharge = 'N' AND sgd.sgdt_exit = 'N' AND sg.sgt_show = 'Y'`,
-		userID, groupID).Scan(&rows).Error
-	if err != nil || len(rows) == 0 {
-		return nil
-	}
-	return &rows[0]
-}
-
 // GetGroupMembers는 Python get_group_members를 이식한다(except→빈 슬라이스).
 func (r *GroupScheduleManageRepository) GetGroupMembers(groupID int) []GSMMemberRow {
 	var rows []GSMMemberRow
@@ -159,14 +132,15 @@ func (r *GroupScheduleManageRepository) UserLocation(userID int) *GSMUserLocRow 
 	return &rows[0]
 }
 
-// OwnerGroups는 current_user가 속한 그룹 목록(sgt_show='Y').
+// OwnerGroups는 요청자가 현재 멤버로 속한 그룹 목록(sgt_show='Y' + 공통 멤버십 조건 — 나간·강퇴·숨김 행 제외, S-4).
 func (r *GroupScheduleManageRepository) OwnerGroups(userID int) ([]GSMOwnerGroupRow, error) {
 	var rows []GSMOwnerGroupRow
 	err := r.db.Raw(`
 		SELECT sg.sgt_idx, sg.sgt_title, sgd.sgdt_idx, sgd.sgdt_owner_chk, sgd.sgdt_leader_chk, sgd.mt_idx
 		FROM smap_group_t sg
 		JOIN smap_group_detail_t sgd ON sg.sgt_idx = sgd.sgt_idx
-		WHERE sgd.mt_idx = ? AND sg.sgt_show = 'Y'`, userID).Scan(&rows).Error
+		JOIN member_t m ON m.mt_idx = sgd.mt_idx
+		WHERE sgd.mt_idx = ? AND sg.sgt_show = 'Y' AND `+currentMemberSQL("sgd", "m"), userID).Scan(&rows).Error
 	return rows, err
 }
 
@@ -293,7 +267,7 @@ const gsmRecurringSQL = `INSERT INTO smap_schedule_t (
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Y', NOW(), ?)`
 
 const gsmSoftDeleteSQL = `UPDATE smap_schedule_t SET sst_show='N', sst_udate=NOW()
-	WHERE (sst_pidx = ? OR sst_idx = ?) AND sst_show = 'Y'`
+	WHERE (sst_pidx = ? OR sst_idx = ?) AND sgt_idx = ? AND sst_show = 'Y'`
 
 // gsmInsertArgs/gsmInsertFullArgs/gsmRecurringArgs는 SQL 컬럼순으로 바인딩 인자를 구성한다.
 func gsmInsertArgs(p map[string]interface{}) []interface{} {
@@ -397,10 +371,12 @@ func gsmExecID(ex sqlExecer, q string, args []interface{}) (int64, error) {
 	return res.LastInsertId()
 }
 
-// GetScheduleShown은 sst_show='Y'인 단일 스케줄을 조회한다(PUT 기존행 조회). 없으면 (nil,nil).
-func (r *GroupScheduleManageRepository) GetScheduleShown(scheduleID int) (*model.Schedule, error) {
+// GetScheduleShownInGroup은 그 그룹(sgt_idx)의 sst_show='Y'인 단일 스케줄을 조회한다(PUT/DELETE 기존행 조회).
+// 경로의 group_id와 일정의 sgt_idx가 다르면 없는 것으로 본다(다른 그룹 일정 수정·삭제 차단, S-1/S-2). 없으면 (nil,nil).
+func (r *GroupScheduleManageRepository) GetScheduleShownInGroup(scheduleID, groupID int) (*model.Schedule, error) {
 	var rows []model.Schedule
-	err := r.db.Raw(`SELECT * FROM smap_schedule_t WHERE sst_idx = ? AND sst_show = 'Y'`, scheduleID).Scan(&rows).Error
+	err := r.db.Raw(`SELECT * FROM smap_schedule_t WHERE sst_idx = ? AND sgt_idx = ? AND sst_show = 'Y'`,
+		scheduleID, groupID).Scan(&rows).Error
 	if err != nil {
 		return nil, err
 	}
@@ -410,48 +386,50 @@ func (r *GroupScheduleManageRepository) GetScheduleShown(scheduleID int) (*model
 	return &rows[0], nil
 }
 
-// SoftDeleteFamilyTx는 패밀리(sst_pidx=parent OR sst_idx=parent)를 sst_show='N'으로 소프트 삭제(트랜잭션 실행).
-func (r *GroupScheduleManageRepository) SoftDeleteFamilyTx(ex sqlExecer, parentID int) error {
-	_, err := ex.Exec(gsmSoftDeleteSQL, parentID, parentID)
+// SoftDeleteFamilyTx는 패밀리(sst_pidx=parent OR sst_idx=parent)를 그 그룹 안에서만 sst_show='N'으로 소프트 삭제(트랜잭션 실행).
+func (r *GroupScheduleManageRepository) SoftDeleteFamilyTx(ex sqlExecer, parentID, groupID int) error {
+	_, err := ex.Exec(gsmSoftDeleteSQL, parentID, parentID, groupID)
 	return err
 }
 
 // SoftDeleteSingleDdate는 DELETE 'this'/비반복(단일 행 sst_show='N', sst_ddate=NOW()). rowcount 반환.
-// ⚠️ sst_show 조건 없음(Python 원본 그대로) — 호출 전 sst_show='Y' 확인됨.
-func (r *GroupScheduleManageRepository) SoftDeleteSingleDdate(scheduleID int) (int64, error) {
+// 그 그룹(sgt_idx)의 행만 건드린다. 호출 전 sst_show='Y' 확인됨.
+func (r *GroupScheduleManageRepository) SoftDeleteSingleDdate(scheduleID, groupID int) (int64, error) {
 	sqlDB, err := r.db.DB()
 	if err != nil {
 		return 0, err
 	}
-	res, err := sqlDB.Exec(`UPDATE smap_schedule_t SET sst_show='N', sst_ddate=NOW() WHERE sst_idx = ?`, scheduleID)
+	res, err := sqlDB.Exec(`UPDATE smap_schedule_t SET sst_show='N', sst_ddate=NOW() WHERE sst_idx = ? AND sgt_idx = ?`,
+		scheduleID, groupID)
 	if err != nil {
 		return 0, err
 	}
 	return res.RowsAffected()
 }
 
-// SoftDeleteAllDdate는 DELETE 'all'(패밀리 sst_pidx=parent OR sst_idx=parent, show='Y'). rowcount 반환.
-func (r *GroupScheduleManageRepository) SoftDeleteAllDdate(parentID int) (int64, error) {
+// SoftDeleteAllDdate는 DELETE 'all'(패밀리 sst_pidx=parent OR sst_idx=parent, 그 그룹, show='Y'). rowcount 반환.
+func (r *GroupScheduleManageRepository) SoftDeleteAllDdate(parentID, groupID int) (int64, error) {
 	sqlDB, err := r.db.DB()
 	if err != nil {
 		return 0, err
 	}
 	res, err := sqlDB.Exec(`UPDATE smap_schedule_t SET sst_show='N', sst_ddate=NOW()
-		WHERE (sst_pidx = ? OR sst_idx = ?) AND sst_show = 'Y'`, parentID, parentID)
+		WHERE (sst_pidx = ? OR sst_idx = ?) AND sgt_idx = ? AND sst_show = 'Y'`, parentID, parentID, groupID)
 	if err != nil {
 		return 0, err
 	}
 	return res.RowsAffected()
 }
 
-// SoftDeleteFutureDdate는 DELETE 'future'(패밀리 + sst_sdate>=current, show='Y'). rowcount 반환.
-func (r *GroupScheduleManageRepository) SoftDeleteFutureDdate(parentID int, since string) (int64, error) {
+// SoftDeleteFutureDdate는 DELETE 'future'(패밀리 + sst_sdate>=current, 그 그룹, show='Y'). rowcount 반환.
+func (r *GroupScheduleManageRepository) SoftDeleteFutureDdate(parentID, groupID int, since string) (int64, error) {
 	sqlDB, err := r.db.DB()
 	if err != nil {
 		return 0, err
 	}
 	res, err := sqlDB.Exec(`UPDATE smap_schedule_t SET sst_show='N', sst_ddate=NOW()
-		WHERE (sst_pidx = ? OR sst_idx = ?) AND sst_sdate >= ? AND sst_show = 'Y'`, parentID, parentID, since)
+		WHERE (sst_pidx = ? OR sst_idx = ?) AND sgt_idx = ? AND sst_sdate >= ? AND sst_show = 'Y'`,
+		parentID, parentID, groupID, since)
 	if err != nil {
 		return 0, err
 	}
@@ -464,23 +442,23 @@ type GSMTargetRow struct {
 	SstSdate *time.Time `gorm:"column:sst_sdate"`
 }
 
-// SelectFamilyTargets는 일괄 수정 대상 조회. since!=nil이면 sst_sdate>=since(future 옵션).
-func (r *GroupScheduleManageRepository) SelectFamilyTargets(parentID int, since *string) ([]GSMTargetRow, error) {
+// SelectFamilyTargets는 일괄 수정 대상 조회(그 그룹의 패밀리만). since!=nil이면 sst_sdate>=since(future 옵션).
+func (r *GroupScheduleManageRepository) SelectFamilyTargets(parentID, groupID int, since *string) ([]GSMTargetRow, error) {
 	var rows []GSMTargetRow
 	if since != nil {
 		err := r.db.Raw(`SELECT sst_idx, sst_sdate FROM smap_schedule_t
-			WHERE (sst_pidx = ? OR sst_idx = ?) AND sst_sdate >= ? AND sst_show = 'Y'`,
-			parentID, parentID, *since).Scan(&rows).Error
+			WHERE (sst_pidx = ? OR sst_idx = ?) AND sgt_idx = ? AND sst_sdate >= ? AND sst_show = 'Y'`,
+			parentID, parentID, groupID, *since).Scan(&rows).Error
 		return rows, err
 	}
 	err := r.db.Raw(`SELECT sst_idx, sst_sdate FROM smap_schedule_t
-		WHERE (sst_pidx = ? OR sst_idx = ?) AND sst_show = 'Y'`, parentID, parentID).Scan(&rows).Error
+		WHERE (sst_pidx = ? OR sst_idx = ?) AND sgt_idx = ? AND sst_show = 'Y'`, parentID, parentID, groupID).Scan(&rows).Error
 	return rows, err
 }
 
 // UpdateScheduleDynamic은 update_single_schedule의 동적 UPDATE를 이식한다.
-// cols/vals는 non-None 필드만(서비스가 Python all_fields 병합순서대로 구성), 항상 sst_udate=NOW() 추가.
-func (r *GroupScheduleManageRepository) UpdateScheduleDynamic(scheduleID int, cols []string, vals []interface{}) error {
+// cols/vals는 non-None 필드만(서비스가 Python all_fields 병합순서대로 구성), 항상 sst_udate=NOW() 추가. 그 그룹의 행만 갱신한다.
+func (r *GroupScheduleManageRepository) UpdateScheduleDynamic(scheduleID, groupID int, cols []string, vals []interface{}) error {
 	sqlDB, err := r.db.DB()
 	if err != nil {
 		return err
@@ -492,8 +470,8 @@ func (r *GroupScheduleManageRepository) UpdateScheduleDynamic(scheduleID int, co
 	setParts = append(setParts, "sst_udate = NOW()")
 	args := make([]interface{}, 0, len(vals)+1)
 	args = append(args, vals...)
-	args = append(args, scheduleID)
-	q := fmt.Sprintf("UPDATE smap_schedule_t SET %s WHERE sst_idx = ?", joinComma(setParts))
+	args = append(args, scheduleID, groupID)
+	q := fmt.Sprintf("UPDATE smap_schedule_t SET %s WHERE sst_idx = ? AND sgt_idx = ?", joinComma(setParts))
 	_, err = sqlDB.Exec(q, args...)
 	return err
 }

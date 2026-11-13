@@ -51,6 +51,20 @@ func (h *MemberFCMTokenHandler) horizontalAuth(c *gin.Context, userID, target in
 	return false
 }
 
+// requireAdmin: 토큰이 없으면 401, 관리자(mt_level=9)가 아니면 403. 앱이 쓰지 않는 전체 대상 작업용.
+func (h *MemberFCMTokenHandler) requireAdmin(c *gin.Context) bool {
+	uid, ok := h.requireUserID(c)
+	if !ok {
+		return false
+	}
+	m, err := h.svc.GetByID(uid)
+	if err == nil && m != nil && m.MtLevel != nil && *m.MtLevel == 9 {
+		return true
+	}
+	writeJSON(c, http.StatusForbidden, gin.H{"detail": "관리자 권한이 필요합니다."})
+	return false
+}
+
 func (h *MemberFCMTokenHandler) writeResult(c *gin.Context, resp interface{}, e *service.FCMErr) {
 	if e != nil {
 		writeJSON(c, e.Status, gin.H{"detail": e.Detail})
@@ -153,13 +167,17 @@ func (h *MemberFCMTokenHandler) Status(c *gin.Context) {
 
 // CleanupExpiredTokens는 POST /cleanup-expired-tokens(무인증).
 func (h *MemberFCMTokenHandler) CleanupExpiredTokens(c *gin.Context) {
+	// G7: 전체 대상 작업이라 관리자만(무토큰 401, 일반 회원 403). 앱은 호출하지 않는다.
+	if !h.requireAdmin(c) {
+		return
+	}
 	resp, e := h.svc.CleanupExpiredTokens()
 	h.writeResult(c, resp, e)
 }
 
 // ResetInvalidTokens는 POST /reset-invalid-tokens(인증).
 func (h *MemberFCMTokenHandler) ResetInvalidTokens(c *gin.Context) {
-	if _, ok := h.requireUserID(c); !ok {
+	if !h.requireAdmin(c) { // G7: 전체 대상 작업 → 관리자만
 		return
 	}
 	resp, e := h.svc.ResetInvalidTokens()
@@ -168,13 +186,17 @@ func (h *MemberFCMTokenHandler) ResetInvalidTokens(c *gin.Context) {
 
 // NotifyTokenRefresh는 POST /notify-token-refresh?mt_idx=(인증).
 func (h *MemberFCMTokenHandler) NotifyTokenRefresh(c *gin.Context) {
-	if _, ok := h.requireUserID(c); !ok {
+	uid, ok := h.requireUserID(c)
+	if !ok {
 		return
 	}
 	var errs []valErr
 	mtIdx := requiredQueryInt(c, "mt_idx", &errs)
 	if len(errs) > 0 {
 		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
+		return
+	}
+	if !h.horizontalAuth(c, uid, mtIdx) { // G7: 본인(또는 관리자)만
 		return
 	}
 	resp, e := h.svc.NotifyTokenRefresh(mtIdx)
@@ -185,7 +207,8 @@ func (h *MemberFCMTokenHandler) NotifyTokenRefresh(c *gin.Context) {
 
 // FullToken은 GET /full-token/{mt_idx}.
 func (h *MemberFCMTokenHandler) FullToken(c *gin.Context) {
-	if _, ok := h.requireUserID(c); !ok {
+	uid, ok := h.requireUserID(c)
+	if !ok {
 		return
 	}
 	if !h.cfg.Debug {
@@ -194,6 +217,9 @@ func (h *MemberFCMTokenHandler) FullToken(c *gin.Context) {
 	}
 	id, ok := memberFCMPathID(c)
 	if !ok {
+		return
+	}
+	if !h.horizontalAuth(c, uid, id) { // G7: 본인(또는 관리자)만
 		return
 	}
 	m, err := h.svc.GetByID(id)
@@ -219,7 +245,8 @@ func (h *MemberFCMTokenHandler) FullToken(c *gin.Context) {
 
 // TestIOSPush는 POST /test-ios-push.
 func (h *MemberFCMTokenHandler) TestIOSPush(c *gin.Context) {
-	if _, ok := h.requireUserID(c); !ok {
+	uid, ok := h.requireUserID(c)
+	if !ok {
 		return
 	}
 	if !h.cfg.Debug {
@@ -231,6 +258,9 @@ func (h *MemberFCMTokenHandler) TestIOSPush(c *gin.Context) {
 	mtIdx := 0
 	if v, ok := body["mt_idx"].(float64); ok {
 		mtIdx = int(v)
+	}
+	if !h.horizontalAuth(c, uid, mtIdx) { // G7: 본인(또는 관리자)만
+		return
 	}
 	testType, _ := body["test_type"].(string)
 	if testType == "" {
@@ -265,7 +295,8 @@ func (h *MemberFCMTokenHandler) TestIOSPush(c *gin.Context) {
 
 // UpdateLogs는 GET /update-logs/{mt_idx}. ⚠️ Python은 docker logs grep(환경 도구) — Go는 fallback 로그만 반환.
 func (h *MemberFCMTokenHandler) UpdateLogs(c *gin.Context) {
-	if _, ok := h.requireUserID(c); !ok {
+	uid, ok := h.requireUserID(c)
+	if !ok {
 		return
 	}
 	if !h.cfg.Debug {
@@ -274,6 +305,9 @@ func (h *MemberFCMTokenHandler) UpdateLogs(c *gin.Context) {
 	}
 	id, ok := memberFCMPathID(c)
 	if !ok {
+		return
+	}
+	if !h.horizontalAuth(c, uid, id) { // G7: 본인(또는 관리자)만
 		return
 	}
 	logs := []string{
@@ -292,7 +326,8 @@ func (h *MemberFCMTokenHandler) UpdateLogs(c *gin.Context) {
 
 // TriggerUpdate는 POST /trigger-update/{mt_idx}.
 func (h *MemberFCMTokenHandler) TriggerUpdate(c *gin.Context) {
-	if _, ok := h.requireUserID(c); !ok {
+	uid, ok := h.requireUserID(c)
+	if !ok {
 		return
 	}
 	if !h.cfg.Debug {
@@ -301,6 +336,9 @@ func (h *MemberFCMTokenHandler) TriggerUpdate(c *gin.Context) {
 	}
 	id, ok := memberFCMPathID(c)
 	if !ok {
+		return
+	}
+	if !h.horizontalAuth(c, uid, id) { // G7: 본인(또는 관리자)만
 		return
 	}
 	m, _ := h.svc.GetByID(id)

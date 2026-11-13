@@ -17,6 +17,7 @@ type groupMemberRepo interface {
 type GroupMemberService struct {
 	repo  groupMemberRepo
 	wrepo groupMemberWriteRepo
+	chat  memberChatDeactivator // nil이면 탈퇴·강퇴 때 채팅 비활성화를 호출하지 않는다(테스트/미주입)
 }
 
 func NewGroupMember(repo groupMemberRepo) *GroupMemberService {

@@ -19,7 +19,11 @@ type WeatherHandler struct {
 	svc       *service.WeatherService
 	cfg       *config.Config
 	cache     *cache.Store
+	self      *SelfGuard // weather/member/:id 본인만(G7)
 }
+
+// SetGuard는 본인 검사 가드를 주입한다.
+func (h *WeatherHandler) SetGuard(g *SelfGuard) { h.self = g }
 
 func NewWeather(svc *service.WeatherService, cfg *config.Config, store *cache.Store) *WeatherHandler {
 	return &WeatherHandler{svc: svc, cfg: cfg, cache: store}
@@ -69,6 +73,10 @@ func (h *WeatherHandler) Member(c *gin.Context) {
 		return
 	}
 
+	// G7: 앱이 쓰지 않는 경로 — 토큰 필수(모드와 무관 401) + 본인만. 캐시 응답보다 먼저 검사한다.
+	if !h.self.SelfStrict(c, id) {
+		return
+	}
 	ctx := c.Request.Context()
 	// Python: f"{prefix}:{json.dumps({'member_id': id}, sort_keys=True)}" 와 동일한 키.
 	cacheKey := fmt.Sprintf(`weather:member:{"member_id": %d}`, id)
@@ -104,6 +112,9 @@ func (h *WeatherHandler) UpdateMember(c *gin.Context) {
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		pathIntErr(c, "member_id", idStr)
+		return
+	}
+	if !h.self.SelfStrict(c, id) { // G7: 쓰기 경로, 앱 미사용 → 토큰 필수 + 본인만
 		return
 	}
 	body, ok := parseGSMCreateBody(c) // 필수 JSON 객체(UseNumber, 비객체→422)

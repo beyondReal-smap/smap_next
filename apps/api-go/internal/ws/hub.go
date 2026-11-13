@@ -32,9 +32,9 @@ func (c *Conn) MtIdx() int { return c.mtIdx }
 // Hub는 전체 연결·룸 상태를 mutex로 보호한다.
 type Hub struct {
 	mu     sync.Mutex
-	conns  map[*Conn]bool        // 전체 연결
+	conns  map[*Conn]bool         // 전체 연결
 	rooms  map[int]map[*Conn]bool // scr_idx → 그 방에 enter한 연결들(broadcast 대상)
-	active map[*Conn]int         // conn → 현재 active(보고 있는) scr_idx
+	active map[*Conn]int          // conn → 현재 active(보고 있는) scr_idx
 }
 
 func NewHub() *Hub {
@@ -118,6 +118,26 @@ func (h *Hub) Broadcast(scrIdx int, payload []byte) {
 		case c.send <- payload:
 		default:
 		}
+	}
+}
+
+// RoomConns는 scr_idx 방에 enter한 연결의 스냅샷이다(수신 시점 멤버십 확인용).
+func (h *Hub) RoomConns(scrIdx int) []*Conn {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	out := make([]*Conn, 0, len(h.rooms[scrIdx]))
+	for c := range h.rooms[scrIdx] {
+		out = append(out, c)
+	}
+	return out
+}
+
+// Send는 한 연결에 payload를 보낸다. send 버퍼가 가득 찬 느린 연결은 drop한다(Broadcast와 같은 정책).
+func (h *Hub) Send(c *Conn, payload []byte) {
+	defer func() { _ = recover() }() // 방금 Unregister되어 send가 닫힌 연결에 보내도 패닉하지 않는다
+	select {
+	case c.send <- payload:
+	default:
 	}
 }
 

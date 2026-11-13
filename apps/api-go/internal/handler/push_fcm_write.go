@@ -19,6 +19,9 @@ func (h *PushFCMHandler) MarkDelivered(c *gin.Context) {
 	if !ok {
 		return
 	}
+	if !h.ownMessage(c, id) {
+		return
+	}
 	found, sok := h.svc.MarkDelivered(id)
 	if !sok || !found {
 		// 404·DB오류 모두 바깥 except로 흡수되어 500-wrap. not-found는 "404: Push FCM not found"가 {e}.
@@ -70,6 +73,9 @@ func (h *PushFCMHandler) Update(c *gin.Context) {
 func (h *PushFCMHandler) Delete(c *gin.Context) {
 	id, ok := pushFCMPathID(c)
 	if !ok {
+		return
+	}
+	if !h.ownMessage(c, id) {
 		return
 	}
 	found, sok := h.svc.DeletePushFCM(id)

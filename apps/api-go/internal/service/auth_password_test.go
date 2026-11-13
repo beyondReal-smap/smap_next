@@ -179,7 +179,10 @@ func TestResetByPhoneCodeMatchSuccess(t *testing.T) {
 	u := activeMember(27, "p@x.com")
 	mem := &fakeAuthMemberRepo{byMtID: map[string]*model.Member{"01011112222": u}}
 	vs := &fakeVerifyStore{verified: map[string]bool{}, codes: map[string]string{"01011112222": "123456"}}
-	resp := pwSvc(mem, vs).ResetPasswordByPhone("01011112222", "123456", "Test1234!@")
+	svc := pwSvc(mem, vs)
+	svc.SetSecurityStore(newFakeEmailStore()) // G8: 직접 코드 비교는 시도 카운터를 거친다
+	svc.SetSMSVerifyMaxAttempts(5)
+	resp := svc.ResetPasswordByPhone("01011112222", "123456", "Test1234!@")
 	if !resp.Success {
 		t.Fatalf("by-phone 코드일치 성공 오류: %+v", resp)
 	}

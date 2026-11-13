@@ -1,7 +1,9 @@
 package service
 
 import (
+	"context"
 	"crypto/subtle"
+	"log/slog"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -26,6 +28,31 @@ type authVerifyStore interface {
 // SetVerifyStore는 Phase C SMS 인증상태 저장소를 주입한다(NewAuth 시그니처 보존용).
 func (s *AuthService) SetVerifyStore(v authVerifyStore) { s.verify = v }
 
+// SetSMSVerifyMaxAttempts는 인증번호 하나에 허용하는 검증 시도 횟수를 설정한다(/sms/verify-code와 공통).
+func (s *AuthService) SetSMSVerifyMaxAttempts(n int) { s.smsMaxAttempts = n }
+
+// consumeSMSAttempt는 인증번호 직접 비교 전에 시도 카운터를 올린다. 허용 횟수를 넘기면 코드를 폐기하고 false다.
+func (s *AuthService) consumeSMSAttempt(phone string) bool {
+	if s.guard == nil || s.smsMaxAttempts < 1 {
+		s.log().Error("sms_attempt_guard_not_wired")
+		return false
+	}
+	ctx := context.Background()
+	n, err := s.guard.IncrWithExpire(ctx, SMSAttemptsKey(phone), smsCodeTTL)
+	if err != nil {
+		s.log().Error("sms_attempt_store_unavailable", slog.String("err", err.Error()))
+		return false
+	}
+	if n > int64(s.smsMaxAttempts) {
+		s.verify.DeleteCode(phone)
+		if _, err := s.guard.DelKeys(ctx, SMSAttemptsKey(phone)); err != nil {
+			s.log().Error("sms_attempt_reset_failed", slog.String("err", err.Error()))
+		}
+		return false
+	}
+	return true
+}
+
 const pwResetServerErrMsg = "요청 처리 중 오류가 발생했습니다."
 
 // pwResetServerErr는 Python 라우터 try/except가 흡수하는 공통 실패 응답(200+success=false).
@@ -34,7 +61,7 @@ func pwResetServerErr() dto.PwResetResponse {
 	return dto.PwResetResponse{Success: false, Message: pwResetServerErrMsg}
 }
 
-// cleanPhone은 Python contact.replace('-', '').replace(' ', '')(하이픈+공백 제거).
+// cleanPhone은 Python contact.replace('-', ”).replace(' ', ”)(하이픈+공백 제거).
 func cleanPhone(s string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(s, "-", ""), " ", "")
 }
@@ -150,6 +177,11 @@ func (s *AuthService) ResetPasswordByPhone(phone, verificationCode, newPassword 
 	if !s.verify.IsVerified(clean) {
 		code, ok := s.verify.GetCode(clean)
 		if !ok { // stored_code 없음 → HTTPException(400) → except 흡수
+			return pwResetServerErr()
+		}
+		// /sms/verify-code와 같은 시도 카운터를 공유한다(이 경로로 6자리 코드를 무제한 대입하는 우회 차단).
+		// 카운터를 올릴 수 없으면(Redis 장애·미주입) 비교하지 않고 실패시킨다.
+		if !s.consumeSMSAttempt(clean) {
 			return pwResetServerErr()
 		}
 		if subtle.ConstantTimeCompare([]byte(verificationCode), []byte(code)) != 1 {

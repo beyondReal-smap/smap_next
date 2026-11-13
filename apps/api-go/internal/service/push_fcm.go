@@ -110,3 +110,16 @@ func (s *PushFCMService) PendingPushFCMs(mtIdx int, since *float64) ([]dto.PushF
 	out, ok := toPushFCMResponses(items)
 	return out, ok, nil
 }
+
+// PushFCMOwner는 푸시 FCM 메시지의 수신 회원(pft_send_mt_idx)을 돌려준다(본인 것만 조회·삭제하는 인가용).
+// found=false→404, ok=false→500.
+func (s *PushFCMService) PushFCMOwner(id int) (owner *int, found, ok bool) {
+	p, err := s.repo.GetByID(id)
+	if err != nil {
+		return nil, false, false
+	}
+	if p == nil {
+		return nil, false, true
+	}
+	return p.PftSendMtIdx, true, true
+}

@@ -14,6 +14,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/bluemusk/smap_next_go/internal/auth"
 	"github.com/bluemusk/smap_next_go/internal/cache"
 	"github.com/bluemusk/smap_next_go/internal/config"
@@ -150,18 +152,40 @@ func main() {
 		slog.Bool("write_require_token", cfg.LocationWriteRequireToken),
 		slog.Bool("place_leader_manage", cfg.LocationPlaceLeaderManage),
 	)
-	if locationRouteMode != auth.RouteModeEnforce {
-		logger.Warn("location routes accept requests without a token (warn): others' locations are readable without a token until LOCATION_AUTH_MODE/ROUTE_AUTH_MODE is enforce")
+
+	// G7 — 일정 라우트용 인증 미들웨어. 앱은 일정 API를 항상 토큰과 함께 부르므로 ROUTE_AUTH_MODE와 무관하게 enforce 고정(scope=schedule).
+	scheduleAuth, err := middleware.NewRouteAuth(middleware.RouteAuthOptions{
+		Revocation:      accessRevocation,
+		Mode:            auth.RouteModeEnforce,
+		Secret:          cfg.JWTSecretKey,
+		Algorithm:       cfg.JWTAlgorithm,
+		StatusCacheTTL:  time.Duration(cfg.RouteAuthStatusCacheTTLSeconds) * time.Second,
+		SummaryInterval: time.Duration(cfg.RouteAuthSummaryIntervalSeconds) * time.Second,
+		Scope:           "schedule",
+	}, memberRepo, logger)
+	if err != nil {
+		logger.Error("schedule auth init failed", slog.String("err", err.Error()))
+		os.Exit(1)
+	}
+	scheduleAuthz := service.NewScheduleAuthz(repository.NewMembership(gdb), cfg.ScheduleLeaderManageOwner, cfg.ScheduleNonleaderTargetOthers)
+	logger.Info("schedule authz configured",
+		slog.Bool("nonleader_target_others", cfg.ScheduleNonleaderTargetOthers),
+		slog.Bool("leader_manage_owner", cfg.ScheduleLeaderManageOwner))
+	if cfg.ScheduleNonleaderTargetOthers {
+		logger.Warn("schedule create lets non-leader members target other group members (SCHEDULE_NONLEADER_TARGET_OTHERS=true, legacy app compatibility)")
 	}
 
 	// Phase 5 — chat 리포지토리. chat REST/WS + groups write의 그룹채팅 동기화가 공유한다.
 	chatRepo := repository.NewChat(gdb)
+	// chatSvc는 chat REST/WS와 그룹 탈퇴·강퇴·삭제의 채팅 비활성화(멤버십 캐시 무효화 포함)가 공유한다.
+	chatSvc := service.NewChat(chatRepo)
+	chatSvc.SetMembershipCacheTTL(time.Duration(cfg.ChatMembershipCacheTTLSeconds) * time.Second)
 
 	// Phase 4 — groups read. 무인증 read + current-user(2종)/stats. current-user는 JWT 필수.
 	// Phase 1 write(create/join 3종, JWT): GroupWriteService가 그룹채팅 동기화에 chatRepo를 사용.
 	groupRepo := repository.NewGroup(gdb)
 	groupSvc := service.NewGroup(groupRepo)
-	groupWriteSvc := service.NewGroupWrite(groupRepo, chatRepo)
+	groupWriteSvc := service.NewGroupWrite(groupRepo, service.NewGroupChatSync(chatRepo, chatSvc))
 	groupH := handler.NewGroup(groupSvc, groupWriteSvc, cfg)
 
 	// Phase 4 — group-details read 4종(무인증).
@@ -202,6 +226,7 @@ func main() {
 	// Phase 4 — schedules 결정적 read 3종(무인증). sst_location_lat/long Decimal→문자열.
 	scheduleRepo := repository.NewSchedule(gdb)
 	scheduleSvc := service.NewSchedule(scheduleRepo)
+	scheduleSvc.SetAuthz(scheduleAuthz)
 	scheduleH := handler.NewSchedule(scheduleSvc)
 
 	// Phase 4 — push-logs(6) + push-fcms(5) read(무인증). zero date 시 500(plain).
@@ -214,6 +239,7 @@ func main() {
 	gmRepo := repository.NewGroupMember(gdb)
 	gmSvc := service.NewGroupMember(gmRepo)
 	gmSvc.SetWriteRepo(gmRepo) // write(add/remove/role)용 repo 주입(동일 인스턴스)
+	gmSvc.SetChat(chatSvc)     // 탈퇴·강퇴 시 채팅 참가 비활성화
 	groupMemberH := handler.NewGroupMember(gmSvc)
 
 	// group-schedule-manage(/schedule) — read 4종(Phase A) + 생성(Phase B).
@@ -269,14 +295,6 @@ func main() {
 		slog.Bool("apple_configured", providerVerifier.Configured(auth.ProviderApple)),
 		slog.Bool("kakao_configured", providerVerifier.Configured(auth.ProviderKakao)),
 	)
-	if socialMode != auth.SocialModeOff {
-		for _, p := range []auth.Provider{auth.ProviderGoogle, auth.ProviderApple, auth.ProviderKakao} {
-			if !providerVerifier.Configured(p) {
-				// 허용 목록이 없으면 해당 공급자의 검증은 503으로 실패한다(토큰이 있는 로그인 포함).
-				logger.Warn("social provider allow-list is empty", slog.String("provider", string(p)), slog.String("mode", string(socialMode)))
-			}
-		}
-	}
 	// Phase C SMS 인증상태(Redis sms:verified:/sms:code: interop) — reset-password-by-phone용.
 	authSvc.SetVerifyStore(cache.NewSMSVerifyStore(cacheStore))
 
@@ -296,7 +314,13 @@ func main() {
 		NaverworksClientSecret: cfg.NaverworksClientSecret,
 		NaverworksDomain:       cfg.NaverworksDomain,
 	})
-	smsVerifySvc := service.NewSMSVerify(smsSvc, cache.NewSMSVerifyStore(cacheStore))
+	// 인증번호 발송·검증은 Redis 한도/상태에 의존한다. Redis를 쓸 수 없으면 503(과금 보호)이다.
+	smsVerifySvc := service.NewSMSVerify(smsSvc, cacheStore, service.SMSLimits{
+		PerPhone:    cfg.SMSSendLimitPerPhone,
+		PerIP:       cfg.SMSSendLimitPerIP,
+		Window:      time.Duration(cfg.SMSSendWindowSeconds) * time.Second,
+		MaxAttempts: cfg.SMSVerifyMaxAttempts,
+	}, logger)
 	smsH := handler.NewSMS(smsVerifySvc, smsSvc, cfg)
 	// forgot-password 발송 연결(Phase C에서 미뤘던 seam).
 	authSvc.SetResetSender(service.NewResetNotifier(smsSvc, emailSvc, logger))
@@ -306,9 +330,6 @@ func main() {
 
 	// G3 — 이메일 인증(발송·검증·토큰·재설정·등록/변경). Redis 원자 연산은 cacheStore(미연결 시 503),
 	// 발송은 위 emailSvc(설정 없으면 503/502로 실패, 성공 위장 없음).
-	if cfg.TrustedClientIPHeader == "" {
-		logger.Warn("TRUSTED_CLIENT_IP_HEADER not set: 이메일 인증 IP 한도가 직접 접속 주소 기준으로 동작합니다(프록시 뒤에서는 모든 사용자가 합산됨)")
-	}
 	emailAuthSvc := service.NewEmailAuth(cacheStore, repository.NewEmailAuth(gdb), emailSvc, service.EmailAuthConfig{
 		Secret:     cfg.JWTSecretKey,
 		Algorithm:  cfg.JWTAlgorithm,
@@ -328,6 +349,7 @@ func main() {
 	authSvc.SetRegisterStore(repository.NewAuthRegister(gdb, refreshRepo))
 	authSvc.SetEmailTokens(emailAuthSvc)
 	authSvc.SetSecurityStore(cacheStore)
+	authSvc.SetSMSVerifyMaxAttempts(cfg.SMSVerifyMaxAttempts) // reset-password-by-phone의 직접 코드 비교도 같은 시도 한도
 	authSvc.SetAccessRevoker(accessRevocation)
 	authSvc.SetLogger(logger)
 	authSvc.SetPolicy(service.AuthPolicy{
@@ -348,15 +370,8 @@ func main() {
 		slog.Int("login_fail_limit_per_ip", cfg.LoginFailLimitPerIP),
 		slog.Int("login_fail_window_sec", cfg.LoginFailWindowSeconds),
 	)
-	if cfg.AllowLegacyPhoneRegister && !cfg.LegacyRegisterRequireSMSVerified {
-		logger.Warn("legacy phone register is open without SMS verification state (LEGACY_REGISTER_REQUIRE_SMS_VERIFIED=false)")
-	}
-	if !cfg.SocialRegisterRequireToken && !cfg.SocialRegisterRequireLoginProof {
-		logger.Warn("social register accepts provider ids without provider token (SOCIAL_REGISTER_REQUIRE_TOKEN=false)")
-	}
 
 	// Phase 5 — chat REST 3종(JWT) + WS 실시간(native). chatSvc를 핸들러·WS가 공유(chatRepo 재사용).
-	chatSvc := service.NewChat(chatRepo)
 	chatH := handler.NewChat(chatSvc, cfg)
 	// FCM(오프라인 푸시) — 자격증명 없으면 available=false(no-op). chat WS가 Sender로 사용.
 	fcmClient := fcm.New(cfg, logger)
@@ -383,15 +398,36 @@ func main() {
 	}
 
 	// group-schedule-manage 생성(Phase B) — memberRepo(editor/대상 조회)·pushLogRepo·fcmClient 공유.
-	groupScheduleH := handler.NewGroupScheduleManage(
-		service.NewGroupScheduleManage(repository.NewGroupScheduleManage(gdb), memberRepo, pushLogRepo, fcmClient),
-	)
+	groupScheduleSvc := service.NewGroupScheduleManage(repository.NewGroupScheduleManage(gdb), memberRepo, pushLogRepo, fcmClient)
+	groupScheduleSvc.SetAuthz(scheduleAuthz)
+	groupScheduleH := handler.NewGroupScheduleManage(groupScheduleSvc)
 
 	memberH.SetGuard(locationGuard)
 	memberWriteH.SetGuard(locationGuard)
 	locationH.SetGuard(locationGuard)
 	groupMemberH.SetGuard(locationGuard)
+	// G7 — 그룹 인가(현재 멤버·그룹장), 본인 검사, 초대 코드 호출 한도. 계측은 일반 사용자 인증 인스턴스(routeAuth)에 올린다.
+	groupGuard := handler.NewGroupGuard(service.NewGroupAuthz(repository.NewGroupAuthz(gdb)), routeAuth)
+	selfGuard := handler.NewSelfGuard(routeAuth)
+	groupH.SetGuard(groupGuard)
+	groupH.SetCodeGuard(service.NewGroupCodeGuard(cacheStore, cfg.GroupCodeLimitPerMember, cfg.GroupCodeLimitPerIP,
+		time.Duration(cfg.GroupCodeWindowSeconds)*time.Second, logger))
+	groupMemberH.SetGroupGuard(groupGuard)
+	pushLogH.SetGuard(selfGuard)
+	pushFCMH.SetGuard(selfGuard)
+	weatherH.SetGuard(selfGuard)
+	logger.Info("group authz configured",
+		slog.Bool("require_group_invite_code", cfg.RequireGroupInviteCode),
+		slog.Int("code_limit_per_member", cfg.GroupCodeLimitPerMember),
+		slog.Int("code_limit_per_ip", cfg.GroupCodeLimitPerIP),
+		slog.Int("code_window_sec", cfg.GroupCodeWindowSeconds),
+	)
 	locationLogH.SetGuard(locationGuard)
+
+	// 시작 시 설정 점검(G8): 운영에 필요한 설정이 비었거나 위험한 값이면 한 곳에서 경고한다. 시작은 막지 않는다.
+	for _, w := range config.StartupWarnings(cfg, config.RuntimeFacts{RedisConnected: rds != nil}) {
+		logger.Warn("startup_check", slog.String("code", w.Code), slog.String("msg", w.Message))
+	}
 
 	httpHandler := server.New(cfg, logger, server.Deps{
 		Health:         healthH,
@@ -403,6 +439,7 @@ func main() {
 		UserAuth:       routeAuth.Required(),
 		UserAuthOpt:    routeAuth.Optional(),
 		LocationAuth:   locationAuth.Required(),
+		ScheduleAuth:   scheduleAuth.Required(),
 		Group:          groupH,
 		GroupDetail:    groupDetailH,
 		Member:         memberH,
@@ -425,6 +462,13 @@ func main() {
 		ChatWS:         chatWS,
 		Auth:           authH,
 		EmailAuth:      emailAuthH,
+		CheckLimit: func(kind string) gin.HandlerFunc {
+			return middleware.IPLimit(middleware.IPLimitOptions{
+				Name: "check_" + kind, Store: cacheStore,
+				Limit: cfg.MemberCheckLimitPerIP, Window: time.Duration(cfg.MemberCheckWindowSeconds) * time.Second,
+				TrustedHeader: cfg.TrustedClientIPHeader, Logger: logger,
+			})
+		},
 	})
 
 	srv := &http.Server{
@@ -450,6 +494,11 @@ func main() {
 	go func() {
 		defer close(locationAuthDone)
 		locationAuth.Run(ctx)
+	}()
+	scheduleAuthDone := make(chan struct{})
+	go func() {
+		defer close(scheduleAuthDone)
+		scheduleAuth.Run(ctx)
 	}()
 
 	go func() {
@@ -477,5 +526,6 @@ func main() {
 	}
 	<-routeAuthDone
 	<-locationAuthDone
+	<-scheduleAuthDone
 	logger.Info("shutdown complete")
 }

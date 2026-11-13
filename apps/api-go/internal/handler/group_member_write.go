@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/bluemusk/smap_next_go/internal/dto"
+	"github.com/bluemusk/smap_next_go/internal/service"
 )
 
 // Add는 POST /api/v1/group-members/add?group_id=&member_id= — 그룹에 멤버 추가(query param).
@@ -71,7 +73,16 @@ func (h *GroupMemberHandler) RemovePath(c *gin.Context) {
 		pathIntErr(c, "member_id", midStr)
 		return
 	}
-	found, ok := h.svc.RemoveMemberPath(gid, mid)
+	// G7: 본인 제거는 자진 탈퇴, 타인 제거는 그룹장의 강퇴(sgdt_discharge='Y' 기록). 그 외는 403.
+	kind, allowed := h.group.Removal(c, gid, mid)
+	if !allowed {
+		return
+	}
+	found, ok, rerr := h.svc.RemoveMemberPath(gid, mid, kind)
+	if errors.Is(rerr, service.ErrOwnerCannotLeave) {
+		writeJSON(c, http.StatusBadRequest, gin.H{"detail": ownerCannotLeaveDetail})
+		return
+	}
 	if !ok {
 		internalServerErrorPlain(c)
 		return
@@ -91,6 +102,10 @@ func (h *GroupMemberHandler) UpdateRole(c *gin.Context) {
 	gid, err := strconv.Atoi(gidStr)
 	if err != nil {
 		pathIntErr(c, "group_id", gidStr)
+		return
+	}
+	// G7: 리더 지정·해제는 그룹장만.
+	if !h.group.ManageGroup(c, gid) {
 		return
 	}
 	raw, _ := io.ReadAll(c.Request.Body)

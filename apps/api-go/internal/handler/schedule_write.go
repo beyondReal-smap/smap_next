@@ -7,23 +7,32 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Create는 POST /schedules/ (무인증). ScheduleCreate(전 Optional) INSERT 후 재조회 → ScheduleResponse.
+// Create는 POST /schedules/ — 신원은 토큰. 본인 일정은 그 그룹 현재 멤버면 누구나, 타인 일정은 그룹장·리더만.
+// ScheduleCreate(전 Optional) INSERT 후 재조회 → ScheduleResponse.
 func (h *ScheduleHandler) Create(c *gin.Context) {
+	actor, ok := scheduleActor(c)
+	if !ok {
+		return
+	}
 	present, errs := parseScheduleBody(c)
 	if len(errs) > 0 {
 		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
 		return
 	}
-	resp, ok := h.svc.CreateSchedule(present)
-	if !ok {
-		plainServerError(c)
+	resp, err := h.svc.CreateSchedule(c.Request.Context(), actor, present)
+	if err != nil {
+		writeScheduleErr(c, err, "생성")
 		return
 	}
 	writeJSON(c, http.StatusOK, resp)
 }
 
-// Update는 PUT /schedules/:schedule_id (무인증). exclude_unset → 존재 컬럼만 UPDATE. 404 "Schedule not found".
+// Update는 PUT /schedules/:schedule_id — 작성자 본인 또는 그 그룹의 그룹장·리더. exclude_unset → 존재 컬럼만 UPDATE. 404 "Schedule not found".
 func (h *ScheduleHandler) Update(c *gin.Context) {
+	actor, aok := scheduleActor(c)
+	if !aok {
+		return
+	}
 	id, ok := schedulePathID(c)
 	if !ok {
 		return
@@ -33,9 +42,9 @@ func (h *ScheduleHandler) Update(c *gin.Context) {
 		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
 		return
 	}
-	resp, found, sok := h.svc.UpdateSchedule(id, present)
-	if !sok {
-		plainServerError(c)
+	resp, found, err := h.svc.UpdateSchedule(c.Request.Context(), actor, id, present)
+	if err != nil {
+		writeScheduleErr(c, err, "수정")
 		return
 	}
 	if !found {
@@ -45,15 +54,19 @@ func (h *ScheduleHandler) Update(c *gin.Context) {
 	writeJSON(c, http.StatusOK, resp)
 }
 
-// Delete는 DELETE /schedules/:schedule_id (무인증). 하드 삭제, {"message":"Schedule deleted successfully"}.
+// Delete는 DELETE /schedules/:schedule_id — 작성자 본인 또는 그 그룹의 그룹장·리더. 하드 삭제, {"message":"Schedule deleted successfully"}.
 func (h *ScheduleHandler) Delete(c *gin.Context) {
+	actor, aok := scheduleActor(c)
+	if !aok {
+		return
+	}
 	id, ok := schedulePathID(c)
 	if !ok {
 		return
 	}
-	found, sok := h.svc.DeleteSchedule(id)
-	if !sok {
-		plainServerError(c)
+	found, err := h.svc.DeleteSchedule(c.Request.Context(), actor, id)
+	if err != nil {
+		writeScheduleErr(c, err, "삭제")
 		return
 	}
 	if !found {

@@ -19,7 +19,7 @@ func (h *OrderHandler) orderUserID(c *gin.Context) (int, bool) {
 	return uid, true
 }
 
-// UpdateStatus는 PUT /orders/status/{order_id}?status= — 소유자 체크 없음.
+// UpdateStatus는 PUT /orders/status/{order_id}?status= — 관리자 전용(G7, 라우트에서 RequireAdmin).
 // ⚠️ 성공 시에도 Python은 모델 직렬화 실패로 500 plain "Internal Server Error"(DB는 갱신됨).
 func (h *OrderHandler) UpdateStatus(c *gin.Context) {
 	idStr := c.Param("order_id")
@@ -50,7 +50,7 @@ func (h *OrderHandler) UpdateStatus(c *gin.Context) {
 	internalServerErrorPlain(c)
 }
 
-// Cancel은 POST /orders/cancel/{order_id}?cancel_reason=&cancel_amount=&refund_info= — 소유자만.
+// Cancel은 POST /orders/cancel/{order_id}?cancel_reason=&cancel_amount=&refund_info= — 관리자 전용(G7).
 func (h *OrderHandler) Cancel(c *gin.Context) {
 	idStr := c.Param("order_id")
 	id, err := strconv.Atoi(idStr)
@@ -72,11 +72,11 @@ func (h *OrderHandler) Cancel(c *gin.Context) {
 	if v, has := c.GetQuery("refund_info"); has {
 		refund = &v
 	}
-	uid, ok := h.orderUserID(c)
-	if !ok {
+	// G7: 라우트가 관리자 전용(RequireAdmin)이다. 토큰 재확인 후 소유자 검사 없이 취소한다.
+	if _, ok := h.orderUserID(c); !ok {
 		return
 	}
-	switch h.svc.Cancel(id, uid, reason, amount, refund) {
+	switch h.svc.CancelAsAdmin(id, reason, amount, refund) {
 	case 0: // CancelNotFound
 		writeJSON(c, http.StatusNotFound, gin.H{"detail": "주문을 찾을 수 없습니다"})
 	case 1: // CancelForbidden

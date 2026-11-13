@@ -34,6 +34,8 @@ type chatWSService interface {
 	SendMessage(scrIdx, mtIdx int, content string) (*dto.ChatMessageItem, bool, error)
 	ReadUpdate(scrIdx, mtIdx, scmsgIdx int) (int, bool, error)
 	BuildOfflinePush(scrIdx, senderMtIdx int, onlineMtIdx map[int]bool) (string, []service.PushTarget, error)
+	// IsRoomMember: 지금 이 회원이 방의 유효 참가자(방 참가 + 현재 그룹 멤버십)인지. 메시지 수신 시점에 접속자마다 확인한다.
+	IsRoomMember(scrIdx, mtIdx int) (bool, error)
 }
 
 // ChatWS는 chat 실시간 핸들러다. Python chat_ws.py의 socket.io 이벤트를 native WS로 이식한다.
@@ -243,12 +245,26 @@ func (w *ChatWS) sendPushToOffline(scrIdx, senderMtIdx int, content string) {
 
 // --- emit 헬퍼 ---
 
+// broadcastEvent는 방에 enter한 접속자에게 이벤트를 보낸다. 전달 시점마다 접속자의 현재 멤버십을 확인한다(C-1):
+// 이미 접속한 소켓이라도 그룹을 나가거나 강퇴된 회원은 방에서 제외하고 보내지 않는다. 확인에 실패하면 보내지 않는다.
+// 확인은 서비스의 짧은 TTL 캐시(허용 결과만)를 거치므로 접속자 수만큼 DB를 조회하지는 않는다.
 func (w *ChatWS) broadcastEvent(scrIdx int, event string, data interface{}) {
 	payload, err := marshalEvent(event, data)
 	if err != nil {
 		return
 	}
-	w.hub.Broadcast(scrIdx, payload)
+	for _, c := range w.hub.RoomConns(scrIdx) {
+		ok, err := w.svc.IsRoomMember(scrIdx, c.mtIdx)
+		if err != nil {
+			w.log.Warn("ws membership check failed", slog.String("err", err.Error()))
+			continue
+		}
+		if !ok {
+			w.hub.LeaveRoom(c, scrIdx)
+			continue
+		}
+		w.hub.Send(c, payload)
+	}
 }
 
 func (w *ChatWS) emitError(conn *Conn, msg string) {

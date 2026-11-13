@@ -16,7 +16,7 @@ func Recovery(logger *slog.Logger) gin.HandlerFunc {
 			if rec := recover(); rec != nil {
 				logger.Error("panic recovered",
 					slog.Any("panic", rec),
-					slog.String("path", c.Request.URL.Path),
+					slog.String("path", logPath(c)),
 					slog.String("method", c.Request.Method),
 					slog.String("stack", string(debug.Stack())),
 				)

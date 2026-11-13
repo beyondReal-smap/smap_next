@@ -51,6 +51,11 @@ type Deps struct {
 	UserAuthOpt gin.HandlerFunc
 	// LocationAuth는 위치 라우트용 인증 미들웨어(LOCATION_AUTH_MODE로 무토큰 처리 결정)다. nil이면 UserAuth를 쓴다.
 	LocationAuth gin.HandlerFunc
+	// ScheduleAuth는 일정 라우트용 인증 미들웨어(항상 enforce)다. nil이면 UserAuth를 쓴다.
+	ScheduleAuth gin.HandlerFunc
+	// CheckLimit은 가입 여부 확인(/members/check/*)의 IP당 한도 미들웨어를 종류 이름(phone/email/nickname)별로 만든다.
+	// nil이면 한도를 붙이지 않는다(테스트 전용).
+	CheckLimit func(kind string) gin.HandlerFunc
 }
 
 // New는 gin 엔진을 구성한다. 라우트는 Python `app/main.py` + `app/api/v1/api.py` 와
@@ -107,6 +112,14 @@ func New(cfg *config.Config, logger *slog.Logger, deps Deps) http.Handler {
 		} else if deps.UserAuth != nil {
 			la.Use(deps.UserAuth)
 		}
+		// sa: 일정 라우트 그룹(G7). 앱은 일정 API를 항상 토큰과 함께 부르므로 무토큰은 ROUTE_AUTH_MODE와 무관하게 401이다
+		// (ScheduleAuth는 enforce 고정 인스턴스; 핸들러도 신원이 없으면 401). 권한 판정(현재 멤버·작성자·그룹장·리더)은 서비스가 한다.
+		sa := v1.Group("")
+		if deps.ScheduleAuth != nil {
+			sa.Use(deps.ScheduleAuth)
+		} else if deps.UserAuth != nil {
+			sa.Use(deps.UserAuth)
+		}
 		// uo: 선택 인증 변형(토큰이 없어도 통과).
 		uo := v1.Group("")
 		if deps.UserAuthOpt != nil {
@@ -115,6 +128,14 @@ func New(cfg *config.Config, logger *slog.Logger, deps Deps) http.Handler {
 		// adm: 관리자 전용 라우트(RequireAdmin: JWT + mt_level=9). /users/*, /fcm_sendone 전부, /sms/send, find-user-by-*, 링크 재설정 3종, DELETE /members/:id.
 		adm := v1.Group("")
 		adm.Use(deps.AdminAuth)
+
+		// checkLimit: 가입 여부 확인 IP당 한도(CheckLimit 미주입이면 통과 핸들러).
+		checkLimit := func(kind string) gin.HandlerFunc {
+			if deps.CheckLimit == nil {
+				return func(c *gin.Context) { c.Next() }
+			}
+			return deps.CheckLimit(kind)
+		}
 
 		v1.GET("/app/version-check", deps.AppVersion.VersionCheck)
 
@@ -136,10 +157,13 @@ func New(cfg *config.Config, logger *slog.Logger, deps Deps) http.Handler {
 		ua.GET("/weather/member/:member_id", deps.Weather.Member)
 		ua.PUT("/weather/member/:member_id", deps.Weather.UpdateMember)
 
+		// G7 라우트 권한 요약: 앱이 쓰지 않는 그룹·푸시·주문 경로(groups/hidden, emergency-restore, join-new-member,
+		// group-details 전부, group-members add/remove, push-logs·push-fcms 목록/생성/수정, orders 상태변경/취소)는 관리자 전용(adm).
+		// 나머지는 ua(ROUTE_AUTH_MODE)이며 토큰이 있으면 핸들러의 가드가 현재 멤버/그룹장/본인을 항상 검사한다.
 		// groups — read. 정적 세그먼트(/hidden,/current-user*,/member,/code)가 파라미터(/:group_id)보다
 		// 우선 매칭된다. /current-user·/current-user/summary는 JWT 필수(get_required_user_id).
 		// /:group_id/stats는 무인증.
-		ua.GET("/groups/hidden", deps.Group.Hidden)
+		adm.GET("/groups/hidden", deps.Group.Hidden)
 		ua.GET("/groups/current-user/summary", deps.Group.CurrentUserSummary)
 		ua.GET("/groups/current-user", deps.Group.CurrentUser)
 		ua.GET("/groups/:group_id", deps.Group.Get)
@@ -147,7 +171,7 @@ func New(cfg *config.Config, logger *slog.Logger, deps Deps) http.Handler {
 		ua.GET("/groups/:group_id/stats", deps.Group.Stats)
 		ua.GET("/groups/", deps.Group.List)
 		ua.GET("/groups/member/:member_id", deps.Group.Member)
-		v1.GET("/groups/code/:code", deps.Group.ByCode)
+		ua.GET("/groups/code/:code", deps.Group.ByCode)
 		// groups — write Phase 1(전부 JWT 필수: get_required_user_id). 정적 /join이 /:group_id/join과
 		// 별도 트리(세그먼트 수 다름)라 충돌 없음. create_group은 그룹장 등록+채팅방 생성을 동반.
 		ua.POST("/groups/join", deps.Group.JoinByCode)
@@ -156,31 +180,31 @@ func New(cfg *config.Config, logger *slog.Logger, deps Deps) http.Handler {
 		// groups — write Phase 2(전부 무인증). 정적 /emergency-restore가 /:group_id와 같은 레벨이지만
 		// Gin은 정적>파라미터 우선이라 공존 가능(GET의 /member·/code 정적과 동일 패턴). update의 sgt_show='N'은
 		// 소프트 삭제. remove는 body값 무시(항상 N/Y). join-new-member는 채팅 동기화 없음.
-		ua.POST("/groups/emergency-restore", deps.Group.EmergencyRestore)
-		ua.POST("/groups/:group_id/join-new-member", deps.Group.JoinNewMember)
+		adm.POST("/groups/emergency-restore", deps.Group.EmergencyRestore)
+		adm.POST("/groups/:group_id/join-new-member", deps.Group.JoinNewMember)
 		ua.PUT("/groups/:group_id", deps.Group.Update)
 		ua.PUT("/groups/:group_id/restore", deps.Group.Restore)
 		ua.PUT("/groups/:group_id/members/:member_id/remove", deps.Group.RemoveMember)
 
 		// group-details — read 4종(전부 무인증). 정적(/member,/group)이 /:group_detail_id보다 우선.
 		// write·role·remove·delete는 후반 Phase.
-		ua.GET("/group-details/", deps.GroupDetail.List)
-		ua.GET("/group-details/:group_detail_id", deps.GroupDetail.Get)
-		ua.GET("/group-details/member/:member_id", deps.GroupDetail.Member)
-		ua.GET("/group-details/group/:group_id", deps.GroupDetail.Group)
+		adm.GET("/group-details/", deps.GroupDetail.List)
+		adm.GET("/group-details/:group_detail_id", deps.GroupDetail.Get)
+		adm.GET("/group-details/member/:member_id", deps.GroupDetail.Member)
+		adm.GET("/group-details/group/:group_id", deps.GroupDetail.Group)
 		// group-details write 5종(무인증). ⚠️create는 스키마-모델 필드 불일치로 항상 500(Python TypeError 버그).
 		// update는 모델 매핑 컬럼만 영속. role/remove는 utcnow()+소프트삭제. delete는 소프트삭제(exit=Y/show=N).
-		ua.POST("/group-details/", deps.GroupDetail.Create)
-		ua.PUT("/group-details/:group_detail_id", deps.GroupDetail.Update)
-		ua.PUT("/group-details/:group_detail_id/role", deps.GroupDetail.UpdateRole)
-		ua.PUT("/group-details/:group_detail_id/remove", deps.GroupDetail.RemoveMember)
-		ua.DELETE("/group-details/:group_detail_id", deps.GroupDetail.Delete)
+		adm.POST("/group-details/", deps.GroupDetail.Create)
+		adm.PUT("/group-details/:group_detail_id", deps.GroupDetail.Update)
+		adm.PUT("/group-details/:group_detail_id/role", deps.GroupDetail.UpdateRole)
+		adm.PUT("/group-details/:group_detail_id/remove", deps.GroupDetail.RemoveMember)
+		adm.DELETE("/group-details/:group_detail_id", deps.GroupDetail.Delete)
 
 		// members — read. 정적(/check/*,/me,/consent,/group)이 /:member_id보다 우선.
 		// /members/me(JWT)는 미인증도 200+result:N로 흡수. /members/consent/:member_id는 JWT.
-		v1.GET("/members/check/phone/:phone", deps.Member.CheckPhone)
-		v1.GET("/members/check/email/:email", deps.Member.CheckEmail)
-		v1.GET("/members/check/nickname/:nickname", deps.Member.CheckNickname)
+		v1.GET("/members/check/phone/:phone", checkLimit("phone"), deps.Member.CheckPhone)
+		v1.GET("/members/check/email/:email", checkLimit("email"), deps.Member.CheckEmail)
+		v1.GET("/members/check/nickname/:nickname", checkLimit("nickname"), deps.Member.CheckNickname)
 		v1.GET("/members/me", deps.Member.Me)
 		v1.GET("/members/consent/:member_id", deps.Member.Consent)
 		// ⚠️ /members/terms는 정상화 결정으로 약관 5종 200 반환(Python은 /{member_id}에 가려져 422였음).
@@ -291,22 +315,22 @@ func New(cfg *config.Config, logger *slog.Logger, deps Deps) http.Handler {
 		// schedules — 결정적 read 3종(무인증). sst_location_lat/long Decimal→문자열.
 		// /before-30min은 Python에서 /:schedule_id에 가려져 422(미등록으로 동일).
 		// now/in-members·out-members·push(시간창, zero date 행 있으면 500=Python ResponseValidationError 재현) 이식.
-		ua.GET("/schedules/", deps.Schedule.List)
-		ua.GET("/schedules/now/in-members", deps.Schedule.NowInMembers)
-		ua.GET("/schedules/now/out-members", deps.Schedule.NowOutMembers)
-		ua.GET("/schedules/now/push", deps.Schedule.NowPush)
-		ua.GET("/schedules/:schedule_id", deps.Schedule.Get)
-		ua.GET("/schedules/member/:member_id", deps.Schedule.Member)
-		ua.GET("/schedules/group/:group_id", deps.Schedule.Group)
+		sa.GET("/schedules/", deps.Schedule.List)
+		adm.GET("/schedules/now/in-members", deps.Schedule.NowInMembers)
+		adm.GET("/schedules/now/out-members", deps.Schedule.NowOutMembers)
+		adm.GET("/schedules/now/push", deps.Schedule.NowPush)
+		sa.GET("/schedules/:schedule_id", deps.Schedule.Get)
+		sa.GET("/schedules/member/:member_id", deps.Schedule.Member)
+		sa.GET("/schedules/group/:group_id", deps.Schedule.Group)
 		// schedules write 3종(무인증). create는 ScheduleCreate 전 필드 모델 매핑(group_details와 달리 성공형 INSERT).
 		// update는 exclude_unset. delete는 하드 삭제. sst_location_lat/long은 Decimal→문자열.
-		ua.POST("/schedules/", deps.Schedule.Create)
-		ua.PUT("/schedules/:schedule_id", deps.Schedule.Update)
-		ua.DELETE("/schedules/:schedule_id", deps.Schedule.Delete)
+		sa.POST("/schedules/", deps.Schedule.Create)
+		sa.PUT("/schedules/:schedule_id", deps.Schedule.Update)
+		sa.DELETE("/schedules/:schedule_id", deps.Schedule.Delete)
 
 		// push-logs — read 6종(무인증). datetime zero date 시 Python처럼 500(plain).
 		// /member/:id/unread가 /member/:id보다 더 구체적 경로로 공존.
-		ua.GET("/push-logs/", deps.PushLog.List)
+		adm.GET("/push-logs/", deps.PushLog.List)
 		ua.GET("/push-logs/:push_log_id", deps.PushLog.Get)
 		ua.GET("/push-logs/member/:member_id", deps.PushLog.Member)
 		ua.GET("/push-logs/member/:member_id/unread", deps.PushLog.Unread)
@@ -314,46 +338,46 @@ func New(cfg *config.Config, logger *slog.Logger, deps Deps) http.Handler {
 		ua.GET("/push-logs/schedule/:schedule_id", deps.PushLog.Schedule)
 		// push-logs write(무인증): create(API3_FCM_service/system_auto면 무DB 가짜응답)·update(exclude_unset)·
 		// delete(하드)·patch read·delete-all/read-all(query mt_idx). 정적 delete-all/read-all + 파라미터 공존.
-		ua.POST("/push-logs/", deps.PushLog.Create)
+		adm.POST("/push-logs/", deps.PushLog.Create)
 		ua.POST("/push-logs/delete-all", deps.PushLog.DeleteAll)
 		ua.POST("/push-logs/read-all", deps.PushLog.ReadAll)
-		ua.PUT("/push-logs/:push_log_id", deps.PushLog.Update)
+		adm.PUT("/push-logs/:push_log_id", deps.PushLog.Update)
 		ua.DELETE("/push-logs/:push_log_id", deps.PushLog.Delete)
 		ua.PATCH("/push-logs/:push_log_id/read", deps.PushLog.MarkRead)
 
 		// push-fcms — read 5종(무인증). /now는 Python에서 /:push_fcm_id에 가려져 422(미등록 동일).
-		ua.GET("/push-fcms/", deps.PushFCM.List)
+		adm.GET("/push-fcms/", deps.PushFCM.List)
 		ua.GET("/push-fcms/:push_fcm_id", deps.PushFCM.Get)
 		ua.GET("/push-fcms/member/:member_id", deps.PushFCM.Member)
 		ua.GET("/push-fcms/code/:code", deps.PushFCM.Code)
 		ua.GET("/push-fcms/pending/:mt_idx", deps.PushFCM.Pending)
 		// push-fcms write(무인증): mark-delivered(no-op)·create·update(exclude_unset)·delete(하드).
 		ua.POST("/push-fcms/mark-delivered/:push_fcm_id", deps.PushFCM.MarkDelivered)
-		ua.POST("/push-fcms/", deps.PushFCM.Create)
-		ua.PUT("/push-fcms/:push_fcm_id", deps.PushFCM.Update)
+		adm.POST("/push-fcms/", deps.PushFCM.Create)
+		adm.PUT("/push-fcms/:push_fcm_id", deps.PushFCM.Update)
 		ua.DELETE("/push-fcms/:push_fcm_id", deps.PushFCM.Delete)
 
 		// group-members — read 1종(무인증). 3단계 쿼리(기본정보+최신위치 self-join+fallback).
 		la.GET("/group-members/member/:group_id", deps.GroupMember.Member)
 		// group-members write(무인증): add/remove(query param)·remove-path·role.
 		// role의 is_leader는 bool→Y/N, 그 외 str(x).upper()→MySQL ENUM 위반 시 500.
-		ua.POST("/group-members/add", deps.GroupMember.Add)
-		ua.DELETE("/group-members/remove", deps.GroupMember.Remove)
+		adm.POST("/group-members/add", deps.GroupMember.Add)
+		adm.DELETE("/group-members/remove", deps.GroupMember.Remove)
 		ua.DELETE("/group-members/:group_id/member/:member_id", deps.GroupMember.RemovePath)
 		ua.PUT("/group-members/:group_id/role", deps.GroupMember.UpdateRole)
 
 		// group-schedule-manage(/schedule) — read 4종(무인증). 권한(check_group_permission)·
 		// 그룹멤버·Haversine SQL 거리계산·동적 WHERE. datetime은 엔드포인트별 str(공백)/isoformat(T) 혼재.
-		ua.GET("/schedule/test-all-columns", deps.GroupSchedule.TestAllColumns)
-		ua.GET("/schedule/owner-groups/all-schedules", deps.GroupSchedule.OwnerGroupsAllSchedules)
-		ua.GET("/schedule/group/:group_id/schedules", deps.GroupSchedule.GroupSchedules)
-		ua.GET("/schedule/debug/schedule/:schedule_id", deps.GroupSchedule.DebugSchedule)
+		adm.GET("/schedule/test-all-columns", deps.GroupSchedule.TestAllColumns)
+		sa.GET("/schedule/owner-groups/all-schedules", deps.GroupSchedule.OwnerGroupsAllSchedules)
+		sa.GET("/schedule/group/:group_id/schedules", deps.GroupSchedule.GroupSchedules)
+		adm.GET("/schedule/debug/schedule/:schedule_id", deps.GroupSchedule.DebugSchedule)
 		// Phase B — 그룹 스케줄 생성(Dict[str,Any] raw INSERT + 반복 3년 + FCM 알림).
-		ua.POST("/schedule/group/:group_id/schedules", deps.GroupSchedule.CreateGroupSchedule)
+		sa.POST("/schedule/group/:group_id/schedules", deps.GroupSchedule.CreateGroupSchedule)
 		// Phase C — 그룹 스케줄 수정(반복옵션 this/all/future + FCM 알림).
-		ua.PUT("/schedule/group/:group_id/schedules/:schedule_id", deps.GroupSchedule.UpdateGroupSchedule)
+		sa.PUT("/schedule/group/:group_id/schedules/:schedule_id", deps.GroupSchedule.UpdateGroupSchedule)
 		// Phase D — 그룹 스케줄 삭제(반복옵션 this/all/future soft-delete + FCM 알림).
-		ua.DELETE("/schedule/group/:group_id/schedules/:schedule_id", deps.GroupSchedule.DeleteGroupSchedule)
+		sa.DELETE("/schedule/group/:group_id/schedules/:schedule_id", deps.GroupSchedule.DeleteGroupSchedule)
 
 		// logs(member_location_log) — read(무인증). to_dict 직렬화(mlt_speed 등 PyFloat).
 		// summary/path: 메모리 Haversine+round(banker's). stay-times/map-markers: raw CTE/GROUP BY를
@@ -384,8 +408,8 @@ func New(cfg *config.Config, logger *slog.Logger, deps Deps) http.Handler {
 		v1.GET("/orders/:member_id", deps.Order.MemberOrders)
 		// orders write 2종. ⚠️ 성공 시에도 Python이 raw 모델을 response_model 없이 반환→직렬화 실패→500 plain
 		// (DB는 갱신/취소 커밋됨). status update는 소유자 체크 없음(P1), cancel은 소유자(403)+이미취소(400). 401="인증이 필요합니다".
-		v1.PUT("/orders/status/:order_id", deps.Order.UpdateStatus)
-		v1.POST("/orders/cancel/:order_id", deps.Order.Cancel)
+		adm.PUT("/orders/status/:order_id", deps.Order.UpdateStatus)
+		adm.POST("/orders/cancel/:order_id", deps.Order.Cancel)
 
 		// sms/email 발송 도메인 — 인증번호 발송/검증(무인증) + 일반 SMS(인증 필수).
 		// send-verification-code/verify-code는 Redis(sms:code:/sms:verified:/sms:rate:) 사용 →

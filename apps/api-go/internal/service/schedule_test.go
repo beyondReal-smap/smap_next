@@ -14,7 +14,9 @@ type fakeScheduleRepo struct {
 	err  error
 }
 
-func (f *fakeScheduleRepo) List(skip, limit int) ([]model.Schedule, error)   { return f.many, f.err }
+func (f *fakeScheduleRepo) ListForMember(mt, skip, limit int) ([]model.Schedule, error) {
+	return f.many, f.err
+}
 func (f *fakeScheduleRepo) GetByID(id int) (*model.Schedule, error)          { return f.one, f.err }
 func (f *fakeScheduleRepo) FindByMember(mtIdx int) ([]model.Schedule, error) { return f.many, f.err }
 func (f *fakeScheduleRepo) FindGroupSchedules(g int, days *int) ([]model.Schedule, error) {
@@ -70,7 +72,7 @@ func TestScheduleZeroDate500(t *testing.T) {
 	}
 	// 목록도 한 행이라도 zero date면 ok=false
 	svc2 := NewSchedule(&fakeScheduleRepo{many: []model.Schedule{{SstIdx: 1}, *sc}})
-	if _, lok := svc2.ListSchedules(0, 100); lok {
+	if _, lok := svc2.ListSchedules(1, 0, 100); lok {
 		t.Error("목록에 zero date 있으면 ok=false(500) 기대")
 	}
 }

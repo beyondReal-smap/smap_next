@@ -29,8 +29,15 @@ type fakeSvc struct {
 	sendOK      bool
 	pushName    string
 	pushTargets []service.PushTarget
+	denied      map[int]bool // IsRoomMember가 거부할 회원
+	mu          sync.Mutex
 }
 
+func (f *fakeSvc) IsRoomMember(s, mt int) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return !f.denied[mt], nil
+}
 func (f *fakeSvc) JoinRoom(s, mt int) (bool, error) { return f.joinOK, nil }
 func (f *fakeSvc) SendMessage(s, mt int, c string) (*dto.ChatMessageItem, bool, error) {
 	return f.sendItem, f.sendOK, nil

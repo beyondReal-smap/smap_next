@@ -1,8 +1,9 @@
 package service
 
 import (
+	"context"
 	"errors"
-	"strings"
+	"fmt"
 	"testing"
 	"time"
 
@@ -33,6 +34,8 @@ type fakeGroupWriteRepo struct {
 	reactivateNewErr     error // Phase 2: ReactivateMembershipNewMember
 	findVisibleErr       error // Phase 2: FindVisibleMembership
 	removeErr            error // Phase 2: RemoveMembership
+	isOwner              bool  // IsGroupOwner 반환(생성자 기준 그룹장)
+	isOwnerErr           error
 
 	createdGroup   *model.Group
 	createdDetail  *model.GroupDetail
@@ -40,12 +43,25 @@ type fakeGroupWriteRepo struct {
 	savedGroup     *model.Group // Phase 2: SaveGroup 기록
 	reactivatedNew bool         // Phase 2
 	removed        bool         // Phase 2
+
+	// G7
+	rows        []model.GroupDetail // FindMembershipRows 반환(nil이면 active로 대체)
+	rowsErr     error
+	current     *model.GroupDetail // FindCurrentMembership 반환
+	currentErr  error
+	transferErr error
+	rejoined    bool
+	kicked      bool
+	left        bool
+	transferred int
 }
 
-func (f *fakeGroupWriteRepo) GetByID(id int) (*model.Group, error)     { return f.group, f.getErr }
+func (f *fakeGroupWriteRepo) GetByID(id int) (*model.Group, error)      { return f.group, f.getErr }
 func (f *fakeGroupWriteRepo) FindByCode(c string) (*model.Group, error) { return f.byCode, f.byCodeErr }
-func (f *fakeGroupWriteRepo) MemberExists(mtIdx int) (bool, error)     { return f.memberExists, f.memberErr }
-func (f *fakeGroupWriteRepo) CodeExists(code string) (bool, error)     { return f.codeExists, f.codeErr }
+func (f *fakeGroupWriteRepo) MemberExists(mtIdx int) (bool, error) {
+	return f.memberExists, f.memberErr
+}
+func (f *fakeGroupWriteRepo) CodeExists(code string) (bool, error) { return f.codeExists, f.codeErr }
 
 func (f *fakeGroupWriteRepo) CreateGroup(g *model.Group) error {
 	if f.createGroupErr != nil {
@@ -111,12 +127,72 @@ func (f *fakeGroupWriteRepo) RemoveMembership(gd *model.GroupDetail, now time.Ti
 	return nil
 }
 
+// --- G7 fake 메서드 ---
+
+func (f *fakeGroupWriteRepo) FindMembershipRows(sgtIdx, mtIdx int) ([]model.GroupDetail, error) {
+	if f.rows != nil || f.rowsErr != nil {
+		return f.rows, f.rowsErr
+	}
+	if f.findActiveErr != nil {
+		return nil, f.findActiveErr
+	}
+	if f.active != nil {
+		return []model.GroupDetail{*f.active}, nil
+	}
+	return nil, nil
+}
+
+func (f *fakeGroupWriteRepo) RejoinMembership(gd *model.GroupDetail, now time.Time) error {
+	if f.reactivateErr != nil {
+		return f.reactivateErr
+	}
+	f.rejoined = true
+	return nil
+}
+
+func (f *fakeGroupWriteRepo) KickMembership(sgtIdx, mtIdx int, now time.Time) error {
+	f.kicked = true
+	return f.removeErr
+}
+
+func (f *fakeGroupWriteRepo) LeaveMembership(sgtIdx, mtIdx int, now time.Time) error {
+	f.left = true
+	return f.removeErr
+}
+
+func (f *fakeGroupWriteRepo) IsGroupOwner(sgtIdx, mtIdx int) (bool, error) {
+	return f.isOwner, f.isOwnerErr
+}
+
+func (f *fakeGroupWriteRepo) FindCurrentMembership(sgtIdx, mtIdx int) (*model.GroupDetail, error) {
+	return f.current, f.currentErr
+}
+
+func (f *fakeGroupWriteRepo) TransferOwnership(g *model.Group, newOwner int, now time.Time) error {
+	f.transferred = newOwner
+	return f.transferErr
+}
+
 // fakeGroupChat는 groupChatWriter 인터페이스를 대체하고 호출 여부/에러를 기록한다.
 type fakeGroupChat struct {
 	createCalled bool
 	addCalled    bool
 	createErr    error
 	addErr       error
+	// 비활성화(탈퇴·강퇴·삭제) 연결 기록
+	deactMembers []string // "sgt:mt"
+	deactGroups  []int
+	deactErr     error
+}
+
+func (f *fakeGroupChat) DeactivateChatMembership(_ context.Context, sgtIdx, mtIdx int) error {
+	f.deactMembers = append(f.deactMembers, fmt.Sprint(sgtIdx, ":", mtIdx))
+	return f.deactErr
+}
+
+func (f *fakeGroupChat) DeactivateGroupChat(_ context.Context, sgtIdx int) error {
+	f.deactGroups = append(f.deactGroups, sgtIdx)
+	return f.deactErr
 }
 
 func (f *fakeGroupChat) CreateGroupChatRoom(sgtIdx int, title *string, ids []int, now time.Time) error {
@@ -140,8 +216,8 @@ func TestCreateGroup(t *testing.T) {
 		if res.MtIdx == nil || *res.MtIdx != 7 {
 			t.Errorf("mt_idx=토큰값(7) 기대, got %v", res.MtIdx)
 		}
-		if res.SgtCode == nil || len(*res.SgtCode) != 6 || !strings.HasPrefix(*res.SgtCode, "G") {
-			t.Errorf("sgt_code는 'G'+5자 기대, got %v", res.SgtCode)
+		if res.SgtCode == nil || !validGroupCodeFormat(*res.SgtCode) {
+			t.Errorf("sgt_code는 대문자/숫자 10자(CSPRNG) 기대, got %v", res.SgtCode)
 		}
 		if res.SgtShow == nil || *res.SgtShow != "Y" {
 			t.Errorf("sgt_show 폴백 'Y' 기대, got %v", res.SgtShow)
@@ -207,7 +283,7 @@ func TestJoinByCode(t *testing.T) {
 	t.Run("이미 가입(show=Y) → JoinAlready", func(t *testing.T) {
 		repo := &fakeGroupWriteRepo{
 			byCode: &model.Group{SgtIdx: 3}, memberExists: true,
-			active: &model.GroupDetail{SgdtIdx: 9, SgdtShow: pStr("Y")},
+			active: &model.GroupDetail{SgdtIdx: 9, SgdtShow: pStr("Y"), SgdtExit: pStr("N"), SgdtDischarge: pStr("N")},
 		}
 		res, err := NewGroupWrite(repo, &fakeGroupChat{}).JoinByCode(7, "gabcde")
 		if err != nil || res.Outcome != JoinAlready {
@@ -215,7 +291,7 @@ func TestJoinByCode(t *testing.T) {
 		}
 	})
 
-	t.Run("재가입(show=N) → JoinReactivated, 채팅 추가 없음", func(t *testing.T) {
+	t.Run("재가입(show=N) → JoinReactivated, 채팅 참가 복구", func(t *testing.T) {
 		repo := &fakeGroupWriteRepo{
 			byCode: &model.Group{SgtIdx: 3}, memberExists: true,
 			active: &model.GroupDetail{SgdtIdx: 9, SgdtShow: pStr("N"), SgdtOwnerChk: pStr("N"), SgdtLeaderChk: pStr("N"), SgdtWdate: pTimePtr(time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC))},
@@ -228,8 +304,9 @@ func TestJoinByCode(t *testing.T) {
 		if !repo.reactivated {
 			t.Errorf("ReactivateMembership 호출 기대")
 		}
-		if chat.addCalled {
-			t.Errorf("재가입엔 채팅 멤버 추가 없음(Python 동일)")
+		// 탈퇴 시 채팅 참가를 끄게 되었으므로(C-1) 재가입은 AddMemberToGroupChat으로 되살린다(Python과 다른 의도된 변경).
+		if !chat.addCalled {
+			t.Errorf("재가입은 채팅 참가를 되살려야 함")
 		}
 		if res.Data.SgdtIdx != 9 || res.Data.SgtIdx != 3 || res.Data.MtIdx != 7 {
 			t.Errorf("data 필드 불일치: %+v", res.Data)
@@ -280,7 +357,7 @@ func TestJoinByCode(t *testing.T) {
 
 func TestJoin(t *testing.T) {
 	t.Run("그룹 없음 → JoinGroupNotFound", func(t *testing.T) {
-		res, err := NewGroupWrite(&fakeGroupWriteRepo{group: nil}, &fakeGroupChat{}).Join(3, 7)
+		res, err := NewGroupWrite(&fakeGroupWriteRepo{group: nil}, &fakeGroupChat{}).Join(3, 7, "", false)
 		if err != nil || res.Outcome != JoinGroupNotFound {
 			t.Errorf("JoinGroupNotFound 기대, got outcome=%v err=%v", res.Outcome, err)
 		}
@@ -288,7 +365,7 @@ func TestJoin(t *testing.T) {
 
 	t.Run("숨김 그룹(show!=Y) → JoinGroupHidden", func(t *testing.T) {
 		repo := &fakeGroupWriteRepo{group: &model.Group{SgtIdx: 3, SgtShow: pStr("N")}}
-		res, err := NewGroupWrite(repo, &fakeGroupChat{}).Join(3, 7)
+		res, err := NewGroupWrite(repo, &fakeGroupChat{}).Join(3, 7, "", false)
 		if err != nil || res.Outcome != JoinGroupHidden {
 			t.Errorf("JoinGroupHidden 기대, got outcome=%v err=%v", res.Outcome, err)
 		}
@@ -296,7 +373,7 @@ func TestJoin(t *testing.T) {
 
 	t.Run("회원 없음 → JoinMemberNotFound", func(t *testing.T) {
 		repo := &fakeGroupWriteRepo{group: &model.Group{SgtIdx: 3, SgtShow: pStr("Y")}, memberExists: false}
-		res, err := NewGroupWrite(repo, &fakeGroupChat{}).Join(3, 7)
+		res, err := NewGroupWrite(repo, &fakeGroupChat{}).Join(3, 7, "", false)
 		if err != nil || res.Outcome != JoinMemberNotFound {
 			t.Errorf("JoinMemberNotFound 기대, got outcome=%v err=%v", res.Outcome, err)
 		}
@@ -305,7 +382,7 @@ func TestJoin(t *testing.T) {
 	t.Run("신규 가입 → JoinCreated", func(t *testing.T) {
 		repo := &fakeGroupWriteRepo{group: &model.Group{SgtIdx: 3, SgtShow: pStr("Y")}, memberExists: true, active: nil}
 		chat := &fakeGroupChat{}
-		res, err := NewGroupWrite(repo, chat).Join(3, 7)
+		res, err := NewGroupWrite(repo, chat).Join(3, 7, "", false)
 		if err != nil || res.Outcome != JoinCreated {
 			t.Fatalf("JoinCreated 기대, got outcome=%v err=%v", res.Outcome, err)
 		}
@@ -345,8 +422,8 @@ func TestUpdateGroup(t *testing.T) {
 	})
 
 	t.Run("일반 업데이트(title/mt_idx/code) → 반영·udate 설정", func(t *testing.T) {
-		repo := &fakeGroupWriteRepo{group: &model.Group{SgtIdx: 3, SgtShow: pStr("Y")}}
-		resp, err := NewGroupWrite(repo, &fakeGroupChat{}).UpdateGroup(3, pInt(99), pStr("새제목"), pStr("NEWCD"), nil, nil)
+		repo := &fakeGroupWriteRepo{group: &model.Group{SgtIdx: 3, SgtShow: pStr("Y")}, current: &model.GroupDetail{SgdtIdx: 5}}
+		resp, err := NewGroupWrite(repo, &fakeGroupChat{}).UpdateGroup(3, pInt(99), pStr("새제목"), pStr("NEWCODE234"), nil, nil)
 		if err != nil || resp == nil {
 			t.Fatalf("성공 기대, got resp=%v err=%v", resp, err)
 		}
@@ -356,7 +433,7 @@ func TestUpdateGroup(t *testing.T) {
 		if resp.MtIdx == nil || *resp.MtIdx != 99 {
 			t.Errorf("mt_idx 반영 기대, got %v", resp.MtIdx)
 		}
-		if resp.SgtCode == nil || *resp.SgtCode != "NEWCD" {
+		if resp.SgtCode == nil || *resp.SgtCode != "NEWCODE234" {
 			t.Errorf("sgt_code 반영 기대, got %v", resp.SgtCode)
 		}
 		if resp.SgtUdate == nil {
@@ -501,7 +578,7 @@ func TestJoinNewMember(t *testing.T) {
 		}
 	})
 
-	t.Run("멤버십 있지만 exit=Y → 재가입(JoinReactivated, 채팅 없음)", func(t *testing.T) {
+	t.Run("멤버십 있지만 exit=Y → 재가입(JoinReactivated, 채팅 참가 복구)", func(t *testing.T) {
 		repo := &fakeGroupWriteRepo{
 			group: &model.Group{SgtIdx: 3, SgtShow: pStr("Y")}, memberExists: true,
 			anyMem: &model.GroupDetail{SgdtIdx: 9, SgdtShow: pStr("Y"), SgdtExit: pStr("Y"), SgdtOwnerChk: pStr("N"), SgdtLeaderChk: pStr("N")},
@@ -514,8 +591,8 @@ func TestJoinNewMember(t *testing.T) {
 		if !repo.reactivatedNew {
 			t.Errorf("ReactivateMembershipNewMember 호출 기대")
 		}
-		if chat.addCalled {
-			t.Errorf("join_new_member 재가입엔 채팅 추가 없음")
+		if !chat.addCalled {
+			t.Errorf("join_new_member 재가입도 끈 채팅 참가를 되살려야 함(C-1)")
 		}
 		if res.Data.SgdtIdx != 9 {
 			t.Errorf("data.sgdt_idx=9 기대, got %d", res.Data.SgdtIdx)
@@ -548,7 +625,7 @@ func TestJoinNewMember(t *testing.T) {
 
 func TestRemoveMember(t *testing.T) {
 	t.Run("그룹 없음 → RemoveGroupNotFound", func(t *testing.T) {
-		res, err := NewGroupWrite(&fakeGroupWriteRepo{group: nil}, &fakeGroupChat{}).RemoveMember(3, 7)
+		res, err := NewGroupWrite(&fakeGroupWriteRepo{group: nil}, &fakeGroupChat{}).RemoveMember(3, 7, RemovalLeave)
 		if err != nil || res.Outcome != RemoveGroupNotFound {
 			t.Errorf("RemoveGroupNotFound 기대, got %v err=%v", res.Outcome, err)
 		}
@@ -556,7 +633,7 @@ func TestRemoveMember(t *testing.T) {
 
 	t.Run("멤버십 없음 → RemoveMemberNotFound", func(t *testing.T) {
 		repo := &fakeGroupWriteRepo{group: &model.Group{SgtIdx: 3}, visible: nil}
-		res, err := NewGroupWrite(repo, &fakeGroupChat{}).RemoveMember(3, 7)
+		res, err := NewGroupWrite(repo, &fakeGroupChat{}).RemoveMember(3, 7, RemovalLeave)
 		if err != nil || res.Outcome != RemoveMemberNotFound {
 			t.Errorf("RemoveMemberNotFound 기대, got %v err=%v", res.Outcome, err)
 		}
@@ -564,12 +641,12 @@ func TestRemoveMember(t *testing.T) {
 
 	t.Run("탈퇴 성공 → show='N',exit='Y',sgdt_udate 채움", func(t *testing.T) {
 		repo := &fakeGroupWriteRepo{group: &model.Group{SgtIdx: 3}, visible: &model.GroupDetail{SgdtIdx: 42, SgdtShow: pStr("Y"), SgdtExit: pStr("N")}}
-		res, err := NewGroupWrite(repo, &fakeGroupChat{}).RemoveMember(3, 7)
+		res, err := NewGroupWrite(repo, &fakeGroupChat{}).RemoveMember(3, 7, RemovalLeave)
 		if err != nil || res.Outcome != RemoveSuccess {
 			t.Fatalf("RemoveSuccess 기대, got %v err=%v", res.Outcome, err)
 		}
-		if !repo.removed {
-			t.Errorf("RemoveMembership 호출 기대")
+		if !repo.left || repo.kicked {
+			t.Errorf("자진 탈퇴(LeaveMembership)만 호출 기대: left=%v kicked=%v", repo.left, repo.kicked)
 		}
 		if res.Data.SgdtIdx != 42 || res.Data.SgdtShow != "N" || res.Data.SgdtExit != "Y" || res.Data.SgdtUdate == "" {
 			t.Errorf("data 불일치: %+v", res.Data)
@@ -578,7 +655,7 @@ func TestRemoveMember(t *testing.T) {
 
 	t.Run("Remove 오류 → (zero,err)=plain500", func(t *testing.T) {
 		repo := &fakeGroupWriteRepo{group: &model.Group{SgtIdx: 3}, visible: &model.GroupDetail{SgdtIdx: 42}, removeErr: errors.New("boom")}
-		_, err := NewGroupWrite(repo, &fakeGroupChat{}).RemoveMember(3, 7)
+		_, err := NewGroupWrite(repo, &fakeGroupChat{}).RemoveMember(3, 7, RemovalLeave)
 		if err == nil {
 			t.Errorf("에러 전파 기대")
 		}

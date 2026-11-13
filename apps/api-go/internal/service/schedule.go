@@ -1,6 +1,8 @@
 package service
 
 import (
+	"context"
+	"errors"
 	"strconv"
 	"time"
 
@@ -22,7 +24,7 @@ func hasZeroDate(times ...*time.Time) bool {
 
 // scheduleRepo는 ScheduleService가 의존하는 데이터 접근 인터페이스.
 type scheduleRepo interface {
-	List(skip, limit int) ([]model.Schedule, error)
+	ListForMember(mtIdx, skip, limit int) ([]model.Schedule, error)
 	GetByID(id int) (*model.Schedule, error)
 	FindByMember(mtIdx int) ([]model.Schedule, error)
 	FindGroupSchedules(groupID int, days *int) ([]model.Schedule, error)
@@ -37,12 +39,31 @@ type scheduleRepo interface {
 // ScheduleService는 Python `app/api/v1/endpoints/schedules.py`의 결정적 read 핸들러를 이식한다.
 // (now/* 시간창·group List[dict]는 별도 작업으로 보류.)
 type ScheduleService struct {
-	repo scheduleRepo
+	repo  scheduleRepo
+	authz *ScheduleAuthz
 }
 
 func NewSchedule(repo scheduleRepo) *ScheduleService {
 	return &ScheduleService{repo: repo}
 }
+
+// SetAuthz는 일정 인가기를 주입한다. 주입되지 않으면 인가가 필요한 메서드는 오류를 낸다(조용히 허용하지 않는다).
+func (s *ScheduleService) SetAuthz(a *ScheduleAuthz) { s.authz = a }
+
+// errScheduleInternal은 응답 변환 실패(zero date 등)로 Python이 500을 내던 경우다.
+var errScheduleInternal = errors.New("schedule: response conversion failed")
+
+var errScheduleAuthzMissing = errors.New("schedule: authz not configured")
+
+func (s *ScheduleService) needAuthz() error {
+	if s.authz == nil {
+		return errScheduleAuthzMissing
+	}
+	return nil
+}
+
+// isPersonal은 그룹에 속하지 않은 개인 일정(sgt_idx가 NULL 또는 0)인지 판정한다.
+func isPersonal(sgt *int) bool { return sgt == nil || *sgt == 0 }
 
 // toScheduleResponse는 ScheduleResponse로 변환한다. zero date가 있으면 ok=false(→ Python 500).
 func toScheduleResponse(s *model.Schedule) (dto.ScheduleResponse, bool) {
@@ -105,9 +126,10 @@ func toScheduleResponses(items []model.Schedule) ([]dto.ScheduleResponse, bool) 
 	return out, true
 }
 
-// ListSchedules는 전체 목록. ok=false면 500(레포 에러 또는 zero date → ResponseValidationError).
-func (s *ScheduleService) ListSchedules(skip, limit int) ([]dto.ScheduleResponse, bool) {
-	items, err := s.repo.List(skip, limit)
+// ListSchedules는 요청자와 관련된 일정 목록(본인 일정 + 본인이 현재 멤버인 그룹의 일정, 삭제 제외).
+// ok=false면 500(레포 에러 또는 zero date → ResponseValidationError).
+func (s *ScheduleService) ListSchedules(actor, skip, limit int) ([]dto.ScheduleResponse, bool) {
+	items, err := s.repo.ListForMember(actor, skip, limit)
 	if err != nil {
 		return nil, false
 	}
@@ -248,4 +270,42 @@ func (s *ScheduleService) GroupSchedules(groupID int, days *int) ([]dto.Schedule
 		out = append(out, toScheduleGroupItem(&items[i]))
 	}
 	return out, nil
+}
+
+// GetScheduleFor는 단건 조회에 인가를 더한다: 그룹 일정은 그 그룹의 현재 멤버만, 개인 일정은 작성자만.
+// found=false→404. 권한이 없으면 ErrScheduleNotMember/ErrScheduleManageDenied, 변환 실패는 errScheduleInternal.
+func (s *ScheduleService) GetScheduleFor(ctx context.Context, actor, id int) (*dto.ScheduleResponse, bool, error) {
+	if err := s.needAuthz(); err != nil {
+		return nil, false, err
+	}
+	sc, err := s.repo.GetByID(id)
+	if err != nil {
+		return nil, false, err
+	}
+	if sc == nil {
+		return nil, false, nil
+	}
+	if isPersonal(sc.SgtIdx) {
+		if sc.MtIdx == nil || *sc.MtIdx != actor {
+			return nil, true, ErrScheduleManageDenied
+		}
+	} else if _, err := s.authz.RequireMember(ctx, actor, *sc.SgtIdx); err != nil {
+		return nil, true, err
+	}
+	r, ok := toScheduleResponse(sc)
+	if !ok {
+		return nil, true, errScheduleInternal
+	}
+	return &r, true, nil
+}
+
+// GroupSchedulesFor는 그룹 일정 조회에 인가를 더한다: 요청자가 그 그룹의 현재 멤버여야 한다.
+func (s *ScheduleService) GroupSchedulesFor(ctx context.Context, actor, groupID int, days *int) ([]dto.ScheduleGroupItem, error) {
+	if err := s.needAuthz(); err != nil {
+		return nil, err
+	}
+	if _, err := s.authz.RequireMember(ctx, actor, groupID); err != nil {
+		return nil, err
+	}
+	return s.GroupSchedules(groupID, days)
 }

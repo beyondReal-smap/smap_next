@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"math"
 	"net/http"
 
@@ -102,6 +103,10 @@ func (h *ChatHandler) CreateDM(c *gin.Context) {
 	}
 
 	res, err := h.svc.CreateDMRoom(mtIdx, target)
+	if errors.Is(err, service.ErrChatDMNotAllowed) {
+		writeJSON(c, http.StatusForbidden, gin.H{"detail": "같은 그룹의 활성 회원끼리만 DM을 사용할 수 있습니다."})
+		return
+	}
 	if err != nil {
 		// Python: create_dm_room이 None이면 500 "채팅방 생성에 실패했습니다."(실제론 dead 경로).
 		// DB 에러를 동일 500으로 매핑한다.

@@ -1,6 +1,9 @@
 package service
 
 import (
+	"context"
+	"errors"
+	"sync"
 	"time"
 
 	"github.com/bluemusk/smap_next_go/internal/dto"
@@ -21,15 +24,91 @@ type chatRepo interface {
 	GetMembersByIDs(ids []int) ([]model.Member, error)
 	CreateMessageTx(scrIdx, mtIdx int, content string, now time.Time) (*model.ChatMessage, error)
 	UpdateLastRead(scrIdx, mtIdx, scmsgIdx int) error
+	ShareActiveGroup(a, b int) (bool, error)
+	RemoveMemberFromGroupChat(sgtIdx, mtIdx int) error
+	RemoveAllFromGroupChat(sgtIdx int) error
 }
+
+// ErrChatDMNotAllowed: DM은 같은 그룹의 현재 멤버(활성 회원)끼리만 만들 수 있다(C-2).
+var ErrChatDMNotAllowed = errors.New("chat: dm allowed only between active members of a shared group")
 
 // ChatService는 Python `app/services/chat_service.py`의 read/DM 메서드를 이식한다.
 // (send_message·group 채팅 메서드는 각각 Phase3 WS·groups write 범위.)
 type ChatService struct {
 	repo chatRepo
+
+	// 소켓 수신 시점 멤버십 확인 캐시(짧은 TTL, 허용 결과만). 메시지 하나를 방의 모든 접속자에게 보낼 때마다
+	// 접속자 수만큼 DB를 조회하지 않기 위함이다. 비활성화 함수는 캐시를 비워 즉시 반영한다.
+	memTTL   time.Duration
+	memMu    sync.Mutex
+	memCache map[[2]int]time.Time
 }
 
 func NewChat(repo chatRepo) *ChatService { return &ChatService{repo: repo} }
+
+// SetMembershipCacheTTL은 IsRoomMember 허용 결과 캐시 수명이다(0이면 캐시 안 함 = 매번 조회).
+func (s *ChatService) SetMembershipCacheTTL(d time.Duration) { s.memTTL = d }
+
+// IsRoomMember는 회원이 지금 그 방의 유효 참가자(방 참가 + 현재 그룹 멤버십)인지 판정한다. 소켓 메시지 수신 시점
+// 확인에 쓴다. 허용 결과만 TTL 동안 캐시하므로 거부는 즉시 반영되고, 허용이 철회되는 지연은 최대 TTL이다.
+func (s *ChatService) IsRoomMember(scrIdx, mtIdx int) (bool, error) {
+	key := [2]int{scrIdx, mtIdx}
+	if s.memTTL > 0 {
+		s.memMu.Lock()
+		exp, ok := s.memCache[key]
+		s.memMu.Unlock()
+		if ok && time.Now().Before(exp) {
+			return true, nil
+		}
+	}
+	m, err := s.repo.FindMembership(scrIdx, mtIdx)
+	if err != nil {
+		return false, err
+	}
+	if m == nil {
+		return false, nil
+	}
+	if s.memTTL > 0 {
+		s.memMu.Lock()
+		if s.memCache == nil || len(s.memCache) > 50000 {
+			s.memCache = make(map[[2]int]time.Time)
+		}
+		s.memCache[key] = time.Now().Add(s.memTTL)
+		s.memMu.Unlock()
+	}
+	return true, nil
+}
+
+func (s *ChatService) clearMembershipCache() {
+	s.memMu.Lock()
+	s.memCache = nil
+	s.memMu.Unlock()
+}
+
+// DeactivateChatMembership은 회원이 그룹을 탈퇴·강퇴될 때 그 그룹 채팅방 참가를 비활성화한다(C-1).
+// 그룹 서비스의 탈퇴·강퇴 경로가 호출한다. 이미 접속한 소켓은 다음 메시지 수신 시점 확인에서 방에서 제외된다.
+func (s *ChatService) DeactivateChatMembership(ctx context.Context, sgtIdx, mtIdx int) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := s.repo.RemoveMemberFromGroupChat(sgtIdx, mtIdx); err != nil {
+		return err
+	}
+	s.clearMembershipCache()
+	return nil
+}
+
+// DeactivateGroupChat은 그룹이 삭제될 때 그 그룹 채팅방의 모든 참가를 비활성화한다(C-1).
+func (s *ChatService) DeactivateGroupChat(ctx context.Context, sgtIdx int) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := s.repo.RemoveAllFromGroupChat(sgtIdx); err != nil {
+		return err
+	}
+	s.clearMembershipCache()
+	return nil
+}
 
 // GetRoomsForMember는 Python ChatService.get_rooms_for_member와 1:1 대응한다.
 // 응답 {"rooms": [...], "total_unread": N}. 방마다 unread/latest/member_count + DM이면 상대 정보.
@@ -45,10 +124,10 @@ func (s *ChatService) GetRoomsForMember(mtIdx int) (dto.ChatRoomList, error) {
 		if err != nil {
 			return dto.ChatRoomList{}, err
 		}
-		lastRead := 0
-		if membership != nil {
-			lastRead = membership.ScmLastReadIdx
+		if membership == nil {
+			continue // 그룹을 나간 뒤에도 남은 참가 행: 방 목록에서 제외(C-1)
 		}
+		lastRead := membership.ScmLastReadIdx
 
 		unread, err := s.repo.UnreadCount(room.ScrIdx, lastRead)
 		if err != nil {
@@ -160,6 +239,14 @@ func (s *ChatService) GetMessages(scrIdx, mtIdx, beforeIdx, limit int) ([]dto.Ch
 // CreateDMRoom은 Python ChatService.create_dm_room와 대응한다.
 // 기존 DM 있으면 {scr_idx, is_new:false}, 없으면 생성 후 {scr_idx, is_new:true}.
 func (s *ChatService) CreateDMRoom(mtIdx, targetMtIdx int) (dto.CreateDMResult, error) {
+	// DM은 같은 그룹의 현재 멤버(활성 회원)끼리만. 없는 번호·정지 회원·다른 그룹 회원이면 거부한다(C-2).
+	shared, err := s.repo.ShareActiveGroup(mtIdx, targetMtIdx)
+	if err != nil {
+		return dto.CreateDMResult{}, err
+	}
+	if !shared {
+		return dto.CreateDMResult{}, ErrChatDMNotAllowed
+	}
 	existing, err := s.repo.FindDM(mtIdx, targetMtIdx)
 	if err != nil {
 		return dto.CreateDMResult{}, err

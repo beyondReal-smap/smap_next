@@ -29,8 +29,8 @@ func (r *ChatRepository) GetRoomsForMember(mtIdx int) ([]model.ChatRoom, error) 
 	return out, err
 }
 
-// FindMembership은 Python ChatMember.find_membership(scr_idx+mt_idx+scm_show='Y'). 없으면 (nil, nil).
-func (r *ChatRepository) FindMembership(scrIdx, mtIdx int) (*model.ChatMember, error) {
+// findRawMembership은 그룹 멤버십을 보지 않는 방 참가 행 조회(scm_show='Y'). 없으면 (nil, nil).
+func (r *ChatRepository) findRawMembership(scrIdx, mtIdx int) (*model.ChatMember, error) {
 	var m model.ChatMember
 	err := r.db.Where("scr_idx = ? AND mt_idx = ? AND scm_show = ?", scrIdx, mtIdx, "Y").First(&m).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -40,6 +40,94 @@ func (r *ChatRepository) FindMembership(scrIdx, mtIdx int) (*model.ChatMember, e
 		return nil, err
 	}
 	return &m, nil
+}
+
+// findRoom은 보이는 방(scr_show='Y')을 조회한다. 없으면 (nil, nil).
+func (r *ChatRepository) findRoom(scrIdx int) (*model.ChatRoom, error) {
+	var room model.ChatRoom
+	err := r.db.Where("scr_idx = ? AND scr_show = ?", scrIdx, "Y").First(&room).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &room, nil
+}
+
+// groupMemberCurrent는 mtIdx가 그룹 sgtIdx의 현재 멤버(공통 멤버십 조건 + 삭제되지 않은 그룹)인지 판정한다.
+func (r *ChatRepository) groupMemberCurrent(sgtIdx, mtIdx int) (bool, error) {
+	var rows []int
+	err := r.db.Raw(
+		"SELECT 1 FROM smap_group_detail_t gd JOIN member_t m ON m.mt_idx = gd.mt_idx "+
+			"JOIN smap_group_t sg ON sg.sgt_idx = gd.sgt_idx "+
+			"WHERE gd.sgt_idx = ? AND gd.mt_idx = ? AND "+currentMemberSQL("gd", "m")+" AND sg.sgt_show = 'Y' LIMIT 1",
+		sgtIdx, mtIdx).Find(&rows).Error
+	return len(rows) > 0, err
+}
+
+// ShareActiveGroup은 두 회원이 서로 다르고 함께 현재 멤버인(삭제되지 않은) 그룹이 하나라도 있는지 판정한다.
+// DM 방 생성·유지의 조건이다(C-2).
+func (r *ChatRepository) ShareActiveGroup(a, b int) (bool, error) {
+	if a == b {
+		return false, nil
+	}
+	var rows []int
+	err := r.db.Raw(
+		"SELECT 1 FROM smap_group_detail_t ga JOIN smap_group_detail_t gb ON gb.sgt_idx = ga.sgt_idx "+
+			"JOIN member_t ma ON ma.mt_idx = ga.mt_idx JOIN member_t mb ON mb.mt_idx = gb.mt_idx "+
+			"JOIN smap_group_t sg ON sg.sgt_idx = ga.sgt_idx "+
+			"WHERE ga.mt_idx = ? AND gb.mt_idx = ? AND "+currentMemberSQL("ga", "ma")+" AND "+currentMemberSQL("gb", "mb")+
+			" AND sg.sgt_show = 'Y' LIMIT 1", a, b).Find(&rows).Error
+	return len(rows) > 0, err
+}
+
+// FindMembership은 방 참가 행(scm_show='Y')이 있고 현재 그룹 멤버십도 유효할 때만 돌려준다(C-1). 없으면 (nil, nil).
+//   - 그룹 방: 회원이 그 그룹의 현재 멤버(나간·강퇴·숨김·삭제된 그룹 제외)여야 한다.
+//   - DM 방: 참가자가 정확히 2명이고, 둘이 아직 같은 그룹의 현재 멤버여야 한다.
+//
+// 채팅 멤버십 비활성화(scm_show='N')가 누락돼도 읽기·전송·입장·수신이 그룹 멤버십 변동을 따르게 하는 방어선이다.
+func (r *ChatRepository) FindMembership(scrIdx, mtIdx int) (*model.ChatMember, error) {
+	m, err := r.findRawMembership(scrIdx, mtIdx)
+	if err != nil || m == nil {
+		return nil, err
+	}
+	room, err := r.findRoom(scrIdx)
+	if err != nil || room == nil {
+		return nil, err
+	}
+	ok, err := r.roomAllows(room, mtIdx)
+	if err != nil || !ok {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (r *ChatRepository) roomAllows(room *model.ChatRoom, mtIdx int) (bool, error) {
+	switch room.ScrType {
+	case "group":
+		if room.SgtIdx == nil {
+			return false, nil
+		}
+		return r.groupMemberCurrent(*room.SgtIdx, mtIdx)
+	case "dm":
+		ids, err := r.dmParticipants(room.ScrIdx)
+		if err != nil || len(ids) != 2 {
+			return false, err
+		}
+		if ids[0] != mtIdx && ids[1] != mtIdx {
+			return false, nil
+		}
+		return r.ShareActiveGroup(ids[0], ids[1])
+	}
+	return false, nil
+}
+
+func (r *ChatRepository) dmParticipants(scrIdx int) ([]int, error) {
+	var ids []int
+	err := r.db.Model(&model.ChatMember{}).Where("scr_idx = ? AND scm_show = ?", scrIdx, "Y").
+		Distinct().Pluck("mt_idx", &ids).Error
+	return ids, err
 }
 
 // UnreadCount는 방의 안 읽은 메시지 수(scmsg_idx > lastRead AND scmsg_show='Y'). get_rooms_for_member용.
@@ -64,11 +152,39 @@ func (r *ChatRepository) GetLatest(scrIdx int) (*model.ChatMessage, error) {
 	return &m, nil
 }
 
-// GetRoomMembers는 Python ChatMember.get_room_members(scr_idx+scm_show='Y').
+// GetRoomMembers는 방의 유효 참가자다(scm_show='Y'). 그룹 방은 현재 그룹 멤버만, DM은 두 참가자가 아직 같은 그룹일 때만
+// (아니면 빈 목록) 돌려준다 — 안 읽은 수·푸시 대상에 나간 멤버가 섞이지 않는다.
 func (r *ChatRepository) GetRoomMembers(scrIdx int) ([]model.ChatMember, error) {
 	out := make([]model.ChatMember, 0)
-	err := r.db.Where("scr_idx = ? AND scm_show = ?", scrIdx, "Y").Find(&out).Error
-	return out, err
+	room, err := r.findRoom(scrIdx)
+	if err != nil || room == nil {
+		return out, err
+	}
+	switch room.ScrType {
+	case "group":
+		if room.SgtIdx == nil {
+			return out, nil
+		}
+		err = r.db.Raw(
+			"SELECT cm.* FROM smap_chat_member_t cm JOIN smap_group_detail_t gd ON gd.mt_idx = cm.mt_idx AND gd.sgt_idx = ? "+
+				"JOIN member_t m ON m.mt_idx = cm.mt_idx JOIN smap_group_t sg ON sg.sgt_idx = gd.sgt_idx "+
+				"WHERE cm.scr_idx = ? AND cm.scm_show = 'Y' AND "+currentMemberSQL("gd", "m")+" AND sg.sgt_show = 'Y'",
+			*room.SgtIdx, scrIdx).Scan(&out).Error
+		return out, err
+	case "dm":
+		if err := r.db.Where("scr_idx = ? AND scm_show = ?", scrIdx, "Y").Find(&out).Error; err != nil {
+			return nil, err
+		}
+		if len(out) != 2 {
+			return make([]model.ChatMember, 0), nil
+		}
+		ok, err := r.ShareActiveGroup(out[0].MtIdx, out[1].MtIdx)
+		if err != nil || !ok {
+			return make([]model.ChatMember, 0), err
+		}
+		return out, nil
+	}
+	return out, nil
 }
 
 // FindDM은 Python ChatRoom.find_dm와 동등하다.
@@ -110,20 +226,19 @@ func (r *ChatRepository) GetMessages(scrIdx, beforeIdx, limit int) ([]model.Chat
 	return out, nil
 }
 
-// CountUnread는 Python ChatMember.count_unread와 동등하다(메시지별 안 읽은 멤버 수).
-// total(scm_show='Y') - read(scm_show='Y' AND scm_last_read_idx >= scmsg_idx).
+// CountUnread는 메시지별 안 읽은 유효 참가자 수다(GetRoomMembers 중 scm_last_read_idx < scmsgIdx).
 func (r *ChatRepository) CountUnread(scrIdx, scmsgIdx int) (int, error) {
-	var total, read int64
-	if err := r.db.Model(&model.ChatMember{}).
-		Where("scr_idx = ? AND scm_show = ?", scrIdx, "Y").Count(&total).Error; err != nil {
+	members, err := r.GetRoomMembers(scrIdx)
+	if err != nil {
 		return 0, err
 	}
-	if err := r.db.Model(&model.ChatMember{}).
-		Where("scr_idx = ? AND scm_show = ? AND scm_last_read_idx >= ?", scrIdx, "Y", scmsgIdx).
-		Count(&read).Error; err != nil {
-		return 0, err
+	n := 0
+	for _, m := range members {
+		if m.ScmLastReadIdx < scmsgIdx {
+			n++
+		}
 	}
-	return int(total - read), nil
+	return n, nil
 }
 
 // CreateDMRoom은 Python chat_service.create_dm_room의 신규 생성부를 트랜잭션으로 묶는다.
@@ -163,6 +278,7 @@ func (r *ChatRepository) GetMembersByIDs(ids []int) ([]model.Member, error) {
 //  1. 메시지 INSERT(scmsg_type='text', scmsg_show='Y', scmsg_wdate=now)
 //  2. room.scr_udate=now (Python find_by_idx(scr_show='Y') 조건이라 show='Y'일 때만)
 //  3. 발신자 membership.scm_last_read_idx=새 메시지 idx
+//
 // Python은 flush 후 commit(비트랜잭션)이라 부분 실패 위험 → Go는 명시 tx로 정합성 보강.
 func (r *ChatRepository) CreateMessageTx(scrIdx, mtIdx int, content string, now time.Time) (*model.ChatMessage, error) {
 	msg := model.ChatMessage{
@@ -239,8 +355,9 @@ func (r *ChatRepository) CreateGroupChatRoom(sgtIdx int, title *string, memberID
 	})
 }
 
-// AddMemberToGroupChat은 Python chat_service.add_member_to_group_chat와 1:1 대응한다(멱등 포함).
-// 그룹 방 없으면 no-op, 이미 멤버(scm_show='Y')면 no-op, 아니면 ChatMember 1건을 INSERT한다.
+// AddMemberToGroupChat은 그룹 채팅방에 회원을 넣는다(멱등). 그룹 방 없으면 no-op, 이미 활성 참가자면 no-op,
+// 이전에 비활성화된 행(scm_show='N')이 있으면 되살리고 마지막 읽은 위치를 최신 메시지로 맞춘다(재가입 시 이전 대화를
+// 안 읽은 메시지로 쌓지 않는다), 없으면 INSERT한다. (scr_idx, mt_idx)는 UNIQUE라 행을 재사용한다.
 func (r *ChatRepository) AddMemberToGroupChat(sgtIdx, mtIdx int, now time.Time) error {
 	room, err := r.findGroupChatRoom(sgtIdx)
 	if err != nil {
@@ -249,37 +366,43 @@ func (r *ChatRepository) AddMemberToGroupChat(sgtIdx, mtIdx int, now time.Time) 
 	if room == nil {
 		return nil
 	}
-	existing, err := r.FindMembership(room.ScrIdx, mtIdx)
-	if err != nil {
-		return err
+	var existing model.ChatMember
+	err = r.db.Where("scr_idx = ? AND mt_idx = ?", room.ScrIdx, mtIdx).First(&existing).Error
+	if err == nil {
+		if existing.ScmShow == "Y" {
+			return nil
+		}
+		latest, lerr := r.GetLatest(room.ScrIdx)
+		if lerr != nil {
+			return lerr
+		}
+		fields := map[string]interface{}{"scm_show": "Y"}
+		if latest != nil {
+			fields["scm_last_read_idx"] = latest.ScmsgIdx
+		}
+		return r.db.Model(&model.ChatMember{}).Where("scm_idx = ?", existing.ScmIdx).Updates(fields).Error
 	}
-	if existing != nil {
-		return nil
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
 	}
 	cm := model.ChatMember{ScrIdx: room.ScrIdx, MtIdx: mtIdx, ScmLastReadIdx: 0, ScmShow: "Y", ScmWdate: now}
 	return r.db.Create(&cm).Error
 }
 
-// RemoveMemberFromGroupChat은 Python chat_service.remove_member_from_group_chat와 1:1 대응한다.
-// ⚠️ groups.py에 호출처가 없는 정의(remove_member_from_group은 이 메서드를 호출하지 않음) —
-// 완전성을 위해 이식하되 어떤 라우트/서비스에서도 호출되지 않는다(의도된 dead code).
-// 그룹 방 없으면 no-op, 멤버십 있으면 scm_show='N'으로 소프트 숨김(Python: scm_show=N + commit).
+// RemoveMemberFromGroupChat은 그룹 sgtIdx의 그룹 채팅방에서 회원 mtIdx의 참가를 비활성화한다(scm_show='N').
+// 탈퇴·강퇴 시 호출한다(C-1). 방·행이 없으면 no-op(영향 행 0). 그룹 멤버십을 보지 않고 직접 UPDATE한다
+// (이미 그룹에서 빠진 뒤에도 비활성화가 동작해야 하므로 FindMembership을 거치지 않는다).
 func (r *ChatRepository) RemoveMemberFromGroupChat(sgtIdx, mtIdx int) error {
-	room, err := r.findGroupChatRoom(sgtIdx)
-	if err != nil {
-		return err
-	}
-	if room == nil {
-		return nil
-	}
-	membership, err := r.FindMembership(room.ScrIdx, mtIdx)
-	if err != nil {
-		return err
-	}
-	if membership == nil {
-		return nil
-	}
-	return r.db.Model(&model.ChatMember{}).
-		Where("scm_idx = ?", membership.ScmIdx).
-		Update("scm_show", "N").Error
+	return r.db.Exec(
+		"UPDATE smap_chat_member_t SET scm_show = 'N' WHERE mt_idx = ? AND scm_show = 'Y' AND scr_idx IN "+
+			"(SELECT scr_idx FROM smap_chat_room_t WHERE sgt_idx = ? AND scr_type = 'group')",
+		mtIdx, sgtIdx).Error
+}
+
+// RemoveAllFromGroupChat은 그룹 삭제 시 그 그룹 채팅방의 모든 참가를 비활성화한다(C-1).
+func (r *ChatRepository) RemoveAllFromGroupChat(sgtIdx int) error {
+	return r.db.Exec(
+		"UPDATE smap_chat_member_t SET scm_show = 'N' WHERE scm_show = 'Y' AND scr_idx IN "+
+			"(SELECT scr_idx FROM smap_chat_room_t WHERE sgt_idx = ? AND scr_type = 'group')",
+		sgtIdx).Error
 }

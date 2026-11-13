@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"errors"
 	"strconv"
 	"strings"
@@ -214,4 +215,10 @@ func (r *GroupMemberRepository) UpdateGD(sgdtIdx int, fields map[string]interfac
 		return nil
 	}
 	return r.db.Model(&model.GroupDetail{}).Where("sgdt_idx = ?", sgdtIdx).Updates(fields).Error
+}
+
+// IsGroupOwner는 mtIdx가 그룹 sgtIdx의 현재 멤버이면서 그룹장(owner_chk 또는 생성자, groupOwnerSQL)인지 판정한다.
+// 인가 판정(GroupAuthzRepository.IsGroupOwner)과 같은 쿼리를 재사용해 기준이 갈라지지 않게 한다.
+func (r *GroupMemberRepository) IsGroupOwner(sgtIdx, mtIdx int) (bool, error) {
+	return NewGroupAuthz(r.db).IsGroupOwner(context.Background(), mtIdx, sgtIdx)
 }

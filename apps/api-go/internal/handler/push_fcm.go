@@ -6,11 +6,38 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/bluemusk/smap_next_go/internal/dto"
 	"github.com/bluemusk/smap_next_go/internal/service"
 )
 
 type PushFCMHandler struct {
-	svc *service.PushFCMService
+	svc  *service.PushFCMService
+	self *SelfGuard // 본인 것만 조회·삭제(G7). 앱이 쓰지 않는 경로라 토큰이 없으면 모드와 무관하게 401.
+}
+
+// SetGuard는 본인 검사 가드를 주입한다.
+func (h *PushFCMHandler) SetGuard(g *SelfGuard) { h.self = g }
+
+// ownMessage는 push-fcms 메시지 id의 수신자가 요청자 본인인지 확인한다(토큰 필수, 남의 것은 403, 없으면 404).
+func (h *PushFCMHandler) ownMessage(c *gin.Context, id int) bool {
+	uid, tok := h.self.RequireToken(c)
+	if !tok {
+		return false
+	}
+	owner, found, ok := h.svc.PushFCMOwner(id)
+	if !ok {
+		plainServerError(c)
+		return false
+	}
+	if !found {
+		writeJSON(c, http.StatusNotFound, gin.H{"detail": "Push FCM not found"})
+		return false
+	}
+	if owner == nil || *owner != uid {
+		writeForbiddenDetail(c)
+		return false
+	}
+	return true
 }
 
 func NewPushFCM(svc *service.PushFCMService) *PushFCMHandler {
@@ -43,6 +70,9 @@ func (h *PushFCMHandler) Get(c *gin.Context) {
 		pathIntErr(c, "push_fcm_id", idStr)
 		return
 	}
+	if !h.ownMessage(c, id) {
+		return
+	}
 	res, found, ok := h.svc.GetPushFCM(id)
 	if !ok {
 		plainServerError(c)
@@ -63,6 +93,9 @@ func (h *PushFCMHandler) Member(c *gin.Context) {
 		pathIntErr(c, "member_id", idStr)
 		return
 	}
+	if !h.self.SelfStrict(c, id) {
+		return
+	}
 	res, ok := h.svc.MemberPushFCMs(id)
 	if !ok {
 		plainServerError(c)
@@ -73,12 +106,23 @@ func (h *PushFCMHandler) Member(c *gin.Context) {
 
 // Code는 GET /api/v1/push-fcms/code/:code.
 func (h *PushFCMHandler) Code(c *gin.Context) {
+	uid, tok := h.self.RequireToken(c)
+	if !tok {
+		return
+	}
 	res, ok := h.svc.CodePushFCMs(c.Param("code"))
 	if !ok {
 		plainServerError(c)
 		return
 	}
-	writeJSON(c, http.StatusOK, res)
+	// 같은 코드의 메시지 중 본인 수신분만.
+	own := make([]dto.PushFCMResponse, 0, len(res))
+	for _, r := range res {
+		if r.PftSendMtIdx != nil && *r.PftSendMtIdx == uid {
+			own = append(own, r)
+		}
+	}
+	writeJSON(c, http.StatusOK, own)
 }
 
 // Pending은 GET /api/v1/push-fcms/pending/:mt_idx — since_timestamp(optional float).
@@ -88,6 +132,9 @@ func (h *PushFCMHandler) Pending(c *gin.Context) {
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		pathIntErr(c, "mt_idx", idStr)
+		return
+	}
+	if !h.self.SelfStrict(c, id) {
 		return
 	}
 	var since *float64

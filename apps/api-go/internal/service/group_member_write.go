@@ -1,6 +1,8 @@
 package service
 
 import (
+	"context"
+
 	"github.com/bluemusk/smap_next_go/internal/dto"
 	"github.com/bluemusk/smap_next_go/internal/model"
 )
@@ -13,6 +15,25 @@ type groupMemberWriteRepo interface {
 	FindGDActive(sgtIdx, mtIdx int) (*model.GroupDetail, error)
 	CreateGD(gd *model.GroupDetail) error
 	UpdateGD(sgdtIdx int, fields map[string]interface{}) error
+	// 그룹장 판정(현재 멤버 + owner_chk 또는 생성자) — 그룹장 탈퇴 거부에 쓴다.
+	IsGroupOwner(sgtIdx, mtIdx int) (bool, error)
+}
+
+// memberChatDeactivator는 탈퇴·강퇴 때 그룹 채팅 참가를 끄는 의존성이다(구현: ChatService, 캐시 무효화 포함).
+type memberChatDeactivator interface {
+	DeactivateChatMembership(ctx context.Context, sgtIdx, mtIdx int) error
+}
+
+// SetChat은 탈퇴·강퇴 경로가 채팅 참가를 끌 때 쓸 서비스를 주입한다.
+func (s *GroupMemberService) SetChat(c memberChatDeactivator) { s.chat = c }
+
+func (s *GroupMemberService) deactivateChat(groupID, memberID int) {
+	if s.chat == nil {
+		return
+	}
+	syncChatAfterGroupChange("deactivate_chat_membership", groupID, memberID, func(ctx context.Context) error {
+		return s.chat.DeactivateChatMembership(ctx, groupID, memberID)
+	})
 }
 
 // SetWriteRepo는 write용 repo를 주입한다(read 전용 NewGroupMember와 분리, 선택적 주입).
@@ -75,23 +96,41 @@ func (s *GroupMemberService) RemoveMember(groupID, memberID int) (found, ok bool
 	if err := s.wrepo.UpdateGD(gd.SgdtIdx, map[string]interface{}{"sgdt_show": "N"}); err != nil {
 		return true, false
 	}
+	s.deactivateChat(groupID, memberID)
 	return true, true
 }
 
 // RemoveMemberPath는 Python remove_member_from_group_path를 이식한다(show='N' + exit='Y').
+// G7: kind가 강퇴(RemovalKick)면 sgdt_discharge='Y'도 기록하고, 자진 탈퇴면 기록하지 않는다.
+// 그룹장 행은 승계 없이 제거할 수 없다(ErrOwnerCannotLeave).
 // found=false → 404 "Member not found in the group", ok=false → 500.
-func (s *GroupMemberService) RemoveMemberPath(groupID, memberID int) (found, ok bool) {
+func (s *GroupMemberService) RemoveMemberPath(groupID, memberID int, kind RemovalKind) (found, ok bool, err error) {
 	gd, err := s.wrepo.FindGD(groupID, memberID, "Y")
 	if err != nil {
-		return false, false
+		return false, false, err
 	}
 	if gd == nil {
-		return false, true
+		return false, true, nil
 	}
-	if err := s.wrepo.UpdateGD(gd.SgdtIdx, map[string]interface{}{"sgdt_show": "N", "sgdt_exit": "Y"}); err != nil {
-		return true, false
+	if gd.SgdtOwnerChk != nil && *gd.SgdtOwnerChk == "Y" {
+		return true, true, ErrOwnerCannotLeave
 	}
-	return true, true
+	// owner_chk 없이 생성자로만 그룹장인 구 데이터도 승계 없이 나갈 수 없다(그룹장 판정과 같은 기준).
+	if isOwner, oerr := s.wrepo.IsGroupOwner(groupID, memberID); oerr != nil {
+		return true, false, oerr
+	} else if isOwner {
+		return true, true, ErrOwnerCannotLeave
+	}
+	fields := map[string]interface{}{"sgdt_show": "N", "sgdt_exit": "Y", "sgdt_leader_chk": "N"}
+	if kind == RemovalKick {
+		fields["sgdt_discharge"] = "Y"
+	}
+	if err := s.wrepo.UpdateGD(gd.SgdtIdx, fields); err != nil {
+		return true, false, err
+	}
+	// 멤버십 변경은 커밋됐으므로 채팅 비활성화 실패는 ERROR 로그로 표면화하고 요청은 성공으로 둔다(C-1).
+	s.deactivateChat(groupID, memberID)
+	return true, true, nil
 }
 
 // UpdateRole은 Python update_member_role을 이식한다.

@@ -14,6 +14,7 @@ import (
 type groupRepo interface {
 	GetByID(id int) (*model.Group, error)
 	List(skip, limit int, showHidden bool) ([]model.Group, error)
+	ListForMember(mtIdx, skip, limit int, showHidden bool) ([]model.Group, error)
 	ListHidden() ([]model.Group, error)
 	FindByMember(mtIdx int) ([]model.Group, error)
 	FindByCode(code string) (*model.Group, error)
@@ -84,6 +85,15 @@ func (s *GroupService) GetGroup(id int) (*dto.GroupResponse, error) {
 // ListGroups는 목록(List[GroupResponse]). showHidden=false면 sgt_show='Y'만.
 func (s *GroupService) ListGroups(skip, limit int, showHidden bool) ([]dto.GroupResponse, error) {
 	groups, err := s.repo.List(skip, limit, showHidden)
+	if err != nil {
+		return nil, err
+	}
+	return toGroupResponses(groups), nil
+}
+
+// ListGroupsForMember는 mtIdx가 현재 멤버인 그룹만의 목록이다(GET /groups/ 요청자 한정 — 전체 그룹·초대 코드 덤프 차단).
+func (s *GroupService) ListGroupsForMember(mtIdx, skip, limit int, showHidden bool) ([]dto.GroupResponse, error) {
+	groups, err := s.repo.ListForMember(mtIdx, skip, limit, showHidden)
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +192,7 @@ func (s *GroupService) CurrentUserGroups(mtIdx int) ([]dto.CurrentUserGroupItem,
 			SgtWdate:    pyISOUtcNow(g.SgtWdate),
 			SgtUdate:    pyISOUtcNow(g.SgtUdate),
 			MemberCount: rows[i].MemberCount,
-			IsOwner:     d.SgdtOwnerChk != nil && *d.SgdtOwnerChk == "Y",
+			IsOwner:     rows[i].IsOwner || (d.SgdtOwnerChk != nil && *d.SgdtOwnerChk == "Y"), // 그룹장 판정(owner_chk 또는 구 데이터의 생성자)
 			IsLeader:    d.SgdtLeaderChk != nil && *d.SgdtLeaderChk == "Y",
 			JoinDate:    pyISOUtcNow(d.SgdtWdate),
 		})

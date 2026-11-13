@@ -116,3 +116,17 @@ func (s *PushLogService) UnreadPushLogs(mtIdx int) ([]dto.PushLogResponse, bool)
 	}
 	return toPushLogResponses(items)
 }
+
+// PushLogOwner는 푸시 로그의 소유 회원(plt.mt_idx)을 돌려준다(본인 것만 조회·읽음·삭제하는 인가용).
+// 응답 변환(zero date 검사)을 거치지 않으므로 표시용 DTO가 500이 되는 행에서도 소유자는 확인된다.
+// found=false→404, ok=false→500.
+func (s *PushLogService) PushLogOwner(id int) (owner *int, found, ok bool) {
+	p, err := s.repo.GetByID(id)
+	if err != nil {
+		return nil, false, false
+	}
+	if p == nil {
+		return nil, false, true
+	}
+	return p.MtIdx, true, true
+}

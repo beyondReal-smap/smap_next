@@ -35,10 +35,15 @@ func (r *ScheduleRepository) Delete(id int) error {
 	return r.db.Where("sst_idx = ?", id).Delete(&model.Schedule{}).Error
 }
 
-// List는 필터 없는 offset/limit 목록(Python get_schedules, sst_show 필터 없음). 정렬 없음.
-func (r *ScheduleRepository) List(skip, limit int) ([]model.Schedule, error) {
+// ListForMember는 요청자와 관련된 일정만 offset/limit로 돌려준다: 삭제되지 않았고(sst_show='Y'),
+// 본인 일정이거나 본인이 현재 멤버인 그룹의 일정. 이전의 필터 없는 전체 덤프(List)를 대체한다. 정렬 없음.
+func (r *ScheduleRepository) ListForMember(mtIdx, skip, limit int) ([]model.Schedule, error) {
 	out := make([]model.Schedule, 0)
-	err := r.db.Offset(skip).Limit(limit).Find(&out).Error
+	groups := r.db.Raw(
+		"SELECT gd.sgt_idx FROM smap_group_detail_t gd JOIN member_t m ON m.mt_idx = gd.mt_idx "+
+			"WHERE gd.mt_idx = ? AND "+currentMemberSQL("gd", "m"), mtIdx)
+	err := r.db.Where("sst_show = ? AND (mt_idx = ? OR sgt_idx IN (?))", "Y", mtIdx, groups).
+		Offset(skip).Limit(limit).Find(&out).Error
 	return out, err
 }
 
@@ -184,14 +189,12 @@ func (r *ScheduleRepository) ClaimScheduleExit(sstIdx int) (int64, error) {
 	return res.RowsAffected, res.Error
 }
 
-// FindGroupSchedules는 Python get_group_schedules를 이식한다: GroupDetail 멤버 서브쿼리 +
-// OR(sgt_idx=group OR mt_idx IN members) + 날짜창 + ORDER BY sst_sdate.
+// FindGroupSchedules는 그룹의 일정 목록이다: 그 그룹(sgt_idx)의 삭제되지 않은(sst_show='Y') 일정만 + 날짜창
+// + ORDER BY sst_sdate. 이전에는 `OR mt_idx IN (그룹 멤버)`가 있어 그 멤버가 다른 그룹에서 만든 일정까지
+// 내려갔고 삭제된 일정도 포함됐다(S-3). 호출 전에 요청자가 그 그룹의 현재 멤버인지 확인해야 한다.
 // days=nil→[오늘, 오늘+14d), days>0→[오늘, 오늘+days), days<=0→날짜필터 없음. 오늘=로컬 00:00.
 func (r *ScheduleRepository) FindGroupSchedules(groupID int, days *int) ([]model.Schedule, error) {
-	sub := r.db.Model(&model.GroupDetail{}).Select("mt_idx").
-		Where("sgt_idx = ? AND sgdt_show = ? AND sgdt_exit = ? AND sgdt_discharge = ?",
-			groupID, "Y", "N", "N")
-	q := r.db.Model(&model.Schedule{}).Where("sgt_idx = ? OR mt_idx IN (?)", groupID, sub)
+	q := r.db.Model(&model.Schedule{}).Where("sgt_idx = ? AND sst_show = ?", groupID, "Y")
 
 	now := time.Now()
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())

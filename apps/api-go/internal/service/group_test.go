@@ -38,6 +38,9 @@ func (f *fakeGroupRepo) ListHidden() ([]model.Group, error) { return f.many, f.e
 func (f *fakeGroupRepo) List(skip, limit int, showHidden bool) ([]model.Group, error) {
 	return f.many, f.err
 }
+func (f *fakeGroupRepo) ListForMember(mtIdx, skip, limit int, showHidden bool) ([]model.Group, error) {
+	return f.many, f.err
+}
 func (f *fakeGroupRepo) FindByMember(mtIdx int) ([]model.Group, error) {
 	return f.many, f.err
 }
