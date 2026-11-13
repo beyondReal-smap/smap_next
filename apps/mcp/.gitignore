@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.tsbuildinfo
+logs/
+
+# 루트 .gitignore가 시크릿 유출 방지를 위해 *.json을 통째로 제외합니다.
+# 이 패키지의 빌드에 필수인 매니페스트만 예외로 되살립니다.
+# (제외된 채로 커밋되면 클론 후 npm install / build가 불가능해집니다.)
+!package.json
+!tsconfig.json

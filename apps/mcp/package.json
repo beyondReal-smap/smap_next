@@ -1,0 +1,37 @@
+{
+  "name": "@smap/mcp-server",
+  "version": "1.0.0",
+  "description": "SMAP 서비스의 페이지·기능·FAQ를 AI 클라이언트에 제공하는 읽기 전용 MCP 서버",
+  "type": "module",
+  "license": "UNLICENSED",
+  "private": true,
+  "bin": {
+    "smap-mcp": "./dist/stdio.js"
+  },
+  "main": "./dist/server.js",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/stdio.js",
+    "start:http": "node dist/http.js",
+    "typecheck": "tsc --noEmit",
+    "smoke": "node scripts/smoke-test.mjs",
+    "smoke:http": "node scripts/smoke-http.mjs",
+    "inspect": "npx -y @modelcontextprotocol/inspector node dist/stdio.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.0",
+    "typescript": "^5.7.0"
+  }
+}
