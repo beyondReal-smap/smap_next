@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 *.pyo
 venv/
+.venv/
 .env
 
 # Node
@@ -24,9 +25,12 @@ logs/
 *.pem
 *.p8
 *.json
-!backend/app/**/*.json
+!apps/api/app/**/*.json
 
 # Data
 storage/
-backend/app_v2/
-backend/app_v3/
+apps/api/app_v2/
+apps/api/app_v3/
+
+# Archive (보존용 이동 파일 — rm 대신 mv 정책)
+.archive/
