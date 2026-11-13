@@ -29,7 +29,8 @@ public struct SettingMenuView: View {
                         // Menu Sections
                         VStack(spacing: 24) {
                             SettingsMenuSectionView(title: "계정 관리", items: [
-                                SettingsMenuItem(title: "계정설정", icon: "person.fill", color: .indigo, destination: AnyView(AccountSettingsView()))
+                                SettingsMenuItem(title: "계정설정", icon: "person.fill", color: .indigo, destination: AnyView(AccountSettingsView())),
+                                SettingsMenuItem(title: "SMAP 프리미엄", icon: "crown.fill", color: SMAPTheme.Accent.crown, destination: AnyView(PremiumView()))
                             ])
 
                             SettingsMenuSectionView(title: "약관 & 정책", items: [
@@ -88,6 +89,7 @@ public struct SettingMenuView: View {
 
 struct ProfileSummaryCard: View {
     let user: SMAPUser
+    @ObservedObject private var storeKit = StoreKitManager.shared
 
     var body: some View {
         HStack(spacing: 16) {
@@ -118,13 +120,16 @@ struct ProfileSummaryCard: View {
                         .font(.suite(size: 18, weight: .bold))
                         .foregroundColor(.white)
 
-                    Text(user.mt_level == 5 ? "VIP" : "일반")
-                        .font(.suite(size: 10, weight: .bold))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
-                        .background(Color.white.opacity(0.2))
-                        .cornerRadius(10)
-                        .foregroundColor(.white)
+                    // 구독 상태(is_premium)가 확정된 뒤에만 배지를 표시한다(로드 전에 "일반"으로 잘못 보이지 않게).
+                    if let isPremium = storeKit.status?.is_premium {
+                        Text(isPremium ? "프리미엄" : "일반")
+                            .font(.suite(size: 10, weight: .bold))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(Color.white.opacity(0.2))
+                            .cornerRadius(10)
+                            .foregroundColor(.white)
+                    }
                 }
 
                 Text(user.mt_email ?? "이메일 정보 없음")

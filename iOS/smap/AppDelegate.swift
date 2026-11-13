@@ -13,7 +13,6 @@ import CoreLocation
 import AVFoundation
 import Photos
 import CoreMotion
-import SwiftyStoreKit
 import GoogleSignIn
 import WebKit
 import KakaoSDKCommon
@@ -284,22 +283,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             print("📍 [LOCATION] 앱 시작 시 자동 위치 권한 요청 생략 (프리퍼미션 대기)")
         }
         
-        SwiftyStoreKit.completeTransactions(atomically: true) { purchases in
-            for purchase in purchases {
-                switch purchase.transaction.transactionState {
-                case .purchased, .restored:
-                    if purchase.needsFinishTransaction {
-                        // Deliver content from server, then:
-                        SwiftyStoreKit.finishTransaction(purchase.transaction)
-                    }
-                    // Unlock content
-                case .failed, .purchasing, .deferred:
-                    break // do nothing
-                @unknown default:
-                    break
-                }
-            }
-        }
+        // StoreKit 2 — 앱 밖에서 생긴 거래(갱신·환불·승인 등) 수신 시작. 서버 검증은 로그인 후 처리된다.
+        StoreKitManager.shared.start()
         
         // 카카오 SDK 초기화
         if let kakaoAppKey = Bundle.main.infoDictionary?["KAKAO_APP_KEY"] as? String {

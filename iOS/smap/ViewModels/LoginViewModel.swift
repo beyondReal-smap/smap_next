@@ -9,6 +9,9 @@ import Foundation
 import SwiftUI
 import AuthenticationServices
 import GoogleSignIn
+import KakaoSDKCommon
+import KakaoSDKAuth
+import KakaoSDKUser
 import Combine
 
 // MARK: - LoginViewModel
@@ -331,6 +334,104 @@ class LoginViewModel: ObservableObject {
         }
     }
     
+    // MARK: - Kakao 로그인
+
+    /// Kakao 로그인 — 카카오톡 앱이 있으면 앱으로, 없으면 카카오 계정(웹)으로 access token 을 받는다.
+    func kakaoLogin() {
+        isLoading = true
+        errorMessage = nil
+
+        let completion: (OAuthToken?, Error?) -> Void = { [weak self] token, error in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                if let error = error {
+                    if Self.isKakaoCancelled(error) {
+                        print("ℹ️ [LoginViewModel] Kakao 로그인 취소됨")
+                    } else {
+                        print("❌ [LoginViewModel] Kakao 로그인 실패: \(type(of: error))")
+                        self.showErrorMessage("카카오 로그인에 실패했습니다.")
+                    }
+                    self.isLoading = false
+                    return
+                }
+                guard let accessToken = token?.accessToken else {
+                    self.showErrorMessage("카카오 로그인 정보를 가져올 수 없습니다.")
+                    self.isLoading = false
+                    return
+                }
+                self.fetchKakaoProfileAndLogin(accessToken: accessToken)
+            }
+        }
+
+        if UserApi.isKakaoTalkLoginAvailable() {
+            UserApi.shared.loginWithKakaoTalk(completion: completion)
+        } else {
+            UserApi.shared.loginWithKakaoAccount(completion: completion)
+        }
+    }
+
+    /// SDK 오류 타입으로 사용자 취소를 판별한다(문자열 비교 금지).
+    private static func isKakaoCancelled(_ error: Error) -> Bool {
+        if case .ClientFailed(let reason, _)? = error as? SdkError, reason == .Cancelled {
+            return true
+        }
+        return false
+    }
+
+    /// 사용자 ID/프로필을 조회한 뒤 서버 로그인을 진행한다. 토큰·프로필은 메모리에서만 쓰고 로그에 남기지 않는다.
+    private func fetchKakaoProfileAndLogin(accessToken: String) {
+        UserApi.shared.me { [weak self] user, error in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                if let error = error {
+                    print("❌ [LoginViewModel] Kakao 사용자 정보 조회 실패: \(type(of: error))")
+                    self.showErrorMessage("카카오 사용자 정보를 가져오지 못했습니다.")
+                    self.isLoading = false
+                    return
+                }
+                guard let kakaoId = user?.id else {
+                    self.showErrorMessage("카카오 사용자 정보를 가져올 수 없습니다.")
+                    self.isLoading = false
+                    return
+                }
+                let email = user?.kakaoAccount?.email
+                let nickname = user?.kakaoAccount?.profile?.nickname
+                Task { await self.processKakaoLogin(accessToken: accessToken, kakaoId: String(kakaoId), email: email, nickname: nickname) }
+            }
+        }
+    }
+
+    private func processKakaoLogin(accessToken: String, kakaoId: String, email: String?, nickname: String?) async {
+        defer { isLoading = false }
+        do {
+            let response = try await authService.kakaoLogin(accessToken: accessToken, kakaoId: kakaoId, email: email, nickname: nickname)
+            guard response.success else {
+                showErrorMessage(response.message ?? response.error ?? "카카오 로그인에 실패했습니다.")
+                return
+            }
+            if response.isNewUser ?? response.data?.isNewUser ?? false {
+                // 신규 사용자 — 가입 화면으로 이동. 가입 요청에 social_provider/social_token 이 실린다.
+                socialLoginData = [
+                    "provider": "kakao",
+                    "email": email ?? "",
+                    "name": nickname ?? "",
+                    "social_token": accessToken,
+                    "kakao_id": kakaoId
+                ]
+                isNewUser = true
+                print("🆕 [LoginViewModel] 신규 Kakao 회원 — 가입 화면으로 이동")
+            } else if (response.token ?? response.data?.token) != nil {
+                isLoggedIn = true
+                print("✅ [LoginViewModel] Kakao 로그인 성공")
+            } else {
+                showErrorMessage("로그인 정보가 올바르지 않습니다. (Token Missing)")
+            }
+        } catch {
+            print("❌ [LoginViewModel] Kakao 로그인 오류: \(type(of: error))")
+            showErrorMessage("카카오 로그인에 실패했습니다: \(error.localizedDescription)")
+        }
+    }
+
     /// Apple 로그인 요청 생성
     func createAppleLoginRequest() -> ASAuthorizationAppleIDRequest {
         let provider = ASAuthorizationAppleIDProvider()

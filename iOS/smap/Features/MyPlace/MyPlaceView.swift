@@ -115,6 +115,7 @@ struct MyPlaceView: View {
                 })
             }
         }
+        .subscriptionLimitAlert(message: $viewModel.subscriptionLimitMessage)
         .alert("오류", isPresented: $viewModel.showError) {
             Button("확인", role: .cancel) {}
         } message: {

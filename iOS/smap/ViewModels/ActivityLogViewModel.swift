@@ -23,6 +23,8 @@ class ActivityLogViewModel: ObservableObject {
     // Error State
     @Published var errorMessage: String?
     @Published var showError = false
+    /// 구독 제한(403 LOG_RETENTION_EXCEEDED) 안내 문구 — 설정되면 "프리미엄 알아보기" 알림을 띄운다.
+    @Published var subscriptionLimitMessage: String?
 
     // Groups
     @Published var groups: [SmapGroup] = []
@@ -87,6 +89,20 @@ class ActivityLogViewModel: ObservableObject {
             return DateFormatter.displayDateFormatter.string(from: date)
         }
         return selectedDate
+    }
+
+    /// 보존 기간 밖 날짜를 잠글 기준 offset(오늘=0). 서버가 제한을 강제 중이고 무료 회원일 때만 값이 있다.
+    /// "최근 N일"은 오늘 포함 N일이므로 offset >= N 이 잠금 대상이다.
+    var lockedFromOffset: Int? {
+        guard let status = StoreKitManager.shared.status,
+              status.enforcement_enabled, !status.is_premium else { return nil }
+        return status.limits.log_retention_days
+    }
+
+    /// 잠긴 날짜를 눌렀을 때의 안내 문구
+    func showRetentionLock() {
+        let days = lockedFromOffset ?? 0
+        subscriptionLimitMessage = "무료 회원은 최근 \(days)일의 활동 기록만 볼 수 있어요."
     }
 
     /// 최근 14일 날짜 목록
@@ -344,19 +360,29 @@ class ActivityLogViewModel: ObservableObject {
         guard locationRequestID == requestID, selectedMemberId == memberId, selectedDate == date else { return }
 
         var failed: [String] = []
+        var limitMessage: String?
+        func note(_ error: Error, _ label: String) {
+            if case NetworkError.subscriptionLimit(_, let message)? = error as? NetworkError {
+                limitMessage = message
+            } else {
+                failed.append(label)
+            }
+        }
         switch markerResult {
         case .success(let value): mapMarkers = value
-        case .failure: failed.append("이동 경로")
+        case .failure(let error): note(error, "이동 경로")
         }
         switch stayResult {
         case .success(let value): stayTimes = value
-        case .failure: failed.append("체류 기록")
+        case .failure(let error): note(error, "체류 기록")
         }
         switch summaryResult {
         case .success(let value): locationSummary = value
-        case .failure: failed.append("활동 요약")
+        case .failure(let error): note(error, "활동 요약")
         }
-        if !failed.isEmpty {
+        if let limitMessage {
+            subscriptionLimitMessage = limitMessage
+        } else if !failed.isEmpty {
             errorMessage = "\(failed.joined(separator: ", "))을(를) 불러오지 못했습니다."
             showError = true
         }

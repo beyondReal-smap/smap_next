@@ -124,6 +124,10 @@ struct MainTabView: View {
             print("[MainTabView] logout notification received — RootView will handle navigation")
         }
         .task {
+            // 로그인 상태에서 구독 상태 조회 + 미완료 거래(서버 검증 지연분) 재처리
+            await StoreKitManager.shared.syncAfterLogin()
+        }
+        .task {
             processPendingGroup()
             // 첫 로그인/가입 시에는 AppDelegate가 시스템 권한 팝업을 순차 처리하므로
             // 온보딩 완료 후에만 커스텀 오버레이를 표시

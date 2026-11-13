@@ -146,6 +146,8 @@ struct ActivityLogSidebarView: View {
                             isSelected: viewModel.selectedMemberId == member.member_id,
                             isSelf: member.member_id == currentUserIdx,
                             selectedDate: viewModel.selectedDate,
+                            lockedFromOffset: viewModel.lockedFromOffset,
+                            onLockedDateTap: { viewModel.showRetentionLock() },
                             onMemberTap: {
                                 Task {
                                     await viewModel.selectMember(member.member_id)
@@ -197,6 +199,9 @@ struct ActivityLogMemberCell: View {
     let isSelected: Bool
     var isSelf: Bool = false
     let selectedDate: String
+    /// 이 값 이상 오래된 날짜(오늘=0)는 잠금 표시. nil 이면 잠금 없음(제한 미강제 또는 프리미엄).
+    var lockedFromOffset: Int? = nil
+    var onLockedDateTap: () -> Void = {}
     let onMemberTap: () -> Void
     let onDateTap: (String) -> Void
     
@@ -307,13 +312,15 @@ struct ActivityLogMemberCell: View {
                     let hasActivity = member.activityDistribution[dayIndex]
                     let isSelectedDate = dateString == selectedDate && isSelected
                     let isToday = offset == 0
+                    let isLocked = lockedFromOffset.map { offset >= $0 } ?? false
 
                     CalendarDayCell(
                         hasActivity: hasActivity,
                         isSelected: isSelectedDate,
                         isToday: isToday,
                         dayLabel: isToday ? "오늘" : "\(offset)일 전",
-                        onTap: hasActivity ? { onDateTap(dateString) } : nil
+                        isLocked: isLocked,
+                        onTap: isLocked ? { onLockedDateTap() } : (hasActivity ? { onDateTap(dateString) } : nil)
                     )
                 }
             }
@@ -327,13 +334,15 @@ struct ActivityLogMemberCell: View {
                     let hasActivity = member.activityDistribution[dayIndex]
                     let isSelectedDate = dateString == selectedDate && isSelected
                     let isToday = offset == 0
+                    let isLocked = lockedFromOffset.map { offset >= $0 } ?? false
 
                     CalendarDayCell(
                         hasActivity: hasActivity,
                         isSelected: isSelectedDate,
                         isToday: isToday,
                         dayLabel: isToday ? "오늘" : "\(offset)일 전",
-                        onTap: hasActivity ? { onDateTap(dateString) } : nil
+                        isLocked: isLocked,
+                        onTap: isLocked ? { onLockedDateTap() } : (hasActivity ? { onDateTap(dateString) } : nil)
                     )
                 }
             }
@@ -402,6 +411,8 @@ struct CalendarDayCell: View {
     let isSelected: Bool
     let isToday: Bool
     var dayLabel: String = "" // VoiceOver 용 — "N일 전" / "오늘" 등
+    /// 무료 회원의 보존 기간 밖 날짜 — 자물쇠 표시, 누르면 프리미엄 안내
+    var isLocked: Bool = false
     let onTap: (() -> Void)?
 
     private var pinkColor: Color { SMAPTheme.Accent.pink }
@@ -434,6 +445,13 @@ struct CalendarDayCell: View {
                         .fill(Color.gray.opacity(0.12))
                 }
 
+                if isLocked {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 9))
+                        .foregroundColor(.secondary)
+                        .accessibilityHidden(true)
+                }
+
                 if isToday {
                     // "오늘" 식별성 강화 — 점 유지 + 외곽 테두리 (아래 overlay)
                     Text("●")
@@ -462,7 +480,11 @@ struct CalendarDayCell: View {
     private var accessibilityDescription: String {
         var parts: [String] = []
         if !dayLabel.isEmpty { parts.append(dayLabel) }
-        parts.append(hasActivity ? "활동 있음" : "활동 없음")
+        if isLocked {
+            parts.append("프리미엄 전용")
+        } else {
+            parts.append(hasActivity ? "활동 있음" : "활동 없음")
+        }
         if isToday { parts.append("오늘") }
         if isSelected { parts.append("선택됨") }
         return parts.joined(separator: ", ")
@@ -647,6 +669,7 @@ struct ActivityLogView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("groupsDidChange"))) { _ in
             Task { await viewModel.loadInitialData() }
         }
+        .subscriptionLimitAlert(message: $viewModel.subscriptionLimitMessage)
         .alert("오류", isPresented: $viewModel.showError) {
             Button("확인", role: .cancel) {}
         } message: {

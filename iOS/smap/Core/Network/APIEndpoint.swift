@@ -7,6 +7,7 @@ enum APIEndpoint {
     case login(mt_id: String, mt_pwd: String, fcmToken: String? = nil, deviceId: String? = nil, deviceModel: String? = nil, osVersion: String? = nil, appVersion: String? = nil)
     case googleLogin(GoogleLoginRequest)
     case appleLogin(AppleLoginRequest)
+    case kakaoLogin(KakaoLoginRequest)
     case register(RegisterRequest, verificationToken: String, phoneNumber: String?)
     case refreshTokenV2(refreshToken: String)
     case logoutWithRefresh(refreshToken: String?)
@@ -18,6 +19,10 @@ enum APIEndpoint {
     case changePassword(ChangePasswordRequest)
     case uploadProfileImage  // multipart — body는 APIClient에서 별도 처리
     case verifyPassword(VerifyPasswordRequest)
+
+    // MARK: - Subscription (계약: .claude/plans/subscription_contract.md)
+    case subscriptionMe
+    case subscriptionVerify(signedTransaction: String)
     case withdraw(WithdrawRequest)
 
     // MARK: - Groups
@@ -108,6 +113,7 @@ enum APIEndpoint {
         case .login: return "/auth/login"
         case .googleLogin: return "/auth/google-login"
         case .appleLogin: return "/auth/apple-login"
+        case .kakaoLogin: return "/auth/kakao-login"
         case .register: return "/auth/register"
         case .refreshTokenV2: return "/auth/refresh"
         case .logoutWithRefresh: return "/auth/logout"
@@ -120,6 +126,8 @@ enum APIEndpoint {
         case .changePassword: return "/members/change-password"
         case .uploadProfileImage: return "/members/upload-profile-image"
         case .verifyPassword: return "/members/verify-password"
+        case .subscriptionMe: return "/subscriptions/me"
+        case .subscriptionVerify: return "/subscriptions/verify"
         case .withdraw: return "/members/withdraw"
         case .getCurrentUserGroups: return "/groups/current-user"
         case .getGroupStats(let sgtIdx): return "/groups/\(sgtIdx)/stats"
@@ -173,14 +181,14 @@ enum APIEndpoint {
     private var method: HTTPMethod {
         switch self {
         case .getCurrentUserGroups, .getGroupMembers, .getGroupStats,
-             .fetchProfile, .getMemberLocations,
+             .fetchProfile, .subscriptionMe, .getMemberLocations,
              .getGroupSchedulesSummary, .getGroupSchedules,
              .getMemberPushLogs, .joinGroupByCode, .getGroupSummary,
              .getChatRooms, .getChatMessages, .appVersionCheck:
             return .GET
-        case .login, .googleLogin, .appleLogin, .register,
+        case .login, .googleLogin, .appleLogin, .kakaoLogin, .register,
              .createGroup, .joinGroupById, .createLocation,
-             .updateProfile, .changePassword, .verifyPassword, .withdraw,
+             .updateProfile, .changePassword, .verifyPassword, .subscriptionVerify, .withdraw,
              .uploadProfileImage, .createLocationLog, .registerFCMToken, .unregisterFCMToken,
              .markAllNotificationsRead, .deleteAllNotifications,
              .createDMRoom, .createSchedule,
@@ -209,6 +217,7 @@ enum APIEndpoint {
             return try? JSONSerialization.data(withJSONObject: dict)
         case .googleLogin(let req): return try? JSONEncoder().encode(req)
         case .appleLogin(let req): return try? JSONEncoder().encode(req)
+        case .kakaoLogin(let req): return try? JSONEncoder().encode(req)
         case .register(let req, let token, let phone):
             guard let data = try? JSONEncoder().encode(req),
                   var body = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return nil }
@@ -218,6 +227,8 @@ enum APIEndpoint {
         case .updateProfile(let req): return try? JSONEncoder().encode(req)
         case .changePassword(let req): return try? JSONEncoder().encode(req)
         case .verifyPassword(let req): return try? JSONEncoder().encode(req)
+        case .subscriptionVerify(let jws):
+            return try? JSONSerialization.data(withJSONObject: ["platform": "ios", "signed_transaction": jws])
         case .withdraw(let req): return try? JSONEncoder().encode(req)
         case .createGroup(let title, let memo):
             return try? JSONSerialization.data(withJSONObject: ["sgt_title": title, "sgt_memo": memo, "sgt_show": "Y"])

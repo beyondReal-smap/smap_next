@@ -379,6 +379,28 @@ struct LoginView: View {
                 .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
             }
 
+            // Kakao 로그인 버튼 — Kakao 공식 규격(배경 #FEE500, 글자·심볼 검정 계열). Android 와 같이 Google 다음 순서.
+            Button(action: {
+                HapticManager.shared.impact(style: .medium)
+                viewModel.kakaoLogin()
+            }) {
+                HStack(spacing: 12) {
+                    KakaoBubbleShape()
+                        .fill(Color(red: 0x19/255, green: 0x19/255, blue: 0x19/255))
+                        .frame(width: 24, height: 24)
+                        .accessibilityHidden(true)
+
+                    Text("카카오로 계속하기")
+                        .font(.suite(size: 15, weight: .medium))
+                        .foregroundColor(Color(red: 0x19/255, green: 0x19/255, blue: 0x19/255))
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
+                .background(Color(red: 0xFE/255, green: 0xE5/255, blue: 0x00/255))
+                .cornerRadius(12)
+            }
+            .disabled(viewModel.isLoading)
+
             // Apple 로그인 버튼 (Google 스타일과 동일하게)
             CustomAppleSignInButton(onTap: {
                 triggerAppleSignIn()
@@ -507,4 +529,23 @@ extension Color {
         )
     }
     #endif
+}
+
+// MARK: - Kakao 말풍선 심볼
+
+/// Kakao 로그인 버튼용 말풍선 심볼. 외부 이미지 에셋을 추가하지 않기 위해 Shape 로 직접 그린다.
+struct KakaoBubbleShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let w = rect.width
+        let h = rect.height
+        // 몸통: 가로로 넓은 타원 (위쪽 약 85%)
+        path.addEllipse(in: CGRect(x: rect.minX + w * 0.04, y: rect.minY + h * 0.08, width: w * 0.92, height: h * 0.74))
+        // 꼬리: 왼쪽 아래로 뻗는 작은 삼각형
+        path.move(to: CGPoint(x: rect.minX + w * 0.26, y: rect.minY + h * 0.72))
+        path.addLine(to: CGPoint(x: rect.minX + w * 0.20, y: rect.minY + h * 0.95))
+        path.addLine(to: CGPoint(x: rect.minX + w * 0.46, y: rect.minY + h * 0.80))
+        path.closeSubpath()
+        return path
+    }
 }

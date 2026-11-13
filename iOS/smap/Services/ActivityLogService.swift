@@ -37,6 +37,15 @@ class ActivityLogService {
         return request
     }
 
+    /// 비정상 응답 변환. 구독 제한(403 + 객체형 detail)은 사용자 안내가 필요하므로 NetworkError 로 전달하고,
+    /// 나머지는 기존과 같이 URLError 로 던진다.
+    private static func statusError(_ status: Int, _ data: Data) -> Error {
+        if status == 403, case .subscriptionLimit = NetworkError.fromHTTPStatus(403, data: data) {
+            return NetworkError.fromHTTPStatus(403, data: data)
+        }
+        return URLError(.badServerResponse)
+    }
+
     // MARK: - API Methods
 
     /// 최근 N일간 그룹 멤버들의 일별 위치 기록 카운트 조회
@@ -55,7 +64,7 @@ class ActivityLogService {
 
         guard (200...299).contains(httpResponse.statusCode) else {
             print("[ActivityLogService] getDailyLocationCounts failed with status: \(httpResponse.statusCode)")
-            throw URLError(.badServerResponse)
+            throw Self.statusError(httpResponse.statusCode, data)
         }
 
         let decoder = JSONDecoder()
@@ -78,7 +87,7 @@ class ActivityLogService {
 
         guard (200...299).contains(httpResponse.statusCode) else {
             print("[ActivityLogService] getMapMarkers failed with status: \(httpResponse.statusCode)")
-            throw URLError(.badServerResponse)
+            throw Self.statusError(httpResponse.statusCode, data)
         }
 
         let decoder = JSONDecoder()
@@ -103,7 +112,7 @@ class ActivityLogService {
 
         guard (200...299).contains(httpResponse.statusCode) else {
             print("[ActivityLogService] getStayTimes failed with status: \(httpResponse.statusCode)")
-            throw URLError(.badServerResponse)
+            throw Self.statusError(httpResponse.statusCode, data)
         }
 
         let decoder = JSONDecoder()
@@ -128,7 +137,7 @@ class ActivityLogService {
 
         guard (200...299).contains(httpResponse.statusCode) else {
             print("[ActivityLogService] getLocationLogSummary failed with status: \(httpResponse.statusCode)")
-            throw URLError(.badServerResponse)
+            throw Self.statusError(httpResponse.statusCode, data)
         }
 
         let decoder = JSONDecoder()
@@ -154,7 +163,7 @@ class ActivityLogService {
 
         guard (200...299).contains(httpResponse.statusCode) else {
             print("[ActivityLogService] getMemberActivityByDate failed with status: \(httpResponse.statusCode)")
-            throw URLError(.badServerResponse)
+            throw Self.statusError(httpResponse.statusCode, data)
         }
 
         let decoder = JSONDecoder()

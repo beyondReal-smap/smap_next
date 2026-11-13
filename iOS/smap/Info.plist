@@ -4,14 +4,6 @@
 <dict>
 	<key>API_BASE_URL</key>
 	<string>$(API_BASE_URL)</string>
-	<key>WEB_BASE_URL</key>
-	<string>$(WEB_BASE_URL)</string>
-	<key>FILE_API_URL</key>
-	<string>$(FILE_API_URL)</string>
-	<key>IMAGE_BASE_URL</key>
-	<string>$(IMAGE_BASE_URL)</string>
-	<key>KAKAO_API_KEY</key>
-	<string>$(KAKAO_API_KEY)</string>
 	<key>AUTH_SECRET_KEY</key>
 	<string>$(AUTH_SECRET_KEY)</string>
 	<key>CFBundleDevelopmentRegion</key>
@@ -76,6 +68,8 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>FILE_API_URL</key>
+	<string>$(FILE_API_URL)</string>
 	<key>FirebaseAppDelegateProxyEnabled</key>
 	<false/>
 	<key>FirebaseScreenReportingEnabled</key>
@@ -84,8 +78,17 @@
 	<string>ca-app-pub-7432142706137657~4060543559</string>
 	<key>GIDClientID</key>
 	<string>283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com</string>
+	<key>IMAGE_BASE_URL</key>
+	<string>$(IMAGE_BASE_URL)</string>
+	<key>KAKAO_API_KEY</key>
+	<string>$(KAKAO_API_KEY)</string>
 	<key>KAKAO_APP_KEY</key>
 	<string>56b34b5e5e538073805559cabc81e1d8</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>kakaokompassauth</string>
+		<string>kakaolink</string>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NMFNcpKeyId</key>
@@ -98,6 +101,17 @@
 		<dict>
 			<key>accounts.kakao.com</key>
 			<dict>
+				<key>NSExceptionMinimumTLSVersion</key>
+				<string>TLSv1.2</string>
+				<key>NSExceptionRequiresForwardSecrecy</key>
+				<false/>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+			</dict>
+			<key>aiagnt.kr</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
 				<key>NSExceptionMinimumTLSVersion</key>
 				<string>TLSv1.2</string>
 				<key>NSExceptionRequiresForwardSecrecy</key>
@@ -132,17 +146,6 @@
 				<key>NSIncludesSubdomains</key>
 				<true/>
 				<key>NSThirdPartyExceptionAllowsInsecureHTTPLoads</key>
-				<true/>
-			</dict>
-			<key>aiagnt.kr</key>
-			<dict>
-				<key>NSExceptionAllowsInsecureHTTPLoads</key>
-				<true/>
-				<key>NSExceptionMinimumTLSVersion</key>
-				<string>TLSv1.2</string>
-				<key>NSExceptionRequiresForwardSecrecy</key>
-				<false/>
-				<key>NSIncludesSubdomains</key>
 				<true/>
 			</dict>
 		</dict>
@@ -190,7 +193,6 @@
 		<string>remote-notification</string>
 		<string>location</string>
 	</array>
-
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>
@@ -216,6 +218,8 @@
 	<string>Light</string>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>WEB_BASE_URL</key>
+	<string>$(WEB_BASE_URL)</string>
 	<key>WKWebView</key>
 	<dict>
 		<key>EnableWKWebViewInspection</key>

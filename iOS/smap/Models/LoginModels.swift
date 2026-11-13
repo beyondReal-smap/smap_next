@@ -155,6 +155,16 @@ struct GoogleLoginRequest: Codable {
     }
 }
 
+/// Kakao 로그인 요청 모델 — POST /auth/kakao-login
+/// 서버가 access_token 을 Kakao 에 조회해 사용자 ID 를 직접 검증하므로 kakao_id 는 서버에서 덮어쓴다(필드는 스키마상 필수).
+struct KakaoLoginRequest: Codable {
+    let kakao_id: String
+    let email: String?
+    let nickname: String?
+    let access_token: String
+    let os_type: String
+}
+
 /// Google/Apple 소셜 로그인 응답 모델
 struct SocialLoginResponse: Codable {
     let success: Bool

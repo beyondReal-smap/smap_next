@@ -23,6 +23,8 @@ class MyPlaceViewModel: ObservableObject {
     @Published var isLoadingLocations: Bool = false
     @Published var isSaving: Bool = false
     @Published var errorMessage: String?
+    /// 구독 제한(403 PLACE_LIMIT_EXCEEDED) 안내 문구 — 설정되면 "프리미엄 알아보기" 알림을 띄운다.
+    @Published var subscriptionLimitMessage: String?
     @Published var showError: Bool = false
     @Published var targetCoordinate: (lat: Double, lng: Double)?  // For map centering
     @Published var initialMapCenter: (lat: Double, lng: Double)?   // Initial center for map (first location)
@@ -280,6 +282,10 @@ class MyPlaceViewModel: ObservableObject {
     func closeSidebar() { withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { isSidebarOpen = false } }
 
     private func handleError(_ error: Error) {
+        if case NetworkError.subscriptionLimit(_, let message)? = error as? NetworkError {
+            subscriptionLimitMessage = message
+            return
+        }
         if let apiError = error as? APIError { errorMessage = apiError.message ?? "알 수 없는 오류" }
         else { errorMessage = error.localizedDescription }
         showError = true

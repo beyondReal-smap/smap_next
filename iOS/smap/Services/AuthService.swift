@@ -8,6 +8,8 @@
 import Foundation
 import Combine
 import UIKit
+import KakaoSDKAuth
+import KakaoSDKUser
 
 // MARK: - AuthService
 
@@ -186,7 +188,18 @@ class AuthService: ObservableObject {
         }
     }
 
+    /// Kakao SDK 에 저장된 토큰/세션 정리. 토큰이 없으면(Kakao 로 로그인하지 않은 사용자) 아무것도 하지 않는다.
+    private func clearKakaoSession() {
+        guard AuthApi.hasToken() else { return }
+        UserApi.shared.logout { error in
+            if let error {
+                print("[AuthService] Kakao 세션 정리 실패: \(type(of: error))")
+            }
+        }
+    }
+
     private func finishLogout() {
+        clearKakaoSession()
         let refresh = getRefreshToken()
         deleteToken()
         deleteRefreshToken()
@@ -272,6 +285,40 @@ class AuthService: ObservableObject {
 
         let response: SocialLoginResponse = try await apiClient.request(
             .googleLogin(googleRequest),
+            token: nil
+        )
+
+        if response.success == true,
+           !(response.isNewUser ?? response.data?.isNewUser ?? false),
+           let user = response.user ?? response.data?.user {
+            if let token = response.token ?? response.data?.token {
+                saveToken(token)
+            }
+            if let refresh = response.data?.refresh_token, !refresh.isEmpty {
+                saveRefreshToken(refresh)
+            }
+            saveUserData(user)
+        }
+
+        return response
+    }
+
+    // MARK: - Kakao Login API
+
+    /// Kakao 로그인 — 서버가 access token 으로 Kakao 사용자 ID 를 검증한다. 토큰은 로그에 남기지 않는다.
+    func kakaoLogin(accessToken: String, kakaoId: String, email: String?, nickname: String?) async throws -> SocialLoginResponse {
+        let request = KakaoLoginRequest(
+            kakao_id: kakaoId,
+            email: email,
+            nickname: nickname,
+            access_token: accessToken,
+            os_type: "ios"
+        )
+
+        print("[AuthService] Kakao 로그인 요청")
+
+        let response: SocialLoginResponse = try await apiClient.request(
+            .kakaoLogin(request),
             token: nil
         )
 
