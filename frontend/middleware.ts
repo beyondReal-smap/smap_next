@@ -15,11 +15,7 @@ const publicPaths = [
   '/_next',
   '/favicon.ico',
   '/images',
-  '/icons',
-  '/test-api',
-  '/test-google',
-  '/test-haptic',
-  '/test-location-modal'
+  '/icons'
 ];
 
 // 그룹 가입 페이지 패턴 (정규표현식)
