@@ -936,6 +936,7 @@ export default function SchedulePage() {
   const [locationSearchQuery, setLocationSearchQuery] = useState('');
   const [locationSearchResults, setLocationSearchResults] = useState<any[]>([]);
   const [isSearchingLocation, setIsSearchingLocation] = useState(false);
+  const [locationSearchError, setLocationSearchError] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
   // 날짜/시간 유효성 검사 상태
@@ -2792,37 +2793,13 @@ export default function SchedulePage() {
 
     setIsSearchingLocation(true);
     setHasSearched(true);
+    setLocationSearchError(false);
     setLocationSearchResults([]);
 
     try {
-      // 먼저 프록시를 통한 카카오 API 호출 시도
-      const proxyUrl = `/api/kakao-search?query=${encodeURIComponent(searchQueryString)}`;
-      let response = await fetch(proxyUrl);
-      let data;
-
-      if (response.ok) {
-        data = await response.json();
-        console.log('[handleSearchLocation] 프록시를 통한 카카오 API 호출 성공:', data);
-      } else {
-        console.warn('[handleSearchLocation] 프록시 API 실패, 직접 호출 시도');
-        
-        // 프록시 실패 시 직접 카카오 API 호출
-    const KAKAO_API_KEY = '7fbf60571daf54ca5bee8373a1f31d2d';
-        const directUrl = `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(searchQueryString)}`;
-
-        response = await fetch(directUrl, {
-        headers: {
-          Authorization: `KakaoAK ${KAKAO_API_KEY}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-        data = await response.json();
-        console.log('[handleSearchLocation] 직접 카카오 API 호출 성공:', data);
-      }
+      const response = await fetch(`/api/kakao-search?query=${encodeURIComponent(searchQueryString)}`);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
 
       if (data.documents && data.documents.length > 0) {
         const resultsWithIds = data.documents.map((doc: any, index: number) => ({
@@ -2832,53 +2809,13 @@ export default function SchedulePage() {
         console.log("[handleSearchLocation] 🔧 setLocationSearchResults 호출 전:", resultsWithIds);
         setLocationSearchResults(resultsWithIds);
       } else {
-        console.log('[handleSearchLocation] 검색 결과가 없어 목업 데이터 제공');
-        // 검색 결과가 없을 때 목업 데이터 제공
-        const mockResults = [
-          {
-            place_name: `${searchQueryString} 관련 장소 1`,
-            road_address_name: '서울특별시 강남구 테헤란로 123',
-            address_name: '서울특별시 강남구 역삼동 123-45',
-            x: '127.0276',
-            y: '37.4979',
-            temp_id: 'mock-1'
-          },
-          {
-            place_name: `${searchQueryString} 관련 장소 2`, 
-            road_address_name: '서울특별시 서초구 서초대로 456',
-            address_name: '서울특별시 서초구 서초동 456-78',
-            x: '127.0145',
-            y: '37.4837',
-            temp_id: 'mock-2'
-          }
-        ];
-        setLocationSearchResults(mockResults);
+        setLocationSearchResults([]);
       }
 
     } catch (error) {
       console.error('[handleSearchLocation] 장소 검색 중 오류 발생:', error);
-      console.log('[handleSearchLocation] 오류로 인해 목업 데이터 제공');
-      
-      // 오류 발생 시 목업 데이터 제공
-      const mockResults = [
-        {
-          place_name: `${searchQueryString} (샘플 장소 1)`,
-          road_address_name: '서울특별시 강남구 테헤란로 123',
-          address_name: '서울특별시 강남구 역삼동 123-45',
-          x: '127.0276',
-          y: '37.4979',
-          temp_id: 'mock-error-1'
-        },
-        {
-          place_name: `${searchQueryString} (샘플 장소 2)`,
-          road_address_name: '서울특별시 서초구 서초대로 456', 
-          address_name: '서울특별시 서초구 서초동 456-78',
-          x: '127.0145',
-          y: '37.4837',
-          temp_id: 'mock-error-2'
-        }
-      ];
-      setLocationSearchResults(mockResults);
+      setLocationSearchError(true);
+      setLocationSearchResults([]);
     } finally {
       setIsSearchingLocation(false);
     }
@@ -5575,7 +5512,7 @@ export default function SchedulePage() {
                         </div>
                       ) : hasSearched && !isSearchingLocation ? (
                         <div className="text-center py-8 px-6">
-                          <p className="text-gray-600 font-medium">검색 결과가 없습니다</p>
+                          <p className="text-gray-600 font-medium">{locationSearchError ? '장소 검색에 실패했습니다. 다시 시도해주세요.' : '검색 결과가 없습니다'}</p>
                           <p className="text-xs text-gray-500 mt-1">다른 검색어를 입력해보세요</p>
                         </div>
                       ) : (

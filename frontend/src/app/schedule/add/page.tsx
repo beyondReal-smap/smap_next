@@ -142,6 +142,7 @@ export default function AddSchedulePage() {
   const [isLocationSearchModalOpen, setIsLocationSearchModalOpen] = useState(false); // 주소 검색 모달 상태
   const [locationSearchQuery, setLocationSearchQuery] = useState(''); // 주소 검색어 상태
   const [locationSearchResults, setLocationSearchResults] = useState<any[]>([]); // 주소 검색 결과 상태
+  const [locationSearchError, setLocationSearchError] = useState(false);
   const [isSearchingLocation, setIsSearchingLocation] = useState(false); // 주소 검색 로딩 상태
 
   const [portalContainer, setPortalContainer] = useState<Element | null>(null);
@@ -735,6 +736,7 @@ export default function AddSchedulePage() {
   // 주소 검색 모달 열기 핸들러 수정 (문자열 변환 추가)
   const handleOpenLocationSearchModal = () => {
     const currentName = scheduleForm.locationName;
+    setLocationSearchError(false);
     setLocationSearchResults([]);
 
     // currentName이 문자열인지 확인하고 변환
@@ -769,16 +771,9 @@ export default function AddSchedulePage() {
     setIsSearchingLocation(true);
     setLocationSearchResults([]);
 
-    const KAKAO_API_KEY = '7fbf60571daf54ca5bee8373a1f31d2d'; // 임시 API 키 (주의!)
-    const url = `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(searchQueryString)}`; // 변환된 문자열 사용
-
+    setLocationSearchError(false);
     try {
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `KakaoAK ${KAKAO_API_KEY}`,
-        },
-      });
-
+      const response = await fetch(`/api/kakao-search?query=${encodeURIComponent(searchQueryString)}`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -797,6 +792,7 @@ export default function AddSchedulePage() {
 
     } catch (error) {
       console.error('주소 검색 중 오류 발생:', error);
+      setLocationSearchError(true);
       setLocationSearchResults([]);
     } finally {
       setIsSearchingLocation(false);
@@ -1476,7 +1472,7 @@ export default function AddSchedulePage() {
               <div className="overflow-y-auto flex-grow min-h-[150px]">
                 {isSearchingLocation && <p className="text-center text-gray-500 py-4">검색 중...</p>}
                 {!isSearchingLocation && locationSearchResults.length === 0 && (
-                  <p className="text-center text-gray-500 py-4">검색 결과가 없습니다.</p>
+                  <p className="text-center text-gray-500 py-4">{locationSearchError ? '주소 검색에 실패했습니다. 다시 시도해주세요.' : '검색 결과가 없습니다.'}</p>
                 )}
                 {!isSearchingLocation && locationSearchResults.length > 0 && (
                   <div className="space-y-2">

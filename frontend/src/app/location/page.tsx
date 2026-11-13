@@ -41,7 +41,6 @@ interface CustomToast {
 const API_KEYS = {
   NAVER_CLIENT_ID: process.env.NEXT_PUBLIC_NAVER_CLIENT_ID || '',
   NAVER_CLIENT_SECRET: process.env.NEXT_PUBLIC_NAVER_CLIENT_SECRET || '',
-  KAKAO_REST_API_KEY: process.env.NEXT_PUBLIC_KAKAO_REST_API_KEY || '',
   NAVER_MAPS_CLIENT_ID: process.env.NEXT_PUBLIC_NAVER_CLIENT_ID || ''
 };
 import ReactDOM from 'react-dom';
@@ -825,6 +824,8 @@ export default function LocationPage() {
   const [shouldAnimate, setShouldAnimate] = useState(true);
   const [isPageLoaded, setIsPageLoaded] = useState(false);
   const [isMapLoading, setIsMapLoading] = useState(true);
+  const [mapLoadError, setMapLoadError] = useState(false);
+  const [mapRetryCount, setMapRetryCount] = useState(0);
   const [isMapInitialized, setIsMapInitialized] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
   const [isFetchingGroupMembers, setIsFetchingGroupMembers] = useState(false);
@@ -1368,6 +1369,10 @@ export default function LocationPage() {
 
   // 장소 선택 시 멤버 위치로 지도 이동 방지 플래그
   const isLocationSelectingRef = useRef(false);
+  const reverseGeocodeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (reverseGeocodeTimerRef.current) clearTimeout(reverseGeocodeTimerRef.current);
+  }, []);
 
   // 모달 상태 추가
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -1722,34 +1727,9 @@ export default function LocationPage() {
     setLocationSearchModalCaller('panel');
 
     try {
-      // 먼저 프록시를 통한 카카오 API 호출 시도 (일정 등록과 동일한 방식)
-      const proxyUrl = `/api/kakao-search?query=${encodeURIComponent(locationSearchQuery)}`;
-      let response = await fetch(proxyUrl);
-      let data;
-
-      if (response.ok) {
-        data = await response.json();
-        console.log('[handlePanelAddressSearch] 프록시를 통한 카카오 API 호출 성공:', data);
-      } else {
-        console.warn('[handlePanelAddressSearch] 프록시 API 실패, 직접 호출 시도');
-
-        // 프록시 실패 시 직접 카카오 API 호출
-        const KAKAO_API_KEY = '7fbf60571daf54ca5bee8373a1f31d2d';
-        const directUrl = `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(locationSearchQuery)}&size=5`;
-
-        response = await fetch(directUrl, {
-          headers: {
-            Authorization: `KakaoAK ${KAKAO_API_KEY}`,
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        data = await response.json();
-        console.log('[handlePanelAddressSearch] 직접 카카오 API 호출 성공:', data);
-      }
+      const response = await fetch(`/api/kakao-search?query=${encodeURIComponent(locationSearchQuery)}`);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
 
       if (data.documents && data.documents.length > 0) {
         const resultsWithIds = data.documents.map((doc: any, index: number) => ({
@@ -3356,10 +3336,6 @@ export default function LocationPage() {
         return;
       }
 
-      // 동적 Client ID 가져오기 (도메인별 자동 선택) - Home 페이지와 동일
-      const dynamicClientId = API_KEYS.NAVER_MAPS_CLIENT_ID;
-      console.log(`🗺️ [LOCATION] 네이버 지도 Client ID 사용: ${dynamicClientId}`);
-
       // 프로덕션 환경에서는 서브모듈 최소화 (로딩 속도 최적화)
       const isProduction = window.location.hostname.includes('.aiagnt.kr');
       const isIOSWebView = typeof window !== 'undefined' &&
@@ -3374,67 +3350,16 @@ export default function LocationPage() {
         setIsMapLoading(false);
         return;
       } catch (e) {
-        console.warn('[LOCATION] ensureNaverMapsLoaded 실패, 수동 로딩으로 폴백', e);
-      }
-
-      // 네이버 지도 API 로드용 URL 생성 (안드로이드 WebView ORB 회피)
-      const isAndroidWebView = /Android/i.test(navigator.userAgent) && /WebView|wv|SMAP-Android/i.test(navigator.userAgent);
-      const naverMapUrl = new URL(`https://oapi.map.naver.com/openapi/v3/maps.js`);
-      naverMapUrl.searchParams.append('ncpKeyId', dynamicClientId);
-      if (!isAndroidWebView) {
-        if (!isIOSWebView && !isProduction) {
-          // 개발 환경: 전체 모듈
-          naverMapUrl.searchParams.append('submodules', 'geocoder,drawing,visualization');
-        } else {
-          // 프로덕션/IOS: 최소 모듈
-          naverMapUrl.searchParams.append('submodules', 'geocoder');
-        }
-      }
-
-      console.log(`🗺️ [LOCATION] 네이버 지도 URL: ${naverMapUrl.toString()}`);
-
-      const script = document.createElement('script');
-      script.src = naverMapUrl.toString();
-      script.async = true;
-      script.defer = true;
-      script.id = 'naver-maps-location';
-
-      let hasErrorOccurred = false;
-
-      script.onload = () => {
-        console.log('[네이버 지도 로드] 스크립트 로드 완료');
-        if (!hasErrorOccurred) {
-          setIsMapLoading(false);
-        }
-      };
-
-      script.onerror = () => {
-        console.error('[네이버 지도 로드] 스크립트 로드 실패');
-        hasErrorOccurred = true;
+        console.error('[LOCATION] 지도 로드 실패:', e);
+        setMapLoadError(true);
         setIsMapLoading(false);
-      };
-
-      // 중복 로드 방지
-      const existingScript = document.getElementById('naver-maps-location');
-      if (existingScript) {
-        existingScript.remove();
       }
-
-      document.head.appendChild(script);
-
-      // 타임아웃 설정 (iOS WebView에서는 더 긴 시간)
-      const timeout = isIOSWebView ? 15000 : 10000;
-      setTimeout(() => {
-        if (!window.naver?.maps && !hasErrorOccurred) {
-          console.warn(`[네이버 지도 로드] 타임아웃 (${timeout}ms)`);
-          hasErrorOccurred = true;
-          setIsMapLoading(false);
-        }
-      }, timeout);
     };
 
+    setMapLoadError(false);
+    setIsMapLoading(true);
     loadNaverMaps();
-  }, []);
+  }, [mapRetryCount]);
 
   // 지도 컨테이너 렌더링 확인
   useEffect(() => {
@@ -3630,7 +3555,8 @@ export default function LocationPage() {
           };
 
           // 500ms 지연 후 역지오코딩 실행 (getAddressFromCoordinates 내부에서 카카오 폴백 처리)
-          setTimeout(performReverseGeocode, 500);
+          if (reverseGeocodeTimerRef.current) clearTimeout(reverseGeocodeTimerRef.current);
+          reverseGeocodeTimerRef.current = setTimeout(performReverseGeocode, 500);
         });
       } catch (error) {
         console.error('[지도 초기화] 오류:', error);
@@ -4149,11 +4075,7 @@ export default function LocationPage() {
           console.log('[getAddressFromCoordinates] 네이버 Service 사용 불가, 카카오 API로 폴백');
 
           try {
-            const response = await fetch(`https://dapi.kakao.com/v2/local/geo/coord2address.json?x=${lng}&y=${lat}`, {
-              headers: {
-                'Authorization': 'KakaoAK 7fbf60571daf54ca5bee8373a1f31d2d'
-              }
-            });
+            const response = await fetch(`/api/kakao-search?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`);
 
             if (response.ok) {
               const data = await response.json();
@@ -4201,20 +4123,16 @@ export default function LocationPage() {
         // 네이버 Service가 있는 경우에만 사용
         if (!window.naver?.maps?.Service) {
           console.warn('[getAddressFromCoordinates] 네이버 맵 Service 사용 불가, 좌표 반환');
-          const fallback = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-          reverseGeocodeCache.set(key, fallback);
-          return fallback;
+          throw new Error('주소 변환에 실패했습니다.');
         }
 
         console.log('[getAddressFromCoordinates] 네이버 Service 사용 가능, 역지오코딩 시작');
 
-        return new Promise<string>((resolve) => {
+        return new Promise<string>((resolve, reject) => {
           const coord = createSafeLatLng(lat, lng);
           if (!coord) {
             console.warn('[getAddressFromCoordinates] LatLng 생성 실패');
-            const fallback = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-            reverseGeocodeCache.set(key, fallback);
-            resolve(fallback);
+            reject(new Error('좌표 변환에 실패했습니다.'));
             return;
           }
 
@@ -4227,9 +4145,7 @@ export default function LocationPage() {
           }, (status: any, response: any) => {
             if (status === window.naver.maps.Service.Status.ERROR) {
               console.warn('[getAddressFromCoordinates] 역지오코딩 오류:', status);
-              const fallback = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-              reverseGeocodeCache.set(key, fallback);
-              resolve(fallback);
+              reject(new Error('주소 변환에 실패했습니다.'));
               return;
             }
 
@@ -4332,8 +4248,7 @@ export default function LocationPage() {
 
               // 최종적으로 주소가 없는 경우 좌표 표시
               if (!address || address.trim() === '' || address.length < 3) {
-                address = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-                console.log('[getAddressFromCoordinates] 주소 파싱 실패, 좌표 사용:', address);
+                throw new Error('주소를 찾을 수 없습니다.');
               }
 
               console.log('[getAddressFromCoordinates] 최종 주소:', address);
@@ -4341,17 +4256,19 @@ export default function LocationPage() {
               resolve(address.trim());
             } catch (parseError) {
               console.error('[getAddressFromCoordinates] 응답 파싱 오류:', parseError);
-              const fallback = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-              reverseGeocodeCache.set(key, fallback);
-              resolve(fallback);
+              reject(parseError);
             }
           });
         });
       })();
 
       reverseGeocodeInflight.set(key, inflight);
-      const result = await inflight;
-      reverseGeocodeInflight.delete(key);
+      let result: string;
+      try {
+        result = await inflight;
+      } finally {
+        reverseGeocodeInflight.delete(key);
+      }
 
       // 1) 서버 캐시에 저장 (베스트 에포트)
       try {
@@ -4365,7 +4282,7 @@ export default function LocationPage() {
       return result;
     } catch (error) {
       console.error('[getAddressFromCoordinates] 역지오코딩 에러:', error);
-      return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+      throw error;
     }
   };
   // 🚨 제거: updateMapMarkers 함수는 더 이상 사용되지 않음
@@ -7113,6 +7030,12 @@ export default function LocationPage() {
             zIndex: 1
           }}
         >
+          {mapLoadError && (
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white">
+              <p>지도를 불러오지 못했습니다.</p>
+              <button type="button" onClick={() => setMapRetryCount(count => count + 1)}>다시 시도</button>
+            </div>
+          )}
           {/* 스켈레톤 UI - 지도 로딩 중일 때 표시 */}
           {isMapLoading && (
             <MapSkeleton

@@ -15,7 +15,7 @@ type EnsureOptions = {
 };
 
 const DEFAULT_OPTIONS: Required<EnsureOptions> = {
-  maxRetries: 5,
+  maxRetries: 2,
   initialDelayMs: 400,
   submodules: 'geocoder',
   useCallbackParam: true,
@@ -27,6 +27,7 @@ function delay(ms: number) {
 
 function buildScriptUrl(submodules: string, useCallbackParam: boolean, cbName: string): string {
   const clientId = API_KEYS.NAVER_MAPS_CLIENT_ID;
+  if (!clientId) throw new Error('NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID가 설정되지 않았습니다.');
   const url = new URL('https://oapi.map.naver.com/openapi/v3/maps.js');
   url.searchParams.set('ncpKeyId', clientId);
   if (submodules) url.searchParams.set('submodules', submodules);
@@ -51,8 +52,9 @@ function injectScript(src: string, id: string): Promise<void> {
     script.async = true;
     script.defer = true;
 
-    const handleLoad = () => resolve();
-    const handleError = () => reject(new Error('Naver Maps script load error'));
+    const timeout = setTimeout(() => reject(new Error('Naver Maps script load timeout')), 15000);
+    const handleLoad = () => { clearTimeout(timeout); resolve(); };
+    const handleError = () => { clearTimeout(timeout); reject(new Error('Naver Maps script load error')); };
 
     script.addEventListener('load', handleLoad, { once: true });
     script.addEventListener('error', handleError, { once: true });
@@ -78,11 +80,12 @@ export async function ensureNaverMapsLoaded(options?: EnsureOptions): Promise<vo
     ? {
         submodules: '',
         useCallbackParam: false,
-        maxRetries: 8, // 안드로이드 WebView에서는 재시도 횟수 증가
+        maxRetries: 2,
         initialDelayMs: 600 // 대기 시간 증가
       }
     : {};
   const opts = { ...DEFAULT_OPTIONS, ...platformSafeOverrides, ...(options || {}) };
+  opts.maxRetries = Math.min(2, Math.max(0, opts.maxRetries));
 
   if (typeof window === 'undefined' || typeof document === 'undefined') {
     return;
@@ -97,7 +100,7 @@ export async function ensureNaverMapsLoaded(options?: EnsureOptions): Promise<vo
     return window.__NAVER_MAPS_PROMISE__!;
   }
 
-  const p = new Promise<void>(async (resolve, reject) => {
+  const p = (async () => {
     let attempt = 0;
     let lastError: any = null;
 
@@ -141,7 +144,6 @@ export async function ensureNaverMapsLoaded(options?: EnsureOptions): Promise<vo
           if (opts.useCallbackParam) {
             (window as any)[cbName] = () => {
               resolvedByCallback = true;
-              resolve();
             };
           }
 
@@ -172,7 +174,6 @@ export async function ensureNaverMapsLoaded(options?: EnsureOptions): Promise<vo
 
           if (window.naver?.maps || resolvedByCallback) {
             console.log('[ensureNaverMapsLoaded] Naver Maps 초기화 성공');
-            resolve();
             return;
           }
           throw new Error(`Naver Maps not initialized in time (${timeoutMs}ms timeout)`);
@@ -188,7 +189,7 @@ export async function ensureNaverMapsLoaded(options?: EnsureOptions): Promise<vo
     } finally {
       window.removeEventListener('error', onWindowError);
     }
-  });
+  })();
 
   window.__NAVER_MAPS_PROMISE__ = p;
 

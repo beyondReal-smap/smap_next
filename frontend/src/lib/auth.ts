@@ -294,4 +294,29 @@ export function getCurrentUserPermissions(request: NextRequest): {
     isOwner: user?.sgdt_owner_chk === 'Y',
     isLeader: user?.sgdt_leader_chk === 'Y'
   };
-} 
+}
+
+// 지도 API에서는 서명된 토큰만 허용합니다.
+export function requireSignedMapAuth(request: NextRequest): NextResponse | null {
+  const secrets = [process.env.JWT_SECRET, process.env.NEXTAUTH_SECRET].filter((secret): secret is string => !!secret);
+  if (secrets.length === 0) {
+    console.error('[map-auth] JWT 서명 검증 환경변수가 설정되지 않았습니다.');
+    return NextResponse.json({ error: '인증 설정 오류' }, { status: 500 });
+  }
+
+  const authorization = request.headers.get('authorization');
+  const token = authorization?.startsWith('Bearer ')
+    ? authorization.slice(7)
+    : request.cookies.get('auth-token')?.value;
+  if (token) {
+    for (const secret of secrets) {
+      try {
+        const payload = jwt.verify(token, secret, { algorithms: ['HS256'] });
+        if (typeof payload === 'object' && payload !== null && (payload.mt_idx || payload.userId)) return null;
+      } catch (_) {
+        // 다른 서명 키가 설정되어 있으면 이어서 검증합니다.
+      }
+    }
+  }
+  return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 });
+}

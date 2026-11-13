@@ -1009,6 +1009,8 @@ export default function HomePage() {
   const [filteredSchedules, setFilteredSchedules] = useState<Schedule[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [isMapLoading, setIsMapLoading] = useState(true);
+  const [mapLoadError, setMapLoadError] = useState(false);
+  const mapLoadAttemptedRef = useRef(false);
   const [isLocationEnabled, setIsLocationEnabled] = useState(false);
   const [mapType, setMapType] = useState<MapType>('naver');
 
@@ -3595,233 +3597,30 @@ export default function HomePage() {
 
   // Naver Maps API 로드 함수 (프리로딩 최적화 + iOS WebView 지원)
   const loadNaverMapsAPI = async () => {
-    // iOS WebView 감지
-    const isIOSWebView = typeof window !== 'undefined' &&
-      window.webkit &&
-      window.webkit.messageHandlers;
-
-    // 이미 로드된 경우 중복 로드 방지
     if (apiLoadStatus.naver || isNaverMapsReady()) {
-      console.log('[HOME] 🚀 Naver Maps API 프리로딩 완료 - 즉시 사용 가능');
       setNaverMapsLoaded(true);
-      apiLoadStatus.naver = true;
-      setIsMapLoading(false); // 프리로드 완료시 즉시 로딩 상태 해제
+      setIsMapLoading(false);
       return;
     }
-
-    if (isIOSWebView) {
-      console.log('[HOME] iOS WebView 환경 - 네이버 지도 최적화 로딩');
-      // iOS WebView에서는 ios-webview-fix.js의 최적화를 기다림
-      // 스크립트가 이미 있는지 확인
-      const existingScript = (typeof document !== 'undefined') ? document.querySelector('script[src*="oapi.map.naver.com"]') : null;
-      if (!existingScript) {
-        // 스크립트가 없으면 생성
-        performBackupLoading();
-      } else {
-        console.log('[HOME] iOS WebView - 네이버 지도 스크립트 발견, 최적화 대기');
-        // ios-webview-fix.js에서 naverMapsReady 이벤트를 발생시킬 때까지 대기
-      }
-      return;
-    }
-
-    console.log('[HOME] Naver Maps API 프리로딩 대기 중 - 백업 로딩 확인');
-
-    // 프리로드된 스크립트가 있는지 확인
-    const preloadedScript = (typeof document !== 'undefined') ? document.getElementById('naver-maps-preload') : null;
-    if (preloadedScript) {
-      console.log('[HOME] 프리로드된 네이버 지도 스크립트 발견 - 로드 완료 대기');
-      // 프리로드된 스크립트가 완료될 때까지 짧은 간격으로 체크
-      const checkInterval = setInterval(() => {
-        if (isNaverMapsReady()) {
-          console.log('[HOME] 프리로드된 Naver Maps API 로드 완료');
-          clearInterval(checkInterval);
-          apiLoadStatus.naver = true;
-          setNaverMapsLoaded(true);
-          setIsMapLoading(false);
-        }
-      }, 50); // 50ms마다 체크
-
-      // 최대 3초 대기 후 백업 로딩
-      setTimeout(async () => {
-        if (!isNaverMapsReady()) {
-          clearInterval(checkInterval);
-          console.log('[HOME] 프리로드 대기 시간 초과 - 백업 로딩 실행');
-          // 보강: 보장 로더로 강제 로딩 (지수 백오프 + 에러리스너)
-          const { ensureNaverMapsLoaded } = await import('../../services/ensureNaverMaps');
-          try {
-            const isProd = window.location.hostname.includes('.aiagnt.kr');
-            await ensureNaverMapsLoaded({ maxRetries: 6, initialDelayMs: 300, submodules: isProd ? 'geocoder' : 'geocoder,drawing,visualization' });
-            apiLoadStatus.naver = true;
-            setNaverMapsLoaded(true);
-            setIsMapLoading(false);
-          } catch (e) {
-            console.error('[HOME] ensureNaverMapsLoaded 실패, 최종 백업 로딩 시도', e);
-            performBackupLoading();
-          }
-        }
-      }, 3000);
-      return;
-    }
-
-    // 프리로드가 없을 경우 즉시 백업 로딩
-    console.log('[HOME] 프리로드 스크립트 없음 - 백업 로딩 시작');
+    if (mapLoadAttemptedRef.current) return;
+    mapLoadAttemptedRef.current = true;
+    setMapLoadError(false);
+    setIsMapLoading(true);
     try {
       const { ensureNaverMapsLoaded } = await import('../../services/ensureNaverMaps');
       const isProd = window.location.hostname.includes('.aiagnt.kr');
-      await ensureNaverMapsLoaded({ maxRetries: 6, initialDelayMs: 300, submodules: isProd ? 'geocoder' : 'geocoder,drawing,visualization' });
+      await ensureNaverMapsLoaded({ initialDelayMs: 300, submodules: isProd ? 'geocoder' : 'geocoder,drawing,visualization' });
       apiLoadStatus.naver = true;
       setNaverMapsLoaded(true);
+    } catch (error) {
+      console.error('[HOME] 지도 로드 실패:', error);
+      setMapLoadError(true);
+    } finally {
       setIsMapLoading(false);
-    } catch (e) {
-      console.error('[HOME] 보장 로더 실패, 일반 백업 로딩으로 폴백', e);
-      performBackupLoading();
-    }
-
-    function performBackupLoading() {
-      // 동적 Client ID 가져오기 (도메인별 자동 선택)
-      const dynamicClientId = API_KEYS.NAVER_MAPS_CLIENT_ID;
-      console.log(`🗺️ [HOME] 네이버 지도 Client ID 사용: ${dynamicClientId}`);
-
-      // 네이버 지도 API 로드용 URL 생성 (올바른 파라미터명 사용)
-      const naverMapUrl = new URL(`https://oapi.map.naver.com/openapi/v3/maps.js`);
-      naverMapUrl.searchParams.append('ncpKeyId', dynamicClientId); // 동적 Client ID 사용
-
-      // 프로덕션 환경에서는 서브모듈 최소화 (로딩 속도 최적화)
-      const isProduction = window.location.hostname.includes('.aiagnt.kr');
-      if (!isIOSWebView && !isProduction) {
-        // 개발 환경에서만 전체 서브모듈 로드
-        naverMapUrl.searchParams.append('submodules', 'geocoder,drawing,visualization');
-      } else if (!isIOSWebView && isProduction) {
-        // 프로덕션에서는 필수 모듈만 로드 (빠른 초기화)
-        naverMapUrl.searchParams.append('submodules', 'geocoder');
-      }
-
-      // script 요소 생성 및 로드
-      const script = document.createElement('script');
-      script.src = naverMapUrl.toString();
-      script.async = true;
-      script.defer = true;
-      script.id = 'naver-maps-backup';
-
-      // 네이버 지도 로딩 에러 감지 및 처리
-      let hasErrorOccurred = false;
-      let errorListener: any = null;
-
-      // 전역 에러 리스너 추가 (401, 500 오류 감지)
-      const handleNaverMapsError = (event: ErrorEvent) => {
-        const errorMessage = event.message || '';
-        const isNaverError = errorMessage.includes('naver') ||
-          errorMessage.includes('maps') ||
-          errorMessage.includes('oapi.map.naver.com') ||
-          errorMessage.includes('Unauthorized') ||
-          errorMessage.includes('Internal Server Error');
-
-        if (isNaverError && !hasErrorOccurred) {
-          hasErrorOccurred = true;
-          console.error('[HOME] 네이버 지도 API 인증/서버 오류 감지:', errorMessage);
-
-          // 구글맵으로 전환하지 않고 네이버맵 재시도
-          setIsMapLoading(false);
-          setNaverMapsLoaded(false);
-
-          // 네이버맵 재시도
-          setTimeout(() => {
-            console.log('[HOME] 네이버 지도 오류 후 재시도...');
-            loadNaverMapsAPI();
-          }, 5000);
-
-          // 에러 리스너 제거
-          if (errorListener) {
-            window.removeEventListener('error', errorListener);
-            errorListener = null;
-          }
-        }
-      };
-
-      // 에러 리스너 등록
-      errorListener = handleNaverMapsError;
-      window.addEventListener('error', errorListener);
-
-      script.onload = () => {
-        console.log('[HOME] Naver Maps API 백업 로드 성공');
-
-        // 로드 성공 후에도 API 호출 오류가 발생할 수 있으므로 일정 시간 동안 에러 감지
-        setTimeout(() => {
-          if (errorListener && !hasErrorOccurred) {
-            window.removeEventListener('error', errorListener);
-            errorListener = null;
-          }
-        }, 5000); // 5초 후 에러 리스너 제거
-
-        if (isIOSWebView) {
-          console.log('[HOME] iOS WebView - 네이버 지도 스크립트 로드 완료, 최적화 대기');
-          // iOS WebView에서는 ios-webview-fix.js의 최적화를 기다림
-        } else {
-          // 일반 브라우저에서는 즉시 설정
-          if (!hasErrorOccurred) {
-            apiLoadStatus.naver = true;
-            setNaverMapsLoaded(true);
-            setIsMapLoading(false);
-          }
-        }
-      };
-
-      script.onerror = () => {
-        console.error('[HOME] 네이버 지도 백업 로드 실패 - 재시도 중...');
-        hasErrorOccurred = true;
-        setIsMapLoading(false);
-
-        // 네이버맵 로딩 재시도 (구글맵으로 전환하지 않음)
-        setTimeout(() => {
-          if (!naverMapsLoaded) {
-            console.log('[HOME] 네이버맵 재시도 중...');
-            loadNaverMapsAPI();
-          }
-        }, 2000);
-
-        // 에러 리스너 제거
-        if (errorListener) {
-          window.removeEventListener('error', errorListener);
-          errorListener = null;
-        }
-      };
-
-      // 중복 로드 방지를 위해 기존 스크립트 제거
-      const existingScript = document.getElementById('naver-maps-backup');
-      if (existingScript) {
-        existingScript.remove();
-      }
-
-      document.head.appendChild(script);
-
-      // iOS WebView에서는 더 긴 타임아웃 설정 (15초)
-      const timeout = isIOSWebView ? 15000 : 10000;
-      setTimeout(() => {
-        if (!naverMapsLoaded && !hasErrorOccurred) {
-          console.warn(`[HOME] 네이버 지도 로딩 타임아웃 (${timeout}ms) - 재시도 중...`);
-          hasErrorOccurred = true;
-
-          // 네이버맵 재시도 (구글맵으로 전환하지 않음)
-          setTimeout(() => {
-            if (!naverMapsLoaded) {
-              console.log('[HOME] 네이버맵 타임아웃 후 재시도...');
-              loadNaverMapsAPI();
-            }
-          }, 3000);
-
-          // 에러 리스너 제거
-          if (errorListener) {
-            window.removeEventListener('error', errorListener);
-            errorListener = null;
-          }
-        }
-      }, timeout);
     }
   };
 
 
-
-  // Naver 지도 초기화 (강화됨) - 무한 루프 방지
   const initNaverMap = () => {
     console.log('[HOME] Naver Maps 초기화 시작 (강화됨)');
 
@@ -6004,31 +5803,7 @@ export default function HomePage() {
       naverMap.current.panTo(currentPosition);
       naverMap.current.setZoom(16);
 
-    } else if (false && map.current && window.google?.maps) {
-      // 기존 현재 위치 마커 제거
-      if (marker.current) {
-        marker.current.setMap(null);
-        marker.current = null;
-      }
 
-      // 새 현재 위치 마커 생성
-      marker.current = new window.google.maps.Marker({
-        position: { lat: userLocation.lat, lng: userLocation.lng },
-        map: map.current,
-        icon: {
-          path: window.google.maps.SymbolPath.CIRCLE,
-          fillColor: '#3b82f6',
-          fillOpacity: 1,
-          strokeColor: '#FFFFFF',
-          strokeWeight: 3,
-          scale: 10
-        },
-        zIndex: 100
-      });
-
-      // 지도 중심을 현재 위치로 이동
-      map.current.panTo({ lat: userLocation.lat, lng: userLocation.lng });
-      map.current.setZoom(16);
     }
   };
 
@@ -6767,17 +6542,7 @@ export default function HomePage() {
         // 네이버맵 마커 클릭 이벤트 트리거
         window.naver.maps.Event.trigger(marker, 'click');
       }
-    } else if (false && map.current) {
-      const location = { lat, lng };
-      map.current.panTo(location);
-      map.current.setZoom(16);
 
-      // 해당 마커의 클릭 이벤트 트리거 (InfoWindow는 마커에서 이미 생성됨)
-      if (scheduleIndex !== -1 && scheduleMarkersRef.current[scheduleIndex]) {
-        const marker = scheduleMarkersRef.current[scheduleIndex];
-        // 구글맵 마커 클릭 이벤트 트리거
-        window.google.maps.event.trigger(marker, 'click');
-      }
     }
   };
 
@@ -7597,6 +7362,13 @@ export default function HomePage() {
               }, 500);
             }}
           >
+            {mapLoadError && (
+              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white">
+                <p>지도를 불러오지 못했습니다.</p>
+                <button type="button" onClick={() => { mapLoadAttemptedRef.current = false; loadNaverMapsAPI(); }}>다시 시도</button>
+              </div>
+            )}
+
             {/* 스켈레톤 UI - 지도 로딩 중일 때 표시 (CLS 개선) */}
             {isMapLoading && (
               <MapSkeleton

@@ -126,7 +126,6 @@ export default function RootLayout({
       <head>
         {/* DNS 프리페치 최적화 */}
         <link rel="dns-prefetch" href="//fonts.googleapis.com" />
-        <link rel="dns-prefetch" href="//maps.googleapis.com" />
         <link rel="dns-prefetch" href="//navermaps.github.io" />
         
         {/* 프리로드 최적화 */}

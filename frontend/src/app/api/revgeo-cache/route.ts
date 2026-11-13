@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { requireSignedMapAuth } from '@/lib/auth';
 
 interface CacheEntry {
   address: string;
@@ -7,6 +8,7 @@ interface CacheEntry {
 }
 
 const cache = new Map<string, CacheEntry>();
+const CACHE_LIMIT = 1000;
 const DEFAULT_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 function getCacheKey(lat: number, lng: number): string {
@@ -36,7 +38,9 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const authError = requireSignedMapAuth(request);
+  if (authError) return authError;
   try {
     const { lat, lng, address, ttlMs } = await request.json();
 
@@ -45,6 +49,7 @@ export async function POST(request: Request) {
     }
 
     const key = getCacheKey(lat, lng);
+    if (!cache.has(key) && cache.size >= CACHE_LIMIT) cache.delete(cache.keys().next().value!);
     cache.set(key, {
       address,
       timestamp: Date.now(),

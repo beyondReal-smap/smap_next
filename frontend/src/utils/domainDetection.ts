@@ -115,26 +115,6 @@ export function generateNaverMapsApiUrl(clientId: string, environment: Environme
 }
 
 /**
- * 구글 지도 API URL 생성 (환경별 최적화)
- */
-export function generateGoogleMapsApiUrl(apiKey: string, environment: EnvironmentConfig): string {
-  const baseUrl = 'https://maps.googleapis.com/maps/api/js';
-  const params = new URLSearchParams();
-  
-  params.append('key', apiKey);
-  params.append('libraries', 'places,geometry');
-  params.append('language', 'ko');
-  params.append('region', 'KR');
-  
-  // 프로덕션에서는 로딩 최적화
-  if (environment.isProduction) {
-    params.append('loading', 'async');
-  }
-  
-  return `${baseUrl}?${params.toString()}`;
-}
-
-/**
  * 환경별 CORS 설정 확인
  */
 export function checkCorsSupport(environment: EnvironmentConfig): Promise<boolean> {
@@ -291,51 +271,6 @@ export class MapApiLoader {
     }
   }
   
-  async loadGoogleMaps(apiKey: string): Promise<boolean> {
-    if (this.loadingStatus.get('google') === 'loaded') {
-      return true;
-    }
-    
-    if (this.loadingStatus.get('google') === 'pending') {
-      return this.waitForLoad('google');
-    }
-    
-    this.loadingStatus.set('google', 'pending');
-    
-    try {
-      const script = document.createElement('script');
-      script.src = generateGoogleMapsApiUrl(apiKey, this.environment);
-      script.async = true;
-      script.defer = true;
-      
-      const loadPromise = new Promise<boolean>((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error('구글 지도 로딩 타임아웃'));
-        }, this.environment.mapApiConfig.timeout);
-        
-        script.onload = () => {
-          clearTimeout(timeout);
-          this.loadingStatus.set('google', 'loaded');
-          resolve(true);
-        };
-        
-        script.onerror = () => {
-          clearTimeout(timeout);
-          this.loadingStatus.set('google', 'error');
-          reject(new Error('구글 지도 로딩 실패'));
-        };
-      });
-      
-      document.head.appendChild(script);
-      return await loadPromise;
-      
-    } catch (error) {
-      this.loadingStatus.set('google', 'error');
-      reportEnvironmentError(error as Error, 'GOOGLE_MAPS_LOAD', this.environment);
-      return false;
-    }
-  }
-  
   private async waitForLoad(provider: string): Promise<boolean> {
     return new Promise((resolve) => {
       const checkInterval = setInterval(() => {
@@ -366,7 +301,6 @@ export class MapApiLoader {
 export default {
   detectEnvironment,
   generateNaverMapsApiUrl,
-  generateGoogleMapsApiUrl,
   checkCorsSupport,
   checkNetworkStatus,
   logEnvironmentInfo,

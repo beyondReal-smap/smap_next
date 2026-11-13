@@ -47,25 +47,8 @@ export const getLocalizedAppInfo = (language: string = 'ko') => {
 // API 키
 export const API_KEYS = {
   // Google Maps API 키 제거됨 (사용하지 않음)
-  // 동적 네이버 지도 Client ID (도메인별 자동 선택)
   get NAVER_MAPS_CLIENT_ID() {
-    if (typeof window !== 'undefined') {
-      const currentDomain = window.location.host;
-      const domainClientId = MAP_CONFIG.NAVER.CLIENT_IDS[currentDomain as keyof typeof MAP_CONFIG.NAVER.CLIENT_IDS];
-      
-      // Vercel 환경 감지 및 로깅
-      const isVercel = currentDomain.includes('vercel.app') || currentDomain.includes('nextstep.aiagnt.kr');
-      console.log(`🗺️ [NAVER MAPS] 도메인: ${currentDomain}, Vercel: ${isVercel}, Client ID: ${domainClientId || '기본값'}`);
-      
-      // Vercel 환경에서는 환경 변수 우선 사용
-      if (isVercel && process.env.NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID) {
-        console.log(`🗺️ [NAVER MAPS] Vercel 환경에서 환경 변수 사용: ${process.env.NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID.substring(0, 8)}...`);
-        return process.env.NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID;
-      }
-      
-      return domainClientId || process.env.NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID || '91y2nh0yff';
-    }
-    return process.env.NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID || '91y2nh0yff';
+    return process.env.NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID || '';
   },
   NAVER_MAPS_API_KEY: 'bKRzkFBbAvfdHDTZB0mJ81jmO8ufULvQavQIQZmp',
   MAPBOX_ACCESS_TOKEN: process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '',
@@ -73,7 +56,7 @@ export const API_KEYS = {
   // 소셜/메시징 API 키
   KAKAO_JAVASCRIPT_KEY: 'e7e1c921e506e190875b4c8f4321c5ac',
   KAKAO_NATIVEAPP_KEY: '56b34b5e5e538073805559cabc81e1d8',
-  KAKAO_REST_API_KEY: process.env.NEXT_PUBLIC_KAKAO_MAPS_API_KEY || '7fbf60571daf54ca5bee8373a1f31d2d', // 카카오 로컬 API용 REST API 키 추가
+  KAKAO_REST_API_KEY: '',
   FIREBASEKEY: 'BOCzkX45zE3u0HFfNpfZDbUHH33OHNoe3k5KeTalEesHgnaBqCykjJUxnDcS6mv9MPSxU8EV3QHCL61gmwzkXlE',
   
   // 동적 Google OAuth Client ID (도메인별 자동 선택)
@@ -98,8 +81,6 @@ export const API_KEYS = {
   },
   
   // NCP 관련 키
-  NCP_ACCESS_KEY: "ncp_iam_BPAMKR5amCXCgRSDodA7",
-  NCP_SECRET_KEY: "ncp_iam_BPKMKR3E8B8h1J0FhAafnW8Cw83IKvDohl",
 };
 
 // 지도 관련 설정
@@ -118,13 +99,6 @@ export const MAP_CONFIG = {
       'localhost:3000',
       '127.0.0.1:3000',
     ],
-    // 프로덕션 환경별 Client ID 설정
-    CLIENT_IDS: {
-      'nextstep.aiagnt.kr': '91y2nh0yff',  // 운영 환경용
-      'app2.aiagnt.kr': '91y2nh0yff',      // 스테이징용
-      'localhost:3000': '91y2nh0yff',      // 개발용
-      // Vercel 환경은 환경 변수에서 가져옴
-    },
     // 네이버 지도 옵션
     DEFAULT_OPTIONS: {
       mapTypeControl: false,

@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireSignedMapAuth } from '@/lib/auth';
 
 // Server-side only: NCP Maps API credentials
 const NCP_KEY_ID = process.env.NCLOUD_MAPS_API_KEY_ID || process.env.NCP_MAPS_API_KEY_ID || '';
 const NCP_KEY = process.env.NCLOUD_MAPS_API_KEY || process.env.NCP_MAPS_API_KEY || '';
 
 export async function GET(request: NextRequest) {
+  const authError = requireSignedMapAuth(request);
+  if (authError) return authError;
   try {
     const { searchParams } = new URL(request.url);
     const latStr = searchParams.get('lat');

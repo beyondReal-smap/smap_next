@@ -1505,10 +1505,6 @@ export default function ActivelogPage() {
     updateLoadingStepSafe('maps');
     updateLoadingProgressSafe(10);
 
-    // 동적 Client ID 가져오기 (도메인별 자동 선택) - Home/Location 페이지와 동일
-    const dynamicClientId = API_KEYS.NAVER_MAPS_CLIENT_ID;
-    console.log(`🗺️ [LOGS] 네이버 지도 Client ID 사용: ${dynamicClientId}`);
-
     // Vercel 환경 감지 및 최적화
     const isVercel = window.location.hostname.includes('vercel.app') ||
       window.location.hostname.includes('nextstep.aiagnt.kr');
@@ -1527,68 +1523,10 @@ export default function ActivelogPage() {
       updateLoadingProgressSafe(25);
       return;
     } catch (e) {
-      console.warn('[LOGS] ensureNaverMapsLoaded 실패, 수동 로딩으로 폴백', e);
-    }
-
-    // 네이버 지도 API 로드용 URL 생성
-    const naverMapUrl = new URL(`https://oapi.map.naver.com/openapi/v3/maps.js`);
-    naverMapUrl.searchParams.append('ncpKeyId', dynamicClientId);
-
-    // Vercel 환경에서는 최소 모듈만 로드 (안정성 우선)
-    if (isVercel || isIOSWebView) {
-      naverMapUrl.searchParams.append('submodules', 'geocoder');
-      console.log(`🗺️ [LOGS] Vercel/iOS 환경 - 최소 모듈 로드`);
-    } else if (!isProduction) {
-      // 개발 환경에서만 전체 서브모듈 로드
-      naverMapUrl.searchParams.append('submodules', 'geocoder,drawing,visualization');
-    } else {
-      // 프로덕션에서는 필수 모듈만 로드 (빠른 초기화)
-      naverMapUrl.searchParams.append('submodules', 'geocoder,drawing');
-    }
-
-    console.log(`🗺️ [LOGS] 네이버 지도 URL: ${naverMapUrl.toString()}`);
-
-    const script = document.createElement('script');
-    script.id = 'naver-maps-script-activelog'; // 스크립트 ID 변경 (다른 페이지와 충돌 방지)
-    script.src = naverMapUrl.toString();
-    script.async = true;
-    script.defer = true;
-
-    let hasErrorOccurred = false;
-
-    script.onload = () => {
-      console.log('[LOGS] Naver Maps API 로드 완료');
-      if (!hasErrorOccurred) {
-        setNaverMapsLoaded(true);
-        setLoadingStep('groups');
-        setLoadingProgress(25);
-      }
-    };
-
-    script.onerror = () => {
-      console.error('[LOGS] Naver Maps API 로드 실패');
-      hasErrorOccurred = true;
+      console.error('[LOGS] 지도 로드 실패:', e);
       setHasInitialLoadFailed(true);
       setIsMapLoading(false);
-    };
-
-    const existingScript = document.getElementById('naver-maps-script-activelog');
-    if (existingScript) {
-      existingScript.remove();
     }
-
-    document.head.appendChild(script);
-
-    // Vercel 환경에서는 더 긴 타임아웃 설정
-    const timeout = isVercel ? 20000 : (isIOSWebView ? 15000 : 10000);
-    setTimeout(() => {
-      if (!window.naver?.maps && !hasErrorOccurred) {
-        console.warn(`[LOGS] 네이버 지도 로드 타임아웃 (${timeout}ms)`);
-        hasErrorOccurred = true;
-        setHasInitialLoadFailed(true);
-        setIsMapLoading(false);
-      }
-    }, timeout);
   };
 
   // 컴포넌트 인스턴스 등록 및 메인 인스턴스 결정
