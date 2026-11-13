@@ -81,6 +81,9 @@ func (s *Service) verifyAppleChain(x5c []interface{}) (*ecdsa.PublicKey, error) 
 		if err != nil {
 			return nil, errors.New("x5c 인증서 오류")
 		}
+		// Apple 전용 확장이 critical 로 표시돼 있어도 Go 가 "처리할 수 없는 critical 확장" 으로 체인을 거부하지 않게,
+		// 아래 hasExt 에서 직접 확인하는 두 OID 만 처리됨으로 표시한다(그 밖의 critical 확장은 그대로 거부).
+		c.UnhandledCriticalExtensions = withoutAppleOIDs(c.UnhandledCriticalExtensions)
 		certs[i] = c
 	}
 	leaf := certs[0]
@@ -105,6 +108,18 @@ func (s *Service) verifyAppleChain(x5c []interface{}) (*ecdsa.PublicKey, error) 
 		return nil, errors.New("리프 키가 ECDSA 가 아님")
 	}
 	return pub, nil
+}
+
+// withoutAppleOIDs 는 처리 못 한 critical 확장 목록에서 이 파일이 직접 검사하는 Apple 전용 OID 두 개만 뺀다.
+func withoutAppleOIDs(in []asn1.ObjectIdentifier) []asn1.ObjectIdentifier {
+	var out []asn1.ObjectIdentifier
+	for _, id := range in {
+		if id.Equal(oidAppleLeaf) || id.Equal(oidAppleIntermediate) {
+			continue
+		}
+		out = append(out, id)
+	}
+	return out
 }
 
 func hasExt(c *x509.Certificate, oid asn1.ObjectIdentifier) bool {

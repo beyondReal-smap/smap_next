@@ -16,6 +16,9 @@ type SubscriptionStatus struct {
 	InGracePeriod      bool               `json:"in_grace_period"`
 	Limits             SubscriptionLimits `json:"limits"`
 	EnforcementEnabled bool               `json:"enforcement_enabled"`
+	// AccountToken: 구매 시 앱이 Apple appAccountToken / Google obfuscatedExternalAccountId 로 넣을 서버 발급 값(UUID).
+	// 서버 비밀이 설정된 경우에만 내려가며(없으면 필드 생략), 기존 필드는 그대로다.
+	AccountToken string `json:"account_token,omitempty"`
 }
 
 // SubscriptionVerifyRequest는 POST /subscriptions/verify 본문(계약 3.2). iOS: platform+signed_transaction,

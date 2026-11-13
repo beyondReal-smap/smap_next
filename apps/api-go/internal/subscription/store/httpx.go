@@ -60,43 +60,90 @@ func parseRSAPrivateKey(pemStr string) (*rsa.PrivateKey, error) {
 	return nil, errors.New("store: 서비스 계정 private_key 형식 오류")
 }
 
-// jwksCache 는 Google OIDC 서명키(RSA) 캐시다. kid 미스 시 쿨다운 후 1회 재조회한다.
+// jwksCache 는 Google OIDC 서명키(RSA) 캐시다.
+//   - 키 조회(네트워크)는 락 밖에서 하고, 동시 요청이 몰려도 조회는 한 번만 한다(진행 중인 조회를 기다린다: singleflight).
+//   - kid 미스는 성공한 조회 후 kidCooldown 동안 재조회하지 않는다. 조회 실패도 failCooldown 동안 재시도하지 않고
+//     바로 ErrStoreUnavailable 을 돌려준다(공개 엔드포인트가 Google 장애 중 조회를 쌓지 못하게).
 type jwksCache struct {
 	mu        sync.Mutex
 	keys      map[string]*rsa.PublicKey
-	fetchedAt time.Time
+	fetchedAt time.Time // 마지막 성공 조회 시각
+	failedAt  time.Time // 마지막 실패 시각(성공하면 zero)
+	inflight  *jwksFlight
+}
+
+type jwksFlight struct {
+	done chan struct{}
+	err  error
 }
 
 const (
-	jwksTTL     = time.Hour
-	kidCooldown = 30 * time.Second
-	minRSABits  = 2048
+	jwksTTL      = time.Hour
+	kidCooldown  = 30 * time.Second
+	failCooldown = 5 * time.Second
+	minRSABits   = 2048
 )
 
 // lookupKey: 키가 없으면 ErrUnauthorized, 조회 실패는 ErrStoreUnavailable.
 func (s *Service) lookupKey(ctx context.Context, kid string) (*rsa.PublicKey, error) {
 	c := &s.oidc
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	now := s.now()
 	fresh := c.keys != nil && now.Sub(c.fetchedAt) < jwksTTL
 	if fresh {
 		if k, ok := c.keys[kid]; ok {
+			c.mu.Unlock()
 			return k, nil
 		}
 		if now.Sub(c.fetchedAt) < kidCooldown {
+			c.mu.Unlock()
 			return nil, ErrUnauthorized
 		}
 	}
-	keys, err := s.fetchJWKS(ctx)
-	if err != nil {
-		return nil, err
+	if c.inflight == nil && !c.failedAt.IsZero() && now.Sub(c.failedAt) < failCooldown {
+		c.mu.Unlock()
+		return nil, ErrStoreUnavailable
 	}
-	c.keys, c.fetchedAt = keys, now
-	if k, ok := keys[kid]; ok {
-		return k, nil
+	flight := c.inflight
+	leader := flight == nil
+	if leader {
+		flight = &jwksFlight{done: make(chan struct{})}
+		c.inflight = flight
 	}
-	return nil, ErrUnauthorized
+	c.mu.Unlock()
+
+	if leader {
+		// 한 요청의 취소가 다른 대기자의 조회를 깨지 않도록 요청 컨텍스트와 분리하고 상한 시간만 둔다.
+		fctx, cancel := context.WithTimeout(context.Background(), s.opt.Timeout)
+		keys, err := s.fetchJWKS(fctx)
+		cancel()
+		c.mu.Lock()
+		if err == nil {
+			c.keys, c.fetchedAt, c.failedAt = keys, s.now(), time.Time{}
+		} else {
+			c.failedAt = s.now()
+		}
+		c.inflight = nil
+		flight.err = err
+		close(flight.done)
+		c.mu.Unlock()
+	} else {
+		select {
+		case <-flight.done:
+		case <-ctx.Done():
+			return nil, ErrStoreUnavailable
+		}
+	}
+	if flight.err != nil {
+		return nil, flight.err
+	}
+	c.mu.Lock()
+	k, ok := c.keys[kid]
+	c.mu.Unlock()
+	if !ok {
+		return nil, ErrUnauthorized
+	}
+	return k, nil
 }
 
 func (s *Service) fetchJWKS(ctx context.Context) (map[string]*rsa.PublicKey, error) {

@@ -445,12 +445,15 @@ func main() {
 	locationLogH.SetBenefits(benefitGuard)
 	subscriptionSvc := service.NewSubscription(subRepo, service.SubscriptionOptions{
 		Verifier: storeSvc, Notifier: storeSvc, Policy: subPolicy, AllowSandbox: cfg.SubscriptionAllowSandbox, Logger: logger,
+		AccountTokenSecret: cfg.SubscriptionAccountTokenSecret,
 		Plans: service.SubscriptionPlanMap{
 			AppleMonthProductID: cfg.SubscriptionAppleMonthProductID, AppleYearProductID: cfg.SubscriptionAppleYearProductID,
 			GoogleMonthBasePlan: cfg.SubscriptionGoogleMonthBasePlan, GoogleYearBasePlan: cfg.SubscriptionGoogleYearBasePlan,
 		},
 	})
 	subscriptionH := handler.NewSubscription(subscriptionSvc)
+	subscriptionH.SetVerifyGuard(service.NewSubscriptionVerifyGuard(cacheStore, cfg.SubscriptionVerifyLimitPerMember,
+		cfg.SubscriptionVerifyLimitPerIP, time.Duration(cfg.SubscriptionVerifyWindowSeconds)*time.Second, logger), cfg.TrustedClientIPHeader)
 	// 구독 me·verify 는 새 경로라 ROUTE_AUTH_MODE와 무관하게 무토큰이면 401(enforce 고정, scope=subscription).
 	subscriptionAuth, err := middleware.NewRouteAuth(middleware.RouteAuthOptions{
 		Revocation:      accessRevocation,
@@ -527,6 +530,14 @@ func main() {
 
 		Subscription:     subscriptionH,
 		SubscriptionAuth: subscriptionAuth.Required(),
+		// 알림 두 경로의 IP당 분당 한도. Redis 장애 시에는 통과시킨다(IPLimit 정책) — 서명·OIDC 검증이 본 방어이고, 장애 중에 환불·해지 알림을 막지 않기 위해서다.
+		SubscriptionNotifyLimit: func(kind string) gin.HandlerFunc {
+			return middleware.IPLimit(middleware.IPLimitOptions{
+				Name: "subscription_notify_" + kind, Store: cacheStore,
+				Limit: cfg.SubscriptionNotifyLimitPerIPPerMinute, Window: time.Minute,
+				TrustedHeader: cfg.TrustedClientIPHeader, Logger: logger,
+			})
+		},
 
 		CheckLimit: func(kind string) gin.HandlerFunc {
 			return middleware.IPLimit(middleware.IPLimitOptions{

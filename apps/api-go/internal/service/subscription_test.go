@@ -357,7 +357,7 @@ func TestNotificationVariants(t *testing.T) {
 	if _, err := e.svc.HandleGoogleNotification(ctx, "", nil); !errors.Is(err, ErrSubStoreDown) {
 		t.Fatal(err)
 	}
-	// 테스트/무시/미연결
+	// 테스트/무시/미연결(미연결 거래는 소유자 없는 행으로 기록된다 — H-1)
 	e.st.AppleN = func(string) (*store.Notification, error) { return &store.Notification{IsTest: true, Ignore: true}, nil }
 	if r, err := e.svc.HandleAppleNotification(ctx, "p"); err != nil || r.Applied {
 		t.Fatal(err)
@@ -365,7 +365,7 @@ func TestNotificationVariants(t *testing.T) {
 	e.st.AppleN = func(string) (*store.Notification, error) {
 		return notif(appleV("nobody", t0.AddDate(0, 1, 0), store.StateActive), "n"), nil
 	}
-	if r, err := e.svc.HandleAppleNotification(ctx, "p"); err != nil || r.Reason != "unlinked" || e.repo.RowCount() != 0 {
+	if r, err := e.svc.HandleAppleNotification(ctx, "p"); err != nil || r.Reason != "recorded_unowned" || e.repo.RowCount() != 1 {
 		t.Fatalf("%v %+v", err, r)
 	}
 	// Google 재가입: 이전 토큰이 연결된 회원에게 새 토큰을 이어 붙인다

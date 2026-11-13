@@ -180,6 +180,15 @@ type Config struct {
 	// 만료된 프리미엄 회원의 mt_level(5→2) 보정 주기(초). 0(기본)이면 끈다 — 켜면 만료 상태로 남은 기존 유료 회원의 표시 등급이
 	// 일괄로 2가 된다. 꺼져 있어도 구독 검증·알림·/subscriptions/me 때 해당 회원은 보정된다.
 	SubscriptionLapseSyncIntervalSeconds int `envconfig:"SUBSCRIPTION_LAPSE_SYNC_INTERVAL_SECONDS" default:"0"`
+	// 구매를 회원 계정에 묶는 토큰(M-1)의 HMAC 비밀. 비면 /subscriptions/me 가 account_token 을 내려주지 않고(앱은 토큰을 넣지 않음)
+	// 증빙의 계정 토큰 대조도 하지 않는다. JWT_SECRET_KEY 에서 파생하지 않는다(키 용도 분리). 설정하면 32자 이상.
+	SubscriptionAccountTokenSecret string `envconfig:"SUBSCRIPTION_ACCOUNT_TOKEN_SECRET" default:""`
+	// /subscriptions/verify 호출 한도(L-1): 회원별·IP별, 고정 창. 정상 사용(구매 직후 + 앱 실행 시 확인)은 시간당 한 자릿수다.
+	SubscriptionVerifyLimitPerMember int `envconfig:"SUBSCRIPTION_VERIFY_LIMIT_PER_MEMBER" default:"30"`
+	SubscriptionVerifyLimitPerIP     int `envconfig:"SUBSCRIPTION_VERIFY_LIMIT_PER_IP" default:"300"`
+	SubscriptionVerifyWindowSeconds  int `envconfig:"SUBSCRIPTION_VERIFY_WINDOW_SECONDS" default:"3600"`
+	// 스토어 알림 두 경로의 IP당 분당 한도(L-1). 스토어가 보내는 정상 트래픽(재시도 포함)보다 한참 크게 둔다. 초과하면 429(스토어가 재시도).
+	SubscriptionNotifyLimitPerIPPerMinute int `envconfig:"SUBSCRIPTION_NOTIFY_LIMIT_PER_IP_PER_MINUTE" default:"600"`
 	// 스토어 검증 설정(internal/subscription/store.Config와 1:1). 값은 로그에 남기지 않는다. 비어 있으면 해당 스토어 경로는 503.
 	AppleBundleID                  string `envconfig:"APPLE_BUNDLE_ID" default:""`
 	AppleRootCAPath                string `envconfig:"APPLE_ROOT_CA_PATH" default:""`

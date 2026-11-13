@@ -10,6 +10,7 @@ import (
 
 	"github.com/bluemusk/smap_next_go/internal/dto"
 	"github.com/bluemusk/smap_next_go/internal/middleware"
+	"github.com/bluemusk/smap_next_go/internal/netutil"
 	"github.com/bluemusk/smap_next_go/internal/repository"
 	"github.com/bluemusk/smap_next_go/internal/service"
 )
@@ -35,10 +36,18 @@ const (
 // 두 알림 경로는 인증 미들웨어 밖이며 서명·발신자 검증(NotificationVerifier)으로 보호한다.
 type SubscriptionHandler struct {
 	svc *service.SubscriptionService
+	// verifyGuard: verify 호출 한도(회원별+IP별). nil 이면 verify 는 503(fail-closed)이다 — 배선 누락이 무제한 호출이 되지 않게.
+	verifyGuard  *service.SubscriptionVerifyGuard
+	trustedIPHdr string
 }
 
 func NewSubscription(svc *service.SubscriptionService) *SubscriptionHandler {
 	return &SubscriptionHandler{svc: svc}
+}
+
+// SetVerifyGuard는 verify 호출 한도와 IP 판정에 쓸 신뢰 헤더 이름(TRUSTED_CLIENT_IP_HEADER)을 주입한다.
+func (h *SubscriptionHandler) SetVerifyGuard(g *service.SubscriptionVerifyGuard, trustedClientIPHeader string) {
+	h.verifyGuard, h.trustedIPHdr = g, trustedClientIPHeader
 }
 
 func subUnauthorized(c *gin.Context) {
@@ -98,6 +107,11 @@ func (h *SubscriptionHandler) Verify(c *gin.Context) {
 	uid, ok := middleware.UserID(c)
 	if !ok {
 		subUnauthorized(c)
+		return
+	}
+	// 본문을 읽기 전에 한도를 먼저 센다(거부된 호출이 파싱·스토어 호출 비용을 쓰지 않게).
+	if rej := h.verifyGuard.Check(c.Request.Context(), uid, netutil.ClientIP(c.Request, h.trustedIPHdr)); rej != nil {
+		writeAuthRejection(c, rej)
 		return
 	}
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxVerifyBodyBytes)

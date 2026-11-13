@@ -68,6 +68,10 @@ func NewSubscription(db *gorm.DB) *SubscriptionRepository { return &Subscription
 
 // SubscriptionTxOps는 회원 행을 잠근 트랜잭션 안에서 쓰는 작업이다(서비스 단위 테스트에서 가짜로 대체한다).
 type SubscriptionTxOps interface {
+	// ForMember는 같은 트랜잭션에서 다른 회원(이전 소유자 등)을 대상으로 하는 작업 집합을 돌려준다.
+	ForMember(mtIdx int) SubscriptionTxOps
+	// LockMember는 대상 회원 행을 FOR UPDATE 로 잠그고 읽는다. 회원이 없으면 ErrMemberNotFound.
+	LockMember() (*model.SubscriptionMemberPlan, error)
 	FindByHash(platform, hash string) (*model.SubscriptionTransaction, error)
 	ListByMember() ([]model.SubscriptionTransaction, error)
 	Insert(row *model.SubscriptionTransaction) error
@@ -114,17 +118,41 @@ func planFromDB(p *model.SubscriptionMemberPlan) {
 // 같은 회원의 동시 갱신을 직렬화한다. 회원이 없으면 ErrMemberNotFound.
 func (r *SubscriptionRepository) WithMemberLock(ctx context.Context, mtIdx int, fn func(tx SubscriptionTxOps, member *model.SubscriptionMemberPlan) error) error {
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var m model.SubscriptionMemberPlan
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("mt_idx = ?", mtIdx).Take(&m).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return ErrMemberNotFound
-			}
-			return classifySubscriptionErr(err)
+		ops := &SubscriptionTx{tx: tx, mt: mtIdx}
+		m, err := ops.LockMember()
+		if err != nil {
+			return err
 		}
-		planFromDB(&m)
-		return fn(&SubscriptionTx{tx: tx, mt: mtIdx}, &m)
+		return fn(ops, m)
 	})
 	return classifySubscriptionErr(err)
+}
+
+// WithTx는 회원 행을 잠그지 않는 트랜잭션에서 fn을 실행한다(소유 회원이 없는 거래 행의 기록·갱신용).
+// 같은 거래를 동시에 처음 기록하면 유니크 키 위반(ErrDuplicateKey)·교착(ErrRetryableTx)이 날 수 있으니 호출자가 다시 시도한다.
+func (r *SubscriptionRepository) WithTx(ctx context.Context, fn func(tx SubscriptionTxOps) error) error {
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return fn(&SubscriptionTx{tx: tx, mt: model.UnownedMtIdx})
+	})
+	return classifySubscriptionErr(err)
+}
+
+// ForMember는 같은 트랜잭션을 다른 회원 기준으로 쓰는 작업 집합이다.
+func (t *SubscriptionTx) ForMember(mtIdx int) SubscriptionTxOps {
+	return &SubscriptionTx{tx: t.tx, mt: mtIdx}
+}
+
+// LockMember는 이 작업 집합의 회원 행을 FOR UPDATE로 잠그고 읽는다.
+func (t *SubscriptionTx) LockMember() (*model.SubscriptionMemberPlan, error) {
+	var m model.SubscriptionMemberPlan
+	if err := t.tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("mt_idx = ?", t.mt).Take(&m).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrMemberNotFound
+		}
+		return nil, classifySubscriptionErr(err)
+	}
+	planFromDB(&m)
+	return &m, nil
 }
 
 var _ SubscriptionTxOps = (*SubscriptionTx)(nil)
@@ -176,6 +204,9 @@ func (t *SubscriptionTx) Save(row *model.SubscriptionTransaction) error {
 
 // UpdateMemberPlan은 회원의 구독 표시 컬럼을 갱신한다. level이 nil이면 mt_level은 건드리지 않는다.
 func (t *SubscriptionTx) UpdateMemberPlan(planDate time.Time, planCheck string, level *int) error {
+	if t.mt <= 0 {
+		return errors.New("subscription: 소유 회원이 없는 작업 집합에는 회원 컬럼을 쓸 수 없음")
+	}
 	fields := map[string]interface{}{"mt_plan_date": dbWall(planDate), "mt_plan_check": planCheck}
 	if level != nil {
 		fields["mt_level"] = *level

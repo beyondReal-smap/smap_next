@@ -2,10 +2,12 @@ package service
 
 import (
 	"context"
+	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"log/slog"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -50,6 +52,7 @@ type SubscriptionPlanMap struct {
 type subscriptionRepo interface {
 	BenefitStore
 	WithMemberLock(ctx context.Context, mtIdx int, fn func(tx repository.SubscriptionTxOps, member *model.SubscriptionMemberPlan) error) error
+	WithTx(ctx context.Context, fn func(tx repository.SubscriptionTxOps) error) error
 	FindByHash(ctx context.Context, platform, hash string) (*model.SubscriptionTransaction, error)
 	ListByMember(ctx context.Context, mtIdx int) ([]model.SubscriptionTransaction, error)
 	SyncMemberLevel(ctx context.Context, mtIdx, want int) (bool, error)
@@ -64,6 +67,7 @@ type SubscriptionService struct {
 	policy   SubscriptionPolicy
 	plans    SubscriptionPlanMap
 	allowSB  bool
+	acctKey  []byte // 계정 토큰 HMAC 비밀(비면 account_token 기능 꺼짐)
 	now      func() time.Time
 	logger   *slog.Logger
 	lastWarn atomic.Int64 // 테이블 없음 경고 로그 스팸 방지(분당 1회)
@@ -76,7 +80,9 @@ type SubscriptionOptions struct {
 	Policy       SubscriptionPolicy
 	Plans        SubscriptionPlanMap
 	AllowSandbox bool
-	Logger       *slog.Logger
+	// AccountTokenSecret: 회원별 계정 토큰(HMAC) 비밀. 비면 /subscriptions/me 가 account_token 을 내려주지 않고 증빙 대조도 하지 않는다.
+	AccountTokenSecret string
+	Logger             *slog.Logger
 }
 
 func NewSubscription(repo subscriptionRepo, opt SubscriptionOptions) *SubscriptionService {
@@ -85,11 +91,27 @@ func NewSubscription(repo subscriptionRepo, opt SubscriptionOptions) *Subscripti
 		lg = slog.Default()
 	}
 	return &SubscriptionService{repo: repo, verifier: opt.Verifier, notifier: opt.Notifier, policy: opt.Policy,
-		plans: opt.Plans, allowSB: opt.AllowSandbox, now: time.Now, logger: lg}
+		plans: opt.Plans, allowSB: opt.AllowSandbox, acctKey: []byte(opt.AccountTokenSecret), now: time.Now, logger: lg}
 }
 
 // SetClock은 테스트용 시계 주입이다.
 func (s *SubscriptionService) SetClock(now func() time.Time) { s.now = now }
+
+// AccountToken은 회원에 묶는 계정 토큰이다: HMAC-SHA256(비밀, 회원번호)의 앞 16바이트를 UUID(v4 형식 비트) 문자열로 만든다.
+// 서버 비밀 없이는 만들 수 없어 다른 회원이 추측해 넣을 수 없고, Apple appAccountToken(UUID 필수)·Google obfuscatedExternalAccountId 둘 다에 쓸 수 있다.
+// 비밀이 없으면 빈 문자열.
+func (s *SubscriptionService) AccountToken(mtIdx int) string {
+	if len(s.acctKey) == 0 || mtIdx <= 0 {
+		return ""
+	}
+	m := hmac.New(sha256.New, s.acctKey)
+	m.Write([]byte("smap-subscription-account-token:v1:" + strconv.Itoa(mtIdx)))
+	b := m.Sum(nil)[:16]
+	b[6] = b[6]&0x0f | 0x40
+	b[8] = b[8]&0x3f | 0x80
+	h := hex.EncodeToString(b)
+	return h[0:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:32]
+}
 
 func storeHash(key string) string {
 	sum := sha256.Sum256([]byte(key))
@@ -189,7 +211,9 @@ func (s *SubscriptionService) Status(ctx context.Context, mtIdx int) (*dto.Subsc
 	if err != nil {
 		return nil, s.mapDBErr(err, "status")
 	}
-	return s.buildStatus(ctx, member, rows), nil
+	st := s.buildStatus(ctx, member, rows)
+	st.AccountToken = s.AccountToken(mtIdx)
+	return st, nil
 }
 
 func (s *SubscriptionService) buildStatus(ctx context.Context, member *model.SubscriptionMemberPlan, rows []model.SubscriptionTransaction) *dto.SubscriptionStatus {
@@ -305,6 +329,15 @@ func (s *SubscriptionService) Verify(ctx context.Context, mtIdx int, req dto.Sub
 		return nil, err
 	}
 
+	// M-1: 증빙에 계정 토큰이 들어 있으면 요청 회원용으로 서버가 만든 값과 같아야 한다(다른 계정용으로 산 구매를 가져와 쓰지 못하게).
+	// 현재 앱은 토큰을 넣지 않으므로(빈 값) 기존 흐름은 영향이 없다. 서버 비밀이 없으면 대조할 기준이 없어 건너뛴다.
+	if v.AppAccountToken != "" {
+		if want := s.AccountToken(mtIdx); want != "" && !strings.EqualFold(strings.TrimSpace(v.AppAccountToken), want) {
+			s.logger.Warn("subscription_account_token_mismatch", slog.String("platform", platform))
+			return nil, ErrSubOwnedByOther
+		}
+	}
+
 	outcome, err := s.apply(ctx, mtIdx, v, applyOptions{})
 	if err != nil {
 		return nil, err
@@ -333,6 +366,9 @@ type applyOutcome struct {
 
 const applyMaxAttempts = 3
 
+// errRowClaimed는 소유자 없는 거래 행을 기록하려는 사이 다른 회원이 그 행을 차지했음을 뜻한다(알림 경로가 소유자를 다시 찾아 재시도).
+var errRowClaimed = errors.New("subscription: row claimed meanwhile")
+
 // apply는 검증된 거래를 회원에 연결하고 최신 상태를 반영한다(멱등). 한 회원 행을 잠근 트랜잭션에서 실행한다.
 // 처음 기록하는 거래를 두 요청이 동시에 넣으면 유니크 키 위반이 나는데, 그때는 트랜잭션을 다시 실행해
 // 이번에는 이미 있는 행을 보고 판정한다(같은 회원이면 멱등 갱신, 다른 회원이면 409).
@@ -352,16 +388,99 @@ func (s *SubscriptionService) apply(ctx context.Context, mtIdx int, v *store.Ver
 		}
 		break
 	}
+	return out, s.classifyApplyErr(err)
+}
+
+func (s *SubscriptionService) classifyApplyErr(err error) error {
 	switch {
 	case errors.Is(err, ErrSubOwnedByOther):
-		return out, ErrSubOwnedByOther
+		return ErrSubOwnedByOther
 	case errors.Is(err, repository.ErrDuplicateKey), errors.Is(err, repository.ErrRetryableTx):
 		s.logger.Warn("subscription_apply_contention", slog.Int("attempts", applyMaxAttempts))
-		return out, ErrSubBusy
+		return ErrSubBusy
 	case errors.Is(err, repository.ErrMemberNotFound):
-		return out, err
+		return err
 	}
-	return out, s.mapDBErr(err, "apply")
+	return s.mapDBErr(err, "apply")
+}
+
+// ownerTransferable은 이미 다른 회원에게 연결된 거래를 요청 회원이 이어받을 수 있는지 판정한다.
+// 소유 회원이 탈퇴(mt_level=1)·정지(mt_status=2)·비노출(mt_show='N')이거나 회원 행이 사라졌으면 true(13단계 차단 기준과 같다).
+// 소유자 행을 잠가 읽는다(요청 회원 잠금 뒤에 잡으므로 순서는 항상 요청자 → 이전 소유자).
+func ownerTransferable(tx repository.SubscriptionTxOps, owner int) (*model.SubscriptionMemberPlan, bool, error) {
+	om, err := tx.ForMember(owner).LockMember()
+	if errors.Is(err, repository.ErrMemberNotFound) {
+		return nil, true, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	return om, model.IsBlockedMember(om.MtLevel, om.MtStatus, om.MtShow), nil
+}
+
+// normalizedExpiry는 권한이 없는 상태(환불·취소·만료·보류)면 만료 시각을 현재로 당긴다(즉시 권한 종료).
+func normalizedExpiry(v *store.Verified, now time.Time) time.Time {
+	expires := truncSec(v.ExpiresAt)
+	if !entitledState(v.State) && expires.After(now) {
+		return truncSec(now)
+	}
+	return expires
+}
+
+// newRowFrom은 검증된 거래로 새 거래 행을 만든다(mtIdx 가 UnownedMtIdx 면 소유자 없는 행).
+func newRowFrom(mtIdx int, platform, hash, plan string, v *store.Verified, expires, eventAt, now time.Time, notified bool) *model.SubscriptionTransaction {
+	var ar *bool
+	if v.AutoRenewKnown {
+		b := v.AutoRenew
+		ar = &b
+	} else if !entitledState(v.State) {
+		b := false
+		ar = &b
+	}
+	row := &model.SubscriptionTransaction{
+		MtIdx: mtIdx, Platform: platform, StoreIDHash: hash, ProductID: v.ProductID, Plan: plan,
+		ExpiresAt: expires, Status: string(v.State), Environment: v.Environment, AutoRenew: ar,
+		InGracePeriod: v.State == store.StateGrace, StoreUpdatedAt: eventAt, UpdatedAt: truncSec(now),
+	}
+	if notified {
+		t := truncSec(now)
+		row.LastNotificationAt = &t
+	}
+	return row
+}
+
+// refreshRow는 기존 거래 행에 더 최신인 스토어 상태를 반영한다. 오래된 증빙·알림(stale)이거나, 같은 시각에 환불·회수를
+// 되살리려는 경우는 건드리지 않는다. 행을 바꿨으면 true.
+func refreshRow(row *model.SubscriptionTransaction, v *store.Verified, plan string, expires, eventAt, now time.Time, notified bool) bool {
+	stale := eventAt.Before(truncSec(row.StoreUpdatedAt))
+	// 같은 시각이면 이미 기록된 환불·회수를 늦게 도착한 권한 있는 상태가 되살리지 못하게 한다.
+	sameTimeResurrect := eventAt.Equal(truncSec(row.StoreUpdatedAt)) && entitledState(v.State) &&
+		(store.State(row.Status) == store.StateRefunded || store.State(row.Status) == store.StateRevoked)
+	if stale || sameTimeResurrect {
+		return false
+	}
+	prevExpiry := row.ExpiresAt
+	row.ProductID, row.Plan, row.Environment = v.ProductID, plan, v.Environment
+	row.ExpiresAt, row.Status, row.InGracePeriod = expires, string(v.State), v.State == store.StateGrace
+	switch {
+	case v.AutoRenewKnown:
+		b := v.AutoRenew
+		row.AutoRenew = &b
+	case !entitledState(v.State):
+		b := false
+		row.AutoRenew = &b
+	case expires.After(truncSec(prevExpiry)):
+		row.AutoRenew = nil // 갱신됨: 이전 주기의 해지 표시는 더 이상 유효하지 않고 새 값은 알 수 없다
+	case row.AutoRenew != nil && !*row.AutoRenew && store.State(row.Status) == store.StateActive:
+		row.Status = string(store.StateCanceled) // 이전에 해지 예약을 알았다면 활성이어도 해지 예약 상태를 유지
+	}
+	row.StoreUpdatedAt = eventAt
+	row.UpdatedAt = truncSec(now)
+	if notified {
+		t := truncSec(now)
+		row.LastNotificationAt = &t
+	}
+	return true
 }
 
 func (s *SubscriptionService) applyLocked(tx repository.SubscriptionTxOps, member *model.SubscriptionMemberPlan, mtIdx int,
@@ -378,18 +497,74 @@ func (s *SubscriptionService) applyLocked(tx repository.SubscriptionTxOps, membe
 	if err != nil {
 		return err
 	}
-	if row != nil && row.MtIdx != mtIdx {
-		return ErrSubOwnedByOther
+
+	eventAt := truncSec(v.LatestEventAt)
+	if v.LatestEventAt.IsZero() {
+		eventAt = truncSec(now)
+	}
+
+	// --- 소유권 판정 ---
+	// transferFrom: 이전 소유자(차단·탈퇴 회원)로부터 이어받는 경우. claimUnowned: 알림이 먼저 기록해 둔 소유자 없는 행을 차지하는 경우.
+	var transferFrom *model.SubscriptionMemberPlan
+	transferring, claimUnowned := false, false
+	oldOwner := 0
+	switch {
+	case row == nil || row.MtIdx == mtIdx:
+	case row.MtIdx == model.UnownedMtIdx:
+		if opt.notified {
+			return errRowClaimed // 알림 경로는 소유자가 있는 쪽으로만 흘러야 한다(호출자가 다시 판단)
+		}
+		claimUnowned = true
+	default: // 다른 회원 소유
+		if opt.notified {
+			return ErrSubOwnedByOther
+		}
+		om, ok, err := ownerTransferable(tx, row.MtIdx)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return ErrSubOwnedByOther
+		}
+		transferring, transferFrom, oldOwner = true, om, row.MtIdx
 	}
 	if v.LinkedTransactionKey != "" {
 		linked, err := tx.FindByHash(platform, storeHash(v.LinkedTransactionKey))
 		if err != nil {
 			return err
 		}
-		if linked != nil && linked.MtIdx != mtIdx {
-			return ErrSubOwnedByOther
+		if linked != nil && linked.MtIdx != mtIdx && linked.MtIdx != model.UnownedMtIdx {
+			if _, ok, err := ownerTransferable(tx, linked.MtIdx); err != nil {
+				return err
+			} else if !ok {
+				return ErrSubOwnedByOther
+			}
 		}
 	}
+
+	// --- verify 경로의 거부 판정 ---
+	// 권한이 없는 상태(만료·환불·보류)인 새 거래·남의 거래·소유자 없는 거래는 기록하지 않고 거부한다.
+	// 이미 이 회원에 연결된 거래는 상태를 기록한 뒤 거부한다.
+	if !opt.notified && !entitledState(v.State) {
+		out.rejected = true
+		if row == nil || row.MtIdx != mtIdx {
+			return nil
+		}
+	}
+	if claimUnowned || transferring {
+		// 환불·회수로 기록된 거래(묘비)는 어떤 증빙으로도 소유자를 만들지 않는다. 알림이 증빙보다 최신인데
+		// 이미 권한이 없는 상태여도(만료·보류 등) 차지하지 않고 거부한다 — 오래된 JWS 가 해지·만료된 거래를 되살리지 못하게 한다.
+		st := store.State(row.Status)
+		if st == store.StateRefunded || st == store.StateRevoked {
+			out.rejected = true
+			return nil
+		}
+		if eventAt.Before(truncSec(row.StoreUpdatedAt)) && !entitled(row, now) {
+			out.rejected = true
+			return nil
+		}
+	}
+
 	prior, err := tx.ListByMember()
 	if err != nil {
 		return err
@@ -399,86 +574,72 @@ func (s *SubscriptionService) applyLocked(tx repository.SubscriptionTxOps, membe
 		priorDates[truncSec(prior[i].ExpiresAt)] = true
 	}
 
-	eventAt := truncSec(v.LatestEventAt)
-	if v.LatestEventAt.IsZero() {
-		eventAt = truncSec(now)
-	}
-
-	// verify 경로에서 권한이 없는 상태(만료·환불·보류)인 새 거래는 기록하지 않고 거부한다. 이미 연결된 거래는 상태를 기록한 뒤 거부한다.
-	if !opt.notified && !entitledState(v.State) {
-		out.rejected = true
-		if row == nil {
-			return nil
-		}
-	}
-
-	expires := truncSec(v.ExpiresAt)
-	if !entitledState(v.State) && expires.After(now) {
-		expires = truncSec(now) // 환불·취소·만료·보류는 즉시 권한 종료(만료일을 현재로 당긴다)
-	}
-	inGrace := v.State == store.StateGrace
+	expires := normalizedExpiry(v, now)
 
 	if row == nil {
-		var ar *bool
-		if v.AutoRenewKnown {
-			b := v.AutoRenew
-			ar = &b
-		} else if !entitledState(v.State) {
-			b := false
-			ar = &b
-		}
-		row = &model.SubscriptionTransaction{
-			MtIdx: mtIdx, Platform: platform, StoreIDHash: hash, ProductID: v.ProductID, Plan: plan,
-			ExpiresAt: expires, Status: string(v.State), Environment: v.Environment, AutoRenew: ar,
-			InGracePeriod: inGrace, StoreUpdatedAt: eventAt, UpdatedAt: truncSec(now),
-		}
-		if opt.notified {
-			t := truncSec(now)
-			row.LastNotificationAt = &t
-		}
+		row = newRowFrom(mtIdx, platform, hash, plan, v, expires, eventAt, now, opt.notified)
 		if err := tx.Insert(row); err != nil {
 			return err
 		}
 		prior = append(prior, *row)
 	} else {
-		stale := eventAt.Before(truncSec(row.StoreUpdatedAt))
-		// 같은 시각이면 이미 기록된 환불·회수를 늦게 도착한 권한 있는 상태가 되살리지 못하게 한다.
-		sameTimeResurrect := eventAt.Equal(truncSec(row.StoreUpdatedAt)) && entitledState(v.State) &&
-			(store.State(row.Status) == store.StateRefunded || store.State(row.Status) == store.StateRevoked)
-		if !stale && !sameTimeResurrect {
-			prevExpiry := row.ExpiresAt
-			row.ProductID, row.Plan, row.Environment = v.ProductID, plan, v.Environment
-			row.ExpiresAt, row.Status, row.InGracePeriod = expires, string(v.State), inGrace
-			switch {
-			case v.AutoRenewKnown:
-				b := v.AutoRenew
-				row.AutoRenew = &b
-			case !entitledState(v.State):
-				b := false
-				row.AutoRenew = &b
-			case expires.After(truncSec(prevExpiry)):
-				row.AutoRenew = nil // 갱신됨: 이전 주기의 해지 표시는 더 이상 유효하지 않고 새 값은 알 수 없다
-			case row.AutoRenew != nil && !*row.AutoRenew && store.State(row.Status) == store.StateActive:
-				row.Status = string(store.StateCanceled) // 이전에 해지 예약을 알았다면 활성이어도 해지 예약 상태를 유지
-			}
-			row.StoreUpdatedAt = eventAt
+		prevExpiry := row.ExpiresAt
+		if claimUnowned || transferring {
+			row.MtIdx = mtIdx
+		}
+		changed := refreshRow(row, v, plan, expires, eventAt, now, opt.notified)
+		if !changed && (claimUnowned || transferring) {
 			row.UpdatedAt = truncSec(now)
-			if opt.notified {
-				t := truncSec(now)
-				row.LastNotificationAt = &t
-			}
+		}
+		if changed || claimUnowned || transferring {
 			if err := tx.Save(row); err != nil {
 				return err
 			}
-			for i := range prior {
-				if prior[i].ID == row.ID {
-					prior[i] = *row
-				}
+		}
+		found := false
+		for i := range prior {
+			if prior[i].ID == row.ID {
+				prior[i] = *row
+				found = true
+			}
+		}
+		if !found {
+			prior = append(prior, *row)
+		}
+		if transferring {
+			if err := s.releaseFromPreviousOwner(tx, oldOwner, transferFrom, prevExpiry, now); err != nil {
+				return err
 			}
 		}
 	}
 
 	return s.syncMember(tx, member, prior, priorDates, now)
+}
+
+// releaseFromPreviousOwner는 거래를 새 회원에게 넘긴 뒤 이전 소유자의 구독 표시 컬럼(mt_plan_date/mt_plan_check/mt_level)을
+// 그의 남은 거래만으로 다시 계산한다. 넘긴 거래의 만료일을 "거래로 만든 값"으로 보고(priorDates 에 포함) 기존 이용권(legacy)으로
+// 오인해 남겨 두지 않는다 — 그러지 않으면 이전 소유자(예: 정지 후 복구될 회원)가 같은 구독의 혜택을 계속 갖는다.
+// 이전 소유자의 회원 행이 사라졌으면(nil) 할 일이 없다.
+func (s *SubscriptionService) releaseFromPreviousOwner(tx repository.SubscriptionTxOps, oldOwner int, oldMember *model.SubscriptionMemberPlan,
+	movedExpiry time.Time, now time.Time) error {
+	if oldMember == nil {
+		return nil
+	}
+	ot := tx.ForMember(oldOwner)
+	rows, err := ot.ListByMember() // 이미 새 소유자로 저장된 행은 빠져 있다
+	if err != nil {
+		return err
+	}
+	dates := map[time.Time]bool{truncSec(movedExpiry): true}
+	for i := range rows {
+		dates[truncSec(rows[i].ExpiresAt)] = true
+	}
+	// 이전 소유자의 만료일 컬럼이 넘긴 거래에서 온 값이면 비운다(남은 거래가 없을 때 syncMember 가 기존 값을 그대로 유지해 혜택이 남는 것을 막는다).
+	om := *oldMember
+	if om.MtPlanDate != nil && truncSec(*om.MtPlanDate).Equal(truncSec(movedExpiry)) {
+		om.MtPlanDate = nil
+	}
+	return s.syncMember(ot, &om, rows, dates, now)
 }
 
 // syncMember는 회원의 구독 표시 컬럼(mt_plan_date/mt_plan_check/mt_level)을 거래 행들로부터 다시 계산해 반영한다(계약 2·3.5).

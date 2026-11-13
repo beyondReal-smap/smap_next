@@ -26,6 +26,20 @@ func (c *Config) validateSubscription() error {
 	if c.SubscriptionAppleMonthProductID == c.SubscriptionAppleYearProductID || c.SubscriptionGoogleMonthBasePlan == c.SubscriptionGoogleYearBasePlan {
 		return fmt.Errorf("config load: 월간/연간 상품 ID(기본 요금제 ID)가 같을 수 없습니다")
 	}
+	if sec := strings.TrimSpace(c.SubscriptionAccountTokenSecret); sec != "" && len(sec) < 32 {
+		return fmt.Errorf("config load: SUBSCRIPTION_ACCOUNT_TOKEN_SECRET은 비우거나 32자 이상이어야 합니다")
+	}
+	if c.SubscriptionVerifyLimitPerMember < 1 || c.SubscriptionVerifyLimitPerMember > 100000 ||
+		c.SubscriptionVerifyLimitPerIP < 1 || c.SubscriptionVerifyLimitPerIP > 1000000 {
+		return fmt.Errorf("config load: SUBSCRIPTION_VERIFY_LIMIT_PER_MEMBER(1~100000)/SUBSCRIPTION_VERIFY_LIMIT_PER_IP(1~1000000) 범위 오류: %d, %d",
+			c.SubscriptionVerifyLimitPerMember, c.SubscriptionVerifyLimitPerIP)
+	}
+	if c.SubscriptionVerifyWindowSeconds < 1 || c.SubscriptionVerifyWindowSeconds > 86400 {
+		return fmt.Errorf("config load: SUBSCRIPTION_VERIFY_WINDOW_SECONDS는 1~86400이어야 합니다: %d", c.SubscriptionVerifyWindowSeconds)
+	}
+	if c.SubscriptionNotifyLimitPerIPPerMinute < 1 || c.SubscriptionNotifyLimitPerIPPerMinute > 1000000 {
+		return fmt.Errorf("config load: SUBSCRIPTION_NOTIFY_LIMIT_PER_IP_PER_MINUTE는 1~1000000이어야 합니다: %d", c.SubscriptionNotifyLimitPerIPPerMinute)
+	}
 	return nil
 }
 
@@ -99,6 +113,9 @@ func SubscriptionStartupWarnings(cfg *Config, f SubscriptionFacts) []StartupWarn
 		add("subscription_enforcement_off", "SUBSCRIPTION_ENFORCEMENT_ENABLED=false → 무료 회원 제한(내 장소 %d개, 활동 기록 %d일)을 적용하지 않음(막혔을 요청 수만 계측)", cfg.SubscriptionFreeMaxPlaces, cfg.SubscriptionFreeLogDays)
 	} else if !cfg.AppleStoreConfigured() || !cfg.GoogleStoreConfigured() {
 		add("subscription_enforcement_without_store", "SUBSCRIPTION_ENFORCEMENT_ENABLED=true 인데 스토어 설정이 불완전 → 구독할 수 없는 플랫폼의 사용자가 제한만 받음")
+	}
+	if strings.TrimSpace(cfg.SubscriptionAccountTokenSecret) == "" {
+		add("subscription_account_token_secret_empty", "SUBSCRIPTION_ACCOUNT_TOKEN_SECRET 비어 있음 → 구매를 회원 계정에 묶는 account_token 을 내려주지 않고 증빙의 계정 토큰 대조도 하지 않음(다른 계정이 남의 구매 증빙을 가져와 연결하는 공격을 막지 못함)")
 	}
 	if cfg.SubscriptionAllowSandbox {
 		add("subscription_sandbox_allowed", "SUBSCRIPTION_ALLOW_SANDBOX=true → 샌드박스(테스트) 구매도 프리미엄으로 인정됨(App Store 심사 기간 외에는 꺼야 함)")

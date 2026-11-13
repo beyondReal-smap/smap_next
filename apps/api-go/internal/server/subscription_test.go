@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/bluemusk/smap_next_go/internal/auth"
 	"github.com/bluemusk/smap_next_go/internal/handler"
 	"github.com/bluemusk/smap_next_go/internal/middleware"
@@ -27,6 +29,8 @@ type subHTTP struct {
 	st     *fakes.Store
 	places *fakePlaceRepo
 	t      *testing.T
+	// counter: verify 한도·알림 한도가 쓰는 메모리 카운터(fail=true 면 Redis 장애 재현).
+	counter *fakeCounter
 }
 
 type wouldBlockCount struct{ n map[string]int }
@@ -34,6 +38,12 @@ type wouldBlockCount struct{ n map[string]int }
 func (w *wouldBlockCount) WouldBlock(k string) { w.n[k]++ }
 
 func newSubHTTP(t *testing.T, enforce bool, withStore bool) (*subHTTP, *wouldBlockCount) {
+	t.Helper()
+	return newSubHTTPLimits(t, enforce, withStore, 1000, 1000)
+}
+
+// newSubHTTPLimits는 verify 회원별 한도와 알림 IP 분당 한도를 지정해 라우터를 만든다.
+func newSubHTTPLimits(t *testing.T, enforce, withStore bool, verifyPerMember, notifyPerMin int) (*subHTTP, *wouldBlockCount) {
 	t.Helper()
 	cfg := testCfg()
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
@@ -64,6 +74,8 @@ func newSubHTTP(t *testing.T, enforce bool, withStore bool) (*subHTTP, *wouldBlo
 		opt.Verifier, opt.Notifier = st, st
 	}
 	subH := handler.NewSubscription(service.NewSubscription(repo, opt))
+	counter := &fakeCounter{n: map[string]int64{}}
+	subH.SetVerifyGuard(service.NewSubscriptionVerifyGuard(counter, verifyPerMember, 1000, time.Hour, logger), "")
 
 	placeRepo := newFakePlaceRepo()
 	locH := handler.NewLocation(service.NewLocation(placeRepo))
@@ -74,8 +86,12 @@ func newSubHTTP(t *testing.T, enforce bool, withStore bool) (*subHTTP, *wouldBlo
 	logH.SetBenefits(benefits)
 
 	r := New(cfg, logger, Deps{AdminAuth: stubAdmin, UserAuth: routeRA.Required(), UserAuthOpt: routeRA.Optional(), LocationAuth: routeRA.Required(),
-		Location: locH, LocationLog: logH, Subscription: subH, SubscriptionAuth: subRA.Required()})
-	return &subHTTP{r, repo, st, placeRepo, t}, meter
+		Location: locH, LocationLog: logH, Subscription: subH, SubscriptionAuth: subRA.Required(),
+		SubscriptionNotifyLimit: func(kind string) gin.HandlerFunc {
+			return middleware.IPLimit(middleware.IPLimitOptions{Name: "subscription_notify_" + kind, Store: counter, Limit: notifyPerMin,
+				Window: time.Minute, Logger: logger})
+		}})
+	return &subHTTP{r, repo, st, placeRepo, t, counter}, meter
 }
 
 func ptr(v int) *int { return &v }
@@ -269,4 +285,49 @@ func TestEnforcementPlacesAndLogs(t *testing.T) {
 		}
 	}
 	_ = context.Background()
+}
+
+// L-1: verify 는 회원별 한도를 넘으면 429 + Retry-After, Redis 장애면 fail-closed 503. 다른 회원은 영향받지 않는다.
+func TestSubscriptionVerifyRateLimit(t *testing.T) {
+	e, _ := newSubHTTPLimits(t, false, true, 2, 1000)
+	e.st.Apple = func(string) (*store.Verified, error) { return nil, store.ErrInvalidProof }
+	body := `{"platform":"ios","signed_transaction":"x"}`
+	for i := 0; i < 2; i++ {
+		if w := e.do("POST", "/subscriptions/verify", gMember, body); w.Code != 400 {
+			t.Fatalf("한도 이내 %d: %d", i, w.Code)
+		}
+	}
+	w := e.do("POST", "/subscriptions/verify", gMember, body)
+	if w.Code != 429 || w.Header().Get("Retry-After") == "" {
+		t.Fatalf("한도 초과 %d %v", w.Code, w.Header())
+	}
+	if w := e.do("POST", "/subscriptions/verify", gOwner, body); w.Code != 400 {
+		t.Fatalf("다른 회원은 영향받으면 안 됨: %d", w.Code)
+	}
+	e.counter.fail = true
+	if w := e.do("POST", "/subscriptions/verify", gLeader, body); w.Code != 503 {
+		t.Fatalf("Redis 장애는 fail-closed 503: %d", w.Code)
+	}
+}
+
+// L-1: 알림 두 경로는 IP당 한도를 넘으면 429(스토어가 재시도). Redis 장애면 알림을 막지 않는다(fail-open).
+func TestSubscriptionNotifyRateLimit(t *testing.T) {
+	e, _ := newSubHTTPLimits(t, false, true, 1000, 2)
+	e.st.AppleN = func(string) (*store.Notification, error) { return &store.Notification{IsTest: true}, nil }
+	for i := 0; i < 2; i++ {
+		if w := e.do("POST", "/subscriptions/apple/notifications", 0, `{"signedPayload":"x"}`); w.Code != 200 {
+			t.Fatalf("한도 이내 %d: %d", i, w.Code)
+		}
+	}
+	if w := e.do("POST", "/subscriptions/apple/notifications", 0, `{"signedPayload":"x"}`); w.Code != 429 {
+		t.Fatalf("한도 초과: %d", w.Code)
+	}
+	// 구글 경로는 별도 카운터
+	if w := e.do("POST", "/subscriptions/google/notifications", 0, `{}`); w.Code == 429 {
+		t.Fatalf("경로별 카운터가 분리돼야 함")
+	}
+	e.counter.fail = true
+	if w := e.do("POST", "/subscriptions/apple/notifications", 0, `{"signedPayload":"x"}`); w.Code != 200 {
+		t.Fatalf("Redis 장애에도 알림은 통과: %d", w.Code)
+	}
 }

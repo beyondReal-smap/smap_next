@@ -48,6 +48,8 @@ type Deps struct {
 	// 비어 있어도 핸들러가 신원이 없으면 401 이라 열리지 않는다. 알림 두 경로는 인증 밖이며 자체 서명·발신자 검증으로 보호한다.
 	Subscription     *handler.SubscriptionHandler
 	SubscriptionAuth gin.HandlerFunc
+	// SubscriptionNotifyLimit은 알림 두 경로("apple"/"google")에 붙는 IP당 한도 미들웨어를 만든다. nil이면 한도 없음(테스트용).
+	SubscriptionNotifyLimit func(kind string) gin.HandlerFunc
 	// AdminAuth는 /admin 그룹에 적용되는 RequireAdmin 미들웨어(JWT + mt_level=9).
 	AdminAuth gin.HandlerFunc
 	// UserAuth는 일반 사용자 인증 미들웨어(ROUTE_AUTH_MODE off|warn|enforce)다. nil이면 붙이지 않는다.
@@ -482,8 +484,14 @@ func New(cfg *config.Config, logger *slog.Logger, deps Deps) http.Handler {
 			}
 			v1.GET("/subscriptions/me", append(subAuth, deps.Subscription.Me)...)
 			v1.POST("/subscriptions/verify", append(subAuth, deps.Subscription.Verify)...)
-			v1.POST("/subscriptions/apple/notifications", deps.Subscription.AppleNotification)
-			v1.POST("/subscriptions/google/notifications", deps.Subscription.GoogleNotification)
+			appleNotify := []gin.HandlerFunc{}
+			googleNotify := []gin.HandlerFunc{}
+			if deps.SubscriptionNotifyLimit != nil {
+				appleNotify = append(appleNotify, deps.SubscriptionNotifyLimit("apple"))
+				googleNotify = append(googleNotify, deps.SubscriptionNotifyLimit("google"))
+			}
+			v1.POST("/subscriptions/apple/notifications", append(appleNotify, deps.Subscription.AppleNotification)...)
+			v1.POST("/subscriptions/google/notifications", append(googleNotify, deps.Subscription.GoogleNotification)...)
 		}
 
 		// admin — read 통계/그룹. RequireAdmin(JWT + mt_level=9) 게이트 적용.

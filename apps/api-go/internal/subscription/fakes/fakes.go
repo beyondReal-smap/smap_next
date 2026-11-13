@@ -227,6 +227,29 @@ func (r *Repo) WithMemberLock(_ context.Context, mt int, fn func(repository.Subs
 	return err
 }
 
+// WithTx 는 회원 행을 잠그지 않는 트랜잭션이다(소유자 없는 거래 행 기록용). 오류가 나면 되돌린다.
+func (r *Repo) WithTx(_ context.Context, fn func(repository.SubscriptionTxOps) error) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	snap := r.snapshot()
+	err := fn(&tx{r: r, mt: model.UnownedMtIdx})
+	if err != nil {
+		r.restore(snap)
+	}
+	return err
+}
+
+func (t *tx) ForMember(mt int) repository.SubscriptionTxOps { return &tx{r: t.r, mt: mt} }
+
+func (t *tx) LockMember() (*model.SubscriptionMemberPlan, error) {
+	m, ok := t.r.Members[t.mt]
+	if !ok {
+		return nil, repository.ErrMemberNotFound
+	}
+	c := *m
+	return &c, nil
+}
+
 func (t *tx) FindByHash(platform, hash string) (*model.SubscriptionTransaction, error) {
 	if t.r.TableMissing {
 		return nil, repository.ErrSubscriptionTableMissing
