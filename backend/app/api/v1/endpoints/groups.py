@@ -222,6 +222,7 @@ def join_group_by_code(
             # 재가입 처리
             existing_membership.sgdt_show = 'Y'
             existing_membership.sgdt_exit = 'N'
+            existing_membership.sgdt_discharge = 'N'
             existing_membership.sgdt_udate = datetime.utcnow()
             db.commit()
             
@@ -288,11 +289,13 @@ def join_group_by_code(
 @router.get("/{group_id}", response_model=GroupResponse)
 def get_group(
     group_id: int,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
     특정 그룹을 조회합니다.
     """
+    deps.require_group_member(db, user_id, group_id)
     group = db.query(Group).filter(Group.sgt_idx == group_id).first()
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
@@ -301,6 +304,7 @@ def get_group(
 @router.get("/", response_model=List[GroupResponse])
 def get_groups(
     db: Session = Depends(deps.get_db),
+    user_id: int = Depends(deps.get_required_user_id),
     skip: int = 0,
     limit: int = 10000,
     show_hidden: bool = False
@@ -308,12 +312,14 @@ def get_groups(
     """
     그룹 목록을 조회합니다. (sgt_show = 'Y'인 그룹만, show_hidden=True면 숨겨진 그룹도 포함)
     """
-    if show_hidden:
-        logger.info("[GET_GROUPS] 숨겨진 그룹 포함하여 조회")
-        groups = db.query(Group).offset(skip).limit(limit).all()
-    else:
-        logger.info("[GET_GROUPS] 표시되는 그룹만 조회")
-        groups = db.query(Group).filter(Group.sgt_show == 'Y').offset(skip).limit(limit).all()
+    group_ids = db.query(GroupDetail.sgt_idx).filter(
+        GroupDetail.mt_idx == user_id, GroupDetail.sgdt_exit == 'N',
+        GroupDetail.sgdt_discharge == 'N', GroupDetail.sgdt_show == 'Y'
+    )
+    query = db.query(Group).filter(Group.sgt_idx.in_(group_ids))
+    if not show_hidden:
+        query = query.filter(Group.sgt_show == 'Y')
+    groups = query.offset(skip).limit(limit).all()
     
     logger.info(f"[GET_GROUPS] 조회된 그룹 수: {len(groups)}")
     for group in groups:
@@ -326,11 +332,14 @@ def get_groups(
 @router.get("/member/{member_id}", response_model=List[GroupResponse])
 def get_member_groups(
     member_id: int,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
     특정 회원의 그룹 목록을 조회합니다.
     """
+    if int(user_id) != member_id:
+        raise HTTPException(status_code=403, detail="본인의 그룹만 조회할 수 있습니다.")
     logger.info(f"[GET_MEMBER_GROUPS] 멤버 그룹 목록 조회 시작 - member_id: {member_id}")
     
     groups = Group.find_by_member(db, member_id)
@@ -344,6 +353,7 @@ def get_member_groups(
 @router.get("/code/{code}", response_model=GroupResponse)
 def get_group_by_code(
     code: str,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
@@ -403,32 +413,24 @@ def create_group(
     if not group_data.get('sgt_show'):
         group_data['sgt_show'] = 'Y'
     
-    # 그룹 생성
-    group = Group(**group_data)
-    db.add(group)
-    db.commit()
-    db.refresh(group)
-    
-    # 그룹 생성자를 GroupDetail 테이블에 그룹장으로 추가
     try:
+        group = Group(**group_data)
+        db.add(group)
+        db.flush()
         group_detail = GroupDetail(
-            sgt_idx=group.sgt_idx,
-            mt_idx=user_id,
-            sgdt_owner_chk='Y',  # 그룹장
-            sgdt_leader_chk='N',
-            sgdt_discharge='N',
-            sgdt_group_chk='Y',
-            sgdt_exit='N',
-            sgdt_show='Y',
-            sgdt_push_chk='Y',
-            sgdt_wdate=datetime.utcnow(),
-            sgdt_udate=datetime.utcnow()
+            sgt_idx=group.sgt_idx, mt_idx=user_id,
+            sgdt_owner_chk='Y', sgdt_leader_chk='N', sgdt_discharge='N',
+            sgdt_group_chk='Y', sgdt_exit='N', sgdt_show='Y', sgdt_push_chk='Y',
+            sgdt_wdate=datetime.utcnow(), sgdt_udate=datetime.utcnow()
         )
         db.add(group_detail)
+        db.flush()
         db.commit()
-        logger.info(f"[CREATE_GROUP] 그룹 멤버(관리자) 생성 완료 - sgdt_idx: {group_detail.sgdt_idx}")
-    except Exception as e:
-        logger.error(f"[CREATE_GROUP] 그룹 멤버 생성 실패: {str(e)}")
+        db.refresh(group)
+    except Exception as exc:
+        db.rollback()
+        logger.exception('그룹 생성 트랜잭션 실패')
+        raise HTTPException(status_code=500, detail='그룹 생성에 실패했습니다.') from exc
 
     # 채팅방 자동 생성
     try:
@@ -444,11 +446,13 @@ def create_group(
 def update_group(
     group_id: int,
     group_in: GroupUpdate,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
     그룹 정보를 업데이트합니다. (sgt_show='N'이면 소프트 삭제)
     """
+    owner_membership = deps.require_group_owner(db, user_id, group_id)
     try:
         logger.info("[UPDATE_GROUP] 그룹 업데이트 요청 시작 - group_id: %s", group_id)
         
@@ -492,6 +496,11 @@ def update_group(
             logger.info("[UPDATE_GROUP] 초대 코드 업데이트")
             
         if group_in.mt_idx is not None:
+            if int(group_in.mt_idx) != int(user_id):
+                next_owner = deps.require_group_member(db, group_in.mt_idx, group_id)
+                owner_membership.sgdt_owner_chk = 'N'
+                next_owner.sgdt_owner_chk = 'Y'
+                next_owner.sgdt_leader_chk = 'N'
             group.mt_idx = group_in.mt_idx
             updated = True
             logger.info(f"[UPDATE_GROUP] mt_idx 업데이트: {group_in.mt_idx}")
@@ -522,6 +531,7 @@ def update_group(
 @router.put("/{group_id}/restore", response_model=GroupResponse)
 def restore_group(
     group_id: int,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
@@ -537,6 +547,17 @@ def restore_group(
     
     logger.info(f"[RESTORE_GROUP] 복구 전 그룹 상태 - sgt_show: {group.sgt_show}, sgt_title: {group.sgt_title}")
     
+    if group.mt_idx != int(user_id):
+        raise HTTPException(status_code=403, detail="그룹장 권한이 필요합니다.")
+    deleted_at = group.sgt_udate
+    if deleted_at:
+        db.query(GroupDetail).filter(GroupDetail.sgt_idx == group_id, GroupDetail.sgdt_show == 'N',
+            GroupDetail.sgdt_udate == deleted_at, GroupDetail.sgdt_exit == 'N', GroupDetail.sgdt_discharge == 'N').update(
+                {GroupDetail.sgdt_show: 'Y'}, synchronize_session=False)
+        db.query(Schedule).filter(Schedule.sgt_idx == group_id, Schedule.sst_show == ShowEnum.N,
+            Schedule.sst_udate == deleted_at).update({Schedule.sst_show: ShowEnum.Y}, synchronize_session=False)
+        db.query(Location).filter(Location.sgt_idx == group_id, Location.slt_show == ShowEnum.N,
+            Location.slt_udate == deleted_at).update({Location.slt_show: ShowEnum.Y}, synchronize_session=False)
     # sgt_show를 'Y'로 변경하여 복구
     group.sgt_show = ShowEnum.Y
     group.sgt_udate = datetime.utcnow()
@@ -600,6 +621,7 @@ def emergency_restore_group(
 @router.get("/{group_id}/stats", response_model=dict)
 def get_group_stats(
     group_id: int,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
@@ -607,6 +629,7 @@ def get_group_stats(
     - 1주일간 일정 개수
     - 위치 데이터 통계
     """
+    deps.require_group_member(db, user_id, group_id)
     try:
         logger.info(f"[GET_GROUP_STATS] 그룹 통계 조회 시작 - group_id: {group_id}")
         
@@ -793,6 +816,7 @@ def join_group(
             logger.info(f"[JOIN_GROUP] 재가입 처리 시작 - sgdt_idx: {existing_membership.sgdt_idx}")
             existing_membership.sgdt_show = 'Y'
             existing_membership.sgdt_exit = 'N'
+            existing_membership.sgdt_discharge = 'N'
             existing_membership.sgdt_udate = datetime.utcnow()
             db.add(existing_membership)
             db.commit()
@@ -1012,12 +1036,17 @@ def remove_member_from_group(
     group_id: int,
     member_id: int,
     remove_data: MemberRemoveRequest,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
     그룹에서 멤버를 탈퇴시킵니다 (소프트 삭제).
     프론트엔드에서 호출하는 엔드포인트: /groups/{groupId}/members/{memberId}/remove
     """
+    if int(user_id) == member_id:
+        deps.require_group_member(db, user_id, group_id)
+    else:
+        deps.require_group_owner(db, user_id, group_id)
     logger.info(f"[REMOVE_MEMBER] 멤버 탈퇴 처리 요청: {{ groupId: '{group_id}', memberId: '{member_id}' }}")
     
     # 그룹 존재 확인
@@ -1039,6 +1068,8 @@ def remove_member_from_group(
         logger.error(f"[REMOVE_MEMBER] 멤버를 그룹에서 찾을 수 없음 - group_id: {group_id}, member_id: {member_id}")
         raise HTTPException(status_code=404, detail="멤버를 그룹에서 찾을 수 없습니다.")
     
+    if getattr(group_detail.sgdt_owner_chk, 'value', group_detail.sgdt_owner_chk) == 'Y':
+        raise HTTPException(status_code=403, detail="그룹장은 승계 없이 탈퇴할 수 없습니다.")
     logger.info(f"[REMOVE_MEMBER] 멤버 조회 URL: https://api3.aiagnt.kr/api/v1/group-members/member/{group_id}")
     logger.info(f"[REMOVE_MEMBER] 조회된 멤버 수: {db.query(GroupDetail).filter(GroupDetail.sgt_idx == group_id).count()}")
     logger.info(f"[REMOVE_MEMBER] 찾은 멤버: {group_detail.__dict__}")
@@ -1048,6 +1079,7 @@ def remove_member_from_group(
     
     group_detail.sgdt_show = 'N'
     group_detail.sgdt_exit = 'Y'
+    group_detail.sgdt_discharge = 'N'
     group_detail.sgdt_udate = datetime.utcnow()
     
     logger.info(f"[REMOVE_MEMBER] 업데이트 후 상태 - sgdt_show: {group_detail.sgdt_show}, sgdt_exit: {group_detail.sgdt_exit}")

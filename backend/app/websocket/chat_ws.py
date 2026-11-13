@@ -12,7 +12,7 @@ from app.models.member import Member
 
 logger = logging.getLogger(__name__)
 
-sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
+sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins=settings.BACKEND_CORS_ORIGINS)
 
 # Track online users: {sid: mt_idx}
 connected_users: dict = {}

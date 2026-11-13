@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.api import deps
 from app.models.location import Location
+from app.models.group_detail import GroupDetail
 from app.schemas.location import LocationCreate, LocationUpdate, LocationResponse
 
 router = APIRouter()
@@ -10,85 +11,99 @@ router = APIRouter()
 @router.get("/", response_model=List[LocationResponse])
 def get_locations(
     db: Session = Depends(deps.get_db),
+    user_id: int = Depends(deps.get_required_user_id),
     skip: int = 0,
     limit: int = 100
 ):
     """
     위치 목록을 조회합니다.
     """
-    locations = db.query(Location.__table__).offset(skip).limit(limit).all()
+    locations = db.query(Location.__table__).filter(Location.mt_idx == user_id, Location.slt_show == "Y").offset(skip).limit(limit).all()
     return locations
 
 @router.get("/{location_id}", response_model=LocationResponse)
 def get_location(
     location_id: int,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
     특정 위치를 조회합니다.
     """
-    location = db.query(Location).filter(Location.slt_idx == location_id).first()
+    location = db.query(Location).filter(Location.slt_idx == location_id, Location.slt_show == "Y").first()
     if location is None:
         raise HTTPException(status_code=404, detail="Location not found")
+    deps.require_same_group_or_self(db, user_id, location.mt_idx)
     return location
 
 @router.get("/member/{member_id}", response_model=List[LocationResponse])
 def get_member_locations(
     member_id: int,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
     특정 회원의 위치 목록을 조회합니다.
     """
+    deps.require_same_group_or_self(db, user_id, member_id)
     locations = Location.find_by_member(db, member_id)
     return locations
 
 @router.get("/group-detail/{group_detail_id}", response_model=List[LocationResponse])
 def get_group_detail_locations(
     group_detail_id: int,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
     특정 그룹 상세의 위치 목록을 조회합니다.
     """
+    detail = db.query(GroupDetail).filter(GroupDetail.sgdt_idx == group_detail_id).first()
+    if not detail:
+        raise HTTPException(status_code=404, detail="GroupDetail not found")
+    deps.require_group_member(db, user_id, detail.sgt_idx)
     locations = Location.find_by_group_detail(db, group_detail_id)
     return locations
 
 @router.get("/myplays/in", response_model=List[LocationResponse])
 def get_in_myplays_locations(
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
     내 플레이스 내부 위치 목록을 조회합니다.
     """
-    locations = Location.get_in_myplays_list(db)
+    locations = [location for location in Location.get_in_myplays_list(db) if location.get('mt_idx') == user_id]
     return locations
 
 @router.get("/myplays/out", response_model=List[LocationResponse])
 def get_out_myplays_locations(
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
     내 플레이스 외부 위치 목록을 조회합니다.
     """
-    locations = Location.get_out_myplays_list(db)
+    locations = [location for location in Location.get_out_myplays_list(db) if location.get('mt_idx') == user_id]
     return locations
 
 @router.post("/")
 def create_location(
     location_data: dict,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
     새로운 위치를 생성합니다.
     """
+    if location_data.get('mt_idx') is not None and str(location_data['mt_idx']) != str(user_id):
+        raise HTTPException(status_code=403, detail="본인의 장소만 생성할 수 있습니다.")
     try:
         from sqlalchemy import text
         from datetime import datetime
         import logging
         
         # 디버그 로깅
-        logging.info(f"Received location data: {location_data}")
         
         # 필수 필드 검증
         required_fields = ['slt_title', 'slt_add']
@@ -123,7 +138,7 @@ def create_location(
         """)
         
         params = {
-            "mt_idx": location_data.get('mt_idx', 282),
+            "mt_idx": user_id,
             "slt_title": str(location_data['slt_title'])[:100],  # 길이 제한
             "slt_add": str(location_data['slt_add'])[:200],  # 길이 제한
             "slt_lat": slt_lat,
@@ -134,7 +149,6 @@ def create_location(
             "slt_wdate": current_time
         }
         
-        logging.info(f"SQL parameters: {params}")
         
         # SQL 실행
         result = db.execute(sql, params)
@@ -176,11 +190,17 @@ def create_location(
 def update_location_notification(
     location_id: int,
     notification_data: dict,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
     위치의 알림 설정을 업데이트합니다.
     """
+    location = db.query(Location).filter(Location.slt_idx == location_id).first()
+    if not location:
+        raise HTTPException(status_code=404, detail="Location not found")
+    if location.mt_idx != int(user_id):
+        raise HTTPException(status_code=403, detail="본인의 장소만 수정할 수 있습니다.")
     try:
         from sqlalchemy import text
         from datetime import datetime
@@ -227,11 +247,17 @@ def update_location_notification(
 def update_location(
     location_id: int,
     location_data: dict,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
     위치 정보를 업데이트합니다.
     """
+    location = db.query(Location).filter(Location.slt_idx == location_id).first()
+    if not location:
+        raise HTTPException(status_code=404, detail="Location not found")
+    if location.mt_idx != int(user_id):
+        raise HTTPException(status_code=403, detail="본인의 장소만 수정할 수 있습니다.")
     try:
         from sqlalchemy import text
         from datetime import datetime
@@ -287,6 +313,8 @@ def update_location(
             "slt_idx": location_id
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Update failed: {str(e)}")
@@ -294,6 +322,7 @@ def update_location(
 @router.delete("/{location_id}", response_model=LocationResponse)
 def delete_location(
     location_id: int,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
@@ -302,6 +331,8 @@ def delete_location(
     location = db.query(Location).filter(Location.slt_idx == location_id).first()
     if location is None:
         raise HTTPException(status_code=404, detail="Location not found")
+    if location.mt_idx != int(user_id):
+        raise HTTPException(status_code=403, detail="본인의 장소만 삭제할 수 있습니다.")
     
     db.delete(location)
     db.commit()
@@ -310,11 +341,13 @@ def delete_location(
 @router.get("/other-members/{member_id}", response_model=List[LocationResponse])
 def get_other_members_locations(
     member_id: int,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
     다른 멤버의 위치 목록을 조회합니다.
     """
+    deps.require_same_group_or_self(db, user_id, member_id)
     locations = Location.find_by_member(db, member_id)
     return locations
 
@@ -322,18 +355,20 @@ def get_other_members_locations(
 def create_member_location(
     member_id: int,
     location_data: dict,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
     특정 멤버의 새로운 위치를 생성합니다.
     """
+    if member_id != int(user_id):
+        raise HTTPException(status_code=403, detail="본인의 장소만 생성할 수 있습니다.")
     try:
         from sqlalchemy import text
         from datetime import datetime
         import logging
         
         # 디버그 로깅
-        logging.info(f"Creating location for member {member_id}: {location_data}")
         
         # 멤버 ID 검증
         member_check_sql = text("SELECT COUNT(*) FROM member_t WHERE mt_idx = :member_id")

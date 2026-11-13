@@ -5,14 +5,15 @@ import time
 import logging
 import secrets
 from datetime import datetime, timedelta
-from typing import Literal
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from jose import JWTError, jwt
 from pydantic import BaseModel, EmailStr, field_validator
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
+from app.api import deps
 from app.core.cache import get_redis
 from app.core.config import settings
 from app.crud import crud_auth, crud_refresh_token
@@ -26,7 +27,7 @@ router = APIRouter()
 
 class EmailRequest(BaseModel):
     email: EmailStr
-    purpose: Literal['register', 'reset_password']
+    purpose: Literal['register', 'reset_password', 'change_email']
 
     @field_validator('email', mode='before')
     @classmethod
@@ -106,8 +107,11 @@ def verify_email_token(token: str, email: str, purpose: str) -> dict:
 
 
 @router.post('/email/send-code', response_model=EmailSendResponse)
-async def send_email_code(data: EmailRequest, request: Request, db: Session = Depends(get_db)):
+async def send_email_code(data: EmailRequest, request: Request, db: Session = Depends(get_db), user_id: Optional[int] = Depends(deps.get_current_user_id)):
     email = str(data.email).lower()
+    if data.purpose == 'change_email':
+        user_id = deps.get_required_user_id(user_id, db)
+        _check_change_email_available(db, email, user_id)
     r = _redis()
     digest = hashlib.sha256(email.encode()).hexdigest()
     ip = _client_ip(request)
@@ -133,6 +137,8 @@ async def send_email_code(data: EmailRequest, request: Request, db: Session = De
 
     code = f'{secrets.randbelow(1000000):06d}'
     key = _key(email, data.purpose)
+    if data.purpose == 'change_email':
+        key += f':{user_id}'
     try:
         r.setex(key, 600, code)
         r.delete(f'{key}:attempts')
@@ -154,10 +160,14 @@ async def send_email_code(data: EmailRequest, request: Request, db: Session = De
 
 
 @router.post('/email/verify-code', response_model=EmailVerifyResponse)
-def verify_email_code(data: EmailVerifyRequest):
+def verify_email_code(data: EmailVerifyRequest, db: Session = Depends(get_db), user_id: Optional[int] = Depends(deps.get_current_user_id)):
     email = str(data.email).lower()
+    if data.purpose == 'change_email':
+        user_id = deps.get_required_user_id(user_id, db)
     r = _redis()
     key = _key(email, data.purpose)
+    if data.purpose == 'change_email':
+        key += f':{user_id}'
     try:
         code = r.get(key)
         if not code:
@@ -176,8 +186,11 @@ def verify_email_code(data: EmailVerifyRequest):
     except Exception as exc:
         logger.error('이메일 인증 저장소 오류: %s', type(exc).__name__)
         raise HTTPException(status_code=503, detail='인증 서비스를 사용할 수 없습니다.') from exc
-    token = jwt.encode({'type': 'email_verification', 'email': email, 'purpose': data.purpose,
-                        'jti': secrets.token_urlsafe(24), 'exp': datetime.utcnow() + timedelta(minutes=15)}, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    claims = {'type': 'email_verification', 'email': email, 'purpose': data.purpose,
+              'jti': secrets.token_urlsafe(24), 'exp': datetime.utcnow() + timedelta(minutes=15)}
+    if data.purpose == 'change_email':
+        claims['sub'] = str(user_id)
+    token = jwt.encode(claims, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
     return EmailVerifyResponse(success=True, verification_token=token)
 
 
@@ -222,4 +235,52 @@ def reset_password_by_email(data: EmailResetRequest, db: Session = Depends(get_d
                 logger.error('재설정 토큰 선점 해제 실패')
         logger.exception('이메일 비밀번호 재설정 트랜잭션 실패')
         raise HTTPException(status_code=500, detail='비밀번호 재설정에 실패했습니다.') from exc
+    return EmailSendResponse(success=True)
+
+
+class EmailChangeRequest(BaseModel):
+    email: EmailStr
+    verification_token: str
+
+    @field_validator('email', mode='before')
+    @classmethod
+    def normalize_email(cls, value):
+        return value.strip().lower() if isinstance(value, str) else value
+
+
+def _check_change_email_available(db: Session, email: str, user_id: int) -> None:
+    other = db.query(Member).filter(
+        Member.mt_idx != user_id,
+        or_(func.lower(func.trim(Member.mt_email)) == email,
+            func.lower(func.trim(Member.mt_id)) == email),
+    ).first()
+    if other:
+        raise HTTPException(status_code=409, detail='이미 가입된 이메일입니다.')
+
+
+@router.post('/email/change', response_model=EmailSendResponse)
+def change_email(data: EmailChangeRequest, user_id: int = Depends(deps.get_required_user_id), db: Session = Depends(get_db)):
+    email = str(data.email).lower()
+    payload = verify_email_token(data.verification_token, email, 'change_email')
+    if payload.get('sub') != str(user_id) or not isinstance(payload.get('jti'), str):
+        raise HTTPException(status_code=403, detail='본인의 이메일 인증 토큰이 필요합니다.')
+    _check_change_email_available(db, email, user_id)
+    member = db.query(Member).filter(Member.mt_idx == user_id).with_for_update().first()
+    if not is_active_member(member):
+        raise HTTPException(status_code=401, detail='인증이 필요합니다.')
+    r = _redis()
+    key = 'email:change-used:' + hashlib.sha256(payload['jti'].encode()).hexdigest()
+    try:
+        claimed = r.set(key, '1', nx=True, ex=max(1, math.ceil(payload['exp'] - time.time())))
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail='인증 서비스를 사용할 수 없습니다.') from exc
+    if not claimed:
+        raise HTTPException(status_code=400, detail='이미 사용한 인증 토큰입니다.')
+    try:
+        member.mt_email = email
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        logger.exception('이메일 변경 트랜잭션 실패')
+        raise HTTPException(status_code=500, detail='이메일 변경에 실패했습니다.') from exc
     return EmailSendResponse(success=True)

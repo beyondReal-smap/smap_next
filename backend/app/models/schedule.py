@@ -59,7 +59,7 @@ class Schedule(BaseModel):
 
     @classmethod
     def find_by_idx(cls, db: Session, idx: int) -> Optional['Schedule']:
-        return db.query(cls).filter(cls.sst_idx == idx).first()
+        return db.query(cls).filter(cls.sst_idx == idx, cls.sst_show == ShowEnum.Y).first()
 
     @classmethod
     def get_now_schedule_in_members(cls, db: Session) -> List[Dict]:

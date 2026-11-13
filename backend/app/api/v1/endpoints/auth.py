@@ -294,7 +294,7 @@ def refresh_token(
     raise HTTPException(status_code=401, detail="Refresh token이 필요합니다.")
 
 # 기존 로그인 API (하위 호환성을 위해 유지)
-@router.post("/login-original", response_model=LoginResponse)
+@router.post("/login-original", response_model=LoginResponse, dependencies=[Depends(deps.get_required_admin_id)])
 def login_for_access_token_custom(
     db: Session = Depends(get_db),
     login_request: LoginRequest = Body(...)
@@ -1019,86 +1019,35 @@ async def forgot_password(
     """
     비밀번호 찾기 (SMS/이메일 발송)
     """
+    response = ForgotPasswordResponse(success=True, message="가입된 연락처로 재설정 링크를 발송했습니다.",
+        data={"type": forgot_data.type, "contact": forgot_data.contact,
+              "token_expires": f"{settings.PASSWORD_RESET_EXPIRE_MINUTES}분", "sent": True})
     try:
-        logger.info(f"🔍 비밀번호 찾기 요청: {forgot_data.type}, {forgot_data.contact[:3]}***")
-        
-        # 사용자 조회
         if forgot_data.type == 'phone':
-            clean_phone = forgot_data.contact.replace('-', '').replace(' ', '')
-            user = crud_auth.get_user_by_phone(db, clean_phone)
+            user = crud_auth.get_user_by_phone(db, forgot_data.contact.replace('-', '').replace(' ', ''))
         else:
-            # 이메일로 사용자 조회 (탈퇴한 계정도 포함)
-            user = db.query(Member).filter(Member.mt_email == forgot_data.contact).first()
-        
-        if not user:
-            logger.warning(f"비밀번호 찾기: 존재하지 않는 사용자 {forgot_data.contact[:3]}***")
-            return ForgotPasswordResponse(
-                success=False,
-                message="등록되지 않은 연락처입니다."
-            )
-        
-        # 짧은 토큰 생성 (UUID 기반)
-        short_token = str(uuid.uuid4())[:8]  # 8자리 짧은 토큰
-        token_expires = datetime.utcnow() + timedelta(minutes=1)  # 1분으로 단축 (테스트용)
-        
-        # 토큰을 데이터베이스에 저장 (보안 강화)
+            user = db.query(Member).filter(Member.mt_email == forgot_data.contact.strip().lower()).first()
+        if not is_active_member(user):
+            return response
+        short_token = str(uuid.uuid4())[:8]
         user.mt_reset_token = short_token
-        user.mt_token_edate = token_expires
+        user.mt_token_edate = datetime.utcnow() + timedelta(minutes=settings.PASSWORD_RESET_EXPIRE_MINUTES)
         db.commit()
-        
-        logger.info("비밀번호 재설정 토큰이 저장되었습니다.")
-        
-        # 비밀번호 재설정 링크 생성 (운영환경 도메인 적용, URL 단축)
-        reset_url = f"https://nextstep.aiagnt.kr/r?t={short_token}"
-        
-        
-        # 실제 SMS/이메일 전송 구현
+        reset_url = f"{str(settings.PASSWORD_RESET_BASE_URL).rstrip('/')}/r?t={short_token}"
         if forgot_data.type == 'phone':
-            # SMS 전송 로직
-            try:
-                from app.services.sms_service import sms_service
-                sms_result = await sms_service.send_password_reset_sms(forgot_data.contact, reset_url)
-                
-                if sms_result['success']:
-                    logger.info(f"✅ SMS 발송 성공: {forgot_data.contact[:3]}***")
-                else:
-                    logger.warning(f"⚠️ SMS 발송 실패: {sms_result['message']}")
-                    
-            except Exception as e:
-                logger.error(f"❌ SMS 발송 중 오류: {str(e)}")
+            from app.services.sms_service import sms_service
+            result = await sms_service.send_password_reset_sms(forgot_data.contact, reset_url)
         else:
-            # 이메일 전송 로직
-            try:
-                from app.services.email_service import email_service
-                email_result = await email_service.send_password_reset_email(forgot_data.contact, reset_url)
-                
-                if email_result['success']:
-                    logger.info(f"✅ 이메일 발송 성공: {forgot_data.contact}")
-                else:
-                    logger.warning(f"⚠️ 이메일 발송 실패: {email_result['message']}")
-                    
-            except Exception as e:
-                logger.error(f"❌ 이메일 발송 중 오류: {str(e)}")
-        
-        logger.info(f"📱 비밀번호 재설정 링크 준비 완료: {forgot_data.type} -> {forgot_data.contact[:3]}***")
-        
-        return ForgotPasswordResponse(
-            success=True,
-            message=f"{'SMS' if forgot_data.type == 'phone' else '이메일'}로 비밀번호 재설정 링크를 발송했습니다.",
-            data={
-                "type": forgot_data.type,
-                "contact": forgot_data.contact,
-                "token_expires": "1분",  # 하드코딩으로 1분 설정
-                "sent": True
-            }
-        )
-        
-    except Exception as e:
-        logger.error(f"비밀번호 찾기 실패: {str(e)}")
-        return ForgotPasswordResponse(
-            success=False,
-            message="요청 처리 중 오류가 발생했습니다."
-        )
+            from app.services.email_service import email_service
+            result = await email_service.send_password_reset_email(forgot_data.contact, reset_url)
+        if not result.get('success'):
+            raise RuntimeError('delivery failed')
+        return response
+    except Exception as exc:
+        logger.error("비밀번호 재설정 링크 발송 실패: %s", type(exc).__name__)
+        return ForgotPasswordResponse(success=False, message="재설정 링크 발송에 실패했습니다.",
+            data={"type": forgot_data.type, "contact": forgot_data.contact,
+                  "token_expires": f"{settings.PASSWORD_RESET_EXPIRE_MINUTES}분", "sent": False})
 
 @router.post("/verify-reset-token", response_model=VerifyResetTokenResponse)
 def verify_reset_token(
@@ -1160,6 +1109,9 @@ def reset_password(
     """
     비밀번호 재설정 처리
     """
+    valid, errors = crud_auth.validate_password_policy(reset_data.new_password)
+    if not valid:
+        raise HTTPException(status_code=400, detail=', '.join(errors))
     try:
         import re
         
@@ -1184,24 +1136,6 @@ def reset_password(
             return ResetPasswordResponse(
                 success=False,
                 message="토큰이 만료되었거나 유효하지 않습니다."
-            )
-        
-        # 새 비밀번호 검증
-        if len(reset_data.new_password) < 8:
-            return ResetPasswordResponse(
-                success=False,
-                message="비밀번호는 8자 이상이어야 합니다."
-            )
-        
-        # 비밀번호 강도 검증
-        has_letter = bool(re.search(r'[a-zA-Z]', reset_data.new_password))
-        has_number = bool(re.search(r'\d', reset_data.new_password))
-        has_special = bool(re.search(r'[!@#$%^&*(),.?":{}|<>]', reset_data.new_password))
-        
-        if not (has_letter and has_number and has_special):
-            return ResetPasswordResponse(
-                success=False,
-                message="비밀번호는 영문, 숫자, 특수문자를 모두 포함해야 합니다."
             )
         
         # 비밀번호 업데이트
@@ -1247,6 +1181,9 @@ def reset_password_by_phone(
     전화번호 기반 비밀번호 재설정 (네이티브 앱용)
     SMS 인증이 완료된 후 호출됨
     """
+    valid, errors = crud_auth.validate_password_policy(reset_data.new_password)
+    if not valid:
+        raise HTTPException(status_code=400, detail=', '.join(errors))
     try:
         import re
 
@@ -1276,24 +1213,6 @@ def reset_password_by_phone(
             return ResetPasswordResponse(
                 success=False,
                 message="등록되지 않은 전화번호입니다."
-            )
-        
-        # 새 비밀번호 검증
-        if len(reset_data.new_password) < 8:
-            return ResetPasswordResponse(
-                success=False,
-                message="비밀번호는 8자 이상이어야 합니다."
-            )
-        
-        # 비밀번호 강도 검증
-        has_letter = bool(re.search(r'[a-zA-Z]', reset_data.new_password))
-        has_number = bool(re.search(r'\d', reset_data.new_password))
-        has_special = bool(re.search(r'[!@#$%^&*(),.?":{}|<>]', reset_data.new_password))
-        
-        if not (has_letter and has_number and has_special):
-            return ResetPasswordResponse(
-                success=False,
-                message="비밀번호는 영문, 숫자, 특수문자를 모두 포함해야 합니다."
             )
         
         # 비밀번호 업데이트

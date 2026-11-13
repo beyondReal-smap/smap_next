@@ -1,5 +1,7 @@
 #!/bin/bash
 
+: "${MYSQL_PASSWORD:?MYSQL_PASSWORD must be set}"
+
 # 색상 정의
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -333,14 +335,14 @@ echo "PID 파일: $PID_FILE"
 # MYSQL_HOST를 127.0.0.1로 강제 설정
 export MYSQL_HOST_VAL="127.0.0.1"
 export MYSQL_USER_VAL=${MYSQL_USER:-smap2}
-export MYSQL_PASSWORD_VAL=${MYSQL_PASSWORD:-dmonster}
+export MYSQL_PASSWORD_VAL="$MYSQL_PASSWORD"
 export MYSQL_DB_VAL=${MYSQL_DB:-smap2_db}
 export MYSQL_PORT_VAL=${MYSQL_PORT:-3306}
 export MYSQL_CHARSET_VAL=${MYSQL_CHARSET:-utf8mb4}
 
 export SQLALCHEMY_DATABASE_URI="mysql+pymysql://${MYSQL_USER_VAL}:${MYSQL_PASSWORD_VAL}@${MYSQL_HOST_VAL}:${MYSQL_PORT_VAL}/${MYSQL_DB_VAL}?charset=${MYSQL_CHARSET_VAL}"
 
-echo "Using SQLALCHEMY_DATABASE_URI: $SQLALCHEMY_DATABASE_URI" >> "$LOG_FILE"
+echo "Database configuration loaded" >> "$LOG_FILE"
 
 # 애플리케이션 실행 (백그라운드)
 echo "FastAPI 애플리케이션을 백그라운드에서 시작합니다..."

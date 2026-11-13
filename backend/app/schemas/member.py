@@ -175,34 +175,14 @@ class ChangePasswordRequest(BaseModel):
     @field_validator('newPassword')
     @classmethod
     def validate_new_password(cls, v):
-        if not v or not v.strip():
-            raise ValueError('새 비밀번호를 입력해주세요.')
-        
-        # 비밀번호 강도 검사
-        if len(v) < 8:
-            raise ValueError('새 비밀번호는 8자 이상이어야 합니다.')
-        
-        import re
-        
-        # 대문자 포함 검사
-        if not re.search(r'[A-Z]', v):
-            raise ValueError('새 비밀번호는 대문자를 포함해야 합니다.')
-        
-        # 소문자 포함 검사
-        if not re.search(r'[a-z]', v):
-            raise ValueError('새 비밀번호는 소문자를 포함해야 합니다.')
-        
-        # 숫자 포함 검사
-        if not re.search(r'\d', v):
-            raise ValueError('새 비밀번호는 숫자를 포함해야 합니다.')
-        
-        # 특수문자 포함 검사
-        if not re.search(r'[@$!%*?&]', v):
-            raise ValueError('새 비밀번호는 특수문자(@$!%*?&)를 포함해야 합니다.')
-        
+        from app.crud.crud_auth import validate_password_policy
+        from fastapi import HTTPException
+        valid, errors = validate_password_policy(v)
+        if not valid:
+            raise HTTPException(status_code=400, detail=', '.join(errors))
         return v
 
-# 비밀번호 변경 응답 스키마
+
 class ChangePasswordResponse(BaseModel):
     success: bool
     message: str

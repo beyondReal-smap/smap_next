@@ -195,11 +195,11 @@ class GroupScheduleManager:
 
             # FCM 토큰 존재 여부 확인
             if not target_member.mt_token_id or target_member.mt_token_id.strip() == "":
-                logger.warning(f"🚨 [FCM] FCM 토큰이 없음 - 회원: {target_member.mt_idx}({target_member.mt_name}), 토큰: '{target_member.mt_token_id}', FCM 전송 생략")
+                logger.info("[FCM] 푸시 토큰 상태 확인")
                 return True
 
             # FCM 푸시 알림 전송
-            logger.info(f"📤 [FCM] 푸시 알림 전송 시도 - 토큰: {target_member.mt_token_id[:20]}..., 제목: {message_info['title']}")
+            logger.info("[FCM] 푸시 토큰 상태 확인")
             response = firebase_service.send_push_notification(
                 target_member.mt_token_id,
                 message_info['title'],
@@ -644,15 +644,17 @@ def test_all_columns(
 
 @router.get("/owner-groups/all-schedules")
 def get_owner_groups_all_schedules(
-    current_user_id: int = Query(..., description="현재 사용자 ID"),
+    current_user_id: Optional[int] = Query(None, description="현재 사용자 ID"),
     year: Optional[int] = Query(None, description="조회할 년도 (예: 2024)"),
     month: Optional[int] = Query(None, description="조회할 월 (1-12)"),
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
     현재 사용자가 오너인 그룹들의 모든 멤버 스케줄을 월별로 조회합니다.
     사용자의 최근 위치와 각 스케줄 위치 간의 거리를 계산합니다.
     """
+    current_user_id = int(user_id)
     try:
         # 기본값 설정 (현재 년월)
         from datetime import datetime
@@ -890,12 +892,15 @@ def get_group_schedules(
     end_date: Optional[str] = Query(None, description="종료 날짜 (YYYY-MM-DD)"),
     days: Optional[int] = Query(None, description="오늘부터 며칠간의 스케줄 조회 (예: 7)"),
     member_id: Optional[int] = Query(None, description="특정 멤버 ID"),
-    current_user_id: int = Query(..., description="현재 사용자 ID"),
+    current_user_id: Optional[int] = Query(None, description="현재 사용자 ID"),
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
     그룹 스케줄 조회 (권한 기반)
     """
+    current_user_id = int(user_id)
+    deps.require_group_member(db, user_id, group_id)
     try:
         logger.info(f"📅 [GET_SCHEDULES] 스케줄 조회 시작 - group_id: {group_id}, days: {days}, start_date: {start_date}, end_date: {end_date}")
         
@@ -1034,15 +1039,17 @@ def get_group_schedules(
 def create_group_schedule(
     group_id: int,
     schedule_data: Dict[str, Any],
-    current_user_id: int = Query(..., description="현재 사용자 ID"),
+    current_user_id: Optional[int] = Query(None, description="현재 사용자 ID"),
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
     그룹 스케줄 생성 (향상된 PHP 로직 기반)
     """
+    current_user_id = int(user_id)
+    deps.require_group_member(db, user_id, group_id)
     try:
         logger.info(f"🔥 [CREATE_SCHEDULE] 스케줄 생성 시작 - group_id: {group_id}, user_id: {current_user_id}")
-        logger.info(f"📝 [CREATE_SCHEDULE] 원본 요청 데이터: {schedule_data}")
         
         # 실제 작업자 정보 추출 (푸시 알림용)
         editor_id = schedule_data.get('editorId')
@@ -1304,15 +1311,17 @@ def update_group_schedule_with_repeat_option(
     group_id: int,
     schedule_id: int,
     schedule_data: Dict[str, Any],
-    current_user_id: int = Query(..., description="현재 사용자 ID"),
+    current_user_id: Optional[int] = Query(None, description="현재 사용자 ID"),
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
     그룹 스케줄 수정 (반복 일정 처리 옵션 지원)
     """
+    current_user_id = int(user_id)
+    deps.require_group_member(db, user_id, group_id)
     try:
         logger.info(f"🔥 [UPDATE_REPEAT_SCHEDULE] 반복 일정 수정 시작 - group_id: {group_id}, schedule_id: {schedule_id}, user_id: {current_user_id}")
-        logger.info(f"📝 [UPDATE_REPEAT_SCHEDULE] 요청 데이터: {schedule_data}")
         
         # 실제 작업자 정보 추출 (푸시 알림용)
         editor_id = schedule_data.get('editorId')
@@ -1336,10 +1345,10 @@ def update_group_schedule_with_repeat_option(
         # 기존 스케줄 조회
         schedule_query = text("""
             SELECT * FROM smap_schedule_t 
-            WHERE sst_idx = :schedule_id AND sst_show = 'Y'
+            WHERE sst_idx = :schedule_id AND sgt_idx = :group_id AND sst_show = 'Y'
         """)
         
-        schedule_result = db.execute(schedule_query, {"schedule_id": schedule_id}).fetchone()
+        schedule_result = db.execute(schedule_query, {"schedule_id": schedule_id, "group_id": group_id}).fetchone()
         
         if not schedule_result:
             logger.error(f"❌ [UPDATE_REPEAT_SCHEDULE] 스케줄을 찾을 수 없음 - schedule_id: {schedule_id}")
@@ -1664,12 +1673,15 @@ def delete_group_schedule_with_repeat_option(
     group_id: int,
     schedule_id: int,
     delete_data: Optional[Dict[str, Any]] = Body(None),
-    current_user_id: int = Query(..., description="현재 사용자 ID"),
+    current_user_id: Optional[int] = Query(None, description="현재 사용자 ID"),
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
     그룹 스케줄 삭제 (반복 일정 처리 옵션 지원)
     """
+    current_user_id = int(user_id)
+    deps.require_group_member(db, user_id, group_id)
     try:
         logger.info(f"🗑️ [DELETE_REPEAT_SCHEDULE] 반복 일정 삭제 시작 - group_id: {group_id}, schedule_id: {schedule_id}, user_id: {current_user_id}")
         
@@ -1699,10 +1711,10 @@ def delete_group_schedule_with_repeat_option(
         # 기존 스케줄 조회
         schedule_query = text("""
             SELECT * FROM smap_schedule_t 
-            WHERE sst_idx = :schedule_id AND sst_show = 'Y'
+            WHERE sst_idx = :schedule_id AND sgt_idx = :group_id AND sst_show = 'Y'
         """)
         
-        schedule_result = db.execute(schedule_query, {"schedule_id": schedule_id}).fetchone()
+        schedule_result = db.execute(schedule_query, {"schedule_id": schedule_id, "group_id": group_id}).fetchone()
         
         if not schedule_result:
             logger.error(f"❌ [DELETE_REPEAT_SCHEDULE] 스케줄을 찾을 수 없음 - schedule_id: {schedule_id}")

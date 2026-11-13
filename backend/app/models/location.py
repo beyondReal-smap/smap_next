@@ -114,10 +114,10 @@ class Location(BaseModel):
                   AND slt.slt_enter_chk = 'N'
             """)
             result = db.execute(sql)
-            return [dict(row) for row in result]
+            return [dict(row._mapping) for row in result]
         except Exception as e:
             logger.error(f"Error in get_in_myplays_list: {e}")
-            return []
+            raise
 
     @classmethod
     def get_out_myplays_list(cls, db: Session) -> List[Dict]:
@@ -135,10 +135,10 @@ class Location(BaseModel):
                   AND DATE(slt_udate) = CURDATE()
             """)
             result = db.execute(sql)
-            return [dict(row) for row in result]
+            return [dict(row._mapping) for row in result]
         except Exception as e:
             logger.error(f"Error in get_out_myplays_list: {e}")
-            return []
+            raise
 
     # ── CUD 메서드 ──
 

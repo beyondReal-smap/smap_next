@@ -12,8 +12,46 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.member import Member, is_active_member
+from app.models.group_detail import GroupDetail
+from sqlalchemy.orm import aliased
 
 logger = logging.getLogger(__name__)
+
+
+def require_group_member(db: Session, user_id: int, group_id: int) -> GroupDetail:
+    membership = db.query(GroupDetail).filter(
+        GroupDetail.sgt_idx == group_id,
+        GroupDetail.mt_idx == user_id,
+        GroupDetail.sgdt_exit == 'N',
+        GroupDetail.sgdt_discharge == 'N',
+        GroupDetail.sgdt_show == 'Y',
+    ).first()
+    if not membership:
+        raise HTTPException(status_code=403, detail="그룹 멤버만 이용할 수 있습니다.")
+    return membership
+
+
+def require_group_owner(db: Session, user_id: int, group_id: int) -> GroupDetail:
+    membership = require_group_member(db, user_id, group_id)
+    if getattr(membership.sgdt_owner_chk, 'value', membership.sgdt_owner_chk) != 'Y':
+        raise HTTPException(status_code=403, detail="그룹장 권한이 필요합니다.")
+    return membership
+
+
+def require_same_group_or_self(db: Session, user_id: int, member_id: int) -> None:
+    if int(user_id) == int(member_id):
+        return
+    other = aliased(GroupDetail)
+    shared = db.query(GroupDetail.sgdt_idx).join(
+        other, other.sgt_idx == GroupDetail.sgt_idx
+    ).filter(
+        GroupDetail.mt_idx == user_id,
+        GroupDetail.sgdt_exit == 'N', GroupDetail.sgdt_discharge == 'N', GroupDetail.sgdt_show == 'Y',
+        other.mt_idx == member_id,
+        other.sgdt_exit == 'N', other.sgdt_discharge == 'N', other.sgdt_show == 'Y',
+    ).first()
+    if not shared:
+        raise HTTPException(status_code=403, detail="같은 그룹 멤버만 이용할 수 있습니다.")
 
 
 def get_current_user_id(authorization: str = Header(None)) -> Optional[int]:

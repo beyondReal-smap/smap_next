@@ -2,8 +2,11 @@ import traceback
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Request, Query, status
 from sqlalchemy.orm import Session
-from typing import List, Optional, Tuple
+from typing import List, Optional
 from ....db.session import get_db
+from app.api import deps
+from app.models.group_detail import GroupDetail
+from app.models.member_location_log import MemberLocationLog
 from ....schemas.member_location_log import (
     MemberLocationLogCreate, 
     MemberLocationLogUpdate, 
@@ -17,39 +20,13 @@ from ....schemas.member_location_log import (
     LocationLogSummaryResponse
 )
 from ....crud import member_location_log as location_log_crud
-from ....core.config import settings
-import jwt
-
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-def _extract_token_from_header(request: Request) -> Optional[str]:
-    auth_header = request.headers.get("Authorization") or request.headers.get("authorization")
-    if not auth_header:
-        return None
-    parts = auth_header.split()
-    if len(parts) == 2 and parts[0].lower() == "bearer":
-        return parts[1]
-    return None
-
-def _get_mt_idx_from_token(request: Request) -> Tuple[Optional[int], Optional[str]]:
-    """Return (mt_idx, error_message). error_message is None when ok."""
-    token = _extract_token_from_header(request)
-    if not token:
-        return None, "Authorization 헤더가 필요합니다 (Bearer 토큰)."
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        # mt_idx 먼저 확인, 없으면 sub 확인 (하위 호환)
-        mt_idx = payload.get("mt_idx") or payload.get("sub")
-        if not mt_idx:
-            return None, "토큰에 mt_idx가 없습니다."
-        return int(mt_idx), None
-    except Exception as e:
-        return None, f"토큰 검증 실패: {str(e)}"
 
 @router.post("/member-location-logs")
 async def handle_location_log_request(
     request: Request,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(get_db)
 ):
     """위치 로그 관련 요청 처리"""
@@ -57,6 +34,23 @@ async def handle_location_log_request(
     try:
         body = await request.json()
         act = body.get("act")
+        if act == "create_location_log":
+            if body.get("mt_idx") is not None and str(body["mt_idx"]) != str(user_id):
+                raise HTTPException(status_code=403, detail="다른 회원의 위치를 기록할 수 없습니다.")
+        elif act in ("update_location_log", "delete_location_log"):
+            log = db.query(MemberLocationLog).filter(MemberLocationLog.mlt_idx == body.get("mlt_idx")).first()
+            if not log:
+                raise HTTPException(status_code=404, detail="Location log not found")
+            if int(log.mt_idx) != int(user_id):
+                raise HTTPException(status_code=403, detail="본인의 위치 기록만 변경할 수 있습니다.")
+        elif act == "get_members_with_logs":
+            if not body.get("group_id"):
+                raise HTTPException(status_code=400, detail="group_id is required")
+            deps.require_group_member(db, user_id, int(body["group_id"]))
+        elif act and act.startswith("get_"):
+            if not body.get("mt_idx"):
+                raise HTTPException(status_code=400, detail="mt_idx is required")
+            deps.require_same_group_or_self(db, user_id, int(body["mt_idx"]))
         
         if not act:
             logger.error("No 'act' parameter provided in request")
@@ -81,6 +75,8 @@ async def handle_location_log_request(
                 result = [log.to_dict() for log in logs]
                 return {"result": "Y", "data": result}
                 
+            except HTTPException:
+                raise
             except Exception as e:
                 logger.error(f"Error getting location logs: {str(e)}")
                 logger.error(traceback.format_exc())
@@ -102,6 +98,8 @@ async def handle_location_log_request(
                 
                 return {"result": "Y", "data": summary.model_dump()}
                 
+            except HTTPException:
+                raise
             except Exception as e:
                 logger.error(f"Error getting location summary: {str(e)}")
                 logger.error(traceback.format_exc())
@@ -123,6 +121,8 @@ async def handle_location_log_request(
                 
                 return {"result": "Y", "data": path_data.model_dump()}
                 
+            except HTTPException:
+                raise
             except Exception as e:
                 logger.error(f"Error getting location path: {str(e)}")
                 logger.error(traceback.format_exc())
@@ -131,16 +131,7 @@ async def handle_location_log_request(
         elif act == "create_location_log":
             # 위치 로그 생성 (토큰 기반 사용자 식별 + 배치 전송 지원)
             try:
-                # 토큰이 있으면 토큰 기반, 없으면 body의 mt_idx 사용
-                token_mt_idx, token_err = _get_mt_idx_from_token(request)
-                if token_err and not body.get("mt_idx"):
-                    # 토큰도 없고 body에 mt_idx도 없으면 에러
-                    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=token_err)
-                
-                # 토큰에서 mt_idx를 가져오거나 body에서 사용
-                final_mt_idx = token_mt_idx if token_mt_idx else body.get("mt_idx")
-                if not final_mt_idx:
-                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="mt_idx가 필요합니다 (토큰 또는 body)")
+                final_mt_idx = user_id
 
                 # 동의(옵션): body 또는 헤더로 넘어오는 동의 플래그가 명시적으로 'N'이면 차단
                 consent = (str(body.get("location_consent", "Y")).upper() != "N")
@@ -197,6 +188,8 @@ async def handle_location_log_request(
                 return {"result": "Y", "data": result.to_dict()}
             except HTTPException:
                 raise
+            except HTTPException:
+                raise
             except Exception as e:
                 logger.error(f"Error creating location log: {str(e)}")
                 logger.error(traceback.format_exc())
@@ -218,6 +211,8 @@ async def handle_location_log_request(
                 
                 return {"result": "Y", "data": result.to_dict()}
                 
+            except HTTPException:
+                raise
             except Exception as e:
                 logger.error(f"Error updating location log: {str(e)}")
                 logger.error(traceback.format_exc())
@@ -237,6 +232,8 @@ async def handle_location_log_request(
                 logger.info(f"Location log deleted successfully: {log_id}")
                 return {"result": "Y", "data": {"deleted_id": log_id}}
                 
+            except HTTPException:
+                raise
             except Exception as e:
                 logger.error(f"Error deleting location log: {str(e)}")
                 logger.error(traceback.format_exc())
@@ -250,10 +247,15 @@ async def handle_location_log_request(
                     raise HTTPException(status_code=400, detail="date is required (YYYY-MM-DD format)")
                 
                 member_ids = location_log_crud.get_members_with_logs_by_date(db, date)
+                active_members = db.query(GroupDetail.mt_idx).filter(GroupDetail.sgt_idx == int(body["group_id"]), GroupDetail.sgdt_exit == "N", GroupDetail.sgdt_discharge == "N", GroupDetail.sgdt_show == "Y").all()
+                allowed_ids = {row[0] for row in active_members}
+                member_ids = [member_id for member_id in member_ids if member_id in allowed_ids]
                 
                 logger.info(f"Found {len(member_ids)} members with logs on {date}")
                 return {"result": "Y", "data": {"member_ids": member_ids}}
                 
+            except HTTPException:
+                raise
             except Exception as e:
                 logger.error(f"Error getting members with logs: {str(e)}")
                 logger.error(traceback.format_exc())
@@ -281,6 +283,8 @@ async def handle_location_log_request(
                 logger.info(f"Retrieved {len(result)} daily location logs for member {mt_idx} on {date}")
                 return {"result": "Y", "data": result}
                 
+            except HTTPException:
+                raise
             except Exception as e:
                 logger.error(f"Error getting daily location logs: {str(e)}")
                 logger.error(traceback.format_exc())
@@ -302,6 +306,8 @@ async def handle_location_log_request(
                 logger.info(f"Retrieved daily location summary for member {mt_idx} on {date}")
                 return {"result": "Y", "data": summary.model_dump()}
                 
+            except HTTPException:
+                raise
             except Exception as e:
                 logger.error(f"Error getting daily location summary: {str(e)}")
                 logger.error(traceback.format_exc())
@@ -323,6 +329,8 @@ async def handle_location_log_request(
                 logger.info(f"Retrieved daily location path for member {mt_idx} on {date}: {len(path_data.points)} points")
                 return {"result": "Y", "data": path_data.model_dump()}
                 
+            except HTTPException:
+                raise
             except Exception as e:
                 logger.error(f"Error getting daily location path: {str(e)}")
                 logger.error(traceback.format_exc())
@@ -355,6 +363,8 @@ async def handle_location_log_request(
                     "total_days": len(summary_data)
                 }
                 
+            except HTTPException:
+                raise
             except Exception as e:
                 logger.error(f"Error getting daily summary by range: {str(e)}")
                 logger.error(traceback.format_exc())
@@ -385,6 +395,8 @@ async def handle_location_log_request(
                     "total_stays": len(stay_times)
                 }
                 
+            except HTTPException:
+                raise
             except Exception as e:
                 logger.error(f"Error getting stay times: {str(e)}")
                 logger.error(traceback.format_exc())
@@ -414,6 +426,8 @@ async def handle_location_log_request(
                     "total_markers": len(map_markers)
                 }
                 
+            except HTTPException:
+                raise
             except Exception as e:
                 logger.error(f"Error getting map markers: {str(e)}")
                 logger.error(traceback.format_exc())
@@ -439,6 +453,8 @@ async def handle_location_log_request(
                     message="위치 로그 요약 정보 조회 성공"
                 )
                 
+            except HTTPException:
+                raise
             except Exception as e:
                 logger.error(f"Error getting location summary: {str(e)}")
                 logger.error(traceback.format_exc())
@@ -517,9 +533,11 @@ def get_member_location_logs(
     end_date: Optional[str] = Query(None, description="종료 날짜 (YYYY-MM-DD)"),
     limit: int = Query(100, description="조회할 로그 수"),
     offset: int = Query(0, description="건너뛸 로그 수"),
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(get_db)
 ):
     """회원의 위치 로그 목록 조회 (GET 방식)"""
+    deps.require_same_group_or_self(db, user_id, mt_idx)
     try:
         logs = location_log_crud.get_member_location_logs(
             db, mt_idx, start_date, end_date, limit, offset
@@ -536,6 +554,7 @@ def get_location_summary(
     date: Optional[str] = Query(None, description="특정 날짜 (YYYY-MM-DD 형식)"),
     start_date: Optional[str] = Query(None, description="시작 날짜 (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="종료 날짜 (YYYY-MM-DD)"),
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(get_db)
 ):
     """
@@ -543,6 +562,7 @@ def get_location_summary(
     date 파라미터가 있으면 해당 날짜의 상세 요약을, 
     없으면 start_date/end_date 범위의 요약을 반환합니다.
     """
+    deps.require_same_group_or_self(db, user_id, mt_idx)
     try:
         if date:
             # iOS 앱 및 활동로그 페이지에서 사용하는 특정 날짜 요약 (PHP 로직 기반)
@@ -565,9 +585,11 @@ def get_location_path(
     mt_idx: int,
     start_date: Optional[str] = Query(None, description="시작 날짜 (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="종료 날짜 (YYYY-MM-DD)"),
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(get_db)
 ):
     """위치 경로 및 요약 정보 조회 (GET 방식)"""
+    deps.require_same_group_or_self(db, user_id, mt_idx)
     try:
         path_data = location_log_crud.get_location_path(db, mt_idx, start_date, end_date)
         return {"result": "Y", "data": path_data.model_dump()}
@@ -581,9 +603,11 @@ def get_daily_location_logs(
     date: str = Query(..., description="날짜 (YYYY-MM-DD 형식)"),
     limit: int = Query(1000, description="조회할 로그 수"),
     offset: int = Query(0, description="건너뛸 로그 수"),
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(get_db)
 ):
     """특정 회원의 특정 날짜 위치 로그 조회 (GET 방식)"""
+    deps.require_same_group_or_self(db, user_id, mt_idx)
     try:
         logs = location_log_crud.get_member_location_logs_by_exact_date(
             db, mt_idx, date, limit, offset
@@ -599,13 +623,15 @@ def get_daily_location_logs(
 
 # 중복된 /summary 엔드포인트 제거 (위의 통합 엔드포인트로 대체됨)
 
-@router.get("/member-location-logs/{mt_idx}/path")
+@router.get("/member-location-logs/{mt_idx}/daily-path")
 def get_daily_location_path(
     mt_idx: int,
     date: str = Query(..., description="날짜 (YYYY-MM-DD 형식)"),
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(get_db)
 ):
     """특정 회원의 특정 날짜 위치 경로 데이터 조회 (GET 방식)"""
+    deps.require_same_group_or_self(db, user_id, mt_idx)
     try:
         path_data = location_log_crud.get_member_daily_location_path(
             db, mt_idx, date
@@ -622,13 +648,18 @@ def get_daily_location_path(
 def get_members_with_logs(
     group_id: int = Query(..., description="그룹 ID"),
     date: str = Query(..., description="날짜 (YYYY-MM-DD 형식)"),
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(get_db)
 ):
     """특정 날짜에 위치 로그가 있는 멤버 목록 조회 (GET 방식)"""
+    deps.require_group_member(db, user_id, group_id)
     try:
         logger.info(f"[GET] Members with logs: group_id={group_id}, date={date}")
         
         member_ids = location_log_crud.get_members_with_logs_by_date(db, date)
+        active_members = db.query(GroupDetail.mt_idx).filter(GroupDetail.sgt_idx == group_id, GroupDetail.sgdt_exit == "N", GroupDetail.sgdt_discharge == "N", GroupDetail.sgdt_show == "Y").all()
+        allowed_ids = {row[0] for row in active_members}
+        member_ids = [member_id for member_id in member_ids if member_id in allowed_ids]
         
         logger.info(f"Found {len(member_ids)} members with logs on {date}")
         
@@ -646,12 +677,14 @@ def get_member_location_logs_daily_summary(
     end_date: str = Query(..., description="종료 날짜 (YYYY-MM-DD 형식)"),
     max_accuracy: float = Query(50.0, description="최대 정확도 값"),
     min_speed: float = Query(0.0, description="최소 속도 값"),
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(get_db)
 ):
     """
     특정 회원의 위치 로그를 날짜별로 그룹화하여 요약 정보 조회 (GET 방식)
     제공된 SQL 쿼리를 기반으로 구현된 API
     """
+    deps.require_same_group_or_self(db, user_id, mt_idx)
     try:
         logger.info(f"[GET] Daily summary: mt_idx={mt_idx}, start_date={start_date}, end_date={end_date}")
         
@@ -679,12 +712,14 @@ def get_member_stay_times(
     min_speed: float = Query(1.0, description="체류/이동 구분 기준 속도"),
     max_accuracy: float = Query(50.0, description="최대 정확도 값"),
     min_duration: int = Query(5, description="최소 체류시간(분)"),
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(get_db)
 ):
     """
     특정 회원의 특정 날짜 체류시간 분석 (GET 방식)
     제공된 복잡한 CTE 쿼리를 기반으로 구현된 API
     """
+    deps.require_same_group_or_self(db, user_id, mt_idx)
     try:
         logger.info(f"[GET] Stay times: mt_idx={mt_idx}, date={date}, min_speed={min_speed}")
         
@@ -711,12 +746,14 @@ def get_member_map_markers(
     date: str = Query(..., description="조회할 날짜 (YYYY-MM-DD 형식)"),
     min_speed: float = Query(1.0, description="최소 속도 값"),
     max_accuracy: float = Query(50.0, description="최대 정확도 값"),
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(get_db)
 ):
     """
     특정 회원의 특정 날짜 지도 마커용 이동로그 데이터 조회 (GET 방식)
     제공된 SQL 쿼리를 기반으로 구현된 API (데이터 샘플링 포함)
     """
+    deps.require_same_group_or_self(db, user_id, mt_idx)
     try:
         logger.info(f"[GET] Map markers API 호출: mt_idx={mt_idx}, date={date}, min_speed={min_speed}, max_ㅣaccuracy={max_accuracy}")
         
@@ -745,11 +782,13 @@ def get_member_map_markers(
 def get_daily_location_counts(
     group_id: int = Query(..., description="그룹 ID"),
     days: int = Query(14, description="조회할 일수 (기본값: 14일)"),
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(get_db)
 ):
     """
     최근 N일간 그룹 멤버들의 일별 위치 기록 카운트를 반환합니다.
     """
+    deps.require_group_member(db, user_id, group_id)
     try:
         from datetime import datetime, timedelta
         from sqlalchemy import func, and_, text
@@ -887,11 +926,13 @@ def get_daily_location_counts(
 def get_daily_location_counts_simple(
     group_id: int = Query(..., description="그룹 ID"),
     days: int = Query(14, description="조회할 일수 (기본값: 14일)"),
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(get_db)
 ):
     """
     멤버별 일별 위치 기록 카운트를 간단한 텍스트 형태로 반환합니다.
     """
+    deps.require_group_member(db, user_id, group_id)
     try:
         from datetime import datetime, timedelta
         from sqlalchemy import func, and_, text
@@ -967,11 +1008,13 @@ def get_daily_location_counts_simple(
 def get_member_activity_by_date(
     group_id: int = Query(..., description="그룹 ID"),
     date: str = Query(..., description="조회할 날짜 (YYYY-MM-DD)"),
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(get_db)
 ):
     """
     특정 날짜의 그룹 멤버별 위치 기록 활동을 반환합니다.
     """
+    deps.require_group_member(db, user_id, group_id)
     try:
         from datetime import datetime
         from sqlalchemy import func, and_, text

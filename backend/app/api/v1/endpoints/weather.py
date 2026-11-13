@@ -8,6 +8,11 @@ from datetime import datetime
 
 router = APIRouter()
 
+def require_weather_owner(member_id: int, user_id: int = Depends(deps.get_required_user_id)) -> None:
+    if int(member_id) != int(user_id):
+        raise HTTPException(status_code=403, detail="본인의 날씨 정보만 이용할 수 있습니다.")
+
+
 @router.get("/current")
 def get_current_weather(
     lat: Optional[float] = Query(None, description="위도"),
@@ -74,7 +79,7 @@ def get_current_weather(
             }
         }
 
-@router.get("/member/{member_id}")
+@router.get("/member/{member_id}", dependencies=[Depends(require_weather_owner)])
 @cached("weather:member", ttl=180)
 def get_member_weather(
     member_id: int,
@@ -107,7 +112,7 @@ def get_member_weather(
     except Exception as e:
         raise HTTPException(status_code=500, detail="날씨 정보를 가져올 수 없습니다.")
 
-@router.put("/member/{member_id}")
+@router.put("/member/{member_id}", dependencies=[Depends(require_weather_owner)])
 def update_member_weather(
     member_id: int,
     weather_data: dict,

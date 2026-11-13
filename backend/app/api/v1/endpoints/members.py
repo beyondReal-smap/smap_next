@@ -1,5 +1,5 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, Header, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, Header, UploadFile, File, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 from app.api import deps
@@ -54,7 +54,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/verify-password")
+@router.post("/verify-password", dependencies=[Depends(deps.get_required_user_id)])
 def verify_password(
     request: VerifyPasswordRequest,
     authorization: str = Header(None),
@@ -106,7 +106,7 @@ def verify_password(
             "success": False
         }
 
-@router.post("/change-password")
+@router.post("/change-password", dependencies=[Depends(deps.get_required_user_id)])
 def change_password(
     request: ChangePasswordRequest,
     authorization: str = Header(None),
@@ -205,12 +205,16 @@ def register_member(
 @router.post("/login", response_model=MemberLoginResponse)
 def login_member(
     login_data: MemberLogin,
+    request: Request,
     db: Session = Depends(deps.get_db)
 ):
     """
     로그인
     """
-    return member_service.login_member(db, login_data.mt_id, login_data.mt_pwd)
+    from app.api.v1.endpoints.auth import login_for_home_page
+    from app.schemas.auth import LoginRequestHome
+    result = login_for_home_page(LoginRequestHome(mt_id=login_data.mt_id, mt_pwd=login_data.mt_pwd), request, db)
+    return MemberLoginResponse(success=result.success, message=result.message, data={"user": result.data["user"]} if result.success else None)
 
 @router.post("/google-login", response_model=GoogleLoginResponse)
 def google_login(
@@ -222,21 +226,41 @@ def google_login(
     """
     return member_service.google_login(db, google_data)
 
+def _limit_account_lookup(request: Request) -> None:
+    from app.api.v1.endpoints.email_auth import _redis, _client_ip
+    import hashlib
+    client = _redis()
+    key = 'member:lookup:ip:' + hashlib.sha256(_client_ip(request).encode()).hexdigest()
+    try:
+        count = client.incr(key)
+        if count == 1:
+            client.expire(key, 3600)
+        if count > 20:
+            raise HTTPException(status_code=429, detail="요청 횟수를 초과했습니다. 잠시 후 다시 시도해주세요.")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("계정 조회 제한 저장소 오류: %s", type(exc).__name__)
+        raise HTTPException(status_code=503, detail="계정 조회 서비스를 사용할 수 없습니다.") from exc
+
+
 @router.get("/check/phone/{phone}")
 def check_phone_availability(
     phone: str,
+    request: Request,
     db: Session = Depends(deps.get_db)
 ):
     """
     전화번호 사용 가능 여부 확인
     """
+    _limit_account_lookup(request)
     is_available = member_service.check_phone_availability(db, phone)
     return {
         "available": is_available,
         "message": "사용 가능한 전화번호입니다." if is_available else "이미 가입된 전화번호입니다."
     }
 
-@router.get("/check/email/{email}")
+@router.get("/check/email/{email}", dependencies=[Depends(deps.get_required_admin_id)])
 def check_email_availability(
     email: str,
     db: Session = Depends(deps.get_db)
@@ -250,7 +274,7 @@ def check_email_availability(
         "message": "사용 가능한 이메일입니다." if is_available else "이미 가입된 이메일입니다."
     }
 
-@router.get("/check/nickname/{nickname}")
+@router.get("/check/nickname/{nickname}", dependencies=[Depends(deps.get_required_admin_id)])
 def check_nickname_availability(
     nickname: str,
     db: Session = Depends(deps.get_db)
@@ -264,7 +288,7 @@ def check_nickname_availability(
         "message": "사용 가능한 닉네임입니다." if is_available else "이미 사용 중인 닉네임입니다."
     }
 
-@router.get("/")
+@router.get("/", dependencies=[Depends(deps.get_required_admin_id)])
 def get_members(
     db: Session = Depends(deps.get_db),
     skip: int = 0,
@@ -331,7 +355,7 @@ def _member_to_dict(member: Member) -> dict:
         "mt_udate": safe_date(member.mt_udate),
     }
 
-@router.get("/me")
+@router.get("/me", dependencies=[Depends(deps.get_required_user_id)])
 def get_user_profile(
     authorization: str = Header(None),
     db: Session = Depends(deps.get_db)
@@ -399,9 +423,81 @@ def get_user_profile(
             "success": False
         }
 
+@router.get("/terms", response_model=TermsListResponse)
+def get_terms_list():
+    """
+    약관 목록을 조회합니다.
+    """
+    logger.info("[TERMS] 약관 목록 조회 요청")
+
+    try:
+        terms = [
+            TermInfo(
+                id="service",
+                title="서비스 이용약관",
+                description="SMAP 서비스 이용에 관한 약관",
+                version="1.0",
+                last_updated="2024-01-01",
+                is_required=True,
+                db_field="mt_agree1"
+            ),
+            TermInfo(
+                id="privacy",
+                title="개인정보 처리방침",
+                description="개인정보 수집 및 이용에 관한 방침",
+                version="1.0",
+                last_updated="2024-01-01",
+                is_required=True,
+                db_field="mt_agree2"
+            ),
+            TermInfo(
+                id="location",
+                title="위치기반서비스 이용약관",
+                description="위치정보 수집 및 이용에 관한 약관",
+                version="1.0",
+                last_updated="2024-01-01",
+                is_required=True,
+                db_field="mt_agree3"
+            ),
+            TermInfo(
+                id="third_party",
+                title="개인정보 제3자 제공",
+                description="개인정보 제3자 제공에 관한 동의",
+                version="1.0",
+                last_updated="2024-01-01",
+                is_required=False,
+                db_field="mt_agree4"
+            ),
+            TermInfo(
+                id="marketing",
+                title="마케팅 정보 수신",
+                description="마케팅 정보 수집 및 이용에 관한 동의",
+                version="1.0",
+                last_updated="2024-01-01",
+                is_required=False,
+                db_field="mt_agree5"
+            )
+        ]
+
+        logger.info(f"[TERMS] 약관 목록 조회 성공 - 총 {len(terms)}개")
+        return TermsListResponse(
+            success=True,
+            message="약관 목록 조회 성공",
+            data=terms
+        )
+
+    except Exception as e:
+        logger.error(f"[TERMS] 약관 목록 조회 실패: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail="서버 오류가 발생했습니다.")
+
+
+
 @router.get("/{member_id}", response_model=MemberResponse)
 def get_member(
     member_id: int,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
@@ -411,6 +507,9 @@ def get_member(
     member = db.query(Member).filter(Member.mt_idx == member_id).first()
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
+    if int(user_id) != member_id:
+        deps.require_same_group_or_self(db, user_id, member_id)
+        return {"mt_idx": member.mt_idx, "mt_id": "", "mt_name": member.mt_name or "", "mt_nickname": member.mt_nickname or "", "mt_file1": member.mt_file1}
 
     # home/page.tsx의 Member 타입에 맞게 데이터 변환
     member_data = {
@@ -450,6 +549,7 @@ def get_member(
 @router.get("/group/{group_id}", response_model=List[dict])
 def get_group_members(
     group_id: int,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
@@ -458,6 +558,7 @@ def get_group_members(
     Member 정보와 GroupDetail 정보를 합쳐서 반환
     """
     # 그룹에 속한 멤버들과 그룹 상세 정보를 조인하여 조회
+    deps.require_group_member(db, user_id, group_id)
     members_with_details = db.query(Member, GroupDetail).join(
         GroupDetail, Member.mt_idx == GroupDetail.mt_idx
     ).filter(
@@ -517,11 +618,14 @@ def get_group_members(
             "sgdt_xdate": group_detail.sgdt_xdate.isoformat() if group_detail.sgdt_xdate else "",
             "sgdt_adate": group_detail.sgdt_adate.isoformat() if group_detail.sgdt_adate else ""
         }
+        if int(member.mt_idx) != int(user_id):
+            for field in ('mt_id', 'mt_hp', 'mt_email', 'mt_birth'):
+                member_data.pop(field, None)
         result.append(member_data)
 
     return result
 
-@router.post("/", response_model=MemberResponse)
+@router.post("/", response_model=MemberResponse, dependencies=[Depends(deps.get_required_admin_id)])
 def create_member(
     member_in: MemberCreate,
     db: Session = Depends(deps.get_db)
@@ -539,17 +643,22 @@ def create_member(
 def update_member(
     member_id: int,
     member_in: MemberUpdate,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
     멤버 정보를 업데이트합니다.
     AuthContext의 updateUserProfile에서 사용
     """
+    if int(user_id) != member_id:
+        raise HTTPException(status_code=403, detail="본인의 정보만 수정할 수 있습니다.")
     member = db.query(Member).filter(Member.mt_idx == member_id).first()
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
 
     update_data = member_in.dict(exclude_unset=True)
+    if 'mt_email' in update_data and (update_data['mt_email'] or '').strip().lower() != (member.mt_email or '').strip().lower():
+        raise HTTPException(status_code=400, detail="이메일 변경은 이메일 인증 API를 이용해주세요.")
     for field, value in update_data.items():
         setattr(member, field, value)
 
@@ -594,16 +703,19 @@ def update_member(
 @router.delete("/{member_id}")
 def delete_member(
     member_id: int,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
     멤버를 삭제합니다.
     """
+    if int(user_id) != member_id:
+        raise HTTPException(status_code=403, detail="본인의 계정만 비활성화할 수 있습니다.")
     member = db.query(Member).filter(Member.mt_idx == member_id).first()
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
 
-    member.mt_status = 0  # 실제 삭제 대신 상태 변경
+    member.mt_status = 2  # 실제 삭제 대신 상태 변경
     db.add(member)
     db.commit()
     return {"success": True, "message": "Member deleted successfully"}
@@ -613,11 +725,14 @@ def update_member_location(
     member_id: int,
     lat: float,
     lng: float,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
     멤버의 위치 정보를 업데이트합니다.
     """
+    if int(user_id) != member_id:
+        raise HTTPException(status_code=403, detail="본인의 위치만 수정할 수 있습니다.")
     member = db.query(Member).filter(Member.mt_idx == member_id).first()
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
@@ -629,7 +744,7 @@ def update_member_location(
     db.refresh(member)
     return member
 
-@router.post("/update-profile")
+@router.post("/update-profile", dependencies=[Depends(deps.get_required_user_id)])
 def update_profile(
     request: UpdateProfileRequest,
     authorization: str = Header(None),
@@ -697,7 +812,7 @@ def update_profile(
             "success": False
         }
 
-@router.post("/update-contact")
+@router.post("/update-contact", dependencies=[Depends(deps.get_required_user_id)])
 def update_contact(
     request: UpdateContactRequest,
     authorization: str = Header(None),
@@ -720,6 +835,12 @@ def update_contact(
             }
 
         logger.info(f"[UPDATE_CONTACT] 연락처 업데이트 요청 - user_id: {user_id}")
+
+        current = crud_auth.get_user_by_idx(db, user_id)
+        if not current:
+            raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+        if request.mt_email.strip().lower() != (current.mt_email or '').strip().lower():
+            raise HTTPException(status_code=400, detail="이메일 변경은 이메일 인증 API를 이용해주세요.")
 
         # 전화번호 중복 확인
         if crud_auth.check_phone_duplicate(db, user_id, request.mt_hp):
@@ -826,7 +947,7 @@ def withdraw_member(
 
 # ==================== 동의 관리 엔드포인트 ====================
 
-@router.get("/consent/{member_id}", response_model=ConsentResponse)
+@router.get("/consent/{member_id}", response_model=ConsentResponse, dependencies=[Depends(deps.get_required_user_id)])
 def get_consent_info(
     member_id: int,
     authorization: str = Header(None),
@@ -873,7 +994,7 @@ def get_consent_info(
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail="서버 오류가 발생했습니다.")
 
-@router.post("/consent", response_model=ConsentUpdateResponse)
+@router.post("/consent", response_model=ConsentUpdateResponse, dependencies=[Depends(deps.get_required_user_id)])
 def update_consent(
     request: ConsentUpdate,
     authorization: str = Header(None),
@@ -914,7 +1035,7 @@ def update_consent(
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail="서버 오류가 발생했습니다.")
 
-@router.post("/consent/all", response_model=ConsentUpdateResponse)
+@router.post("/consent/all", response_model=ConsentUpdateResponse, dependencies=[Depends(deps.get_required_user_id)])
 def update_all_consent(
     request: ConsentUpdateAll,
     authorization: str = Header(None),
@@ -963,76 +1084,6 @@ def update_all_consent(
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail="서버 오류가 발생했습니다.")
 
-@router.get("/terms", response_model=TermsListResponse)
-def get_terms_list():
-    """
-    약관 목록을 조회합니다.
-    """
-    logger.info("[TERMS] 약관 목록 조회 요청")
-
-    try:
-        terms = [
-            TermInfo(
-                id="service",
-                title="서비스 이용약관",
-                description="SMAP 서비스 이용에 관한 약관",
-                version="1.0",
-                lastUpdated="2024-01-01",
-                isRequired=True,
-                field="mt_agree1"
-            ),
-            TermInfo(
-                id="privacy",
-                title="개인정보 처리방침",
-                description="개인정보 수집 및 이용에 관한 방침",
-                version="1.0",
-                lastUpdated="2024-01-01",
-                isRequired=True,
-                field="mt_agree2"
-            ),
-            TermInfo(
-                id="location",
-                title="위치기반서비스 이용약관",
-                description="위치정보 수집 및 이용에 관한 약관",
-                version="1.0",
-                lastUpdated="2024-01-01",
-                isRequired=True,
-                field="mt_agree3"
-            ),
-            TermInfo(
-                id="third_party",
-                title="개인정보 제3자 제공",
-                description="개인정보 제3자 제공에 관한 동의",
-                version="1.0",
-                lastUpdated="2024-01-01",
-                isRequired=False,
-                field="mt_agree4"
-            ),
-            TermInfo(
-                id="marketing",
-                title="마케팅 정보 수신",
-                description="마케팅 정보 수집 및 이용에 관한 동의",
-                version="1.0",
-                lastUpdated="2024-01-01",
-                isRequired=False,
-                field="mt_agree5"
-            )
-        ]
-
-        logger.info(f"[TERMS] 약관 목록 조회 성공 - 총 {len(terms)}개")
-        return TermsListResponse(
-            success=True,
-            message="약관 목록 조회 성공",
-            data=terms
-        )
-
-    except Exception as e:
-        logger.error(f"[TERMS] 약관 목록 조회 실패: {str(e)}")
-        import traceback
-        logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail="서버 오류가 발생했습니다.")
-
-
 # 프로필 사진 업로드 디렉토리 설정
 UPLOAD_DIR = Path("public/images")
 UPLOAD_DIR.mkdir(exist_ok=True, parents=True)
@@ -1040,7 +1091,7 @@ UPLOAD_DIR.mkdir(exist_ok=True, parents=True)
 @router.post("/upload-profile-image")
 async def upload_profile_image(
     file: UploadFile = File(...),
-    current_user_id: Optional[int] = Depends(deps.get_current_user_id),
+    current_user_id: Optional[int] = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
@@ -1113,7 +1164,7 @@ async def upload_profile_image(
 
 @router.delete("/delete-profile-image")
 def delete_profile_image(
-    current_user_id: Optional[int] = Depends(deps.get_current_user_id),
+    current_user_id: Optional[int] = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """

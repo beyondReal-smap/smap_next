@@ -315,7 +315,7 @@ class EmailService:
                                 <div class="warning-section">
                                     <div class="warning-title">⚠️ 주의사항</div>
                                     <ul class="warning-list">
-                                        <li>이 링크는 <strong>10분 동안만</strong> 유효합니다</li>
+                                        <li>이 링크는 <strong>{settings.PASSWORD_RESET_EXPIRE_MINUTES}분 동안만</strong> 유효합니다</li>
                                         <li>본인이 요청하지 않았다면 이 이메일을 무시하세요</li>
                                         <li>보안을 위해 비밀번호 재설정 후에는 이 링크가 무효화됩니다</li>
                                         <li>링크를 다른 사람과 공유하지 마세요</li>
@@ -350,7 +350,7 @@ class EmailService:
                     {reset_url}
 
                     ⚠️ 주의사항:
-                    • 이 링크는 10분 동안만 유효합니다
+                    • 이 링크는 {settings.PASSWORD_RESET_EXPIRE_MINUTES}분 동안만 유효합니다
                     • 본인이 요청하지 않았다면 이 이메일을 무시하세요
                     • 보안을 위해 비밀번호 재설정 후에는 이 링크가 무효화됩니다
                     • 링크를 다른 사람과 공유하지 마세요
@@ -375,18 +375,10 @@ class EmailService:
                     logger.error(f"❌ 네이버웍스 이메일 발송 중 오류: {str(e)}")
                     logger.warning(f"⚠️ Gmail SMTP로 폴백: {email}")
             
-            # 개발 환경에서는 Mock 처리 (네이버웍스 설정이 없을 때만)
             if os.getenv('NODE_ENV') == 'development':
-                logger.info(f"📧 [개발환경] 이메일 발송 Mock: {email}")
-                logger.info(f"📧 [개발환경] 재설정 링크: {reset_url}")
-                
-                return {
-                    "success": True,
-                    "message": "이메일이 성공적으로 발송되었습니다. (개발환경 Mock)",
-                    "email": email,
-                    "dev": True
-                }
-            
+                logger.warning("개발 환경에서는 재설정 메일을 발송하지 않습니다.")
+                return {"success": False, "message": "메일 발송이 비활성화되어 있습니다."}
+
             # 네이버웍스 설정이 없거나 실패했으면 Gmail SMTP 사용
             logger.info(f"📧 Gmail SMTP 이메일 발송 시도: {email}")
             
@@ -551,7 +543,7 @@ class EmailService:
                         <div class="warning-section">
                             <div class="warning-title">⚠️ 주의사항</div>
                             <ul class="warning-list">
-                                <li>이 링크는 <strong>10분 동안만</strong> 유효합니다</li>
+                                <li>이 링크는 <strong>{settings.PASSWORD_RESET_EXPIRE_MINUTES}분 동안만</strong> 유효합니다</li>
                                 <li>본인이 요청하지 않았다면 이 이메일을 무시하세요</li>
                                 <li>보안을 위해 비밀번호 재설정 후에는 이 링크가 무효화됩니다</li>
                                 <li>링크를 다른 사람과 공유하지 마세요</li>
@@ -586,7 +578,7 @@ class EmailService:
             {reset_url}
             
             ⚠️ 주의사항:
-            • 이 링크는 10분 동안만 유효합니다
+            • 이 링크는 {settings.PASSWORD_RESET_EXPIRE_MINUTES}분 동안만 유효합니다
             • 본인이 요청하지 않았다면 이 이메일을 무시하세요
             • 보안을 위해 비밀번호 재설정 후에는 이 링크가 무효화됩니다
             • 링크를 다른 사람과 공유하지 마세요

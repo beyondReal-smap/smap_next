@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.api import deps
 from app.models.member import Member
-from app.crud.crud_auth import get_current_member
 from app.schemas.fcm_token import FCMTokenUpdateRequest, FCMTokenResponse
 from app.core.response import create_response, SUCCESS, FAILURE
 from pydantic import BaseModel, Field
@@ -32,7 +31,7 @@ def unregister_fcm_token(request: FCMUnregisterRequest, user_id: int = Depends(d
 def update_fcm_token(
     request: FCMTokenUpdateRequest,
     db: Session = Depends(deps.get_db),
-    current_member: Member = Depends(get_current_member)
+    current_member: Member = Depends(deps.get_current_user)
 ):
     """
     FCM 토큰 업데이트
@@ -125,7 +124,7 @@ def update_fcm_token(
 @router.get("/status", response_model=FCMTokenResponse)
 def get_fcm_token_status(
     db: Session = Depends(deps.get_db),
-    current_member: Member = Depends(get_current_member)
+    current_member: Member = Depends(deps.get_current_user)
 ):
     """
     현재 회원의 FCM 토큰 상태 조회
@@ -162,7 +161,7 @@ def get_fcm_token_status(
 @router.post("/notify-token-change", response_model=FCMTokenResponse)
 def notify_fcm_token_change(
     db: Session = Depends(deps.get_db),
-    current_member: Member = Depends(get_current_member)
+    current_member: Member = Depends(deps.get_current_user)
 ):
     """
     FCM 토큰 변경을 백그라운드 앱에 알리기 위한 Silent Push 전송

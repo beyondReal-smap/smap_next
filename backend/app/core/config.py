@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     APPLE_ALLOWED_BUNDLE_IDS: str = ""
     KAKAO_ALLOWED_APP_ID: str = ""
     REQUIRE_GROUP_INVITE_CODE: bool = False
+    PASSWORD_RESET_EXPIRE_MINUTES: int = Field(default=30, ge=1)
+    PASSWORD_RESET_BASE_URL: AnyHttpUrl = "https://nextstep.aiagnt.kr"
 
     # CORS 설정
     BACKEND_CORS_ORIGINS: List[str] = [

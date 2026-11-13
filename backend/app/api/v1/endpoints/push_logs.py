@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 
 router = APIRouter()
 
-@router.get("/", response_model=List[PushLogResponse])
+@router.get("/", response_model=List[PushLogResponse], dependencies=[Depends(deps.get_required_admin_id)])
 def get_push_logs(
     db: Session = Depends(deps.get_db),
     skip: int = 0,
@@ -24,7 +24,8 @@ def get_push_logs(
 @router.get("/{push_log_id}", response_model=PushLogResponse)
 def get_push_log(
     push_log_id: int,
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(deps.get_db),
+    user_id: int = Depends(deps.get_required_user_id)
 ):
     """
     특정 푸시 로그를 조회합니다.
@@ -32,16 +33,21 @@ def get_push_log(
     push_log = PushLog.find_by_idx(db, push_log_id)
     if not push_log:
         raise HTTPException(status_code=404, detail="Push log not found")
+    if push_log.mt_idx != int(user_id):
+        raise HTTPException(status_code=403, detail="본인의 푸시만 이용할 수 있습니다.")
     return push_log
 
 @router.get("/member/{member_id}", response_model=List[PushLogResponse])
 def get_member_push_logs(
     member_id: int,
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(deps.get_db),
+    user_id: int = Depends(deps.get_required_user_id)
 ):
     """
     특정 회원의 푸시 로그 목록을 조회합니다. (최근 7일)
     """
+    if int(member_id) != int(user_id):
+        raise HTTPException(status_code=403, detail="본인의 정보만 이용할 수 있습니다.")
     # 7일 전 날짜 계산
     seven_days_ago = datetime.now() - timedelta(days=7)
 
@@ -56,38 +62,45 @@ def get_member_push_logs(
 @router.get("/recent/{member_id}", response_model=List[PushLogResponse])
 def get_recent_member_push_logs(
     member_id: int,
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(deps.get_db),
+    user_id: int = Depends(deps.get_required_user_id)
 ):
     """
     특정 회원의 최근 푸시 로그 목록을 조회합니다. (최근 7일)
     /member/{member_id}와 동일한 기능으로 호환성 유지
     """
+    if int(member_id) != int(user_id):
+        raise HTTPException(status_code=403, detail="본인의 정보만 이용할 수 있습니다.")
     # 기존의 get_member_push_logs와 동일한 로직 사용
-    return get_member_push_logs(member_id, db)
+    return get_member_push_logs(member_id, db, user_id)
 
 @router.get("/schedule/{schedule_id}", response_model=List[PushLogResponse])
 def get_schedule_push_logs(
     schedule_id: int,
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(deps.get_db),
+    user_id: int = Depends(deps.get_required_user_id)
 ):
     """
     특정 일정의 푸시 로그 목록을 조회합니다.
     """
-    push_logs = PushLog.find_by_schedule(db, schedule_id)
+    push_logs = db.query(PushLog).filter(PushLog.sst_idx == schedule_id, PushLog.mt_idx == user_id, PushLog.plt_show == ShowEnum.Y).all()
     return push_logs
 
 @router.get("/member/{member_id}/unread", response_model=List[PushLogResponse])
 def get_member_unread_push_logs(
     member_id: int,
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(deps.get_db),
+    user_id: int = Depends(deps.get_required_user_id)
 ):
     """
     특정 회원의 읽지 않은 푸시 로그 목록을 조회합니다.
     """
+    if int(member_id) != int(user_id):
+        raise HTTPException(status_code=403, detail="본인의 정보만 이용할 수 있습니다.")
     push_logs = PushLog.find_unread(db, member_id)
     return push_logs
 
-@router.post("/", response_model=PushLogResponse)
+@router.post("/", response_model=PushLogResponse, dependencies=[Depends(deps.get_required_admin_id)])
 def create_push_log(
     push_log_in: PushLogCreate,
     db: Session = Depends(deps.get_db)
@@ -117,7 +130,7 @@ def create_push_log(
     db.refresh(push_log)
     return push_log
 
-@router.put("/{push_log_id}", response_model=PushLogResponse)
+@router.put("/{push_log_id}", response_model=PushLogResponse, dependencies=[Depends(deps.get_required_admin_id)])
 def update_push_log(
     push_log_id: int,
     push_log_in: PushLogUpdate,
@@ -141,7 +154,8 @@ def update_push_log(
 @router.delete("/{push_log_id}")
 def delete_push_log(
     push_log_id: int,
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(deps.get_db),
+    user_id: int = Depends(deps.get_required_user_id)
 ):
     """
     푸시 로그를 삭제합니다.
@@ -149,6 +163,8 @@ def delete_push_log(
     push_log = PushLog.find_by_idx(db, push_log_id)
     if not push_log:
         raise HTTPException(status_code=404, detail="Push log not found")
+    if push_log.mt_idx != int(user_id):
+        raise HTTPException(status_code=403, detail="본인의 푸시만 이용할 수 있습니다.")
     
     db.delete(push_log)
     db.commit()
@@ -157,7 +173,8 @@ def delete_push_log(
 @router.patch("/{push_log_id}/read")
 def mark_push_log_as_read(
     push_log_id: int,
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(deps.get_db),
+    user_id: int = Depends(deps.get_required_user_id)
 ):
     """
     특정 푸시 로그를 읽음 처리합니다.
@@ -165,6 +182,8 @@ def mark_push_log_as_read(
     push_log = PushLog.find_by_idx(db, push_log_id)
     if not push_log:
         raise HTTPException(status_code=404, detail="Push log not found")
+    if push_log.mt_idx != int(user_id):
+        raise HTTPException(status_code=403, detail="본인의 푸시만 이용할 수 있습니다.")
 
     try:
         push_log.plt_read_chk = ReadCheckEnum.Y
@@ -180,11 +199,14 @@ def mark_push_log_as_read(
 @router.post("/delete-all")
 def delete_all_push_logs(
     mt_idx: int,
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(deps.get_db),
+    user_id: int = Depends(deps.get_required_user_id)
 ):
     """
     특정 회원의 모든 푸시 로그를 삭제합니다.
     """
+    if int(mt_idx) != int(user_id):
+        raise HTTPException(status_code=403, detail="본인의 정보만 이용할 수 있습니다.")
     try:
         # 실제로 삭제하지 않고 plt_show를 'N'으로 변경
         db.query(PushLog).filter(
@@ -203,11 +225,14 @@ def delete_all_push_logs(
 @router.post("/read-all")
 def read_all_push_logs(
     mt_idx: int,
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(deps.get_db),
+    user_id: int = Depends(deps.get_required_user_id)
 ):
     """
     특정 회원의 모든 푸시 로그를 읽음 처리합니다.
     """
+    if int(mt_idx) != int(user_id):
+        raise HTTPException(status_code=403, detail="본인의 정보만 이용할 수 있습니다.")
     try:
         db.query(PushLog).filter(
             PushLog.mt_idx == mt_idx,

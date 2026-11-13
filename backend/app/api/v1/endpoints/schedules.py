@@ -19,18 +19,21 @@ router = APIRouter()
 @router.get("/", response_model=List[ScheduleResponse])
 def get_schedules(
     db: Session = Depends(deps.get_db),
+    user_id: int = Depends(deps.get_required_user_id),
     skip: int = 0,
     limit: int = 100
 ):
     """
     일정 목록을 조회합니다.
     """
-    schedules = db.query(Schedule).offset(skip).limit(limit).all()
+    groups = db.query(GroupDetail.sgt_idx).filter(GroupDetail.mt_idx == user_id, GroupDetail.sgdt_exit == 'N', GroupDetail.sgdt_discharge == 'N', GroupDetail.sgdt_show == 'Y')
+    schedules = db.query(Schedule).filter(Schedule.sst_show == ShowEnum.Y, or_(Schedule.mt_idx == user_id, Schedule.sgt_idx.in_(groups))).offset(skip).limit(limit).all()
     return schedules
 
 @router.get("/{schedule_id}", response_model=ScheduleResponse)
 def get_schedule(
     schedule_id: int,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
@@ -39,16 +42,23 @@ def get_schedule(
     schedule = Schedule.find_by_idx(db, schedule_id)
     if not schedule:
         raise HTTPException(status_code=404, detail="Schedule not found")
+    if schedule.sgt_idx is not None:
+        deps.require_group_member(db, user_id, schedule.sgt_idx)
+    elif schedule.mt_idx != int(user_id):
+        raise HTTPException(status_code=403, detail="일정 조회 권한이 없습니다.")
     return schedule
 
 @router.get("/member/{member_id}", response_model=List[ScheduleResponse])
 def get_member_schedules(
     member_id: int,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
     특정 회원의 일정 목록을 조회합니다.
     """
+    if int(user_id) != member_id:
+        raise HTTPException(status_code=403, detail="본인의 일정만 조회할 수 있습니다.")
     schedules = Schedule.find_by_member(db, member_id)
     return schedules
 
@@ -56,6 +66,7 @@ def get_member_schedules(
 def get_group_schedules(
     group_id: int,
     days: Optional[int] = None,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
@@ -63,6 +74,7 @@ def get_group_schedules(
     home/page.tsx의 scheduleService.getGroupSchedules()에서 사용
     'days' 파라미터가 주어지면 오늘부터 해당 일수까지의 일정을 반환합니다.
     """
+    deps.require_group_member(db, user_id, group_id)
     try:
         logger.info(f"📅 [GET_GROUP_SCHEDULES] 시작 - group_id: {group_id}, days: {days}")
         
@@ -172,7 +184,7 @@ def get_group_schedules(
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
-@router.get("/now/in-members", response_model=List[ScheduleResponse])
+@router.get("/now/in-members", response_model=List[ScheduleResponse], dependencies=[Depends(deps.get_required_admin_id)])
 def get_now_schedule_in_members(
     db: Session = Depends(deps.get_db)
 ):
@@ -182,7 +194,7 @@ def get_now_schedule_in_members(
     schedules = Schedule.get_now_schedule_in_members(db)
     return schedules
 
-@router.get("/now/out-members", response_model=List[ScheduleResponse])
+@router.get("/now/out-members", response_model=List[ScheduleResponse], dependencies=[Depends(deps.get_required_admin_id)])
 def get_now_schedule_out_members(
     db: Session = Depends(deps.get_db)
 ):
@@ -192,7 +204,7 @@ def get_now_schedule_out_members(
     schedules = Schedule.get_now_schedule_out_members(db)
     return schedules
 
-@router.get("/now/push", response_model=List[ScheduleResponse])
+@router.get("/now/push", response_model=List[ScheduleResponse], dependencies=[Depends(deps.get_required_admin_id)])
 def get_now_schedule_push(
     db: Session = Depends(deps.get_db)
 ):
@@ -202,7 +214,7 @@ def get_now_schedule_push(
     schedules = Schedule.get_now_schedule_push(db)
     return schedules
 
-@router.get("/before-30min", response_model=List[ScheduleResponse])
+@router.get("/before-30min", response_model=List[ScheduleResponse], dependencies=[Depends(deps.get_required_admin_id)])
 def get_schedule_before_30min(
     db: Session = Depends(deps.get_db)
 ):
@@ -215,12 +227,19 @@ def get_schedule_before_30min(
 @router.post("/", response_model=ScheduleResponse)
 def create_schedule(
     schedule_in: ScheduleCreate,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
     새로운 일정을 생성합니다.
     """
-    schedule = Schedule(**schedule_in.dict())
+    if schedule_in.sgt_idx is not None:
+        deps.require_group_member(db, user_id, schedule_in.sgt_idx)
+    if schedule_in.mt_idx is not None and schedule_in.mt_idx != int(user_id):
+        raise HTTPException(status_code=403, detail="본인의 일정만 생성할 수 있습니다.")
+    data = schedule_in.dict()
+    data['mt_idx'] = int(user_id)
+    schedule = Schedule(**data)
     db.add(schedule)
     db.commit()
     db.refresh(schedule)
@@ -230,6 +249,7 @@ def create_schedule(
 def update_schedule(
     schedule_id: int,
     schedule_in: ScheduleUpdate,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
@@ -238,6 +258,12 @@ def update_schedule(
     schedule = Schedule.find_by_idx(db, schedule_id)
     if not schedule:
         raise HTTPException(status_code=404, detail="Schedule not found")
+    if schedule.sgt_idx is not None:
+        deps.require_group_member(db, user_id, schedule.sgt_idx)
+    elif schedule.mt_idx != int(user_id):
+        raise HTTPException(status_code=403, detail="일정 수정 권한이 없습니다.")
+    if any(field in schedule_in.dict(exclude_unset=True) for field in ('sgt_idx', 'mt_idx', 'sgdt_idx')):
+        raise HTTPException(status_code=403, detail="일정 소유자를 변경할 수 없습니다.")
     
     for field, value in schedule_in.dict(exclude_unset=True).items():
         setattr(schedule, field, value)
@@ -250,6 +276,7 @@ def update_schedule(
 @router.delete("/{schedule_id}")
 def delete_schedule(
     schedule_id: int,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
@@ -258,6 +285,10 @@ def delete_schedule(
     schedule = Schedule.find_by_idx(db, schedule_id)
     if not schedule:
         raise HTTPException(status_code=404, detail="Schedule not found")
+    if schedule.sgt_idx is not None:
+        deps.require_group_member(db, user_id, schedule.sgt_idx)
+    elif schedule.mt_idx != int(user_id):
+        raise HTTPException(status_code=403, detail="일정 삭제 권한이 없습니다.")
     
     db.delete(schedule)
     db.commit()

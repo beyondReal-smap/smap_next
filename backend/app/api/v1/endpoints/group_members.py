@@ -15,11 +15,13 @@ router = APIRouter()
 @router.get("/member/{group_id}", response_model=List[dict])
 def get_group_members(
     group_id: int,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
     그룹에 속한 멤버 목록과 그룹 상세 정보, 최신 위치 정보를 조회합니다.
     """
+    deps.require_group_member(db, user_id, group_id)
     try:
         logger.info(f"📋 [GET_GROUP_MEMBERS] 그룹 멤버 조회 시작 - group_id: {group_id}")
         
@@ -193,11 +195,16 @@ def add_member_to_group(
 def remove_member_from_group(
     group_id: int,
     member_id: int,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
     그룹에서 멤버를 제거합니다.
     """
+    if int(user_id) == member_id:
+        deps.require_group_member(db, user_id, group_id)
+    else:
+        deps.require_group_owner(db, user_id, group_id)
     group_detail = db.query(GroupDetail).filter(
         GroupDetail.sgt_idx == group_id,
         GroupDetail.mt_idx == member_id,
@@ -207,7 +214,11 @@ def remove_member_from_group(
     if not group_detail:
         raise HTTPException(status_code=404, detail="Member not found in the group")
     
+    if getattr(group_detail.sgdt_owner_chk, 'value', group_detail.sgdt_owner_chk) == 'Y':
+        raise HTTPException(status_code=403, detail="그룹장은 승계 없이 탈퇴할 수 없습니다.")
     group_detail.sgdt_show = ShowEnum.N
+    group_detail.sgdt_exit = 'Y'
+    group_detail.sgdt_discharge = 'N'
     db.add(group_detail)
     db.commit()
     
@@ -217,11 +228,16 @@ def remove_member_from_group(
 def remove_member_from_group_path(
     group_id: int,
     member_id: int,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
     그룹에서 멤버를 제거합니다. (경로 파라미터 버전)
     """
+    if int(user_id) == member_id:
+        deps.require_group_member(db, user_id, group_id)
+    else:
+        deps.require_group_owner(db, user_id, group_id)
     logger.info(f"[REMOVE_MEMBER] 멤버 내보내기 요청 - group_id: {group_id}, member_id: {member_id}")
     
     group_detail = db.query(GroupDetail).filter(
@@ -234,9 +250,12 @@ def remove_member_from_group_path(
         logger.warning(f"[REMOVE_MEMBER] 멤버를 찾을 수 없음 - group_id: {group_id}, member_id: {member_id}")
         raise HTTPException(status_code=404, detail="Member not found in the group")
     
+    if getattr(group_detail.sgdt_owner_chk, 'value', group_detail.sgdt_owner_chk) == 'Y':
+        raise HTTPException(status_code=403, detail="그룹장은 승계 없이 탈퇴할 수 없습니다.")
     # 소프트 삭제 처리
     group_detail.sgdt_show = 'N'
     group_detail.sgdt_exit = 'Y'
+    group_detail.sgdt_discharge = 'N'
     db.add(group_detail)
     db.commit()
     
@@ -248,11 +267,13 @@ def remove_member_from_group_path(
 def update_member_role(
     group_id: int,
     role_data: dict,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
     그룹 멤버의 역할(리더)을 변경합니다.
     """
+    deps.require_group_owner(db, user_id, group_id)
     # member_id 추출 (키 존재 여부로 체크)
     member_id = role_data.get("member_id") if "member_id" in role_data else role_data.get("mt_idx")
     
@@ -263,7 +284,7 @@ def update_member_role(
     elif "sgdt_leader_chk" in role_data:
         is_leader = role_data.get("sgdt_leader_chk")
     
-    logger.info(f"[UPDATE_ROLE] 역할 변경 요청 - group_id: {group_id}, member_id: {member_id}, is_leader: {is_leader}, raw_data: {role_data}")
+    logger.info(f"[UPDATE_ROLE] 역할 변경 요청 - group_id: {group_id}, member_id: {member_id}, is_leader: {is_leader}")
     
     if not member_id:
         raise HTTPException(status_code=400, detail="member_id or mt_idx is required")

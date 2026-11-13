@@ -22,14 +22,13 @@ router = APIRouter()
 @router.get("/summary/{member_id}", response_model=OrderSummary)
 def get_order_summary(
     member_id: int,
-    authorization: str = Header(None),
+    current_user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db),
 ) -> Any:
     """
     회원의 주문 요약 정보 조회
     """
     # 토큰에서 사용자 ID 추출
-    current_user_id = deps.get_current_user_id(authorization)
     if not current_user_id:
         raise HTTPException(status_code=401, detail="인증이 필요합니다")
     
@@ -47,14 +46,13 @@ def get_orders_by_member(
     pay_type: str = Query(None, description="결제 방법"),
     page: int = Query(1, ge=1, description="페이지 번호"),
     size: int = Query(20, ge=1, le=100, description="페이지 크기"),
-    authorization: str = Header(None),
+    current_user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db),
 ) -> Any:
     """
     회원의 주문 목록 조회 (필터링 및 페이징)
     """
     # 토큰에서 사용자 ID 추출
-    current_user_id = deps.get_current_user_id(authorization)
     if not current_user_id:
         raise HTTPException(status_code=401, detail="인증이 필요합니다")
     
@@ -88,14 +86,13 @@ def get_orders_by_member(
 @router.get("/detail/{order_id}", response_model=OrderResponse)
 def get_order_detail(
     order_id: int,
-    authorization: str = Header(None),
+    current_user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db),
 ) -> Any:
     """
     주문 상세 정보 조회
     """
     # 토큰에서 사용자 ID 추출
-    current_user_id = deps.get_current_user_id(authorization)
     if not current_user_id:
         raise HTTPException(status_code=401, detail="인증이 필요합니다")
     
@@ -112,14 +109,13 @@ def get_order_detail(
 @router.get("/code/{order_code}", response_model=OrderResponse)
 def get_order_by_code(
     order_code: str,
-    authorization: str = Header(None),
+    current_user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db),
 ) -> Any:
     """
     주문번호로 주문 조회
     """
     # 토큰에서 사용자 ID 추출
-    current_user_id = deps.get_current_user_id(authorization)
     if not current_user_id:
         raise HTTPException(status_code=401, detail="인증이 필요합니다")
     
@@ -137,18 +133,21 @@ def get_order_by_code(
 def update_order_status(
     order_id: int,
     status: int,
-    authorization: str = Header(None),
+    current_user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db),
 ) -> Any:
     """
     주문 상태 업데이트 (관리자만)
     """
     # 토큰에서 사용자 ID 추출
-    current_user_id = deps.get_current_user_id(authorization)
     if not current_user_id:
         raise HTTPException(status_code=401, detail="인증이 필요합니다")
     
-    # 관리자 체크는 생략하고 일단 모든 사용자가 가능하도록 함
+    existing = crud.crud_order.get(db=db, id=order_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="주문을 찾을 수 없습니다")
+    if int(current_user_id) != int(existing.mt_idx):
+        raise HTTPException(status_code=403, detail="접근 권한이 없습니다")
     order = crud.crud_order.update_order_status(
         db=db, 
         order_id=order_id, 
@@ -166,14 +165,13 @@ def cancel_order(
     cancel_reason: str,
     cancel_amount: float = None,
     refund_info: str = None,
-    authorization: str = Header(None),
+    current_user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db),
 ) -> Any:
     """
     주문 취소
     """
     # 토큰에서 사용자 ID 추출
-    current_user_id = deps.get_current_user_id(authorization)
     if not current_user_id:
         raise HTTPException(status_code=401, detail="인증이 필요합니다")
     
@@ -203,14 +201,13 @@ def cancel_order(
 def get_recent_orders(
     member_id: int,
     limit: int = Query(5, ge=1, le=20, description="조회할 주문 수"),
-    authorization: str = Header(None),
+    current_user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db),
 ) -> Any:
     """
     최근 주문 목록 조회
     """
     # 토큰에서 사용자 ID 추출
-    current_user_id = deps.get_current_user_id(authorization)
     if not current_user_id:
         raise HTTPException(status_code=401, detail="인증이 필요합니다")
     

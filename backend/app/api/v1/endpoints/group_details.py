@@ -23,37 +23,43 @@ class MemberRemove(BaseModel):
 @router.get("/", response_model=List[GroupDetailResponse])
 def get_group_details(
     db: Session = Depends(deps.get_db),
+    user_id: int = Depends(deps.get_required_user_id),
     skip: int = 0,
     limit: int = 100
 ):
     """
     그룹 상세 정보 목록을 조회합니다.
     """
-    group_details = db.query(GroupDetail).offset(skip).limit(limit).all()
+    group_details = db.query(GroupDetail).filter(GroupDetail.mt_idx == user_id, GroupDetail.sgdt_show == "Y").offset(skip).limit(limit).all()
     return group_details
 
 @router.get("/{group_detail_id}", response_model=GroupDetailResponse)
 def get_group_detail(
     group_detail_id: int,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
     특정 그룹 상세 정보를 조회합니다.
     """
-    group_detail = db.query(GroupDetail).filter(GroupDetail.sgdt_idx == group_detail_id).first()
+    group_detail = db.query(GroupDetail).filter(GroupDetail.sgdt_idx == group_detail_id, GroupDetail.sgdt_show == "Y").first()
     if not group_detail:
         raise HTTPException(status_code=404, detail="GroupDetail not found")
+    deps.require_group_member(db, user_id, group_detail.sgt_idx)
     return group_detail
 
 @router.get("/member/{member_id}", response_model=List[dict])
 def get_member_group_details(
     member_id: int,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
     특정 멤버가 속한 그룹 상세 정보 목록을 조회합니다.
     home/page.tsx의 AuthContext에서 사용
     """
+    if int(user_id) != member_id:
+        raise HTTPException(status_code=403, detail="본인의 그룹만 조회할 수 있습니다.")
     group_details = db.query(GroupDetail).filter(
         and_(
             GroupDetail.mt_idx == member_id,
@@ -89,11 +95,13 @@ def get_member_group_details(
 @router.get("/group/{group_id}", response_model=List[GroupDetailResponse])
 def get_group_member_details(
     group_id: int,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
     특정 그룹의 멤버 상세 정보 목록을 조회합니다.
     """
+    deps.require_group_member(db, user_id, group_id)
     group_details = db.query(GroupDetail).filter(
         and_(
             GroupDetail.sgt_idx == group_id,
@@ -120,6 +128,7 @@ def create_group_detail(
 def update_group_detail(
     group_detail_id: int,
     group_detail_in: GroupDetailUpdate,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
@@ -128,9 +137,10 @@ def update_group_detail(
     group_detail = db.query(GroupDetail).filter(GroupDetail.sgdt_idx == group_detail_id).first()
     if not group_detail:
         raise HTTPException(status_code=404, detail="GroupDetail not found")
+    deps.require_group_owner(db, user_id, group_detail.sgt_idx)
     
     update_data = group_detail_in.dict(exclude_unset=True)
-    if "mt_idx" in update_data or "sgt_idx" in update_data:
+    if "mt_idx" in update_data or "sgt_idx" in update_data or "sgdt_owner_chk" in update_data:
         raise HTTPException(status_code=403, detail="그룹 또는 회원 식별자를 변경할 수 없습니다.")
     for field, value in update_data.items():
         setattr(group_detail, field, value)
@@ -144,6 +154,7 @@ def update_group_detail(
 def update_member_role(
     group_detail_id: int,
     role_update: MemberRoleUpdate,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
@@ -152,6 +163,7 @@ def update_member_role(
     group_detail = db.query(GroupDetail).filter(GroupDetail.sgdt_idx == group_detail_id).first()
     if not group_detail:
         raise HTTPException(status_code=404, detail="GroupDetail not found")
+    deps.require_group_owner(db, user_id, group_detail.sgt_idx)
     
     # 역할 변경
     group_detail.sgdt_leader_chk = LeaderCheckEnum.Y if role_update.sgdt_leader_chk == 'Y' else LeaderCheckEnum.N
@@ -175,6 +187,7 @@ def update_member_role(
 def remove_member_from_group(
     group_detail_id: int,
     remove_data: MemberRemove,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
@@ -183,10 +196,17 @@ def remove_member_from_group(
     group_detail = db.query(GroupDetail).filter(GroupDetail.sgdt_idx == group_detail_id).first()
     if not group_detail:
         raise HTTPException(status_code=404, detail="GroupDetail not found")
+    if int(group_detail.mt_idx) == int(user_id):
+        deps.require_group_member(db, user_id, group_detail.sgt_idx)
+    else:
+        deps.require_group_owner(db, user_id, group_detail.sgt_idx)
+    if getattr(group_detail.sgdt_owner_chk, 'value', group_detail.sgdt_owner_chk) == 'Y':
+        raise HTTPException(status_code=403, detail="그룹장은 승계 없이 탈퇴할 수 없습니다.")
     
     # 소프트 삭제 처리
     group_detail.sgdt_show = ShowEnum.N
     group_detail.sgdt_exit = ExitEnum.Y
+    group_detail.sgdt_discharge = 'N'
     group_detail.sgdt_udate = datetime.utcnow()
     
     db.add(group_detail)
@@ -207,6 +227,7 @@ def remove_member_from_group(
 @router.delete("/{group_detail_id}")
 def delete_group_detail(
     group_detail_id: int,
+    user_id: int = Depends(deps.get_required_user_id),
     db: Session = Depends(deps.get_db)
 ):
     """
@@ -215,10 +236,17 @@ def delete_group_detail(
     group_detail = db.query(GroupDetail).filter(GroupDetail.sgdt_idx == group_detail_id).first()
     if not group_detail:
         raise HTTPException(status_code=404, detail="GroupDetail not found")
+    if int(group_detail.mt_idx) == int(user_id):
+        deps.require_group_member(db, user_id, group_detail.sgt_idx)
+    else:
+        deps.require_group_owner(db, user_id, group_detail.sgt_idx)
+    if getattr(group_detail.sgdt_owner_chk, 'value', group_detail.sgdt_owner_chk) == 'Y':
+        raise HTTPException(status_code=403, detail="그룹장은 승계 없이 탈퇴할 수 없습니다.")
     
     # 실제 삭제 대신 상태 변경
     group_detail.sgdt_exit = 'Y'
     group_detail.sgdt_show = 'N'
+    group_detail.sgdt_discharge = 'N'
     db.add(group_detail)
     db.commit()
     return {"success": True, "message": "GroupDetail deleted successfully"}

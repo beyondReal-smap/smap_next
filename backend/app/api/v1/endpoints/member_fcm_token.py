@@ -44,7 +44,7 @@ def validate_fcm_token_format(token: str) -> bool:
     # FCM 토큰 기본 검증
     if not token or not isinstance(token, str):
         logger.warning("❌ FCM 토큰이 비어있거나 문자열이 아님")
-        logger.warning(f"   토큰 값: {repr(token)}")
+        logger.debug("FCM 토큰 상태 확인")
         logger.warning(f"   토큰 타입: {type(token)}")
         return False
 
@@ -57,7 +57,7 @@ def validate_fcm_token_format(token: str) -> bool:
     # null, None, undefined 등의 문자열 검증
     lower_token = token.lower()
     if lower_token in ['null', 'none', 'undefined', 'nan', '']:
-        logger.warning(f"❌ FCM 토큰이 유효하지 않은 값: '{token}'")
+        logger.debug("FCM 토큰 상태 확인")
         return False
 
     # 길이 검증 (현실적인 범위로 조정)
@@ -81,7 +81,7 @@ def validate_fcm_token_format(token: str) -> bool:
             
             # 프로젝트 ID 검증
             if not project_id or len(project_id) == 0 or len(project_id) > 100:
-                logger.warning(f"❌ FCM 토큰 프로젝트 ID가 올바르지 않음: '{project_id}'")
+                logger.debug("FCM 토큰 상태 확인")
                 return False
             
             # 토큰 부분이 APA91b로 시작하는지 확인 (선택사항)
@@ -99,7 +99,7 @@ def validate_fcm_token_format(token: str) -> bool:
     
     # 기본 문자 검증 - 영숫자, 하이픈, 언더스코어만 허용
     if not re.match(r'^[a-zA-Z0-9_-]+$', token.replace(":", "")):
-        logger.warning(f"❌ FCM 토큰에 허용되지 않는 문자 포함: {mask_token(token)}")
+        logger.debug("FCM 토큰 상태 확인")
         return False
 
     logger.info("✅ FCM 토큰 형식 검증 통과")
@@ -110,7 +110,7 @@ def _check_horizontal_authorization(user_id: int, target_mt_idx: int, db: Sessio
     """
     수평 인가(Horizontal Authorization) 검증.
     인증된 사용자가 다른 사용자의 FCM 토큰에 접근하는 것을 방지합니다.
-    관리자(mt_level == 9)는 모든 회원의 토큰에 접근할 수 있습니다.
+    본인의 FCM 토큰에만 접근할 수 있습니다.
 
     Args:
         user_id: 현재 인증된 사용자 ID (JWT에서 추출)
@@ -120,14 +120,12 @@ def _check_horizontal_authorization(user_id: int, target_mt_idx: int, db: Sessio
     Raises:
         HTTPException: 권한이 없는 경우 403 에러
     """
-    if user_id != target_mt_idx:
-        member = Member.find_by_idx(db, user_id)
-        if not member or member.mt_level != 9:
-            logger.warning(f"수평 인가 위반: user_id={user_id}가 mt_idx={target_mt_idx}의 토큰에 접근 시도")
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="다른 회원의 토큰에 접근할 수 없습니다."
-            )
+    if int(user_id) != int(target_mt_idx):
+        logger.warning(f"수평 인가 위반: user_id={user_id}가 mt_idx={target_mt_idx}의 토큰에 접근 시도")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="다른 회원의 토큰에 접근할 수 없습니다."
+        )
 
 
 @router.post("/register", response_model=MemberFCMTokenResponse)
@@ -199,8 +197,8 @@ def register_member_fcm_token(
                 if hours_since_update < 1:
                     logger.warning(f"⚠️ [TOKEN CHANGE ANALYSIS] 매우 잦은 토큰 변경 감지!")
                     logger.warning(f"⚠️ [TOKEN CHANGE ANALYSIS] 마지막 업데이트: {hours_since_update:.2f}시간 전")
-                    logger.warning(f"⚠️ [TOKEN CHANGE ANALYSIS] 기존 토큰: {mask_token(old_token)}")
-                    logger.warning(f"⚠️ [TOKEN CHANGE ANALYSIS] 새 토큰: {mask_token(request.fcm_token)}")
+                    logger.debug("FCM 토큰 상태 확인")
+                    logger.debug("FCM 토큰 상태 확인")
 
                     # FCM 토큰 변경의 일반적인 원인 분석
                     if len(old_token) != len(request.fcm_token):
@@ -284,16 +282,16 @@ def register_member_fcm_token(
 
         # mt_token_id 삭제 현상 모니터링을 위한 로깅 추가
         if not old_token and is_new_token:
-            logger.warning(f"⚠️ mt_token_id 삭제 감지: 회원 {request.mt_idx}의 기존 토큰이 없음 (새 토큰: {mask_token(request.fcm_token)})")
+            logger.debug("FCM 토큰 상태 확인")
         elif old_token and not is_new_token:
             logger.info(f"✅ mt_token_id 유지 확인: 회원 {request.mt_idx}의 토큰 동일")
         elif old_token != request.fcm_token:
-            logger.info(f"🔄 mt_token_id 변경: 회원 {request.mt_idx} 토큰 변경 (기존: {mask_token(old_token)} → 새: {mask_token(request.fcm_token)})")
+            logger.debug("FCM 토큰 상태 확인")
 
         # FCM 토큰 형식 검증 (개선된 검증 로직)
         if not validate_fcm_token_format(request.fcm_token):
             logger.warning(f"❌ 잘못된 FCM 토큰 형식 감지 - 회원 ID: {request.mt_idx}")
-            logger.warning(f"❌ 토큰: {mask_token(request.fcm_token)}")
+            logger.debug("FCM 토큰 상태 확인")
             logger.warning(f"❌ 토큰 길이: {len(request.fcm_token)}자")
 
             # 기존에 저장된 토큰이 있다면 무효화 처리하지 않음
@@ -314,7 +312,7 @@ def register_member_fcm_token(
             try:
                 if not firebase_service.validate_ios_token(request.fcm_token):
                     logger.warning(f"🚨 [TOKEN VALIDATION] FCM 토큰 유효성 검증 실패 - 회원 ID: {request.mt_idx}")
-                    logger.warning(f"🚨 [TOKEN VALIDATION] 문제 토큰: {mask_token(request.fcm_token)}")
+                    logger.debug("FCM 토큰 상태 확인")
 
                     # Firebase 검증 실패 시에도 일단 수용하되 경고 로그 남김
                     logger.warning(f"⚠️ [TOKEN VALIDATION] Firebase 검증 실패했지만 토큰 등록 허용 (네트워크 문제 가능성)")
@@ -343,8 +341,8 @@ def register_member_fcm_token(
         logger.info(f"🔄 [TOKEN UPDATE] 엔드포인트: /register")
         logger.info(f"🔄 [TOKEN UPDATE] 클라이언트 IP: {client_ip}")
         logger.info(f"🔄 [TOKEN UPDATE] User-Agent: {user_agent}")
-        logger.info(f"🔄 [TOKEN UPDATE] 기존 토큰: {mask_token(old_token) if old_token else 'None'}")
-        logger.info(f"🔄 [TOKEN UPDATE] 새 토큰: {mask_token(request.fcm_token)}")
+        logger.debug("FCM 토큰 상태 확인")
+        logger.debug("FCM 토큰 상태 확인")
         logger.info(f"🔄 [TOKEN UPDATE] 토큰 변경 여부: {is_new_token}")
 
         # 토큰 값 설정 (항상 수행)
@@ -551,8 +549,8 @@ def check_and_update_fcm_token(
                 time_since_update = datetime.now() - member.mt_token_updated_at
                 if time_since_update.total_seconds() < 3600:  # 1시간 이내에 업데이트된 토큰
                     logger.info(f"🛡️ 기존 토큰 보호: 회원 ID {request.mt_idx} (마지막 업데이트: {time_since_update.total_seconds()/60:.1f}분 전)")
-                    logger.info(f"🛡️ 기존 토큰: {mask_token(current_token)} (보호됨)")
-                    logger.info(f"🚫 새 토큰: {mask_token(request.fcm_token)} (거부됨)")
+                    logger.debug("FCM 토큰 상태 확인")
+                    logger.debug("FCM 토큰 상태 확인")
                     message = "기존 FCM 토큰이 최근에 업데이트되어 보호됩니다."
                     needs_update = False
                 else:
@@ -583,7 +581,7 @@ def check_and_update_fcm_token(
             # FCM 토큰 형식 검증 (잘못된 토큰 방지)
             if not validate_fcm_token_format(request.fcm_token):
                 logger.warning(f"잘못된 FCM 토큰 형식 감지 (check-and-update) - 회원 ID: {request.mt_idx}")
-                logger.warning(f"잘못된 토큰: {mask_token(request.fcm_token)}")
+                logger.debug("FCM 토큰 상태 확인")
                 logger.warning(f"토큰 길이: {len(request.fcm_token)}자")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -597,8 +595,8 @@ def check_and_update_fcm_token(
             # 상세 로깅 - 토큰 업데이트 추적
             logger.info(f"🔄 [TOKEN UPDATE] 토큰 업데이트 시작 - 회원 ID: {request.mt_idx}")
             logger.info(f"🔄 [TOKEN UPDATE] 엔드포인트: /check-and-update")
-            logger.info(f"🔄 [TOKEN UPDATE] 기존 토큰: {mask_token(current_token) if current_token else 'None'}")
-            logger.info(f"🔄 [TOKEN UPDATE] 새 토큰: {mask_token(request.fcm_token)}")
+            logger.debug("FCM 토큰 상태 확인")
+            logger.debug("FCM 토큰 상태 확인")
             logger.info(f"🔄 [TOKEN UPDATE] 업데이트 사유: {message}")
 
             # 토큰 값 설정 (항상 수행)
@@ -656,6 +654,7 @@ def validate_and_refresh_fcm_token(
     Returns:
         MemberFCMTokenResponse: 검증/갱신 결과
     """
+    _check_horizontal_authorization(user_id, request.mt_idx, db)
     try:
         logger.info(f"FCM 토큰 유효성 검증 요청 - 회원 ID: {request.mt_idx}")
 
@@ -724,7 +723,7 @@ def validate_and_refresh_fcm_token(
 
                 # 실제 전송은 시도하지 않고 dry-run으로 검증만 수행
                 # (실제 메시지를 보내지 않으려면 validation_only=True로 설정)
-                logger.info(f"📡 FCM 서버 토큰 검증 시도 - 토큰: {mask_token(request.fcm_token)}")
+                logger.debug("FCM 토큰 상태 확인")
 
                 # 간단한 토큰 형식 검증만 수행 (실제 FCM 전송은 비용과 사용자 경험 고려)
                 if firebase_service.validate_ios_token(request.fcm_token):
@@ -770,7 +769,7 @@ def validate_and_refresh_fcm_token(
             # FCM 토큰 형식 검증 (잘못된 토큰 방지)
             if not validate_fcm_token_format(request.fcm_token):
                 logger.warning(f"잘못된 FCM 토큰 형식 감지 (validate-and-refresh) - 회원 ID: {request.mt_idx}")
-                logger.warning(f"잘못된 토큰: {mask_token(request.fcm_token)}")
+                logger.debug("FCM 토큰 상태 확인")
                 logger.warning(f"토큰 길이: {len(request.fcm_token)}자")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -782,8 +781,8 @@ def validate_and_refresh_fcm_token(
             # 상세 로깅 - 토큰 업데이트 추적
             logger.info(f"🔄 [TOKEN UPDATE] 토큰 업데이트 시작 - 회원 ID: {request.mt_idx}")
             logger.info(f"🔄 [TOKEN UPDATE] 엔드포인트: /validate-and-refresh")
-            logger.info(f"🔄 [TOKEN UPDATE] 기존 토큰: {mask_token(member.mt_token_id) if member.mt_token_id else 'None'}")
-            logger.info(f"🔄 [TOKEN UPDATE] 새 토큰: {mask_token(request.fcm_token)}")
+            logger.debug("FCM 토큰 상태 확인")
+            logger.debug("FCM 토큰 상태 확인")
             logger.info(f"🔄 [TOKEN UPDATE] 업데이트 사유: {reason}")
             logger.info(f"🔄 [TOKEN UPDATE] 서버 검증 통과: {server_validation_passed}")
 
@@ -858,6 +857,7 @@ def background_token_check(
     Returns:
         MemberFCMTokenResponse: 검증/갱신 결과
     """
+    _check_horizontal_authorization(user_id, request.mt_idx, db)
     try:
         logger.info(f"백그라운드 FCM 토큰 검증 요청 - 회원 ID: {request.mt_idx}, 타입: {request.check_type}")
 
@@ -892,7 +892,7 @@ def background_token_check(
         )
         
         if is_preview_token:
-            logger.info(f"미리보기 토큰 감지 - DB의 실제 토큰과 비교 건너뛰기: {mask_token(request.fcm_token)}")
+            logger.debug("FCM 토큰 상태 확인")
             # 미리보기 토큰인 경우 DB의 실제 토큰과 비교하지 않음
             actual_token = member.mt_token_id
             if not actual_token:
@@ -949,7 +949,7 @@ def background_token_check(
             # FCM 토큰 형식 검증 (미리보기 토큰이 아닌 경우에만)
             if not is_preview_token and not validate_fcm_token_format(actual_token):
                 logger.warning(f"잘못된 FCM 토큰 형식 감지 (background-check) - 회원 ID: {request.mt_idx}")
-                logger.warning(f"잘못된 토큰: {mask_token(actual_token)}")
+                logger.debug("FCM 토큰 상태 확인")
                 logger.warning(f"토큰 길이: {len(actual_token)}자")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -1002,7 +1002,7 @@ def background_token_check(
         )
 
 
-@router.post("/cleanup-expired-tokens", response_model=MemberFCMTokenResponse)
+@router.post("/cleanup-expired-tokens", response_model=MemberFCMTokenResponse, dependencies=[Depends(deps.get_required_admin_id)])
 def cleanup_expired_fcm_tokens(
     db: Session = Depends(get_db)
 ):
@@ -1069,7 +1069,7 @@ def cleanup_expired_fcm_tokens(
         )
 
 
-@router.post("/reset-invalid-tokens", response_model=MemberFCMTokenResponse)
+@router.post("/reset-invalid-tokens", response_model=MemberFCMTokenResponse, dependencies=[Depends(deps.get_required_admin_id)])
 def reset_invalid_fcm_tokens(
     db: Session = Depends(get_db),
     user_id: int = Depends(deps.get_required_user_id)
@@ -1098,7 +1098,7 @@ def reset_invalid_fcm_tokens(
             # FCM 토큰 형식 검증
             if not validate_fcm_token_format(member.mt_token_id):
                 logger.warning(f"🚨 잘못된 FCM 토큰 발견 - 회원 ID: {member.mt_idx}")
-                logger.warning(f"   잘못된 토큰: {mask_token(member.mt_token_id)}")
+                logger.debug("FCM 토큰 상태 확인")
 
                 # 잘못된 토큰 자동 삭제 제거 - 요청 시에만 처리
                 # member.mt_token_id = None
@@ -1148,6 +1148,7 @@ def notify_token_refresh(
     Returns:
         MemberFCMTokenResponse: 알림 전송 결과
     """
+    _check_horizontal_authorization(user_id, mt_idx, db)
     try:
         logger.info(f"🔔 FCM 토큰 갱신 알림 전송 요청 - 회원 ID: {mt_idx}")
 
@@ -1203,7 +1204,7 @@ class TestIOSPushRequest(BaseModel):
     mt_idx: int
     test_type: str = "simple"  # simple, direct, complex
 
-@router.post("/test-ios-push")
+@router.post("/test-ios-push", dependencies=[Depends(deps.get_required_admin_id)])
 def test_ios_push_delivery(
     request: TestIOSPushRequest,
     db: Session = Depends(get_db),
@@ -1283,11 +1284,11 @@ def test_ios_push_delivery(
                 response = messaging.send(message)
                 logger.info(f"✅ [TEST DIRECT] Firebase Console 방식 테스트 완료: {response}")
             except messaging.UnregisteredError:
-                logger.warning(f"🚨 [TEST DIRECT] 토큰이 등록되지 않음: {mask_token(member.mt_token_id)}")
+                logger.debug("FCM 토큰 상태 확인")
                 # 테스트 목적이므로 토큰 무효화하지 않음
                 response = "test_unregistered_but_not_invalidated"
             except messaging.SenderIdMismatchError:
-                logger.warning(f"🚨 [TEST DIRECT] Sender ID 불일치: {mask_token(member.mt_token_id)}")
+                logger.debug("FCM 토큰 상태 확인")
                 # 테스트 목적이므로 토큰 무효화하지 않음
                 response = "test_sender_mismatch_but_not_invalidated"
             except Exception as e:
@@ -1327,7 +1328,7 @@ def test_ios_push_delivery(
         )
 
 
-@router.get("/full-token/{mt_idx}")
+@router.get("/full-token/{mt_idx}", dependencies=[Depends(deps.get_required_admin_id)])
 def get_full_fcm_token_for_test(
     mt_idx: int,
     db: Session = Depends(get_db),
@@ -1380,7 +1381,7 @@ def get_full_fcm_token_for_test(
         raise HTTPException(status_code=500, detail=f"전체 FCM 토큰 조회 실패: {str(e)}")
 
 
-@router.get("/update-logs/{mt_idx}")
+@router.get("/update-logs/{mt_idx}", dependencies=[Depends(deps.get_required_admin_id)])
 def get_token_update_logs(
     mt_idx: int,
     limit: int = 50,
@@ -1467,7 +1468,7 @@ def get_token_update_logs(
         }
 
 
-@router.post("/trigger-update/{mt_idx}")
+@router.post("/trigger-update/{mt_idx}", dependencies=[Depends(deps.get_required_admin_id)])
 def trigger_token_update_test(
     mt_idx: int,
     db: Session = Depends(get_db),

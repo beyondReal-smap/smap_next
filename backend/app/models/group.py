@@ -21,12 +21,25 @@ class Group(BaseModel):
         소프트 삭제: sgt_show를 'N'으로 변경
         """
         from datetime import datetime
-        self.sgt_show = ShowEnum.N
-        self.sgt_udate = datetime.utcnow()
-        db.flush()
-        db.commit()
-        db.refresh(self)
-        return self
+        try:
+            self.sgt_show = ShowEnum.N
+            self.sgt_udate = datetime.utcnow()
+            from app.models.group_detail import GroupDetail
+            from app.models.schedule import Schedule
+            from app.models.location import Location
+            db.query(GroupDetail).filter(GroupDetail.sgt_idx == self.sgt_idx, GroupDetail.sgdt_show == "Y").update(
+                {GroupDetail.sgdt_show: 'N', GroupDetail.sgdt_udate: self.sgt_udate}, synchronize_session=False)
+            db.query(Schedule).filter(Schedule.sgt_idx == self.sgt_idx, Schedule.sst_show == ShowEnum.Y).update(
+                {Schedule.sst_show: ShowEnum.N, Schedule.sst_udate: self.sgt_udate}, synchronize_session=False)
+            db.query(Location).filter(Location.sgt_idx == self.sgt_idx, Location.slt_show == ShowEnum.Y).update(
+                {Location.slt_show: ShowEnum.N, Location.slt_udate: self.sgt_udate}, synchronize_session=False)
+            db.flush()
+            db.commit()
+            db.refresh(self)
+            return self
+        except Exception:
+            db.rollback()
+            raise
 
     def restore(self, db: Session):
         """
