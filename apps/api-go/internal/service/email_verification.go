@@ -18,23 +18,29 @@ type verificationCopy struct {
 	Subject     string // 메일 제목(인증번호를 넣지 않는다: 잠금 화면 알림 노출 방지)
 	Title       string
 	Description string
+	IgnoreNote  string // HTML 안내 둘째 줄(텍스트 본문은 첫 문장만 쓴다)
 }
+
+const defaultIgnoreNote = "직접 요청하지 않았다면 이 메일을 무시해 주세요. 계정에는 아무 변화도 생기지 않아요."
 
 var verificationCopies = map[string]verificationCopy{
 	EmailPurposeRegister: {
 		Subject:     "[SMAP] 회원가입 인증번호",
-		Title:       "이메일 인증번호를 확인해 주세요",
+		Title:       "이메일 인증번호를 입력해 주세요",
 		Description: "SMAP 가입을 계속하려면 아래 인증번호를 앱에 입력해 주세요.",
+		IgnoreNote:  defaultIgnoreNote,
 	},
 	EmailPurposeResetPassword: {
 		Subject:     "[SMAP] 비밀번호 재설정 인증번호",
 		Title:       "비밀번호 재설정 인증번호예요",
 		Description: "비밀번호를 다시 설정하려면 아래 인증번호를 앱에 입력해 주세요.",
+		IgnoreNote:  defaultIgnoreNote,
 	},
 	EmailPurposeChangeEmail: {
 		Subject:     "[SMAP] 이메일 등록 인증번호",
 		Title:       "이메일 등록 인증번호예요",
 		Description: "이 이메일을 SMAP 계정에 등록하려면 아래 인증번호를 앱에 입력해 주세요.",
+		IgnoreNote:  "직접 요청하지 않았다면 이 메일을 무시해 주세요. 계정에 이 이메일이 등록되지 않아요.",
 	},
 }
 
@@ -55,8 +61,8 @@ func buildVerificationMessage(purpose, code string) (verificationMessage, error)
 	}
 	var buf bytes.Buffer
 	if err := verificationHTMLTmpl.Execute(&buf, struct {
-		Subject, Title, Description, Code string
-	}{c.Subject, c.Title, c.Description, code}); err != nil {
+		Subject, Title, Description, IgnoreNote, Code string
+	}{c.Subject, c.Title, c.Description, c.IgnoreNote, code}); err != nil {
 		return verificationMessage{}, fmt.Errorf("render verification email: %w", err)
 	}
 	var t strings.Builder
