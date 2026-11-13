@@ -179,16 +179,8 @@ func (s *AuthService) ResetPasswordByPhone(phone, verificationCode, newPassword 
 	}
 }
 
-// updatePassword는 Python crud_auth.update_user_password를 이식한다.
-// bcrypt.gensalt() 기본 cost(=12, PASSWORD_BCRYPT_COST와 동일값)로 해시 후 mt_pwd/mt_udate UPDATE.
-// 해시 실패/DB 오류 시 false(Python의 except→False). 호출 측이 이미 user를 로드했으므로
-// "user 없음→False" 경로는 실질적으로 발생하지 않는다.
+// updatePassword는 Python crud_auth.update_user_password를 이식한다. 15단계: 해시 갱신 + 그 회원 refresh 전부 폐기
+// (한 트랜잭션) + 구 access token 무효 기준 기록(changePasswordAndRevoke). 어느 하나라도 실패하면 false.
 func (s *AuthService) updatePassword(mtIdx int, newPassword string) bool {
-	hashed, err := auth.HashPassword(newPassword, s.cfg.BcryptCost)
-	if err != nil {
-		return false
-	}
-	return s.members.UpdateColumns(mtIdx, map[string]interface{}{
-		"mt_pwd": hashed, "mt_udate": dbUTCNow(),
-	}) == nil
+	return s.changePasswordAndRevoke(mtIdx, newPassword)
 }

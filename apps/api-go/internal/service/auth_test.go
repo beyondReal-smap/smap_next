@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -24,6 +25,9 @@ type fakeAuthMemberRepo struct {
 	getErr    error
 	createErr error
 	updateErr error
+	dupEmail  map[string][]model.Member
+	pwErr     error
+	pwSets    []int
 
 	created    *model.Member
 	nextIdx    int
@@ -99,6 +103,28 @@ func (f *fakeAuthMemberRepo) GetByResetToken(token string, now time.Time) (*mode
 		return nil, f.getErr
 	}
 	return f.byReset[token], nil
+}
+
+// G4: 이메일이 같은 활성(미차단) 회원. byEmail 맵 기준. pwSets는 SetPasswordRevokeRefresh 호출 기록.
+func (f *fakeAuthMemberRepo) FindActiveByEmail(email string) ([]model.Member, error) {
+	if f.getErr != nil {
+		return nil, f.getErr
+	}
+	if f.dupEmail != nil {
+		return f.dupEmail[email], nil
+	}
+	if m := f.byEmail[email]; m != nil && !m.IsBlocked() {
+		return []model.Member{*m}, nil
+	}
+	return nil, nil
+}
+func (f *fakeAuthMemberRepo) SetPasswordRevokeRefresh(idx int, hashed string) error {
+	if f.pwErr != nil {
+		return f.pwErr
+	}
+	f.pwSets = append(f.pwSets, idx)
+	f.lastFields = map[string]interface{}{"mt_pwd": hashed}
+	return nil
 }
 
 type fakeAuthRefreshRepo struct {
@@ -217,6 +243,15 @@ func loginTestUser(t *testing.T, cfg AuthConfig) *model.Member {
 	return &model.Member{MtIdx: 1186, MtID: pStr("01012345678"), MtName: &name, MtPwd: &hash, MtEmail: pStr("u@x.com")}
 }
 
+// loginOnly는 한도 거부 없이 Login 응답만 돌려주는 테스트 헬퍼(기본 정책: 한도 저장소 없음).
+func loginOnly(svc *AuthService, in LoginInput, ua, ipHash string) dto.LoginHomeResponse {
+	resp, rej := svc.Login(context.Background(), in, ClientMeta{UserAgent: ua, IPHash: ipHash, ClientIP: "198.51.100.9"})
+	if rej != nil {
+		panic(rej.Error())
+	}
+	return resp
+}
+
 func TestLoginHomeSuccess(t *testing.T) {
 	cfg := testAuthConfig()
 	user := loginTestUser(t, cfg)
@@ -224,7 +259,7 @@ func TestLoginHomeSuccess(t *testing.T) {
 	ref := &fakeAuthRefreshRepo{issueRaw: "refresh-raw-xyz"}
 	svc := NewAuth(mem, ref, cfg)
 
-	resp := svc.LoginHome(LoginInput{MtID: "010-1234-5678", MtPwd: "Test1234!@"}, "UA", "iphash")
+	resp := loginOnly(svc, LoginInput{MtID: "010-1234-5678", MtPwd: "Test1234!@"}, "UA", "iphash")
 	if !resp.Success || resp.Message != "로그인 성공" {
 		t.Fatalf("로그인 실패: %+v", resp)
 	}
@@ -253,7 +288,7 @@ func TestLoginHomeWrongPassword(t *testing.T) {
 	user := loginTestUser(t, cfg)
 	mem := &fakeAuthMemberRepo{byMtID: map[string]*model.Member{"01012345678": user}}
 	svc := NewAuth(mem, &fakeAuthRefreshRepo{}, cfg)
-	resp := svc.LoginHome(LoginInput{MtID: "01012345678", MtPwd: "WRONG"}, "", "")
+	resp := loginOnly(svc, LoginInput{MtID: "01012345678", MtPwd: "WRONG"}, "", "")
 	if resp.Success || resp.Message != "아이디 또는 비밀번호가 올바르지 않습니다." {
 		t.Fatalf("틀린 비번 분기 오류: %+v", resp)
 	}
@@ -263,7 +298,7 @@ func TestLoginHomeNotFound(t *testing.T) {
 	cfg := testAuthConfig()
 	mem := &fakeAuthMemberRepo{byMtID: map[string]*model.Member{}}
 	svc := NewAuth(mem, &fakeAuthRefreshRepo{}, cfg)
-	resp := svc.LoginHome(LoginInput{MtID: "010", MtPwd: "x"}, "", "")
+	resp := loginOnly(svc, LoginInput{MtID: "010", MtPwd: "x"}, "", "")
 	if resp.Success || resp.Message != "아이디 또는 비밀번호가 올바르지 않습니다." {
 		t.Fatalf("미발견 분기 오류: %+v", resp)
 	}
@@ -274,7 +309,7 @@ func TestLoginHomeEmailBranch(t *testing.T) {
 	user := loginTestUser(t, cfg)
 	mem := &fakeAuthMemberRepo{byEmail: map[string]*model.Member{"u@x.com": user}}
 	svc := NewAuth(mem, &fakeAuthRefreshRepo{issueRaw: "r"}, cfg)
-	resp := svc.LoginHome(LoginInput{MtID: "u@x.com", MtPwd: "Test1234!@"}, "", "")
+	resp := loginOnly(svc, LoginInput{MtID: "u@x.com", MtPwd: "Test1234!@"}, "", "")
 	if !resp.Success {
 		t.Fatalf("이메일 로그인 실패: %+v", resp)
 	}
@@ -284,7 +319,7 @@ func TestLoginHomeServerError(t *testing.T) {
 	cfg := testAuthConfig()
 	mem := &fakeAuthMemberRepo{getErr: errStr("db down")}
 	svc := NewAuth(mem, &fakeAuthRefreshRepo{}, cfg)
-	resp := svc.LoginHome(LoginInput{MtID: "010", MtPwd: "x"}, "", "")
+	resp := loginOnly(svc, LoginInput{MtID: "010", MtPwd: "x"}, "", "")
 	if resp.Success || resp.Message != "서버 오류가 발생했습니다." {
 		t.Fatalf("서버오류 흡수 실패: %+v", resp)
 	}
@@ -358,94 +393,6 @@ func TestLoginOriginal(t *testing.T) {
 	out2, _ := svc.LoginOriginal("01012345678", "WRONG")
 	if out2 != LoginOrigUnauthorized {
 		t.Fatalf("login-original 401 분기 오류: %d", out2)
-	}
-}
-
-// --- Register ---
-
-func baseRegisterInput() RegisterInput {
-	return RegisterInput{
-		MtType: 1, MtLevel: 2, MtStatus: 1,
-		MtID: "01099998888", MtPwd: pStr("Test1234!@"),
-		MtName: "신규", MtNickname: "신규닉",
-		MtEmail:  pStr("new@x.com"),
-		MtAgree1: true, MtAgree2: true, MtAgree3: true,
-	}
-}
-
-func TestRegisterCreated(t *testing.T) {
-	cfg := testAuthConfig()
-	mem := &fakeAuthMemberRepo{byMtID: map[string]*model.Member{}, byEmail: map[string]*model.Member{}}
-	svc := NewAuth(mem, &fakeAuthRefreshRepo{}, cfg)
-	out, resp := svc.Register(baseRegisterInput())
-	if out != RegisterCreated || resp == nil || !resp.Success || resp.Message != "회원가입 성공" {
-		t.Fatalf("register 성공 오류: out=%d resp=%+v", out, resp)
-	}
-	data, ok := resp.Data.(*dto.RegisterData)
-	if !ok || data.User == nil {
-		t.Fatalf("register data 타입: %T", resp.Data)
-	}
-	if data.User.MtID != "01099998888" || data.User.MtName != "신규" {
-		t.Fatalf("register user 필드 오류: %+v", data.User)
-	}
-	// 저장된 행: mt_hp는 숫자 mt_id라 동일, 비밀번호 해시 저장, mt_show='Y'.
-	if mem.created == nil || mem.created.MtHp == nil || *mem.created.MtHp != "01099998888" {
-		t.Fatalf("mt_hp 저장 오류: %+v", mem.created)
-	}
-	if mem.created.MtPwd == nil || !auth.VerifyPassword("Test1234!@", *mem.created.MtPwd) {
-		t.Fatal("비밀번호 해시 저장/검증 실패")
-	}
-	if mem.created.MtShow == nil || *mem.created.MtShow != "Y" {
-		t.Fatal("mt_show='Y' 저장 안 됨")
-	}
-}
-
-func TestRegisterPhoneExists(t *testing.T) {
-	cfg := testAuthConfig()
-	existing := &model.Member{MtIdx: 1}
-	mem := &fakeAuthMemberRepo{byMtID: map[string]*model.Member{"01099998888": existing}}
-	svc := NewAuth(mem, &fakeAuthRefreshRepo{}, cfg)
-	out, _ := svc.Register(baseRegisterInput())
-	if out != RegisterPhoneExists {
-		t.Fatalf("전화번호 중복 분기 오류: %d", out)
-	}
-}
-
-func TestRegisterEmailExists(t *testing.T) {
-	cfg := testAuthConfig()
-	existing := &model.Member{MtIdx: 2}
-	mem := &fakeAuthMemberRepo{
-		byMtID:  map[string]*model.Member{},
-		byEmail: map[string]*model.Member{"new@x.com": existing},
-	}
-	svc := NewAuth(mem, &fakeAuthRefreshRepo{}, cfg)
-	out, _ := svc.Register(baseRegisterInput())
-	if out != RegisterEmailExists {
-		t.Fatalf("이메일 중복 분기 오류: %d", out)
-	}
-}
-
-func TestRegisterWeakPasswordServerError(t *testing.T) {
-	cfg := testAuthConfig()
-	mem := &fakeAuthMemberRepo{byMtID: map[string]*model.Member{}, byEmail: map[string]*model.Member{}}
-	svc := NewAuth(mem, &fakeAuthRefreshRepo{}, cfg)
-	in := baseRegisterInput()
-	in.MtPwd = pStr("weak") // 정책 위반 → create_user ValueError → 500
-	out, _ := svc.Register(in)
-	if out != RegisterServerErr {
-		t.Fatalf("약한 비밀번호 → 500 분기 오류: %d", out)
-	}
-}
-
-func TestRegisterBadBirthServerError(t *testing.T) {
-	cfg := testAuthConfig()
-	mem := &fakeAuthMemberRepo{byMtID: map[string]*model.Member{}, byEmail: map[string]*model.Member{}}
-	svc := NewAuth(mem, &fakeAuthRefreshRepo{}, cfg)
-	in := baseRegisterInput()
-	in.MtBirth = pStr("not-a-date") // strptime 실패 → 500
-	out, _ := svc.Register(in)
-	if out != RegisterServerErr {
-		t.Fatalf("잘못된 생년월일 → 500 분기 오류: %d", out)
 	}
 }
 

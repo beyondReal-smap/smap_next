@@ -18,16 +18,29 @@ import (
 
 // MemberWriteHandler는 Python members.py의 write 17종(google-login 제외 16종, google은 auth 재사용)을 이식한다.
 type MemberWriteHandler struct {
-	svc *service.MemberWriteService
-	cfg *config.Config
+	svc        *service.MemberWriteService
+	cfg        *config.Config
+	revocation auth.AccessRevocationChecker
 }
+
+// SetRevocation은 구 access token 무효 기준 조회기를 주입한다(비밀번호 변경 이전 토큰 거부).
+func (h *MemberWriteHandler) SetRevocation(r auth.AccessRevocationChecker) { h.revocation = r }
 
 func NewMemberWrite(svc *service.MemberWriteService, cfg *config.Config) *MemberWriteHandler {
 	return &MemberWriteHandler{svc: svc, cfg: cfg}
 }
 
 func (h *MemberWriteHandler) optUID(c *gin.Context) (int, bool) {
-	return auth.ParseOptionalUserID(c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
+	uid, ok := auth.ParseOptionalUserID(c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
+	if !ok {
+		return 0, false
+	}
+	// 비밀번호 변경 이전에 발급된 토큰은 인증 실패로 취급한다(Redis 장애 시에는 통과 + 경고 로그).
+	if ident, state := auth.VerifyAccessTokenIdentity(c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm); state == auth.TokenValid &&
+		auth.AccessRevoked(h.revocation, nil, ident) {
+		return 0, false
+	}
+	return uid, true
 }
 
 // ======================= 비밀번호 (verify/change) =======================

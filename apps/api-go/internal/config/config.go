@@ -96,6 +96,35 @@ type Config struct {
 	// warn 계측 카운터를 요약 로그로 내보내는 주기(초).
 	RouteAuthSummaryIntervalSeconds int `envconfig:"ROUTE_AUTH_SUMMARY_INTERVAL_SECONDS" default:"60"`
 
+	// --- 소셜 로그인 공급자 토큰 검증(G5) ---
+	// SOCIAL_TOKEN_VERIFICATION: off | when_present | required. 기본 when_present
+	// (토큰이 있으면 검증·실패 시 거부, 없으면 기존 동작 + 경고 계측). 잘못된 값은 Load에서 에러.
+	SocialTokenVerificationRaw string `envconfig:"SOCIAL_TOKEN_VERIFICATION" default:"when_present"`
+	// 허용 목록(쉼표 구분). Google은 id_token의 aud(웹/iOS 클라이언트 ID), Apple은 identityToken의 aud(번들 ID),
+	// Kakao는 앱 ID(숫자). 비어 있으면 해당 공급자 검증은 503(조용히 건너뛰지 않는다).
+	GoogleAllowedClientIDsRaw string `envconfig:"GOOGLE_ALLOWED_CLIENT_IDS" default:""`
+	AppleAllowedBundleIDsRaw  string `envconfig:"APPLE_ALLOWED_BUNDLE_IDS" default:""`
+	KakaoAllowedAppID         string `envconfig:"KAKAO_ALLOWED_APP_ID" default:""`
+
+	// TRUSTED_CLIENT_IP_HEADER: 한도(rate limit)용 클라이언트 IP를 읽을 신뢰 헤더 이름(예: CF-Connecting-IP).
+	// 직접 접속 상대가 loopback/사설 대역일 때만 이 헤더를 믿는다. 비어 있으면 직접 접속 주소만 사용한다
+	// (터널·프록시 뒤에서는 모든 사용자가 한 주소로 합산되므로 운영에서는 반드시 설정).
+	TrustedClientIPHeader string `envconfig:"TRUSTED_CLIENT_IP_HEADER" default:""`
+
+	// --- 가입·로그인 정책(G4) ---
+	// 토큰(email_verification_token) 없는 구버전 호환 가입(전화번호/소셜 ID 평문)을 허용할지. 꺼지면 400 "본인인증이 필요합니다.".
+	AllowLegacyPhoneRegister bool `envconfig:"ALLOW_LEGACY_PHONE_REGISTER" default:"true"`
+	// 구버전 가입에서 서버에 SMS 인증 완료 상태(Redis)가 있어야 하는지. iOS 3.2.0은 서버 verify-code를 호출하지 않으므로 기본 false.
+	LegacyRegisterRequireSMSVerified bool `envconfig:"LEGACY_REGISTER_REQUIRE_SMS_VERIFIED" default:"false"`
+	// 소셜 가입에 공급자 토큰(social_provider+social_token)을 강제할지. 구버전은 가입에 토큰을 보내지 않으므로 기본 false.
+	SocialRegisterRequireToken bool `envconfig:"SOCIAL_REGISTER_REQUIRE_TOKEN" default:"false"`
+	// 토큰 없는 소셜 가입에 "공급자 토큰을 검증한 소셜 로그인(신규 사용자 판정) 증거(Redis 15분)"를 요구할지. 기본 false.
+	SocialRegisterRequireLoginProof bool `envconfig:"SOCIAL_REGISTER_REQUIRE_LOGIN_PROOF" default:"false"`
+	// 로그인 실패 한도: 계정(정규화 ID)당 / IP당, 고정 창(초). 초과 시 429.
+	LoginFailLimitPerAccount int `envconfig:"LOGIN_FAIL_LIMIT_PER_ACCOUNT" default:"10"`
+	LoginFailLimitPerIP      int `envconfig:"LOGIN_FAIL_LIMIT_PER_IP" default:"100"`
+	LoginFailWindowSeconds   int `envconfig:"LOGIN_FAIL_WINDOW_SECONDS" default:"900"`
+
 	// 프로필 이미지 저장 디렉토리(members upload/delete-profile-image). Python은 cwd 기준 상대
 	// public/images에 저장하나, 실제 /images 서빙은 Python FastAPI StaticFiles(BASE_DIR/public/images,
 	// 절대경로)이다. Go cwd=backend-go라 상대경로를 쓰면 안 되고, Python과 동일한 절대경로에 써야
@@ -133,6 +162,9 @@ type Config struct {
 	// Gmail SMTP 폴백 자격증명(Python settings.EMAIL_SENDER/PASSWORD). 미설정 시 SMTP 발송 실패.
 	EmailSender   string `envconfig:"EMAIL_SENDER" default:""`
 	EmailPassword string `envconfig:"EMAIL_PASSWORD" default:""`
+	// SMTP 서버·포트(기본 Gmail 465). 네이버웍스 SMTP는 smtp.worksmobile.com:465. 465는 암묵적 TLS, 그 외는 STARTTLS.
+	EmailSMTPServer string `envconfig:"EMAIL_SMTP_SERVER" default:"smtp.gmail.com"`
+	EmailSMTPPort   int    `envconfig:"EMAIL_SMTP_PORT" default:"465"`
 	// 네이버웍스 메일 API(우선 발송 경로). 미설정 시 Gmail SMTP로 폴백(Python os.getenv).
 	NaverworksClientID     string `envconfig:"NAVERWORKS_CLIENT_ID" default:""`
 	NaverworksClientSecret string `envconfig:"NAVERWORKS_CLIENT_SECRET" default:""`
@@ -213,6 +245,12 @@ func Load(envPath string) (*Config, error) {
 	// envconfig가 unexported 필드를 채울 수 없으므로 수동 보강.
 	c.corsOriginsRaw = os.Getenv("BACKEND_CORS_ORIGINS")
 	if err := c.validateRouteAuth(); err != nil {
+		return nil, err
+	}
+	if err := c.validateSocial(); err != nil {
+		return nil, err
+	}
+	if err := c.validateAuthPolicy(); err != nil {
 		return nil, err
 	}
 	return &c, nil

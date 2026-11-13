@@ -100,7 +100,10 @@ func main() {
 		logger.Error("route auth mode invalid", slog.String("err", err.Error()))
 		os.Exit(1)
 	}
+	// 비밀번호 변경·재설정·탈퇴 후 구 access token 무효 기준(Redis, TTL=access 수명). 조회 실패는 통과 + 경고.
+	accessRevocation := cache.NewAccessRevocation(cacheStore, time.Duration(cfg.AccessTokenExpireMinutes)*time.Minute)
 	routeAuth, err := middleware.NewRouteAuth(middleware.RouteAuthOptions{
+		Revocation:      accessRevocation,
 		Mode:            routeMode,
 		Secret:          cfg.JWTSecretKey,
 		Algorithm:       cfg.JWTAlgorithm,
@@ -145,7 +148,9 @@ func main() {
 		RequireNumbers: cfg.PasswordRequireNumbers,
 		RequireSpecial: cfg.PasswordRequireSpecial,
 	})
+	memberWriteSvc.SetAccessRevoker(accessRevocation, logger)
 	memberWriteH := handler.NewMemberWrite(memberWriteSvc, cfg)
+	memberWriteH.SetRevocation(accessRevocation)
 
 	// Phase 4 — users read 7종(auth 도메인, 무인증) + auth/me(JWT). memberRepo 공유.
 	userSvc := service.NewUser(memberRepo)
@@ -203,6 +208,38 @@ func main() {
 	})
 	// Phase B 소셜로그인 부가데이터(그룹·스케줄) repo 주입.
 	authSvc.SetSocial(repository.NewAuthSocial(gdb))
+	// G5 소셜 로그인 공급자 토큰 검증(SOCIAL_TOKEN_VERIFICATION off|when_present|required).
+	socialMode, err := cfg.SocialTokenVerification()
+	if err != nil {
+		logger.Error("social token verification mode invalid", slog.String("err", err.Error()))
+		os.Exit(1)
+	}
+	providerVerifier, err := auth.NewProviderVerifier(auth.ProviderVerifierConfig{
+		GoogleClientIDs: cfg.GoogleAllowedClientIDs(),
+		AppleBundleIDs:  cfg.AppleAllowedBundleIDs(),
+		KakaoAppID:      cfg.KakaoAllowedAppID,
+	})
+	if err != nil {
+		logger.Error("social provider verifier init failed", slog.String("err", err.Error()))
+		os.Exit(1)
+	}
+	authSvc.SetSocialVerification(service.SocialVerification{
+		Verifier: providerVerifier, Mode: socialMode, Emails: memberRepo, Logger: logger,
+	})
+	logger.Info("social token verification configured",
+		slog.String("mode", string(socialMode)),
+		slog.Bool("google_configured", providerVerifier.Configured(auth.ProviderGoogle)),
+		slog.Bool("apple_configured", providerVerifier.Configured(auth.ProviderApple)),
+		slog.Bool("kakao_configured", providerVerifier.Configured(auth.ProviderKakao)),
+	)
+	if socialMode != auth.SocialModeOff {
+		for _, p := range []auth.Provider{auth.ProviderGoogle, auth.ProviderApple, auth.ProviderKakao} {
+			if !providerVerifier.Configured(p) {
+				// 허용 목록이 없으면 해당 공급자의 검증은 503으로 실패한다(토큰이 있는 로그인 포함).
+				logger.Warn("social provider allow-list is empty", slog.String("provider", string(p)), slog.String("mode", string(socialMode)))
+			}
+		}
+	}
 	// Phase C SMS 인증상태(Redis sms:verified:/sms:code: interop) — reset-password-by-phone용.
 	authSvc.SetVerifyStore(cache.NewSMSVerifyStore(cacheStore))
 
@@ -216,6 +253,8 @@ func main() {
 	emailSvc := service.NewEmail(service.EmailConfig{
 		Sender:                 cfg.EmailSender,
 		Password:               cfg.EmailPassword,
+		SMTPServer:             cfg.EmailSMTPServer,
+		SMTPPort:               cfg.EmailSMTPPort,
 		NaverworksClientID:     cfg.NaverworksClientID,
 		NaverworksClientSecret: cfg.NaverworksClientSecret,
 		NaverworksDomain:       cfg.NaverworksDomain,
@@ -226,6 +265,58 @@ func main() {
 	authSvc.SetResetSender(service.NewResetNotifier(smsSvc, emailSvc, logger))
 
 	authH := handler.NewAuth(authSvc, cfg)
+	authH.SetRevocation(accessRevocation)
+
+	// G3 — 이메일 인증(발송·검증·토큰·재설정·등록/변경). Redis 원자 연산은 cacheStore(미연결 시 503),
+	// 발송은 위 emailSvc(설정 없으면 503/502로 실패, 성공 위장 없음).
+	if cfg.TrustedClientIPHeader == "" {
+		logger.Warn("TRUSTED_CLIENT_IP_HEADER not set: 이메일 인증 IP 한도가 직접 접속 주소 기준으로 동작합니다(프록시 뒤에서는 모든 사용자가 합산됨)")
+	}
+	emailAuthSvc := service.NewEmailAuth(cacheStore, repository.NewEmailAuth(gdb), emailSvc, service.EmailAuthConfig{
+		Secret:     cfg.JWTSecretKey,
+		Algorithm:  cfg.JWTAlgorithm,
+		BcryptCost: cfg.PasswordBcryptCost,
+		Policy: auth.PasswordPolicy{
+			MinLength:      cfg.PasswordMinLength,
+			RequireUpper:   cfg.PasswordRequireUpper,
+			RequireLower:   cfg.PasswordRequireLower,
+			RequireNumbers: cfg.PasswordRequireNumbers,
+			RequireSpecial: cfg.PasswordRequireSpecial,
+		},
+	}, logger)
+	emailAuthSvc.SetAccessRevoker(accessRevocation)
+	emailAuthH := handler.NewEmailAuth(emailAuthSvc, cfg, logger)
+
+	// G4 — 가입(이메일 인증 토큰 소비·소셜 검증·구버전 호환)·로그인 실패 한도·비밀번호 변경 시 토큰 회수.
+	authSvc.SetRegisterStore(repository.NewAuthRegister(gdb, refreshRepo))
+	authSvc.SetEmailTokens(emailAuthSvc)
+	authSvc.SetSecurityStore(cacheStore)
+	authSvc.SetAccessRevoker(accessRevocation)
+	authSvc.SetLogger(logger)
+	authSvc.SetPolicy(service.AuthPolicy{
+		AllowLegacyPhoneRegister:   cfg.AllowLegacyPhoneRegister,
+		LegacyRegisterRequireSMS:   cfg.LegacyRegisterRequireSMSVerified,
+		SocialRegisterRequireToken: cfg.SocialRegisterRequireToken,
+		SocialRegisterRequireProof: cfg.SocialRegisterRequireLoginProof,
+		LoginFailPerAccount:        cfg.LoginFailLimitPerAccount,
+		LoginFailPerIP:             cfg.LoginFailLimitPerIP,
+		LoginFailWindow:            time.Duration(cfg.LoginFailWindowSeconds) * time.Second,
+	})
+	logger.Info("auth policy configured",
+		slog.Bool("allow_legacy_phone_register", cfg.AllowLegacyPhoneRegister),
+		slog.Bool("legacy_register_require_sms_verified", cfg.LegacyRegisterRequireSMSVerified),
+		slog.Bool("social_register_require_token", cfg.SocialRegisterRequireToken),
+		slog.Bool("social_register_require_login_proof", cfg.SocialRegisterRequireLoginProof),
+		slog.Int("login_fail_limit_per_account", cfg.LoginFailLimitPerAccount),
+		slog.Int("login_fail_limit_per_ip", cfg.LoginFailLimitPerIP),
+		slog.Int("login_fail_window_sec", cfg.LoginFailWindowSeconds),
+	)
+	if cfg.AllowLegacyPhoneRegister && !cfg.LegacyRegisterRequireSMSVerified {
+		logger.Warn("legacy phone register is open without SMS verification state (LEGACY_REGISTER_REQUIRE_SMS_VERIFIED=false)")
+	}
+	if !cfg.SocialRegisterRequireToken && !cfg.SocialRegisterRequireLoginProof {
+		logger.Warn("social register accepts provider ids without provider token (SOCIAL_REGISTER_REQUIRE_TOKEN=false)")
+	}
 
 	// Phase 5 — chat REST 3종(JWT) + WS 실시간(native). chatSvc를 핸들러·WS가 공유(chatRepo 재사용).
 	chatSvc := service.NewChat(chatRepo)
@@ -239,7 +330,10 @@ func main() {
 	fcmSendoneH := handler.NewFCMSendone(service.NewPushSend(memberRepo, pushLogRepo, fcmClient))
 	fcmSendoneH.SetAdminGate(adminAuth) // 전체 발송(mt_idx==0)은 관리자만
 	// fcm-token — FCM 토큰 관리 3종(get_current_member 인증). memberRepo 공유.
-	fcmTokenH := handler.NewFCMToken(service.NewFCMToken(memberRepo), cfg)
+	fcmTokenSvc := service.NewFCMToken(memberRepo)
+	fcmTokenSvc.SetUnregisterRepo(memberRepo)
+	fcmTokenH := handler.NewFCMToken(fcmTokenSvc, cfg)
+	fcmTokenH.SetRevocation(accessRevocation)
 	// member-fcm-token — 회원 FCM 토큰 관리 12종. memberRepo 공유 + DEBUG test-ios-push용 fcmClient.
 	memberFCMTokenH := handler.NewMemberFCMToken(service.NewMemberFCMToken(memberRepo), cfg, fcmClient)
 
@@ -278,6 +372,7 @@ func main() {
 		Chat:           chatH,
 		ChatWS:         chatWS,
 		Auth:           authH,
+		EmailAuth:      emailAuthH,
 	})
 
 	srv := &http.Server{

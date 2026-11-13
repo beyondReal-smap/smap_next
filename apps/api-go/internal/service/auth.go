@@ -1,8 +1,9 @@
 package service
 
 import (
-	mathrand "math/rand"
+	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bluemusk/smap_next_go/internal/auth"
@@ -24,6 +25,9 @@ type authMemberRepo interface {
 	GetByPhoneOr(phone string) (*model.Member, error)
 	// Phase C 비번재설정 토큰 조회(mt_reset_token + 미만료)
 	GetByResetToken(token string, now time.Time) (*model.Member, error)
+	// G4 로그인: 이메일이 같은 활성 회원(최대 2명). 비밀번호 변경: 해시 갱신 + refresh 전부 폐기(한 트랜잭션).
+	FindActiveByEmail(email string) ([]model.Member, error)
+	SetPasswordRevokeRefresh(mtIdx int, hashed string) error
 }
 
 // authRefreshRepo는 refresh 토큰 발급/회전/폐기(좁은 인터페이스).
@@ -54,10 +58,22 @@ type AuthConfig struct {
 type AuthService struct {
 	members authMemberRepo
 	refresh authRefreshRepo
-	social  authSocialRepo  // Phase B 부가데이터(그룹·스케줄). SetSocial로 주입.
-	verify  authVerifyStore // Phase C SMS 인증상태(Redis interop). SetVerifyStore로 주입.
-	sender  resetSender     // sms/email 트랙: forgot 발송 seam. SetResetSender로 주입(nil이면 발송 skip).
+	social  authSocialRepo     // Phase B 부가데이터(그룹·스케줄). SetSocial로 주입.
+	verify  authVerifyStore    // Phase C SMS 인증상태(Redis interop). SetVerifyStore로 주입.
+	sender  resetSender        // sms/email 트랙: forgot 발송 seam. SetResetSender로 주입(nil이면 발송 skip).
+	socialV SocialVerification // G5 소셜 공급자 토큰 검증(모드·검증기·이메일 조회). SetSocialVerification으로 주입.
 	cfg     AuthConfig
+
+	// G4
+	reg      authRegisterStore // 가입 트랜잭션(SetRegisterStore)
+	emailTok emailTokenService // 가입 이메일 인증 토큰 파싱·소비(SetEmailTokens)
+	guard    securityStore     // 로그인 실패 한도·소셜 로그인 증거(Redis; SetSecurityStore)
+	revoker  accessRevoker     // 비밀번호 변경 시 구 access token 무효 기준(SetAccessRevoker)
+	policy   AuthPolicy
+	logger   *slog.Logger
+	dummyMu  sync.Once
+	dummyPwd string
+	identMu  [64]sync.Mutex // 같은 식별자의 동시 가입 직렬화(프로세스 내)
 }
 
 // resetSender는 forgot-password의 비번재설정 링크 발송(SMS/이메일) seam이다.
@@ -96,96 +112,6 @@ type LoginInput struct {
 	AppVersion  string
 }
 
-// LoginHome은 Python login_for_home_page를 이식한다. 모든 예외를 흡수해 항상 200 동등 응답을 반환한다.
-// (FastAPI 핸들러의 try/except가 success:false로 흡수 → 본 함수는 항상 (resp, nil))
-func (s *AuthService) LoginHome(in LoginInput, userAgent, ipHash string) dto.LoginHomeResponse {
-	fail := func() dto.LoginHomeResponse {
-		return dto.LoginHomeResponse{Success: false, Message: "아이디 또는 비밀번호가 올바르지 않습니다."}
-	}
-	serverErr := func() dto.LoginHomeResponse {
-		return dto.LoginHomeResponse{Success: false, Message: "서버 오류가 발생했습니다."}
-	}
-
-	// 이메일(@) 또는 전화번호(하이픈 제거)로 조회.
-	var user *model.Member
-	var err error
-	if strings.Contains(in.MtID, "@") {
-		user, err = s.members.GetByEmail(in.MtID)
-	} else {
-		user, err = s.members.GetByMtID(strings.ReplaceAll(in.MtID, "-", ""))
-	}
-	if err != nil {
-		return serverErr()
-	}
-	if user == nil {
-		return fail()
-	}
-
-	// 비밀번호 검증. mt_pwd 없으면(소셜) 실패.
-	pwd := derefStr(user.MtPwd)
-	if pwd == "" || !auth.VerifyPassword(in.MtPwd, pwd) {
-		return fail()
-	}
-	// 탈퇴(mt_level=1)·정지(mt_status=2)·비노출(mt_show='N') 회원은 로그인 거부. NULL은 통과(기존 회원 잠금 방지).
-	// 계정 존재·상태 노출을 막으려고 비밀번호 검증 뒤에, 비밀번호 오류와 같은 응답으로 거부한다.
-	if user.IsBlocked() {
-		return fail()
-	}
-
-	accessToken, err := s.issueAccessToken(user)
-	if err != nil {
-		return serverErr()
-	}
-
-	now := dbUTCNow()
-	fields := map[string]interface{}{"mt_ldate": now, "mt_adate": now}
-	if in.DeviceID != "" {
-		fields["mt_device_id"] = in.DeviceID
-	}
-	if in.DeviceModel != "" {
-		fields["mt_device_model"] = in.DeviceModel
-	}
-	if in.OsType != "" {
-		v := 0
-		if strings.ToLower(in.OsType) == "ios" {
-			v = 1
-		}
-		fields["mt_os_check"] = v
-	}
-	if in.OsVersion != "" {
-		fields["mt_os_version"] = in.OsVersion
-	}
-	if in.AppVersion != "" {
-		fields["mt_app_version"] = in.AppVersion
-	}
-	if err := s.members.UpdateColumns(user.MtIdx, fields); err != nil {
-		return serverErr()
-	}
-	// SQLAlchemy expire_on_commit 등가: commit 후 user_data를 만들 때 속성이 DB에서 재조회된다.
-	// 갱신 행을 재조회해 응답이 컬럼 정밀도(mt_ldate/mt_adate 등)를 그대로 반영하게 한다.
-	if fresh, ferr := s.members.GetByID(user.MtIdx); ferr == nil && fresh != nil {
-		user = fresh
-	} else {
-		user.MtLdate, user.MtAdate = &now, &now // 안전 폴백(정상 흐름에선 도달 안 함)
-	}
-
-	refreshRaw, _, err := s.refresh.Issue(user.MtIdx, "", userAgent, ipHash)
-	if err != nil {
-		return serverErr()
-	}
-
-	return dto.LoginHomeResponse{
-		Success: true,
-		Message: "로그인 성공",
-		Data: &dto.LoginHomeData{
-			Token:        accessToken,
-			RefreshToken: refreshRaw,
-			ExpiresIn:    s.accessExpiresInSeconds(),
-			User:         buildLoginUserData(user),
-		},
-	}
-}
-
 // Logout은 Python logout: refresh_token 있으면 revoke, 항상 고정 응답.
 func (s *AuthService) Logout(refreshRaw string) dto.LogoutResponse {
 	if refreshRaw != "" {
@@ -198,14 +124,14 @@ func (s *AuthService) Logout(refreshRaw string) dto.LogoutResponse {
 type RefreshOutcome int
 
 const (
-	RefreshV2OK       RefreshOutcome = iota // v2 rotation 성공
-	RefreshV2Invalid                        // refresh token 유효하지 않음 (401)
-	RefreshUserGone                         // 사용자를 찾을 수 없음 (401)
-	RefreshV1OK                             // v1 access 재발급 성공
-	RefreshNoToken                          // 토큰 부재 (401)
-	RefreshV1Invalid                        // v1 토큰 유효하지 않음 (mt_idx 없음, 401)
-	RefreshV1Fail                           // v1 JWT 디코드 실패 (401)
-	RefreshServerErr                        // DB 등 서버 오류
+	RefreshV2OK      RefreshOutcome = iota // v2 rotation 성공
+	RefreshV2Invalid                       // refresh token 유효하지 않음 (401)
+	RefreshUserGone                        // 사용자를 찾을 수 없음 (401)
+	RefreshV1OK                            // v1 access 재발급 성공
+	RefreshNoToken                         // 토큰 부재 (401)
+	RefreshV1Invalid                       // v1 토큰 유효하지 않음 (mt_idx 없음, 401)
+	RefreshV1Fail                          // v1 JWT 디코드 실패 (401)
+	RefreshServerErr                       // DB 등 서버 오류
 )
 
 // RefreshV2는 body refresh_token으로 rotation. Python refresh의 v2 경로.
@@ -311,177 +237,6 @@ func (s *AuthService) LoginOriginal(mtHp, mtPass string) (LoginOriginalOutcome, 
 	}
 
 	return LoginOrigOK, &dto.LoginOriginalResponse{AccessToken: accessToken, User: identity}
-}
-
-// RegisterInput은 RegisterRequest(create_user가 사용하는 필드).
-type RegisterInput struct {
-	MtType    int
-	MtLevel   int
-	MtStatus  int
-	MtID      string
-	MtPwd     *string
-	MtName    string
-	MtNickname string
-	MtEmail   *string
-	MtBirth   *string
-	MtGender  *int
-	MtFile1   *string
-	MtAgree1  bool
-	MtAgree2  bool
-	MtAgree3  bool
-	MtAgree4  bool
-	MtAgree5  bool
-	MtTokenID *string
-	MtLat     *float64
-	MtLong    *float64
-	MtGoogleID *string
-	MtKakaoID  *string
-	MtAppleID  *string
-}
-
-// RegisterOutcome은 /register 결과 분기.
-type RegisterOutcome int
-
-const (
-	RegisterCreated      RegisterOutcome = iota // 201
-	RegisterPhoneExists                         // 409 "이미 등록된 전화번호입니다."
-	RegisterEmailExists                         // 409 "이미 등록된 이메일입니다."
-	RegisterServerErr                           // 500 "사용자 생성 중 오류가 발생했습니다."
-)
-
-// Register는 Python register_user + crud_auth.create_user를 이식한다.
-func (s *AuthService) Register(in RegisterInput) (RegisterOutcome, *dto.LoginHomeResponse) {
-	// 전화번호 중복 확인 (mt_id 하이픈 제거)
-	existing, err := s.members.GetByMtID(strings.ReplaceAll(in.MtID, "-", ""))
-	if err != nil {
-		return RegisterServerErr, nil
-	}
-	if existing != nil {
-		return RegisterPhoneExists, nil
-	}
-	// 이메일 중복 확인 (mt_email and mt_email.strip())
-	if in.MtEmail != nil && strings.TrimSpace(*in.MtEmail) != "" {
-		existingEmail, err := s.members.GetByEmail(*in.MtEmail)
-		if err != nil {
-			return RegisterServerErr, nil
-		}
-		if existingEmail != nil {
-			return RegisterEmailExists, nil
-		}
-	}
-
-	// crud_auth.create_user — 이후 모든 오류는 register의 try/except가 500으로 흡수.
-	created, err := s.createUser(in)
-	if err != nil {
-		return RegisterServerErr, nil
-	}
-	accessToken, err := s.issueAccessToken(created)
-	if err != nil {
-		return RegisterServerErr, nil
-	}
-
-	resp := &dto.LoginHomeResponse{
-		Success: true,
-		Message: "회원가입 성공",
-		Data: &dto.RegisterData{
-			Token: accessToken,
-			User:  buildRegisterUserData(created),
-		},
-	}
-	return RegisterCreated, resp
-}
-
-// createUser는 Python crud_auth.create_user. 비밀번호 정책 위반/생년월일 파싱 오류는 error 반환(→500).
-func (s *AuthService) createUser(in RegisterInput) (*model.Member, error) {
-	var hashed *string
-	if in.MtPwd != nil && *in.MtPwd != "" {
-		h, err := auth.HashPasswordWithPolicy(*in.MtPwd, s.cfg.BcryptCost, s.cfg.Policy)
-		if err != nil {
-			return nil, err
-		}
-		hashed = &h
-	}
-
-	cleanID := strings.ReplaceAll(in.MtID, "-", "")
-	mtHp := ""
-	if isAllDigits(cleanID) {
-		mtHp = cleanID
-	}
-
-	// 프로필 이미지: 없거나 50자 초과면 랜덤 아바타(/images/avatar{1-7}.png).
-	profileImage := ""
-	if in.MtFile1 != nil {
-		profileImage = *in.MtFile1
-	}
-	if profileImage == "" || len(profileImage) > 50 {
-		profileImage = "/images/avatar" + itoaSmall(mathrand.Intn(7)+1) + ".png"
-	}
-
-	now := dbUTCNow()
-	yn := func(b bool) *string {
-		v := "N"
-		if b {
-			v = "Y"
-		}
-		return &v
-	}
-	show := "Y"
-	// 권한·상태 값은 요청 본문(in.MtType/MtLevel/MtStatus)을 무시하고 서버가 일반 회원 값으로 정한다.
-	// 무인증 가입에서 mt_level=9 등을 주입해 관리자 계정을 만드는 것을 막기 위함이다
-	// (FastAPI 일반 가입과 동일: mt_type=1, mt_level=2, mt_status=1).
-	mtType := newMemberType
-	mtLevel := newMemberLevel
-	mtStatus := newMemberStatus
-
-	// mt_birth: strptime('%Y-%m-%d') → 실패 시 ValueError(→500).
-	var birth *time.Time
-	if in.MtBirth != nil && *in.MtBirth != "" {
-		t, perr := time.Parse("2006-01-02", *in.MtBirth)
-		if perr != nil {
-			return nil, perr
-		}
-		birth = &t
-	}
-
-	// mt_lat/mt_long: getattr(...) or 기본값(서울시청). INSERT에 기본값이 저장된다.
-	lat := 37.5642
-	if in.MtLat != nil && *in.MtLat != 0 {
-		lat = *in.MtLat
-	}
-	long := 127.0016
-	if in.MtLong != nil && *in.MtLong != 0 {
-		long = *in.MtLong
-	}
-
-	m := &model.Member{
-		MtID:       &cleanID,
-		MtPwd:      hashed,
-		MtName:     &in.MtName,
-		MtEmail:    in.MtEmail,
-		MtNickname: &in.MtNickname,
-		MtHp:       &mtHp,
-		MtType:     &mtType,
-		MtLevel:    &mtLevel,
-		MtStatus:   &mtStatus,
-		MtShow:     &show,
-		MtWdate:    &now,
-		MtLdate:    &now,
-		MtAgree1:   yn(in.MtAgree1),
-		MtAgree2:   yn(in.MtAgree2),
-		MtAgree3:   yn(in.MtAgree3),
-		MtAgree4:   yn(in.MtAgree4),
-		MtAgree5:   yn(in.MtAgree5),
-		MtGoogleID: in.MtGoogleID,
-		MtKakaoID:  in.MtKakaoID,
-		MtAppleID:  in.MtAppleID,
-		MtBirth:    birth,
-		MtGender:   in.MtGender,
-		MtFile1:    &profileImage,
-		MtLat:      &lat,
-		MtLong:     &long,
-		MtTokenID:  in.MtTokenID,
-	}
-	return s.members.CreateMember(m)
 }
 
 // --- user_data 빌더 (login/register 응답) ---

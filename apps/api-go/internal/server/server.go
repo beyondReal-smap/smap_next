@@ -40,6 +40,9 @@ type Deps struct {
 	Chat           *handler.ChatHandler
 	ChatWS         *ws.ChatWS
 	Auth           *handler.AuthHandler
+	// EmailAuth는 이메일 인증 4종(/auth/email/*, /auth/reset-password-by-email). 라우트는 공개이고
+	// 로그인이 필요한 경우는 핸들러가 직접 Bearer 토큰을 검증한다.
+	EmailAuth *handler.EmailAuthHandler
 	// AdminAuth는 /admin 그룹에 적용되는 RequireAdmin 미들웨어(JWT + mt_level=9).
 	AdminAuth gin.HandlerFunc
 	// UserAuth는 일반 사용자 인증 미들웨어(ROUTE_AUTH_MODE off|warn|enforce)다. nil이면 붙이지 않는다.
@@ -242,6 +245,15 @@ func New(cfg *config.Config, logger *slog.Logger, deps Deps) http.Handler {
 		v1.POST("/auth/reset-password", deps.Auth.ResetPassword)
 		v1.POST("/auth/reset-password-by-phone", deps.Auth.ResetPasswordByPhone)
 
+		// auth 이메일 인증(G3) — 공개 라우트. change_email 흐름(send-code/verify-code의 purpose=change_email,
+		// /email/change)은 핸들러가 Bearer access 토큰을 직접 검증한다(ROUTE_AUTH_MODE와 무관하게 강제).
+		if deps.EmailAuth != nil {
+			v1.POST("/auth/email/send-code", deps.EmailAuth.SendCode)
+			v1.POST("/auth/email/verify-code", deps.EmailAuth.VerifyCode)
+			v1.POST("/auth/email/change", deps.EmailAuth.ChangeEmail)
+			v1.POST("/auth/reset-password-by-email", deps.EmailAuth.ResetPasswordByEmail)
+		}
+
 		// locations — read 7종(전부 무인증). slt_lat/long은 Decimal→문자열. 정적(/member,
 		// /group-detail,/other-members,/myplays)이 /:location_id보다 우선. write는 후반 Phase.
 		ua.GET("/locations/", deps.Location.List)
@@ -389,6 +401,8 @@ func New(cfg *config.Config, logger *slog.Logger, deps Deps) http.Handler {
 		// fcm-token — FCM 토큰 관리 3종(전부 get_current_member 인증). ⚠️ Python firebase_service 미import:
 		// /update silent push는 no-op, /notify-token-change는 항상 500 plain "Internal Server Error".
 		// (fcm_silent_push는 api.py 미등록=dead code → 미이식)
+		// unregister(G4): 로그아웃·탈퇴 직전 호출. 사용자 인증 미들웨어(ua) + 핸들러 자체 Bearer 검증(모드 무관 401).
+		ua.POST("/fcm-token/unregister", deps.FCMToken.Unregister)
 		v1.POST("/fcm-token/update", deps.FCMToken.Update)
 		v1.GET("/fcm-token/status", deps.FCMToken.Status)
 		v1.POST("/fcm-token/notify-token-change", deps.FCMToken.NotifyTokenChange)

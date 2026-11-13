@@ -3,6 +3,7 @@ package service
 import (
 	"testing"
 
+	"github.com/bluemusk/smap_next_go/internal/auth"
 	"github.com/bluemusk/smap_next_go/internal/dto"
 	"github.com/bluemusk/smap_next_go/internal/model"
 )
@@ -27,6 +28,8 @@ func (f *fakeAuthSocialRepo) MemberLatLongStr(mtIdx int) (*string, *string, erro
 func socialSvc(mem *fakeAuthMemberRepo) *AuthService {
 	svc := NewAuth(mem, &fakeAuthRefreshRepo{issueRaw: "r"}, testAuthConfig())
 	svc.SetSocial(&fakeAuthSocialRepo{})
+	// 이메일 중복 조회는 mem.byEmail 기준(탈퇴 제외). 검증 모드는 off(서비스 단위 테스트는 검증 결과를 주입하지 않는다).
+	svc.SetSocialVerification(SocialVerification{Mode: auth.SocialModeOff, Emails: memberEmailChecker{mem}})
 	return svc
 }
 
@@ -103,15 +106,15 @@ func TestGoogleNewUser(t *testing.T) {
 	}
 }
 
-func TestGoogleExistingByEmail(t *testing.T) {
+func TestGoogleExistingByGoogleID(t *testing.T) {
 	u := activeMember(11, "g@x.com")
-	mem := &fakeAuthMemberRepo{byEmail: map[string]*model.Member{"g@x.com": u}, byGoogle: map[string]*model.Member{}, byID: map[int]*model.Member{11: u}}
+	mem := &fakeAuthMemberRepo{byEmail: map[string]*model.Member{"g@x.com": u}, byGoogle: map[string]*model.Member{"g1": u}, byID: map[int]*model.Member{11: u}}
 	resp := socialSvc(mem).GoogleLogin(GoogleInput{Email: "g@x.com", GoogleID: "g1"})
 	if !resp.Success || resp.Message != "Google 로그인 성공" {
 		t.Fatalf("google 기존 분기 오류: %+v", resp)
 	}
 	d, ok := resp.Data.(*dto.SocialLoginData)
-	if !ok || d.LookupMethod != "email" || d.Member == nil {
+	if !ok || d.LookupMethod != "google_id" || d.Member == nil {
 		t.Fatalf("google 기존 data 오류: %T %+v", resp.Data, resp.Data)
 	}
 }

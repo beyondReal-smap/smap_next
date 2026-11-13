@@ -43,12 +43,28 @@ func (s TokenState) String() string {
 //
 // 허용 알고리즘은 설정값으로 고정한다(alg confusion 방지). 빈 시크릿은 항상 TokenInvalid.
 func VerifyAccessToken(authHeader, secret, algorithm string) (int, TokenState) {
+	id, state := VerifyAccessTokenIdentity(authHeader, secret, algorithm)
+	return id.MtIdx, state
+}
+
+// AccessIdentity는 검증된 access 토큰의 회원 번호와 발급 시각(iat, 초)이다.
+// HasIAT=false면 iat claim이 없는 구 토큰이다(비밀번호 변경 기준이 설정된 회원에게는 무효).
+type AccessIdentity struct {
+	MtIdx  int
+	IAT    int64
+	HasIAT bool
+}
+
+// VerifyAccessTokenIdentity는 VerifyAccessToken과 같은 검증을 하고 iat까지 돌려준다.
+// iat는 정수/소수(Python time.time()) 모두 받아 초 단위로 내림한다.
+func VerifyAccessTokenIdentity(authHeader, secret, algorithm string) (AccessIdentity, TokenState) {
+	var none AccessIdentity
 	if !strings.HasPrefix(authHeader, "Bearer ") {
-		return 0, TokenAbsent
+		return none, TokenAbsent
 	}
 	tokenStr := authHeader[len("Bearer "):]
 	if tokenStr == "" || secret == "" {
-		return 0, TokenInvalid
+		return none, TokenInvalid
 	}
 
 	claims := jwt.MapClaims{}
@@ -56,17 +72,22 @@ func VerifyAccessToken(authHeader, secret, algorithm string) (int, TokenState) {
 		return []byte(secret), nil
 	}, jwt.WithValidMethods([]string{algorithm}))
 	if err != nil {
-		return 0, TokenInvalid
+		return none, TokenInvalid
 	}
 	if _, hasType := claims["type"]; hasType {
-		return 0, TokenInvalid
+		return none, TokenInvalid
 	}
-
+	out := AccessIdentity{}
+	if f, ok := claims["iat"].(float64); ok && f > 0 {
+		out.IAT, out.HasIAT = int64(f), true
+	}
 	if id, ok := mtIdxClaim(claims["mt_idx"]); ok && id > 0 {
-		return id, TokenValid
+		out.MtIdx = id
+		return out, TokenValid
 	}
 	if id, ok := subClaim(claims["sub"]); ok && id > 0 {
-		return id, TokenValid
+		out.MtIdx = id
+		return out, TokenValid
 	}
-	return 0, TokenInvalid
+	return none, TokenInvalid
 }

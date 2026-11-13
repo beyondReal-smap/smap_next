@@ -1,6 +1,8 @@
 package service
 
 import (
+	"errors"
+
 	"github.com/bluemusk/smap_next_go/internal/dto"
 	"github.com/bluemusk/smap_next_go/internal/model"
 )
@@ -17,6 +19,24 @@ type fcmTokenMemberRepo interface {
 //	/update의 silent push는 no-op(미발송), /notify-token-change는 항상 500(핸들러에서 처리).
 type FCMTokenService struct {
 	members fcmTokenMemberRepo
+	unreg   fcmUnregisterRepo
+}
+
+// fcmUnregisterRepo는 /fcm-token/unregister용 잠금 + 상수시간 비교 해제(구현은 *repository.MemberRepository).
+type fcmUnregisterRepo interface {
+	ClearFCMTokenIfMatch(mtIdx int, token string) (bool, error)
+}
+
+// SetUnregisterRepo는 해제용 저장소를 주입한다.
+func (s *FCMTokenService) SetUnregisterRepo(r fcmUnregisterRepo) { s.unreg = r }
+
+// Unregister는 본인 mt_token_id가 token과 일치할 때만(상수시간 비교) 토큰 3컬럼을 비운다.
+// 불일치/미등록이어도 에러가 아니다(호출자는 항상 {"success":true}). 저장소 미주입은 에러.
+func (s *FCMTokenService) Unregister(mtIdx int, token string) (bool, error) {
+	if s.unreg == nil {
+		return false, errors.New("fcm unregister repo not wired")
+	}
+	return s.unreg.ClearFCMTokenIfMatch(mtIdx, token)
 }
 
 func NewFCMToken(members fcmTokenMemberRepo) *FCMTokenService {

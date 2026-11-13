@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"testing"
 
 	"github.com/bluemusk/smap_next_go/internal/dto"
@@ -28,6 +29,7 @@ func (f *fakeVerifyStore) ClearVerified(phone string) {
 func pwSvc(mem *fakeAuthMemberRepo, vs *fakeVerifyStore) *AuthService {
 	svc := NewAuth(mem, &fakeAuthRefreshRepo{}, testAuthConfig())
 	svc.SetVerifyStore(vs)
+	svc.SetAccessRevoker(&fakeRevoker{})
 	return svc
 }
 
@@ -211,4 +213,18 @@ func TestResetByPhoneUserNotFound(t *testing.T) {
 	if resp.Success || resp.Message != "등록되지 않은 전화번호입니다." {
 		t.Fatalf("by-phone 미발견 오류: %+v", resp)
 	}
+}
+
+// fakeRevoker는 accessRevoker 테스트 더블이다.
+type fakeRevoker struct {
+	marked []int
+	err    error
+}
+
+func (f *fakeRevoker) RevokeBefore(_ context.Context, mtIdx int) error {
+	if f.err != nil {
+		return f.err
+	}
+	f.marked = append(f.marked, mtIdx)
+	return nil
 }

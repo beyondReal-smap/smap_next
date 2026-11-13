@@ -67,7 +67,6 @@ func (s *AuthService) KakaoLogin(in KakaoInput, userAgent, ipHash string) dto.Lo
 		return errResp()
 	}
 	var user *model.Member
-	linkFields := map[string]interface{}{}
 	if existing != nil {
 		if derefInt(existing.MtLevel) == 1 {
 			return dto.LoginHomeResponse{Success: false, Message: "탈퇴한 계정입니다. 새로운 계정으로 가입해주세요."}
@@ -77,36 +76,21 @@ func (s *AuthService) KakaoLogin(in KakaoInput, userAgent, ipHash string) dto.Lo
 		}
 		user = existing
 	} else {
-		if in.Email != "" {
-			eu, err := s.members.GetByEmail(in.Email)
-			if err != nil {
-				return errResp()
-			}
-			if eu != nil {
-				if derefInt(eu.MtLevel) == 1 {
-					return dto.LoginHomeResponse{Success: false, Message: "탈퇴한 계정입니다. 새로운 계정으로 가입해주세요."}
-				}
-				// 기존 이메일 계정에 카카오 연결
-				user = eu
-				linkFields["mt_kakao_id"] = in.KakaoID
-				linkFields["mt_type"] = 2
-				if in.ProfileImage != "" {
-					linkFields["mt_file1"] = in.ProfileImage
-				}
-			} else {
-				return newUser
-			}
-		} else {
-			return newUser
+		// 공급자 ID로 찾지 못한 경우 이메일로 기존 계정에 자동 연결하지 않는다(계정 탈취 경로 차단).
+		// 이메일이 활성 회원과 겹치면 안내만 돌려준다. 검증된 카카오 로그인은 이메일을 비워 이 분기를 타지 않는다.
+		taken, err := s.emailTaken(in.Email)
+		if err != nil {
+			return errResp()
 		}
+		if taken {
+			return dto.LoginHomeResponse{Success: false, Message: msgSocialEmailTaken}
+		}
+		return newUser
 	}
 
-	// 로그인 처리: 시각/기기 갱신 + (연결 필드) → 재조회 → user_data.
+	// 로그인 처리: 시각/기기 갱신 → 재조회 → user_data.
 	now := dbUTCNow()
 	fields := map[string]interface{}{"mt_ldate": now, "mt_adate": now}
-	for k, v := range linkFields {
-		fields[k] = v
-	}
 	applyDeviceFields(fields, in.DeviceID, in.DeviceModel, in.OsType, in.OsVersion, in.AppVersion)
 	if err := s.members.UpdateColumns(user.MtIdx, fields); err != nil {
 		return errResp()
@@ -162,25 +146,10 @@ func (s *AuthService) googleLogin(in GoogleInput, newUserAsError bool) dto.Login
 		return dto.LoginHomeResponse{Success: false, Message: "Google ID 또는 이메일이 필요합니다."}
 	}
 
+	// 계정 식별은 공급자 ID(google_id)로만 한다. 이메일이 같다는 이유로 기존 계정을 찾거나 연결하지 않는다.
 	var existing *model.Member
 	lookupMethod := "none"
-	linkFields := map[string]interface{}{}
-
-	if in.Email != "" {
-		eu, err := s.members.GetByEmail(in.Email)
-		if err != nil {
-			return errResp()
-		}
-		if eu != nil {
-			existing = eu
-			lookupMethod = "email"
-			if in.GoogleID != "" && existing.MtGoogleID == nil {
-				linkFields["mt_google_id"] = in.GoogleID
-				linkFields["mt_type"] = 4
-			}
-		}
-	}
-	if existing == nil && in.GoogleID != "" {
+	if in.GoogleID != "" {
 		gu, err := s.members.GetByGoogleID(in.GoogleID)
 		if err != nil {
 			return errResp()
@@ -197,9 +166,6 @@ func (s *AuthService) googleLogin(in GoogleInput, newUserAsError bool) dto.Login
 		}
 		now := dbUTCNow()
 		fields := map[string]interface{}{"mt_ldate": now, "mt_adate": now}
-		for k, v := range linkFields {
-			fields[k] = v
-		}
 		if in.Image != "" && derefStr(existing.MtFile1) == "" {
 			fields["mt_file1"] = in.Image
 		}
@@ -234,6 +200,13 @@ func (s *AuthService) googleLogin(in GoogleInput, newUserAsError bool) dto.Login
 	// /auth는 schemas.auth.GoogleLoginRequest(given_name 있음)라 정상 신규 응답.
 	if newUserAsError {
 		return errResp()
+	}
+	taken, err := s.emailTaken(in.Email)
+	if err != nil {
+		return errResp()
+	}
+	if taken {
+		return dto.LoginHomeResponse{Success: false, Message: msgSocialEmailTaken}
 	}
 	temp := &dto.GoogleTempUser{
 		MtID: "google_" + in.GoogleID, MtName: orStr(in.Name, in.GivenName), MtNickname: orStr(in.GivenName, in.Name),
@@ -270,21 +243,8 @@ func (s *AuthService) AppleLogin(in AppleInput) dto.LoginHomeResponse {
 		return errResp()
 	}
 	lookupMethod := "none"
-	linkFields := map[string]interface{}{}
 	if existing != nil {
 		lookupMethod = "apple_id"
-	} else if in.Email != "" {
-		eu, err := s.members.GetByEmail(in.Email)
-		if err != nil {
-			return errResp()
-		}
-		if eu != nil {
-			existing = eu
-			lookupMethod = "email"
-			// Apple ID 연결(무조건)
-			linkFields["mt_apple_id"] = in.UserIdentifier
-			linkFields["mt_type"] = 5
-		}
 	}
 
 	if existing != nil {
@@ -293,9 +253,6 @@ func (s *AuthService) AppleLogin(in AppleInput) dto.LoginHomeResponse {
 		}
 		now := dbUTCNow()
 		fields := map[string]interface{}{"mt_ldate": now, "mt_adate": now}
-		for k, v := range linkFields {
-			fields[k] = v
-		}
 		if err := s.members.UpdateColumns(existing.MtIdx, fields); err != nil {
 			return errResp()
 		}
@@ -323,7 +280,14 @@ func (s *AuthService) AppleLogin(in AppleInput) dto.LoginHomeResponse {
 		}
 	}
 
-	// 신규 사용자
+	// 신규 사용자: 공급자 이메일이 기존 활성 계정과 겹치면 자동 연결하지 않고 안내한다.
+	taken, err := s.emailTaken(in.Email)
+	if err != nil {
+		return errResp()
+	}
+	if taken {
+		return dto.LoginHomeResponse{Success: false, Message: msgSocialEmailTaken}
+	}
 	appleIDShort := in.UserIdentifier
 	if len(appleIDShort) > 10 {
 		appleIDShort = appleIDShort[:10]
@@ -346,6 +310,8 @@ func (s *AuthService) AppleLogin(in AppleInput) dto.LoginHomeResponse {
 // find-user-by-email / find-user-by-phone
 // ===========================================================================
 
+// googleID는 하위 호환을 위해 받지만 사용하지 않는다: 검증되지 않은 클라이언트 값으로 계정에 소셜 ID를
+// 연결하면 계정 탈취 경로가 된다(공급자 ID 연결은 검증된 로그인·가입에서만 한다).
 func (s *AuthService) FindUserByEmail(email string, googleID string) dto.LoginHomeResponse {
 	errResp := func() dto.LoginHomeResponse {
 		return dto.LoginHomeResponse{Success: false, Message: "서버 오류가 발생했습니다."}
@@ -363,14 +329,6 @@ func (s *AuthService) FindUserByEmail(email string, googleID string) dto.LoginHo
 			Data: &dto.FindWithdrawnEmailData{Found: true, IsWithdrawn: true,
 				User: dto.FindWithdrawnEmailUser{MtIdx: user.MtIdx, MtEmail: user.MtEmail, MtLevel: user.MtLevel}}}
 	}
-	if googleID != "" && user.MtGoogleID == nil {
-		if err := s.members.UpdateColumns(user.MtIdx, map[string]interface{}{
-			"mt_google_id": googleID, "mt_type": 4, "mt_ldate": dbUTCNow(),
-		}); err != nil {
-			return errResp()
-		}
-		user = s.reread(user)
-	}
 	groups := s.buildGroups(user.MtIdx)
 	start, end := scheduleWindow()
 	schedRows, _ := s.social.SchedulesOrForUser(user.MtIdx, start, end)
@@ -386,6 +344,7 @@ func (s *AuthService) FindUserByEmail(email string, googleID string) dto.LoginHo
 	}
 }
 
+// googleID는 FindUserByEmail과 같은 이유로 사용하지 않는다.
 func (s *AuthService) FindUserByPhone(phone string, googleID string) dto.LoginHomeResponse {
 	errResp := func() dto.LoginHomeResponse {
 		return dto.LoginHomeResponse{Success: false, Message: "서버 오류가 발생했습니다."}
@@ -402,14 +361,6 @@ func (s *AuthService) FindUserByPhone(phone string, googleID string) dto.LoginHo
 		return dto.LoginHomeResponse{Success: false, Message: "탈퇴한 계정입니다.",
 			Data: &dto.FindWithdrawnPhoneData{Found: true, IsWithdrawn: true,
 				User: dto.FindWithdrawnPhoneUser{MtIdx: user.MtIdx, MtHp: user.MtHp, MtLevel: user.MtLevel}}}
-	}
-	if googleID != "" && user.MtGoogleID == nil {
-		if err := s.members.UpdateColumns(user.MtIdx, map[string]interface{}{
-			"mt_google_id": googleID, "mt_type": 4, "mt_ldate": dbUTCNow(),
-		}); err != nil {
-			return errResp()
-		}
-		user = s.reread(user)
 	}
 	groups := s.buildGroups(user.MtIdx)
 	start, end := scheduleWindow()

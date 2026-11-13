@@ -15,8 +15,53 @@ import (
 
 // FCMTokenHandler는 Python app/api/v1/endpoints/fcm_token.py(/fcm-token)를 이식한다(전부 get_current_member 인증).
 type FCMTokenHandler struct {
-	svc *service.FCMTokenService
-	cfg *config.Config
+	svc        *service.FCMTokenService
+	cfg        *config.Config
+	revocation auth.AccessRevocationChecker
+}
+
+// SetRevocation은 구 access token 무효 기준 조회기를 주입한다.
+func (h *FCMTokenHandler) SetRevocation(r auth.AccessRevocationChecker) { h.revocation = r }
+
+// Unregister는 POST /fcm-token/unregister(앱이 로그아웃·탈퇴 직전에 호출). 본문 {"fcm_token": "..."}(1~4096자).
+// Bearer 필수: ROUTE_AUTH_MODE와 무관하게 이 핸들러가 직접 검증한다(무토큰/무효/차단 회원/무효 기준 이전 토큰은 401).
+// 본인 mt_token_id와 상수시간 비교로 일치할 때만 해제하며, 불일치/미등록도 200 {"success":true}다.
+func (h *FCMTokenHandler) Unregister(c *gin.Context) {
+	ident, state := auth.VerifyAccessTokenIdentity(c.GetHeader("Authorization"), h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
+	if state != auth.TokenValid || auth.AccessRevoked(h.revocation, nil, ident) {
+		c.Header("WWW-Authenticate", "Bearer")
+		writeJSON(c, http.StatusUnauthorized, gin.H{"detail": "인증이 필요합니다."})
+		return
+	}
+	m, err := h.svc.GetMember(ident.MtIdx)
+	if err != nil {
+		plainServerError(c)
+		return
+	}
+	if m == nil || m.IsBlocked() {
+		c.Header("WWW-Authenticate", "Bearer")
+		writeJSON(c, http.StatusUnauthorized, gin.H{"detail": "인증이 필요합니다."})
+		return
+	}
+	var body map[string]interface{}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		body = map[string]interface{}{}
+	}
+	raw, ok := body["fcm_token"]
+	if !ok {
+		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": []valErr{{Type: "missing", Loc: []string{"body", "fcm_token"}, Msg: msgFieldRequired, Input: body}}})
+		return
+	}
+	tok, isStr := raw.(string)
+	if !isStr || tok == "" || len(tok) > 4096 {
+		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": []valErr{{Type: "string_type", Loc: []string{"body", "fcm_token"}, Msg: "fcm_token은 1~4096자 문자열이어야 합니다.", Input: "[redacted]"}}})
+		return
+	}
+	if _, err := h.svc.Unregister(ident.MtIdx, tok); err != nil {
+		plainServerError(c)
+		return
+	}
+	writeJSON(c, http.StatusOK, gin.H{"success": true})
 }
 
 func NewFCMToken(svc *service.FCMTokenService, cfg *config.Config) *FCMTokenHandler {

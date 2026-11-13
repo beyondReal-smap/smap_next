@@ -5,12 +5,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/bluemusk/smap_next_go/internal/auth"
 	"github.com/bluemusk/smap_next_go/internal/config"
+	"github.com/bluemusk/smap_next_go/internal/netutil"
 	"github.com/bluemusk/smap_next_go/internal/service"
 )
 
@@ -18,6 +20,27 @@ import (
 type AuthHandler struct {
 	svc *service.AuthService
 	cfg *config.Config
+	// revocation은 비밀번호 변경 이전에 발급된 access token을 /auth/refresh v1에서도 거부하기 위한 기준 조회기(nil 가능).
+	revocation auth.AccessRevocationChecker
+}
+
+// SetRevocation은 구 access token 무효 기준 조회기를 주입한다.
+func (h *AuthHandler) SetRevocation(r auth.AccessRevocationChecker) { h.revocation = r }
+
+// writeAuthRejection은 {"detail": ...} 거부 응답을 쓴다(429면 Retry-After 포함).
+func writeAuthRejection(c *gin.Context, rej *service.AuthRejection) {
+	if rej.Status == http.StatusTooManyRequests && rej.RetryAfter > 0 {
+		c.Header("Retry-After", strconv.Itoa(rej.RetryAfter))
+	}
+	writeJSON(c, rej.Status, gin.H{"detail": rej.Detail})
+}
+
+func (h *AuthHandler) clientMeta(c *gin.Context) service.ClientMeta {
+	return service.ClientMeta{
+		UserAgent: c.GetHeader("User-Agent"),
+		IPHash:    clientIPHash(c),
+		ClientIP:  netutil.ClientIP(c.Request, h.cfg.TrustedClientIPHeader),
+	}
 }
 
 func NewAuth(svc *service.AuthService, cfg *config.Config) *AuthHandler {
@@ -41,7 +64,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
 		return
 	}
-	resp := h.svc.LoginHome(in, c.GetHeader("User-Agent"), clientIPHash(c))
+	resp, rej := h.svc.Login(c.Request.Context(), in, h.clientMeta(c))
+	if rej != nil {
+		writeAuthRejection(c, rej)
+		return
+	}
 	writeJSON(c, http.StatusOK, resp)
 }
 
@@ -93,6 +120,11 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	}
 	access := strings.TrimSpace(authHeader[7:])
 	claims, ok := auth.DecodeAccessClaims(access, h.cfg.JWTSecretKey, h.cfg.JWTAlgorithm)
+	// 비밀번호 변경 이전에 발급된 access token으로는 새 토큰을 받을 수 없다(없는 토큰/무효 토큰과 같은 401).
+	if ok && claims.HasMtIdx && auth.AccessRevoked(h.revocation, nil, auth.AccessIdentity{MtIdx: claims.MtIdx, IAT: claims.IAT, HasIAT: claims.HasIAT}) {
+		writeJSON(c, http.StatusUnauthorized, gin.H{"detail": "토큰 갱신에 실패했습니다."})
+		return
+	}
 	if !ok {
 		writeJSON(c, http.StatusUnauthorized, gin.H{"detail": "토큰 갱신에 실패했습니다."})
 		return
@@ -144,17 +176,12 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		}
 		return
 	}
-	outcome, resp := h.svc.Register(in)
-	switch outcome {
-	case service.RegisterCreated:
-		writeJSON(c, http.StatusCreated, resp)
-	case service.RegisterPhoneExists:
-		writeJSON(c, http.StatusConflict, gin.H{"detail": "이미 등록된 전화번호입니다."})
-	case service.RegisterEmailExists:
-		writeJSON(c, http.StatusConflict, gin.H{"detail": "이미 등록된 이메일입니다."})
-	default:
-		writeJSON(c, http.StatusInternalServerError, gin.H{"detail": "사용자 생성 중 오류가 발생했습니다."})
+	resp, rej := h.svc.Register(c.Request.Context(), in, h.clientMeta(c))
+	if rej != nil {
+		writeAuthRejection(c, rej)
+		return
 	}
+	writeJSON(c, http.StatusCreated, resp)
 }
 
 // --- body 파서 ---
@@ -229,6 +256,11 @@ type registerBody struct {
 	MtGoogleID *string  `json:"mt_google_id"`
 	MtKakaoID  *string  `json:"mt_kakao_id"`
 	MtAppleID  *string  `json:"mt_apple_id"`
+	MtHp       *string  `json:"mt_hp"`
+
+	EmailVerificationToken *string `json:"email_verification_token"`
+	SocialProvider         *string `json:"social_provider"`
+	SocialToken            *string `json:"social_token"`
 }
 
 // parseRegisterBody는 Python register_user의 수동 파싱을 이식한다.
@@ -279,6 +311,11 @@ func parseRegisterBody(c *gin.Context) (service.RegisterInput, int, bool) {
 		MtGoogleID: b.MtGoogleID,
 		MtKakaoID:  b.MtKakaoID,
 		MtAppleID:  b.MtAppleID,
+		MtHp:       b.MtHp,
+
+		EmailVerificationToken: derefOpt(b.EmailVerificationToken),
+		SocialProvider:         derefOpt(b.SocialProvider),
+		SocialToken:            derefOpt(b.SocialToken),
 	}
 	return in, 0, true
 }

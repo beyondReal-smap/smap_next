@@ -160,6 +160,8 @@ type AccessClaims struct {
 	HasMtIdx bool    // Python `mt_idx = payload.get("mt_idx") or payload.get("sub")`가 None이 아닌지.
 	MtID     string  // payload.get("mt_id"); 문자열이 아니면 "".
 	MtName   *string // payload.get("mt_name"); 문자열이면 그 값, 아니면 nil.
+	IAT      int64   // iat(초). 없으면 HasIAT=false.
+	HasIAT   bool
 }
 
 // DecodeAccessClaims는 Python refresh v1의 `jwt.decode(...)` + claim 추출과 동등하다.
@@ -182,6 +184,9 @@ func DecodeAccessClaims(tokenStr, secret, algorithm string) (AccessClaims, bool)
 		out.MtIdx, out.HasMtIdx = id, true
 	} else if id, ok := subClaim(claims["sub"]); ok {
 		out.MtIdx, out.HasMtIdx = id, true
+	}
+	if f, ok := claims["iat"].(float64); ok && f > 0 {
+		out.IAT, out.HasIAT = int64(f), true
 	}
 	if v, ok := claims["mt_id"].(string); ok {
 		out.MtID = v

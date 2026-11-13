@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/smtp"
@@ -18,6 +19,8 @@ import (
 type EmailConfig struct {
 	Sender                 string
 	Password               string
+	SMTPServer             string // 비면 smtp.gmail.com
+	SMTPPort               int    // 0이면 465
 	NaverworksClientID     string
 	NaverworksClientSecret string
 	NaverworksDomain       string
@@ -42,13 +45,24 @@ type EmailService struct {
 	nwSecret   string
 	nwDomain   string
 	client     *http.Client
+
+	// 테스트용 발송 seam(nil이면 실제 경로). 경로 선택 로직만 가짜로 검증하기 위함.
+	nwSendFn   func(to, subject, html string) bool
+	smtpSendFn func(to, subject, html, text string) error
 }
 
 // NewEmail은 설정으로 EmailService를 만든다.
 func NewEmail(cfg EmailConfig) *EmailService {
+	server, port := cfg.SMTPServer, cfg.SMTPPort
+	if server == "" {
+		server = "smtp.gmail.com"
+	}
+	if port == 0 {
+		port = 465
+	}
 	return &EmailService{
-		smtpServer: "smtp.gmail.com",
-		smtpPort:   465,
+		smtpServer: server,
+		smtpPort:   port,
 		sender:     cfg.Sender,
 		password:   cfg.Password,
 		nwClientID: cfg.NaverworksClientID,
@@ -68,7 +82,7 @@ func (s *EmailService) SendPasswordResetEmail(email, resetURL string) EmailResul
 
 	// 네이버웍스 설정이 모두 있으면 우선 시도, 성공 시 반환.
 	if s.nwClientID != "" && s.nwSecret != "" && s.nwDomain != "" {
-		if s.sendNaverworks(email, subject, html) {
+		if s.deliverNaverworks(email, subject, html) {
 			return EmailResult{Success: true, Message: "이메일이 성공적으로 발송되었습니다."}
 		}
 		// 실패 → Gmail 폴백
@@ -80,10 +94,55 @@ func (s *EmailService) SendPasswordResetEmail(email, resetURL string) EmailResul
 	}
 
 	// Gmail SMTP 폴백. 자격증명 미설정 시 즉시 실패(Python은 connect 후 login 실패 — 관측 결과 동일).
-	if err := s.sendGmail(email, subject, html, text); err != nil {
+	if err := s.deliverSMTP(email, subject, html, text); err != nil {
 		return EmailResult{Success: false, Message: "이메일 발송에 실패했습니다: " + err.Error()}
 	}
 	return EmailResult{Success: true, Message: "이메일이 성공적으로 발송되었습니다."}
+}
+
+// ErrMailNotConfigured는 네이버웍스·Gmail SMTP 자격증명이 하나도 없어 메일을 보낼 수 없음을 뜻한다.
+var ErrMailNotConfigured = errors.New("mail delivery not configured")
+
+const verificationEmailSubject = "[SMAP] 이메일 인증번호"
+
+// SendVerificationCode는 이메일 인증번호 메일을 보낸다(FastAPI send_verification_code와 같은 경로:
+// 네이버웍스 우선 → 실패 시 Gmail SMTP 폴백). 비밀번호 재설정 메일과 달리 개발환경 Mock으로 성공을 위장하지 않는다:
+// 설정이 없으면 ErrMailNotConfigured, 모든 경로가 실패하면 일반 에러를 반환한다.
+// 인증번호·수신 주소는 에러 메시지에 넣지 않는다.
+func (s *EmailService) SendVerificationCode(email, code string) error {
+	nwConfigured := s.nwClientID != "" && s.nwSecret != "" && s.nwDomain != ""
+	gmailConfigured := s.sender != "" && s.password != ""
+	if !nwConfigured && !gmailConfigured {
+		return ErrMailNotConfigured
+	}
+	text := fmt.Sprintf("[SMAP] 인증번호는 %s입니다. 10분 이내에 입력해주세요.", code)
+	html := "<p>" + text + "</p>"
+	if nwConfigured {
+		if s.deliverNaverworks(email, verificationEmailSubject, html) {
+			return nil
+		}
+		if !gmailConfigured {
+			return errors.New("naverworks send failed")
+		}
+	}
+	if err := s.deliverSMTP(email, verificationEmailSubject, html, text); err != nil {
+		return fmt.Errorf("smtp send failed: %w", err)
+	}
+	return nil
+}
+
+func (s *EmailService) deliverNaverworks(to, subject, html string) bool {
+	if s.nwSendFn != nil {
+		return s.nwSendFn(to, subject, html)
+	}
+	return s.sendNaverworks(to, subject, html)
+}
+
+func (s *EmailService) deliverSMTP(to, subject, html, text string) error {
+	if s.smtpSendFn != nil {
+		return s.smtpSendFn(to, subject, html, text)
+	}
+	return s.sendGmail(to, subject, html, text)
 }
 
 // sendNaverworks는 네이버웍스 메일 API로 발송한다(토큰 획득 → 메일 전송). 성공 여부만 반환.
@@ -94,7 +153,7 @@ func (s *EmailService) sendNaverworks(toEmail, subject, htmlContent string) bool
 	}
 	mailURL := fmt.Sprintf("https://www.worksapis.com/v1.0/domains/%s/mail", s.nwDomain)
 	payload := map[string]interface{}{
-		"senderAddress": "admin@smap.site",
+		"senderAddress": s.apiSenderAddress(),
 		"senderName":    "SMAP",
 		"title":         subject,
 		"body":          htmlContent,
@@ -115,6 +174,14 @@ func (s *EmailService) sendNaverworks(toEmail, subject, htmlContent string) bool
 	}
 	defer resp.Body.Close()
 	return resp.StatusCode == http.StatusOK
+}
+
+// apiSenderAddress는 API 경로 발신 주소다: EMAIL_SENDER가 있으면 그것, 비면 기존 고정값.
+func (s *EmailService) apiSenderAddress() string {
+	if s.sender != "" {
+		return s.sender
+	}
+	return "admin@smap.site"
 }
 
 // naverworksToken은 OAuth2 client_credentials로 액세스 토큰을 획득한다.
@@ -147,21 +214,35 @@ func (s *EmailService) naverworksToken() (string, error) {
 	return out.AccessToken, nil
 }
 
-// sendGmail은 Gmail SMTP(465 implicit TLS)로 MIME(text+html) 메일을 보낸다.
+// sendGmail은 SMTP(EMAIL_SMTP_SERVER/PORT; 기본 Gmail 465)로 MIME(text+html) 메일을 보낸다.
+// 포트 465는 암묵적 TLS(tls.Dial 후 smtp.NewClient), 그 외 포트는 평문 접속 후 STARTTLS.
 // 자격증명이 비면 즉시 실패(불필요한 외부 연결 회피 — 관측상 Python의 login 실패와 동일 결과).
 func (s *EmailService) sendGmail(to, subject, htmlContent, textContent string) error {
 	if s.sender == "" || s.password == "" {
 		return fmt.Errorf("Gmail SMTP 자격증명 미설정")
 	}
 	addr := fmt.Sprintf("%s:%d", s.smtpServer, s.smtpPort)
-	conn, err := tls.Dial("tcp", addr, &tls.Config{ServerName: s.smtpServer})
-	if err != nil {
-		return err
-	}
-	client, err := smtp.NewClient(conn, s.smtpServer)
-	if err != nil {
-		_ = conn.Close()
-		return err
+	var client *smtp.Client
+	if s.smtpPort == 465 {
+		conn, err := tls.Dial("tcp", addr, &tls.Config{ServerName: s.smtpServer})
+		if err != nil {
+			return err
+		}
+		client, err = smtp.NewClient(conn, s.smtpServer)
+		if err != nil {
+			_ = conn.Close()
+			return err
+		}
+	} else {
+		var err error
+		client, err = smtp.Dial(addr)
+		if err != nil {
+			return err
+		}
+		if err := client.StartTLS(&tls.Config{ServerName: s.smtpServer}); err != nil {
+			_ = client.Close()
+			return err
+		}
 	}
 	defer client.Close()
 	if err := client.Auth(smtp.PlainAuth("", s.sender, s.password, s.smtpServer)); err != nil {

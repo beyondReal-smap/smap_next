@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -9,14 +10,30 @@ import (
 	"github.com/bluemusk/smap_next_go/internal/service"
 )
 
+// writeSocialVerifyError는 공급자 토큰 검증 실패를 401/502/503 {"detail": ...}로 응답한다.
+// 검증 외 에러는 호출하지 않는다(소셜 로그인의 나머지 실패는 기존대로 200+success=false).
+func writeSocialVerifyError(c *gin.Context, err error) {
+	var ve *service.SocialVerifyError
+	if errors.As(err, &ve) {
+		writeJSON(c, ve.Status, gin.H{"detail": ve.Detail})
+		return
+	}
+	writeJSON(c, http.StatusInternalServerError, gin.H{"detail": "Internal Server Error"})
+}
+
 // KakaoLogin은 POST /auth/kakao-login. KakaoLoginRequest 검증(kakao_id·access_token 필수) → 항상 200.
 func (h *AuthHandler) KakaoLogin(c *gin.Context) {
-	in, errs := parseKakaoBody(c)
+	in, accessToken, errs := parseKakaoBody(c)
 	if len(errs) > 0 {
 		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
 		return
 	}
-	writeJSON(c, http.StatusOK, h.svc.KakaoLogin(in, c.GetHeader("User-Agent"), clientIPHash(c)))
+	resp, err := h.svc.KakaoLoginVerified(c.Request.Context(), in, accessToken, c.GetHeader("User-Agent"), clientIPHash(c))
+	if err != nil {
+		writeSocialVerifyError(c, err)
+		return
+	}
+	writeJSON(c, http.StatusOK, resp)
 }
 
 // GoogleLogin은 POST /auth/google-login. 수동 파싱(Pydantic 우회, 항상 200+success).
@@ -32,7 +49,12 @@ func (h *AuthHandler) GoogleLogin(c *gin.Context) {
 		GivenName: jsonStr(body, "given_name"),
 		Image:     jsonStr(body, "image"),
 	}
-	writeJSON(c, http.StatusOK, h.svc.GoogleLogin(in))
+	resp, err := h.svc.GoogleLoginVerified(c.Request.Context(), in, jsonStr(body, "id_token"), false, c.GetHeader("User-Agent"))
+	if err != nil {
+		writeSocialVerifyError(c, err)
+		return
+	}
+	writeJSON(c, http.StatusOK, resp)
 }
 
 // GoogleLoginStrict은 POST /members/google-login. /auth(수동파싱)와 달리 Pydantic GoogleLoginRequest
@@ -45,6 +67,7 @@ func (h *AuthHandler) GoogleLoginStrict(c *gin.Context) {
 	email := uReqStr(body, "email", &errs)
 	name := uReqStr(body, "name", &errs)
 	img := uOptStr(body, "image", &errs)
+	idToken := uOptStr(body, "id_token", &errs)
 	if len(errs) > 0 {
 		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
 		return
@@ -53,17 +76,31 @@ func (h *AuthHandler) GoogleLoginStrict(c *gin.Context) {
 	if img != nil {
 		in.Image = *img
 	}
-	writeJSON(c, http.StatusOK, h.svc.GoogleLoginNewAsError(in))
+	token := ""
+	if idToken != nil {
+		token = *idToken
+	}
+	resp, err := h.svc.GoogleLoginVerified(c.Request.Context(), in, token, true, c.GetHeader("User-Agent"))
+	if err != nil {
+		writeSocialVerifyError(c, err)
+		return
+	}
+	writeJSON(c, http.StatusOK, resp)
 }
 
 // AppleLogin은 POST /auth/apple-login. AppleLoginRequest 검증(userIdentifier 필수) → 항상 200.
 func (h *AuthHandler) AppleLogin(c *gin.Context) {
-	in, errs := parseAppleBody(c)
+	in, identityToken, errs := parseAppleBody(c)
 	if len(errs) > 0 {
 		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
 		return
 	}
-	writeJSON(c, http.StatusOK, h.svc.AppleLogin(in))
+	resp, err := h.svc.AppleLoginVerified(c.Request.Context(), in, identityToken, c.GetHeader("User-Agent"))
+	if err != nil {
+		writeSocialVerifyError(c, err)
+		return
+	}
+	writeJSON(c, http.StatusOK, resp)
 }
 
 // FindUserByEmail은 POST /auth/find-user-by-email. GoogleUserDataRequest{email 필수, google_id?}.
@@ -97,7 +134,8 @@ func jsonStr(body map[string]interface{}, key string) string {
 }
 
 // parseKakaoBody는 KakaoLoginRequest(kakao_id·access_token 필수)를 파싱한다. 필드순서대로 422 수집.
-func parseKakaoBody(c *gin.Context) (in service.KakaoInput, errs []valErr) {
+// access_token은 공급자 검증용으로 별도 반환한다.
+func parseKakaoBody(c *gin.Context) (in service.KakaoInput, accessToken string, errs []valErr) {
 	var body map[string]interface{}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		body = map[string]interface{}{}
@@ -106,18 +144,19 @@ func parseKakaoBody(c *gin.Context) (in service.KakaoInput, errs []valErr) {
 	in.Email = derefOpt(optStringField(body, "email", &errs))
 	_ = derefOpt(optStringField(body, "nickname", &errs))
 	in.ProfileImage = derefOpt(optStringField(body, "profile_image", &errs))
-	_ = requiredStringField(body, "access_token", &errs) // 검증만(서비스 미사용)
+	accessToken = requiredStringField(body, "access_token", &errs)
 	_ = derefOpt(optStringField(body, "fcm_token", &errs))
 	in.DeviceID = derefOpt(optStringField(body, "device_id", &errs))
 	in.DeviceModel = derefOpt(optStringField(body, "device_model", &errs))
 	in.OsType = derefOpt(optStringField(body, "os_type", &errs))
 	in.OsVersion = derefOpt(optStringField(body, "os_version", &errs))
 	in.AppVersion = derefOpt(optStringField(body, "app_version", &errs))
-	return in, errs
+	return in, accessToken, errs
 }
 
-// parseAppleBody는 AppleLoginRequest(userIdentifier 필수)를 파싱한다.
-func parseAppleBody(c *gin.Context) (in service.AppleInput, errs []valErr) {
+// parseAppleBody는 AppleLoginRequest(userIdentifier 필수)를 파싱한다. identityToken(선택)은 공급자 검증용으로
+// 별도 반환한다. authorizationCode는 서버가 쓰지 않는다.
+func parseAppleBody(c *gin.Context) (in service.AppleInput, identityToken string, errs []valErr) {
 	var body map[string]interface{}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		body = map[string]interface{}{}
@@ -125,7 +164,8 @@ func parseAppleBody(c *gin.Context) (in service.AppleInput, errs []valErr) {
 	in.UserIdentifier = requiredStringField(body, "userIdentifier", &errs)
 	in.Email = derefOpt(optStringField(body, "email", &errs))
 	in.UserName = derefOpt(optStringField(body, "userName", &errs))
-	return in, errs
+	identityToken = derefOpt(optStringField(body, "identityToken", &errs))
+	return in, identityToken, errs
 }
 
 // parseFindBody는 GoogleUserDataRequest/PhoneUserDataRequest를 파싱한다(idKey=email|phone 필수, google_id?).

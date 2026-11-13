@@ -465,3 +465,69 @@ func TestUserIDHelperIgnoresForeignValues(t *testing.T) {
 		t.Errorf("정상 값: %d %v", uid, ok)
 	}
 }
+
+// fakeRevocation은 지정한 mt_idx의 iat 없는/오래된 토큰을 무효로 판정하고, err가 있으면 조회 실패를 흉내낸다.
+type fakeRevocation struct {
+	base map[int]int64
+	err  error
+}
+
+func (f *fakeRevocation) IsAccessRevoked(_ context.Context, mtIdx int, iat int64, hasIAT bool) (bool, error) {
+	if f.err != nil {
+		return false, f.err
+	}
+	b, ok := f.base[mtIdx]
+	if !ok {
+		return false, nil
+	}
+	return !hasIAT || iat < b, nil
+}
+
+func newRevocationEnv(t *testing.T, mode auth.RouteMode, rev auth.AccessRevocationChecker) *raEnv {
+	t.Helper()
+	e := &raEnv{states: newFakeStates(), logs: &bytes.Buffer{}}
+	ra, err := NewRouteAuth(RouteAuthOptions{Mode: mode, Secret: raTestSecret, Algorithm: "HS256", StatusCacheTTL: time.Second, SummaryInterval: time.Minute, Revocation: rev},
+		e.states, slog.New(slog.NewJSONHandler(e.logs, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := gin.New()
+	h := func(c *gin.Context) { e.reached++; c.JSON(http.StatusOK, gin.H{}) }
+	r.GET("/req", ra.Required(), h)
+	r.GET("/opt", ra.Optional(), h)
+	e.router = r
+	return e
+}
+
+func TestRouteAuthRevokedTokenBlocked(t *testing.T) {
+	rev := &fakeRevocation{base: map[int]int64{1: 2000}}
+	e := newRevocationEnv(t, auth.RouteModeEnforce, rev)
+	old := "Bearer " + raToken(t, jwt.MapClaims{"mt_idx": 1, "iat": 1000})
+	fresh := "Bearer " + raToken(t, jwt.MapClaims{"mt_idx": 1, "iat": 3000})
+	noIat := "Bearer " + raToken(t, jwt.MapClaims{"mt_idx": 1})
+	other := "Bearer " + raToken(t, jwt.MapClaims{"mt_idx": 6, "iat": 1})
+	for name, tc := range map[string]struct {
+		path, hdr string
+		want      int
+	}{
+		"old required":   {"/req", old, 401},
+		"old optional":   {"/opt", old, 401},
+		"noiat required": {"/req", noIat, 401},
+		"fresh":          {"/req", fresh, 200},
+		"other member":   {"/req", other, 200},
+	} {
+		if w := e.do(tc.path, tc.hdr, ""); w.Code != tc.want {
+			t.Errorf("%s: %d want %d", name, w.Code, tc.want)
+		}
+	}
+}
+
+func TestRouteAuthRevocationStoreErrorAllows(t *testing.T) {
+	e := newRevocationEnv(t, auth.RouteModeEnforce, &fakeRevocation{err: errors.New("redis down")})
+	if w := e.do("/req", "Bearer "+raToken(t, jwt.MapClaims{"mt_idx": 1, "iat": 1}), ""); w.Code != 200 {
+		t.Errorf("Redis 장애 시 통과: %d", w.Code)
+	}
+	if !strings.Contains(e.logs.String(), "access_revocation_check_failed_allowing") {
+		t.Error("경고 로그 필요")
+	}
+}

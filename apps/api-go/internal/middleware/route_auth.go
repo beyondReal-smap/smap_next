@@ -51,6 +51,9 @@ type RouteAuthOptions struct {
 	StatusCacheTTL time.Duration
 	// SummaryInterval은 warn 계측 카운터를 요약 로그로 내보내는 주기다(0이면 요약 로그 비활성).
 	SummaryInterval time.Duration
+	// Revocation은 비밀번호 변경 후 구 access token 무효화 기준(nil이면 비교하지 않는다).
+	// 조회 실패(Redis 장애)는 통과 + 경고 로그다.
+	Revocation auth.AccessRevocationChecker
 	// Now는 캐시 만료 판정용 시계다. nil이면 time.Now(). 테스트에서 주입한다.
 	Now func() time.Time
 }
@@ -69,6 +72,7 @@ const (
 	kindInvalidToken = "invalid_token"
 	kindBlocked      = "blocked_member"
 	kindUnknown      = "unknown_member"
+	kindRevoked      = "revoked_token"
 
 	actionAllowed  = "allowed"
 	actionRejected = "rejected"
@@ -159,7 +163,8 @@ func (r *RouteAuth) handler(optional bool) gin.HandlerFunc {
 		}
 		enforce := r.opts.Mode == auth.RouteModeEnforce && !optional
 
-		uid, state := auth.VerifyAccessToken(c.GetHeader("Authorization"), r.opts.Secret, r.opts.Algorithm)
+		ident, state := auth.VerifyAccessTokenIdentity(c.GetHeader("Authorization"), r.opts.Secret, r.opts.Algorithm)
+		uid := ident.MtIdx
 		switch state {
 		case auth.TokenAbsent, auth.TokenInvalid:
 			kind := kindNoToken
@@ -176,6 +181,13 @@ func (r *RouteAuth) handler(optional bool) gin.HandlerFunc {
 				r.record(c, kind, actionAllowed)
 			}
 			c.Next()
+			return
+		}
+
+		// 비밀번호 변경 이전에 발급된 토큰은 모드와 무관하게(탈퇴·정지와 같이) 거부한다.
+		if auth.AccessRevoked(r.opts.Revocation, r.logger, ident) {
+			r.record(c, kindRevoked, actionRejected)
+			abortUnauthorized(c)
 			return
 		}
 

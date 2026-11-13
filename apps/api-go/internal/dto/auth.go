@@ -20,76 +20,80 @@ type LoginHomeData struct {
 	User         *LoginUserData `json:"user"`
 }
 
-// RegisterData는 /register 성공 data: {token, user}. (login과 달리 refresh_token·expires_in 없음)
+// RegisterData는 /register 성공 data: {token, refresh_token, expires_in, user}.
+// refresh_token·expires_in은 15단계에서 추가됐다(구버전 앱은 모르는 필드를 무시한다. token 키가 맨 앞이어야
+// Android 구버전의 정규식 파서가 같은 값을 잡는다).
 type RegisterData struct {
-	Token string            `json:"token"`
-	User  *RegisterUserData `json:"user"`
+	Token        string            `json:"token"`
+	RefreshToken string            `json:"refresh_token"`
+	ExpiresIn    int               `json:"expires_in"`
+	User         *RegisterUserData `json:"user"`
 }
 
 // LoginUserData는 /login 응답의 user(29필드, auth.py line 160-190 순서 그대로).
 // mt_birth만 nullable(*string), 나머지는 `or` 폴백으로 항상 값 존재.
 type LoginUserData struct {
-	MtIdx        int     `json:"mt_idx"`
-	MtType       int     `json:"mt_type"`
-	MtLevel      int     `json:"mt_level"`
-	MtStatus     int     `json:"mt_status"`
-	MtID         string  `json:"mt_id"`
-	MtName       string  `json:"mt_name"`
-	MtNickname   string  `json:"mt_nickname"`
-	MtHp         string  `json:"mt_hp"`
-	MtEmail      string  `json:"mt_email"`
-	MtBirth      *string `json:"mt_birth"`
-	MtGender     int     `json:"mt_gender"`
-	MtFile1      string  `json:"mt_file1"`
-	MtLat        PyFloat `json:"mt_lat"`
-	MtLong       PyFloat `json:"mt_long"`
-	MtSido       string  `json:"mt_sido"`
-	MtGu         string  `json:"mt_gu"`
-	MtDong       string  `json:"mt_dong"`
-	MtOnboarding string  `json:"mt_onboarding"`
-	MtPush1      string  `json:"mt_push1"`
-	MtPlanCheck  string  `json:"mt_plan_check"`
-	MtPlanDate   string  `json:"mt_plan_date"`
-	MtWeatherPop string  `json:"mt_weather_pop"`
-	MtWeatherSky int     `json:"mt_weather_sky"`
-	MtWeatherTmn int     `json:"mt_weather_tmn"`
-	MtWeatherTmx int     `json:"mt_weather_tmx"`
-	MtWeatherDate string `json:"mt_weather_date"`
-	MtWdate      string  `json:"mt_wdate"`
-	MtLdate      string  `json:"mt_ldate"`
-	MtAdate      string  `json:"mt_adate"`
+	MtIdx         int     `json:"mt_idx"`
+	MtType        int     `json:"mt_type"`
+	MtLevel       int     `json:"mt_level"`
+	MtStatus      int     `json:"mt_status"`
+	MtID          string  `json:"mt_id"`
+	MtName        string  `json:"mt_name"`
+	MtNickname    string  `json:"mt_nickname"`
+	MtHp          string  `json:"mt_hp"`
+	MtEmail       string  `json:"mt_email"`
+	MtBirth       *string `json:"mt_birth"`
+	MtGender      int     `json:"mt_gender"`
+	MtFile1       string  `json:"mt_file1"`
+	MtLat         PyFloat `json:"mt_lat"`
+	MtLong        PyFloat `json:"mt_long"`
+	MtSido        string  `json:"mt_sido"`
+	MtGu          string  `json:"mt_gu"`
+	MtDong        string  `json:"mt_dong"`
+	MtOnboarding  string  `json:"mt_onboarding"`
+	MtPush1       string  `json:"mt_push1"`
+	MtPlanCheck   string  `json:"mt_plan_check"`
+	MtPlanDate    string  `json:"mt_plan_date"`
+	MtWeatherPop  string  `json:"mt_weather_pop"`
+	MtWeatherSky  int     `json:"mt_weather_sky"`
+	MtWeatherTmn  int     `json:"mt_weather_tmn"`
+	MtWeatherTmx  int     `json:"mt_weather_tmx"`
+	MtWeatherDate string  `json:"mt_weather_date"`
+	MtWdate       string  `json:"mt_wdate"`
+	MtLdate       string  `json:"mt_ldate"`
+	MtAdate       string  `json:"mt_adate"`
 }
 
 // RegisterUserData는 /register 응답의 user(28필드). ⚠️ login과 달리 mt_push1 누락(auth.py 419 충실 이식).
 type RegisterUserData struct {
-	MtIdx        int     `json:"mt_idx"`
-	MtType       int     `json:"mt_type"`
-	MtLevel      int     `json:"mt_level"`
-	MtStatus     int     `json:"mt_status"`
-	MtID         string  `json:"mt_id"`
-	MtName       string  `json:"mt_name"`
-	MtNickname   string  `json:"mt_nickname"`
-	MtHp         string  `json:"mt_hp"`
-	MtEmail      string  `json:"mt_email"`
-	MtBirth      *string `json:"mt_birth"`
-	MtGender     int     `json:"mt_gender"`
-	MtFile1      string  `json:"mt_file1"`
-	MtLat        PyFloat `json:"mt_lat"`
-	MtLong       PyFloat `json:"mt_long"`
-	MtSido       string  `json:"mt_sido"`
-	MtGu         string  `json:"mt_gu"`
-	MtDong       string  `json:"mt_dong"`
-	MtOnboarding string  `json:"mt_onboarding"`
-	MtPlanCheck  string  `json:"mt_plan_check"`
-	MtPlanDate   string  `json:"mt_plan_date"`
-	MtWeatherPop string  `json:"mt_weather_pop"`
-	MtWeatherSky int     `json:"mt_weather_sky"`
-	MtWeatherTmn int     `json:"mt_weather_tmn"`
-	MtWeatherTmx int     `json:"mt_weather_tmx"`
-	MtWeatherDate string `json:"mt_weather_date"`
-	MtWdate      string  `json:"mt_wdate"`
-	MtLdate      string  `json:"mt_ldate"`
-	MtAdate      string  `json:"mt_adate"`
+	MtIdx         int     `json:"mt_idx"`
+	MtType        int     `json:"mt_type"`
+	MtLevel       int     `json:"mt_level"`
+	MtStatus      int     `json:"mt_status"`
+	MtID          string  `json:"mt_id"`
+	MtName        string  `json:"mt_name"`
+	MtNickname    string  `json:"mt_nickname"`
+	MtHp          string  `json:"mt_hp"`
+	MtEmail       string  `json:"mt_email"`
+	MtBirth       *string `json:"mt_birth"`
+	MtGender      int     `json:"mt_gender"`
+	MtFile1       string  `json:"mt_file1"`
+	MtLat         PyFloat `json:"mt_lat"`
+	MtLong        PyFloat `json:"mt_long"`
+	MtSido        string  `json:"mt_sido"`
+	MtGu          string  `json:"mt_gu"`
+	MtDong        string  `json:"mt_dong"`
+	MtOnboarding  string  `json:"mt_onboarding"`
+	MtPlanCheck   string  `json:"mt_plan_check"`
+	MtPlanDate    string  `json:"mt_plan_date"`
+	MtWeatherPop  string  `json:"mt_weather_pop"`
+	MtWeatherSky  int     `json:"mt_weather_sky"`
+	MtWeatherTmn  int     `json:"mt_weather_tmn"`
+	MtWeatherTmx  int     `json:"mt_weather_tmx"`
+	MtWeatherDate string  `json:"mt_weather_date"`
+	MtWdate       string  `json:"mt_wdate"`
+	MtLdate       string  `json:"mt_ldate"`
+	MtAdate       string  `json:"mt_adate"`
 }
 
 // RefreshV2Response는 /refresh v2(rotation): {success, token, refresh_token, expires_in, message}.

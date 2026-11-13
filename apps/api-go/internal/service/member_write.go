@@ -1,6 +1,9 @@
 package service
 
 import (
+	"context"
+	"errors"
+	"log/slog"
 	"math/rand"
 	"strings"
 	"time"
@@ -8,6 +11,7 @@ import (
 	"github.com/bluemusk/smap_next_go/internal/auth"
 	"github.com/bluemusk/smap_next_go/internal/dto"
 	"github.com/bluemusk/smap_next_go/internal/model"
+	"github.com/bluemusk/smap_next_go/internal/repository"
 )
 
 // memberWriteRepo는 MemberWriteService가 의존하는 데이터 접근 인터페이스(members write 17종).
@@ -22,14 +26,31 @@ type memberWriteRepo interface {
 	ExistsPhoneExcept(cleanPhone string, exceptIdx int) (bool, error)
 	ExistsEmailExcept(email string, exceptIdx int) (bool, error)
 	ExistsNicknameExcept(nickname string, exceptIdx int) (bool, error)
+	// G4: 비밀번호 갱신 + refresh 전부 폐기(한 트랜잭션), 탈퇴 정리(한 트랜잭션).
+	SetPasswordRevokeRefresh(mtIdx int, hashed string) error
+	WithdrawMember(mtIdx, retireChk int, retireEtc *string) error
 }
 
 // MemberWriteService는 Python `app/api/v1/endpoints/members.py`의 write 핸들러를 이식한다.
 // (register/login은 member_service, 비번/프로필/연락처는 crud_auth, 동의는 crud_member 로직.)
 type MemberWriteService struct {
-	repo   memberWriteRepo
-	cost   int
-	policy auth.PasswordPolicy
+	repo    memberWriteRepo
+	cost    int
+	policy  auth.PasswordPolicy
+	revoker accessRevoker // 비밀번호 변경·탈퇴 시 구 access token 무효 기준(SetAccessRevoker)
+	logger  *slog.Logger
+}
+
+// SetAccessRevoker는 구 access token 무효 기준 기록기를 주입한다.
+func (s *MemberWriteService) SetAccessRevoker(r accessRevoker, l *slog.Logger) {
+	s.revoker, s.logger = r, l
+}
+
+func (s *MemberWriteService) log() *slog.Logger {
+	if s.logger != nil {
+		return s.logger
+	}
+	return slog.Default()
 }
 
 func NewMemberWrite(repo memberWriteRepo, cost int, policy auth.PasswordPolicy) *MemberWriteService {
@@ -245,6 +266,7 @@ func (s *MemberWriteService) VerifyPassword(uid int, currentPwd string) bool {
 }
 
 // ChangePassword는 Python crud_auth.change_user_password를 이식한다(정책검증+bcrypt → mt_pwd/mt_udate).
+// 15단계: 같은 트랜잭션에서 그 회원 refresh 전부 폐기 + 구 access token 무효 기준 기록(실패하면 변경하지 않는다).
 // 정책위반(get_hashed_password ValueError)은 내부 except로 흡수되어 false(스키마 validator가 선차단해 사실상 미도달).
 func (s *MemberWriteService) ChangePassword(uid int, newPwd string) bool {
 	u, err := s.repo.GetByIdxActive(uid)
@@ -255,8 +277,18 @@ func (s *MemberWriteService) ChangePassword(uid int, newPwd string) bool {
 	if err != nil {
 		return false
 	}
-	now := dbUTCNow()
-	if err := s.repo.UpdateColumns(uid, map[string]interface{}{"mt_pwd": h, "mt_udate": now}); err != nil {
+	if s.revoker == nil {
+		s.log().Error("access_revoker_not_wired")
+		return false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := s.revoker.RevokeBefore(ctx, uid); err != nil {
+		s.log().Error("password_change_revoke_marker_failed", slog.String("err", err.Error()))
+		return false
+	}
+	if err := s.repo.SetPasswordRevokeRefresh(uid, h); err != nil {
+		s.log().Error("password_change_db_failed", slog.String("err", err.Error()))
 		return false
 	}
 	return true
@@ -361,31 +393,24 @@ func (s *MemberWriteService) ConsentAll(uid int, a1, a2, a3, a4, a5 string) (boo
 	return true, nil
 }
 
-// Withdraw는 Python members.withdraw_member 라우터 로직을 이식한다(get_user_by_idx → 6컬럼 UPDATE).
-// 반환: "notfound"(사용자 없음), "already"(mt_level==1, dead), "ok", "error".
+// Withdraw는 FastAPI members.withdraw_member 규약으로 탈퇴를 한 트랜잭션에서 처리한다(refresh 폐기, FCM 토큰 비움,
+// 그룹 멤버십·소유 그룹·장소 비노출, mt_id_retire 보관 + mt_id/mt_email/mt_hp/소셜 ID 해제). 정리는 repository.WithdrawMember.
+// 반환: "notfound"(활성 회원 아님), "ok", "error".
 func (s *MemberWriteService) Withdraw(uid, retireChk int, retireEtc *string) string {
-	u, err := s.repo.GetByIdxActive(uid)
-	if err != nil {
+	if err := s.repo.WithdrawMember(uid, retireChk, retireEtc); err != nil {
+		if errors.Is(err, repository.ErrWithdrawNotFound) {
+			return "notfound"
+		}
+		s.log().Error("withdraw_failed", slog.String("err", err.Error()))
 		return "error"
 	}
-	if u == nil {
-		return "notfound"
-	}
-	if derefIntUser(u.MtLevel) == 1 {
-		return "already" // get_user_by_idx 필터가 level<2 제외 → dead 분기
-	}
-	now := dbUTCNow()
-	fields := map[string]interface{}{
-		"mt_retire_level": derefIntUser(u.MtLevel),
-		"mt_level":        1,
-		"mt_retire_chk":   retireChk,
-		"mt_retire_etc":   nilOrStr(retireEtc),
-		"mt_rdate":        now,
-		"mt_id_retire":    derefStrOr(u.MtID, ""),
-		"mt_udate":        now,
-	}
-	if err := s.repo.UpdateColumns(uid, fields); err != nil {
-		return "error"
+	// 남은 access token(최대 상태 캐시 30초 + 만료까지)을 즉시 무효화한다. 탈퇴는 이미 커밋됐으므로 실패해도 결과는 그대로(경고).
+	if s.revoker != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		if err := s.revoker.RevokeBefore(ctx, uid); err != nil {
+			s.log().Warn("withdraw_revoke_marker_failed", slog.String("err", err.Error()))
+		}
 	}
 	return "ok"
 }

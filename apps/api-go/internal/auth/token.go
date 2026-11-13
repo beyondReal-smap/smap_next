@@ -21,6 +21,7 @@ func CreateAccessToken(mtIdx int, mtID string, mtName *string, secret, algorithm
 	claims := jwt.MapClaims{
 		"mt_idx": mtIdx,
 		"mt_id":  mtID,
+		"iat":    time.Now().UTC().Unix(), // 비밀번호 변경 후 구 토큰 무효화 판정용(발급 시각, 초)
 		"exp":    time.Now().UTC().Add(time.Duration(expMinutes) * time.Minute).Unix(),
 	}
 	// Python은 키를 항상 포함한다(None이면 null). mt_name nil → JSON null.
@@ -45,6 +46,7 @@ func CreateAccessTokenRaw(data map[string]interface{}, secret, algorithm string,
 	for k, v := range data {
 		claims[k] = v
 	}
+	claims["iat"] = time.Now().UTC().Unix()
 	claims["exp"] = time.Now().UTC().Add(time.Duration(expMinutes) * time.Minute).Unix()
 
 	method := jwt.GetSigningMethod(algorithm)

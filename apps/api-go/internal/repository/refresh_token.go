@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"github.com/bluemusk/smap_next_go/internal/model"
 )
@@ -64,6 +65,11 @@ func trimUA(ua string) *string {
 // Issue는 Python issue: 새 refresh 토큰 발급 후 저장. (raw, chain_id) 반환.
 // chainID가 ""이면 새 체인(uuid4), 주어지면 rotation 연장.
 func (r *RefreshTokenRepository) Issue(mtIdx int, chainID, userAgent, ipHash string) (string, string, error) {
+	return r.IssueTx(r.db, mtIdx, chainID, userAgent, ipHash)
+}
+
+// IssueTx는 Issue를 주어진 DB 핸들(트랜잭션 포함)에서 수행한다(가입 트랜잭션에서 회원 INSERT와 묶기 위함).
+func (r *RefreshTokenRepository) IssueTx(db *gorm.DB, mtIdx int, chainID, userAgent, ipHash string) (string, string, error) {
 	raw, err := r.genRaw()
 	if err != nil {
 		return "", "", err
@@ -86,75 +92,78 @@ func (r *RefreshTokenRepository) Issue(mtIdx int, chainID, userAgent, ipHash str
 		UserAgent: trimUA(userAgent),
 		IPHash:    ip,
 	}
-	if err := r.db.Create(row).Error; err != nil {
+	if err := db.Create(row).Error; err != nil {
 		return "", "", err
 	}
 	return raw, chain, nil
 }
 
-// Rotate는 Python rotate: 기존 raw를 회전.
+// Rotate는 Python rotate: 기존 raw를 회전한다. 같은 토큰으로 동시에 두 요청이 와도 하나만 성공하도록
+// 한 트랜잭션 안에서 기존 행을 SELECT ... FOR UPDATE로 잠근 뒤 판정한다(A-11).
 //   - 성공: (new_raw, mt_idx, true, nil). (chain_id는 caller 미사용이라 생략)
-//   - 실패(없음/만료/이미 사용됨): ("", 0, false, nil). reuse 감지 시 체인 전체 revoke.
+//   - 실패(없음/만료/이미 사용됨): ("", 0, false, nil). reuse 감지 시 체인 전체 revoke(이 폐기는 커밋된다).
 //   - DB 오류: ("", 0, false, err).
 func (r *RefreshTokenRepository) Rotate(rawOld, userAgent, ipHash string) (string, int, bool, error) {
 	oldHash := hashRaw(rawOld)
-	var old model.RefreshToken
-	err := r.db.Where("token_hash = ?", oldHash).First(&old).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return "", 0, false, nil
-	}
-	if err != nil {
-		return "", 0, false, err
-	}
-
-	now := dbNow()
-
-	// REUSE DETECTION — 이미 revoked된 토큰 재사용 시 체인 전체 폐기.
-	if old.RevokedAt != nil {
-		if err := r.db.Model(&model.RefreshToken{}).
-			Where("chain_id = ? AND revoked_at IS NULL", old.ChainID).
-			Update("revoked_at", now).Error; err != nil {
-			return "", 0, false, err
-		}
-		return "", 0, false, nil
-	}
-
-	if old.ExpiresAt.Before(now) {
-		return "", 0, false, nil
-	}
-
-	rawNew, err := r.genRaw()
-	if err != nil {
-		return "", 0, false, err
-	}
-	newHash := hashRaw(rawNew)
-
-	var ip *string
-	if ipHash != "" {
-		ip = &ipHash
-	}
-	newRow := &model.RefreshToken{
-		MtIdx:     old.MtIdx,
-		TokenHash: newHash,
-		ChainID:   old.ChainID,
-		IssuedAt:  now,
-		ExpiresAt: now.Add(time.Duration(r.expireDays) * 24 * time.Hour),
-		UserAgent: trimUA(userAgent),
-		IPHash:    ip,
-	}
-	// Python은 add(new_row) + old 갱신 후 단일 commit. GORM은 트랜잭션으로 묶는다.
+	var (
+		rawNew string
+		mtIdx  int
+		ok     bool
+	)
 	txErr := r.db.Transaction(func(tx *gorm.DB) error {
+		var old model.RefreshToken
+		err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("token_hash = ?", oldHash).First(&old).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		now := dbNow()
+
+		// REUSE DETECTION — 이미 revoked된 토큰 재사용 시 체인 전체 폐기.
+		if old.RevokedAt != nil {
+			return tx.Model(&model.RefreshToken{}).
+				Where("chain_id = ? AND revoked_at IS NULL", old.ChainID).
+				Update("revoked_at", now).Error
+		}
+		if old.ExpiresAt.Before(now) {
+			return nil
+		}
+
+		gen, err := r.genRaw()
+		if err != nil {
+			return err
+		}
+		newHash := hashRaw(gen)
+		var ip *string
+		if ipHash != "" {
+			ip = &ipHash
+		}
+		newRow := &model.RefreshToken{
+			MtIdx:     old.MtIdx,
+			TokenHash: newHash,
+			ChainID:   old.ChainID,
+			IssuedAt:  now,
+			ExpiresAt: now.Add(time.Duration(r.expireDays) * 24 * time.Hour),
+			UserAgent: trimUA(userAgent),
+			IPHash:    ip,
+		}
 		if err := tx.Create(newRow).Error; err != nil {
 			return err
 		}
-		return tx.Model(&model.RefreshToken{}).
+		if err := tx.Model(&model.RefreshToken{}).
 			Where("id = ?", old.ID).
-			Updates(map[string]interface{}{"revoked_at": now, "replaced_by_hash": newHash}).Error
+			Updates(map[string]interface{}{"revoked_at": now, "replaced_by_hash": newHash}).Error; err != nil {
+			return err
+		}
+		rawNew, mtIdx, ok = gen, old.MtIdx, true
+		return nil
 	})
 	if txErr != nil {
 		return "", 0, false, txErr
 	}
-	return rawNew, old.MtIdx, true, nil
+	return rawNew, mtIdx, ok, nil
 }
 
 // RevokeByRaw는 Python revoke_by_raw: 로그아웃 시 특정 raw token revoke.

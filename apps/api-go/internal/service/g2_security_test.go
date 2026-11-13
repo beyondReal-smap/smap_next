@@ -22,24 +22,6 @@ func mustHash(t *testing.T, pwd string) *string {
 
 func intp(v int) *int { return &v }
 
-// --- 가입 3경로: mt_level/mt_status/mt_type 주입 무시 ---
-
-func TestAuthRegisterIgnoresInjectedPrivileges(t *testing.T) {
-	mem := &fakeAuthMemberRepo{byMtID: map[string]*model.Member{}, byEmail: map[string]*model.Member{}}
-	svc := NewAuth(mem, &fakeAuthRefreshRepo{}, testAuthConfig())
-	in := baseRegisterInput()
-	in.MtType, in.MtLevel, in.MtStatus = 4, 9, 9 // 관리자 계정 주입 시도
-
-	outcome, resp := svc.Register(in)
-	if outcome != RegisterCreated || resp == nil {
-		t.Fatalf("가입 자체는 성공해야 함: %v", outcome)
-	}
-	c := mem.created
-	if c == nil || *c.MtLevel != 2 || *c.MtStatus != 1 || *c.MtType != 1 {
-		t.Fatalf("서버가 일반 회원 값(level=2,status=1,type=1)으로 강제해야 함: level=%v status=%v type=%v", c.MtLevel, c.MtStatus, c.MtType)
-	}
-}
-
 type fakeMemberWriteRepo struct {
 	created     *model.Member
 	userCreated *model.Member
@@ -62,6 +44,8 @@ func (f *fakeMemberWriteRepo) CreateUserMember(m *model.Member) (*model.Member, 
 	return m, nil
 }
 func (f *fakeMemberWriteRepo) UpdateColumns(int, map[string]interface{}) error { return nil }
+func (f *fakeMemberWriteRepo) SetPasswordRevokeRefresh(int, string) error      { return nil }
+func (f *fakeMemberWriteRepo) WithdrawMember(int, int, *string) error          { return nil }
 func (f *fakeMemberWriteRepo) ExistsPhoneExcept(string, int) (bool, error)     { return false, nil }
 func (f *fakeMemberWriteRepo) ExistsEmailExcept(string, int) (bool, error)     { return false, nil }
 func (f *fakeMemberWriteRepo) ExistsNicknameExcept(string, int) (bool, error)  { return false, nil }
@@ -175,7 +159,7 @@ func TestLoginHomeRejectsBlockedMembers(t *testing.T) {
 			mem := &fakeAuthMemberRepo{byMtID: map[string]*model.Member{"01011112222": m}, byID: map[int]*model.Member{7: m}}
 			svc := NewAuth(mem, &fakeAuthRefreshRepo{issueRaw: "refresh-raw"}, testAuthConfig())
 
-			resp := svc.LoginHome(LoginInput{MtID: "010-1111-2222", MtPwd: "Right1234!@"}, "ua", "ip")
+			resp := loginOnly(svc, LoginInput{MtID: "010-1111-2222", MtPwd: "Right1234!@"}, "ua", "ip")
 			if resp.Success != tt.wantOK {
 				t.Fatalf("success=%v want %v (%s)", resp.Success, tt.wantOK, resp.Message)
 			}
@@ -194,8 +178,8 @@ func TestLoginHomeRejectsBlockedMembers(t *testing.T) {
 	m := memberWithState(t, 7, intp(1), intp(1), nil)
 	mem := &fakeAuthMemberRepo{byMtID: map[string]*model.Member{"01011112222": m}, byID: map[int]*model.Member{7: m}}
 	svc := NewAuth(mem, &fakeAuthRefreshRepo{}, testAuthConfig())
-	wrong := svc.LoginHome(LoginInput{MtID: "01011112222", MtPwd: "Wrong1234!@"}, "", "")
-	blocked := svc.LoginHome(LoginInput{MtID: "01011112222", MtPwd: "Right1234!@"}, "", "")
+	wrong := loginOnly(svc, LoginInput{MtID: "01011112222", MtPwd: "Wrong1234!@"}, "", "")
+	blocked := loginOnly(svc, LoginInput{MtID: "01011112222", MtPwd: "Right1234!@"}, "", "")
 	if wrong.Message != blocked.Message || wrong.Success != blocked.Success {
 		t.Errorf("탈퇴 회원 거부 응답이 비밀번호 오류와 달라 상태가 노출됨: %+v vs %+v", wrong, blocked)
 	}
