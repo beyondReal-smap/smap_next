@@ -33,6 +33,55 @@ struct SubscriptionStatus: Decodable, Equatable {
     let in_grace_period: Bool
     let limits: SubscriptionLimits
     let enforcement_enabled: Bool
+    /// 구매를 SMAP 회원에 묶는 UUID 문자열(StoreKit appAccountToken). 서버 비밀이 없으면 내려오지 않는다.
+    let account_token: String?
+}
+
+// MARK: - 구매용 계정 토큰 확보 (순수 로직 — 테스트 가능하도록 StoreKit/싱글턴과 분리)
+
+enum PurchaseAccountToken {
+    enum TokenError: Error, Equatable {
+        /// 값은 있는데 UUID 형식이 아님 — 서버 버그를 숨기지 않는다.
+        case malformed
+        /// 로그인 정보가 없어 현재 회원을 알 수 없음
+        case notSignedIn
+        /// /subscriptions/me 조회 실패
+        case fetchFailed
+    }
+
+    /// 서버가 내려준 문자열을 UUID 로 변환. 값 없음(nil)은 nil, 있는데 형식이 틀리면 오류.
+    static func parse(_ raw: String?) throws -> UUID? {
+        guard let raw else { return nil }
+        guard let uuid = UUID(uuidString: raw) else { throw TokenError.malformed }
+        return uuid
+    }
+
+    /// 보관해 둔 상태가 현재 회원의 것일 때만 재사용한다. 회원 식별자를 모르면 재사용하지 않는다.
+    static func reusableStatus(cached: SubscriptionStatus?, cachedOwner: Int?, currentMember: Int?) -> SubscriptionStatus? {
+        guard let cached, let cachedOwner, let currentMember, cachedOwner == currentMember else { return nil }
+        return cached
+    }
+
+    /// 구매 직전 토큰 확보. 현재 회원의 보관 상태가 있으면 재사용, 아니면 `fetch` 로 새로 조회.
+    /// 조회 실패는 오류(토큰 없이 진행하지 않음), 응답에 토큰이 없는 것은 정상(nil).
+    static func resolve(
+        cached: SubscriptionStatus?,
+        cachedOwner: Int?,
+        currentMember: Int?,
+        fetch: () async throws -> SubscriptionStatus
+    ) async throws -> (token: UUID?, status: SubscriptionStatus) {
+        let status: SubscriptionStatus
+        if let reusable = reusableStatus(cached: cached, cachedOwner: cachedOwner, currentMember: currentMember) {
+            status = reusable
+        } else {
+            do {
+                status = try await fetch()
+            } catch {
+                throw TokenError.fetchFailed
+            }
+        }
+        return (try parse(status.account_token), status)
+    }
 }
 
 // MARK: - StoreKitManager
@@ -78,6 +127,8 @@ final class StoreKitManager: ObservableObject {
     @Published private(set) var isLoadingProducts = false
     @Published private(set) var productsLoadFailed = false
     @Published private(set) var status: SubscriptionStatus?
+    /// `status` 를 받아 둔 시점의 로그인 회원(mt_idx) — 다른 회원의 account_token 재사용 방지
+    private var statusOwner: Int?
     @Published private(set) var statusLoadFailed = false
     @Published private(set) var isTrialEligible = false
     @Published private(set) var isProcessing = false
@@ -95,6 +146,7 @@ final class StoreKitManager: ObservableObject {
         ) { [weak self] _ in
             Task { @MainActor in
                 self?.status = nil
+                self?.statusOwner = nil
                 self?.statusLoadFailed = false
                 self?.hasDelayedVerification = false
             }
@@ -130,9 +182,11 @@ final class StoreKitManager: ObservableObject {
 
     func refreshStatus() async {
         guard AuthService.shared.getToken() != nil else { return }
+        let owner = AuthService.shared.currentUser?.mt_idx
         do {
             let fetched: SubscriptionStatus = try await APIClient.shared.request(.subscriptionMe)
             status = fetched
+            statusOwner = owner
             statusLoadFailed = false
         } catch {
             print("[StoreKit] 구독 상태 조회 실패: \(type(of: error))")
@@ -187,8 +241,19 @@ final class StoreKitManager: ObservableObject {
         guard !isProcessing else { return .cancelled }
         isProcessing = true
         defer { isProcessing = false }
+        let accountToken: UUID?
         do {
-            switch try await product.purchase() {
+            accountToken = try await resolveAccountToken()
+        } catch PurchaseAccountToken.TokenError.malformed {
+            print("[StoreKit] account_token 형식 오류 — 구매를 시작하지 않습니다.")
+            return .failed("계정 정보를 확인하지 못해 결제를 시작할 수 없어요. 문제가 계속되면 문의해 주세요.")
+        } catch {
+            print("[StoreKit] 계정 토큰 확보 실패: \(error)")
+            return .failed("결제를 시작하지 못했어요. 네트워크를 확인하고 다시 시도해 주세요.")
+        }
+        do {
+            let options: Set<Product.PurchaseOption> = accountToken.map { [.appAccountToken($0)] } ?? []
+            switch try await product.purchase(options: options) {
             case .success(let verification):
                 switch await handle(verification) {
                 case .verified: return .success
@@ -211,6 +276,23 @@ final class StoreKitManager: ObservableObject {
             print("[StoreKit] 구매 실패: \(type(of: error))")
             return .failed("결제를 완료하지 못했어요.")
         }
+    }
+
+    /// 구매 직전 현재 로그인 회원의 account_token 확보(값이 없으면 nil — 토큰 없이 진행).
+    private func resolveAccountToken() async throws -> UUID? {
+        guard AuthService.shared.getToken() != nil else { throw PurchaseAccountToken.TokenError.notSignedIn }
+        let owner = AuthService.shared.currentUser?.mt_idx
+        let result = try await PurchaseAccountToken.resolve(
+            cached: status, cachedOwner: statusOwner, currentMember: owner
+        ) {
+            try await APIClient.shared.request(.subscriptionMe)
+        }
+        if result.status != status || statusOwner != owner {
+            status = result.status
+            statusOwner = owner
+            statusLoadFailed = false
+        }
+        return result.token
     }
 
     // MARK: 복원
@@ -265,6 +347,7 @@ final class StoreKitManager: ObservableObject {
         guard AuthService.shared.getToken() != nil else { return .deferred }
         guard inFlight.insert(transaction.id).inserted else { return .ignored }
         defer { inFlight.remove(transaction.id) }
+        let owner = AuthService.shared.currentUser?.mt_idx
 
         do {
             // JWS 는 로그에 남기지 않는다.
@@ -274,6 +357,7 @@ final class StoreKitManager: ObservableObject {
             // 서버가 성공을 돌려준 뒤에만 완료 처리한다.
             await transaction.finish()
             status = updated
+            statusOwner = owner
             statusLoadFailed = false
             hasDelayedVerification = false
             return .verified

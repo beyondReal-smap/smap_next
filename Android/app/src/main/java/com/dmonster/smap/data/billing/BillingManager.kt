@@ -15,6 +15,8 @@ import com.android.billingclient.api.QueryProductDetailsParams
 import com.android.billingclient.api.QueryPurchasesParams
 import com.android.billingclient.api.queryProductDetails
 import com.android.billingclient.api.queryPurchasesAsync
+import com.dmonster.smap.data.GlobalEvent
+import com.dmonster.smap.data.GlobalEventBus
 import com.dmonster.smap.data.service.AuthService
 import com.dmonster.smap.data.service.SubscriptionPolicy
 import com.dmonster.smap.data.service.SubscriptionService
@@ -77,6 +79,10 @@ class BillingManager(
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val accountTokenResolver = PurchaseAccountTokenResolver(
+        currentMemberId = { authService.getMtIdx() },
+        fetchStatus = { subscriptionService.refreshSubscriptionStatus() }
+    )
     private val connectionMutex = Mutex()
     private val reprocessMutex = Mutex()
 
@@ -88,6 +94,14 @@ class BillingManager(
                 .build()
         )
         .build()
+
+    init {
+        scope.launch {
+            GlobalEventBus.events.collect { event ->
+                if (event is GlobalEvent.LoggedOut) accountTokenResolver.invalidate()
+            }
+        }
+    }
 
     private val _offers = MutableStateFlow<List<SubscriptionOfferUiModel>>(emptyList())
     val offers: StateFlow<List<SubscriptionOfferUiModel>> = _offers.asStateFlow()
@@ -252,12 +266,22 @@ class BillingManager(
                 return@launch
             }
             _purchaseState.value = BillingPurchaseState.Purchasing
+            // 구매를 현재 회원 계정에 묶기 위한 토큰. 조회 실패 시 토큰 없이 진행하지 않는다.
+            val accountToken = when (val resolved = accountTokenResolver.resolve()) {
+                is AccountTokenResult.Token -> resolved.value
+                is AccountTokenResult.None -> null
+                is AccountTokenResult.Failure -> {
+                    _purchaseState.value = BillingPurchaseState.Error(resolved.message)
+                    return@launch
+                }
+            }
             val productDetailsParams = BillingFlowParams.ProductDetailsParams.newBuilder()
                 .setProductDetails(offer.productDetails)
                 .setOfferToken(offer.offerToken)
                 .build()
             val billingFlowParams = BillingFlowParams.newBuilder()
                 .setProductDetailsParamsList(listOf(productDetailsParams))
+                .apply { if (accountToken != null) setObfuscatedAccountId(accountToken) }
                 .build()
 
             val launchResult = billingClient.launchBillingFlow(activity, billingFlowParams)

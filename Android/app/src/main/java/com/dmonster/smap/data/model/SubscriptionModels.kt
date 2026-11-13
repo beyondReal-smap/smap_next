@@ -16,7 +16,9 @@ data class SubscriptionStatusResponse(
     @SerialName("auto_renew") val autoRenew: Boolean? = null,
     @SerialName("in_grace_period") val inGracePeriod: Boolean = false,
     @SerialName("limits") val limits: SubscriptionLimits = SubscriptionLimits(),
-    @SerialName("enforcement_enabled") val enforcementEnabled: Boolean = false
+    @SerialName("enforcement_enabled") val enforcementEnabled: Boolean = false,
+    // 구매 시 obfuscatedAccountId로 넣을 서버 발급 UUID. 서버 비밀 미설정 시 없음. 로그에 남기지 않는다.
+    @SerialName("account_token") val accountToken: String? = null
 )
 
 @Serializable

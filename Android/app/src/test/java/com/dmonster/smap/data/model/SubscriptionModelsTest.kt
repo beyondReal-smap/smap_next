@@ -106,4 +106,14 @@ class SubscriptionModelsTest {
         assertNull(parseFastApiErrorDetail(""))
         assertNull(parseFastApiErrorDetail("not json"))
     }
+
+    @Test
+    fun `SubscriptionStatusResponse parses optional account_token and defaults to null`() {
+        val with = json.decodeFromString<SubscriptionStatusResponse>(
+            """{"is_premium": false, "account_token": "11111111-1111-4111-8111-111111111111"}"""
+        )
+        assertEquals("11111111-1111-4111-8111-111111111111", with.accountToken)
+        val without = json.decodeFromString<SubscriptionStatusResponse>("""{"is_premium": false}""")
+        assertNull(without.accountToken)
+    }
 }
