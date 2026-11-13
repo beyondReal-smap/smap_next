@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth, getCurrentUserId } from '@/lib/auth';
+import { verifyBackendAuth } from '@/lib/auth';
 
 interface CreateScheduleRequest {
   sst_title?: string;
@@ -24,70 +24,30 @@ interface CreateScheduleRequest {
 }
 
 async function makeBackendRequest(url: string, options: RequestInit): Promise<any> {
-  try {
-    console.log('[SCHEDULE API] 🚀 백엔드 요청 시작:', { url, method: options.method });
-    console.log('[SCHEDULE API] 📦 요청 옵션:', options);
-    
-    // SSL 인증서 문제 해결을 위한 설정 (공지사항 API와 동일)
-    process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
-    
-    const fetchOptions: RequestInit = {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        ...options.headers,
-      },
-    };
-    
-    const response = await fetch(url, fetchOptions);
+  console.log('[SCHEDULE API] 🚀 백엔드 요청 시작:', { url, method: options.method });
 
-    console.log('[SCHEDULE API] 📡 백엔드 응답 수신:', {
+  const fetchOptions: RequestInit = {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      ...options.headers,
+    },
+  };
+
+  const response = await fetch(url, fetchOptions);
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[SCHEDULE API] ❌ 백엔드 오류 응답:', {
       status: response.status,
       statusText: response.statusText,
-      ok: response.ok,
-      url: response.url
+      errorText,
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[SCHEDULE API] ❌ 백엔드 오류 응답:', {
-        status: response.status,
-        statusText: response.statusText,
-        errorText: errorText
-      });
-      throw new Error(`Backend API error: ${response.status} - ${errorText}`);
-    }
-
-    const data = await response.json();
-    console.log('[SCHEDULE API] ✅ 백엔드 응답 데이터:', data);
-    return data;
-
-  } catch (error: any) {
-    console.error('[SCHEDULE API] 💥 백엔드 요청 실패:', {
-      message: error.message,
-      name: error.name,
-      cause: error.cause
-    });
-    
-    // 백엔드 연결 실패 시 목업 응답
-    if (error.message?.includes('fetch') || 
-        error.code === 'ECONNREFUSED' || 
-        error.name === 'TypeError' ||
-        error.message?.includes('certificate') ||
-        error.message?.includes('SSL')) {
-      console.log('[SCHEDULE API] 🔄 백엔드 연결 실패, 목업 응답 반환');
-      return {
-        success: true,
-        data: {
-          sst_idx: Math.floor(Math.random() * 1000000),
-          message: '스케줄이 성공적으로 생성되었습니다. (목업 응답 - 백엔드 연결 실패)'
-        }
-      };
-    }
-    
-    throw error;
+    throw new Error(`Backend API error: ${response.status} - ${errorText}`);
   }
+
+  return await response.json();
 }
 
 /**
@@ -103,18 +63,13 @@ export async function POST(
   console.log('[SCHEDULE API] 파라미터:', { groupId });
   
   try {
-    // 인증 확인
-    const { user, unauthorized } = requireAuth(request);
-    if (unauthorized) {
-      return NextResponse.json({ error: unauthorized.error }, { status: unauthorized.status });
+    const { user, token, errorResponse } = await verifyBackendAuth(request);
+    if (errorResponse || !user || !token) {
+      return errorResponse ?? NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
     }
     
     const body: CreateScheduleRequest = await request.json();
-    console.log('[SCHEDULE API] 생성 요청 데이터:', body);
-    
-    // current_user_id는 인증된 사용자 ID (현재는 하드코딩된 1186)
-    const currentUserId = getCurrentUserId(request);
-    console.log('[SCHEDULE API] 현재 사용자 ID:', currentUserId);
+    const currentUserId = user.mt_idx;
     
     // 백엔드 API URL 구성
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api3.aiagnt.kr';
@@ -147,10 +102,11 @@ export async function POST(
 
     const response = await makeBackendRequest(apiUrl, {
       method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
       body: JSON.stringify(backendRequestData)
     });
-    
-    console.log('[SCHEDULE API] 백엔드 응답:', response);
     
     if (response.success) {
       return NextResponse.json({
@@ -190,10 +146,9 @@ export async function GET(
   console.log('[SCHEDULE API] 파라미터:', { groupId });
   
   try {
-    // 인증 확인
-    const { user, unauthorized } = requireAuth(request);
-    if (unauthorized) {
-      return NextResponse.json({ error: unauthorized.error }, { status: unauthorized.status });
+    const { user, token, errorResponse } = await verifyBackendAuth(request);
+    if (errorResponse || !user || !token) {
+      return errorResponse ?? NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
     }
     
     // URL 파라미터 추출
@@ -203,11 +158,7 @@ export async function GET(
     const days = searchParams.get('days');
     const memberId = searchParams.get('member_id');
     
-    console.log('[SCHEDULE API] 쿼리 파라미터:', { startDate, endDate, days, memberId });
-    
-    // current_user_id는 인증된 사용자 ID (현재는 하드코딩된 1186)
-    const currentUserId = getCurrentUserId(request);
-    console.log('[SCHEDULE API] 현재 사용자 ID:', currentUserId);
+    const currentUserId = user.mt_idx;
     
     // 백엔드 API URL 구성
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api3.aiagnt.kr';
@@ -224,9 +175,10 @@ export async function GET(
     // 백엔드 API 호출
     const response = await makeBackendRequest(apiUrl, {
       method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
     });
-    
-    console.log('[SCHEDULE API] 백엔드 응답:', response);
     
     if (response.success) {
       return NextResponse.json(response);

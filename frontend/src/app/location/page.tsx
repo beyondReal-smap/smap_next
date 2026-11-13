@@ -1835,13 +1835,23 @@ export default function LocationPage() {
         return;
       }
 
+      if (!selectedGroupId) {
+        openModal('그룹 선택 필요', '장소를 등록할 그룹을 먼저 선택해주세요.', 'error');
+        return;
+      }
+
+      if (!newLocation.coordinates || !newLocation.coordinates[0] || !newLocation.coordinates[1]) {
+        openModal('위치 선택 필요', '지도에서 유효한 위치를 선택해주세요.', 'error');
+        return;
+      }
+
       const locationData = {
         slt_title: newLocation.name.trim(),
         slt_add: newLocation.address.trim(),
-        slt_lat: newLocation.coordinates[1] || 37.5665, // latitude
-        slt_long: newLocation.coordinates[0] || 126.9780, // longitude
-        sgt_idx: selectedGroupId || 641, // 선택된 그룹 ID
-        sgdt_idx: selectedGroupId || 641, // 그룹 상세 ID
+        slt_lat: newLocation.coordinates[1], // latitude
+        slt_long: newLocation.coordinates[0], // longitude
+        sgt_idx: selectedGroupId, // 선택된 그룹 ID
+        sgdt_idx: selectedGroupId, // 그룹 상세 ID
         slt_show: 'Y',
         slt_enter_alarm: newLocation.notifications ? 'Y' : 'N',
         slt_enter_chk: 'N'
@@ -2541,6 +2551,7 @@ export default function LocationPage() {
       }
     } catch (error) {
       console.error('[fetchGroupMembersData] 오류:', error);
+      openModal('조회 실패', '그룹 멤버 목록을 불러오는데 실패했습니다.', 'error');
 
       setGroupMembers([]);
       setIsFirstMemberSelectionComplete(true);

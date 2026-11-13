@@ -11,6 +11,13 @@ const publicPaths = [
   '/register-new',
   '/login',
   '/social-login',
+  '/forgot-password',
+  '/reset-password',
+  '/r',
+  '/account-deletion',
+  '/legal',
+  '/privacy',
+  '/offline',
   '/api/auth',
   '/_next',
   '/favicon.ico',
@@ -50,8 +57,10 @@ export function middleware(request: NextRequest) {
   }
 
   // 공개 경로는 항상 통과
-  if (publicPaths.some(path => pathname.startsWith(path)) || isGroupJoinPath(pathname)) {
-    console.log('[MIDDLEWARE] 🟢 공개 경로 통과:', pathname);
+  if (
+    publicPaths.some(path => pathname === path || pathname.startsWith(`${path}/`)) ||
+    isGroupJoinPath(pathname)
+  ) {
     return NextResponse.next();
   }
 

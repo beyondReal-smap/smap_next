@@ -130,10 +130,6 @@ export default function InquiryPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [emailError, setEmailError] = useState('');
 
-  // 텔레그램 봇 토큰 및 채팅 ID
-  const TELEGRAM_BOT_TOKEN = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN || '7701491070:AAH6wpf7wK5o7jq--mRlZWpE_rb3HIIjvBU';
-  const TELEGRAM_CHAT_ID = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID || '6495247513';
-
   // 페이지 마운트 시 스크롤 설정
   useEffect(() => {
     document.body.style.overflowY = 'auto';
@@ -204,68 +200,42 @@ export default function InquiryPage() {
     }
   };
 
-  // 텔레그램 전송 함수
+  // 서버 라우트를 통한 텔레그램 문의 전송
   const sendTelegram = async (): Promise<{success: boolean, message: string}> => {
     try {
-      // 문의 유형 한글 변환
-      const categoryLabels: { [key: string]: string } = {
-        'general': '일반 문의',
-        'technical': '기술 지원',
-        'account': '계정 문제',
-        'billing': '결제 문의'
-      };
+      const token =
+        typeof window !== 'undefined'
+          ? localStorage.getItem('smap_auth_token') || localStorage.getItem('auth_token') || localStorage.getItem('auth-token')
+          : null;
 
-      // 텔레그램 메시지 텍스트 구성
-      const text = `
-📨 새로운 1:1 문의
-
-📋 문의 유형: ${categoryLabels[category] || category}
-📝 제목: ${subject}
-📧 이메일: ${email}
-
-💬 문의 내용:
-${message}
-
-⏰ 접수 시간: ${new Date().toLocaleString('ko-KR')}
-      `.trim();
-
-      // 텔레그램 API 호출
-      const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      const response = await fetch('/api/inquiry', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
-          chat_id: TELEGRAM_CHAT_ID,
-          text: text,
-          parse_mode: 'HTML'
+          category,
+          subject,
+          message,
+          email,
         }),
       });
 
-      const result = await response.json();
-      
-      if (!result.ok) {
-        throw new Error(result.description || '텔레그램 전송 실패');
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.success) {
+        return {
+          success: false,
+          message: result.message || '문의 전송에 실패했습니다. 잠시 후 다시 시도해주세요.',
+        };
       }
-      
-      return { success: true, message: '메시지가 성공적으로 전송되었습니다.' };
+
+      return { success: true, message: result.message || '메시지가 성공적으로 전송되었습니다.' };
     } catch (error: any) {
-      console.error('Telegram API error:', error);
-      
-      // API 호출 실패 시 대체 방법으로 텔레그램 웹을 여는 링크 제공
-      const categoryLabels: { [key: string]: string } = {
-        'general': '일반 문의',
-        'technical': '기술 지원', 
-        'account': '계정 문제',
-        'billing': '결제 문의'
-      };
-      
-      const telegramMessage = encodeURIComponent(`📨 새로운 1:1 문의\n\n📋 문의 유형: ${categoryLabels[category] || category}\n📝 제목: ${subject}\n📧 이메일: ${email}\n\n💬 문의 내용:\n${message}`);
-      window.open(`https://t.me/smapvisual?text=${telegramMessage}`);
-      
-      return { 
-        success: false, 
-        message: '텔레그램 API 전송에 실패했습니다. 대신 텔레그램 채팅창이 열렸습니다.' 
+      console.error('Inquiry API error:', error);
+      return {
+        success: false,
+        message: '문의 전송 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.',
       };
     }
   };

@@ -1,18 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import resolveBackendBaseUrl from '../../_utils/backend';
+import { verifyBackendAdminAuth } from '@/lib/auth';
 
 // 관리자 대시보드 통계 API
 export async function GET(request: NextRequest) {
     try {
+        const { token, errorResponse } = await verifyBackendAdminAuth(request);
+        if (errorResponse) return errorResponse;
+
         const backendBase = resolveBackendBaseUrl();
         const backendUrl = `${backendBase}/api/v1/admin/stats`;
-
-        process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
 
         const response = await fetch(backendUrl, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
             },
         });
 
@@ -22,7 +25,7 @@ export async function GET(request: NextRequest) {
         }
 
         const data = await response.json();
-        console.log('[Admin Stats API] 백엔드 응답:', data);
+        console.log('[Admin Stats API] 백엔드 응답 성공');
 
         return NextResponse.json(data);
     } catch (error) {

@@ -1,251 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server';
 import resolveBackendBaseUrl from '../../_utils/backend';
-import { getCurrentUserId } from '@/lib/auth';
-
-// node-fetch를 대안으로 사용
-let nodeFetch: any = null;
-try {
-  nodeFetch = require('node-fetch');
-} catch (e) {
-  console.log('[Current User Groups API] node-fetch 패키지를 찾을 수 없음');
-}
+import { verifyBackendAuth } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
+  const { user, token, errorResponse } = await verifyBackendAuth(request);
+  if (errorResponse || !user || !token) {
+    return errorResponse ?? NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
+  }
+
   try {
-    console.log('[Current User Groups API] 현재 사용자 그룹 목록 조회 요청');
-    
-    // 쿼리 파라미터 확인 (강제 새로고침 여부)
     const { searchParams } = new URL(request.url);
     const forceRefresh = searchParams.get('_force_refresh') === 'true';
     const timestamp = searchParams.get('_t');
     const environment = process.env.NODE_ENV || 'development';
-    
-    console.log('[Current User Groups API] 요청 파라미터:', {
-      forceRefresh,
-      timestamp,
-      environment,
-      domain: process.env.VERCEL_URL || 'localhost'
-    });
 
-    // 현재 로그인한 사용자 ID 가져오기
-    const currentUserId = getCurrentUserId(request);
-    console.log('[Current User Groups API] 현재 사용자 ID:', currentUserId);
-    console.log('[Current User Groups API] 사용자 ID 타입:', typeof currentUserId);
-    console.log('[Current User Groups API] 사용자 ID === 1186:', currentUserId === 1186);
-    console.log('[Current User Groups API] 사용자 ID == 1186:', currentUserId == 1186);
-
-    // Authorization 헤더에서 토큰 추출
-    const authorization = request.headers.get('authorization');
-    console.log('[Current User Groups API] Authorization 헤더:', authorization ? '토큰 있음' : '토큰 없음');
-    
-    // 쿠키에서도 토큰 확인
-    const cookieToken = request.cookies.get('auth-token')?.value;
-    console.log('[Current User Groups API] 쿠키 토큰:', cookieToken ? '있음' : '없음');
-    
-
-    
-    // 현재 사용자 ID가 없으면 클라이언트 토큰에서 그룹 정보 확인 시도
-    if (!currentUserId) {
-      console.log('[Current User Groups API] 인증된 사용자 ID가 없음, 클라이언트 토큰 우회 시도');
-      
-      // 쿠키에서 클라이언트 토큰 확인
-      const clientToken = request.cookies.get('client-token')?.value;
-      if (clientToken) {
-        try {
-          const clientData = JSON.parse(decodeURIComponent(clientToken));
-          console.log('[Current User Groups API] 클라이언트 토큰 데이터:', { 
-            hasGroups: !!clientData.groups,
-            groupCount: Array.isArray(clientData.groups) ? clientData.groups.length : 0,
-            userId: clientData.userId
-          });
-          
-          if (clientData.groups && Array.isArray(clientData.groups)) {
-            console.log('[Current User Groups API] ✅ 클라이언트 토큰에서 그룹 정보 발견:', clientData.groups.length + '개');
-            return NextResponse.json(clientData.groups);
-          }
-        } catch (e) {
-          console.log('[Current User Groups API] 클라이언트 토큰 파싱 실패:', e instanceof Error ? e.message : String(e));
-        }
-      }
-      
-      console.log('[Current User Groups API] 모든 인증 방법 실패, 빈 배열 반환');
-      return NextResponse.json([]);
-    }
-
-    // 백엔드 API 호출 - 현재 사용자의 그룹 목록 조회 (올바른 엔드포인트 사용)
     const backendBase = resolveBackendBaseUrl();
-    const backendUrl = `${backendBase}/api/v1/groups/member/${currentUserId}`;
-    console.log('[Current User Groups API] 백엔드 호출:', backendUrl);
-    
-    const fetchOptions: RequestInit = {
+    const backendUrl = `${backendBase}/api/v1/groups/member/${user.mt_idx}`;
+
+    const response = await fetch(backendUrl, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`,
         'User-Agent': 'Next.js API Proxy',
-        ...(authorization && { 'Authorization': authorization }),
         ...(forceRefresh && {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
           'Expires': '0',
           'X-Force-Refresh': 'true',
           'X-Timestamp': timestamp || Date.now().toString(),
-          'X-Environment': environment
-        })
+          'X-Environment': environment,
+        }),
       },
-      // @ts-ignore - Next.js 환경에서 SSL 인증서 검증 우회
-      rejectUnauthorized: false,
-    };
-    
-    // Node.js 환경 변수로 SSL 검증 비활성화
-    const originalTlsReject = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-    
-    let response: any;
-    let usedMethod = 'default-fetch';
-
-    try {
-      // 기본 fetch 시도
-      response = await fetch(backendUrl, {
-        ...fetchOptions,
-        next: forceRefresh ? { revalidate: 0 } : { revalidate: 60 },
-        cache: forceRefresh ? 'no-store' : 'default'
-      });
-      console.log('[Current User Groups API] 기본 fetch 성공');
-    } catch (fetchError) {
-      console.log('[Current User Groups API] 기본 fetch 실패, node-fetch 시도:', fetchError instanceof Error ? fetchError.message : String(fetchError));
-      
-      if (nodeFetch) {
-        // node-fetch 시도
-        try {
-          response = await nodeFetch(backendUrl, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'User-Agent': 'Next.js API Proxy (node-fetch)',
-              ...(authorization && { 'Authorization': authorization }),
-            },
-            // node-fetch의 SSL 우회 옵션
-            agent: function(_parsedURL: any) {
-              const https = require('https');
-              return new https.Agent({
-                rejectUnauthorized: false
-              });
-            }
-          });
-          usedMethod = 'node-fetch';
-          console.log('[Current User Groups API] node-fetch 성공');
-        } catch (nodeFetchError) {
-          console.error('[Current User Groups API] node-fetch도 실패:', nodeFetchError);
-          throw fetchError; // 원래 에러를 던짐
-        }
-      } else {
-        throw fetchError; // node-fetch가 없으면 원래 에러를 던짐
-      }
-    } finally {
-      // 환경 변수 복원
-      if (originalTlsReject !== undefined) {
-        process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalTlsReject;
-      } else {
-        delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-      }
-    }
-
-    console.log('[Current User Groups API] 백엔드 응답 상태:', response.status, response.statusText, '(사용된 방법:', usedMethod + ')');
-
-    // 401 또는 422 에러가 발생한 경우 대체 방법으로 현재 사용자 ID를 직접 사용
-    if (!response.ok && (response.status === 401 || response.status === 422)) {
-      const errorText = await response.text();
-      console.log('[Current User Groups API] 인증 실패, 현재 사용자 ID로 재시도:', errorText);
-      
-      // 현재 사용자 ID가 없으면 빈 배열 반환 (신규 사용자)
-      if (!currentUserId) {
-        console.log('[Current User Groups API] 인증된 사용자 ID가 없음, 빈 배열 반환');
-        return NextResponse.json([]);
-      }
-      
-      const userIdToUse = currentUserId;
-      console.log('[Current User Groups API] 사용할 사용자 ID:', userIdToUse);
-      
-      // 올바른 백엔드 엔드포인트 사용: /groups/member/{member_id}
-      const fallbackUrl = `${backendBase}/api/v1/groups/member/${userIdToUse}`;
-      console.log('[Current User Groups API] 대체 API 호출:', fallbackUrl);
-      
-      try {
-        process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-        
-        const fallbackResponse = await fetch(fallbackUrl, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'User-Agent': 'Next.js API Proxy (fallback)',
-            ...(forceRefresh && {
-              'Cache-Control': 'no-cache, no-store, must-revalidate',
-              'Pragma': 'no-cache',
-              'Expires': '0',
-              'X-Force-Refresh': 'true',
-              'X-Timestamp': timestamp || Date.now().toString(),
-              'X-Environment': environment
-            })
-          },
-          next: forceRefresh ? { revalidate: 0 } : { revalidate: 60 },
-          cache: forceRefresh ? 'no-store' : 'default'
-        });
-        
-        if (fallbackResponse.ok) {
-          const fallbackData = await fallbackResponse.json();
-          console.log('[Current User Groups API] 대체 API 성공:', fallbackData);
-          return NextResponse.json(fallbackData);
-        } else {
-          const fallbackErrorText = await fallbackResponse.text();
-          console.error('[Current User Groups API] 대체 API 실패:', fallbackResponse.status, fallbackErrorText);
-        }
-      } catch (fallbackError) {
-        console.error('[Current User Groups API] 대체 API도 실패:', fallbackError);
-      }
-      
-      // 모든 방법이 실패하면 원래 에러 반환
-      throw new Error(`Backend API error: ${response.status} - ${errorText}`);
-    }
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[Current User Groups API] 백엔드 에러 응답:', errorText);
-      throw new Error(`Backend API error: ${response.status} - ${errorText}`);
+      return NextResponse.json(
+        { error: '현재 사용자 그룹 목록 조회에 실패했습니다.', details: errorText },
+        { status: response.status }
+      );
     }
 
-    const data = await response.json();
-    console.log('[Current User Groups API] 백엔드 응답 데이터:', {
-      dataType: Array.isArray(data) ? 'array' : typeof data,
-      count: Array.isArray(data) ? data.length : 'N/A',
-      sampleData: Array.isArray(data) && data.length > 0 ? data[0] : data
-    });
-
-    const responseObj = NextResponse.json(data);
-    
-    // 강제 새로고침인 경우 응답에도 캐시 무효화 헤더 추가
-    if (forceRefresh) {
-      responseObj.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
-      responseObj.headers.set('Pragma', 'no-cache');
-      responseObj.headers.set('Expires', '0');
-      responseObj.headers.set('X-Force-Refresh', 'true');
-      responseObj.headers.set('X-Timestamp', timestamp || Date.now().toString());
-      responseObj.headers.set('X-Environment', environment);
-    }
-
-    return responseObj;
-
+    const groupsData = await response.json();
+    return NextResponse.json(groupsData);
   } catch (error) {
     console.error('[Current User Groups API] 오류:', error);
-    
-    // 최후의 수단으로 빈 배열 반환 (신규 사용자는 그룹이 없음)
-    const currentUserIdForMock = getCurrentUserId(request);
-    console.log('[Current User Groups API] 에러 발생, 사용자 ID:', currentUserIdForMock);
-    
-    // 신규 사용자는 그룹이 없으므로 빈 배열 반환
-    console.log('[Current User Groups API] 빈 배열 반환 (신규 사용자)');
-    return NextResponse.json([]);
+    return NextResponse.json(
+      { error: '현재 사용자 그룹 목록 조회 중 서버 오류가 발생했습니다.' },
+      { status: 500 }
+    );
   }
-} 
+}

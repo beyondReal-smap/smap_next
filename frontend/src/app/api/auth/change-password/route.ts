@@ -20,62 +20,16 @@ async function fetchWithFallback(url: string, options: any = {}): Promise<any> {
       ...options.headers,
     },
     body: options.body,
-    // @ts-ignore - Next.js 환경에서 SSL 인증서 검증 우회
-    rejectUnauthorized: false,
   };
-  
-  // Node.js 환경 변수로 SSL 검증 비활성화
-  const originalTlsReject = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-  
-  let response: any;
 
-  try {
-    try {
-      // 기본 fetch 시도
-      response = await fetch(url, fetchOptions);
-      console.log('[Change Password API] 기본 fetch 성공');
-    } catch (fetchError) {
-      console.log('[Change Password API] 기본 fetch 실패, node-fetch 시도:', fetchError instanceof Error ? fetchError.message : String(fetchError));
-      
-      if (nodeFetch) {
-        // node-fetch 시도
-        response = await nodeFetch(url, {
-          method: options.method || 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'User-Agent': 'Next.js API Proxy (node-fetch)',
-            ...options.headers,
-          },
-          body: options.body,
-          agent: function(_parsedURL: any) {
-            const https = require('https');
-            return new https.Agent({
-              rejectUnauthorized: false
-            });
-          }
-        });
-        console.log('[Change Password API] node-fetch 성공');
-      } else {
-        throw fetchError;
-      }
-    }
+  const response = await fetch(url, fetchOptions);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`API error: ${response.status} - ${errorText}`);
-    }
-
-    return await response.json();
-  } finally {
-    // 환경 변수 복원
-    if (originalTlsReject !== undefined) {
-      process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalTlsReject;
-    } else {
-      delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-    }
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`API error: ${response.status} - ${errorText}`);
   }
+
+  return await response.json();
 }
 
 export async function POST(request: NextRequest) {
@@ -132,8 +86,6 @@ export async function POST(request: NextRequest) {
       }),
     });
 
-    console.log('🔍 FastAPI 서버 응답:', JSON.stringify(backendData, null, 2));
-
     if (backendData.success || backendData.result === 'Y') {
       console.log('✅ FastAPI 백엔드 비밀번호 변경 성공');
       
@@ -143,7 +95,6 @@ export async function POST(request: NextRequest) {
       });
     } else {
       console.log('❌ FastAPI 백엔드 비밀번호 변경 실패:', backendData.message);
-      console.log('❌ 전체 응답 데이터:', JSON.stringify(backendData, null, 2));
       
       return NextResponse.json(
         { 

@@ -255,8 +255,9 @@ export default function NoticeDetailPage() {
               <div 
                 className="prose prose-sm max-w-none text-gray-800 leading-relaxed whitespace-pre-wrap"
                 style={{ wordBreak: 'keep-all' }}
-                dangerouslySetInnerHTML={{ __html: notice.nt_content.replace(/\n/g, '<br />') }}
-              />
+              >
+                {notice.nt_content}
+              </div>
 
               {notice.nt_uwdate !== notice.nt_wdate && (
                 <div className="mt-6 pt-4 border-t border-gray-100">

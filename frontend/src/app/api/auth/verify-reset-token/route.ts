@@ -39,9 +39,6 @@ export async function POST(request: NextRequest) {
       console.log('[VERIFY RESET TOKEN] 요청 데이터:', { 
         tokenLength: token.length
       });
-      
-      // SSL 인증서 문제 해결을 위한 설정
-      process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
 
       const backendResponse = await fetch(backendUrl, {
         method: 'POST',
@@ -59,11 +56,10 @@ export async function POST(request: NextRequest) {
       console.log('[VERIFY RESET TOKEN] 백엔드 응답 헤더:', Object.fromEntries(backendResponse.headers.entries()));
 
       const backendData = await backendResponse.json();
-      console.log('[VERIFY RESET TOKEN] 백엔드 응답 데이터:', backendData);
 
       if (!backendResponse.ok) {
         // 백엔드에서 오류 응답이 온 경우
-        console.error('[VERIFY RESET TOKEN] 백엔드 오류:', backendResponse.status, backendData);
+        console.error('[VERIFY RESET TOKEN] 백엔드 오류:', backendResponse.status);
         return NextResponse.json(
           { 
             success: false, 
@@ -83,24 +79,6 @@ export async function POST(request: NextRequest) {
 
     } catch (backendError) {
       console.error('[VERIFY RESET TOKEN] 백엔드 연결 실패:', backendError);
-      
-      // 개발 환경에서는 Mock 데이터 반환
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[VERIFY RESET TOKEN] 개발 환경 - Mock 데이터 반환');
-        return NextResponse.json({
-          success: true,
-          message: '토큰이 유효합니다.',
-          data: {
-            user_id: 1186,
-            type: 'phone',
-            email: 'test@example.com',
-            phone: '01029565435'
-          },
-          dev: true
-        });
-      }
-      
-      // 프로덕션에서는 에러 반환
       return NextResponse.json(
         { message: '서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.' },
         { status: 503 }

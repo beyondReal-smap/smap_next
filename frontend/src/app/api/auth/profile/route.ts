@@ -21,62 +21,16 @@ async function fetchWithFallback(url: string, options: any = {}): Promise<any> {
       ...options.headers,
     },
     body: options.body,
-    // @ts-ignore - Next.js 환경에서 SSL 인증서 검증 우회
-    rejectUnauthorized: false,
   };
-  
-  // Node.js 환경 변수로 SSL 검증 비활성화
-  const originalTlsReject = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-  
-  let response: any;
 
-  try {
-    try {
-      // 기본 fetch 시도
-      response = await fetch(url, fetchOptions);
-      console.log('[Profile API] 기본 fetch 성공');
-    } catch (fetchError) {
-      console.log('[Profile API] 기본 fetch 실패, node-fetch 시도:', fetchError instanceof Error ? fetchError.message : String(fetchError));
-      
-      if (nodeFetch) {
-        // node-fetch 시도
-        response = await nodeFetch(url, {
-          method: options.method || 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'User-Agent': 'Next.js API Proxy (node-fetch)',
-            ...options.headers,
-          },
-          body: options.body,
-          agent: function(_parsedURL: any) {
-            const https = require('https');
-            return new https.Agent({
-              rejectUnauthorized: false
-            });
-          }
-        });
-        console.log('[Profile API] node-fetch 성공');
-      } else {
-        throw fetchError;
-      }
-    }
+  const response = await fetch(url, fetchOptions);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`API error: ${response.status} - ${errorText}`);
-    }
-
-    return await response.json();
-  } finally {
-    // 환경 변수 복원
-    if (originalTlsReject !== undefined) {
-      process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalTlsReject;
-    } else {
-      delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-    }
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`API error: ${response.status} - ${errorText}`);
   }
+
+  return await response.json();
 }
 
 export async function GET(request: NextRequest) {
@@ -94,7 +48,6 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('🔄 FastAPI 백엔드로 사용자 프로필 조회 요청 전달');
-    console.log('🔑 Authorization 헤더:', authHeader.substring(0, 50) + '...');
     console.log('🌐 백엔드 URL:', `${BACKEND_URL}/api/v1/members/me`);
 
     // FastAPI 백엔드 API 호출 (fetchWithFallback 사용)
@@ -104,8 +57,6 @@ export async function GET(request: NextRequest) {
         'Authorization': authHeader,
       },
     });
-
-    console.log('🔍 FastAPI 서버 응답:', JSON.stringify(backendData, null, 2));
 
     if (backendData.success || backendData.result === 'Y') {
       console.log('✅ FastAPI 백엔드 프로필 조회 성공');
@@ -117,7 +68,6 @@ export async function GET(request: NextRequest) {
       });
     } else {
       console.log('❌ FastAPI 백엔드 프로필 조회 실패:', backendData.message);
-      console.log('❌ 전체 응답 데이터:', JSON.stringify(backendData, null, 2));
       
       return NextResponse.json(
         { 

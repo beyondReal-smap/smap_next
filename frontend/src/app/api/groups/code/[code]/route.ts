@@ -44,7 +44,7 @@ export async function GET(
     }
 
     const data = await response.json();
-    console.log('[Group Code API] 그룹 정보 조회 성공:', data);
+    console.log('[Group Code API] 그룹 정보 조회 성공');
 
     return NextResponse.json(data);
 

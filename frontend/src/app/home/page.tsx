@@ -2324,10 +2324,10 @@ export default function HomePage() {
               location: {
                 lat: member.mlt_lat !== null && member.mlt_lat !== undefined
                   ? parseFloat(member.mlt_lat.toString())
-                  : parseFloat(member.mt_lat || '37.5642') + (Math.random() * 0.01 - 0.005),
+                  : (member.mt_lat !== null && member.mt_lat !== undefined ? parseFloat(member.mt_lat.toString()) : 0),
                 lng: member.mlt_long !== null && member.mlt_long !== undefined
                   ? parseFloat(member.mlt_long.toString())
-                  : parseFloat(member.mt_long || '127.0016') + (Math.random() * 0.01 - 0.005)
+                  : (member.mt_long !== null && member.mt_long !== undefined ? parseFloat(member.mt_long.toString()) : 0)
               },
               schedules: [],
               mt_gender: typeof member.mt_gender === 'number' ? member.mt_gender : null,
@@ -2363,10 +2363,10 @@ export default function HomePage() {
                 location: {
                   lat: member.mlt_lat !== null && member.mlt_lat !== undefined
                     ? parseFloat(member.mlt_lat.toString())
-                    : parseFloat(member.mt_lat || '37.5642') + (Math.random() * 0.01 - 0.005),
+                    : (member.mt_lat !== null && member.mt_lat !== undefined ? parseFloat(member.mt_lat.toString()) : 0),
                   lng: member.mlt_long !== null && member.mlt_long !== undefined
                     ? parseFloat(member.mlt_long.toString())
-                    : parseFloat(member.mt_long || '127.0016') + (Math.random() * 0.01 - 0.005)
+                    : (member.mt_long !== null && member.mt_long !== undefined ? parseFloat(member.mt_long.toString()) : 0)
                 },
                 schedules: [],
                 mt_gender: typeof member.mt_gender === 'number' ? member.mt_gender : null,
@@ -2396,10 +2396,10 @@ export default function HomePage() {
                       location: {
                         lat: member.mlt_lat !== null && member.mlt_lat !== undefined
                           ? parseFloat(member.mlt_lat.toString())
-                          : parseFloat(member.mt_lat || '37.5642') + (Math.random() * 0.01 - 0.005),
+                          : (member.mt_lat !== null && member.mt_lat !== undefined ? parseFloat(member.mt_lat.toString()) : 0),
                         lng: member.mlt_long !== null && member.mlt_long !== undefined
                           ? parseFloat(member.mlt_long.toString())
-                          : parseFloat(member.mt_long || '127.0016') + (Math.random() * 0.01 - 0.005)
+                          : (member.mt_long !== null && member.mt_long !== undefined ? parseFloat(member.mt_long.toString()) : 0)
                       },
                       schedules: [],
                       mt_gender: typeof member.mt_gender === 'number' ? member.mt_gender : null,

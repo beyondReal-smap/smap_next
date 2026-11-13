@@ -166,32 +166,14 @@ class MemberService {
         } : null
       });
 
-      // 응답 데이터가 배열이고 길이가 0보다 큰 경우에만 반환
-      if (Array.isArray(response.data) && response.data.length > 0) {
-        console.log('[MEMBER SERVICE] ✅ 실제 백엔드 데이터 사용:', response.data.length, '명');
+      // 응답 데이터가 배열이면 그대로 반환 (빈 배열 포함)
+      if (Array.isArray(response.data)) {
         return response.data;
-      } else {
-        console.warn('[MEMBER SERVICE] ⚠️ 백엔드에서 빈 배열 반환, mock 데이터 사용');
-        return mockData;
       }
+      throw new Error('그룹 멤버 응답 형식이 올바르지 않습니다.');
     } catch (error: any) {
       console.error('[MEMBER SERVICE] ❌ 백엔드 API 호출 실패:', error);
-
-      // 404 에러인 경우 빈 배열 반환 (그룹이 존재하지 않음)
-      if (error?.response?.status === 404) {
-        console.warn('[MEMBER SERVICE] 404 에러: 그룹을 찾을 수 없어 빈 배열 반환');
-        return [];
-      } else if (error?.response?.status) {
-        console.error('[MEMBER SERVICE] HTTP 에러:', error.response.status);
-        // 다른 HTTP 에러는 빈 배열로 처리
-        console.warn('[MEMBER SERVICE] HTTP 에러로 인한 빈 배열 반환');
-        return [];
-      } else {
-        console.error('[MEMBER SERVICE] 네트워크 에러 또는 기타 오류');
-        // 네트워크 오류도 빈 배열로 처리
-        console.warn('[MEMBER SERVICE] 네트워크 에러로 인한 빈 배열 반환');
-        return [];
-      }
+      throw error;
     }
   }
 

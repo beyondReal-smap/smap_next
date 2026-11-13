@@ -1,36 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'https://api3.smap.site';
-
-async function fetchWithInsecureTLS(url: string, options: RequestInit = {}) {
-  try {
-    if (typeof require !== 'undefined') {
-      try {
-        const fetch = require('node-fetch');
-        const https = require('https');
-        const agent = new https.Agent({ rejectUnauthorized: false });
-        return await fetch(url, { ...options, agent });
-      } catch {}
-    }
-    return await fetch(url, options);
-  } catch (error) {
-    throw error;
-  }
-}
+import resolveBackendBaseUrl from '../../../_utils/backend';
+import { extractAuthToken } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
-  const original = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
   try {
+    const token = extractAuthToken(request);
+    if (!token) {
+      return NextResponse.json({ result: 'N', message: '인증 토큰이 필요합니다.' }, { status: 401 });
+    }
     const body = await request.json();
 
     if (!body.act) {
       return NextResponse.json({ result: 'N', message: "'act' parameter is required" }, { status: 400 });
     }
 
-    const res = await fetchWithInsecureTLS(`${BACKEND_URL}/api/v1/logs/member-location-logs`, {
+    const backendBase = resolveBackendBaseUrl();
+    const res = await fetch(`${backendBase}/api/v1/logs/member-location-logs`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify(body),
     });
 
@@ -45,8 +36,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(json, { status: res.status });
   } catch (error: any) {
     return NextResponse.json({ result: 'N', message: 'Proxy error', detail: error?.message || String(error) }, { status: 502 });
-  } finally {
-    if (original !== undefined) process.env.NODE_TLS_REJECT_UNAUTHORIZED = original; else delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
   }
 }
 

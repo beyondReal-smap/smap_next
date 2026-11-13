@@ -33,9 +33,6 @@ export async function POST(request: NextRequest) {
         type, 
         contact: type === 'phone' ? contact.substring(0, 3) + '***' : contact 
       });
-      
-      // SSL 인증서 문제 해결을 위한 설정
-      process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
 
       const backendResponse = await fetch(backendUrl, {
         method: 'POST',
@@ -54,11 +51,10 @@ export async function POST(request: NextRequest) {
       console.log('[FORGOT PASSWORD] 백엔드 응답 헤더:', Object.fromEntries(backendResponse.headers.entries()));
 
       const backendData = await backendResponse.json();
-      console.log('[FORGOT PASSWORD] 백엔드 응답 데이터:', backendData);
 
       if (!backendResponse.ok) {
         // 백엔드에서 오류 응답이 온 경우
-        console.error('[FORGOT PASSWORD] 백엔드 오류:', backendResponse.status, backendData);
+        console.error('[FORGOT PASSWORD] 백엔드 오류:', backendResponse.status);
         return NextResponse.json(
           { 
             success: false, 
@@ -78,26 +74,6 @@ export async function POST(request: NextRequest) {
 
     } catch (backendError) {
       console.error('[FORGOT PASSWORD] 백엔드 연결 실패:', backendError);
-      
-      // 개발 환경에서는 Mock 데이터 반환
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[FORGOT PASSWORD] 개발 환경 - Mock 데이터 반환');
-        return NextResponse.json({
-          success: true,
-          message: type === 'phone' 
-            ? 'SMS로 비밀번호 재설정 링크를 발송했습니다.' 
-            : '이메일로 비밀번호 재설정 링크를 발송했습니다.',
-          data: {
-            type,
-            contact: type === 'phone' ? contact : contact,
-            token_expires: "1분",
-            sent: true
-          },
-          dev: true
-        });
-      }
-      
-      // 프로덕션에서는 에러 반환
       return NextResponse.json(
         { message: '서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.' },
         { status: 503 }

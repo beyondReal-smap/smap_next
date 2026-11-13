@@ -6,7 +6,7 @@ const CACHE_TTL_MS = 60 * 1000;
 const CACHE_LIMIT = 200;
 
 export async function GET(request: NextRequest) {
-  const authError = requireSignedMapAuth(request);
+  const authError = await requireSignedMapAuth(request);
   if (authError) return authError;
 
   const params = request.nextUrl.searchParams;

@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import resolveBackendBaseUrl from '../../_utils/backend';
+import { verifyBackendAdminAuth } from '@/lib/auth';
 
 // 관리자 FCM 푸시 발송 API - 백엔드 /api/v1/fcm_sendone/ 사용
 export async function POST(request: NextRequest) {
     try {
+        const { token, errorResponse } = await verifyBackendAdminAuth(request);
+        if (errorResponse) return errorResponse;
+
         const body = await request.json();
-        console.log('[Admin FCM API] FCM 푸시 발송 요청:', body);
+        console.log('[Admin FCM API] FCM 푸시 발송 요청');
 
         const backendBase = resolveBackendBaseUrl();
         const backendUrl = `${backendBase}/api/v1/fcm_sendone/`;
-
-        process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
 
         // FCM 발송 요청 데이터 구성
         const fcmRequest = {
@@ -27,6 +29,7 @@ export async function POST(request: NextRequest) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
             },
             body: JSON.stringify(fcmRequest),
         });
@@ -38,7 +41,7 @@ export async function POST(request: NextRequest) {
         }
 
         const data = await response.json();
-        console.log('[Admin FCM API] 발송 성공:', data);
+        console.log('[Admin FCM API] 발송 성공');
 
         return NextResponse.json({
             success: true,
@@ -57,6 +60,9 @@ export async function POST(request: NextRequest) {
 // FCM 푸시 이력 조회 - 백엔드 /api/v1/push-logs/ 사용
 export async function GET(request: NextRequest) {
     try {
+        const { token, errorResponse } = await verifyBackendAdminAuth(request);
+        if (errorResponse) return errorResponse;
+
         const { searchParams } = new URL(request.url);
         const page = parseInt(searchParams.get('page') || '1');
         const size = parseInt(searchParams.get('size') || '50');
@@ -67,12 +73,11 @@ export async function GET(request: NextRequest) {
         const backendBase = resolveBackendBaseUrl();
         const backendUrl = `${backendBase}/api/v1/push-logs/?skip=${skip}&limit=${size}`;
 
-        process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
-
         const response = await fetch(backendUrl, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
             },
         });
 

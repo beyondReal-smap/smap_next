@@ -422,7 +422,7 @@ export default function ClientLayout({
           }
         }
         
-        // 토큰 찾기
+        // 토큰 찾기 (가짜 토큰 문자열 제외)
         for (const key of possibleTokenKeys) {
           const tokenData = localStorage.getItem(key);
           if (tokenData && tokenData !== 'null' && tokenData !== '') {
@@ -442,9 +442,9 @@ export default function ClientLayout({
           }
         }
         
-        // mt_idx만 있어도 자동 로그인 시도 (최소 요구사항)
-        if (userData?.mt_idx) {
-          console.log('🔄 [AUTO-LOGIN] mt_idx 기반 자동 로그인 시작:', userData.mt_idx);
+        // mt_idx와 실제 토큰이 모두 있어야 자동 로그인 복원
+        if (userData?.mt_idx && token) {
+          console.log('🔄 [AUTO-LOGIN] 토큰 기반 자동 로그인 시작:', userData.mt_idx);
           
           // 로그인 시간 유효성 확인 (7일)
           let isValidSession = true; // 기본값 true (시간 정보가 없어도 허용)
@@ -472,10 +472,9 @@ export default function ClientLayout({
                 
                 // 표준화된 키로 데이터 저장
                 localStorage.setItem('smap_user_data', JSON.stringify(userData));
-                localStorage.setItem('smap_auth_token', token || 'auto_login_token');
+                localStorage.setItem('smap_auth_token', token);
                 localStorage.setItem('smap_login_time', loginTime || Date.now().toString());
                 localStorage.setItem('isLoggedIn', 'true');
-                sessionStorage.setItem('authToken', 'authenticated');
                 
                 console.log('✅ [AUTO-LOGIN] 자동 로그인 성공 - 인증 상태 복원 완료');
                 setIsLoggedIn(true);

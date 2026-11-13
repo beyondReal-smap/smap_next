@@ -39,7 +39,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: NextRequest) {
-  const authError = requireSignedMapAuth(request);
+  const authError = await requireSignedMapAuth(request);
   if (authError) return authError;
   try {
     const { lat, lng, address, ttlMs } = await request.json();

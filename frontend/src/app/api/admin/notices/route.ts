@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import resolveBackendBaseUrl from '../../_utils/backend';
+import { verifyBackendAdminAuth } from '@/lib/auth';
 
 // 관리자 공지사항 목록 조회 API - 백엔드 /api/v1/notices/ 사용
 export async function GET(request: NextRequest) {
     try {
+        const { token, errorResponse } = await verifyBackendAdminAuth(request);
+        if (errorResponse) return errorResponse;
+
         const { searchParams } = new URL(request.url);
         const page = parseInt(searchParams.get('page') || '1');
         const size = parseInt(searchParams.get('size') || '20');
@@ -15,12 +19,11 @@ export async function GET(request: NextRequest) {
         // 관리자용이므로 show_only=false로 비공개 공지도 포함 가능
         const backendUrl = `${backendBase}/api/v1/notices/?page=${page}&size=${size}&show_only=false`;
 
-        process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
-
         const response = await fetch(backendUrl, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
             },
         });
 
@@ -30,7 +33,7 @@ export async function GET(request: NextRequest) {
         }
 
         const data = await response.json();
-        console.log('[Admin Notices API] 백엔드 응답 성공:', data);
+        console.log('[Admin Notices API] 백엔드 응답 성공');
 
         // 백엔드가 { notices: [...], total, page, size, total_pages } 형태로 반환
         const notices = data.notices || data.data || (Array.isArray(data) ? data : []);
@@ -54,18 +57,20 @@ export async function GET(request: NextRequest) {
 // 공지사항 작성 - 백엔드 /api/v1/notices/ POST
 export async function POST(request: NextRequest) {
     try {
+        const { token, errorResponse } = await verifyBackendAdminAuth(request);
+        if (errorResponse) return errorResponse;
+
         const body = await request.json();
-        console.log('[Admin Notices API] 공지사항 작성:', body);
+        console.log('[Admin Notices API] 공지사항 작성 요청');
 
         const backendBase = resolveBackendBaseUrl();
         const backendUrl = `${backendBase}/api/v1/notices/`;
-
-        process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
 
         const response = await fetch(backendUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
             },
             body: JSON.stringify({
                 nt_title: body.nt_title || body.title,
@@ -98,6 +103,9 @@ export async function POST(request: NextRequest) {
 // 공지사항 수정 - 백엔드 /api/v1/notices/{notice_id} PUT
 export async function PUT(request: NextRequest) {
     try {
+        const { token, errorResponse } = await verifyBackendAdminAuth(request);
+        if (errorResponse) return errorResponse;
+
         const body = await request.json();
         const { nt_idx, ...updateData } = body;
 
@@ -110,12 +118,11 @@ export async function PUT(request: NextRequest) {
         const backendBase = resolveBackendBaseUrl();
         const backendUrl = `${backendBase}/api/v1/notices/${nt_idx}`;
 
-        process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
-
         const response = await fetch(backendUrl, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
             },
             body: JSON.stringify({
                 nt_title: updateData.nt_title || updateData.title,
@@ -148,6 +155,9 @@ export async function PUT(request: NextRequest) {
 // 공지사항 삭제 - 백엔드 /api/v1/notices/{notice_id} DELETE
 export async function DELETE(request: NextRequest) {
     try {
+        const { token, errorResponse } = await verifyBackendAdminAuth(request);
+        if (errorResponse) return errorResponse;
+
         const { searchParams } = new URL(request.url);
         const nt_idx = searchParams.get('nt_idx');
 
@@ -160,12 +170,11 @@ export async function DELETE(request: NextRequest) {
         const backendBase = resolveBackendBaseUrl();
         const backendUrl = `${backendBase}/api/v1/notices/${nt_idx}`;
 
-        process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
-
         const response = await fetch(backendUrl, {
             method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
             },
         });
 

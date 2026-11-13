@@ -45,13 +45,9 @@ export async function POST(request: NextRequest) {
       const profileImage = body.profile_image || body.mt_file1 || null;
 
       const memberData = {
-        mt_type: body.mt_type || 3, // 애플
-        mt_level: body.mt_level || 2,
-        mt_status: body.mt_status || 1,
+        mt_type: 3, // 애플
         mt_id: body.mt_id,
-        // 소셜 가입은 비밀번호를 사용하지 않지만, 백엔드 호환을 위해 전달 가능
-        // 백엔드에서 무시되거나 저장 방식 정의에 따름
-        mt_pwd: body.mt_pwd || 'apple_auto_password_123',
+        mt_pwd: body.mt_pwd,
         mt_name: body.mt_name,
         mt_nickname: body.mt_nickname,
         mt_email: body.mt_email || null,
@@ -90,21 +86,10 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json(backendData);
       } catch (err) {
-        // 백엔드 연결 실패 시 임시 성공 응답
-        const tempMemberData = {
-          mt_idx: Math.floor(Math.random() * 10000) + 1000,
-          mt_id: memberData.mt_id,
-          mt_name: memberData.mt_name,
-          mt_nickname: memberData.mt_nickname,
-          mt_email: memberData.mt_email,
-          mt_wdate: new Date().toISOString(),
-        };
-
-        return NextResponse.json({
-          success: true,
-          message: '회원가입이 완료되었습니다. (임시 처리)',
-          data: tempMemberData,
-        });
+        return NextResponse.json(
+          { success: false, message: '백엔드 서버와 통신할 수 없습니다.' },
+          { status: 502 }
+        );
       }
     }
 

@@ -21,9 +21,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // SSL 인증서 문제 해결을 위한 설정
-    process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
-
     // 백엔드 API로 토큰 전송
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api3.aiagnt.kr';
     console.log('[AUTH CALLBACK] 백엔드 URL:', backendUrl);
@@ -68,7 +65,7 @@ export async function POST(request: NextRequest) {
       }
 
       const data = await response.json();
-      console.log('[AUTH CALLBACK] 백엔드 응답 성공:', data);
+      console.log('[AUTH CALLBACK] 백엔드 응답 성공');
       
       return NextResponse.json({ success: true, data });
       

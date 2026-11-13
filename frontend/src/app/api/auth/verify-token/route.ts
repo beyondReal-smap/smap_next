@@ -1,58 +1,62 @@
 import { NextRequest, NextResponse } from 'next/server';
-import jwt from 'jsonwebtoken';
+import resolveBackendBaseUrl from '@/app/api/_utils/backend';
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('[VERIFY TOKEN] 토큰 검증 요청 시작');
-    
-    const { token } = await request.json();
-    
+    const body = await request.json().catch(() => ({}));
+    const token =
+      (typeof body?.token === 'string' && body.token) ||
+      request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ||
+      request.cookies.get('auth-token')?.value;
+
     if (!token) {
-      console.log('[VERIFY TOKEN] 토큰이 제공되지 않음');
       return NextResponse.json(
         { success: false, message: '토큰이 필요합니다.' },
         { status: 400 }
       );
     }
 
-    // JWT 토큰 검증
-    const secret = process.env.NEXTAUTH_SECRET || 'default-secret';
-    console.log('[VERIFY TOKEN] JWT 토큰 검증 시작');
-    
-    const decoded = jwt.verify(token, secret) as any;
-    console.log('[VERIFY TOKEN] JWT 토큰 검증 성공:', { userId: decoded.userId, email: decoded.email });
+    const backendUrl = `${resolveBackendBaseUrl()}/api/v1/auth/me`;
+    const response = await fetch(backendUrl, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      signal: AbortSignal.timeout(5000),
+    });
 
+    if (response.status === 401 || response.status === 403) {
+      return NextResponse.json(
+        { success: false, message: '유효하지 않거나 만료된 토큰입니다.' },
+        { status: 401 }
+      );
+    }
+
+    if (!response.ok) {
+      return NextResponse.json(
+        { success: false, message: '인증 서버 응답 오류가 발생했습니다.' },
+        { status: 502 }
+      );
+    }
+
+    const user = await response.json();
     return NextResponse.json({
       success: true,
       message: '토큰이 유효합니다.',
       user: {
-        userId: decoded.userId,
-        email: decoded.email,
-        nickname: decoded.nickname,
-        provider: decoded.provider || 'local'
-      }
+        userId: user.mt_idx,
+        mt_idx: user.mt_idx,
+        mt_id: user.mt_id,
+        mt_name: user.mt_name,
+        mt_level: user.mt_level,
+      },
     });
-
   } catch (error) {
-    console.error('[VERIFY TOKEN] JWT 토큰 검증 실패:', error);
-    
-    if (error instanceof jwt.JsonWebTokenError) {
-      return NextResponse.json(
-        { success: false, message: '유효하지 않은 토큰입니다.' },
-        { status: 401 }
-      );
-    }
-    
-    if (error instanceof jwt.TokenExpiredError) {
-      return NextResponse.json(
-        { success: false, message: '토큰이 만료되었습니다.' },
-        { status: 401 }
-      );
-    }
-
+    console.error('[VERIFY TOKEN] 토큰 검증 오류:', error instanceof Error ? error.message : String(error));
     return NextResponse.json(
-      { success: false, message: '토큰 검증 중 오류가 발생했습니다.' },
-      { status: 500 }
+      { success: false, message: '토큰 검증 중 서버 오류가 발생했습니다.' },
+      { status: 502 }
     );
   }
-} 
+}

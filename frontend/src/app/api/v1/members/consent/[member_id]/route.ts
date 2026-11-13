@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyJWT } from '@/lib/auth';
+import { verifyBackendAuth } from '@/lib/auth';
 
 export async function GET(
   request: NextRequest,
@@ -7,35 +7,16 @@ export async function GET(
 ) {
   const { member_id } = await params;
   try {
-    console.log('[CONSENT API] 동의 정보 조회 요청:', member_id);
-    
-    // JWT 토큰 검증
-    const token = request.headers.get('authorization')?.replace('Bearer ', '') ||
-                  request.cookies.get('token')?.value;
-    
-    if (!token) {
-      console.log('[CONSENT API] 토큰 없음');
-      return NextResponse.json(
-        { success: false, message: '인증이 필요합니다.' },
-        { status: 401 }
-      );
+    const { user, token, errorResponse } = await verifyBackendAuth(request);
+    if (errorResponse || !user || !token) {
+      return errorResponse ?? NextResponse.json({ success: false, message: '인증이 필요합니다.' }, { status: 401 });
     }
 
-    const decoded = verifyJWT(token);
-    if (!decoded) {
-      console.log('[CONSENT API] 토큰 검증 실패');
-      return NextResponse.json(
-        { success: false, message: '유효하지 않은 토큰입니다.' },
-        { status: 401 }
-      );
-    }
-
-    const currentUserId = decoded.mt_idx;
-    const requestedUserId = parseInt(member_id);
+    const currentUserId = user.mt_idx;
+    const requestedUserId = parseInt(member_id, 10);
 
     // 본인 정보만 조회 가능
     if (currentUserId !== requestedUserId) {
-      console.log('[CONSENT API] 권한 없음:', { currentUserId, requestedUserId });
       return NextResponse.json(
         { success: false, message: '본인의 동의 정보만 조회할 수 있습니다.' },
         { status: 403 }
@@ -60,7 +41,7 @@ export async function GET(
     }
 
     const data = await response.json();
-    console.log('[CONSENT API] 백엔드 응답 성공:', data);
+    console.log('[CONSENT API] 백엔드 응답 성공');
     
     return NextResponse.json(data);
   } catch (error) {

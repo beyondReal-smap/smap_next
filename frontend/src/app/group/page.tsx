@@ -653,6 +653,7 @@ function GroupPageContent() {
     } catch (error) {
       console.error('그룹 목록 조회 오류:', error);
       setGroups([]);
+      showToastModal('error', '조회 실패', '그룹 목록을 불러오는데 실패했습니다.');
     } finally {
       setLoading(false);
     }
@@ -727,6 +728,7 @@ function GroupPageContent() {
     } catch (error) {
       console.error('그룹 멤버 조회 오류:', error);
       setGroupMembers([]);
+      showToastModal('error', '조회 실패', '그룹 멤버 목록을 불러오는데 실패했습니다.');
 
       // 오류 발생 시에도 최소한의 기본 멤버 데이터 생성 (그룹 소유자 본인)
       if (user) {

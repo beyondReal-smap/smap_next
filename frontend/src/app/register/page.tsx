@@ -1050,16 +1050,6 @@ export default function RegisterPage() {
       const now = Date.now();
       const cleanPhone = registerData.mt_id.replace(/-/g, '');
 
-      // 테스트용 전화번호 처리
-      if (cleanPhone === '01011111111') {
-        setVerificationSent(true);
-        setVerificationTimer(180); // 3분
-        setLastSentTime(now);
-        // 테스트 번호는 실제 SMS 발송 없이 바로 다음 단계로 이동
-        handleNext();
-        return;
-      }
-
       const response = await fetch('/api/auth/register', {
         method: 'PUT',
         headers: {
@@ -1112,23 +1102,6 @@ export default function RegisterPage() {
     setIsLoading(true);
     try {
       const cleanPhone = registerData.mt_id.replace(/-/g, '');
-
-      // 테스트용 전화번호 처리
-      if (cleanPhone === '01011111111') {
-        if (registerData.verification_code === '111111') {
-          handleNext();
-          return;
-        } else {
-          setErrorModal({
-            isOpen: true,
-            title: '인증 실패',
-            message: '테스트 번호의 인증번호는 111111입니다.',
-            isCountdown: false
-          });
-          setIsLoading(false);
-          return;
-        }
-      }
 
       const response = await fetch('/api/auth/register', {
         method: 'PUT',

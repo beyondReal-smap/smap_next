@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
-import { verifyJWT } from '@/lib/auth';
+import { verifyBackendAuth } from '@/lib/auth';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 
 export async function POST(req: NextRequest) {
   try {
-    const token = req.headers.get('authorization')?.replace('Bearer ', '');
-    const user = token ? verifyJWT(token) : null;
-    
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { user, errorResponse } = await verifyBackendAuth(req);
+    if (errorResponse || !user) {
+      return errorResponse ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await req.json();

@@ -11,41 +11,26 @@ try {
 }
 
 async function fetchWithFallback(url: string, options: RequestInit): Promise<any> {
-  // Node.js 환경 변수로 SSL 검증 비활성화
-  const originalTlsReject = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-  
   let response: any;
 
   try {
-    try {
-      // 기본 fetch 시도
-      response = await fetch(url, { ...options, next: { revalidate: 120 } });
-    } catch (fetchError) {
-      if (nodeFetch) {
-        // node-fetch 시도
-        response = await nodeFetch(url, {
-          ...options,
-        });
-      } else {
-        throw fetchError;
-      }
-    }
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`API error: ${response.status} - ${errorText}`);
-    }
-
-    return await response.json();
-  } finally {
-    // 환경 변수 복원
-    if (originalTlsReject !== undefined) {
-      process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalTlsReject;
+    response = await fetch(url, { ...options, next: { revalidate: 120 } });
+  } catch (fetchError) {
+    if (nodeFetch) {
+      response = await nodeFetch(url, {
+        ...options,
+      });
     } else {
-      delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+      throw fetchError;
     }
   }
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`API error: ${response.status} - ${errorText}`);
+  }
+
+  return await response.json();
 }
 
 export async function GET(
@@ -71,12 +56,10 @@ export async function GET(
           'Accept': 'application/json',
           'User-Agent': 'Next.js API Proxy',
         },
-        // @ts-ignore - Next.js 환경에서 SSL 인증서 검증 우회
-        rejectUnauthorized: false,
       };
       
       data = await fetchWithFallback(backendUrl, fetchOptions);
-      console.log('[Group Public API] 일반 그룹 API 성공:', data);
+      console.log('[Group Public API] 일반 그룹 API 성공');
     } catch (error) {
       console.log('[Group Public API] 일반 그룹 API 실패:', error);
       throw error;
@@ -98,8 +81,6 @@ export async function GET(
           'Accept': 'application/json',
           'User-Agent': 'Next.js API Proxy',
         },
-        // @ts-ignore
-        rejectUnauthorized: false,
       });
       
       if (Array.isArray(memberResponse)) {
@@ -115,15 +96,12 @@ export async function GET(
       memberCount = 0;
     }
     
-    console.log('[Group Public API] 최종 데이터:', data);
-    
-    // 공개 정보만 포함한 그룹 데이터 반환
+    // 공개 정보만 포함한 그룹 데이터 반환 (초대 코드 sgt_code 제외)
     const publicGroupData = {
       sgt_idx: data.sgt_idx,
       sgt_title: data.sgt_title,
       sgt_content: data.sgt_content || data.sgt_memo,
       sgt_memo: data.sgt_memo,
-      sgt_code: data.sgt_code,
       sgt_show: data.sgt_show,
       sgt_wdate: data.sgt_wdate,
       memberCount: memberCount

@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import resolveBackendBaseUrl from '../../_utils/backend';
+import { verifyBackendAdminAuth } from '@/lib/auth';
 
 // 관리자 회원 목록 조회 API - 백엔드 /api/v1/members/ 사용
 export async function GET(request: NextRequest) {
     try {
+        const { token, errorResponse } = await verifyBackendAdminAuth(request);
+        if (errorResponse) return errorResponse;
+
         const { searchParams } = new URL(request.url);
         const page = parseInt(searchParams.get('page') || '1');
         const size = parseInt(searchParams.get('size') || '20');
@@ -15,12 +19,11 @@ export async function GET(request: NextRequest) {
         const backendBase = resolveBackendBaseUrl();
         const backendUrl = `${backendBase}/api/v1/members/?skip=${skip}&limit=${size}`;
 
-        process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
-
         const response = await fetch(backendUrl, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
             },
         });
 
@@ -50,7 +53,10 @@ export async function GET(request: NextRequest) {
             const countUrl = `${backendBase}/api/v1/members/?skip=0&limit=10000`;
             const countResponse = await fetch(countUrl, {
                 method: 'GET',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                },
             });
             if (countResponse.ok) {
                 const countData = await countResponse.json();
@@ -92,6 +98,9 @@ export async function GET(request: NextRequest) {
 // 회원 정보 수정 API - 백엔드 /api/v1/members/{member_id} PUT 사용
 export async function PUT(request: NextRequest) {
     try {
+        const { token, errorResponse } = await verifyBackendAdminAuth(request);
+        if (errorResponse) return errorResponse;
+
         const body = await request.json();
         const { mt_idx, ...updateData } = body;
 
@@ -104,12 +113,11 @@ export async function PUT(request: NextRequest) {
         const backendBase = resolveBackendBaseUrl();
         const backendUrl = `${backendBase}/api/v1/members/${mt_idx}`;
 
-        process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
-
         const response = await fetch(backendUrl, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
             },
             body: JSON.stringify(updateData),
         });
@@ -138,6 +146,9 @@ export async function PUT(request: NextRequest) {
 // 회원 삭제 API - 백엔드 /api/v1/members/{member_id} DELETE 사용
 export async function DELETE(request: NextRequest) {
     try {
+        const { token, errorResponse } = await verifyBackendAdminAuth(request);
+        if (errorResponse) return errorResponse;
+
         const { searchParams } = new URL(request.url);
         const mt_idx = searchParams.get('mt_idx');
 
@@ -150,12 +161,11 @@ export async function DELETE(request: NextRequest) {
         const backendBase = resolveBackendBaseUrl();
         const backendUrl = `${backendBase}/api/v1/members/${mt_idx}`;
 
-        process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
-
         const response = await fetch(backendUrl, {
             method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
             },
         });
 

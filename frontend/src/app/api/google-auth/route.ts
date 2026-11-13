@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import jwt from 'jsonwebtoken';
 import { OAuth2Client } from 'google-auth-library';
 
 // Google Client ID (iOS 로그에서 확인된 값)
@@ -150,64 +149,15 @@ export async function POST(request: NextRequest) {
       sendLogToConsole('error', 'Google 토큰 검증 실패', {
         errorType: typeof error,
         errorMessage: error instanceof Error ? error.message : String(error),
-        errorStack: error instanceof Error ? error.stack : 'No stack'
       });
-      
-      // 토큰 검증 실패 시 토큰에서 직접 정보 추출 시도 (임시 방편)
-      sendLogToConsole('warning', '토큰 검증 실패, 직접 파싱 시도');
-      try {
-        const tokenParts = idToken.split('.');
-        if (tokenParts.length === 3) {
-          const payload = JSON.parse(Buffer.from(tokenParts[1], 'base64').toString());
-          
-          // 기본적인 토큰 유효성 확인
-          const now = Math.floor(Date.now() / 1000);
-          if (payload.exp && payload.exp < now) {
-            throw new Error('토큰이 만료되었습니다');
-          }
-          
-          if (payload.iss !== 'https://accounts.google.com') {
-            throw new Error('유효하지 않은 토큰 발급자입니다');
-          }
-          
-          // audience 정보 로깅
-          sendLogToConsole('info', '직접 파싱된 토큰 정보', {
-            aud: payload.aud,
-            iss: payload.iss,
-            sub: payload.sub,
-            email: payload.email,
-            exp: payload.exp,
-            iat: payload.iat
-          });
-          
-          googleUser = {
-            googleId: payload.sub,
-            email: payload.email,
-            name: payload.name,
-            givenName: payload.given_name,
-            familyName: payload.family_name,
-            picture: payload.picture,
-            emailVerified: payload.email_verified
-          };
-          
-          sendLogToConsole('info', '직접 파싱으로 사용자 정보 추출 성공', googleUser);
-        } else {
-          throw new Error('잘못된 토큰 형식');
-        }
-      } catch (parseError) {
-        sendLogToConsole('error', '직접 파싱도 실패', {
-          error: parseError instanceof Error ? parseError.message : String(parseError)
-        });
-        
-        return NextResponse.json(
-          { 
-            error: 'Google 토큰 검증에 실패했습니다.',
-            details: error instanceof Error ? error.message : String(error),
-            originalError: error instanceof Error ? error.message : String(error)
-          },
-          { status: 400 }
-        );
-      }
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Google 토큰 검증에 실패했습니다.',
+        },
+        { status: 401 }
+      );
     }
 
     // 백엔드 API 시도 (실패해도 계속 진행)
@@ -220,9 +170,6 @@ export async function POST(request: NextRequest) {
         googleUserId: googleUser.googleId,
         googleUserEmail: googleUser.email
       });
-      
-      // SSL 인증서 검증 비활성화 (개발 환경)
-      process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
       
       const requestBody: any = {
         // 기본 구글 정보
@@ -540,27 +487,15 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // JWT 토큰 생성 (기존 사용자만)
-      let token = null;
-      if (!isNewUser && user.mt_idx) {
-        token = jwt.sign(
-          { 
-            mt_idx: user.mt_idx,
-            userId: user.mt_idx, 
-            mt_id: user.mt_id,
-            mt_name: user.mt_name,
-            mt_nickname: user.mt_nickname,
-            mt_hp: user.mt_hp,
-            mt_email: user.mt_email,
-            mt_birth: user.mt_birth,
-            mt_gender: user.mt_gender,
-            mt_type: user.mt_type,
-            mt_level: user.mt_level,
-            googleId: user.mt_google_id,
-            provider: 'google'
+      // 백엔드에서 발급한 JWT 토큰 사용 (자체 JWT 폴백 생성 금지)
+      let token: string | null = backendData.data?.token || null;
+      if (!isNewUser && user.mt_idx && !token) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: '인증 토큰을 발급받지 못했습니다.'
           },
-          process.env.NEXTAUTH_SECRET || 'default-secret',
-          { expiresIn: '7d' }
+          { status: 502 }
         );
       }
       
@@ -642,6 +577,17 @@ export async function POST(request: NextRequest) {
             maxAge: 60 * 60 * 24 * 7,
             path: '/',
           });
+
+          const refreshToken = backendData.data?.refresh_token;
+          if (refreshToken) {
+            response.cookies.set('refresh-token', refreshToken, {
+              httpOnly: true,
+              secure: process.env.NODE_ENV === 'production',
+              sameSite: 'lax',
+              maxAge: 60 * 60 * 24 * 30,
+              path: '/',
+            });
+          }
           
           // 🔥 클라이언트에서 접근 가능한 그룹 데이터 설정
           response.cookies.set('client-token', encodeURIComponent(JSON.stringify(clientData)), {
@@ -677,64 +623,14 @@ export async function POST(request: NextRequest) {
       return response;
     }
 
-    // 백엔드 연결 실패 시 임시 모드
-    sendLogToConsole('warning', '⚠️ 백엔드 연결 실패 - 임시 모드로 로그인 처리');
-    sendLogToConsole('warning', '임시 계정 정보', {
-      googleId: googleUser.googleId,
-      email: googleUser.email,
-      name: googleUser.name,
-      note: '실제 고객 데이터가 아닌 임시 테스트 계정입니다'
-    });
-    
-    const tempUser = {
-      id: googleUser.googleId,
-      mt_idx: parseInt(googleUser.googleId.substring(0, 8)), // 임시 ID
-      email: googleUser.email,
-      name: googleUser.name,
-      nickname: googleUser.givenName || googleUser.name,
-      profile_image: googleUser.picture,
-      provider: 'google',
-      mt_type: 3 // Google 로그인
-    };
-
-    // JWT 토큰 생성 (임시 모드용)
-    const token = jwt.sign(
-      { 
-        mt_idx: tempUser.mt_idx,
-        userId: tempUser.mt_idx, 
-        mt_id: tempUser.id,
-        email: tempUser.email, 
-        name: tempUser.name,
-        nickname: tempUser.nickname,
-        googleId: googleUser.googleId,
-        provider: 'google'
+    // 백엔드 연결 실패 시 에러 반환 (가짜 로그인 폴백 금지)
+    return NextResponse.json(
+      {
+        success: false,
+        error: '백엔드 인증 서버와 통신할 수 없습니다. 잠시 후 다시 시도해주세요.'
       },
-      process.env.NEXTAUTH_SECRET || 'default-secret',
-      { expiresIn: '7d' }
+      { status: 502 }
     );
-
-    console.log('[GOOGLE API] 임시 사용자 정보 구성 완료:', tempUser);
-    console.log('[GOOGLE API] JWT 토큰 생성 완료');
-
-    const response = NextResponse.json({
-      success: true,
-      user: tempUser,
-      token,
-      isNewUser: isNewUser,
-      message: 'Google 로그인 성공 (임시 모드)'
-    });
-
-    // 쿠키에 토큰 저장
-    response.cookies.set('auth-token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7, // 7일
-      path: '/',
-    });
-
-    console.log('[GOOGLE API] 응답 전송 완료');
-    return response;
 
   } catch (error) {
     console.error('[GOOGLE API] 처리 중 오류:', error);

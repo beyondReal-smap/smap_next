@@ -1,8 +1,3 @@
-// 개발환경에서만 SSL 검증 비활성화
-if (process.env.NODE_ENV === 'development') {
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-}
-
 // PWA 설정
 const withPWA = require('next-pwa')({
   dest: 'public',

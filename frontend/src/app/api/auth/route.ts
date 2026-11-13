@@ -16,13 +16,11 @@ export async function POST(request: NextRequest) {
   
   try {
     const body = await request.json();
-    console.log('[AUTH API] 요청 본문:', body);
-    
+
     return NextResponse.json({
       success: true,
       message: 'Auth API POST is working',
       timestamp: new Date().toISOString(),
-      receivedData: body
     });
   } catch (error) {
     console.error('[AUTH API] POST 요청 처리 오류:', error);

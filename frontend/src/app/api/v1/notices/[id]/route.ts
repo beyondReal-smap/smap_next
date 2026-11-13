@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import resolveBackendBaseUrl from '../../../_utils/backend';
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -11,12 +13,9 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const increment_hit = searchParams.get('increment_hit') || 'true';
     
-    const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api3.aiagnt.kr'}/api/v1/notices/${resolvedParams.id}?increment_hit=${increment_hit}`;
+    const backendUrl = `${resolveBackendBaseUrl()}/api/v1/notices/${encodeURIComponent(resolvedParams.id)}?increment_hit=${increment_hit}`;
     console.log('[Notice Detail API] 백엔드 요청:', backendUrl);
 
-    // SSL 인증서 문제 해결을 위한 설정
-    process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
-    
     const response = await fetch(backendUrl, {
       method: 'GET',
       headers: {
@@ -37,7 +36,7 @@ export async function GET(
     }
 
     const data = await response.json();
-    console.log('[Notice Detail API] 백엔드 응답 성공:', data);
+    console.log('[Notice Detail API] 백엔드 응답 성공');
     
     return NextResponse.json(data);
   } catch (error) {

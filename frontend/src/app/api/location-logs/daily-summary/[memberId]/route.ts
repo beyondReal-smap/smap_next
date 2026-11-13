@@ -1,37 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { extractAuthToken } from '@/lib/auth';
 
 async function fetchWithFallback(url: string, options: RequestInit = {}) {
-  try {
-    // Try with node-fetch if available
-    if (typeof require !== 'undefined') {
-      try {
-        const fetch = require('node-fetch');
-        const https = require('https');
-        
-        const agent = new https.Agent({
-          rejectUnauthorized: false
-        });
-        
-        return await fetch(url, {
-          ...options,
-          agent
-        });
-      } catch (nodeError) {
-        console.log('Node-fetch failed, falling back to global fetch');
-      }
-    }
-    
-    // Fallback to global fetch
-    return await fetch(url, options);
-  } catch (error) {
-    console.error('All fetch methods failed:', error);
-    throw error;
-  }
+  return await fetch(url, options);
 }
 
 // 백엔드 응답을 안전하게 변환하는 함수
 function transformDailySummaryResponse(backendData: any) {
-  console.log('[Daily Summary API] 백엔드 원본 데이터:', backendData);
   console.log('[Daily Summary API] 데이터 타입 분석:', {
     isArray: Array.isArray(backendData),
     hasResult: 'result' in backendData,
@@ -191,21 +166,19 @@ export async function GET(
   { params }: { params: Promise<{ memberId: string }> }
 ) {
   try {
+    const token = extractAuthToken(request);
+    if (!token) {
+      return NextResponse.json({ success: false, message: '인증 토큰이 필요합니다.' }, { status: 401 });
+    }
     const { memberId } = await params;
     const { searchParams } = new URL(request.url);
     const date = searchParams.get('date');
     const startDate = searchParams.get('start_date');
     const endDate = searchParams.get('end_date');
-    
-    // Build query parameters
-    const queryParams = new URLSearchParams();
-    if (date) queryParams.append('date', date);
-    if (startDate) queryParams.append('start_date', startDate);
-    if (endDate) queryParams.append('end_date', endDate);
-    
-    const backendUrl = `https://api3.aiagnt.kr/api/v1/logs/member-location-logs`;
-    
-    // act 값을 백엔드에서 실제 지원하는 값으로 설정
+
+    const backendBase = process.env.BACKEND_URL || 'https://api3.aiagnt.kr';
+    const backendUrl = `${backendBase}/api/v1/logs/member-location-logs`;
+
     const requestBody = {
       act: startDate && endDate ? 'get_daily_summary_by_range' : 'get_daily_summary',
       mt_idx: parseInt(memberId),
@@ -213,50 +186,32 @@ export async function GET(
       start_date: startDate,
       end_date: endDate
     };
-    
-    console.log('[Daily Summary API] 백엔드 요청 데이터:', requestBody);
-    
+
     const response = await fetchWithFallback(backendUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
       },
       body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
-      throw new Error(`Backend responded with status: ${response.status}`);
+      return NextResponse.json(
+        { success: false, message: '일일 요약을 불러오는데 실패했습니다.' },
+        { status: response.status }
+      );
     }
 
     const data = await response.json();
-    
-    // 백엔드 응답을 안전하게 변환
     const transformedData = transformDailySummaryResponse(data);
-    
     return NextResponse.json(transformedData);
   } catch (error) {
     console.error('일일 요약 API 오류:', error);
-    
-    // 목업 데이터 반환
-    const mockData = {
-      data: [
-        {
-          date: "2025-06-05",
-          total_distance: 5.2,
-          total_time: "02:30:00",
-          step_count: 6500,
-          avg_speed: 2.1,
-          max_speed: 4.5,
-          avg_battery: 75,
-          min_battery: 60,
-          max_battery: 90
-        }
-      ],
-      success: true,
-      message: "일일 요약 조회 성공 (목업 데이터)"
-    };
-    
-    return NextResponse.json(mockData);
+    return NextResponse.json(
+      { success: false, message: '일일 요약 조회 중 서버 오류가 발생했습니다.' },
+      { status: 500 }
+    );
   }
 }
 

@@ -3,49 +3,25 @@ import { NextRequest, NextResponse } from 'next/server';
 const BACKEND_URL = process.env.BACKEND_URL || 'https://api3.aiagnt.kr';
 
 async function fetchWithFallback(url: string, options: any = {}): Promise<any> {
-  // Node.js 환경 변수로 SSL 검증 비활성화
-  const originalTlsReject = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-  
-  try {
-    const fetchOptions: RequestInit = {
-      method: options.method || 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'User-Agent': 'Next.js API Proxy',
-        ...options.headers,
-      },
-      body: options.body,
-    };
+  const fetchOptions: RequestInit = {
+    method: options.method || 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'User-Agent': 'Next.js API Proxy',
+      ...options.headers,
+    },
+    body: options.body,
+  };
 
-    console.log('[Withdraw API] API 호출 시작:', url);
-    
-    const response = await fetch(url, fetchOptions);
-    
-    console.log('[Withdraw API] API 응답 상태:', response.status);
+  const response = await fetch(url, fetchOptions);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[Withdraw API] API 오류 응답:', errorText);
-      throw new Error(`API error: ${response.status} - ${errorText}`);
-    }
-
-    const data = await response.json();
-    console.log('[Withdraw API] API 응답 성공');
-    return data;
-    
-  } catch (error) {
-    console.error('[Withdraw API] fetch 오류:', error);
-    throw error;
-  } finally {
-    // 환경 변수 복원
-    if (originalTlsReject !== undefined) {
-      process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalTlsReject;
-    } else {
-      delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-    }
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`API error: ${response.status} - ${errorText}`);
   }
+
+  return await response.json();
 }
 
 export async function POST(request: NextRequest) {

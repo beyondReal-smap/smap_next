@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import resolveBackendBaseUrl from '../../_utils/backend';
+import { verifyBackendAdminAuth } from '@/lib/auth';
 
 // 관리자 그룹 목록 조회 API - 백엔드 /api/v1/groups/ 사용
 export async function GET(request: NextRequest) {
     try {
+        const { token, errorResponse } = await verifyBackendAdminAuth(request);
+        if (errorResponse) return errorResponse;
+
         const { searchParams } = new URL(request.url);
         const page = parseInt(searchParams.get('page') || '1');
         const size = parseInt(searchParams.get('size') || '10000');
@@ -16,12 +20,11 @@ export async function GET(request: NextRequest) {
         const backendBase = resolveBackendBaseUrl();
         const backendUrl = `${backendBase}/api/v1/admin/groups?skip=${skip}&limit=${size}&show_hidden=${showHidden}`;
 
-        process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
-
         const response = await fetch(backendUrl, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
             },
         });
 
@@ -63,6 +66,9 @@ export async function GET(request: NextRequest) {
 // 그룹 숨김 처리 (소프트 삭제) - 백엔드 /api/v1/groups/{group_id} PUT으로 sgt_show='N'
 export async function PUT(request: NextRequest) {
     try {
+        const { token, errorResponse } = await verifyBackendAdminAuth(request);
+        if (errorResponse) return errorResponse;
+
         const body = await request.json();
         const { sgt_idx, ...updateData } = body;
 
@@ -75,12 +81,11 @@ export async function PUT(request: NextRequest) {
         const backendBase = resolveBackendBaseUrl();
         const backendUrl = `${backendBase}/api/v1/groups/${sgt_idx}`;
 
-        process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
-
         const response = await fetch(backendUrl, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
             },
             body: JSON.stringify(updateData),
         });
@@ -109,6 +114,9 @@ export async function PUT(request: NextRequest) {
 // 그룹 삭제 (숨김 처리)
 export async function DELETE(request: NextRequest) {
     try {
+        const { token, errorResponse } = await verifyBackendAdminAuth(request);
+        if (errorResponse) return errorResponse;
+
         const { searchParams } = new URL(request.url);
         const sgt_idx = searchParams.get('sgt_idx');
 
@@ -121,13 +129,12 @@ export async function DELETE(request: NextRequest) {
         const backendBase = resolveBackendBaseUrl();
         const backendUrl = `${backendBase}/api/v1/groups/${sgt_idx}`;
 
-        process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
-
         // sgt_show를 'N'으로 설정하여 소프트 삭제
         const response = await fetch(backendUrl, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
             },
             body: JSON.stringify({ sgt_show: 'N' }),
         });

@@ -16,9 +16,6 @@ export async function GET(request: NextRequest) {
     const backendUrl = `${backendBase}/api/v1/notices/?page=${page}&size=${size}&show_only=${show_only}`;
     console.log('[Notice API] 백엔드 요청:', backendUrl);
 
-    // SSL 인증서 문제 해결을 위한 설정
-    process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
-    
     const response = await fetch(backendUrl, {
       method: 'GET',
       headers: {
@@ -33,7 +30,7 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await response.json();
-    console.log('[Notice API] 백엔드 응답 성공:', data);
+    console.log('[Notice API] 백엔드 응답 성공');
     
     return NextResponse.json(data);
   } catch (error) {

@@ -241,7 +241,7 @@ class MemberLocationLogService {
       return [];
     } catch (error) {
       console.error('[MemberLocationLogService] 일일 위치 로그 조회 오류:', error);
-      return [];
+      throw error;
     }
   }
 
@@ -279,7 +279,7 @@ class MemberLocationLogService {
       return [];
     } catch (error) {
       console.error('[MemberLocationLogService] 일일 위치 경로 조회 오류:', error);
-      return [];
+      throw error;
     }
   }
 
@@ -298,7 +298,7 @@ class MemberLocationLogService {
       return [];
     } catch (error) {
       console.error('[MemberLocationLogService] 위치 로그가 있는 멤버 조회 오류:', error);
-      return [];
+      throw error;
     }
   }
 
@@ -339,7 +339,7 @@ class MemberLocationLogService {
       return [];
     } catch (error) {
       console.error('[MemberLocationLogService] 날짜별 요약 조회 오류:', error);
-      return [];
+      throw error;
     }
   }
 
@@ -380,7 +380,7 @@ class MemberLocationLogService {
       return [];
     } catch (error) {
       console.error('[MemberLocationLogService] 체류시간 분석 조회 오류:', error);
-      return [];
+      throw error;
     }
   }
 
@@ -417,7 +417,7 @@ class MemberLocationLogService {
       return [];
     } catch (error) {
       console.error('[MemberLocationLogService] 지도 마커 데이터 조회 오류:', error);
-      return [];
+      throw error;
     }
   }
 
@@ -440,7 +440,7 @@ class MemberLocationLogService {
       return null;
     } catch (error) {
       console.error('[MemberLocationLogService] PHP 로직 기반 요약 조회 오류:', error);
-      return null;
+      throw error;
     }
   }
 
@@ -457,7 +457,7 @@ class MemberLocationLogService {
       return null;
     } catch (error) {
       console.error('[MemberLocationLogService] 일별 위치 카운트 조회 오류:', error);
-      return null;
+      throw error;
     }
   }
 
@@ -486,7 +486,7 @@ class MemberLocationLogService {
       return null;
     } catch (error) {
       console.error('[MemberLocationLogService] 멤버 활동 조회 오류:', error);
-      return null;
+      throw error;
     }
   }
 }

@@ -1,35 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyBackendAuth } from '@/lib/auth';
 
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ groupId: string }> }
 ) {
   try {
+    const { user, token, errorResponse } = await verifyBackendAuth(request);
+    if (errorResponse || !user || !token) {
+      return errorResponse ?? NextResponse.json({ success: false, message: '인증이 필요합니다.' }, { status: 401 });
+    }
+
     const params = await context.params;
-    console.log(`[GROUP JOIN NEW MEMBER API] 새 회원 그룹 가입 요청 시작 - groupId: ${params.groupId}`);
-    
-    const body = await request.json();
-    const { mt_idx } = body;
-    
-    if (!mt_idx) {
-      console.log('[GROUP JOIN NEW MEMBER API] mt_idx가 없음');
+    const body = await request.json().catch(() => ({}));
+    const requestedMtIdx = body?.mt_idx;
+
+    if (requestedMtIdx !== undefined && Number(requestedMtIdx) !== Number(user.mt_idx)) {
       return NextResponse.json(
-        { success: false, message: '사용자 ID가 필요합니다.' },
-        { status: 400 }
+        { success: false, message: '본인 계정만 그룹에 가입할 수 있습니다.' },
+        { status: 403 }
       );
     }
 
+    const mt_idx = user.mt_idx;
     const groupId = parseInt(params.groupId);
-    console.log(`[GROUP JOIN NEW MEMBER API] 사용자 정보 - mt_idx: ${mt_idx}, groupId: ${groupId}`);
 
-    // 백엔드 API 호출
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api3.aiagnt.kr';
+    const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'https://api3.aiagnt.kr';
     const response = await fetch(`${backendUrl}/api/v1/groups/${groupId}/join-new-member`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
         'User-Agent': 'Next.js API Proxy',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
       },
       body: JSON.stringify({
         mt_idx: mt_idx,
@@ -53,7 +56,7 @@ export async function POST(
     }
 
     const data = await response.json();
-    console.log(`[GROUP JOIN NEW MEMBER API] 그룹 가입 성공:`, data);
+    console.log('[GROUP JOIN NEW MEMBER API] 그룹 가입 성공');
 
     return NextResponse.json({
       success: true,
