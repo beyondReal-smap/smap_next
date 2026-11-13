@@ -41,9 +41,10 @@ struct WithdrawView: View {
     ]
     
     private var isSocialLogin: Bool {
-        guard let user = authService.currentUser else { return false }
         // 1: 일반, 2: Kakao, 3: Apple, 4: Google
-        return user.mt_type != 1
+        // 로그인 방식을 알 수 없으면(mt_type nil) 일반 가입자로 취급해 비밀번호 확인을 요구한다.
+        guard let type = authService.currentUser?.mt_type else { return false }
+        return type != 1
     }
     
     var body: some View {
@@ -99,7 +100,7 @@ struct WithdrawView: View {
                                     .frame(width: 28, height: 28)
                                 
                                 if step < currentStep {
-                                    Image(systemName: "check")
+                                    Image(systemName: "checkmark")
                                         .font(.suite(size: 12, weight: .bold))
                                         .foregroundColor(.white)
                                 } else {

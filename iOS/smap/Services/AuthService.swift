@@ -165,8 +165,28 @@ class AuthService: ObservableObject {
         NotificationCenter.default.post(name: NSNotification.Name("logout"), object: nil)
     }
 
-    /// 완전 로그아웃. 서버 revoke는 fire-and-forget — 네트워크 실패 시에도 로컬은 비운다.
     func logout() {
+        Task {
+            await unregisterPushToken()
+            finishLogout()
+        }
+    }
+
+    private func unregisterPushToken() async {
+        guard let token = getToken() else { return }
+        guard let fcmToken = getFCMToken(), !fcmToken.isEmpty else {
+            print("[AuthService] 저장된 푸시 토큰이 없어 서버 해제를 건너뜁니다.")
+            return
+        }
+        do {
+            let _ = try await apiClient.requestRaw(.unregisterFCMToken(fcmToken), token: token)
+        } catch {
+            // 해제 실패로 사용자의 로그아웃이나 탈퇴를 막지 않습니다.
+            print("[AuthService] 푸시 토큰 해제 실패: \(type(of: error))")
+        }
+    }
+
+    private func finishLogout() {
         let refresh = getRefreshToken()
         deleteToken()
         deleteRefreshToken()
@@ -255,7 +275,9 @@ class AuthService: ObservableObject {
             token: nil
         )
 
-        if response.success == true, let user = response.user ?? response.data?.user {
+        if response.success == true,
+           !(response.isNewUser ?? response.data?.isNewUser ?? false),
+           let user = response.user ?? response.data?.user {
             if let token = response.token ?? response.data?.token {
                 saveToken(token)
             }
@@ -469,6 +491,7 @@ class AuthService: ObservableObject {
 
     /// 회원 탈퇴
     func withdraw(reasonIdx: Int, etcReason: String?, reasons: [String]) async throws -> WithdrawResponse {
+        await unregisterPushToken()
         let withdrawRequest = WithdrawRequest(
             mt_retire_chk: reasonIdx,
             mt_retire_etc: etcReason,
@@ -481,7 +504,7 @@ class AuthService: ObservableObject {
         )
 
         if response.success {
-            logout() // 탈퇴 성공 시 로그아웃 처리
+            finishLogout()
         }
         return response
     }

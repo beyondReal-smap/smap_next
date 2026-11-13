@@ -292,7 +292,7 @@ class GroupViewModel @Inject constructor(
                         _errorMessage.value = "그룹 가입에 실패했습니다"
                     }
                 }
-                is ApiResult.Error -> _errorMessage.value = "그룹 가입에 실패했습니다 (${result.code})"
+                is ApiResult.Error -> _errorMessage.value = if (result.code == 403 || result.code == 404) "초대 링크가 유효하지 않거나 만료됐어요" else "그룹 가입에 실패했습니다 (${result.code})"
                 is ApiResult.NetworkError -> _errorMessage.value = "네트워크 연결을 확인해주세요"
             }
             _isJoining.value = false

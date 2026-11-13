@@ -46,6 +46,11 @@ class HomeViewModel @Inject constructor(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
+    // 그룹·멤버 조회 실패 상태. errorMessage(스낵바용, 표시 후 소거)와 달리 재시도 성공 전까지 유지해
+    // 빈 지도와 "불러오기 실패"를 화면에서 구분한다.
+    private val _loadFailed = MutableStateFlow(false)
+    val loadFailed: StateFlow<Boolean> = _loadFailed.asStateFlow()
+
     // Sidebar State
     private val _isSidebarOpen = MutableStateFlow(false)
     val isSidebarOpen: StateFlow<Boolean> = _isSidebarOpen.asStateFlow()
@@ -193,6 +198,7 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             _isLoading.value = true
             _errorMessage.value = null
+            _loadFailed.value = false
 
             Log.d(TAG, "🚀 [API] 그룹 목록 로드 시작")
             when (val result = safeApiCall { homeService.getGroups() }) {
@@ -217,10 +223,12 @@ class HomeViewModel @Inject constructor(
                 is ApiResult.Error -> {
                     Log.e(TAG, "❌ [API] 데이터 로드 실패 (${result.code})")
                     _errorMessage.value = "데이터를 불러오지 못했습니다"
+                    _loadFailed.value = true
                 }
                 is ApiResult.NetworkError -> {
                     Log.e(TAG, "❌ [API] 데이터 로드 실패 - 네트워크", result.exception)
                     _errorMessage.value = "네트워크 연결을 확인해주세요"
+                    _loadFailed.value = true
                 }
             }
             _isLoading.value = false
@@ -268,7 +276,7 @@ class HomeViewModel @Inject constructor(
             _isCreatingGroup.value = true
             _errorMessage.value = null
 
-            Log.d(TAG, "🚀 [API] 초대코드로 그룹 가입 시작: $inviteCode")
+            Log.d(TAG, "🚀 [API] 초대코드로 그룹 가입 시작")
             when (val result = safeApiCall { homeService.joinGroup(inviteCode) }) {
                 is ApiResult.Success -> {
                     if (result.data) {
@@ -282,7 +290,7 @@ class HomeViewModel @Inject constructor(
                 }
                 is ApiResult.Error -> {
                     Log.e(TAG, "❌ [API] 그룹 가입 실패 (${result.code})")
-                    _errorMessage.value = "그룹 가입에 실패했습니다 (${result.code})"
+                    _errorMessage.value = if (result.code == 403 || result.code == 404) "초대 링크가 유효하지 않거나 만료됐어요" else "그룹 가입에 실패했습니다 (${result.code})"
                 }
                 is ApiResult.NetworkError -> {
                     Log.e(TAG, "❌ [API] 그룹 가입 실패 - 네트워크", result.exception)
@@ -303,6 +311,7 @@ class HomeViewModel @Inject constructor(
     private fun loadGroupData(groupId: Int) {
         viewModelScope.launch {
             Log.d(TAG, "🚀 [API] 그룹($groupId) 멤버 및 일정 로드 시작")
+            _loadFailed.value = false
 
             when (val result = safeApiCall { homeService.getGroupMembers(groupId) }) {
                 is ApiResult.Success -> {
@@ -341,10 +350,12 @@ class HomeViewModel @Inject constructor(
                 is ApiResult.Error -> {
                     Log.e(TAG, "❌ [API] 그룹 데이터 로드 실패 (${result.code})")
                     _errorMessage.value = "그룹 데이터를 불러오지 못했습니다 (${result.code})"
+                    _loadFailed.value = true
                 }
                 is ApiResult.NetworkError -> {
                     Log.e(TAG, "❌ [API] 그룹 데이터 로드 실패 - 네트워크", result.exception)
                     _errorMessage.value = "네트워크 연결을 확인해주세요"
+                    _loadFailed.value = true
                 }
             }
         }
@@ -357,6 +368,7 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             _isLoading.value = true
             _errorMessage.value = null
+            _loadFailed.value = false
 
             Log.d(TAG, "🔄 [REFRESH] 전체 데이터 새로고침 시작")
             when (val result = safeApiCall { homeService.getGroups() }) {
@@ -380,14 +392,22 @@ class HomeViewModel @Inject constructor(
                 is ApiResult.Error -> {
                     Log.e(TAG, "❌ [REFRESH] 데이터 새로고침 실패 (${result.code})")
                     _errorMessage.value = "데이터를 새로고침하지 못했습니다 (${result.code})"
+                    _loadFailed.value = true
                 }
                 is ApiResult.NetworkError -> {
                     Log.e(TAG, "❌ [REFRESH] 데이터 새로고침 실패 - 네트워크", result.exception)
                     _errorMessage.value = "네트워크 연결을 확인해주세요"
+                    _loadFailed.value = true
                 }
             }
             _isLoading.value = false
         }
+    }
+
+    /** 오류 화면의 "다시 시도" — 선택된 그룹이 없으면 전체를, 있으면 그 그룹의 멤버/일정을 다시 조회한다. */
+    fun retryLoad() {
+        val group = _selectedGroup.value
+        if (group == null) loadDataFromAPI() else loadGroupData(group.sgtIdx)
     }
 
     fun toggleSidebar() {

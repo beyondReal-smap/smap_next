@@ -101,10 +101,39 @@ class SmapApiTest {
     @Test
     fun `invite join uses wrapped server response without decoding group`() = runTest {
         server.enqueue(MockResponse().setBody("""{"success":true,"data":{"sgt_idx":42,"mt_idx":7}}"""))
-        api.joinGroupFromInvite(42, com.dmonster.smap.data.model.JoinGroupRequest(7, 42)).close()
+        api.joinGroupFromInvite(42, com.dmonster.smap.data.model.JoinGroupRequest(7, 42, "CODE")).close()
         val request = server.takeRequest()
         assertEquals("/groups/42/join", request.path)
-        assertTrue(request.body.readUtf8().contains("\"mt_idx\":7"))
+        val body = request.body.readUtf8()
+        assertTrue(body.contains("\"mt_idx\":7"))
+        assertTrue(body.contains("\"sgt_code\":\"CODE\""))
+    }
+
+    @Test
+    fun `invite links parse code and legacy format`() {
+        val withCode = com.dmonster.smap.data.model.parseInviteLink("smap://group/42/join?code=A%2BB")
+        assertEquals(42, withCode?.groupId)
+        assertEquals("A+B", withCode?.code)
+        assertNull(com.dmonster.smap.data.model.parseInviteLink("smap://group/42/join")?.code)
+        assertNull(com.dmonster.smap.data.model.parseInviteLink("smap://group/no/join"))
+    }
+
+    @Test
+    fun `registration serializes social credentials`() {
+        val body = Json.encodeToString(com.dmonster.smap.data.model.RegisterRequest.serializer(),
+            com.dmonster.smap.data.model.RegisterRequest(socialProvider = "google", socialToken = "sample"))
+        assertTrue(body.contains("\"social_provider\":\"google\""))
+        assertTrue(body.contains("\"social_token\":\"sample\""))
+    }
+
+    @Test
+    fun `unregister sends fcm token in request body`() = runTest {
+        server.enqueue(MockResponse().setBody("""{"success":true}"""))
+        api.unregisterFcmToken(com.dmonster.smap.data.model.FcmUnregisterRequest("sample")).close()
+        val request = server.takeRequest()
+        assertEquals("/fcm-token/unregister", request.path)
+        assertEquals("POST", request.method)
+        assertEquals("{\"fcm_token\":\"sample\"}", request.body.readUtf8())
     }
 
     @Test
@@ -128,5 +157,18 @@ class SmapApiTest {
         assertTrue(com.dmonster.smap.data.model.isServerPasswordValid("Password1!"))
         assertFalse(com.dmonster.smap.data.model.isServerPasswordValid("password1!"))
         assertFalse(com.dmonster.smap.data.model.isServerPasswordValid("PASSWORD1!"))
+    }
+    @Test
+    fun `private fields can be absent in group and profile responses`() {
+        val json = Json { ignoreUnknownKeys = true; coerceInputValues = true; isLenient = true; encodeDefaults = true }
+        val body = """{"mt_idx":8,"mt_name":"member","mt_nickname":"nick","mt_file1":"photo"}"""
+        val member = json.decodeFromString<com.dmonster.smap.data.model.SmapGroupMember>(body)
+        val profile = json.decodeFromString<com.dmonster.smap.data.model.SMAPUser>(body)
+        assertNull(member.mtId)
+        assertNull(member.mtEmail)
+        assertNull(profile.mtId)
+        assertNull(profile.mtHp)
+        assertNull(profile.mtEmail)
+        assertNull(profile.mtBirth)
     }
 }

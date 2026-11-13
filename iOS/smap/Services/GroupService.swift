@@ -47,6 +47,7 @@ class GroupService {
 
     /// 그룹 가입 (초대 코드)
     func joinGroup(inviteCode: String) async throws -> Bool {
+        do {
         // 1. 코드로 그룹 정보 조회
         let group: SmapGroup = try await apiClient.request(.joinGroupByCode(code: inviteCode), token: token)
 
@@ -54,8 +55,13 @@ class GroupService {
         guard let mtIdx = AuthService.shared.getUserData()?.mt_idx else {
             throw NetworkError.unauthorized
         }
-        let _ = try await apiClient.requestRaw(.joinGroupById(sgtIdx: group.sgt_idx, mtIdx: mtIdx), token: token)
+        let _ = try await apiClient.requestRaw(.joinGroupById(sgtIdx: group.sgt_idx, mtIdx: mtIdx, code: inviteCode), token: token)
         return true
+        } catch NetworkError.forbidden {
+            throw NetworkError.badRequest("초대 링크가 유효하지 않거나 만료됐어요")
+        } catch NetworkError.notFound {
+            throw NetworkError.badRequest("초대 링크가 유효하지 않거나 만료됐어요")
+        }
     }
 
     /// 그룹 가입 (초대 코드) - alias
@@ -64,8 +70,8 @@ class GroupService {
     }
 
     /// 그룹 ID로 직접 가입 (딥링크용)
-    func joinGroupById(mt_idx: Int, sgt_idx: Int) async throws -> Bool {
-        let _ = try await apiClient.requestRaw(.joinGroupById(sgtIdx: sgt_idx, mtIdx: mt_idx), token: token)
+    func joinGroupById(mt_idx: Int, sgt_idx: Int, code: String? = nil) async throws -> Bool {
+        let _ = try await apiClient.requestRaw(.joinGroupById(sgtIdx: sgt_idx, mtIdx: mt_idx, code: code), token: token)
         return true
     }
 

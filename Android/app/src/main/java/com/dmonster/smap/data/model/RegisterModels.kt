@@ -34,6 +34,8 @@ data class RegisterRequest(
     @SerialName("mt_google_id") val mtGoogleId: String? = null,
     @SerialName("mt_apple_id") val mtAppleId: String? = null,
     @SerialName("mt_kakao_id") val mtKakaoId: String? = null,
+    @SerialName("social_provider") val socialProvider: String? = null,
+    @SerialName("social_token") val socialToken: String? = null,
     @SerialName("mt_agree1") val mtAgree1: Boolean = false,  // 서비스 이용약관 (필수)
     @SerialName("mt_agree2") val mtAgree2: Boolean = false,  // 개인정보 수집이용 (필수)
     @SerialName("mt_agree3") val mtAgree3: Boolean = false,  // 위치정보 이용약관 (필수)

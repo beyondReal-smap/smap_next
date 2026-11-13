@@ -258,14 +258,14 @@ fun GroupScreen(
                     viewModel.hideShareDialog()
                 },
                 onCopyLink = {
-                    val link = "${BuildConfig.WEB_BASE_URL}/group/${group.sgtIdx}/join"
+                    val link = inviteLink(group.sgtIdx, group.sgtCode)
                     clipboardManager.setText(AnnotatedString(link))
                     viewModel.showSuccess("초대 링크가 복사되었습니다")
                     viewModel.hideShareDialog()
                 },
                 onSMS = {
                     val code = group.sgtCode ?: ""
-                    val message = "[SMAP] ${group.sgtTitle} 그룹에 초대합니다!\n초대 코드: $code"
+                    val message = "[SMAP] ${group.sgtTitle} 그룹에 초대합니다!\n초대 코드: $code\n링크: ${inviteLink(group.sgtIdx, group.sgtCode)}"
                     val intent = Intent(Intent.ACTION_VIEW).apply {
                         data = android.net.Uri.parse("sms:?body=${android.net.Uri.encode(message)}")
                     }
@@ -299,7 +299,7 @@ fun GroupScreen(
                 group = group,
                 onDismiss = { viewModel.hideInviteBottomSheet() },
                 onCopyLink = {
-                    val link = "${BuildConfig.WEB_BASE_URL}/group/${group.sgtIdx}/join"
+                    val link = inviteLink(group.sgtIdx, group.sgtCode)
                     clipboardManager.setText(AnnotatedString(link))
                     viewModel.showSuccess("초대 링크가 복사되었습니다")
                     viewModel.hideInviteBottomSheet()
@@ -310,7 +310,7 @@ fun GroupScreen(
                 },
                 onShareSMS = {
                     val code = group.sgtCode ?: ""
-                    val message = "[SMAP] ${group.sgtTitle} 그룹에 초대합니다!\n초대 코드: $code"
+                    val message = "[SMAP] ${group.sgtTitle} 그룹에 초대합니다!\n초대 코드: $code\n링크: ${inviteLink(group.sgtIdx, group.sgtCode)}"
                     val intent = Intent(Intent.ACTION_VIEW).apply {
                         data = android.net.Uri.parse("sms:?body=${android.net.Uri.encode(message)}")
                     }
@@ -323,7 +323,7 @@ fun GroupScreen(
                 },
                 onDefaultShare = {
                     val code = group.sgtCode ?: ""
-                    val link = "${BuildConfig.WEB_BASE_URL}/group/${group.sgtIdx}/join"
+                    val link = inviteLink(group.sgtIdx, group.sgtCode)
                     val message = "[SMAP] ${group.sgtTitle} 그룹에 초대합니다!\n초대 코드: $code\n링크: $link"
                     val shareIntent = Intent(Intent.ACTION_SEND).apply {
                         type = "text/plain"
@@ -348,7 +348,7 @@ fun GroupScreen(
     // QR Code Dialog
     if (showQRCodeDialog) {
         selectedGroup?.let { group ->
-            val qrData = "${BuildConfig.WEB_BASE_URL}/group/${group.sgtIdx}/join"
+            val qrData = inviteLink(group.sgtIdx, group.sgtCode)
             val scope = rememberCoroutineScope()
             QRCodeDialog(
                 data = qrData,
@@ -387,6 +387,11 @@ fun GroupScreen(
             )
         }
     }
+}
+
+private fun inviteLink(groupId: Int, code: String?): String {
+    val base = "${BuildConfig.WEB_BASE_URL}/group/$groupId/join"
+    return if (code.isNullOrBlank()) base else "$base?code=${java.net.URLEncoder.encode(code, "UTF-8")}"
 }
 
 // MARK: - Top Bar

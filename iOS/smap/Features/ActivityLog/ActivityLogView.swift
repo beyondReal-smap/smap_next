@@ -823,13 +823,7 @@ struct ActivityLogFloatingCard: View {
                         .clipShape(Circle())
                         .overlay(Circle().stroke(Color.white, lineWidth: 2))
                         .shadow(color: Color.black.opacity(0.1), radius: 2)
-                        
-                        // Online indicator
-                        Circle()
-                            .fill(Color.green)
-                            .frame(width: 10, height: 10)
-                            .overlay(Circle().stroke(Color.white, lineWidth: 1.5))
-                            .offset(x: 2, y: 2)
+                        // 실제 온라인 상태 데이터가 없어 항상 켜져 있던 "온라인" 점은 제거했다(가짜 상태 표시 금지).
                     }
                     
                     VStack(alignment: .leading, spacing: 2) {

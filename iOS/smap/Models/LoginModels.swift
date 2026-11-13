@@ -504,6 +504,8 @@ struct RegisterRequest: Codable {
     var mt_google_id: String?
     var mt_kakao_id: String?
     var mt_apple_id: String?
+    var social_provider: String? = nil
+    var social_token: String? = nil
     
     var mt_token_id: String? = nil // FCM Token
 }

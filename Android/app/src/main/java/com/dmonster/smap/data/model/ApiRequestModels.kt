@@ -34,8 +34,28 @@ data class JoinGroupByCodeRequest(
 @Serializable
 data class JoinGroupRequest(
     @SerialName("mt_idx") val mtIdx: Int,
-    @SerialName("sgt_idx") val sgtIdx: Int
+    @SerialName("sgt_idx") val sgtIdx: Int,
+    @SerialName("sgt_code") val sgtCode: String? = null
 )
+
+@Serializable
+data class FcmUnregisterRequest(@SerialName("fcm_token") val fcmToken: String)
+
+data class InviteLink(val groupId: Int, val code: String?)
+
+fun parseInviteLink(value: String): InviteLink? {
+    val uri = try { java.net.URI(value) } catch (_: java.net.URISyntaxException) { return null }
+    if (uri.scheme != "smap" || uri.host != "group") return null
+    val parts = uri.path.orEmpty().split('/').filter { it.isNotEmpty() }
+    if (parts.size != 2 || parts[1] != "join") return null
+    val groupId = parts[0].toIntOrNull()?.takeIf { it > 0 } ?: return null
+    val code = try {
+        uri.rawQuery?.split('&')?.map { it.split('=', limit = 2) }
+            ?.firstOrNull { it[0] == "code" }?.getOrNull(1)
+            ?.let { java.net.URLDecoder.decode(it, "UTF-8") }?.takeIf { it.isNotBlank() }
+    } catch (_: IllegalArgumentException) { return null }
+    return InviteLink(groupId, code)
+}
 
 @Serializable
 data class UpdateMemberRoleRequest(

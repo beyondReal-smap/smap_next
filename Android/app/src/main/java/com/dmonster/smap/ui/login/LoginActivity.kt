@@ -21,6 +21,8 @@ import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import com.kakao.sdk.auth.model.OAuthToken
+import com.kakao.sdk.common.model.ClientError
+import com.kakao.sdk.common.model.ClientErrorCause
 import com.kakao.sdk.user.UserApiClient
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -155,13 +157,13 @@ class LoginActivity : ComponentActivity() {
                 if (error != null) {
                     Log.e(TAG, "❌ 카카오톡 로그인 실패", error)
                     // 사용자가 취소한 경우가 아니면 카카오계정 로그인 시도
-                    if (error.toString().contains("AuthError(statusCode=302, reason=Cancelled)")) {
+                    if (error is ClientError && error.reason == ClientErrorCause.Cancelled) {
                         viewModel.setLoading(false)
                     } else {
                         startKakaoAccountSignIn()
                     }
                 } else if (token != null) {
-                    Log.d(TAG, "✅ 카카오톡 로그인 성공: ${token.accessToken}")
+                    Log.d(TAG, "✅ 카카오톡 로그인 성공")
                     fetchKakaoUserInfo(token.accessToken)
                 }
             }
@@ -177,7 +179,7 @@ class LoginActivity : ComponentActivity() {
                 viewModel.setLoading(false)
                 viewModel.showErrorMessage("카카오 로그인 실패: ${error.localizedMessage}")
             } else if (token != null) {
-                Log.d(TAG, "✅ 카카오계정 로그인 성공: ${token.accessToken}")
+                Log.d(TAG, "✅ 카카오계정 로그인 성공")
                 fetchKakaoUserInfo(token.accessToken)
             }
         }

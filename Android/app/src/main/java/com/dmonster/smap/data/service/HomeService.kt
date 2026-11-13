@@ -85,7 +85,8 @@ class HomeService(
         // Step 2: join the group
         val body = JoinGroupRequest(
             mtIdx = mtIdx,
-            sgtIdx = groupId
+            sgtIdx = groupId,
+            sgtCode = inviteCode
         )
         api.joinGroup(groupId, body)
         Log.d(TAG, "[joinGroup] joined successfully")

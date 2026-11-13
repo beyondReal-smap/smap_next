@@ -74,6 +74,11 @@ class MyPlaceViewModel @Inject constructor(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
+    // 조회 실패 상태. errorMessage(스낵바용, 표시 후 소거)와 달리 재시도 성공 전까지 유지해
+    // "등록된 장소 없음"과 "불러오기 실패"를 화면에서 구분한다.
+    private val _loadFailed = MutableStateFlow(false)
+    val loadFailed: StateFlow<Boolean> = _loadFailed.asStateFlow()
+
     private val _successMessage = MutableStateFlow<String?>(null)
     val successMessage: StateFlow<String?> = _successMessage.asStateFlow()
 
@@ -147,6 +152,7 @@ class MyPlaceViewModel @Inject constructor(
     fun performInitialLoad() {
         viewModelScope.launch {
             _isMapLoading.value = true
+            _loadFailed.value = false
 
             when (val result = safeApiCall { groupService.getGroups() }) {
                 is ApiResult.Success -> {
@@ -188,6 +194,8 @@ class MyPlaceViewModel @Inject constructor(
                                         else -> {
                                             if (BuildConfig.DEBUG) Log.e(TAG, "Location load failed during initial load")
                                             _locations.value = emptyList()
+                                            _errorMessage.value = "장소 정보를 불러오지 못했습니다."
+                                            _loadFailed.value = true
                                         }
                                     }
                                 } else {
@@ -200,6 +208,7 @@ class MyPlaceViewModel @Inject constructor(
                             else -> {
                                 if (BuildConfig.DEBUG) Log.e(TAG, "Member load failed during initial load")
                                 _errorMessage.value = "그룹 멤버를 불러오지 못했습니다."
+                                _loadFailed.value = true
                                 _members.value = emptyList()
                                 _locations.value = emptyList()
                             }
@@ -216,10 +225,12 @@ class MyPlaceViewModel @Inject constructor(
                 is ApiResult.Error -> {
                     if (BuildConfig.DEBUG) Log.e(TAG, "Initial data load failed (${result.code})")
                     _errorMessage.value = "데이터를 불러오지 못했습니다 (${result.code})"
+                    _loadFailed.value = true
                 }
                 is ApiResult.NetworkError -> {
                     if (BuildConfig.DEBUG) Log.e(TAG, "Initial data load failed - network", result.exception)
                     _errorMessage.value = "네트워크 연결을 확인해주세요"
+                    _loadFailed.value = true
                 }
             }
 
@@ -253,16 +264,19 @@ class MyPlaceViewModel @Inject constructor(
             _isLoadingLocations.value = true
             when (val result = safeApiCall { myPlaceService.getLocations(member.mtIdx) }) {
                 is ApiResult.Success -> {
+                    _loadFailed.value = false
                     _locations.value = result.data
                     if (BuildConfig.DEBUG) Log.d(TAG, "${result.data.size} locations loaded")
                 }
                 is ApiResult.Error -> {
                     if (BuildConfig.DEBUG) Log.e(TAG, "Location load failed (${result.code})")
                     _errorMessage.value = "장소 정보를 불러오지 못했습니다 (${result.code})"
+                    _loadFailed.value = true
                 }
                 is ApiResult.NetworkError -> {
                     if (BuildConfig.DEBUG) Log.e(TAG, "Location load failed - network", result.exception)
                     _errorMessage.value = "네트워크 연결을 확인해주세요"
+                    _loadFailed.value = true
                 }
             }
             _isLoadingLocations.value = false

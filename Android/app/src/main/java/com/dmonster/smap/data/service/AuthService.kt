@@ -9,6 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -27,6 +28,8 @@ class AuthService(
     private val prefs: SharedPreferences,
     private val tokenStore: com.dmonster.smap.data.auth.TokenStore
 ) {
+    @Volatile var pendingSocialProvider: String? = null
+    @Volatile var pendingSocialToken: String? = null
 
     companion object {
         private const val TAG = "AuthService"
@@ -125,6 +128,25 @@ class AuthService(
         }
     }
 
+    private suspend fun unregisterPushToken() {
+        val fcmToken = prefs.getString("fcm_token", null)
+        if (fcmToken.isNullOrBlank()) {
+            Log.w(TAG, "저장된 푸시 토큰이 없어 서버 해제를 건너뜁니다.")
+            return
+        }
+        try {
+            withTimeout(5_000) { api.unregisterFcmToken(FcmUnregisterRequest(fcmToken)).close() }
+        } catch (e: Exception) {
+            // 해제 실패로 사용자의 로그아웃이나 탈퇴를 막지 않습니다.
+            Log.w(TAG, "푸시 토큰 해제 실패: ${e.javaClass.simpleName}")
+        }
+    }
+
+    suspend fun logoutWithUnregister() {
+        unregisterPushToken()
+        logout()
+    }
+
     // =========================================================================
     // Network calls (delegated to SmapApi)
     // =========================================================================
@@ -181,7 +203,7 @@ class AuthService(
         return try {
             val loginResponse = api.googleLogin(request)
 
-            if (loginResponse.success == true) {
+            if (loginResponse.success == true && !(loginResponse.isNewUser ?: loginResponse.data?.isNewUser ?: false)) {
                 Log.d(TAG, "[Social Login] Google success")
                 val token = loginResponse.token ?: loginResponse.data?.token
                 val user = loginResponse.user ?: loginResponse.data?.user
@@ -223,7 +245,7 @@ class AuthService(
         return try {
             val loginResponse = api.kakaoLogin(request)
 
-            if (loginResponse.success == true) {
+            if (loginResponse.success == true && !(loginResponse.isNewUser ?: loginResponse.data?.isNewUser ?: false)) {
                 Log.d(TAG, "[Social Login] Kakao success")
                 val token = loginResponse.token ?: loginResponse.data?.token
                 val user = loginResponse.user ?: loginResponse.data?.user
@@ -308,6 +330,7 @@ class AuthService(
      */
     suspend fun withdraw(reasonIdx: Int, etcReason: String?, reasons: List<String>): WithdrawResponse {
         return try {
+            unregisterPushToken()
             val request = WithdrawRequest(mtRetireChk = reasonIdx, mtRetireEtc = etcReason, reasons = reasons)
             val response = api.withdraw(request)
             if (response.success) {

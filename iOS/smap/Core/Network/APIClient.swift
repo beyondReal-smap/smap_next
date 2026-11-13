@@ -61,7 +61,7 @@ final class APIClient: @unchecked Sendable {
         }
 
         // 401 → refresh 후 한 번만 재시도. refresh 엔드포인트 자체는 재시도 안 함.
-        if httpResponse.statusCode == 401, retryOn401, !endpoint.isRefreshEndpoint {
+        if httpResponse.statusCode == 401, retryOn401, !endpoint.isRefreshEndpoint, !endpoint.isRegistrationEndpoint, effectiveToken != nil {
             let newAccess: String
             do {
                 newAccess = try await refreshCoordinator.refreshIfNeeded(attemptedWith: effectiveToken, client: self)
@@ -198,6 +198,10 @@ private actor RefreshCoordinator {
 // MARK: - APIEndpoint helpers
 
 extension APIEndpoint {
+    var isRegistrationEndpoint: Bool {
+        if case .register = self { return true }
+        return false
+    }
     /// refresh 자체 호출이 401일 때 자기 자신을 다시 refresh하지 않도록 식별.
     var isRefreshEndpoint: Bool {
         if case .refreshTokenV2 = self { return true }

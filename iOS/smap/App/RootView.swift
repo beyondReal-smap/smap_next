@@ -128,6 +128,7 @@ struct RootView: View {
     private var registerContent: some View {
         NativeRegisterView(
             onComplete: {
+                registerSocialData = nil
                 if AuthService.shared.isLoggedIn {
                     appState = .authenticated
                 } else {
@@ -137,6 +138,7 @@ struct RootView: View {
             },
             socialData: registerSocialData,
             onExistingUser: { phone in
+                registerSocialData = nil
                 loginPrefilledPhone = phone
                 appState = .unauthenticated
             }

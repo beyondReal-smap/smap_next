@@ -350,7 +350,7 @@ fun QRCodeDialog(
                     ) {
                         androidx.compose.foundation.Image(
                             bitmap = currentBitmap.asImageBitmap(),
-                            contentDescription = "QR Code",
+                            contentDescription = "그룹 초대 QR 코드",
                             modifier = Modifier.fillMaxSize()
                         )
                     }

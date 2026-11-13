@@ -53,7 +53,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                         if (task.isSuccessful) {
                             val token = task.result
                             if (!token.isNullOrEmpty()) {
-                                Log.d(TAG, "✅ [FCM] 현재 토큰 획득 성공: ${token.take(20)}...")
+                                Log.d(TAG, "✅ [FCM] 현재 토큰 획득 성공")
                                 forceUpdateTokenToServer(context, token, "manual_trigger")
                             } else {
                                 Log.e(TAG, "❌ [FCM] 획득한 토큰이 비어있습니다.")
@@ -201,7 +201,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
 
     override fun onNewToken(token: String) {
         super.onNewToken(token)
-        Log.d(TAG, "🔥 [FCM] 새로운 토큰 생성됨: ${token.take(20)}...")
+        Log.d(TAG, "🔥 [FCM] 새로운 토큰 생성됨")
         forceUpdateTokenToServer(this, token, "auto_refresh")
     }
 

@@ -49,6 +49,7 @@ class HomeViewModel: ObservableObject {
     func fetchInitialData() async {
         print("🚀 [HomeViewModel] fetchInitialData started")
         self.isLoading = true
+        self.errorMessage = nil
 
         do {
             let fetchedGroups = try await homeService.getMyGroups()
@@ -78,6 +79,17 @@ class HomeViewModel: ObservableObject {
         }
     }
 
+    /// 홈 오류 배너의 "다시 시도" — 그룹 목록 자체가 실패했으면 처음부터, 아니면 선택 그룹의 멤버만 다시 조회한다.
+    func retryLoad() {
+        Task {
+            if let group = selectedGroup, !groups.isEmpty {
+                await fetchGroupData(sgtIdx: group.sgt_idx)
+            } else {
+                await fetchInitialData()
+            }
+        }
+    }
+
     func selectGroup(_ group: SmapGroup) {
         HapticManager.shared.selection()
         self.selectedGroup = group
@@ -88,6 +100,7 @@ class HomeViewModel: ObservableObject {
 
     func fetchGroupData(sgtIdx: Int) async {
         print("🚀 [HomeViewModel] fetchGroupData started for group: \(sgtIdx)")
+        self.errorMessage = nil
 
         // 1. 멤버 데이터 가져오기 (필수)
         do {

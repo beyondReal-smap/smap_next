@@ -16,6 +16,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import androidx.compose.foundation.shape.RoundedCornerShape
+import com.dmonster.smap.ui.components.SmapErrorState
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.dmonster.smap.ui.common.rememberSmapHaptics
 import com.dmonster.smap.ui.theme.ActivityLogColors
@@ -74,6 +76,7 @@ fun ActivityLogScreen(
     val isLoading by viewModel.isLoading.collectAsState()
     val isLoadingLogs by viewModel.isLoadingLogs.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
+    val loadFailed by viewModel.loadFailed.collectAsState()
     
     val isMapLoading = isLoading
     
@@ -450,8 +453,25 @@ fun ActivityLogScreen(
             )
         }
         
+        // 조회 실패 — "활동 데이터 없음"과 구분해 다시 시도 가능하게 한다(지도는 유지).
+        if (loadFailed && !isLoading && !isLoadingLogs && !isMapLoading) {
+            Box(
+                modifier = Modifier.fillMaxSize().zIndex(5f),
+                contentAlignment = Alignment.Center
+            ) {
+                SmapErrorState(
+                    modifier = Modifier
+                        .fillMaxWidth(0.85f)
+                        .height(260.dp)
+                        .background(Color.White.copy(alpha = 0.95f), RoundedCornerShape(16.dp)),
+                    title = "활동 기록을 불러오지 못했어요",
+                    onRetry = { viewModel.retryLoad() }
+                )
+            }
+        }
+
         // Empty state overlay for map when no location data — 2줄 가이드 패턴
-        if (locationLogs.isEmpty() && selectedMember != null && !isLoading && !isLoadingLogs && !isMapLoading) {
+        if (!loadFailed && locationLogs.isEmpty() && selectedMember != null && !isLoading && !isLoadingLogs && !isMapLoading) {
             Box(
                 modifier = Modifier.fillMaxSize().zIndex(5f),
                 contentAlignment = Alignment.Center

@@ -47,7 +47,7 @@ struct HomeView: View {
                         viewModel.selectGroup(group)
                     },
                     onNotificationTap: {
-                        viewModel.markAllAsRead() // 알림 아이콘 누르면 즉시 모두 읽음 처리
+                        // 읽음 처리는 목록을 본 뒤(시트가 닫힐 때) 수행한다 — 여는 즉시 처리하면 안 읽은 표시가 의미가 없다.
                         showNotifications = true
                     },
                     onSettingsTap: {
@@ -55,14 +55,29 @@ struct HomeView: View {
                     }
                 )
 
+                if let message = viewModel.errorMessage {
+                    VStack(spacing: 8) {
+                        SMAPBanner(message: message, tone: .error)
+                        SMAPButton("다시 시도", style: .outline) {
+                            viewModel.retryLoad()
+                        }
+                        .frame(maxWidth: 200)
+                    }
+                    .padding(.horizontal, 16)
+                }
+
                 // 일정·위치 공유 앱 성격 강화 — 홈에서 오늘의 진행 중/다음 일정 바로 확인.
                 TodaySchedulePreviewView(schedules: viewModel.homePreviewSchedules) { _ in
                     HapticManager.shared.impact(style: .light)
+                    // 일정 탭(tag 2)으로 이동 — MainTabView 가 수신한다.
+                    NotificationCenter.default.post(name: NSNotification.Name("switchMainTab"), object: 2)
                 }
 
                 Spacer()
             }
             .sheet(isPresented: $showNotifications, onDismiss: {
+                // 목록을 열어 본 뒤 닫는 시점에 전체 읽음 처리 (성공 시 배지 해제, 이후 서버 기준으로 재확인)
+                viewModel.markAllAsRead()
                 viewModel.checkUnreadNotifications()
             }) {
                 NotificationListView()

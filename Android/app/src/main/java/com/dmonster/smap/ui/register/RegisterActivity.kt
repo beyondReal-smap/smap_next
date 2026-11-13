@@ -89,6 +89,7 @@ class RegisterActivity : ComponentActivity() {
     }
 
     private fun navigateToLogin(prefilledPhone: String?) {
+        viewModel.clearSocialSession()
         val intent = Intent(this, LoginActivity::class.java)
         prefilledPhone?.let {
             intent.putExtra("prefilled_phone", it)

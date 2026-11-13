@@ -27,7 +27,7 @@ enum APIEndpoint {
     case updateGroup(sgtIdx: Int, title: String, memo: String)
     case deleteGroup(sgtIdx: Int)  // Note: HTTP PUT (soft delete via sgt_show="N"), not DELETE
     case joinGroupByCode(code: String)
-    case joinGroupById(sgtIdx: Int, mtIdx: Int)
+    case joinGroupById(sgtIdx: Int, mtIdx: Int, code: String? = nil)
     case getGroupSummary
 
     // MARK: - Group Members
@@ -66,6 +66,7 @@ enum APIEndpoint {
 
     // MARK: - FCM
     case registerFCMToken(mtIdx: String, fcmToken: String, apnsToken: String?)
+    case unregisterFCMToken(String)
 
     // MARK: - Legacy (Phase 4에서 제거 예정)
     case legacyTokenAuth(mt_token_id: String)
@@ -82,6 +83,7 @@ enum APIEndpoint {
         }
         var request = URLRequest(url: url)
         request.httpMethod = method.rawValue
+        if case .unregisterFCMToken = self { request.timeoutInterval = 5 }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if let body = body {
             request.httpBody = body
@@ -125,7 +127,7 @@ enum APIEndpoint {
         case .updateGroup(let sgtIdx, _, _): return "/groups/\(sgtIdx)"
         case .deleteGroup(let sgtIdx): return "/groups/\(sgtIdx)"
         case .joinGroupByCode(let code): return "/groups/code/\(code)"
-        case .joinGroupById(let sgtIdx, _): return "/groups/\(sgtIdx)/join"
+        case .joinGroupById(let sgtIdx, _, _): return "/groups/\(sgtIdx)/join"
         case .getGroupSummary: return "/groups/current-user/summary"
         case .getGroupMembers(let sgtIdx): return "/group-members/member/\(sgtIdx)"
         case .updateMemberRole(let sgtIdx, _, _): return "/group-members/\(sgtIdx)/role"
@@ -159,6 +161,7 @@ enum APIEndpoint {
             return path
         case .createLocationLog: return "/logs/member-location-logs"
         case .registerFCMToken: return "/member-fcm-token/register"
+        case .unregisterFCMToken: return "/fcm-token/unregister"
         case .legacyTokenAuth, .legacyFileUpload: return "" // absoluteURL 사용
         }
     }
@@ -178,7 +181,7 @@ enum APIEndpoint {
         case .login, .googleLogin, .appleLogin, .register,
              .createGroup, .joinGroupById, .createLocation,
              .updateProfile, .changePassword, .verifyPassword, .withdraw,
-             .uploadProfileImage, .createLocationLog, .registerFCMToken,
+             .uploadProfileImage, .createLocationLog, .registerFCMToken, .unregisterFCMToken,
              .markAllNotificationsRead, .deleteAllNotifications,
              .createDMRoom, .createSchedule,
              .refreshTokenV2, .logoutWithRefresh,
@@ -222,8 +225,10 @@ enum APIEndpoint {
             return try? JSONSerialization.data(withJSONObject: ["sgt_title": title, "sgt_memo": memo])
         case .deleteGroup:
             return try? JSONSerialization.data(withJSONObject: ["sgt_show": "N"])
-        case .joinGroupById(let sgtIdx, let mtIdx):
-            return try? JSONSerialization.data(withJSONObject: ["mt_idx": mtIdx, "sgt_idx": sgtIdx])
+        case .joinGroupById(let sgtIdx, let mtIdx, let code):
+            var body: [String: Any] = ["mt_idx": mtIdx, "sgt_idx": sgtIdx]
+            if let code { body["sgt_code"] = code }
+            return try? JSONSerialization.data(withJSONObject: body)
         case .updateMemberRole(_, let mtIdx, let isLeader):
             return try? JSONSerialization.data(withJSONObject: ["mt_idx": mtIdx, "is_leader": isLeader])
         case .createLocation(_, let req), .updateLocation(_, let req),
@@ -239,6 +244,8 @@ enum APIEndpoint {
             var dict: [String: Any] = ["mt_idx": mtIdx, "fcm_token": fcmToken]
             if let apnsToken { dict["apns_token"] = apnsToken }
             return try? JSONSerialization.data(withJSONObject: dict)
+        case .unregisterFCMToken(let token):
+            return try? JSONSerialization.data(withJSONObject: ["fcm_token": token])
         case .refreshTokenV2(let refresh):
             return try? JSONSerialization.data(withJSONObject: ["refresh_token": refresh])
         case .logoutWithRefresh(let refresh):

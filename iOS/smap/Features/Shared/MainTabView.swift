@@ -106,6 +106,9 @@ struct MainTabView: View {
             // 탭 전환 시 모든 사이드바 닫기 알림 발생 (현재 선택된 탭 인덱스 전달)
             NotificationCenter.default.post(name: NSNotification.Name("closeSidebars"), object: selectedTab)
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("switchMainTab"))) { note in
+            if let tab = note.object as? Int { selectedTab = tab }
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("handleGroupJoinDeepLink"))) { _ in
             processPendingGroup()
         }
@@ -160,21 +163,27 @@ struct MainTabView: View {
             return
         }
         joiningPendingGroup = true
+        let code = UserDefaults.standard.string(forKey: "pending_join_group_code")
         Task { @MainActor in
             defer { joiningPendingGroup = false }
             do {
-                guard try await GroupService.shared.joinGroupById(mt_idx: memberId, sgt_idx: groupId) else {
+                guard try await GroupService.shared.joinGroupById(mt_idx: memberId, sgt_idx: groupId, code: code) else {
                     throw NetworkError.badRequest("그룹 가입에 실패했습니다.")
                 }
-                if UserDefaults.standard.string(forKey: "pending_join_group_id") == value {
+                if UserDefaults.standard.string(forKey: "pending_join_group_id") == value && UserDefaults.standard.string(forKey: "pending_join_group_code") == code {
                     UserDefaults.standard.removeObject(forKey: "pending_join_group_id")
+                    UserDefaults.standard.removeObject(forKey: "pending_join_group_code")
                 }
                 NotificationCenter.default.post(name: NSNotification.Name("groupsDidChange"), object: nil)
                 joinFailed = false
                 joinResultMessage = "그룹에 가입했습니다."
             } catch {
                 joinFailed = true
-                joinResultMessage = (error as? NetworkError)?.userMessage ?? "그룹 가입에 실패했습니다. 다시 시도해주세요."
+                if let networkError = error as? NetworkError, case .forbidden = networkError {
+                    joinResultMessage = "초대 링크가 유효하지 않거나 만료됐어요"
+                } else {
+                    joinResultMessage = (error as? NetworkError)?.userMessage ?? "그룹 가입에 실패했습니다. 다시 시도해주세요."
+                }
             }
             showJoinResult = true
         }

@@ -79,7 +79,7 @@ struct GroupDetailView: View {
         }
         .sheet(isPresented: $showingQRCode) {
             QRCodeView(
-                data: "https://nextstep.aiagnt.kr/group/\(group.sgt_idx)/join",
+                data: group.inviteLink,
                 size: 250
             )
         }

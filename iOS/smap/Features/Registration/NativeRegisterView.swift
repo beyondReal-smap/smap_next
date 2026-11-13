@@ -20,11 +20,11 @@ struct RegisterTermsView: View {
                 .foregroundColor(SMAPTheme.Color.textPrimary)
             
             VStack(spacing: 16) {
-                ToggleRow(title: "(필수) 서비스 이용약관", isChecked: $viewModel.registerData.mt_agree1)
-                ToggleRow(title: "(필수) 개인정보 처리방침", isChecked: $viewModel.registerData.mt_agree2)
-                ToggleRow(title: "(필수) 위치기반서비스 이용약관", isChecked: $viewModel.registerData.mt_agree3)
-                ToggleRow(title: "(선택) 개인정보 제3자 제공 동의", isChecked: $viewModel.registerData.mt_agree4)
-                ToggleRow(title: "(선택) 마케팅 정보 수신 동의", isChecked: $viewModel.registerData.mt_agree5)
+                ToggleRow(title: "(필수) 서비스 이용약관", isChecked: $viewModel.registerData.mt_agree1, termsDestination: AnyView(ServiceTermsView()))
+                ToggleRow(title: "(필수) 개인정보 처리방침", isChecked: $viewModel.registerData.mt_agree2, termsDestination: AnyView(PrivacyPolicyView()))
+                ToggleRow(title: "(필수) 위치기반서비스 이용약관", isChecked: $viewModel.registerData.mt_agree3, termsDestination: AnyView(LocationTermsView()))
+                ToggleRow(title: "(선택) 개인정보 제3자 제공 동의", isChecked: $viewModel.registerData.mt_agree4, termsDestination: AnyView(ThirdPartyProvisionView()))
+                ToggleRow(title: "(선택) 마케팅 정보 수신 동의", isChecked: $viewModel.registerData.mt_agree5, termsDestination: AnyView(MarketingConsentView()))
             }
             .padding(.top, 20)
             
@@ -37,6 +37,9 @@ struct RegisterTermsView: View {
 struct ToggleRow: View {
     let title: String
     @Binding var isChecked: Bool
+    /// 약관 상세 화면. 행 오른쪽 화살표를 누르면 시트로 연다.
+    let termsDestination: AnyView
+    @State private var showTerms = false
     
     var body: some View {
         HStack {
@@ -50,14 +53,17 @@ struct ToggleRow: View {
                 }
             }
             Spacer()
-            // 약관 상세 화면이 아직 없어 링크 연결은 보류 — 최소한 터치영역 44pt + 라벨만 적용
-            Button(action: { /* Open URL */ }) {
+            Button(action: { showTerms = true }) {
                 Image(systemName: "chevron.right")
                     .foregroundColor(.gray)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
             .accessibilityLabel("약관 보기")
+        }
+        // 약관 화면은 자체 "뒤로" 버튼(dismiss)을 툴바에 두므로 NavigationStack 으로 감싸 표시한다.
+        .sheet(isPresented: $showTerms) {
+            NavigationStack { termsDestination }
         }
     }
 }
@@ -691,6 +697,11 @@ struct NativeRegisterView: View {
             Button("확인", role: .cancel) {}
         } message: {
             Text(viewModel.errorMessage ?? "알 수 없는 오류")
+        }
+        .alert("알림", isPresented: $viewModel.socialSessionExpired) {
+            Button("확인") { onComplete?() }
+        } message: {
+            Text("소셜 로그인을 다시 진행해 주세요")
         }
         .alert("알림", isPresented: $viewModel.showExistingUserAlert) {
             Button("확인", role: .cancel) {

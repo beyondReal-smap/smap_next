@@ -22,7 +22,7 @@ class DeepLinkService {
 
     /// URL scheme 처리 — AppDelegate application(_:open:options:)에서 호출
     func handleURL(_ url: URL) -> Bool {
-        print("📱 DeepLinkService: URL 열기 요청 - \(url)")
+        print("📱 DeepLinkService: URL 열기 요청")
         print("📱 URL Scheme: \(url.scheme ?? "nil")")
         print("📱 URL Host: \(url.host ?? "nil")")
 
@@ -57,7 +57,7 @@ class DeepLinkService {
     /// smap:// 딥링크 처리 (그룹 가입 등)
     /// 형식: smap://group/{id}/join
     private func handleSmapScheme(_ url: URL) -> Bool {
-        print("📱 [DEEP_LINK] smap 스킴 감지됨: \(url)")
+        print("📱 [DEEP_LINK] smap 스킴 감지됨")
 
         let pathComponents = url.pathComponents
         if url.host == "group", pathComponents.count == 3, pathComponents[2] == "join", Int(pathComponents[1]) != nil {
@@ -66,6 +66,8 @@ class DeepLinkService {
 
             // 그룹 정보 저장 및 알림 발송
             UserDefaults.standard.set(groupId, forKey: "pending_join_group_id")
+            let code = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "code" })?.value
+            UserDefaults.standard.set(code?.isEmpty == false ? code : nil, forKey: "pending_join_group_code")
 
             NotificationCenter.default.post(
                 name: NSNotification.Name(rawValue: "handleGroupJoinDeepLink"),

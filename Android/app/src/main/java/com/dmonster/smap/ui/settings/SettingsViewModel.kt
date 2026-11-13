@@ -84,8 +84,10 @@ class SettingsViewModel @Inject constructor(
     }
     
     fun logout(onSuccess: () -> Unit) {
-        authService.logout()
-        onSuccess()
+        viewModelScope.launch {
+            authService.logoutWithUnregister()
+            onSuccess()
+        }
     }
 
     fun verifyPassword(password: String, onResult: (Boolean, String?) -> Unit) {

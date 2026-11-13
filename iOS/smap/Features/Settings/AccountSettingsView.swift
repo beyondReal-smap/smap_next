@@ -294,7 +294,6 @@ struct AccountSettingsView: View {
             Button("로그아웃", role: .destructive) {
                 HapticManager.shared.notification(type: .warning)
                 authService.logout()
-                NotificationCenter.default.post(name: NSNotification.Name("logout"), object: nil)
             }
         } message: {
             Text("정말로 로그아웃 하시겠습니까?")

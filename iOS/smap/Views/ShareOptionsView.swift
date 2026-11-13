@@ -163,7 +163,7 @@ struct ShareOptionsView: View {
     // MARK: - Helper Functions
     
     private func generateInviteLink() -> String {
-        return "https://nextstep.aiagnt.kr/group/\(group.sgt_idx)/join"
+        return group.inviteLink
     }
     
     private func generateInviteMessage() -> String {
@@ -233,6 +233,14 @@ struct ShareOptionsView: View {
         }
         
         return topController
+    }
+}
+
+extension SmapGroup {
+    var inviteLink: String {
+        var components = URLComponents(string: "https://nextstep.aiagnt.kr/group/\(sgt_idx)/join")!
+        if let code = sgt_code, !code.isEmpty { components.queryItems = [URLQueryItem(name: "code", value: code)] }
+        return components.string!
     }
 }
 

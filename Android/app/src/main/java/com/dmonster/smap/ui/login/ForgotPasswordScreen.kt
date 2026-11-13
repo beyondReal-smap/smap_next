@@ -78,7 +78,7 @@ fun ForgotPasswordScreen(
                     }) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
+                            contentDescription = "뒤로",
                             tint = Color.Black
                         )
                     }
@@ -396,7 +396,7 @@ private fun NewPasswordStepContent(
                     IconButton(onClick = onToggleNewPassword) {
                         Icon(
                             imageVector = if (showNewPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                            contentDescription = "Toggle password visibility",
+                            contentDescription = if (showNewPassword) "비밀번호 숨기기" else "비밀번호 표시",
                             tint = Color.Gray
                         )
                     }
@@ -447,7 +447,7 @@ private fun NewPasswordStepContent(
                     IconButton(onClick = onToggleConfirmPassword) {
                         Icon(
                             imageVector = if (showConfirmPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                            contentDescription = "Toggle password visibility",
+                            contentDescription = if (showConfirmPassword) "비밀번호 숨기기" else "비밀번호 표시",
                             tint = Color.Gray
                         )
                     }
@@ -537,7 +537,7 @@ private fun CompleteStepContent(onDismiss: () -> Unit) {
         ) {
             Icon(
                 imageVector = Icons.Filled.CheckCircle,
-                contentDescription = "Success",
+                contentDescription = null,
                 tint = Color(0xFF22C55E),
                 modifier = Modifier.size(60.dp)
             )

@@ -42,6 +42,9 @@ interface SmapApi {
     @POST("auth/logout")
     suspend fun logout(@Body request: LogoutRequest): LogoutResponse
 
+    @POST("fcm-token/unregister")
+    suspend fun unregisterFcmToken(@Body request: FcmUnregisterRequest): okhttp3.ResponseBody
+
     /** GET /app/version-check?platform=android&version=3.x.x — 강제 업데이트 여부 */
     @GET("app/version-check")
     suspend fun checkAppVersion(

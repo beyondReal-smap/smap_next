@@ -12,6 +12,7 @@ import SwiftUI
 struct NotificationListView: View {
     @StateObject var viewModel = NotificationViewModel()
     @Environment(\.dismiss) var dismiss
+    @State private var showDeleteAllConfirm = false
 
     // 색상은 디자인 시스템에서 단일 참조 (SMAPTheme.Accent.pink)
     private var pinkColor: Color { SMAPTheme.Accent.pink }
@@ -60,6 +61,12 @@ struct NotificationListView: View {
             .onAppear {
                 viewModel.fetchNotifications()
             }
+            .confirmationDialog("알림을 모두 삭제할까요?", isPresented: $showDeleteAllConfirm, titleVisibility: .visible) {
+                Button("전체 삭제", role: .destructive) { viewModel.deleteAllNotifications() }
+                Button("취소", role: .cancel) { }
+            } message: {
+                Text("삭제한 알림은 되돌릴 수 없어요.")
+            }
             .alert("오류", isPresented: Binding(
                 get: { viewModel.errorMessage != nil },
                 set: { if !$0 { viewModel.errorMessage = nil } }
@@ -101,7 +108,7 @@ struct NotificationListView: View {
 
             // Menu
             Menu {
-                Button(role: .destructive, action: { viewModel.deleteAllNotifications() }) {
+                Button(role: .destructive, action: { showDeleteAllConfirm = true }) {
                     Label("전체 삭제", systemImage: "trash")
                 }
             } label: {

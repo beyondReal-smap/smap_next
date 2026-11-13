@@ -42,6 +42,12 @@ fun RegisterScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
+    if (uiState.socialSessionExpired) {
+        AlertDialog(onDismissRequest = onBack, title = { Text("알림") },
+            text = { Text("소셜 로그인을 다시 진행해 주세요") },
+            confirmButton = { TextButton(onClick = onBack) { Text("확인") } })
+    }
+
     // 소셜 데이터 적용
     LaunchedEffect(socialData) {
         viewModel.applySocialData(socialData)

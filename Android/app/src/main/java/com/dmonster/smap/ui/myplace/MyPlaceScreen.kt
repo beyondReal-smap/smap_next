@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import com.dmonster.smap.ui.components.SmapErrorState
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.dmonster.smap.ui.common.rememberSmapHaptics
@@ -87,6 +88,7 @@ fun MyPlaceScreen(
     val isSearching by viewModel.isSearching.collectAsState()
     val hasSearched by viewModel.hasSearched.collectAsState()
     val isMapLoading by viewModel.isMapLoading.collectAsState()
+    val loadFailed by viewModel.loadFailed.collectAsState()
     
     // Snackbar
     val snackbarHostState = remember { SnackbarHostState() }
@@ -320,6 +322,23 @@ fun MyPlaceScreen(
             )
         }
 
+        // 조회 실패 — "등록된 장소 없음"과 구분해 다시 시도 가능하게 한다(지도는 유지).
+        if (loadFailed && !isMapLoading) {
+            Box(
+                modifier = Modifier.fillMaxSize().zIndex(6f),
+                contentAlignment = Alignment.Center
+            ) {
+                SmapErrorState(
+                    modifier = Modifier
+                        .fillMaxWidth(0.85f)
+                        .height(260.dp)
+                        .background(Color.White.copy(alpha = 0.95f), RoundedCornerShape(16.dp)),
+                    title = "내 장소를 불러오지 못했어요",
+                    onRetry = { viewModel.performInitialLoad() }
+                )
+            }
+        }
+
         // Map Loading Overlay (Topmost)
         AnimatedVisibility(
             visible = isMapLoading,
@@ -474,7 +493,7 @@ fun FloatingActionPlaceButton(
         ) {
             Icon(
                 imageVector = Icons.Filled.Person,
-                contentDescription = "Members",
+                contentDescription = "멤버 목록 보기",
                 modifier = Modifier.size(32.dp)
             )
         }

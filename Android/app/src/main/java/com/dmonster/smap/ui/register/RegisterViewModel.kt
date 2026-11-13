@@ -72,6 +72,7 @@ class RegisterViewModel @Inject constructor(
 
         // Registration complete
         val isRegistrationComplete: Boolean = false,
+        val socialSessionExpired: Boolean = false,
         val showExistingUserAlert: Boolean = false,
         val existingUserPhone: String = "",
 
@@ -386,12 +387,20 @@ class RegisterViewModel @Inject constructor(
     // MARK: - Registration
     
     private fun completeRegistration() {
+        if (isSocialAccount && (authService.pendingSocialProvider == null || authService.pendingSocialToken == null)) {
+            _uiState.value = _uiState.value.copy(socialSessionExpired = true)
+            return
+        }
         _uiState.value = _uiState.value.copy(isLoading = true)
 
         viewModelScope.launch {
             try {
                 val result = withContext(Dispatchers.IO) {
-                    val requestBody = json.encodeToString(_uiState.value.registerData)
+                    val data = _uiState.value.registerData.copy(
+                        socialProvider = authService.pendingSocialProvider,
+                        socialToken = authService.pendingSocialToken
+                    )
+                    val requestBody = json.encodeToString(data)
                         .toRequestBody("application/json".toMediaType())
 
                     val request = Request.Builder()
@@ -422,9 +431,17 @@ class RegisterViewModel @Inject constructor(
                     authService.saveToken(token)
                     authService.saveRefreshToken(refresh)
                     authService.saveUserData(user)
+                    authService.pendingSocialProvider = null
+                    authService.pendingSocialToken = null
                     _uiState.value = _uiState.value.copy(isLoading = false, currentStep = RegisterStep.COMPLETE, isRegistrationComplete = true)
                 } else {
                     _uiState.value = _uiState.value.copy(isLoading = false)
+                    if (responseCode == 401 && authService.pendingSocialProvider != null) {
+                        authService.pendingSocialProvider = null
+                        authService.pendingSocialToken = null
+                        _uiState.value = _uiState.value.copy(socialSessionExpired = true)
+                        return@launch
+                    }
                     val errorMessage = when (responseCode) {
                         400 -> try { org.json.JSONObject(body.orEmpty()).optString("detail").ifBlank { "입력 정보를 확인해주세요." } } catch (_: Exception) { "입력 정보를 확인해주세요." }
                         409 -> "이미 가입된 이메일입니다."
@@ -468,6 +485,11 @@ class RegisterViewModel @Inject constructor(
         )
 
         _uiState.value = _uiState.value.copy(registerData = registerData)
+    }
+
+    fun clearSocialSession() {
+        authService.pendingSocialProvider = null
+        authService.pendingSocialToken = null
     }
     
     val isSocialAccount: Boolean

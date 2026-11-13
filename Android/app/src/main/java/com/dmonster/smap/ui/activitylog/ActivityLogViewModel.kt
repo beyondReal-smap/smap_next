@@ -96,6 +96,11 @@ class ActivityLogViewModel @Inject constructor(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
+    // 조회 실패 상태. errorMessage(스낵바용, 표시 후 소거)와 달리 재시도 성공 전까지 유지해
+    // "기록 없음"과 "불러오기 실패"를 화면에서 구분한다.
+    private val _loadFailed = MutableStateFlow(false)
+    val loadFailed: StateFlow<Boolean> = _loadFailed.asStateFlow()
+
     // Dialog States
     private val _showGroupSelector = MutableStateFlow(false)
     val showGroupSelector: StateFlow<Boolean> = _showGroupSelector.asStateFlow()
@@ -125,11 +130,17 @@ class ActivityLogViewModel @Inject constructor(
 
     // MARK: - Data Loading
 
+    /** 오류 화면의 "다시 시도" — 그룹이 없으면 그룹부터, 있으면 활동 데이터만 다시 조회한다. */
+    fun retryLoad() {
+        if (_selectedGroup.value == null) loadGroups() else loadActivityData()
+    }
+
     private fun loadGroups() {
         if (isLoadingGroups) return
         isLoadingGroups = true
         viewModelScope.launch {
             _isLoading.value = true
+            _loadFailed.value = false
             try {
                 when (val result = safeApiCall { groupService.getGroups() }) {
                     is ApiResult.Success -> {
@@ -149,10 +160,12 @@ class ActivityLogViewModel @Inject constructor(
                     is ApiResult.Error -> {
                         if (BuildConfig.DEBUG) Log.e(TAG, "그룹 로드 실패 (${result.code})")
                         _errorMessage.value = "그룹을 불러오지 못했습니다 (${result.code})"
+                        _loadFailed.value = true
                     }
                     is ApiResult.NetworkError -> {
                         if (BuildConfig.DEBUG) Log.e(TAG, "그룹 로드 실패 - 네트워크", result.exception)
                         _errorMessage.value = "네트워크 연결을 확인해주세요"
+                        _loadFailed.value = true
                     }
                 }
             } finally {
@@ -222,6 +235,7 @@ class ActivityLogViewModel @Inject constructor(
         activityJob = viewModelScope.launch {
             _isLoading.value = true
             _isLoadingLogs.value = true
+            _loadFailed.value = false
             try {
                 val logsDeferred = async { safeApiCall { activityLogService.getLocationLogs(member.mtIdx, dateStr) } }
                 val summaryDeferred = async { safeApiCall { activityLogService.getLocationSummary(member.mtIdx, dateStr) } }
@@ -232,8 +246,14 @@ class ActivityLogViewModel @Inject constructor(
                         _locationLogs.value = result.data.filter { it.hasValidCoordinates }
                         _sliderValue.value = 0.0
                     }
-                    is ApiResult.Error -> _errorMessage.value = "활동 데이터를 불러오지 못했습니다 (${result.code})"
-                    is ApiResult.NetworkError -> _errorMessage.value = "네트워크 연결을 확인해주세요"
+                    is ApiResult.Error -> {
+                        _errorMessage.value = "활동 데이터를 불러오지 못했습니다 (${result.code})"
+                        _loadFailed.value = true
+                    }
+                    is ApiResult.NetworkError -> {
+                        _errorMessage.value = "네트워크 연결을 확인해주세요"
+                        _loadFailed.value = true
+                    }
                 }
                 when (val result = summaryDeferred.await()) {
                     is ApiResult.Success -> _locationSummary.value = result.data

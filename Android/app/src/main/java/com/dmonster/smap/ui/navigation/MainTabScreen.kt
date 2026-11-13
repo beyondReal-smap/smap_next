@@ -66,6 +66,9 @@ fun MainTabScreen(
     val view = LocalView.current
     var visitedMyPlace by rememberSaveable { mutableStateOf(false) }
     var visitedActivityLog by rememberSaveable { mutableStateOf(false) }
+    // 홈의 설정·알림 오버레이가 열려 있으면 하단 탭바를 가려, 오버레이 위로 탭바가 노출되거나
+    // 오버레이를 연 채 탭을 바꿔 설정 상태가 사라지는 일을 막는다.
+    var homeOverlayOpen by remember { mutableStateOf(false) }
     if (selectedTabIndex == 3) visitedMyPlace = true
     if (selectedTabIndex == 4) visitedActivityLog = true
     
@@ -94,7 +97,7 @@ fun MainTabScreen(
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0), // 시스템 인셋 수동 제어
         bottomBar = {
-            NavigationBar(
+            if (!(selectedTabIndex == 0 && homeOverlayOpen)) NavigationBar(
                 modifier = Modifier, // Remove fixed height to allow flexible inset-based taller height on gesture nav
                 containerColor = Color.White,
                 tonalElevation = 0.dp,
@@ -150,7 +153,7 @@ fun MainTabScreen(
                 .consumeWindowInsets(innerPadding) // 하위 화면에서 중복 패딩 방지
         ) {
             Layout(content = {
-                Box { HomeScreen(viewModel = homeViewModel, onLogout = onLogout, isVisible = selectedTabIndex == 0) }
+                Box { HomeScreen(viewModel = homeViewModel, onLogout = onLogout, isVisible = selectedTabIndex == 0, onOverlayVisibleChange = { homeOverlayOpen = it }) }
                 if (visitedMyPlace) Box { MyPlaceScreen(isVisible = selectedTabIndex == 3) }
                 if (visitedActivityLog) Box { ActivityLogScreen(isVisible = selectedTabIndex == 4) }
                 if (selectedTabIndex == 1) Box { GroupScreen() }

@@ -13,6 +13,9 @@ import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.dmonster.smap.ui.settings.SettingsScreen
+import com.dmonster.smap.ui.components.SmapErrorState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.background
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import android.graphics.PointF
@@ -41,7 +44,9 @@ import androidx.lifecycle.repeatOnLifecycle
 fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
     onLogout: () -> Unit,
-    isVisible: Boolean = true
+    isVisible: Boolean = true,
+    // 설정·알림 오버레이가 열려 있는 동안 상위(MainTabScreen)가 하단 탭바를 가릴 수 있게 알린다.
+    onOverlayVisibleChange: (Boolean) -> Unit = {}
 ) {
     // Collect State
     val groups by viewModel.groups.collectAsState()
@@ -53,6 +58,7 @@ fun HomeScreen(
     val isSidebarOpen by viewModel.isSidebarOpen.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
+    val loadFailed by viewModel.loadFailed.collectAsState()
     val selectedMemberId by viewModel.selectedMemberId.collectAsState()
 
     // Snackbar Host State for error messages
@@ -87,6 +93,8 @@ fun HomeScreen(
             isNotificationVisible = false
         }
     }
+    val isOverlayOpen = isSettingsVisible || isNotificationVisible
+    LaunchedEffect(isOverlayOpen) { onOverlayVisibleChange(isOverlayOpen) }
     
     // Notification ViewModel
     val notiViewModel: NotificationViewModel = hiltViewModel()
@@ -413,6 +421,23 @@ fun HomeScreen(
             }
         }
         
+        // 조회 실패 — 빈 지도와 구분해 다시 시도 가능하게 한다(지도는 유지).
+        if (loadFailed && !isMapLoading) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                SmapErrorState(
+                    modifier = Modifier
+                        .fillMaxWidth(0.85f)
+                        .height(260.dp)
+                        .background(Color.White.copy(alpha = 0.95f), RoundedCornerShape(16.dp)),
+                    title = "그룹 정보를 불러오지 못했어요",
+                    onRetry = { viewModel.retryLoad() }
+                )
+            }
+        }
+
         // 4. Floating Action Button (Hidden during map loading)
         AnimatedVisibility(
             visible = !isMapLoading,
@@ -444,7 +469,7 @@ fun HomeScreen(
             visible = isNotificationVisible,
             enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
             exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize().navigationBarsPadding()
         ) {
             NotificationScreen(
                 onClose = {
@@ -462,7 +487,7 @@ fun HomeScreen(
             visible = isSettingsVisible,
             enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
             exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize().navigationBarsPadding()
         ) {
             SettingsScreen(
                 onClose = { isSettingsVisible = false },

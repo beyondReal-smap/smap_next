@@ -461,10 +461,13 @@ fun GroupHeaderCard(
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Box(
+                            // clickable 을 맨 앞에 두고 minimumInteractiveComponentSize 로 터치 영역을 48dp 이상 확보한다.
+                            // (padding 뒤에 clickable 이 있으면 터치 영역이 칩 크기에 그쳐 48dp 에 못 미침) 시각 크기는 그대로.
                             modifier = Modifier
+                                .clickable { onCopyCode() }
+                                .minimumInteractiveComponentSize()
                                 .background(Color.Black.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                                .clickable { onCopyCode() },
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {

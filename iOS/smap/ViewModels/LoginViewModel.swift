@@ -290,13 +290,14 @@ class LoginViewModel: ObservableObject {
                     
                     if finalIsNewUser == true {
                         // 자동 가입 실패 또는 로직 오류로 여전히 신규 유저로 인식됨 -> 수동 가입으로 이동
-                        self.isNewUser = true
                         self.socialLoginData = [
                             "provider": "google",
                             "email": email ?? "",
                             "name": name ?? "",
+                            "social_token": idToken,
                             "google_id": googleId ?? ""
                         ]
+                        self.isNewUser = true
                         print("⚠️ [LoginViewModel] 자동 가입 실패? 수동 가입으로 전환")
                     } else {
                         // 로그인 성공
@@ -380,13 +381,14 @@ class LoginViewModel: ObservableObject {
                 if response.success {
                     if let data = response.data {
                         if data.isNewUser {
-                            self.isNewUser = true
                             self.socialLoginData = [
                                 "provider": "apple",
+                                "social_token": identityToken ?? "",
                                 "userIdentifier": userIdentifier,
                                 "email": email ?? "",
                                 "name": userName
                             ]
+                            self.isNewUser = true
                             print("✅ [LoginViewModel] 신규 Apple 회원")
                         } else {
                             self.isLoggedIn = true
@@ -472,13 +474,14 @@ class LoginViewModel: ObservableObject {
                 if let response = loginResponse, response.success {
                     if let data = response.data {
                         if data.isNewUser {
-                            self.isNewUser = true
                             self.socialLoginData = [
                                 "provider": "apple",
+                                "social_token": identityToken ?? "",
                                 "userIdentifier": userIdentifier,
                                 "email": email ?? "",
                                 "name": userName
                             ]
+                            self.isNewUser = true
                             print("✅ [LoginViewModel] 신규 Apple 회원")
                         } else {
                             self.isLoggedIn = true
@@ -577,6 +580,7 @@ class RegisterViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var showError = false
+    @Published var socialSessionExpired = false
     
     // Step specific state
     @Published var verificationCode: String = ""
@@ -633,6 +637,8 @@ class RegisterViewModel: ObservableObject {
         }
         
         if let provider = data["provider"] as? String {
+            registerData.social_provider = provider
+            registerData.social_token = data["social_token"] as? String
             // "id" 키가 없으면 provider별 구체적 키 확인
             let googleId = data["google_id"] as? String
             let appleId = data["apple_id"] as? String ?? data["userIdentifier"] as? String  // Apple은 userIdentifier도 확인
@@ -961,6 +967,10 @@ class RegisterViewModel: ObservableObject {
     
     func register() {
         guard let token = verificationToken else { errorMessage = "이메일 인증이 필요합니다."; showError = true; return }
+        if isSocialAccount && (registerData.social_token?.isEmpty != false) {
+            socialSessionExpired = true
+            return
+        }
         isLoading = true
         
         // FCM 토큰 주입
@@ -973,12 +983,18 @@ class RegisterViewModel: ObservableObject {
                 let result = try await authService.register(request: registerData, verificationToken: token, phoneNumber: optionalPhone)
                 guard result.success else { throw NetworkError.badRequest(result.message) }
                 DispatchQueue.main.async {
+                    self.registerData.social_token = nil
                     self.isLoading = false
                     self.currentStep = .complete
                 }
             } catch {
                 DispatchQueue.main.async {
                     self.isLoading = false
+                    if self.isSocialAccount, let networkError = error as? NetworkError, case .unauthorized = networkError {
+                        self.registerData.social_token = nil
+                        self.socialSessionExpired = true
+                        return
+                    }
                     if let networkError = error as? NetworkError {
                         self.errorMessage = networkError.userMessage
                     } else {

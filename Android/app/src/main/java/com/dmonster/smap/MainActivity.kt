@@ -21,6 +21,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.dmonster.smap.data.api.SmapApi
 import com.dmonster.smap.data.model.JoinGroupRequest
+import com.dmonster.smap.data.model.parseInviteLink
 import com.dmonster.smap.data.GlobalEvent
 import com.dmonster.smap.data.GlobalEventBus
 import kotlinx.coroutines.launch
@@ -63,7 +64,7 @@ class MainActivity : ComponentActivity() {
         val isLoggedIn = authService.isLoggedIn
 
         if (BuildConfig.DEBUG) {
-            Log.d(TAG, "[AUTH_GUARD] Check: $isLoggedIn (Token=${authService.getToken()?.take(5)}..., User=${authService.getUserData()?.displayName})")
+            Log.d(TAG, "[AUTH_GUARD] Check: $isLoggedIn")
         }
 
         if (!isLoggedIn) {
@@ -92,7 +93,7 @@ class MainActivity : ComponentActivity() {
                         text = { androidx.compose.material3.Text(message) },
                         confirmButton = { androidx.compose.material3.TextButton(onClick = {
                             inviteMessage.value = null
-                            if (inviteFailed.value) processPendingInvite()
+                            if (inviteFailed.value || getSharedPreferences("smap_prefs", MODE_PRIVATE).contains("pending_group_id")) processPendingInvite()
                         }) { androidx.compose.material3.Text(if (inviteFailed.value) "다시 시도" else "확인") } },
                         dismissButton = if (inviteFailed.value) ({ androidx.compose.material3.TextButton(onClick = { inviteMessage.value = null }) { androidx.compose.material3.Text("닫기") } }) else null
                     )
@@ -215,7 +216,6 @@ class MainActivity : ComponentActivity() {
                     MainTabScreen(
                         onLogout = {
                             stopLocationService()
-                            authService.logout()
                             navigateToLogin()
                         }
                     )
@@ -411,42 +411,30 @@ class MainActivity : ComponentActivity() {
         val prefs = getSharedPreferences("smap_prefs", MODE_PRIVATE)
         val value = prefs.getString("pending_group_id", null) ?: return
         val groupId = value.toIntOrNull() ?: return
+        val code = prefs.getString("pending_group_code", null)
         val memberId = authService.getMtIdx()
         if (joiningInvite || memberId == 0 || !authService.isLoggedIn) return
         joiningInvite = true
         lifecycleScope.launch {
             try {
-                smapApi.joinGroupFromInvite(groupId, JoinGroupRequest(memberId, groupId)).close()
-                if (prefs.getString("pending_group_id", null) == value) prefs.edit().remove("pending_group_id").apply()
+                smapApi.joinGroupFromInvite(groupId, JoinGroupRequest(memberId, groupId, code)).close()
+                if (prefs.getString("pending_group_id", null) == value && prefs.getString("pending_group_code", null) == code)
+                    prefs.edit().remove("pending_group_id").remove("pending_group_code").apply()
                 GlobalEventBus.emit(GlobalEvent.GroupsChanged)
                 inviteFailed.value = false
                 inviteMessage.value = "그룹에 가입했습니다."
             } catch (e: Exception) {
                 inviteFailed.value = true
-                inviteMessage.value = "그룹 가입에 실패했습니다. 다시 시도해 주세요."
+                inviteMessage.value = if (e is retrofit2.HttpException && e.code() == 403) "초대 링크가 유효하지 않거나 만료됐어요" else "그룹 가입에 실패했습니다. 다시 시도해 주세요."
             } finally { joiningInvite = false }
         }
     }
 
     private fun handleDeepLink(intent: Intent?) {
-        intent?.data?.let { uri ->
-            Log.d(TAG, "[DEEP_LINK] Received URI: $uri")
-
-            // smap://group/{id}/join 처리
-            if (uri.scheme == "smap" && uri.host == "group") {
-                val pathSegments = uri.pathSegments
-                if (pathSegments.size >= 2 && pathSegments[1] == "join") {
-                    val groupId = pathSegments[0]
-                    if (groupId.toIntOrNull() != null) {
-                        Log.d(TAG, "[DEEP_LINK] Group ID: $groupId")
-                        getSharedPreferences("smap_prefs", MODE_PRIVATE).edit()
-                            .putString("pending_group_id", groupId)
-                            .apply()
-                    } else {
-                        Log.e(TAG, "[DEEP_LINK] Invalid group ID: $groupId")
-                    }
-                }
-            }
-        }
+        val invite = intent?.dataString?.let(::parseInviteLink) ?: return
+        getSharedPreferences("smap_prefs", MODE_PRIVATE).edit()
+            .putString("pending_group_id", invite.groupId.toString())
+            .putString("pending_group_code", invite.code)
+            .apply()
     }
 }

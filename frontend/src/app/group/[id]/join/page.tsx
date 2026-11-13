@@ -216,10 +216,10 @@ export default function GroupJoinPage() {
     try {
       if (isIOS()) {
         // iOS Safari에서 안전한 딥링크 처리
-        const deepLink = `smap://group/${groupId}/join`;
+        const deepLink = `smap://group/${groupId}/join${window.location.search}`;
         const fallbackUrl = APP_STORE_URL;
 
-        console.log(`[GROUP_JOIN] iOS 딥링크 시도: ${deepLink}`);
+        console.log('[GROUP_JOIN] iOS 딥링크 시도');
 
         // iOS에서 더 안전한 딥링크 처리 방법
         let appOpened = false;
@@ -292,8 +292,8 @@ export default function GroupJoinPage() {
 
       } else if (isAndroid()) {
         // 안드로이드에서 더 안정적인 방법 사용
-        const deepLink = `smap://group/${groupId}/join`;
-        console.log(`[GROUP_JOIN] Android 딥링크 시도: ${deepLink}`);
+        const deepLink = `smap://group/${groupId}/join${window.location.search}`;
+        console.log('[GROUP_JOIN] Android 딥링크 시도');
         let appOpened = false;
 
         // 페이지 가시성 변화를 감지하여 앱이 열렸는지 확인

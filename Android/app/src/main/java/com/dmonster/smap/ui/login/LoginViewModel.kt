@@ -127,7 +127,7 @@ class LoginViewModel @Inject constructor(
             }) {
                 is ApiResult.Success -> {
                     Log.d("LoginViewModel", "📥 Backend 응답 수신: success=${result.data.success}")
-                    handleSocialLoginResponse(result.data, "google", email, name, googleId, profileImage)
+                    handleSocialLoginResponse(result.data, "google", email, name, googleId, profileImage, idToken)
                 }
                 is ApiResult.Error -> {
                     Log.e("LoginViewModel", "❌ Google 로그인 실패 (${result.code})")
@@ -166,7 +166,7 @@ class LoginViewModel @Inject constructor(
             }) {
                 is ApiResult.Success -> {
                     Log.d("LoginViewModel", "📥 Backend 응답 수신: success=${result.data.success}")
-                    handleSocialLoginResponse(result.data, "kakao", email, nickname, kakaoId, profileImage)
+                    handleSocialLoginResponse(result.data, "kakao", email, nickname, kakaoId, profileImage, accessToken)
                 }
                 is ApiResult.Error -> {
                     Log.e("LoginViewModel", "❌ Kakao 로그인 실패 (${result.code})")
@@ -186,13 +186,16 @@ class LoginViewModel @Inject constructor(
         email: String?,
         name: String?,
         socialId: String?,
-        profileImage: String? = null
+        profileImage: String? = null,
+        providerToken: String
     ) {
         if (response.success == true) {
             val isNewUser = response.isNewUser ?: response.data?.isNewUser ?: false
             android.util.Log.d("LoginViewModel", "📊 Social Login Status - isNewUser: $isNewUser")
             
             if (isNewUser) {
+                authService.pendingSocialProvider = provider
+                authService.pendingSocialToken = providerToken
                 _uiState.value = _uiState.value.copy(
                     isNewUser = true,
                     socialLoginData = mapOf(
@@ -265,7 +268,9 @@ class LoginViewModel @Inject constructor(
      * 로그아웃
      */
     fun logout() {
-        authService.logout()
-        _uiState.value = LoginUiState()
+        viewModelScope.launch {
+            authService.logoutWithUnregister()
+            _uiState.value = LoginUiState()
+        }
     }
 }
