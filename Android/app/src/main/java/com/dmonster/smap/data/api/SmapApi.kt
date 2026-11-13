@@ -325,4 +325,16 @@ interface SmapApi {
         @Query("before") before: Int? = null,
         @Query("limit") limit: Int = 50
     ): List<ChatMessage>
+
+    // =========================================================================
+    // Subscription endpoints (계약 문서 3절)
+    // =========================================================================
+
+    /** GET /subscriptions/me — 현재 로그인한 회원의 구독 상태 */
+    @GET("subscriptions/me")
+    suspend fun getSubscriptionMe(): SubscriptionStatusResponse
+
+    /** POST /subscriptions/verify — 스토어 구매·복원 토큰 검증 및 반영 */
+    @POST("subscriptions/verify")
+    suspend fun verifySubscription(@Body request: SubscriptionVerifyRequest): SubscriptionStatusResponse
 }

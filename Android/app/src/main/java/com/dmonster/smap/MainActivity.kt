@@ -25,7 +25,9 @@ import com.dmonster.smap.data.model.parseInviteLink
 import com.dmonster.smap.data.GlobalEvent
 import com.dmonster.smap.data.GlobalEventBus
 import kotlinx.coroutines.launch
+import com.dmonster.smap.data.billing.BillingManager
 import com.dmonster.smap.data.service.AuthService
+import com.dmonster.smap.data.service.SubscriptionService
 import com.dmonster.smap.ui.components.BackgroundLocationGuideDialog
 import com.dmonster.smap.ui.components.LocationDeniedOverlay
 import com.dmonster.smap.ui.login.LoginActivity
@@ -43,6 +45,8 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var authService: AuthService
     @Inject lateinit var smapApi: SmapApi
+    @Inject lateinit var subscriptionService: SubscriptionService
+    @Inject lateinit var billingManager: BillingManager
     private val inviteMessage = mutableStateOf<String?>(null)
     private val inviteFailed = mutableStateOf(false)
     private var joiningInvite = false
@@ -83,6 +87,8 @@ class MainActivity : ComponentActivity() {
         // 그 결과 푸시 전송이 전체적으로 중단됐다(서버 토큰 보유율 15.6%).
         // 앱 진입마다 getToken→/member-fcm-token/register 를 호출해 등록 파이프라인을 복구한다.
         ensureFcmTokenRegistered()
+        lifecycleScope.launch { subscriptionService.refreshSubscriptionStatus() }
+        lifecycleScope.launch { billingManager.reprocessPendingPurchases() }
 
         setContent {
             SmapTheme {
@@ -279,6 +285,9 @@ class MainActivity : ComponentActivity() {
     // Re-check when returning from Settings
     override fun onResume() {
         super.onResume()
+        if (authService.isLoggedIn) {
+            lifecycleScope.launch { billingManager.reprocessPendingPurchases() }
+        }
         if (hasLocationPermissions()) {
             showLocationDeniedOverlay.value = false
             if (hasBackgroundLocationPermission()) {

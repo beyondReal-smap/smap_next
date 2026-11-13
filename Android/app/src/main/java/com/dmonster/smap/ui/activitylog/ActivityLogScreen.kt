@@ -86,6 +86,8 @@ fun ActivityLogScreen(
     val memberActivityStats by viewModel.memberActivityStats.collectAsState()
     val selectedDate by viewModel.selectedDate.collectAsState()
     val stayTimes by viewModel.stayTimes.collectAsState()
+    val subscriptionStatus by viewModel.subscriptionStatus.collectAsState()
+    val retentionExceededMessage by viewModel.retentionExceededMessage.collectAsState()
 
     var mapLogs by remember { mutableStateOf(locationLogs) }
     var mapStayTimes by remember { mutableStateOf(stayTimes) }
@@ -449,7 +451,9 @@ fun ActivityLogScreen(
                 onGroupSelect = { viewModel.selectGroup(it) },
                 onMemberSelect = { viewModel.selectMember(it) },
                 onMemberAndDateSelect = { member, date -> viewModel.selectMemberAndDate(member, date) },
-                onClose = { viewModel.hideMemberSidebar() }
+                onClose = { viewModel.hideMemberSidebar() },
+                subscriptionStatus = subscriptionStatus,
+                onLockedDateClick = { date -> viewModel.onLockedDateClicked(date) }
             )
         }
         
@@ -535,5 +539,30 @@ fun ActivityLogScreen(
                 .align(Alignment.BottomCenter)
                 .zIndex(100f)
         )
+
+        retentionExceededMessage?.let { message ->
+            AlertDialog(
+                onDismissRequest = { viewModel.clearRetentionExceeded() },
+                title = { Text("활동 기록 조회 안내") },
+                text = { Text(message) },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            viewModel.clearRetentionExceeded()
+                            com.dmonster.smap.data.GlobalEventBus.tryEmit(
+                                com.dmonster.smap.data.GlobalEvent.OpenSubscriptionScreen
+                            )
+                        }
+                    ) {
+                        Text("프리미엄 알아보기")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { viewModel.clearRetentionExceeded() }) {
+                        Text("닫기")
+                    }
+                }
+            )
+        }
     }
 }

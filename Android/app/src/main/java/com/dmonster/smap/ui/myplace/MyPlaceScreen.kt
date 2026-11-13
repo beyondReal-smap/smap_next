@@ -80,6 +80,7 @@ fun MyPlaceScreen(
     val pendingLocation by viewModel.pendingLocation.collectAsState()
     val pendingPlaceInfo by viewModel.pendingPlaceInfo.collectAsState()
     val isCreating by viewModel.isCreating.collectAsState()
+    val limitExceededMessage by viewModel.limitExceededMessage.collectAsState()
     
     // Search States
     val showSearchScreen by viewModel.showSearchScreen.collectAsState()
@@ -423,6 +424,31 @@ fun MyPlaceScreen(
                 viewModel.deleteLocation(location.sltIdx)
             },
             isLoading = isLoading
+        )
+    }
+
+    limitExceededMessage?.let { message ->
+        AlertDialog(
+            onDismissRequest = { viewModel.clearLimitExceeded() },
+            title = { Text("내 장소 등록 안내") },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.clearLimitExceeded()
+                        com.dmonster.smap.data.GlobalEventBus.tryEmit(
+                            com.dmonster.smap.data.GlobalEvent.OpenSubscriptionScreen
+                        )
+                    }
+                ) {
+                    Text("프리미엄 알아보기")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.clearLimitExceeded() }) {
+                    Text("닫기")
+                }
+            }
         )
     }
     }

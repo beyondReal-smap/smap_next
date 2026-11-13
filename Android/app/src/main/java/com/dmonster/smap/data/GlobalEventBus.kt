@@ -23,4 +23,6 @@ object GlobalEventBus {
 sealed class GlobalEvent {
     data object GroupsChanged : GlobalEvent()
     data object ScheduleChanged : GlobalEvent()
+    data object LoggedOut : GlobalEvent()
+    data object OpenSubscriptionScreen : GlobalEvent()
 }

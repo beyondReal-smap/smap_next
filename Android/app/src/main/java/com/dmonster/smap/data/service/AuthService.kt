@@ -115,6 +115,7 @@ class AuthService(
         val refresh = tokenStore.getRefreshToken()
         prefs.edit().clear().apply()
         tokenStore.clearRefreshToken()
+        com.dmonster.smap.data.GlobalEventBus.tryEmit(com.dmonster.smap.data.GlobalEvent.LoggedOut)
         Log.d(TAG, "Logged out - local cleared")
 
         if (!refresh.isNullOrBlank()) {

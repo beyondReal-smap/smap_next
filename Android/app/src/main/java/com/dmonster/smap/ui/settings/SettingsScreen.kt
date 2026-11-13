@@ -30,6 +30,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.dmonster.smap.BuildConfig
+import com.dmonster.smap.data.GlobalEvent
+import com.dmonster.smap.data.GlobalEventBus
 import com.dmonster.smap.data.model.SmapNotice
 import com.dmonster.smap.ui.common.rememberSmapHaptics
 import com.dmonster.smap.ui.theme.BrandColors
@@ -144,6 +146,14 @@ fun SettingsScreen(
                             iconBg = SettingsColors.AccountBg,
                             title = "계정설정",
                             onClick = { isAccountSettingsVisible = true }
+                        )
+                        HorizontalDivider(color = SettingsColors.Divider, thickness = 1.dp, modifier = Modifier.padding(start = 56.dp))
+                        SettingsMenuItem(
+                            icon = Icons.Default.WorkspacePremium,
+                            iconColor = BrandColors.Primary,
+                            iconBg = SettingsColors.AccountBg,
+                            title = "SMAP 프리미엄",
+                            onClick = { GlobalEventBus.tryEmit(GlobalEvent.OpenSubscriptionScreen) }
                         )
                     }
 

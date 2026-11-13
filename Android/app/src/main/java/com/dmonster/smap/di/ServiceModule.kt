@@ -1,12 +1,15 @@
 package com.dmonster.smap.di
 
+import android.content.Context
 import android.content.SharedPreferences
 import com.dmonster.smap.data.api.SmapApi
 import com.dmonster.smap.data.auth.TokenStore
+import com.dmonster.smap.data.billing.BillingManager
 import com.dmonster.smap.data.service.*
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
@@ -48,4 +51,18 @@ object ServiceModule {
     @Provides @Singleton
     fun provideChatSocketManager(authService: AuthService): ChatSocketManager =
         ChatSocketManager(authService)
+
+    @Provides @Singleton
+    fun provideSubscriptionService(
+        api: SmapApi,
+        prefs: SharedPreferences,
+        authService: AuthService
+    ): SubscriptionService = SubscriptionService(api, prefs, authService)
+
+    @Provides @Singleton
+    fun provideBillingManager(
+        @ApplicationContext context: Context,
+        subscriptionService: SubscriptionService,
+        authService: AuthService
+    ): BillingManager = BillingManager(context, subscriptionService, authService)
 }

@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,6 +33,8 @@ import coil.compose.AsyncImage
 import com.dmonster.smap.data.model.DailyCount
 import com.dmonster.smap.data.model.SmapGroup
 import com.dmonster.smap.data.model.SmapGroupMember
+import com.dmonster.smap.data.model.SubscriptionStatusResponse
+import com.dmonster.smap.data.service.SubscriptionPolicy
 import com.dmonster.smap.ui.common.rememberSmapHaptics
 import com.dmonster.smap.ui.theme.AccentColors
 import com.dmonster.smap.ui.theme.ActivityLogColors
@@ -57,7 +60,9 @@ fun ActivityMemberSidebar(
     onMemberSelect: (SmapGroupMember) -> Unit,
     onMemberAndDateSelect: (SmapGroupMember, java.time.LocalDate) -> Unit,
     @Suppress("UNUSED_PARAMETER") onClose: () -> Unit, // 닫기 로직은 스크림 탭으로 대신 처리 — 시그니처 유지
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    subscriptionStatus: SubscriptionStatusResponse? = null,
+    onLockedDateClick: ((java.time.LocalDate) -> Unit)? = null
 ) {
     // Calculate last 14 days for heatmap (recalculates across midnight)
     val today = remember(System.currentTimeMillis() / 86400000) { java.time.LocalDate.now() }
@@ -255,7 +260,9 @@ fun ActivityMemberSidebar(
                                     onClick = { onMemberSelect(member) },
                                     onDateSelect = { onMemberAndDateSelect(member, it) },
                                     dailyCounts = dailyCounts,
-                                    heatmapDates = heatmapDates
+                                    heatmapDates = heatmapDates,
+                                    subscriptionStatus = subscriptionStatus,
+                                    onLockedDateClick = onLockedDateClick
                                 )
                             }
                         }
@@ -275,7 +282,9 @@ fun ActivityMemberCard(
     onClick: () -> Unit,
     onDateSelect: (java.time.LocalDate) -> Unit,
     dailyCounts: List<DailyCount>,
-    heatmapDates: List<java.time.LocalDate>
+    heatmapDates: List<java.time.LocalDate>,
+    subscriptionStatus: SubscriptionStatusResponse? = null,
+    onLockedDateClick: ((java.time.LocalDate) -> Unit)? = null
 ) {
     // Parse dailyCounts into a Set of active LocalDates for robust matching
     val activeDates = remember(dailyCounts) {
@@ -402,7 +411,9 @@ fun ActivityMemberCard(
                         activeDates = activeDates,
                         isSelected = isSelected,
                         selectedDate = selectedDate,
-                        onDateSelect = onDateSelect
+                        onDateSelect = onDateSelect,
+                        subscriptionStatus = subscriptionStatus,
+                        onLockedDateClick = onLockedDateClick
                     )
 
                     Spacer(modifier = Modifier.height(6.dp))
@@ -427,7 +438,9 @@ fun ActivityHeatmap(
     activeDates: Set<java.time.LocalDate>,
     isSelected: Boolean,
     selectedDate: java.time.LocalDate,
-    onDateSelect: (java.time.LocalDate) -> Unit
+    onDateSelect: (java.time.LocalDate) -> Unit,
+    subscriptionStatus: SubscriptionStatusResponse? = null,
+    onLockedDateClick: ((java.time.LocalDate) -> Unit)? = null
 ) {
     // iOS style: 2 Rows x 7 Columns = 14 days
     // Row 0: Day headers (S M T W T F S)
@@ -494,12 +507,18 @@ fun ActivityHeatmap(
             (0..6).forEach { index ->
                 if (index < dates.size) {
                     val date = dates[index]
+                    val isLocked = SubscriptionPolicy.isActivityDateLocked(date, today, subscriptionStatus)
                     HeatmapCell(
                         date = date,
                         isActive = date in activeDates,
                         isSelectedDate = isSelected && date == selectedDate,
                         isToday = date == today,
-                        onClick = if (date in activeDates) {{ onDateSelect(date) }} else null
+                        isLocked = isLocked,
+                        onClick = when {
+                            isLocked -> {{ onLockedDateClick?.invoke(date) }}
+                            date in activeDates -> {{ onDateSelect(date) }}
+                            else -> null
+                        }
                     )
                 }
             }
@@ -513,12 +532,18 @@ fun ActivityHeatmap(
             (7..13).forEach { index ->
                 if (index < dates.size) {
                     val date = dates[index]
+                    val isLocked = SubscriptionPolicy.isActivityDateLocked(date, today, subscriptionStatus)
                     HeatmapCell(
                         date = date,
                         isActive = date in activeDates,
                         isSelectedDate = isSelected && date == selectedDate,
                         isToday = date == today,
-                        onClick = if (date in activeDates) {{ onDateSelect(date) }} else null
+                        isLocked = isLocked,
+                        onClick = when {
+                            isLocked -> {{ onLockedDateClick?.invoke(date) }}
+                            date in activeDates -> {{ onDateSelect(date) }}
+                            else -> null
+                        }
                     )
                 }
             }
@@ -532,7 +557,8 @@ fun HeatmapCell(
     isActive: Boolean,
     isSelectedDate: Boolean,
     isToday: Boolean,
-    onClick: (() -> Unit)?
+    onClick: (() -> Unit)?,
+    isLocked: Boolean = false
 ) {
     val indigoColor = ActivityLogColors.HeatmapActive
     val pinkColor = ActivityLogColors.HeatmapSelectedStart
@@ -540,6 +566,7 @@ fun HeatmapCell(
     val haptics = rememberSmapHaptics()
 
     val cellStatusLabel = when {
+        isLocked -> "잠김, 프리미엄 필요"
         isSelectedDate -> "선택됨"
         isActive -> "기록 있음"
         else -> "기록 없음"
@@ -579,7 +606,14 @@ fun HeatmapCell(
         contentAlignment = Alignment.Center
     ) {
         // Today indicator dot (iOS style) - using Box for perfect centering
-        if (isToday) {
+        if (isLocked) {
+            Icon(
+                imageVector = Icons.Outlined.Lock,
+                contentDescription = null,
+                tint = if (isActive || isSelectedDate) Color.White.copy(alpha = 0.9f) else Color.Gray,
+                modifier = Modifier.size(10.dp)
+            )
+        } else if (isToday) {
             Box(
                 modifier = Modifier
                     .size(8.dp)

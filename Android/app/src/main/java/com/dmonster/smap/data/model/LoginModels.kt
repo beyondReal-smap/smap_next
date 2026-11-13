@@ -52,6 +52,8 @@ data class SMAPUser(
     @SerialName("mt_hp") val mtHp: String? = null,
     @SerialName("mt_level") val mtLevel: Int? = null,
     @SerialName("mt_status") val mtStatus: Int? = null,
+    @SerialName("mt_plan_date") val mtPlanDate: String? = null,
+    @SerialName("mt_plan_check") val mtPlanCheck: String? = null,
     @SerialName("mt_type") val mtType: Int? = null,          // 1: 일반, 2: Kakao, 3: Apple, 4: Google
     @SerialName("mt_file1") val mtFile1: String? = null,     // 프로필 이미지
     @SerialName("mt_google_id") val mtGoogleId: String? = null,

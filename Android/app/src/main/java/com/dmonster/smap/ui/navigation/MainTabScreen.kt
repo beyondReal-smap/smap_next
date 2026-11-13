@@ -28,6 +28,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.dmonster.smap.data.GlobalEvent
+import com.dmonster.smap.data.GlobalEventBus
 import com.dmonster.smap.ui.activitylog.ActivityLogScreen
 import com.dmonster.smap.ui.chat.ChatScreen
 import com.dmonster.smap.ui.group.GroupScreen
@@ -36,6 +38,7 @@ import com.dmonster.smap.ui.home.HomeScreen
 import com.dmonster.smap.ui.home.HomeViewModel
 import com.dmonster.smap.ui.myplace.MyPlaceScreen
 import com.dmonster.smap.ui.schedule.ScheduleScreen
+import com.dmonster.smap.ui.subscription.SubscriptionScreen
 import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.SuiteFont
 
@@ -69,8 +72,17 @@ fun MainTabScreen(
     // 홈의 설정·알림 오버레이가 열려 있으면 하단 탭바를 가려, 오버레이 위로 탭바가 노출되거나
     // 오버레이를 연 채 탭을 바꿔 설정 상태가 사라지는 일을 막는다.
     var homeOverlayOpen by remember { mutableStateOf(false) }
+    var showSubscriptionScreen by rememberSaveable { mutableStateOf(false) }
     if (selectedTabIndex == 3) visitedMyPlace = true
     if (selectedTabIndex == 4) visitedActivityLog = true
+
+    LaunchedEffect(Unit) {
+        GlobalEventBus.events.collect { event ->
+            if (event is GlobalEvent.OpenSubscriptionScreen) {
+                showSubscriptionScreen = true
+            }
+        }
+    }
     
     // HomeViewModel to access group creation modal state
     val homeViewModel: HomeViewModel = hiltViewModel()
@@ -97,7 +109,7 @@ fun MainTabScreen(
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0), // 시스템 인셋 수동 제어
         bottomBar = {
-            if (!(selectedTabIndex == 0 && homeOverlayOpen)) NavigationBar(
+            if (!showSubscriptionScreen && !(selectedTabIndex == 0 && homeOverlayOpen)) NavigationBar(
                 modifier = Modifier, // Remove fixed height to allow flexible inset-based taller height on gesture nav
                 containerColor = Color.White,
                 tonalElevation = 0.dp,
@@ -182,6 +194,12 @@ fun MainTabScreen(
                     onJoinGroup = { inviteCode -> homeViewModel.joinGroup(inviteCode) },
                     errorMessage = errorMessage,
                     onDismiss = { homeViewModel.hideGroupCreationModal() }
+                )
+            }
+
+            if (showSubscriptionScreen) {
+                SubscriptionScreen(
+                    onBack = { showSubscriptionScreen = false }
                 )
             }
         }

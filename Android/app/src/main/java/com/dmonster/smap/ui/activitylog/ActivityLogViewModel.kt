@@ -10,11 +10,15 @@ import com.dmonster.smap.data.model.DailyCount
 import com.dmonster.smap.data.model.LocationSummary
 import com.dmonster.smap.data.model.SmapGroup
 import com.dmonster.smap.data.model.SmapGroupMember
+import com.dmonster.smap.data.model.SubscriptionErrorCodes
+import com.dmonster.smap.data.model.SubscriptionStatusResponse
 import com.dmonster.smap.data.api.ApiResult
 import com.dmonster.smap.data.api.safeApiCall
 import com.dmonster.smap.data.service.ActivityLogService
 import com.dmonster.smap.data.service.AuthService
 import com.dmonster.smap.data.service.GroupService
+import com.dmonster.smap.data.service.SubscriptionPolicy
+import com.dmonster.smap.data.service.SubscriptionService
 import com.dmonster.smap.data.GlobalEvent
 import com.dmonster.smap.data.GlobalEventBus
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -37,7 +41,8 @@ import java.time.format.DateTimeFormatter
 class ActivityLogViewModel @Inject constructor(
     private val activityLogService: ActivityLogService,
     private val groupService: GroupService,
-    private val authService: AuthService
+    private val authService: AuthService,
+    private val subscriptionService: SubscriptionService
 ) : ViewModel() {
 
     companion object {
@@ -100,6 +105,21 @@ class ActivityLogViewModel @Inject constructor(
     // "기록 없음"과 "불러오기 실패"를 화면에서 구분한다.
     private val _loadFailed = MutableStateFlow(false)
     val loadFailed: StateFlow<Boolean> = _loadFailed.asStateFlow()
+
+    val subscriptionStatus: StateFlow<SubscriptionStatusResponse?> = subscriptionService.subscriptionStatus
+
+    private val _retentionExceededMessage = MutableStateFlow<String?>(null)
+    val retentionExceededMessage: StateFlow<String?> = _retentionExceededMessage.asStateFlow()
+
+    fun clearRetentionExceeded() {
+        _retentionExceededMessage.value = null
+    }
+
+    fun onLockedDateClicked(date: LocalDate) {
+        val status = subscriptionStatus.value
+        val days = status?.limits?.logRetentionDays ?: 2
+        _retentionExceededMessage.value = "무료 회원은 최근 ${days}일의 활동 기록만 볼 수 있어요."
+    }
 
     // Dialog States
     private val _showGroupSelector = MutableStateFlow(false)
@@ -247,8 +267,14 @@ class ActivityLogViewModel @Inject constructor(
                         _sliderValue.value = 0.0
                     }
                     is ApiResult.Error -> {
-                        _errorMessage.value = "활동 데이터를 불러오지 못했습니다 (${result.code})"
-                        _loadFailed.value = true
+                        if (result.code == 403 && result.detailCode == SubscriptionErrorCodes.LOG_RETENTION_EXCEEDED) {
+                            _locationLogs.value = emptyList()
+                            _retentionExceededMessage.value = result.detailMessage ?: "무료 회원은 최근 2일의 활동 기록만 볼 수 있어요."
+                            _loadFailed.value = false
+                        } else {
+                            _errorMessage.value = result.detailMessage ?: "활동 데이터를 불러오지 못했습니다 (${result.code})"
+                            _loadFailed.value = true
+                        }
                     }
                     is ApiResult.NetworkError -> {
                         _errorMessage.value = "네트워크 연결을 확인해주세요"
@@ -275,7 +301,12 @@ class ActivityLogViewModel @Inject constructor(
     // MARK: - Date Navigation
 
     fun selectDate(date: LocalDate) {
-        if (!date.isAfter(LocalDate.now())) {
+        val today = LocalDate.now()
+        if (SubscriptionPolicy.isActivityDateLocked(date, today, subscriptionStatus.value)) {
+            onLockedDateClicked(date)
+            return
+        }
+        if (!date.isAfter(today)) {
             _selectedDate.value = date
             loadActivityData()
         }
@@ -305,6 +336,10 @@ class ActivityLogViewModel @Inject constructor(
      * iOS 스타일 - 멤버 + 날짜를 동시에 선택 (히트맵 셀 탭 시)
      */
     fun selectMemberAndDate(member: SmapGroupMember, date: LocalDate) {
+        if (SubscriptionPolicy.isActivityDateLocked(date, LocalDate.now(), subscriptionStatus.value)) {
+            onLockedDateClicked(date)
+            return
+        }
         _selectedMember.value = member
         _selectedDate.value = date
         _showMemberSidebar.value = false

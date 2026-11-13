@@ -5,8 +5,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dmonster.smap.data.api.ApiResult
 import com.dmonster.smap.data.api.safeApiCall
+import com.dmonster.smap.data.billing.BillingManager
 import com.dmonster.smap.data.model.SocialLoginResponse
 import com.dmonster.smap.data.service.AuthService
+import com.dmonster.smap.data.service.SubscriptionService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,7 +39,9 @@ data class LoginUiState(
  */
 @HiltViewModel
 class LoginViewModel @Inject constructor(
-    private val authService: AuthService
+    private val authService: AuthService,
+    private val subscriptionService: SubscriptionService,
+    private val billingManager: BillingManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(LoginUiState(isLoggedIn = authService.isLoggedIn))
@@ -88,6 +92,8 @@ class LoginViewModel @Inject constructor(
                     Log.d("LoginViewModel", "📥 Backend 응답 수신: success=${response.success}")
                     if (response.success) {
                         Log.d("LoginViewModel", "✅ 로그인 성공 - 메인으로 이동 준비")
+                        viewModelScope.launch { subscriptionService.refreshSubscriptionStatus() }
+                        viewModelScope.launch { billingManager.reprocessPendingPurchases() }
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
                             isLoggedIn = true
@@ -209,6 +215,8 @@ class LoginViewModel @Inject constructor(
                 )
                 android.util.Log.d("LoginViewModel", "✅ 신규 ${provider.uppercase()} 회원 (ProfileImage: ${profileImage != null})")
             } else {
+                viewModelScope.launch { subscriptionService.refreshSubscriptionStatus() }
+                viewModelScope.launch { billingManager.reprocessPendingPurchases() }
                 _uiState.value = _uiState.value.copy(isLoggedIn = true)
                 android.util.Log.d("LoginViewModel", "✅ 기존 ${provider.uppercase()} 회원 로그인")
             }

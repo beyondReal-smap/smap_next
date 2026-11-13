@@ -9,6 +9,7 @@ import com.dmonster.smap.data.api.safeApiCall
 import com.dmonster.smap.data.model.SavedLocation
 import com.dmonster.smap.data.model.SmapGroup
 import com.dmonster.smap.data.model.SmapGroupMember
+import com.dmonster.smap.data.model.SubscriptionErrorCodes
 import com.dmonster.smap.data.service.AuthService
 import com.dmonster.smap.data.service.GroupService
 import com.dmonster.smap.data.service.MyPlaceService
@@ -81,6 +82,13 @@ class MyPlaceViewModel @Inject constructor(
 
     private val _successMessage = MutableStateFlow<String?>(null)
     val successMessage: StateFlow<String?> = _successMessage.asStateFlow()
+
+    private val _limitExceededMessage = MutableStateFlow<String?>(null)
+    val limitExceededMessage: StateFlow<String?> = _limitExceededMessage.asStateFlow()
+
+    fun clearLimitExceeded() {
+        _limitExceededMessage.value = null
+    }
 
     // Dialog States
     private val _showGroupSelector = MutableStateFlow(false)
@@ -522,7 +530,14 @@ class MyPlaceViewModel @Inject constructor(
                         _errorMessage.value = "장소 저장에 실패했습니다"
                     }
                 }
-                is ApiResult.Error -> _errorMessage.value = "장소 저장에 실패했습니다 (${result.code})"
+                is ApiResult.Error -> {
+                    if (result.code == 403 && result.detailCode == SubscriptionErrorCodes.PLACE_LIMIT_EXCEEDED) {
+                        hideAddDialog()
+                        _limitExceededMessage.value = result.detailMessage ?: "무료 회원은 내 장소를 2개까지 등록할 수 있어요."
+                    } else {
+                        _errorMessage.value = result.detailMessage ?: "장소 저장에 실패했습니다 (${result.code})"
+                    }
+                }
                 is ApiResult.NetworkError -> _errorMessage.value = "네트워크 연결을 확인해주세요"
             }
             _isCreating.value = false
