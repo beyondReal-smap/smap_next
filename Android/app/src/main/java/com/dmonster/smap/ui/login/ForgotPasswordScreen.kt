@@ -1,36 +1,71 @@
 package com.dmonster.smap.ui.login
 
-import androidx.compose.animation.*
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.outlined.Email
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Pin
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusDirection
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.*
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.dmonster.smap.ui.common.PhoneVisualTransformation
+import com.dmonster.smap.ui.components.SmapBanner
+import com.dmonster.smap.ui.components.SmapBannerTone
+import com.dmonster.smap.ui.components.SmapButton
+import com.dmonster.smap.ui.components.SmapPasswordField
+import com.dmonster.smap.ui.components.SmapTextButton
+import com.dmonster.smap.ui.components.SmapTextField
+import com.dmonster.smap.ui.components.SmapTopBar
+import com.dmonster.smap.ui.register.PasswordRuleChip
 import com.dmonster.smap.ui.theme.BrandColors
-import com.dmonster.smap.ui.theme.SuiteFont
+import com.dmonster.smap.ui.theme.SmapSpacing
+import com.dmonster.smap.ui.theme.SmapText
+
+private typealias Step = ForgotPasswordViewModel.Step
+private typealias Kind = ForgotPasswordViewModel.InputKind
 
 /**
  * 비밀번호 찾기 화면 (iOS ForgotPasswordView 참고)
+ * 가입 흐름(RegisterScreen)과 같은 구성: 상단바 + 진행 표시 + 본문 + 하단 고정 버튼, 오류는 화면 안 배너.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ForgotPasswordScreen(
     onDismiss: () -> Unit,
@@ -43,547 +78,364 @@ fun ForgotPasswordScreen(
     val verificationTimer by viewModel.verificationTimer.collectAsState()
     val newPassword by viewModel.newPassword.collectAsState()
     val confirmPassword by viewModel.confirmPassword.collectAsState()
-    val showNewPassword by viewModel.showNewPassword.collectAsState()
-    val showConfirmPassword by viewModel.showConfirmPassword.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
-    
-    // Snackbar for errors
-    val snackbarHostState = remember { SnackbarHostState() }
-    
+
+    // ViewModel 의 오류는 한 번 전달되면 비워진다. 알럿/스낵바 대신 화면 안 배너로 남겨 두고,
+    // 단계가 바뀌거나 사용자가 다시 입력하면 지운다. (단계 효과를 먼저 선언해 같은 프레임의
+    // "오류 + 단계 되돌림"에서 오류가 지워지지 않게 한다.)
+    var shownError by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(currentStep) { shownError = null }
     LaunchedEffect(errorMessage) {
         errorMessage?.let {
-            snackbarHostState.showSnackbar(it, duration = SnackbarDuration.Short)
+            shownError = it
             viewModel.clearError()
         }
     }
-    
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.White)
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            // Header (hide back arrow on COMPLETE step)
-            if (currentStep != ForgotPasswordViewModel.Step.COMPLETE) {
-                Row(
+
+    val goBack: () -> Unit = { if (!viewModel.goBack()) onDismiss() }
+    BackHandler(enabled = currentStep != Step.COMPLETE) { goBack() }
+
+    Scaffold(
+        containerColor = MaterialTheme.colorScheme.surface,
+        topBar = {
+            SmapTopBar(
+                title = "비밀번호 찾기",
+                onBack = if (currentStep != Step.COMPLETE) goBack else null,
+            )
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            if (currentStep != Step.COMPLETE) {
+                LinearProgressIndicator(
+                    progress = { progressOf(currentStep) },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = {
-                        if (!viewModel.goBack()) {
-                            onDismiss()
-                        }
-                    }) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "뒤로",
-                            tint = Color.Black
-                        )
-                    }
-                    Spacer(modifier = Modifier.weight(1f))
-                }
+                        .height(4.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
             }
-            
-            // Content
-            Column(
+
+            Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 24.dp)
+                    .weight(1f)
+                    .fillMaxWidth()
             ) {
-                // Title Section
-                TitleSection(currentStep, sentKind)
-                
-                Spacer(modifier = Modifier.height(30.dp))
-                
-                // Step Content with Animation
                 AnimatedContent(
                     targetState = currentStep,
                     transitionSpec = {
                         slideInHorizontally { it } + fadeIn() togetherWith
-                                slideOutHorizontally { -it } + fadeOut()
+                            slideOutHorizontally { -it } + fadeOut()
                     },
                     label = "step_transition"
                 ) { step ->
-                    when (step) {
-                        ForgotPasswordViewModel.Step.PHONE -> PhoneStepContent(
-                            phoneNumber = phoneNumber,
-                            onPhoneChange = { viewModel.updatePhoneNumber(it) },
-                            onSendCode = { viewModel.checkUserAndSendCode() },
-                            isLoading = isLoading
-                        )
-                        ForgotPasswordViewModel.Step.VERIFICATION -> VerificationStepContent(
-                            verificationCode = verificationCode,
-                            onCodeChange = { viewModel.updateVerificationCode(it) },
-                            timer = verificationTimer,
-                            onVerify = { viewModel.verifyCode() },
-                            onResend = { viewModel.checkUserAndSendCode() }
-                        )
-                        ForgotPasswordViewModel.Step.NEW_PASSWORD -> NewPasswordStepContent(
-                            newPassword = newPassword,
-                            confirmPassword = confirmPassword,
-                            showNewPassword = showNewPassword,
-                            showConfirmPassword = showConfirmPassword,
-                            onNewPasswordChange = { viewModel.updateNewPassword(it) },
-                            onConfirmPasswordChange = { viewModel.updateConfirmPassword(it) },
-                            onToggleNewPassword = { viewModel.toggleShowNewPassword() },
-                            onToggleConfirmPassword = { viewModel.toggleShowConfirmPassword() },
-                            isPasswordLengthValid = viewModel.isPasswordLengthValid,
-                            hasPasswordLetter = viewModel.hasPasswordLetter,
-                            hasPasswordNumber = viewModel.hasPasswordNumber,
-                            hasPasswordSpecialChar = viewModel.hasPasswordSpecialChar,
-                            passwordsMatch = viewModel.passwordsMatch,
-                            isRulesSatisfied = viewModel.isPasswordRulesSatisfied,
-                            onResetPassword = { viewModel.resetPassword() },
-                            isLoading = isLoading
-                        )
-                        ForgotPasswordViewModel.Step.COMPLETE -> CompleteStepContent(
-                            showEmailHint = sentKind == ForgotPasswordViewModel.InputKind.PHONE,
-                            onDismiss = onDismiss
-                        )
+                    if (step == Step.COMPLETE) {
+                        CompleteStepContent(showEmailHint = sentKind == Kind.PHONE)
+                    } else {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .verticalScroll(rememberScrollState())
+                                .padding(24.dp)
+                        ) {
+                            when (step) {
+                                Step.PHONE -> PhoneStepContent(
+                                    input = phoneNumber,
+                                    onInputChange = {
+                                        shownError = null
+                                        viewModel.updatePhoneNumber(it)
+                                    },
+                                    canSend = ForgotPasswordViewModel.classify(phoneNumber) != Kind.INVALID,
+                                    isLoading = isLoading,
+                                    onSendCode = { viewModel.checkUserAndSendCode() },
+                                )
+                                Step.VERIFICATION -> VerificationStepContent(
+                                    target = phoneNumber.trim(),
+                                    sentKind = sentKind,
+                                    code = verificationCode,
+                                    onCodeChange = {
+                                        shownError = null
+                                        viewModel.updateVerificationCode(it)
+                                    },
+                                    timer = verificationTimer,
+                                    resendWait = viewModel.remainingResendSeconds(),
+                                    canResend = !isLoading,
+                                    onResend = { viewModel.checkUserAndSendCode() },
+                                )
+                                Step.NEW_PASSWORD -> NewPasswordStepContent(
+                                    newPassword = newPassword,
+                                    confirmPassword = confirmPassword,
+                                    onNewPasswordChange = {
+                                        shownError = null
+                                        viewModel.updateNewPassword(it)
+                                    },
+                                    onConfirmPasswordChange = {
+                                        shownError = null
+                                        viewModel.updateConfirmPassword(it)
+                                    },
+                                    isPasswordLengthValid = viewModel.isPasswordLengthValid,
+                                    hasPasswordLetter = viewModel.hasPasswordLetter,
+                                    hasPasswordNumber = viewModel.hasPasswordNumber,
+                                    hasPasswordSpecialChar = viewModel.hasPasswordSpecialChar,
+                                    passwordsMatch = viewModel.passwordsMatch,
+                                )
+                                Step.COMPLETE -> {}
+                            }
+                        }
                     }
                 }
             }
-        }
-        
-        // Loading Overlay
-        if (isLoading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(
-                    color = BrandColors.Primary,
-                    modifier = Modifier.size(48.dp)
+
+            shownError?.let {
+                SmapBanner(
+                    message = it,
+                    tone = SmapBannerTone.Error,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                 )
             }
+
+            val enabled = when (currentStep) {
+                Step.PHONE -> ForgotPasswordViewModel.classify(phoneNumber) != Kind.INVALID
+                Step.VERIFICATION -> verificationCode.length == 6
+                Step.NEW_PASSWORD -> viewModel.isPasswordRulesSatisfied && viewModel.passwordsMatch
+                Step.COMPLETE -> true
+            }
+            SmapButton(
+                text = when (currentStep) {
+                    Step.PHONE -> "인증번호 받기"
+                    Step.VERIFICATION -> "인증 확인"
+                    Step.NEW_PASSWORD -> "비밀번호 변경"
+                    Step.COMPLETE -> "로그인하러 가기"
+                },
+                onClick = {
+                    when (currentStep) {
+                        Step.PHONE -> viewModel.checkUserAndSendCode()
+                        Step.VERIFICATION -> viewModel.verifyCode()
+                        Step.NEW_PASSWORD -> viewModel.resetPassword()
+                        Step.COMPLETE -> onDismiss()
+                    }
+                },
+                enabled = enabled,
+                isLoading = isLoading,
+                modifier = Modifier.padding(24.dp),
+            )
         }
-        
-        // Snackbar Host
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.BottomCenter)
-        )
     }
+}
+
+private fun progressOf(step: Step): Float = when (step) {
+    Step.PHONE -> 1f / 3f
+    Step.VERIFICATION -> 2f / 3f
+    Step.NEW_PASSWORD, Step.COMPLETE -> 1f
 }
 
 @Composable
-private fun TitleSection(currentStep: ForgotPasswordViewModel.Step, sentKind: ForgotPasswordViewModel.InputKind) {
-    val (title, description) = when (currentStep) {
-        ForgotPasswordViewModel.Step.PHONE -> "비밀번호 찾기" to "가입하실 때 사용한 이메일 또는 전화번호를 입력해주세요."
-        ForgotPasswordViewModel.Step.VERIFICATION -> "인증번호 입력" to (if (sentKind == ForgotPasswordViewModel.InputKind.PHONE) "문자로 보낸 6자리 인증번호를 입력해주세요." else "메일로 보낸 6자리 인증번호를 입력해주세요.")
-        ForgotPasswordViewModel.Step.NEW_PASSWORD -> "새 비밀번호 설정" to "새로운 비밀번호를 설정해주세요."
-        ForgotPasswordViewModel.Step.COMPLETE -> "설정 완료" to "비밀번호가 성공적으로 변경되었습니다."
-    }
-    
-    Column {
-        Text(
-            text = title,
-            fontSize = 28.sp,
-            fontFamily = SuiteFont,
-            fontWeight = FontWeight.Bold,
-            color = Color.Black
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = description,
-            fontSize = 16.sp,
-            fontFamily = SuiteFont,
-            fontWeight = FontWeight.Medium,
-            color = Color.Gray
-        )
-    }
+private fun StepHeader(title: String, description: String) {
+    Text(text = title, style = SmapText.title, color = MaterialTheme.colorScheme.onSurface)
+    Text(text = description, style = SmapText.secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
+/** 1단계 — 가입할 때 쓴 이메일 또는 전화번호를 입력한다. */
 @Composable
 private fun PhoneStepContent(
-    phoneNumber: String,
-    onPhoneChange: (String) -> Unit,
+    input: String,
+    onInputChange: (String) -> Unit,
+    canSend: Boolean,
+    isLoading: Boolean,
     onSendCode: () -> Unit,
-    isLoading: Boolean
 ) {
-    val canSend = ForgotPasswordViewModel.classify(phoneNumber) != ForgotPasswordViewModel.InputKind.INVALID
-    Column(verticalArrangement = Arrangement.spacedBy(40.dp)) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(
-                text = "이메일 또는 전화번호",
-                fontSize = 14.sp,
-                fontFamily = SuiteFont,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.Gray
-            )
-            
-            OutlinedTextField(
-                value = phoneNumber,
-                onValueChange = onPhoneChange,
-                placeholder = { Text("이메일 주소 또는 전화번호", fontFamily = SuiteFont) },
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Text,
-                    imeAction = ImeAction.Done
-                ),
-                keyboardActions = KeyboardActions(
-                    onDone = { if (canSend && !isLoading) onSendCode() }
-                ),
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color(0xFFF5F5F5),
-                    unfocusedContainerColor = Color(0xFFF5F5F5),
-                    focusedBorderColor = BrandColors.Primary.copy(alpha = 0.3f),
-                    unfocusedBorderColor = Color.Transparent
-                ),
-                singleLine = true
-            )
-        }
-        
-        Button(
-            onClick = onSendCode,
-            enabled = canSend && !isLoading,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = BrandColors.Primary,
-                disabledContainerColor = Color.Gray.copy(alpha = 0.3f)
-            )
-        ) {
-            Text(
-                text = "인증번호 받기",
-                fontSize = 18.sp,
-                fontFamily = SuiteFont,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-        }
+    Column(verticalArrangement = Arrangement.spacedBy(SmapSpacing.sm)) {
+        StepHeader(
+            title = "이메일 또는 전화번호를 입력해 주세요",
+            description = "가입할 때 쓴 주소로 인증번호를 보내 드려요."
+        )
+
+        Spacer(Modifier.height(SmapSpacing.md))
+
+        SmapTextField(
+            value = input,
+            onValueChange = onInputChange,
+            label = "이메일 또는 전화번호",
+            placeholder = "name@example.com",
+            leadingIcon = Icons.Outlined.Email,
+            keyboardType = KeyboardType.Email,
+            imeAction = ImeAction.Done,
+            keyboardActions = KeyboardActions(onDone = { if (canSend && !isLoading) onSendCode() }),
+        )
     }
 }
 
+/** 2단계 — 메일(또는 문자)로 받은 6자리 인증번호를 입력한다. */
 @Composable
 private fun VerificationStepContent(
-    verificationCode: String,
+    target: String,
+    sentKind: Kind,
+    code: String,
     onCodeChange: (String) -> Unit,
     timer: Int,
-    onVerify: () -> Unit,
-    onResend: () -> Unit
+    resendWait: Int,
+    canResend: Boolean,
+    onResend: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(40.dp)) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "인증번호",
-                    fontSize = 14.sp,
-                    fontFamily = SuiteFont,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.Gray
-                )
-                if (timer > 0) {
-                    Text(
-                        text = String.format("%d:%02d", timer / 60, timer % 60),
-                        fontSize = 14.sp,
-                        fontFamily = SuiteFont,
-                        fontWeight = FontWeight.Medium,
-                        color = Color.Red
-                    )
-                }
+    val isPhone = sentKind == Kind.PHONE
+    val expired = timer == 0
+
+    Column(verticalArrangement = Arrangement.spacedBy(SmapSpacing.sm)) {
+        StepHeader(
+            title = "인증번호를 입력해 주세요",
+            description = if (isPhone) {
+                "$target\n문자로 보낸 6자리 숫자를 입력해 주세요."
+            } else {
+                "$target\n위 주소로 보낸 6자리 숫자를 입력해 주세요."
             }
-            
-            OutlinedTextField(
-                value = verificationCode,
-                onValueChange = onCodeChange,
-                placeholder = { Text("6자리 입력", fontFamily = SuiteFont) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color(0xFFF5F5F5),
-                    unfocusedContainerColor = Color(0xFFF5F5F5),
-                    focusedBorderColor = BrandColors.Primary.copy(alpha = 0.3f),
-                    unfocusedBorderColor = Color.Transparent
-                ),
-                singleLine = true
+        )
+
+        Spacer(Modifier.height(SmapSpacing.md))
+
+        SmapTextField(
+            value = code,
+            onValueChange = onCodeChange,
+            label = "인증번호",
+            placeholder = "6자리 숫자",
+            leadingIcon = Icons.Outlined.Pin,
+            keyboardType = KeyboardType.NumberPassword,
+            imeAction = ImeAction.Done,
+            helperText = if (timer > 0) "남은 시간 ${formatTimer(timer)}" else null,
+            errorText = if (expired) "인증번호가 만료됐어요. 다시 받아 주세요." else null,
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = if (isPhone) "문자가 오지 않았나요?" else "메일이 오지 않았나요?",
+                style = SmapText.caption,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            SmapTextButton(
+                text = if (resendWait > 0) "다시 받기 (${resendWait}초)" else "인증번호 다시 받기",
+                onClick = onResend,
+                enabled = canResend && resendWait == 0,
             )
         }
-        
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Button(
-                onClick = onVerify,
-                enabled = verificationCode.length == 6,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = BrandColors.Primary,
-                    disabledContainerColor = Color.Gray.copy(alpha = 0.3f)
-                )
-            ) {
-                Text(
-                    text = "인증하기",
-                    fontSize = 18.sp,
-                    fontFamily = SuiteFont,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-            }
-            
-            TextButton(
-                onClick = onResend,
-                modifier = Modifier.align(Alignment.CenterHorizontally)
-            ) {
-                Text(
-                    text = "인증번호 재발송",
-                    fontSize = 14.sp,
-                    fontFamily = SuiteFont,
-                    fontWeight = FontWeight.Medium,
-                    color = Color.Gray
-                )
-            }
+
+        if (!isPhone) {
+            SmapBanner(
+                message = "메일이 보이지 않으면 스팸함을 확인해 주세요.",
+                tone = SmapBannerTone.Info,
+            )
         }
     }
 }
 
+/** 3단계 — 새 비밀번호를 정한다. 규칙 칩은 가입 화면의 PasswordRuleChip 을 재사용한다. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun NewPasswordStepContent(
     newPassword: String,
     confirmPassword: String,
-    showNewPassword: Boolean,
-    showConfirmPassword: Boolean,
     onNewPasswordChange: (String) -> Unit,
     onConfirmPasswordChange: (String) -> Unit,
-    onToggleNewPassword: () -> Unit,
-    onToggleConfirmPassword: () -> Unit,
     isPasswordLengthValid: Boolean,
     hasPasswordLetter: Boolean,
     hasPasswordNumber: Boolean,
     hasPasswordSpecialChar: Boolean,
     passwordsMatch: Boolean,
-    isRulesSatisfied: Boolean,
-    onResetPassword: () -> Unit,
-    isLoading: Boolean
 ) {
-    val focusManager = LocalFocusManager.current
-    Column(verticalArrangement = Arrangement.spacedBy(30.dp)) {
-        // New Password Field
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(
-                text = "새 비밀번호",
-                fontSize = 14.sp,
-                fontFamily = SuiteFont,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.Gray
-            )
-            
-            OutlinedTextField(
-                value = newPassword,
-                onValueChange = onNewPasswordChange,
-                placeholder = { Text("8자 이상, 영문 대소문자/숫자/특수문자 포함", fontFamily = SuiteFont) },
-                visualTransformation = if (showNewPassword) VisualTransformation.None else PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Password,
-                    imeAction = ImeAction.Next
-                ),
-                keyboardActions = KeyboardActions(
-                    onNext = { focusManager.moveFocus(FocusDirection.Down) }
-                ),
-                trailingIcon = {
-                    IconButton(onClick = onToggleNewPassword) {
-                        Icon(
-                            imageVector = if (showNewPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                            contentDescription = if (showNewPassword) "비밀번호 숨기기" else "비밀번호 표시",
-                            tint = Color.Gray
-                        )
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color(0xFFF5F5F5),
-                    unfocusedContainerColor = Color(0xFFF5F5F5),
-                    focusedBorderColor = BrandColors.Primary.copy(alpha = 0.3f),
-                    unfocusedBorderColor = Color.Transparent
-                ),
-                singleLine = true
-            )
-            
-            // Password Rules
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                PasswordRuleRow(text = "8자 이상", isValid = isPasswordLengthValid)
-                PasswordRuleRow(text = "영문 대소문자 포함", isValid = hasPasswordLetter)
-                PasswordRuleRow(text = "숫자 포함", isValid = hasPasswordNumber)
-                PasswordRuleRow(text = "특수문자 포함", isValid = hasPasswordSpecialChar)
-            }
-        }
-        
-        // Confirm Password Field
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(
-                text = "비밀번호 확인",
-                fontSize = 14.sp,
-                fontFamily = SuiteFont,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.Gray
-            )
-            
-            OutlinedTextField(
-                value = confirmPassword,
-                onValueChange = onConfirmPasswordChange,
-                placeholder = { Text("다시 입력해주세요", fontFamily = SuiteFont) },
-                visualTransformation = if (showConfirmPassword) VisualTransformation.None else PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Password,
-                    imeAction = ImeAction.Done
-                ),
-                keyboardActions = KeyboardActions(
-                    onDone = { focusManager.clearFocus() }
-                ),
-                trailingIcon = {
-                    IconButton(onClick = onToggleConfirmPassword) {
-                        Icon(
-                            imageVector = if (showConfirmPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                            contentDescription = if (showConfirmPassword) "비밀번호 숨기기" else "비밀번호 표시",
-                            tint = Color.Gray
-                        )
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color(0xFFF5F5F5),
-                    unfocusedContainerColor = Color(0xFFF5F5F5),
-                    focusedBorderColor = BrandColors.Primary.copy(alpha = 0.3f),
-                    unfocusedBorderColor = Color.Transparent
-                ),
-                singleLine = true
-            )
-            
-            if (confirmPassword.isNotEmpty() && !passwordsMatch) {
-                Text(
-                    text = "비밀번호가 일치하지 않습니다.",
-                    fontSize = 12.sp,
-                    fontFamily = SuiteFont,
-                    color = Color.Red
-                )
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(10.dp))
-        
-        Button(
-            onClick = onResetPassword,
-            enabled = isRulesSatisfied && passwordsMatch && !isLoading,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = BrandColors.Primary,
-                disabledContainerColor = Color.Gray.copy(alpha = 0.3f)
-            )
+    val confirmMismatch = confirmPassword.isNotEmpty() && !passwordsMatch
+
+    Column(verticalArrangement = Arrangement.spacedBy(SmapSpacing.sm)) {
+        StepHeader(
+            title = "새 비밀번호를 정해 주세요",
+            description = "8자 이상, 영문 대소문자·숫자·특수문자를 모두 포함해 주세요."
+        )
+
+        Spacer(Modifier.height(SmapSpacing.md))
+
+        SmapPasswordField(
+            value = newPassword,
+            onValueChange = onNewPasswordChange,
+            label = "새 비밀번호",
+            leadingIcon = Icons.Outlined.Lock,
+            imeAction = ImeAction.Next,
+        )
+
+        FlowRow(
+            modifier = Modifier.padding(start = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text(
-                text = "비밀번호 변경",
-                fontSize = 18.sp,
-                fontFamily = SuiteFont,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
+            PasswordRuleChip("8자 이상", isPasswordLengthValid)
+            PasswordRuleChip("영문 대소문자", hasPasswordLetter)
+            PasswordRuleChip("숫자", hasPasswordNumber)
+            PasswordRuleChip("특수문자", hasPasswordSpecialChar)
         }
+
+        SmapPasswordField(
+            value = confirmPassword,
+            onValueChange = onConfirmPasswordChange,
+            label = "비밀번호 확인",
+            leadingIcon = Icons.Outlined.Lock,
+            errorText = if (confirmMismatch) "비밀번호가 일치하지 않아요." else null,
+            imeAction = ImeAction.Done,
+        )
     }
 }
 
+/** 4단계 — 성공 상태. 전화번호로 재설정한 경우 이메일 등록 안내를 함께 보여 준다. */
 @Composable
-private fun PasswordRuleRow(text: String, isValid: Boolean) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically
+private fun CompleteStepContent(showEmailHint: Boolean) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
         Icon(
-            imageVector = if (isValid) Icons.Filled.CheckCircle else Icons.Filled.Cancel,
+            imageVector = Icons.Filled.CheckCircle,
             contentDescription = null,
-            tint = if (isValid) Color(0xFF22C55E) else Color.Gray.copy(alpha = 0.5f),
-            modifier = Modifier.size(16.dp)
+            tint = BrandColors.Success,
+            modifier = Modifier.size(80.dp)
         )
-        Text(
-            text = text,
-            fontSize = 12.sp,
-            fontFamily = SuiteFont,
-            color = if (isValid) Color(0xFF22C55E) else Color.Gray.copy(alpha = 0.7f)
-        )
-    }
-}
 
-@Composable
-private fun CompleteStepContent(showEmailHint: Boolean, onDismiss: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(40.dp)
-    ) {
-        Spacer(modifier = Modifier.height(40.dp))
-        
-        // Success Icon
-        Box(
-            modifier = Modifier
-                .size(100.dp)
-                .background(Color(0xFF22C55E).copy(alpha = 0.1f), RoundedCornerShape(50.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Filled.CheckCircle,
-                contentDescription = null,
-                tint = Color(0xFF22C55E),
-                modifier = Modifier.size(60.dp)
-            )
-        }
-        
+        Spacer(Modifier.height(SmapSpacing.lg))
+
         Text(
-            text = "비밀번호가 변경되었습니다!\n새 비밀번호로 로그인해주세요.",
-            fontSize = 16.sp,
-            fontFamily = SuiteFont,
-            fontWeight = FontWeight.Medium,
-            color = Color.Gray,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            text = "비밀번호를 바꿨어요",
+            style = SmapText.title,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+
+        Spacer(Modifier.height(SmapSpacing.sm))
+
+        Text(
+            text = "새 비밀번호로 로그인해 주세요.",
+            style = SmapText.body,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
         )
 
         // 전화번호로 재설정한 경우: 이메일 등록 유도 (다음에는 이메일로 찾을 수 있음)
         if (showEmailHint) {
-            Text(
-                text = "이메일을 등록해 두면 다음에는 이메일로 찾을 수 있어요",
-                fontSize = 14.sp,
-                fontFamily = SuiteFont,
-                color = Color.Gray,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
-        }
-        
-        Spacer(modifier = Modifier.height(20.dp))
-        
-        Button(
-            onClick = onDismiss,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = BrandColors.Primary)
-        ) {
-            Text(
-                text = "로그인으로 돌아가기",
-                fontSize = 18.sp,
-                fontFamily = SuiteFont,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
+            Spacer(Modifier.height(SmapSpacing.md))
+            SmapBanner(
+                message = "이메일을 등록해 두면 다음에는 이메일로 찾을 수 있어요.",
+                tone = SmapBannerTone.Info,
             )
         }
     }
 }
 
+private fun formatTimer(totalSeconds: Int): String {
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return "$minutes:${seconds.toString().padStart(2, '0')}"
+}

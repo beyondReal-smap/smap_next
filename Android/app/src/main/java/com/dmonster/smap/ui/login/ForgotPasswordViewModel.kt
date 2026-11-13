@@ -143,6 +143,13 @@ class ForgotPasswordViewModel @Inject constructor(private val authService: com.d
         _showConfirmPassword.value = !_showConfirmPassword.value
     }
     
+    /** 재발송까지 남은 초(화면의 "다시 받기 (N초)" 표시용). 상태를 바꾸지 않는다. */
+    fun remainingResendSeconds(): Int {
+        if (lastSentTime == 0L) return 0
+        val remainMs = RESEND_COOLDOWN_MS - (System.currentTimeMillis() - lastSentTime)
+        return if (remainMs <= 0) 0 else ((remainMs + 999) / 1000).toInt()
+    }
+
     fun clearError() {
         _errorMessage.value = null
     }
