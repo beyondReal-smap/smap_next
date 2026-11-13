@@ -77,4 +77,56 @@ class SmapApiTest {
         assertEquals("GET", request.method)
         assertTrue(request.path!!.contains("locations/member/7"))
     }
+    @Test
+    fun `email authentication requests use backend contract`() = runTest {
+        server.enqueue(MockResponse().setBody("""{"success":true}"""))
+        assertTrue(api.sendEmailCode(com.dmonster.smap.data.model.EmailCodeRequest("person@example.com", "register")).success)
+        val send = server.takeRequest()
+        assertEquals("/auth/email/send-code", send.path)
+        assertTrue(send.body.readUtf8().contains("\"purpose\":\"register\""))
+
+        server.enqueue(MockResponse().setBody("""{"success":true,"verification_token":"test-token"}"""))
+        assertEquals("test-token", api.verifyEmailCode(com.dmonster.smap.data.model.EmailCodeRequest("person@example.com", "register", "123456")).verificationToken)
+        val verify = server.takeRequest()
+        assertEquals("/auth/email/verify-code", verify.path)
+        assertTrue(verify.body.readUtf8().contains("\"code\":\"123456\""))
+
+        server.enqueue(MockResponse().setBody("""{"success":true}"""))
+        assertTrue(api.resetPasswordByEmail(com.dmonster.smap.data.model.EmailResetRequest("person@example.com", "test-token", "Password1!")).success)
+        val reset = server.takeRequest()
+        assertEquals("/auth/reset-password-by-email", reset.path)
+        assertTrue(reset.body.readUtf8().contains("\"verification_token\":\"test-token\""))
+    }
+
+    @Test
+    fun `invite join uses wrapped server response without decoding group`() = runTest {
+        server.enqueue(MockResponse().setBody("""{"success":true,"data":{"sgt_idx":42,"mt_idx":7}}"""))
+        api.joinGroupFromInvite(42, com.dmonster.smap.data.model.JoinGroupRequest(7, 42)).close()
+        val request = server.takeRequest()
+        assertEquals("/groups/42/join", request.path)
+        assertTrue(request.body.readUtf8().contains("\"mt_idx\":7"))
+    }
+
+    @Test
+    fun `refresh authentication failures differ from server failures`() {
+        assertTrue(isInvalidRefreshStatus(401))
+        assertFalse(isInvalidRefreshStatus(403))
+        assertFalse(isInvalidRefreshStatus(500))
+        assertFalse(isInvalidRefreshStatus(503))
+    }
+
+    @Test
+    fun `cancelled requests propagate cancellation`() = runTest {
+        try {
+            safeApiCall<Unit> { throw kotlinx.coroutines.CancellationException("cancelled") }
+            fail("취소가 전파되어야 합니다.")
+        } catch (_: kotlinx.coroutines.CancellationException) { }
+    }
+
+    @Test
+    fun `password rules require uppercase lowercase number and permitted special`() {
+        assertTrue(com.dmonster.smap.data.model.isServerPasswordValid("Password1!"))
+        assertFalse(com.dmonster.smap.data.model.isServerPasswordValid("password1!"))
+        assertFalse(com.dmonster.smap.data.model.isServerPasswordValid("PASSWORD1!"))
+    }
 }

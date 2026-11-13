@@ -1,256 +1,135 @@
 package com.dmonster.smap.ui.register
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.outlined.Badge
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Phone
+import androidx.compose.material.icons.outlined.RadioButtonUnchecked
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.dmonster.smap.ui.components.SmapPasswordField
+import com.dmonster.smap.ui.components.SmapTextField
 import com.dmonster.smap.ui.theme.BrandColors
-import com.dmonster.smap.ui.theme.SuiteFont
+import com.dmonster.smap.ui.theme.SmapSpacing
+import com.dmonster.smap.ui.theme.SmapText
 
+/** 가입 3단계 — 이름·닉네임·(선택) 전화번호·비밀번호. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun BasicInfoContent(
     viewModel: RegisterViewModel,
     uiState: RegisterViewModel.RegisterUiState
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    val password = uiState.registerData.mtPwd ?: ""
+    val confirmMismatch = uiState.passwordConfirm.isNotEmpty() && !viewModel.isPasswordMatch
+
+    Column(verticalArrangement = Arrangement.spacedBy(SmapSpacing.md)) {
         Text(
-            text = "기본 정보를 입력해주세요",
-            fontFamily = SuiteFont,
-            fontWeight = FontWeight.Bold,
-            fontSize = 26.sp
+            text = "기본 정보를 입력해 주세요",
+            style = SmapText.title,
+            color = MaterialTheme.colorScheme.onSurface,
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-        var isFocusedName by remember { mutableStateOf(false) }
-
-        // 이름
-        OutlinedTextField(
+        SmapTextField(
             value = uiState.registerData.mtName,
             onValueChange = { viewModel.setName(it) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .onFocusChanged { isFocusedName = it.isFocused },
-            label = { Text("이름", fontFamily = SuiteFont) },
-            leadingIcon = {
-                Icon(
-                    Icons.Default.Person,
-                    contentDescription = null,
-                    tint = if (isFocusedName) BrandColors.Primary else BrandColors.TextSecondary
-                )
-            },
-            singleLine = true,
-            shape = RoundedCornerShape(12.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = BrandColors.Primary,
-                unfocusedBorderColor = BrandColors.Border
-            )
+            label = "이름",
+            leadingIcon = Icons.Outlined.Person,
+            imeAction = ImeAction.Next,
         )
 
-        var isFocusedNickname by remember { mutableStateOf(false) }
-
-        // 닉네임
-        OutlinedTextField(
+        SmapTextField(
             value = uiState.registerData.mtNickname,
             onValueChange = { viewModel.setNickname(it) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .onFocusChanged { isFocusedNickname = it.isFocused },
-            label = { Text("닉네임", fontFamily = SuiteFont) },
-            leadingIcon = {
-                Icon(
-                    Icons.Default.Badge,
-                    contentDescription = null,
-                    tint = if (isFocusedNickname) BrandColors.Primary else BrandColors.TextSecondary
-                )
-            },
-            singleLine = true,
-            shape = RoundedCornerShape(12.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = BrandColors.Primary,
-                unfocusedBorderColor = BrandColors.Border
-            )
+            label = "닉네임",
+            leadingIcon = Icons.Outlined.Badge,
+            helperText = "그룹 멤버에게 보이는 이름이에요.",
+            imeAction = ImeAction.Next,
         )
 
-        var isFocusedEmail by remember { mutableStateOf(false) }
-
-        // 이메일 (선택)
-        OutlinedTextField(
-            value = uiState.registerData.mtEmail ?: "",
-            onValueChange = { viewModel.setEmail(it) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .onFocusChanged { isFocusedEmail = it.isFocused },
-            label = { Text("이메일 (선택)", fontFamily = SuiteFont) },
-            leadingIcon = {
-                Icon(
-                    Icons.Default.Email,
-                    contentDescription = null,
-                    tint = if (isFocusedEmail) BrandColors.Primary else BrandColors.TextSecondary
-                )
-            },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-            singleLine = true,
-            shape = RoundedCornerShape(12.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = BrandColors.Primary,
-                unfocusedBorderColor = BrandColors.Border
-            )
+        // 로그인 ID 가 이메일로 바뀌면서 전화번호는 선택 입력이 됐다.
+        SmapTextField(
+            value = uiState.registerData.mtHp ?: "",
+            onValueChange = { viewModel.setOptionalPhone(it) },
+            label = "전화번호 (선택)",
+            leadingIcon = Icons.Outlined.Phone,
+            keyboardType = KeyboardType.Phone,
+            imeAction = ImeAction.Next,
         )
 
-        // 이메일 형식 오류 메시지
-        val email = uiState.registerData.mtEmail
-        if (!email.isNullOrBlank() && !viewModel.isEmailValid) {
-            Text(
-                text = "올바른 이메일 형식을 입력해주세요",
-                fontFamily = SuiteFont,
-                color = BrandColors.Error,
-                fontSize = 13.sp,
-                modifier = Modifier.padding(start = 4.dp)
-            )
+        Spacer(Modifier.height(SmapSpacing.xs))
+
+        SmapPasswordField(
+            value = password,
+            onValueChange = { viewModel.setPassword(it) },
+            label = "비밀번호",
+            leadingIcon = Icons.Outlined.Lock,
+            imeAction = ImeAction.Next,
+        )
+
+        // 규칙을 처음부터 보여 주고 충족한 항목만 체크로 바꾼다.
+        // 입력 전에는 한 줄 안내만, 입력을 시작하면 빨간 X 가 한꺼번에 나타나던 방식은
+        // 아직 다 치지 않은 사용자에게 오류처럼 보였다.
+        FlowRow(
+            modifier = Modifier.padding(start = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            PasswordRuleChip("8자 이상", viewModel.isPasswordLengthValid)
+            PasswordRuleChip("영문 대소문자", viewModel.hasPasswordLetter)
+            PasswordRuleChip("숫자", viewModel.hasPasswordNumber)
+            PasswordRuleChip("특수문자", viewModel.hasPasswordSpecialChar)
         }
 
-        if (!viewModel.isSocialAccount) {
-            Spacer(modifier = Modifier.height(8.dp))
-
-            var isFocusedPwd by remember { mutableStateOf(false) }
-
-            // 비밀번호
-            OutlinedTextField(
-                value = uiState.registerData.mtPwd ?: "",
-                onValueChange = { viewModel.setPassword(it) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .onFocusChanged { isFocusedPwd = it.isFocused },
-                label = { Text("비밀번호", fontFamily = SuiteFont) },
-                leadingIcon = {
-                    Icon(
-                        Icons.Default.Lock,
-                        contentDescription = null,
-                        tint = if (isFocusedPwd) BrandColors.Primary else BrandColors.TextSecondary
-                    )
-                },
-                visualTransformation = if (uiState.showPassword) VisualTransformation.None
-                                      else PasswordVisualTransformation(),
-                trailingIcon = {
-                    IconButton(onClick = { viewModel.toggleShowPassword() }) {
-                        Icon(
-                            imageVector = if (uiState.showPassword) Icons.Default.Visibility
-                                         else Icons.Default.VisibilityOff,
-                            contentDescription = if (uiState.showPassword) "비밀번호 숨기기" else "비밀번호 표시",
-                            tint = if (isFocusedPwd) BrandColors.Primary else BrandColors.TextSecondary
-                        )
-                    }
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = BrandColors.Primary,
-                    unfocusedBorderColor = BrandColors.Border
-                )
-            )
-
-            // 비밀번호 규칙 안내 (한 줄로 표시)
-            val pwd = uiState.registerData.mtPwd ?: ""
-            if (pwd.isEmpty()) {
-                Text(
-                    text = "8자 이상, 영문, 숫자, 특수문자 포함",
-                    fontFamily = SuiteFont,
-                    color = BrandColors.TextSecondary,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(start = 4.dp)
-                )
-            } else {
-                Row(
-                    modifier = Modifier.padding(start = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    PasswordRuleChip("8자+", viewModel.isPasswordLengthValid)
-                    PasswordRuleChip("영문", viewModel.hasPasswordLetter)
-                    PasswordRuleChip("숫자", viewModel.hasPasswordNumber)
-                    PasswordRuleChip("특수문자", viewModel.hasPasswordSpecialChar)
-                }
-            }
-
-            var isFocusedPwdConfirm by remember { mutableStateOf(false) }
-
-            // 비밀번호 확인
-            OutlinedTextField(
-                value = uiState.passwordConfirm,
-                onValueChange = { viewModel.setPasswordConfirm(it) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .onFocusChanged { isFocusedPwdConfirm = it.isFocused },
-                label = { Text("비밀번호 확인", fontFamily = SuiteFont) },
-                leadingIcon = {
-                    Icon(
-                        Icons.Default.Lock,
-                        contentDescription = null,
-                        tint = if (isFocusedPwdConfirm) BrandColors.Primary else BrandColors.TextSecondary
-                    )
-                },
-                visualTransformation = if (uiState.showPasswordConfirm) VisualTransformation.None
-                                      else PasswordVisualTransformation(),
-                trailingIcon = {
-                    IconButton(onClick = { viewModel.toggleShowPasswordConfirm() }) {
-                        Icon(
-                            imageVector = if (uiState.showPasswordConfirm) Icons.Default.Visibility
-                                         else Icons.Default.VisibilityOff,
-                            contentDescription = if (uiState.showPasswordConfirm) "비밀번호 확인 숨기기" else "비밀번호 확인 표시",
-                            tint = if (isFocusedPwdConfirm) BrandColors.Primary else BrandColors.TextSecondary
-                        )
-                    }
-                },
-                isError = uiState.passwordConfirm.isNotEmpty() && !viewModel.isPasswordMatch,
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = BrandColors.Primary,
-                    unfocusedBorderColor = BrandColors.Border
-                )
-            )
-
-            if (uiState.passwordConfirm.isNotEmpty() && !viewModel.isPasswordMatch) {
-                Text(
-                    text = "비밀번호가 일치하지 않습니다",
-                    fontFamily = SuiteFont,
-                    color = BrandColors.Error,
-                    fontSize = 14.sp
-                )
-            }
-        }
+        SmapPasswordField(
+            value = uiState.passwordConfirm,
+            onValueChange = { viewModel.setPasswordConfirm(it) },
+            label = "비밀번호 확인",
+            leadingIcon = Icons.Outlined.Lock,
+            errorText = if (confirmMismatch) "비밀번호가 일치하지 않아요." else null,
+            imeAction = ImeAction.Done,
+        )
     }
 }
 
 @Composable
 internal fun PasswordRuleChip(text: String, isValid: Boolean) {
+    val color = if (isValid) BrandColors.Success else MaterialTheme.colorScheme.onSurfaceVariant
     Row(
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
+        // 색만으로 구분하지 않도록 아이콘 모양도 바꾸고, 낭독기에는 충족 여부를 문장으로 알린다.
+        modifier = Modifier.semantics(mergeDescendants = true) {
+            contentDescription = if (isValid) "$text, 충족" else "$text, 미충족"
+        },
     ) {
         Icon(
-            imageVector = if (isValid) Icons.Default.Check else Icons.Default.Close,
+            imageVector = if (isValid) Icons.Filled.Check else Icons.Outlined.RadioButtonUnchecked,
             contentDescription = null,
-            tint = if (isValid) BrandColors.Primary else BrandColors.Error,
-            modifier = Modifier.size(14.dp)
+            tint = color,
+            modifier = Modifier.size(14.dp),
         )
-        Spacer(modifier = Modifier.width(2.dp))
-        Text(
-            text = text,
-            fontFamily = SuiteFont,
-            color = if (isValid) BrandColors.Primary else BrandColors.TextSecondary,
-            fontSize = 12.sp
-        )
+        Spacer(Modifier.width(4.dp))
+        Text(text = text, style = SmapText.captionSmall, color = color)
     }
 }

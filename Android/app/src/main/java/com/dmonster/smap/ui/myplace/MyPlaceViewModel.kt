@@ -147,7 +147,6 @@ class MyPlaceViewModel @Inject constructor(
     fun performInitialLoad() {
         viewModelScope.launch {
             _isMapLoading.value = true
-            val startTime = System.currentTimeMillis()
 
             when (val result = safeApiCall { groupService.getGroups() }) {
                 is ApiResult.Success -> {
@@ -155,7 +154,11 @@ class MyPlaceViewModel @Inject constructor(
                     _groups.value = groups
 
                     if (groups.isNotEmpty()) {
-                        val firstGroup = groups.first()
+                        val firstGroup = groups.find { it.sgtIdx == _selectedGroup.value?.sgtIdx } ?: groups.first()
+                        if (_selectedGroup.value?.sgtIdx != firstGroup.sgtIdx) {
+                            _selectedMember.value = null
+                            _selectedLocation.value = null
+                        }
                         _selectedGroup.value = firstGroup
 
                         // Load Members
@@ -163,8 +166,16 @@ class MyPlaceViewModel @Inject constructor(
                             is ApiResult.Success -> {
                                 _members.value = membersResult.data
                                 if (membersResult.data.isNotEmpty()) {
-                                    val firstMember = membersResult.data.first()
+                                    val firstMember = membersResult.data.find { it.mtIdx == _selectedMember.value?.mtIdx }
+                                        ?: membersResult.data.find { it.mtIdx == authService.getUserData()?.mtIdx }
                                     _selectedMember.value = firstMember
+                                    if (firstMember == null) {
+                                        _locations.value = emptyList()
+                                        _selectedLocation.value = null
+                                        _errorMessage.value = "그룹에서 본인 정보를 찾을 수 없습니다."
+                                        _isMapLoading.value = false
+                                        return@launch
+                                    }
 
                                     // Load Locations
                                     when (val locsResult = safeApiCall { myPlaceService.getLocations(firstMember.mtIdx) }) {
@@ -181,17 +192,23 @@ class MyPlaceViewModel @Inject constructor(
                                     }
                                 } else {
                                     _members.value = emptyList()
+                                    _selectedMember.value = null
+                                    _selectedLocation.value = null
                                     _locations.value = emptyList()
                                 }
                             }
                             else -> {
                                 if (BuildConfig.DEBUG) Log.e(TAG, "Member load failed during initial load")
+                                _errorMessage.value = "그룹 멤버를 불러오지 못했습니다."
                                 _members.value = emptyList()
                                 _locations.value = emptyList()
                             }
                         }
                     } else {
                         _groups.value = emptyList()
+                        _selectedGroup.value = null
+                        _selectedMember.value = null
+                        _selectedLocation.value = null
                         _members.value = emptyList()
                         _locations.value = emptyList()
                     }
@@ -206,11 +223,6 @@ class MyPlaceViewModel @Inject constructor(
                 }
             }
 
-            // Ensure at least 1 second loading for smoothness
-            val elapsed = System.currentTimeMillis() - startTime
-            if (elapsed < 1000) {
-                kotlinx.coroutines.delay(1000 - elapsed)
-            }
             _isMapLoading.value = false
         }
     }
@@ -225,7 +237,7 @@ class MyPlaceViewModel @Inject constructor(
                     if (result.data.isNotEmpty() && _selectedMember.value == null) {
                         val currentUserIdx = authService.getUserData()?.mtIdx
                         val selfMember = result.data.find { it.mtIdx == currentUserIdx }
-                        selectMember(selfMember ?: result.data.first())
+                        if (selfMember != null) selectMember(selfMember) else _errorMessage.value = "그룹에서 본인 정보를 찾을 수 없습니다."
                     }
                 }
                 is ApiResult.Error -> { if (BuildConfig.DEBUG) Log.e(TAG, "Member load failed (${result.code})") }
@@ -358,7 +370,11 @@ class MyPlaceViewModel @Inject constructor(
         }
     }
 
+    private val reverseGeocodeCache = java.util.Collections.synchronizedMap(mutableMapOf<Pair<Long, Long>, Pair<String?, String?>>())
+
     private suspend fun reverseGeocode(lat: Double, lng: Double): Pair<String?, String?>? {
+        val cacheKey = kotlin.math.round(lat * 10000).toLong() to kotlin.math.round(lng * 10000).toLong()
+        reverseGeocodeCache[cacheKey]?.let { return it }
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val url = "https://dapi.kakao.com/v2/local/geo/coord2address.json?x=$lng&y=$lat"
@@ -375,7 +391,7 @@ class MyPlaceViewModel @Inject constructor(
                         val doc = result.documents.firstOrNull()
                         val address = doc?.roadAddress?.addressName ?: doc?.address?.addressName
                         val building = doc?.roadAddress?.buildingName
-                        building to address
+                        (building to address).also { if (address != null) reverseGeocodeCache[cacheKey] = it }
                     } catch (e: Exception) {
                         Log.e(TAG, "Failed to parse address response", e)
                         null
@@ -392,7 +408,7 @@ class MyPlaceViewModel @Inject constructor(
 
     fun performSearch() {
         val query = _searchQuery.value
-        if (query.isBlank()) return
+        if (query.isBlank() || _isSearching.value) return
 
         // API 키 미설정 시 network 호출 전에 즉시 가드 — 빈 키로 호출하면 401 이 내려와
         // "검색에 실패했습니다" 로만 표시되어 원인 파악이 어렵기 때문이다.
@@ -402,8 +418,8 @@ class MyPlaceViewModel @Inject constructor(
             return
         }
 
+        _isSearching.value = true
         viewModelScope.launch {
-            _isSearching.value = true
             try {
                 val url = "https://dapi.kakao.com/v2/local/search/keyword.json?query=${java.net.URLEncoder.encode(query, "UTF-8")}"
                 val request = Request.Builder()

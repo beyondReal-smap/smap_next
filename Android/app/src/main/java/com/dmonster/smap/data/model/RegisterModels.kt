@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
  */
 enum class RegisterStep(val title: String, val progress: Float) {
     TERMS("이용약관", 0.16f),
-    PHONE("전화번호 인증", 0.33f),
+    PHONE("이메일 인증", 0.33f),
     VERIFICATION("인증번호 확인", 0.5f),
     BASIC_INFO("기본 정보", 0.66f),
     PROFILE("프로필 정보", 0.83f),
@@ -25,6 +25,7 @@ data class RegisterRequest(
     @SerialName("mt_name") val mtName: String = "",
     @SerialName("mt_nickname") val mtNickname: String = "",
     @SerialName("mt_email") val mtEmail: String? = null,
+    @SerialName("email_verification_token") val emailVerificationToken: String? = null,
     @SerialName("mt_hp") val mtHp: String? = null,
     @SerialName("mt_birth") val mtBirth: String? = null,
     @SerialName("mt_gender") val mtGender: Int? = null,
@@ -92,3 +93,16 @@ data class PhoneCheckResponse(
     @SerialName("exists") val exists: Boolean = false,
     @SerialName("message") val message: String? = null
 )
+
+@Serializable
+data class EmailCodeRequest(val email: String, val purpose: String, val code: String? = null)
+
+@Serializable
+data class EmailCodeResponse(val success: Boolean, @SerialName("verification_token") val verificationToken: String? = null)
+
+@Serializable
+data class EmailResetRequest(val email: String, @SerialName("verification_token") val verificationToken: String, @SerialName("new_password") val newPassword: String)
+
+fun isServerPasswordValid(password: String): Boolean = password.length >= 8 &&
+    password.any { it in 'A'..'Z' } && password.any { it in 'a'..'z' } &&
+    password.any { it.isDigit() } && password.any { it in "!@#\$%^&*(),.?\":{}|<>" }

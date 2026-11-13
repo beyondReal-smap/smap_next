@@ -268,17 +268,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             print("📍 [LOCATION] 앱 시작 시 자동 위치 권한 요청 생략 (프리퍼미션 대기)")
         }
         
-        StoreKitManager.shared.fetchReceipt { _, fetchError in
-            if let fetchError = fetchError {
-                print("fetchReceipt error - \(fetchError)")
-                return
-            }
-            
-            StoreKitManager.shared.restorePurchases { msg in
-                print("restorePurchases === \(msg ?? "")")
-            }
-        }
-        
         SwiftyStoreKit.completeTransactions(atomically: true) { purchases in
             for purchase in purchases {
                 switch purchase.transaction.transactionState {

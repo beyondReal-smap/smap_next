@@ -644,6 +644,9 @@ struct ActivityLogView: View {
             // 초기 데이터 로드 (그룹 목록 + 첫 그룹 선택 + 일별 카운트)
             await viewModel.loadInitialData()
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("groupsDidChange"))) { _ in
+            Task { await viewModel.loadInitialData() }
+        }
         .alert("오류", isPresented: $viewModel.showError) {
             Button("확인", role: .cancel) {}
         } message: {
@@ -671,8 +674,6 @@ struct ActivityLogView: View {
         guard isMapLoading else { return }
         
         Task {
-            // 최소 1.5초 대기
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
             
             // 뷰모델 데이터 로딩 대기 (최대 5초)
             var retryCount = 0
@@ -1300,7 +1301,7 @@ struct ActivityLogMapView: UIViewRepresentable {
             } else {
                 timeStr = "--:--"
             }
-            let speed = curr.mlt_speed ?? 0.0
+            let speed = (curr.mlt_speed ?? 0.0) * 3.6
             let speedStr = String(format: "%.1f km/h", speed)
             
             // Current Position Marker (Blue Bordered Circle)
@@ -1325,9 +1326,17 @@ struct ActivityLogMapView: UIViewRepresentable {
             infoMarker.mapView = mapView
             context.coordinator.currentInfoMarker = infoMarker
             
-            let cameraUpdate = NMFCameraUpdate(scrollTo: NMGLatLng(lat: curr.latitude, lng: curr.longitude))
-            cameraUpdate.animation = .none
-            mapView.moveCamera(cameraUpdate)
+            let now = Date.timeIntervalSinceReferenceDate
+            let coordinator = context.coordinator
+            if (isSliderDragging && now - coordinator.lastSliderCameraMove >= 0.1) ||
+                (!isSliderDragging && (coordinator.wasSliderDragging || coordinator.lastSliderCameraIndex != index)) {
+                let cameraUpdate = NMFCameraUpdate(scrollTo: NMGLatLng(lat: curr.latitude, lng: curr.longitude))
+                cameraUpdate.animation = .none
+                mapView.moveCamera(cameraUpdate)
+                coordinator.lastSliderCameraMove = now
+                coordinator.lastSliderCameraIndex = index
+            }
+            coordinator.wasSliderDragging = isSliderDragging
         }
     }
     
@@ -1476,6 +1485,9 @@ struct ActivityLogMapView: UIViewRepresentable {
         var currentPositionMarker: NMFMarker?
         var currentInfoMarker: NMFMarker?
         var lastMapMarkersCount: Int = 0
+        var lastSliderCameraMove: TimeInterval = 0
+        var lastSliderCameraIndex: Int?
+        var wasSliderDragging = false
         
         func clearOverlays() {
             markers.forEach { $0.mapView = nil }

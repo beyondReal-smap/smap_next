@@ -113,7 +113,7 @@ struct ForgotPasswordView: View {
     
     private var stepDescription: String {
         switch viewModel.currentStep {
-        case .phone: return "가입하실 때 사용한 전화번호를 입력해주세요."
+        case .phone: return "가입하실 때 사용한 이메일을 입력해주세요."
         case .verification: return "\(viewModel.phoneNumber)로 발송된\n6자리 인증번호를 입력해주세요."
         case .newPassword: return "새로운 비밀번호를 설정해주세요."
         case .complete: return "비밀번호가 성공적으로 변경되었습니다."
@@ -125,15 +125,18 @@ struct ForgotPasswordView: View {
     private var phoneStepView: some View {
         VStack(spacing: 40) {
             VStack(alignment: .leading, spacing: 10) {
-                Text("전화번호")
+                Text("이메일")
                     .font(.suite(size: 14, weight: .semibold))
                     .foregroundColor(.gray)
                 
-                PhoneTextField(text: $viewModel.phoneNumber, placeholder: "010-0000-0000", onEditingChanged: { editing in
+                TextField("이메일 주소", text: $viewModel.phoneNumber, onEditingChanged: { editing in
                     withAnimation(.easeInOut(duration: 0.2)) {
                         isFocused = editing
                     }
                 })
+                    .keyboardType(.emailAddress)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
                     .padding(.horizontal, 16)
                     .frame(height: 56)
                     .background(Color(white: 0.96))
@@ -152,10 +155,10 @@ struct ForgotPasswordView: View {
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 56)
-                    .background(viewModel.phoneNumber.count >= 10 ? SMAPTheme.Color.primary : Color.gray.opacity(0.3))
+                    .background(viewModel.phoneNumber.contains("@") ? SMAPTheme.Color.primary : Color.gray.opacity(0.3))
                     .cornerRadius(12)
             }
-            .disabled(viewModel.phoneNumber.count < 10)
+            .disabled(!viewModel.phoneNumber.contains("@") || viewModel.isLoading)
         }
     }
     
@@ -223,10 +226,10 @@ struct ForgotPasswordView: View {
                     
                     HStack {
                         if viewModel.showNewPassword {
-                            TextField("8자 이상, 영문/숫자/특수문자 포함", text: $viewModel.newPassword)
+                            TextField("8자 이상, 영문 대소문자/숫자/특수문자 포함", text: $viewModel.newPassword)
                                 .textContentType(.newPassword)
                         } else {
-                            SecureField("8자 이상, 영문/숫자/특수문자 포함", text: $viewModel.newPassword)
+                            SecureField("8자 이상, 영문 대소문자/숫자/특수문자 포함", text: $viewModel.newPassword)
                                 .textContentType(.newPassword)
                         }
                         
@@ -245,7 +248,7 @@ struct ForgotPasswordView: View {
                     // Password Rules Guide
                     VStack(alignment: .leading, spacing: 6) {
                         ruleRow(text: "8자 이상", isValid: viewModel.isPasswordLengthValid)
-                        ruleRow(text: "영문 포함", isValid: viewModel.hasPasswordLetter)
+                        ruleRow(text: "영문 대소문자 포함", isValid: viewModel.hasPasswordLetter)
                         ruleRow(text: "숫자 포함", isValid: viewModel.hasPasswordNumber)
                         ruleRow(text: "특수문자 포함", isValid: viewModel.hasPasswordSpecialChar)
                     }

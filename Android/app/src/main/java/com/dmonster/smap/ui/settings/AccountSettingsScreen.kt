@@ -2,6 +2,10 @@ package com.dmonster.smap.ui.settings
 
 import com.dmonster.smap.BuildConfig
 import android.net.Uri
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
@@ -49,10 +53,13 @@ fun AccountSettingsScreen(
 ) {
     val user by viewModel.user.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-    val userMessage by viewModel.userMessage.collectAsState()
+    val result by viewModel.result.collectAsState()
+    val scope = rememberCoroutineScope()
+    var imageMessage by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
     
     var currentScreen by remember { mutableStateOf(AccountSubScreen.NONE) }
+    BackHandler(enabled = currentScreen != AccountSubScreen.NONE) { currentScreen = AccountSubScreen.NONE }
     var showingLogoutAlert by remember { mutableStateOf(false) }
     var isUploadingImage by remember { mutableStateOf(false) }
     
@@ -62,19 +69,31 @@ fun AccountSettingsScreen(
     ) { uri: Uri? ->
         uri?.let {
             isUploadingImage = true
-            context.contentResolver.openInputStream(it)?.use { inputStream ->
-                val bytes = inputStream.readBytes()
-                viewModel.uploadProfileImage(bytes)
+            scope.launch {
+                try {
+                    val bytes = withContext(Dispatchers.IO) {
+                        context.contentResolver.openInputStream(it)?.use { stream -> stream.readBytes() }
+                            ?: throw java.io.IOException("이미지를 열 수 없습니다.")
+                    }
+                    viewModel.uploadProfileImage(bytes)
+                } catch (e: Exception) {
+                    isUploadingImage = false
+                    imageMessage = "이미지를 불러오지 못했습니다."
+                }
             }
         }
     }
-    
-    // Handle upload result
-    LaunchedEffect(userMessage) {
-        if (userMessage?.contains("이미지") == true) {
+
+    LaunchedEffect(result) {
+        result?.takeIf { it.operation == "image" }?.let {
             isUploadingImage = false
-            viewModel.clearMessage()
+            imageMessage = it.message
+            viewModel.clearResult()
         }
+    }
+    imageMessage?.let { message ->
+        AlertDialog(onDismissRequest = { imageMessage = null }, title = { Text("알림") },
+            text = { Text(message) }, confirmButton = { TextButton(onClick = { imageMessage = null }) { Text("확인") } })
     }
 
     Box(modifier = Modifier.fillMaxSize()) {

@@ -58,6 +58,8 @@ class LoginActivity : ComponentActivity() {
                 )
             } else {
                 Log.e(TAG, "❌ ID Token이 null입니다. Web Client ID 설정을 확인하세요.")
+                viewModel.setLoading(false)
+                viewModel.showErrorMessage("구글 로그인에 실패했습니다. 다시 시도해주세요.")
             }
         } catch (e: ApiException) {
             viewModel.setLoading(false)

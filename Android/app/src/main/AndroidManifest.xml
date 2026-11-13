@@ -79,6 +79,11 @@
         android:hardwareAccelerated="true"
         android:largeHeap="true"
         tools:targetApi="tiramisu">
+        <provider android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.provider" android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/qr_file_paths" />
+        </provider>
         
         <!-- 스플래시 화면 (앱 시작점) -->
         <activity

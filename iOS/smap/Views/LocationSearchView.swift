@@ -46,6 +46,7 @@ struct KakaoRoadAddress: Codable {
 class KakaoLocationSearchService: ObservableObject {
     static let shared = KakaoLocationSearchService()
     private var apiKey: String { AppConfiguration.kakaoAPIKey }
+    private let addressCache = NSCache<NSString, NSString>()
     
     private init() {}
     
@@ -70,6 +71,8 @@ class KakaoLocationSearchService: ObservableObject {
     }
     
     func reverseGeocode(latitude: Double, longitude: Double) async throws -> String? {
+        let key = "\(Int((latitude * 10000).rounded())),\(Int((longitude * 10000).rounded()))" as NSString
+        if let cached = addressCache.object(forKey: key) { return cached as String }
         let urlString = "https://dapi.kakao.com/v2/local/geo/coord2address.json?x=\(longitude)&y=\(latitude)"
         guard let url = URL(string: urlString) else {
             throw NSError(domain: "KakaoLocationSearchService", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])
@@ -82,13 +85,15 @@ class KakaoLocationSearchService: ObservableObject {
         let (data, response) = try await URLSession.shared.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            return nil
+            throw NSError(domain: "KakaoLocationSearchService", code: 0, userInfo: [NSLocalizedDescriptionKey: "API Request Failed"])
         }
         
         let result = try JSONDecoder().decode(KakaoAddressResponse.self, from: data)
         if let doc = result.documents.first {
             // Prefer road address if available
-            return doc.road_address?.address_name ?? doc.address?.address_name
+            let address = doc.road_address?.address_name ?? doc.address?.address_name
+            if let address { addressCache.setObject(address as NSString, forKey: key) }
+            return address
         }
         return nil
     }
@@ -144,7 +149,7 @@ struct LocationSearchView: View {
                             .background(query.isEmpty ? Color.gray.opacity(0.3) : SMAPTheme.Color.primary)
                             .cornerRadius(14)
                     }
-                    .disabled(query.isEmpty)
+                    .disabled(query.isEmpty || isLoading)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 16)
@@ -258,7 +263,7 @@ struct LocationSearchView: View {
     }
     
     private func performSearch() {
-        guard !query.isEmpty else { return }
+        guard !query.isEmpty, !isLoading else { return }
         isLoading = true
         errorMessage = nil
         

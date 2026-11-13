@@ -12,11 +12,11 @@ import Foundation
 
 struct GroupStats: Codable {
     let group_id: Int
-    let group_title: String
+    let group_title: String?
     let member_count: Int
     let weekly_schedules: Int
     let total_locations: Int
-    let stats_period: StatsPeriod
+    let stats_period: StatsPeriod?
     let member_stats: [GroupMemberStats]
 }
 

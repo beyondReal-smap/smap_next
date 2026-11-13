@@ -21,6 +21,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.dmonster.smap.data.model.RegisterStep
+import com.dmonster.smap.ui.components.SmapBanner
+import com.dmonster.smap.ui.components.SmapBannerTone
+import com.dmonster.smap.ui.components.SmapButton
+import com.dmonster.smap.ui.components.SmapTopBar
 import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.SuiteFont
 
@@ -87,6 +91,15 @@ fun RegisterScreen(
     }
 
 
+    // 상단 화살표와 시스템 뒤로가기가 같은 동작을 하도록 한 곳에서 정의한다.
+    // 기존에는 시스템 뒤로가기에 처리기가 없어, 가입 도중 누르면 앱이 종료되고 입력이 사라졌다.
+    val goBack: () -> Unit = {
+        if (uiState.currentStep == RegisterStep.TERMS) onBack() else viewModel.previousStep()
+    }
+    BackHandler(enabled = uiState.currentLegalDocument == null && uiState.currentStep != RegisterStep.COMPLETE) {
+        goBack()
+    }
+
     // 약관 상세 열려있을 때 시스템 뒤로가기 처리
     BackHandler(enabled = uiState.currentLegalDocument != null) {
         viewModel.hideLegalDocument()
@@ -94,33 +107,12 @@ fun RegisterScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
-
+        // 기본 배경(연분홍)이 하단 시스템 바 영역에 띠처럼 비치지 않도록 화면 표면색과 맞춘다.
+        containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        text = uiState.currentStep.title,
-                        fontFamily = SuiteFont,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp
-                    )
-                },
-                navigationIcon = {
-                    if (uiState.currentStep != RegisterStep.COMPLETE) {
-                        IconButton(onClick = {
-                            if (uiState.currentStep == RegisterStep.TERMS) {
-                                onBack()
-                            } else {
-                                viewModel.previousStep()
-                            }
-                        }) {
-                            Icon(Icons.Default.ChevronLeft, contentDescription = "뒤로")
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = Color.White
-                )
+            SmapTopBar(
+                title = uiState.currentStep.title,
+                onBack = if (uiState.currentStep != RegisterStep.COMPLETE) goBack else null,
             )
         }
     ) { paddingValues ->
@@ -128,7 +120,7 @@ fun RegisterScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(Color.White)
+                .background(MaterialTheme.colorScheme.surface)
         ) {
             // Progress Bar
             if (uiState.currentStep != RegisterStep.COMPLETE) {
@@ -137,8 +129,8 @@ fun RegisterScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(4.dp),
-                    color = BrandColors.Primary,
-                    trackColor = BrandColors.Border
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
                 )
             }
 
@@ -187,15 +179,10 @@ fun RegisterScreen(
             // Error Message
             val errorMsg = uiState.errorMessage
             if (uiState.showError && errorMsg != null) {
-                Text(
-                    text = errorMsg,
-                    color = BrandColors.Error,
-                    fontFamily = SuiteFont,
-                    fontSize = 16.sp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 8.dp),
-                    textAlign = TextAlign.Center
+                SmapBanner(
+                    message = errorMsg,
+                    tone = SmapBannerTone.Error,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                 )
             }
 
@@ -222,14 +209,15 @@ fun RegisterScreen(
             }
 
             val buttonText = when (uiState.currentStep) {
-                RegisterStep.PHONE -> if (viewModel.isSocialAccount) "다음" else "인증번호 받기"
+                RegisterStep.PHONE -> "인증번호 받기"
                 RegisterStep.VERIFICATION -> "인증 확인"
                 RegisterStep.PROFILE -> "가입 완료"
                 RegisterStep.COMPLETE -> "시작하기"
                 else -> "다음"
             }
 
-            Button(
+            SmapButton(
+                text = buttonText,
                 onClick = {
                     when (uiState.currentStep) {
                         RegisterStep.PHONE -> viewModel.sendVerificationCode()
@@ -238,33 +226,10 @@ fun RegisterScreen(
                         else -> viewModel.nextStep()
                     }
                 },
-                enabled = isEnabled && !uiState.isLoading && !uiState.isVerificationLoading,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp)
-                    .height(52.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = BrandColors.Primary,
-                    disabledContainerColor = BrandColors.Primary.copy(alpha = 0.3f),
-                    disabledContentColor = Color.White
-                )
-            ) {
-                if (uiState.isLoading || uiState.isVerificationLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = Color.White,
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Text(
-                        text = buttonText,
-                        fontFamily = SuiteFont,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 18.sp
-                    )
-                }
-            }
+                enabled = isEnabled,
+                isLoading = uiState.isLoading || uiState.isVerificationLoading,
+                modifier = Modifier.padding(24.dp),
+            )
         }
 
         }
@@ -286,7 +251,7 @@ fun RegisterScreen(
             label = "legal_transition"
         ) { document ->
             if (document != null) {
-                Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
+                Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
                     LegalScreen(
                         document = document,
                         onBack = { viewModel.hideLegalDocument() }

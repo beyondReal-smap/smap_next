@@ -20,7 +20,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.material.icons.outlined.Cake
+import androidx.compose.material.icons.outlined.DateRange
+import androidx.compose.ui.semantics.Role
+import com.dmonster.smap.ui.components.SmapTextField
 import com.dmonster.smap.ui.theme.BrandColors
+import com.dmonster.smap.ui.theme.SmapText
 import com.dmonster.smap.ui.theme.SuiteFont
 import java.util.Calendar
 
@@ -32,53 +37,41 @@ internal fun ProfileContent(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(
-            text = "프로필 정보를 설정해주세요",
-            fontFamily = SuiteFont,
-            fontWeight = FontWeight.Bold,
-            fontSize = 26.sp
+            text = "프로필 정보를 설정해 주세요",
+            style = SmapText.title,
+            color = MaterialTheme.colorScheme.onSurface,
         )
-
-        Spacer(modifier = Modifier.height(2.dp))
-
-        var isFocusedBirth by remember { mutableStateOf(false) }
+        Text(
+            text = "나중에 설정에서 바꿀 수 있어요. 건너뛰어도 됩니다.",
+            style = SmapText.secondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
 
         // 생년월일 (DatePicker)
         var showDatePicker by remember { mutableStateOf(false) }
 
-        OutlinedTextField(
-            value = uiState.registerData.mtBirth ?: "",
-            onValueChange = {},
-            modifier = Modifier
-                .fillMaxWidth()
-                .onFocusChanged { isFocusedBirth = it.isFocused }
-                .clickable { showDatePicker = true },
-            label = { Text("생년월일 (선택)", fontFamily = SuiteFont) },
-            placeholder = { Text("탭하여 선택", fontFamily = SuiteFont) },
-            readOnly = true,
-            enabled = false,
-            leadingIcon = {
-                Icon(
-                    Icons.Default.Cake,
-                    contentDescription = null,
-                    tint = if (isFocusedBirth || showDatePicker) BrandColors.Primary else BrandColors.TextSecondary
-                )
-            },
-            trailingIcon = {
-                Icon(
-                    Icons.Default.DateRange,
-                    contentDescription = "날짜 선택",
-                    tint = if (isFocusedBirth || showDatePicker) BrandColors.Primary else BrandColors.TextSecondary
-                )
-            },
-            singleLine = true,
-            shape = RoundedCornerShape(12.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                disabledTextColor = Color.Black,
-                disabledBorderColor = BrandColors.Border,
-                disabledLabelColor = BrandColors.TextSecondary,
-                disabledPlaceholderColor = BrandColors.TextSecondary
+        // 읽기 전용 입력창 위에 투명한 클릭 영역을 덮는다.
+        // 기존에는 enabled=false 인 입력창에 clickable 을 붙여, 낭독기에 "사용 안 함"으로 읽히고
+        // 글자색을 검정으로 고정해 다크 모드에서 보이지 않았다.
+        Box {
+            SmapTextField(
+                value = uiState.registerData.mtBirth ?: "",
+                onValueChange = {},
+                label = "생년월일 (선택)",
+                placeholder = "눌러서 선택",
+                leadingIcon = Icons.Outlined.Cake,
+                trailingContent = { Icon(Icons.Outlined.DateRange, contentDescription = null) },
+                readOnly = true,
             )
-        )
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .clickable(
+                        onClickLabel = "생년월일 선택",
+                        role = Role.Button,
+                    ) { showDatePicker = true }
+            )
+        }
 
         // Wheel Style (Spinner) DatePicker Dialog
         if (showDatePicker) {
@@ -148,10 +141,8 @@ internal fun ProfileContent(
         // 성별 선택
         Text(
             text = "성별 (선택)",
-            fontFamily = SuiteFont,
-            fontWeight = FontWeight.Medium,
-            fontSize = 16.sp,
-            color = BrandColors.TextSecondary
+            style = SmapText.captionMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         Row(
@@ -186,19 +177,20 @@ private fun GenderButton(
         modifier = modifier.height(48.dp),
         shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = if (isSelected) BrandColors.Primary else Color.White,
-            contentColor = if (isSelected) Color.White else BrandColors.TextPrimary
+            containerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+            contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
         ),
         border = if (!isSelected) BorderStroke(
             width = 1.dp,
-            color = BrandColors.Border
+            color = MaterialTheme.colorScheme.outline
         ) else null
     ) {
-        Text(
-            text = text,
-            fontFamily = SuiteFont,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-        )
+        // 선택 여부를 색만으로 구분하지 않도록 체크 아이콘을 함께 보인다.
+        if (isSelected) {
+            Icon(Icons.Default.Check, contentDescription = "선택됨", modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+        }
+        Text(text = text, style = if (isSelected) SmapText.bodyBold else SmapText.body)
     }
 }
 
@@ -212,7 +204,7 @@ internal fun CompleteContent() {
         Icon(
             imageVector = Icons.Default.CheckCircle,
             contentDescription = null,
-            tint = BrandColors.Primary,
+            tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(80.dp)
         )
 
@@ -220,18 +212,16 @@ internal fun CompleteContent() {
 
         Text(
             text = "가입을 환영합니다!",
-            fontFamily = SuiteFont,
-            fontWeight = FontWeight.Bold,
-            fontSize = 26.sp
+            style = SmapText.title,
+            color = MaterialTheme.colorScheme.onSurface,
         )
 
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
             text = "smap과 함께 소중한 사람들과\n위치를 공유해보세요",
-            fontFamily = SuiteFont,
-            color = BrandColors.TextSecondary,
-            fontSize = 18.sp,
+            style = SmapText.body,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
     }

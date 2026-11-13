@@ -61,8 +61,11 @@ class LoginViewModel: ObservableObject {
     
     /// 입력값 유효성 검사
     var isInputValid: Bool {
-        let cleanPhone = phoneNumber.replacingOccurrences(of: "-", with: "")
-        return cleanPhone.count >= 10 && !password.isEmpty
+        let identifier = phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanPhone = identifier.replacingOccurrences(of: "-", with: "")
+        let isPhone = cleanPhone.range(of: "^[0-9]{10,11}$", options: .regularExpression) != nil
+        let isEmail = identifier.range(of: "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$", options: .regularExpression) != nil
+        return (isPhone || isEmail) && !password.isEmpty
     }
     
     // MARK: - Login Actions
@@ -71,7 +74,7 @@ class LoginViewModel: ObservableObject {
     @available(iOS 15.0, *)
     func login() async {
         guard isInputValid else {
-            DispatchQueue.main.async { self.showErrorMessage("전화번호와 비밀번호를 입력해주세요.") }
+            DispatchQueue.main.async { self.showErrorMessage("이메일 또는 전화번호와 비밀번호를 확인해주세요.") }
             return
         }
         
@@ -548,6 +551,13 @@ class LoginViewModel: ObservableObject {
 
 // MARK: - RegisterViewModel
 
+private func isServerPasswordValid(_ password: String) -> Bool {
+    password.count >= 8 && password.range(of: "[A-Z]", options: .regularExpression) != nil &&
+    password.range(of: "[a-z]", options: .regularExpression) != nil &&
+    password.rangeOfCharacter(from: .decimalDigits) != nil &&
+    password.rangeOfCharacter(from: CharacterSet(charactersIn: "!@#$%^&*(),.?\":{}|<>")) != nil
+}
+
 @MainActor
 class RegisterViewModel: ObservableObject {
     // MARK: - Published Properties
@@ -571,6 +581,7 @@ class RegisterViewModel: ObservableObject {
     // Step specific state
     @Published var verificationCode: String = ""
     @Published var passwordConfirm: String = ""
+    @Published var optionalPhone: String = ""
     
     // Password visibility toggle
     @Published var showPassword: Bool = false
@@ -587,7 +598,7 @@ class RegisterViewModel: ObservableObject {
     @Published var verificationTimer: Int = 0
     @Published var isVerificationLoading: Bool = false
     @Published var lastSentTime: Date? = nil
-    private var sentVerificationCode: String? = nil  // 발송된 인증번호 저장
+    private var verificationToken: String? = nil
     
     // 기존 가입자 알림 상태
     @Published var showExistingUserAlert: Bool = false
@@ -667,7 +678,7 @@ class RegisterViewModel: ObservableObject {
     
     var isPhoneValid: Bool {
         // Basic length check for now, specific logic can be added
-        return registerData.mt_id.count >= 10
+        return validateEmail(registerData.mt_id) && !registerData.mt_id.isEmpty
     }
     
     var isBasicInfoValid: Bool {
@@ -675,14 +686,9 @@ class RegisterViewModel: ObservableObject {
         let isNicknameValid = !registerData.mt_nickname.isEmpty
         let isEmailValid = validateEmail(registerData.mt_email)
         
-        // 소셜 로그인은 비밀번호 검사 생략
-        if isSocialAccount {
-            return isNameValid && isNicknameValid && isEmailValid
-        } else {
-            let isPasswordValid = isValidPassword(registerData.mt_pwd ?? "")
-            let isPasswordConfirmValid = registerData.mt_pwd == passwordConfirm && !passwordConfirm.isEmpty
-            return isNameValid && isNicknameValid && isPasswordValid && isPasswordConfirmValid && isEmailValid
-        }
+        let isPasswordValid = isValidPassword(registerData.mt_pwd ?? "")
+        let isPasswordConfirmValid = registerData.mt_pwd == passwordConfirm && !passwordConfirm.isEmpty
+        return isNameValid && isNicknameValid && isPasswordValid && isPasswordConfirmValid && isEmailValid
     }
     
     var isProfileValid: Bool {
@@ -699,18 +705,13 @@ class RegisterViewModel: ObservableObject {
         switch currentStep {
         case .terms:
             if isTermsValid {
-                // 소셜 계정은 핸드폰 인증 건너뛰고 기본 정보 입력으로 이동
-                if isSocialAccount {
-                    currentStep = .basicInfo
-                } else {
-                    currentStep = .phone
-                }
+                currentStep = .phone
             }
         case .phone:
             // Skip verification for now or mock it
-            if isPhoneValid { currentStep = .basicInfo }
+            sendVerificationCode()
         case .verification:
-             currentStep = .basicInfo
+             if verificationToken != nil { currentStep = .basicInfo }
         case .basicInfo:
             if isBasicInfoValid { currentStep = .profile }
             else { showValidationErrors() }
@@ -756,9 +757,9 @@ class RegisterViewModel: ObservableObject {
             errorMessage = "닉네임을 입력해주세요."
         } else if !validateEmail(registerData.mt_email) {
             errorMessage = "올바른 이메일 형식을 입력해주세요."
-        } else if !isSocialAccount { // 소셜 계정이 아닐 때만 비밀번호 검사
+        } else {
             if !isValidPassword(registerData.mt_pwd ?? "") {
-                errorMessage = "비밀번호는 8자 이상, 영문/숫자/특수문자 중 2가지 이상을 조합해주세요."
+                errorMessage = "비밀번호는 8자 이상이며 영문 대소문자, 숫자, 특수문자를 포함해야 합니다."
             } else if registerData.mt_pwd != passwordConfirm || passwordConfirm.isEmpty {
                 errorMessage = "비밀번호가 일치하지 않습니다."
             }
@@ -777,20 +778,20 @@ class RegisterViewModel: ObservableObject {
     func canResend() -> Bool {
         guard let lastSent = lastSentTime else { return true }
         let elapsed = Date().timeIntervalSince(lastSent)
-        return elapsed >= 180 // 3분 = 180초
+        return elapsed >= 60
     }
     
     /// 재발송까지 남은 시간 (초)
     func remainingResendTime() -> Int {
         guard let lastSent = lastSentTime else { return 0 }
         let elapsed = Date().timeIntervalSince(lastSent)
-        let remaining = 180 - Int(elapsed)
+        let remaining = 60 - Int(elapsed)
         return max(0, remaining)
     }
     
     /// 타이머 시작 (180초)
     func startTimer() {
-        verificationTimer = 180
+        verificationTimer = 600
         timerCancellable?.cancel()
         
         timerCancellable = Timer.publish(every: 1, on: .main, in: .common)
@@ -806,193 +807,67 @@ class RegisterViewModel: ObservableObject {
     }
     
     /// 인증번호 발송 (기존 가입자 확인 후 발송)
+    func updateEmail(_ value: String) {
+        guard registerData.mt_id != value else { return }
+        registerData.mt_id = value
+        registerData.mt_email = value
+        verificationToken = nil
+        verificationSent = false
+        verificationCode = ""
+        verificationTimer = 0
+        lastSentTime = nil
+        timerCancellable?.cancel()
+    }
+
     func sendVerificationCode() {
-        let cleanPhone = formatPhoneForAPI(registerData.mt_id)
-        
-        // 전화번호 유효성 검사
-        guard cleanPhone.count >= 10 else {
-            errorMessage = "올바른 전화번호를 입력해주세요."
-            showError = true
-            return
-        }
-        
-        // 재발송 제한 확인
-        if !canResend() {
-            let remaining = remainingResendTime()
-            let minutes = remaining / 60
-            let seconds = remaining % 60
-            errorMessage = "인증번호 재발송은 \(minutes)분 \(seconds)초 후에 가능합니다."
-            showError = true
-            return
-        }
-        
-        // 테스트 번호 처리
-        if cleanPhone == "01011111111" {
-            print("📱 [SMS] 테스트 번호 - 실제 SMS 발송 생략")
-            verificationSent = true
-            lastSentTime = Date()
-            startTimer()
-            currentStep = .verification
-            return
-        }
-        
+        let email = registerData.mt_id.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !isVerificationLoading else { return }
+        guard isPhoneValid else { errorMessage = "올바른 이메일을 입력해주세요."; showError = true; return }
+        if verificationToken != nil { currentStep = .basicInfo; return }
+        guard canResend() else { errorMessage = "잠시 후 다시 시도해주세요."; showError = true; return }
         isVerificationLoading = true
-        
-        // 1단계: 기존 가입자 확인
-        guard let checkURL = URL(string: checkPhoneAPIURL + cleanPhone) else {
-            errorMessage = "서버 오류가 발생했습니다."
-            showError = true
-            isVerificationLoading = false
-            return
-        }
-        
-        print("📱 [REGISTER] 전화번호 중복 확인 중... \(cleanPhone)")
-        
-        URLSession.shared.dataTask(with: checkURL) { [weak self] data, response, error in
-            DispatchQueue.main.async {
-                if let error = error {
-                    print("❌ [REGISTER] 전화번호 확인 오류: \(error.localizedDescription)")
-                    self?.isVerificationLoading = false
-                    self?.errorMessage = "서버 연결에 실패했습니다."
-                    self?.showError = true
-                    return
-                }
-                
-                guard let data = data,
-                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                      let available = json["available"] as? Bool else {
-                    self?.isVerificationLoading = false
-                    self?.errorMessage = "서버 응답 오류가 발생했습니다."
-                    self?.showError = true
-                    return
-                }
-                
-                if !available {
-                    // 기존 가입자 발견 - 확인 알림 표시
-                    print("⚠️ [REGISTER] 이미 가입된 전화번호 - 알림 표시")
-                    self?.isVerificationLoading = false
-                    
-                    // 전화번호 저장 후 알림 표시 (확인 버튼 누르면 이동)
-                    self?.existingUserPhone = self?.registerData.mt_id ?? cleanPhone
-                    self?.showExistingUserAlert = true
-                    return
-                }
-                
-                // 2단계: 신규 사용자 - SMS 발송
-                print("✅ [REGISTER] 신규 전화번호 확인됨 - SMS 발송 시작")
-                self?.sendSMSVerification(cleanPhone: cleanPhone)
-            }
-        }.resume()
-    }
-    
-    /// SMS 인증번호 실제 발송 (내부 함수)
-    private func sendSMSVerification(cleanPhone: String) {
-        guard let url = URL(string: smsAPIURL) else {
-            errorMessage = "서버 오류가 발생했습니다."
-            showError = true
-            isVerificationLoading = false
-            return
-        }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        let body: [String: Any] = ["phone_number": cleanPhone]
-        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
-        
-        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
-            DispatchQueue.main.async {
-                self?.isVerificationLoading = false
-                
-                if let error = error {
-                    print("❌ [SMS] 발송 오류: \(error.localizedDescription)")
-                    self?.errorMessage = "인증번호 발송에 실패했습니다."
-                    self?.showError = true
-                    return
-                }
-                
-                guard let data = data,
-                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                      let success = json["success"] as? Bool else {
-                    self?.errorMessage = "서버 응답 오류가 발생했습니다."
-                    self?.showError = true
-                    return
-                }
-                
-                if success {
-                    // 발송된 인증번호 저장 (백엔드에서 반환)
-                    if let returnedCode = json["code"] as? String {
-                        self?.sentVerificationCode = returnedCode
-                        print("✅ [SMS] 인증번호 발송 성공 - 코드 저장됨")
-                    }
-                    self?.verificationSent = true
-                    self?.lastSentTime = Date()
-                    self?.startTimer()
-                    self?.currentStep = .verification
-                } else {
-                    let errorMsg = json["error"] as? String ?? "인증번호 발송에 실패했습니다."
-                    self?.errorMessage = errorMsg
-                    self?.showError = true
-                }
-            }
-        }.resume()
-    }
-    
-    /// 인증번호 확인 (로컬에 저장된 코드와 비교)
-    func verifyCode() {
-        let cleanPhone = formatPhoneForAPI(registerData.mt_id)
-        let code = verificationCode
-        
-        guard !code.isEmpty else {
-            errorMessage = "인증번호를 입력해주세요."
-            showError = true
-            return
-        }
-        
-        guard verificationSent else {
-            errorMessage = "먼저 인증번호를 요청해주세요."
-            showError = true
-            return
-        }
-        
-        // 타이머 만료 확인
-        guard verificationTimer > 0 else {
-            errorMessage = "인증번호가 만료되었습니다. 재발송해주세요."
-            showError = true
-            return
-        }
-        
-        // 테스트 번호 처리
-        if cleanPhone == "01011111111" {
-            if code == "111111" {
-                print("✅ [SMS] 테스트 번호 인증 성공")
-                currentStep = .basicInfo
-            } else {
-                errorMessage = "인증번호가 올바르지 않습니다."
+        Task {
+            defer { isVerificationLoading = false }
+            do {
+                let response = try await authService.emailAuth(path: "/auth/email/send-code", body: ["email": email, "purpose": "register"])
+                guard registerData.mt_id.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == email else { return }
+                guard response.success else { throw NetworkError.badRequest("인증번호 발송에 실패했습니다.") }
+                registerData.mt_id = email
+                registerData.mt_email = email
+                verificationToken = nil
+                verificationSent = true
+                lastSentTime = Date()
+                startTimer()
+                currentStep = .verification
+            } catch {
+                errorMessage = (error as? NetworkError)?.userMessage ?? "네트워크 연결을 확인해주세요."
                 showError = true
             }
-            return
-        }
-        
-        // 저장된 인증번호와 비교
-        guard let storedCode = sentVerificationCode else {
-            errorMessage = "인증번호 발송 정보가 없습니다. 다시 요청해주세요."
-            showError = true
-            return
-        }
-        
-        if code == storedCode {
-            print("✅ [SMS] 인증번호 확인 성공")
-            sentVerificationCode = nil  // 사용된 코드 삭제
-            currentStep = .basicInfo
-        } else {
-            print("❌ [SMS] 인증번호 불일치 - 입력: \(code)")
-            errorMessage = "인증번호가 올바르지 않습니다."
-            showError = true
         }
     }
-    
+
+    func verifyCode() {
+        guard !isVerificationLoading else { return }
+        if verificationToken != nil { currentStep = .basicInfo; return }
+        guard verificationCode.count == 6, verificationTimer > 0 else { errorMessage = "인증번호를 확인해주세요."; showError = true; return }
+        let email = registerData.mt_id.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        isVerificationLoading = true
+        Task {
+            defer { isVerificationLoading = false }
+            do {
+                let response = try await authService.emailAuth(path: "/auth/email/verify-code", body: ["email": email, "purpose": "register", "code": verificationCode])
+                guard registerData.mt_id.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == email else { return }
+                guard response.success, let token = response.verification_token, !token.isEmpty else { throw NetworkError.badRequest("인증번호 확인에 실패했습니다.") }
+                verificationToken = token
+                timerCancellable?.cancel()
+                currentStep = .basicInfo
+            } catch {
+                errorMessage = (error as? NetworkError)?.userMessage ?? "네트워크 연결을 확인해주세요."
+                showError = true
+            }
+        }
+    }
+
     /// 인증번호 재발송
     func resendVerificationCode() {
         if canResend() {
@@ -1009,29 +884,15 @@ class RegisterViewModel: ObservableObject {
     // MARK: - Validation Logic
     
     func isValidPassword(_ password: String) -> Bool {
-        // Password validation logic: 8+ chars, at least 2 of: Uppercase/Lowercase, Number, Special Char
-        if password.count < 8 { return false }
-        
-        let hasUppercase = password.range(of: "[A-Z]", options: .regularExpression) != nil
-        let hasLowercase = password.range(of: "[a-z]", options: .regularExpression) != nil
-        let hasNumber = password.range(of: "[0-9]", options: .regularExpression) != nil
-        let hasSpecialChar = password.range(of: "[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?]", options: .regularExpression) != nil
-        
-        // 영문(대/소문자 중 하나), 숫자, 특수문자 중 2가지 이상 조합
-        var categoryCount = 0
-        if hasUppercase || hasLowercase { categoryCount += 1 }
-        if hasNumber { categoryCount += 1 }
-        if hasSpecialChar { categoryCount += 1 }
-        
-        return categoryCount >= 2
+        isServerPasswordValid(password)
     }
-    
+
     /// 비밀번호 규칙 상세 체크 (UI 표시용)
     func passwordValidationDetails(_ password: String) -> (hasMinLength: Bool, hasLetter: Bool, hasNumber: Bool, hasSpecialChar: Bool) {
         let hasMinLength = password.count >= 8
-        let hasLetter = password.range(of: "[A-Za-z]", options: .regularExpression) != nil
+        let hasLetter = password.range(of: "[A-Z]", options: .regularExpression) != nil && password.range(of: "[a-z]", options: .regularExpression) != nil
         let hasNumber = password.range(of: "[0-9]", options: .regularExpression) != nil
-        let hasSpecialChar = password.range(of: "[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?]", options: .regularExpression) != nil
+        let hasSpecialChar = password.rangeOfCharacter(from: CharacterSet(charactersIn: "!@#$%^&*(),.?\":{}|<>")) != nil
         
         return (hasMinLength, hasLetter, hasNumber, hasSpecialChar)
     }
@@ -1099,6 +960,7 @@ class RegisterViewModel: ObservableObject {
     // MARK: - API Calls
     
     func register() {
+        guard let token = verificationToken else { errorMessage = "이메일 인증이 필요합니다."; showError = true; return }
         isLoading = true
         
         // FCM 토큰 주입
@@ -1108,7 +970,8 @@ class RegisterViewModel: ObservableObject {
         
         Task {
             do {
-                let _ = try await authService.register(request: registerData)
+                let result = try await authService.register(request: registerData, verificationToken: token, phoneNumber: optionalPhone)
+                guard result.success else { throw NetworkError.badRequest(result.message) }
                 DispatchQueue.main.async {
                     self.isLoading = false
                     self.currentStep = .complete
@@ -1119,7 +982,7 @@ class RegisterViewModel: ObservableObject {
                     if let networkError = error as? NetworkError {
                         self.errorMessage = networkError.userMessage
                     } else {
-                        self.errorMessage = error.localizedDescription
+                        self.errorMessage = "회원가입 요청을 처리하지 못했습니다."
                     }
                     self.showError = true
                 }
@@ -1143,7 +1006,17 @@ class ForgotPasswordViewModel: ObservableObject {
     // MARK: - Published Properties
     
     @Published var currentStep: Step = .phone
-    @Published var phoneNumber: String = ""
+    @Published var phoneNumber: String = "" {
+        didSet {
+            if phoneNumber != oldValue {
+                verificationToken = nil
+                verificationSent = false
+                verificationTimer = 0
+                lastSentTime = nil
+                timerCancellable?.cancel()
+            }
+        }
+    }
     
     @Published var verificationCode: String = ""
     @Published var newPassword: String = ""
@@ -1161,7 +1034,7 @@ class ForgotPasswordViewModel: ObservableObject {
     @Published var verificationSent: Bool = false
     @Published var verificationTimer: Int = 0
     @Published var lastSentTime: Date? = nil
-    private var sentVerificationCode: String? = nil
+    private var verificationToken: String? = nil
     private var timerCancellable: AnyCancellable?
     
     private let authService = AuthService.shared
@@ -1183,7 +1056,7 @@ class ForgotPasswordViewModel: ObservableObject {
     }
     
     var hasPasswordLetter: Bool {
-        newPassword.range(of: "[a-zA-Z]", options: .regularExpression) != nil
+        newPassword.range(of: "[a-z]", options: .regularExpression) != nil && newPassword.range(of: "[A-Z]", options: .regularExpression) != nil
     }
     
     var hasPasswordNumber: Bool {
@@ -1195,22 +1068,22 @@ class ForgotPasswordViewModel: ObservableObject {
     }
     
     var isPasswordRulesSatisfied: Bool {
-        isPasswordLengthValid && hasPasswordLetter && hasPasswordNumber && hasPasswordSpecialChar
+        isServerPasswordValid(newPassword)
     }
     
     func canResend() -> Bool {
         guard let lastSent = lastSentTime else { return true }
-        return Date().timeIntervalSince(lastSent) >= 180
+        return Date().timeIntervalSince(lastSent) >= 60
     }
     
     func remainingResendTime() -> Int {
         guard let lastSent = lastSentTime else { return 0 }
         let elapsed = Int(Date().timeIntervalSince(lastSent))
-        return max(0, 180 - elapsed)
+        return max(0, 60 - elapsed)
     }
     
     func startTimer() {
-        verificationTimer = 180
+        verificationTimer = 600
         timerCancellable?.cancel()
         timerCancellable = Timer.publish(every: 1, on: .main, in: .common)
             .autoconnect()
@@ -1228,203 +1101,59 @@ class ForgotPasswordViewModel: ObservableObject {
     
     /// 사용자 존재 여부 확인 후 인증번호 발송
     func checkUserAndSendCode() {
-        let cleanPhone = formatPhoneForAPI(phoneNumber)
-        
-        guard cleanPhone.count >= 10 else {
-            errorMessage = "올바른 전화번호를 입력해주세요."
-            showError = true
-            return
-        }
-        
+        let email = phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !isLoading else { return }
+        guard email.range(of: "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$", options: .regularExpression) != nil else { errorMessage = "올바른 이메일을 입력해주세요."; showError = true; return }
+        guard canResend() else { errorMessage = "잠시 후 다시 시도해주세요."; showError = true; return }
         isLoading = true
-        
-        // 1단계: 사용자 존재 확인
-        guard let url = URL(string: checkPhoneAPIURL + cleanPhone) else {
-            errorMessage = "서버 오류가 발생했습니다."
-            showError = true
-            isLoading = false
-            return
+        Task {
+            defer { isLoading = false }
+            do {
+                let response = try await authService.emailAuth(path: "/auth/email/send-code", body: ["email": email, "purpose": "reset_password"])
+                guard phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == email else { return }
+                guard response.success else { throw NetworkError.badRequest("인증번호 발송에 실패했습니다.") }
+                verificationToken = nil
+                verificationSent = true
+                lastSentTime = Date()
+                startTimer()
+                currentStep = .verification
+            } catch { errorMessage = (error as? NetworkError)?.userMessage ?? "네트워크 연결을 확인해주세요."; showError = true }
         }
-        
-        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
-            DispatchQueue.main.async {
-                if error != nil {
-                    self?.isLoading = false
-                    self?.errorMessage = "서버 연결에 실패했습니다."
-                    self?.showError = true
-                    return
-                }
-                
-                guard let data = data,
-                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                      let available = json["available"] as? Bool else {
-                    self?.isLoading = false
-                    self?.errorMessage = "서버 응답 오류가 발생했습니다."
-                    self?.showError = true
-                    return
-                }
-                
-                if available {
-                    // 가입되지 않은 전화번호
-                    self?.isLoading = false
-                    self?.errorMessage = "가입되지 않은 전화번호입니다."
-                    self?.showError = true
-                } else {
-                    // 가입된 사용자 - SMS 발송 시작
-                    self?.sendVerificationCode(cleanPhone: cleanPhone)
-                }
-            }
-        }.resume()
     }
-    
-    private func sendVerificationCode(cleanPhone: String) {
-        // 재발송 제한 확인 (테스트 시에는 주석 처리 가능)
-        if !canResend() && lastSentTime != nil {
-            let remaining = remainingResendTime()
-            isLoading = false
-            errorMessage = "인증번호 재발송은 \(remaining / 60)분 \(remaining % 60)초 후에 가능합니다."
-            showError = true
-            return
-        }
-        
-        // 테스트 번호 처리
-        if cleanPhone == "01011111111" {
-            isLoading = false
-            verificationSent = true
-            lastSentTime = Date()
-            startTimer()
-            currentStep = .verification
-            return
-        }
-        
-        guard let url = URL(string: smsAPIURL) else {
-            errorMessage = "서버 오류가 발생했습니다."
-            showError = true
-            isLoading = false
-            return
-        }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        let body: [String: Any] = ["phone_number": cleanPhone]
-        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
-        
-        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
-            DispatchQueue.main.async {
-                self?.isLoading = false
-                
-                if error != nil {
-                    self?.errorMessage = "인증번호 발송에 실패했습니다."
-                    self?.showError = true
-                    return
-                }
-                
-                guard let data = data,
-                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                      let success = json["success"] as? Bool else {
-                    self?.errorMessage = "서버 응답 오류가 발생했습니다."
-                    self?.showError = true
-                    return
-                }
-                
-                if success {
-                    if let returnedCode = json["code"] as? String {
-                        self?.sentVerificationCode = returnedCode
-                    }
-                    self?.verificationSent = true
-                    self?.lastSentTime = Date()
-                    self?.startTimer()
-                    self?.currentStep = .verification
-                } else {
-                    self?.errorMessage = json["error"] as? String ?? "인증번호 발송에 실패했습니다."
-                    self?.showError = true
-                }
-            }
-        }.resume()
-    }
-    
+
     func verifyCode() {
-        if phoneNumber.replacingOccurrences(of: "-", with: "") == "01011111111" && verificationCode == "111111" {
-            currentStep = .newPassword
-            return
-        }
-        
-        guard verificationTimer > 0 else {
-            errorMessage = "인증 시간이 만료되었습니다. 다시 시도해주세요."
-            showError = true
-            return
-        }
-        
-        if verificationCode == sentVerificationCode {
-            timerCancellable?.cancel()
-            currentStep = .newPassword
-        } else {
-            errorMessage = "인증번호가 일치하지 않습니다."
-            showError = true
+        guard !isLoading else { return }
+        if verificationToken != nil { currentStep = .newPassword; return }
+        guard verificationCode.count == 6, verificationTimer > 0 else { errorMessage = "인증번호를 확인해주세요."; showError = true; return }
+        let email = phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        isLoading = true
+        Task {
+            defer { isLoading = false }
+            do {
+                let response = try await authService.emailAuth(path: "/auth/email/verify-code", body: ["email": email, "purpose": "reset_password", "code": verificationCode])
+                guard phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == email else { return }
+                guard response.success, let token = response.verification_token, !token.isEmpty else { throw NetworkError.badRequest("인증번호 확인에 실패했습니다.") }
+                verificationToken = token
+                timerCancellable?.cancel()
+                currentStep = .newPassword
+            } catch { errorMessage = (error as? NetworkError)?.userMessage ?? "네트워크 연결을 확인해주세요."; showError = true }
         }
     }
-    
+
     func resetPassword() {
-        guard newPassword.count >= 8 else {
-            errorMessage = "비밀번호는 8자 이상이어야 합니다."
-            showError = true
-            return
-        }
-        
-        guard newPassword == confirmPassword else {
-            errorMessage = "비밀번호가 일치하지 않습니다."
-            showError = true
-            return
-        }
-        
+        guard !isLoading else { return }
+        guard isPasswordRulesSatisfied, newPassword == confirmPassword else { errorMessage = "비밀번호 규칙과 확인값을 확인해주세요."; showError = true; return }
+        guard let token = verificationToken else { errorMessage = "이메일 인증이 필요합니다."; showError = true; return }
+        let email = phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         isLoading = true
-        
-        let cleanPhone = formatPhoneForAPI(phoneNumber)
-        
-        guard let url = URL(string: resetPasswordAPIURL) else {
-            errorMessage = "서버 오류가 발생했습니다."
-            showError = true
-            isLoading = false
-            return
+        Task {
+            defer { isLoading = false }
+            do {
+                let response = try await authService.emailAuth(path: "/auth/reset-password-by-email", body: ["email": email, "verification_token": token, "new_password": newPassword])
+                guard response.success else { throw NetworkError.badRequest("비밀번호 변경에 실패했습니다.") }
+                verificationToken = nil
+                currentStep = .complete
+            } catch { errorMessage = (error as? NetworkError)?.userMessage ?? "네트워크 연결을 확인해주세요."; showError = true }
         }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        let body: [String: Any] = [
-            "phone": cleanPhone,
-            "new_password": newPassword
-        ]
-        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
-        
-        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
-            DispatchQueue.main.async {
-                self?.isLoading = false
-                
-                if error != nil {
-                    self?.errorMessage = "비밀번호 변경에 실패했습니다."
-                    self?.showError = true
-                    return
-                }
-                
-                guard let data = data,
-                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                      let success = json["success"] as? Bool else {
-                    self?.errorMessage = "서버 응답 오류가 발생했습니다."
-                    self?.showError = true
-                    return
-                }
-                
-                if success {
-                    self?.currentStep = .complete
-                } else {
-                    self?.errorMessage = json["message"] as? String ?? "비밀번호 변경에 실패했습니다."
-                    self?.showError = true
-                }
-            }
-        }.resume()
     }
 }

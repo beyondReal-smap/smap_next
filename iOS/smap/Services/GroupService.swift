@@ -24,29 +24,17 @@ class GroupService {
 
     /// 그룹 통계 가져오기
     func getGroupStats(sgtIdx: Int) async throws -> GroupStats {
-        let result: StatsResponse = try await apiClient.request(.getGroupStats(sgtIdx: sgtIdx), token: token)
-        guard result.success, let stats = result.data else {
-            throw NetworkError.badRequest(result.message ?? "그룹 통계 로드 실패")
-        }
-        return stats
+        try await apiClient.request(.getGroupStats(sgtIdx: sgtIdx), token: token)
     }
 
     /// 그룹 생성
     func createGroup(title: String, memo: String) async throws -> SmapGroup {
-        let result: GroupCreateResponse = try await apiClient.request(.createGroup(title: title, memo: memo), token: token)
-        guard result.success, let group = result.data else {
-            throw NetworkError.badRequest(result.message ?? "그룹 생성 실패")
-        }
-        return group
+        try await apiClient.request(.createGroup(title: title, memo: memo), token: token)
     }
 
     /// 그룹 수정
     func updateGroup(sgtIdx: Int, title: String, memo: String) async throws -> SmapGroup {
-        let result: GroupCreateResponse = try await apiClient.request(.updateGroup(sgtIdx: sgtIdx, title: title, memo: memo), token: token)
-        guard result.success, let group = result.data else {
-            throw NetworkError.badRequest(result.message ?? "그룹 수정 실패")
-        }
-        return group
+        try await apiClient.request(.updateGroup(sgtIdx: sgtIdx, title: title, memo: memo), token: token)
     }
 
     /// 그룹 삭제 (소프트 삭제 - sgt_show를 N으로 변경)

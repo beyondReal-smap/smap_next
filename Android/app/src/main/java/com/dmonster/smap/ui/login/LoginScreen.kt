@@ -17,7 +17,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Warning
@@ -273,17 +273,17 @@ private fun LoginForm(
             modifier = Modifier
                 .fillMaxWidth()
                 .onFocusChanged { isPhoneFocused = it.isFocused },
-            placeholder = { Text("전화번호") },
+            placeholder = { Text("이메일 또는 전화번호") },
             leadingIcon = {
                 Icon(
-                    imageVector = Icons.Default.Phone,
-                    contentDescription = "전화번호",
+                    imageVector = Icons.Default.Person,
+                    contentDescription = null,
                     tint = if (isPhoneFocused) BrandColors.Primary else BrandColors.TextSecondary
                 )
             },
-            visualTransformation = PhoneVisualTransformation(),
+            visualTransformation = if (phoneNumber.all { it.isDigit() }) PhoneVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
             keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Phone,
+                keyboardType = KeyboardType.Email,
                 imeAction = ImeAction.Next
             ),
             keyboardActions = KeyboardActions(

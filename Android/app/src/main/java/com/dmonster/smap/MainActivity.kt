@@ -18,6 +18,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
+import com.dmonster.smap.data.api.SmapApi
+import com.dmonster.smap.data.model.JoinGroupRequest
+import com.dmonster.smap.data.GlobalEvent
+import com.dmonster.smap.data.GlobalEventBus
+import kotlinx.coroutines.launch
 import com.dmonster.smap.data.service.AuthService
 import com.dmonster.smap.ui.components.BackgroundLocationGuideDialog
 import com.dmonster.smap.ui.components.LocationDeniedOverlay
@@ -35,6 +41,16 @@ class MainActivity : ComponentActivity() {
     }
 
     @Inject lateinit var authService: AuthService
+    @Inject lateinit var smapApi: SmapApi
+    private val inviteMessage = mutableStateOf<String?>(null)
+    private val inviteFailed = mutableStateOf(false)
+    private var joiningInvite = false
+    private var navigatingToLogin = false
+    private val authListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if ((key == "auth_token" || key == null) && authService.getToken().isNullOrBlank()) {
+            runOnUiThread { stopLocationService(); navigateToLogin() }
+        }
+    }
 
     // Mutable state for overlay so onResume can clear it
     private var showLocationDeniedOverlay = mutableStateOf(false)
@@ -43,6 +59,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        handleDeepLink(intent)
         val isLoggedIn = authService.isLoggedIn
 
         if (BuildConfig.DEBUG) {
@@ -56,7 +73,8 @@ class MainActivity : ComponentActivity() {
         }
 
         // 딥링크 처리
-        handleDeepLink(intent)
+        getSharedPreferences("smap_auth_prefs", MODE_PRIVATE).registerOnSharedPreferenceChangeListener(authListener)
+        processPendingInvite()
 
         // 🔥 [FCM] 로그인 상태로 앱에 진입할 때마다 최신 FCM 토큰을 서버에 멱등 재등록한다.
         // 기존 구조는 onNewToken(토큰 회전 시에만 발화, 수개월 주기)에만 의존하여
@@ -67,6 +85,18 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             SmapTheme {
+                inviteMessage.value?.let { message ->
+                    androidx.compose.material3.AlertDialog(
+                        onDismissRequest = { inviteMessage.value = null },
+                        title = { androidx.compose.material3.Text("그룹 초대") },
+                        text = { androidx.compose.material3.Text(message) },
+                        confirmButton = { androidx.compose.material3.TextButton(onClick = {
+                            inviteMessage.value = null
+                            if (inviteFailed.value) processPendingInvite()
+                        }) { androidx.compose.material3.Text(if (inviteFailed.value) "다시 시도" else "확인") } },
+                        dismissButton = if (inviteFailed.value) ({ androidx.compose.material3.TextButton(onClick = { inviteMessage.value = null }) { androidx.compose.material3.Text("닫기") } }) else null
+                    )
+                }
                 val locationDeniedOverlay by showLocationDeniedOverlay
                 val backgroundGuide by showBackgroundGuide
 
@@ -337,6 +367,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun navigateToLogin() {
+        if (navigatingToLogin || isFinishing) return
+        navigatingToLogin = true
         val intent = Intent(this, LoginActivity::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
@@ -367,6 +399,33 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleDeepLink(intent)
+        processPendingInvite()
+    }
+
+    override fun onDestroy() {
+        getSharedPreferences("smap_auth_prefs", MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(authListener)
+        super.onDestroy()
+    }
+
+    private fun processPendingInvite() {
+        val prefs = getSharedPreferences("smap_prefs", MODE_PRIVATE)
+        val value = prefs.getString("pending_group_id", null) ?: return
+        val groupId = value.toIntOrNull() ?: return
+        val memberId = authService.getMtIdx()
+        if (joiningInvite || memberId == 0 || !authService.isLoggedIn) return
+        joiningInvite = true
+        lifecycleScope.launch {
+            try {
+                smapApi.joinGroupFromInvite(groupId, JoinGroupRequest(memberId, groupId)).close()
+                if (prefs.getString("pending_group_id", null) == value) prefs.edit().remove("pending_group_id").apply()
+                GlobalEventBus.emit(GlobalEvent.GroupsChanged)
+                inviteFailed.value = false
+                inviteMessage.value = "그룹에 가입했습니다."
+            } catch (e: Exception) {
+                inviteFailed.value = true
+                inviteMessage.value = "그룹 가입에 실패했습니다. 다시 시도해 주세요."
+            } finally { joiningInvite = false }
+        }
     }
 
     private fun handleDeepLink(intent: Intent?) {

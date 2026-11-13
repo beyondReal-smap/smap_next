@@ -1,5 +1,7 @@
 package com.dmonster.smap.ui.settings
 
+import androidx.activity.compose.BackHandler
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -106,6 +108,7 @@ fun InquiryScreen(onBack: () -> Unit) {
             onBack()
         }
     }
+    BackHandler { attemptBack() }
 
     val botToken = BuildConfig.TELEGRAM_BOT_TOKEN
     val chatId = BuildConfig.TELEGRAM_CHAT_ID
@@ -130,7 +133,8 @@ fun InquiryScreen(onBack: () -> Unit) {
                     ⏰ 접수 시간: $dateStr
                 """.trimIndent()
                 
-                val success = authService.sendTelegramInquiry(chatId, botToken, text)
+                val result = authService.sendTelegramInquiry(chatId, botToken, text)
+                val success = result.isSuccess
                 isSuccess = success
                 resultMessage = if (success) "문의가 성공적으로 전송되었습니다." else "전송 중 오류가 발생했습니다."
                 if (success) haptics.success() else haptics.error()

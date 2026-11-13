@@ -220,6 +220,7 @@ struct LocationDetailPanel: View {
             }
             
             // Actions Section
+            if viewModel.canManageLocation(location) {
             VStack(spacing: 12) {
                 HStack(spacing: 12) {
                     Button(action: { viewModel.startEditing() }) {
@@ -277,6 +278,7 @@ struct LocationDetailPanel: View {
                 .accessibilityHint("삭제 전 확인 단계가 있습니다")
             }
             .padding(.top, 8)
+            }
             
             Spacer().frame(height: 20)
         }

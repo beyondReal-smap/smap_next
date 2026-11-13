@@ -40,7 +40,7 @@ fun ChangePasswordScreen(
 ) {
     val user by viewModel.user.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-    val userMessage by viewModel.userMessage.collectAsState()
+    val result by viewModel.result.collectAsState()
     
     // 입력값은 민감 정보라 세션 동안 유지되더라도 회전 시에는 보존되어야 한다 (rememberSaveable)
     var currentPassword by rememberSaveable { mutableStateOf("") }
@@ -56,23 +56,23 @@ fun ChangePasswordScreen(
     var isSuccess by remember { mutableStateOf(false) }
     
     // Password validation
-    val isLengthValid = newPassword.length in 8..20
-    val hasLetter = newPassword.any { it.isLetter() }
+    val isLengthValid = newPassword.length >= 8
+    val hasLetter = newPassword.any { it in 'A'..'Z' } && newPassword.any { it in 'a'..'z' }
     val hasNumber = newPassword.any { it.isDigit() }
-    val hasSpecial = newPassword.any { !it.isLetterOrDigit() }
-    val isPasswordStrong = isLengthValid && hasLetter && hasNumber && hasSpecial
+    val hasSpecial = newPassword.any { it in "!@#\$%^&*(),.?\":{}|<>" }
+    val isPasswordStrong = com.dmonster.smap.data.model.isServerPasswordValid(newPassword)
     val isPasswordMatch = newPassword.isNotEmpty() && newPassword == confirmPassword
     
     // Check if social login user
     val isSocialUser = user?.mtType?.let { it != 1 } ?: false
     
     // Handle message from ViewModel
-    LaunchedEffect(userMessage) {
-        userMessage?.let { msg ->
-            dialogMessage = msg
-            isSuccess = msg.contains("성공") || msg.contains("변경")
+    LaunchedEffect(result) {
+        result?.takeIf { it.operation == "password" }?.let {
+            dialogMessage = it.message
+            isSuccess = it.success
             showResultDialog = true
-            viewModel.clearMessage()
+            viewModel.clearResult()
         }
     }
 
@@ -309,8 +309,8 @@ private fun PasswordChangeForm(
             // Password Strength Indicators
             if (newPassword.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    PasswordRequirement("8~20자", isLengthValid)
-                    PasswordRequirement("영문 포함", hasLetter)
+                    PasswordRequirement("8자 이상", isLengthValid)
+                    PasswordRequirement("영문 대문자와 소문자 포함", hasLetter)
                     PasswordRequirement("숫자 포함", hasNumber)
                     PasswordRequirement("특수문자 포함", hasSpecial)
                 }

@@ -216,17 +216,11 @@ class HomeViewModel @Inject constructor(
                 }
                 is ApiResult.Error -> {
                     Log.e(TAG, "❌ [API] 데이터 로드 실패 (${result.code})")
-                    _errorMessage.value = "데이터를 불러오지 못했습니다 (${result.code})"
-                    if (_groups.value.isEmpty()) {
-                        _showGroupCreationModal.value = true
-                    }
+                    _errorMessage.value = "데이터를 불러오지 못했습니다"
                 }
                 is ApiResult.NetworkError -> {
                     Log.e(TAG, "❌ [API] 데이터 로드 실패 - 네트워크", result.exception)
                     _errorMessage.value = "네트워크 연결을 확인해주세요"
-                    if (_groups.value.isEmpty()) {
-                        _showGroupCreationModal.value = true
-                    }
                 }
             }
             _isLoading.value = false
@@ -372,11 +366,13 @@ class HomeViewModel @Inject constructor(
                     Log.d(TAG, "🔄 [REFRESH] ${groups.size}개 그룹 로드 완료")
 
                     val currentGroup = _selectedGroup.value
-                    if (currentGroup != null) {
+                    if (currentGroup != null && groups.any { it.sgtIdx == currentGroup.sgtIdx }) {
                         Log.d(TAG, "🔄 [REFRESH] 그룹(${currentGroup.sgtIdx}) 멤버/일정 새로고침")
                         loadGroupData(currentGroup.sgtIdx)
                     } else if (groups.isNotEmpty()) {
                         selectGroup(groups.first())
+                    } else {
+                        _selectedGroup.value = null
                     }
 
                     Log.d(TAG, "✅ [REFRESH] 전체 데이터 새로고침 완료")

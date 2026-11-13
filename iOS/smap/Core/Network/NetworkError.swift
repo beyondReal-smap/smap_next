@@ -48,9 +48,17 @@ enum NetworkError: Error, LocalizedError {
             return .forbidden
         case 404:
             return .notFound
+        case 409:
+            return .badRequest("이미 가입된 이메일입니다.")
+        case 422:
+            return .badRequest("입력한 정보를 확인해주세요.")
+        case 429:
+            return .badRequest("요청이 너무 많습니다. 잠시 후 다시 시도해주세요.")
         case 400:
             let message = data.flatMap { try? JSONDecoder().decode(ErrorDetail.self, from: $0) }?.detail
             return .badRequest(message)
+        case 502, 503:
+            return .badRequest("일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요.")
         case 500...599:
             let message = data.flatMap { String(data: $0, encoding: .utf8) }
             return .serverError(statusCode, message)

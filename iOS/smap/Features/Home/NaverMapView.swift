@@ -37,14 +37,16 @@ struct NaverMapView: UIViewRepresentable {
     func updateUIView(_ uiView: NMFNaverMapView, context: Context) {
         context.coordinator.updateMarkers(mapView: uiView.mapView, members: members, schedules: schedules)
 
-        // 맵 이동 로직 (선택된 멤버가 있을 때만 이동)
-        // 주의: Binding이 변할 때마다 호출되므로, 실제로 위치가 변했을 때만 이동하도록 하는 것이 좋음
-        if let targetMember = members.first(where: { $0.isSelected }) {
-             if let lat = targetMember.mlt_lat, let lon = targetMember.mlt_long {
-                 let cameraUpdate = NMFCameraUpdate(scrollTo: NMGLatLng(lat: lat, lng: lon))
-                 cameraUpdate.animation = .easeIn
-                 uiView.mapView.moveCamera(cameraUpdate)
-             }
+        let selected = members.first(where: { $0.isSelected })
+        if let member = selected, let lat = member.mlt_lat, let lon = member.mlt_long {
+            if context.coordinator.lastSelectedMemberID != member.mt_idx {
+                let cameraUpdate = NMFCameraUpdate(scrollTo: NMGLatLng(lat: lat, lng: lon))
+                cameraUpdate.animation = .easeIn
+                uiView.mapView.moveCamera(cameraUpdate)
+                context.coordinator.lastSelectedMemberID = member.mt_idx
+            }
+        } else if selected == nil {
+            context.coordinator.lastSelectedMemberID = nil
         }
     }
 
@@ -54,7 +56,13 @@ struct NaverMapView: UIViewRepresentable {
 
     class Coordinator: NSObject, NMFMapViewTouchDelegate, NMFOverlayImageDataSource {
         var parent: NaverMapView
-        var markers: [NMFMarker] = []
+        var memberMarkers: [Int: NMFMarker] = [:]
+        var memberSnapshots: [Int: SmapGroupMember] = [:]
+        var scheduleMarkers: [String: NMFMarker] = [:]
+        var scheduleSignatures: [String: String] = [:]
+        private static let profileImages = NSCache<NSURL, UIImage>()
+        private var imageRequests: Set<URL> = []
+        var lastSelectedMemberID: Int?
         var infoWindow: NMFInfoWindow?
         var currentMapView: NMFMapView?
         var currentMember: SmapGroupMember?
@@ -87,7 +95,7 @@ struct NaverMapView: UIViewRepresentable {
             // 멤버 정보 추출
             let name = member.displayName
             let battery = member.mlt_battery ?? 0
-            let speed = member.mlt_speed ?? 0.0
+            let speed = (member.mlt_speed ?? 0.0) * 3.6
             let gpsTime = member.mlt_gps_time ?? "업데이트 없음"
 
             // 배터리 색상
@@ -166,36 +174,21 @@ struct NaverMapView: UIViewRepresentable {
         }
 
         func updateMarkers(mapView: NMFMapView, members: [SmapGroupMember], schedules: [SmapSchedule]) {
-            print("📍 [NaverMapView] Markers update requested. Members: \(members.count), Schedules: \(schedules.count)")
-
             currentMapView = mapView
-
-            // 기존 마커 제거
-            for marker in markers {
-                marker.mapView = nil
+            let visibleIDs = Set(members.filter { $0.mlt_lat != nil && $0.mlt_long != nil }.map { $0.mt_idx })
+            for id in memberMarkers.keys.filter({ !visibleIDs.contains($0) }) {
+                memberMarkers.removeValue(forKey: id)?.mapView = nil
+                memberSnapshots.removeValue(forKey: id)
             }
-            markers.removeAll()
-
-            // 선택된 멤버 추적
-            var selectedMember: SmapGroupMember? = nil
-            var selectedMarker: NMFMarker? = nil
-
             for member in members {
-                if let lat = member.mlt_lat, let lon = member.mlt_long {
-                    print("📍 [NaverMapView] Creating marker for \(member.displayName): (\(lat), \(lon))")
-                    let marker = NMFMarker()
-                    marker.position = NMGLatLng(lat: lat, lng: lon)
-
-                    // 커스텀 마커 이미지 생성
-                    let markerImage = MarkerFactory.createMarkerImage(for: member, image: nil)
-                    marker.iconImage = NMFOverlayImage(image: markerImage)
-
+                guard let lat = member.mlt_lat, let lon = member.mlt_long else { continue }
+                let old = memberSnapshots[member.mt_idx]
+                let marker: NMFMarker
+                if let existing = memberMarkers[member.mt_idx] {
+                    marker = existing
+                } else {
+                    marker = NMFMarker()
                     marker.anchor = CGPoint(x: 0.5, y: 0.5)
-
-                    // 마커에 멤버 데이터 저장
-                    marker.userInfo = ["member": member]
-
-                    // 마커 터치 핸들러
                     marker.touchHandler = { [weak self] overlay -> Bool in
                         if let marker = overlay as? NMFMarker,
                            let memberData = marker.userInfo["member"] as? SmapGroupMember {
@@ -203,65 +196,62 @@ struct NaverMapView: UIViewRepresentable {
                         }
                         return true
                     }
-
                     marker.mapView = mapView
-                    markers.append(marker)
-
-                    // 선택된 멤버 추적
-                    if member.isSelected {
-                        selectedMember = member
-                        selectedMarker = marker
-                        // Z-order: 선택된 멤버는 더 위에 표시
-                        marker.zIndex = 2000
-                    } else {
-                        marker.zIndex = 100
-                    }
-
-                    // 비동기 이미지 로드 및 업데이트
-                    if let url = Coordinator.getSafeImageUrl(member.mt_file1) {
-                         URLSession.shared.dataTask(with: url) { data, _, _ in
-                             if let data = data, let image = UIImage(data: data) {
-                                 DispatchQueue.main.async {
-                                     // 이미지가 로드되면 마커 아이콘 업데이트
-                                     let newIcon = MarkerFactory.createMarkerImage(for: member, image: image)
-                                     marker.iconImage = NMFOverlayImage(image: newIcon)
-                                 }
-                             }
-                         }.resume()
-                    }
+                    memberMarkers[member.mt_idx] = marker
                 }
-            }
-
-            // 선택된 멤버의 InfoWindow 자동 표시
-            if let member = selectedMember, let marker = selectedMarker {
-                showInfoWindow(for: member, at: marker)
-            }
-
-            for (index, schedule) in schedules.enumerated() {
-                if let lat = schedule.sst_location_lat, let lon = schedule.sst_location_long {
-                    let marker = NMFMarker()
+                if old?.mlt_lat != lat || old?.mlt_long != lon {
                     marker.position = NMGLatLng(lat: lat, lng: lon)
-
-                    // 스케줄 마커 커스텀 이미지 생성
-                    let markerImage = createScheduleMarkerImage(
-                        order: index + 1,
-                        title: schedule.title ?? "일정",
-                        startTime: schedule.date,
-                        endTime: schedule.sst_edate,
-                        status: schedule.status
-                    )
-                    marker.iconImage = NMFOverlayImage(image: markerImage)
-                    marker.anchor = CGPoint(x: 0.5, y: 1.0) // 하단 중앙이 좌표
-
-                    // 마커에 스케줄 데이터 저장
-                    marker.userInfo = ["schedule": schedule]
-
-                    // Z-order: 일정 마커는 일반 멤버보다는 위, 선택된 멤버보다는 아래
-                    marker.zIndex = 1000
-
-                    marker.mapView = mapView
-                    markers.append(marker)
                 }
+                let url = Self.getSafeImageUrl(member.mt_file1)
+                if old == nil || old?.displayName != member.displayName || old?.isSelected != member.isSelected || old?.mt_file1 != member.mt_file1 {
+                    let image = url.flatMap { Self.profileImages.object(forKey: $0 as NSURL) }
+                    marker.iconImage = NMFOverlayImage(image: MarkerFactory.createMarkerImage(for: member, image: image))
+                }
+                marker.userInfo = ["member": member]
+                marker.zIndex = member.isSelected ? 2000 : 100
+                memberSnapshots[member.mt_idx] = member
+                if let url, Self.profileImages.object(forKey: url as NSURL) == nil, imageRequests.insert(url).inserted {
+                    URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
+                        let image = data.flatMap { UIImage(data: $0) }
+                        DispatchQueue.main.async {
+                            guard let self else { return }
+                            self.imageRequests.remove(url)
+                            guard let image else { return }
+                            Self.profileImages.setObject(image, forKey: url as NSURL)
+                            for (id, current) in self.memberSnapshots where Self.getSafeImageUrl(current.mt_file1) == url {
+                                self.memberMarkers[id]?.iconImage = NMFOverlayImage(image: MarkerFactory.createMarkerImage(for: current, image: image))
+                            }
+                        }
+                    }.resume()
+                }
+                if member.isSelected && (currentMember?.mt_idx != member.mt_idx || old != member || currentMember?.mlt_battery != member.mlt_battery || currentMember?.mlt_gps_time != member.mlt_gps_time || currentMember?.mlt_speed != member.mlt_speed) {
+                    showInfoWindow(for: member, at: marker)
+                }
+            }
+            if let selectedID = currentMember?.mt_idx, !visibleIDs.contains(selectedID) {
+                infoWindow?.close()
+                currentMember = nil
+            }
+            var visibleScheduleIDs = Set<String>()
+            for (index, schedule) in schedules.enumerated() {
+                guard let lat = schedule.sst_location_lat, let lon = schedule.sst_location_long else { continue }
+                let id = schedule.sst_idx.map { "id:\($0)" } ?? "index:\(index)"
+                visibleScheduleIDs.insert(id)
+                let signature = "\(index)|\(lat)|\(lon)|\(schedule.title ?? "")|\(schedule.date ?? "")|\(schedule.sst_edate ?? "")|\(schedule.status)"
+                if scheduleSignatures[id] == signature { continue }
+                let marker = scheduleMarkers[id] ?? NMFMarker()
+                marker.position = NMGLatLng(lat: lat, lng: lon)
+                marker.iconImage = NMFOverlayImage(image: createScheduleMarkerImage(order: index + 1, title: schedule.title ?? "일정", startTime: schedule.date, endTime: schedule.sst_edate, status: schedule.status))
+                marker.anchor = CGPoint(x: 0.5, y: 1.0)
+                marker.userInfo = ["schedule": schedule]
+                marker.zIndex = 1000
+                marker.mapView = mapView
+                scheduleMarkers[id] = marker
+                scheduleSignatures[id] = signature
+            }
+            for id in scheduleMarkers.keys.filter({ !visibleScheduleIDs.contains($0) }) {
+                scheduleMarkers.removeValue(forKey: id)?.mapView = nil
+                scheduleSignatures.removeValue(forKey: id)
             }
         }
 

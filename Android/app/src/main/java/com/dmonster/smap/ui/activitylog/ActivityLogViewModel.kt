@@ -24,6 +24,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -101,6 +104,7 @@ class ActivityLogViewModel @Inject constructor(
     val showMemberSidebar: StateFlow<Boolean> = _showMemberSidebar.asStateFlow()
 
     private var isLoadingGroups = false
+    private var activityJob: Job? = null
 
     init {
         loadGroups()
@@ -130,8 +134,16 @@ class ActivityLogViewModel @Inject constructor(
                 when (val result = safeApiCall { groupService.getGroups() }) {
                     is ApiResult.Success -> {
                         _groups.value = result.data
-                        if (result.data.isNotEmpty() && _selectedGroup.value == null) {
-                            selectGroup(result.data.first())
+                        if (result.data.none { it.sgtIdx == _selectedGroup.value?.sgtIdx }) {
+                            activityJob?.cancel()
+                            _selectedGroup.value = null
+                            _selectedMember.value = null
+                            _members.value = emptyList()
+                            _locationLogs.value = emptyList()
+                            _locationSummary.value = null
+                            _stayTimes.value = emptyList()
+                            _memberActivityStats.value = emptyMap()
+                            result.data.firstOrNull()?.let { selectGroup(it) }
                         }
                     }
                     is ApiResult.Error -> {
@@ -154,6 +166,7 @@ class ActivityLogViewModel @Inject constructor(
         viewModelScope.launch {
             when (val result = safeApiCall { groupService.getGroupMembers(groupId) }) {
                 is ApiResult.Success -> {
+                    if (_selectedGroup.value?.sgtIdx != groupId) return@launch
                     _members.value = result.data
 
                     // 현재 사용자를 기본 선택 (없으면 첫 번째 멤버)
@@ -205,7 +218,8 @@ class ActivityLogViewModel @Inject constructor(
         val member = _selectedMember.value ?: return
         val dateStr = _selectedDate.value.format(dateFormatter)
 
-        viewModelScope.launch {
+        activityJob?.cancel()
+        activityJob = viewModelScope.launch {
             _isLoading.value = true
             _isLoadingLogs.value = true
             try {
@@ -230,8 +244,10 @@ class ActivityLogViewModel @Inject constructor(
                     else -> { /* error already handled above */ }
                 }
             } finally {
-                _isLoading.value = false
-                _isLoadingLogs.value = false
+                if (currentCoroutineContext().isActive) {
+                    _isLoading.value = false
+                    _isLoadingLogs.value = false
+                }
             }
         }
     }
@@ -248,6 +264,9 @@ class ActivityLogViewModel @Inject constructor(
     // MARK: - Selection
 
     fun selectGroup(group: SmapGroup) {
+        activityJob?.cancel()
+        _isLoading.value = false
+        _isLoadingLogs.value = false
         _selectedGroup.value = group
         _showGroupSelector.value = false
         _selectedMember.value = null

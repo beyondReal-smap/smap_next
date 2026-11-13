@@ -74,14 +74,6 @@ class HomeViewModel: ObservableObject {
                 self.errorMessage = error.localizedDescription
             }
 
-            // 그룹이 없고 에러가 난 경우에도 (특히 401 등) 신규 사용자의 경우일 수 있으므로
-            // 모달을 띄워 그룹 생성을 유도하거나 최소한 UI가 멈춰있지 않게 함
-            // 단, 401이면 생성이 실패할 수도 있지만, 사용자 경험상 먹통보다는 나음
-            if self.groups.isEmpty {
-                 print("⚠️ [HomeViewModel] Error occurred but groups are empty. Forcing Group Creation Modal.")
-                self.showGroupCreationModal = true
-            }
-
             self.isLoading = false
         }
     }
@@ -373,12 +365,16 @@ class HomeViewModel: ObservableObject {
         }
 
         // 2. 현재 선택된 그룹의 멤버/일정 새로고침
-        if let currentGroup = selectedGroup {
+        if let currentGroup = selectedGroup, groups.contains(where: { $0.sgt_idx == currentGroup.sgt_idx }) {
             print("🔄 [HomeViewModel] Refreshing group \(currentGroup.sgt_idx) data")
             await fetchGroupData(sgtIdx: currentGroup.sgt_idx)
-        } else if let firstGroup = groups.first {
-            // 선택된 그룹이 없으면 첫 번째 그룹 선택
-            selectGroup(firstGroup)
+        } else {
+            selectedGroup = nil
+            members = []
+            schedules = []
+            if let firstGroup = groups.first {
+                selectGroup(firstGroup)
+            }
         }
 
         print("✅ [HomeViewModel] refreshData completed")

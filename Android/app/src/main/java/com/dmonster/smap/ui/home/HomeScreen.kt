@@ -34,12 +34,14 @@ import coil.request.SuccessResult
 import coil.imageLoader
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.repeatOnLifecycle
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalNaverMapApi::class)
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    isVisible: Boolean = true
 ) {
     // Collect State
     val groups by viewModel.groups.collectAsState()
@@ -78,6 +80,13 @@ fun HomeScreen(
     
     // Settings Screen State
     var isSettingsVisible by remember { mutableStateOf(false) }
+    val showGroupCreationModal by viewModel.showGroupCreationModal.collectAsState()
+    LaunchedEffect(isVisible) {
+        if (!isVisible) {
+            isSettingsVisible = false
+            isNotificationVisible = false
+        }
+    }
     
     // Notification ViewModel
     val notiViewModel: NotificationViewModel = hiltViewModel()
@@ -86,9 +95,19 @@ fun HomeScreen(
     
     // 앱이 foreground로 돌아올 때 데이터 새로고침 (ON_RESUME handles initial load too)
     val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
+    LaunchedEffect(lifecycleOwner, isVisible, isSettingsVisible, isNotificationVisible, showGroupCreationModal) {
+        if (isVisible && !isSettingsVisible && !isNotificationVisible && !showGroupCreationModal) {
+            lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                while (true) {
+                    delay(30_000)
+                    viewModel.refreshData()
+                }
+            }
+        }
+    }
+    DisposableEffect(lifecycleOwner, isVisible) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
+            if (isVisible && event == Lifecycle.Event.ON_RESUME) {
                 if (BuildConfig.DEBUG) {
                     Log.d("HomeScreen", "🔄 [HomeScreen] App resumed - refreshing location data")
                 }
@@ -103,8 +122,6 @@ fun HomeScreen(
     
     LaunchedEffect(isLoading) {
         if (!isLoading && isMapLoading) {
-            // Wait minimum 1 second before hiding overlay
-            delay(1000)
             isMapLoading = false
         }
     }
@@ -160,7 +177,8 @@ fun HomeScreen(
     }
 
     // Load Member Avatars into Coil MemoryCache
-    LaunchedEffect(avatarLoadSignature) {
+    LaunchedEffect(isVisible, avatarLoadSignature) {
+        if (!isVisible) return@LaunchedEffect
         members.forEach { member ->
             val photo = member.mtFile1
             if (photo.isNullOrBlank()) return@forEach
@@ -230,6 +248,7 @@ fun HomeScreen(
 
     // Effect: Move camera when member selected or group changes
     LaunchedEffect(selectedMemberId, selectedGroup) {
+        if (!isVisible) return@LaunchedEffect
         val m = selectedMemberState
         val lat = m?.mltLat
         val lng = m?.mltLong
@@ -249,6 +268,12 @@ fun HomeScreen(
                     .animate(com.naver.maps.map.CameraAnimation.Fly, 1000)
             )
         }
+    }
+
+    var mapMembers by remember { mutableStateOf(members) }
+    var mapSchedules by remember { mutableStateOf(filteredSchedules) }
+    LaunchedEffect(isVisible, members, filteredSchedules) {
+        if (isVisible) { mapMembers = members; mapSchedules = filteredSchedules }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -294,7 +319,7 @@ fun HomeScreen(
                         contentPadding = PaddingValues(top = 60.dp)
                     ) {
                         // Member Markers — key 고정으로 Compose diff 최적화
-                        members.forEach { member ->
+                        mapMembers.forEach { member ->
                             key(member.mtIdx) {
                                 val memberLat = member.mltLat
                                 val memberLng = member.mltLong
@@ -318,7 +343,7 @@ fun HomeScreen(
                         }
 
                         // Schedule Markers — sstIdx 로 key 고정
-                        filteredSchedules.forEachIndexed { index, schedule ->
+                        mapSchedules.forEachIndexed { index, schedule ->
                             key(schedule.sstIdx) {
                                 val lat = schedule.sstLocationLat
                                 val lng = schedule.sstLocationLong
@@ -342,14 +367,15 @@ fun HomeScreen(
 
                         // Effect: Update InfoWindow screen position
                         // 키를 선택 멤버 id + 위치만으로 압축해 불필요 재실행 제거
+                        val mapSelectedMember = mapMembers.find { it.isSelected }
                         MapEffect(
-                            selectedMemberState?.mtIdx,
-                            selectedMemberState?.mltLat,
-                            selectedMemberState?.mltLong,
+                            mapSelectedMember?.mtIdx,
+                            mapSelectedMember?.mltLat,
+                            mapSelectedMember?.mltLong,
                             cameraPositionState.position,
                             cameraPositionState.isMoving
                         ) { map ->
-                            val m = selectedMemberState
+                            val m = mapSelectedMember
                             val lat = m?.mltLat
                             val lng = m?.mltLong
                             markerScreenPosition = if (m != null && lat != null && lng != null) {
@@ -403,13 +429,13 @@ fun HomeScreen(
         }
 
         // BackHandler for overlay screens
-        BackHandler(enabled = isNotificationVisible) {
+        BackHandler(enabled = isVisible && isNotificationVisible) {
             isNotificationVisible = false
             if (hasUnread) {
                 notiViewModel.markAllAsRead()
             }
         }
-        BackHandler(enabled = isSettingsVisible) {
+        BackHandler(enabled = isVisible && isSettingsVisible) {
             isSettingsVisible = false
         }
 

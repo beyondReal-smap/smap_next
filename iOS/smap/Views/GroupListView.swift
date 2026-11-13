@@ -88,19 +88,9 @@ struct GroupListView: View {
             .onAppear {
                 viewModel.fetchGroups()
                 
-                // 앱 실행 시 저장된 딥링크 그룹 ID가 있는지 확인
-                if let pendingGroupId = UserDefaults.standard.string(forKey: "pending_join_group_id") {
-                    print("👥 [DEEP_LINK] 저장된 펜딩 그룹 ID 발견: \(pendingGroupId)")
-                    joinGroupById(pendingGroupId)
-                    UserDefaults.standard.removeObject(forKey: "pending_join_group_id")
-                }
             }
-            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("handleGroupJoinDeepLink"))) { notification in
-                if let groupId = notification.userInfo?["group_id"] as? String {
-                    print("👥 [DEEP_LINK] 알림 수신 - 그룹 가입 실행: \(groupId)")
-                    joinGroupById(groupId)
-                    UserDefaults.standard.removeObject(forKey: "pending_join_group_id")
-                }
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("groupsDidChange"))) { _ in
+                viewModel.fetchGroups()
             }
             .alert("알림", isPresented: $viewModel.showError) {
                 Button("확인", role: .cancel) {}
@@ -117,31 +107,7 @@ struct GroupListView: View {
         }
     }
     
-    // 그룹 ID(sgt_idx)로 직접 가입하는 함수
-    private func joinGroupById(_ groupId: String) {
-        guard let sgt_idx = Int(groupId), let mt_idx = AuthService.shared.currentUser?.mt_idx else {
-            print("❌ [DEEP_LINK] 가입 실패: 유효하지 않은 ID 또는 사용자 정보")
-            return
-        }
-        
-        print("🚀 [DEEP_LINK] 그룹 가입 API 호출 시작 - mt_idx: \(mt_idx), sgt_idx: \(sgt_idx)")
-        
-        Task {
-            do {
-                let success = try await GroupService.shared.joinGroupById(mt_idx: mt_idx, sgt_idx: sgt_idx)
-                await MainActor.run {
-                    if success {
-                        print("✅ [DEEP_LINK] 그룹 가입 성공!")
-                        viewModel.fetchGroups()
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    print("❌ [DEEP_LINK] 그룹 가입 실패: \(error.localizedDescription)")
-                }
-            }
-        }
-    }
+
 }
 
 struct GroupListHeaderView: View {

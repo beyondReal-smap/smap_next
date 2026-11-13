@@ -1,5 +1,7 @@
 package com.dmonster.smap.ui.settings
 
+import androidx.activity.compose.BackHandler
+
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -62,6 +64,17 @@ fun SettingsScreen(
         isInquiryVisible || 
         isNoticeListVisible || 
         selectedNotice != null
+
+    BackHandler(enabled = isAnySubScreenVisible) {
+        when {
+            selectedNotice != null -> selectedNotice = null
+            isNoticeListVisible -> isNoticeListVisible = false
+            isInquiryVisible -> isInquiryVisible = false
+            isUserGuideVisible -> isUserGuideVisible = false
+            selectedTermsScreen != null -> selectedTermsScreen = null
+            isAccountSettingsVisible -> isAccountSettingsVisible = false
+        }
+    }
 
     Box(
         modifier = Modifier

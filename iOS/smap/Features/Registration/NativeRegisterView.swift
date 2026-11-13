@@ -62,115 +62,106 @@ struct ToggleRow: View {
     }
 }
 
-// MARK: - Phone View
+// MARK: - Email View
+// 구조체 이름의 "Phone" 은 SMS 인증 시절의 이름이다. 호출부가 같은 이름을 쓰고 있어 그대로 두었다.
+/// 가입 1단계 — 로그인 ID 가 될 이메일을 입력한다. Android `PhoneContent` 와 같은 구성.
 struct RegisterPhoneView: View {
     @ObservedObject var viewModel: RegisterViewModel
-    
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("휴대폰 번호를\n입력해주세요")
-                .font(.suite(size: 24, weight: .bold))
-                .foregroundColor(SMAPTheme.Color.textPrimary)
-            
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 12) {
-                    Image(systemName: "phone")
-                        .foregroundColor(isFocused ? SMAPTheme.Color.primary : SMAPTheme.Color.textSecondary)
-                        .frame(width: 20)
-                    
-                    PhoneTextField(text: $viewModel.registerData.mt_id, placeholder: "010-0000-0000", onEditingChanged: { editing in
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            isFocused = editing
-                        }
-                    })
-                }
-                .padding(.horizontal, 16)
-                .frame(height: 56)
-                .background(SMAPTheme.Color.inputBackground)
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(isFocused ? SMAPTheme.Color.primary : SMAPTheme.Color.border, lineWidth: isFocused ? 2 : 1)
-                )
-            }
-            
+        VStack(alignment: .leading, spacing: SMAPTheme.Spacing.sm) {
+            RegisterStepHeader(
+                title: "이메일을 입력해 주세요",
+                description: "이 이메일이 로그인 아이디가 됩니다.\n인증번호를 보내 본인 확인을 진행해요."
+            )
+
+            SMAPTextField(
+                "name@example.com",
+                text: Binding(get: { viewModel.registerData.mt_id }, set: { viewModel.updateEmail($0) }),
+                label: "이메일",
+                keyboardType: .emailAddress,
+                textContentType: .emailAddress
+            )
+            .padding(.top, SMAPTheme.Spacing.md)
+
             Spacer()
         }
-        .padding()
+        .padding(SMAPTheme.Spacing.lg)
     }
-    
-    @State private var isFocused: Bool = false
 }
 
 // MARK: - Verification View
+/// 가입 2단계 — 메일로 받은 6자리 인증번호를 입력한다.
 struct RegisterVerificationView: View {
     @ObservedObject var viewModel: RegisterViewModel
-    
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("인증번호를\n입력해주세요")
-                .font(.suite(size: 24, weight: .bold))
-                .foregroundColor(SMAPTheme.Color.textPrimary)
-            
-            Text("문자로 전송된 인증번호 6자리를 입력해주세요.")
-                .font(.suite(size: 14))
-                .foregroundColor(.gray)
-            
-            // 인증번호 입력 + 타이머
+        let resendWait = viewModel.remainingResendTime()
+        let canResend = viewModel.canResend() && !viewModel.isVerificationLoading
+        let expired = viewModel.verificationTimer <= 0
+
+        VStack(alignment: .leading, spacing: SMAPTheme.Spacing.sm) {
+            RegisterStepHeader(
+                title: "인증번호를 입력해 주세요",
+                description: "\(viewModel.registerData.mt_id)\n위 주소로 보낸 6자리 숫자를 입력해 주세요."
+            )
+
+            SMAPTextField(
+                "6자리 숫자",
+                text: $viewModel.verificationCode,
+                label: "인증번호",
+                // 남은 시간을 입력창 바로 아래에 두어, 만료 여부를 입력하면서 볼 수 있게 한다.
+                helperText: expired ? nil : "남은 시간 \(timeString(time: viewModel.verificationTimer))",
+                errorMessage: expired ? "인증번호가 만료됐어요. 다시 받아 주세요." : nil,
+                keyboardType: .numberPad,
+                textContentType: .oneTimeCode // 키보드 상단 '코드 자동 채우기' 활성화
+            )
+            .padding(.top, SMAPTheme.Spacing.md)
+
             HStack {
-                FocusableTextField(
-                    placeholder: "인증번호 6자리",
-                    text: $viewModel.verificationCode,
-                    icon: "lock.shield",
-                    keyboardType: .numberPad,
-                    textContentType: .oneTimeCode // 키보드 상단 '코드 자동 채우기' 활성화
-                )
-                
-                // 타이머 표시
-                if viewModel.verificationTimer > 0 {
-                    Text(timeString(time: viewModel.verificationTimer))
-                        .font(.suite(size: 14, weight: .semibold))
-                        .foregroundColor(.red)
-                        .frame(width: 50)
-                } else {
-                    Text("만료됨")
-                        .font(.suite(size: 14, weight: .semibold))
-                        .foregroundColor(.red)
-                        .frame(width: 50)
+                Text("메일이 오지 않았나요?")
+                    .font(SMAPTheme.Font.caption)
+                    .foregroundStyle(SMAPTheme.Color.textSecondary)
+                Spacer()
+                Button {
+                    viewModel.resendVerificationCode()
+                } label: {
+                    // 대기 중에는 몇 초 뒤에 누를 수 있는지 알려 준다.
+                    Text(resendWait > 0 ? "다시 받기 (\(resendWait)초)" : "인증번호 다시 받기")
+                        .font(SMAPTheme.Font.secondaryMedium)
+                        .foregroundStyle(canResend ? SMAPTheme.Color.primary : SMAPTheme.Color.textSecondary)
+                        .frame(minHeight: 44) // 글자만 누르는 버튼이라 터치 영역을 44pt 로 보장
+                        .contentShape(Rectangle())
                 }
+                .disabled(!canResend)
             }
-            
-            // 재발송 버튼
-            Button(action: {
-                viewModel.resendVerificationCode()
-            }) {
-                HStack {
-                    Text("인증번호 재전송")
-                        .font(.suite(size: 13))
-                        .foregroundColor(viewModel.canResend() ? SMAPTheme.Color.primary : .gray)
-                        .underline()
-                    
-                    // 재발송 불가 시 남은 시간 표시
-                    if !viewModel.canResend() {
-                        let remaining = viewModel.remainingResendTime()
-                        Text("(\(remaining / 60):\(String(format: "%02d", remaining % 60)))")
-                            .font(.suite(size: 13))
-                            .foregroundColor(.gray)
-                    }
-                }
-            }
-            .disabled(!viewModel.canResend() && viewModel.isVerificationLoading)
-            .padding(.top, 8)
-            
+
+            SMAPBanner(message: "메일이 보이지 않으면 스팸함을 확인해 주세요.")
+
             Spacer()
         }
-        .padding()
+        .padding(SMAPTheme.Spacing.lg)
     }
-    
+
     func timeString(time: Int) -> String {
         let minutes = time / 60
         let seconds = time % 60
-        return String(format: "%02d:%02d", minutes, seconds)
+        return String(format: "%d:%02d", minutes, seconds)
+    }
+}
+
+/// 가입 단계 공통 머리말(제목 + 설명).
+private struct RegisterStepHeader: View {
+    let title: String
+    let description: String
+
+    var body: some View {
+        Text(title)
+            .font(SMAPTheme.Font.title)
+            .foregroundStyle(SMAPTheme.Color.textPrimary)
+        Text(description)
+            .font(SMAPTheme.Font.secondary)
+            .foregroundStyle(SMAPTheme.Color.textSecondary)
     }
 }
 
@@ -206,13 +197,13 @@ struct RegisterBasicInfoView: View {
                     // 이메일 (선택)
                     VStack(alignment: .leading, spacing: 4) {
                         FocusableTextField(
-                            placeholder: "이메일 (선택)",
+                            placeholder: "전화번호 (선택)",
                             text: Binding(
-                                 get: { viewModel.registerData.mt_email ?? "" },
-                                 set: { viewModel.registerData.mt_email = $0 }
+                                 get: { viewModel.optionalPhone },
+                                 set: { viewModel.optionalPhone = String($0.filter { $0.isNumber }.prefix(11)) }
                              ),
                             icon: "envelope",
-                            keyboardType: .emailAddress
+                            keyboardType: .phonePad
                         )
                         .frame(height: 56)
                         
@@ -229,7 +220,7 @@ struct RegisterBasicInfoView: View {
                     }
                     
                     // 비밀번호 (토글 가능) - 소셜 계정은 생략
-                    if !viewModel.isSocialAccount {
+                    Group {
                         VStack(alignment: .leading, spacing: 8) {
                             FocusableSecureField(
                                  placeholder: "비밀번호",
@@ -293,13 +284,13 @@ struct PasswordRulesView: View {
             
             HStack(spacing: 12) {
                 PasswordRuleItem(text: "8자 이상", isValid: details.hasMinLength)
-                PasswordRuleItem(text: "영문", isValid: details.hasLetter)
+                PasswordRuleItem(text: "영문 대소문자", isValid: details.hasLetter)
                 PasswordRuleItem(text: "숫자", isValid: details.hasNumber)
                 PasswordRuleItem(text: "특수문자", isValid: details.hasSpecialChar)
             }
             
             // 조합 안내
-            Text("* 영문, 숫자, 특수문자 중 2가지 이상 조합")
+            Text("* 영문 대소문자, 숫자, 특수문자를 모두 포함해주세요")
                 .font(.suite(size: 11))
                 .foregroundColor(SMAPTheme.Color.textSecondary)
         }
@@ -577,7 +568,7 @@ struct NativeRegisterView: View {
                     
                     Spacer()
                     
-                    Text(viewModel.currentStep.title)
+                    Text(viewModel.currentStep == .phone ? "이메일 인증" : viewModel.currentStep.title)
                         .font(.suite(size: 18, weight: .bold))
                         .foregroundColor(SMAPTheme.Color.textPrimary)
                     
@@ -747,7 +738,7 @@ struct NativeRegisterView: View {
         switch viewModel.currentStep {
         case .terms: return viewModel.isTermsValid
         case .phone: return viewModel.isPhoneValid
-        case .verification: return true // Mock
+        case .verification: return viewModel.verificationCode.count == 6
         case .basicInfo: return viewModel.isBasicInfoValid
         case .profile: return viewModel.isProfileValid
         case .complete: return true

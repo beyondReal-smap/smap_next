@@ -29,7 +29,7 @@ data class LoginUiState(
     val socialLoginData: Map<String, String>? = null
 ) {
     val isInputValid: Boolean
-        get() = phoneNumber.length >= 10 && password.isNotEmpty()
+        get() = (android.util.Patterns.EMAIL_ADDRESS.matcher(phoneNumber.trim()).matches() || phoneNumber.replace("-", "").matches(Regex("[0-9]{10,11}"))) && password.isNotEmpty()
 }
 
 /**
@@ -47,9 +47,7 @@ class LoginViewModel @Inject constructor(
      * 전화번호 입력 (숫자만 저장, 표시 시 포맷팅)
      */
     fun onPhoneNumberChange(value: String) {
-        // 숫자만 추출하여 저장 (최대 11자리)
-        val digits = value.filter { it.isDigit() }.take(11)
-        _uiState.value = _uiState.value.copy(phoneNumber = digits)
+        _uiState.value = _uiState.value.copy(phoneNumber = value.take(200))
     }
     
     /**
@@ -71,7 +69,7 @@ class LoginViewModel @Inject constructor(
      */
     fun login() {
         if (!_uiState.value.isInputValid) {
-            showErrorMessage("전화번호와 비밀번호를 입력해주세요.")
+            showErrorMessage("이메일 또는 전화번호와 비밀번호를 확인해주세요.")
             return
         }
 

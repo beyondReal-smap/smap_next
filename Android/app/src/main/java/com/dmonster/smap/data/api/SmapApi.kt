@@ -17,6 +17,15 @@ interface SmapApi {
     // Auth endpoints (from AuthService)
     // =========================================================================
 
+    @POST("auth/email/send-code")
+    suspend fun sendEmailCode(@Body request: EmailCodeRequest): EmailCodeResponse
+
+    @POST("auth/email/verify-code")
+    suspend fun verifyEmailCode(@Body request: EmailCodeRequest): EmailCodeResponse
+
+    @POST("auth/reset-password-by-email")
+    suspend fun resetPasswordByEmail(@Body request: EmailResetRequest): EmailCodeResponse
+
     /** POST /auth/login */
     @POST("auth/login")
     suspend fun login(@Body request: LoginRequest): LoginResponse
@@ -147,6 +156,9 @@ interface SmapApi {
         @Path("groupId") groupId: Int,
         @Body body: JoinGroupRequest
     ): SmapGroup
+
+    @POST("groups/{groupId}/join")
+    suspend fun joinGroupFromInvite(@Path("groupId") groupId: Int, @Body body: JoinGroupRequest): okhttp3.ResponseBody
 
     // =========================================================================
     // Group Member endpoints (from GroupService / HomeService)

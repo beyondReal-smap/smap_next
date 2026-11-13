@@ -30,7 +30,7 @@ import java.util.concurrent.TimeUnit
  * 비밀번호 찾기 ViewModel (iOS ForgotPasswordViewModel 참고)
  */
 @HiltViewModel
-class ForgotPasswordViewModel @Inject constructor() : ViewModel() {
+class ForgotPasswordViewModel @Inject constructor(private val authService: com.dmonster.smap.data.service.AuthService) : ViewModel() {
     
     companion object {
         private const val TAG = "ForgotPasswordVM"
@@ -70,6 +70,8 @@ class ForgotPasswordViewModel @Inject constructor() : ViewModel() {
     val verificationTimer: StateFlow<Int> = _verificationTimer.asStateFlow()
     
     private var timerJob: Job? = null
+    private var verificationToken: String? = null
+    private var lastSentTime = 0L
     
     // Password state
     private val _newPassword = MutableStateFlow("")
@@ -93,12 +95,12 @@ class ForgotPasswordViewModel @Inject constructor() : ViewModel() {
     
     // Password validation rules
     val isPasswordLengthValid: Boolean get() = _newPassword.value.length >= 8
-    val hasPasswordLetter: Boolean get() = _newPassword.value.contains(Regex("[a-zA-Z]"))
+    val hasPasswordLetter: Boolean get() = _newPassword.value.contains(Regex("[a-z]")) && _newPassword.value.contains(Regex("[A-Z]"))
     val hasPasswordNumber: Boolean get() = _newPassword.value.contains(Regex("[0-9]"))
     val hasPasswordSpecialChar: Boolean get() = _newPassword.value.contains(Regex("[!@#\$%^&*(),.?\":{}|<>]"))
     
     val isPasswordRulesSatisfied: Boolean get() = 
-        isPasswordLengthValid && hasPasswordLetter && hasPasswordNumber && hasPasswordSpecialChar
+        com.dmonster.smap.data.model.isServerPasswordValid(_newPassword.value)
     
     val passwordsMatch: Boolean get() = 
         _newPassword.value.isNotEmpty() && _newPassword.value == _confirmPassword.value
@@ -106,8 +108,13 @@ class ForgotPasswordViewModel @Inject constructor() : ViewModel() {
     // MARK: - Input Handlers
     
     fun updatePhoneNumber(value: String) {
-        val digits = value.filter { it.isDigit() }
-        _phoneNumber.value = digits.take(11)
+        if (_phoneNumber.value != value) {
+            _phoneNumber.value = value
+            verificationToken = null
+            lastSentTime = 0L
+            timerJob?.cancel()
+            _verificationTimer.value = 0
+        }
     }
     
     fun updateVerificationCode(value: String) {
@@ -156,234 +163,65 @@ class ForgotPasswordViewModel @Inject constructor() : ViewModel() {
     // MARK: - API Actions
     
     fun checkUserAndSendCode() {
-        val cleanPhone = formatPhoneForAPI(_phoneNumber.value)
-        
-        if (cleanPhone.length < 10) {
-            _errorMessage.value = "올바른 전화번호를 입력해주세요."
-            return
-        }
-        
+        val email = _phoneNumber.value.trim().lowercase()
+        if (_isLoading.value) return
+        if (!email.matches(Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"))) { _errorMessage.value = "올바른 이메일을 입력해주세요."; return }
+        if (lastSentTime != 0L && System.currentTimeMillis() - lastSentTime < 60000) { _errorMessage.value = "잠시 후 다시 시도해주세요."; return }
         _isLoading.value = true
-        
         viewModelScope.launch {
             try {
-                // Step 1: Check if user exists
-                val checkResult = withContext(Dispatchers.IO) {
-                    checkPhoneExists(cleanPhone)
-                }
-                
-                if (checkResult == null) {
-                    _errorMessage.value = "서버 연결에 실패했습니다."
-                    _isLoading.value = false
-                    return@launch
-                }
-                
-                if (checkResult) {
-                    // Phone number not found (available = true means new user)
-                    _errorMessage.value = "가입되지 않은 전화번호입니다."
-                    _isLoading.value = false
-                } else {
-                    // User exists - send verification code
-                    sendVerificationCode(cleanPhone)
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error checking user: ${e.message}")
-                _errorMessage.value = "오류가 발생했습니다."
-                _isLoading.value = false
-            }
-        }
-    }
-    
-    private suspend fun checkPhoneExists(cleanPhone: String): Boolean? {
-        return try {
-            val request = Request.Builder()
-                .url("$CHECK_PHONE_URL$cleanPhone")
-                .get()
-                .build()
-            
-            val response = httpClient.newCall(request).execute()
-            val body = response.body?.string()
-            
-            if (response.isSuccessful && body != null) {
-                val parsed = json.parseToJsonElement(body).jsonObject
-                parsed["available"]?.jsonPrimitive?.boolean
-            } else {
-                null
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Check phone error: ${e.message}")
-            null
-        }
-    }
-    
-    private suspend fun sendVerificationCode(cleanPhone: String) {
-        // Test number handling (debug builds only)
-        if (BuildConfig.DEBUG && cleanPhone == "01011111111") {
-            _isLoading.value = false
-            startTimer()
-            _currentStep.value = Step.VERIFICATION
-            return
-        }
-        
-        try {
-            val result = withContext(Dispatchers.IO) {
-                val requestBody = JSONObject().apply {
-                    put("phone_number", cleanPhone)
-                }.toString()
-
-                val request = Request.Builder()
-                    .url(SMS_SEND_URL)
-                    .post(requestBody.toByteArray().toRequestBody("application/json".toMediaType()))
-                    .build()
-
-                val response = httpClient.newCall(request).execute()
-                val body = response.body?.string()
-
-                if (response.isSuccessful && body != null) {
-                    json.parseToJsonElement(body).jsonObject
-                } else {
-                    null
-                }
-            }
-
-            _isLoading.value = false
-
-            if (result != null && result["success"]?.jsonPrimitive?.boolean == true) {
+                val result = authService.sendEmailCode(email, "reset_password")
+                if (_phoneNumber.value.trim().lowercase() != email) return@launch
+                if (!result.success) { _errorMessage.value = "인증번호 발송에 실패했습니다."; return@launch }
+                lastSentTime = System.currentTimeMillis()
+                verificationToken = null
                 startTimer()
                 _currentStep.value = Step.VERIFICATION
-            } else {
-                _errorMessage.value = result?.get("error")?.jsonPrimitive?.content ?: "인증번호 발송에 실패했습니다."
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Send verification error: ${e.message}")
-            _isLoading.value = false
-            _errorMessage.value = "인증번호 발송에 실패했습니다."
+            } catch (e: Exception) { _errorMessage.value = com.dmonster.smap.data.service.emailAuthError(e) }
+            finally { _isLoading.value = false }
         }
     }
-    
+
     fun verifyCode() {
-        val code = _verificationCode.value
-        val cleanPhone = formatPhoneForAPI(_phoneNumber.value)
-
-        if (code.length != 6) {
-            _errorMessage.value = "6자리 인증번호를 입력해주세요."
-            return
-        }
-
-        // Test number handling (debug builds only)
-        if (BuildConfig.DEBUG && cleanPhone == "01011111111" && code == "111111") {
-            _currentStep.value = Step.NEW_PASSWORD
-            return
-        }
-
-        if (_verificationTimer.value <= 0) {
-            _errorMessage.value = "인증 시간이 만료되었습니다. 다시 시도해주세요."
-            return
-        }
-
-        // 서버 측 인증번호 검증
+        if (_isLoading.value) return
+        if (verificationToken != null) { _currentStep.value = Step.NEW_PASSWORD; return }
+        if (_verificationCode.value.length != 6 || _verificationTimer.value <= 0) { _errorMessage.value = "인증번호를 확인해주세요."; return }
+        val email = _phoneNumber.value.trim().lowercase()
         _isLoading.value = true
-
         viewModelScope.launch {
             try {
-                val result = withContext(Dispatchers.IO) {
-                    val requestBody = JSONObject().apply {
-                        put("phone_number", cleanPhone)
-                        put("code", code)
-                    }.toString()
-
-                    val request = Request.Builder()
-                        .url(VERIFY_CODE_URL)
-                        .post(requestBody.toByteArray().toRequestBody("application/json".toMediaType()))
-                        .build()
-
-                    val response = httpClient.newCall(request).execute()
-                    val body = response.body?.string()
-
-                    Log.d(TAG, "인증번호 검증 응답: $body")
-
-                    if (response.isSuccessful && body != null) {
-                        json.parseToJsonElement(body).jsonObject
-                    } else {
-                        null
-                    }
-                }
-
-                _isLoading.value = false
-
-                if (result != null && result["success"]?.jsonPrimitive?.boolean == true) {
-                    Log.d(TAG, "✅ 인증번호 확인 성공 (서버 검증)")
-                    _currentStep.value = Step.NEW_PASSWORD
-                } else {
-                    _errorMessage.value = result?.get("error")?.jsonPrimitive?.content ?: "인증번호가 일치하지 않습니다."
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "인증번호 검증 오류: ${e.message}")
-                _isLoading.value = false
-                _errorMessage.value = "인증번호 확인 중 오류가 발생했습니다."
-            }
+                val result = authService.verifyEmailCode(email, "reset_password", _verificationCode.value)
+                if (_phoneNumber.value.trim().lowercase() != email) return@launch
+                val token = result.verificationToken
+                if (!result.success || token.isNullOrBlank()) { _errorMessage.value = "인증번호 확인에 실패했습니다."; return@launch }
+                verificationToken = token
+                timerJob?.cancel()
+                _currentStep.value = Step.NEW_PASSWORD
+            } catch (e: Exception) { _errorMessage.value = com.dmonster.smap.data.service.emailAuthError(e) }
+            finally { _isLoading.value = false }
         }
     }
-    
+
     fun resetPassword() {
-        if (_newPassword.value.length < 8) {
-            _errorMessage.value = "비밀번호는 8자 이상이어야 합니다."
-            return
-        }
-        
-        if (_newPassword.value != _confirmPassword.value) {
-            _errorMessage.value = "비밀번호가 일치하지 않습니다."
-            return
-        }
-        
+        if (_isLoading.value) return
+        if (!isPasswordRulesSatisfied || !passwordsMatch) { _errorMessage.value = "비밀번호 규칙과 확인값을 확인해주세요."; return }
+        val token = verificationToken ?: run { _errorMessage.value = "이메일 인증이 필요합니다."; return }
         _isLoading.value = true
-        
         viewModelScope.launch {
             try {
-                val cleanPhone = formatPhoneForAPI(_phoneNumber.value)
-                
-                val result = withContext(Dispatchers.IO) {
-                    val jsonBody = JSONObject().apply {
-                        put("phone", cleanPhone)
-                        put("new_password", _newPassword.value)
-                        put("verification_code", _verificationCode.value)
-                    }.toString()
-
-                    val request = Request.Builder()
-                        .url(RESET_PASSWORD_URL)
-                        .post(jsonBody.toByteArray().toRequestBody("application/json".toMediaType()))
-                        .build()
-
-                    val response = httpClient.newCall(request).execute()
-                    val body = response.body?.string()
-
-                    if (response.isSuccessful && body != null) {
-                        json.parseToJsonElement(body).jsonObject
-                    } else {
-                        null
-                    }
-                }
-
-                _isLoading.value = false
-
-                if (result != null && result["success"]?.jsonPrimitive?.boolean == true) {
-                    _currentStep.value = Step.COMPLETE
-                } else {
-                    _errorMessage.value = result?.get("message")?.jsonPrimitive?.content ?: "비밀번호 변경에 실패했습니다."
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Reset password error: ${e.message}")
-                _isLoading.value = false
-                _errorMessage.value = "비밀번호 변경에 실패했습니다."
-            }
+                val result = authService.resetPasswordByEmail(_phoneNumber.value.trim().lowercase(), token, _newPassword.value)
+                if (result.success) { verificationToken = null; _currentStep.value = Step.COMPLETE }
+                else _errorMessage.value = "비밀번호 변경에 실패했습니다."
+            } catch (e: Exception) { _errorMessage.value = com.dmonster.smap.data.service.emailAuthError(e) }
+            finally { _isLoading.value = false }
         }
     }
-    
+
     // MARK: - Helpers
     
     private fun startTimer() {
         timerJob?.cancel()
-        _verificationTimer.value = 180
+        _verificationTimer.value = 600
         timerJob = viewModelScope.launch {
             while (_verificationTimer.value > 0) {
                 delay(1000)

@@ -16,6 +16,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -89,7 +90,7 @@ class RegisterViewModel @Inject constructor(
     // 재발송 가능 여부 확인 (3분 = 180초 = 180000밀리초)
     private fun canResend(): Boolean {
         return lastSentTime?.let { 
-            System.currentTimeMillis() - it >= 180_000 
+            System.currentTimeMillis() - it >= 60_000
         } ?: true
     }
     
@@ -97,7 +98,7 @@ class RegisterViewModel @Inject constructor(
     fun remainingResendTime(): Int {
         return lastSentTime?.let {
             val elapsed = (System.currentTimeMillis() - it) / 1000
-            maxOf(0, 180 - elapsed.toInt())
+            maxOf(0, 60 - elapsed.toInt())
         } ?: 0
     }
     
@@ -166,33 +167,19 @@ class RegisterViewModel @Inject constructor(
     // MARK: - Phone Number
     
     fun setPhoneNumber(phone: String) {
-        // 숫자만 추출하여 저장 (최대 11자리)
-        val digits = phone.filter { it.isDigit() }.take(11)
-        _uiState.value = _uiState.value.copy(
-            registerData = _uiState.value.registerData.copy(mtId = digits)
-        )
+        if (_uiState.value.registerData.mtId != phone) {
+            timerJob?.cancel()
+            lastSentTime = null
+            _uiState.value = _uiState.value.copy(
+                registerData = _uiState.value.registerData.copy(mtId = phone, mtEmail = phone, emailVerificationToken = null),
+                verificationCode = "", verificationSent = false, verificationTimer = 0
+            )
+        }
     }
-    
-    /**
-     * 포맷된 전화번호 (표시용)
-     */
-    val formattedPhoneNumber: String
-        get() {
-            val digits = _uiState.value.registerData.mtId
-            return when {
-                digits.length <= 3 -> digits
-                digits.length <= 6 -> "${digits.substring(0, 3)}-${digits.substring(3)}"
-                digits.length <= 10 -> "${digits.substring(0, 3)}-${digits.substring(3, 6)}-${digits.substring(6)}"
-                else -> "${digits.substring(0, 3)}-${digits.substring(3, 7)}-${digits.substring(7)}"
-            }
-        }
-    
-    val isPhoneValid: Boolean
-        get() {
-            val digits = _uiState.value.registerData.mtId
-            return digits.length == 11 && digits.startsWith("010")
-        }
-    
+
+    val formattedPhoneNumber: String get() = _uiState.value.registerData.mtId
+    val isPhoneValid: Boolean get() = _uiState.value.registerData.mtId.trim().matches(Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"))
+
     // MARK: - Verification Code
     
     fun setVerificationCode(code: String) {
@@ -202,184 +189,54 @@ class RegisterViewModel @Inject constructor(
     }
     
     fun sendVerificationCode() {
-        val phone = _uiState.value.registerData.mtId.filter { it.isDigit() }
-        
-        if (!isPhoneValid) {
-            showError("올바른 전화번호를 입력해주세요")
-            return
-        }
-        
-        // 재발송 제한 확인
-        if (!canResend()) {
-            val remaining = remainingResendTime()
-            val minutes = remaining / 60
-            val seconds = remaining % 60
-            showError("인증번호 재발송은 ${minutes}분 ${seconds}초 후에 가능합니다")
-            return
-        }
-        
-        // 테스트 번호 처리 (debug builds only)
-        if (BuildConfig.DEBUG && phone == "01011111111") {
-            Log.d(TAG, "📱 테스트 번호 - 실제 SMS 발송 생략")
-            lastSentTime = System.currentTimeMillis()
-            _uiState.value = _uiState.value.copy(
-                isVerificationLoading = false,
-                verificationSent = true,
-                verificationTimer = 180,
-                currentStep = RegisterStep.VERIFICATION
-            )
-            startTimer()
-            return
-        }
-        
+        val email = _uiState.value.registerData.mtId.trim().lowercase()
+        if (_uiState.value.isVerificationLoading) return
+        if (_uiState.value.registerData.emailVerificationToken != null) { _uiState.value = _uiState.value.copy(currentStep = RegisterStep.BASIC_INFO); return }
+        if (!isPhoneValid) { showError("올바른 이메일을 입력해주세요"); return }
+        if (!canResend()) { showError("잠시 후 다시 시도해주세요"); return }
         _uiState.value = _uiState.value.copy(isVerificationLoading = true)
-
         viewModelScope.launch {
             try {
-                // 전화번호 중복 확인
-                val checkResult = withContext(Dispatchers.IO) {
-                    val checkRequest = Request.Builder()
-                        .url("$CHECK_PHONE_API_URL$phone")
-                        .get()
-                        .build()
-
-                    val checkResponse = client.newCall(checkRequest).execute()
-                    val checkBody = checkResponse.body?.string()
-
-                    Log.d(TAG, "📱 전화번호 중복 확인 응답: $checkBody")
-                    Log.d(TAG, "📱 응답 코드: ${checkResponse.code}")
-
-                    // available: false 이면서 명시적으로 존재하는 경우만 기존 사용자로 처리
-                    checkBody?.let { body ->
-                        body.contains("\"available\":false") || body.contains("\"available\": false")
-                    } ?: false
-                }
-
-                if (checkResult) {
-                    Log.d(TAG, "⚠️ 이미 가입된 전화번호 감지")
-                    _uiState.value = _uiState.value.copy(
-                        isVerificationLoading = false,
-                        showExistingUserAlert = true,
-                        existingUserPhone = _uiState.value.registerData.mtId
-                    )
-                    return@launch
-                }
-
-                Log.d(TAG, "✅ 신규 전화번호 - SMS 발송 진행")
-
-                // SMS 발송
-                val smsResult = withContext(Dispatchers.IO) {
-                    val requestBody = """{"phone_number":"$phone"}"""
-                        .toRequestBody("application/json".toMediaType())
-
-                    val smsRequest = Request.Builder()
-                        .url(SMS_API_URL)
-                        .post(requestBody)
-                        .build()
-
-                    val smsResponse = client.newCall(smsRequest).execute()
-                    val smsBody = smsResponse.body?.string()
-
-                    Log.d(TAG, "SMS 응답: $smsBody")
-                    Pair(smsResponse.isSuccessful, smsBody)
-                }
-
-                val (isSuccessful, smsBody) = smsResult
-                if (isSuccessful && smsBody?.contains("\"success\":true") == true) {
-                    lastSentTime = System.currentTimeMillis()
-
-                    Log.d(TAG, "✅ 인증번호 발송 성공 - 서버 측 인증코드 저장됨")
-
-                    _uiState.value = _uiState.value.copy(
-                        isVerificationLoading = false,
-                        verificationSent = true,
-                        verificationTimer = 180,  // 3분
-                        currentStep = RegisterStep.VERIFICATION
-                    )
-
-                    startTimer()
-                } else {
-                    _uiState.value = _uiState.value.copy(isVerificationLoading = false)
-                    showError("인증번호 발송에 실패했습니다")
-                }
+                val result = authService.sendEmailCode(email, "register")
+                if (_uiState.value.registerData.mtId.trim().lowercase() != email) return@launch
+                if (!result.success) { showError("인증번호 발송에 실패했습니다"); return@launch }
+                lastSentTime = System.currentTimeMillis()
+                _uiState.value = _uiState.value.copy(verificationSent = true, verificationTimer = 600,
+                    currentStep = RegisterStep.VERIFICATION,
+                    registerData = _uiState.value.registerData.copy(mtId = email, mtEmail = email, emailVerificationToken = null))
+                startTimer()
             } catch (e: Exception) {
-                Log.e(TAG, "SMS 발송 오류", e)
+                showError(com.dmonster.smap.data.service.emailAuthError(e))
+            } finally {
                 _uiState.value = _uiState.value.copy(isVerificationLoading = false)
-                showError("네트워크 오류가 발생했습니다")
             }
         }
     }
-    
+
     fun verifyCode() {
-        val inputCode = _uiState.value.verificationCode
-        val phone = _uiState.value.registerData.mtId.filter { it.isDigit() }
-
-        if (inputCode.length != 6) {
-            showError("6자리 인증번호를 입력해주세요")
-            return
-        }
-
-        // 타이머 만료 확인
-        if (_uiState.value.verificationTimer <= 0) {
-            showError("인증번호가 만료되었습니다. 재발송해주세요")
-            return
-        }
-
-        // 테스트 번호 처리 (debug builds only)
-        if (BuildConfig.DEBUG && phone == "01011111111") {
-            if (inputCode == "111111") {
-                Log.d(TAG, "✅ 테스트 번호 인증 성공")
-                timerJob?.cancel()
-                nextStep()
-            } else {
-                showError("인증번호가 올바르지 않습니다")
-            }
-            return
-        }
-
-        // 서버 측 인증번호 검증
-        _uiState.value = _uiState.value.copy(isVerificationLoading = true)
-
+        val state = _uiState.value
+        if (state.isVerificationLoading) return
+        if (state.registerData.emailVerificationToken != null) { nextStep(); return }
+        if (state.verificationCode.length != 6 || state.verificationTimer <= 0) { showError("인증번호를 확인해주세요"); return }
+        val email = state.registerData.mtId.trim().lowercase()
+        _uiState.value = state.copy(isVerificationLoading = true)
         viewModelScope.launch {
             try {
-                val result = withContext(Dispatchers.IO) {
-                    val requestBody = """{"phone_number":"$phone","code":"$inputCode"}"""
-                        .toRequestBody("application/json".toMediaType())
-
-                    val request = Request.Builder()
-                        .url(VERIFY_CODE_API_URL)
-                        .post(requestBody)
-                        .build()
-
-                    val response = client.newCall(request).execute()
-                    val body = response.body?.string()
-
-                    Log.d(TAG, "인증번호 검증 응답: $body")
-                    Pair(response.isSuccessful, body)
-                }
-
-                val (isSuccessful, body) = result
-                _uiState.value = _uiState.value.copy(isVerificationLoading = false)
-
-                if (isSuccessful && body?.contains("\"success\":true") == true) {
-                    Log.d(TAG, "✅ 인증번호 확인 성공 (서버 검증)")
-                    timerJob?.cancel()
-                    nextStep()
-                } else {
-                    val errorMsg = body?.let {
-                        Regex("\"error\"\\s*:\\s*\"([^\"]+)\"").find(it)?.groupValues?.get(1)
-                    } ?: "인증번호가 일치하지 않습니다"
-                    Log.d(TAG, "❌ 인증번호 검증 실패: $errorMsg")
-                    showError(errorMsg)
-                }
+                val result = authService.verifyEmailCode(email, "register", state.verificationCode)
+                if (_uiState.value.registerData.mtId.trim().lowercase() != email) return@launch
+                val token = result.verificationToken
+                if (!result.success || token.isNullOrBlank()) { showError("인증번호 확인에 실패했습니다"); return@launch }
+                timerJob?.cancel()
+                _uiState.value = _uiState.value.copy(registerData = _uiState.value.registerData.copy(emailVerificationToken = token))
+                nextStep()
             } catch (e: Exception) {
-                Log.e(TAG, "인증번호 검증 오류", e)
+                showError(com.dmonster.smap.data.service.emailAuthError(e))
+            } finally {
                 _uiState.value = _uiState.value.copy(isVerificationLoading = false)
-                showError("인증번호 확인 중 오류가 발생했습니다")
             }
         }
     }
-    
+
     private fun startTimer() {
         timerJob?.cancel()
         timerJob = viewModelScope.launch {
@@ -429,19 +286,19 @@ class RegisterViewModel @Inject constructor(
         get() = (_uiState.value.registerData.mtPwd?.length ?: 0) >= 8
     
     val hasPasswordLetter: Boolean
-        get() = _uiState.value.registerData.mtPwd?.any { it.isLetter() } ?: false
+        get() = _uiState.value.registerData.mtPwd?.let { password -> password.any { it in 'A'..'Z' } && password.any { it in 'a'..'z' } } ?: false
     
     val hasPasswordNumber: Boolean
         get() = _uiState.value.registerData.mtPwd?.any { it.isDigit() } ?: false
     
     val hasPasswordSpecialChar: Boolean
         get() {
-            val specialChars = "!@#\$%^&*(),.?\":{}|<>_+-=[];'/\\"
+            val specialChars = "!@#\$%^&*(),.?\":{}|<>"
             return _uiState.value.registerData.mtPwd?.any { it in specialChars } ?: false
         }
     
     val isPasswordValid: Boolean
-        get() = isPasswordLengthValid && hasPasswordLetter && hasPasswordNumber && hasPasswordSpecialChar
+        get() = com.dmonster.smap.data.model.isServerPasswordValid(_uiState.value.registerData.mtPwd.orEmpty())
     
     val isPasswordMatch: Boolean
         get() = _uiState.value.registerData.mtPwd == _uiState.value.passwordConfirm
@@ -459,11 +316,7 @@ class RegisterViewModel @Inject constructor(
             val data = _uiState.value.registerData
             val basicFieldsValid = data.mtName.isNotBlank() && data.mtNickname.isNotBlank() && isEmailValid
             
-            return if (isSocialAccount) {
-                basicFieldsValid
-            } else {
-                basicFieldsValid && isPasswordValid && isPasswordMatch
-            }
+            return basicFieldsValid && isPasswordValid && isPasswordMatch
         }
     
     val isProfileValid: Boolean
@@ -487,23 +340,26 @@ class RegisterViewModel @Inject constructor(
     }
     
     fun setEmail(email: String) {
-        _uiState.value = _uiState.value.copy(
-            registerData = _uiState.value.registerData.copy(mtEmail = email.ifBlank { null })
-        )
+        setPhoneNumber(email)
     }
     
+    fun setOptionalPhone(phone: String) {
+        _uiState.value = _uiState.value.copy(registerData = _uiState.value.registerData.copy(mtHp = phone.filter { it.isDigit() }.take(11).ifBlank { null }))
+    }
+
     // MARK: - Navigation
     
     fun nextStep() {
         val currentStep = _uiState.value.currentStep
         val nextStep = when (currentStep) {
             RegisterStep.TERMS -> {
-                if (isSocialAccount) RegisterStep.BASIC_INFO else RegisterStep.PHONE
+                RegisterStep.PHONE
             }
             RegisterStep.PHONE -> RegisterStep.VERIFICATION  // sendVerificationCode에서 처리
             RegisterStep.VERIFICATION -> RegisterStep.BASIC_INFO
             RegisterStep.BASIC_INFO -> RegisterStep.PROFILE
             RegisterStep.PROFILE -> {
+                if (_uiState.value.registerData.emailVerificationToken.isNullOrBlank()) { showError("이메일 인증이 필요합니다"); return }
                 completeRegistration()
                 return
             }
@@ -546,51 +402,35 @@ class RegisterViewModel @Inject constructor(
                     val response = client.newCall(request).execute()
                     val body = response.body?.string()
 
-                    Log.d(TAG, "회원가입 응답: $body")
                     Triple(response.isSuccessful, response.code, body)
                 }
 
                 val (isSuccessful, responseCode, body) = result
 
-                if (isSuccessful && body?.contains("\"success\":true") == true) {
-                    // 토큰 저장
-                    val tokenMatch = Regex("\"token\":\"([^\"]+)\"").find(body)
-                    tokenMatch?.groupValues?.get(1)?.let { token ->
-                        authService.saveToken(token)
+                if (isSuccessful && body != null) {
+                    val parsed = json.parseToJsonElement(body).jsonObject
+                    if (parsed["success"]?.jsonPrimitive?.content != "true") {
+                        _uiState.value = _uiState.value.copy(isLoading = false)
+                        showError("회원가입에 실패했습니다")
+                        return@launch
                     }
-
-                    // 사용자 데이터 저장
-                    try {
-                        val parsed = json.parseToJsonElement(body).jsonObject
-                        val dataObject = parsed["data"]?.jsonObject
-                        val userJson = dataObject?.get("user")
-                        if (userJson != null) {
-                            val user = json.decodeFromJsonElement(
-                                com.dmonster.smap.data.model.SMAPUser.serializer(),
-                                userJson
-                            )
-                            authService.saveUserData(user)
-                            Log.d(TAG, "회원가입 완료 - 사용자 데이터 저장: ${user.mtNickname}")
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "사용자 데이터 파싱 오류", e)
-                    }
-
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        currentStep = RegisterStep.COMPLETE,
-                        isRegistrationComplete = true
-                    )
+                    val dataObject = parsed["data"]?.jsonObject ?: throw IllegalStateException("회원가입 응답 누락")
+                    val token = dataObject["token"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: throw IllegalStateException("인증 토큰 누락")
+                    val refresh = dataObject["refresh_token"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: throw IllegalStateException("갱신 토큰 누락")
+                    val userJson = dataObject["user"] ?: throw IllegalStateException("사용자 정보 누락")
+                    val user = json.decodeFromJsonElement(com.dmonster.smap.data.model.SMAPUser.serializer(), userJson)
+                    authService.saveToken(token)
+                    authService.saveRefreshToken(refresh)
+                    authService.saveUserData(user)
+                    _uiState.value = _uiState.value.copy(isLoading = false, currentStep = RegisterStep.COMPLETE, isRegistrationComplete = true)
                 } else {
                     _uiState.value = _uiState.value.copy(isLoading = false)
-
-                    val errorMessage = if (responseCode == 409) {
-                        Log.w(TAG, "회원가입 중복 오류 (409): $body")
-                        "이미 가입된 정보(전화번호, 이메일 등)가 있거나\n이미 사용 중인 닉네임입니다."
-                    } else {
-                        Log.w(TAG, "회원가입 실패 ($responseCode): $body")
-                        Regex("\"message\":\"([^\"]+)\"").find(body ?: "")
-                            ?.groupValues?.get(1) ?: "회원가입에 실패했습니다"
+                    val errorMessage = when (responseCode) {
+                        400 -> try { org.json.JSONObject(body.orEmpty()).optString("detail").ifBlank { "입력 정보를 확인해주세요." } } catch (_: Exception) { "입력 정보를 확인해주세요." }
+                        409 -> "이미 가입된 이메일입니다."
+                        429 -> "요청이 많습니다. 잠시 후 다시 시도해주세요."
+                        502, 503 -> "일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+                        else -> "회원가입에 실패했습니다."
                     }
                     showError(errorMessage)
                 }

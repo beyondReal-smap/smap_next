@@ -1,5 +1,7 @@
 package com.dmonster.smap.ui.activitylog
 
+import androidx.activity.compose.BackHandler
+
 import com.dmonster.smap.AppConstants
 import com.dmonster.smap.BuildConfig
 import androidx.compose.animation.*
@@ -43,7 +45,8 @@ import com.dmonster.smap.R
 @OptIn(ExperimentalNaverMapApi::class)
 @Composable
 fun ActivityLogScreen(
-    viewModel: ActivityLogViewModel = hiltViewModel()
+    viewModel: ActivityLogViewModel = hiltViewModel(),
+    isVisible: Boolean = true
 ) {
     val haptics = rememberSmapHaptics()
 
@@ -72,24 +75,25 @@ fun ActivityLogScreen(
     val isLoadingLogs by viewModel.isLoadingLogs.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
     
-    // Map Loading State
-    var isMapLoading by remember { mutableStateOf(true) }
-    
-    LaunchedEffect(Unit) {
-        // Ensure map loading shows for at least 1.5 seconds
-        delay(1500)
-        isMapLoading = false
-    }
+    val isMapLoading = isLoading
     
     // UI States — showGroupSelector 는 사이드바 내부에서 직접 제어하므로 여기서 구독 불필요
     val showMemberSidebar by viewModel.showMemberSidebar.collectAsState()
+    BackHandler(enabled = isVisible && showMemberSidebar) { viewModel.hideMemberSidebar() }
     val memberActivityStats by viewModel.memberActivityStats.collectAsState()
     val selectedDate by viewModel.selectedDate.collectAsState()
     val stayTimes by viewModel.stayTimes.collectAsState()
 
+    var mapLogs by remember { mutableStateOf(locationLogs) }
+    var mapStayTimes by remember { mutableStateOf(stayTimes) }
+    val currentVisibility = rememberUpdatedState(isVisible)
+    LaunchedEffect(isVisible, locationLogs, stayTimes) {
+        if (isVisible) { mapLogs = locationLogs; mapStayTimes = stayTimes }
+    }
+
     // Performance Optimization: Cache heavy calculations & Sampling to max 200 points
-    val processedData = remember(locationLogs) {
-        val valid = locationLogs.filter { it.hasValidCoordinates }
+    val processedData = remember(mapLogs) {
+        val valid = mapLogs.filter { it.hasValidCoordinates }
         val maxPoints = 200
         val sampledLogs = if (valid.size > maxPoints) {
              val result = ArrayList<com.dmonster.smap.data.model.LocationLog>()
@@ -132,9 +136,9 @@ fun ActivityLogScreen(
 
     
     // Move camera when logs change (iOS Style: Start Point, Zoom 15)
-    LaunchedEffect(locationLogs) {
-        if (locationLogs.isNotEmpty()) {
-            val firstLog = locationLogs.firstOrNull { it.hasValidCoordinates }
+    LaunchedEffect(mapLogs) {
+        if (isVisible && mapLogs.isNotEmpty()) {
+            val firstLog = mapLogs.firstOrNull { it.hasValidCoordinates }
             if (firstLog != null) {
                 val startPos = LatLng(firstLog.latitude, firstLog.longitude)
                 cameraPositionState.animate(CameraUpdate.toCameraPosition(CameraPosition(startPos, 15.0)))
@@ -177,7 +181,7 @@ fun ActivityLogScreen(
                     val stayContext = androidx.compose.ui.platform.LocalContext.current
                     val stayDensity = stayContext.resources.displayMetrics.density
                     
-                    stayTimes.forEachIndexed { index, stay ->
+                    mapStayTimes.forEachIndexed { index, stay ->
                         val stayLat = stay.stayLatitude
                         val stayLng = stay.stayLongitude
                         if (stayLat != null && stayLng != null && stayLat != 0.0 && stayLng != 0.0) {
@@ -276,6 +280,7 @@ fun ActivityLogScreen(
                             // Watch slider value changes
                             snapshotFlow { uiSliderValue }
                                 .collect { value ->
+                                    if (!currentVisibility.value) return@collect
                                     if (capturedTotalPoints < 1) return@collect
                                     
                                     val idx = ((capturedTotalPoints - 1) * (value / 100.0)).toInt()

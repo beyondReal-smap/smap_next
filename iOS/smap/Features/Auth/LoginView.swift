@@ -231,15 +231,18 @@ struct LoginView: View {
         VStack(spacing: 16) {
             // 전화번호 입력
             HStack(spacing: 12) {
-                Image(systemName: "phone.fill")
+                Image(systemName: "person.fill")
                     .foregroundColor(isFocused ? SMAPTheme.Color.primary : SMAPTheme.Color.textSecondary)
                     .frame(width: 20)
 
-                PhoneTextField(text: $viewModel.phoneNumber, placeholder: "전화번호", onEditingChanged: { editing in
+                TextField("이메일 또는 전화번호", text: $viewModel.phoneNumber, onEditingChanged: { editing in
                     withAnimation(.easeInOut(duration: 0.2)) {
                         isFocused = editing
                     }
                 })
+                .keyboardType(.emailAddress)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
             }
             .padding(.horizontal, 16)
             .frame(height: 56)

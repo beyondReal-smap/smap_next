@@ -39,7 +39,7 @@ fun EditProfileScreen(
 ) {
     val user by viewModel.user.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-    val userMessage by viewModel.userMessage.collectAsState()
+    val result by viewModel.result.collectAsState()
     val context = LocalContext.current
     
     var name by remember(user) { mutableStateOf(user?.mtName ?: "") }
@@ -53,12 +53,16 @@ fun EditProfileScreen(
     val isGenderLocked = remember(user) { user?.mtGender != null && user?.mtGender != 0 }
     
     var showSuccessDialog by remember { mutableStateOf(false) }
+    var resultSuccess by remember { mutableStateOf(false) }
+    var resultMessage by remember { mutableStateOf("") }
     
     // Handle message from ViewModel
-    LaunchedEffect(userMessage) {
-        if (userMessage?.contains("업데이트") == true) {
+    LaunchedEffect(result) {
+        result?.takeIf { it.operation == "profile" }?.let {
+            resultSuccess = it.success
+            resultMessage = it.message
             showSuccessDialog = true
-            viewModel.clearMessage()
+            viewModel.clearResult()
         }
     }
 
@@ -345,11 +349,11 @@ fun EditProfileScreen(
     
     if (showSuccessDialog) {
         AlertDialog(
-            onDismissRequest = { showSuccessDialog = false; onBack() },
+            onDismissRequest = { showSuccessDialog = false; if (resultSuccess) onBack() },
             title = { Text("알림", fontFamily = SuiteFont, fontWeight = FontWeight.Bold) },
-            text = { Text("프로필이 업데이트되었습니다.", fontFamily = SuiteFont) },
+            text = { Text(resultMessage, fontFamily = SuiteFont) },
             confirmButton = {
-                TextButton(onClick = { showSuccessDialog = false; onBack() }) {
+                TextButton(onClick = { showSuccessDialog = false; if (resultSuccess) onBack() }) {
                     Text("확인", fontFamily = SuiteFont, fontWeight = FontWeight.Bold, color = BrandColors.Primary)
                 }
             }

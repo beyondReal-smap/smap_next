@@ -33,6 +33,7 @@ actor LocationUploader {
     // flush가 진행 중일 때 중복 진입을 막아 같은 데이터를 두 번 보내거나
     // pending에서 두 번 제거되는 경합을 차단한다.
     private var isFlushing = false
+    private var sessionGeneration = 0
 
     private var batchTask: Task<Void, Never>?
     private var heartbeatTask: Task<Void, Never>?
@@ -49,7 +50,25 @@ actor LocationUploader {
         self.mtIdx = idx
     }
 
+    func currentSessionGeneration() -> Int { sessionGeneration }
+
+    func clearSession() {
+        sessionGeneration += 1
+        stopBatching()
+        stopHeartbeat()
+        mtIdx = ""
+        pending.removeAll()
+        lastHeartbeatLocation = nil
+        lastHeartbeatLocationAt = nil
+        persistQueue()
+    }
+
     // MARK: - Queue
+
+    func enqueue(_ location: LocationData, generation: Int) {
+        guard generation == sessionGeneration, !mtIdx.isEmpty else { return }
+        enqueue(location)
+    }
 
     func enqueue(_ location: LocationData) {
         pending.append(location)
@@ -115,8 +134,11 @@ actor LocationUploader {
         print("[LocationUploader] flush 시작 - \(pending.count)건 전송 (mtIdx: \(mtIdx))")
 
         let toSend = pending
+        let generation = sessionGeneration
         for location in toSend {
+            guard generation == sessionGeneration else { break }
             let success = await sendSingle(location)
+            guard generation == sessionGeneration else { break }
             if success {
                 pending.removeAll { $0.timestamp == location.timestamp && $0.lat == location.lat }
             }

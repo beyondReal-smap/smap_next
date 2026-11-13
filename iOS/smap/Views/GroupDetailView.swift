@@ -91,7 +91,8 @@ struct GroupDetailView: View {
         .alert(isCurrentUserOwner ? "그룹 삭제" : "그룹 나가기", isPresented: $showingDeleteAlert) {
             Button("취소", role: .cancel) {}
             Button(isCurrentUserOwner ? "삭제" : "나가기", role: .destructive) {
-                if isCurrentUserOwner {
+                guard let isOwner = ownerStatus else { return }
+                if isOwner {
                     viewModel.deleteGroup(sgtIdx: group.sgt_idx)
                 } else {
                     viewModel.leaveGroup(sgtIdx: group.sgt_idx)
@@ -164,11 +165,11 @@ struct GroupDetailView: View {
                     
                     Divider()
                     
-                    if isCurrentUserOwner {
+                    if ownerStatus == true {
                         Button(role: .destructive, action: { showingDeleteAlert = true }) {
                             Label("그룹 삭제", systemImage: "trash")
                         }
-                    } else {
+                    } else if ownerStatus == false {
                         Button(role: .destructive, action: { showingDeleteAlert = true }) {
                             Label("그룹 나가기", systemImage: "arrow.turn.up.left")
                         }
@@ -379,17 +380,16 @@ struct GroupDetailView: View {
         (editTitle != (group.sgt_title ?? "")) || (editMemo != (group.sgt_memo ?? ""))
     }
 
-    private var isCurrentUserOwner: Bool {
-        guard let currentUser = AuthService.shared.getUserData() else { return false }
-        // Find current user in member list and check owner status
-        if let member = viewModel.groupMembers.first(where: { $0.mt_idx == currentUser.mt_idx ?? 0 }) {
-            return member.sgdt_owner_chk == "Y"
-        }
-        return false 
-        // Fallback: check stored group creator info if available (LoginModels SmapGroup uses mt_idx for creator)
-        // return group.mt_idx == currentUser.mt_idx
+    private var ownerStatus: Bool? {
+        guard viewModel.loadedMembersGroupId == group.sgt_idx,
+              let currentUserId = AuthService.shared.getUserData()?.mt_idx,
+              let member = viewModel.groupMembers.first(where: { $0.mt_idx == currentUserId }),
+              let owner = member.sgdt_owner_chk, owner == "Y" || owner == "N" else { return nil }
+        return owner == "Y"
     }
-    
+
+    private var isCurrentUserOwner: Bool { ownerStatus == true }
+
     private func formatDate(_ dateString: String) -> String {
         // Try ISO8601 format first
         let isoFormatter = ISO8601DateFormatter()

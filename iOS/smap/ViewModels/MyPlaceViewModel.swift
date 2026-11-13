@@ -36,9 +36,21 @@ class MyPlaceViewModel: ObservableObject {
         do {
             let fetchedGroups = try await groupService.getCurrentUserGroups()
             self.groups = fetchedGroups
-            if let firstGroup = fetchedGroups.first {
-                self.selectedGroup = firstGroup
-                await loadGroupMembers(sgtIdx: firstGroup.sgt_idx)
+            if let group = fetchedGroups.first(where: { $0.sgt_idx == selectedGroup?.sgt_idx }) ?? fetchedGroups.first {
+                self.selectedGroup = group
+                self.selectedMember = nil
+                self.members = []
+                self.locations = []
+                self.selectedLocation = nil
+                self.isLocationPanelOpen = false
+                await loadGroupMembers(sgtIdx: group.sgt_idx)
+            } else {
+                self.selectedGroup = nil
+                self.selectedMember = nil
+                self.members = []
+                self.locations = []
+                self.selectedLocation = nil
+                self.isLocationPanelOpen = false
             }
             isLoading = false
         } catch {
@@ -110,33 +122,9 @@ class MyPlaceViewModel: ObservableObject {
     }
 
     func canManageLocation(_ location: SavedLocation) -> Bool {
-        guard let currentUser = AuthService.shared.currentUser else { return false }
-
-        // 1. Own data
-        if location.mt_idx == currentUser.mt_idx {
-            return true
-        }
-
-        // Find current user's role in the group
-        guard let currentMember = members.first(where: { $0.mt_idx == currentUser.mt_idx }) else {
-            return false
-        }
-
-        // 2. Owner can manage anything
-        if currentMember.isOwner {
-            return true
-        }
-
-        // 3. Leader can manage anything except Owner's data
-        if currentMember.isLeader {
-            let targetMember = members.first(where: { $0.mt_idx == location.mt_idx })
-            if targetMember?.isOwner == true {
-                return false
-            }
-            return true
-        }
-
-        return false
+        guard let currentUserId = AuthService.shared.getUserData()?.mt_idx,
+              let ownerId = location.mt_idx else { return false }
+        return currentUserId == ownerId
     }
 
     func selectGroup(_ group: SmapGroup) {
@@ -183,6 +171,7 @@ class MyPlaceViewModel: ObservableObject {
     }
 
     func startEditing() {
+        guard let location = selectedLocation, canManageLocation(location) else { return }
         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
             isEditMode = true
         }
@@ -201,6 +190,7 @@ class MyPlaceViewModel: ObservableObject {
         isSaving = true
         do {
             if let existingLocation = selectedLocation {
+                guard canManageLocation(existingLocation) else { isSaving = false; return false }
                 let request = LocationUpdateRequest(slt_title: title, slt_add: address, slt_lat: latitude, slt_long: longitude, slt_enter_alarm: notifications ? "Y" : "N")
                 let success = try await myPlaceService.updateLocation(memberId: memberId, locationId: existingLocation.slt_idx, request: request)
                 if !success { throw APIError(detail: nil, message: "장소 정보 수정 내용이 서버에 반영되지 않았습니다. 다시 시도해주세요.") }
@@ -237,6 +227,7 @@ class MyPlaceViewModel: ObservableObject {
     }
 
     func deleteLocation(_ location: SavedLocation) async -> Bool {
+        guard canManageLocation(location) else { return false }
         guard let memberId = selectedMember?.mt_idx else { return false }
         isSaving = true
         do {
@@ -254,6 +245,7 @@ class MyPlaceViewModel: ObservableObject {
     }
 
     func toggleNotification(for location: SavedLocation) async -> Bool {
+        guard canManageLocation(location) else { return false }
         // Optimistic UI update: update local state immediately to prevent layout jitter
         let newNotificationState = !location.notifications
         let newAlarmValue = newNotificationState ? "Y" : "N"

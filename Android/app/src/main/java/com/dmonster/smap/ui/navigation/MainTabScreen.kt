@@ -20,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalView
@@ -63,6 +64,10 @@ fun MainTabScreen(
 ) {
     var selectedTabIndex by rememberSaveable { mutableIntStateOf(0) }
     val view = LocalView.current
+    var visitedMyPlace by rememberSaveable { mutableStateOf(false) }
+    var visitedActivityLog by rememberSaveable { mutableStateOf(false) }
+    if (selectedTabIndex == 3) visitedMyPlace = true
+    if (selectedTabIndex == 4) visitedActivityLog = true
     
     // HomeViewModel to access group creation modal state
     val homeViewModel: HomeViewModel = hiltViewModel()
@@ -144,30 +149,22 @@ fun MainTabScreen(
                 .padding(innerPadding)
                 .consumeWindowInsets(innerPadding) // 하위 화면에서 중복 패딩 방지
         ) {
-            AnimatedContent(
-                targetState = selectedTabIndex,
-                transitionSpec = {
-                    if (targetState > initialState) {
-                        (slideInHorizontally { width -> width } + fadeIn()).togetherWith(
-                            slideOutHorizontally { width -> -width } + fadeOut()
-                        )
-                    } else {
-                        (slideInHorizontally { width -> -width } + fadeIn()).togetherWith(
-                            slideOutHorizontally { width -> width } + fadeOut()
-                        )
-                    }.using(
-                        SizeTransform(clip = false)
-                    )
-                },
-                label = "TabTransition"
-            ) { targetIndex ->
-                when (targetIndex) {
-                    0 -> HomeScreen(viewModel = homeViewModel, onLogout = onLogout)
-                    1 -> GroupScreen()
-                    2 -> ScheduleScreen()
-                    3 -> MyPlaceScreen()
-                    4 -> ActivityLogScreen()
-                    // 5 -> ChatScreen()  // TODO: 채팅 기능 완성 후 활성화
+            Layout(content = {
+                Box { HomeScreen(viewModel = homeViewModel, onLogout = onLogout, isVisible = selectedTabIndex == 0) }
+                if (visitedMyPlace) Box { MyPlaceScreen(isVisible = selectedTabIndex == 3) }
+                if (visitedActivityLog) Box { ActivityLogScreen(isVisible = selectedTabIndex == 4) }
+                if (selectedTabIndex == 1) Box { GroupScreen() }
+                if (selectedTabIndex == 2) Box { ScheduleScreen() }
+            }) { measurables, constraints ->
+                val placeables = measurables.map { it.measure(constraints) }
+                val visibleIndex = when (selectedTabIndex) {
+                    0 -> 0
+                    3 -> 1
+                    4 -> 1 + if (visitedMyPlace) 1 else 0
+                    else -> placeables.lastIndex
+                }
+                layout(constraints.maxWidth, constraints.maxHeight) {
+                    placeables.getOrNull(visibleIndex)?.placeRelative(0, 0)
                 }
             }
 

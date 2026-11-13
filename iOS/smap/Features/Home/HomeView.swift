@@ -126,6 +126,9 @@ struct HomeView: View {
             // 홈 화면이 다시 표시될 때 멤버 위치 새로고침
             await viewModel.refreshData()
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("groupsDidChange"))) { _ in
+            Task { await viewModel.refreshData() }
+        }
         .onDisappear {
             viewModel.pauseUpdates()
             // 페이지를 벗어날 때 사이드바 자동(즉시) 닫기
@@ -158,8 +161,6 @@ struct HomeView: View {
         guard isMapLoading else { return }
 
         Task {
-            // 최소 1.5초 대기
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
 
             // 뷰모델 데이터 로딩 대기 (최대 5초)
             var retryCount = 0

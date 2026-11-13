@@ -7,7 +7,7 @@ enum APIEndpoint {
     case login(mt_id: String, mt_pwd: String, fcmToken: String? = nil, deviceId: String? = nil, deviceModel: String? = nil, osVersion: String? = nil, appVersion: String? = nil)
     case googleLogin(GoogleLoginRequest)
     case appleLogin(AppleLoginRequest)
-    case register(RegisterRequest)
+    case register(RegisterRequest, verificationToken: String, phoneNumber: String?)
     case refreshTokenV2(refreshToken: String)
     case logoutWithRefresh(refreshToken: String?)
     case appVersionCheck(platform: String, version: String)
@@ -206,7 +206,12 @@ enum APIEndpoint {
             return try? JSONSerialization.data(withJSONObject: dict)
         case .googleLogin(let req): return try? JSONEncoder().encode(req)
         case .appleLogin(let req): return try? JSONEncoder().encode(req)
-        case .register(let req): return try? JSONEncoder().encode(req)
+        case .register(let req, let token, let phone):
+            guard let data = try? JSONEncoder().encode(req),
+                  var body = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return nil }
+            body["email_verification_token"] = token
+            if let phone, !phone.isEmpty { body["mt_hp"] = phone }
+            return try? JSONSerialization.data(withJSONObject: body)
         case .updateProfile(let req): return try? JSONEncoder().encode(req)
         case .changePassword(let req): return try? JSONEncoder().encode(req)
         case .verifyPassword(let req): return try? JSONEncoder().encode(req)

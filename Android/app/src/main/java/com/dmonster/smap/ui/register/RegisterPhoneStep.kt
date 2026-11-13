@@ -1,142 +1,121 @@
 package com.dmonster.smap.ui.register
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.outlined.Email
+import androidx.compose.material.icons.outlined.Pin
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.dmonster.smap.ui.common.PhoneVisualTransformation
-import com.dmonster.smap.ui.theme.BrandColors
-import com.dmonster.smap.ui.theme.SuiteFont
+import com.dmonster.smap.ui.components.SmapBanner
+import com.dmonster.smap.ui.components.SmapBannerTone
+import com.dmonster.smap.ui.components.SmapTextButton
+import com.dmonster.smap.ui.components.SmapTextField
+import com.dmonster.smap.ui.theme.SmapSpacing
+import com.dmonster.smap.ui.theme.SmapText
 
+// 파일·함수 이름의 "Phone" 은 SMS 인증 시절의 이름이다. 호출부(RegisterScreen)와 단계 enum 이
+// 같은 이름을 쓰고 있어, 이메일 전환 로직 작업과 충돌하지 않도록 이름은 그대로 두었다.
+
+/** 가입 1단계 — 로그인 ID 가 될 이메일을 입력한다. */
 @Composable
 internal fun PhoneContent(
     viewModel: RegisterViewModel,
     uiState: RegisterViewModel.RegisterUiState
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text(
-            text = "전화번호를 입력해주세요",
-            fontFamily = SuiteFont,
-            fontWeight = FontWeight.Bold,
-            fontSize = 26.sp
+    Column(verticalArrangement = Arrangement.spacedBy(SmapSpacing.sm)) {
+        StepHeader(
+            title = "이메일을 입력해 주세요",
+            description = "이 이메일이 로그인 아이디가 됩니다.\n인증번호를 보내 본인 확인을 진행해요."
         )
 
-        Text(
-            text = "본인 인증을 위해 전화번호가 필요합니다",
-            fontFamily = SuiteFont,
-            color = BrandColors.TextSecondary,
-            fontSize = 16.sp
-        )
+        Spacer(Modifier.height(SmapSpacing.md))
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        var isFocused by remember { mutableStateOf(false) }
-
-        OutlinedTextField(
+        SmapTextField(
             value = uiState.registerData.mtId,
             onValueChange = { viewModel.setPhoneNumber(it) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .onFocusChanged { isFocused = it.isFocused },
-            placeholder = { Text("010-1234-5678", fontFamily = SuiteFont) },
-            leadingIcon = {
-                Icon(
-                    Icons.Default.Phone,
-                    contentDescription = null,
-                    tint = if (isFocused) BrandColors.Primary else BrandColors.TextSecondary
-                )
-            },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-            visualTransformation = PhoneVisualTransformation(),
-            singleLine = true,
-            shape = RoundedCornerShape(12.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = BrandColors.Primary,
-                unfocusedBorderColor = BrandColors.Border
-            )
+            label = "이메일",
+            placeholder = "name@example.com",
+            leadingIcon = Icons.Outlined.Email,
+            keyboardType = KeyboardType.Email,
+            imeAction = ImeAction.Done,
         )
     }
 }
 
+/** 가입 2단계 — 메일로 받은 6자리 인증번호를 입력한다. */
 @Composable
 internal fun VerificationContent(
     viewModel: RegisterViewModel,
     uiState: RegisterViewModel.RegisterUiState
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text(
-            text = "인증번호를 입력해주세요",
-            fontFamily = SuiteFont,
-            fontWeight = FontWeight.Bold,
-            fontSize = 26.sp
+    val resendWait = viewModel.remainingResendTime()
+    val canResend = resendWait == 0 && !uiState.isVerificationLoading
+    val expired = uiState.verificationSent && uiState.verificationTimer == 0
+
+    Column(verticalArrangement = Arrangement.spacedBy(SmapSpacing.sm)) {
+        StepHeader(
+            title = "인증번호를 입력해 주세요",
+            description = "${uiState.registerData.mtId}\n위 주소로 보낸 6자리 숫자를 입력해 주세요."
         )
 
-        Text(
-            text = "${viewModel.formattedPhoneNumber}로 발송된\n6자리 인증번호를 입력해주세요",
-            fontFamily = SuiteFont,
-            color = BrandColors.TextSecondary,
-            fontSize = 16.sp
-        )
+        Spacer(Modifier.height(SmapSpacing.md))
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        var isFocusedCode by remember { mutableStateOf(false) }
-
-        OutlinedTextField(
+        SmapTextField(
             value = uiState.verificationCode,
             onValueChange = { viewModel.setVerificationCode(it) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .onFocusChanged { isFocusedCode = it.isFocused },
-            placeholder = { Text("인증번호 6자리", fontFamily = SuiteFont) },
-            leadingIcon = {
-                Icon(
-                    Icons.Default.Lock,
-                    contentDescription = null,
-                    tint = if (isFocusedCode) BrandColors.Primary else BrandColors.TextSecondary
-                )
-            },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            singleLine = true,
-            shape = RoundedCornerShape(12.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = BrandColors.Primary,
-                unfocusedBorderColor = BrandColors.Border
-            )
+            label = "인증번호",
+            placeholder = "6자리 숫자",
+            leadingIcon = Icons.Outlined.Pin,
+            keyboardType = KeyboardType.NumberPassword,
+            imeAction = ImeAction.Done,
+            // 남은 시간을 입력창 바로 아래에 두어, 만료 여부를 입력하면서 볼 수 있게 한다.
+            helperText = if (uiState.verificationTimer > 0) "남은 시간 ${formatTimer(uiState.verificationTimer)}" else null,
+            errorText = if (expired) "인증번호가 만료됐어요. 다시 받아 주세요." else null,
         )
 
-        // 타이머
-        if (uiState.verificationTimer > 0) {
-            val minutes = uiState.verificationTimer / 60
-            val seconds = uiState.verificationTimer % 60
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
             Text(
-                text = "남은 시간: ${minutes}:${seconds.toString().padStart(2, '0')}",
-                fontFamily = SuiteFont,
-                color = BrandColors.Primary,
-                fontSize = 16.sp
+                text = "메일이 오지 않았나요?",
+                style = SmapText.caption,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            SmapTextButton(
+                // 대기 중에는 몇 초 뒤에 누를 수 있는지 알려 준다("재발송 대기 중"만으로는 알 수 없었다).
+                text = if (resendWait > 0) "다시 받기 (${resendWait}초)" else "인증번호 다시 받기",
+                onClick = { viewModel.sendVerificationCode() },
+                enabled = canResend,
             )
         }
 
-        // 재발송 버튼 - 타이머가 0일 때만 활성화
-        val canResend = uiState.verificationTimer == 0
-        TextButton(
-            onClick = { viewModel.sendVerificationCode() },
-            enabled = canResend
-        ) {
-            Text(
-                text = if (canResend) "인증번호 재발송" else "재발송 대기 중",
-                fontFamily = SuiteFont,
-                color = if (canResend) BrandColors.Primary else BrandColors.TextSecondary
-            )
-        }
+        SmapBanner(
+            message = "메일이 보이지 않으면 스팸함을 확인해 주세요.",
+            tone = SmapBannerTone.Info,
+        )
     }
+}
+
+@Composable
+private fun StepHeader(title: String, description: String) {
+    Text(text = title, style = SmapText.title, color = MaterialTheme.colorScheme.onSurface)
+    Text(text = description, style = SmapText.secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+private fun formatTimer(totalSeconds: Int): String {
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return "$minutes:${seconds.toString().padStart(2, '0')}"
 }

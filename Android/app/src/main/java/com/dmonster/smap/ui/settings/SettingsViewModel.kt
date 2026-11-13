@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
+data class SettingsResult(val operation: String, val success: Boolean, val message: String)
+
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val authService: AuthService
@@ -33,6 +35,11 @@ class SettingsViewModel @Inject constructor(
     private val _userMessage = MutableStateFlow<String?>(null)
     val userMessage: StateFlow<String?> = _userMessage
     
+    private val _result = MutableStateFlow<SettingsResult?>(null)
+    val result: StateFlow<SettingsResult?> = _result
+
+    fun clearResult() { _result.value = null }
+
     init {
         refreshProfile()
     }
@@ -54,9 +61,9 @@ class SettingsViewModel @Inject constructor(
             val response = authService.updateProfile(name, nickname, birth, gender)
             if (response.success) {
                 _user.value = authService.getUserData()
-                _userMessage.value = "프로필이 업데이트되었습니다."
+                _result.value = SettingsResult("profile", true, "프로필이 업데이트되었습니다.")
             } else {
-                _userMessage.value = response.message ?: "업데이트 실패"
+                _result.value = SettingsResult("profile", false, response.message ?: "프로필 수정에 실패했습니다.")
             }
             setLoading("updateProfile", false)
         }
@@ -68,9 +75,9 @@ class SettingsViewModel @Inject constructor(
             val response = authService.uploadProfileImage(imageData)
             if (response.success) {
                 _user.value = authService.getUserData()
-                _userMessage.value = "프로필 이미지가 변경되었습니다."
+                _result.value = SettingsResult("image", true, "프로필 이미지가 변경되었습니다.")
             } else {
-                _userMessage.value = response.message ?: "이미지 업로드 실패"
+                _result.value = SettingsResult("image", false, response.message ?: "이미지 업로드에 실패했습니다.")
             }
             setLoading("uploadImage", false)
         }
@@ -97,7 +104,7 @@ class SettingsViewModel @Inject constructor(
             if (response.success) {
                 onSuccess()
             } else {
-                _userMessage.value = response.message ?: "탈퇴 처리 실패"
+                _result.value = SettingsResult("withdraw", false, response.message ?: "탈퇴 처리에 실패했습니다.")
             }
             setLoading("withdraw", false)
         }
@@ -108,9 +115,9 @@ class SettingsViewModel @Inject constructor(
             setLoading("changePassword", true)
             val response = authService.changePassword(currentPassword, newPassword)
             if (response.success) {
-                _userMessage.value = "비밀번호가 성공적으로 변경되었습니다."
+                _result.value = SettingsResult("password", true, "비밀번호가 성공적으로 변경되었습니다.")
             } else {
-                _userMessage.value = response.message ?: "비밀번호 변경 실패"
+                _result.value = SettingsResult("password", false, response.message ?: "비밀번호 변경에 실패했습니다.")
             }
             setLoading("changePassword", false)
         }

@@ -16,6 +16,8 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
 
     // MARK: - Private
 
+    private var clearingSessionTask: Task<Void, Never>?
+    private var sessionGeneration = UUID()
     private let clManager = CLLocationManager()
     private let motionManager = MotionManager()
     let uploader = LocationUploader()
@@ -154,7 +156,13 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
 
     func updateUserInfo(mtIdx: String, mtId: String, mtName: String) {
         self.savedMtIdx = mtIdx
-        Task { await uploader.updateMtIdx(mtIdx) }
+        let clearing = clearingSessionTask
+        let generation = sessionGeneration
+        Task {
+            await clearing?.value
+            guard generation == sessionGeneration else { return }
+            await uploader.updateMtIdx(mtIdx)
+        }
         print("[LocationManager] User info updated: \(mtIdx)")
 
         // If we have a cached location, send it immediately
@@ -165,8 +173,16 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
     }
 
     func clearUserInfo() {
+        sessionGeneration = UUID()
+        stopTracking()
         savedMtIdx = ""
-        Task { await uploader.updateMtIdx("") }
+        lastLocation = nil
+        UserDefaults.standard.removeObject(forKey: "smap_pending_locations")
+        let prior = clearingSessionTask
+        clearingSessionTask = Task {
+            await prior?.value
+            await uploader.clearSession()
+        }
         print("[LocationManager] User info cleared")
     }
 
@@ -260,8 +276,11 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
         UIDevice.current.isBatteryMonitoringEnabled = true
         let battery = Int(UIDevice.current.batteryLevel * 100)
 
+        let generation = sessionGeneration
         Task {
+            let uploaderGeneration = await uploader.currentSessionGeneration()
             let steps = await uploader.getCurrentStepCount()
+            guard generation == sessionGeneration else { return }
             let data = LocationData(
                 lat: location.coordinate.latitude,
                 lng: location.coordinate.longitude,
@@ -272,7 +291,7 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
                 battery: battery,
                 steps: steps
             )
-            await uploader.enqueue(data)
+            await uploader.enqueue(data, generation: uploaderGeneration)
         }
     }
 

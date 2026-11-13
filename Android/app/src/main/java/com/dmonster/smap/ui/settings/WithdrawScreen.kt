@@ -1,5 +1,7 @@
 package com.dmonster.smap.ui.settings
 
+import androidx.activity.compose.BackHandler
+
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -48,8 +50,10 @@ fun WithdrawScreen(
 ) {
     val user by viewModel.user.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val result by viewModel.result.collectAsState()
     
     var currentStep by remember { mutableStateOf(1) }
+    BackHandler { if (currentStep > 1) currentStep -= 1 else onBack() }
     var password by remember { mutableStateOf("") }
     var showPassword by remember { mutableStateOf(false) }
     val selectedReasons = remember { mutableStateListOf<String>() }
@@ -58,6 +62,13 @@ fun WithdrawScreen(
     var errorMessage by remember { mutableStateOf("") }
     var showConfirmWithdrawAlert by remember { mutableStateOf(false) }
     
+    LaunchedEffect(result) {
+        result?.takeIf { it.operation == "withdraw" }?.let {
+            errorMessage = it.message
+            viewModel.clearResult()
+        }
+    }
+
     // 이모지 대신 Material 아이콘 사용(시각 일관성·접근성). 사유 텍스트가 의미를 전달하므로 아이콘은 장식.
     val reasonsArr = listOf(
         WithdrawReasonData(1, Icons.Filled.Bedtime, "자주 사용하지 않아요"),

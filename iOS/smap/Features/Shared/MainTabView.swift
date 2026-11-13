@@ -16,6 +16,10 @@ struct MainTabView: View {
     @StateObject private var locationPermission = LocationPermissionChecker()
     @State private var dismissedPermissionView = false
     @State private var showPermissionView = false
+    @State private var joiningPendingGroup = false
+    @State private var showJoinResult = false
+    @State private var joinResultMessage = ""
+    @State private var joinFailed = false
     
     // 로그아웃 알림 퍼블리셔
     private let logoutPublisher = NotificationCenter.default.publisher(for: NSNotification.Name("logout"))
@@ -102,12 +106,22 @@ struct MainTabView: View {
             // 탭 전환 시 모든 사이드바 닫기 알림 발생 (현재 선택된 탭 인덱스 전달)
             NotificationCenter.default.post(name: NSNotification.Name("closeSidebars"), object: selectedTab)
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("handleGroupJoinDeepLink"))) { _ in
+            processPendingGroup()
+        }
+        .alert("그룹 초대", isPresented: $showJoinResult) {
+            if joinFailed { Button("다시 시도") { processPendingGroup() } }
+            Button("확인", role: .cancel) {
+                if !joinFailed { processPendingGroup() }
+            }
+        } message: { Text(joinResultMessage) }
         .onReceive(logoutPublisher) { _ in
             // RootView observes "logout" and swaps to LoginView.
             // No UIKit window manipulation needed.
             print("[MainTabView] logout notification received — RootView will handle navigation")
         }
         .task {
+            processPendingGroup()
             // 첫 로그인/가입 시에는 AppDelegate가 시스템 권한 팝업을 순차 처리하므로
             // 온보딩 완료 후에만 커스텀 오버레이를 표시
             let hasOnboarded = UserDefaults.standard.bool(forKey: "smap_permission_onboarding_done")
@@ -135,5 +149,36 @@ struct MainTabView: View {
         .animation(.easeInOut(duration: 0.3), value: dismissedPermissionView)
         .animation(.easeInOut(duration: 0.3), value: showPermissionView)
     }
+
+    private func processPendingGroup() {
+        guard !joiningPendingGroup,
+              let value = UserDefaults.standard.string(forKey: "pending_join_group_id") else { return }
+        guard let groupId = Int(value), let memberId = AuthService.shared.getUserData()?.mt_idx else {
+            joinFailed = true
+            joinResultMessage = "그룹 초대 정보를 확인할 수 없습니다. 다시 로그인 후 시도해주세요."
+            showJoinResult = true
+            return
+        }
+        joiningPendingGroup = true
+        Task { @MainActor in
+            defer { joiningPendingGroup = false }
+            do {
+                guard try await GroupService.shared.joinGroupById(mt_idx: memberId, sgt_idx: groupId) else {
+                    throw NetworkError.badRequest("그룹 가입에 실패했습니다.")
+                }
+                if UserDefaults.standard.string(forKey: "pending_join_group_id") == value {
+                    UserDefaults.standard.removeObject(forKey: "pending_join_group_id")
+                }
+                NotificationCenter.default.post(name: NSNotification.Name("groupsDidChange"), object: nil)
+                joinFailed = false
+                joinResultMessage = "그룹에 가입했습니다."
+            } catch {
+                joinFailed = true
+                joinResultMessage = (error as? NetworkError)?.userMessage ?? "그룹 가입에 실패했습니다. 다시 시도해주세요."
+            }
+            showJoinResult = true
+        }
+    }
+
 }
 

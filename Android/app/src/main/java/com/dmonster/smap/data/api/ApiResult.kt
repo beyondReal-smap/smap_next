@@ -2,6 +2,7 @@ package com.dmonster.smap.data.api
 
 import retrofit2.HttpException
 import java.io.IOException
+import kotlinx.coroutines.CancellationException
 
 sealed class ApiResult<out T> {
     data class Success<T>(val data: T) : ApiResult<T>()
@@ -12,13 +13,17 @@ sealed class ApiResult<out T> {
 suspend fun <T> safeApiCall(call: suspend () -> T): ApiResult<T> {
     return try {
         ApiResult.Success(call())
+    } catch (e: CancellationException) {
+        throw e
     } catch (e: HttpException) {
-        ApiResult.Error(e.code(), e.message())
+        android.util.Log.e("ApiResult", "HTTP 요청 실패", e)
+        ApiResult.Error(e.code(), "요청을 처리하지 못했습니다.")
     } catch (e: IOException) {
         ApiResult.NetworkError(e)
     } catch (e: Exception) {
         // Catch serialization errors (JsonDecodingException, etc.)
         // that occur when API returns unexpected response format
-        ApiResult.Error(-1, e.message ?: "알 수 없는 오류가 발생했습니다")
+        android.util.Log.e("ApiResult", "응답 처리 실패", e)
+        ApiResult.Error(-1, "응답을 처리하지 못했습니다.")
     }
 }

@@ -24,8 +24,6 @@ struct MyPlaceView: View {
     var body: some View {
         ZStack(alignment: .leading) {
             // Map
-            // Map - Render only after loading to ensure initial coordinates are set
-            if !viewModel.isLoading {
                 MyPlaceMapView(
                     locations: viewModel.locations,
                     selectedLocation: $viewModel.selectedLocation,
@@ -34,15 +32,19 @@ struct MyPlaceView: View {
                     onLocationTap: { viewModel.selectLocationFromMarker($0) },
                     onMapTap: { lat, lng in 
                         Task {
-                            let address = try? await KakaoLocationSearchService.shared.reverseGeocode(latitude: lat, longitude: lng)
-                            newLocationCoordinates = (lat, lng)
-                            newLocationName = nil // Leave empty for user to fill
-                            newLocationAddress = address ?? ""
-                            viewModel.startNewLocation(latitude: lat, longitude: lng)
+                            do {
+                                let address = try await KakaoLocationSearchService.shared.reverseGeocode(latitude: lat, longitude: lng)
+                                newLocationCoordinates = (lat, lng)
+                                newLocationName = nil
+                                newLocationAddress = address
+                                viewModel.startNewLocation(latitude: lat, longitude: lng)
+                            } catch {
+                                viewModel.errorMessage = "주소를 불러오지 못했습니다."
+                                viewModel.showError = true
+                            }
                         }
                     })
                 .ignoresSafeArea().offset(y: 60)
-            }
             
             // Header
             VStack {
@@ -70,7 +72,7 @@ struct MyPlaceView: View {
             
             // Loading
             
-            if isMapLoading {
+            if isMapLoading || viewModel.isLoading {
                 MapLoadingOverlay()
                     .transition(AnyTransition.opacity)
                     .zIndex(1000)
@@ -81,6 +83,9 @@ struct MyPlaceView: View {
             handleLoading()
         }
         .task { await viewModel.loadInitialData() }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("groupsDidChange"))) { _ in
+            Task { await viewModel.loadInitialData() }
+        }
         .sheet(isPresented: $viewModel.isLocationPanelOpen) { 
             LocationDetailPanel(
                 viewModel: viewModel, 
@@ -758,6 +763,6 @@ struct MyPlaceMapView: UIViewRepresentable {
         let onMapTap: (Double, Double) -> Void
         init(onLocationTap: @escaping (SavedLocation) -> Void, onMapTap: @escaping (Double, Double) -> Void) { self.onLocationTap = onLocationTap; self.onMapTap = onMapTap }
         func clearMarkers() { markers.forEach { $0.mapView = nil }; markers.removeAll() }
-        func mapView(_ mapView: NMFMapView, didTapMap latlng: NMGLatLng, point: CGPoint) { onMapTap(latlng.lat, latlng.lng) }
+        func mapView(_ mapView: NMFMapView, didLongTapMap latlng: NMGLatLng, point: CGPoint) { onMapTap(latlng.lat, latlng.lng) }
     }
 }

@@ -36,6 +36,7 @@ fun LocationSearchDialog(
     var query by remember { mutableStateOf("") }
     var places by remember { mutableStateOf<List<KakaoPlace>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
+    var searchError by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val service = remember { KakaoLocationService() }
 
@@ -113,11 +114,20 @@ fun LocationSearchDialog(
 
                 Button(
                     onClick = {
-                        if (query.isNotBlank()) {
+                        if (query.isNotBlank() && !isLoading) {
+                            isLoading = true
+                            searchError = null
                             scope.launch {
-                                isLoading = true
-                                places = service.searchLocation(query)
-                                isLoading = false
+                                try {
+                                    places = service.searchLocation(query)
+                                } catch (e: kotlinx.coroutines.CancellationException) {
+                                    throw e
+                                } catch (e: Exception) {
+                                    places = emptyList()
+                                    searchError = "장소 검색에 실패했습니다. 다시 시도해주세요."
+                                } finally {
+                                    isLoading = false
+                                }
                             }
                         }
                     },
@@ -140,6 +150,8 @@ fun LocationSearchDialog(
                         modifier = Modifier.align(Alignment.Center),
                         color = BrandColors.Primary
                     )
+                } else if (searchError != null) {
+                    Text(searchError!!, modifier = Modifier.align(Alignment.Center))
                 } else if (places.isEmpty()) {
                     Column(
                         modifier = Modifier.fillMaxSize(),

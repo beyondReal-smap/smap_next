@@ -158,6 +158,13 @@ class AuthService: ObservableObject {
         return getToken() != nil && getUserData() != nil
     }
 
+    func expireSession() {
+        deleteToken()
+        deleteRefreshToken()
+        deleteUserData()
+        NotificationCenter.default.post(name: NSNotification.Name("logout"), object: nil)
+    }
+
     /// 완전 로그아웃. 서버 revoke는 fire-and-forget — 네트워크 실패 시에도 로컬은 비운다.
     func logout() {
         let refresh = getRefreshToken()
@@ -186,7 +193,8 @@ class AuthService: ObservableObject {
     /// 전화번호/비밀번호 로그인
     func login(phoneNumber: String, password: String, fcmToken: String? = nil) async throws -> LoginResponse {
         // 전화번호에서 하이픈 제거
-        let cleanPhone = phoneNumber.replacingOccurrences(of: "-", with: "")
+        let identifier = phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanPhone = identifier.contains("@") ? identifier : identifier.replacingOccurrences(of: "-", with: "")
 
         // 기기 정보 가져오기 (MainActor에서 캡처)
         let deviceInfo = await MainActor.run {
@@ -247,7 +255,7 @@ class AuthService: ObservableObject {
             token: nil
         )
 
-        if response.success == true, let user = response.user {
+        if response.success == true, let user = response.user ?? response.data?.user {
             if let token = response.token ?? response.data?.token {
                 saveToken(token)
             }
@@ -303,27 +311,48 @@ class AuthService: ObservableObject {
         return response
     }
 
+    struct EmailCodeResult: Decodable {
+        let success: Bool
+        let verification_token: String?
+    }
+
+    func emailAuth(path: String, body: [String: String]) async throws -> EmailCodeResult {
+        guard let url = URL(string: baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + path) else {
+            throw NetworkError.badRequest("인증 요청을 처리할 수 없습니다.")
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse else { throw NetworkError.badRequest("서버 응답을 확인해주세요.") }
+            guard (200...299).contains(http.statusCode) else { throw NetworkError.fromHTTPStatus(http.statusCode, data: data) }
+            return try JSONDecoder().decode(EmailCodeResult.self, from: data)
+        } catch let error as NetworkError { throw error }
+        catch { throw NetworkError.badRequest("네트워크 연결을 확인해주세요.") }
+    }
+
     // MARK: - Registration
 
     /// 회원가입
-    func register(request: RegisterRequest) async throws -> LoginResponse {
+    func register(request: RegisterRequest, verificationToken: String, phoneNumber: String?) async throws -> LoginResponse {
         print("[AuthService] 회원가입 요청: \(request.mt_id)")
 
         let response: LoginResponse = try await apiClient.request(
-            .register(request),
+            .register(request, verificationToken: verificationToken, phoneNumber: phoneNumber),
             token: nil
         )
 
-        // 토큰 및 사용자 정보 저장 (Backend가 토큰을 반환하므로 즉시 로그인 처리)
-        if let data = response.data, let token = data.token {
-            saveToken(token)
-            print("[AuthService] 회원가입 후 토큰 저장 완료")
-
-            if let user = data.user {
-                saveUserData(user)
-                print("[AuthService] 회원가입 후 사용자 정보 저장 완료: \(user.displayName)")
-            }
+        guard response.success, let data = response.data,
+              let token = data.token, !token.isEmpty,
+              let refresh = data.refresh_token, !refresh.isEmpty,
+              let user = data.user else {
+            throw NetworkError.badRequest(response.success ? "회원가입 응답을 확인해주세요." : response.message)
         }
+        saveToken(token)
+        saveRefreshToken(refresh)
+        saveUserData(user)
 
         return response
     }

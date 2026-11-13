@@ -18,6 +18,8 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
+internal fun isInvalidRefreshStatus(status: Int): Boolean = status == 401
+
 /**
  * 401 응답 → `/auth/refresh` (v2: body) 호출 → 새 access + 새 refresh 받아 원 요청 재시도.
  * Refresh 요청이 실패하면 null 반환해 401을 상위로 전파한다.
@@ -48,6 +50,7 @@ class TokenAuthenticator @Inject constructor(
             .writeTimeout(10, TimeUnit.SECONDS)
             .build()
     }
+    private var invalidRefresh = false
 
     @Synchronized
     override fun authenticate(route: Route?, response: Response): Request? {
@@ -70,13 +73,23 @@ class TokenAuthenticator @Inject constructor(
 
         // refresh 시도 — secure store에 refresh가 있으면 v2(body), 없으면 v1(Bearer)로 fallback.
         val refresh = tokenStore.getRefreshToken().orEmpty()
+        invalidRefresh = false
         val rotated: RotateResult? = when {
             refresh.isNotBlank() -> refreshWithRefreshToken(refresh)
             currentToken.isNotBlank() ->
                 refreshWithBearer(currentToken)?.let { RotateResult(it, null) }
             else -> null
         }
-        if (rotated == null) return null
+        if (rotated == null) {
+            if (invalidRefresh && prefs.getString(KEY_TOKEN, null) == currentToken) {
+                tokenStore.clearRefreshToken()
+                prefs.edit().remove(KEY_TOKEN).remove("user_data").remove("mt_idx").apply()
+            }
+            return null
+        }
+
+        if (prefs.getString(KEY_TOKEN, null).orEmpty() != currentToken ||
+            (refresh.isNotBlank() && tokenStore.getRefreshToken() != refresh)) return null
 
         prefs.edit().putString(KEY_TOKEN, rotated.access).apply()
         rotated.refresh?.let { tokenStore.saveRefreshToken(it) }
@@ -110,6 +123,7 @@ class TokenAuthenticator @Inject constructor(
         return runCatching {
             refreshClient.newCall(request).execute().use { res ->
                 if (!res.isSuccessful) {
+                    invalidRefresh = isInvalidRefreshStatus(res.code)
                     Log.w(TAG, "v2 refresh failed: HTTP ${res.code}")
                     return@use null
                 }
@@ -118,6 +132,7 @@ class TokenAuthenticator @Inject constructor(
                 if (parsed.success && !parsed.token.isNullOrBlank()) {
                     RotateResult(parsed.token, parsed.refreshToken)
                 } else {
+                    invalidRefresh = true
                     Log.w(TAG, "v2 refresh marked not-success: ${parsed.message}")
                     null
                 }
@@ -136,12 +151,16 @@ class TokenAuthenticator @Inject constructor(
         return runCatching {
             refreshClient.newCall(request).execute().use { res ->
                 if (!res.isSuccessful) {
+                    invalidRefresh = isInvalidRefreshStatus(res.code)
                     Log.w(TAG, "v1 refresh failed: HTTP ${res.code}")
                     return@use null
                 }
                 val body = res.body?.string().orEmpty()
                 val parsed = json.decodeFromString<TokenRefreshResponse>(body)
-                if (parsed.success && !parsed.token.isNullOrBlank()) parsed.token else null
+                if (parsed.success && !parsed.token.isNullOrBlank()) parsed.token else {
+                    invalidRefresh = true
+                    null
+                }
             }
         }.onFailure { Log.w(TAG, "v1 refresh threw", it) }.getOrNull()
     }

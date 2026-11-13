@@ -8,6 +8,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -42,6 +43,7 @@ class AuthService(
 
     // 로그아웃 시 서버 revoke 호출(fire-and-forget). 호출자의 일반 함수 컨텍스트와 호환.
     private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val inquiryClient = OkHttpClient()
 
     // =========================================================================
     // Login state
@@ -62,7 +64,7 @@ class AuthService(
 
     fun saveToken(token: String) {
         prefs.edit().putString(KEY_TOKEN, token).commit()
-        Log.d(TAG, "Token saved: ${token.take(10)}...")
+        Log.d(TAG, "Token saved")
     }
 
     fun getToken(): String? = prefs.getString(KEY_TOKEN, null)
@@ -127,11 +129,15 @@ class AuthService(
     // Network calls (delegated to SmapApi)
     // =========================================================================
 
+    suspend fun sendEmailCode(email: String, purpose: String) = api.sendEmailCode(EmailCodeRequest(email, purpose))
+    suspend fun verifyEmailCode(email: String, purpose: String, code: String) = api.verifyEmailCode(EmailCodeRequest(email, purpose, code))
+    suspend fun resetPasswordByEmail(email: String, token: String, password: String) = api.resetPasswordByEmail(EmailResetRequest(email, token, password))
+
     /**
      * POST /auth/login
      */
     suspend fun login(phoneNumber: String, password: String): LoginResponse {
-        val cleanPhone = phoneNumber.replace("-", "")
+        val cleanPhone = phoneNumber.trim().let { if (it.contains("@")) it else it.replace("-", "") }
 
         val request = LoginRequest(
             mtId = cleanPhone,
@@ -152,7 +158,7 @@ class AuthService(
             loginResponse
         } catch (e: Exception) {
             Log.e(TAG, "Login failed", e)
-            LoginResponse(success = false, message = "Network error: ${e.message}", data = null)
+            LoginResponse(success = false, message = "로그인 요청에 실패했습니다. 네트워크 연결을 확인해주세요.", data = null)
         }
     }
 
@@ -267,7 +273,7 @@ class AuthService(
             ApiResponse(response.success, response.message)
         } catch (e: Exception) {
             Log.e(TAG, "Update profile failed", e)
-            ApiResponse(false, "Network error: ${e.message}")
+            ApiResponse(false, "프로필 수정에 실패했습니다. 네트워크 연결을 확인해주세요.")
         }
     }
 
@@ -280,7 +286,7 @@ class AuthService(
             api.changePassword(request)
         } catch (e: Exception) {
             Log.e(TAG, "Change password failed", e)
-            ChangePasswordResponse(false, "Network error: ${e.message}")
+            ChangePasswordResponse(false, "비밀번호 변경에 실패했습니다. 네트워크 연결을 확인해주세요.")
         }
     }
 
@@ -310,7 +316,7 @@ class AuthService(
             response
         } catch (e: Exception) {
             Log.e(TAG, "Withdraw failed", e)
-            WithdrawResponse(false, "Network error: ${e.message}")
+            WithdrawResponse(false, "탈퇴 처리에 실패했습니다. 네트워크 연결을 확인해주세요.")
         }
     }
 
@@ -328,7 +334,7 @@ class AuthService(
             response
         } catch (e: Exception) {
             Log.e(TAG, "Upload image failed", e)
-            ProfileImageUploadResponse(false, "Network error: ${e.message}", null)
+            ProfileImageUploadResponse(false, "이미지 업로드에 실패했습니다. 네트워크 연결을 확인해주세요.", null)
         }
     }
 
@@ -348,26 +354,40 @@ class AuthService(
      * Send 1:1 inquiry via Telegram Bot API.
      * This uses a DIFFERENT base URL (api.telegram.org) so it stays as manual OkHttp.
      */
-    suspend fun sendTelegramInquiry(chatId: String, botToken: String, text: String): Boolean {
-        return try {
+    suspend fun sendTelegramInquiry(chatId: String, botToken: String, text: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
             val url = "https://api.telegram.org/bot$botToken/sendMessage"
             val telegramRequest = TelegramMessageRequest(chatId = chatId, text = text)
             val jsonBody = json.encodeToString(telegramRequest)
             val requestBody = jsonBody.toRequestBody("application/json".toMediaType())
 
-            val httpClient = OkHttpClient()
             val httpRequest = Request.Builder()
                 .url(url)
                 .post(requestBody)
                 .addHeader("Content-Type", "application/json")
                 .build()
 
-            val response = httpClient.newCall(httpRequest).execute()
-            Log.d(TAG, "[Telegram] Response: ${response.code}")
-            response.isSuccessful
+            inquiryClient.newCall(httpRequest).execute().use { response ->
+                Log.d(TAG, "[Telegram] Response: ${response.code}")
+                if (response.isSuccessful) Result.success(Unit)
+                else Result.failure(IllegalStateException("문의 전송에 실패했습니다 (${response.code})."))
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Send telegram inquiry failed", e)
-            false
+            Result.failure(e)
         }
     }
+}
+
+fun emailAuthError(error: Throwable): String {
+    if (error is retrofit2.HttpException) {
+        return when (error.code()) {
+            400 -> try { org.json.JSONObject(error.response()?.errorBody()?.string().orEmpty()).optString("detail").ifBlank { "입력 정보를 확인해주세요." } } catch (_: Exception) { "입력 정보를 확인해주세요." }
+            409 -> "이미 가입된 이메일입니다."
+            429 -> "요청이 많습니다. 잠시 후 다시 시도해주세요."
+            502, 503 -> "일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+            else -> "요청을 처리하지 못했습니다."
+        }
+    }
+    return "네트워크 연결을 확인해주세요."
 }

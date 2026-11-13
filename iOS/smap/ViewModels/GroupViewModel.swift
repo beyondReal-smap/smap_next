@@ -7,6 +7,7 @@ class GroupViewModel: ObservableObject {
     @Published var groups: [SmapGroup] = []
     @Published var selectedGroup: SmapGroup?
     @Published var groupMembers: [SmapGroupMember] = []
+    @Published private(set) var loadedMembersGroupId: Int?
     @Published var groupStats: GroupStats?
     @Published var totalMembers: Int = 0
     
@@ -143,11 +144,14 @@ class GroupViewModel: ObservableObject {
     
     /// 그룹 멤버 조회
     func fetchGroupMembers(sgtIdx: Int) {
-        // 이미 로딩 중이면 스킵하거나, 개별 로딩 상태 관리
+        groupMembers = []
+        loadedMembersGroupId = nil
         Task {
             do {
                 let members = try await groupService.getGroupMembers(sgtIdx: sgtIdx)
+                guard self.selectedGroup?.sgt_idx == sgtIdx else { return }
                 self.groupMembers = members
+                self.loadedMembersGroupId = sgtIdx
             } catch {
                 print("❌ [GroupViewModel] 멤버 조회 실패: \(error)")
             }

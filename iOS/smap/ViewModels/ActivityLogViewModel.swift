@@ -116,6 +116,8 @@ class ActivityLogViewModel: ObservableObject {
 
     private let service = ActivityLogService.shared
     private var cancellables = Set<AnyCancellable>()
+    private var locationRequestID = UUID()
+    private var countsRequestID = UUID()
 
     // MARK: - Initialization
 
@@ -133,6 +135,11 @@ class ActivityLogViewModel: ObservableObject {
         print("[ActivityLogViewModel] 그룹 선택: \(groupId)")
         selectedGroupId = groupId
         selectedMemberId = nil
+        locationRequestID = UUID()
+        isMarkersLoading = false
+        mapMarkers = []
+        stayTimes = []
+        locationSummary = nil
 
         // 일별 카운트 데이터 로드
         await loadDailyLocationCounts()
@@ -198,14 +205,31 @@ class ActivityLogViewModel: ObservableObject {
         // 1. 그룹 목록 먼저 로드
         await fetchGroups()
 
-        // 2. 첫 번째 그룹 자동 선택
-        if let firstGroup = groups.first {
-            print("[ActivityLogViewModel] 첫 번째 그룹 자동 선택: \(firstGroup.sgt_title ?? "N/A")")
-            selectedGroup = firstGroup
-            selectedGroupId = firstGroup.sgt_idx
-
-            // 3. 해당 그룹의 일별 카운트 로드
+        if let group = groups.first(where: { $0.sgt_idx == selectedGroupId }) ?? groups.first {
+            if selectedGroupId != group.sgt_idx {
+                selectedMemberId = nil
+                locationRequestID = UUID()
+                isMarkersLoading = false
+                mapMarkers = []
+                stayTimes = []
+                locationSummary = nil
+            }
+            selectedGroup = group
+            selectedGroupId = group.sgt_idx
             await loadDailyLocationCounts()
+        } else {
+            selectedGroup = nil
+            selectedGroupId = nil
+            selectedMemberId = nil
+            locationRequestID = UUID()
+            countsRequestID = UUID()
+            isMarkersLoading = false
+            isDailyCountsLoading = false
+            dailyCountsResponse = nil
+            memberDailyCounts = []
+            mapMarkers = []
+            stayTimes = []
+            locationSummary = nil
         }
 
         isLoading = false
@@ -236,6 +260,11 @@ class ActivityLogViewModel: ObservableObject {
         selectedGroup = group
         selectedGroupId = group.sgt_idx
         selectedMemberId = nil
+        locationRequestID = UUID()
+        isMarkersLoading = false
+        mapMarkers = []
+        stayTimes = []
+        locationSummary = nil
 
         await loadDailyLocationCounts()
     }
@@ -246,6 +275,8 @@ class ActivityLogViewModel: ObservableObject {
     private func loadDailyLocationCounts() async {
         guard let groupId = selectedGroupId else { return }
 
+        let requestID = UUID()
+        countsRequestID = requestID
         isDailyCountsLoading = true
         errorMessage = nil
 
@@ -253,11 +284,20 @@ class ActivityLogViewModel: ObservableObject {
             print("[ActivityLogViewModel] 일별 카운트 로드 시작: groupId=\(groupId)")
             let response = try await service.getDailyLocationCounts(groupId: groupId, days: 14)
 
+            guard countsRequestID == requestID, selectedGroupId == groupId else { return }
             dailyCountsResponse = response
             memberDailyCounts = response.member_daily_counts
 
             print("[ActivityLogViewModel] 일별 카운트 로드 완료: \(memberDailyCounts.count)명")
 
+            if let selected = selectedMemberId, !memberDailyCounts.contains(where: { $0.member_id == selected }) {
+                selectedMemberId = nil
+                locationRequestID = UUID()
+                isMarkersLoading = false
+                mapMarkers = []
+                stayTimes = []
+                locationSummary = nil
+            }
             // 현재 사용자 먼저 선택, 없으면 첫 번째 멤버
             if selectedMemberId == nil {
                 let currentUserIdx = AuthService.shared.getUserData()?.mt_idx
@@ -269,58 +309,60 @@ class ActivityLogViewModel: ObservableObject {
             }
 
         } catch {
+            guard countsRequestID == requestID, selectedGroupId == groupId else { return }
             print("[ActivityLogViewModel] 일별 카운트 로드 실패: \(error)")
             errorMessage = "활동 데이터를 불러오는데 실패했습니다."
             showError = true
         }
 
-        isDailyCountsLoading = false
+        if countsRequestID == requestID { isDailyCountsLoading = false }
     }
 
     /// 선택된 멤버의 위치 데이터 로드
+    private func capture<T>(_ operation: () async throws -> T) async -> Result<T, Error> {
+        do { return .success(try await operation()) }
+        catch { return .failure(error) }
+    }
+
     private func loadMemberLocationData() async {
         guard let memberId = selectedMemberId else { return }
-
+        let date = selectedDate
+        let requestID = UUID()
+        locationRequestID = requestID
         isMarkersLoading = true
         isLoading = true
         errorMessage = nil
-
-        // 기존 데이터 초기화
         mapMarkers = []
         stayTimes = []
         locationSummary = nil
         sliderValue = 0
 
-        do {
-            print("[ActivityLogViewModel] 멤버 위치 데이터 로드 시작: memberId=\(memberId), date=\(selectedDate)")
+        async let markers = capture { try await self.service.getMapMarkers(memberId: memberId, date: date) }
+        async let stays = capture { try await self.service.getStayTimes(memberId: memberId, date: date) }
+        async let summary = capture { try await self.service.getLocationLogSummary(memberId: memberId, date: date) }
+        let (markerResult, stayResult, summaryResult) = await (markers, stays, summary)
+        guard locationRequestID == requestID, selectedMemberId == memberId, selectedDate == date else { return }
 
-            // 병렬로 API 호출
-            async let markersTask = service.getMapMarkers(memberId: memberId, date: selectedDate)
-            async let stayTimesTask = service.getStayTimes(memberId: memberId, date: selectedDate)
-            async let summaryTask = service.getLocationLogSummary(memberId: memberId, date: selectedDate)
-
-            let (markers, stays, summary) = try await (markersTask, stayTimesTask, summaryTask)
-
-            mapMarkers = markers
-            stayTimes = stays
-            locationSummary = summary
-
-            print("[ActivityLogViewModel] 멤버 위치 데이터 로드 완료: 마커=\(markers.count), 체류=\(stays.count)")
-
-            // 사이드바 자동 닫기 (데이터 로드 후)
-            if isSidebarOpen {
-                try? await Task.sleep(nanoseconds: 500_000_000)
-                self.closeSidebar()
-            }
-
-        } catch {
-            print("[ActivityLogViewModel] 멤버 위치 데이터 로드 실패: \(error)")
-            errorMessage = "위치 데이터를 불러오는데 실패했습니다."
+        var failed: [String] = []
+        switch markerResult {
+        case .success(let value): mapMarkers = value
+        case .failure: failed.append("이동 경로")
+        }
+        switch stayResult {
+        case .success(let value): stayTimes = value
+        case .failure: failed.append("체류 기록")
+        }
+        switch summaryResult {
+        case .success(let value): locationSummary = value
+        case .failure: failed.append("활동 요약")
+        }
+        if !failed.isEmpty {
+            errorMessage = "\(failed.joined(separator: ", "))을(를) 불러오지 못했습니다."
             showError = true
         }
-
         isMarkersLoading = false
         isLoading = false
+        if isSidebarOpen { closeSidebar() }
     }
 
     /// 특정 날짜에 해당 멤버의 활동이 있는지 확인

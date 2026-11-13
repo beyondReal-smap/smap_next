@@ -34,7 +34,8 @@ class ActivityLogService(private val api: SmapApi) {
 
     suspend fun getLocationLogs(memberId: Int, date: String): List<LocationLog> {
         val response = api.getLocationLogs(memberId, date)
-        val body = response.body()?.string() ?: return emptyList()
+        if (!response.isSuccessful) throw retrofit2.HttpException(response)
+        val body = response.body()?.string() ?: throw IllegalStateException("활동 로그 응답이 비어 있습니다.")
         val trimmed = body.trim()
         // Backend returns [] (empty array) when no data, but LocationLogListResponse expects {}
         if (trimmed == "[]") {

@@ -23,9 +23,9 @@ class KakaoLocationService {
             .build()
 
         client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) return@withContext emptyList()
+            if (!response.isSuccessful) throw java.io.IOException("장소 검색 요청 실패")
 
-            val body = response.body?.string() ?: return@withContext emptyList()
+            val body = response.body?.string() ?: throw java.io.IOException("장소 검색 응답이 비어 있습니다")
             val json = JSONObject(body)
             val documents = json.getJSONArray("documents")
 

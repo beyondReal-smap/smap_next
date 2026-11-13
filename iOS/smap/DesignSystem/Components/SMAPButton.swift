@@ -26,7 +26,8 @@ struct SMAPButton: View {
                 Text(title).font(SMAPTheme.Font.bodyBold)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
+            // 높이를 고정값으로 맞춘다(Android SmapButton 52dp 와 동일). 글자 크기에 따라 버튼 높이가 달라지던 것을 방지.
+            .frame(minHeight: 52)
             .background(backgroundColor)
             .foregroundStyle(foregroundColor)
             .clipShape(RoundedRectangle(cornerRadius: SMAPTheme.Radius.md))
@@ -38,7 +39,9 @@ struct SMAPButton: View {
             }
         }
         .disabled(isDisabled || isLoading)
-        .opacity((isDisabled || isLoading) ? 0.6 : 1.0)
+        // 로딩 중에는 흐리게 하지 않는다. "눌렸다"는 것이 보여야 하고, 비활성과 구분되어야 한다.
+        .opacity(isDisabled ? 0.5 : 1.0)
+        .accessibilityLabel(isLoading ? "\(title), 처리 중" : title)
     }
 
     private var backgroundColor: Color {

@@ -59,9 +59,9 @@ class DeepLinkService {
     private func handleSmapScheme(_ url: URL) -> Bool {
         print("📱 [DEEP_LINK] smap 스킴 감지됨: \(url)")
 
-        let pathComponents = url.pathComponents // ["/", "group", "{id}", "join"]
-        if pathComponents.count >= 3 && pathComponents[1] == "group" {
-            let groupId = pathComponents[2]
+        let pathComponents = url.pathComponents
+        if url.host == "group", pathComponents.count == 3, pathComponents[2] == "join", Int(pathComponents[1]) != nil {
+            let groupId = pathComponents[1]
             print("👥 [DEEP_LINK] 그룹 가입 요청 감지 - 그룹 ID: \(groupId)")
 
             // 그룹 정보 저장 및 알림 발송

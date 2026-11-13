@@ -52,14 +52,11 @@ final class GroupServiceTests: XCTestCase {
 
     // MARK: - getGroupStats
 
-    func testGetGroupStats_decodesWrappedResponse() async throws {
+    func testGetGroupStats_decodesFlatResponse() async throws {
         MockURLProtocol.requestHandler = { request in
             XCTAssertTrue(request.url!.path.contains("/groups/5/stats"))
             let json = """
             {
-                "success": true,
-                "message": null,
-                "data": {
                     "group_id": 5,
                     "group_title": "Test",
                     "member_count": 3,
@@ -67,7 +64,6 @@ final class GroupServiceTests: XCTestCase {
                     "total_locations": 2,
                     "stats_period": {"start_date": "2026-03-01", "end_date": "2026-03-22", "days": 21},
                     "member_stats": []
-                }
             }
             """.data(using: .utf8)!
             return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, json)
@@ -80,9 +76,9 @@ final class GroupServiceTests: XCTestCase {
     func testGetGroupStats_throwsOnFailure() async {
         MockURLProtocol.requestHandler = { request in
             let json = """
-            {"success": false, "message": "Not found", "data": null}
+            {"detail": "Not found"}
             """.data(using: .utf8)!
-            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, json)
+            return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, json)
         }
         do {
             _ = try await service.getGroupStats(sgtIdx: 999)
@@ -92,6 +88,18 @@ final class GroupServiceTests: XCTestCase {
         }
     }
 
+    func testGetGroupStats_decodesEmptyMembersWithoutPeriod() async throws {
+        MockURLProtocol.requestHandler = { request in
+            let json = """
+            {"group_id": 5, "group_title": null, "member_count": 0, "weekly_schedules": 0, "total_locations": 0, "member_stats": []}
+            """.data(using: .utf8)!
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, json)
+        }
+        let stats = try await service.getGroupStats(sgtIdx: 5)
+        XCTAssertNil(stats.stats_period)
+        XCTAssertTrue(stats.member_stats.isEmpty)
+    }
+
     // MARK: - createGroup
 
     func testCreateGroup_sendsPostAndDecodes() async throws {
@@ -99,9 +107,9 @@ final class GroupServiceTests: XCTestCase {
             XCTAssertEqual(request.httpMethod, "POST")
             XCTAssertTrue(request.url!.path.contains("/groups"))
             let json = """
-            {"success": true, "message": null, "data": {"sgt_idx": 10, "sgt_title": "New Group"}}
+            {"sgt_idx": 10, "sgt_title": "New Group"}
             """.data(using: .utf8)!
-            return (HTTPURLResponse(url: request.url!, statusCode: 201, httpVersion: nil, headerFields: nil)!, json)
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, json)
         }
         let group = try await service.createGroup(title: "New Group", memo: "memo")
         XCTAssertEqual(group.sgt_idx, 10)
@@ -115,7 +123,7 @@ final class GroupServiceTests: XCTestCase {
             XCTAssertEqual(request.httpMethod, "PUT")
             XCTAssertTrue(request.url!.path.contains("/groups/7"))
             let json = """
-            {"success": true, "message": null, "data": {"sgt_idx": 7, "sgt_title": "Updated"}}
+            {"sgt_idx": 7, "sgt_title": "Updated"}
             """.data(using: .utf8)!
             return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, json)
         }

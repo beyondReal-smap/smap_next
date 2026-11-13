@@ -173,8 +173,8 @@ fun ForgotPasswordScreen(
 @Composable
 private fun TitleSection(currentStep: ForgotPasswordViewModel.Step) {
     val (title, description) = when (currentStep) {
-        ForgotPasswordViewModel.Step.PHONE -> "비밀번호 찾기" to "가입하실 때 사용한 전화번호를 입력해주세요."
-        ForgotPasswordViewModel.Step.VERIFICATION -> "인증번호 입력" to "전화번호로 발송된 6자리 인증번호를 입력해주세요."
+        ForgotPasswordViewModel.Step.PHONE -> "비밀번호 찾기" to "가입하실 때 사용한 이메일을 입력해주세요."
+        ForgotPasswordViewModel.Step.VERIFICATION -> "인증번호 입력" to "이메일로 발송된 6자리 인증번호를 입력해주세요."
         ForgotPasswordViewModel.Step.NEW_PASSWORD -> "새 비밀번호 설정" to "새로운 비밀번호를 설정해주세요."
         ForgotPasswordViewModel.Step.COMPLETE -> "설정 완료" to "비밀번호가 성공적으로 변경되었습니다."
     }
@@ -208,7 +208,7 @@ private fun PhoneStepContent(
     Column(verticalArrangement = Arrangement.spacedBy(40.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(
-                text = "전화번호",
+                text = "이메일",
                 fontSize = 14.sp,
                 fontFamily = SuiteFont,
                 fontWeight = FontWeight.SemiBold,
@@ -218,14 +218,13 @@ private fun PhoneStepContent(
             OutlinedTextField(
                 value = phoneNumber,
                 onValueChange = onPhoneChange,
-                placeholder = { Text("010-0000-0000", fontFamily = SuiteFont) },
-                visualTransformation = PhoneVisualTransformation(),
+                placeholder = { Text("이메일 주소", fontFamily = SuiteFont) },
                 keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Phone,
+                    keyboardType = KeyboardType.Email,
                     imeAction = ImeAction.Done
                 ),
                 keyboardActions = KeyboardActions(
-                    onDone = { if (phoneNumber.replace("-", "").length >= 10 && !isLoading) onSendCode() }
+                    onDone = { if (phoneNumber.contains("@") && !isLoading) onSendCode() }
                 ),
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -241,7 +240,7 @@ private fun PhoneStepContent(
         
         Button(
             onClick = onSendCode,
-            enabled = phoneNumber.replace("-", "").length >= 10 && !isLoading,
+            enabled = phoneNumber.contains("@") && !isLoading,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
@@ -384,7 +383,7 @@ private fun NewPasswordStepContent(
             OutlinedTextField(
                 value = newPassword,
                 onValueChange = onNewPasswordChange,
-                placeholder = { Text("8자 이상, 영문/숫자/특수문자 포함", fontFamily = SuiteFont) },
+                placeholder = { Text("8자 이상, 영문 대소문자/숫자/특수문자 포함", fontFamily = SuiteFont) },
                 visualTransformation = if (showNewPassword) VisualTransformation.None else PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Password,
@@ -416,7 +415,7 @@ private fun NewPasswordStepContent(
             // Password Rules
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 PasswordRuleRow(text = "8자 이상", isValid = isPasswordLengthValid)
-                PasswordRuleRow(text = "영문 포함", isValid = hasPasswordLetter)
+                PasswordRuleRow(text = "영문 대소문자 포함", isValid = hasPasswordLetter)
                 PasswordRuleRow(text = "숫자 포함", isValid = hasPasswordNumber)
                 PasswordRuleRow(text = "특수문자 포함", isValid = hasPasswordSpecialChar)
             }

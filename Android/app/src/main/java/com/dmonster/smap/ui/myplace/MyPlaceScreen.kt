@@ -1,5 +1,7 @@
 package com.dmonster.smap.ui.myplace
 
+import androidx.activity.compose.BackHandler
+
 import com.dmonster.smap.AppConstants
 import com.dmonster.smap.BuildConfig
 import android.util.Log
@@ -49,7 +51,8 @@ import com.dmonster.smap.ui.home.MapLoadingOverlay
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalNaverMapApi::class)
 @Composable
 fun MyPlaceScreen(
-    viewModel: MyPlaceViewModel = hiltViewModel()
+    viewModel: MyPlaceViewModel = hiltViewModel(),
+    isVisible: Boolean = true
 ) {
     val context = LocalContext.current
     val haptics = rememberSmapHaptics()
@@ -69,6 +72,7 @@ fun MyPlaceScreen(
     
     // Dialog States
     val showMemberSidebar by viewModel.showMemberSidebar.collectAsState()
+    BackHandler(enabled = isVisible && showMemberSidebar) { viewModel.hideMemberSidebar() }
     val showAddDialog by viewModel.showAddDialog.collectAsState()
     val showEditDialog by viewModel.showEditDialog.collectAsState()
     val showDeleteDialog by viewModel.showDeleteDialog.collectAsState()
@@ -119,6 +123,7 @@ fun MyPlaceScreen(
     
     // Move camera to selected location with zoom
     LaunchedEffect(selectedLocation) {
+        if (!isVisible) return@LaunchedEffect
         selectedLocation?.let { location ->
             if (location.hasValidCoordinates) {
                 cameraPositionState.animate(
@@ -133,6 +138,7 @@ fun MyPlaceScreen(
 
     // Default to Seoul City Hall if no locations
     LaunchedEffect(isMapLoading) {
+        if (!isVisible) return@LaunchedEffect
         if (!isMapLoading && selectedLocation == null && locations.isEmpty()) {
             cameraPositionState.animate(
                 update = CameraUpdate.scrollTo(
@@ -142,6 +148,12 @@ fun MyPlaceScreen(
         }
     }
     
+    var mapLocations by remember { mutableStateOf(locations) }
+    var mapSelectedLocation by remember { mutableStateOf(selectedLocation) }
+    LaunchedEffect(isVisible, locations, selectedLocation) {
+        if (isVisible) { mapLocations = locations; mapSelectedLocation = selectedLocation }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -172,7 +184,9 @@ fun MyPlaceScreen(
                     val adapter = remember { LocationInfoWindowAdapter(context) }
                     val nativeOverlays = remember { mutableListOf<com.naver.maps.map.overlay.Overlay>() }
                     
-                    MapEffect(locations, selectedLocation) { naverMap ->
+                    MapEffect(mapLocations, mapSelectedLocation) { naverMap ->
+                        val locations = mapLocations
+                        val selectedLocation = mapSelectedLocation
                         try {
                             // 1. Clear existing markers/infowindows
                             nativeOverlays.forEach { it.map = null }
@@ -317,6 +331,7 @@ fun MyPlaceScreen(
         }
     }
     
+    if (isVisible) {
     // Location Detail Sheet (iOS Style)
     if (showAddDialog && (pendingLocation != null || pendingPlaceInfo != null)) {
         LocationDetailSheet(
@@ -390,6 +405,7 @@ fun MyPlaceScreen(
             },
             isLoading = isLoading
         )
+    }
     }
 }
 

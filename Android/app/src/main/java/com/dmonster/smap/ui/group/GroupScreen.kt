@@ -2,6 +2,7 @@ package com.dmonster.smap.ui.group
 
 import com.dmonster.smap.BuildConfig
 import android.content.Intent
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -50,6 +51,7 @@ fun GroupScreen(
     
     // Collect States
     val currentView by viewModel.currentView.collectAsState()
+    BackHandler(enabled = currentView != GroupViewModel.ViewState.LIST) { viewModel.backToList() }
     val isLoading by viewModel.isLoading.collectAsState()
     val isMembersLoading by viewModel.isMembersLoading.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
@@ -353,6 +355,7 @@ fun GroupScreen(
                 onDismiss = { viewModel.hideQRCodeDialog() },
                 onShare = { bitmap ->
                     scope.launch {
+                        try {
                         // Perform file I/O off the main thread
                         val uri = withContext(Dispatchers.IO) {
                             val cachePath = java.io.File(context.cacheDir, "images")
@@ -374,10 +377,10 @@ fun GroupScreen(
                             putExtra(Intent.EXTRA_STREAM, uri)
                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                         }
-                        try {
                             context.startActivity(Intent.createChooser(shareIntent, "QR 코드 공유"))
                         } catch (e: Exception) {
                             if (BuildConfig.DEBUG) android.util.Log.e("GroupScreen", "Failed to start activity", e)
+                            viewModel.showError("QR 코드를 공유하지 못했습니다.")
                         }
                     }
                 }

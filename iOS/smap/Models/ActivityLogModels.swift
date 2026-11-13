@@ -158,7 +158,7 @@ struct DailyCount: Codable, Identifiable {
 /// 멤버별 일별 카운트
 struct MemberDailyCount: Codable, Identifiable {
     let member_id: Int
-    let member_name: String
+    let member_name: String?
     let mt_nickname: String? // Added for nickname support
     let member_photo: String?
     let member_gender: Int?
@@ -170,7 +170,7 @@ struct MemberDailyCount: Codable, Identifiable {
         if let nick = mt_nickname, !nick.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return nick
         }
-        return member_name
+        return member_name ?? ""
     }
 
     /// 14일간 활동 여부 배열 (오래된 날짜 -> 최근 날짜 순)
