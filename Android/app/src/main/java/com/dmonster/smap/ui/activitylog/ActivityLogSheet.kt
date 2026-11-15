@@ -1,6 +1,7 @@
 package com.dmonster.smap.ui.activitylog
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -211,6 +212,9 @@ fun RouteScrubber(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(32.dp)
+                // 맨 처음 위치의 손잡이가 화면 왼쪽 가장자리(제스처 내비게이션의 "뒤로" 영역)에 걸려,
+                // 손잡이를 잡고 끌면 막대 대신 뒤로 가기가 실행됐다. 막대 영역만 시스템 제스처에서 뺀다.
+                .systemGestureExclusion()
                 .semantics { contentDescription = "경로 따라가기, 현재 ${currentTime ?: "알 수 없음"}" },
         )
         Row {
