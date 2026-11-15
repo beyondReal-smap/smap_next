@@ -124,7 +124,11 @@ fun LocationDetailSheet(
     val hasUnsavedChanges: () -> Boolean = {
         when {
             !(isEditMode || isNew) -> false
-            isNew -> name.isNotBlank() || address.isNotBlank() || memo.isNotBlank()
+            // 지도에서 고른 위치·검색 결과로 미리 채운 이름·주소는 사용자가 입력한 것이 아니므로 변경으로 보지 않는다.
+            // (이전에는 아무것도 입력하지 않고 닫아도 미리 채운 주소 때문에 "저장하지 않은 변경사항" 확인창이 떴다.)
+            isNew -> name != (pendingInfo?.first ?: "") ||
+                address != (pendingInfo?.second ?: "") ||
+                memo != (pendingInfo?.third ?: "")
             else -> {
                 val orig = location
                 orig != null && (
@@ -522,47 +526,29 @@ fun LocationDetailSheet(
     }
 
     if (showUnsavedChangesDialog) {
+        // 장소 삭제·그룹·일정 확인창과 같은 모양 — 경고 아이콘 없이 문장 + [계속 편집][버리기] 같은 크기 버튼.
         AlertDialog(
             onDismissRequest = { showUnsavedChangesDialog = false },
-            icon = {
-                Icon(
-                    imageVector = Icons.Default.Warning,
-                    contentDescription = null,
-                    tint = AccentColors.Orange,
-                    modifier = Modifier.size(36.dp)
-                )
-            },
-            title = {
-                Text(
-                    text = "저장하지 않은 변경사항이 있어요",
-                    fontFamily = SuiteFont,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                )
-            },
+            title = { Text("입력한 내용을 버릴까요?", style = com.dmonster.smap.ui.theme.SmapText.headline) },
             text = {
                 Text(
-                    text = "지금 닫으면 입력한 내용이 사라집니다.\n그래도 닫으시겠습니까?",
-                    fontFamily = SuiteFont,
-                    textAlign = TextAlign.Center
+                    "닫으면 저장하지 않은 내용이 사라져요.",
+                    style = com.dmonster.smap.ui.theme.SmapText.secondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             },
             confirmButton = {
-                Button(
-                    onClick = {
+                SmapDialogActions(
+                    confirmText = "버리기",
+                    dismissText = "계속 편집",
+                    onConfirm = {
                         showUnsavedChangesDialog = false
                         haptics.warning()
                         closeWithAnimation(onDismiss)
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = BrandColors.Error)
-                ) {
-                    Text("버리기", fontFamily = SuiteFont, color = Color.White)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showUnsavedChangesDialog = false }) {
-                    Text("계속 편집", fontFamily = SuiteFont)
-                }
+                    onDismiss = { showUnsavedChangesDialog = false },
+                    destructive = true
+                )
             }
         )
     }

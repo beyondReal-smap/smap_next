@@ -417,7 +417,7 @@ fun ActivityLogScreen(
         // 조회 실패 — "활동 데이터 없음"과 구분해 다시 시도 가능하게 한다(지도는 유지).
         if (loadFailed && !isLoading && !isLoadingLogs && !isMapLoading) {
             Box(
-                modifier = Modifier.fillMaxSize().padding(top = statusBarTop + 64.dp, bottom = ActivityLogSheetPeekHeight).zIndex(5f),
+                modifier = Modifier.fillMaxSize().padding(top = statusBarTop + 64.dp, bottom = sheetPeek).zIndex(5f),
                 contentAlignment = Alignment.Center
             ) {
                 SmapErrorState(

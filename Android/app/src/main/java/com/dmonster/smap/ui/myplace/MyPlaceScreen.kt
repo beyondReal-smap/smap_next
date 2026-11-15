@@ -4,6 +4,7 @@ import com.dmonster.smap.ui.components.GroupPickerSheet
 import com.dmonster.smap.ui.components.MapCircleButton
 import com.dmonster.smap.ui.components.MapTopControls
 import com.dmonster.smap.ui.components.SmapMapSheetScaffold
+import com.dmonster.smap.ui.theme.SmapSpacing
 import kotlinx.coroutines.launch
 
 import com.dmonster.smap.AppConstants
@@ -168,6 +169,12 @@ fun MyPlaceScreen(
     var showGroupPicker by remember { mutableStateOf(false) }
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
+    // 지도를 한 번 눌러 고른 임시 위치(장소 추가 확인 카드용). 화면 안에서만 쓰는 UI 상태라 ViewModel 에 두지 않는다.
+    var tapPin by remember { mutableStateOf<LatLng?>(null) }
+    val tapPinColor = MaterialTheme.colorScheme.primary
+    // 다른 멤버·그룹으로 바꾸거나 추가 권한이 없어지면 이전 대상에 대한 임시 핀은 의미가 없다.
+    LaunchedEffect(selectedMember?.mtIdx, selectedGroup?.sgtIdx, canAddLocation) { tapPin = null }
+
     Box(modifier = Modifier.fillMaxSize()) {
         SmapMapSheetScaffold(
             peekHeight = MyPlaceSheetPeekHeight,
@@ -185,6 +192,7 @@ fun MyPlaceScreen(
                     canManageLocation = { viewModel.canManageLocation(it) },
                     onSelectMember = { viewModel.selectMember(it) },
                     onSelectLocation = {
+                        tapPin = null
                         viewModel.selectLocation(it)
                         scope.launch { sheetScaffoldState.bottomSheetState.partialExpand() }
                     },
@@ -223,13 +231,32 @@ fun MyPlaceScreen(
             onMapLongClick = { _, coord ->
                 if (canAddLocation) {
                     haptics.warning()
+                    tapPin = null
                     viewModel.showAddDialog(coord.latitude, coord.longitude)
                 }
             },
-            onMapClick = { _, _ ->
-                viewModel.clearSelection()
+            // 한 번 누르기: 선택된 장소가 있으면 선택 해제가 먼저(기존 동작 유지), 없으면 임시 핀 + 추가 확인 카드.
+            onMapClick = { _, coord ->
+                when {
+                    selectedLocation != null -> viewModel.clearSelection()
+                    canAddLocation -> {
+                        haptics.light()
+                        tapPin = coord
+                    }
+                }
             }
         ) {
+            tapPin?.let { pin ->
+                // 파일 위쪽에서 지도 SDK 의 Marker 클래스를 직접 import 하고 있어 Compose Marker 는 전체 이름으로 부른다.
+                com.naver.maps.map.compose.Marker(
+                    state = MarkerState(position = pin),
+                    icon = MarkerIcons.BLACK,
+                    iconTintColor = tapPinColor,
+                    captionText = "새 장소",
+                    zIndex = 300
+                )
+            }
+
             // Native Marker & InfoWindow Management via MapEffect
             val adapter = remember { LocationInfoWindowAdapter(context) }
             val nativeOverlays = remember { mutableListOf<com.naver.maps.map.overlay.Overlay>() }
@@ -304,6 +331,20 @@ fun MyPlaceScreen(
                 ) {
                     CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
+            }
+
+            tapPin?.let { pin ->
+                MapTapAddCard(
+                    targetMemberName = otherMemberName,
+                    onAdd = {
+                        tapPin = null
+                        viewModel.showAddDialog(pin.latitude, pin.longitude)
+                    },
+                    onDismiss = { tapPin = null },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(start = SmapSpacing.md, end = SmapSpacing.md, bottom = MyPlaceSheetPeekHeight + 12.dp)
+                )
             }
         }
 
