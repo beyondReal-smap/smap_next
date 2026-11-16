@@ -2,6 +2,7 @@ package com.dmonster.smap.di
 
 import com.dmonster.smap.BuildConfig
 import com.dmonster.smap.data.api.AuthInterceptor
+import com.dmonster.smap.demo.DemoMode
 import com.dmonster.smap.data.api.SmapApi
 import com.dmonster.smap.data.api.TokenAuthenticator
 import dagger.Module
@@ -37,6 +38,8 @@ object NetworkModule {
         tokenAuthenticator: TokenAuthenticator
     ): OkHttpClient {
         return OkHttpClient.Builder()
+            // 스토어 스크린샷용 데모 모드(디버그 빌드만 동작, 운영 빌드는 그대로 통과)
+            .addInterceptor(DemoMode.interceptor)
             .addInterceptor(authInterceptor)
             .authenticator(tokenAuthenticator)
             .addInterceptor(HttpLoggingInterceptor().apply {

@@ -12,6 +12,13 @@ import KakaoSDKAuth
 struct SmapApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
+    init() {
+        #if DEBUG
+        // 스토어 스크린샷용 데모 모드(디버그 빌드 + 실행 인자 -SMAPDemo YES 일 때만)
+        DemoURLProtocol.registerIfRequested()
+        #endif
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()

@@ -32,6 +32,7 @@ import com.dmonster.smap.ui.components.BackgroundLocationGuideDialog
 import com.dmonster.smap.ui.components.LocationDeniedOverlay
 import com.dmonster.smap.ui.login.LoginActivity
 import com.dmonster.smap.ui.navigation.MainTabScreen
+import com.dmonster.smap.demo.DemoMode
 import com.dmonster.smap.ui.theme.SmapTheme
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -64,6 +65,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // 스토어 스크린샷용 데모 모드(디버그 빌드 + --ez smap_demo true 로 시작할 때만)
+        DemoMode.applyLaunchIntent(this, intent)
         handleDeepLink(intent)
         val isLoggedIn = authService.isLoggedIn
 

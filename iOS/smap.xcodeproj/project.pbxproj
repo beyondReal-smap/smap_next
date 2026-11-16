@@ -73,6 +73,7 @@
 		7EBFF774653EB213F90F50DB /* ChatModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD743805E8F54B13356935EE /* ChatModels.swift */; };
 		7FCE3529A757B3B1673CD8B2 /* NaverMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02A0539DC922A7FE78E3CE87 /* NaverMapView.swift */; };
 		812C6D4A8BFC26DF9D7C3DB1 /* KeychainManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB01FED42F3C817D4F548182 /* KeychainManagerTests.swift */; };
+		81FCA7065A82D8D599DBEC82 /* DemoFixtures.generated.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A704AD52FB3917C722DD042 /* DemoFixtures.generated.swift */; };
 		876BE2B856B8351FEEEC7C59 /* ActivityLogService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01AB323A5328F03F04508F13 /* ActivityLogService.swift */; };
 		8D9A42E2E12CABA6E45C4CEC /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0BA036646484BBA5BCAD000 /* LoginView.swift */; };
 		8F6FBE0745963AFADB7FCD59 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8F6BDA102080F14BC5A1377 /* Theme.swift */; };
@@ -101,6 +102,7 @@
 		B11CAFE4D8A24F6E9C3D7A01 /* AuthServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C22DBEF5E9B35A7FA4E68B02 /* AuthServiceTests.swift */; };
 		B18E36A979FF29AC3CF39802 /* ActivityLogViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B72F05B895819BAFC4076504 /* ActivityLogViewModel.swift */; };
 		B20C990C52F079F35037935F /* UserDefaultsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84E5F9E1CE2882E5F246A7EC /* UserDefaultsManager.swift */; };
+		B349BDCAECE343B4E6A36B94 /* DemoURLProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = F13E2AE30AAAAD5153629898 /* DemoURLProtocol.swift */; };
 		B4DC719F3B3F3F3377E9FB81 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DC1B67D2BBBF002A1F25E204 /* Foundation.framework */; };
 		B85D4559B18C1D8AFD42FDC7 /* SMAPTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24ADB4DD2C3D90F283A452AB /* SMAPTextField.swift */; };
 		BA097A12C2B77A5FE2D232AD /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD736AA6B14C18777AC6D3A6 /* NotificationService.swift */; };
@@ -179,6 +181,7 @@
 		4EC6364864F595F85F7C7559 /* MyPlaceModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MyPlaceModels.swift; sourceTree = "<group>"; };
 		5276E8F7F9EB554FB0284094 /* AppConfiguration.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppConfiguration.swift; sourceTree = "<group>"; };
 		5587D43A89157332BFA10424 /* RoundedCorner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RoundedCorner.swift; sourceTree = "<group>"; };
+		5A704AD52FB3917C722DD042 /* DemoFixtures.generated.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DemoFixtures.generated.swift; sourceTree = "<group>"; };
 		5DA26B7F0F63EE8D0E580F20 /* NoticeListView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NoticeListView.swift; sourceTree = "<group>"; };
 		6265B67FBE6A3A536620DAAD /* UserGuideView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UserGuideView.swift; sourceTree = "<group>"; };
 		62E3750BD06FB7857AEC15A6 /* smapTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = smapTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -263,6 +266,7 @@
 		EA7E3CC88DCEADC59E0D5E35 /* Pods-smap.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-smap.release.xcconfig"; path = "Target Support Files/Pods-smap/Pods-smap.release.xcconfig"; sourceTree = "<group>"; };
 		EB5E8B6769F63DAECC4C6BFB /* LocationDetailPanel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocationDetailPanel.swift; sourceTree = "<group>"; };
 		EDA557E6118B97E3C3EF9039 /* ActivityLogModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ActivityLogModels.swift; sourceTree = "<group>"; };
+		F13E2AE30AAAAD5153629898 /* DemoURLProtocol.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DemoURLProtocol.swift; sourceTree = "<group>"; };
 		F2C91D16CC5BFA7761FCBE8A /* HomeModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeModels.swift; sourceTree = "<group>"; };
 		F49C868EA905A5BA43A716DF /* SMAPButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SMAPButton.swift; sourceTree = "<group>"; };
 		F4D21A23274BFE83F2D6DB03 /* FloatingBackgroundView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FloatingBackgroundView.swift; sourceTree = "<group>"; };
@@ -385,6 +389,16 @@
 			path = ActivityLog;
 			sourceTree = "<group>";
 		};
+		426FEC8714B54D349BAA4E3A /* Demo */ = {
+			isa = PBXGroup;
+			children = (
+				F13E2AE30AAAAD5153629898 /* DemoURLProtocol.swift */,
+				5A704AD52FB3917C722DD042 /* DemoFixtures.generated.swift */,
+			);
+			name = Demo;
+			path = Demo;
+			sourceTree = "<group>";
+		};
 		49D09EA62EFAC388C385739E /* smapTests */ = {
 			isa = PBXGroup;
 			children = (
@@ -443,6 +457,7 @@
 				015524C0E4DDFD774AF076D7 /* NetworkError.swift */,
 				DD697FC1738D83F5A06E98BE /* APIEndpoint.swift */,
 				D22CA221744223B0C67BEC1F /* APIClient.swift */,
+				426FEC8714B54D349BAA4E3A /* Demo */,
 			);
 			name = Network;
 			path = Network;
@@ -1113,6 +1128,8 @@
 				5D576E1F2BD8EAF23C033E72 /* HomeSheet.swift in Sources */,
 				78620FD45A85E3448CE05571 /* MyPlaceSheet.swift in Sources */,
 				AD10C3E0AB0F9D2906CE2662 /* ActivityLogSheet.swift in Sources */,
+				B349BDCAECE343B4E6A36B94 /* DemoURLProtocol.swift in Sources */,
+				81FCA7065A82D8D599DBEC82 /* DemoFixtures.generated.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
