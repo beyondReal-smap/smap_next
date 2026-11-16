@@ -93,7 +93,7 @@ fun SmapButton(
             val gradient = style == SmapButtonStyle.Primary && enabled
             Button(
                 onClick = onClick,
-                modifier = if (gradient) buttonModifier.clip(shape).background(SmapBrush.navy) else buttonModifier,
+                modifier = if (gradient) buttonModifier.clip(shape).background(SmapBrush.accent) else buttonModifier,
                 enabled = clickable,
                 shape = shape,
                 colors = ButtonDefaults.buttonColors(

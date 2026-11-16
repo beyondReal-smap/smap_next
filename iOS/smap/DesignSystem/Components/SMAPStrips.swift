@@ -5,6 +5,7 @@ import SwiftUI
 /// 멤버 얼굴 원. 사진이 없으면 이름 첫 글자를 연한 남색 원 위에 보인다(회색 사람 아이콘 대신 누구인지 구분되게).
 /// [selected] 면 남색 그라데이션 테두리와 흰 간격으로 선택을 표시한다.
 struct SMAPAvatar: View {
+    @Environment(\.smapAccent) private var accent
     let name: String
     let imagePath: String?
     var size: CGFloat = 44
@@ -14,10 +15,10 @@ struct SMAPAvatar: View {
         let ring: CGFloat = selected ? 2.5 : 0
         let inner = selected ? size - (ring + 2) * 2 : size
         ZStack {
-            Circle().fill(SMAPTheme.Surface.primaryContainer)
+            Circle().fill(accent.container)
             Text(String(name.trimmingCharacters(in: .whitespaces).prefix(1)).isEmpty ? "?" : String(name.trimmingCharacters(in: .whitespaces).prefix(1)))
                 .font(.suite(size: inner * 0.38 - 2, weight: .bold))
-                .foregroundStyle(SMAPTheme.Navy.base)
+                .foregroundStyle(accent.base)
             if let url = AuthService.getProfileImageURL(imagePath) {
                 AsyncImage(url: url, transaction: Transaction(animation: .easeOut(duration: 0.2))) { phase in
                     if case .success(let image) = phase {
@@ -31,7 +32,7 @@ struct SMAPAvatar: View {
         .frame(width: size, height: size)
         .overlay {
             if selected {
-                Circle().strokeBorder(SMAPTheme.Navy.gradient, lineWidth: ring)
+                Circle().strokeBorder(accent.gradient, lineWidth: ring)
             }
         }
         .accessibilityHidden(true)
@@ -49,6 +50,7 @@ struct MemberStripItem: Identifiable, Equatable {
 /// 시트 맨 위 가로 멤버 얼굴 줄 — 접힌 시트에서도 보여 한 번에 멤버를 고른다.
 /// [onAllTap] 이 있으면 맨 앞에 "전체" 항목(모든 멤버가 보이게 지도 맞춤)을 둔다.
 struct MemberStrip: View {
+    @Environment(\.smapAccent) private var accent
     let members: [MemberStripItem]
     let selectedId: Int?
     let onSelect: (MemberStripItem) -> Void
@@ -62,8 +64,8 @@ struct MemberStrip: View {
                     stripItem(label: "전체", selected: selected, accessibility: "전체 멤버 보기", action: onAllTap) {
                         ZStack {
                             if selected {
-                                Circle().fill(SMAPTheme.Navy.gradient).padding(4.5)
-                                Circle().strokeBorder(SMAPTheme.Navy.gradient, lineWidth: 2.5)
+                                Circle().fill(accent.gradient).padding(4.5)
+                                Circle().strokeBorder(accent.gradient, lineWidth: 2.5)
                             } else {
                                 Circle().fill(SMAPTheme.Surface.variant)
                             }
@@ -99,7 +101,7 @@ struct MemberStrip: View {
                 avatar()
                 Text(label)
                     .font(selected ? SMAPTheme.Font.captionBold : SMAPTheme.Font.caption)
-                    .foregroundStyle(selected ? SMAPTheme.Navy.base : SMAPTheme.Surface.onSurfaceMuted)
+                    .foregroundStyle(selected ? accent.base : SMAPTheme.Surface.onSurfaceMuted)
                     .lineLimit(1)
             }
             .frame(width: 60)
@@ -122,6 +124,7 @@ struct DateChipItem: Identifiable, Equatable {
 /// 가로 날짜 줄 — 홈(일정 날짜)·활동 로그(14일) 공용. 선택한 날은 남색으로 채운다.
 /// 처음 그릴 때 선택한 날이 보이도록 스크롤한다.
 struct DateStrip: View {
+    @Environment(\.smapAccent) private var accent
     let items: [DateChipItem]
     let selected: Date
     let onSelect: (DateChipItem) -> Void
@@ -181,7 +184,7 @@ struct DateStrip: View {
                         .frame(height: 24)
                 }
                 Circle()
-                    .fill(!item.dot ? Color.clear : (isSelected ? Color.white : SMAPTheme.Navy.base))
+                    .fill(!item.dot ? Color.clear : (isSelected ? Color.white : accent.base))
                     .frame(width: 5, height: 5)
                     .padding(.top, 2)
             }
@@ -190,7 +193,7 @@ struct DateStrip: View {
             .frame(width: 48)
             .background {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(isSelected ? AnyShapeStyle(SMAPTheme.Navy.gradient) : AnyShapeStyle(SMAPTheme.Surface.variant))
+                    .fill(isSelected ? AnyShapeStyle(accent.gradient) : AnyShapeStyle(SMAPTheme.Surface.variant))
             }
         }
         .buttonStyle(.plain)

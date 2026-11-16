@@ -21,6 +21,7 @@ enum SMAPSheetMetrics {
 /// 손잡이·머리 띠를 끌어올리거나 누르면 화면의 [maxHeightFraction] 까지 펼쳐진다(지도 절반은 늘 보이게).
 /// 내용이 더 길면 [content] 안의 ScrollView 가 스크롤한다.
 struct SMAPMapSheet<Header: View, Content: View>: View {
+    @Environment(\.smapAccent) private var accent
     let peekHeight: CGFloat
     @Binding var isExpanded: Bool
     var maxHeightFraction: CGFloat = 0.55
@@ -44,7 +45,7 @@ struct SMAPMapSheet<Header: View, Content: View>: View {
                         .frame(maxWidth: .infinity, minHeight: SMAPSheetMetrics.headerMinHeight, alignment: .leading)
                         .padding(.bottom, SMAPSheetMetrics.headerBandBottom)
                 }
-                .background(SMAPTheme.Navy.band)
+                .background(accent.band)
                 .contentShape(Rectangle())
                 .gesture(dragGesture(maxHeight: maxHeight))
                 .onTapGesture { toggle() }
@@ -124,6 +125,7 @@ struct MapCircleButton: View {
 
 /// 지도 왼쪽 위 그룹 전환 알약. 이전에는 사이드바를 열고 드롭다운을 눌러야 그룹을 바꿀 수 있었다.
 struct GroupSwitcherPill: View {
+    @Environment(\.smapAccent) private var accent
     let groupName: String?
     let action: () -> Void
 
@@ -132,7 +134,7 @@ struct GroupSwitcherPill: View {
             HStack(spacing: 8) {
                 Image(systemName: "person.2.fill")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(SMAPTheme.Navy.base)
+                    .foregroundStyle(accent.base)
                 Text(groupName ?? "그룹 선택")
                     .font(SMAPTheme.Font.captionBold)
                     .foregroundStyle(SMAPTheme.Surface.onSurface)
@@ -194,6 +196,7 @@ struct MapTopScrim: View {
 
 /// 그룹 선택 시트 — 지도 탭과 일정 탭 공용. [onCreateGroup] 이 있으면 맨 아래 "새 그룹 만들기" 행.
 struct GroupPickerSheet: View {
+    @Environment(\.smapAccent) private var accent
     let groups: [SmapGroup]
     let selectedGroupId: Int?
     let onSelect: (SmapGroup) -> Void
@@ -224,7 +227,7 @@ struct GroupPickerSheet: View {
                             if isSelected {
                                 Image(systemName: "checkmark")
                                     .font(.system(size: 16, weight: .bold))
-                                    .foregroundStyle(SMAPTheme.Navy.base)
+                                    .foregroundStyle(accent.base)
                                     .accessibilityLabel("선택됨")
                             }
                         }

@@ -46,6 +46,8 @@ import com.dmonster.smap.ui.home.HomeViewModel
 import com.dmonster.smap.ui.myplace.MyPlaceScreen
 import com.dmonster.smap.ui.schedule.ScheduleScreen
 import com.dmonster.smap.ui.subscription.SubscriptionScreen
+import com.dmonster.smap.ui.components.SmapAccent
+import com.dmonster.smap.ui.components.SmapAccentTheme
 import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.SuiteFont
 
@@ -149,7 +151,9 @@ fun MainTabScreen(
             ) {
                 tabs.forEachIndexed { index, tab ->
                     val isSelected = selectedTabIndex == index
-                    
+                    // 선택된 탭 글자·아이콘은 그 메뉴의 강조색
+                    val tabColor = SmapAccent.forTab(index).base
+
                     NavigationBarItem(
                         icon = {
                             Icon(
@@ -178,8 +182,8 @@ fun MainTabScreen(
                             }
                         },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = BrandColors.Primary,
-                            selectedTextColor = BrandColors.Primary,
+                            selectedIconColor = tabColor,
+                            selectedTextColor = tabColor,
                             unselectedIconColor = Color(0xFF94A3B8),
                             unselectedTextColor = Color(0xFF94A3B8),
                             indicatorColor = Color.Transparent
@@ -199,12 +203,13 @@ fun MainTabScreen(
             Layout(
                 modifier = Modifier.clipToBounds(),
                 content = {
+                    // 탭마다 강조색을 따로 준다(홈 남색·그룹 청록·일정 주황·내장소 보라·활동 로그 장미) — 전부 남색이라 단조로웠다.
                     // 지도 탭은 한 번 열면 계속 살려 둔다(지도·상태 유지). 그룹·일정은 보일 때와 밀려 나가는 동안만 둔다.
-                    Box(Modifier.layoutId(0)) { HomeScreen(viewModel = homeViewModel, onLogout = onLogout, isVisible = selectedTabIndex == 0, onOverlayVisibleChange = { homeOverlayOpen = it }) }
-                    if (visitedMyPlace) Box(Modifier.layoutId(3)) { MyPlaceScreen(isVisible = selectedTabIndex == 3) }
-                    if (visitedActivityLog) Box(Modifier.layoutId(4)) { ActivityLogScreen(isVisible = selectedTabIndex == 4) }
-                    if (selectedTabIndex == 1 || from == 1) Box(Modifier.layoutId(1)) { GroupScreen() }
-                    if (selectedTabIndex == 2 || from == 2) Box(Modifier.layoutId(2)) { ScheduleScreen() }
+                    Box(Modifier.layoutId(0)) { SmapAccentTheme(SmapAccent.forTab(0)) { HomeScreen(viewModel = homeViewModel, onLogout = onLogout, isVisible = selectedTabIndex == 0, onOverlayVisibleChange = { homeOverlayOpen = it }) } }
+                    if (visitedMyPlace) Box(Modifier.layoutId(3)) { SmapAccentTheme(SmapAccent.forTab(3)) { MyPlaceScreen(isVisible = selectedTabIndex == 3) } }
+                    if (visitedActivityLog) Box(Modifier.layoutId(4)) { SmapAccentTheme(SmapAccent.forTab(4)) { ActivityLogScreen(isVisible = selectedTabIndex == 4) } }
+                    if (selectedTabIndex == 1 || from == 1) Box(Modifier.layoutId(1)) { SmapAccentTheme(SmapAccent.forTab(1)) { GroupScreen() } }
+                    if (selectedTabIndex == 2 || from == 2) Box(Modifier.layoutId(2)) { SmapAccentTheme(SmapAccent.forTab(2)) { ScheduleScreen() } }
                 },
             ) { measurables, constraints ->
                 val placeables = measurables.associate { (it.layoutId as Int) to it.measure(constraints) }

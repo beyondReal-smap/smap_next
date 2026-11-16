@@ -258,7 +258,7 @@ private fun RouteThumb(dragging: Boolean) {
             .shadow(3.dp, CircleShape)
             .background(Color.White, CircleShape)
             .padding(3.dp)
-            .background(SmapBrush.navy, CircleShape)
+            .background(SmapBrush.accent, CircleShape)
     )
 }
 
@@ -276,7 +276,7 @@ private fun RouteTrack(fraction: Float) {
             Modifier
                 .fillMaxWidth(fraction)
                 .fillMaxHeight()
-                .background(SmapBrush.navyBand)
+                .background(SmapBrush.accentBand)
         )
     }
 }

@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct SMAPButton: View {
+    @Environment(\.smapAccent) private var accent
     enum Style { case primary, secondary, outline, danger }
 
     let title: String
@@ -31,7 +32,7 @@ struct SMAPButton: View {
             // 주 버튼은 브랜드 남색 그라데이션(Android SmapButton 과 동일) — 단색은 밋밋하다는 피드백(2026-11-16)
             .background {
                 if style == .primary {
-                    SMAPTheme.Navy.gradient
+                    accent.gradient
                 } else {
                     backgroundColor
                 }

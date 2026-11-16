@@ -233,6 +233,7 @@ struct ProfileSummaryCard: View {
 // MARK: - Account Settings View
 
 struct AccountSettingsView: View {
+    @Environment(\.smapAccent) private var accent
     @Environment(\.presentationMode) var presentationMode
     @ObservedObject var authService = AuthService.shared
 
@@ -367,7 +368,7 @@ struct AccountSettingsView: View {
 
                         Image(systemName: "camera.fill")
                             .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(SMAPTheme.Navy.base)
+                            .foregroundStyle(accent.base)
                             .frame(width: 26, height: 26)
                             .background(Color.white, in: Circle())
                             .offset(x: 2, y: 2)

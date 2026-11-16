@@ -109,9 +109,9 @@ fun MonthCalendar(
     Column(
         modifier
             .fillMaxWidth()
-            .shadow(10.dp, shape, ambientColor = SmapBrush.Navy, spotColor = SmapBrush.Navy)
+            .shadow(10.dp, shape, ambientColor = SmapBrush.Accent, spotColor = SmapBrush.Accent)
             .clip(shape)
-            .background(SmapBrush.navy)
+            .background(SmapBrush.accent)
             .drawBehind {
                 drawCircle(Color.White.copy(alpha = 0.07f), radius = size.width * 0.38f, center = Offset(size.width * 1.0f, 0f))
             }
@@ -217,7 +217,7 @@ private fun CalendarDay(
             day.toString(),
             style = SmapText.body.copy(fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Normal),
             color = when {
-                isSelected -> SmapBrush.Navy
+                isSelected -> SmapBrush.Accent
                 isToday -> Color.White
                 isSunday -> CalendarSundayOnNavy
                 else -> Color.White
@@ -231,7 +231,7 @@ private fun CalendarDay(
                 .background(
                     when {
                         !hasEvent -> Color.Transparent
-                        isSelected -> SmapBrush.Navy
+                        isSelected -> SmapBrush.Accent
                         else -> Color.White
                     }
                 )
@@ -290,7 +290,7 @@ fun ScheduleRow(
                     style = SmapText.captionBold,
                     color = Color.White,
                     modifier = Modifier
-                        .background(SmapBrush.navy, RoundedCornerShape(50))
+                        .background(SmapBrush.accent, RoundedCornerShape(50))
                         .padding(horizontal = 10.dp, vertical = 4.dp)
                 )
             }

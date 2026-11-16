@@ -6,6 +6,7 @@ import SwiftUI
 
 /// 목록 한 줄 — 왼쪽(아바타·아이콘) · 제목/보조 줄 · 오른쪽(값·스위치·화살표).
 struct SMAPListRow<Leading: View, Trailing: View>: View {
+    @Environment(\.smapAccent) private var accent
     let title: String
     var subtitle: String? = nil
     var selected: Bool = false
@@ -44,7 +45,7 @@ struct SMAPListRow<Leading: View, Trailing: View>: View {
         .padding(.horizontal, SMAPTheme.Spacing.md)
         .padding(.vertical, 10)
         .frame(minHeight: 60)
-        .background(selected ? SMAPTheme.Surface.primaryContainer.opacity(0.55) : Color.clear)
+        .background(selected ? accent.container.opacity(0.55) : Color.clear)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(selected ? .isSelected : [])
@@ -77,19 +78,20 @@ private struct SMAPRowButtonStyle: ButtonStyle {
 
 /// 행 왼쪽 아이콘 원. [emphasized] 면 남색 그라데이션 원 + 흰 아이콘 — 그 화면의 주인공 항목에 써서 목록에 무게를 준다.
 struct SMAPRowIcon: View {
+    @Environment(\.smapAccent) private var accent
     let systemImage: String
     var emphasized: Bool = false
 
     var body: some View {
         ZStack {
             if emphasized {
-                Circle().fill(SMAPTheme.Navy.gradient)
+                Circle().fill(accent.gradient)
             } else {
-                Circle().fill(SMAPTheme.Surface.primaryContainer)
+                Circle().fill(accent.container)
             }
             Image(systemName: systemImage)
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(emphasized ? Color.white : SMAPTheme.Navy.base)
+                .foregroundStyle(emphasized ? Color.white : accent.base)
         }
         .frame(width: 40, height: 40)
         .accessibilityHidden(true)
@@ -158,14 +160,15 @@ struct SMAPRowDivider: View {
 
 /// 남색 글자 알약 (예: "일정 3") — 연한 남색 바탕
 struct SMAPCountPill: View {
+    @Environment(\.smapAccent) private var accent
     let text: String
 
     var body: some View {
         Text(text)
             .font(SMAPTheme.Font.captionBold)
-            .foregroundStyle(SMAPTheme.Navy.base)
+            .foregroundStyle(accent.base)
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
-            .background(SMAPTheme.Surface.primaryContainer, in: Capsule())
+            .background(accent.container, in: Capsule())
     }
 }

@@ -54,6 +54,7 @@ struct HomeSheetHeader: View {
 
 /// 띠 아래 흰 영역 — 얼굴 줄(접혀도 보임) + 펼치면 보이는 목록
 struct HomeSheetBody: View {
+    @Environment(\.smapAccent) private var accent
     @ObservedObject var viewModel: HomeViewModel
     let currentUserIdx: Int?
     let onSelectMember: (SmapGroupMember) -> Void
@@ -142,7 +143,7 @@ struct HomeSheetBody: View {
                         SMAPListRow(title: schedule.title.flatMap { $0.isEmpty ? nil : $0 } ?? "제목 없음", subtitle: scheduleMemberName(schedule), leading: {
                             Text(scheduleTime(schedule))
                                 .font(SMAPTheme.Font.captionBold)
-                                .foregroundStyle(SMAPTheme.Navy.base)
+                                .foregroundStyle(accent.base)
                                 .frame(width: 52, alignment: .leading)
                         })
                     }

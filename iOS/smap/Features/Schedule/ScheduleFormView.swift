@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct ScheduleFormView: View {
+    @Environment(\.smapAccent) private var accent
     @ObservedObject var viewModel: ScheduleViewModel
     let initialGroupId: Int
     var schedule: Schedule? = nil
@@ -336,7 +337,7 @@ struct ScheduleFormView: View {
                 trailing: {
                     Text("다시 시도")
                         .font(SMAPTheme.Font.captionBold)
-                        .foregroundStyle(SMAPTheme.Navy.base)
+                        .foregroundStyle(accent.base)
                 }
             )
         } else if !membersLoaded {
@@ -477,7 +478,7 @@ struct ScheduleFormView: View {
                         .frame(maxWidth: .infinity, minHeight: 40)
                         .background {
                             if isSelected {
-                                Circle().fill(SMAPTheme.Navy.gradient).frame(width: 40, height: 40)
+                                Circle().fill(accent.gradient).frame(width: 40, height: 40)
                             } else {
                                 Circle().fill(SMAPTheme.Surface.variant).frame(width: 40, height: 40)
                             }

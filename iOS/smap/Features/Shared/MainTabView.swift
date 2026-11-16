@@ -147,7 +147,9 @@ struct MainTabView: View {
             if isSelected { x = direction * width * (1 - transitionProgress) }
             if isLeaving { x = -direction * width * transitionProgress }
         }
+        // 탭마다 강조색을 따로 준다(홈 남색·그룹 청록·일정 주황·내장소 보라·활동 로그 장미) — 전부 남색이라 단조로웠다.
         return content()
+            .smapAccent(SMAPAccent.forTab(index))
             .offset(x: x)
             .opacity(isSelected || isLeaving ? 1 : 0)
             .allowsHitTesting(isSelected)
@@ -195,7 +197,7 @@ struct MainTabView: View {
 
 // MARK: - 하단 탭바
 
-/// 하단 탭바 — Android 와 같은 흰 바탕 + 남색 선택(회색 미선택), 아이콘 위 글자 아래.
+/// 하단 탭바 — Android 와 같은 흰 바탕 + 선택 탭은 그 메뉴의 강조색(회색 미선택), 아이콘 위 글자 아래.
 private struct SMAPTabBar: View {
     let selected: Int
     let onSelect: (Int) -> Void
@@ -224,7 +226,7 @@ private struct SMAPTabBar: View {
                             .font(.suite(size: 11, weight: isSelected ? .medium : .regular))
                             .lineLimit(1)
                     }
-                    .foregroundStyle(isSelected ? SMAPTheme.Color.primary : Self.unselectedColor)
+                    .foregroundStyle(isSelected ? SMAPAccent.forTab(index).base : Self.unselectedColor)
                     .frame(maxWidth: .infinity)
                     .padding(.top, 8)
                     .padding(.bottom, 4)

@@ -149,6 +149,7 @@ struct ActivityLogSheetBody: View {
 /// 경로 따라가기 — 막대를 밀면 지도 위 표시가 그 시각 위치로 움직인다(값 0~100, 기존 지도 연동 그대로).
 /// 이전에는 지도 왼쪽 아래 떠 있는 작은 카드라 시트·사이드바에 가려졌다. 이제 시트 머리 띠 바로 아래에 늘 보인다.
 struct RouteScrubber: View {
+    @Environment(\.smapAccent) private var accent
     @ObservedObject var viewModel: ActivityLogViewModel
 
     private let thumbSize: CGFloat = 22
@@ -162,7 +163,7 @@ struct RouteScrubber: View {
                 Spacer()
                 Text(timeText(viewModel.currentMarkerAtSlider?.mlt_gps_time) ?? "--:--")
                     .font(SMAPTheme.Font.bodyBold)
-                    .foregroundStyle(SMAPTheme.Navy.base)
+                    .foregroundStyle(accent.base)
                     .monospacedDigit()
             }
             GeometryReader { geo in
@@ -172,11 +173,11 @@ struct RouteScrubber: View {
                 let centerX = thumbSize / 2 + usable * fraction
                 ZStack(alignment: .leading) {
                     // 연한 남색 바탕 위에 지나온 구간만 남색으로 채운다
-                    Capsule().fill(SMAPTheme.Surface.primaryContainer).frame(height: 6)
-                    Capsule().fill(SMAPTheme.Navy.band).frame(width: centerX, height: 6)
+                    Capsule().fill(accent.container).frame(height: 6)
+                    Capsule().fill(accent.band).frame(width: centerX, height: 6)
                     // 손잡이 — 흰 테두리 남색 원. 맨 왼쪽에서도 분명히 보인다.
                     Circle()
-                        .fill(SMAPTheme.Navy.gradient)
+                        .fill(accent.gradient)
                         .padding(3)
                         .background(Circle().fill(Color.white))
                         .frame(width: size, height: size)

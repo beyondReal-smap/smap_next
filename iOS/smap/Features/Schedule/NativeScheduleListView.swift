@@ -13,6 +13,7 @@
 import SwiftUI
 
 struct NativeScheduleListView: View {
+    @Environment(\.smapAccent) private var accent
     @StateObject private var viewModel = ScheduleViewModel()
 
     @State private var showingAddSchedule = false
@@ -181,7 +182,7 @@ struct NativeScheduleListView: View {
                     action: { showingAddSchedule = true },
                     leading: { SMAPRowIcon(systemImage: "calendar.badge.plus") },
                     trailing: {
-                        Text("추가").font(SMAPTheme.Font.captionBold).foregroundStyle(SMAPTheme.Navy.base)
+                        Text("추가").font(SMAPTheme.Font.captionBold).foregroundStyle(accent.base)
                     }
                 )
             } else {
@@ -229,6 +230,7 @@ struct NativeScheduleListView: View {
 /// 월 달력 — 남색 그라데이션 카드 위 흰 글자. 고른 날은 흰 원 + 남색 글자, 오늘은 옅은 흰 원, 일정 있는 날은 점.
 /// 지난/다음 달 날짜 칸은 비워 이번 달만 보이게 한다(Android 와 동일).
 struct ScheduleMonthCalendar: View {
+    @Environment(\.smapAccent) private var accent
     let currentMonth: Date
     let selectedDate: Date
     let eventDates: Set<Date>
@@ -306,7 +308,7 @@ struct ScheduleMonthCalendar: View {
         .background(
             GeometryReader { geo in
                 ZStack {
-                    SMAPTheme.Navy.gradient
+                    accent.gradient
                     Circle()
                         .fill(Color.white.opacity(0.07))
                         .frame(width: geo.size.width * 0.76)
@@ -318,7 +320,7 @@ struct ScheduleMonthCalendar: View {
             .allowsHitTesting(false)
         )
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .shadow(color: SMAPTheme.Navy.base.opacity(0.28), radius: 10, y: 4)
+        .shadow(color: accent.base.opacity(0.28), radius: 10, y: 4)
     }
 
     private func monthButton(_ systemImage: String, label: String, action: @escaping () -> Void) -> some View {
@@ -338,7 +340,7 @@ struct ScheduleMonthCalendar: View {
         let isToday = calendar.isDateInToday(date)
         let hasEvent = eventDates.contains(calendar.startOfDay(for: date))
         let day = calendar.component(.day, from: date)
-        let textColor: Color = isSelected ? SMAPTheme.Navy.base : (isToday ? .white : (isSunday ? Self.sundayOnNavy : .white))
+        let textColor: Color = isSelected ? accent.base : (isToday ? .white : (isSunday ? Self.sundayOnNavy : .white))
         var a11y = "\(day)일"
         if isToday { a11y += ", 오늘" }
         if hasEvent { a11y += ", 일정 있음" }
@@ -352,7 +354,7 @@ struct ScheduleMonthCalendar: View {
                     .font(.suite(size: 16, weight: isSelected || isToday ? .bold : .regular))
                     .foregroundStyle(textColor)
                 Circle()
-                    .fill(!hasEvent ? Color.clear : (isSelected ? SMAPTheme.Navy.base : Color.white))
+                    .fill(!hasEvent ? Color.clear : (isSelected ? accent.base : Color.white))
                     .frame(width: 4, height: 4)
             }
             .frame(width: 40, height: 40)
@@ -382,6 +384,7 @@ struct ScheduleMonthCalendar: View {
 /// 왼쪽 시각(시작·끝), 가운데 제목과 "누구 · 어디 · 반복", 오른쪽 상태(진행 중일 때만 남색으로 강조).
 /// 이전 카드의 … 메뉴는 없앴다 — 눌러서 여는 상세 시트에 수정·삭제가 있다.
 struct ScheduleRow: View {
+    @Environment(\.smapAccent) private var accent
     let schedule: Schedule
     let action: () -> Void
 
@@ -403,7 +406,7 @@ struct ScheduleRow: View {
                 VStack(alignment: .leading, spacing: 0) {
                     Text(allDay ? "종일" : (start ?? "-"))
                         .font(SMAPTheme.Font.bodyBold)
-                        .foregroundStyle(schedule.status == .completed ? SMAPTheme.Surface.onSurfaceMuted : SMAPTheme.Navy.base)
+                        .foregroundStyle(schedule.status == .completed ? SMAPTheme.Surface.onSurfaceMuted : accent.base)
                     if !allDay, let end {
                         Text(end)
                             .font(SMAPTheme.Font.captionSmall)
@@ -427,7 +430,7 @@ struct ScheduleRow: View {
                             .foregroundStyle(.white)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 4)
-                            .background(SMAPTheme.Navy.gradient, in: Capsule())
+                            .background(accent.gradient, in: Capsule())
                     }
                 }
             }
@@ -439,6 +442,7 @@ struct ScheduleRow: View {
 
 /// 일정 상세 — 상태·제목, 날짜·시간, 대상, 장소, 반복, 메모 + (권한 있으면) 삭제·수정.
 struct ScheduleDetailSheet: View {
+    @Environment(\.smapAccent) private var accent
     let schedule: Schedule
     let canManage: Bool
     let onEdit: () -> Void
@@ -458,7 +462,7 @@ struct ScheduleDetailSheet: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(schedule.status.text)
                             .font(SMAPTheme.Font.captionBold)
-                            .foregroundStyle(schedule.status == .ongoing ? SMAPTheme.Navy.base : SMAPTheme.Surface.onSurfaceMuted)
+                            .foregroundStyle(schedule.status == .ongoing ? accent.base : SMAPTheme.Surface.onSurfaceMuted)
                         Text(schedule.sst_title.flatMap { $0.isEmpty ? nil : $0 } ?? "제목 없음")
                             .font(SMAPTheme.Font.title)
                             .foregroundStyle(SMAPTheme.Surface.onSurface)

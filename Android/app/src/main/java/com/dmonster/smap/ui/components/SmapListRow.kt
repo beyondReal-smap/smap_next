@@ -99,7 +99,7 @@ fun SmapRowIcon(icon: ImageVector, modifier: Modifier = Modifier, emphasized: Bo
         modifier = modifier
             .size(40.dp)
             .clip(CircleShape)
-            .then(if (emphasized) Modifier.background(SmapBrush.navy) else Modifier.background(colors.primaryContainer)),
+            .then(if (emphasized) Modifier.background(SmapBrush.accent) else Modifier.background(colors.primaryContainer)),
         contentAlignment = Alignment.Center,
     ) {
         Icon(

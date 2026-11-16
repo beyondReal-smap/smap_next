@@ -7,6 +7,7 @@ import SwiftUI
 // 떠 있는 + 버튼은 목록 아래쪽 항목을 가리고 다른 탭과 위치가 달라 제목 옆 글자 버튼으로 옮겼다.
 
 struct GroupListView: View {
+    @Environment(\.smapAccent) private var accent
     @StateObject private var viewModel = GroupViewModel()
     @State private var inviteCode: String = ""
     @State private var showCreateModal: Bool = false
@@ -65,7 +66,7 @@ struct GroupListView: View {
                         Image(systemName: "plus").font(.system(size: 14, weight: .semibold))
                         Text("새 그룹").font(SMAPTheme.Font.captionBold)
                     }
-                    .foregroundStyle(SMAPTheme.Navy.base)
+                    .foregroundStyle(accent.base)
                     .padding(.horizontal, SMAPTheme.Spacing.sm)
                     .frame(minHeight: 44)
                     .contentShape(Rectangle())
@@ -85,7 +86,7 @@ struct GroupListView: View {
                     action: { showCreateModal = true },
                     leading: { SMAPRowIcon(systemImage: "person.3") },
                     trailing: {
-                        Text("만들기").font(SMAPTheme.Font.captionBold).foregroundStyle(SMAPTheme.Navy.base)
+                        Text("만들기").font(SMAPTheme.Font.captionBold).foregroundStyle(accent.base)
                     }
                 )
             } else {
@@ -163,6 +164,7 @@ private struct GroupListHero: View {
 /// 시스템 PasteButton 은 허용 팝업이 없지만 글꼴을 바꿀 수 없어(앱 글꼴 SUITE 미적용) "+ 새 그룹"과 같은 글자 버튼으로 둔다.
 /// 대신 처음 누를 때 iOS 가 붙여넣기 허용을 묻는다.
 private struct InviteJoinSection: View {
+    @Environment(\.smapAccent) private var accent
     @Binding var inviteCode: String
     let isJoining: Bool
     let onJoin: () -> Void
@@ -190,7 +192,7 @@ private struct InviteJoinSection: View {
                     Image(systemName: "doc.on.clipboard").font(.system(size: 14, weight: .semibold))
                     Text("붙여넣기").font(SMAPTheme.Font.captionBold)
                 }
-                .foregroundStyle(SMAPTheme.Navy.base)
+                .foregroundStyle(accent.base)
                 .padding(.horizontal, SMAPTheme.Spacing.sm)
                 .frame(minHeight: 44)
                 .contentShape(Rectangle())
@@ -249,20 +251,21 @@ enum InviteCodeParser {
 
 /// 역할 배지 — 그룹장은 남색 채움(가장 강한 역할), 리더는 연한 남색.
 struct RoleBadge: View {
+    @Environment(\.smapAccent) private var accent
     let text: String
 
     var body: some View {
         let strong = text == "그룹장"
         Text(text)
             .font(SMAPTheme.Font.captionBold)
-            .foregroundStyle(strong ? Color.white : SMAPTheme.Navy.base)
+            .foregroundStyle(strong ? Color.white : accent.base)
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
             .background {
                 if strong {
-                    Capsule().fill(SMAPTheme.Navy.gradient)
+                    Capsule().fill(accent.gradient)
                 } else {
-                    Capsule().fill(SMAPTheme.Surface.primaryContainer)
+                    Capsule().fill(accent.container)
                 }
             }
     }

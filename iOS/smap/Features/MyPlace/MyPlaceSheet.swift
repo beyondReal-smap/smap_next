@@ -51,6 +51,7 @@ struct MyPlaceSheetHeader: View {
 
 /// 띠 아래 — 멤버 얼굴 줄(접혀도 보임) + 장소 목록
 struct MyPlaceSheetBody: View {
+    @Environment(\.smapAccent) private var accent
     @ObservedObject var viewModel: MyPlaceViewModel
     let currentUserIdx: Int?
     let onSelectLocation: (SavedLocation) -> Void
@@ -116,7 +117,7 @@ struct MyPlaceSheetBody: View {
                     } label: {
                         Image(systemName: alarmOn ? "bell.fill" : "bell.slash")
                             .font(.system(size: 18, weight: .medium))
-                            .foregroundStyle(alarmOn ? SMAPTheme.Navy.base : SMAPTheme.Surface.onSurfaceMuted)
+                            .foregroundStyle(alarmOn ? accent.base : SMAPTheme.Surface.onSurfaceMuted)
                             .frame(width: 44, height: 44)
                     }
                     .buttonStyle(.plain)

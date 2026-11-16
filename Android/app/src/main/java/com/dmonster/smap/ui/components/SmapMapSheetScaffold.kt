@@ -121,7 +121,7 @@ private fun SheetHandle() {
     Box(
         Modifier
             .fillMaxWidth()
-            .background(SmapBrush.navyBand)
+            .background(SmapBrush.accentBand)
             .padding(top = 7.dp, bottom = 5.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -133,10 +133,11 @@ private fun SheetHandle() {
     }
 }
 
-/** 지도 시트 머리 줄 바탕 — 손잡이 띠에 이어지는 남색 띠. 안의 글자는 흰색·[SmapOnNavyMuted] 로 쓴다. */
+/** 지도 시트 머리 줄 바탕 — 손잡이 띠에 이어지는 메뉴 강조색 띠(그 탭의 색을 읽으려고 @Composable). 안의 글자는 흰색·[SmapOnNavyMuted] 로 쓴다. */
+@Composable
 fun Modifier.sheetHeaderBand(): Modifier = this
     .fillMaxWidth()
-    .background(SmapBrush.navyBand)
+    .background(SmapBrush.accentBand)
     .padding(bottom = SheetHeaderBandBottom)
 
 /** 머리 띠 아래 여백 — 각 시트의 접힌 높이에 이만큼 더한다. */

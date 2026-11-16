@@ -36,10 +36,70 @@ extension SMAPTheme {
     static let sheetRadius: CGFloat = 28
 }
 
+// MARK: - 메뉴별 강조색
+//
+// 처음엔 남색 하나만 썼는데 모든 메뉴가 "파랑파랑"해 단조롭다는 피드백(2026-11-16)에 따라 메뉴마다 색을 나눴다.
+// 홈·설정 남색 / 그룹 청록 / 일정 주황 / 내장소 보라 / 활동 로그 장미 (Android SmapAccent 와 같은 값).
+// 탭 화면에 `.smapAccent(_:)` 를 걸면 그 아래 요약 카드·아이콘 원·버튼·시트 띠가 그 색을 쓴다.
+
+/// 메뉴 강조색 한 벌 — 짙은 색 → 기준 색 → 밝은 색 그라데이션 + 옅은 바탕(아이콘 원·칩).
+struct SMAPAccent {
+    let deep: Color
+    let base: Color
+    let bright: Color
+    let container: Color
+
+    /// 요약 카드·강조 아이콘·선택 상태
+    var gradient: LinearGradient { LinearGradient(colors: [deep, base, bright], startPoint: .topLeading, endPoint: .bottomTrailing) }
+    /// 가로 방향만 변하는 그라데이션 — 위아래로 붙는 칸(시트 손잡이 띠·머리 줄)이 한 띠로 이어 보이게.
+    var band: LinearGradient { LinearGradient(colors: [deep, base, bright], startPoint: .leading, endPoint: .trailing) }
+
+    private static func rgb(_ hex: UInt32) -> Color {
+        Color(red: Double((hex >> 16) & 0xFF) / 255, green: Double((hex >> 8) & 0xFF) / 255, blue: Double(hex & 0xFF) / 255)
+    }
+
+    static let navy = SMAPAccent(deep: SMAPTheme.Navy.deep, base: SMAPTheme.Navy.base, bright: SMAPTheme.Navy.bright, container: SMAPTheme.Surface.primaryContainer)
+    static let teal = SMAPAccent(deep: rgb(0x0B4F4A), base: rgb(0x0F766E), bright: rgb(0x0D9488), container: rgb(0xE1F3F1))
+    static let orange = SMAPAccent(deep: rgb(0x9A3412), base: rgb(0xC2410C), bright: rgb(0xEA580C), container: rgb(0xFCEBDD))
+    static let purple = SMAPAccent(deep: rgb(0x4C1D95), base: rgb(0x6D28D9), bright: rgb(0x8B5CF6), container: rgb(0xEEE8FD))
+    static let rose = SMAPAccent(deep: rgb(0x9F1239), base: rgb(0xBE185D), bright: rgb(0xDB2777), container: rgb(0xFBE6EF))
+
+    /// 하단 탭 순서(홈·그룹·일정·내장소·활동 로그)별 색
+    static func forTab(_ index: Int) -> SMAPAccent {
+        switch index {
+        case 1: return .teal
+        case 2: return .orange
+        case 3: return .purple
+        case 4: return .rose
+        default: return .navy
+        }
+    }
+}
+
+private struct SMAPAccentKey: EnvironmentKey {
+    static let defaultValue = SMAPAccent.navy
+}
+
+extension EnvironmentValues {
+    /// 지금 메뉴의 강조색. 기본은 브랜드 남색(홈·설정).
+    var smapAccent: SMAPAccent {
+        get { self[SMAPAccentKey.self] }
+        set { self[SMAPAccentKey.self] = newValue }
+    }
+}
+
+extension View {
+    /// 이 아래 화면 전체의 강조색 — 공용 부품 색과 시스템 컨트롤(토글·날짜 선택 등) tint 를 함께 바꾼다.
+    func smapAccent(_ accent: SMAPAccent) -> some View {
+        environment(\.smapAccent, accent).tint(accent.base)
+    }
+}
+
 // MARK: - 요약 카드
 
 /// 남색 그라데이션 요약 카드 — 탭 맨 위·상세 화면 맨 위의 시각적 중심. 오른쪽 위 옅은 원 두 개로 깊이감을 준다.
 struct SMAPHeroCard<Content: View>: View {
+    @Environment(\.smapAccent) private var accent
     @ViewBuilder var content: () -> Content
 
     var body: some View {
@@ -49,7 +109,7 @@ struct SMAPHeroCard<Content: View>: View {
             .background(
                 GeometryReader { geo in
                     ZStack {
-                        SMAPTheme.Navy.gradient
+                        accent.gradient
                         Circle()
                             .fill(Color.white.opacity(0.08))
                             .frame(width: geo.size.width * 0.84)
@@ -65,7 +125,7 @@ struct SMAPHeroCard<Content: View>: View {
                 .allowsHitTesting(false)
             )
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .shadow(color: SMAPTheme.Navy.base.opacity(0.28), radius: 10, y: 4)
+            .shadow(color: accent.base.opacity(0.28), radius: 10, y: 4)
             .foregroundStyle(.white)
     }
 }
@@ -122,6 +182,7 @@ struct SMAPHeroStats: View {
 
 /// 남색 그라데이션 원형 버튼 — 탭 맨 위 "추가"처럼 그 화면의 주 동작.
 struct SMAPGradientIconButton: View {
+    @Environment(\.smapAccent) private var accent
     let systemImage: String
     let accessibilityLabel: String
     let action: () -> Void
@@ -132,8 +193,8 @@ struct SMAPGradientIconButton: View {
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: 44, height: 44)
-                .background(SMAPTheme.Navy.gradient, in: Circle())
-                .shadow(color: SMAPTheme.Navy.base.opacity(0.35), radius: 6, y: 3)
+                .background(accent.gradient, in: Circle())
+                .shadow(color: accent.base.opacity(0.35), radius: 6, y: 3)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel)
@@ -142,6 +203,7 @@ struct SMAPGradientIconButton: View {
 
 /// 남색 머리 띠 위 주 동작 버튼 — 흰 알약 + 남색 글자·아이콘 (홈 "전체 보기", 내장소 "장소 추가").
 struct SheetBandButton: View {
+    @Environment(\.smapAccent) private var accent
     let title: String
     let systemImage: String
     let action: () -> Void
@@ -152,7 +214,7 @@ struct SheetBandButton: View {
                 Image(systemName: systemImage).font(.system(size: 14, weight: .semibold))
                 Text(title).font(SMAPTheme.Font.captionBold)
             }
-            .foregroundStyle(SMAPTheme.Navy.base)
+            .foregroundStyle(accent.base)
             .padding(.horizontal, 14)
             .frame(height: 40)
             .background(Color.white, in: Capsule())

@@ -20,6 +20,10 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -35,20 +39,70 @@ import com.dmonster.smap.ui.theme.SmapSpacing
 import com.dmonster.smap.ui.theme.SmapText
 
 /*
- * 남색 강조 — 36단계 재설계가 "회색 바탕 + 흰 행"만 남아 밋밋하다는 피드백(2026-11-16)에 따라
- * 화면마다 시각적 중심을 하나 둔다. 색은 브랜드 남색 계열만 쓴다(다색 팔레트는 고르지 않음).
+ * 메뉴별 강조색 — 36단계 재설계가 "회색 바탕 + 흰 행"만 남아 밋밋하다는 피드백(2026-11-16)에 따라
+ * 화면마다 그라데이션 시각적 중심을 하나 둔다. 처음엔 남색 하나만 썼는데 모든 메뉴가 "파랑파랑"해
+ * 단조롭다는 피드백(2026-11-16)에 따라 메뉴마다 색을 나눴다(iOS SMAPAccent 와 같은 값).
+ * 홈·설정 남색 / 그룹 청록 / 일정 주황 / 내장소 보라 / 활동 로그 장미.
  */
 
-/** 브랜드 남색 그라데이션 — 요약 카드·강조 아이콘·선택 상태 공용. 짙은 남색 → 브랜드 → 밝은 남색. */
-object SmapBrush {
-    val NavyDeep = Color(0xFF000C78)
-    val Navy = Color(0xFF0113A3)
-    val NavyBright = Color(0xFF3D55EA)
-
-    val navy: Brush = Brush.linearGradient(listOf(NavyDeep, Navy, NavyBright))
+/** 메뉴 강조색 한 벌 — 짙은 색 → 기준 색 → 밝은 색 그라데이션 + 옅은 바탕(아이콘 원·칩). */
+@Immutable
+data class SmapAccent(val deep: Color, val base: Color, val bright: Color, val container: Color) {
+    /** 요약 카드·강조 아이콘·선택 상태 */
+    val brush: Brush = Brush.linearGradient(listOf(deep, base, bright))
 
     /** 가로 방향만 변하는 그라데이션 — 시트 손잡이 띠와 머리 줄처럼 위아래로 붙는 두 칸이 한 띠로 이어 보이게. */
-    val navyBand: Brush = Brush.horizontalGradient(listOf(NavyDeep, Navy, NavyBright))
+    val band: Brush = Brush.horizontalGradient(listOf(deep, base, bright))
+
+    companion object {
+        val Navy = SmapAccent(Color(0xFF000C78), Color(0xFF0113A3), Color(0xFF3D55EA), Color(0xFFE8EBFB))
+        val Teal = SmapAccent(Color(0xFF0B4F4A), Color(0xFF0F766E), Color(0xFF0D9488), Color(0xFFE1F3F1))
+        val Orange = SmapAccent(Color(0xFF9A3412), Color(0xFFC2410C), Color(0xFFEA580C), Color(0xFFFCEBDD))
+        val Purple = SmapAccent(Color(0xFF4C1D95), Color(0xFF6D28D9), Color(0xFF8B5CF6), Color(0xFFEEE8FD))
+        val Rose = SmapAccent(Color(0xFF9F1239), Color(0xFFBE185D), Color(0xFFDB2777), Color(0xFFFBE6EF))
+
+        /** 하단 탭 순서(홈·그룹·일정·내장소·활동 로그)별 색 */
+        fun forTab(index: Int): SmapAccent = when (index) {
+            1 -> Teal
+            2 -> Orange
+            3 -> Purple
+            4 -> Rose
+            else -> Navy
+        }
+    }
+}
+
+/** 지금 메뉴의 강조색. 기본은 브랜드 남색(홈·설정). */
+val LocalSmapAccent = staticCompositionLocalOf { SmapAccent.Navy }
+
+/**
+ * [accent] 를 이 아래 화면 전체의 강조색으로 쓴다 — 요약 카드·아이콘 원·버튼(SmapBrush)뿐 아니라
+ * colorScheme.primary/primaryContainer 도 바꿔 입력창 테두리·글자 버튼·행 아이콘까지 같은 색이 되게 한다.
+ */
+@Composable
+fun SmapAccentTheme(accent: SmapAccent, content: @Composable () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    MaterialTheme(
+        colorScheme = scheme.copy(primary = accent.base, primaryContainer = accent.container, onPrimaryContainer = accent.deep),
+        typography = MaterialTheme.typography,
+        shapes = MaterialTheme.shapes,
+    ) {
+        CompositionLocalProvider(LocalSmapAccent provides accent, content = content)
+    }
+}
+
+/** 지금 메뉴 강조색의 그라데이션 — 요약 카드·강조 아이콘·선택 상태 공용. */
+object SmapBrush {
+    val accent: Brush
+        @Composable @ReadOnlyComposable get() = LocalSmapAccent.current.brush
+
+    /** 가로 방향만 변하는 그라데이션 — 시트 손잡이 띠와 머리 줄처럼 위아래로 붙는 두 칸이 한 띠로 이어 보이게. */
+    val accentBand: Brush
+        @Composable @ReadOnlyComposable get() = LocalSmapAccent.current.band
+
+    /** 강조색 기준 색(그림자·선택 글자) */
+    val Accent: Color
+        @Composable @ReadOnlyComposable get() = LocalSmapAccent.current.base
 }
 
 /** 남색 바탕 위 보조 글자색 */
@@ -70,9 +124,9 @@ fun SmapHeroCard(
     Box(
         modifier
             .fillMaxWidth()
-            .shadow(10.dp, shape, ambientColor = SmapBrush.Navy, spotColor = SmapBrush.Navy)
+            .shadow(10.dp, shape, ambientColor = SmapBrush.Accent, spotColor = SmapBrush.Accent)
             .clip(shape)
-            .background(SmapBrush.navy)
+            .background(SmapBrush.accent)
             .drawBehind {
                 drawCircle(Color.White.copy(alpha = 0.08f), radius = size.width * 0.42f, center = Offset(size.width * 0.98f, -size.height * 0.05f))
                 drawCircle(Color.White.copy(alpha = 0.06f), radius = size.width * 0.22f, center = Offset(size.width * 0.80f, size.height * 1.02f))
@@ -151,9 +205,9 @@ fun SmapGradientIconButton(
     Box(
         modifier
             .size(44.dp)
-            .shadow(6.dp, androidx.compose.foundation.shape.CircleShape, ambientColor = SmapBrush.Navy, spotColor = SmapBrush.Navy)
+            .shadow(6.dp, androidx.compose.foundation.shape.CircleShape, ambientColor = SmapBrush.Accent, spotColor = SmapBrush.Accent)
             .clip(androidx.compose.foundation.shape.CircleShape)
-            .background(SmapBrush.navy)
+            .background(SmapBrush.accent)
             .clickable(onClickLabel = contentDescription, role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)
             .semantics { this.contentDescription = contentDescription },
         contentAlignment = androidx.compose.ui.Alignment.Center,

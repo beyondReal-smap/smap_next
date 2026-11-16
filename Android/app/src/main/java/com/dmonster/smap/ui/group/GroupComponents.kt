@@ -390,7 +390,7 @@ private fun RoleBadge(text: String) {
         color = if (strong) Color.White else MaterialTheme.colorScheme.primary,
         modifier = Modifier
             .then(
-                if (strong) Modifier.background(SmapBrush.navy, RoundedCornerShape(50))
+                if (strong) Modifier.background(SmapBrush.accent, RoundedCornerShape(50))
                 else Modifier.background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(50))
             )
             .padding(horizontal = 10.dp, vertical = 4.dp),
