@@ -27,12 +27,11 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -84,23 +83,25 @@ fun GroupListContent(
             modifier = Modifier
                 .fillMaxSize()
                 .background(colors.background),
-            contentPadding = PaddingValues(start = SmapSpacing.md, end = SmapSpacing.md, bottom = SmapSpacing.xl),
+            contentPadding = PaddingValues(start = SmapSpacing.md, end = SmapSpacing.md, top = SmapSpacing.md, bottom = SmapSpacing.xl),
             verticalArrangement = Arrangement.spacedBy(SmapSpacing.lg),
         ) {
             item {
-                TopActionRow {
-                    FilledTonalIconButton(
-                        onClick = onCreateClick,
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = colors.primaryContainer,
-                            contentColor = colors.primary,
-                        ),
-                    ) { Icon(Icons.Outlined.Add, contentDescription = "새 그룹 만들기") }
-                }
-            }
-
-            item {
-                SmapSection(title = if (groups.isEmpty()) "내 그룹" else "내 그룹 ${groups.size}") {
+                // 새 그룹 만들기는 "내 그룹" 줄 오른쪽에 둔다. 큰 제목을 뺀 뒤 맨 위에 + 하나만 남아
+                // 빈 줄이 생겼던 것을 없애고, 목록과 그 목록에 대한 동작을 한 줄에 묶는다.
+                SmapSection(
+                    title = if (groups.isEmpty()) "내 그룹" else "내 그룹 ${groups.size}",
+                    action = {
+                        TextButton(
+                            onClick = onCreateClick,
+                            contentPadding = PaddingValues(horizontal = SmapSpacing.sm),
+                        ) {
+                            Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(SmapSpacing.xs))
+                            Text("새 그룹", style = SmapText.captionBold)
+                        }
+                    },
+                ) {
                     when {
                         isLoading -> repeat(2) { i ->
                             if (i > 0) SmapRowDivider()
@@ -132,23 +133,6 @@ fun GroupListContent(
 
             item { InviteJoinSection(inviteCode, onInviteCodeChange, onJoinGroup, isJoining) }
         }
-    }
-}
-
-/**
- * 탭 첫 화면 맨 위 동작 줄. 아래 탭 막대에 이미 "그룹"이 표시돼 큰 제목은 중복이라 빼고(대표님 요청),
- * 오른쪽 동작 버튼만 남긴다.
- */
-@Composable
-private fun TopActionRow(action: @Composable () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(top = SmapSpacing.md),
-        horizontalArrangement = Arrangement.End,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        action()
     }
 }
 
