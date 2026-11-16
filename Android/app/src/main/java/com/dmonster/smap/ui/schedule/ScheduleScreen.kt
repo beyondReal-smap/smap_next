@@ -16,6 +16,7 @@ import com.dmonster.smap.data.model.SmapSchedule
 import com.dmonster.smap.ui.common.rememberSmapHaptics
 import com.dmonster.smap.ui.components.GroupPickerSheet
 import com.dmonster.smap.ui.components.SmapGradientIconButton
+import com.dmonster.smap.ui.components.TopControlsVerticalPadding
 import com.dmonster.smap.ui.components.GroupSwitcherPill
 import com.dmonster.smap.ui.components.SmapListRow
 import com.dmonster.smap.ui.components.SmapRowDivider
@@ -118,7 +119,7 @@ fun ScheduleScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = SmapSpacing.md),
+                            .padding(top = TopControlsVerticalPadding),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(Modifier.weight(1f)) {

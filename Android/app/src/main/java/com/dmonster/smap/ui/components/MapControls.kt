@@ -175,6 +175,12 @@ fun GroupPickerSheet(
     }
 }
 
+/**
+ * 그룹 알약 줄의 위아래 여백 — 지도 탭과 일정 탭이 같은 값을 써야 알약 위치가 탭을 바꿔도 그대로다.
+ * (일정 탭만 16dp 를 써서 알약이 6dp 아래에 있었다.)
+ */
+val TopControlsVerticalPadding = 10.dp
+
 /** 지도 위 떠 있는 조작 줄 — 왼쪽 그룹 알약, 오른쪽 원형 버튼들. */
 @Composable
 fun MapTopControls(
@@ -186,7 +192,7 @@ fun MapTopControls(
     Row(
         modifier
             .fillMaxWidth()
-            .padding(horizontal = SmapSpacing.md, vertical = 10.dp),
+            .padding(horizontal = SmapSpacing.md, vertical = TopControlsVerticalPadding),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(SmapSpacing.sm),
     ) {
