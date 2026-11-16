@@ -1,5 +1,6 @@
 package com.dmonster.smap.ui.settings
 
+import androidx.compose.foundation.layout.navigationBarsPadding
 import com.dmonster.smap.data.model.SMAPUser
 import com.dmonster.smap.ui.theme.SmapText
 import com.dmonster.smap.ui.theme.SmapSpacing
@@ -49,7 +50,6 @@ import com.dmonster.smap.data.GlobalEventBus
 import com.dmonster.smap.data.model.SmapNotice
 import com.dmonster.smap.ui.common.rememberSmapHaptics
 import com.dmonster.smap.ui.theme.BrandColors
-import com.dmonster.smap.ui.theme.SettingsColors
 import com.dmonster.smap.ui.theme.SuiteFont
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -95,7 +95,8 @@ fun SettingsScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(SettingsColors.PageBackground)
+            .background(MaterialTheme.colorScheme.background)
+            .navigationBarsPadding()
     ) {
         // Main Settings Content with Slide Animation
         AnimatedVisibility(

@@ -425,7 +425,9 @@ fun HomeScreen(
             visible = isSettingsVisible,
             enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
             exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
-            modifier = Modifier.fillMaxSize().navigationBarsPadding()
+            // 아래 내비게이션 막대 여백은 SettingsScreen 안에서 배경을 칠한 뒤 준다.
+            // 여기서 주면 막대 뒤가 비어 홈 화면 시트 글자가 비쳐 보였다.
+            modifier = Modifier.fillMaxSize()
         ) {
             SettingsScreen(
                 onClose = { isSettingsVisible = false },
