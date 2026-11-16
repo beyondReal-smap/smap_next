@@ -1,6 +1,25 @@
 package com.dmonster.smap.ui.myplace
 
 import com.dmonster.smap.ui.components.SmapDialogActions
+import androidx.compose.material.icons.automirrored.outlined.Notes
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.NotificationsNone
+import androidx.compose.material.icons.outlined.Place
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.text.style.TextOverflow
+import com.dmonster.smap.ui.components.SmapAvatar
+import com.dmonster.smap.ui.components.SmapButton
+import com.dmonster.smap.ui.components.SmapButtonStyle
+import com.dmonster.smap.ui.components.SmapListRow
+import com.dmonster.smap.ui.components.SmapRowDivider
+import com.dmonster.smap.ui.components.SmapRowIcon
+import com.dmonster.smap.ui.components.SmapSection
+import com.dmonster.smap.ui.components.SmapTextField
+import com.dmonster.smap.ui.theme.SmapSpacing
+import com.dmonster.smap.ui.theme.SmapText
 import com.dmonster.smap.BuildConfig
 import kotlinx.coroutines.launch
 import androidx.compose.animation.*
@@ -24,10 +43,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalFocusManager
@@ -50,10 +67,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
 import com.dmonster.smap.ui.common.rememberSmapHaptics
-import com.dmonster.smap.ui.theme.AccentColors
 import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.SuiteFont
-import android.util.Log
 import coil.request.ImageRequest
 import androidx.compose.ui.platform.LocalContext
 
@@ -150,6 +165,19 @@ fun LocationDetailSheet(
     }
     
 
+    // 36단계 재설계와 같은 모양 — 일정 상세·작성 시트처럼.
+    // 이전: 남색 원 아이콘 + 그림자 카드 + 남색·주황·빨강 전폭 버튼 3개(알림 버튼은 토글과 중복), 좌표 숫자 노출.
+    // 지금: 회색 바탕 위 흰 묶음(SmapSection) + 공용 행(SmapListRow), 아래에 [삭제][편집] / [저장].
+    // 색은 내장소 탭 강조색(보라)을 SmapAccentTheme 로 그대로 물려받는다.
+    val colors = MaterialTheme.colorScheme
+    val focusManager = LocalFocusManager.current
+    val sheetTitle = when {
+        isNew -> if (targetMemberName != null) "${targetMemberName}님의 장소 추가" else "새 장소 등록"
+        isEditMode -> if (targetMemberName != null) "${targetMemberName}님의 장소 편집" else "장소 편집"
+        else -> if (targetMemberName != null) "${targetMemberName}님의 장소" else "장소 정보"
+    }
+    val canSave = name.isNotBlank() && address.isNotBlank() && !isLoading
+
     ModalBottomSheet(
         onDismissRequest = {
             // 스와이프/스크림 탭으로 닫힐 때도 미저장 변경 확인
@@ -160,369 +188,228 @@ fun LocationDetailSheet(
             }
         },
         sheetState = sheetState,
-        dragHandle = { BottomSheetDefaults.DragHandle() },
-        containerColor = BrandColors.InputBackground,
+        containerColor = colors.background,
         tonalElevation = 0.dp,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            color = BrandColors.InputBackground,
-            tonalElevation = 0.dp
-        ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
+                .navigationBarsPadding()
                 .imePadding()
-                .padding(bottom = 40.dp)
+                .padding(bottom = SmapSpacing.md)
         ) {
-            // Header Actions
+            // 머리 줄 — [닫기] 제목
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .padding(horizontal = SmapSpacing.xs),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(onClick = { attemptDismiss() }) {
-                    Text("닫기", color = BrandColors.Primary, fontSize = 16.sp, fontFamily = SuiteFont)
+                IconButton(onClick = { attemptDismiss() }) {
+                    Icon(Icons.Outlined.Close, contentDescription = "닫기", tint = colors.onSurfaceVariant)
                 }
-                
                 Text(
-                    text = when {
-                        isNew -> if (targetMemberName != null) "${targetMemberName}님의 장소 추가" else "새 장소 등록"
-                        isEditMode -> if (targetMemberName != null) "${targetMemberName}님의 장소 편집" else "장소 편집"
-                        else -> if (targetMemberName != null) "${targetMemberName}님의 장소" else "장소 정보"
-                    },
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = SuiteFont
+                    text = sheetTitle,
+                    style = SmapText.headline,
+                    color = colors.onSurface,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .weight(1f)
+                        .semantics { heading() }
                 )
-                
-                if ((isEditMode || isNew) && canManage) {
-                    TextButton(
-                        onClick = {
-                            haptics.medium()
-                            onSave(name, address, lat, lng, memo.ifBlank { null }, enterAlarm)
-                        },
-                        enabled = name.isNotBlank() && address.isNotBlank() && !isLoading
-                    ) {
-                        Text(
-                            text = "저장",
-                            color = BrandColors.Primary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
-                            fontFamily = SuiteFont
-                        )
-                    }
-                } else {
-                    Spacer(modifier = Modifier.width(64.dp))
-                }
+                Spacer(modifier = Modifier.width(48.dp))
             }
 
-            AnimatedContent(
-                targetState = isEditMode to (location != null),
-                transitionSpec = {
-                    fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
-                },
-                label = "ModeSwitch"
-            ) { (editMode, hasLocation) ->
-                if (!editMode && hasLocation) {
-                    // VIEW MODE
-                    val loc = location!!
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // Profile Icon
-                    Box(
-                        modifier = Modifier
-                            .size(72.dp)
-                            .background(
-                                Brush.linearGradient(listOf(BrandColors.Primary, AccentColors.PrimarySoft)),
-                                CircleShape
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.LocationOn, null, tint = Color.White, modifier = Modifier.size(32.dp))
-                    }
-                    
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(text = loc.name, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-                    Text(text = loc.address, fontSize = 15.sp, color = Color.Gray, textAlign = TextAlign.Center)
-                    
-                    Spacer(modifier = Modifier.height(24.dp))
-                    
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color.White,
-                        shadowElevation = 2.dp,
-                        tonalElevation = 0.dp
-                    ) {
-                        Column {
-                            InfoRow(icon = Icons.Default.Public, title = "좌표", value = "${String.format("%.6f", loc.latitude)}, ${String.format("%.6f", loc.longitude)}")
-                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = BrandColors.InputBackground)
-                            InfoRow(
-                                icon = Icons.Default.Notifications, 
-                                title = "도착 알림", 
-                                value = if (loc.sltEnterAlarm == "Y") "켜짐" else "꺼짐", 
-                                isToggle = true,
-                                isChecked = loc.sltEnterAlarm == "Y",
-                                onToggle = { onNotificationToggle(loc) }
-                            )
-                        }
-                    }
-                    
-                    Spacer(modifier = Modifier.height(24.dp))
-                    
-                    // Buttons
-                        if (canManage) {
-                            ActionButton(text = "편집", icon = Icons.Default.Edit, bgColor = BrandColors.Primary) { isEditMode = true }
-                            Spacer(modifier = Modifier.height(12.dp))
-                            ActionButton(
-                                text = if (loc.sltEnterAlarm == "Y") "알림 끄기" else "알림 켜기", 
-                                icon = if (loc.sltEnterAlarm == "Y") Icons.Default.NotificationsOff else Icons.Default.NotificationsActive, 
-                                bgColor = AccentColors.Orange
-                            ) { onNotificationToggle(loc) }
-                            Spacer(modifier = Modifier.height(12.dp))
-                            ActionButton(text = "삭제", icon = Icons.Default.Delete, bgColor = BrandColors.Error) { onDelete(loc) }
-                        }
-                    }
-                } else {
-                    // EDIT / NEW MODE
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 20.dp),
-                        verticalArrangement = Arrangement.spacedBy(20.dp)
-                    ) {
-                    // Target Member Selection (if NEW)
-                    if (isNew) {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                AnimatedContent(
+                    targetState = isEditMode to (location != null),
+                    transitionSpec = {
+                        fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
+                    },
+                    label = "ModeSwitch"
+                ) { (editMode, hasLocation) ->
+                    if (!editMode && hasLocation) {
+                        // 보기
+                        val loc = location!!
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = SmapSpacing.md),
+                            verticalArrangement = Arrangement.spacedBy(SmapSpacing.md)
+                        ) {
                             Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(bottom = 4.dp)
+                                modifier = Modifier.padding(horizontal = SmapSpacing.xs, vertical = SmapSpacing.sm),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(Icons.Default.Person, null, tint = BrandColors.Primary, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("등록 대상 멤버", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = BrandColors.TextPrimary, fontFamily = SuiteFont)
+                                SmapRowIcon(Icons.Outlined.Place, emphasized = true)
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(loc.name, style = SmapText.title, color = colors.onSurface)
+                                    Text(loc.address, style = SmapText.secondary, color = colors.onSurfaceVariant)
+                                }
                             }
-                            
-                            val memberSelectClickable = isNew && members.size > 1
-                            Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .alpha(if (memberSelectClickable) 1f else 0.6f)
-                                    .clickable(
-                                        enabled = memberSelectClickable,
-                                        role = Role.Button
-                                    ) {
-                                        showMemberSelector = true
-                                    }
-                                    .semantics {
-                                        contentDescription = if (memberSelectClickable) {
-                                            "등록 대상 멤버 선택, 현재 ${selectedMember?.displayName ?: "미선택"}"
-                                        } else {
-                                            "등록 대상 멤버 ${selectedMember?.displayName ?: "없음"} (변경 불가)"
-                                        }
-                                    },
-                                shape = RoundedCornerShape(16.dp),
-                                color = Color.White,
-                                shadowElevation = 2.dp,
-                                tonalElevation = 0.dp
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(16.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    val imageUrl = remember(selectedMember?.mtFile1) {
-                                        val file = selectedMember?.mtFile1
-                                        if (!file.isNullOrBlank()) {
-                                            when {
-                                                file.startsWith("http") -> file
-                                                file.startsWith("/images/") -> "${BuildConfig.IMAGE_BASE_URL}$file"
-                                                file.startsWith("/") -> "${BuildConfig.IMAGE_BASE_URL}/images$file"
-                                                else -> "${BuildConfig.IMAGE_BASE_URL}/images/$file"
-                                            }
-                                        } else null
-                                    }
-                                    
-                                    Box(modifier = Modifier.size(44.dp).clip(CircleShape).background(Color.Gray.copy(alpha = 0.1f))) {
-                                        if (imageUrl != null) {
-                                            AsyncImage(
-                                                model = ImageRequest.Builder(LocalContext.current)
-                                                    .data(imageUrl)
-                                                    .crossfade(true)
-                                                    .build(),
-                                                contentDescription = "${selectedMember?.displayName ?: "멤버"} 프로필 사진",
-                                                modifier = Modifier.fillMaxSize(),
-                                                contentScale = ContentScale.Crop,
-                                                onState = { state ->
-                                                    if (state is coil.compose.AsyncImagePainter.State.Error && BuildConfig.DEBUG) {
-                                                        Log.e("LocationDetailSheet", "Avatar Load Error: ${state.result.throwable.message}")
-                                                    }
-                                                }
-                                            )
-                                        } else {
-                                            Icon(Icons.Default.Person, null, tint = Color.Gray, modifier = Modifier.align(Alignment.Center))
-                                        }
-                                    }
-                                    
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(text = selectedMember?.displayName ?: "멤버 선택", fontSize = 16.sp, fontWeight = FontWeight.Bold, fontFamily = SuiteFont)
-                                        Text(text = "이 멤버의 장소로 등록됩니다", fontSize = 13.sp, color = Color.Gray, fontFamily = SuiteFont)
-                                    }
-                                    
-                                    if (isNew && members.size > 1) {
-                                        Icon(Icons.Default.ExpandMore, contentDescription = null, tint = Color.Gray)
-                                    }
+                            SmapSection {
+                                val alarmOn = loc.sltEnterAlarm == "Y"
+                                SmapListRow(
+                                    title = "도착 알림",
+                                    subtitle = if (alarmOn) "도착하면 알려 드려요" else "꺼져 있어요",
+                                    leading = { SmapRowIcon(Icons.Outlined.NotificationsNone) },
+                                    trailing = { Switch(checked = alarmOn, onCheckedChange = { onNotificationToggle(loc) }) },
+                                    onClick = { onNotificationToggle(loc) }
+                                )
+                                loc.memo?.takeIf { it.isNotBlank() }?.let { memoText ->
+                                    SmapRowDivider()
+                                    SmapListRow(
+                                        title = memoText,
+                                        subtitle = "메모",
+                                        leading = { SmapRowIcon(Icons.AutoMirrored.Outlined.Notes) }
+                                    )
                                 }
                             }
                         }
-                    }
-
-                    // Place Info Section
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                         Row(
-                             verticalAlignment = Alignment.CenterVertically,
-                             modifier = Modifier.padding(bottom = 4.dp)
-                         ) {
-                            Icon(Icons.Default.Map, null, tint = BrandColors.Primary, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("장소 정보", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = BrandColors.TextPrimary, fontFamily = SuiteFont)
-                        }
-
-                        Surface(
+                    } else {
+                        // 편집 / 새로 등록
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable(role = Role.Button) { onSearchClick() }
-                                .semantics { contentDescription = "주소 검색으로 장소 찾기" },
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color.White,
-                            shadowElevation = 2.dp,
-                            tonalElevation = 0.dp
+                                .padding(SmapSpacing.md),
+                            verticalArrangement = Arrangement.spacedBy(SmapSpacing.lg)
                         ) {
-                            Row(
-                                modifier = Modifier.padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Default.Search, contentDescription = null, tint = BrandColors.Primary)
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Text("주소 검색으로 찾기", fontSize = 16.sp, fontWeight = FontWeight.Medium, fontFamily = SuiteFont)
-                                Spacer(modifier = Modifier.weight(1f))
-                                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.Gray)
+                            if (isNew) {
+                                val memberSelectClickable = members.size > 1
+                                SmapSection(title = "누구의 장소") {
+                                    SmapListRow(
+                                        title = selectedMember?.displayName ?: "멤버 선택",
+                                        subtitle = "이 멤버의 장소로 등록돼요",
+                                        leading = {
+                                            SmapAvatar(
+                                                name = selectedMember?.displayName ?: "멤버",
+                                                imagePath = selectedMember?.mtFile1,
+                                                size = 40.dp
+                                            )
+                                        },
+                                        trailing = if (memberSelectClickable) {
+                                            { Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = colors.outline) }
+                                        } else null,
+                                        onClick = if (memberSelectClickable) ({ showMemberSelector = true }) else null
+                                    )
+                                }
                             }
-                        }
-                        
-                        // Inputs — imeAction 연쇄로 키보드 플로우 자연스럽게
-                        InputSection(
-                            title = "장소 이름 *",
-                            value = name,
-                            placeholder = "장소 이름을 입력하세요",
-                            imeAction = ImeAction.Next,
-                            onValueChange = { name = it }
-                        )
-                        InputSection(
-                            title = "상세 주소 *",
-                            value = address,
-                            placeholder = "주소를 입력하세요",
-                            imeAction = ImeAction.Next,
-                            onValueChange = { address = it }
-                        )
-                        InputSection(
-                            title = "메모",
-                            value = memo,
-                            placeholder = "메모를 입력하세요 (선택)",
-                            imeAction = ImeAction.Done,
-                            onValueChange = { memo = it }
-                        )
-                    }
-                    
-                    // Coordinates (Read-only)
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 4.dp)) {
-                            Icon(Icons.Default.Public, null, tint = BrandColors.Primary, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("좌표", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = BrandColors.TextPrimary, fontFamily = SuiteFont)
-                        }
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            color = BrandColors.Border
-                        ) {
-                            Text(
-                                text = if (lat != 0.0 && lng != 0.0) {
-                                    "${String.format("%.6f", lat)}, ${String.format("%.6f", lng)}"
-                                } else "좌표 없음",
-                                modifier = Modifier.padding(14.dp),
-                                fontSize = 16.sp,
-                                color = Color.Gray
-                            )
-                        }
-                    }
-                    
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color.White,
-                        shadowElevation = 2.dp,
-                        tonalElevation = 0.dp
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                             Column(modifier = Modifier.weight(1f)) {
-                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                     Icon(Icons.Default.Notifications, null, tint = BrandColors.Primary, modifier = Modifier.size(18.dp))
-                                     Spacer(modifier = Modifier.width(8.dp))
-                                     Text("도착 알림", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = BrandColors.TextPrimary, fontFamily = SuiteFont)
-                                 }
-                                 Spacer(modifier = Modifier.height(4.dp))
-                                 Text(
-                                     text = "멤버가 도착하면 알림을 받아요",
-                                     fontSize = 13.sp,
-                                     color = Color.Gray,
-                                     fontFamily = SuiteFont,
-                                     lineHeight = 18.sp
-                                 )
-                             }
-                            Switch(
-                                checked = enterAlarm == "Y", 
-                                onCheckedChange = { 
-                                    enterAlarm = if (it) "Y" else "N"
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color.White,
-                                    checkedTrackColor = BrandColors.Primary
+
+                            SmapSection(title = "어디") {
+                                SmapListRow(
+                                    title = "주소 검색으로 찾기",
+                                    subtitle = if (lat == 0.0 && lng == 0.0) "아직 위치를 고르지 않았어요" else null,
+                                    leading = { SmapRowIcon(Icons.Outlined.Search) },
+                                    trailing = { Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = colors.outline) },
+                                    onClick = onSearchClick
                                 )
-                            )
+                                SmapRowDivider()
+                                Column(
+                                    modifier = Modifier.padding(SmapSpacing.md),
+                                    verticalArrangement = Arrangement.spacedBy(SmapSpacing.sm)
+                                ) {
+                                    SmapTextField(
+                                        value = name,
+                                        onValueChange = { name = it },
+                                        label = "장소 이름",
+                                        placeholder = "예: 우리 집, 학교, 학원",
+                                        imeAction = ImeAction.Next,
+                                        keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
+                                    )
+                                    SmapTextField(
+                                        value = address,
+                                        onValueChange = { address = it },
+                                        label = "주소",
+                                        placeholder = "주소를 입력해 주세요",
+                                        imeAction = ImeAction.Next,
+                                        keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
+                                    )
+                                    SmapTextField(
+                                        value = memo,
+                                        onValueChange = { memo = it },
+                                        label = "메모 (선택)",
+                                        placeholder = "참고할 내용",
+                                        singleLine = false,
+                                        imeAction = ImeAction.Done,
+                                        keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
+                                    )
+                                }
+                            }
+
+                            SmapSection(title = "알림") {
+                                SmapListRow(
+                                    title = "도착 알림",
+                                    subtitle = "멤버가 도착하면 알림을 받아요",
+                                    leading = { SmapRowIcon(Icons.Outlined.NotificationsNone) },
+                                    trailing = {
+                                        Switch(
+                                            checked = enterAlarm == "Y",
+                                            onCheckedChange = { enterAlarm = if (it) "Y" else "N" }
+                                        )
+                                    },
+                                    onClick = { enterAlarm = if (enterAlarm == "Y") "N" else "Y" }
+                                )
+                            }
                         }
                     }
                 }
             }
 
-                if (showMemberSelector) {
-                    MemberSelectorDialog(
-                        members = members,
-                        selectedMemberId = selectedMember?.mtIdx,
-                        onDismiss = { showMemberSelector = false },
-                        onSelect = {
-                            onMemberSelect(it)
-                            showMemberSelector = false
-                        }
-                    )
+            // 아래 고정 버튼 — 보기: [삭제][편집], 편집·등록: [저장]
+            if (canManage) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = SmapSpacing.md, end = SmapSpacing.md, top = SmapSpacing.sm),
+                    horizontalArrangement = Arrangement.spacedBy(SmapSpacing.sm)
+                ) {
+                    if (!isEditMode && location != null) {
+                        SmapButton(
+                            text = "삭제",
+                            onClick = { onDelete(location) },
+                            style = SmapButtonStyle.Secondary,
+                            modifier = Modifier.weight(1f)
+                        )
+                        SmapButton(
+                            text = "편집",
+                            onClick = { isEditMode = true },
+                            leadingIcon = Icons.Outlined.Edit,
+                            modifier = Modifier.weight(2f)
+                        )
+                    } else {
+                        SmapButton(
+                            text = if (isNew) "장소 추가" else "저장",
+                            onClick = {
+                                haptics.medium()
+                                onSave(name, address, lat, lng, memo.ifBlank { null }, enterAlarm)
+                            },
+                            enabled = canSave,
+                            isLoading = isLoading,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             }
+
+            if (showMemberSelector) {
+                MemberSelectorDialog(
+                    members = members,
+                    selectedMemberId = selectedMember?.mtIdx,
+                    onDismiss = { showMemberSelector = false },
+                    onSelect = {
+                        onMemberSelect(it)
+                        showMemberSelector = false
+                    }
+                )
+            }
         }
-    }
     }
 
     if (showUnsavedChangesDialog) {
@@ -550,91 +437,6 @@ fun LocationDetailSheet(
                     destructive = true
                 )
             }
-        )
-    }
-}
-
-@Composable
-private fun InfoRow(
-    icon: ImageVector, 
-    title: String, 
-    value: String, 
-    isToggle: Boolean = false, 
-    isChecked: Boolean = false,
-    onToggle: ((Boolean) -> Unit)? = null
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(icon, null, tint = BrandColors.Primary, modifier = Modifier.size(24.dp))
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(text = title, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = BrandColors.TextPrimary, fontFamily = SuiteFont)
-        Spacer(modifier = Modifier.weight(1f))
-        if (isToggle) {
-            Switch(
-                checked = isChecked, 
-                onCheckedChange = { onToggle?.invoke(it) }, 
-                modifier = Modifier.scale(0.8f),
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = Color.White,
-                    checkedTrackColor = BrandColors.Primary
-                )
-            )
-        } else {
-            Text(text = value, fontSize = 15.sp, color = Color.Black, fontFamily = SuiteFont)
-        }
-    }
-}
-
-@Composable
-private fun ActionButton(text: String, icon: ImageVector, bgColor: Color, onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth().height(50.dp),
-        shape = RoundedCornerShape(12.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = bgColor)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null, modifier = Modifier.size(18.dp))
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(text = text, fontSize = 16.sp, fontWeight = FontWeight.Bold, fontFamily = SuiteFont)
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun InputSection(
-    title: String,
-    value: String,
-    placeholder: String,
-    imeAction: ImeAction = ImeAction.Next,
-    onValueChange: (String) -> Unit
-) {
-    val focusManager = LocalFocusManager.current
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
-        OutlinedTextField(
-            value = value,
-            onValueChange = onValueChange,
-            placeholder = { Text(placeholder, color = Color.Gray.copy(alpha = 0.7f)) },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            keyboardOptions = KeyboardOptions(
-                imeAction = imeAction,
-                keyboardType = KeyboardType.Text
-            ),
-            keyboardActions = KeyboardActions(
-                onNext = { focusManager.moveFocus(androidx.compose.ui.focus.FocusDirection.Down) },
-                onDone = { focusManager.clearFocus() }
-            ),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White,
-                focusedBorderColor = BrandColors.Primary,
-                unfocusedBorderColor = Color.Transparent
-            )
         )
     }
 }
