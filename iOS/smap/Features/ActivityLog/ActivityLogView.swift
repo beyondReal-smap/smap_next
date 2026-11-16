@@ -65,7 +65,9 @@ struct ActivityLogView: View {
             withAnimation(.easeOut(duration: 0.3)) { hasLoadedOnce = true }
         }
         .onChange(of: isActive) { _, active in
-            if !active { showGroupPicker = false }
+            if !active { showGroupPicker = false; return }
+            // 오늘 기록이 오래됐으면 화면을 가리지 않고 새로 받는다(미리 만들어 둔 탭은 앱을 켤 때 받아 두었다).
+            Task { await viewModel.refreshIfStale() }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("groupsDidChange"))) { _ in
             Task { await viewModel.loadInitialData() }
@@ -245,9 +247,15 @@ struct ActivityLogMapView: UIViewRepresentable {
                 m.mapView = mapView
                 context.coordinator.markers.append(m)
                 
-                let cameraUpdate = NMFCameraUpdate(scrollTo: NMGLatLng(lat: first.latitude, lng: first.longitude))
-                cameraUpdate.animation = .fly
-                mapView.moveCamera(cameraUpdate)
+                // 출발점이 바뀌었을 때(날짜·멤버 변경, 첫 표시)만 카메라를 옮긴다.
+                // 이전에는 다시 그릴 때마다 출발점으로 날아가, 새로 받은 점이 붙기만 해도 보던 위치가 초기화됐다.
+                let start = NMGLatLng(lat: first.latitude, lng: first.longitude)
+                if context.coordinator.lastCameraStart.map({ $0.lat != start.lat || $0.lng != start.lng }) ?? true {
+                    context.coordinator.lastCameraStart = start
+                    let cameraUpdate = NMFCameraUpdate(scrollTo: start)
+                    cameraUpdate.animation = .fly
+                    mapView.moveCamera(cameraUpdate)
+                }
             }
             
             if let last = validMarkers.last {
@@ -344,12 +352,12 @@ struct ActivityLogMapView: UIViewRepresentable {
             let now = Date.timeIntervalSinceReferenceDate
             let coordinator = context.coordinator
             if (isSliderDragging && now - coordinator.lastSliderCameraMove >= 0.1) ||
-                (!isSliderDragging && (coordinator.wasSliderDragging || coordinator.lastSliderCameraIndex != index)) {
+                (!isSliderDragging && (coordinator.wasSliderDragging || coordinator.lastSliderCameraValue != sliderValue)) {
                 let cameraUpdate = NMFCameraUpdate(scrollTo: NMGLatLng(lat: curr.latitude, lng: curr.longitude))
                 cameraUpdate.animation = .none
                 mapView.moveCamera(cameraUpdate)
                 coordinator.lastSliderCameraMove = now
-                coordinator.lastSliderCameraIndex = index
+                coordinator.lastSliderCameraValue = sliderValue
             }
             coordinator.wasSliderDragging = isSliderDragging
         }
@@ -500,8 +508,12 @@ struct ActivityLogMapView: UIViewRepresentable {
         var currentPositionMarker: NMFMarker?
         var currentInfoMarker: NMFMarker?
         var lastMapMarkersCount: Int = 0
+        /// 마지막으로 카메라를 맞춘 출발점 — 같은 경로에 점만 늘어난 경우(조용한 새로고침) 카메라를 되돌리지 않기 위해
+        var lastCameraStart: NMGLatLng?
         var lastSliderCameraMove: TimeInterval = 0
-        var lastSliderCameraIndex: Int?
+        /// 카메라가 마지막으로 따라간 슬라이더 값 — 위치 순번이 아니라 값으로 비교해,
+        /// 조용히 새로 받아 점이 늘어 순번만 바뀐 경우엔 카메라를 옮기지 않는다
+        var lastSliderCameraValue: Double?
         var wasSliderDragging = false
         
         func clearOverlays() {

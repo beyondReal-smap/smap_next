@@ -132,6 +132,10 @@ class ActivityLogViewModel: ObservableObject {
     private let service = ActivityLogService.shared
     private var cancellables = Set<AnyCancellable>()
     private var locationRequestID = UUID()
+    /// 이동 경로를 마지막으로 받은 시각 — 탭에 다시 들어올 때 조용히 새로 받을지 판단한다
+    private var lastLocationLoadAt: Date?
+    /// 이 시간이 지난 오늘 기록은 탭에 들어올 때 새로 받는다 (Android ActivityLogViewModel 과 같은 값)
+    private static let staleInterval: TimeInterval = 120
     private var countsRequestID = UUID()
 
     // MARK: - Initialization
@@ -345,7 +349,9 @@ class ActivityLogViewModel: ObservableObject {
             }
         }
         switch markerResult {
-        case .success(let value): mapMarkers = value
+        case .success(let value):
+            mapMarkers = value
+            lastLocationLoadAt = Date()
         case .failure(let error): note(error, "이동 경로")
         }
         switch stayResult {
@@ -364,6 +370,43 @@ class ActivityLogViewModel: ObservableObject {
         }
         isMarkersLoading = false
         isLoading = false
+    }
+
+    /// 탭에 다시 들어올 때 — 오늘을 보고 있고 마지막으로 받은 지 2분이 넘었으면 화면을 가리지 않고 새로 받는다.
+    /// 로딩 표시·슬라이더 초기화·오류 알림 없이 값만 바꾼다. 실패하면 지금 보이는 기록을 그대로 두고 로그만 남긴다.
+    func refreshIfStale() async {
+        guard isToday(selectedDate),
+              let memberId = selectedMemberId,
+              !isMarkersLoading,
+              let last = lastLocationLoadAt,
+              Date().timeIntervalSince(last) >= Self.staleInterval else { return }
+        let date = selectedDate
+        let requestID = UUID()
+        locationRequestID = requestID
+
+        async let markers = capture { try await self.service.getMapMarkers(memberId: memberId, date: date) }
+        async let stays = capture { try await self.service.getStayTimes(memberId: memberId, date: date) }
+        async let summary = capture { try await self.service.getLocationLogSummary(memberId: memberId, date: date) }
+        let (markerResult, stayResult, summaryResult) = await (markers, stays, summary)
+        // 그사이 날짜·멤버를 바꿨거나 다른 요청이 시작됐으면 버린다.
+        guard locationRequestID == requestID, selectedMemberId == memberId, selectedDate == date else { return }
+
+        switch markerResult {
+        case .success(let value):
+            mapMarkers = value
+            lastLocationLoadAt = Date()
+        case .failure(let error):
+            print("[ActivityLogViewModel] 조용한 새로고침 실패(이동 경로): \(error)")
+            return
+        }
+        switch stayResult {
+        case .success(let value): stayTimes = value
+        case .failure(let error): print("[ActivityLogViewModel] 조용한 새로고침 실패(체류 기록): \(error)")
+        }
+        switch summaryResult {
+        case .success(let value): locationSummary = value
+        case .failure(let error): print("[ActivityLogViewModel] 조용한 새로고침 실패(활동 요약): \(error)")
+        }
     }
 
     /// 특정 날짜에 해당 멤버의 활동이 있는지 확인

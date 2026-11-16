@@ -47,9 +47,14 @@ class ActivityLogViewModel @Inject constructor(
 
     companion object {
         private const val TAG = "ActivityLogViewModel"
+        /** 이 시간이 지난 오늘 기록은 탭에 들어올 때 새로 받는다 (iOS ActivityLogViewModel 과 같은 값) */
+        private const val STALE_AFTER_MS = 120_000L
     }
     
     private val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+
+    /** 이동 경로를 마지막으로 받은 시각(elapsedRealtime) — 탭에 다시 들어올 때 조용히 새로 받을지 판단한다. 0 이면 아직 못 받음 */
+    private var lastLoadedAtMs = 0L
 
     // Date
     private val _selectedDate = MutableStateFlow(LocalDate.now())
@@ -265,6 +270,7 @@ class ActivityLogViewModel @Inject constructor(
                     is ApiResult.Success -> {
                         _locationLogs.value = result.data.filter { it.hasValidCoordinates }
                         _sliderValue.value = 0.0
+                        lastLoadedAtMs = android.os.SystemClock.elapsedRealtime()
                     }
                     is ApiResult.Error -> {
                         if (result.code == 403 && result.detailCode == SubscriptionErrorCodes.LOG_RETENTION_EXCEEDED) {
@@ -294,6 +300,45 @@ class ActivityLogViewModel @Inject constructor(
                     _isLoading.value = false
                     _isLoadingLogs.value = false
                 }
+            }
+        }
+    }
+
+    /**
+     * 탭에 다시 들어올 때 — 오늘을 보고 있고 마지막으로 받은 지 2분이 넘었으면 화면을 가리지 않고 새로 받는다.
+     * 로딩 표시·슬라이더 초기화·오류 안내 없이 값만 바꾼다. 실패하면 지금 보이는 기록을 그대로 두고 로그만 남긴다.
+     * 첫 로딩이 아직이거나 실패한 상태(lastLoadedAtMs == 0)는 기존 로딩·다시 시도 흐름에 맡긴다.
+     */
+    fun refreshIfStale() {
+        if (_selectedDate.value != LocalDate.now()) return
+        val member = _selectedMember.value ?: return
+        if (activityJob?.isActive == true || lastLoadedAtMs == 0L) return
+        if (android.os.SystemClock.elapsedRealtime() - lastLoadedAtMs < STALE_AFTER_MS) return
+        val dateStr = _selectedDate.value.format(dateFormatter)
+
+        // 날짜·멤버를 바꾸면 loadActivityData 가 이 작업을 취소한다.
+        activityJob = viewModelScope.launch {
+            val logsDeferred = async { safeApiCall { activityLogService.getLocationLogs(member.mtIdx, dateStr) } }
+            val summaryDeferred = async { safeApiCall { activityLogService.getLocationSummary(member.mtIdx, dateStr) } }
+            val stayTimesDeferred = async { safeApiCall { activityLogService.getStayTimes(member.mtIdx, dateStr) } }
+
+            when (val result = logsDeferred.await()) {
+                is ApiResult.Success -> {
+                    _locationLogs.value = result.data.filter { it.hasValidCoordinates }
+                    lastLoadedAtMs = android.os.SystemClock.elapsedRealtime()
+                }
+                else -> {
+                    Log.w(TAG, "조용한 새로고침 실패(이동 경로): $result")
+                    return@launch
+                }
+            }
+            when (val result = summaryDeferred.await()) {
+                is ApiResult.Success -> _locationSummary.value = result.data
+                else -> Log.w(TAG, "조용한 새로고침 실패(활동 요약): $result")
+            }
+            when (val result = stayTimesDeferred.await()) {
+                is ApiResult.Success -> _stayTimes.value = result.data
+                else -> Log.w(TAG, "조용한 새로고침 실패(체류 기록): $result")
             }
         }
     }

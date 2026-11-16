@@ -84,6 +84,10 @@ fun ActivityLogScreen(
     var mapLogs by remember { mutableStateOf(locationLogs) }
     var mapStayTimes by remember { mutableStateOf(stayTimes) }
     val currentVisibility = rememberUpdatedState(isVisible)
+    // 탭에 들어올 때 오늘 기록이 오래됐으면 화면을 가리지 않고 새로 받는다(미리 만들어 둔 탭은 앱을 켤 때 받아 두었다).
+    LaunchedEffect(isVisible) {
+        if (isVisible) viewModel.refreshIfStale()
+    }
     LaunchedEffect(isVisible, locationLogs, stayTimes) {
         // 보일 때만 지도에 반영한다. 단, 미리 만들어 둔 숨은 탭은 첫 데이터를 미리 그려 둔다 —
         // 그러지 않으면 처음 들어오는 순간 경로·표시를 한꺼번에 그려 전환이 끊겼다.
@@ -135,9 +139,12 @@ fun ActivityLogScreen(
 
     
     // Move camera when logs change (iOS Style: Start Point, Zoom 15)
-    LaunchedEffect(mapLogs) {
+    // 출발점이 바뀌었을 때(날짜·멤버 변경, 첫 표시)만 카메라를 옮긴다 — 조용히 새로 받아 점만 늘어난 경우엔
+    // 보던 위치를 그대로 둔다(이전에는 다시 그릴 때마다 출발점으로 돌아갔다).
+    val cameraStartLog = mapLogs.firstOrNull { it.hasValidCoordinates }
+    LaunchedEffect(cameraStartLog?.latitude, cameraStartLog?.longitude) {
         if (mapLogs.isNotEmpty()) {
-            val firstLog = mapLogs.firstOrNull { it.hasValidCoordinates }
+            val firstLog = cameraStartLog
             if (firstLog != null) {
                 val startPos = LatLng(firstLog.latitude, firstLog.longitude)
                 val update = CameraUpdate.toCameraPosition(CameraPosition(startPos, 15.0))
@@ -355,9 +362,14 @@ fun ActivityLogScreen(
                             val capturedTotalPoints = totalPoints
                         
                             val job = launch {
+                                // 경로를 다시 그리면 이 감시가 새로 시작되며 현재 값을 한 번 바로 내보낸다.
+                                // 그때는 표시만 맞추고 카메라는 두어, 조용히 새로 받은 뒤에도 보던 위치가 유지되게 한다.
+                                var previousValue: Float? = null
                                 // Watch slider value changes
                                 snapshotFlow { uiSliderValue }
                                     .collect { value ->
+                                        val sliderMoved = previousValue != null && previousValue != value
+                                        previousValue = value
                                         if (!currentVisibility.value) return@collect
                                         if (capturedTotalPoints < 1) return@collect
                                     
@@ -392,10 +404,12 @@ fun ActivityLogScreen(
                                             infoMarker.width = infoBitmap.width
                                             infoMarker.height = infoBitmap.height
                                         
-                                            // Always move camera to follow slider position (match iOS behavior)
-                                            val update = CameraUpdate.scrollTo(pos)
-                                            update.animate(com.naver.maps.map.CameraAnimation.None)
-                                            map.moveCamera(update)
+                                            // 슬라이더를 움직였을 때 카메라가 따라간다 (match iOS behavior)
+                                            if (sliderMoved) {
+                                                val update = CameraUpdate.scrollTo(pos)
+                                                update.animate(com.naver.maps.map.CameraAnimation.None)
+                                                map.moveCamera(update)
+                                            }
                                         }
                                     }
                             }
