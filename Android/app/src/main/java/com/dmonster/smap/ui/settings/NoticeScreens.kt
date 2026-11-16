@@ -1,33 +1,67 @@
 package com.dmonster.smap.ui.settings
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.Campaign
+import androidx.compose.material.icons.outlined.NotificationsOff
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.dmonster.smap.data.model.SmapNotice
 import com.dmonster.smap.data.service.AuthService
-import com.dmonster.smap.ui.theme.SuiteFont
+import com.dmonster.smap.ui.components.SmapEmptyState
+import com.dmonster.smap.ui.components.SmapErrorState
+import com.dmonster.smap.ui.components.SmapListRow
+import com.dmonster.smap.ui.components.SmapLoadingState
+import com.dmonster.smap.ui.components.SmapRowDivider
+import com.dmonster.smap.ui.components.SmapRowIcon
+import com.dmonster.smap.ui.components.SmapSection
+import com.dmonster.smap.ui.components.SmapTopBar
+import com.dmonster.smap.ui.theme.SmapSpacing
+import com.dmonster.smap.ui.theme.SmapText
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
+import java.time.LocalDate
+import java.time.temporal.ChronoUnit
+
+/*
+ * 공지사항 — 36단계: 설정 화면과 같은 "회색 바탕 + 구역 + 흰 행" 목록 / 흰 바탕 본문으로 (iOS NoticeListView 와 같은 구성).
+ * 이전에는 흰 "< 뒤로" 알약 머리 + 빨강 그라데이션 머리 카드 + 그림자 카드 목록이었다(빨강은 앱 어디에도 없는 색).
+ */
+
+/** 최근 며칠 안에 올라온 공지에 "NEW" 표시 */
+private const val NEW_BADGE_DAYS = 7L
+
 @EntryPoint
 @InstallIn(SingletonComponent::class)
 interface NoticeEntryPoint {
@@ -42,106 +76,49 @@ fun NoticeListScreen(onBack: () -> Unit, onNoticeClick: (SmapNotice) -> Unit) {
     }
     var notices by remember { mutableStateOf<List<SmapNotice>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var loadFailed by remember { mutableStateOf(false) }
+    var reloadKey by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(reloadKey) {
+        isLoading = true
+        loadFailed = false
         try {
             val response = authService.getNotices()
-            if (response != null) {
-                notices = response.notices
-            }
+            // 응답이 없으면(null) 실패로 본다 — 이전에는 빈 목록("공지가 없습니다")으로 보여 원인이 가려졌다.
+            if (response != null) notices = response.notices else loadFailed = true
         } catch (e: Exception) {
-            errorMessage = e.message ?: "Unknown error"
+            android.util.Log.e("NoticeListScreen", "공지 목록 조회 실패", e)
+            loadFailed = true
         } finally {
             isLoading = false
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFF7F7F7))
-    ) {
-        Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
-            // Header
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 20.dp)
-            ) {
-                Surface(
-                    onClick = onBack,
-                    shape = RoundedCornerShape(24.dp),
-                    color = Color.White,
-                    shadowElevation = 2.dp,
-                    modifier = Modifier.height(44.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                            contentDescription = "뒤로",
-                            tint = Color.Black,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Text(
-                            text = "뒤로",
-                            fontFamily = SuiteFont,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 17.sp,
-                            color = Color.Black
-                        )
-                    }
-                }
-            }
-
-            if (isLoading) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = Color.Red)
-                }
-            } else if (errorMessage != null) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("오류: $errorMessage", color = Color.Gray, fontFamily = SuiteFont)
-                }
-            } else if (notices.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("등록된 공지사항이 없습니다.", color = Color.Gray, fontFamily = SuiteFont)
-                }
-            } else {
-                LazyColumn(
+    val colors = MaterialTheme.colorScheme
+    Scaffold(
+        containerColor = colors.background,
+        topBar = { SmapTopBar(title = "공지사항", onBack = onBack) }
+    ) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            when {
+                isLoading -> SmapLoadingState()
+                loadFailed -> SmapErrorState(onRetry = { reloadKey++ })
+                notices.isEmpty() -> SmapEmptyState(
+                    title = "등록된 공지사항이 없어요",
+                    description = "새 소식이 생기면 여기에 알려 드릴게요.",
+                    icon = Icons.Outlined.NotificationsOff,
+                )
+                else -> LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 20.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    contentPadding = PaddingValues(SmapSpacing.md),
                 ) {
                     item {
-                        // Header Card
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 12.dp)
-                                .background(
-                                    brush = Brush.linearGradient(
-                                        colors = listOf(Color.Red, Color(0xFFCC0000))
-                                    ),
-                                    shape = RoundedCornerShape(24.dp)
-                                )
-                                .padding(24.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Text("공지사항", fontFamily = SuiteFont, fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color.White)
-                                    Text("최신 소식 및 업데이트", fontFamily = SuiteFont, fontSize = 14.sp, color = Color.White.copy(alpha = 0.8f))
-                                }
-                                Icon(Icons.Default.Notifications, contentDescription = null, tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.size(32.dp))
+                        SmapSection(title = "공지 ${notices.size}") {
+                            notices.forEachIndexed { index, notice ->
+                                if (index > 0) SmapRowDivider()
+                                NoticeRow(notice = notice, onClick = { onNoticeClick(notice) })
                             }
                         }
-                    }
-
-                    items(notices, key = { it.ntIdx }) { notice ->
-                        NoticeItem(notice = notice, onClick = { onNoticeClick(notice) })
                     }
                 }
             }
@@ -150,88 +127,71 @@ fun NoticeListScreen(onBack: () -> Unit, onNoticeClick: (SmapNotice) -> Unit) {
 }
 
 @Composable
-fun NoticeItem(notice: SmapNotice, onClick: () -> Unit) {
-    Card(
+private fun NoticeRow(notice: SmapNotice, onClick: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    SmapListRow(
+        title = notice.ntTitle,
+        subtitle = noticeMeta(notice),
+        leading = { SmapRowIcon(Icons.Outlined.Campaign) },
+        trailing = {
+            if (isRecent(notice)) NewBadge()
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = colors.onSurfaceVariant)
+        },
+        onClick = onClick,
+    )
+}
+
+/** 최근 공지 표시 — 메뉴 강조색 글자 + 옅은 바탕 알약 */
+@Composable
+private fun NewBadge() {
+    val colors = MaterialTheme.colorScheme
+    Text(
+        "NEW",
+        style = SmapText.captionBold,
+        color = colors.primary,
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .clickable { onClick() },
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(notice.ntTitle, fontFamily = SuiteFont, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.Black, maxLines = 1)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(notice.ntWdate.take(10), fontFamily = SuiteFont, fontSize = 12.sp, color = Color.Gray)
-                Text("조회수 ${notice.ntHit}", fontFamily = SuiteFont, fontSize = 12.sp, color = Color.Gray)
-            }
-        }
-    }
+            .background(colors.primaryContainer, RoundedCornerShape(50))
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+    )
 }
 
 @Composable
 fun NoticeDetailScreen(notice: SmapNotice, onBack: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFF7F7F7))
-    ) {
-        Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
-            // Header
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 20.dp)
-            ) {
-                Surface(
-                    onClick = onBack,
-                    shape = RoundedCornerShape(24.dp),
-                    color = Color.White,
-                    shadowElevation = 2.dp,
-                    modifier = Modifier.height(44.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                            contentDescription = "뒤로",
-                            tint = Color.Black,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Text(
-                            text = "뒤로",
-                            fontFamily = SuiteFont,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 17.sp,
-                            color = Color.Black
-                        )
-                    }
-                }
+    val colors = MaterialTheme.colorScheme
+    Scaffold(
+        containerColor = colors.surface,
+        topBar = { SmapTopBar(title = "공지사항", onBack = onBack) }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(SmapSpacing.lg),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(SmapSpacing.sm)) {
+                if (isRecent(notice)) NewBadge()
+                Text(noticeMeta(notice), style = SmapText.caption, color = colors.onSurfaceVariant)
             }
-
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp)
-            ) {
-                Text(notice.ntTitle, fontFamily = SuiteFont, fontWeight = FontWeight.Bold, fontSize = 22.sp, color = Color.Black)
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(notice.ntWdate, fontFamily = SuiteFont, fontSize = 13.sp, color = Color.Gray)
-                    Text("조회수 ${notice.ntHit}", fontFamily = SuiteFont, fontSize = 13.sp, color = Color.Gray)
-                }
-                
-                HorizontalDivider(modifier = Modifier.padding(vertical = 24.dp), color = Color.Black.copy(alpha = 0.05f))
-                
-                Text(notice.ntContent, fontFamily = SuiteFont, fontSize = 15.sp, lineHeight = 24.sp, color = Color.Black)
-                
-                Spacer(modifier = Modifier.height(40.dp))
-            }
+            Spacer(Modifier.height(SmapSpacing.sm))
+            Text(notice.ntTitle, style = SmapText.title, color = colors.onSurface)
+            HorizontalDivider(modifier = Modifier.padding(vertical = SmapSpacing.lg), color = colors.outlineVariant)
+            Text(
+                notice.ntContent,
+                style = SmapText.body.copy(lineHeight = SmapText.body.fontSize * 1.65f),
+                color = colors.onSurface,
+                overflow = TextOverflow.Clip,
+            )
+            Spacer(Modifier.height(SmapSpacing.xl))
         }
     }
+}
+
+/** "2026.11.16 · 조회 3" */
+private fun noticeMeta(notice: SmapNotice): String =
+    "${notice.ntWdate.take(10).replace('-', '.')} · 조회 ${notice.ntHit}"
+
+private fun isRecent(notice: SmapNotice): Boolean {
+    val date = runCatching { LocalDate.parse(notice.ntWdate.take(10)) }.getOrNull() ?: return false
+    return ChronoUnit.DAYS.between(date, LocalDate.now()) in 0 until NEW_BADGE_DAYS
 }
