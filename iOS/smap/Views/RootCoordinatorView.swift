@@ -13,19 +13,22 @@ import SwiftUI
 struct SplashView: View {
     
 
-    // Android 스플래시(values-v31/styles.xml)와 같은 모양 — 밝은 배경(#FEF8F9) 가운데 앱 아이콘.
-    // 이전에는 어두운 회색 배경 + 위쪽 1/4 위치라, 흰 런치 화면에서 넘어올 때 색이 확 바뀌고 Android 와도 달랐다.
+    // Android 스플래시(values-v31/styles.xml)와 같은 모양 — 화면 전체 브랜드 남색 + 가운데 두 핀.
+    // LaunchScreen.storyboard 도 같은 그림이라 런치 화면 → 이 화면으로 넘어갈 때 아무것도 바뀌지 않는다.
+    // 핀 크기는 Android 스플래시에서 잰 실제 크기(핀 폭 약 75dp)에 맞춘 값이다.
     var body: some View {
         ZStack {
-            SMAPTheme.Color.background
+            SMAPTheme.Color.primary
                 .ignoresSafeArea()
 
-            Image("AppNoBg")
+            Image("SplashPins")
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(width: 112, height: 112)
+                .frame(width: 289, height: 289)
                 .accessibilityHidden(true)
         }
+        // 남색 위에서 상태바 글자를 흰색으로(스플래시가 사라지면 앱 기본 라이트 모드로 돌아간다)
+        .preferredColorScheme(.dark)
     }
 }
 

@@ -11,8 +11,8 @@
         <item name="android:windowSplashScreenAnimationDuration">0</item>
         <item name="android:windowSplashScreenIconBackgroundColor">@color/splash_background</item>
         <!-- 밝은 스플래시 배경에서 시스템 아이콘이 어두운 색으로 보이게 한다. -->
-        <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
         <!-- 애니메이션 비활성화 -->
         <item name="android:windowAnimationStyle">@null</item>
         <item name="android:windowContentTransitions">false</item>

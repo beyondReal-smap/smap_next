@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- 런치 화면 = SplashView 와 같은 그림(브랜드 남색 #0113A3 + 가운데 289pt 두 핀). 넘어갈 때 아무것도 바뀌지 않게 한다. -->
 <document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="13122.16" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="01J-lp-oVM">
     <dependencies>
         <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="13104.12"/>
@@ -13,7 +14,20 @@
                     <view key="view" contentMode="scaleToFill" id="Ze5-6b-2t3">
                         <rect key="frame" x="0.0" y="0.0" width="375" height="667"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
-                        <color key="backgroundColor" xcode11CocoaTouchSystemColor="systemBackgroundColor" cocoaTouchSystemColor="whiteColor"/>
+                        <subviews>
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" image="SplashPins" translatesAutoresizingMaskIntoConstraints="NO" id="sPl-Pn-001">
+                                <rect key="frame" x="43" y="189" width="289" height="289"/>
+                                <constraints>
+                                    <constraint firstAttribute="width" constant="289" id="sPl-Wd-001"/>
+                                    <constraint firstAttribute="height" constant="289" id="sPl-Ht-001"/>
+                                </constraints>
+                            </imageView>
+                        </subviews>
+                        <color key="backgroundColor" red="0.0039215686274509803" green="0.074509803921568626" blue="0.63921568627450975" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <constraints>
+                            <constraint firstItem="sPl-Pn-001" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="sPl-Cx-001"/>
+                            <constraint firstItem="sPl-Pn-001" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" id="sPl-Cy-001"/>
+                        </constraints>
                         <viewLayoutGuide key="safeArea" id="6Tk-OE-BBY"/>
                     </view>
                 </viewController>
@@ -22,4 +36,7 @@
             <point key="canvasLocation" x="53" y="375"/>
         </scene>
     </scenes>
+    <resources>
+        <image name="SplashPins" width="289" height="289"/>
+    </resources>
 </document>

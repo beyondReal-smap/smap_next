@@ -8,9 +8,9 @@
         <item name="android:windowBackground">@drawable/splash_background</item>
         <item name="android:statusBarColor">@color/splash_background</item>
         <item name="android:navigationBarColor">@color/splash_background</item>
-        <!-- 밝은 스플래시 배경 위에서 시스템 아이콘이 어두운 색으로 보이게 한다. -->
-        <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowLightNavigationBar">true</item>
+        <!-- 남색 스플래시 배경 위에서 시스템 아이콘이 흰색으로 보이게 한다. -->
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
         <!-- 페이드 인/아웃 애니메이션 비활성화 -->
         <item name="android:windowAnimationStyle">@null</item>
         <item name="android:windowDisablePreview">false</item>

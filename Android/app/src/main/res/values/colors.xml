@@ -11,7 +11,7 @@
       스플래시 → 메인으로 넘어가는 구간의 색 단차/깜빡임을 제거한다.
       이전 값 #353538은 메인 화면과 톤 차이가 커서 전환이 부자연스러웠다.
     -->
-    <color name="splash_background">#FEF8F9</color>
+    <color name="splash_background">#0113A3</color>
     
     <!-- 카카오 로그인 -->
     <color name="kakao_yellow">#FEE500</color>
