@@ -87,30 +87,6 @@ enum SMAPTheme {
         })
     }
 
-    // MARK: - Schedule Section (일정 작성 폼의 섹션별 색상)
-    // bg 는 옅은 톤(50), badge 는 짙은 톤(600). Next.js 디자인과 맞춘 팔레트.
-
-    enum ScheduleSection {
-        // Badge — 섹션 번호/아이콘에 쓰이는 포인트 색. 의미 구분용으로만 유지.
-        static let badgeGroup = SwiftUI.Color(red: 220/255, green: 38/255, blue: 38/255)    // Red 600
-        static let badgeContent = SwiftUI.Color(red: 37/255, green: 99/255, blue: 235/255)  // Blue 600
-        static let badgeDateTime = SwiftUI.Color(red: 22/255, green: 163/255, blue: 74/255) // Green 600
-        static let badgeExtra = SwiftUI.Color(red: 217/255, green: 119/255, blue: 6/255)    // Amber 600
-
-        // Background — "4색 배경 산만함" 완화를 위해 badge 색의 아주 옅은 tint로 변경.
-        // 구조 구분은 border/stroke 쪽에서 담당 (섹션 overlay 에 badge.opacity(0.18) stroke 권장).
-        static var bgGroup: SwiftUI.Color { badgeGroup.opacity(0.06) }
-        static var bgContent: SwiftUI.Color { badgeContent.opacity(0.06) }
-        static var bgDateTime: SwiftUI.Color { badgeDateTime.opacity(0.06) }
-        static var bgExtra: SwiftUI.Color { badgeExtra.opacity(0.06) }
-
-        // Stroke — 섹션 카드 테두리. 배경이 연해졌으므로 구분감은 이쪽에서.
-        static var strokeGroup: SwiftUI.Color { badgeGroup.opacity(0.18) }
-        static var strokeContent: SwiftUI.Color { badgeContent.opacity(0.18) }
-        static var strokeDateTime: SwiftUI.Color { badgeDateTime.opacity(0.18) }
-        static var strokeExtra: SwiftUI.Color { badgeExtra.opacity(0.18) }
-    }
-
     // MARK: - Fonts (SUITE 폰트 기반 — uses Font.suite() extension from AppStyles.swift)
 
     enum Font {

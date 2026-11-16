@@ -26,6 +26,7 @@ struct DatePickerWith10MinInterval: UIViewRepresentable {
         let picker = UIDatePicker()
         picker.minuteInterval = 10 // 10분 단위
         picker.preferredDatePickerStyle = .compact
+        applyMode(to: picker) // 크기를 재기 전에 모드가 정해져 있어야 날짜·시각 버튼 폭이 나온다
         picker.addTarget(context.coordinator, action: #selector(Coordinator.dateChanged(_:)), for: .valueChanged)
 
         applyAppFont(to: picker)
@@ -36,14 +37,7 @@ struct DatePickerWith10MinInterval: UIViewRepresentable {
     func updateUIView(_ uiView: UIDatePicker, context: Context) {
         uiView.date = selection
 
-        // displayedComponents에 따라 datePickerMode 설정
-        if displayedComponents.contains(.date) && displayedComponents.contains(.hourAndMinute) {
-            uiView.datePickerMode = .dateAndTime
-        } else if displayedComponents.contains(.date) {
-            uiView.datePickerMode = .date
-        } else if displayedComponents.contains(.hourAndMinute) {
-            uiView.datePickerMode = .time
-        }
+        applyMode(to: uiView)
 
         uiView.tintColor = UIColor(accentColor)
 
@@ -58,6 +52,22 @@ struct DatePickerWith10MinInterval: UIViewRepresentable {
             }
             applyAppFont(to: subview)
         }
+    }
+
+    /// displayedComponents 에 따라 datePickerMode 설정
+    private func applyMode(to picker: UIDatePicker) {
+        if displayedComponents.contains(.date) && displayedComponents.contains(.hourAndMinute) {
+            picker.datePickerMode = .dateAndTime
+        } else if displayedComponents.contains(.date) {
+            picker.datePickerMode = .date
+        } else if displayedComponents.contains(.hourAndMinute) {
+            picker.datePickerMode = .time
+        }
+    }
+
+    /// 날짜·시각 버튼이 들어가는 만큼의 크기로 놓는다 — 없으면 SwiftUI 가 1pt 로 잡아 빈 캡슐만 보였다.
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UIDatePicker, context: Context) -> CGSize? {
+        uiView.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize)
     }
 
     func makeCoordinator() -> Coordinator {
