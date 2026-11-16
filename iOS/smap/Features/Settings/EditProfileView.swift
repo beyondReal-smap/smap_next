@@ -12,6 +12,7 @@ import SwiftUI
 /// 이전에는 행마다 남색·주황·분홍·보라 아이콘 상자 + 생년월일·성별 켜기 스위치 + 결과 알림창이었다.
 /// 생년월일은 칸을 누르면 고르는 창이 뜨고, 성별은 반반 나눈 두 칸에서 고른다(고르지 않으면 보내지 않음).
 /// 결과는 알림창 대신 버튼 위 배너로 보여 주고, 성공하면 잠깐 뒤 이전 화면으로 돌아간다.
+/// 이름·생년월일·성별은 한 번 등록하면 바꿀 수 없다 — Android 규칙에 맞춤(2026-11-16 결정). 잠긴 칸에는 이유를 적는다.
 struct EditProfileView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.smapAccent) private var accent
@@ -29,11 +30,20 @@ struct EditProfileView: View {
     @State private var successMessage: String?
     @State private var errorMessage: String?
 
+    // 이미 등록된 값은 바꿀 수 없다(Android EditProfileScreen 과 같은 규칙)
+    private let isNameLocked: Bool
+    private let isBirthLocked: Bool
+    private let isGenderLocked: Bool
+
     /// 생년월일을 처음 고를 때 달력이 열리는 날짜
     private static let defaultBirthDate = DateFormatter.yyyyMMdd.date(from: "1990-01-01") ?? Date()
 
     init() {
-        if let user = AuthService.shared.currentUser {
+        let user = AuthService.shared.currentUser
+        isNameLocked = !(user?.mt_name ?? "").trimmingCharacters(in: .whitespaces).isEmpty
+        isBirthLocked = !(user?.mt_birth ?? "").trimmingCharacters(in: .whitespaces).isEmpty
+        isGenderLocked = (user?.mt_gender ?? 0) != 0
+        if let user {
             _name = State(initialValue: user.mt_name ?? "")
             _nickname = State(initialValue: user.mt_nickname ?? "")
             _birthDate = State(initialValue: user.mt_birth.flatMap { DateFormatter.yyyyMMdd.date(from: $0) })
@@ -52,7 +62,16 @@ struct EditProfileView: View {
                     .foregroundStyle(SMAPTheme.Color.textSecondary)
 
                 VStack(alignment: .leading, spacing: SMAPTheme.Spacing.md) {
-                    SMAPTextField("이름을 입력하세요", text: $name, label: "이름", textContentType: .name, submitLabel: .next)
+                    SMAPTextField(
+                        "이름을 입력하세요",
+                        text: $name,
+                        label: "이름",
+                        helperText: isNameLocked ? "등록한 이름은 바꿀 수 없어요" : nil,
+                        textContentType: .name,
+                        submitLabel: .next
+                    )
+                    .disabled(isNameLocked)
+                    .foregroundStyle(isNameLocked ? SMAPTheme.Color.textSecondary : SMAPTheme.Color.textPrimary)
                     SMAPTextField("닉네임을 입력하세요", text: $nickname, label: "닉네임", textContentType: .nickname)
                 }
                 .padding(.top, SMAPTheme.Spacing.md)
@@ -112,11 +131,13 @@ struct EditProfileView: View {
                         .foregroundStyle(SMAPTheme.Color.textSecondary)
                     Text(birthDate.map { DateFormatter.yyyyMMdd.string(from: $0) } ?? "선택")
                         .font(SMAPTheme.Font.body)
-                        .foregroundStyle(birthDate == nil ? SMAPTheme.Color.textSecondary : SMAPTheme.Color.textPrimary)
+                        .foregroundStyle(birthDate == nil || isBirthLocked ? SMAPTheme.Color.textSecondary : SMAPTheme.Color.textPrimary)
                     Spacer(minLength: 0)
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(SMAPTheme.Color.textSecondary)
+                    if !isBirthLocked {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(SMAPTheme.Color.textSecondary)
+                    }
                 }
                 .padding(.horizontal, SMAPTheme.Spacing.md)
                 .frame(minHeight: 52)
@@ -124,7 +145,11 @@ struct EditProfileView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .disabled(isBirthLocked)
             .accessibilityLabel("생년월일, \(birthDate.map { DateFormatter.yyyyMMdd.string(from: $0) } ?? "선택 안 함")")
+            if isBirthLocked {
+                lockedNote("등록한 생년월일은 바꿀 수 없어요")
+            }
         }
     }
 
@@ -160,7 +185,17 @@ struct EditProfileView: View {
                 genderOption("남성", value: 1)
                 genderOption("여성", value: 2)
             }
+            if isGenderLocked {
+                lockedNote("등록한 성별은 바꿀 수 없어요")
+            }
         }
+    }
+
+    /// 잠긴 칸 아래 이유 한 줄
+    private func lockedNote(_ text: String) -> some View {
+        Text(text)
+            .font(SMAPTheme.Font.captionSmall)
+            .foregroundStyle(SMAPTheme.Color.textSecondary)
     }
 
     private func genderOption(_ title: String, value: Int) -> some View {
@@ -173,10 +208,15 @@ struct EditProfileView: View {
                 .font(selected ? SMAPTheme.Font.bodyBold : SMAPTheme.Font.body)
                 .foregroundStyle(selected ? Color.white : SMAPTheme.Color.textSecondary)
                 .frame(maxWidth: .infinity, minHeight: 52)
-                .background(selected ? accent.base : SMAPTheme.Color.inputBackground, in: RoundedRectangle(cornerRadius: SMAPTheme.Radius.md))
+                // 잠겨 있으면 고른 칸도 회색으로(누를 수 없음을 보여 준다) — Android 와 같다
+                .background(
+                    selected ? (isGenderLocked ? SMAPTheme.Color.textSecondary.opacity(0.35) : accent.base) : SMAPTheme.Color.inputBackground,
+                    in: RoundedRectangle(cornerRadius: SMAPTheme.Radius.md)
+                )
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(isGenderLocked)
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
     }
 
