@@ -1,5 +1,13 @@
 package com.dmonster.smap.ui.activitylog
 
+import com.dmonster.smap.ui.components.SmapBrush
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Box
 import com.dmonster.smap.ui.components.sheetHeaderBand
 import com.dmonster.smap.ui.components.SmapOnNavyMuted
 import androidx.compose.ui.graphics.Color
@@ -182,6 +190,7 @@ private fun activeDatesOf(counts: List<DailyCount>): Set<LocalDate> =
  * 이전에는 접힌 시트 위에 떠 있는 작은 카드라 시트를 올리면 가려졌다. 이제 시트 머리 줄 아래에 늘 보인다.
  * 값 범위 0~100(기존 지도 연동 계약 유지).
  */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun RouteScrubber(
     value: Float,
@@ -212,6 +221,14 @@ fun RouteScrubber(
             onValueChange = onValueChange,
             valueRange = 0f..100f,
             interactionSource = interaction,
+            // 기본 손잡이(가는 세로 막대 + 흰 틈)는 맨 왼쪽에 있을 때 채워진 막대가 없어 무엇인지 구분이 안 됐다.
+            // 흰 테두리 남색 원 손잡이 + 지나온 구간 남색 채움으로 바꿔 시작 위치에서도 손잡이가 분명히 보이게 한다.
+            thumb = { RouteThumb(dragging) },
+            track = { state ->
+                val span = state.valueRange.endInclusive - state.valueRange.start
+                val fraction = if (span > 0f) ((state.value - state.valueRange.start) / span).coerceIn(0f, 1f) else 0f
+                RouteTrack(fraction)
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(32.dp)
@@ -224,5 +241,38 @@ fun RouteScrubber(
             Text(startTime ?: "", style = SmapText.captionSmall, color = colors.onSurfaceVariant, modifier = Modifier.weight(1f))
             Text(endTime ?: "", style = SmapText.captionSmall, color = colors.onSurfaceVariant)
         }
+    }
+}
+
+/** 경로 막대 손잡이 — 흰 테두리 남색 원. 끄는 중에는 조금 커져 잡혀 있다는 것이 보인다. */
+@Composable
+private fun RouteThumb(dragging: Boolean) {
+    val size = if (dragging) 26.dp else 22.dp
+    Box(
+        Modifier
+            .size(size)
+            .shadow(3.dp, CircleShape)
+            .background(Color.White, CircleShape)
+            .padding(3.dp)
+            .background(SmapBrush.navy, CircleShape)
+    )
+}
+
+/** 경로 막대 — 연한 남색 바탕 위에 지나온 구간([fraction])만 남색으로 채운다. */
+@Composable
+private fun RouteTrack(fraction: Float) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(6.dp)
+            .clip(RoundedCornerShape(3.dp))
+            .background(MaterialTheme.colorScheme.primaryContainer)
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth(fraction)
+                .fillMaxHeight()
+                .background(SmapBrush.navyBand)
+        )
     }
 }
