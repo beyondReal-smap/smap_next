@@ -950,7 +950,8 @@ struct EmailChangeView: View {
             .padding(SMAPTheme.Spacing.lg)
         }
         .background(SMAPTheme.Adaptive.pageBackground.ignoresSafeArea())
-        .navigationTitle("이메일")
+        // 제목·안내 문구를 Android 이메일 변경 화면과 같게("이메일 변경"/"이메일 등록", "새 이메일을 입력해 주세요")
+        .navigationTitle(viewModel.currentEmail.isEmpty ? "이메일 등록" : "이메일 변경")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar {
@@ -984,7 +985,7 @@ struct EmailChangeView: View {
 
     private var emailStep: some View {
         Group {
-            Text(viewModel.currentEmail.isEmpty ? "이메일을 등록해 주세요" : "이메일을 변경해 주세요")
+            Text(viewModel.currentEmail.isEmpty ? "이메일을 입력해 주세요" : "새 이메일을 입력해 주세요")
                 .font(SMAPTheme.Font.title)
                 .foregroundStyle(SMAPTheme.Color.textPrimary)
             Text(viewModel.currentEmail.isEmpty

@@ -7,323 +7,202 @@
 
 import SwiftUI
 
+/// 비밀번호 변경 — 36단계: 이메일 변경·회원탈퇴와 같은 "제목 + 설명 + 입력창 + 아래 버튼" 폼 화면 (Android ChangePasswordScreen 과 같은 구성).
+///
+/// 이전에는 남색 그라데이션 머리 카드 + 칸마다 색 아이콘 + 결과 알림창이었다.
+/// 조건 목록을 서버 검사(POST /members/change-password)와 맞췄다: 이전 목록은 소문자만 있어도 "영문" 통과로 표시해
+/// 화면에선 다 맞았는데 서버가 "대문자를 포함해야 합니다"로 거절할 수 있었다.
 struct ChangePasswordView: View {
-    @Environment(\.presentationMode) var presentationMode
+    @Environment(\.dismiss) private var dismiss
     @ObservedObject var authService = AuthService.shared
 
-    @State private var currentPassword: String = ""
-    @State private var newPassword: String = ""
-    @State private var confirmPassword: String = ""
+    @State private var currentPassword = ""
+    @State private var newPassword = ""
+    @State private var confirmPassword = ""
 
-    @State private var isLoading: Bool = false
-    @State private var showAlert: Bool = false
-    @State private var alertMessage: String = ""
+    @State private var isLoading = false
+    @State private var successMessage: String?
+    @State private var errorMessage: String?
 
-    // Password Strength
-    private var isLengthValid: Bool { newPassword.count >= 8 && newPassword.count <= 20 }
-    private var hasLetter: Bool { newPassword.rangeOfCharacter(from: .letters) != nil }
-    private var hasNumber: Bool { newPassword.rangeOfCharacter(from: .decimalDigits) != nil }
-    private var hasSpecial: Bool { newPassword.rangeOfCharacter(from: CharacterSet(charactersIn: "!@#$%^&*()-_=+[]{}|;:'\",.<>/?")) != nil }
-    private var isPasswordStrong: Bool { isLengthValid && hasLetter && hasNumber && hasSpecial }
+    /// 서버가 받는 특수문자 — 서버 검사와 같은 목록
+    private static let serverSpecialChars = "@$!%*?&"
+
+    private var rules: [(title: String, met: Bool)] {
+        [
+            ("8자 이상", newPassword.count >= 8),
+            ("영문 대문자", newPassword.contains { ("A"..."Z").contains($0) }),
+            ("영문 소문자", newPassword.contains { ("a"..."z").contains($0) }),
+            ("숫자", newPassword.contains { ("0"..."9").contains($0) }),
+            ("특수문자 (\(Self.serverSpecialChars))", newPassword.contains { Self.serverSpecialChars.contains($0) }),
+        ]
+    }
+    private var isPasswordStrong: Bool { rules.allSatisfy(\.met) }
     private var isPasswordMatch: Bool { !newPassword.isEmpty && newPassword == confirmPassword }
 
+    /// 소셜 로그인 회원(mt_type 1 이 아님)은 비밀번호가 없다
     private var isSocialUser: Bool {
         guard let type = authService.currentUser?.mt_type else { return false }
         return type != 1
     }
 
-    
-
     var body: some View {
         ScrollView {
-            VStack(spacing: 24) {
+            VStack(alignment: .leading, spacing: SMAPTheme.Spacing.sm) {
                 if isSocialUser {
-                    socialUserView
-                        .padding(.top, 60)
+                    socialUserNotice
                 } else {
-                    changePasswordForm
+                    form
                 }
             }
-            .padding(.top, 20)
+            .padding(SMAPTheme.Spacing.lg)
         }
         .scrollDismissesKeyboard(.interactively)
-        .background(Color(UIColor.secondarySystemBackground).ignoresSafeArea())
+        .background(SMAPTheme.Adaptive.pageBackground.ignoresSafeArea())
+        .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar {
             ToolbarItem(placement: .principal) {
-                Text("비밀번호 변경")
-                    .font(.suite(size: 18, weight: .bold))
+                Text("비밀번호 변경").font(SMAPTheme.Font.bodyBold)
             }
             ToolbarItem(placement: .navigationBarLeading) {
-                Button(action: {
-                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                    presentationMode.wrappedValue.dismiss()
-                }) {
+                Button(action: { hideKeyboard(); dismiss() }) {
                     HStack(spacing: 4) {
-                        Image(systemName: "chevron.left")
-                            .font(.suite(size: 18, weight: .semibold))
-                        Text("뒤로")
-                            .font(.suite(size: 18, weight: .bold))
+                        Image(systemName: "chevron.left").font(.system(size: 16, weight: .semibold))
+                        Text("뒤로").font(SMAPTheme.Font.bodyBold)
                     }
-                    .foregroundColor(.primary)
+                    .foregroundStyle(SMAPTheme.Surface.onSurface)
                 }
-            }
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("완료") {
-                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                }
-                .font(.suite(size: 16, weight: .semibold))
-                .foregroundColor(SMAPTheme.Color.primary)
             }
         }
-        .alert("알림", isPresented: $showAlert) {
-            Button("확인", role: .cancel) {
-                if alertMessage.contains("성공") {
-                    presentationMode.wrappedValue.dismiss()
-                }
-            }
-        } message: {
-            Text(alertMessage)
+        // 성공 안내를 잠깐 보여 준 뒤 이전 화면으로 돌아간다(이메일 변경 화면과 같다).
+        .task(id: successMessage) {
+            guard successMessage != nil else { return }
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
+            dismiss()
         }
     }
 
-    private var socialUserView: some View {
-        VStack(spacing: 24) {
-            Image(systemName: "shield.slash")
-                .font(.suite(size: 60))
-                .foregroundColor(.orange)
+    @ViewBuilder
+    private var form: some View {
+        Text("새 비밀번호를 설정해 주세요")
+            .font(SMAPTheme.Font.title)
+            .foregroundStyle(SMAPTheme.Color.textPrimary)
+        Text("영문 대·소문자, 숫자, 특수문자를 섞어 8자 이상으로 만들어 주세요.")
+            .font(SMAPTheme.Font.secondary)
+            .foregroundStyle(SMAPTheme.Color.textSecondary)
 
-            Text("소셜 로그인 사용자는\n비밀번호를 변경할 수 없습니다.")
-                .font(.suite(size: 20, weight: .bold))
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
-
-            Text("Google 또는 Apple 계정을 통해 로그인하신 경우, 해당 서비스의 설정에서 비밀번호를 관리해 주세요.")
-                .font(.suite(size: 15))
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
-
-            Button(action: { presentationMode.wrappedValue.dismiss() }) {
-                Text("뒤로 가기")
-                    .font(.suite(size: 17, weight: .bold))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(SMAPTheme.Color.primary)
-                    .foregroundColor(.white)
-                    .cornerRadius(12)
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
-        }
-        .padding(24)
-        .background(Color(UIColor.systemBackground))
-        .cornerRadius(20)
-        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
-        .padding(.horizontal, 16)
-    }
-
-    private var changePasswordForm: some View {
-        VStack(spacing: 24) {
-            // Header Card (Premium Gradient)
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("비밀번호 변경")
-                            .font(.suite(size: 24, weight: .bold))
-                            .foregroundColor(.white)
-
-                        Text("보안을 위해 8~20자의 영문, 숫자,\n특수문자를 조합하여 설정해 주세요.")
-                            .font(.suite(size: 14))
-                            .foregroundColor(.white.opacity(0.85))
-                            .lineSpacing(4)
-                    }
-                    Spacer()
-                    Image(systemName: "lock.shield.fill")
-                        .font(.suite(size: 44))
-                        .foregroundColor(.white.opacity(0.3))
-                }
-            }
-            .padding(24)
-            .frame(maxWidth: .infinity)
-            .background(
-                LinearGradient(
-                    gradient: Gradient(colors: [SMAPTheme.Color.primary, SMAPTheme.Accent.primarySoft]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
+        VStack(alignment: .leading, spacing: SMAPTheme.Spacing.md) {
+            SMAPTextField("현재 비밀번호를 입력하세요", text: $currentPassword, label: "현재 비밀번호", isSecure: true, textContentType: .password, submitLabel: .next)
+            SMAPTextField("새 비밀번호", text: $newPassword, label: "새 비밀번호", isSecure: true, textContentType: .newPassword, submitLabel: .next)
+            SMAPTextField(
+                "새 비밀번호를 한 번 더 입력하세요",
+                text: $confirmPassword,
+                label: "새 비밀번호 확인",
+                errorMessage: !confirmPassword.isEmpty && !isPasswordMatch ? "새 비밀번호와 달라요" : nil,
+                isSecure: true,
+                textContentType: .newPassword
             )
-            .cornerRadius(24)
-            .shadow(color: SMAPTheme.Color.primary.opacity(0.3), radius: 12, x: 0, y: 8)
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
-
-            // Input Fields Card
-            VStack(spacing: 20) {
-                PasswordFormRow(icon: "lock.fill", iconColor: SMAPTheme.Color.primary, label: "현재 비밀번호", text: $currentPassword, placeholder: "현재 비밀번호를 입력하세요", textContentType: .password)
-
-                PasswordFormRow(icon: "key.fill", iconColor: SMAPTheme.Color.primary, label: "새 비밀번호", text: $newPassword, placeholder: "새 비밀번호 (8-20자)", textContentType: .newPassword)
-
-                PasswordFormRow(icon: "checkmark.circle.fill", iconColor: .green, label: "새 비밀번호 확인", text: $confirmPassword, placeholder: "비밀번호를 한번 더 입력해 주세요", textContentType: .newPassword)
-            }
-            .padding(20)
-            .background(Color(UIColor.systemBackground))
-            .cornerRadius(20)
-            .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 2)
-            .padding(.horizontal, 16)
-
-            // Password Strength Indicators
-            VStack(alignment: .leading, spacing: 12) {
-                Text("비밀번호 체크")
-                    .font(.suite(size: 14, weight: .bold))
-                    .foregroundColor(.primary)
-                    .padding(.leading, 4)
-
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        StrengthRow(title: "8-20자 이내", isValid: isLengthValid)
-                        StrengthRow(title: "영문/숫자/특수문자", isValid: isPasswordStrong)
-                    }
-                    Spacer()
-                    VStack(alignment: .leading, spacing: 10) {
-                        StrengthRow(title: "비밀번호 일치", isValid: isPasswordMatch)
-                        Spacer().frame(height: 12)
-                    }
-                }
-                .padding(20)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(UIColor.systemBackground))
-                .cornerRadius(20)
-                .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 2)
-            }
-            .padding(.horizontal, 16)
-
-            // Action Button
-            Button(action: handleSave) {
-                HStack {
-                    if isLoading {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            .padding(.trailing, 8)
-                    }
-                    Text("비밀번호 변경 완료")
-                        .font(.suite(size: 17, weight: .semibold))
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(canSave ? SMAPTheme.Color.primary : Color.gray.opacity(0.3))
-                .foregroundColor(.white)
-                .cornerRadius(12)
-                .shadow(color: canSave ? SMAPTheme.Color.primary.opacity(0.2) : Color.clear, radius: 8, x: 0, y: 4)
-            }
-            .disabled(!canSave || isLoading)
-            .padding(.horizontal, 16)
-            .padding(.bottom, 30)
         }
+        .padding(.top, SMAPTheme.Spacing.md)
+
+        // 조건 목록 — 처음부터 보여 주고, 맞춘 조건은 초록 체크로 바뀐다.
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(rules, id: \.title) { rule in
+                ruleRow(rule.title, met: rule.met)
+            }
+            ruleRow("새 비밀번호 확인 일치", met: isPasswordMatch)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(SMAPTheme.Spacing.md)
+        .background(SMAPTheme.Color.inputBackground, in: RoundedRectangle(cornerRadius: 12))
+        .padding(.top, SMAPTheme.Spacing.sm)
+    }
+
+    private func ruleRow(_ title: String, met: Bool) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: met ? "checkmark.circle.fill" : "circle")
+                .font(.system(size: 16))
+                .foregroundStyle(met ? SMAPTheme.Color.success : SMAPTheme.Surface.outline)
+            Text(title)
+                .font(SMAPTheme.Font.caption)
+                .foregroundStyle(met ? SMAPTheme.Color.textPrimary : SMAPTheme.Color.textSecondary)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(title) \(met ? "충족" : "미충족")")
+    }
+
+    /// 소셜 로그인 회원 안내 — 비밀번호는 그 서비스(카카오·Apple·Google)에서 관리한다.
+    private var socialUserNotice: some View {
+        VStack(spacing: SMAPTheme.Spacing.sm) {
+            SMAPRowIcon(systemImage: "shield")
+                .scaleEffect(1.8)
+                .frame(width: 72, height: 72)
+                .padding(.bottom, SMAPTheme.Spacing.sm)
+            Text("비밀번호를 바꿀 수 없는 계정이에요")
+                .font(SMAPTheme.Font.title)
+                .foregroundStyle(SMAPTheme.Color.textPrimary)
+            Text("카카오·Apple·Google 계정으로 로그인했다면 그 서비스의 설정에서 비밀번호를 관리해 주세요.")
+                .font(SMAPTheme.Font.secondary)
+                .foregroundStyle(SMAPTheme.Color.textSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, SMAPTheme.Spacing.xl)
+    }
+
+    // MARK: 아래 — 결과 배너 + 버튼
+
+    private var bottomBar: some View {
+        VStack(spacing: SMAPTheme.Spacing.sm) {
+            if let successMessage {
+                SMAPBanner(message: successMessage, tone: .success)
+            } else if let errorMessage {
+                SMAPBanner(message: errorMessage, tone: .error)
+            }
+            if isSocialUser {
+                SMAPButton("돌아가기") { dismiss() }
+            } else {
+                SMAPButton("비밀번호 변경", isLoading: isLoading, isDisabled: !canSave) { handleSave() }
+            }
+        }
+        .padding(SMAPTheme.Spacing.lg)
+        .background(SMAPTheme.Adaptive.pageBackground)
     }
 
     private var canSave: Bool {
-        !currentPassword.isEmpty && isPasswordStrong && isPasswordMatch
+        successMessage == nil && !currentPassword.isEmpty && isPasswordStrong && isPasswordMatch
+    }
+
+    private func hideKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
     private func handleSave() {
         isLoading = true
+        errorMessage = nil
         HapticManager.shared.impact(style: .light)
-        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        hideKeyboard()
 
         Task {
             do {
-                let response = try await authService.changePassword(
-                    current: currentPassword,
-                    new: newPassword
-                )
-
+                let response = try await authService.changePassword(current: currentPassword, new: newPassword)
                 await MainActor.run {
                     isLoading = false
                     HapticManager.shared.notification(type: response.success ? .success : .error)
-                    alertMessage = response.message
-                    showAlert = true
+                    if response.success {
+                        successMessage = response.message
+                    } else {
+                        errorMessage = response.message
+                    }
                 }
             } catch {
                 await MainActor.run {
                     isLoading = false
                     HapticManager.shared.notification(type: .error)
-                    alertMessage = error.localizedDescription
-                    showAlert = true
+                    errorMessage = error.localizedDescription
                 }
             }
         }
-    }
-}
-
-struct PasswordFormRow: View {
-    let icon: String
-    let iconColor: Color
-    let label: String
-    @Binding var text: String
-    let placeholder: String
-    var textContentType: UITextContentType? = nil // 자동완성/강력암호 제안 힌트
-    @State private var isVisible: Bool = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.suite(size: 14))
-                    .foregroundColor(iconColor)
-                Text(label)
-                    .font(.suite(size: 14, weight: .bold))
-                    .foregroundColor(.primary)
-            }
-            .padding(.leading, 4)
-
-            ZStack(alignment: .trailing) {
-                if isVisible {
-                    TextField(placeholder, text: $text)
-                        .autocapitalization(.none)
-                        .textContentType(textContentType)
-                } else {
-                    SecureField(placeholder, text: $text)
-                        .autocapitalization(.none)
-                        .textContentType(textContentType)
-                }
-
-                Button(action: { isVisible.toggle() }) {
-                    Image(systemName: isVisible ? "eye.slash.fill" : "eye.fill")
-                        .font(.suite(size: 14))
-                        .foregroundColor(.gray.opacity(0.5))
-                        .padding(10)
-                }
-                .accessibilityLabel(isVisible ? "비밀번호 숨기기" : "비밀번호 보기")
-            }
-            .font(.suite(size: 15))
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .background(Color(UIColor.secondarySystemBackground).opacity(0.5))
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.gray.opacity(0.1), lineWidth: 1)
-            )
-        }
-    }
-}
-
-struct StrengthRow: View {
-    let title: String
-    let isValid: Bool
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: isValid ? "checkmark.circle.fill" : "circle")
-                .font(.suite(size: 12))
-                .foregroundColor(isValid ? .green : .gray.opacity(0.5))
-            Text(title)
-                .font(.suite(size: 12))
-                .foregroundColor(isValid ? .green : .gray)
-        }
-        .padding(.leading, 4)
     }
 }
