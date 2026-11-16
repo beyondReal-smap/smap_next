@@ -417,13 +417,8 @@ struct AccountSettingsView: View {
     // MARK: 내 정보
 
     private func accountInfoSection(_ user: SMAPUser) -> some View {
-        // 소셜 로그인 여부 확인 (2=카카오, 3=Apple, 4=Google) — 소셜 회원은 휴대폰 행을 숨긴다.
-        let isSocialLogin = user.mt_type == 2 || user.mt_type == 3 || user.mt_type == 4
-        return SMAPSection(title: "내 정보") {
-            if !isSocialLogin {
-                infoRow("휴대폰", icon: "phone.fill", value: user.mt_id ?? "-")
-                SMAPRowDivider()
-            }
+        // 휴대폰 가입 회원은 없다(이메일 가입) — 아이디가 이메일이라 "휴대폰" 칸에 이메일이 보이던 행을 뺐다.
+        SMAPSection(title: "내 정보") {
             infoRow("닉네임", icon: "at", value: user.mt_nickname ?? "-")
             SMAPRowDivider()
             infoRow("로그인 방식", icon: "key.fill", value: getLoginMethodText(user.mt_type))

@@ -184,11 +184,7 @@ fun AccountSettingsScreen(
 
                         user?.let { u ->
                             SmapSection(title = "내 정보") {
-                                val isSocialLogin = u.mtType in listOf(2, 3, 4)
-                                if (!isSocialLogin) {
-                                    SmapListRow(title = "휴대폰", leading = { SmapRowIcon(Icons.Default.Phone) }, trailing = { RowValue(u.mtId ?: "-") })
-                                    SmapRowDivider()
-                                }
+                                // 휴대폰 가입 회원은 없다(이메일 가입) — 아이디가 이메일이라 "휴대폰" 칸에 이메일이 보이던 행을 뺐다.
                                 SmapListRow(title = "닉네임", leading = { SmapRowIcon(Icons.Default.AlternateEmail) }, trailing = { RowValue(u.mtNickname ?: "-") })
                                 SmapRowDivider()
                                 SmapListRow(
