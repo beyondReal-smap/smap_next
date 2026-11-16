@@ -36,7 +36,7 @@ struct MainTabView: View {
         GeometryReader { geo in
             let width = geo.size.width
             ZStack {
-                tabPage(0, width: width) { HomeView(isActive: selectedTab == 0) }
+                tabPage(0, width: width) { HomeView(isActive: selectedTab == 0, onInitialLoadFinished: prewarmMapTabs) }
                 if visitedMyPlace { tabPage(3, width: width) { MyPlaceView(isActive: selectedTab == 3) } }
                 if visitedActivityLog { tabPage(4, width: width) { ActivityLogView(isActive: selectedTab == 4) } }
                 // 그룹·일정은 보일 때와 밀려 나가는 동안만 둔다(열 때마다 새로 불러오는 기존 동작 유지).
@@ -109,6 +109,23 @@ struct MainTabView: View {
         .animation(.easeInOut(duration: 0.3), value: dismissedPermissionView)
         .animation(.easeInOut(duration: 0.3), value: showPermissionView)
     }
+
+    // MARK: - 지도 탭 미리 만들기
+
+    /// 내장소·활동 로그를 처음 누를 때 지도·화면을 그 자리에서 만들어 밀려 들어오는 전환이 끊겼다.
+    /// 홈 첫 로딩이 끝나고 잠시 뒤 보이지 않게 미리 만들어 둔다(Android MainTabScreen 과 같은 순서·간격).
+    /// 두 지도를 한 번에 만들면 그 순간 홈이 끊길 수 있어 시간을 나눈다.
+    private func prewarmMapTabs() {
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: Self.prewarmDelayNanos)
+            visitedMyPlace = true
+            try? await Task.sleep(nanoseconds: Self.prewarmGapNanos)
+            visitedActivityLog = true
+        }
+    }
+
+    private static let prewarmDelayNanos: UInt64 = 1_500_000_000
+    private static let prewarmGapNanos: UInt64 = 1_000_000_000
 
     // MARK: - 탭 전환
 

@@ -1,6 +1,7 @@
 package com.dmonster.smap.ui.navigation
 
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.animation.core.tween
@@ -69,6 +70,11 @@ sealed class TabItem(
     data object Chat : TabItem("채팅", Icons.Filled.Chat, Icons.Filled.Chat)
 }
 
+/** 홈 첫 로딩 뒤 내장소 지도를 미리 만들기까지 기다리는 시간 */
+private const val PREWARM_DELAY_MS = 1_500L
+/** 내장소 다음 활동 로그 지도를 만들기까지의 간격 */
+private const val PREWARM_GAP_MS = 1_000L
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun MainTabScreen(
@@ -120,6 +126,16 @@ fun MainTabScreen(
     val showGroupCreationModal by homeViewModel.showGroupCreationModal.collectAsState()
     val isCreatingGroup by homeViewModel.isCreatingGroup.collectAsState()
     val errorMessage by homeViewModel.errorMessage.collectAsState()
+    // 내장소·활동 로그를 처음 누를 때 지도·화면을 그 자리에서 만들어 밀려 들어오는 전환이 끊겼다(첫 진입 프레임 42% 끊김).
+    // 홈 첫 로딩이 끝나고 잠시 뒤 보이지 않게 미리 만들어 둔다(iOS MainTabView 와 같은 순서·간격).
+    // 두 지도를 한 번에 만들면 그 순간 홈이 끊길 수 있어 시간을 나눈다.
+    LaunchedEffect(Unit) {
+        homeViewModel.isLoading.first { !it }
+        kotlinx.coroutines.delay(PREWARM_DELAY_MS)
+        visitedMyPlace = true
+        kotlinx.coroutines.delay(PREWARM_GAP_MS)
+        visitedActivityLog = true
+    }
     
     val tabs = listOf(
         TabItem.Home,

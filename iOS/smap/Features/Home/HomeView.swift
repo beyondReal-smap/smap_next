@@ -16,6 +16,8 @@ import NMapsMap
 struct HomeView: View {
     /// 지금 보이는 탭인지 — 탭 컨테이너가 홈을 계속 살려 두므로 onAppear 대신 이 값으로 갱신을 켜고 끈다.
     var isActive: Bool = true
+    /// 첫 데이터·지도 로딩이 끝났을 때 한 번 — 탭 컨테이너가 이 뒤에 다른 지도 탭을 미리 만든다.
+    var onInitialLoadFinished: () -> Void = {}
     @StateObject var viewModel = HomeViewModel()
     @State private var showNotifications = false
     @State private var showSettings = false
@@ -107,6 +109,7 @@ struct HomeView: View {
             }
             viewModel.resumeUpdates()
             withAnimation(.easeOut(duration: 0.3)) { isMapLoading = false }
+            onInitialLoadFinished()
         }
         .onChange(of: isActive) { _, active in
             if active {

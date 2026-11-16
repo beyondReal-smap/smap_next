@@ -85,7 +85,9 @@ fun ActivityLogScreen(
     var mapStayTimes by remember { mutableStateOf(stayTimes) }
     val currentVisibility = rememberUpdatedState(isVisible)
     LaunchedEffect(isVisible, locationLogs, stayTimes) {
-        if (isVisible) { mapLogs = locationLogs; mapStayTimes = stayTimes }
+        // 보일 때만 지도에 반영한다. 단, 미리 만들어 둔 숨은 탭은 첫 데이터를 미리 그려 둔다 —
+        // 그러지 않으면 처음 들어오는 순간 경로·표시를 한꺼번에 그려 전환이 끊겼다.
+        if (isVisible || mapLogs.isEmpty()) { mapLogs = locationLogs; mapStayTimes = stayTimes }
     }
 
     // Performance Optimization: Cache heavy calculations & Sampling to max 200 points
@@ -134,18 +136,22 @@ fun ActivityLogScreen(
     
     // Move camera when logs change (iOS Style: Start Point, Zoom 15)
     LaunchedEffect(mapLogs) {
-        if (isVisible && mapLogs.isNotEmpty()) {
+        if (mapLogs.isNotEmpty()) {
             val firstLog = mapLogs.firstOrNull { it.hasValidCoordinates }
             if (firstLog != null) {
                 val startPos = LatLng(firstLog.latitude, firstLog.longitude)
-                cameraPositionState.animate(CameraUpdate.toCameraPosition(CameraPosition(startPos, 15.0)))
+                val update = CameraUpdate.toCameraPosition(CameraPosition(startPos, 15.0))
+                // 숨은 채 미리 그릴 때는 애니메이션 없이 바로 옮겨 둔다(보이지 않는 움직임에 프레임을 쓰지 않게).
+                if (isVisible) cameraPositionState.animate(update) else cameraPositionState.move(update)
             }
         }
     }
 
     // Handle error messages via snackbar — Haptic 동반
     val snackbarHostState = remember { SnackbarHostState() }
-    LaunchedEffect(errorMessage) {
+    // 미리 만들어 둔 숨은 탭이 다른 탭에서 진동·안내를 내지 않게, 보일 때만 보여 준다(그 전엔 보류).
+    LaunchedEffect(errorMessage, isVisible) {
+        if (!isVisible) return@LaunchedEffect
         errorMessage?.let {
             haptics.error()
             snackbarHostState.showSnackbar(it)
@@ -456,7 +462,8 @@ fun ActivityLogScreen(
         }
 
 
-        retentionExceededMessage?.let { message ->
+        // 대화상자는 별도 창이라 숨은 탭에서도 화면 위로 뜬다 — 이 탭이 보일 때만 띄운다.
+        if (isVisible) retentionExceededMessage?.let { message ->
             AlertDialog(
                 onDismissRequest = { viewModel.clearRetentionExceeded() },
                 title = { Text("활동 기록 조회 안내") },

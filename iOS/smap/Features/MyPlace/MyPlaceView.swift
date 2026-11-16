@@ -146,8 +146,15 @@ struct MyPlaceView: View {
                 })
             }
         }
-        .subscriptionLimitAlert(message: $viewModel.subscriptionLimitMessage)
-        .alert("오류", isPresented: $viewModel.showError) {
+        // 미리 만들어 둔 숨은 탭의 알림이 다른 탭 위로 뜨지 않게, 이 탭이 보일 때만 띄운다(그 전엔 보류).
+        .subscriptionLimitAlert(message: Binding(
+            get: { isActive ? viewModel.subscriptionLimitMessage : nil },
+            set: { viewModel.subscriptionLimitMessage = $0 }
+        ))
+        .alert("오류", isPresented: Binding(
+            get: { isActive && viewModel.showError },
+            set: { viewModel.showError = $0 }
+        )) {
             Button("확인", role: .cancel) {}
         } message: {
             Text(viewModel.errorMessage ?? "")

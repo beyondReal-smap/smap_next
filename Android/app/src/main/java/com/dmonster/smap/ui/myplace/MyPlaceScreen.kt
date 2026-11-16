@@ -109,7 +109,9 @@ fun MyPlaceScreen(
     }
     
     // Handle messages — Haptic 동반
-    LaunchedEffect(errorMessage) {
+    // 미리 만들어 둔 숨은 탭이 다른 탭에서 진동·안내를 내지 않게, 보일 때만 보여 준다(그 전엔 보류).
+    LaunchedEffect(errorMessage, isVisible) {
+        if (!isVisible) return@LaunchedEffect
         errorMessage?.let {
             haptics.error()
             snackbarHostState.showSnackbar(it, duration = SnackbarDuration.Short)
