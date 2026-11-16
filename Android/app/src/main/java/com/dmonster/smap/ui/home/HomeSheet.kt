@@ -1,5 +1,7 @@
 package com.dmonster.smap.ui.home
 
+import com.dmonster.smap.ui.components.SheetHeaderBandGap
+import com.dmonster.smap.ui.components.SheetHeaderMinHeight
 import com.dmonster.smap.ui.components.sheetHeaderBand
 import com.dmonster.smap.ui.components.SmapOnNavyMuted
 import androidx.compose.ui.graphics.Color
@@ -49,7 +51,7 @@ import java.util.Locale
 import java.util.TimeZone
 
 /** 접힌 시트 높이: 손잡이 + 머리 줄 + 멤버 얼굴 줄 */
-val HomeSheetPeekHeight = 184.dp
+val HomeSheetPeekHeight = 178.dp
 
 /**
  * 홈 지도 시트 — 사이드바("멤버 조회")와 지도 위 말풍선을 대신한다.
@@ -77,7 +79,7 @@ fun ColumnScope.HomeSheetContent(
     Row(
         Modifier
             .sheetHeaderBand()
-            .heightIn(min = 52.dp)
+            .heightIn(min = SheetHeaderMinHeight)
             .padding(start = SmapSpacing.screenHorizontal, end = SmapSpacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -112,7 +114,7 @@ fun ColumnScope.HomeSheetContent(
         }
     }
 
-    Spacer(Modifier.height(SmapSpacing.sm))
+    Spacer(Modifier.height(SheetHeaderBandGap))
     MemberStrip(
         members = members,
         selectedMemberId = selectedMemberId,

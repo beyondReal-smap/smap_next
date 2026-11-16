@@ -1,5 +1,7 @@
 package com.dmonster.smap.ui.activitylog
 
+import com.dmonster.smap.ui.components.SheetHeaderBandGap
+import com.dmonster.smap.ui.components.SheetHeaderMinHeight
 import com.dmonster.smap.ui.components.SmapBrush
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.clip
@@ -54,7 +56,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-val ActivityLogSheetPeekHeight = 186.dp
+val ActivityLogSheetPeekHeight = 180.dp
 
 /** 경로 따라가기 줄이 있을 때 접힌 시트에 더하는 높이. */
 val ActivityLogRouteControlHeight = 76.dp
@@ -98,7 +100,7 @@ fun ColumnScope.ActivityLogSheetContent(
     Row(
         Modifier
             .sheetHeaderBand()
-            .heightIn(min = 52.dp)
+            .heightIn(min = SheetHeaderMinHeight)
             .padding(horizontal = SmapSpacing.screenHorizontal),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -126,7 +128,8 @@ fun ColumnScope.ActivityLogSheetContent(
         }
     }
     if (routeControl != null) routeControl()
-    Spacer(Modifier.height(SmapSpacing.sm))
+    // 경로 막대가 있으면 막대 자체가 띠 아래 여백 역할을 한다.
+    Spacer(Modifier.height(if (routeControl != null) SmapSpacing.sm else SheetHeaderBandGap))
     DateStrip(
         items = dateItems,
         selected = selectedDate,

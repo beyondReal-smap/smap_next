@@ -120,7 +120,7 @@ private fun SheetHandle() {
         Modifier
             .fillMaxWidth()
             .background(SmapBrush.navyBand)
-            .padding(top = 10.dp, bottom = 6.dp),
+            .padding(top = 7.dp, bottom = 5.dp),
         contentAlignment = Alignment.Center,
     ) {
         Box(
@@ -138,4 +138,10 @@ fun Modifier.sheetHeaderBand(): Modifier = this
     .padding(bottom = SheetHeaderBandBottom)
 
 /** 머리 띠 아래 여백 — 각 시트의 접힌 높이에 이만큼 더한다. */
-val SheetHeaderBandBottom = 12.dp
+val SheetHeaderBandBottom = 8.dp
+
+/** 머리 줄 최소 높이(띠 안). 두꺼워 보인다는 피드백으로 52 → 48. */
+val SheetHeaderMinHeight = 48.dp
+
+/** 남색 띠와 그 아래 첫 줄(멤버 얼굴 줄·날짜 줄) 사이 흰 여백 — 띠에 붙어 답답해 보이지 않게. */
+val SheetHeaderBandGap = 14.dp

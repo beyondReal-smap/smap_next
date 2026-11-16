@@ -1,5 +1,7 @@
 package com.dmonster.smap.ui.myplace
 
+import com.dmonster.smap.ui.components.SheetHeaderBandGap
+import com.dmonster.smap.ui.components.SheetHeaderMinHeight
 import com.dmonster.smap.ui.components.sheetHeaderBand
 import com.dmonster.smap.ui.components.SmapOnNavyMuted
 import androidx.compose.ui.graphics.Color
@@ -46,7 +48,7 @@ import com.dmonster.smap.ui.components.SmapSection
 import com.dmonster.smap.ui.theme.SmapSpacing
 import com.dmonster.smap.ui.theme.SmapText
 
-val MyPlaceSheetPeekHeight = 184.dp
+val MyPlaceSheetPeekHeight = 178.dp
 
 /**
  * 내장소 지도 시트 — 사이드바("장소 관리")를 대신한다.
@@ -77,7 +79,7 @@ fun ColumnScope.MyPlaceSheetContent(
     Row(
         Modifier
             .sheetHeaderBand()
-            .heightIn(min = 52.dp)
+            .heightIn(min = SheetHeaderMinHeight)
             .padding(start = SmapSpacing.screenHorizontal, end = SmapSpacing.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -114,7 +116,7 @@ fun ColumnScope.MyPlaceSheetContent(
         }
     }
 
-    Spacer(Modifier.height(SmapSpacing.sm))
+    Spacer(Modifier.height(SheetHeaderBandGap))
     MemberStrip(
         members = members,
         selectedMemberId = selectedMember?.mtIdx,
