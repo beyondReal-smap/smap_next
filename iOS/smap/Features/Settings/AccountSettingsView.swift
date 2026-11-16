@@ -247,44 +247,53 @@ struct AccountSettingsView: View {
     @State private var showingImageUploadError = false
     @State private var imageUploadErrorMessage = ""
 
-    
-
+    // 36단계 — 설정 첫 화면과 같은 언어로: 위에 남색 프로필 카드(사진 바꾸기), 아래 "구역 제목 + 흰 묶음" 행.
+    // 이전에는 행마다 남색·분홍·주황·보라·청록 아이콘 상자, 로그아웃만 따로 떨어진 빨강 상자였다. (Android 와 같은 구성)
     var body: some View {
         ScrollView {
-            VStack(spacing: 24) {
-                profileHeaderCard
+            VStack(alignment: .leading, spacing: SMAPTheme.Spacing.lg) {
+                profileHero
 
-                if authService.currentUser != nil {
-                    accountManagementSection
-                    accountInfoSection
-                    logoutSection
+                if let user = authService.currentUser {
+                    accountManagementSection(user)
+                    accountInfoSection(user)
+                    SMAPSection {
+                        SMAPListRow(
+                            title: "로그아웃",
+                            destructive: true,
+                            action: { showingLogoutAlert = true },
+                            leading: { SMAPDangerIcon(systemImage: "rectangle.portrait.and.arrow.right") }
+                        )
+                    }
                     withdrawLink
                 }
-
-                Spacer(minLength: 40)
             }
+            .padding(SMAPTheme.Spacing.md)
+            .padding(.bottom, SMAPTheme.Spacing.xl)
         }
-        .background(Color(UIColor.secondarySystemBackground).ignoresSafeArea())
+        .background(SMAPTheme.Surface.canvas.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Text("계정설정")
-                    .font(.suite(size: 18, weight: .bold))
+                    .font(SMAPTheme.Font.bodyBold)
             }
-        }
-        .navigationBarBackButtonHidden(true)
-        .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button(action: { presentationMode.wrappedValue.dismiss() }) {
                     HStack(spacing: 4) {
                         Image(systemName: "chevron.left")
-                            .font(.suite(size: 18, weight: .semibold))
+                            .font(.system(size: 16, weight: .semibold))
                         Text("뒤로")
-                            .font(.suite(size: 18, weight: .bold))
+                            .font(SMAPTheme.Font.bodyBold)
                     }
-                    .foregroundColor(.primary)
+                    .foregroundStyle(SMAPTheme.Surface.onSurface)
                 }
             }
+        }
+        // 숨긴 NavigationLink(isActive:, iOS 16 부터 사용 중단) 대신 navigationDestination 으로 탈퇴 화면 이동
+        .navigationDestination(isPresented: $isWithdrawActive) {
+            WithdrawView()
         }
         .sheet(isPresented: $showingImagePicker) {
             ImagePicker(image: $inputImage)
@@ -304,6 +313,14 @@ struct AccountSettingsView: View {
         } message: {
             Text("정말로 로그아웃 하시겠습니까?")
         }
+        .alert("회원탈퇴", isPresented: $showingWithdrawConfirm) {
+            Button("취소", role: .cancel) {}
+            Button("계속", role: .destructive) {
+                isWithdrawActive = true
+            }
+        } message: {
+            Text("계정 영구 삭제는 되돌릴 수 없습니다. 계속 진행하시겠습니까?")
+        }
         .onAppear {
             // 페이지 진입 시 로컬 선택 이미지 초기화 (서버 데이터로 표시)
             selectedImage = nil
@@ -320,199 +337,123 @@ struct AccountSettingsView: View {
         }
     }
 
-    // MARK: - Extracted View Properties
+    // MARK: 남색 프로필 카드 — 사진(누르면 바꾸기) · 이름 · 이메일
 
-    private var profileHeaderCard: some View {
-        HStack(spacing: 20) {
-            ZStack(alignment: .bottomTrailing) {
-                if isLoadingImage {
-                    ProgressView()
-                        .frame(width: 80, height: 80)
-                        .background(Color.gray.opacity(0.1))
+    private var profileHero: some View {
+        let user = authService.currentUser
+        let name = user?.displayName ?? "회원"
+        let email = user?.mt_email.flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
+        return SMAPHeroCard {
+            HStack(spacing: 16) {
+                Button { showingImagePicker = true } label: {
+                    ZStack(alignment: .bottomTrailing) {
+                        ZStack {
+                            if let selectedImage {
+                                Image(uiImage: selectedImage)
+                                    .resizable()
+                                    .scaledToFill()
+                            } else {
+                                SMAPAvatar(name: name, imagePath: user?.mt_file1, size: 64)
+                            }
+                            if isLoadingImage {
+                                Color.black.opacity(0.35)
+                                ProgressView().tint(.white)
+                            }
+                        }
+                        .frame(width: 64, height: 64)
                         .clipShape(Circle())
-                } else if let selected = selectedImage {
-                    Image(uiImage: selected)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 80, height: 80)
-                        .clipShape(Circle())
-                        .overlay(Circle().stroke(Color.white, lineWidth: 3))
-                        .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
-                } else if let user = authService.currentUser,
-                          let avatarUrl = AuthService.getProfileImageURL(user.mt_file1) {
-                    AsyncImage(url: avatarUrl) { phase in
-                        if let image = phase.image {
-                            image.resizable().aspectRatio(contentMode: .fill)
-                        } else {
-                            defaultAvatar
+                        .padding(3)
+                        .background(Color.white.opacity(0.22), in: Circle())
+
+                        Image(systemName: "camera.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(SMAPTheme.Navy.base)
+                            .frame(width: 26, height: 26)
+                            .background(Color.white, in: Circle())
+                            .offset(x: 2, y: 2)
+                    }
+                }
+                .buttonStyle(.plain)
+                .disabled(isLoadingImage)
+                .accessibilityLabel("프로필 사진 변경")
+
+                SMAPHeroHeading(eyebrow: "내 계정", title: name, subtitle: email ?? "이메일 미등록")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    // MARK: 계정 관리
+
+    private func accountManagementSection(_ user: SMAPUser) -> some View {
+        let email = user.mt_email.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+        return SMAPSection(title: "계정 관리") {
+            NavigationLink(destination: EditProfileView()) {
+                SMAPListRow(title: "프로필 편집", leading: { SMAPRowIcon(systemImage: "pencil") }, trailing: { RowChevron() })
+            }
+            .buttonStyle(.plain)
+            SMAPRowDivider()
+            NavigationLink(destination: ChangePasswordView()) {
+                SMAPListRow(title: "비밀번호 변경", leading: { SMAPRowIcon(systemImage: "lock.fill") }, trailing: { RowChevron() })
+            }
+            .buttonStyle(.plain)
+            SMAPRowDivider()
+            NavigationLink(destination: EmailChangeView()) {
+                SMAPListRow(
+                    title: "이메일",
+                    leading: { SMAPRowIcon(systemImage: "envelope.fill") },
+                    trailing: {
+                        HStack(spacing: SMAPTheme.Spacing.sm) {
+                            AccountRowValue(text: email ?? "등록 필요", alert: email == nil)
+                            RowChevron()
                         }
                     }
-                    .frame(width: 80, height: 80)
-                    .clipShape(Circle())
-                    .overlay(Circle().stroke(Color.white, lineWidth: 3))
-                    .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
-                } else {
-                    defaultAvatar
-                }
-
-                Button(action: { showingImagePicker = true }) {
-                    Image(systemName: "camera.fill")
-                        .font(.suite(size: 10, weight: .semibold))
-                        .foregroundColor(.white)
-                        .padding(6)
-                        .background(SMAPTheme.Color.primary)
-                        .clipShape(Circle())
-                        .overlay(Circle().stroke(Color.white, lineWidth: 1.5))
-                }
-                .accessibilityLabel("프로필 사진 변경")
-                .offset(x: 2, y: 2)
+                )
             }
-
-            if let user = authService.currentUser {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(user.displayName)
-                        .font(.suite(size: 20, weight: .bold))
-                        .foregroundColor(.white)
-
-                    if let email = user.mt_email, !email.isEmpty {
-                        Text(email)
-                            .font(.suite(size: 13))
-                            .foregroundColor(.white.opacity(0.8))
-                            .lineLimit(1)
-                    }
-                }
-            }
-            Spacer()
-        }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 24)
-        .frame(maxWidth: .infinity)
-        .background(
-            LinearGradient(
-                gradient: Gradient(colors: [SMAPTheme.Color.primary, SMAPTheme.Accent.primarySoft]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
-        .cornerRadius(24)
-        .shadow(color: SMAPTheme.Color.primary.opacity(0.3), radius: 12, x: 0, y: 8)
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
-    }
-
-    private var accountManagementSection: some View {
-        SettingsSectionView(title: "계정 관리") {
-            NavigationLink(destination: EditProfileView()) {
-                SettingsRowView(icon: "person.fill", iconColor: .indigo, title: "프로필 편집")
-            }
-
-            Divider().padding(.leading, 52)
-
-            NavigationLink(destination: ChangePasswordView()) {
-                SettingsRowView(icon: "lock.fill", iconColor: .pink, title: "비밀번호 변경")
-            }
-
-            Divider().padding(.leading, 52)
-
-            NavigationLink(destination: EmailChangeView()) {
-                EmailSettingsRowView(email: authService.currentUser?.mt_email)
-            }
+            .buttonStyle(.plain)
         }
     }
 
-    @ViewBuilder
-    private var accountInfoSection: some View {
-        if let user = authService.currentUser {
-            // 소셜 로그인 여부 확인 (2=카카오, 3=Apple, 4=Google)
-            let isSocialLogin = user.mt_type == 2 || user.mt_type == 3 || user.mt_type == 4
+    // MARK: 내 정보
 
-            SettingsSectionView(title: "내 정보") {
-                // 소셜 로그인이 아닌 경우에만 휴대폰 번호 표시
-                if !isSocialLogin {
-                    SettingsInfoRowView(icon: "phone.fill", iconColor: SMAPTheme.Color.primary, title: "휴대폰", value: user.mt_id ?? "-")
-                    Divider().padding(.leading, 52)
-                }
-                SettingsInfoRowView(icon: "at", iconColor: .orange, title: "닉네임", value: user.mt_nickname ?? "-")
-                Divider().padding(.leading, 52)
-                SettingsInfoRowView(icon: "person.badge.key.fill", iconColor: .purple, title: "로그인 방식", value: getLoginMethodText(user.mt_type))
-                Divider().padding(.leading, 52)
-                SettingsInfoRowView(icon: "calendar", iconColor: .teal, title: "가입일", value: formatDate(user.mt_wdate))
+    private func accountInfoSection(_ user: SMAPUser) -> some View {
+        // 소셜 로그인 여부 확인 (2=카카오, 3=Apple, 4=Google) — 소셜 회원은 휴대폰 행을 숨긴다.
+        let isSocialLogin = user.mt_type == 2 || user.mt_type == 3 || user.mt_type == 4
+        return SMAPSection(title: "내 정보") {
+            if !isSocialLogin {
+                infoRow("휴대폰", icon: "phone.fill", value: user.mt_id ?? "-")
+                SMAPRowDivider()
             }
+            infoRow("닉네임", icon: "at", value: user.mt_nickname ?? "-")
+            SMAPRowDivider()
+            infoRow("로그인 방식", icon: "key.fill", value: getLoginMethodText(user.mt_type))
+            SMAPRowDivider()
+            infoRow("가입일", icon: "calendar", value: formatDate(user.mt_wdate))
         }
     }
 
-    private var logoutSection: some View {
-        VStack(spacing: 0) {
-            Button(action: { showingLogoutAlert = true }) {
-                HStack(spacing: 12) {
-                    // 로그아웃 아이콘
-                    Image(systemName: "rectangle.portrait.and.arrow.right")
-                        .font(.suite(size: 15, weight: .medium))
-                        .foregroundColor(.white)
-                        .frame(width: 28, height: 28)
-                        .background(SMAPTheme.Color.error.opacity(0.8))
-                        .cornerRadius(6)
-
-                    Text("로그아웃")
-                        .font(.suite(size: 16))
-                        .foregroundColor(SMAPTheme.Color.error)
-
-                    Spacer()
-
-                    Image(systemName: "chevron.right")
-                        .font(.suite(size: 13, weight: .semibold))
-                        .foregroundColor(Color(UIColor.tertiaryLabel))
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(Color(UIColor.systemBackground))
-            }
-        }
-        .cornerRadius(12)
-        .padding(.horizontal, 16)
+    private func infoRow(_ title: String, icon: String, value: String) -> some View {
+        SMAPListRow(title: title, leading: { SMAPRowIcon(systemImage: icon) }, trailing: { AccountRowValue(text: value) })
     }
+
+    // MARK: 회원 탈퇴 — 실수로 누르지 않게 작은 글자 링크 + 확인창
 
     private var withdrawLink: some View {
-        // Destructive 액션 — 실수로 탭하지 않도록 confirmation 경유.
-        // 숨겨진 NavigationLink 를 통해 isActive 플래그로 이동 제어.
-        ZStack {
-            NavigationLink(isActive: $isWithdrawActive) {
-                WithdrawView()
-            } label: {
-                EmptyView()
-            }
-            .hidden()
-
-            Button {
-                HapticManager.shared.impact(style: .medium)
-                showingWithdrawConfirm = true
-            } label: {
-                Text("회원탈퇴")
-                    .font(.suite(size: 14))
-                    .foregroundColor(.secondary)
-                    .underline()
-                    .frame(minHeight: 44) // HIG 터치 타겟
-                    .contentShape(Rectangle())
-            }
-            .accessibilityLabel("회원탈퇴")
-            .accessibilityHint("계정 영구 삭제 화면으로 이동 전 확인이 표시됩니다")
+        Button {
+            HapticManager.shared.impact(style: .medium)
+            showingWithdrawConfirm = true
+        } label: {
+            Text("회원 탈퇴")
+                .font(SMAPTheme.Font.caption)
+                .foregroundStyle(SMAPTheme.Surface.onSurfaceMuted)
+                .underline()
+                .padding(.horizontal, SMAPTheme.Spacing.md)
+                .frame(minHeight: 44) // HIG 터치 타겟
+                .contentShape(Rectangle())
         }
-        .padding(.top, 8)
-        .alert("회원탈퇴", isPresented: $showingWithdrawConfirm) {
-            Button("취소", role: .cancel) {}
-            Button("계속", role: .destructive) {
-                isWithdrawActive = true
-            }
-        } message: {
-            Text("계정 영구 삭제는 되돌릴 수 없습니다. 계속 진행하시겠습니까?")
-        }
-    }
-
-    private var defaultAvatar: some View {
-        Image(systemName: "person.circle.fill")
-            .resizable()
-            .frame(width: 90, height: 90)
-            .foregroundColor(Color.gray.opacity(0.3))
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity)
+        .accessibilityHint("계정 영구 삭제 화면으로 이동 전 확인이 표시됩니다")
     }
 
     private func uploadImage() {
@@ -577,83 +518,18 @@ struct AccountSettingsView: View {
 
 // MARK: - Settings Section Components
 
-struct SettingsSectionView<Content: View>: View {
-    let title: String
-    @ViewBuilder let content: Content
+/// 계정설정 행 오른쪽 값 — 길면 가운데를 줄임. [alert] 면 빨강 굵게(예: 이메일 "등록 필요").
+private struct AccountRowValue: View {
+    let text: String
+    var alert: Bool = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.suite(size: 13, weight: .medium))
-                .foregroundColor(.secondary)
-                .padding(.horizontal, 20)
-
-            VStack(spacing: 0) {
-                content
-            }
-            .background(Color(UIColor.systemBackground))
-            .cornerRadius(12)
-            .padding(.horizontal, 16)
-        }
-    }
-}
-
-struct SettingsRowView: View {
-    let icon: String
-    let iconColor: Color
-    let title: String
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.suite(size: 15, weight: .medium))
-                .foregroundColor(.white)
-                .frame(width: 28, height: 28)
-                .background(iconColor)
-                .cornerRadius(6)
-
-            Text(title)
-                .font(.suite(size: 16))
-                .foregroundColor(.primary)
-
-            Spacer()
-
-            Image(systemName: "chevron.right")
-                .font(.suite(size: 13, weight: .semibold))
-                .foregroundColor(Color(UIColor.tertiaryLabel))
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-    }
-}
-
-struct SettingsInfoRowView: View {
-    let icon: String
-    let iconColor: Color
-    let title: String
-    let value: String
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.suite(size: 14, weight: .medium))
-                .foregroundColor(.white)
-                .frame(width: 28, height: 28)
-                .background(iconColor)
-                .cornerRadius(6)
-
-            Text(title)
-                .font(.suite(size: 16))
-                .foregroundColor(.primary)
-
-            Spacer()
-
-            Text(value)
-                .font(.suite(size: 15))
-                .foregroundColor(.secondary)
-        }
-        .padding()
-        .background(Color(UIColor.systemBackground))
+        Text(text)
+            .font(alert ? SMAPTheme.Font.captionBold : SMAPTheme.Font.caption)
+            .foregroundStyle(alert ? SMAPTheme.Color.error : SMAPTheme.Surface.onSurfaceMuted)
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .frame(maxWidth: 180, alignment: .trailing)
     }
 }
 
@@ -853,52 +729,6 @@ struct WebViewWrapper: UIViewRepresentable {
 // MARK: - 이메일 등록·변경 (로그인 상태)
 // 전화번호로 가입한 기존 회원이 이메일을 등록하거나 바꾼다. 가입 화면의 이메일 인증 단계(RegisterPhoneView/
 // RegisterVerificationView)와 같은 문구 톤·컴포넌트·간격을 쓴다. 새 Swift 파일을 추가할 수 없어 이 파일에 둔다.
-
-/// 계정설정 목록의 "이메일" 행 — 현재 이메일을 오른쪽에 보여 주고, 없으면 "등록 필요"를 강조한다.
-struct EmailSettingsRowView: View {
-    let email: String?
-
-    private var trimmedEmail: String { (email ?? "").trimmingCharacters(in: .whitespacesAndNewlines) }
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "envelope.fill")
-                .font(.suite(size: 15, weight: .medium))
-                .foregroundColor(.white)
-                .frame(width: 28, height: 28)
-                .background(Color.blue)
-                .cornerRadius(6)
-                .accessibilityHidden(true)
-
-            Text("이메일")
-                .font(SMAPTheme.Font.body)
-                .foregroundStyle(SMAPTheme.Color.textPrimary)
-
-            Spacer(minLength: SMAPTheme.Spacing.sm)
-
-            if trimmedEmail.isEmpty {
-                Text("등록 필요")
-                    .font(SMAPTheme.Font.captionBold)
-                    .foregroundStyle(SMAPTheme.Color.primary)
-            } else {
-                Text(trimmedEmail)
-                    .font(SMAPTheme.Font.caption)
-                    .foregroundStyle(SMAPTheme.Color.textSecondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-
-            Image(systemName: "chevron.right")
-                .font(.suite(size: 13, weight: .semibold))
-                .foregroundColor(Color(UIColor.tertiaryLabel))
-                .accessibilityHidden(true)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(trimmedEmail.isEmpty ? "이메일, 등록 필요" : "이메일, \(trimmedEmail)")
-    }
-}
 
 /// 이메일 등록·변경 상태 관리 — 발송 여부, 쿨다운, 검증 토큰을 이 화면 안에서만 가진다.
 /// 가입 ViewModel 규칙을 따른다: 이메일을 고치면 인증 상태 초기화, 늦게 온 이전 이메일의 응답은 무시.

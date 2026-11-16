@@ -112,6 +112,21 @@ fun SmapRowIcon(icon: ImageVector, modifier: Modifier = Modifier, emphasized: Bo
 }
 
 /**
+ * 위험 동작(삭제·나가기·로그아웃) 행 왼쪽 아이콘 — 연한 빨강 원 + 빨강 아이콘.
+ * 그룹 상세에만 있던 것을 계정설정 로그아웃과 함께 쓰려고 공용으로 옮겼다.
+ */
+@Composable
+fun SmapDangerIcon(icon: ImageVector, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    androidx.compose.foundation.layout.Box(
+        modifier = modifier
+            .size(40.dp)
+            .background(colors.error.copy(alpha = 0.08f), CircleShape),
+        contentAlignment = Alignment.Center,
+    ) { Icon(icon, contentDescription = null, tint = colors.error, modifier = Modifier.size(20.dp)) }
+}
+
+/**
  * 구역 — 회색 배경 위 "작은 제목 + 흰 묶음". 묶음 안의 행 사이에는 얇은 구분선을 넣는다.
  * [action] 은 제목 오른쪽 글자 버튼(예: "전체 보기", "추가").
  */

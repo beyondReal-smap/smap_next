@@ -1,7 +1,6 @@
 package com.dmonster.smap.ui.settings
 
 import com.dmonster.smap.ui.components.SmapDialogActions
-import com.dmonster.smap.BuildConfig
 import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -11,7 +10,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -27,22 +25,30 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
+import com.dmonster.smap.ui.components.HeroHeading
+import com.dmonster.smap.ui.components.SmapAvatar
+import com.dmonster.smap.ui.components.SmapDangerIcon
+import com.dmonster.smap.ui.components.SmapHeroCard
+import com.dmonster.smap.ui.components.SmapListRow
+import com.dmonster.smap.ui.components.SmapRowDivider
+import com.dmonster.smap.ui.components.SmapRowIcon
+import com.dmonster.smap.ui.components.SmapSection
+import com.dmonster.smap.ui.components.SmapTopBar
+import com.dmonster.smap.ui.theme.SmapSpacing
 import com.dmonster.smap.ui.components.SmapBanner
 import com.dmonster.smap.ui.components.SmapBannerTone
 import com.dmonster.smap.ui.components.SmapTextButton
 import com.dmonster.smap.ui.theme.SmapText
-import com.dmonster.smap.ui.theme.AccentColors
-import com.dmonster.smap.ui.theme.BrandColors
-import com.dmonster.smap.ui.theme.SettingsColors
 import com.dmonster.smap.ui.theme.SuiteFont
 
 enum class AccountSubScreen {
@@ -114,54 +120,20 @@ fun AccountSettingsScreen(
                 animationSpec = tween(300)
             )
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(SettingsColors.PageBackground)
-            ) {
-                Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
-                    // Header
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 20.dp)
-                    ) {
-                        Surface(
-                            onClick = onBack,
-                            shape = RoundedCornerShape(24.dp),
-                            color = Color.White,
-                            shadowElevation = 2.dp,
-                            modifier = Modifier.height(44.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 16.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                                    contentDescription = "뒤로",
-                                    tint = Color.Black,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Text(
-                                    text = "설정",
-                                    fontFamily = SuiteFont,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 17.sp,
-                                    color = Color.Black
-                                )
-                            }
-                        }
-                    }
-
+            // 36단계 — 설정 첫 화면과 같은 언어로: 위에 남색 프로필 카드(사진 바꾸기), 아래 "구역 제목 + 흰 묶음" 행.
+            // 이전에는 행마다 보라·분홍·남색·주황·자주 아이콘 상자와 따로 만든 흰 "< 설정" 알약 머리였다.
+            val colors = MaterialTheme.colorScheme
+            Box(modifier = Modifier.fillMaxSize().background(colors.background)) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    SmapTopBar(title = "계정설정", onBack = onBack)
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
                             .verticalScroll(rememberScrollState())
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                            .padding(horizontal = SmapSpacing.md),
+                        verticalArrangement = Arrangement.spacedBy(SmapSpacing.lg)
                     ) {
+                        Spacer(Modifier.height(SmapSpacing.xs))
                         // 이메일 미등록 회원 안내(비밀번호 찾기에 필요)
                         if (user != null && user?.mtEmail.isNullOrBlank()) {
                             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -175,101 +147,104 @@ fun AccountSettingsScreen(
                             }
                         }
 
-                        // Profile Header Card with Photo Upload
-                        ProfileHeaderWithUpload(
-                            name = user?.displayName ?: "사용자",
-                            email = user?.mtEmail ?: "이메일 정보 없음",
-                            profileImage = user?.mtFile1,
+                        AccountProfileHero(
+                            name = user?.displayName ?: "회원",
+                            email = user?.mtEmail?.takeIf { it.isNotBlank() },
+                            imagePath = user?.mtFile1,
                             isUploading = isUploadingImage,
                             onPhotoClick = { photoPickerLauncher.launch("image/*") }
                         )
 
-                        // Account Management
-                        SettingsSection(title = "계정 관리") {
-                            AccountSettingsRow(
-                                icon = Icons.Default.Edit,
-                                iconColor = Color(0xFF5C6BC0),
+                        SmapSection(title = "계정 관리") {
+                            SmapListRow(
                                 title = "프로필 편집",
+                                leading = { SmapRowIcon(Icons.Default.Edit) },
+                                trailing = { RowChevron() },
                                 onClick = { currentScreen = AccountSubScreen.EDIT_PROFILE }
                             )
-                            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), thickness = 0.5.dp, color = Color.Gray.copy(alpha = 0.1f))
-                            AccountSettingsRow(
-                                icon = Icons.Default.Lock,
-                                iconColor = Color(0xFFF06292),
+                            SmapRowDivider()
+                            SmapListRow(
                                 title = "비밀번호 변경",
+                                leading = { SmapRowIcon(Icons.Default.Lock) },
+                                trailing = { RowChevron() },
                                 onClick = { currentScreen = AccountSubScreen.CHANGE_PASSWORD }
                             )
-                            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), thickness = 0.5.dp, color = Color.Gray.copy(alpha = 0.1f))
-                            val registeredEmail = user?.mtEmail
-                            AccountSettingsRow(
-                                icon = Icons.Default.Email,
-                                iconColor = BrandColors.Primary,
+                            SmapRowDivider()
+                            val registeredEmail = user?.mtEmail?.takeIf { it.isNotBlank() }
+                            SmapListRow(
                                 title = "이메일",
-                                value = if (registeredEmail.isNullOrBlank()) "등록 필요" else registeredEmail,
-                                valueColor = if (registeredEmail.isNullOrBlank()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                                leading = { SmapRowIcon(Icons.Default.Email) },
+                                trailing = {
+                                    RowValue(registeredEmail ?: "등록 필요", alert = registeredEmail == null)
+                                    RowChevron()
+                                },
                                 onClick = { currentScreen = AccountSubScreen.EMAIL }
                             )
                         }
 
-                        // Info Section
                         user?.let { u ->
-                            SettingsSection(title = "내 정보") {
+                            SmapSection(title = "내 정보") {
                                 val isSocialLogin = u.mtType in listOf(2, 3, 4)
                                 if (!isSocialLogin) {
-                                    AccountInfoRow(icon = Icons.Default.Phone, iconColor = BrandColors.Primary, title = "휴대폰", value = u.mtId ?: "-")
-                                    HorizontalDivider(modifier = Modifier.padding(start = 52.dp), thickness = 0.5.dp, color = Color.Gray.copy(alpha = 0.1f))
+                                    SmapListRow(title = "휴대폰", leading = { SmapRowIcon(Icons.Default.Phone) }, trailing = { RowValue(u.mtId ?: "-") })
+                                    SmapRowDivider()
                                 }
-                                AccountInfoRow(icon = Icons.Default.AlternateEmail, iconColor = Color(0xFFFFA726), title = "닉네임", value = u.mtNickname ?: "-")
-                                HorizontalDivider(modifier = Modifier.padding(start = 52.dp), thickness = 0.5.dp, color = Color.Gray.copy(alpha = 0.1f))
-                                AccountInfoRow(
-                                    icon = Icons.Default.VpnKey,
-                                    iconColor = Color(0xFF9C27B0),
+                                SmapListRow(title = "닉네임", leading = { SmapRowIcon(Icons.Default.AlternateEmail) }, trailing = { RowValue(u.mtNickname ?: "-") })
+                                SmapRowDivider()
+                                SmapListRow(
                                     title = "로그인 방식",
-                                    value = when (u.mtType) {
-                                        1 -> "일반"
-                                        2 -> "카카오"
-                                        3 -> "Apple"
-                                        4 -> "Google"
-                                        else -> "일반"
+                                    leading = { SmapRowIcon(Icons.Default.VpnKey) },
+                                    trailing = {
+                                        RowValue(
+                                            when (u.mtType) {
+                                                2 -> "카카오"
+                                                3 -> "Apple"
+                                                4 -> "Google"
+                                                else -> "일반"
+                                            }
+                                        )
                                     }
                                 )
+                                SmapRowDivider()
+                                // iOS 에는 있던 가입일을 같이 보여 준다(양쪽 같은 항목).
+                                SmapListRow(title = "가입일", leading = { SmapRowIcon(Icons.Default.CalendarMonth) }, trailing = { RowValue(u.mtWdate?.take(10) ?: "-") })
                             }
                         }
 
-                        // Logout Section
-                        SettingsSection(title = "지원") {
-                            AccountSettingsRow(
-                                icon = Icons.AutoMirrored.Filled.Logout,
-                                iconColor = Color.Red.copy(alpha = 0.7f),
+                        SmapSection {
+                            SmapListRow(
                                 title = "로그아웃",
+                                destructive = true,
+                                leading = { SmapDangerIcon(Icons.AutoMirrored.Filled.Logout) },
                                 onClick = { showingLogoutAlert = true }
                             )
                         }
 
-                        // Withdrawal Link
-                        Box(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
+                        // 회원 탈퇴 — 실수로 누르지 않게 작은 글자 링크로 둔다(탈퇴 화면에서 한 번 더 확인).
+                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                             Text(
                                 text = "회원 탈퇴",
-                                fontFamily = SuiteFont,
-                                fontSize = 13.sp,
-                                color = Color.Gray.copy(alpha = 0.5f),
-                                modifier = Modifier.clickable { currentScreen = AccountSubScreen.WITHDRAW }
+                                style = SmapText.caption,
+                                color = colors.onSurfaceVariant,
+                                textDecoration = TextDecoration.Underline,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable(role = Role.Button) { currentScreen = AccountSubScreen.WITHDRAW }
+                                    .padding(horizontal = 16.dp, vertical = 12.dp)
                             )
                         }
-                        
-                        Spacer(modifier = Modifier.height(40.dp))
+
+                        Spacer(modifier = Modifier.height(SmapSpacing.xl))
                     }
                 }
 
-                if (isLoading || isUploadingImage) {
+                // 사진 올리는 중은 카드의 사진 위에만 표시한다 — 화면 전체를 막는 것은 다른 처리(isLoading) 때만.
+                if (isLoading) {
                     Box(
                         modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.1f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator(color = BrandColors.Primary)
+                        CircularProgressIndicator(color = colors.primary)
                     }
                 }
             }
@@ -372,204 +347,69 @@ fun AccountSettingsScreen(
     }
 }
 
+/**
+ * 계정설정 맨 위 남색 프로필 카드 — 사진(누르면 바꾸기, 카메라 표시) · 이름 · 이메일.
+ */
 @Composable
-fun ProfileHeaderWithUpload(
+private fun AccountProfileHero(
     name: String,
-    email: String,
-    profileImage: String?,
+    email: String?,
+    imagePath: String?,
     isUploading: Boolean,
     onPhotoClick: () -> Unit
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
-            .background(
-                Brush.linearGradient(
-                    colors = listOf(BrandColors.Primary, AccentColors.PrimarySoft)
-                )
-            )
-            .padding(24.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(20.dp)
-        ) {
-            // Avatar with camera button
-            Box(contentAlignment = Alignment.BottomEnd) {
-                if (isUploading) {
-                    Box(
-                        modifier = Modifier.size(80.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.3f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(32.dp), strokeWidth = 2.dp)
-                    }
-                } else if (!profileImage.isNullOrBlank()) {
-                    val imageUrl = when {
-                        profileImage.startsWith("http") -> profileImage
-                        profileImage.startsWith("/images/") -> "${BuildConfig.IMAGE_BASE_URL}$profileImage"
-                        profileImage.startsWith("/") -> "${BuildConfig.IMAGE_BASE_URL}/images$profileImage"
-                        else -> "${BuildConfig.IMAGE_BASE_URL}/images/$profileImage"
-                    }
-                    AsyncImage(
-                        model = imageUrl,
-                        contentDescription = "${name.ifBlank { "사용자" }} 프로필 사진",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(80.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.2f))
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier.size(80.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.2f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.Person, contentDescription = null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(40.dp))
-                    }
-                }
-                
-                // Camera Button
-                Surface(
-                    onClick = onPhotoClick,
-                    shape = CircleShape,
-                    color = BrandColors.Primary,
-                    modifier = Modifier.size(28.dp).offset(x = 2.dp, y = 2.dp),
-                    border = BorderStroke(2.dp, Color.White)
+    SmapHeroCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                contentAlignment = Alignment.BottomEnd,
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .clickable(enabled = !isUploading, onClickLabel = "프로필 사진 변경", role = Role.Button, onClick = onPhotoClick)
+                    .semantics { contentDescription = "프로필 사진 변경" }
+            ) {
+                Box(
+                    Modifier
+                        .size(70.dp)
+                        .background(Color.White.copy(alpha = 0.22f), CircleShape)
+                        .padding(3.dp)
                 ) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        Icon(Icons.Default.CameraAlt, contentDescription = "사진 변경", tint = Color.White, modifier = Modifier.size(14.dp))
+                    SmapAvatar(name = name, imagePath = imagePath, size = 64.dp)
+                    if (isUploading) {
+                        Box(
+                            Modifier.matchParentSize().clip(CircleShape).background(Color.Black.copy(alpha = 0.35f)),
+                            contentAlignment = Alignment.Center
+                        ) { CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 2.dp) }
                     }
                 }
+                Box(
+                    Modifier.size(26.dp).background(Color.White, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.CameraAlt, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
+                }
             }
-
-            Column {
-                Text(
-                    text = name,
-                    fontFamily = SuiteFont,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp,
-                    color = Color.White
-                )
-                Text(
-                    text = email,
-                    fontFamily = SuiteFont,
-                    fontSize = 13.sp,
-                    color = Color.White.copy(alpha = 0.8f)
-                )
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f)) {
+                HeroHeading(eyebrow = "내 계정", title = name, subtitle = email ?: "이메일 미등록")
             }
         }
     }
 }
 
+/** 행 오른쪽 값 — 길면 줄임. [alert] 면 빨강 굵게(예: 이메일 "등록 필요"). */
 @Composable
-fun SettingsSection(
-    title: String,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(
-            text = title,
-            fontFamily = SuiteFont,
-            fontWeight = FontWeight.Bold,
-            fontSize = 14.sp,
-            color = Color.Gray,
-            modifier = Modifier.padding(start = 4.dp)
-        )
-        Surface(
-            color = Color.White,
-            shape = RoundedCornerShape(20.dp),
-            modifier = Modifier.fillMaxWidth(),
-            shadowElevation = 1.dp
-        ) {
-            Column(content = content)
-        }
-    }
+private fun RowValue(text: String, alert: Boolean = false) {
+    Text(
+        text = text,
+        style = if (alert) SmapText.captionBold else SmapText.caption,
+        color = if (alert) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.widthIn(max = 180.dp)
+    )
 }
 
 @Composable
-fun AccountSettingsRow(
-    icon: ImageVector,
-    iconColor: Color,
-    title: String,
-    onClick: () -> Unit,
-    value: String? = null,
-    valueColor: Color = Color.Gray
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .background(iconColor.copy(alpha = 0.1f), RoundedCornerShape(10.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(18.dp))
-        }
-        Text(
-            text = title,
-            fontFamily = SuiteFont,
-            fontWeight = FontWeight.Medium,
-            fontSize = 15.sp,
-            color = Color.Black,
-            modifier = Modifier.weight(1f)
-        )
-        if (value != null) {
-            Text(
-                text = value,
-                style = SmapText.caption,
-                color = valueColor,
-                maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                modifier = Modifier.widthIn(max = 160.dp)
-            )
-        }
-        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = Color.Gray.copy(alpha = 0.3f), modifier = Modifier.size(16.dp))
-    }
-}
-
-@Composable
-fun AccountInfoRow(
-    icon: ImageVector,
-    iconColor: Color,
-    title: String,
-    value: String
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .background(iconColor.copy(alpha = 0.1f), RoundedCornerShape(10.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(18.dp))
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                fontFamily = SuiteFont,
-                fontSize = 11.sp,
-                color = Color.Gray
-            )
-            Text(
-                text = value,
-                fontFamily = SuiteFont,
-                fontWeight = FontWeight.Medium,
-                fontSize = 15.sp,
-                color = Color.Black
-            )
-        }
-    }
+private fun RowChevron() {
+    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.outline, modifier = Modifier.size(20.dp))
 }

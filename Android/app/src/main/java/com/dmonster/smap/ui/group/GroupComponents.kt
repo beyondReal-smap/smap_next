@@ -47,6 +47,7 @@ import com.dmonster.smap.data.model.SmapGroup
 import com.dmonster.smap.data.model.SmapGroupMember
 import com.dmonster.smap.ui.components.SmapAvatar
 import com.dmonster.smap.ui.components.SmapButton
+import com.dmonster.smap.ui.components.SmapDangerIcon
 import com.dmonster.smap.ui.components.SmapListRow
 import com.dmonster.smap.ui.components.SmapRowDivider
 import com.dmonster.smap.ui.components.SmapRowIcon
@@ -362,14 +363,14 @@ fun GroupDetailContent(
                     SmapListRow(
                         title = "그룹 삭제",
                         subtitle = "모든 멤버가 그룹에서 빠지고 되돌릴 수 없어요",
-                        leading = { DangerIcon(Icons.Outlined.DeleteOutline) },
+                        leading = { SmapDangerIcon(Icons.Outlined.DeleteOutline) },
                         destructive = true,
                         onClick = onDeleteClick,
                     )
                 } else {
                     SmapListRow(
                         title = "그룹 나가기",
-                        leading = { DangerIcon(Icons.AutoMirrored.Outlined.ExitToApp) },
+                        leading = { SmapDangerIcon(Icons.AutoMirrored.Outlined.ExitToApp) },
                         destructive = true,
                         onClick = onLeaveClick,
                     )
@@ -399,17 +400,6 @@ private fun RoleBadge(text: String) {
 @Composable
 private fun Chevron() {
     Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.outline)
-}
-
-@Composable
-private fun DangerIcon(icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    val colors = MaterialTheme.colorScheme
-    Box(
-        Modifier
-            .size(40.dp)
-            .background(colors.error.copy(alpha = 0.08f), CircleShape),
-        contentAlignment = Alignment.Center,
-    ) { Icon(icon, contentDescription = null, tint = colors.error, modifier = Modifier.size(20.dp)) }
 }
 
 @Composable

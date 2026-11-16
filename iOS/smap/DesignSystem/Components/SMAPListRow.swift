@@ -96,6 +96,21 @@ struct SMAPRowIcon: View {
     }
 }
 
+/// 위험 동작(삭제·나가기·로그아웃) 행 왼쪽 아이콘 — 연한 빨강 원 + 빨강 아이콘.
+/// 그룹 상세에만 있던 것을 계정설정 로그아웃과 함께 쓰려고 공용으로 옮겼다.
+struct SMAPDangerIcon: View {
+    let systemImage: String
+
+    var body: some View {
+        Image(systemName: systemImage)
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundStyle(SMAPTheme.Color.error)
+            .frame(width: 40, height: 40)
+            .background(SMAPTheme.Color.error.opacity(0.08), in: Circle())
+            .accessibilityHidden(true)
+    }
+}
+
 /// 구역 — 회색 배경 위 "작은 제목 + 흰 묶음". [action] 은 제목 오른쪽 글자 버튼.
 struct SMAPSection<Content: View, Action: View>: View {
     var title: String? = nil

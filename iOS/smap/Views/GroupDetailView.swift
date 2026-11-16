@@ -218,14 +218,14 @@ struct GroupDetailView: View {
                     subtitle: "모든 멤버가 그룹에서 빠지고 되돌릴 수 없어요",
                     destructive: true,
                     action: { showingDeleteAlert = true },
-                    leading: { DangerIcon(systemImage: "trash") }
+                    leading: { SMAPDangerIcon(systemImage: "trash") }
                 )
             } else {
                 SMAPListRow(
                     title: "그룹 나가기",
                     destructive: true,
                     action: { showingDeleteAlert = true },
-                    leading: { DangerIcon(systemImage: "rectangle.portrait.and.arrow.right") }
+                    leading: { SMAPDangerIcon(systemImage: "rectangle.portrait.and.arrow.right") }
                 )
             }
         }
@@ -241,20 +241,6 @@ struct GroupDetailView: View {
     }
 
     private var isCurrentUserOwner: Bool { ownerStatus == true }
-}
-
-/// 위험 동작 아이콘 — 연한 빨강 원 + 빨강 아이콘
-private struct DangerIcon: View {
-    let systemImage: String
-
-    var body: some View {
-        Image(systemName: systemImage)
-            .font(.system(size: 16, weight: .semibold))
-            .foregroundStyle(SMAPTheme.Color.error)
-            .frame(width: 40, height: 40)
-            .background(SMAPTheme.Color.error.opacity(0.08), in: Circle())
-            .accessibilityHidden(true)
-    }
 }
 
 // MARK: - Subviews
