@@ -220,7 +220,7 @@ private struct InviteJoinSection: View {
 }
 
 /// 초대 메시지·링크에서 초대 코드만 꺼낸다.
-/// 메시지 형식: "[SMAP] OO 그룹에 초대합니다!\n초대 코드: 5JDZRMNVEV\n링크: https://…/group/12/join?code=5JDZRMNVEV"
+/// 메시지 형식: "[도착했어] OO 그룹에 초대합니다!\n초대 코드: 5JDZRMNVEV\n링크: https://…/group/12/join?code=5JDZRMNVEV"
 enum InviteCodeParser {
     /// 영문 대문자·숫자만 남긴다
     static func sanitize(_ text: String) -> String {

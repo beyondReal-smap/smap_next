@@ -5,7 +5,7 @@ package com.dmonster.smap.ui.group
  *
  * 코드는 대개 카카오톡·문자로 받은 초대 메시지에서 복사해 넣는다. 메시지 전체를 붙여 넣으면 링크의 영문·숫자까지
  * 붙어 엉뚱한 코드가 됐다. 메시지 형식:
- * "[SMAP] OO 그룹에 초대합니다!\n초대 코드: 5JDZRMNVEV\n링크: https://…/group/12/join?code=5JDZRMNVEV"
+ * "[도착했어] OO 그룹에 초대합니다!\n초대 코드: 5JDZRMNVEV\n링크: https://…/group/12/join?code=5JDZRMNVEV"
  */
 object InviteCodeParser {
     private val patterns = listOf(

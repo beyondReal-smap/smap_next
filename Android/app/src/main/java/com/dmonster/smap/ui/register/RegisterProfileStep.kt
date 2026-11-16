@@ -219,7 +219,7 @@ internal fun CompleteContent() {
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "smap과 함께 소중한 사람들과\n위치를 공유해보세요",
+            text = "도착했어와 함께 소중한 사람들과\n위치를 공유해보세요",
             style = SmapText.body,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center

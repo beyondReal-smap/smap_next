@@ -1310,7 +1310,7 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = smap/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = smap;
+				INFOPLIST_KEY_CFBundleDisplayName = "도착했어";
 				INFOPLIST_KEY_LSApplicationCategoryType = "";
 				INFOPLIST_KEY_NSCameraUsageDescription = "${NSCameraUsageDescription}";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "${NSLocationAlwaysAndWhenInUseUsageDescription}";
@@ -1357,7 +1357,7 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = smap/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = smap;
+				INFOPLIST_KEY_CFBundleDisplayName = "도착했어";
 				INFOPLIST_KEY_LSApplicationCategoryType = "";
 				INFOPLIST_KEY_NSCameraUsageDescription = "${NSCameraUsageDescription}";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "${NSLocationAlwaysAndWhenInUseUsageDescription}";

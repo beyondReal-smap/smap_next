@@ -204,8 +204,8 @@ struct LoginView: View {
                 .accessibilityHidden(true)
 
             VStack(spacing: 4) {
-                // 앱 이름 - smap
-                Text("smap")
+                // 앱 이름
+                Text("도착했어")
                     .font(.suite(size: 32, weight: .bold))
                     .foregroundColor(SMAPTheme.Color.textPrimary)
 

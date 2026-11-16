@@ -276,10 +276,10 @@ class SmapApplication : Application() {
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channelId = "smap_notification_channel"
-            val channelName = "SMAP 알림"
+            val channelName = "도착했어 알림"
             val importance = NotificationManager.IMPORTANCE_HIGH
             val channel = NotificationChannel(channelId, channelName, importance).apply {
-                description = "SMAP의 주요 알림을 수신합니다."
+                description = "도착했어의 주요 알림을 수신합니다."
                 enableLights(true)
                 enableVibration(true)
             }

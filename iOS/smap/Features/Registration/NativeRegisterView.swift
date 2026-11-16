@@ -520,7 +520,7 @@ struct RegisterCompleteView: View {
                 .font(.suite(size: 24, weight: .bold))
                 .multilineTextAlignment(.center)
             
-            Text("smap과 함께 소중한 일상을 공유해보세요.")
+            Text("도착했어와 함께 소중한 일상을 공유해보세요.")
                 .font(.suite(size: 16))
                 .foregroundColor(.gray)
                 .multilineTextAlignment(.center)

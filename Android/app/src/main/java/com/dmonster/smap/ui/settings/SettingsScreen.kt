@@ -131,7 +131,7 @@ fun SettingsScreen(
                         SmapListRow(title = "계정설정", leading = { SmapRowIcon(Icons.Default.Person) }, trailing = { SettingsChevron() }, onClick = { open { isAccountSettingsVisible = true } })
                         SmapRowDivider()
                         SmapListRow(
-                            title = "SMAP 프리미엄",
+                            title = "도착했어 프리미엄",
                             leading = { SmapRowIcon(Icons.Default.WorkspacePremium, emphasized = true) },
                             trailing = { SettingsChevron() },
                             onClick = { open { GlobalEventBus.tryEmit(GlobalEvent.OpenSubscriptionScreen) } }
@@ -163,7 +163,7 @@ fun SettingsScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Text("SMAP", style = SmapText.captionBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("도착했어", style = SmapText.captionBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("버전 ${BuildConfig.VERSION_NAME}", style = SmapText.captionSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Spacer(modifier = Modifier.height(SmapSpacing.xl))

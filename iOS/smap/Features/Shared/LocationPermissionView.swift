@@ -40,7 +40,7 @@ struct LocationPermissionView: View {
                 .lineSpacing(5)
                 .padding(.bottom, 8)
 
-            Text("허용하시면 바로 smap을 이용하실 수 있어요!")
+            Text("허용하시면 바로 도착했어를 이용하실 수 있어요!")
                 .font(.subheadline)
                 .foregroundColor(.blue)
                 .padding(.bottom, 32)
@@ -63,7 +63,7 @@ struct LocationPermissionView: View {
                     .cornerRadius(14)
                 }
 
-                Text("설정 > smap > 위치 >\n'항상' 또는 '앱을 사용하는 동안'을 선택해 주세요")
+                Text("설정 > 도착했어 > 위치 >\n'항상' 또는 '앱을 사용하는 동안'을 선택해 주세요")
                     .font(.caption)
                     .foregroundColor(.gray)
                     .multilineTextAlignment(.center)

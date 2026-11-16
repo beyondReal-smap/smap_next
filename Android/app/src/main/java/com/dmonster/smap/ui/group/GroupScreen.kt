@@ -229,7 +229,7 @@ fun GroupScreen(
                 },
                 onSMS = {
                     val code = group.sgtCode ?: ""
-                    val message = "[SMAP] ${group.sgtTitle} 그룹에 초대합니다!\n초대 코드: $code\n링크: ${inviteLink(group.sgtIdx, group.sgtCode)}"
+                    val message = "[도착했어] ${group.sgtTitle} 그룹에 초대합니다!\n초대 코드: $code\n링크: ${inviteLink(group.sgtIdx, group.sgtCode)}"
                     val intent = Intent(Intent.ACTION_VIEW).apply {
                         data = android.net.Uri.parse("sms:?body=${android.net.Uri.encode(message)}")
                     }
@@ -274,7 +274,7 @@ fun GroupScreen(
                 },
                 onShareSMS = {
                     val code = group.sgtCode ?: ""
-                    val message = "[SMAP] ${group.sgtTitle} 그룹에 초대합니다!\n초대 코드: $code\n링크: ${inviteLink(group.sgtIdx, group.sgtCode)}"
+                    val message = "[도착했어] ${group.sgtTitle} 그룹에 초대합니다!\n초대 코드: $code\n링크: ${inviteLink(group.sgtIdx, group.sgtCode)}"
                     val intent = Intent(Intent.ACTION_VIEW).apply {
                         data = android.net.Uri.parse("sms:?body=${android.net.Uri.encode(message)}")
                     }
@@ -288,7 +288,7 @@ fun GroupScreen(
                 onDefaultShare = {
                     val code = group.sgtCode ?: ""
                     val link = inviteLink(group.sgtIdx, group.sgtCode)
-                    val message = "[SMAP] ${group.sgtTitle} 그룹에 초대합니다!\n초대 코드: $code\n링크: $link"
+                    val message = "[도착했어] ${group.sgtTitle} 그룹에 초대합니다!\n초대 코드: $code\n링크: $link"
                     val shareIntent = Intent(Intent.ACTION_SEND).apply {
                         type = "text/plain"
                         putExtra(Intent.EXTRA_TEXT, message)

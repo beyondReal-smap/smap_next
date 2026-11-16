@@ -117,7 +117,7 @@ fun SubscriptionScreen(
     Scaffold(
         containerColor = colors.background,
         topBar = {
-            SmapTopBar(title = "SMAP 프리미엄", onBack = onBack)
+            SmapTopBar(title = "도착했어 프리미엄", onBack = onBack)
         }
     ) { innerPadding ->
         Column(
@@ -292,7 +292,7 @@ private fun NonSubscriberSection(
 
     Column(verticalArrangement = Arrangement.spacedBy(SmapSpacing.xs)) {
         Text(
-            text = "SMAP 프리미엄",
+            text = "도착했어 프리미엄",
             style = SmapText.title,
             color = colors.onSurface
         )

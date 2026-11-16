@@ -50,7 +50,7 @@ public struct SettingMenuView: View {
                     SMAPSection(title: "계정 관리") {
                         settingsLink("계정설정", icon: "person.fill") { AccountSettingsView() }
                         SMAPRowDivider()
-                        settingsLink("SMAP 프리미엄", icon: "crown.fill", emphasized: true) { PremiumView() }
+                        settingsLink("도착했어 프리미엄", icon: "crown.fill", emphasized: true) { PremiumView() }
                     }
 
                     SMAPSection(title: "약관 & 정책") {
@@ -74,7 +74,7 @@ public struct SettingMenuView: View {
                     }
 
                     VStack(spacing: 4) {
-                        Text("SMAP")
+                        Text("도착했어")
                             .font(SMAPTheme.Font.captionBold)
                         // Bundle에서 직접 읽어 빌드 버전(MARKETING_VERSION)과 항상 일치시킨다.
                         Text("버전 \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")")

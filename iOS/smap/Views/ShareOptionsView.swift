@@ -169,9 +169,9 @@ struct ShareOptionsView: View {
     private func generateInviteMessage() -> String {
         let inviteLink = generateInviteLink()
         if let inviteCode = group.sgt_code, !inviteCode.isEmpty {
-            return "[SMAP] \(group.sgt_title ?? "그룹")에 초대되었습니다!\n\n초대 코드: \(inviteCode)\n\n링크: \(inviteLink)"
+            return "[도착했어] \(group.sgt_title ?? "그룹")에 초대되었습니다!\n\n초대 코드: \(inviteCode)\n\n링크: \(inviteLink)"
         } else {
-            return "[SMAP] \(group.sgt_title ?? "그룹")에 초대되었습니다!\n\n링크: \(inviteLink)"
+            return "[도착했어] \(group.sgt_title ?? "그룹")에 초대되었습니다!\n\n링크: \(inviteLink)"
         }
     }
     

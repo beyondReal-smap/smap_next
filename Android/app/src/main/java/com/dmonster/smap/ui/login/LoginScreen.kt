@@ -222,13 +222,13 @@ private fun LogoSection() {
         // 앱 아이콘 (AppNoBg)
         Image(
             painter = painterResource(id = R.drawable.app_no_bg),
-            contentDescription = "smap 로고",
+            contentDescription = "도착했어 로고",
             modifier = Modifier.size(80.dp)
         )
         
         // 앱 이름
         Text(
-            text = "smap",
+            text = "도착했어",
             fontSize = 34.responsiveSp(),
             fontFamily = SuiteFont,
             fontWeight = FontWeight.Bold,

@@ -456,7 +456,7 @@ struct PremiumView: View {
             .padding(SMAPTheme.Spacing.md)
         }
         .background(SMAPTheme.Adaptive.pageBackground.ignoresSafeArea())
-        .navigationTitle("SMAP 프리미엄")
+        .navigationTitle("도착했어 프리미엄")
         .navigationBarTitleDisplayMode(.inline)
         .manageSubscriptionsSheet(isPresented: $showManageSubscriptions)
         .task {
@@ -469,7 +469,7 @@ struct PremiumView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: SMAPTheme.Spacing.xs) {
-            Text("SMAP 프리미엄")
+            Text("도착했어 프리미엄")
                 .font(SMAPTheme.Font.title)
                 .foregroundStyle(SMAPTheme.Color.textPrimary)
             Text("소중한 사람들의 기록을 더 오래, 더 많이.")

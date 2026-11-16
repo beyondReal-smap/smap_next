@@ -1876,7 +1876,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
         // 메시지에서 제목과 본문 추출
         print("📝 [FCM-FORCE-DISPLAY] 단계 2: 메시지 내용 추출")
-        let title = userInfo["title"] as? String ?? "SMAP 알림"
+        let title = userInfo["title"] as? String ?? "도착했어 알림"
         let body = userInfo["body"] as? String ?? "새로운 메시지가 도착했습니다"
 
         print("   📋 제목: \(title)")

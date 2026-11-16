@@ -219,7 +219,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         
         val notificationBuilder = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(R.drawable.ic_stat_notification)  // 🔥 알림 전용 모노크롬 아이콘
-            .setContentTitle(title ?: "SMAP")
+            .setContentTitle(title ?: "도착했어")
             .setContentText(messageBody)
             .setAutoCancel(true)
             .setSound(defaultSoundUri)
@@ -232,10 +232,10 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 channelId,
-                "SMAP 알림",
+                "도착했어 알림",
                 NotificationManager.IMPORTANCE_HIGH // 중요도 높음 (팝업 허용)
             )
-            channel.description = "SMAP의 주요 알림을 수신합니다."
+            channel.description = "도착했어의 주요 알림을 수신합니다."
             channel.enableLights(true)
             channel.enableVibration(true)
             notificationManager.createNotificationChannel(channel)

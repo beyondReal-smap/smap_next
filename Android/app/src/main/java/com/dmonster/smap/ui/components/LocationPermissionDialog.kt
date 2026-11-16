@@ -61,7 +61,7 @@ fun LocationPermissionDialog(
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Text(
-                    text = "SMAP은 앱이 닫혀 있을 때나 사용 중이 아닐 때도 '활동 로그' 기록 및 '그룹 멤버와 실시간 위치 공유' 기능을 지원하기 위해 위치 데이터를 수집합니다.\n\n앱을 정상적으로 사용하려면 위치 권한을 '항상 허용'으로 설정해 주세요.\n\n수집된 위치 정보는 서비스 제공 목적 이외에 다른 용도로 사용되지 않습니다.",
+                    text = "도착했어는 앱이 닫혀 있을 때나 사용 중이 아닐 때도 '활동 로그' 기록 및 '그룹 멤버와 실시간 위치 공유' 기능을 지원하기 위해 위치 데이터를 수집합니다.\n\n앱을 정상적으로 사용하려면 위치 권한을 '항상 허용'으로 설정해 주세요.\n\n수집된 위치 정보는 서비스 제공 목적 이외에 다른 용도로 사용되지 않습니다.",
                     style = TextStyle(
                         fontSize = 14.sp,
                         fontFamily = SuiteFont,
@@ -148,7 +148,7 @@ fun LocationDeniedOverlay(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "SMAP의 위치 공유 및 활동 로그 기능을 사용하려면 위치 권한을 허용해주세요.\n\n설정 > 권한 > 위치에서 '항상 허용'으로 변경해주세요.",
+                    text = "도착했어의 위치 공유 및 활동 로그 기능을 사용하려면 위치 권한을 허용해주세요.\n\n설정 > 권한 > 위치에서 '항상 허용'으로 변경해주세요.",
                     style = TextStyle(
                         fontSize = 14.sp,
                         fontFamily = SuiteFont,

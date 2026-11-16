@@ -111,7 +111,7 @@ def feature_graphic(home_shot: Path, log_shot: Path) -> Image.Image:
     d = ImageDraw.Draw(canvas)
     icon = Image.open(ICON / "1024.png").convert("RGBA").resize((112, 112), Image.LANCZOS)
     canvas.alpha_composite(rounded(icon, 26), (64, 112))
-    d.text((64, 250), "SMAP", font=font("heavy", 64), fill="white")
+    d.text((64, 250), "도착했어", font=font("heavy", 64), fill="white")
     d.text((64, 330), "가족 위치 공유 · 도착 알림 · 이동 기록", font=font("semibold", 26), fill=(255, 255, 255, 225))
     for i, shot in enumerate((log_shot, home_shot)):
         ph = phone(Image.open(shot), 250)

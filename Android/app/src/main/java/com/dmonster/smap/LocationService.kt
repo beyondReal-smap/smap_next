@@ -949,7 +949,7 @@ class LocationService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 NOTIFICATION_CHANNEL_ID,
-                "SMAP 위치 추적 (활동 로그)",
+                "도착했어 위치 추적 (활동 로그)",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
                 description = "'활동 로그' 및 '그룹 멤버와 실시간 위치 공유' 기능을 위해 백그라운드에서 위치를 수집합니다."
@@ -962,7 +962,7 @@ class LocationService : Service() {
 
     private fun createNotification(mode: PowerMode) =
         NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
-            .setContentTitle("SMAP 위치 공유 중")
+            .setContentTitle("도착했어 위치 공유 중")
             .setContentText(notificationText(mode))
             .setSmallIcon(R.mipmap.ic_launcher)
             .setPriority(NotificationCompat.PRIORITY_LOW)
