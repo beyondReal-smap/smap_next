@@ -156,7 +156,8 @@ fun ScheduleScreen(
                         title = scheduleDateTitle(selectedDate) + if (count > 0) " · ${count}개" else ""
                     ) {
                         when {
-                            isLoading || isLoadingSchedules -> Box(
+                            // 그날 일정이 이미 보이면 새로 불러오는 동안에도 그대로 둔다(탭을 열 때마다 스피너로 깜빡이던 것).
+                            (isLoading || isLoadingSchedules) && selectedDateSchedules.isEmpty() -> Box(
                                 Modifier
                                     .fillMaxWidth()
                                     .height(96.dp),

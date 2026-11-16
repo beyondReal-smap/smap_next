@@ -1,5 +1,10 @@
 package com.dmonster.smap.ui.navigation
 
+import kotlinx.coroutines.launch
+import androidx.compose.ui.layout.layoutId
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.material.icons.outlined.People
 import androidx.compose.material.icons.filled.People
 import android.view.HapticFeedbackConstants
@@ -68,6 +73,28 @@ fun MainTabScreen(
     onLogout: () -> Unit
 ) {
     var selectedTabIndex by rememberSaveable { mutableIntStateOf(0) }
+    // 탭 전환 좌우 슬라이드 — 이전에는 한 프레임에 화면 전체가 바뀌어 "깜빡"이는 것처럼 보였다.
+    // 왼쪽 탭 → 오른쪽 탭이면 새 화면이 오른쪽에서 들어오고, 반대면 왼쪽에서 들어온다.
+    // 진행률은 탭을 누르는 순간 0 으로 바꿔(동기) 첫 프레임부터 이전 화면이 그대로 보이게 한다.
+    var transitionFrom by remember { mutableStateOf<Int?>(null) }
+    var transitionProgress by remember { mutableFloatStateOf(1f) }
+    val tabScope = rememberCoroutineScope()
+    var tabTransitionJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    fun switchTab(index: Int) {
+        if (index == selectedTabIndex) return
+        tabTransitionJob?.cancel()
+        transitionFrom = selectedTabIndex
+        transitionProgress = 0f
+        selectedTabIndex = index
+        tabTransitionJob = tabScope.launch {
+            androidx.compose.animation.core.animate(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
+            ) { value, _ -> transitionProgress = value }
+            transitionFrom = null
+        }
+    }
     val view = LocalView.current
     var visitedMyPlace by rememberSaveable { mutableStateOf(false) }
     var visitedActivityLog by rememberSaveable { mutableStateOf(false) }
@@ -105,7 +132,7 @@ fun MainTabScreen(
     // 홈 탭(0)에서는 비활성화하여 기본 동작을 따른다. 내부(모달 등)의 BackHandler가
     // 더 안쪽에 컴포즈되면 그쪽이 우선 처리한다.
     BackHandler(enabled = selectedTabIndex != 0) {
-        selectedTabIndex = 0
+        switchTab(0)
     }
 
     Scaffold(
@@ -113,7 +140,7 @@ fun MainTabScreen(
         bottomBar = {
             // 그룹 시작 화면(전체 화면 모달)이 떠 있을 때도 탭바를 숨긴다. 이전에는 모달 아래로 탭바가 보여
             // 눌러도 선택 표시만 바뀌고 화면은 그대로여서 고장 난 것처럼 보였다.
-            if (!showSubscriptionScreen && !showGroupCreationModal && !(selectedTabIndex == 0 && homeOverlayOpen)) NavigationBar(
+            if (!showSubscriptionScreen && !showGroupCreationModal && !(selectedTabIndex == 0 && homeOverlayOpen)) CompositionLocalProvider(LocalRippleConfiguration provides null) { NavigationBar(
                 modifier = Modifier, // Remove fixed height to allow flexible inset-based taller height on gesture nav
                 containerColor = Color.White,
                 tonalElevation = 0.dp,
@@ -147,7 +174,7 @@ fun MainTabScreen(
                         onClick = {
                             if (selectedTabIndex != index) {
                                 view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                selectedTabIndex = index
+                                switchTab(index)
                             }
                         },
                         colors = NavigationBarItemDefaults.colors(
@@ -159,7 +186,7 @@ fun MainTabScreen(
                         )
                     )
                 }
-            }
+            } }
         }
     ) { innerPadding ->
         Box(
@@ -168,22 +195,29 @@ fun MainTabScreen(
                 .padding(innerPadding)
                 .consumeWindowInsets(innerPadding) // 하위 화면에서 중복 패딩 방지
         ) {
-            Layout(content = {
-                Box { HomeScreen(viewModel = homeViewModel, onLogout = onLogout, isVisible = selectedTabIndex == 0, onOverlayVisibleChange = { homeOverlayOpen = it }) }
-                if (visitedMyPlace) Box { MyPlaceScreen(isVisible = selectedTabIndex == 3) }
-                if (visitedActivityLog) Box { ActivityLogScreen(isVisible = selectedTabIndex == 4) }
-                if (selectedTabIndex == 1) Box { GroupScreen() }
-                if (selectedTabIndex == 2) Box { ScheduleScreen() }
-            }) { measurables, constraints ->
-                val placeables = measurables.map { it.measure(constraints) }
-                val visibleIndex = when (selectedTabIndex) {
-                    0 -> 0
-                    3 -> 1
-                    4 -> 1 + if (visitedMyPlace) 1 else 0
-                    else -> placeables.lastIndex
-                }
-                layout(constraints.maxWidth, constraints.maxHeight) {
-                    placeables.getOrNull(visibleIndex)?.placeRelative(0, 0)
+            val from = transitionFrom
+            Layout(
+                modifier = Modifier.clipToBounds(),
+                content = {
+                    // 지도 탭은 한 번 열면 계속 살려 둔다(지도·상태 유지). 그룹·일정은 보일 때와 밀려 나가는 동안만 둔다.
+                    Box(Modifier.layoutId(0)) { HomeScreen(viewModel = homeViewModel, onLogout = onLogout, isVisible = selectedTabIndex == 0, onOverlayVisibleChange = { homeOverlayOpen = it }) }
+                    if (visitedMyPlace) Box(Modifier.layoutId(3)) { MyPlaceScreen(isVisible = selectedTabIndex == 3) }
+                    if (visitedActivityLog) Box(Modifier.layoutId(4)) { ActivityLogScreen(isVisible = selectedTabIndex == 4) }
+                    if (selectedTabIndex == 1 || from == 1) Box(Modifier.layoutId(1)) { GroupScreen() }
+                    if (selectedTabIndex == 2 || from == 2) Box(Modifier.layoutId(2)) { ScheduleScreen() }
+                },
+            ) { measurables, constraints ->
+                val placeables = measurables.associate { (it.layoutId as Int) to it.measure(constraints) }
+                val width = constraints.maxWidth
+                layout(width, constraints.maxHeight) {
+                    if (from == null || from == selectedTabIndex) {
+                        placeables[selectedTabIndex]?.placeRelative(0, 0)
+                    } else {
+                        val direction = if (selectedTabIndex > from) 1 else -1
+                        val p = transitionProgress
+                        placeables[from]?.placeRelative((-direction * width * p).toInt(), 0)
+                        placeables[selectedTabIndex]?.placeRelative((direction * width * (1f - p)).toInt(), 0)
+                    }
                 }
             }
 

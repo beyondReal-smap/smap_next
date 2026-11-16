@@ -83,6 +83,9 @@ fun GroupListContent(
     onRefresh: () -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
+    // 이미 받은 목록이 있으면 다시 불러오는 동안에도 그대로 보여 준다. 탭을 다시 열 때마다 자리 표시(회색 줄)로
+    // 바뀌었다가 목록이 돌아와 깜빡이는 것처럼 보였다. 자리 표시는 처음 불러올 때만.
+    val showPlaceholder = isLoading && groups.isEmpty()
     PullToRefreshBox(isRefreshing = isRefreshing, onRefresh = onRefresh, modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier
@@ -91,7 +94,7 @@ fun GroupListContent(
             contentPadding = PaddingValues(start = SmapSpacing.md, end = SmapSpacing.md, top = SmapSpacing.md, bottom = SmapSpacing.xl),
             verticalArrangement = Arrangement.spacedBy(SmapSpacing.lg),
         ) {
-            item { GroupListHero(groups, groupMemberCounts, userName, currentUserIdx, isLoading) }
+            item { GroupListHero(groups, groupMemberCounts, userName, currentUserIdx, showPlaceholder) }
 
             item {
                 // 새 그룹 만들기는 "내 그룹" 줄 오른쪽에 둔다. 큰 제목을 뺀 뒤 맨 위에 + 하나만 남아
@@ -110,7 +113,7 @@ fun GroupListContent(
                     },
                 ) {
                     when {
-                        isLoading -> repeat(2) { i ->
+                        showPlaceholder -> repeat(2) { i ->
                             if (i > 0) SmapRowDivider()
                             SkeletonRow()
                         }
