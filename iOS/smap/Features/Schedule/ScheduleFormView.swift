@@ -1251,7 +1251,9 @@ struct ScheduleFormView: View {
                         sst_location_lat: locationLat,
                         sst_location_long: locationLong,
                         sst_memo: memo,
-                        sst_alram: alarm == 0 ? nil : alarm,
+                        // 알림 없음도 0 으로 보낸다(Android 와 동일). nil 이면 키가 빠지고, 서버가 빈 값을 'N' 으로 채워
+                        // 숫자 칸(sst_alram)에 넣으려다 DB 오류(500) — "알림 없음" 일정이 저장되지 않았다.
+                        sst_alram: alarm,
                         sst_alarm_t: alarmText,
                         sst_schedule_alarm_chk: scheduleAlarmChk,
                         sst_pick_type: pickType,
@@ -1278,7 +1280,9 @@ struct ScheduleFormView: View {
                         sst_location_lat: locationLat,
                         sst_location_long: locationLong,
                         sst_memo: memo,
-                        sst_alram: alarm == 0 ? nil : alarm,
+                        // 알림 없음도 0 으로 보낸다(Android 와 동일). nil 이면 키가 빠지고, 서버가 빈 값을 'N' 으로 채워
+                        // 숫자 칸(sst_alram)에 넣으려다 DB 오류(500) — "알림 없음" 일정이 저장되지 않았다.
+                        sst_alram: alarm,
                         sst_alarm_t: alarmText,
                         sst_schedule_alarm_chk: scheduleAlarmChk,
                         sst_pick_type: pickType,
