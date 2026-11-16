@@ -1,94 +1,42 @@
 import SwiftUI
 
+// MARK: - 그룹 탭 (Android GroupComponents.kt 이식, 36단계 재설계)
+//
+// 이전: 머리 글자 + 남색·분홍 통계 카드 두 장 + 초대 코드 입력 + 흰 카드 목록 + 오른쪽 아래 떠 있는 + 버튼.
+// 지금: 회색 바탕 위 남색 요약 카드(인사·그룹/멤버 수) → "내 그룹 N" 구역(제목 옆 + 새 그룹) → "초대 코드로 참여" 구역.
+// 떠 있는 + 버튼은 목록 아래쪽 항목을 가리고 다른 탭과 위치가 달라 제목 옆 글자 버튼으로 옮겼다.
+
 struct GroupListView: View {
     @StateObject private var viewModel = GroupViewModel()
     @State private var inviteCode: String = ""
     @State private var showCreateModal: Bool = false
-    @State private var newGroupTitle: String = ""
-    @State private var newGroupMemo: String = ""
-    
-    // Brand Colors
-    
-    private let secondaryColor = Color.gray
-    
+
+    private var currentUserIdx: Int? { AuthService.shared.getUserData()?.mt_idx }
+
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                // Custom Header
-                GroupListHeaderView()
-                    .padding(.bottom, 10)
-                
-                ZStack(alignment: .bottomTrailing) {
-                    ScrollView {
-                        VStack(spacing: 20) {
-                            // 1. Stats Cards
-                            StatsCardsView(groupCount: viewModel.groups.count, totalMembers: viewModel.totalMembers)
-                            
-                            // 2. Invite Code Section
-                            InviteCodeSection(inviteCode: $inviteCode) {
-                                viewModel.joinGroup(inviteCode: inviteCode)
-                                inviteCode = "" // Clear after join
-                            }
-                            .disabled(viewModel.isJoining)
-                            
-                            // 3. Group List
-                            if viewModel.isLoading {
-                                ProgressView()
-                                    .frame(maxWidth: .infinity, minHeight: 200)
-                            } else if viewModel.groups.isEmpty {
-                                EmptyGroupView()
-                            } else {
-                                LazyVStack(spacing: 16) {
-                                    let groups = viewModel.groups
-                                    ForEach(Array(groups.enumerated()), id: \.element.id) { index, group in
-                                        NavigationLink(destination: GroupDetailView(viewModel: viewModel, group: group, groupIndex: index)) {
-                                            GroupCard(group: group, index: index)
-                                        }
-                                    }
-                                }
-                                .padding(.horizontal)
-                            }
-                            
-                            // Bottom Padding for FAB
-                            Spacer(minLength: 80)
-                        }
-                        // Remove default top padding since we have custom header
-                        // .padding(.top) 
+            ScrollView {
+                VStack(alignment: .leading, spacing: SMAPTheme.Spacing.lg) {
+                    GroupListHero(
+                        groups: viewModel.groups,
+                        userName: AuthService.shared.getUserData()?.displayName,
+                        currentUserIdx: currentUserIdx,
+                        isLoading: showPlaceholder
+                    )
+                    groupSection
+                    InviteJoinSection(inviteCode: $inviteCode, isJoining: viewModel.isJoining) {
+                        viewModel.joinGroup(inviteCode: inviteCode)
+                        inviteCode = ""
                     }
-                    .refreshable {
-                        viewModel.fetchGroups()
-                    }
-                    
-                    // Floating Action Button for Create Group — 타 화면 FAB(홈/내장소/위치기록)와 위치·그림자 통일.
-                    Button(action: {
-                        showCreateModal = true
-                    }) {
-                        Image(systemName: "plus")
-                            .font(.title2.bold())
-                            .foregroundColor(.white)
-                            .frame(width: 56, height: 56)
-                            .background(
-                                LinearGradient(
-                                    gradient: Gradient(colors: [SMAPTheme.Color.primary, SMAPTheme.Color.primaryDark]),
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .clipShape(Circle())
-                            .shadow(color: SMAPTheme.Color.primary.opacity(0.3), radius: 12, x: 0, y: 8)
-                    }
-                    .accessibilityLabel("그룹 추가")
-                    .accessibilityAddTraits(.isButton)
-                    .padding(.trailing, 20)
-                    .padding(.bottom, 20)
                 }
+                .padding(SMAPTheme.Spacing.md)
+                .padding(.bottom, SMAPTheme.Spacing.lg)
             }
-            .background(Color(white: 0.98)) // Light gray background
+            .scrollDismissesKeyboard(.interactively)
+            .background(SMAPTheme.Surface.canvas.ignoresSafeArea())
+            .refreshable { viewModel.fetchGroups() }
             .toolbar(.hidden, for: .navigationBar)
-            .onAppear {
-                viewModel.fetchGroups()
-                
-            }
+            .onAppear { viewModel.fetchGroups() }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("groupsDidChange"))) { _ in
                 viewModel.fetchGroups()
             }
@@ -98,508 +46,313 @@ struct GroupListView: View {
                 Text(viewModel.errorMessage ?? "오류가 발생했습니다.")
             }
             .sheet(isPresented: $showCreateModal) {
-                CreateGroupView(isPresented: $showCreateModal, title: $newGroupTitle, memo: $newGroupMemo) {
-                    viewModel.createGroup(title: newGroupTitle, memo: newGroupMemo)
-                    newGroupTitle = ""
-                    newGroupMemo = ""
+                GroupFormSheet(mode: .create, isSaving: viewModel.isCreating) { title, memo in
+                    viewModel.createGroup(title: title, memo: memo)
                 }
             }
         }
     }
-    
 
-}
+    /// 이미 받은 목록이 있으면 다시 불러오는 동안에도 그대로 보여 준다(탭을 열 때마다 깜빡이지 않게). 자리 표시는 처음 한 번만.
+    private var showPlaceholder: Bool { viewModel.isLoading && viewModel.groups.isEmpty }
 
-struct GroupListHeaderView: View {
-    var body: some View {
-        HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("그룹")
-                    .font(.suite(size: 22, weight: .bold))
-                    .foregroundColor(.black)
-                Text("그룹과 멤버를 한눈에 관리하세요")
-                    .font(.suite(size: 13))
-                    .foregroundColor(.gray)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
-            Spacer()
-        }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 16)
-    }
-}
-
-// MARK: - Subviews
-
-struct StatsCardsView: View {
-    let groupCount: Int
-    let totalMembers: Int
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            // Total Groups Card
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("총 그룹")
-                            .font(.suite(size: 14))
-                            .foregroundColor(Color(red: 219/255, green: 234/255, blue: 254/255)) // text-blue-100
-                        Text("\(groupCount)개")
-                            .font(.suite(size: 24, weight: .bold))
-                            .foregroundColor(.white)
+    private var groupSection: some View {
+        SMAPSection(
+            title: viewModel.groups.isEmpty ? "내 그룹" : "내 그룹 \(viewModel.groups.count)",
+            action: {
+                Button { showCreateModal = true } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "plus").font(.system(size: 14, weight: .semibold))
+                        Text("새 그룹").font(SMAPTheme.Font.captionBold)
                     }
-                    Spacer()
-                    Image(systemName: "square.stack.3d.up.fill")
-                        .font(.suite(size: 28, weight: .bold))
-                        .foregroundColor(Color(red: 191/255, green: 219/255, blue: 254/255).opacity(0.5)) // text-blue-200
+                    .foregroundStyle(SMAPTheme.Navy.base)
+                    .padding(.horizontal, SMAPTheme.Spacing.sm)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("새 그룹 만들기")
             }
-            .padding()
-            .frame(maxWidth: .infinity)
-            .background(
-                LinearGradient(gradient: Gradient(colors: [SMAPTheme.Color.primary, SMAPTheme.Color.primaryDark]), startPoint: .leading, endPoint: .trailing)
-            )
-            .cornerRadius(16)
-            .shadow(color: SMAPTheme.Color.primary.opacity(0.25), radius: 4, x: 0, y: 2)
-
-            // Total Members Card
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("총 멤버")
-                            .font(.suite(size: 14))
-                            .foregroundColor(Color(red: 252/255, green: 231/255, blue: 243/255)) // text-pink-100
-                        Text("\(totalMembers)명")
-                            .font(.suite(size: 24, weight: .bold))
-                            .foregroundColor(.white)
+        ) {
+            if showPlaceholder {
+                SkeletonRow()
+                SMAPRowDivider()
+                SkeletonRow()
+            } else if viewModel.groups.isEmpty {
+                SMAPListRow(
+                    title: "아직 그룹이 없어요",
+                    subtitle: "가족·친구와 위치를 함께 보려면 그룹을 만들거나 초대 코드로 참여하세요.",
+                    action: { showCreateModal = true },
+                    leading: { SMAPRowIcon(systemImage: "person.3") },
+                    trailing: {
+                        Text("만들기").font(SMAPTheme.Font.captionBold).foregroundStyle(SMAPTheme.Navy.base)
                     }
-                    Spacer()
-                    Image(systemName: "person.2.fill")
-                        .font(.suite(size: 28, weight: .bold))
-                        .foregroundColor(Color(red: 251/255, green: 207/255, blue: 232/255).opacity(0.5)) // text-pink-200
+                )
+            } else {
+                ForEach(Array(viewModel.groups.enumerated()), id: \.element.id) { index, group in
+                    if index > 0 { SMAPRowDivider() }
+                    NavigationLink {
+                        GroupDetailView(viewModel: viewModel, group: group)
+                    } label: {
+                        GroupRow(group: group, isMine: currentUserIdx != nil && group.mt_idx == currentUserIdx)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
-            .padding()
-            .frame(maxWidth: .infinity)
-            .background(
-                LinearGradient(gradient: Gradient(colors: [SMAPTheme.Accent.pink, SMAPTheme.Accent.pinkDeep]), startPoint: .leading, endPoint: .trailing)
-            )
-            .cornerRadius(16)
-            .shadow(color: SMAPTheme.Accent.pink.opacity(0.25), radius: 4, x: 0, y: 2)
         }
-        .padding(.horizontal)
     }
 }
 
-struct InviteCodeSection: View {
-    @Binding var inviteCode: String
-    var onJoin: () -> Void
-    
-    var body: some View {
-        // 커스텀 바인딩을 사용하여 입력을 즉시 필터링
-        let filteredBinding = Binding<String>(
-            get: { self.inviteCode },
-            set: { newValue in
-                // 대문자로 변환하고 영문 알파벳(A-Z)과 숫자(0-9)만 허용
-                self.inviteCode = newValue.uppercased().filter { char in
-                    char.isASCII && (char.isLetter || char.isNumber)
-                }
-            }
-        )
-        
-        HStack(spacing: 12) {
-            HStack {
-                Image(systemName: "person.badge.plus")
-                    .foregroundColor(.gray)
-                TextField("초대 코드 입력...", text: filteredBinding)
-                    .font(.suite(size: 16))
-                    .textInputAutocapitalization(.characters)
-                    .autocorrectionDisabled()
-                    .keyboardType(.asciiCapable) // 영문/숫자 키보드 강제
-            }
-            .padding(.horizontal)
-            .frame(height: 56) // 높이 고정
-            .background(Color.white)
-            .cornerRadius(12)
-            .overlay(
-                // 입력 영역 stroke — 브랜드 primary tint로 통일 (FAB/가입 버튼과 조화)
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(SMAPTheme.Color.primary.opacity(0.2), lineWidth: 1)
-            )
-            
-            Button(action: onJoin) {
-                Text("가입")
-                    .font(.suite(size: 16, weight: .bold))
-                    .foregroundColor(.white)
-                    .frame(minHeight: 44) // HIG 터치 타겟
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 12)
-                    .background(
-                        inviteCode.isEmpty ? Color.gray.opacity(0.4) : SMAPTheme.Color.primary
-                    )
-                    .cornerRadius(12)
-                    .shadow(color: SMAPTheme.Color.primary.opacity(0.2), radius: 4, x: 0, y: 2)
-            }
-            .disabled(inviteCode.isEmpty)
-            .accessibilityHint(inviteCode.isEmpty ? "초대 코드를 먼저 입력하세요" : "입력한 코드로 그룹에 가입")
-        }
-        .padding(.horizontal)
-    }
-}
-
-struct GroupCard: View {
+/// 그룹 목록 한 줄 — 남색 원 아이콘 · 이름 · "멤버 N명 · 메모" · (그룹장 배지) · 꺾쇠
+private struct GroupRow: View {
     let group: SmapGroup
-    let index: Int
+    let isMine: Bool
 
     var body: some View {
-        HStack(spacing: 14) {
-            // Icon — flat 스타일, 브랜드 tint 배경
-            ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(SMAPTheme.Color.primary.opacity(0.08))
-                    .frame(width: 52, height: 52)
-
-                let iconUrl = URL(string: "https://nextstep.aiagnt.kr/images/group\((index % 2) + 1).webp")
-
-                AsyncImage(url: iconUrl) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image.resizable()
-                            .aspectRatio(contentMode: .fill)
-                    case .failure(_):
-                        Image(systemName: "person.3.fill")
-                            .foregroundColor(SMAPTheme.Color.primary.opacity(0.8))
-                            .font(.suite(size: 22))
-                    case .empty:
-                        ProgressView()
-                    @unknown default:
-                        EmptyView()
-                    }
+        let memo = group.sgt_memo.flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
+        // NavigationLink 가 누름을 처리하므로 행 자체에는 동작을 주지 않는다.
+        SMAPListRow(
+            title: group.sgt_title.flatMap { $0.isEmpty ? nil : $0 } ?? "이름 없는 그룹",
+            subtitle: (["멤버 \(group.member_count ?? 0)명"] + [memo].compactMap { $0 }).joined(separator: " · "),
+            leading: { SMAPRowIcon(systemImage: "person.3.fill", emphasized: true) },
+            trailing: {
+                HStack(spacing: SMAPTheme.Spacing.sm) {
+                    if isMine { RoleBadge(text: "그룹장") }
+                    RowChevron()
                 }
-                .frame(width: 48, height: 48)
-                .cornerRadius(10)
             }
+        )
+        .contentShape(Rectangle())
+    }
+}
+
+/// 그룹 탭 맨 위 남색 요약 카드 — 인사 + 그룹·멤버 수.
+/// 멤버 수는 그룹별 인원의 합이라 여러 그룹에 같은 사람이 있으면 겹쳐 센다("전체 멤버", Android 와 같은 기준).
+private struct GroupListHero: View {
+    let groups: [SmapGroup]
+    let userName: String?
+    let currentUserIdx: Int?
+    let isLoading: Bool
+
+    var body: some View {
+        SMAPHeroCard {
+            SMAPHeroHeading(
+                eyebrow: userName.map { "안녕하세요, \($0)님" } ?? "안녕하세요",
+                title: title
+            )
+            if !isLoading && !groups.isEmpty {
+                SMAPHeroStats(stats: [
+                    ("\(groups.count)", "내 그룹"),
+                    ("\(groups.reduce(0) { $0 + ($1.member_count ?? 0) })", "전체 멤버"),
+                    ("\(groups.filter { currentUserIdx != nil && $0.mt_idx == currentUserIdx }.count)", "내가 만든 그룹"),
+                ])
+            }
+        }
+    }
+
+    private var title: String {
+        if isLoading { return "그룹을 불러오고 있어요" }
+        if groups.isEmpty { return "그룹을 만들고\n가족을 초대해 보세요" }
+        return "\(groups.count)개 그룹에서\n함께 위치를 나누고 있어요"
+    }
+}
+
+/// 초대 코드로 참여 — 입력창 + 참여 버튼. 코드는 영문 대문자·숫자만 받는다.
+/// 코드는 대개 카카오톡·문자로 받은 초대 메시지에서 복사해 넣는다. 제목 옆 "붙여넣기"나 입력창 붙여넣기 모두
+/// 메시지 전체가 들어와도 코드만 골라 넣는다.
+/// 시스템 PasteButton 은 허용 팝업이 없지만 글꼴을 바꿀 수 없어(앱 글꼴 SUITE 미적용) "+ 새 그룹"과 같은 글자 버튼으로 둔다.
+/// 대신 처음 누를 때 iOS 가 붙여넣기 허용을 묻는다.
+private struct InviteJoinSection: View {
+    @Binding var inviteCode: String
+    let isJoining: Bool
+    let onJoin: () -> Void
+
+    var body: some View {
+        let filtered = Binding<String>(
+            get: { inviteCode },
+            set: { newValue in
+                // 한 번에 두 글자 이상 늘면 붙여넣기로 보고 메시지에서 코드만 고른다. 한 글자씩 칠 때는 거르기만.
+                if newValue.count - inviteCode.count > 1 {
+                    if let code = InviteCodeParser.extract(from: newValue) { inviteCode = code }
+                } else {
+                    inviteCode = InviteCodeParser.sanitize(newValue)
+                }
+            }
+        )
+        let canJoin = !inviteCode.isEmpty && !isJoining
+        SMAPSection(title: "초대 코드로 참여", action: {
+            Button {
+                guard let text = UIPasteboard.general.string, let code = InviteCodeParser.extract(from: text) else { return }
+                HapticManager.shared.selection()
+                inviteCode = code
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "doc.on.clipboard").font(.system(size: 14, weight: .semibold))
+                    Text("붙여넣기").font(SMAPTheme.Font.captionBold)
+                }
+                .foregroundStyle(SMAPTheme.Navy.base)
+                .padding(.horizontal, SMAPTheme.Spacing.sm)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("초대 코드 붙여넣기")
+        }) {
+            HStack(alignment: .bottom, spacing: SMAPTheme.Spacing.sm) {
+                SMAPTextField(
+                    "예: 5JDZRMNVEV",
+                    text: filtered,
+                    label: "초대 코드",
+                    keyboardType: .asciiCapable,
+                    submitLabel: .join,
+                    onSubmit: { if canJoin { onJoin() } }
+                )
+                .textInputAutocapitalization(.characters)
+                .autocorrectionDisabled()
+                SMAPButton("참여", isLoading: isJoining, isDisabled: !canJoin, action: onJoin)
+                    .frame(width: 80)
+            }
+            .padding(SMAPTheme.Spacing.md)
+        }
+    }
+}
+
+/// 초대 메시지·링크에서 초대 코드만 꺼낸다.
+/// 메시지 형식: "[SMAP] OO 그룹에 초대합니다!\n초대 코드: 5JDZRMNVEV\n링크: https://…/group/12/join?code=5JDZRMNVEV"
+enum InviteCodeParser {
+    /// 영문 대문자·숫자만 남긴다
+    static func sanitize(_ text: String) -> String {
+        text.uppercased().filter { $0.isASCII && ($0.isLetter || $0.isNumber) }
+    }
+
+    /// 1) 링크의 code= 값 2) "코드:" 뒤 값 3) 대문자·숫자 6~12자 낱말(주소의 소문자 낱말·#색상값 제외)
+    /// 4) 다 아니면 전체를 거른 값이 코드 길이(4~12자)일 때만. 초대와 무관한 긴 글이면 nil — 입력창을 그대로 둔다.
+    static func extract(from text: String) -> String? {
+        let patterns = [
+            #"[?&]code=([A-Za-z0-9]+)"#,
+            #"코드\s*[:：]?\s*([A-Za-z0-9]+)"#,
+            #"(?<![A-Za-z0-9#])([A-Z0-9]{6,12})(?![A-Za-z0-9])"#,
+        ]
+        for pattern in patterns {
+            if let regex = try? NSRegularExpression(pattern: pattern),
+               let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+               let range = Range(match.range(at: 1), in: text) {
+                return sanitize(String(text[range]))
+            }
+        }
+        let whole = sanitize(text)
+        return (4...12).contains(whole.count) ? whole : nil
+    }
+}
+
+// MARK: - 그룹 화면 공용 조각
+
+/// 역할 배지 — 그룹장은 남색 채움(가장 강한 역할), 리더는 연한 남색.
+struct RoleBadge: View {
+    let text: String
+
+    var body: some View {
+        let strong = text == "그룹장"
+        Text(text)
+            .font(SMAPTheme.Font.captionBold)
+            .foregroundStyle(strong ? Color.white : SMAPTheme.Navy.base)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background {
+                if strong {
+                    Capsule().fill(SMAPTheme.Navy.gradient)
+                } else {
+                    Capsule().fill(SMAPTheme.Surface.primaryContainer)
+                }
+            }
+    }
+}
+
+struct RowChevron: View {
+    var body: some View {
+        Image(systemName: "chevron.right")
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(SMAPTheme.Surface.outline)
             .accessibilityHidden(true)
-
-            // Info — 제목 / 메모 / 보조정보 3단 위계
-            VStack(alignment: .leading, spacing: 3) {
-                Text(group.sgt_title ?? "이름 없음")
-                    .font(.suite(size: 17, weight: .bold))
-                    .foregroundColor(.primary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.9)
-
-                Text(group.sgt_memo ?? "그룹 설명이 없습니다")
-                    .font(.suite(size: 13))
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-
-                // 보조정보: 멤버수(좌) + 날짜(우). Spacer 로 자연 분리되어 짤림 방지.
-                HStack(spacing: 6) {
-                    Image(systemName: "person.2.fill")
-                        .font(.suite(size: 11, weight: .semibold))
-                    Text("\(group.member_count ?? 0)명")
-                        .font(.suite(size: 12, weight: .medium))
-                        .monospacedDigit()
-
-                    if let dateStr = group.sgt_wdate {
-                        Text("·")
-                            .font(.suite(size: 12))
-                            .foregroundColor(.secondary)
-                        Text(dateStr.components(separatedBy: "T").first ?? dateStr)
-                            .font(.suite(size: 12))
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                    }
-                }
-                .foregroundColor(SMAPTheme.Color.primary)
-                .padding(.top, 4)
-            }
-
-            Spacer(minLength: 4)
-
-            Image(systemName: "chevron.right")
-                .font(.suite(size: 13, weight: .semibold))
-                .foregroundColor(Color.secondary.opacity(0.6))
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 14)
-        .frame(minHeight: 80) // 안정적인 Row 높이, 멤버 몇 명이든 레이아웃 일관
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.white)
-        )
-        .overlay(
-            // 그림자 대신 가벼운 stroke로 분리감. iOS 최신 flat 트렌드와 정합.
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.black.opacity(0.06), lineWidth: 1)
-        )
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(group.sgt_title ?? "이름 없음") 그룹, 멤버 \(group.member_count ?? 0)명")
-        .accessibilityHint("상세 보기")
     }
 }
 
-struct EmptyGroupView: View {
+/// 불러오는 동안 행 자리 표시(회색 원 + 두 줄)
+struct SkeletonRow: View {
     var body: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "person.3.sequence.fill")
-                .font(.suite(size: 60))
-                .foregroundColor(.gray.opacity(0.3))
-            
-            Text("소속된 그룹이 없습니다")
-                .font(.suite(size: 18, weight: .semibold))
-                .foregroundColor(.secondary)
-            
-            Text("새 그룹을 생성하거나 초대 코드로 가입해보세요!")
-                .font(.suite(size: 14))
-                .foregroundColor(.gray)
-                .multilineTextAlignment(.center)
+        HStack(spacing: 12) {
+            Circle().fill(SMAPTheme.Surface.variant).frame(width: 40, height: 40)
+            VStack(alignment: .leading, spacing: 6) {
+                RoundedRectangle(cornerRadius: 4).fill(SMAPTheme.Surface.variant).frame(width: 140, height: 14)
+                RoundedRectangle(cornerRadius: 4).fill(SMAPTheme.Surface.variant).frame(width: 90, height: 10)
+            }
+            Spacer(minLength: 0)
         }
-        .padding(40)
-        .frame(maxWidth: .infinity)
-        .background(Color.white)
-        .cornerRadius(20)
-        .padding(.horizontal)
-        .shadow(color: Color.black.opacity(0.05), radius: 10)
+        .padding(SMAPTheme.Spacing.md)
+        .accessibilityHidden(true)
     }
 }
 
-// Create Group Modal
-struct CreateGroupView: View {
-    @Binding var isPresented: Bool
-    @Binding var title: String
-    @Binding var memo: String
-    var onSave: () -> Void
-    
-    @State private var isAnimating = false
-    @FocusState private var focusedField: Field?
-    
-    enum Field { case title, memo }
-    
-    
-    private var pinkColor: Color { SMAPTheme.Accent.pink }
-    
+// MARK: - 그룹 만들기·수정 창
+
+/// 그룹 이름·설명 입력 창 — 만들기와 수정이 같이 쓴다.
+/// 이전 창은 "이름이 비었는지"로 만들기/수정을 구분해 수정 중 이름을 지우면 제목이 "새 그룹 생성"으로 바뀌었다. 이제 mode 로 구분한다.
+/// 분홍·노랑 장식 원과 팁 상자는 빼고 Android 와 같은 입력창 두 개 + 남색 주 버튼으로.
+struct GroupFormSheet: View {
+    enum Mode { case create, edit(title: String, memo: String) }
+
+    let mode: Mode
+    let isSaving: Bool
+    let onSave: (_ title: String, _ memo: String) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var title = ""
+    @State private var memo = ""
+    @State private var showDiscardAlert = false
+
+    private var isEdit: Bool { if case .edit = mode { return true } else { return false } }
+    private var original: (String, String) { if case let .edit(t, m) = mode { return (t, m) } else { return ("", "") } }
+    private var trimmedTitle: String { title.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var hasChanges: Bool { title != original.0 || memo != original.1 }
+
     var body: some View {
         NavigationStack {
-            ZStack {
-                // Background Gradient
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color(red: 248/255, green: 250/255, blue: 255/255),
-                        Color.white
-                    ]),
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
-                
-                VStack(spacing: 0) {
-                    // Header Illustration
-                    ZStack {
-                        // Background Circle
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    gradient: Gradient(colors: [SMAPTheme.Color.primary.opacity(0.1), pinkColor.opacity(0.1)]),
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 140, height: 140)
-                            .scaleEffect(isAnimating ? 1.0 : 0.8)
-                        
-                        // Inner Circle
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    gradient: Gradient(colors: [SMAPTheme.Color.primary, pinkColor]),
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 90, height: 90)
-                            .shadow(color: SMAPTheme.Color.primary.opacity(0.3), radius: 15, x: 0, y: 8)
-                            .scaleEffect(isAnimating ? 1.0 : 0.9)
-                        
-                        // Icon
-                        Image(systemName: "person.3.fill")
-                            .font(.suite(size: 36, weight: .medium))
-                            .foregroundColor(.white)
-                            .scaleEffect(isAnimating ? 1.0 : 0.8)
+            ScrollView {
+                VStack(alignment: .leading, spacing: SMAPTheme.Spacing.lg) {
+                    Text(isEdit ? "그룹 이름이나 설명을 바꿀 수 있어요" : "함께 위치를 나눌 그룹을 만들어요.\n만들면 멤버를 초대할 코드가 생겨요.")
+                        .font(SMAPTheme.Font.caption)
+                        .foregroundStyle(SMAPTheme.Surface.onSurfaceMuted)
+                    SMAPTextField("예: 우리 가족, 친한 친구들", text: $title, label: "그룹 이름", submitLabel: .next)
+                    SMAPTextField("그룹을 짧게 설명해 주세요", text: $memo, label: "설명 (선택)")
+                    SMAPButton(isEdit ? "저장" : "그룹 만들기", isLoading: isSaving, isDisabled: trimmedTitle.isEmpty || (isEdit && !hasChanges)) {
+                        onSave(trimmedTitle, memo.trimmingCharacters(in: .whitespacesAndNewlines))
+                        dismiss()
                     }
-                    .padding(.top, 30)
-                    .padding(.bottom, 20)
-                    .onAppear {
-                        withAnimation(.spring(response: 0.6, dampingFraction: 0.7)) {
-                            isAnimating = true
-                        }
-                    }
-                    
-                    // Title
-                    VStack(spacing: 6) {
-                        Text(title.isEmpty ? "새 그룹 생성" : "그룹 정보 수정")
-                            .font(.suite(size: 24, weight: .bold))
-                            .foregroundColor(.black)
-                        
-                        Text("소중한 사람들과 위치를 공유할 그룹을 만들어보세요")
-                            .font(.suite(size: 14))
-                            .foregroundColor(.gray)
-                            .multilineTextAlignment(.center)
-                    }
-                    .padding(.bottom, 30)
-                    
-                    // Form Section
-                    VStack(spacing: 16) {
-                        // Group Name Field
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "tag.fill")
-                                    .font(.suite(size: 12))
-                                    .foregroundColor(SMAPTheme.Color.primary)
-                                Text("그룹 이름")
-                                    .font(.suite(size: 13, weight: .semibold))
-                                    .foregroundColor(.gray)
-                            }
-                            
-                            HStack(spacing: 12) {
-                                Image(systemName: "person.3.sequence.fill")
-                                    .foregroundColor(focusedField == .title ? SMAPTheme.Color.primary : .gray.opacity(0.5))
-                                    .font(.suite(size: 18))
-                                
-                                TextField("예: 우리가족, 친한 친구들", text: $title)
-                                    .font(.suite(size: 16))
-                                    .focused($focusedField, equals: .title)
-                                
-                                if !title.isEmpty {
-                                    Button(action: { title = "" }) {
-                                        Image(systemName: "xmark.circle.fill")
-                                            .foregroundColor(.gray.opacity(0.4))
-                                    }
-                                    .accessibilityLabel("그룹 이름 지우기")
-                                }
-                            }
-                            .padding(16)
-                            .background(Color.white)
-                            .cornerRadius(14)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14)
-                                    .stroke(focusedField == .title ? SMAPTheme.Color.primary : Color.gray.opacity(0.15), lineWidth: focusedField == .title ? 2 : 1)
-                            )
-                            .shadow(color: focusedField == .title ? SMAPTheme.Color.primary.opacity(0.1) : Color.clear, radius: 8, x: 0, y: 4)
-                        }
-                        
-                        // Group Description Field
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "text.alignleft")
-                                    .font(.suite(size: 12))
-                                    .foregroundColor(pinkColor)
-                                Text("그룹 설명 (선택)")
-                                    .font(.suite(size: 13, weight: .semibold))
-                                    .foregroundColor(.gray)
-                            }
-                            
-                            HStack(spacing: 12) {
-                                Image(systemName: "doc.text.fill")
-                                    .foregroundColor(focusedField == .memo ? pinkColor : .gray.opacity(0.5))
-                                    .font(.suite(size: 18))
-                                
-                                TextField("그룹에 대한 간단한 설명을 입력해주세요", text: $memo)
-                                    .font(.suite(size: 16))
-                                    .focused($focusedField, equals: .memo)
-                                
-                                if !memo.isEmpty {
-                                    Button(action: { memo = "" }) {
-                                        Image(systemName: "xmark.circle.fill")
-                                            .foregroundColor(.gray.opacity(0.4))
-                                    }
-                                    .accessibilityLabel("그룹 설명 지우기")
-                                }
-                            }
-                            .padding(16)
-                            .background(Color.white)
-                            .cornerRadius(14)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14)
-                                    .stroke(focusedField == .memo ? pinkColor : Color.gray.opacity(0.15), lineWidth: focusedField == .memo ? 2 : 1)
-                            )
-                            .shadow(color: focusedField == .memo ? pinkColor.opacity(0.1) : Color.clear, radius: 8, x: 0, y: 4)
-                        }
-                    }
-                    .padding(.horizontal, 24)
-                    
-                    Spacer()
-                    
-                    // Create Button
-                    Button(action: {
-                        onSave()
-                        isPresented = false
-                    }) {
-                        HStack(spacing: 10) {
-                            Image(systemName: title.isEmpty ? "plus.circle.fill" : "checkmark.circle.fill")
-                                .font(.suite(size: 20, weight: .medium))
-                            
-                            Text(title.isEmpty ? "그룹 생성" : "저장하기")
-                                .font(.suite(size: 17, weight: .bold))
-                        }
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 56)
-                        .background(
-                            Group {
-                                if title.isEmpty {
-                                    LinearGradient(
-                                        gradient: Gradient(colors: [Color.gray.opacity(0.4), Color.gray.opacity(0.3)]),
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                } else {
-                                    LinearGradient(
-                                        gradient: Gradient(colors: [SMAPTheme.Color.primary, Color(red: 99/255, green: 102/255, blue: 241/255)]),
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                }
-                            }
-                        )
-                        .cornerRadius(16)
-                        .shadow(color: title.isEmpty ? Color.clear : SMAPTheme.Color.primary.opacity(0.3), radius: 12, x: 0, y: 6)
-                    }
-                    .disabled(title.isEmpty)
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 20)
-                    
-                    // Tips Section
-                    HStack(spacing: 8) {
-                        Image(systemName: "lightbulb.fill")
-                            .font(.suite(size: 14))
-                            .foregroundColor(.yellow)
-                        
-                        Text("그룹을 만들면 멤버들을 초대할 수 있는 코드가 생성됩니다")
-                            .font(.suite(size: 12))
-                            .foregroundColor(.gray)
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 12)
-                    .background(SMAPTheme.Accent.crown.opacity(0.1))
-                    .cornerRadius(12)
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 30)
+                    .padding(.top, SMAPTheme.Spacing.sm)
                 }
+                .padding(20)
             }
+            .background(SMAPTheme.Surface.card.ignoresSafeArea())
+            .navigationTitle(isEdit ? "그룹 정보 수정" : "새 그룹")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: { isPresented = false }) {
-                        Image(systemName: "xmark")
-                            .font(.suite(size: 16, weight: .medium))
-                            .foregroundColor(.gray)
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("닫기") {
+                        if hasChanges { showDiscardAlert = true } else { dismiss() }
                     }
-                    .accessibilityLabel("닫기")
                 }
             }
+            .alert("입력한 내용을 버릴까요?", isPresented: $showDiscardAlert) {
+                Button("계속 입력", role: .cancel) {}
+                Button("버리기", role: .destructive) { dismiss() }
+            }
+        }
+        // 입력 중 아래로 쓸어 실수로 닫히지 않게
+        .interactiveDismissDisabled(hasChanges)
+        .presentationDetents([.medium, .large])
+        .onAppear {
+            title = original.0
+            memo = original.1
         }
     }
 }

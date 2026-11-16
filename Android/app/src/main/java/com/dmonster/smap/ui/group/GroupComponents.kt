@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.outlined.ExitToApp
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.ContentPaste
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Groups
@@ -37,6 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -79,6 +81,7 @@ fun GroupListContent(
     onGroupClick: (SmapGroup) -> Unit,
     onCreateClick: () -> Unit,
     onInviteCodeChange: (String) -> Unit,
+    onPasteInviteCode: (String) -> Unit,
     onJoinGroup: () -> Unit,
     onRefresh: () -> Unit,
 ) {
@@ -145,7 +148,7 @@ fun GroupListContent(
                 }
             }
 
-            item { InviteJoinSection(inviteCode, onInviteCodeChange, onJoinGroup, isJoining) }
+            item { InviteJoinSection(inviteCode, onInviteCodeChange, onPasteInviteCode, onJoinGroup, isJoining) }
         }
     }
 }
@@ -189,11 +192,26 @@ private fun GroupListHero(
 private fun InviteJoinSection(
     inviteCode: String,
     onCodeChange: (String) -> Unit,
+    onPaste: (String) -> Unit,
     onJoin: () -> Unit,
     isJoining: Boolean,
 ) {
     val focus = LocalFocusManager.current
-    SmapSection(title = "초대 코드로 참여") {
+    val clipboard = LocalClipboardManager.current
+    // 코드는 대개 초대 메시지에서 복사해 온다 — 제목 옆 "붙여넣기"로 입력창을 길게 누르지 않고 바로 넣는다.
+    SmapSection(
+        title = "초대 코드로 참여",
+        action = {
+            TextButton(
+                onClick = { clipboard.getText()?.text?.let(onPaste) },
+                contentPadding = PaddingValues(horizontal = SmapSpacing.sm),
+            ) {
+                Icon(Icons.Outlined.ContentPaste, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(SmapSpacing.xs))
+                Text("붙여넣기", style = SmapText.captionBold)
+            }
+        },
+    ) {
         Column(Modifier.padding(SmapSpacing.md), verticalArrangement = Arrangement.spacedBy(SmapSpacing.sm)) {
             Row(verticalAlignment = Alignment.Top) {
                 SmapTextField(

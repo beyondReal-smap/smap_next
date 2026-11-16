@@ -137,6 +137,7 @@ fun GroupScreen(
                             onGroupClick = { viewModel.selectGroup(it) },
                             onCreateClick = { viewModel.showCreateDialog() },
                             onInviteCodeChange = { viewModel.updateInviteCode(it) },
+                            onPasteInviteCode = { viewModel.pasteInviteCode(it) },
                             onJoinGroup = { viewModel.joinGroupByCode() },
                             onRefresh = { viewModel.refresh() }
                         )

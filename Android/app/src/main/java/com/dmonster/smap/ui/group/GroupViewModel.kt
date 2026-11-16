@@ -280,9 +280,17 @@ class GroupViewModel @Inject constructor(
     // MARK: - Actions
 
     fun updateInviteCode(code: String) {
-        // 대문자로 변환하고 영문 알파벳(A-Z)과 숫자(0-9)만 허용 (한글 제외)
-        val filtered = code.uppercase().filter { it in 'A'..'Z' || it in '0'..'9' }
-        _inviteCode.value = filtered
+        // 한 번에 두 글자 이상 늘면 붙여넣기로 보고 메시지에서 코드만 고른다. 한 글자씩 칠 때는 영문 대문자·숫자만 남긴다.
+        if (code.length - _inviteCode.value.length > 1) {
+            InviteCodeParser.extract(code)?.let { _inviteCode.value = it }
+        } else {
+            _inviteCode.value = InviteCodeParser.sanitize(code)
+        }
+    }
+
+    /** "붙여넣기" 버튼 — 클립보드 글에서 코드만 꺼내 넣는다 */
+    fun pasteInviteCode(text: String) {
+        InviteCodeParser.extract(text)?.let { _inviteCode.value = it }
     }
 
     fun joinGroupByCode() {
