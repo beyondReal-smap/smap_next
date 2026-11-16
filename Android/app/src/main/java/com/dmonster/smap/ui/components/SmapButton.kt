@@ -1,5 +1,8 @@
 package com.dmonster.smap.ui.components
 
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
@@ -85,16 +88,23 @@ fun SmapButton(
         SmapButtonStyle.Primary, SmapButtonStyle.Destructive -> {
             val container = if (style == SmapButtonStyle.Destructive) colors.error else colors.primary
             val onContainer = if (style == SmapButtonStyle.Destructive) colors.onError else colors.onPrimary
+            // 주 동작 버튼은 남색 그라데이션으로 채워 화면에서 가장 먼저 눈에 들어오게 한다(평면 남색은 밋밋했다).
+            // 비활성(enabled=false)일 때는 그라데이션을 빼고 회색으로 둔다. 로딩 중에는 그대로 유지.
+            val gradient = style == SmapButtonStyle.Primary && enabled
             Button(
                 onClick = onClick,
-                modifier = buttonModifier,
+                modifier = if (gradient) buttonModifier.clip(shape).background(SmapBrush.navy) else buttonModifier,
                 enabled = clickable,
                 shape = shape,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = container,
+                    containerColor = if (gradient) Color.Transparent else container,
                     contentColor = onContainer,
                     // 로딩 중에는 색을 유지해 "눌렸다"는 것이 보이게 하고, 비활성일 때만 흐리게 한다.
-                    disabledContainerColor = if (isLoading) container else colors.onSurface.copy(alpha = 0.12f),
+                    disabledContainerColor = when {
+                        gradient -> Color.Transparent
+                        isLoading -> container
+                        else -> colors.onSurface.copy(alpha = 0.12f)
+                    },
                     disabledContentColor = if (isLoading) onContainer else colors.onSurface.copy(alpha = 0.38f),
                 ),
                 contentPadding = PaddingValues(horizontal = 16.dp),

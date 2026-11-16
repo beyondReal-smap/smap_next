@@ -15,6 +15,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.dmonster.smap.data.model.SmapSchedule
 import com.dmonster.smap.ui.common.rememberSmapHaptics
 import com.dmonster.smap.ui.components.GroupPickerSheet
+import com.dmonster.smap.ui.components.SmapGradientIconButton
 import com.dmonster.smap.ui.components.GroupSwitcherPill
 import com.dmonster.smap.ui.components.SmapListRow
 import com.dmonster.smap.ui.components.SmapRowDivider
@@ -126,13 +127,12 @@ fun ScheduleScreen(
                                 onClick = { viewModel.toggleGroupSelector() }
                             )
                         }
-                        FilledTonalIconButton(
-                            onClick = { viewModel.showCreateDialog() },
-                            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                contentColor = MaterialTheme.colorScheme.primary
-                            )
-                        ) { Icon(Icons.Outlined.Add, contentDescription = "일정 추가") }
+                        // 일정 추가는 이 탭의 주 동작이라 남색 그라데이션 원으로 강조한다.
+                        SmapGradientIconButton(
+                            icon = Icons.Outlined.Add,
+                            contentDescription = "일정 추가",
+                            onClick = { viewModel.showCreateDialog() }
+                        )
                     }
                 }
 

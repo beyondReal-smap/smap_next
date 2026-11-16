@@ -40,7 +40,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.dmonster.smap.data.model.SmapGroup
 import com.dmonster.smap.data.model.SmapGroupMember
@@ -51,9 +50,13 @@ import com.dmonster.smap.ui.components.SmapRowDivider
 import com.dmonster.smap.ui.components.SmapRowIcon
 import com.dmonster.smap.ui.components.SmapSection
 import com.dmonster.smap.ui.components.SmapTextField
-import com.dmonster.smap.ui.theme.SmapRadius
 import com.dmonster.smap.ui.theme.SmapSpacing
 import com.dmonster.smap.ui.theme.SmapText
+import com.dmonster.smap.ui.components.HeroStats
+import com.dmonster.smap.ui.components.HeroHeading
+import com.dmonster.smap.ui.components.SmapHeroCard
+import com.dmonster.smap.ui.components.SmapBrush
+import androidx.compose.ui.graphics.Color
 
 /*
  * 36단계 재설계 — 그룹 탭.
@@ -67,6 +70,8 @@ import com.dmonster.smap.ui.theme.SmapText
 fun GroupListContent(
     groups: List<SmapGroup>,
     groupMemberCounts: Map<Int, Int>,
+    userName: String?,
+    currentUserIdx: Int?,
     inviteCode: String,
     isLoading: Boolean,
     isJoining: Boolean,
@@ -86,6 +91,8 @@ fun GroupListContent(
             contentPadding = PaddingValues(start = SmapSpacing.md, end = SmapSpacing.md, top = SmapSpacing.md, bottom = SmapSpacing.xl),
             verticalArrangement = Arrangement.spacedBy(SmapSpacing.lg),
         ) {
+            item { GroupListHero(groups, groupMemberCounts, userName, currentUserIdx, isLoading) }
+
             item {
                 // 새 그룹 만들기는 "내 그룹" 줄 오른쪽에 둔다. 큰 제목을 뺀 뒤 맨 위에 + 하나만 남아
                 // 빈 줄이 생겼던 것을 없애고, 목록과 그 목록에 대한 동작을 한 줄에 묶는다.
@@ -119,11 +126,15 @@ fun GroupListContent(
                         else -> groups.forEachIndexed { i, g ->
                             if (i > 0) SmapRowDivider()
                             val count = groupMemberCounts[g.sgtIdx] ?: g.memberCount ?: 0
+                            val mine = currentUserIdx != null && g.mtIdx == currentUserIdx
                             SmapListRow(
                                 title = g.sgtTitle ?: "이름 없는 그룹",
                                 subtitle = listOfNotNull("멤버 ${count}명", g.sgtMemo?.takeIf { it.isNotBlank() }).joinToString(" · "),
-                                leading = { SmapRowIcon(Icons.Outlined.Groups) },
-                                trailing = { Chevron() },
+                                leading = { SmapRowIcon(Icons.Outlined.Groups, emphasized = true) },
+                                trailing = {
+                                    if (mine) RoleBadge("그룹장")
+                                    Chevron()
+                                },
                                 onClick = { onGroupClick(g) },
                             )
                         }
@@ -132,6 +143,41 @@ fun GroupListContent(
             }
 
             item { InviteJoinSection(inviteCode, onInviteCodeChange, onJoinGroup, isJoining) }
+        }
+    }
+}
+
+/**
+ * 그룹 탭 맨 위 남색 요약 카드 — 인사 + 그룹·멤버 수.
+ * 멤버 수는 그룹별 인원의 합이라 여러 그룹에 같은 사람이 있으면 겹쳐 센다("전체 멤버").
+ */
+@Composable
+private fun GroupListHero(
+    groups: List<SmapGroup>,
+    groupMemberCounts: Map<Int, Int>,
+    userName: String?,
+    currentUserIdx: Int?,
+    isLoading: Boolean,
+) {
+    val totalMembers = groups.sumOf { groupMemberCounts[it.sgtIdx] ?: it.memberCount ?: 0 }
+    val owned = groups.count { currentUserIdx != null && it.mtIdx == currentUserIdx }
+    SmapHeroCard {
+        HeroHeading(
+            eyebrow = userName?.let { "안녕하세요, ${it}님" } ?: "안녕하세요",
+            title = when {
+                isLoading -> "그룹을 불러오고 있어요"
+                groups.isEmpty() -> "그룹을 만들고\n가족을 초대해 보세요"
+                else -> "${groups.size}개 그룹에서\n함께 위치를 나누고 있어요"
+            },
+        )
+        if (!isLoading && groups.isNotEmpty()) {
+            HeroStats(
+                listOf(
+                    "${groups.size}" to "내 그룹",
+                    "$totalMembers" to "전체 멤버",
+                    "$owned" to "내가 만든 그룹",
+                )
+            )
         }
     }
 }
@@ -200,34 +246,32 @@ fun GroupDetailContent(
         contentPadding = PaddingValues(SmapSpacing.md),
         verticalArrangement = Arrangement.spacedBy(SmapSpacing.lg),
     ) {
-        // 요약
+        // 요약 — 화면의 시각적 중심(남색 카드). 이전 흰 카드는 아래 묶음들과 구분이 안 돼 밋밋했다.
         item {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(SmapRadius.lg))
-                    .background(colors.surface)
-                    .padding(SmapSpacing.lg),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Box(
-                    Modifier
-                        .size(64.dp)
-                        .background(colors.primaryContainer, CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) { Icon(Icons.Outlined.Groups, contentDescription = null, tint = colors.primary, modifier = Modifier.size(32.dp)) }
-                Spacer(Modifier.height(SmapSpacing.md))
-                Text(group.sgtTitle ?: "이름 없는 그룹", style = SmapText.title, color = colors.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                group.sgtMemo?.takeIf { it.isNotBlank() }?.let {
-                    Spacer(Modifier.height(4.dp))
-                    Text(it, style = SmapText.secondary, color = colors.onSurfaceVariant)
+            SmapHeroCard {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier
+                            .size(52.dp)
+                            .background(Color.White.copy(alpha = 0.16f), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) { Icon(Icons.Outlined.Groups, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp)) }
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        HeroHeading(
+                            eyebrow = if (isOwner) "내가 만든 그룹" else "참여 중인 그룹",
+                            title = group.sgtTitle ?: "이름 없는 그룹",
+                            subtitle = group.sgtMemo?.takeIf { it.isNotBlank() },
+                        )
+                    }
                 }
-                Spacer(Modifier.height(SmapSpacing.lg))
-                Row(Modifier.fillMaxWidth()) {
-                    Stat("멤버", "${memberCount}명", Modifier.weight(1f))
-                    Stat("이번 주 일정", "${scheduleCount}개", Modifier.weight(1f))
-                    Stat("등록 장소", "${locationCount}곳", Modifier.weight(1f))
-                }
+                HeroStats(
+                    listOf(
+                        "${memberCount}명" to "멤버",
+                        "${scheduleCount}개" to "이번 주 일정",
+                        "${locationCount}곳" to "등록 장소",
+                    )
+                )
             }
         }
 
@@ -314,23 +358,19 @@ fun GroupDetailContent(
     }
 }
 
-@Composable
-private fun Stat(label: String, value: String, modifier: Modifier = Modifier) {
-    val colors = MaterialTheme.colorScheme
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, style = SmapText.headline, color = colors.onSurface)
-        Text(label, style = SmapText.captionSmall, color = colors.onSurfaceVariant)
-    }
-}
-
+/** 역할 배지 — 그룹장은 남색 채움(가장 강한 역할), 리더는 연한 남색. */
 @Composable
 private fun RoleBadge(text: String) {
+    val strong = text == "그룹장"
     Text(
         text,
         style = SmapText.captionBold,
-        color = MaterialTheme.colorScheme.primary,
+        color = if (strong) Color.White else MaterialTheme.colorScheme.primary,
         modifier = Modifier
-            .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(50))
+            .then(
+                if (strong) Modifier.background(SmapBrush.navy, RoundedCornerShape(50))
+                else Modifier.background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(50))
+            )
             .padding(horizontal = 10.dp, vertical = 4.dp),
     )
 }

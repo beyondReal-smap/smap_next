@@ -88,18 +88,26 @@ fun SmapListRow(
     }
 }
 
-/** 행 왼쪽에 두는 아이콘 원(장소·설정 항목 등). */
+/**
+ * 행 왼쪽에 두는 아이콘 원(장소·설정 항목 등).
+ * [emphasized] 면 남색 그라데이션 원 + 흰 아이콘 — 그 화면의 주인공 항목(그룹·장소 등)에 써서 목록에 무게를 준다.
+ */
 @Composable
-fun SmapRowIcon(icon: ImageVector, modifier: Modifier = Modifier) {
+fun SmapRowIcon(icon: ImageVector, modifier: Modifier = Modifier, emphasized: Boolean = false) {
     val colors = MaterialTheme.colorScheme
     androidx.compose.foundation.layout.Box(
         modifier = modifier
             .size(40.dp)
             .clip(CircleShape)
-            .background(colors.primaryContainer),
+            .then(if (emphasized) Modifier.background(SmapBrush.navy) else Modifier.background(colors.primaryContainer)),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = null, tint = colors.primary, modifier = Modifier.size(20.dp))
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = if (emphasized) androidx.compose.ui.graphics.Color.White else colors.primary,
+            modifier = Modifier.size(20.dp),
+        )
     }
 }
 

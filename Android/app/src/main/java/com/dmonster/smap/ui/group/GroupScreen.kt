@@ -128,6 +128,8 @@ fun GroupScreen(
                         GroupListContent(
                             groups = groups,
                             groupMemberCounts = groupMemberCounts,
+                            userName = viewModel.currentUserName(),
+                            currentUserIdx = viewModel.currentUserIdx(),
                             inviteCode = inviteCode,
                             isLoading = isLoading,
                             isJoining = isJoining,

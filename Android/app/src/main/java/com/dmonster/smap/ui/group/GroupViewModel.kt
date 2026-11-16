@@ -474,6 +474,11 @@ class GroupViewModel @Inject constructor(
     /** 멤버 목록에서 "(나)" 표시용. */
     fun currentUserIdx(): Int? = authService.getUserData()?.mtIdx
 
+    /** 그룹 탭 인사말용 이름 — 닉네임이 있으면 닉네임. */
+    fun currentUserName(): String? = authService.getUserData()?.let { user ->
+        user.mtNickname?.takeIf { it.isNotBlank() } ?: user.mtName?.takeIf { it.isNotBlank() }
+    }
+
     fun isCurrentUserOwner(): Boolean {
         val user = authService.getUserData() ?: return false
         val userMtIdx = user.mtIdx ?: return false
