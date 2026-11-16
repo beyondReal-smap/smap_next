@@ -27,81 +27,92 @@ public struct SettingMenuView: View {
 
     public var body: some View {
         NavigationStack {
-            ZStack {
-                SMAPTheme.Adaptive.pageBackground.ignoresSafeArea()
-
-                ScrollView {
-                    VStack(spacing: 24) {
-                        // 이메일 미등록 안내 — 설정 화면 상단에만 표시한다(홈·다른 탭에는 띄우지 않음).
-                        if isEmailMissing {
-                            VStack(spacing: SMAPTheme.Spacing.sm) {
-                                SMAPBanner(message: "이메일을 등록해 주세요. 비밀번호를 잊었을 때 필요해요.")
-                                SMAPButton("등록하기", style: .outline) { showEmailChange = true }
-                                    .frame(maxWidth: 200)
-                            }
-                            .padding(.horizontal)
+            // 36단계 — Android 설정 첫 화면과 같은 구성: 위에 남색 프로필 카드(누르면 계정설정),
+            // 아래는 "구역 제목 + 흰 묶음" 행. 이전에는 메뉴마다 남색·청록·보라·분홍·노랑·주황·빨강 아이콘이라 산만했다.
+            ScrollView {
+                VStack(alignment: .leading, spacing: SMAPTheme.Spacing.lg) {
+                    // 이메일 미등록 안내 — 설정 화면 상단에만 표시한다(홈·다른 탭에는 띄우지 않음).
+                    if isEmailMissing {
+                        VStack(spacing: SMAPTheme.Spacing.sm) {
+                            SMAPBanner(message: "이메일을 등록해 주세요. 비밀번호를 잊었을 때 필요해요.")
+                            SMAPButton("등록하기", style: .outline) { showEmailChange = true }
+                                .frame(maxWidth: 200)
                         }
-
-                        // Menu Sections
-                        VStack(spacing: 24) {
-                            SettingsMenuSectionView(title: "계정 관리", items: [
-                                SettingsMenuItem(title: "계정설정", icon: "person.fill", color: .indigo, destination: AnyView(AccountSettingsView())),
-                                SettingsMenuItem(title: "SMAP 프리미엄", icon: "crown.fill", color: SMAPTheme.Accent.crown, destination: AnyView(PremiumView()))
-                            ])
-
-                            SettingsMenuSectionView(title: "약관 & 정책", items: [
-                                SettingsMenuItem(title: "서비스 이용약관", icon: "doc.text.fill", color: .teal, destination: AnyView(ServiceTermsView())),
-                                SettingsMenuItem(title: "개인정보 처리방침", icon: "shield.fill", color: .cyan, destination: AnyView(PrivacyPolicyView())),
-                                SettingsMenuItem(title: "위치기반서비스 이용약관", icon: "location.fill", color: .purple, destination: AnyView(LocationTermsView())),
-                                SettingsMenuItem(title: "마케팅 정보 수집 및 이용 동의", icon: "star.fill", color: SMAPTheme.Color.primary, destination: AnyView(MarketingConsentView())),
-                                SettingsMenuItem(title: "개인정보 제3자 제공 동의", icon: "person.2.fill", color: .pink, destination: AnyView(ThirdPartyProvisionView()))
-                            ])
-
-                            SettingsMenuSectionView(title: "고객 지원", items: [
-                                SettingsMenuItem(title: "사용 가이드", icon: "book.fill", color: .yellow, destination: AnyView(UserGuideView())),
-                                SettingsMenuItem(title: "1:1 문의", icon: "envelope.fill", color: .orange, destination: AnyView(InquiryView())),
-                                SettingsMenuItem(title: "공지사항", icon: "bell.fill", color: .red, destination: AnyView(NoticeListView()))
-                            ])
-                        }
-                        .padding(.horizontal)
-
-                        // App Version Info
-                        VStack(spacing: 4) {
-                            Text("SMAP")
-                                .font(.suite(size: 14, weight: .semibold))
-                                .foregroundColor(.gray)
-                            // Bundle에서 직접 읽어 빌드 버전(MARKETING_VERSION)과 항상 일치시킨다.
-                            // 하드코딩 시 버전 업마다 두 곳을 동기화해야 해 누락 위험.
-                            Text("버전 \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")")
-                                .font(.suite(size: 12))
-                                .foregroundColor(.gray.opacity(0.8))
-                        }
-                        .padding(.vertical, 32)
+                        .frame(maxWidth: .infinity)
                     }
-                    .padding(.vertical)
+
+                    NavigationLink(destination: AccountSettingsView()) {
+                        SettingsProfileHero(user: authService.currentUser)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("계정설정 열기")
+
+                    SMAPSection(title: "계정 관리") {
+                        settingsLink("계정설정", icon: "person.fill") { AccountSettingsView() }
+                        SMAPRowDivider()
+                        settingsLink("SMAP 프리미엄", icon: "crown.fill", emphasized: true) { PremiumView() }
+                    }
+
+                    SMAPSection(title: "약관 & 정책") {
+                        settingsLink("서비스 이용약관", icon: "doc.text.fill") { ServiceTermsView() }
+                        SMAPRowDivider()
+                        settingsLink("개인정보 처리방침", icon: "shield.fill") { PrivacyPolicyView() }
+                        SMAPRowDivider()
+                        settingsLink("위치기반서비스 이용약관", icon: "location.fill") { LocationTermsView() }
+                        SMAPRowDivider()
+                        settingsLink("마케팅 정보 수집 및 이용 동의", icon: "star.fill") { MarketingConsentView() }
+                        SMAPRowDivider()
+                        settingsLink("개인정보 제3자 제공 동의", icon: "person.2.fill") { ThirdPartyProvisionView() }
+                    }
+
+                    SMAPSection(title: "고객 지원") {
+                        settingsLink("사용 가이드", icon: "book.fill") { UserGuideView() }
+                        SMAPRowDivider()
+                        settingsLink("1:1 문의", icon: "envelope.fill") { InquiryView() }
+                        SMAPRowDivider()
+                        settingsLink("공지사항", icon: "bell.fill") { NoticeListView() }
+                    }
+
+                    VStack(spacing: 4) {
+                        Text("SMAP")
+                            .font(SMAPTheme.Font.captionBold)
+                        // Bundle에서 직접 읽어 빌드 버전(MARKETING_VERSION)과 항상 일치시킨다.
+                        Text("버전 \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")")
+                            .font(SMAPTheme.Font.captionSmall)
+                    }
+                    .foregroundStyle(SMAPTheme.Surface.onSurfaceMuted)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, SMAPTheme.Spacing.lg)
                 }
+                .padding(SMAPTheme.Spacing.md)
             }
+            .background(SMAPTheme.Surface.canvas.ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("설정")
+                        .font(SMAPTheme.Font.bodyBold)
+                }
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button(action: {
                         presentationMode.wrappedValue.dismiss()
                     }) {
                         HStack(spacing: 4) {
                             Image(systemName: "chevron.left")
-                                .font(.suite(size: 18, weight: .semibold))
+                                .font(.system(size: 16, weight: .semibold))
                             Text("홈")
-                                .font(.suite(size: 18, weight: .bold))
+                                .font(SMAPTheme.Font.bodyBold)
                         }
-                        .foregroundColor(.primary)
+                        .foregroundStyle(SMAPTheme.Surface.onSurface)
                     }
+                    .accessibilityLabel("홈으로 닫기")
                 }
             }
             .navigationDestination(isPresented: $showEmailChange) {
                 EmailChangeView()
             }
             .task {
-                // 이메일 등록 여부(미등록 배너)가 최신 서버 값을 따르도록 프로필을 갱신한다.
+                // 이메일 등록 여부(미등록 배너)·프로필 카드가 최신 서버 값을 따르도록 프로필을 갱신한다.
                 do {
                     _ = try await authService.fetchUserProfile()
                 } catch {
@@ -109,6 +120,43 @@ public struct SettingMenuView: View {
                 }
             }
         }
+    }
+
+    /// 설정 메뉴 한 줄 — 아이콘 원 + 제목 + 화살표, 누르면 다음 화면.
+    private func settingsLink<Destination: View>(_ title: String, icon: String, emphasized: Bool = false,
+                                                 @ViewBuilder destination: @escaping () -> Destination) -> some View {
+        NavigationLink(destination: destination) {
+            SMAPListRow(
+                title: title,
+                leading: { SMAPRowIcon(systemImage: icon, emphasized: emphasized) },
+                trailing: { RowChevron() }
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// 설정 맨 위 남색 프로필 카드 — 사진이 없으면 이름 첫 글자 원. (Android SettingsProfileHero 이식)
+private struct SettingsProfileHero: View {
+    let user: SMAPUser?
+
+    var body: some View {
+        let nickname = user?.mt_nickname?.trimmingCharacters(in: .whitespaces)
+        let name = (nickname?.isEmpty == false ? nickname : nil) ?? user?.mt_name.flatMap { $0.isEmpty ? nil : $0 } ?? "회원"
+        SMAPHeroCard {
+            HStack(spacing: 14) {
+                SMAPAvatar(name: name, imagePath: user?.mt_file1, size: 54)
+                    .padding(3)
+                    .background(Color.white.opacity(0.22), in: Circle())
+                SMAPHeroHeading(eyebrow: "내 계정", title: name, subtitle: user?.mt_email)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(SMAPTheme.Surface.onNavyMuted)
+                    .accessibilityHidden(true)
+            }
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 }
 
@@ -179,80 +227,6 @@ struct ProfileSummaryCard: View {
         )
         .cornerRadius(24)
         .shadow(color: Color.blue.opacity(0.2), radius: 10, x: 0, y: 5)
-    }
-}
-
-struct SettingsMenuSectionView: View {
-    let title: String
-    let items: [SettingsMenuItem]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(title)
-                    .font(.suite(size: 16, weight: .bold))
-                    .foregroundColor(.primary)
-
-                Spacer()
-
-                Rectangle()
-                    .fill(Color.gray.opacity(0.2))
-                    .frame(height: 1)
-                    .padding(.leading, 8)
-            }
-
-            VStack(spacing: 0) {
-                ForEach(0..<items.count, id: \.self) { index in
-                    NavigationLink(destination: items[index].destination) {
-                        SettingsMenuItemView(item: items[index])
-                    }
-
-                    if index < items.count - 1 {
-                        Divider().padding(.leading, 56)
-                    }
-                }
-            }
-            .background(Color.white)
-            .cornerRadius(20)
-            .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
-        }
-    }
-}
-
-struct SettingsMenuItem {
-    let title: String
-    let icon: String
-    let color: Color
-    let destination: AnyView
-}
-
-struct SettingsMenuItemView: View {
-    let item: SettingsMenuItem
-
-    var body: some View {
-        HStack(spacing: 16) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(item.color.opacity(0.1))
-                    .frame(width: 40, height: 40)
-
-                Image(systemName: item.icon)
-                    .foregroundColor(item.color)
-                    .font(.suite(size: 18))
-            }
-
-            Text(item.title)
-                .font(.suite(size: 16, weight: .medium))
-                .foregroundColor(.primary)
-
-            Spacer()
-
-            Image(systemName: "chevron.right")
-                .font(.suite(size: 14, weight: .semibold))
-                .foregroundColor(.gray.opacity(0.4))
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
     }
 }
 
