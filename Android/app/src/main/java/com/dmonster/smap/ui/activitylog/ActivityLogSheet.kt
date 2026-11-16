@@ -59,7 +59,7 @@ import java.util.Locale
 val ActivityLogSheetPeekHeight = 180.dp
 
 /** 경로 따라가기 줄이 있을 때 접힌 시트에 더하는 높이. */
-val ActivityLogRouteControlHeight = 76.dp
+val ActivityLogRouteControlHeight = 84.dp
 
 /**
  * 활동 로그 지도 시트 — 사이드바("로그 조회")와 지도 위 요약 카드를 대신한다.
@@ -212,8 +212,9 @@ fun RouteScrubber(
         Modifier
             .fillMaxWidth()
             .height(ActivityLogRouteControlHeight)
-            .padding(horizontal = SmapSpacing.screenHorizontal),
-        verticalArrangement = Arrangement.Center,
+            // 남색 띠 바로 아래 "경로 따라가기" 글자가 띠에 붙어 보였다(대표님 피드백) — 위 여백을 12dp 두고 위에서부터 쌓는다.
+            .padding(start = SmapSpacing.screenHorizontal, end = SmapSpacing.screenHorizontal, top = 12.dp),
+        verticalArrangement = Arrangement.Top,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("경로 따라가기", style = SmapText.captionBold, color = colors.onSurfaceVariant, modifier = Modifier.weight(1f))
