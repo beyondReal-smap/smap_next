@@ -201,3 +201,6 @@ AndroidWebView/app/src/main/java/**/R.java
 *.zip
 *.tar.gz
 *.rar
+
+# Apple 개인키(.p8)는 저장소에 두지 않는다 — 보관: ~/.smap-secrets
+*.p8
