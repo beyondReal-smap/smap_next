@@ -121,11 +121,14 @@ struct NaverMapView: UIViewRepresentable {
                         }
                         return true
                     }
-                    marker.mapView = mapView
                     memberMarkers[member.mt_idx] = marker
                 }
                 if old?.mlt_lat != lat || old?.mlt_long != lon {
                     marker.position = NMGLatLng(lat: lat, lng: lon)
+                }
+                // 위치를 넣은 뒤에 지도에 올린다 — 위치 없이 올리면 SDK 가 무시해 멤버 마커가 지도에 보이지 않았다.
+                if marker.mapView == nil {
+                    marker.mapView = mapView
                 }
                 let url = Self.getSafeImageUrl(member.mt_file1)
                 if old == nil || old?.displayName != member.displayName || old?.isSelected != member.isSelected || old?.mt_file1 != member.mt_file1 {
@@ -338,9 +341,9 @@ struct MarkerFactory {
             let path = UIBezierPath(ovalIn: avatarRect)
 
             // Border Color (Selected vs Normal)
-            let borderColor: UIColor = member.isSelected ?
-                UIColor(red: 236/255, green: 72/255, blue: 153/255, alpha: 1.0) : // Pink
-                UIColor(red: 79/255, green: 70/255, blue: 229/255, alpha: 1.0)  // Indigo
+            // Android 멤버 마커와 같은 색 — 선택: 남보라 테두리·이름표, 미선택: 회색 테두리·흰 이름표 (분홍 제거)
+            let selectedColor = UIColor(red: 79/255, green: 70/255, blue: 229/255, alpha: 1.0) // #4F46E5
+            let borderColor: UIColor = member.isSelected ? selectedColor : .systemGray
 
             // Fill Background (White)
             UIColor.white.setFill()
@@ -372,7 +375,7 @@ struct MarkerFactory {
 
                 let attrs: [NSAttributedString.Key: Any] = [
                     .font: UIFont.suite(size: 10, weight: .medium),
-                    .foregroundColor: UIColor.white,
+                    .foregroundColor: member.isSelected ? UIColor.white : UIColor.black,
                     .paragraphStyle: paragraphStyle
                 ]
 
@@ -385,9 +388,9 @@ struct MarkerFactory {
                     height: labelHeight
                 )
 
-                // Label Background (Semi-transparent Black)
+                // 이름표 바탕 — 선택이면 남보라, 아니면 흰색
                 let labelPath = UIBezierPath(roundedRect: labelRect, cornerRadius: 4)
-                UIColor.black.withAlphaComponent(0.7).setFill()
+                (member.isSelected ? selectedColor : UIColor.white).setFill()
                 labelPath.fill()
 
                 // Draw Text
