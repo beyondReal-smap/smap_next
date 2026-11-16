@@ -103,6 +103,10 @@ interface SmapApi {
         @Query("show_only") showOnly: Boolean = true
     ): SmapNoticeListWithPagination
 
+    /** GET /notices/{id} — 서버가 조회수를 1 올린 뒤 공지를 돌려준다(increment_hit 기본 true) */
+    @GET("notices/{id}")
+    suspend fun getNotice(@Path("id") id: Int): SmapNotice
+
     // =========================================================================
     // Registration endpoints (from RegisterModels -- inferred from standard patterns)
     // =========================================================================

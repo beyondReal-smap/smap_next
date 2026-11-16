@@ -95,7 +95,12 @@ struct NoticeRow: View {
 
 struct NoticeDetailView: View {
     @Environment(\.dismiss) private var dismiss
-    let notice: SmapNotice
+    /// 목록에서 받은 내용으로 바로 보여 주고, 서버가 조회수를 올려 돌려준 값으로 바꾼다(Android 와 같은 동작).
+    @State private var notice: SmapNotice
+
+    init(notice: SmapNotice) {
+        _notice = State(initialValue: notice)
+    }
 
     var body: some View {
         ScrollView {
@@ -126,6 +131,16 @@ struct NoticeDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar { noticeToolbar(dismiss: dismiss) }
+        .task(id: notice.nt_idx) {
+            do {
+                notice = try await NoticeService.shared.getNotice(id: notice.nt_idx)
+            } catch is CancellationError {
+                return
+            } catch {
+                // 조회수 반영만 실패한 것 — 본문은 이미 보이므로 화면은 그대로 두고 원인을 남긴다.
+                print("[NoticeDetailView] 공지 상세 조회(조회수 증가) 실패: \(notice.nt_idx) \(error)")
+            }
+        }
     }
 }
 

@@ -51,6 +51,7 @@ import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.CancellationException
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
@@ -157,6 +158,22 @@ private fun NewBadge() {
 
 @Composable
 fun NoticeDetailScreen(notice: SmapNotice, onBack: () -> Unit) {
+    val context = LocalContext.current
+    val authService = remember {
+        EntryPointAccessors.fromApplication(context.applicationContext, NoticeEntryPoint::class.java).authService()
+    }
+    // 목록에서 받은 내용으로 바로 보여 주고, 서버가 조회수를 올려 돌려준 값으로 바꾼다(iOS 와 같은 동작).
+    var shown by remember(notice.ntIdx) { mutableStateOf(notice) }
+    LaunchedEffect(notice.ntIdx) {
+        try {
+            shown = authService.getNotice(notice.ntIdx)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // 조회수 반영만 실패한 것 — 본문은 이미 보이므로 화면은 그대로 두고 원인을 남긴다.
+            android.util.Log.e("NoticeDetailScreen", "공지 상세 조회(조회수 증가) 실패: ${notice.ntIdx}", e)
+        }
+    }
     val colors = MaterialTheme.colorScheme
     Scaffold(
         containerColor = colors.surface,
@@ -170,14 +187,14 @@ fun NoticeDetailScreen(notice: SmapNotice, onBack: () -> Unit) {
                 .padding(SmapSpacing.lg),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(SmapSpacing.sm)) {
-                if (isRecent(notice)) NewBadge()
-                Text(noticeMeta(notice), style = SmapText.caption, color = colors.onSurfaceVariant)
+                if (isRecent(shown)) NewBadge()
+                Text(noticeMeta(shown), style = SmapText.caption, color = colors.onSurfaceVariant)
             }
             Spacer(Modifier.height(SmapSpacing.sm))
-            Text(notice.ntTitle, style = SmapText.title, color = colors.onSurface)
+            Text(shown.ntTitle, style = SmapText.title, color = colors.onSurface)
             HorizontalDivider(modifier = Modifier.padding(vertical = SmapSpacing.lg), color = colors.outlineVariant)
             Text(
-                notice.ntContent,
+                shown.ntContent,
                 style = SmapText.body.copy(lineHeight = SmapText.body.fontSize * 1.65f),
                 color = colors.onSurface,
                 overflow = TextOverflow.Clip,

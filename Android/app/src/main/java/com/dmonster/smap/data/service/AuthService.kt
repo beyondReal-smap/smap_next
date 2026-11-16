@@ -389,6 +389,12 @@ class AuthService(
     }
 
     /**
+     * GET /notices/{id} — 공지를 열 때 호출해 조회수를 올리고 최신 값을 받는다.
+     * 실패는 호출한 쪽에서 처리한다(본문은 목록에서 받은 내용으로 이미 보여 줄 수 있다).
+     */
+    suspend fun getNotice(id: Int): SmapNotice = api.getNotice(id)
+
+    /**
      * Send 1:1 inquiry via Telegram Bot API.
      * This uses a DIFFERENT base URL (api.telegram.org) so it stays as manual OkHttp.
      */
