@@ -9,92 +9,118 @@ import SwiftUI
 import NMapsMap
 
 // MARK: - MyPlace View
+//
+// 지도는 화면 전체, 위쪽 떠 있는 줄(그룹 알약·검색) + 아래 남색 머리 시트(멤버 얼굴 줄·장소 목록).
+// 이전의 왼쪽 사이드바·떠 있는 멤버 버튼·흐린 머리 막대를 대신한다(Android 와 같은 구조).
+// 지도를 누르면 임시 핀 + 확인 카드 → "이 위치 추가"로 장소 등록 창을 연다.
 
 struct MyPlaceView: View {
+    /// 지금 보이는 탭인지 — 탭 컨테이너가 이 화면을 계속 살려 둔다.
+    var isActive: Bool = true
     @StateObject private var viewModel = MyPlaceViewModel()
-    @State private var sidebarDragOffset: CGFloat = 0
     @State private var newLocationCoordinates: (lat: Double, lng: Double)?
     @State private var newLocationName: String? = nil
     @State private var newLocationAddress: String? = nil
-    @State private var isMapLoading = true  // 지도 로딩 상태
-    
-    
-    private let sidebarWidth: CGFloat = 320
-    
+    @State private var pendingCoordinate: (lat: Double, lng: Double)?
+    @State private var isResolvingAddress = false
+    @State private var isSheetExpanded = false
+    @State private var showGroupPicker = false
+    @State private var hasLoadedOnce = false
+
+    private var currentUserIdx: Int? { AuthService.shared.getUserData()?.mt_idx }
+
     var body: some View {
-        ZStack(alignment: .leading) {
-            // Map
+        GeometryReader { geo in
+            ZStack(alignment: .top) {
                 MyPlaceMapView(
                     locations: viewModel.locations,
                     selectedLocation: $viewModel.selectedLocation,
                     targetCoordinate: $viewModel.targetCoordinate,
                     initialCenter: viewModel.initialMapCenter,
+                    pendingCoordinate: pendingCoordinate,
+                    contentInsets: UIEdgeInsets(top: geo.safeAreaInsets.top + 64, left: 0, bottom: MyPlaceSheet.peekHeight, right: 0),
                     onLocationTap: { viewModel.selectLocationFromMarker($0) },
-                    onMapTap: { lat, lng in 
+                    onMapTap: { lat, lng in
                         // 선택한 멤버의 장소를 관리할 권한이 없으면 장소 추가 흐름을 시작하지 않는다
                         guard viewModel.canAddToSelectedMember else { return }
-                        Task {
-                            do {
-                                let address = try await KakaoLocationSearchService.shared.reverseGeocode(latitude: lat, longitude: lng)
-                                newLocationCoordinates = (lat, lng)
-                                newLocationName = nil
-                                newLocationAddress = address
-                                viewModel.startNewLocation(latitude: lat, longitude: lng)
-                            } catch {
-                                viewModel.errorMessage = "주소를 불러오지 못했습니다."
-                                viewModel.showError = true
-                            }
-                        }
-                    })
-                .ignoresSafeArea().offset(y: 60)
-            
-            // Header
-            VStack {
-                MyPlaceHeaderView(
-                    onSearchTap: { viewModel.isHeaderSearchPresented = true }
+                        HapticManager.shared.selection()
+                        isSheetExpanded = false
+                        withAnimation(.easeOut(duration: 0.2)) { pendingCoordinate = (lat, lng) }
+                    }
                 )
-                Spacer()
-            }
-            
-            // Sidebar Overlay
-            if viewModel.isSidebarOpen || sidebarDragOffset > 0 {
-                Color.black.opacity(overlayOpacity).ignoresSafeArea().onTapGesture { viewModel.closeSidebar() }
-            }
-            
-            // Sidebar
-            MyPlaceSidebarView(viewModel: viewModel).frame(width: sidebarWidth).offset(x: sidebarOffset).gesture(sidebarDragGesture).zIndex(100)
-            
-            // Edge Swipe
-            if !viewModel.isSidebarOpen {
-                Color.clear.frame(width: 20).contentShape(Rectangle()).gesture(edgeSwipeGesture).frame(maxWidth: .infinity, alignment: .leading)
-            }
-            
-            // FAB
-            VStack { Spacer(); HStack { Spacer(); FloatingActionPlaceButton(count: viewModel.members.count) { viewModel.toggleSidebar() }.padding(.trailing, 20).padding(.bottom, 20) } }
-            
-            // Loading
-            
-            if isMapLoading || viewModel.isLoading {
-                MapLoadingOverlay()
-                    .transition(AnyTransition.opacity)
-                    .zIndex(1000)
+                .ignoresSafeArea(edges: .top)
+
+                MapTopScrim()
+                    .frame(height: geo.safeAreaInsets.top + 24)
+                    .ignoresSafeArea(edges: .top)
+
+                MapTopControls(groupName: viewModel.selectedGroup?.sgt_title, onGroupTap: { showGroupPicker = true }) {
+                    MapCircleButton(systemImage: "magnifyingglass", accessibilityLabel: "장소 검색") {
+                        viewModel.isHeaderSearchPresented = true
+                    }
+                }
+
+                SMAPMapSheet(peekHeight: MyPlaceSheet.peekHeight, isExpanded: $isSheetExpanded) {
+                    MyPlaceSheetHeader(viewModel: viewModel, currentUserIdx: currentUserIdx) {
+                        viewModel.isHeaderSearchPresented = true
+                    }
+                } content: {
+                    MyPlaceSheetBody(viewModel: viewModel, currentUserIdx: currentUserIdx) { location in
+                        viewModel.selectLocationFromList(location)
+                        isSheetExpanded = false
+                    }
+                }
+
+                if pendingCoordinate != nil {
+                    VStack {
+                        Spacer()
+                        MapTapAddCard(
+                            targetMemberName: viewModel.isViewingOtherMember ? viewModel.selectedMember?.displayName : nil,
+                            onAdd: addPendingLocation,
+                            onDismiss: { withAnimation(.easeOut(duration: 0.2)) { pendingCoordinate = nil } }
+                        )
+                        .padding(.horizontal, SMAPTheme.Spacing.md)
+                        .padding(.bottom, MyPlaceSheet.peekHeight + SMAPTheme.Spacing.sm)
+                    }
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+
+                if !hasLoadedOnce {
+                    MapLoadingOverlay()
+                        .transition(.opacity)
+                        .zIndex(1000)
+                }
             }
         }
         .toolbar(.hidden, for: .navigationBar)
-        .onAppear {
-            handleLoading()
+        .task {
+            // 지도 로딩 막은 처음 한 번만 — 이전에는 탭을 떠날 때마다 다시 켜 돌아올 때마다 깜빡였다.
+            await viewModel.loadInitialData()
+            withAnimation(.easeOut(duration: 0.3)) { hasLoadedOnce = true }
         }
-        .task { await viewModel.loadInitialData() }
+        .onChange(of: isActive) { _, active in
+            if !active {
+                pendingCoordinate = nil
+                showGroupPicker = false
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("groupsDidChange"))) { _ in
             Task { await viewModel.loadInitialData() }
         }
-        .sheet(isPresented: $viewModel.isLocationPanelOpen) { 
+        .sheet(isPresented: $showGroupPicker) {
+            GroupPickerSheet(
+                groups: viewModel.groups,
+                selectedGroupId: viewModel.selectedGroup?.sgt_idx,
+                onSelect: { viewModel.selectGroup($0) }
+            )
+        }
+        .sheet(isPresented: $viewModel.isLocationPanelOpen) {
             LocationDetailPanel(
-                viewModel: viewModel, 
+                viewModel: viewModel,
                 initialCoordinates: newLocationCoordinates,
                 initialName: newLocationName,
                 initialAddress: newLocationAddress
-            ) 
+            )
         }
         .sheet(isPresented: $viewModel.isHeaderSearchPresented) {
             NavigationStack {
@@ -103,7 +129,8 @@ struct MyPlaceView: View {
                         newLocationCoordinates = (lat, lng)
                         newLocationName = place.place_name
                         newLocationAddress = place.road_address_name.isEmpty ? place.address_name : place.road_address_name
-                        
+                        pendingCoordinate = nil
+
                         viewModel.targetCoordinate = (lat: lat, lng: lng)
                         viewModel.isHeaderSearchPresented = false
                         // 권한이 없으면 지도만 이동하고 장소 등록 패널은 열지 않는다
@@ -125,568 +152,24 @@ struct MyPlaceView: View {
         } message: {
             Text(viewModel.errorMessage ?? "")
         }
-        .onDisappear {
-            // 페이지를 벗어날 때 사이드바 자동(즉시) 닫기
-            viewModel.isSidebarOpen = false
-            sidebarDragOffset = 0
-            // 다시 돌아올 때를 위해 로딩 상태 리셋
-            isMapLoading = true
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("closeSidebars"))) { notification in
-            viewModel.isSidebarOpen = false
-            sidebarDragOffset = 0
-            if let targetTab = notification.object as? Int, targetTab == 3 {
-                isMapLoading = true
-                handleLoading()
-            }
-        }
     }
-    
-    /// 지도 로딩 조절 로직 (최소 1.5초 및 데이터 완료 대기)
-    private func handleLoading() {
-        // 이미 진행 중인 타이머가 있을 수 있으므로 isMapLoading이 true일 때만 시작
-        guard isMapLoading else { return }
-        
+
+    /// 확인 카드 "이 위치 추가" — 주소를 찾아 장소 등록 창을 연다.
+    private func addPendingLocation() {
+        guard let pending = pendingCoordinate, !isResolvingAddress else { return }
+        isResolvingAddress = true
         Task {
-            // 최소 1.5초 대기
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
-            
-            // 뷰모델 데이터 로딩 대기 (최대 5초)
-            var retryCount = 0
-            while viewModel.isLoading && retryCount < 25 {
-                try? await Task.sleep(nanoseconds: 200_000_000)
-                retryCount += 1
-            }
-            
-            withAnimation(.easeOut(duration: 0.3)) {
-                isMapLoading = false
-            }
-        }
-    }
-    
-    private var sidebarOffset: CGFloat { viewModel.isSidebarOpen ? max(0, sidebarDragOffset) : min(0, -sidebarWidth + sidebarDragOffset) }
-    private var overlayOpacity: Double { let progress = viewModel.isSidebarOpen ? 1.0 - Double(max(0, -sidebarDragOffset)) / Double(sidebarWidth) : Double(sidebarDragOffset) / Double(sidebarWidth); return 0.4 * max(0, min(1, progress)) }
-    
-    private var edgeSwipeGesture: some Gesture {
-        DragGesture().onChanged { if $0.translation.width > 0 { sidebarDragOffset = min(sidebarWidth, $0.translation.width) } }
-        .onEnded { if $0.translation.width > sidebarWidth * 0.3 { viewModel.openSidebar() } else { viewModel.closeSidebar() }; sidebarDragOffset = 0 }
-    }
-    
-    private var sidebarDragGesture: some Gesture {
-        DragGesture().onChanged { sidebarDragOffset = $0.translation.width }
-        .onEnded { if viewModel.isSidebarOpen && $0.translation.width < -sidebarWidth * 0.3 { viewModel.closeSidebar() }; withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { sidebarDragOffset = 0 } }
-    }
-}
-
-struct MyPlaceHeaderView: View {
-    let onSearchTap: () -> Void
-
-
-    var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("내장소")
-                    .font(.suite(size: 22, weight: .bold))
-                    .foregroundColor(.black)
-                Text("장소를 등록하고 관리하세요")
-                    .font(.suite(size: 13))
-                    .foregroundColor(.gray)
-            }
-
-            Spacer()
-
-            Button(action: onSearchTap) {
-                Image(systemName: "magnifyingglass")
-                    .font(.suite(size: 20))
-                    .foregroundColor(.gray)
-            }
-            .frame(width: 36, height: 44)
-            .accessibilityLabel("검색")
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(
-            BlurView(style: .systemUltraThinMaterialLight)
-                .ignoresSafeArea(edges: .top)
-        )
-    }
-}
-
-struct FloatingActionPlaceButton: View {
-    let count: Int
-    let action: () -> Void
-    
-    private var pinkColor: Color { SMAPTheme.Accent.pink }
-    
-    var body: some View {
-        Button(action: action) {
-            ZStack(alignment: .topTrailing) {
-                // Main Button Circle
-                Circle()
-                    .fill(SMAPTheme.Color.primary)
-                    .frame(width: 56, height: 56)
-                    .shadow(color: SMAPTheme.Color.primary.opacity(0.3), radius: 12, x: 0, y: 8)
-                    .overlay(
-                        Image(systemName: "person.fill")
-                            .font(.suite(size: 22))
-                            .foregroundColor(.white)
-                    )
-
-                // Badge (Pink)
-                if count > 0 {
-                    Text(count > 99 ? "99+" : "\(count)")
-                        .font(.suite(size: 12, weight: .bold))
-                        .foregroundColor(.white)
-                        .frame(minWidth: 24, minHeight: 24)
-                        .background(pinkColor)
-                        .clipShape(Circle())
-                        .offset(x: 4, y: -4)
-                }
-            }
-        }
-        .accessibilityLabel(count > 0 ? "멤버 선택 및 장소 보기, \(count)명" : "멤버 선택 및 장소 보기")
-        .accessibilityHint("사이드바를 열어 그룹 멤버와 등록된 장소를 확인")
-    }
-}
-
-struct MyPlaceSidebarView: View {
-    @ObservedObject var viewModel: MyPlaceViewModel
-    
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header
-            sidebarHeader
-                .padding(.top, 20)
-                .padding(.horizontal, 24)
-                .padding(.bottom, 16)
-            
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    // Group Selector Section
-                    groupSelectorSection
-                    
-                    // Member Horizontal Selector
-                    memberSelectorSection
-                    
-                    // Location List Section
-                    locationListSection
-                }
-                .padding(.bottom, 40)
-            }
-        }
-        .frame(width: 320)
-        .background(
-            SMAPTheme.Adaptive.sidebarBackground
-                .ignoresSafeArea()
-        )
-        .cornerRadius(24, corners: [.topRight, .bottomRight])
-        .shadow(color: Color.black.opacity(0.15), radius: 20, x: 5, y: 0)
-    }
-    
-    // MARK: - Sections
-    
-    // 헤더 — 3개 사이드바 공통 spacing 16pt
-    private var sidebarHeader: some View {
-        HStack(spacing: 16) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(SMAPTheme.Color.primary)
-                    .frame(width: 40, height: 40)
-                Image(systemName: "mappin.and.ellipse")
-                    .foregroundColor(.white)
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                Text("장소 관리")
-                    .font(.suite(size: 20, weight: .bold))
-                Text("멤버를 선택해보세요")
-                    .font(.suite(size: 15))
-                    .foregroundColor(.secondary)
-            }
-        }
-    }
-    
-    private var groupSelectorSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Circle().fill(SMAPTheme.Semantic.indicatorGroup).frame(width: 8, height: 8)
-                Text("그룹 선택").font(.suite(size: 16, weight: .bold))
-            }
-            
-            Menu {
-                ForEach(viewModel.groups) { group in
-                    Button(group.sgt_title ?? "이름 없음") { viewModel.selectGroup(group) }
-                }
-            } label: {
-                HStack {
-                    Text(viewModel.selectedGroup?.sgt_title ?? "그룹 선택")
-                        .font(.suite(size: 17))
-                        .foregroundColor(.primary)
-                    Spacer()
-                    Image(systemName: "chevron.down")
-                        .font(.suite(size: 15))
-                        .foregroundColor(.secondary)
-                }
-                .padding()
-                .background(RoundedRectangle(cornerRadius: 12).fill(Color.white))
-                .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 4)
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.gray.opacity(0.1), lineWidth: 1))
-            }
-        }
-        .padding(16)
-        .background(RoundedRectangle(cornerRadius: 16).fill(Color.white))
-        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.gray.opacity(0.1), lineWidth: 1))
-        .padding(.horizontal, 20)
-    }
-    
-    private var memberSelectorSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Circle().fill(SMAPTheme.Semantic.indicatorMember).frame(width: 8, height: 8)
-                Text("멤버 선택").font(.suite(size: 16, weight: .bold))
-                Spacer()
-                Text("\(viewModel.members.count)명")
-                    .font(.suite(size: 14))
-                    .foregroundColor(.secondary)
-            }
-            
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 16) {
-                    let currentUserIdx = AuthService.shared.getUserData()?.mt_idx
-                    ForEach(viewModel.members) { member in
-                        PlaceMemberCircleCell(
-                            member: member,
-                            isSelf: member.mt_idx == currentUserIdx
-                        ) {
-                            viewModel.selectMember(member)
-                        }
-                    }
-                }
-                .padding(.horizontal, 2)
-                .padding(.vertical, 4)
-            }
-        }
-        .padding(16)
-        .background(RoundedRectangle(cornerRadius: 16).fill(Color.white))
-        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.gray.opacity(0.1), lineWidth: 1))
-        .padding(.horizontal, 20)
-    }
-    
-    private var locationListSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Circle().fill(SMAPTheme.Semantic.indicatorLocation).frame(width: 8, height: 8)
-                Text("장소 목록").font(.suite(size: 16, weight: .bold))
-                Spacer()
-                if let selected = viewModel.selectedMember {
-                    Text("\(selected.displayName)님의 장소")
-                        .font(.suite(size: 13))
-                        .foregroundColor(.secondary)
-                }
-            }
-            
-            if viewModel.isViewingOtherMember && !viewModel.canAddToSelectedMember {
-                SMAPBanner(message: "다른 멤버의 장소는 볼 수만 있어요.")
-            }
-            
-            if viewModel.isLoadingLocations {
-                HStack { Spacer(); ProgressView().padding(); Spacer() }
-            } else if viewModel.locations.isEmpty {
-                // 빈 상태 — 단순 메시지 대신 액션 유도.
-                // 핵심 interaction (지도 롱프레스로 장소 추가)이 숨겨져 있으므로 명시적으로 안내.
-                VStack(spacing: 10) {
-                    Image(systemName: "mappin.and.ellipse")
-                        .font(.suite(size: 32, weight: .light))
-                        .foregroundColor(SMAPTheme.Semantic.indicatorLocation.opacity(0.5))
-                        .accessibilityHidden(true)
-                    Text("등록된 장소가 없어요")
-                        .font(.suite(size: 15, weight: .semibold))
-                        .foregroundColor(.primary)
-                    Text(viewModel.canAddToSelectedMember ? "지도를 길게 눌러 새 장소를 추가하거나\n주소 검색으로 장소를 찾아보세요" : "이 멤버가 등록한 장소가 아직 없어요")
-                        .font(.suite(size: 12))
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 28)
-                .accessibilityElement(children: .combine)
-            } else {
-                VStack(spacing: 10) {
-                    ForEach(viewModel.locations) { location in
-                        PlaceLocationCell(
-                            location: location,
-                            isSelected: viewModel.selectedLocation?.slt_idx == location.slt_idx,
-                            canManage: viewModel.canManageLocation(location),
-                            onToggleNotification: {
-                                Task { await viewModel.toggleNotification(for: location) }
-                            }
-                        ) {
-                            viewModel.selectLocationFromSidebar(location)
-                        }
-                    }
-                }
-            }
-        }
-        .padding(16)
-        .background(RoundedRectangle(cornerRadius: 16).fill(Color.white))
-        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.gray.opacity(0.1), lineWidth: 1))
-        .padding(.horizontal, 20)
-    }
-}
-
-
-struct PlaceMemberCell: View {
-    let member: PlaceMember
-    var isSelf: Bool = false
-    let onTap: () -> Void
-    
-    
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 12) {
-                // Avatar with Badge
-                ZStack(alignment: .bottomTrailing) {
-                    // Profile Image with Selection Border
-                    Group {
-                        if let url = getProfileImageUrl(member.mt_file1) {
-                            AsyncImage(url: url) { phase in
-                                switch phase {
-                                case .empty:
-                                    ProgressView()
-                                        .frame(width: 44, height: 44)
-                                case .success(let image):
-                                    image
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                        .frame(width: 44, height: 44)
-                                        .clipShape(Circle())
-                                case .failure:
-                                    defaultAvatar
-                                @unknown default:
-                                    defaultAvatar
-                                }
-                            }
-                        } else {
-                            defaultAvatar
-                        }
-                    }
-                    .overlay(
-                        Circle()
-                            .stroke(member.isSelected ? SMAPTheme.Color.primary : Color.clear, lineWidth: 2.5)
-                    )
-                    
-                    // Crown/Star Icon
-                    if member.isOwner {
-                        Circle()
-                            .fill(SMAPTheme.Accent.crown)
-                            .frame(width: 16, height: 16)
-                            .overlay(Image(systemName: "crown.fill").font(.suite(size: 8)).foregroundColor(.white))
-                            .offset(x: 4, y: 4)
-                            .accessibilityLabel("그룹 오너")
-                    } else if member.isLeader {
-                        Circle()
-                            .fill(SMAPTheme.Accent.orange)
-                            .frame(width: 16, height: 16)
-                            .overlay(Image(systemName: "star.fill").font(.suite(size: 8)).foregroundColor(.white))
-                            .offset(x: 4, y: 4)
-                            .accessibilityLabel("그룹 리더")
-                    }
-                }
-                .frame(width: 52, height: 52)
-                
-                // Member Info
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(isSelf ? "\(member.displayName) (나)" : member.displayName)
-                        .font(.suite(size: 17, weight: .medium))
-                        .foregroundColor(.primary)
-                    Text("장소 \(member.locationCount)개")
-                        .font(.suite(size: 13))
-                        .foregroundColor(.secondary)
-                }
-                
-                Spacer()
-                
-                if member.isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(SMAPTheme.Color.primary)
-                        .font(.suite(size: 22))
-                }
-            }
-            .padding(12)
-            .background(member.isSelected ? SMAPTheme.Color.primary.opacity(0.05) : Color.white)
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(member.isSelected ? SMAPTheme.Color.primary.opacity(0.3) : Color.clear, lineWidth: 1)
-            )
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-    
-    private var defaultAvatar: some View {
-        Circle()
-            .fill(Color.gray.opacity(0.2))
-            .frame(width: 44, height: 44)
-            .overlay(
-                Image(systemName: "person.fill")
-                    .foregroundColor(.gray)
-            )
-    }
-    
-    // Helper function to construct proper profile image URL
-    private func getProfileImageUrl(_ path: String?) -> URL? {
-        return AuthService.getProfileImageURL(path)
-    }
-}
-
-// MARK: - New Member Circle Cell for Horizontal selector
-
-struct PlaceMemberCircleCell: View {
-    let member: PlaceMember
-    var isSelf: Bool = false
-    let onTap: () -> Void
-    
-    
-    var body: some View {
-        Button(action: onTap) {
-            VStack(spacing: 8) {
-                ZStack(alignment: .bottomTrailing) {
-                    // Profile Image
-                    Group {
-                        if let url = getProfileImageUrl(member.mt_file1) {
-                            AsyncImage(url: url) { phase in
-                                switch phase {
-                                case .empty:
-                                    ProgressView().frame(width: 48, height: 48)
-                                case .success(let image):
-                                    image
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                        .frame(width: 48, height: 48)
-                                        .clipShape(Circle())
-                                case .failure:
-                                    defaultAvatar
-                                @unknown default:
-                                    defaultAvatar
-                                }
-                            }
-                        } else {
-                            defaultAvatar
-                        }
-                    }
-                    .overlay(
-                        Circle()
-                            .stroke(member.isSelected ? SMAPTheme.Color.primary : Color.gray.opacity(0.2), lineWidth: 2)
-                    )
-                    
-                    // Owner/Leader Badge
-                    if member.isOwner {
-                        Circle()
-                            .fill(SMAPTheme.Accent.crown)
-                            .frame(width: 14, height: 14)
-                            .overlay(Image(systemName: "crown.fill").font(.suite(size: 7)).foregroundColor(.white))
-                            .offset(x: 2, y: 2)
-                            .accessibilityLabel("그룹 오너")
-                    } else if member.isLeader {
-                        Circle()
-                            .fill(SMAPTheme.Accent.orange)
-                            .frame(width: 14, height: 14)
-                            .overlay(Image(systemName: "star.fill").font(.suite(size: 7)).foregroundColor(.white))
-                            .offset(x: 2, y: 2)
-                            .accessibilityLabel("그룹 리더")
-                    }
-                }
-                
-                Text(isSelf ? "\(member.displayName) (나)" : member.displayName)
-                    .font(.suite(size: 13, weight: member.isSelected ? .bold : .medium))
-                    .foregroundColor(member.isSelected ? SMAPTheme.Color.primary : .primary)
-                    .lineLimit(1)
-                    .frame(width: 65)
-            }
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-    
-    private var defaultAvatar: some View {
-        Circle()
-            .fill(Color.gray.opacity(0.2))
-            .frame(width: 48, height: 48)
-            .overlay(
-                Image(systemName: "person.fill")
-                    .foregroundColor(.gray)
-            )
-    }
-    
-    private func getProfileImageUrl(_ path: String?) -> URL? {
-        return AuthService.getProfileImageURL(path)
-    }
-}
-
-// MARK: - Place Location Cell
-
-struct PlaceLocationCell: View {
-    let location: SavedLocation
-    let isSelected: Bool
-    let canManage: Bool
-    let onToggleNotification: () -> Void
-    let onTap: () -> Void
-    
-    
-    
-    var body: some View {
-        ZStack(alignment: .trailing) {
-            // Base layer: Main row content (tappable for selection)
-            Button(action: onTap) {
-                HStack(spacing: 12) {
-                    // Location Info
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(location.name)
-                            .font(.suite(size: 16, weight: .medium))
-                            .foregroundColor(.primary)
-                            .lineLimit(1)
-                        Text(location.address)
-                            .font(.suite(size: 10))
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                    }
-                    
-                    Spacer()
-                    
-                    // Placeholder for bell button (important: disable hit testing)
-                    Color.clear
-                        .frame(width: 40, height: 40)
-                        .allowsHitTesting(false)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(isSelected ? SMAPTheme.Color.primary.opacity(0.08) : Color.white.opacity(0.6))
-                .cornerRadius(10)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(isSelected ? SMAPTheme.Color.primary.opacity(0.3) : Color.clear, lineWidth: 1)
-                )
-            }
-            .buttonStyle(PlainButtonStyle())
-            
-            // Top layer: Notification Toggle Button (independent touch target)
-            if canManage {
-                Button(action: onToggleNotification) {
-                    Image(systemName: location.notifications ? "bell.fill" : "bell.slash")
-                        .font(.suite(size: 14))
-                        .foregroundColor(location.notifications ? .orange : .gray.opacity(0.4))
-                        .frame(width: 36, height: 36)
-                        .background(Color.white)
-                        .clipShape(Circle())
-                        .shadow(color: Color.black.opacity(0.08), radius: 2, x: 0, y: 1)
-                        .contentShape(Circle())
-                }
-                .buttonStyle(PlainButtonStyle())
-                .accessibilityLabel(location.notifications ? "알림 끄기" : "알림 켜기")
-                .padding(.trailing, 12)
+            defer { isResolvingAddress = false }
+            do {
+                let address = try await KakaoLocationSearchService.shared.reverseGeocode(latitude: pending.lat, longitude: pending.lng)
+                newLocationCoordinates = pending
+                newLocationName = nil
+                newLocationAddress = address
+                pendingCoordinate = nil
+                viewModel.startNewLocation(latitude: pending.lat, longitude: pending.lng)
+            } catch {
+                viewModel.errorMessage = "주소를 불러오지 못했습니다."
+                viewModel.showError = true
             }
         }
     }
@@ -697,6 +180,10 @@ struct MyPlaceMapView: UIViewRepresentable {
     @Binding var selectedLocation: SavedLocation?
     @Binding var targetCoordinate: (lat: Double, lng: Double)?
     var initialCenter: (lat: Double, lng: Double)?  // Initial center for map initialization
+    /// 지도를 눌러 고른 임시 위치 — 확인 카드가 떠 있는 동안 핀으로 보인다.
+    var pendingCoordinate: (lat: Double, lng: Double)? = nil
+    /// 위 조작 줄·아래 시트에 가리는 만큼 — 고른 장소가 보이는 영역 가운데에 오게 한다.
+    var contentInsets: UIEdgeInsets = .zero
     let onLocationTap: (SavedLocation) -> Void
     let onMapTap: (Double, Double) -> Void
     
@@ -729,8 +216,20 @@ struct MyPlaceMapView: UIViewRepresentable {
     }
     
     func updateUIView(_ mapView: NMFMapView, context: Context) {
+        if mapView.contentInset != contentInsets {
+            mapView.contentInset = contentInsets
+        }
         // Update markers
         context.coordinator.clearMarkers()
+        if let pending = pendingCoordinate {
+            let pin = NMFMarker(position: NMGLatLng(lat: pending.lat, lng: pending.lng))
+            // 기본 초록 마커에 색을 입히면 섞여 청록이 된다 — 검정 마커에 남색을 입힌다.
+            pin.iconImage = NMF_MARKER_IMAGE_BLACK
+            pin.iconTintColor = UIColor(SMAPTheme.Navy.base)
+            pin.zIndex = 2000
+            pin.mapView = mapView
+            context.coordinator.markers.append(pin)
+        }
         for location in locations {
             let marker = NMFMarker()
             marker.position = NMGLatLng(lat: location.latitude, lng: location.longitude)
@@ -772,6 +271,8 @@ struct MyPlaceMapView: UIViewRepresentable {
         let onMapTap: (Double, Double) -> Void
         init(onLocationTap: @escaping (SavedLocation) -> Void, onMapTap: @escaping (Double, Double) -> Void) { self.onLocationTap = onLocationTap; self.onMapTap = onMapTap }
         func clearMarkers() { markers.forEach { $0.mapView = nil }; markers.removeAll() }
+        // 한 번 누르기·길게 누르기 모두 임시 핀을 놓는다(확인 카드에서 한 번 더 확인).
+        func mapView(_ mapView: NMFMapView, didTapMap latlng: NMGLatLng, point: CGPoint) { onMapTap(latlng.lat, latlng.lng) }
         func mapView(_ mapView: NMFMapView, didLongTapMap latlng: NMGLatLng, point: CGPoint) { onMapTap(latlng.lat, latlng.lng) }
     }
 }

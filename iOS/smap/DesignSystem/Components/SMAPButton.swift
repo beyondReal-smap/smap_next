@@ -28,7 +28,14 @@ struct SMAPButton: View {
             .frame(maxWidth: .infinity)
             // 높이를 고정값으로 맞춘다(Android SmapButton 52dp 와 동일). 글자 크기에 따라 버튼 높이가 달라지던 것을 방지.
             .frame(minHeight: 52)
-            .background(backgroundColor)
+            // 주 버튼은 브랜드 남색 그라데이션(Android SmapButton 과 동일) — 단색은 밋밋하다는 피드백(2026-11-16)
+            .background {
+                if style == .primary {
+                    SMAPTheme.Navy.gradient
+                } else {
+                    backgroundColor
+                }
+            }
             .foregroundStyle(foregroundColor)
             .clipShape(RoundedRectangle(cornerRadius: SMAPTheme.Radius.md))
             .overlay {

@@ -16,7 +16,6 @@ class MyPlaceViewModel: ObservableObject {
     @Published var selectedMember: PlaceMember?
     @Published var locations: [SavedLocation] = []
     @Published var selectedLocation: SavedLocation?
-    @Published var isSidebarOpen: Bool = false
     @Published var isLocationPanelOpen: Bool = false
     @Published var isEditMode: Bool = false
     @Published var isLoading: Bool = true // Start with loading true to prevent map init with default coordinates
@@ -189,13 +188,11 @@ class MyPlaceViewModel: ObservableObject {
         // Keep sidebar open to show locations list
     }
 
-    func selectLocationFromSidebar(_ location: SavedLocation) {
+    /// 시트 목록에서 장소를 고르면 지도만 그 장소로 옮긴다(상세 창은 마커를 눌렀을 때).
+    func selectLocationFromList(_ location: SavedLocation) {
         selectedLocation = location
         targetCoordinate = (lat: location.latitude, lng: location.longitude)
-        // Ensure detail panel is closed when selecting from sidebar
         isLocationPanelOpen = false
-        // Close sidebar to show the map update
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { isSidebarOpen = false }
     }
 
     func selectLocationFromMarker(_ location: SavedLocation) {
@@ -321,9 +318,6 @@ class MyPlaceViewModel: ObservableObject {
         }
     }
 
-    func toggleSidebar() { withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { isSidebarOpen.toggle() } }
-    func openSidebar() { withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { isSidebarOpen = true } }
-    func closeSidebar() { withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { isSidebarOpen = false } }
 
     /// `isWrite`: 장소 추가·수정·삭제·알림 변경 요청의 오류일 때만 true (권한/한도 안내가 쓰기 요청에만 해당)
     private func handleError(_ error: Error, isWrite: Bool = false) {

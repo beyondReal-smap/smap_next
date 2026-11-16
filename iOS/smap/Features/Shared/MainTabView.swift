@@ -37,8 +37,8 @@ struct MainTabView: View {
             let width = geo.size.width
             ZStack {
                 tabPage(0, width: width) { HomeView(isActive: selectedTab == 0) }
-                if visitedMyPlace { tabPage(3, width: width) { MyPlaceView() } }
-                if visitedActivityLog { tabPage(4, width: width) { ActivityLogView() } }
+                if visitedMyPlace { tabPage(3, width: width) { MyPlaceView(isActive: selectedTab == 3) } }
+                if visitedActivityLog { tabPage(4, width: width) { ActivityLogView(isActive: selectedTab == 4) } }
                 // 그룹·일정은 보일 때와 밀려 나가는 동안만 둔다(열 때마다 새로 불러오는 기존 동작 유지).
                 if selectedTab == 1 || transitionFrom == 1 { tabPage(1, width: width) { GroupListView() } }
                 if selectedTab == 2 || transitionFrom == 2 { tabPage(2, width: width) { NativeScheduleListView() } }

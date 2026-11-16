@@ -70,6 +70,7 @@
 		74DE4DEA68BBA71092E9E720 /* ImagePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FB0289DFA9DB5160EC07275 /* ImagePicker.swift */; };
 		768B136F94EB733BF7C8EC3F /* NewDMView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02A121223B384FDDCC28FE19 /* NewDMView.swift */; };
 		7699790BF91C941027D9F54A /* SMAPNavy.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE09EDFC5F2293E99FF59D2D /* SMAPNavy.swift */; };
+		78620FD45A85E3448CE05571 /* MyPlaceSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3488CBE9626AF88DD76D630 /* MyPlaceSheet.swift */; };
 		78D094598CC1522B6A0A53E2 /* MyPlaceModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EC6364864F595F85F7C7559 /* MyPlaceModels.swift */; };
 		79091396AD0916B823C9B8CE /* SMAPListRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAB1BAECE90E67C177242FC1 /* SMAPListRow.swift */; };
 		7B3BDD67E349F3AE195AEAE0 /* SMAPButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = F49C868EA905A5BA43A716DF /* SMAPButton.swift */; };
@@ -101,6 +102,7 @@
 		A6A0586B0397198F2AF81B87 /* ScheduleService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3890E11DD9B82BA5B146AB8A /* ScheduleService.swift */; };
 		A6BFED3F483F38129E1A0A5A /* ScheduleModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 637AE176A6DB0408B597EC27 /* ScheduleModels.swift */; };
 		AA4FA87FA06D765B2BA2882C /* InquiryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E88EBC4AED2C7B4160E5DCD7 /* InquiryView.swift */; };
+		AD10C3E0AB0F9D2906CE2662 /* ActivityLogSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A82B1F3E3BB039A5E192A8D1 /* ActivityLogSheet.swift */; };
 		B07F361F901BF86CBDE2D358 /* HomeModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2C91D16CC5BFA7761FCBE8A /* HomeModels.swift */; };
 		B0E5B55E62CC25B82FD791A3 /* GroupCreationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A6DAE526BDE5CED20EE42D2 /* GroupCreationView.swift */; };
 		B11CAFE4D8A24F6E9C3D7A01 /* AuthServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C22DBEF5E9B35A7FA4E68B02 /* AuthServiceTests.swift */; };
@@ -240,8 +242,10 @@
 		A1B2C3D40015 /* RootCoordinatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootCoordinatorView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6789012345678 /* LocationPermissionView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocationPermissionView.swift; sourceTree = "<group>"; };
 		A285D1EDA2D7751AD0989FE6 /* DataMigrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DataMigrationTests.swift; sourceTree = "<group>"; };
+		A3488CBE9626AF88DD76D630 /* MyPlaceSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MyPlaceSheet.swift; sourceTree = "<group>"; };
 		A658788DFD22BBB65D68B968 /* Pods-smap.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-smap.debug.xcconfig"; path = "Target Support Files/Pods-smap/Pods-smap.debug.xcconfig"; sourceTree = "<group>"; };
 		A6E857FB9A66B645DD27275D /* MockURLProtocol.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MockURLProtocol.swift; sourceTree = "<group>"; };
+		A82B1F3E3BB039A5E192A8D1 /* ActivityLogSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ActivityLogSheet.swift; sourceTree = "<group>"; };
 		A8F6BDA102080F14BC5A1377 /* Theme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		A9E2B42038DD89D78086429E /* PlaceholderTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlaceholderTests.swift; sourceTree = "<group>"; };
 		AB01FED42F3C817D4F548182 /* KeychainManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeychainManagerTests.swift; sourceTree = "<group>"; };
@@ -390,6 +394,7 @@
 			children = (
 				77E9C6311F4640B2DA7A85D6 /* MyPlaceView.swift */,
 				EB5E8B6769F63DAECC4C6BFB /* LocationDetailPanel.swift */,
+				A3488CBE9626AF88DD76D630 /* MyPlaceSheet.swift */,
 			);
 			name = MyPlace;
 			path = MyPlace;
@@ -399,6 +404,7 @@
 			isa = PBXGroup;
 			children = (
 				18CD7CDF0285FD87D76EFBBB /* ActivityLogView.swift */,
+				A82B1F3E3BB039A5E192A8D1 /* ActivityLogSheet.swift */,
 			);
 			name = ActivityLog;
 			path = ActivityLog;
@@ -1153,6 +1159,8 @@
 				79091396AD0916B823C9B8CE /* SMAPListRow.swift in Sources */,
 				0E509A777E022FEA5F1DCCC9 /* SMAPStrips.swift in Sources */,
 				5D576E1F2BD8EAF23C033E72 /* HomeSheet.swift in Sources */,
+				78620FD45A85E3448CE05571 /* MyPlaceSheet.swift in Sources */,
+				AD10C3E0AB0F9D2906CE2662 /* ActivityLogSheet.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

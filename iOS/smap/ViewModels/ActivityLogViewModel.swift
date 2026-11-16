@@ -43,7 +43,6 @@ class ActivityLogViewModel: ObservableObject {
     @Published var locationSummary: LocationSummary?
 
     // UI States
-    @Published var isSidebarOpen = false
     @Published var sliderValue: Double = 0
     @Published var isSliderDragging = false
 
@@ -185,29 +184,6 @@ class ActivityLogViewModel: ObservableObject {
         }
     }
 
-    /// 캘린더 셀 클릭 시 호출 (멤버 + 날짜 동시 변경)
-    func selectMemberAndDate(memberId: Int, date: String) async {
-        print("[ActivityLogViewModel] 멤버+날짜 선택: \(memberId), \(date)")
-        selectedMemberId = memberId
-        selectedDate = date
-
-        await loadMemberLocationData()
-    }
-
-    /// 사이드바 토글
-    func toggleSidebar() {
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-            isSidebarOpen.toggle()
-        }
-    }
-
-    /// 사이드바 닫기
-    func closeSidebar() {
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-            isSidebarOpen = false
-        }
-    }
-
     /// 슬라이더 값 업데이트
     func updateSliderValue(_ value: Double) {
         sliderValue = max(0, min(100, value))
@@ -268,8 +244,8 @@ class ActivityLogViewModel: ObservableObject {
         isGroupsLoading = false
     }
 
-    /// 그룹 선택 핸들러
-    func selectGroupFromSidebar(_ group: SmapGroup) async {
+    /// 그룹 선택 시트에서 그룹을 고른 경우
+    func selectGroupFromPicker(_ group: SmapGroup) async {
         guard selectedGroupId != group.sgt_idx else { return }
 
         print("[ActivityLogViewModel] 그룹 변경: \(group.sgt_title ?? "N/A")")
@@ -388,7 +364,6 @@ class ActivityLogViewModel: ObservableObject {
         }
         isMarkersLoading = false
         isLoading = false
-        if isSidebarOpen { closeSidebar() }
     }
 
     /// 특정 날짜에 해당 멤버의 활동이 있는지 확인
