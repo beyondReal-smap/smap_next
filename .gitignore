@@ -204,3 +204,8 @@ AndroidWebView/app/src/main/java/**/R.java
 
 # Apple 개인키(.p8)는 저장소에 두지 않는다 — 보관: ~/.smap-secrets
 *.p8
+
+# 서명 키·인증서 개인키는 저장소에 두지 않는다 — 보관: ~/.smap-secrets
+*.jks
+*.keystore
+*.pem
