@@ -130,7 +130,7 @@ enum SMAPTheme {
 
         // Dynamic Type — 접근성 "큰 글자" 설정 연동.
         // 본문·부가정보·본문형 라벨에 우선 적용 권장. 레이아웃에 민감한 헤더/배지는 고정 크기 유지.
-        // 기존 `Font.suite` 확장은 size+2 보정이 들어가 있어 직접 `Font.custom` 을 사용해 명확한 기준으로 스케일.
+        // `Font.suite` 와 같은 SUITE 글꼴을 쓰되, 시스템 글자 크기 설정에 맞춰 커지도록 `relativeTo` 를 준다.
         static let titleDynamic = dynamicSuite(size: 22, weight: .bold, relativeTo: .title2)
         static let headlineDynamic = dynamicSuite(size: 18, weight: .bold, relativeTo: .title3)
         static let subheadlineDynamic = dynamicSuite(size: 16, weight: .semibold, relativeTo: .headline)
@@ -144,20 +144,7 @@ enum SMAPTheme {
             weight: SwiftUI.Font.Weight,
             relativeTo textStyle: SwiftUI.Font.TextStyle
         ) -> SwiftUI.Font {
-            // AtoZ(A2Z) 패밀리 — 각 weight 가 독립 family 로 분리돼 PostScript 이름을 런타임에 조회.
-            let family: String
-            switch weight {
-            case .ultraLight, .thin: family = "A2Z 1 Thin"
-            case .light: family = "A2Z 3 Light"
-            case .regular: family = "A2Z 4 Regular"
-            case .medium: family = "A2Z 5 Medium"
-            case .semibold: family = "A2Z 6 SemiBold"
-            case .bold: family = "A2Z 7 Bold"
-            case .heavy: family = "A2Z 8 ExtraBold"
-            case .black: family = "A2Z 9 Black"
-            default: family = "A2Z 4 Regular"
-            }
-            let psName = UIFont.fontNames(forFamilyName: family).first ?? family
+            let psName = SuiteFontName.postScriptName(for: weight)
             return SwiftUI.Font.custom(psName, size: size, relativeTo: textStyle)
         }
     }

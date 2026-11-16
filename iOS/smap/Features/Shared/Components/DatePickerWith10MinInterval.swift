@@ -10,7 +10,7 @@ import UIKit
 
 // MARK: - Custom DatePicker with 10-minute intervals
 
-/// UIKit의 UIDatePicker를 래핑하여 10분 단위 시간 선택 지원 + AtoZ(A2Z) 폰트 적용
+/// UIKit의 UIDatePicker를 래핑하여 10분 단위 시간 선택 지원 + 앱 글꼴(SUITE) 적용
 struct DatePickerWith10MinInterval: UIViewRepresentable {
     @Binding var selection: Date
     var displayedComponents: DatePickerComponents
@@ -50,8 +50,7 @@ struct DatePickerWith10MinInterval: UIViewRepresentable {
         applyAppFont(to: uiView)
     }
 
-    /// DatePicker 내부 UILabel에 앱 기본 폰트(AtoZ) Medium 적용.
-    /// UIFont.suite는 AppStyles에서 A2Z 패밀리를 반환한다.
+    /// DatePicker 내부 UILabel에 앱 기본 폰트(SUITE) Medium 적용.
     private func applyAppFont(to view: UIView) {
         for subview in view.subviews {
             if let label = subview as? UILabel {

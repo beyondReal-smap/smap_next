@@ -9,27 +9,20 @@ import androidx.compose.ui.unit.sp
 import com.dmonster.smap.R
 
 /**
- * 앱 기본 폰트 패밀리 — iOS 와 동일하게 AtoZ(A2Z) 로 전환.
- * 이름은 `SuiteFont` 로 유지해 호출부 파급 제거.
+ * 앱 기본 폰트 패밀리 — SUITE (iOS 와 같은 파일). 2026-11-16 AtoZ(A2Z) → SUITE 로 전환.
  *
- * Weight 매핑 (AtoZ 1~9 → Compose Font.Weight):
- *   Thin(100), ExtraLight(200), Light(300), Normal(400), Medium(500),
- *   SemiBold(600), Bold(700), ExtraBold(800), Black(900)
+ * 파일에 있는 굵기: Light(300) · Regular(400) · Medium(500) · SemiBold(600) · Bold(700) · ExtraBold(800) · Heavy(900).
+ * Thin·ExtraLight 를 요청하면 Compose 가 가장 가까운 Light 를 쓴다.
  */
 val SuiteFont = FontFamily(
-    Font(R.font.atoz_1thin,        FontWeight.Thin),
-    Font(R.font.atoz_2extralight,  FontWeight.ExtraLight),
-    Font(R.font.atoz_3light,       FontWeight.Light),
-    Font(R.font.atoz_4regular,     FontWeight.Normal),
-    Font(R.font.atoz_5medium,      FontWeight.Medium),
-    Font(R.font.atoz_6semibold,    FontWeight.SemiBold),
-    Font(R.font.atoz_7bold,        FontWeight.Bold),
-    Font(R.font.atoz_8extrabold,   FontWeight.ExtraBold),
-    Font(R.font.atoz_9black,       FontWeight.Black)
+    Font(R.font.suite_light,     FontWeight.Light),
+    Font(R.font.suite_regular,   FontWeight.Normal),
+    Font(R.font.suite_medium,    FontWeight.Medium),
+    Font(R.font.suite_semibold,  FontWeight.SemiBold),
+    Font(R.font.suite_bold,      FontWeight.Bold),
+    Font(R.font.suite_extrabold, FontWeight.ExtraBold),
+    Font(R.font.suite_heavy,     FontWeight.Black)
 )
-
-/** 의미 명확화를 위한 AtoZ 별칭. 새 코드에서는 `AtoZFont` 로 쓰는 걸 권장. */
-val AtoZFont: FontFamily = SuiteFont
 
 /**
  * 앱 전체 Typography (SUITE 폰트 기반)
