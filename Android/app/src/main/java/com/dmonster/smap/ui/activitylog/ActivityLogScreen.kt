@@ -294,6 +294,8 @@ fun ActivityLogScreen(
                             Marker(
                                 state = MarkerState(position = allCoords.first()),
                                 icon = OverlayImage.fromResource(R.drawable.ic_marker_start),
+                                // 기본 기준점은 아래 가운데라 원이 실제 시작·종료 지점보다 위로 떠 있었다. 원 중심을 지점에 맞춘다.
+                                anchor = androidx.compose.ui.geometry.Offset(0.5f, 0.5f),
                                 width = 28.dp,
                                 height = 28.dp,
                                 zIndex = 60
@@ -305,6 +307,8 @@ fun ActivityLogScreen(
                             Marker(
                                 state = MarkerState(position = allCoords.last()),
                                 icon = OverlayImage.fromResource(R.drawable.ic_marker_end),
+                                // 기본 기준점은 아래 가운데라 원이 실제 시작·종료 지점보다 위로 떠 있었다. 원 중심을 지점에 맞춘다.
+                                anchor = androidx.compose.ui.geometry.Offset(0.5f, 0.5f),
                                 width = 28.dp,
                                 height = 28.dp,
                                 zIndex = 61

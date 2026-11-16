@@ -10,10 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.dmonster.smap.data.model.SmapSchedule
 import com.dmonster.smap.ui.common.rememberSmapHaptics
@@ -114,21 +111,15 @@ fun ScheduleScreen(
                 contentPadding = PaddingValues(start = SmapSpacing.md, end = SmapSpacing.md, bottom = SmapSpacing.xl),
                 verticalArrangement = Arrangement.spacedBy(SmapSpacing.md)
             ) {
-                // 제목 줄 — 그룹 전환 알약(지도 탭과 같은 모양)과 일정 추가 버튼.
+                // 맨 위 줄 — 그룹 전환 알약(지도 탭과 같은 모양·위치)과 일정 추가 버튼.
+                // 아래 탭 막대에 이미 "일정"이 표시돼 큰 제목은 중복이라 뺐다(대표님 요청).
                 item {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(start = 4.dp, top = SmapSpacing.md),
+                            .padding(top = SmapSpacing.md),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            "일정",
-                            style = SmapText.title.copy(fontSize = 28.sp),
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.semantics { heading() }
-                        )
-                        Spacer(Modifier.width(SmapSpacing.sm))
                         Box(Modifier.weight(1f)) {
                             GroupSwitcherPill(
                                 groupName = selectedGroup?.sgtTitle,

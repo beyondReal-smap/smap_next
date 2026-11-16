@@ -39,8 +39,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -90,7 +88,7 @@ fun GroupListContent(
             verticalArrangement = Arrangement.spacedBy(SmapSpacing.lg),
         ) {
             item {
-                LargeTitle("그룹") {
+                TopActionRow {
                     FilledTonalIconButton(
                         onClick = onCreateClick,
                         colors = IconButtonDefaults.filledTonalIconButtonColors(
@@ -137,23 +135,19 @@ fun GroupListContent(
     }
 }
 
-/** 큰 제목 줄(탭 첫 화면용). */
+/**
+ * 탭 첫 화면 맨 위 동작 줄. 아래 탭 막대에 이미 "그룹"이 표시돼 큰 제목은 중복이라 빼고(대표님 요청),
+ * 오른쪽 동작 버튼만 남긴다.
+ */
 @Composable
-private fun LargeTitle(title: String, action: @Composable () -> Unit = {}) {
+private fun TopActionRow(action: @Composable () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(start = 4.dp, top = SmapSpacing.md),
+            .padding(top = SmapSpacing.md),
+        horizontalArrangement = Arrangement.End,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            title,
-            style = SmapText.title.copy(fontSize = androidx.compose.ui.unit.TextUnit(28f, androidx.compose.ui.unit.TextUnitType.Sp)),
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier
-                .weight(1f)
-                .semantics { heading() },
-        )
         action()
     }
 }
