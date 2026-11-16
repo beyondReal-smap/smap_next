@@ -12,6 +12,12 @@ import NMapsMap
 struct NaverMapView: UIViewRepresentable {
     @Binding var members: [SmapGroupMember]
     var schedules: [SmapSchedule]
+    /// 지도 위 조작 줄·아래 시트에 가리는 만큼 — 선택한 멤버가 보이는 영역 가운데에 오게 한다.
+    var contentInsets: UIEdgeInsets = .zero
+    /// 값이 바뀔 때마다 모든 멤버가 보이게 지도를 맞춘다(시트 "전체" 보기).
+    var fitAllToken: Int = 0
+    /// 마커를 누르면 그 멤버를 고른다 — 상태는 시트 머리 줄이 보여 준다(이전의 지도 말풍선 대신).
+    var onMemberTap: (SmapGroupMember) -> Void = { _ in }
 
     func makeUIView(context: Context) -> NMFNaverMapView {
         let view = NMFNaverMapView()
@@ -35,6 +41,10 @@ struct NaverMapView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: NMFNaverMapView, context: Context) {
+        context.coordinator.parent = self
+        if uiView.mapView.contentInset != contentInsets {
+            uiView.mapView.contentInset = contentInsets
+        }
         context.coordinator.updateMarkers(mapView: uiView.mapView, members: members, schedules: schedules)
 
         let selected = members.first(where: { $0.isSelected })
@@ -48,13 +58,30 @@ struct NaverMapView: UIViewRepresentable {
         } else if selected == nil {
             context.coordinator.lastSelectedMemberID = nil
         }
+
+        if context.coordinator.lastFitAllToken != fitAllToken {
+            context.coordinator.lastFitAllToken = fitAllToken
+            let points = members.compactMap { m -> NMGLatLng? in
+                guard let lat = m.mlt_lat, let lon = m.mlt_long else { return nil }
+                return NMGLatLng(lat: lat, lng: lon)
+            }
+            if points.count == 1 {
+                let update = NMFCameraUpdate(scrollTo: points[0], zoomTo: 15)
+                update.animation = .easeIn
+                uiView.mapView.moveCamera(update)
+            } else if points.count > 1 {
+                let update = NMFCameraUpdate(fit: NMGLatLngBounds(latLngs: points), padding: 64)
+                update.animation = .easeIn
+                uiView.mapView.moveCamera(update)
+            }
+        }
     }
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
 
-    class Coordinator: NSObject, NMFMapViewTouchDelegate, NMFOverlayImageDataSource {
+    class Coordinator: NSObject, NMFMapViewTouchDelegate {
         var parent: NaverMapView
         var memberMarkers: [Int: NMFMarker] = [:]
         var memberSnapshots: [Int: SmapGroupMember] = [:]
@@ -63,114 +90,12 @@ struct NaverMapView: UIViewRepresentable {
         private static let profileImages = NSCache<NSURL, UIImage>()
         private var imageRequests: Set<URL> = []
         var lastSelectedMemberID: Int?
-        var infoWindow: NMFInfoWindow?
+        var lastFitAllToken = 0
         var currentMapView: NMFMapView?
-        var currentMember: SmapGroupMember?
 
         init(_ parent: NaverMapView) {
             self.parent = parent
             super.init()
-
-            // InfoWindow 초기화
-            infoWindow = NMFInfoWindow()
-            infoWindow?.dataSource = self
-            infoWindow?.anchor = CGPoint(x: 0.5, y: 1.2) // 마커와 간격 추가
-        }
-
-        // MARK: - NMFOverlayImageDataSource (InfoWindow 내용)
-        func view(with overlay: NMFOverlay) -> UIView {
-            let containerView = UIView()
-            containerView.backgroundColor = .white
-            containerView.layer.cornerRadius = 12
-            containerView.layer.shadowColor = UIColor.black.cgColor
-            containerView.layer.shadowOpacity = 0.15
-            containerView.layer.shadowOffset = CGSize(width: 0, height: 4)
-            containerView.layer.shadowRadius = 12
-
-            guard let member = currentMember else {
-                containerView.frame = CGRect(origin: .zero, size: CGSize(width: 100, height: 40))
-                return containerView
-            }
-
-            // 멤버 정보 추출
-            let name = member.displayName
-            let battery = member.mlt_battery ?? 0
-            let speed = (member.mlt_speed ?? 0.0) * 3.6
-            let gpsTime = member.mlt_gps_time ?? "업데이트 없음"
-
-            // 배터리 색상
-            let _ : UIColor = battery > 50 ? .systemGreen : (battery > 20 ? .systemOrange : .systemRed)
-
-            // 레이아웃
-            let padding: CGFloat = 12
-            let width: CGFloat = 150
-            var yOffset: CGFloat = padding
-
-            // 이름 라벨
-            let nameLabel = UILabel()
-            nameLabel.font = UIFont.suite(size: 14, weight: .semibold)
-            nameLabel.attributedText = calloutLine(symbol: "person.fill", text: name, font: nameLabel.font, color: .black)
-            nameLabel.textColor = .black
-            nameLabel.frame = CGRect(x: padding, y: yOffset, width: width - padding * 2, height: 20)
-            containerView.addSubview(nameLabel)
-            yOffset += 24
-
-            // 배터리 라벨
-            let batteryLabel = UILabel()
-            batteryLabel.font = UIFont.suite(size: 12)
-            let batteryLevel = member.mlt_battery ?? -1
-            let batteryText = batteryLevel < 0 ? "확인 불가" : "\(batteryLevel)%"
-            batteryLabel.attributedText = calloutLine(symbol: "battery.100", text: "배터리: \(batteryText)", font: batteryLabel.font, color: .gray)
-            batteryLabel.textColor = .gray
-            batteryLabel.frame = CGRect(x: padding, y: yOffset, width: width - padding * 2, height: 18)
-            containerView.addSubview(batteryLabel)
-            yOffset += 20
-
-            // 속도 라벨
-            let speedLabel = UILabel()
-            speedLabel.font = UIFont.suite(size: 12)
-            speedLabel.attributedText = calloutLine(symbol: "figure.walk", text: "속도: \(String(format: "%.1f", speed))km/h", font: speedLabel.font, color: .gray)
-            speedLabel.textColor = .gray
-            speedLabel.frame = CGRect(x: padding, y: yOffset, width: width - padding * 2, height: 18)
-            containerView.addSubview(speedLabel)
-            yOffset += 20
-
-            // GPS 시간 라벨
-            let timeLabel = UILabel()
-            timeLabel.font = UIFont.suite(size: 11)
-            timeLabel.attributedText = calloutLine(symbol: "clock", text: "GPS 업데이트: \(formatGpsTime(gpsTime))", font: timeLabel.font, color: .lightGray)
-            timeLabel.textColor = .lightGray
-            timeLabel.frame = CGRect(x: padding, y: yOffset, width: width - padding * 2, height: 16)
-            containerView.addSubview(timeLabel)
-            yOffset += 20
-
-            containerView.frame = CGRect(x: 0, y: 0, width: width, height: yOffset + padding)
-            return containerView
-        }
-
-        private func formatGpsTime(_ timeStr: String) -> String {
-            // "2024-12-30 13:45:00" -> "13:45"
-            if timeStr.count >= 16 {
-                let start = timeStr.index(timeStr.startIndex, offsetBy: 11)
-                let end = timeStr.index(timeStr.startIndex, offsetBy: 16)
-                return String(timeStr[start..<end])
-            }
-            return timeStr
-        }
-
-        // 콜아웃 라인 — 이모지 대신 SF Symbol 을 텍스트 앞에 붙여 시각 일관성 확보 (새 에셋 불필요)
-        private func calloutLine(symbol: String, text: String, font: UIFont, color: UIColor) -> NSAttributedString {
-            let result = NSMutableAttributedString()
-            let config = UIImage.SymbolConfiguration(pointSize: font.pointSize, weight: .regular)
-            if let image = UIImage(systemName: symbol, withConfiguration: config)?
-                .withTintColor(color, renderingMode: .alwaysOriginal) {
-                let attachment = NSTextAttachment()
-                attachment.image = image
-                result.append(NSAttributedString(attachment: attachment))
-                result.append(NSAttributedString(string: " ", attributes: [.font: font, .foregroundColor: color]))
-            }
-            result.append(NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: color]))
-            return result
         }
 
         func updateMarkers(mapView: NMFMapView, members: [SmapGroupMember], schedules: [SmapSchedule]) {
@@ -192,7 +117,7 @@ struct NaverMapView: UIViewRepresentable {
                     marker.touchHandler = { [weak self] overlay -> Bool in
                         if let marker = overlay as? NMFMarker,
                            let memberData = marker.userInfo["member"] as? SmapGroupMember {
-                            self?.showInfoWindow(for: memberData, at: marker)
+                            self?.parent.onMemberTap(memberData)
                         }
                         return true
                     }
@@ -224,13 +149,6 @@ struct NaverMapView: UIViewRepresentable {
                         }
                     }.resume()
                 }
-                if member.isSelected && (currentMember?.mt_idx != member.mt_idx || old != member || currentMember?.mlt_battery != member.mlt_battery || currentMember?.mlt_gps_time != member.mlt_gps_time || currentMember?.mlt_speed != member.mlt_speed) {
-                    showInfoWindow(for: member, at: marker)
-                }
-            }
-            if let selectedID = currentMember?.mt_idx, !visibleIDs.contains(selectedID) {
-                infoWindow?.close()
-                currentMember = nil
             }
             var visibleScheduleIDs = Set<String>()
             for (index, schedule) in schedules.enumerated() {
@@ -388,21 +306,6 @@ struct NaverMapView: UIViewRepresentable {
                 }
             }
             return dateStr
-        }
-
-        // MARK: - InfoWindow Display
-
-        func showInfoWindow(for member: SmapGroupMember, at marker: NMFMarker) {
-            // 현재 열린 InfoWindow 닫기
-            infoWindow?.close()
-
-            // InfoWindow 데이터 업데이트
-            currentMember = member
-
-            // InfoWindow 열기
-            infoWindow?.open(with: marker)
-
-            print("ℹ️ [NaverMapView] InfoWindow opened for: \(member.displayName)")
         }
 
         // 이미지 URL 처리 헬퍼 (Frontend imageUtils.ts 로직 반영)

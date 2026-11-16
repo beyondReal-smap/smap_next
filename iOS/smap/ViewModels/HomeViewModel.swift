@@ -265,10 +265,9 @@ class HomeViewModel: ObservableObject {
         return filtered
     }
 
-    /// 홈 화면 "오늘 일정 미리보기" 카드에 노출할 일정.
-    /// 진행 중 1건 우선, 그 다음 가장 가까운 예정 1건. 최대 2건.
-    /// 선택된 멤버가 있으면 해당 멤버 기준 filteredSchedules, 없으면 전체 schedules 중 오늘 기준.
-    var homePreviewSchedules: [SmapSchedule] {
+    /// 홈 시트 "그날 일정" — 멤버를 골랐으면 그 멤버의 일정, 아니면(전체 보기) 그룹 전체 일정. 시작 시각 순.
+    /// (이전 "오늘 일정 미리보기" 카드를 시트가 대신하면서 날짜를 골라 볼 수 있게 했다.)
+    var sheetSchedules: [SmapSchedule] {
         let pool: [SmapSchedule]
         if members.contains(where: { $0.isSelected }) {
             pool = filteredSchedules
@@ -286,14 +285,15 @@ class HomeViewModel: ObservableObject {
                 return sDateStr.hasPrefix(targetDateStr)
             }
         }
+        return pool.sorted { ($0.date ?? "") < ($1.date ?? "") }
+    }
 
-        let ongoing = pool.first(where: { $0.status == .ongoing })
-        let nextUpcoming = pool
-            .filter { $0.status == .upcoming }
-            .sorted(by: { ($0.date ?? "") < ($1.date ?? "") })
-            .first
-
-        return [ongoing, nextUpcoming].compactMap { $0 }
+    /// 시트 "전체" — 선택을 풀어 모든 멤버를 본다(지도 맞춤은 화면이 한다).
+    func showAllMembers() {
+        HapticManager.shared.selection()
+        for i in 0..<members.count {
+            members[i].isSelected = false
+        }
     }
 
     func selectMember(_ member: SmapGroupMember) {

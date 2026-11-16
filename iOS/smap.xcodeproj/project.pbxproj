@@ -19,6 +19,7 @@
 		06C6150BCC131DA8C2455FF0 /* DataMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F2025C78F84D972ACF396A1 /* DataMigration.swift */; };
 		0982335F7C2A76E6FD160431 /* HapticManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01EE0A92648F52B4CE24F7A0 /* HapticManager.swift */; };
 		0C152DD71348FF6D4E12A024 /* MotionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC3CB5B6A915CFD9F08A1CB9 /* MotionManager.swift */; };
+		0E509A777E022FEA5F1DCCC9 /* SMAPStrips.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BFC3E41686EF85484CDAB8C /* SMAPStrips.swift */; };
 		0F10BD14511AFFF3CBE017E5 /* Pods_smap.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 37FC506E4A26E11B0DA96829 /* Pods_smap.framework */; };
 		121DBEF14ECA1DC5F374FDC0 /* SecureFocusField.swift in Sources */ = {isa = PBXBuildFile; fileRef = E77034C856577C9BCFC39234 /* SecureFocusField.swift */; };
 		16ADB0E846CAB0CAE24A1698 /* GroupViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6482EE75F8FB57368F9AA596 /* GroupViewModel.swift */; };
@@ -55,6 +56,7 @@
 		59DB9DD0F3A270AEA22BB449 /* AccountSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46B7D7E7D275F79294EC37E3 /* AccountSettingsView.swift */; };
 		5A74E8C3F2A6BA0C9EC14C2C /* NotificationListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D2471D9A3E0A1AAC834D160 /* NotificationListView.swift */; };
 		5AD260155CB7F6B537BA7E93 /* LocationDetailPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB5E8B6769F63DAECC4C6BFB /* LocationDetailPanel.swift */; };
+		5D576E1F2BD8EAF23C033E72 /* HomeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17E8FD57469BB5B76B0BCB52 /* HomeSheet.swift */; };
 		5DC0069666700DE0509800A2 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65CCDED888D125A36702CFCA /* RootView.swift */; };
 		5E6CED4CBEC392A0A1DA64FC /* MockURLProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6E857FB9A66B645DD27275D /* MockURLProtocol.swift */; };
 		64D5ABCC8F580161AD519B4D /* AtoZ-9Black.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 9884D870DEA517AA321EBA1C /* AtoZ-9Black.ttf */; };
@@ -67,7 +69,9 @@
 		72EFE7D7C2BEF97C98AFDB18 /* NoticeListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DA26B7F0F63EE8D0E580F20 /* NoticeListView.swift */; };
 		74DE4DEA68BBA71092E9E720 /* ImagePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FB0289DFA9DB5160EC07275 /* ImagePicker.swift */; };
 		768B136F94EB733BF7C8EC3F /* NewDMView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02A121223B384FDDCC28FE19 /* NewDMView.swift */; };
+		7699790BF91C941027D9F54A /* SMAPNavy.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE09EDFC5F2293E99FF59D2D /* SMAPNavy.swift */; };
 		78D094598CC1522B6A0A53E2 /* MyPlaceModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EC6364864F595F85F7C7559 /* MyPlaceModels.swift */; };
+		79091396AD0916B823C9B8CE /* SMAPListRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAB1BAECE90E67C177242FC1 /* SMAPListRow.swift */; };
 		7B3BDD67E349F3AE195AEAE0 /* SMAPButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = F49C868EA905A5BA43A716DF /* SMAPButton.swift */; };
 		7B60EB6E35CDFA4AA56FCDD4 /* ActivityIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 039D288D49E05BAF86EFB1AC /* ActivityIndicator.swift */; };
 		7D54FC619E5AE0816B42F335 /* SMAPSnackBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16F34A3F1A8B143430D99E8A /* SMAPSnackBar.swift */; };
@@ -105,6 +109,7 @@
 		B4DC719F3B3F3F3377E9FB81 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DC1B67D2BBBF002A1F25E204 /* Foundation.framework */; };
 		B85D4559B18C1D8AFD42FDC7 /* SMAPTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24ADB4DD2C3D90F283A452AB /* SMAPTextField.swift */; };
 		BA097A12C2B77A5FE2D232AD /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD736AA6B14C18777AC6D3A6 /* NotificationService.swift */; };
+		BE78D0ABD770F848557CAD45 /* SMAPMapSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 641B6EE942B3F115EBF8174C /* SMAPMapSheet.swift */; };
 		BF971E8194AEAEF92AFAAFD5 /* HomeHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A08A0EC8330B484B756CE472 /* HomeHeaderView.swift */; };
 		CC18AF767D32BCCBA0CBE488 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFB7BBAEEC4C8ADD1A97EBA2 /* SidebarView.swift */; };
 		CF30A8F7B5222FBC7B041BFE /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 846D82AE62D1FF1FAFD3B490 /* KeychainManager.swift */; };
@@ -160,6 +165,7 @@
 		0F2025C78F84D972ACF396A1 /* DataMigration.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DataMigration.swift; sourceTree = "<group>"; };
 		1543F20C479DC08F43430167 /* Pods-smapTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-smapTests.release.xcconfig"; path = "Target Support Files/Pods-smapTests/Pods-smapTests.release.xcconfig"; sourceTree = "<group>"; };
 		16F34A3F1A8B143430D99E8A /* SMAPSnackBar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SMAPSnackBar.swift; sourceTree = "<group>"; };
+		17E8FD57469BB5B76B0BCB52 /* HomeSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeSheet.swift; sourceTree = "<group>"; };
 		18493739DEB5E311957CE00E /* SMAPLoadingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SMAPLoadingView.swift; sourceTree = "<group>"; };
 		18CD7CDF0285FD87D76EFBBB /* ActivityLogView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ActivityLogView.swift; sourceTree = "<group>"; };
 		2307FD89019DFF34290AFE02 /* AtoZ-8ExtraBold.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; path = "AtoZ-8ExtraBold.ttf"; sourceTree = "<group>"; };
@@ -192,6 +198,7 @@
 		62E3750BD06FB7857AEC15A6 /* smapTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = smapTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		6377EF3F7BCBFF01B8C7D18F /* ChangePasswordView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChangePasswordView.swift; sourceTree = "<group>"; };
 		637AE176A6DB0408B597EC27 /* ScheduleModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScheduleModels.swift; sourceTree = "<group>"; };
+		641B6EE942B3F115EBF8174C /* SMAPMapSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SMAPMapSheet.swift; sourceTree = "<group>"; };
 		6482EE75F8FB57368F9AA596 /* GroupViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GroupViewModel.swift; sourceTree = "<group>"; };
 		65320A8BB93E6B422E7E9185 /* NetworkErrorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NetworkErrorTests.swift; sourceTree = "<group>"; };
 		65CCDED888D125A36702CFCA /* RootView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
@@ -210,6 +217,7 @@
 		846D82AE62D1FF1FAFD3B490 /* KeychainManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeychainManager.swift; sourceTree = "<group>"; };
 		84E5F9E1CE2882E5F246A7EC /* UserDefaultsManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UserDefaultsManager.swift; sourceTree = "<group>"; };
 		88078C8FA9DBFABE5F2479B0 /* ChatListView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatListView.swift; sourceTree = "<group>"; };
+		8BFC3E41686EF85484CDAB8C /* SMAPStrips.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SMAPStrips.swift; sourceTree = "<group>"; };
 		8C2A2A8AA712C374E7722E5A /* ChatRoomView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatRoomView.swift; sourceTree = "<group>"; };
 		917653CD5E9DF6A39F3C0D80 /* NoticeService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NoticeService.swift; sourceTree = "<group>"; };
 		94339A4F2B2BE26F002177C1 /* smap.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = smap.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -240,6 +248,7 @@
 		AC62D12FBC527A10551D4FB2 /* GroupService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GroupService.swift; sourceTree = "<group>"; };
 		AD736AA6B14C18777AC6D3A6 /* NotificationService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		AD7A59FABE69C71E3559B181 /* Debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
+		AE09EDFC5F2293E99FF59D2D /* SMAPNavy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SMAPNavy.swift; sourceTree = "<group>"; };
 		AF05EF3AE6A6A4FE43F7AAE5 /* ChatSocketManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatSocketManager.swift; sourceTree = "<group>"; };
 		AFB7BBAEEC4C8ADD1A97EBA2 /* SidebarView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
 		B007D9E14F2E5FF07C33E834 /* AtoZ-7Bold.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; path = "AtoZ-7Bold.ttf"; sourceTree = "<group>"; };
@@ -291,6 +300,7 @@
 		F6010CE12F03E759008B05B7 /* ShareOptionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareOptionsView.swift; sourceTree = "<group>"; };
 		F6E644BC2F04D5A100E1D03E /* LocationSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationSearchView.swift; sourceTree = "<group>"; };
 		F6E644C02F058F8000E1D03E /* AppStyles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStyles.swift; sourceTree = "<group>"; };
+		FAB1BAECE90E67C177242FC1 /* SMAPListRow.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SMAPListRow.swift; sourceTree = "<group>"; };
 		FDD6C6A3EF9EA0213CD10D74 /* CustomAppleSignInButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CustomAppleSignInButton.swift; sourceTree = "<group>"; };
 		FF2E88340B84F50F0999DBAC /* Shared.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -474,6 +484,7 @@
 				A08A0EC8330B484B756CE472 /* HomeHeaderView.swift */,
 				02A0539DC922A7FE78E3CE87 /* NaverMapView.swift */,
 				2207BA873CC3307EEC4E594B /* Components */,
+				17E8FD57469BB5B76B0BCB52 /* HomeSheet.swift */,
 			);
 			name = Home;
 			path = Home;
@@ -734,6 +745,10 @@
 				24ADB4DD2C3D90F283A452AB /* SMAPTextField.swift */,
 				18493739DEB5E311957CE00E /* SMAPLoadingView.swift */,
 				16F34A3F1A8B143430D99E8A /* SMAPSnackBar.swift */,
+				AE09EDFC5F2293E99FF59D2D /* SMAPNavy.swift */,
+				641B6EE942B3F115EBF8174C /* SMAPMapSheet.swift */,
+				FAB1BAECE90E67C177242FC1 /* SMAPListRow.swift */,
+				8BFC3E41686EF85484CDAB8C /* SMAPStrips.swift */,
 			);
 			name = Components;
 			path = Components;
@@ -1133,6 +1148,11 @@
 				949CC8B2DEF6B1FF5061C2B6 /* ChatService.swift in Sources */,
 				69BCB2500EAB3E13D1A1936F /* ChatSocketManager.swift in Sources */,
 				F633FF24ED6730B86128491C /* ChatViewModel.swift in Sources */,
+				7699790BF91C941027D9F54A /* SMAPNavy.swift in Sources */,
+				BE78D0ABD770F848557CAD45 /* SMAPMapSheet.swift in Sources */,
+				79091396AD0916B823C9B8CE /* SMAPListRow.swift in Sources */,
+				0E509A777E022FEA5F1DCCC9 /* SMAPStrips.swift in Sources */,
+				5D576E1F2BD8EAF23C033E72 /* HomeSheet.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
