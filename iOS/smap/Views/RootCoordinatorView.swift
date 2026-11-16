@@ -13,23 +13,18 @@ import SwiftUI
 struct SplashView: View {
     
 
+    // Android 스플래시(values-v31/styles.xml)와 같은 모양 — 밝은 배경(#FEF8F9) 가운데 앱 아이콘.
+    // 이전에는 어두운 회색 배경 + 위쪽 1/4 위치라, 흰 런치 화면에서 넘어올 때 색이 확 바뀌고 Android 와도 달랐다.
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                // Background Color #353538
-                Color(red: 53/255, green: 53/255, blue: 56/255)
-                    .ignoresSafeArea()
+        ZStack {
+            SMAPTheme.Color.background
+                .ignoresSafeArea()
 
-                VStack(spacing: 0) {
-                    // App Icon (AppNoBg from Assets)
-                    Image("AppNoBg")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 80, height: 80) // Adjust size as needed
-                        .accessibilityHidden(true)
-                }
-                .position(x: geometry.size.width / 2, y: geometry.size.height * 0.25) // 1/4 Height Position
-            }
+            Image("AppNoBg")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 112, height: 112)
+                .accessibilityHidden(true)
         }
     }
 }
