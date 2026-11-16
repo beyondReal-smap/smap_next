@@ -18,7 +18,6 @@ class HomeViewModel: ObservableObject {
     @Published var selectedDate: Date = Date()
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
-    @Published var isSidebarOpen: Bool = false
     @Published var hasUnreadNotifications: Bool = false
     @Published var showGroupCreationModal: Bool = false
 
