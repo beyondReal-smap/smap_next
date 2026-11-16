@@ -63,12 +63,13 @@ fun MemberStrip(
                     Box(
                         Modifier
                             .size(52.dp)
-                            .then(if (selected) Modifier.border(2.5.dp, colors.primary, CircleShape) else Modifier)
+                            .then(if (selected) Modifier.border(2.5.dp, SmapBrush.navy, CircleShape) else Modifier)
                             .padding(if (selected) 4.5.dp else 0.dp)
-                            .background(colors.surfaceVariant, CircleShape),
+                            // 선택되면 남색으로 채워 "지금 전체를 보고 있다"가 분명히 보이게 한다.
+                            .then(if (selected) Modifier.background(SmapBrush.navy, CircleShape) else Modifier.background(colors.surfaceVariant, CircleShape)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.Outlined.Map, contentDescription = null, tint = colors.onSurfaceVariant)
+                        Icon(Icons.Outlined.Map, contentDescription = null, tint = if (selected) androidx.compose.ui.graphics.Color.White else colors.onSurfaceVariant)
                     }
                 }
             }

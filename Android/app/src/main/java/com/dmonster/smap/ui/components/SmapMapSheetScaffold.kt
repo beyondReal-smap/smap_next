@@ -110,18 +110,32 @@ fun SmapMapSheetScaffold(
     }
 }
 
+/**
+ * 손잡이 — 남색 띠 위 흰 막대. 바로 아래 머리 줄([sheetHeaderBand])과 같은 띠로 이어져
+ * 시트 위쪽이 남색 머리로 보인다(흰 시트만 있을 때는 지도 위에서 밋밋했다).
+ */
 @Composable
 private fun SheetHandle() {
     Box(
         Modifier
             .fillMaxWidth()
+            .background(SmapBrush.navyBand)
             .padding(top = 10.dp, bottom = 6.dp),
         contentAlignment = Alignment.Center,
     ) {
         Box(
             Modifier
                 .size(width = 36.dp, height = 4.dp)
-                .background(MaterialTheme.colorScheme.outline, RoundedCornerShape(2.dp))
+                .background(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.55f), RoundedCornerShape(2.dp))
         )
     }
 }
+
+/** 지도 시트 머리 줄 바탕 — 손잡이 띠에 이어지는 남색 띠. 안의 글자는 흰색·[SmapOnNavyMuted] 로 쓴다. */
+fun Modifier.sheetHeaderBand(): Modifier = this
+    .fillMaxWidth()
+    .background(SmapBrush.navyBand)
+    .padding(bottom = SheetHeaderBandBottom)
+
+/** 머리 띠 아래 여백 — 각 시트의 접힌 높이에 이만큼 더한다. */
+val SheetHeaderBandBottom = 12.dp

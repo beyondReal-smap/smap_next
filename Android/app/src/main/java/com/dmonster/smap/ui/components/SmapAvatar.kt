@@ -56,7 +56,7 @@ fun SmapAvatar(
     Box(
         modifier = modifier
             .size(size)
-            .then(if (selected) Modifier.border(ring, colors.primary, CircleShape) else Modifier)
+            .then(if (selected) Modifier.border(ring, SmapBrush.navy, CircleShape) else Modifier)
             .padding(if (selected) ring + 2.dp else 0.dp)
             .clip(CircleShape)
             .background(colors.primaryContainer),

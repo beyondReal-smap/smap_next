@@ -1,5 +1,8 @@
 package com.dmonster.smap.ui.home
 
+import com.dmonster.smap.ui.components.sheetHeaderBand
+import com.dmonster.smap.ui.components.SmapOnNavyMuted
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -46,7 +49,7 @@ import java.util.Locale
 import java.util.TimeZone
 
 /** 접힌 시트 높이: 손잡이 + 머리 줄 + 멤버 얼굴 줄 */
-val HomeSheetPeekHeight = 172.dp
+val HomeSheetPeekHeight = 184.dp
 
 /**
  * 홈 지도 시트 — 사이드바("멤버 조회")와 지도 위 말풍선을 대신한다.
@@ -73,7 +76,7 @@ fun ColumnScope.HomeSheetContent(
     // 머리 줄
     Row(
         Modifier
-            .fillMaxWidth()
+            .sheetHeaderBand()
             .heightIn(min = 52.dp)
             .padding(start = SmapSpacing.screenHorizontal, end = SmapSpacing.sm),
         verticalAlignment = Alignment.CenterVertically,
@@ -83,7 +86,7 @@ fun ColumnScope.HomeSheetContent(
                 Text(
                     if (selected.mtIdx == currentUserIdx) "${selected.displayName} (나)" else selected.displayName,
                     style = SmapText.headline,
-                    color = colors.onSurface,
+                    color = Color.White,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.semantics { heading() },
@@ -91,21 +94,21 @@ fun ColumnScope.HomeSheetContent(
                 Text(
                     memberStatusLine(selected) ?: "아직 위치 정보가 없어요",
                     style = SmapText.caption,
-                    color = colors.onSurfaceVariant,
+                    color = SmapOnNavyMuted,
                     maxLines = 1,
                 )
             } else {
                 Text(
                     "멤버 ${members.size}명",
                     style = SmapText.headline,
-                    color = colors.onSurface,
+                    color = Color.White,
                     modifier = Modifier.semantics { heading() },
                 )
-                Text("얼굴을 누르면 그 멤버 위치로 이동해요", style = SmapText.caption, color = colors.onSurfaceVariant)
+                Text("얼굴을 누르면 그 멤버 위치로 이동해요", style = SmapText.caption, color = SmapOnNavyMuted)
             }
         }
         if (selected != null) {
-            TextButton(onClick = onShowAll) { Text("전체 보기", style = SmapText.captionBold) }
+            TextButton(onClick = onShowAll) { Text("전체 보기", style = SmapText.captionBold, color = Color.White) }
         }
     }
 

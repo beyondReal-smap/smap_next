@@ -46,7 +46,13 @@ object SmapBrush {
     val NavyBright = Color(0xFF3D55EA)
 
     val navy: Brush = Brush.linearGradient(listOf(NavyDeep, Navy, NavyBright))
+
+    /** 가로 방향만 변하는 그라데이션 — 시트 손잡이 띠와 머리 줄처럼 위아래로 붙는 두 칸이 한 띠로 이어 보이게. */
+    val navyBand: Brush = Brush.horizontalGradient(listOf(NavyDeep, Navy, NavyBright))
 }
+
+/** 남색 바탕 위 보조 글자색 */
+val SmapOnNavyMuted = Color.White.copy(alpha = 0.72f)
 
 /** 남색 카드 위 흰 글자 단계 */
 private val HeroMuted = Color.White.copy(alpha = 0.72f)

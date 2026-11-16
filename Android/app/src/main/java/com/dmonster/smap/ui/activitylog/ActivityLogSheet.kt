@@ -1,5 +1,8 @@
 package com.dmonster.smap.ui.activitylog
 
+import com.dmonster.smap.ui.components.sheetHeaderBand
+import com.dmonster.smap.ui.components.SmapOnNavyMuted
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
 import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.foundation.layout.Arrangement
@@ -43,7 +46,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-val ActivityLogSheetPeekHeight = 174.dp
+val ActivityLogSheetPeekHeight = 186.dp
 
 /** 경로 따라가기 줄이 있을 때 접힌 시트에 더하는 높이. */
 val ActivityLogRouteControlHeight = 76.dp
@@ -86,7 +89,7 @@ fun ColumnScope.ActivityLogSheetContent(
 
     Row(
         Modifier
-            .fillMaxWidth()
+            .sheetHeaderBand()
             .heightIn(min = 52.dp)
             .padding(horizontal = SmapSpacing.screenHorizontal),
         verticalAlignment = Alignment.CenterVertically,
@@ -95,7 +98,7 @@ fun ColumnScope.ActivityLogSheetContent(
             Text(
                 "$name · $dateText",
                 style = SmapText.headline,
-                color = colors.onSurface,
+                color = Color.White,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.semantics { heading() },
@@ -109,7 +112,7 @@ fun ColumnScope.ActivityLogSheetContent(
                     else -> "${summary.distanceFormatted} 이동 · ${summary.timeFormatted} · ${summary.stepsFormatted}"
                 },
                 style = SmapText.caption,
-                color = colors.onSurfaceVariant,
+                color = SmapOnNavyMuted,
                 maxLines = 1,
             )
         }

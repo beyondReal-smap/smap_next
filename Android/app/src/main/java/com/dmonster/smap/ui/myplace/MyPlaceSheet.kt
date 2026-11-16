@@ -1,5 +1,8 @@
 package com.dmonster.smap.ui.myplace
 
+import com.dmonster.smap.ui.components.sheetHeaderBand
+import com.dmonster.smap.ui.components.SmapOnNavyMuted
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,7 +46,7 @@ import com.dmonster.smap.ui.components.SmapSection
 import com.dmonster.smap.ui.theme.SmapSpacing
 import com.dmonster.smap.ui.theme.SmapText
 
-val MyPlaceSheetPeekHeight = 172.dp
+val MyPlaceSheetPeekHeight = 184.dp
 
 /**
  * 내장소 지도 시트 — 사이드바("장소 관리")를 대신한다.
@@ -73,7 +76,7 @@ fun ColumnScope.MyPlaceSheetContent(
 
     Row(
         Modifier
-            .fillMaxWidth()
+            .sheetHeaderBand()
             .heightIn(min = 52.dp)
             .padding(start = SmapSpacing.screenHorizontal, end = SmapSpacing.md),
         verticalAlignment = Alignment.CenterVertically,
@@ -82,7 +85,7 @@ fun ColumnScope.MyPlaceSheetContent(
             Text(
                 "$owner 장소",
                 style = SmapText.headline,
-                color = colors.onSurface,
+                color = Color.White,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.semantics { heading() },
@@ -92,7 +95,7 @@ fun ColumnScope.MyPlaceSheetContent(
                 else if (locations.isEmpty()) "아직 등록한 장소가 없어요"
                 else "${locations.size}곳 · 도착하면 알려 드려요",
                 style = SmapText.caption,
-                color = colors.onSurfaceVariant,
+                color = SmapOnNavyMuted,
             )
         }
         if (canAddLocation) {
@@ -100,7 +103,8 @@ fun ColumnScope.MyPlaceSheetContent(
                 onClick = onAddClick,
                 shape = androidx.compose.foundation.shape.CircleShape,
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = colors.primary),
+                // 남색 띠 위에서는 흰 버튼 + 남색 글자로 뒤집어 대비를 낸다.
+                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = colors.primary),
                 modifier = Modifier.height(40.dp),
             ) {
                 Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(18.dp))

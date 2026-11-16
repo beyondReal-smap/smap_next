@@ -92,7 +92,7 @@ private fun DateChip(item: DateChipItem, isSelected: Boolean, isToday: Boolean, 
         Modifier
             .width(48.dp)
             .clip(RoundedCornerShape(14.dp))
-            .background(if (isSelected) colors.primary else colors.surfaceVariant)
+            .then(if (isSelected) Modifier.background(SmapBrush.navy) else Modifier.background(colors.surfaceVariant))
             .selectable(selected = isSelected, onClick = onClick, role = Role.Tab)
             .semantics(mergeDescendants = true) { contentDescription = a11y },
         horizontalAlignment = Alignment.CenterHorizontally,
