@@ -316,8 +316,7 @@ func (r *GroupScheduleManageRepository) BeginTx() (*sql.Tx, error) {
 }
 
 // InsertSchedule은 Python create_group_schedule의 raw INSERT를 이식한다(named→positional, pool 실행).
-// ⚠️ sst_alram이 'N'(문자열 기본값)으로 들어오면 MySQL strict가 tinyint에 1366을 던져 err가 전파되며,
-// 이는 Python의 "sst_alram 미제공 시 500"을 status 수준에서 충실 재현한다(드라이버별 에러 문자열은 상이).
+// sst_alram 이 요청에 없을 때의 기본값은 서비스(gsmCreateAlram)에서 0 으로 채운다(이전 'N' 은 1366 → 500).
 func (r *GroupScheduleManageRepository) InsertSchedule(p map[string]interface{}) (int64, error) {
 	ex, err := r.db.DB()
 	if err != nil {

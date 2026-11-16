@@ -538,7 +538,7 @@ func gsmBuildScheduleParams(groupID, targetMemberID, targetSgdtIdx int, body map
 		repeatJSONV = ""
 	}
 	alarmVal := gsmComputeAlarm(body, sdate)
-	// INSERT 파라미터(Python insert_params 그대로 — slt_idx_t=sst_location_add, sst_alram 기본 'N' 버그 포함)
+	// INSERT 파라미터(Python insert_params 이식 — slt_idx_t=sst_location_add). sst_alram 은 gsmCreateAlram 참고.
 	params := map[string]interface{}{
 		"mt_idx":                 targetMemberID,
 		"sst_title":              finalTitle,
@@ -556,7 +556,7 @@ func gsmBuildScheduleParams(groupID, targetMemberID, targetSgdtIdx int, body map
 		"sst_location_alarm":     gsmGetOr(body, "sst_location_alarm", "4"),
 		"sst_memo":               body["sst_memo"],
 		"sst_supplies":           body["sst_supplies"],
-		"sst_alram":              gsmGetOr(body, "sst_alram", "N"),
+		"sst_alram":              gsmCreateAlram(body),
 		"sst_alram_t":            body["sst_alram_t"],
 		"sst_schedule_alarm_chk": gsmGetOr(body, "sst_schedule_alarm_chk", "N"),
 		"sst_pick_type":          body["sst_pick_type"],
@@ -878,8 +878,10 @@ func (s *GroupScheduleManageService) updateSingleSchedule(scheduleID, groupID in
 		{"sst_location_add", body["sst_location_add"]},
 		{"sst_location_lat", body["sst_location_lat"]},
 		{"sst_location_long", body["sst_location_long"]},
-		{"sst_location_alarm", gsmGetOr(body, "sst_location_alarm", "N")}, // ⚠️ POST는 '4', UPDATE는 'N'
-		{"sst_alram", gsmGetOr(body, "sst_alram", "N")},
+		// 숫자 칸 두 개는 요청에 없으면 건드리지 않는다(nil → SET 에서 빠짐). 이전에는 'N' 으로 채워
+		// tinyint 에 문자열을 넣다 1366 → 500 이 났다(iOS 는 값이 없으면 키를 아예 보내지 않는다).
+		{"sst_location_alarm", body["sst_location_alarm"]},
+		{"sst_alram", body["sst_alram"]},
 		{"sst_alram_t", body["sst_alram_t"]},
 		{"sst_schedule_alarm_chk", gsmGetOr(body, "sst_schedule_alarm_chk", "N")},
 		{"sst_pick_type", body["sst_pick_type"]},
@@ -1401,6 +1403,13 @@ func gsmGetOr(m map[string]interface{}, key string, def interface{}) interface{}
 		return v
 	}
 	return def
+}
+
+// gsmCreateAlram은 새 일정의 sst_alram(알림 분, 숫자 칸) 값이다. 요청에 없으면 0(알림 없음).
+// Python 원본은 'N' 을 기본값으로 넣어 MySQL strict 가 1366 을 던졌다 — "알림 없음"으로 만든 iOS 일정이 500 으로 저장되지 않았다.
+// Android 는 알림이 없을 때 0 을 보내므로 같은 값으로 맞춘다.
+func gsmCreateAlram(body map[string]interface{}) interface{} {
+	return gsmGetOr(body, "sst_alram", 0)
 }
 
 // gsmEqY는 *string == "Y".
