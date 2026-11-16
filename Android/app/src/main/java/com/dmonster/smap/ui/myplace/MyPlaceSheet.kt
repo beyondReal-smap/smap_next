@@ -1,5 +1,6 @@
 package com.dmonster.smap.ui.myplace
 
+import com.dmonster.smap.ui.components.SheetBandButton
 import com.dmonster.smap.ui.components.SheetHeaderBandGap
 import com.dmonster.smap.ui.components.SheetHeaderMinHeight
 import com.dmonster.smap.ui.components.sheetHeaderBand
@@ -24,8 +25,6 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.NotificationsOff
 import androidx.compose.material.icons.outlined.Place
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -101,18 +100,7 @@ fun ColumnScope.MyPlaceSheetContent(
             )
         }
         if (canAddLocation) {
-            Button(
-                onClick = onAddClick,
-                shape = androidx.compose.foundation.shape.CircleShape,
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                // 남색 띠 위에서는 흰 버튼 + 남색 글자로 뒤집어 대비를 낸다.
-                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = colors.primary),
-                modifier = Modifier.height(40.dp),
-            ) {
-                Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.size(4.dp))
-                Text("장소 추가", style = SmapText.captionBold)
-            }
+            SheetBandButton(text = "장소 추가", icon = Icons.Outlined.Add, onClick = onAddClick)
         }
     }
 

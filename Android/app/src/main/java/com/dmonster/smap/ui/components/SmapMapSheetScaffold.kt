@@ -1,5 +1,7 @@
 package com.dmonster.smap.ui.components
 
+import com.dmonster.smap.ui.theme.SmapText
+import androidx.compose.material3.Text
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -145,3 +147,30 @@ val SheetHeaderMinHeight = 48.dp
 
 /** 남색 띠와 그 아래 첫 줄(멤버 얼굴 줄·날짜 줄) 사이 흰 여백 — 띠에 붙어 답답해 보이지 않게. */
 val SheetHeaderBandGap = 14.dp
+
+/**
+ * 남색 머리 띠 위 주 동작 버튼 — 흰 알약 + 남색 글자·아이콘.
+ * 내장소 "장소 추가"와 홈 "전체 보기"가 같은 모양을 쓰도록 한곳에 둔다(글자 버튼은 띠 위에서 눈에 띄지 않았다).
+ */
+@Composable
+fun SheetBandButton(
+    text: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    androidx.compose.material3.Button(
+        onClick = onClick,
+        shape = androidx.compose.foundation.shape.CircleShape,
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+            containerColor = androidx.compose.ui.graphics.Color.White,
+            contentColor = MaterialTheme.colorScheme.primary,
+        ),
+        modifier = modifier.height(40.dp),
+    ) {
+        androidx.compose.material3.Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
+        androidx.compose.foundation.layout.Spacer(Modifier.size(4.dp))
+        Text(text, style = SmapText.captionBold)
+    }
+}

@@ -1,5 +1,7 @@
 package com.dmonster.smap.ui.home
 
+import androidx.compose.material.icons.outlined.Map
+import com.dmonster.smap.ui.components.SheetBandButton
 import com.dmonster.smap.ui.components.SheetHeaderBandGap
 import com.dmonster.smap.ui.components.SheetHeaderMinHeight
 import com.dmonster.smap.ui.components.sheetHeaderBand
@@ -24,7 +26,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.EventAvailable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -110,7 +111,7 @@ fun ColumnScope.HomeSheetContent(
             }
         }
         if (selected != null) {
-            TextButton(onClick = onShowAll) { Text("전체 보기", style = SmapText.captionBold, color = Color.White) }
+            SheetBandButton(text = "전체 보기", icon = Icons.Outlined.Map, onClick = onShowAll)
         }
     }
 

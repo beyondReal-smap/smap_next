@@ -1,5 +1,7 @@
 package com.dmonster.smap.ui.navigation
 
+import androidx.compose.material.icons.outlined.People
+import androidx.compose.material.icons.filled.People
 import android.view.HapticFeedbackConstants
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
@@ -53,7 +55,7 @@ sealed class TabItem(
     val unselectedIcon: ImageVector
 ) {
     data object Home : TabItem("홈", Icons.Filled.Home, Icons.Outlined.Home)
-    data object Group : TabItem("그룹", Icons.Filled.Groups, Icons.Outlined.Groups)
+    data object Group : TabItem("그룹", Icons.Filled.People, Icons.Outlined.People)
     data object Schedule : TabItem("일정", Icons.Filled.CalendarMonth, Icons.Outlined.CalendarMonth)
     data object MyPlace : TabItem("내장소", Icons.Filled.LocationOn, Icons.Outlined.Place)
     data object ActivityLog : TabItem("활동 로그", Icons.Filled.History, Icons.Outlined.History)
