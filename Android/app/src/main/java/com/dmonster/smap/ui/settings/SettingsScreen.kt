@@ -1,5 +1,19 @@
 package com.dmonster.smap.ui.settings
 
+import com.dmonster.smap.data.model.SMAPUser
+import com.dmonster.smap.ui.theme.SmapText
+import com.dmonster.smap.ui.theme.SmapSpacing
+import com.dmonster.smap.ui.components.SmapOnNavyMuted
+import com.dmonster.smap.ui.components.SmapAvatar
+import com.dmonster.smap.ui.components.HeroHeading
+import com.dmonster.smap.ui.components.SmapHeroCard
+import com.dmonster.smap.ui.components.SmapRowDivider
+import com.dmonster.smap.ui.components.SmapRowIcon
+import com.dmonster.smap.ui.components.SmapListRow
+import com.dmonster.smap.ui.components.SmapSection
+import com.dmonster.smap.ui.components.SmapTopBar
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.activity.compose.BackHandler
 
 import androidx.compose.animation.*
@@ -95,99 +109,63 @@ fun SettingsScreen(
                 animationSpec = tween(300)
             )
         ) {
-            Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
-                // Header - Custom Pill-style Back Button
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 20.dp)
-                ) {
-                    Surface(
-                        onClick = onClose,
-                        shape = RoundedCornerShape(24.dp),
-                        color = Color.White,
-                        shadowElevation = 2.dp,
-                        modifier = Modifier.height(44.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                                contentDescription = "뒤로",
-                                tint = Color.Black,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Text(
-                                text = "홈",
-                                fontFamily = SuiteFont,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 17.sp,
-                                color = Color.Black
-                            )
-                        }
-                    }
-                }
-
+            // 37단계 남색 강조 — 설정 첫 화면도 다른 탭과 같은 언어로: 위에 남색 프로필 카드,
+            // 아래는 "구역 제목 + 흰 묶음" 행. 이전에는 메뉴마다 하늘·보라·분홍·주황 아이콘이라 산만했다.
+            val user by viewModel.user.collectAsState()
+            val haptics = rememberSmapHaptics()
+            fun open(action: () -> Unit) { haptics.light(); action() }
+            Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                SmapTopBar(title = "설정", onBack = onClose)
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(24.dp)
+                        .padding(horizontal = SmapSpacing.md),
+                    verticalArrangement = Arrangement.spacedBy(SmapSpacing.lg)
                 ) {
-                    // Menu Sections - Exact match with iOS screenshot
-                    SettingsMenuSection(title = "계정 관리") {
-                        SettingsMenuItem(
-                            icon = Icons.Default.Person,
-                            iconColor = SettingsColors.AccountIcon,
-                            iconBg = SettingsColors.AccountBg,
-                            title = "계정설정",
-                            onClick = { isAccountSettingsVisible = true }
-                        )
-                        HorizontalDivider(color = SettingsColors.Divider, thickness = 1.dp, modifier = Modifier.padding(start = 56.dp))
-                        SettingsMenuItem(
-                            icon = Icons.Default.WorkspacePremium,
-                            iconColor = BrandColors.Primary,
-                            iconBg = SettingsColors.AccountBg,
+                    Spacer(Modifier.height(SmapSpacing.xs))
+                    SettingsProfileHero(user = user, onClick = { open { isAccountSettingsVisible = true } })
+
+                    SmapSection(title = "계정 관리") {
+                        SmapListRow(title = "계정설정", leading = { SmapRowIcon(Icons.Default.Person) }, trailing = { SettingsChevron() }, onClick = { open { isAccountSettingsVisible = true } })
+                        SmapRowDivider()
+                        SmapListRow(
                             title = "SMAP 프리미엄",
-                            onClick = { GlobalEventBus.tryEmit(GlobalEvent.OpenSubscriptionScreen) }
+                            leading = { SmapRowIcon(Icons.Default.WorkspacePremium, emphasized = true) },
+                            trailing = { SettingsChevron() },
+                            onClick = { open { GlobalEventBus.tryEmit(GlobalEvent.OpenSubscriptionScreen) } }
                         )
                     }
 
-                    SettingsMenuSection(title = "약관 & 정책") {
-                        SettingsMenuItem(icon = Icons.Default.Description, iconColor = SettingsColors.TermsServiceIcon, iconBg = SettingsColors.TermsServiceBg, title = "서비스 이용약관", onClick = { selectedTermsScreen = "service" })
-                        HorizontalDivider(color = SettingsColors.Divider, thickness = 1.dp, modifier = Modifier.padding(start = 56.dp))
-                        SettingsMenuItem(icon = Icons.Default.Shield, iconColor = SettingsColors.TermsPrivacyIcon, iconBg = SettingsColors.TermsPrivacyBg, title = "개인정보 처리방침", onClick = { selectedTermsScreen = "privacy" })
-                        HorizontalDivider(color = SettingsColors.Divider, thickness = 1.dp, modifier = Modifier.padding(start = 56.dp))
-                        SettingsMenuItem(icon = Icons.Default.NearMe, iconColor = SettingsColors.TermsLocationIcon, iconBg = SettingsColors.TermsLocationBg, title = "위치기반서비스 이용약관", onClick = { selectedTermsScreen = "location" })
-                        HorizontalDivider(color = SettingsColors.Divider, thickness = 1.dp, modifier = Modifier.padding(start = 56.dp))
-                        SettingsMenuItem(icon = Icons.Default.Star, iconColor = SettingsColors.TermsMarketingIcon, iconBg = SettingsColors.TermsMarketingBg, title = "마케팅 정보 수집 및 이용 동의", onClick = { selectedTermsScreen = "marketing" })
-                        HorizontalDivider(color = SettingsColors.Divider, thickness = 1.dp, modifier = Modifier.padding(start = 56.dp))
-                        SettingsMenuItem(icon = Icons.Default.Groups, iconColor = SettingsColors.TermsThirdpartyIcon, iconBg = SettingsColors.TermsThirdpartyBg, title = "개인정보 제3자 제공 동의", onClick = { selectedTermsScreen = "thirdparty" })
+                    SmapSection(title = "약관 & 정책") {
+                        SmapListRow(title = "서비스 이용약관", leading = { SmapRowIcon(Icons.Default.Description) }, trailing = { SettingsChevron() }, onClick = { open { selectedTermsScreen = "service" } })
+                        SmapRowDivider()
+                        SmapListRow(title = "개인정보 처리방침", leading = { SmapRowIcon(Icons.Default.Shield) }, trailing = { SettingsChevron() }, onClick = { open { selectedTermsScreen = "privacy" } })
+                        SmapRowDivider()
+                        SmapListRow(title = "위치기반서비스 이용약관", leading = { SmapRowIcon(Icons.Default.NearMe) }, trailing = { SettingsChevron() }, onClick = { open { selectedTermsScreen = "location" } })
+                        SmapRowDivider()
+                        SmapListRow(title = "마케팅 정보 수집 및 이용 동의", leading = { SmapRowIcon(Icons.Default.Star) }, trailing = { SettingsChevron() }, onClick = { open { selectedTermsScreen = "marketing" } })
+                        SmapRowDivider()
+                        SmapListRow(title = "개인정보 제3자 제공 동의", leading = { SmapRowIcon(Icons.Default.Groups) }, trailing = { SettingsChevron() }, onClick = { open { selectedTermsScreen = "thirdparty" } })
                     }
 
-                    SettingsMenuSection(title = "고객 지원") {
-                        SettingsMenuItem(icon = Icons.AutoMirrored.Filled.MenuBook, iconColor = SettingsColors.SupportGuideIcon, iconBg = SettingsColors.SupportGuideBg, title = "사용 가이드", onClick = { isUserGuideVisible = true })
-                        HorizontalDivider(color = SettingsColors.Divider, thickness = 1.dp, modifier = Modifier.padding(start = 56.dp))
-                        SettingsMenuItem(icon = Icons.Default.Email, iconColor = SettingsColors.SupportInquiryIcon, iconBg = SettingsColors.SupportInquiryBg, title = "1:1 문의", onClick = { isInquiryVisible = true })
-                        HorizontalDivider(color = SettingsColors.Divider, thickness = 1.dp, modifier = Modifier.padding(start = 56.dp))
-                        SettingsMenuItem(icon = Icons.Default.Notifications, iconColor = SettingsColors.SupportNoticeIcon, iconBg = SettingsColors.SupportNoticeBg, title = "공지사항", onClick = { isNoticeListVisible = true })
+                    SmapSection(title = "고객 지원") {
+                        SmapListRow(title = "사용 가이드", leading = { SmapRowIcon(Icons.AutoMirrored.Filled.MenuBook) }, trailing = { SettingsChevron() }, onClick = { open { isUserGuideVisible = true } })
+                        SmapRowDivider()
+                        SmapListRow(title = "1:1 문의", leading = { SmapRowIcon(Icons.Default.Email) }, trailing = { SettingsChevron() }, onClick = { open { isInquiryVisible = true } })
+                        SmapRowDivider()
+                        SmapListRow(title = "공지사항", leading = { SmapRowIcon(Icons.Default.Notifications) }, trailing = { SettingsChevron() }, onClick = { open { isNoticeListVisible = true } })
                     }
-                    
-                    // Version Info
+
                     Column(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = SmapSpacing.lg),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Text("SMAP", fontFamily = SuiteFont, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color.Gray)
-                        Text("버전 ${BuildConfig.VERSION_NAME}", fontFamily = SuiteFont, fontSize = 12.sp, color = Color.Gray.copy(alpha = 0.8f))
+                        Text("SMAP", style = SmapText.captionBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("버전 ${BuildConfig.VERSION_NAME}", style = SmapText.captionSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    
-                    Spacer(modifier = Modifier.height(40.dp))
+                    Spacer(modifier = Modifier.height(SmapSpacing.xl))
                 }
             }
         }
@@ -392,91 +370,34 @@ fun ProfileSummaryCard(
     }
 }
 
+/**
+ * 설정 맨 위 남색 프로필 카드 — 누르면 계정설정. 사진이 없으면 이름 첫 글자 원.
+ */
 @Composable
-fun SettingsMenuSection(
-    title: String,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Text(
-                text = title,
-                fontFamily = SuiteFont,
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp, // Slightly smaller
-                color = Color.Black
-            )
-            HorizontalDivider(
-                modifier = Modifier.weight(1f),
-                thickness = 0.5.dp, // Thinner divider
-                color = Color.Black.copy(alpha = 0.05f)
-            )
-        }
-        
-        Surface(
-            color = Color.White,
-            shape = RoundedCornerShape(28.dp), // More rounded
-            modifier = Modifier.fillMaxWidth(),
-            shadowElevation = 0.dp // Usually flat in iOS with subtle border or just background contrast
-        ) {
-            Column(content = content)
+private fun SettingsProfileHero(user: SMAPUser?, onClick: () -> Unit) {
+    val name = user?.mtNickname?.takeIf { it.isNotBlank() } ?: user?.mtName?.takeIf { it.isNotBlank() } ?: "회원"
+    SmapHeroCard(
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .clickable(onClickLabel = "계정설정 열기", role = Role.Button, onClick = onClick)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier
+                    .size(60.dp)
+                    .background(Color.White.copy(alpha = 0.22f), CircleShape)
+                    .padding(3.dp)
+            ) { SmapAvatar(name = name, imagePath = user?.mtFile1, size = 54.dp) }
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                HeroHeading(eyebrow = "내 계정", title = name, subtitle = user?.mtEmail?.takeIf { it.isNotBlank() })
+            }
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = SmapOnNavyMuted)
         }
     }
 }
 
 @Composable
-fun SettingsMenuItem(
-    icon: ImageVector,
-    iconColor: Color,
-    iconBg: Color = Color.Transparent,
-    title: String,
-    onClick: () -> Unit
-) {
-    val haptics = rememberSmapHaptics()
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 48.dp)
-            .clickable(role = Role.Button) {
-                haptics.light()
-                onClick()
-            }
-            .semantics(mergeDescendants = true) { contentDescription = title }
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .background(iconBg, RoundedCornerShape(12.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                icon,
-                contentDescription = null, // Row 에서 contentDescription 병합
-                tint = iconColor,
-                modifier = Modifier.size(22.dp)
-            )
-        }
-
-        Text(
-            text = title,
-            fontFamily = SuiteFont,
-            fontWeight = FontWeight.Medium,
-            fontSize = 16.sp,
-            color = SettingsColors.TextBodyPrimary,
-            modifier = Modifier.weight(1f)
-        )
-
-        Icon(
-            Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            contentDescription = null,
-            tint = BrandColors.Border,
-            modifier = Modifier.size(20.dp)
-        )
-    }
+private fun SettingsChevron() {
+    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.outline, modifier = Modifier.size(20.dp))
 }
