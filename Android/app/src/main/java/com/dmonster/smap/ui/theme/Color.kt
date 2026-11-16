@@ -56,46 +56,6 @@ object SemanticColors {
 }
 
 /**
- * iOS SMAPTheme.ScheduleSection — 일정 작성 폼 섹션별 색.
- * 과도한 배경 톤을 피하려고 badge.opacity(0.06) + stroke(0.18) 구조 사용.
- */
-object ScheduleSectionColors {
-    // Badge — 섹션 번호/아이콘 포인트 컬러
-    val BadgeGroup = Color(0xFFDC2626)    // Red 600
-    val BadgeContent = Color(0xFF2563EB)  // Blue 600
-    val BadgeDateTime = Color(0xFF16A34A) // Green 600
-    val BadgeExtra = Color(0xFFD97706)    // Amber 600
-
-    // 배경 — badge 색의 6% alpha (산만함 완화)
-    val BgGroup = BadgeGroup.copy(alpha = 0.06f)
-    val BgContent = BadgeContent.copy(alpha = 0.06f)
-    val BgDateTime = BadgeDateTime.copy(alpha = 0.06f)
-    val BgExtra = BadgeExtra.copy(alpha = 0.06f)
-
-    // 구분선 — 배경이 연해졌으므로 stroke 로 경계 구분
-    val StrokeGroup = BadgeGroup.copy(alpha = 0.18f)
-    val StrokeContent = BadgeContent.copy(alpha = 0.18f)
-    val StrokeDateTime = BadgeDateTime.copy(alpha = 0.18f)
-    val StrokeExtra = BadgeExtra.copy(alpha = 0.18f)
-}
-
-/**
- * 라이트/다크 적응 배경색 — 수동 전환도 가능하도록 쌍으로 제공.
- * 다크 테마가 활성화됐을 때 Color.kt 내부 로직이 아닌 Theme.kt 의 colorScheme 가 담당.
- */
-object AdaptiveColors {
-    // 페이지 기본 배경 (라이트)
-    val PageBackgroundLight = Color(0xFFFAFAFF)
-    val PageBackgroundDark = Color(0xFF16161F)
-    // 카드/표면
-    val SurfaceLight = Color.White
-    val SurfaceDark = Color(0xFF28282F)
-    // 사이드바 전용 배경
-    val SidebarBackgroundLight = Color(0xFFF5F7FA)
-    val SidebarBackgroundDark = Color(0xFF1C1F24)
-}
-
-/**
  * 활동로그 전용 팔레트 — 경로 그라데이션/머물기 시간대/히트맵에서 공용.
  * 하드코딩을 차단해 추후 다크모드·테마 변경 시 한 곳만 수정하면 된다.
  */
