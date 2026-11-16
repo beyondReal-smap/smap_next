@@ -226,6 +226,9 @@ struct MyPlaceMapView: UIViewRepresentable {
             // 기본 초록 마커에 색을 입히면 섞여 청록이 된다 — 검정 마커에 남색을 입힌다.
             pin.iconImage = NMF_MARKER_IMAGE_BLACK
             pin.iconTintColor = UIColor(SMAPTheme.Navy.base)
+            // 기본 크기(약 40pt 폭)는 지도 위에서 커 보였다 — 비율을 유지한 채 약 3/4 로 (Android 와 같은 크기).
+            pin.width = 28
+            pin.height = 37
             pin.zIndex = 2000
             pin.mapView = mapView
             context.coordinator.markers.append(pin)

@@ -252,6 +252,9 @@ fun MyPlaceScreen(
                     state = MarkerState(position = pin),
                     icon = MarkerIcons.BLACK,
                     iconTintColor = tapPinColor,
+                    // 기본 크기(약 38×50dp)는 지도 위에서 커 보였다 — 비율을 유지한 채 약 3/4 로 (iOS 와 같은 크기).
+                    width = 28.dp,
+                    height = 37.dp,
                     captionText = "새 장소",
                     zIndex = 300
                 )
