@@ -60,6 +60,9 @@ struct SMAPHeroCard<Content: View>: View {
                             .position(x: geo.size.width * 0.80, y: geo.size.height * 1.02)
                     }
                 }
+                // 장식 원은 카드 밖으로 삐져나간다. clipShape 는 그림만 자르고 누름 영역은 자르지 않아
+                // 카드 바로 아래 버튼(예: 그룹 탭 "+ 새 그룹")의 누름을 가로챌 수 있다 — 장식은 누름을 받지 않게 한다.
+                .allowsHitTesting(false)
             )
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             .shadow(color: SMAPTheme.Navy.base.opacity(0.28), radius: 10, y: 4)

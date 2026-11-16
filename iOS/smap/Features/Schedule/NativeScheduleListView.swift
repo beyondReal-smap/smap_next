@@ -2,18 +2,25 @@
 // NativeScheduleListView.swift
 // smap
 //
-// Extracted from RootCoordinatorView.swift
+// 일정 탭 (Android ScheduleScreen.kt 이식, 36단계 재설계)
+//
+// 이전: "일정" 큰 제목 + 흰 달력 카드 + 남색 날짜 띠 + 흰 일정 카드(… 메뉴로 수정·삭제), 불러올 때마다 화면 전체를 덮는 스피너.
+// 지금: 지도 탭과 같은 그룹 알약 + 남색 + 버튼 → 남색 달력 카드 → "11월 16일 월요일 · N개" 구역.
+// 일정 행을 누르면 상세 시트(수정·삭제). 아래 탭 막대에 이미 "일정"이 있어 큰 제목은 뺐다.
+// 그룹 알약이 없어 다른 그룹의 일정을 볼 수 없던 것도 고친다.
 //
 
 import SwiftUI
 
 struct NativeScheduleListView: View {
     @StateObject private var viewModel = ScheduleViewModel()
-    @Environment(\.presentationMode) var presentationMode
 
     @State private var showingAddSchedule = false
+    @State private var showingGroupPicker = false
+    @State private var detailSchedule: Schedule?
     @State private var scheduleToEdit: Schedule?
-    @State private var scheduleToEditOption: String? // "this", "future", "all"
+    @State private var scheduleToEditOption: String? // "this", "all"
+    @State private var scheduleToDelete: Schedule?
 
     @State private var showingRecurringActionSheet = false
     @State private var recurringActionType: RecurringActionType = .edit
@@ -23,54 +30,44 @@ struct NativeScheduleListView: View {
         case edit, delete
     }
 
-    
-
     var body: some View {
         NavigationStack {
-            ZStack {
-                SMAPTheme.Adaptive.pageBackground.ignoresSafeArea()
-
-
-                VStack(spacing: 0) {
-                    titleView // "Schedule" Title area
-                        .zIndex(1)
-
-                    // Floating Card Container (Month Nav + Calendar)
-                    VStack(spacing: 0) {
-                        monthNavView
-                        calendarGridView
-                    }
-                    .padding(.bottom, 10)
-                    .background(Color.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 24))
-                    .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 5)
-                    .padding(.horizontal, 16) // Aligned with summary card padding
-                    .zIndex(1)
-
-                    // Scrollable Event List
-                    ScrollView {
-                        VStack(spacing: 20) {
-                            eventListView
-                        }
-                        .padding(.top, 20)
-                        .padding(.bottom, 80)
-                    }
-                    .refreshable {
-                        viewModel.fetchSchedules()
-                    }
+            ScrollView {
+                VStack(alignment: .leading, spacing: SMAPTheme.Spacing.md) {
+                    topControls
+                    ScheduleMonthCalendar(
+                        currentMonth: viewModel.currentMonth,
+                        selectedDate: viewModel.selectedDate,
+                        eventDates: viewModel.datesWithEvents,
+                        onSelect: { viewModel.selectDate($0) },
+                        onPrevious: { viewModel.changeMonth(by: -1) },
+                        onNext: { viewModel.changeMonth(by: 1) },
+                        onToday: { viewModel.goToToday() }
+                    )
+                    daySection
+                        .padding(.top, SMAPTheme.Spacing.sm)
                 }
-
-                if viewModel.isLoading {
-                    ZStack {
-                        Color.black.opacity(0.1).ignoresSafeArea()
-                        ActivityIndicator(style: .large, color: SMAPTheme.Color.primary.uiColor)
-                            .padding()
-                            .background(Color.white)
-                            .cornerRadius(12)
-                    }
-                }
+                .padding(.horizontal, SMAPTheme.Spacing.md)
+                .padding(.bottom, SMAPTheme.Spacing.xl)
             }
+            .background(SMAPTheme.Surface.canvas.ignoresSafeArea())
+            .refreshable { viewModel.fetchSchedules() }
             .toolbar(.hidden, for: .navigationBar)
+            .sheet(isPresented: $showingGroupPicker) {
+                GroupPickerSheet(
+                    groups: viewModel.groups,
+                    selectedGroupId: viewModel.selectedGroup?.sgt_idx,
+                    onSelect: { viewModel.selectGroup($0) }
+                )
+            }
+            .sheet(item: $detailSchedule) { schedule in
+                ScheduleDetailSheet(
+                    schedule: schedule,
+                    canManage: viewModel.canManageSchedule(schedule),
+                    onEdit: { startEdit(schedule) },
+                    onDelete: { startDelete(schedule) }
+                )
+            }
             .sheet(isPresented: $showingAddSchedule) {
                 ScheduleFormView(
                     viewModel: viewModel,
@@ -101,589 +98,447 @@ struct NativeScheduleListView: View {
                 if recurringActionType == .edit {
                     Button("이 일정만 수정") {
                         if let s = selectedScheduleForAction {
-                            scheduleToEdit = s
                             scheduleToEditOption = "this"
+                            scheduleToEdit = s
                         }
                     }
                     Button("모든 반복 일정 수정") {
                         if let s = selectedScheduleForAction {
-                            scheduleToEdit = s
                             scheduleToEditOption = "all"
+                            scheduleToEdit = s
                         }
                     }
                 } else {
                     Button("이 일정만 삭제", role: .destructive) {
-                        if let s = selectedScheduleForAction {
-                            viewModel.deleteSchedule(s, option: "this")
-                        }
+                        if let s = selectedScheduleForAction { viewModel.deleteSchedule(s, option: "this") }
                     }
                     Button("모든 반복 일정 삭제", role: .destructive) {
-                        if let s = selectedScheduleForAction {
-                            viewModel.deleteSchedule(s, option: "all")
-                        }
+                        if let s = selectedScheduleForAction { viewModel.deleteSchedule(s, option: "all") }
                     }
                 }
                 Button("취소", role: .cancel) {}
             } message: {
                 Text("수행할 범위를 선택해 주세요.")
             }
+            // 반복이 아닌 일정 삭제 — 이전에는 … 메뉴에서 누르자마자 확인 없이 지워졌다.
+            .alert(
+                "일정을 삭제할까요?",
+                isPresented: Binding(get: { scheduleToDelete != nil }, set: { if !$0 { scheduleToDelete = nil } }),
+                presenting: scheduleToDelete
+            ) { schedule in
+                Button("취소", role: .cancel) {}
+                Button("삭제", role: .destructive) { viewModel.deleteSchedule(schedule) }
+            } message: { schedule in
+                Text("‘\(schedule.sst_title ?? "제목 없음")’ 일정을 지우면 되돌릴 수 없어요.")
+            }
+            // 불러오기·삭제 실패를 알린다(이전에는 errorMessage 를 화면에 보여 주지 않아 실패가 묻혔다).
+            .alert(
+                "알림",
+                isPresented: Binding(get: { viewModel.errorMessage != nil }, set: { if !$0 { viewModel.errorMessage = nil } })
+            ) {
+                Button("확인", role: .cancel) {}
+            } message: {
+                Text(viewModel.errorMessage ?? "")
+            }
         }
     }
 
-    private var titleView: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("일정")
-                    .font(.suite(size: 22, weight: .bold)) // Updated to match Group List
-                    .foregroundColor(.primary)
-                Text("그룹 멤버들과 일정을 공유해보세요")
-                    .font(.suite(size: 13))
-                    .foregroundColor(.gray)
-            }
-            Spacer()
-            // 일정 추가 CTA — 기존엔 Plus 아이콘만 있어 발견성이 낮았음.
-            // 아이콘 + 텍스트 조합으로 명확화 + 44pt 터치 타겟 확보.
-            Button(action: {
+    // MARK: 맨 위 줄 — 그룹 전환 알약(지도 탭과 같은 모양) + 일정 추가(이 탭의 주 동작이라 남색 원)
+
+    private var topControls: some View {
+        HStack(spacing: SMAPTheme.Spacing.sm) {
+            GroupSwitcherPill(groupName: viewModel.selectedGroup?.sgt_title) { showingGroupPicker = true }
+            Spacer(minLength: 0)
+            SMAPGradientIconButton(systemImage: "plus", accessibilityLabel: "일정 추가") {
                 HapticManager.shared.impact(style: .light)
                 showingAddSchedule = true
-            }) {
-                HStack(spacing: 4) {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.suite(size: 20, weight: .semibold))
-                    Text("추가")
-                        .font(.suite(size: 14, weight: .semibold))
-                }
-                .foregroundColor(.white)
-                .padding(.horizontal, 12)
-                .frame(height: 36)
-                .background(SMAPTheme.Color.primary)
-                .clipShape(Capsule())
-                .frame(minWidth: 44, minHeight: 44)
-                .contentShape(Rectangle())
             }
-            .accessibilityLabel("일정 추가")
-            .accessibilityHint("새 일정 작성 화면 열기")
         }
-
-        .padding(.vertical, 8)
-        .padding(.horizontal, 16)
-        .padding(.bottom, 10) // Extra bottom spacing for card separation
+        .padding(.top, SMAPSheetMetrics.topControlsVerticalPadding)
     }
 
-    private var monthNavView: some View {
-        // Month Navigation and "Go to Today"
+    // MARK: 고른 날 일정
+
+    private static let dayTitleFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "ko_KR")
+        f.dateFormat = "M월 d일 EEEE"
+        return f
+    }()
+
+    private var daySection: some View {
+        let schedules = viewModel.filteredSchedules
+        let title = Self.dayTitleFormatter.string(from: viewModel.selectedDate) + (schedules.isEmpty ? "" : " · \(schedules.count)개")
+        return SMAPSection(title: title) {
+            if viewModel.isLoading && schedules.isEmpty {
+                // 그날 일정이 이미 보이면 새로 불러오는 동안에도 그대로 둔다(화면 전체를 덮던 스피너 제거).
+                ProgressView()
+                    .frame(maxWidth: .infinity, minHeight: 96)
+            } else if schedules.isEmpty {
+                SMAPListRow(
+                    title: "이 날은 일정이 없어요",
+                    subtitle: "새 일정을 만들면 멤버에게 알려 드려요",
+                    action: { showingAddSchedule = true },
+                    leading: { SMAPRowIcon(systemImage: "calendar.badge.plus") },
+                    trailing: {
+                        Text("추가").font(SMAPTheme.Font.captionBold).foregroundStyle(SMAPTheme.Navy.base)
+                    }
+                )
+            } else {
+                ForEach(Array(schedules.enumerated()), id: \.element.id) { index, schedule in
+                    if index > 0 { SMAPRowDivider() }
+                    ScheduleRow(schedule: schedule) { detailSchedule = schedule }
+                }
+            }
+        }
+    }
+
+    // MARK: 수정·삭제 — 반복 일정은 범위를 먼저 묻는다
+
+    private func startEdit(_ schedule: Schedule) {
+        detailSchedule = nil
+        if schedule.isRecurring {
+            selectedScheduleForAction = schedule
+            recurringActionType = .edit
+            presentAfterSheetDismiss { showingRecurringActionSheet = true }
+        } else {
+            scheduleToEditOption = nil
+            presentAfterSheetDismiss { scheduleToEdit = schedule }
+        }
+    }
+
+    private func startDelete(_ schedule: Schedule) {
+        detailSchedule = nil
+        if schedule.isRecurring {
+            selectedScheduleForAction = schedule
+            recurringActionType = .delete
+            presentAfterSheetDismiss { showingRecurringActionSheet = true }
+        } else {
+            presentAfterSheetDismiss { scheduleToDelete = schedule }
+        }
+    }
+
+    /// 상세 시트가 내려간 뒤에 다음 창을 띄운다 — 시트가 닫히는 중에 다른 창을 띄우면 SwiftUI 가 무시한다.
+    private func presentAfterSheetDismiss(_ action: @escaping () -> Void) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: action)
+    }
+}
+
+// MARK: - 남색 달력 카드
+
+/// 월 달력 — 남색 그라데이션 카드 위 흰 글자. 고른 날은 흰 원 + 남색 글자, 오늘은 옅은 흰 원, 일정 있는 날은 점.
+/// 지난/다음 달 날짜 칸은 비워 이번 달만 보이게 한다(Android 와 동일).
+struct ScheduleMonthCalendar: View {
+    let currentMonth: Date
+    let selectedDate: Date
+    let eventDates: Set<Date>
+    let onSelect: (Date) -> Void
+    let onPrevious: () -> Void
+    let onNext: () -> Void
+    let onToday: () -> Void
+
+    /// 남색 바탕 위 일요일 — 빨강을 옅게 해 남색 위에서도 읽히게 한다.
+    private static let sundayOnNavy = Color(red: 1, green: 0xB3 / 255, blue: 0xB8 / 255)
+    private let calendar = Calendar.current
+
+    var body: some View {
+        let today = Date()
+        let isThisMonth = calendar.isDate(currentMonth, equalTo: today, toGranularity: .month)
         VStack(spacing: 0) {
             HStack(spacing: 0) {
-                Spacer()
-                Button(action: { viewModel.changeMonth(by: -1) }) {
-                    Image(systemName: "chevron.left")
-                        .font(.suite(size: 16, weight: .semibold))
-                        .foregroundColor(.gray)
-                        .padding(.horizontal)
-                        .padding(.vertical, 12) // 아이콘 시각크기 유지 + 터치영역 44pt 확보
-                        .contentShape(Rectangle())
+                // verbatim — 숫자를 그냥 넣으면 SwiftUI 가 "2,026년"처럼 자릿수 쉼표를 붙인다.
+                Text(verbatim: "\(calendar.component(.year, from: currentMonth))년 \(calendar.component(.month, from: currentMonth))월")
+                    .font(SMAPTheme.Font.headline)
+                    .foregroundStyle(.white)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 0)
+                if !isThisMonth || !calendar.isDate(selectedDate, inSameDayAs: today) {
+                    Button(action: onToday) {
+                        Text("오늘")
+                            .font(SMAPTheme.Font.captionBold)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 10)
+                            .frame(minHeight: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
-                .accessibilityLabel("이전 달")
-                Text(formatMonth(viewModel.currentMonth))
-                    .font(.suite(size: 16, weight: .bold)) // Larger Month
-                    .frame(width: 140)
-                Button(action: { viewModel.changeMonth(by: 1) }) {
-                    Image(systemName: "chevron.right")
-                        .font(.suite(size: 16, weight: .semibold))
-                        .foregroundColor(.gray)
-                        .padding(.horizontal)
-                        .padding(.vertical, 12) // 아이콘 시각크기 유지 + 터치영역 44pt 확보
-                        .contentShape(Rectangle())
-                }
-                .accessibilityLabel("다음 달")
-                Spacer()
+                monthButton("chevron.left", label: "이전 달", action: onPrevious)
+                monthButton("chevron.right", label: "다음 달", action: onNext)
             }
-            .padding(.top, 8)
+            .padding(.leading, SMAPTheme.Spacing.md)
+            .padding(.trailing, 4)
 
-            Button(action: {
-                withAnimation {
-                    viewModel.goToToday()
-                }
-            }) {
-                Text("오늘로 이동")
-                    .font(.suite(size: 14, weight: .medium))
-                    .foregroundColor(SMAPTheme.Color.primary)
-            }
-            .padding(.bottom, 4)
-            .padding(.top, 4)
-        }
-    }
-
-    private var calendarGridView: some View {
-        VStack(spacing: 0) { // Reduced spacing
-            let days = ["일", "월", "화", "수", "목", "금", "토"]
-            HStack {
-                // 캘린더 관례 — 다크모드 자동 대응 위해 systemRed/systemBlue 사용.
-                let sundayColor = Color(UIColor.systemRed)
-                let saturdayColor = Color(UIColor.systemBlue)
-                ForEach(days, id: \.self) { day in
+            HStack(spacing: 0) {
+                ForEach(Array(["일", "월", "화", "수", "목", "금", "토"].enumerated()), id: \.offset) { index, day in
                     Text(day)
-                        .font(.suite(size: 12))
-                        .foregroundColor(day == "일" ? sundayColor : (day == "토" ? saturdayColor : .gray))
+                        .font(SMAPTheme.Font.captionSmall)
+                        .foregroundStyle(index == 0 ? Self.sundayOnNavy : Color.white.opacity(0.7))
                         .frame(maxWidth: .infinity)
                 }
             }
-            let monthDays = generateMonthDays()
-            ForEach(0..<monthDays.count / 7, id: \.self) { weekIndex in
-                HStack(spacing: 0) {
-                    ForEach(0..<7, id: \.self) { dayIndex in
-                        let index = weekIndex * 7 + dayIndex
-                        if index < monthDays.count {
-                            let date = monthDays[index]
-                            CalendarDateCell(
-                                date: date,
-                                isSelected: Calendar.current.isDate(date, inSameDayAs: viewModel.selectedDate),
-                                isToday: Calendar.current.isDateInToday(date),
-                                isCurrentMonth: Calendar.current.isDate(date, equalTo: viewModel.currentMonth, toGranularity: .month),
-                                hasEvent: viewModel.datesWithEvents.contains(Calendar.current.startOfDay(for: date)),
-                                onTap: { viewModel.selectDate(date) }
-                            )
+            .padding(.horizontal, SMAPTheme.Spacing.sm)
+            .padding(.bottom, 4)
+            .accessibilityHidden(true)
+
+            let cells = monthCells()
+            VStack(spacing: 0) {
+                ForEach(0..<(cells.count / 7), id: \.self) { week in
+                    HStack(spacing: 0) {
+                        ForEach(0..<7, id: \.self) { col in
+                            Group {
+                                if let date = cells[week * 7 + col] {
+                                    dayCell(date, isSunday: col == 0)
+                                } else {
+                                    Color.clear
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
                         }
                     }
                 }
             }
+            .padding(.horizontal, SMAPTheme.Spacing.sm)
+            .padding(.bottom, SMAPTheme.Spacing.sm)
         }
-        .padding(.horizontal)
         .padding(.top, 4)
-        .padding(.bottom, 0)
-    }
-
-    private var memberFilterView: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // Text removed as requested
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 16) {
-                    ForEach(viewModel.groupMembers) { member in
-                        Button(action: {
-                            withAnimation(.spring()) {
-                                viewModel.toggleMemberSelection(member.id)
-                            }
-                        }) {
-                            VStack(spacing: 8) {
-                                ZStack {
-                                    if let photoUrl = member.mt_file1, !photoUrl.isEmpty {
-                                        AsyncImage(url: URL(string: photoUrl.hasPrefix("http") ? photoUrl : "https://nextstep.aiagnt.kr\(photoUrl)")) { phase in
-                                            if let image = phase.image {
-                                                image.resizable().aspectRatio(contentMode: .fill)
-                                            } else {
-                                                Image(systemName: "person.circle.fill").resizable().foregroundColor(.gray.opacity(0.3))
-                                            }
-                                        }
-                                        .frame(width: 52, height: 52)
-                                        .clipShape(Circle())
-                                    } else {
-                                        Image(systemName: "person.circle.fill")
-                                            .resizable()
-                                            .frame(width: 52, height: 52)
-                                            .foregroundColor(.gray.opacity(0.3))
-                                    }
-
-                                    if viewModel.selectedMemberIds.contains(member.id) {
-                                        Circle()
-                                            .stroke(SMAPTheme.Color.primary, lineWidth: 3)
-                                            .frame(width: 60, height: 60)
-
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .foregroundColor(SMAPTheme.Color.primary)
-                                            .background(Color.white.clipShape(Circle()))
-                                            .font(.suite(size: 16))
-                                            .offset(x: 20, y: 20)
-                                    }
-                                }
-                                .padding(4)
-
-                                Text(member.displayName)
-                                    .font(.suite(size: 11, weight: viewModel.selectedMemberIds.contains(member.id) ? .bold : .medium))
-                                    .foregroundColor(viewModel.selectedMemberIds.contains(member.id) ? .primary : .gray)
-                            }
-                        }
-                    }
-                }
-                .padding(.horizontal)
-                .padding(.bottom, 4)
-            }
-        }
-        .padding(.vertical, 8)
-    }
-
-    private var eventListView: some View {
-        VStack(spacing: 0) {
-            // Selected Date Banner
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(formatSelectedDate(viewModel.selectedDate))
-                        .font(.suite(size: 18, weight: .bold))
-                        .foregroundColor(.white)
-
-                    Text("\(viewModel.filteredSchedules.count)개의 일정")
-                        .font(.suite(size: 14))
-                        .foregroundColor(.white.opacity(0.8))
-                }
-                Spacer()
-            }
-            .padding(20)
-            .background(
-                RoundedRectangle(cornerRadius: 24)
-                    .fill(
-                        LinearGradient(
-                            gradient: Gradient(colors: [SMAPTheme.Color.primary, SMAPTheme.Color.primaryDark]),
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-            )
-            .padding(.horizontal, 16)
-            .padding(.bottom, 16)
-
-            VStack(alignment: .leading, spacing: 8) {
-                if viewModel.filteredSchedules.isEmpty {
-                    // 빈 상태 — 모바일 밀도에 맞춰 아이콘 축소, 톤은 친근하게, CTA 는 44pt 확보.
-                    VStack(spacing: 10) {
-                        Image(systemName: "calendar")
-                            .font(.suite(size: 36, weight: .light))
-                            .foregroundColor(SMAPTheme.Color.primary.opacity(0.45))
-                        Text("이 날짜에 등록된 일정이 없어요")
-                            .font(.suite(size: 15, weight: .medium))
-                            .foregroundColor(.secondary)
-                        Button(action: {
-                            HapticManager.shared.impact(style: .light)
-                            showingAddSchedule = true
-                        }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "plus")
-                                    .font(.suite(size: 13, weight: .semibold))
-                                Text("일정 추가하기")
-                                    .font(.suite(size: 14, weight: .semibold))
-                            }
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 18)
-                            .frame(height: 40)
-                            .background(SMAPTheme.Color.primary)
-                            .clipShape(Capsule())
-                            .frame(minHeight: 44) // HIG
-                            .contentShape(Rectangle())
-                        }
-                        .accessibilityHint("선택된 날짜에 새 일정 작성")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 32)
-                } else {
-                    ForEach(viewModel.filteredSchedules) { schedule in
-                        ScheduleEventCard(
-                            schedule: schedule,
-                            groupName: viewModel.selectedGroup?.sgt_title,
-                            canManage: viewModel.canManageSchedule(schedule),
-                            onEdit: {
-                                print("DEBUG: Edit clicked for schedule: \(schedule.sst_title ?? ""), isRecurring: \(schedule.isRecurring)")
-                                if schedule.isRecurring {
-                                    selectedScheduleForAction = schedule
-                                    recurringActionType = .edit
-                                    showingRecurringActionSheet = true
-                                } else {
-                                    scheduleToEdit = schedule
-                                    scheduleToEditOption = nil
-                                }
-                            },
-                            onDelete: {
-                                print("DEBUG: Delete clicked for schedule: \(schedule.sst_title ?? ""), isRecurring: \(schedule.isRecurring)")
-                                if schedule.isRecurring {
-                                    selectedScheduleForAction = schedule
-                                    recurringActionType = .delete
-                                    showingRecurringActionSheet = true
-                                } else {
-                                    viewModel.deleteSchedule(schedule)
-                                }
-                            }
-                        )
-                        .padding(.horizontal, 16)
-                    }
+        .background(
+            GeometryReader { geo in
+                ZStack {
+                    SMAPTheme.Navy.gradient
+                    Circle()
+                        .fill(Color.white.opacity(0.07))
+                        .frame(width: geo.size.width * 0.76)
+                        .position(x: geo.size.width, y: 0)
                 }
             }
+            // 장식 원은 카드 밖으로 삐져나간다. clipShape 는 그림만 자르고 누름 영역은 자르지 않아
+            // 카드 위 "일정 추가" 버튼의 누름을 가로챘다 — 장식은 누름을 받지 않게 한다.
+            .allowsHitTesting(false)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .shadow(color: SMAPTheme.Navy.base.opacity(0.28), radius: 10, y: 4)
+    }
+
+    private func monthButton(_ systemImage: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Color.white.opacity(0.85))
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
     }
 
-    private func formatMonth(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy년 MM월"
-        return formatter.string(from: date)
-    }
+    private func dayCell(_ date: Date, isSunday: Bool) -> some View {
+        let isSelected = calendar.isDate(date, inSameDayAs: selectedDate)
+        let isToday = calendar.isDateInToday(date)
+        let hasEvent = eventDates.contains(calendar.startOfDay(for: date))
+        let day = calendar.component(.day, from: date)
+        let textColor: Color = isSelected ? SMAPTheme.Navy.base : (isToday ? .white : (isSunday ? Self.sundayOnNavy : .white))
+        var a11y = "\(day)일"
+        if isToday { a11y += ", 오늘" }
+        if hasEvent { a11y += ", 일정 있음" }
 
-    private func formatSelectedDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "M월 d일 EEEE"
-        formatter.locale = Locale(identifier: "ko_KR")
-        return formatter.string(from: date)
-    }
-
-    private func generateMonthDays() -> [Date] {
-        let calendar = Calendar.current
-
-        // Start of the month
-        let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: viewModel.currentMonth))!
-
-        // End of the month
-        let range = calendar.range(of: .day, in: .month, for: startOfMonth)!
-        let endOfMonth = calendar.date(byAdding: .day, value: range.count - 1, to: startOfMonth)!
-
-        // Start of the grid (Previous Sunday)
-        let firstWeekday = calendar.component(.weekday, from: startOfMonth)
-        let startOfCalendar = calendar.date(byAdding: .day, value: -(firstWeekday - 1), to: startOfMonth)!
-
-        // End of the grid (Next Saturday)
-        let lastWeekday = calendar.component(.weekday, from: endOfMonth)
-        let daysToAdd = 7 - lastWeekday
-        let endOfCalendar = calendar.date(byAdding: .day, value: daysToAdd, to: endOfMonth)!
-
-        // Total days to show
-        let numberOfDays = calendar.dateComponents([.day], from: startOfCalendar, to: endOfCalendar).day! + 1
-
-        var days: [Date] = []
-        for i in 0..<numberOfDays {
-            if let date = calendar.date(byAdding: .day, value: i, to: startOfCalendar) {
-                days.append(date)
+        return Button {
+            HapticManager.shared.selection()
+            onSelect(date)
+        } label: {
+            VStack(spacing: 1) {
+                Text("\(day)")
+                    .font(.suite(size: 16, weight: isSelected || isToday ? .bold : .regular))
+                    .foregroundStyle(textColor)
+                Circle()
+                    .fill(!hasEvent ? Color.clear : (isSelected ? SMAPTheme.Navy.base : Color.white))
+                    .frame(width: 4, height: 4)
             }
+            .frame(width: 40, height: 40)
+            .background(Circle().fill(isSelected ? Color.white : (isToday ? Color.white.opacity(0.18) : Color.clear)))
+            .contentShape(Circle())
         }
-        return days
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(a11y)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+    }
+
+    /// 이번 달 칸 — 1일 앞쪽(일요일 시작)과 마지막 주 뒤쪽은 nil(빈칸)
+    private func monthCells() -> [Date?] {
+        guard let start = calendar.date(from: calendar.dateComponents([.year, .month], from: currentMonth)),
+              let days = calendar.range(of: .day, in: .month, for: start)?.count else { return [] }
+        let leading = calendar.component(.weekday, from: start) - 1
+        var cells: [Date?] = Array(repeating: nil, count: leading)
+        cells += (0..<days).map { calendar.date(byAdding: .day, value: $0, to: start) }
+        cells += Array(repeating: nil, count: (7 - cells.count % 7) % 7)
+        return cells
     }
 }
 
-struct CalendarDateCell: View {
-    let date: Date
-    let isSelected: Bool
-    let isToday: Bool
-    let isCurrentMonth: Bool
-    let hasEvent: Bool
-    let onTap: () -> Void
+// MARK: - 일정 한 줄
 
-    
+/// 왼쪽 시각(시작·끝), 가운데 제목과 "누구 · 어디 · 반복", 오른쪽 상태(진행 중일 때만 남색으로 강조).
+/// 이전 카드의 … 메뉴는 없앴다 — 눌러서 여는 상세 시트에 수정·삭제가 있다.
+struct ScheduleRow: View {
+    let schedule: Schedule
+    let action: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) { // Spacing 0 for tighter layout
-            Text("\(Calendar.current.component(.day, from: date))")
-                .font(.suite(size: 15, weight: isSelected ? .bold : (isToday ? .bold : .medium)))
-                .foregroundColor(textColor)
-                .frame(width: 36, height: 36)
-                .background(
-                    ZStack {
-                        if isSelected {
-                            SMAPTheme.Color.primary
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                                .shadow(color: SMAPTheme.Color.primary.opacity(0.3), radius: 4, x: 0, y: 2)
-                        } else if isToday {
-                            SMAPTheme.Color.primary.opacity(0.1)
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                        }
+        let allDay = schedule.sst_all_day == "Y"
+        let start = scheduleClock(schedule.sst_sdate)
+        let end = scheduleClock(schedule.sst_edate)
+        let subtitle = [
+            schedule.validMemberName.isEmpty ? nil : schedule.validMemberName,
+            schedule.sst_location_title.flatMap { $0.isEmpty ? nil : $0 },
+            schedule.isRecurring ? (schedule.repeatDescription ?? "반복") : nil,
+        ].compactMap { $0 }.joined(separator: " · ")
+
+        SMAPListRow(
+            title: schedule.sst_title.flatMap { $0.isEmpty ? nil : $0 } ?? "제목 없음",
+            subtitle: subtitle.isEmpty ? nil : subtitle,
+            action: action,
+            leading: {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(allDay ? "종일" : (start ?? "-"))
+                        .font(SMAPTheme.Font.bodyBold)
+                        .foregroundStyle(schedule.status == .completed ? SMAPTheme.Surface.onSurfaceMuted : SMAPTheme.Navy.base)
+                    if !allDay, let end {
+                        Text(end)
+                            .font(SMAPTheme.Font.captionSmall)
+                            .foregroundStyle(SMAPTheme.Surface.onSurfaceMuted)
                     }
-                )
-
-            if hasEvent {
-                // 일정이 있는 날짜 표시 점 — 알림 dot과 동일 의미
-                Circle()
-                    .fill(SMAPTheme.Accent.notificationDot)
-                    .frame(width: 4, height: 4)
-                    .padding(.top, -8) // Pull closer to the number
-                    .accessibilityHidden(true)
-            } else {
-                Spacer().frame(height: 4) // Mantain height consistency
+                }
+                .frame(width: 52, alignment: .leading)
+            },
+            trailing: {
+                HStack(spacing: SMAPTheme.Spacing.sm) {
+                    if schedule.isRecurring {
+                        Image(systemName: "repeat")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(SMAPTheme.Surface.onSurfaceMuted)
+                            .accessibilityLabel("반복 일정")
+                    }
+                    if schedule.status == .ongoing {
+                        // 진행 중은 지금 봐야 할 일정이라 남색으로 채워 목록에서 가장 먼저 보이게 한다.
+                        Text(schedule.status.text)
+                            .font(SMAPTheme.Font.captionBold)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(SMAPTheme.Navy.gradient, in: Capsule())
+                    }
+                }
             }
-        }
-        .frame(maxWidth: .infinity)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            withAnimation(.spring()) {
-                onTap()
-            }
-        }
-        .opacity(isCurrentMonth ? 1.0 : 0.2)
-        // Removed vertical padding to reduce height
-    }
-
-    private var textColor: Color {
-        if isSelected { return .white }
-        if isToday { return SMAPTheme.Color.primary }
-        let weekday = Calendar.current.component(.weekday, from: date)
-        // 캘린더 관례 — 일요일 빨강, 토요일 파랑. 다크모드 대응 위해 systemRed/systemBlue 사용.
-        if weekday == 1 { return Color(UIColor.systemRed).opacity(isCurrentMonth ? 1.0 : 0.5) }
-        if weekday == 7 { return Color(UIColor.systemBlue).opacity(isCurrentMonth ? 1.0 : 0.5) }
-        return .primary
+        )
     }
 }
 
-struct ScheduleEventCard: View {
+// MARK: - 일정 상세 시트
+
+/// 일정 상세 — 상태·제목, 날짜·시간, 대상, 장소, 반복, 메모 + (권한 있으면) 삭제·수정.
+struct ScheduleDetailSheet: View {
     let schedule: Schedule
-    let groupName: String? // Added groupName
     let canManage: Bool
     let onEdit: () -> Void
     let onDelete: () -> Void
 
-    
+    private static let dayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "ko_KR")
+        f.dateFormat = "M월 d일 EEEE"
+        return f
+    }()
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            // Left: Time Block (Compact)
-            VStack(alignment: .leading, spacing: 2) {
-                if let sDate = scheduleDate(from: schedule.sst_sdate) {
-                    Text(formatTime(sDate))
-                        .font(.suite(size: 16, weight: .bold))
-                        .foregroundColor(.primary)
-                }
-
-                if let eDate = scheduleDate(from: schedule.sst_edate) {
-                    Text("~ \(formatTime(eDate))")
-                        .font(.suite(size: 12))
-                        .foregroundColor(.gray)
-                }
-
-                // Moved Repeat Info to here for visibility
-                if let repeatText = schedule.repeatDescription {
-                     HStack(spacing: 2) {
-                        Image(systemName: "repeat")
-                            .font(.suite(size: 10))
-                        Text(repeatText)
-                            .font(.suite(size: 11))
+        VStack(alignment: .leading, spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(schedule.status.text)
+                            .font(SMAPTheme.Font.captionBold)
+                            .foregroundStyle(schedule.status == .ongoing ? SMAPTheme.Navy.base : SMAPTheme.Surface.onSurfaceMuted)
+                        Text(schedule.sst_title.flatMap { $0.isEmpty ? nil : $0 } ?? "제목 없음")
+                            .font(SMAPTheme.Font.title)
+                            .foregroundStyle(SMAPTheme.Surface.onSurface)
+                            .accessibilityAddTraits(.isHeader)
                     }
-                    .foregroundColor(SMAPTheme.Color.primary.opacity(0.8))
-                    .padding(.top, 4)
-                    .accessibilityLabel("반복 \(repeatText)")
+                    .padding(.horizontal, 20)
+                    .padding(.top, 28)
+                    .padding(.bottom, SMAPTheme.Spacing.sm)
+
+                    SMAPListRow(title: dateText, subtitle: timeText, leading: { SMAPRowIcon(systemImage: "clock") })
+                    if !schedule.validMemberName.isEmpty {
+                        SMAPListRow(title: schedule.validMemberName, subtitle: "일정 대상", leading: {
+                            SMAPAvatar(name: schedule.validMemberName, imagePath: schedule.validMemberPhoto, size: 40)
+                        })
+                    }
+                    if let place = schedule.sst_location_title, !place.isEmpty {
+                        SMAPListRow(title: place, subtitle: schedule.sst_location_add.flatMap { $0.isEmpty ? nil : $0 } ?? "장소",
+                                    leading: { SMAPRowIcon(systemImage: "mappin.and.ellipse") })
+                    }
+                    if schedule.isRecurring {
+                        SMAPListRow(title: schedule.repeatDescription ?? "반복 일정", subtitle: "반복",
+                                    leading: { SMAPRowIcon(systemImage: "repeat") })
+                    }
+                    if let alarm = schedule.sst_alarm_t, !alarm.isEmpty {
+                        SMAPListRow(title: alarm, subtitle: "알림", leading: { SMAPRowIcon(systemImage: "bell") })
+                    }
+                    if let memo = schedule.sst_memo, !memo.isEmpty {
+                        HStack(alignment: .top, spacing: 12) {
+                            SMAPRowIcon(systemImage: "text.alignleft")
+                            Text(memo)
+                                .font(SMAPTheme.Font.body)
+                                .foregroundStyle(SMAPTheme.Surface.onSurface)
+                                .padding(.top, 9)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .padding(.horizontal, SMAPTheme.Spacing.md)
+                        .padding(.vertical, 10)
+                    }
                 }
             }
-            .frame(width: 70, alignment: .leading)
-
-            // Right: Content Block
-            VStack(alignment: .leading, spacing: 4) {
-                // Member & Group Info
-                HStack(spacing: 6) {
-                    // Avatar
-                    if #available(iOS 15.0, *),
-                       let photo = schedule.validMemberPhoto,
-                       !photo.isEmpty,
-                       let url = URL(string: photo.hasPrefix("http") ? photo : "https://nextstep.aiagnt.kr\(photo)") {
-
-                        AsyncImage(url: url) { phase in
-                            if let image = phase.image {
-                                image.resizable().aspectRatio(contentMode: .fill)
-                            } else {
-                                Image(systemName: "person.circle.fill").foregroundColor(.gray)
-                            }
-                        }
-                        .frame(width: 20, height: 20)
-                        .clipShape(Circle())
-                    } else {
-                        Image(systemName: "person.circle.fill")
-                            .resizable()
-                            .frame(width: 20, height: 20)
-                            .foregroundColor(.gray)
-                    }
-
-                    Text(schedule.validMemberName)
-                        .font(.suite(size: 12, weight: .bold))
-                        .foregroundColor(SMAPTheme.Color.primary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-
-                    if let gName = groupName {
-                        Text("•")
-                            .font(.suite(size: 10))
-                            .foregroundColor(.gray)
-                        Text(gName)
-                            .font(.suite(size: 12))
-                            .foregroundColor(.gray)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                    }
+            if canManage {
+                HStack(spacing: SMAPTheme.Spacing.sm) {
+                    // 삭제는 보조 동작이라 좁게, 수정이 나머지 폭 (Android 1:2 비율과 비슷하게)
+                    SMAPButton("삭제", style: .secondary, action: onDelete)
+                        .frame(width: 110)
+                    SMAPButton("수정", action: onEdit)
                 }
-
-                Text(schedule.sst_title ?? "제목 없음")
-                    .font(.suite(size: 15, weight: .medium))
-                    .foregroundColor(.primary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-
-                if let location = schedule.sst_location_title, !location.isEmpty {
-                    HStack(spacing: 4) {
-                        Image(systemName: "mappin.and.ellipse")
-                            .font(.suite(size: 12))
-                        Text(location)
-                            .font(.suite(size: 13))
-                    }
-                    .foregroundColor(.gray)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            // Status Badge & Menu
-            VStack(alignment: .trailing, spacing: 4) {
-                Text(schedule.status.text)
-                    .font(.suite(size: 11, weight: .bold))
-                    .foregroundColor(statusColor)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(statusColor.opacity(0.1))
-                    .cornerRadius(4)
-
-                if canManage {
-                    Menu {
-                        Button(action: onEdit) {
-                            Label("수정", systemImage: "pencil")
-                        }
-                        Button(role: .destructive, action: onDelete) {
-                            Label("삭제", systemImage: "trash")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.suite(size: 14))
-                            .foregroundColor(.gray)
-                            .frame(width: 44, height: 32) // HIG 터치 타겟 (가로 44pt)
-                            .contentShape(Rectangle())
-                    }
-                    .accessibilityLabel("일정 관리")
-                    .accessibilityHint("수정 또는 삭제")
-                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, SMAPTheme.Spacing.md)
             }
         }
-        .padding(.vertical, 12)
-        .padding(.horizontal, 14)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white)
-        )
-        .overlay(
-            // 카드 구분은 얇은 border로. 그림자 남발 제거 — iOS flat 트렌드.
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.black.opacity(0.06), lineWidth: 1)
-        )
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(schedule.sst_title ?? "제목 없음"), \(schedule.status.text)")
+        .background(SMAPTheme.Surface.card.ignoresSafeArea())
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 
-    private func formatTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
-        return formatter.string(from: date)
+    private var dateText: String {
+        guard let raw = schedule.sst_sdate, let date = scheduleDate(raw) else { return schedule.sst_sdate ?? "" }
+        return Self.dayFormatter.string(from: date)
     }
 
-    private func scheduleDate(from string: String?) -> Date? {
-        guard let str = string else { return nil }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        if let date = formatter.date(from: str) { return date }
-
-        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
-        return formatter.date(from: str)
-    }
-
-    private var statusColor: Color {
-        switch schedule.status {
-        case .completed: return SMAPTheme.Semantic.statCompleted
-        case .ongoing: return SMAPTheme.Semantic.statOngoing
-        case .upcoming: return SMAPTheme.Semantic.statUpcoming
-        case .defaultStatus: return .gray
+    private var timeText: String? {
+        if schedule.sst_all_day == "Y" { return "하루 종일" }
+        switch (scheduleClock(schedule.sst_sdate), scheduleClock(schedule.sst_edate)) {
+        case let (start?, end?): return "\(start) – \(end)"
+        case let (start?, nil): return start
+        default: return nil
         }
     }
+
+    private func scheduleDate(_ raw: String) -> Date? {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        return f.date(from: String(raw.prefix(10)))
+    }
+}
+
+/// "2026-11-16 10:00:00" / "2026-11-16T10:00" → "10:00"
+private func scheduleClock(_ raw: String?) -> String? {
+    guard let raw, let range = raw.range(of: #"[T ](\d{2}):(\d{2})"#, options: .regularExpression) else { return nil }
+    return String(raw[range].dropFirst())
 }
