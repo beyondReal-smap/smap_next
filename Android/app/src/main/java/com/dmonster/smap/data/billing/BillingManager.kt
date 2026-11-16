@@ -13,8 +13,6 @@ import com.android.billingclient.api.Purchase
 import com.android.billingclient.api.PurchasesUpdatedListener
 import com.android.billingclient.api.QueryProductDetailsParams
 import com.android.billingclient.api.QueryPurchasesParams
-import com.android.billingclient.api.queryProductDetails
-import com.android.billingclient.api.queryPurchasesAsync
 import com.dmonster.smap.data.GlobalEvent
 import com.dmonster.smap.data.GlobalEventBus
 import com.dmonster.smap.data.service.AuthService
@@ -158,14 +156,14 @@ class BillingManager(
                 .setProductList(productList)
                 .build()
 
-            val result = billingClient.queryProductDetails(params)
+            val result = billingClient.awaitProductDetails(params)
             if (result.billingResult.responseCode != BillingClient.BillingResponseCode.OK) {
                 Log.w(TAG, "queryProductDetails failed: code=${result.billingResult.responseCode}")
                 _productLoadError.value = "요금제를 불러오지 못했어요."
                 return false
             }
 
-            val details = result.productDetailsList?.firstOrNull { it.productId == PRODUCT_ID }
+            val details = result.productDetailsList.firstOrNull { it.productId == PRODUCT_ID }
             if (details == null) {
                 _offers.value = emptyList()
                 _productLoadError.value = "요금제를 불러오지 못했어요."
@@ -363,7 +361,7 @@ class BillingManager(
         if (!authService.isLoggedIn) return@withLock
         if (!ensureConnected()) return@withLock
 
-        val purchasesResult = billingClient.queryPurchasesAsync(
+        val purchasesResult = billingClient.awaitPurchases(
             QueryPurchasesParams.newBuilder()
                 .setProductType(BillingClient.ProductType.SUBS)
                 .build()
@@ -399,7 +397,7 @@ class BillingManager(
             return
         }
 
-        val purchasesResult = billingClient.queryPurchasesAsync(
+        val purchasesResult = billingClient.awaitPurchases(
             QueryPurchasesParams.newBuilder()
                 .setProductType(BillingClient.ProductType.SUBS)
                 .build()
