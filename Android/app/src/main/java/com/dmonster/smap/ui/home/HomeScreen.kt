@@ -20,6 +20,7 @@ import com.dmonster.smap.ui.components.MapCircleButton
 import com.dmonster.smap.ui.components.MapTopControls
 import com.dmonster.smap.ui.components.SmapErrorState
 import com.dmonster.smap.ui.components.SmapMapSheetScaffold
+import com.dmonster.smap.ui.components.rememberSmapMapSheetState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
 import androidx.compose.ui.platform.LocalContext
@@ -144,12 +145,7 @@ fun HomeScreen(
     }
 
     // 지도 시트 상태 — 멤버를 고르면 시트를 접어 지도가 보이게 한다.
-    val sheetScaffoldState = rememberBottomSheetScaffoldState(
-        bottomSheetState = rememberStandardBottomSheetState(
-            initialValue = SheetValue.PartiallyExpanded,
-            skipHiddenState = true
-        )
-    )
+    val sheetState = rememberSmapMapSheetState()
     var showGroupPicker by remember { mutableStateOf(false) }
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
@@ -267,7 +263,7 @@ fun HomeScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         SmapMapSheetScaffold(
             peekHeight = HomeSheetPeekHeight,
-            scaffoldState = sheetScaffoldState,
+            sheetState = sheetState,
             snackbarHostState = snackbarHostState,
             sheetContent = {
                 HomeSheetContent(
@@ -280,7 +276,7 @@ fun HomeScreen(
                     memberStats = { viewModel.getMemberTodayStats(it) },
                     onSelectMember = { m ->
                         viewModel.selectMember(m.mtIdx)
-                        scope.launch { sheetScaffoldState.bottomSheetState.partialExpand() }
+                        scope.launch { sheetState.partialExpand() }
                     },
                     onShowAll = { viewModel.deselectAllMembers() },
                     onSelectDate = { viewModel.selectDate(it) }

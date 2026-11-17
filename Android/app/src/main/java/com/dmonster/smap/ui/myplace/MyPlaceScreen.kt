@@ -4,6 +4,7 @@ import com.dmonster.smap.ui.components.GroupPickerSheet
 import com.dmonster.smap.ui.components.MapCircleButton
 import com.dmonster.smap.ui.components.MapTopControls
 import com.dmonster.smap.ui.components.SmapMapSheetScaffold
+import com.dmonster.smap.ui.components.rememberSmapMapSheetState
 import com.dmonster.smap.ui.theme.SmapSpacing
 import kotlinx.coroutines.launch
 
@@ -161,12 +162,7 @@ fun MyPlaceScreen(
     }
 
     // 지도 시트 — 장소를 고르면 접어서 지도가 보이게 한다.
-    val sheetScaffoldState = rememberBottomSheetScaffoldState(
-        bottomSheetState = rememberStandardBottomSheetState(
-            initialValue = SheetValue.PartiallyExpanded,
-            skipHiddenState = true
-        )
-    )
+    val sheetState = rememberSmapMapSheetState()
     val scope = rememberCoroutineScope()
     var showGroupPicker by remember { mutableStateOf(false) }
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -180,7 +176,7 @@ fun MyPlaceScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         SmapMapSheetScaffold(
             peekHeight = MyPlaceSheetPeekHeight,
-            scaffoldState = sheetScaffoldState,
+            sheetState = sheetState,
             snackbarHostState = snackbarHostState,
             sheetContent = {
                 MyPlaceSheetContent(
@@ -196,7 +192,7 @@ fun MyPlaceScreen(
                     onSelectLocation = {
                         tapPin = null
                         viewModel.selectLocation(it)
-                        scope.launch { sheetScaffoldState.bottomSheetState.partialExpand() }
+                        scope.launch { sheetState.partialExpand() }
                     },
                     onToggleNotification = { viewModel.toggleLocationNotification(it) },
                     onAddClick = { viewModel.showSearchScreen() }

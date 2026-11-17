@@ -17,6 +17,17 @@ enum SMAPSheetMetrics {
     static let topControlsVerticalPadding: CGFloat = 10
 }
 
+/// 시트가 자리로 가는 움직임 — 펼침·접힘과 끌다 놓은 뒤 되돌아가는 움직임이 같은 곡선을 쓴다.
+private let sheetSettleAnimation = Animation.interactiveSpring(response: 0.32, dampingFraction: 0.86)
+
+/// 놓을 때 방향을 정하는 기준(Android SmapMapSheetState 와 같은 값).
+private enum SheetDragRule {
+    /// 이보다 빠르게 튕기면 움직인 거리와 상관없이 튕긴 방향으로(pt/s)
+    static let flingVelocity: CGFloat = 300
+    /// 이만큼만 움직여도 그 방향으로 끝까지(pt)
+    static let directionSlop: CGFloat = 4
+}
+
 /// 아래에서 끌어올리는 지도 시트. 접힌 높이([peekHeight])에서도 핵심(멤버 얼굴 줄 등)이 보이고,
 /// 손잡이·머리 띠를 끌어올리거나 누르면 화면의 [maxHeightFraction] 까지 펼쳐진다(지도 절반은 늘 보이게).
 /// 내용이 더 길면 [content] 안의 ScrollView 가 스크롤한다.
@@ -30,7 +41,8 @@ struct SMAPMapSheet<Header: View, Content: View>: View {
     /// 띠 아래 흰 영역
     @ViewBuilder var content: () -> Content
 
-    @GestureState private var dragTranslation: CGFloat = 0
+    // 손을 떼면 0 으로 돌아가는 값 — 되돌아가는 것도 애니메이션으로(이전에는 툭 튀어 버벅이는 것처럼 보였다).
+    @GestureState(resetTransaction: Transaction(animation: sheetSettleAnimation)) private var dragTranslation: CGFloat = 0
 
     var body: some View {
         GeometryReader { geo in
@@ -59,7 +71,7 @@ struct SMAPMapSheet<Header: View, Content: View>: View {
             .clipShape(UnevenRoundedRectangle(topLeadingRadius: SMAPTheme.sheetRadius, topTrailingRadius: SMAPTheme.sheetRadius, style: .continuous))
             .shadow(color: .black.opacity(0.12), radius: 12, y: -2)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-            .animation(.interactiveSpring(response: 0.32, dampingFraction: 0.86), value: isExpanded)
+            .animation(sheetSettleAnimation, value: isExpanded)
         }
     }
 
@@ -72,10 +84,19 @@ struct SMAPMapSheet<Header: View, Content: View>: View {
         DragGesture(minimumDistance: 6)
             .updating($dragTranslation) { value, state, _ in state = value.translation.height }
             .onEnded { value in
-                // 놓은 위치와 손을 뗄 때의 속도(predicted)로 펼침/접힘을 정한다.
-                let base = isExpanded ? maxHeight : peekHeight
-                let projected = base - value.predictedEndTranslation.height
-                let shouldExpand = projected > (peekHeight + maxHeight) / 2
+                // 방향이 정해지면 끝까지 간다(2026-11-17). 이전에는 "예상 도착점이 절반을 넘어야" 펼쳐져서
+                // 조금 올리다 놓으면 제자리로 튕겨 돌아갔다.
+                //  1) 놓을 때 뚜렷하게 튕겼으면 그 방향  2) 아니면 움직인 방향  3) 거의 안 움직였으면 그대로
+                let moved = value.translation.height      // 아래가 +
+                let velocity = value.velocity.height      // pt/s, 아래가 +
+                let shouldExpand: Bool
+                if abs(velocity) >= SheetDragRule.flingVelocity {
+                    shouldExpand = velocity < 0
+                } else if abs(moved) >= SheetDragRule.directionSlop {
+                    shouldExpand = moved < 0
+                } else {
+                    shouldExpand = isExpanded
+                }
                 if shouldExpand != isExpanded { HapticManager.shared.selection() }
                 isExpanded = shouldExpand
             }

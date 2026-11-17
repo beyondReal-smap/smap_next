@@ -23,6 +23,7 @@ import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.components.GroupPickerSheet
 import com.dmonster.smap.ui.components.MapTopControls
 import com.dmonster.smap.ui.components.SmapMapSheetScaffold
+import com.dmonster.smap.ui.components.rememberSmapMapSheetState
 import com.dmonster.smap.ui.home.MapLoadingOverlay
 import androidx.compose.material.icons.Icons
 import androidx.compose.ui.unit.sp
@@ -167,12 +168,7 @@ fun ActivityLogScreen(
     }
 
     // 지도 시트 상태 / 그룹 선택
-    val sheetScaffoldState = rememberBottomSheetScaffoldState(
-        bottomSheetState = rememberStandardBottomSheetState(
-            initialValue = SheetValue.PartiallyExpanded,
-            skipHiddenState = true
-        )
-    )
+    val sheetState = rememberSmapMapSheetState()
     val scope = rememberCoroutineScope()
     var showGroupPicker by remember { mutableStateOf(false) }
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -188,7 +184,7 @@ fun ActivityLogScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         SmapMapSheetScaffold(
             peekHeight = sheetPeek,
-            scaffoldState = sheetScaffoldState,
+            sheetState = sheetState,
             snackbarHostState = snackbarHostState,
             sheetContent = {
                 ActivityLogSheetContent(
@@ -203,7 +199,7 @@ fun ActivityLogScreen(
                     subscriptionStatus = subscriptionStatus,
                     onSelectMember = {
                         viewModel.selectMember(it)
-                        scope.launch { sheetScaffoldState.bottomSheetState.partialExpand() }
+                        scope.launch { sheetState.partialExpand() }
                     },
                     onSelectDate = { viewModel.selectDate(it) },
                     onLockedDate = { viewModel.onLockedDateClicked(it) },
