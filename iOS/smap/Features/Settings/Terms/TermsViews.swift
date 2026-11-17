@@ -59,9 +59,9 @@ struct ServiceTermsView: View {
 
                     TermSection(title: "제2조(정의)", content: """
                     1. "서비스"라 함은 구현되는 단말기(PC, TV, 휴대형단말기 등의 각종 유무선 장치를 포함)와 상관없이 이용자가 이용할 수 있는 회사의 제반 서비스를 의미합니다.
-                       ① smap 서비스
+                       ① 도착했어 서비스
                        ② 기타 회사가 정하는 서비스
-                    2. "smap 서비스"라 함은 실시간 위치조회, 위치와 일정 기반 알림 등 회사가 이용자에게 제공하는 서비스를 말합니다.
+                    2. "도착했어 서비스"라 함은 실시간 위치조회, 위치와 일정 기반 알림 등 회사가 이용자에게 제공하는 서비스를 말합니다.
                     3. "이용자"란 회사가 제공하는 서비스를 받는 개인회원과 비회원을 말합니다.
                     4. "개인회원"은 회사에 개인정보를 제공하여 회원등록을 한 사람으로, 회사로부터 지속적으로 정보를 제공받고 서비스를 계속적으로 이용할 수 있는 자를 말합니다.
                     5. "비회원"은 회원가입 없이 회사가 제공하는 서비스를 이용하는 자를 말합니다.
@@ -164,7 +164,7 @@ struct PrivacyPolicyView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     Text("비욘드리얼(\"회사\"라 함)는 이용자의 개인정보를 소중하게 생각하며, 『개인정보 보호법』 및 『위치정보의 보호 및 이용 등에 관한 법률』 등 관련 법령을 준수하고 있습니다.")
                         .font(.suite(size: 15)).lineSpacing(6)
-                    Text("본 방침은 \"smap\" 서비스 이용 시 수집되는 위치 데이터를 포함한 개인정보의 처리 과정을 상세히 공개합니다.")
+                    Text("본 방침은 \"도착했어\" 서비스 이용 시 수집되는 위치 데이터를 포함한 개인정보의 처리 과정을 상세히 공개합니다.")
                         .font(.suite(size: 15)).lineSpacing(6)
 
                     TermSection(title: "1. 개인정보 수집 항목 및 이용목적", content: "회사는 서비스 제공을 위해 아래와 같은 개인정보 및 기기 액세스 권한을 수집·이용합니다.")
@@ -201,7 +201,7 @@ struct PrivacyPolicyView: View {
                     // Important notice
                     VStack(alignment: .leading, spacing: 8) {
                         Text("[중요] 위치 정보 액세스 고지").font(.suite(size: 15, weight: .bold)).foregroundColor(.orange)
-                        Text("\"smap\"은 앱이 닫혀 있거나 사용 중이 아닐 때도 실시간 위치 공유 기능을 지원하기 위해 위치 데이터를 수집합니다.").font(.suite(size: 14)).lineSpacing(4)
+                        Text("\"도착했어\"는 앱이 닫혀 있거나 사용 중이 아닐 때도 실시간 위치 공유 기능을 지원하기 위해 위치 데이터를 수집합니다.").font(.suite(size: 14)).lineSpacing(4)
                         Text("이용자가 '항상 허용'으로 설정한 경우에 한해 백그라운드에서 위치 정보를 액세스하며, 이는 그룹 멤버 간의 원활한 일정 및 위치 공유를 위한 핵심 기능입니다.").font(.suite(size: 14)).lineSpacing(4)
                     }
                     .padding(16).frame(maxWidth: .infinity, alignment: .leading)
@@ -259,7 +259,7 @@ struct LocationTermsView: View {
                 }.frame(maxWidth: .infinity).padding(.vertical, 20)
 
                 VStack(alignment: .leading, spacing: 20) {
-                    TermSection(title: "제1조(목적)", content: "본 약관은 회원(비욘드리얼 서비스 약관에 동의한 자, 이하 \"회원\")이 비욘드리얼(이하 \"회사\")이 제공하는 웹/모바일 애플리케이션(\"smap\")의 위치기반서비스를 이용함에 있어 회원과 회사의 권리와 의무, 기타 제반 사항을 정함을 목적으로 합니다.")
+                    TermSection(title: "제1조(목적)", content: "본 약관은 회원(비욘드리얼 서비스 약관에 동의한 자, 이하 \"회원\")이 비욘드리얼(이하 \"회사\")이 제공하는 웹/모바일 애플리케이션(\"도착했어\")의 위치기반서비스를 이용함에 있어 회원과 회사의 권리와 의무, 기타 제반 사항을 정함을 목적으로 합니다.")
                     TermSection(title: "제2조(가입자격)", content: "서비스에 가입할 수 있는 회원은 위치기반서비스를 이용할 수 있는 이동전화 단말기의 소유자 본인이어야 합니다.")
                     TermSection(title: "제3조(서비스 가입)", content: "회사는 다음 각 호에 해당하는 가입신청을 승낙하지 않을 수 있습니다.\n1. 실명이 아니거나 타인의 명의를 사용하는 등 허위로 신청하는 경우\n2. 고객 등록 사항을 누락하거나 오기하여 신청하는 경우\n3. 공공질서 또는 미풍양속을 저해하거나 저해할 목적을 가지고 신청하는 경우\n4. 기타 회사가 정한 이용신청 요건이 충족되지 않았을 경우")
                     TermSection(title: "제4조(서비스 해지)", content: "회원은 회사가 정한 절차를 통해 서비스 해지를 신청할 수 있습니다.")
