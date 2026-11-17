@@ -106,7 +106,6 @@ cd Android
 `gradle.properties` 또는 `local.properties`에 설정:
 
 ```properties
-GOOGLE_OAUTH_CLIENT_ID=your_client_id
 KAKAO_API_KEY=your_kakao_key
 ```
 
