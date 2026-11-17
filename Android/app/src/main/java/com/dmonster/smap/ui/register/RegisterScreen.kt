@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,6 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.dmonster.smap.ui.theme.SmapRadius
 import com.dmonster.smap.data.model.RegisterStep
 import com.dmonster.smap.ui.components.SmapBanner
 import com.dmonster.smap.ui.components.SmapBannerTone
@@ -192,9 +194,15 @@ fun RegisterScreen(
                 )
             }
 
-            // "전체 동의하기" 버튼 위에 위치 (약관 단계일 때만)
+            // "전체 동의하기" 버튼 위에 위치 (약관 단계일 때만) — iOS 처럼 회색 상자(모서리 12)로 개별 항목과 구분
             if (uiState.currentStep == RegisterStep.TERMS) {
-                Box(modifier = Modifier.padding(horizontal = 24.dp)) {
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = 24.dp)
+                        .clip(RoundedCornerShape(SmapRadius.md))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                ) {
                     TermsCheckItem(
                         title = "전체 동의하기",
                         isChecked = viewModel.isAllTermsAgreed,

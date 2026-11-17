@@ -20,7 +20,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.material.icons.outlined.Cake
 import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.ui.semantics.Role
 import com.dmonster.smap.ui.components.SmapTextField
@@ -59,7 +58,6 @@ internal fun ProfileContent(
                 onValueChange = {},
                 label = "생년월일 (선택)",
                 placeholder = "눌러서 선택",
-                leadingIcon = Icons.Outlined.Cake,
                 trailingContent = { Icon(Icons.Outlined.DateRange, contentDescription = null) },
                 readOnly = true,
             )

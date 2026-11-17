@@ -17,8 +17,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.outlined.Key
-import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.Icon
@@ -148,7 +146,6 @@ fun ChangePasswordScreen(
                     value = currentPassword,
                     onValueChange = { currentPassword = it },
                     label = "현재 비밀번호",
-                    leadingIcon = Icons.Outlined.Lock,
                     imeAction = ImeAction.Next,
                     keyboardActions = next,
                 )
@@ -156,7 +153,6 @@ fun ChangePasswordScreen(
                     value = newPassword,
                     onValueChange = { newPassword = it },
                     label = "새 비밀번호",
-                    leadingIcon = Icons.Outlined.Key,
                     imeAction = ImeAction.Next,
                     keyboardActions = next,
                 )
@@ -164,7 +160,6 @@ fun ChangePasswordScreen(
                     value = confirmPassword,
                     onValueChange = { confirmPassword = it },
                     label = "새 비밀번호 확인",
-                    leadingIcon = Icons.Outlined.Key,
                     imeAction = ImeAction.Done,
                     keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                     errorText = if (confirmPassword.isNotEmpty() && !isPasswordMatch) "새 비밀번호와 달라요" else null,

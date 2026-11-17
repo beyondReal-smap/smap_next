@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Email
-import androidx.compose.material.icons.outlined.Pin
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,7 +44,6 @@ internal fun PhoneContent(
             onValueChange = { viewModel.setPhoneNumber(it) },
             label = "이메일",
             placeholder = "name@example.com",
-            leadingIcon = Icons.Outlined.Email,
             keyboardType = KeyboardType.Email,
             imeAction = ImeAction.Done,
         )
@@ -75,7 +73,6 @@ internal fun VerificationContent(
             onValueChange = { viewModel.setVerificationCode(it) },
             label = "인증번호",
             placeholder = "6자리 숫자",
-            leadingIcon = Icons.Outlined.Pin,
             keyboardType = KeyboardType.NumberPassword,
             imeAction = ImeAction.Done,
             // 남은 시간을 입력창 바로 아래에 두어, 만료 여부를 입력하면서 볼 수 있게 한다.

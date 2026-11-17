@@ -158,14 +158,14 @@ struct ForgotPasswordView: View {
     private var phoneStepView: some View {
         Group {
             StepHeader(
-                title: "이메일 또는 전화번호를 입력해 주세요",
+                title: "이메일을 입력해 주세요",
                 description: "가입할 때 쓴 주소로 인증번호를 보내 드려요."
             )
 
             SMAPTextField(
-                "이메일 주소 또는 전화번호",
+                "name@example.com",
                 text: $viewModel.phoneNumber,
-                label: "이메일 또는 전화번호",
+                label: "이메일",
                 errorMessage: inlineError,
                 keyboardType: .emailAddress,
                 textContentType: .username

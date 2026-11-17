@@ -64,11 +64,11 @@ class LoginViewModel: ObservableObject {
     
     /// 입력값 유효성 검사
     var isInputValid: Bool {
+        // 로그인 아이디는 이메일만 받는다(2026-11-17 전화번호 로그인 제거 — 새로 시작하는 앱 기준).
+        // 프로퍼티 이름 phoneNumber 는 전화번호 시절 이름이다. 호출부가 같은 이름을 써서 그대로 두었다.
         let identifier = phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines)
-        let cleanPhone = identifier.replacingOccurrences(of: "-", with: "")
-        let isPhone = cleanPhone.range(of: "^[0-9]{10,11}$", options: .regularExpression) != nil
         let isEmail = identifier.range(of: "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$", options: .regularExpression) != nil
-        return (isPhone || isEmail) && !password.isEmpty
+        return isEmail && !password.isEmpty
     }
     
     // MARK: - Login Actions
@@ -77,7 +77,7 @@ class LoginViewModel: ObservableObject {
     @available(iOS 15.0, *)
     func login() async {
         guard isInputValid else {
-            DispatchQueue.main.async { self.showErrorMessage("이메일 또는 전화번호와 비밀번호를 확인해주세요.") }
+            DispatchQueue.main.async { self.showErrorMessage("이메일과 비밀번호를 확인해주세요.") }
             return
         }
         
@@ -117,7 +117,7 @@ class LoginViewModel: ObservableObject {
     /// 전화번호/비밀번호 로그인 (iOS 13/14 동기 래퍼)
     func loginSync() {
         guard isInputValid else {
-            showErrorMessage("전화번호와 비밀번호를 입력해주세요.")
+            showErrorMessage("이메일과 비밀번호를 확인해주세요.")
             return
         }
         
@@ -1177,8 +1177,9 @@ class ForgotPasswordViewModel: ObservableObject {
             .range(of: "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$", options: .regularExpression) != nil
     }
     
-    /// 첫 단계 버튼 활성 조건
-    var isIdentifierValid: Bool { isPhoneInput || isEmailInput }
+    /// 첫 단계 버튼 활성 조건 — 이메일만 받는다(2026-11-17 전화번호 입력 제거).
+    /// 그래서 checkUserAndSendCode 의 SMS 경로(isPhoneInput)는 더 이상 실행되지 않는다.
+    var isIdentifierValid: Bool { isEmailInput }
     
     /// 전화번호 인증번호 유효 시간(서버 3분), 이메일은 10분
     private var codeLifetimeSeconds: Int { isPhoneInput ? 180 : 600 }
@@ -1240,7 +1241,7 @@ class ForgotPasswordViewModel: ObservableObject {
     /// 입력 종류(이메일/전화번호)에 맞춰 인증번호 발송
     func checkUserAndSendCode() {
         guard !isLoading else { return }
-        guard isIdentifierValid else { errorMessage = "올바른 이메일 또는 전화번호를 입력해주세요."; showError = true; return }
+        guard isIdentifierValid else { errorMessage = "올바른 이메일을 입력해주세요."; showError = true; return }
         guard canResend() else { errorMessage = "잠시 후 다시 시도해주세요."; showError = true; return }
         if isPhoneInput { sendPhoneCode() } else { sendEmailCode() }
     }

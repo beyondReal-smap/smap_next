@@ -19,14 +19,15 @@ struct RegisterTermsView: View {
                 .font(.suite(size: 24, weight: .bold))
                 .foregroundColor(SMAPTheme.Color.textPrimary)
             
-            VStack(spacing: 16) {
+            // 한 행 = 화살표 터치 영역 44pt + 사이 4pt = 48pt(Android 와 같음). 예전엔 사이 16pt 라 60pt 로 벌어져 보였다.
+            VStack(spacing: 4) {
                 ToggleRow(title: "(필수) 서비스 이용약관", isChecked: $viewModel.registerData.mt_agree1, termsDestination: AnyView(ServiceTermsView()))
                 ToggleRow(title: "(필수) 개인정보 처리방침", isChecked: $viewModel.registerData.mt_agree2, termsDestination: AnyView(PrivacyPolicyView()))
                 ToggleRow(title: "(필수) 위치기반서비스 이용약관", isChecked: $viewModel.registerData.mt_agree3, termsDestination: AnyView(LocationTermsView()))
                 ToggleRow(title: "(선택) 개인정보 제3자 제공 동의", isChecked: $viewModel.registerData.mt_agree4, termsDestination: AnyView(ThirdPartyProvisionView()))
                 ToggleRow(title: "(선택) 마케팅 정보 수신 동의", isChecked: $viewModel.registerData.mt_agree5, termsDestination: AnyView(MarketingConsentView()))
             }
-            .padding(.top, 20)
+            .padding(.top, 4)
             
             Spacer()
         }

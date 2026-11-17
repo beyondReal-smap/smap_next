@@ -18,25 +18,22 @@ struct CustomAppleSignInButton: View {
             HapticManager.shared.impact(style: .medium)
             onTap()
         }) {
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 // Apple 로고
                 Image(systemName: "apple.logo")
-                    .font(.suite(size: 22, weight: .medium))
+                    .font(.system(size: 18, weight: .medium))
                     .foregroundColor(.white)
+                    .frame(width: 20, height: 20)
 
                 Text("Apple로 계속하기")
-                    .font(.suite(size: 15, weight: .medium))
+                    .font(.suite(size: 16, weight: .medium))  // 로그인 화면 Google·카카오 버튼과 같은 16
                     .foregroundColor(.white)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 48)
+            // 높이·모서리는 앱 공용 버튼(SMAPButton 52pt·12pt)과 맞춘다(Google·카카오 버튼과 같은 규격).
+            .frame(height: 52)
             .background(Color.black)
-            .cornerRadius(12)
-            // .overlay(
-            //    RoundedRectangle(cornerRadius: 12)
-            //        .stroke(SMAPTheme.Color.border, lineWidth: 1)
-            // )
-            .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+            .clipShape(RoundedRectangle(cornerRadius: SMAPTheme.Radius.md))
         }
     }
 }

@@ -25,8 +25,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.Email
-import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.Pin
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -240,7 +238,7 @@ private fun StepHeader(title: String, description: String) {
     Text(text = description, style = SmapText.secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
-/** 1단계 — 가입할 때 쓴 이메일 또는 전화번호를 입력한다. */
+/** 1단계 — 가입할 때 쓴 이메일을 입력한다. */
 @Composable
 private fun PhoneStepContent(
     input: String,
@@ -251,7 +249,7 @@ private fun PhoneStepContent(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(SmapSpacing.sm)) {
         StepHeader(
-            title = "이메일 또는 전화번호를 입력해 주세요",
+            title = "이메일을 입력해 주세요",
             description = "가입할 때 쓴 주소로 인증번호를 보내 드려요."
         )
 
@@ -260,9 +258,8 @@ private fun PhoneStepContent(
         SmapTextField(
             value = input,
             onValueChange = onInputChange,
-            label = "이메일 또는 전화번호",
+            label = "이메일",
             placeholder = "name@example.com",
-            leadingIcon = Icons.Outlined.Email,
             keyboardType = KeyboardType.Email,
             imeAction = ImeAction.Done,
             keyboardActions = KeyboardActions(onDone = { if (canSend && !isLoading) onSendCode() }),
@@ -302,7 +299,6 @@ private fun VerificationStepContent(
             onValueChange = onCodeChange,
             label = "인증번호",
             placeholder = "6자리 숫자",
-            leadingIcon = Icons.Outlined.Pin,
             keyboardType = KeyboardType.NumberPassword,
             imeAction = ImeAction.Done,
             helperText = if (timer > 0) "남은 시간 ${formatTimer(timer)}" else null,
@@ -363,7 +359,6 @@ private fun NewPasswordStepContent(
             value = newPassword,
             onValueChange = onNewPasswordChange,
             label = "새 비밀번호",
-            leadingIcon = Icons.Outlined.Lock,
             imeAction = ImeAction.Next,
         )
 
@@ -382,7 +377,6 @@ private fun NewPasswordStepContent(
             value = confirmPassword,
             onValueChange = onConfirmPasswordChange,
             label = "비밀번호 확인",
-            leadingIcon = Icons.Outlined.Lock,
             errorText = if (confirmMismatch) "비밀번호가 일치하지 않아요." else null,
             imeAction = ImeAction.Done,
         )

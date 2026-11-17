@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Badge
-import androidx.compose.material.icons.outlined.Notes
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -130,7 +128,6 @@ private fun GroupFormSheet(
                 onValueChange = { if (it.length <= NAME_MAX) name = it },
                 label = "그룹 이름",
                 placeholder = "예: 우리 가족, 회사 동료",
-                leadingIcon = Icons.Outlined.Badge,
                 helperText = "${name.length}/$NAME_MAX",
                 imeAction = ImeAction.Next,
             )
@@ -139,7 +136,6 @@ private fun GroupFormSheet(
                 onValueChange = { if (it.length <= DESC_MAX) description = it },
                 label = "그룹 설명 (선택)",
                 placeholder = "어떤 그룹인지 짧게 적어 주세요",
-                leadingIcon = Icons.Outlined.Notes,
                 helperText = "${description.length}/$DESC_MAX",
                 singleLine = false,
             )

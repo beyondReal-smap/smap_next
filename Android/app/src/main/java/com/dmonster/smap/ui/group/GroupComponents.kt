@@ -221,7 +221,6 @@ private fun InviteJoinSection(
                     onValueChange = { v -> onCodeChange(v.uppercase().filter { it in 'A'..'Z' || it in '0'..'9' }) },
                     label = "초대 코드",
                     placeholder = "예: 5JDZRMNVEV",
-                    leadingIcon = Icons.Outlined.PersonAdd,
                     keyboardType = KeyboardType.Ascii,
                     imeAction = ImeAction.Done,
                     keyboardActions = KeyboardActions(onDone = { focus.clearFocus(); if (inviteCode.isNotBlank()) onJoin() }),

@@ -14,7 +14,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Email
-import androidx.compose.material.icons.outlined.Pin
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -147,7 +146,6 @@ private fun EmailStepContent(viewModel: EmailChangeViewModel, uiState: EmailChan
         onValueChange = { viewModel.setEmail(it) },
         label = "이메일",
         placeholder = "name@example.com",
-        leadingIcon = Icons.Outlined.Email,
         keyboardType = KeyboardType.Email,
         imeAction = ImeAction.Done,
         helperText = if (uiState.isRegistered) "현재 이메일 ${uiState.currentEmail}" else null,
@@ -173,7 +171,6 @@ private fun CodeStepContent(viewModel: EmailChangeViewModel, uiState: EmailChang
         onValueChange = { viewModel.setCode(it) },
         label = "인증번호",
         placeholder = "6자리 숫자",
-        leadingIcon = Icons.Outlined.Pin,
         keyboardType = KeyboardType.NumberPassword,
         imeAction = ImeAction.Done,
         enabled = !uiState.isCompleted,

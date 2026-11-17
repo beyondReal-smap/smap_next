@@ -10,9 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.outlined.Badge
 import androidx.compose.material.icons.outlined.Groups
-import androidx.compose.material.icons.outlined.Notes
 import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -137,14 +135,12 @@ fun GroupCreationScreen(
                         onValueChange = { groupName = it },
                         label = "그룹 이름",
                         placeholder = "예: 우리 가족, 회사 동료",
-                        leadingIcon = Icons.Outlined.Badge,
                         imeAction = ImeAction.Next
                     )
                     SmapTextField(
                         value = groupDescription,
                         onValueChange = { groupDescription = it },
                         label = "그룹 설명 (선택)",
-                        leadingIcon = Icons.Outlined.Notes,
                         imeAction = ImeAction.Done
                     )
                     SmapBanner(message = "그룹을 만들면 멤버를 초대할 수 있는 코드가 생겨요.")
@@ -154,7 +150,6 @@ fun GroupCreationScreen(
                         // 초대 코드는 영문 대문자·숫자로만 이뤄진다(그룹 탭 입력과 같은 규칙).
                         onValueChange = { v -> inviteCode = v.uppercase().filter { it in 'A'..'Z' || it in '0'..'9' } },
                         label = "초대 코드",
-                        leadingIcon = Icons.Outlined.PersonAdd,
                         helperText = "그룹장에게 받은 코드를 입력해 주세요.",
                         keyboardType = KeyboardType.Ascii,
                         imeAction = ImeAction.Done

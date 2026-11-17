@@ -12,9 +12,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.outlined.Badge
-import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Phone
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material3.Icon
@@ -55,7 +52,6 @@ internal fun BasicInfoContent(
             value = uiState.registerData.mtName,
             onValueChange = { viewModel.setName(it) },
             label = "이름",
-            leadingIcon = Icons.Outlined.Person,
             imeAction = ImeAction.Next,
         )
 
@@ -63,7 +59,6 @@ internal fun BasicInfoContent(
             value = uiState.registerData.mtNickname,
             onValueChange = { viewModel.setNickname(it) },
             label = "닉네임",
-            leadingIcon = Icons.Outlined.Badge,
             helperText = "그룹 멤버에게 보이는 이름이에요.",
             imeAction = ImeAction.Next,
         )
@@ -73,7 +68,6 @@ internal fun BasicInfoContent(
             value = uiState.registerData.mtHp ?: "",
             onValueChange = { viewModel.setOptionalPhone(it) },
             label = "전화번호 (선택)",
-            leadingIcon = Icons.Outlined.Phone,
             keyboardType = KeyboardType.Phone,
             imeAction = ImeAction.Next,
         )
@@ -84,7 +78,6 @@ internal fun BasicInfoContent(
             value = password,
             onValueChange = { viewModel.setPassword(it) },
             label = "비밀번호",
-            leadingIcon = Icons.Outlined.Lock,
             imeAction = ImeAction.Next,
         )
 
@@ -106,7 +99,6 @@ internal fun BasicInfoContent(
             value = uiState.passwordConfirm,
             onValueChange = { viewModel.setPasswordConfirm(it) },
             label = "비밀번호 확인",
-            leadingIcon = Icons.Outlined.Lock,
             errorText = if (confirmMismatch) "비밀번호가 일치하지 않아요." else null,
             imeAction = ImeAction.Done,
         )

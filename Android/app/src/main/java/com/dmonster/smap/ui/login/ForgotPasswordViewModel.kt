@@ -13,7 +13,8 @@ import kotlinx.coroutines.launch
 
 /**
  * 비밀번호 찾기 ViewModel (iOS ForgotPasswordViewModel 참고)
- * 입력이 이메일이면 메일 인증, 숫자 10~11자리 전화번호면 SMS 인증 경로로 진행한다.
+ * 이메일로 메일 인증을 받아 비밀번호를 재설정한다(2026-11-17 전화번호 입력 제거 — 아이디는 이메일만).
+ * SMS 경로 코드는 InputKind.PHONE 이 더 이상 나오지 않아 실행되지 않는다.
  * 인증 성공 여부는 항상 서버 응답으로만 판정한다(앱에서 코드를 비교하지 않는다).
  */
 @HiltViewModel
@@ -26,14 +27,9 @@ class ForgotPasswordViewModel @Inject constructor(private val authService: com.d
         const val MSG_WAIT = "잠시 후 다시 시도해주세요."
         private val EMAIL_REGEX = Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")
 
-        /** 입력 종류 판별. 전화번호는 하이픈·공백 제거 후 숫자 10~11자리 */
-        fun classify(input: String): InputKind {
-            val trimmed = input.trim()
-            if (EMAIL_REGEX.matches(trimmed)) return InputKind.EMAIL
-            val digits = trimmed.replace("-", "").replace(" ", "")
-            if (digits.length in 10..11 && digits.all { it in '0'..'9' }) return InputKind.PHONE
-            return InputKind.INVALID
-        }
+        /** 입력 종류 판별 — 이메일만 받는다. */
+        fun classify(input: String): InputKind =
+            if (EMAIL_REGEX.matches(input.trim())) InputKind.EMAIL else InputKind.INVALID
 
         /** 서버로 보낼 정규화 값: 이메일은 소문자, 전화번호는 숫자만 */
         fun normalize(input: String): String = when (classify(input)) {
@@ -177,7 +173,7 @@ class ForgotPasswordViewModel @Inject constructor(private val authService: com.d
         val kind = classify(_phoneNumber.value)
         val target = normalize(_phoneNumber.value)
         if (_isLoading.value) return
-        if (kind == InputKind.INVALID) { _errorMessage.value = "올바른 이메일 또는 전화번호를 입력해주세요."; return }
+        if (kind == InputKind.INVALID) { _errorMessage.value = "올바른 이메일을 입력해주세요."; return }
         if (lastSentTime != 0L && System.currentTimeMillis() - lastSentTime < RESEND_COOLDOWN_MS) { _errorMessage.value = MSG_WAIT; return }
         _isLoading.value = true
         viewModelScope.launch {

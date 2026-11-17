@@ -31,7 +31,9 @@ data class LoginUiState(
     val socialLoginData: Map<String, String>? = null
 ) {
     val isInputValid: Boolean
-        get() = (android.util.Patterns.EMAIL_ADDRESS.matcher(phoneNumber.trim()).matches() || phoneNumber.replace("-", "").matches(Regex("[0-9]{10,11}"))) && password.isNotEmpty()
+        // 로그인 아이디는 이메일만 받는다(2026-11-17 전화번호 로그인 제거 — 새로 시작하는 앱 기준).
+        // 필드 이름 phoneNumber 는 전화번호 시절 이름이다. 호출부가 같은 이름을 써서 그대로 두었다.
+        get() = android.util.Patterns.EMAIL_ADDRESS.matcher(phoneNumber.trim()).matches() && password.isNotEmpty()
 }
 
 /**
@@ -73,7 +75,7 @@ class LoginViewModel @Inject constructor(
      */
     fun login() {
         if (!_uiState.value.isInputValid) {
-            showErrorMessage("이메일 또는 전화번호와 비밀번호를 확인해주세요.")
+            showErrorMessage("이메일과 비밀번호를 확인해주세요.")
             return
         }
 

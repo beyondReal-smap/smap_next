@@ -1,6 +1,7 @@
 package com.dmonster.smap.ui.components
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
@@ -58,9 +59,12 @@ fun SmapButton(
     val colors = MaterialTheme.colorScheme
     val shape = RoundedCornerShape(SmapRadius.md)
     val clickable = enabled && !isLoading
+    // 비활성은 모양·색을 그대로 두고 전체를 50% 흐리게 한다(iOS SMAPButton 과 같은 방식).
+    // 예전에는 회색 바탕으로 바뀌어, iOS(흐린 남색)와 달라 보였다(2026-11-17).
     val buttonModifier = modifier
         .fillMaxWidth()
         .height(SmapSize.buttonHeight)
+        .alpha(if (enabled) 1f else 0.5f)
         .semantics { if (isLoading) contentDescription = "$text, 처리 중" }
 
     val content: @Composable () -> Unit = {
@@ -89,8 +93,8 @@ fun SmapButton(
             val container = if (style == SmapButtonStyle.Destructive) colors.error else colors.primary
             val onContainer = if (style == SmapButtonStyle.Destructive) colors.onError else colors.onPrimary
             // 주 동작 버튼은 남색 그라데이션으로 채워 화면에서 가장 먼저 눈에 들어오게 한다(평면 남색은 밋밋했다).
-            // 비활성(enabled=false)일 때는 그라데이션을 빼고 회색으로 둔다. 로딩 중에는 그대로 유지.
-            val gradient = style == SmapButtonStyle.Primary && enabled
+            // 비활성·로딩 중에도 그라데이션을 유지한다(비활성은 위 alpha 로 흐리게).
+            val gradient = style == SmapButtonStyle.Primary
             Button(
                 onClick = onClick,
                 modifier = if (gradient) buttonModifier.clip(shape).background(SmapBrush.accent) else buttonModifier,
@@ -99,13 +103,9 @@ fun SmapButton(
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (gradient) Color.Transparent else container,
                     contentColor = onContainer,
-                    // 로딩 중에는 색을 유지해 "눌렸다"는 것이 보이게 하고, 비활성일 때만 흐리게 한다.
-                    disabledContainerColor = when {
-                        gradient -> Color.Transparent
-                        isLoading -> container
-                        else -> colors.onSurface.copy(alpha = 0.12f)
-                    },
-                    disabledContentColor = if (isLoading) onContainer else colors.onSurface.copy(alpha = 0.38f),
+                    // 로딩·비활성 모두 색을 유지한다. 비활성은 buttonModifier 의 alpha 로만 구분한다.
+                    disabledContainerColor = if (gradient) Color.Transparent else container,
+                    disabledContentColor = onContainer,
                 ),
                 contentPadding = PaddingValues(horizontal = 16.dp),
             ) { content() }
@@ -120,7 +120,7 @@ fun SmapButton(
                     containerColor = colors.surfaceVariant,
                     contentColor = colors.onSurface,
                     disabledContainerColor = colors.surfaceVariant,
-                    disabledContentColor = colors.onSurface.copy(alpha = 0.38f),
+                    disabledContentColor = colors.onSurface,
                 ),
                 elevation = null,
                 contentPadding = PaddingValues(horizontal = 16.dp),
@@ -132,8 +132,8 @@ fun SmapButton(
                 modifier = buttonModifier,
                 enabled = clickable,
                 shape = shape,
-                border = BorderStroke(1.dp, if (enabled) colors.primary else colors.outline),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.primary),
+                border = BorderStroke(1.dp, colors.primary),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.primary, disabledContentColor = colors.primary),
                 contentPadding = PaddingValues(horizontal = 16.dp),
             ) { content() }
         }

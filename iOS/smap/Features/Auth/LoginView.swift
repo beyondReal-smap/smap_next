@@ -66,7 +66,6 @@ struct LoginView: View {
 
     /// 비밀번호 찾기 시트 표시 여부
     @State private var showForgotPassword = false
-    @State private var isFocused = false
 
     /// 기존 가입자 발견 시 전달받은 전화번호 (자동 입력)
     var prefilledPhone: String?
@@ -78,94 +77,65 @@ struct LoginView: View {
     var onNavigateToRegister: (([String: Any]?) -> Void)?
 
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                // Background Gradient (Matches Frontend)
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color(red: 102/255, green: 126/255, blue: 234/255), // #667eea
-                        Color(red: 118/255, green: 75/255, blue: 162/255),  // #764ba2
-                        Color(red: 240/255, green: 147/255, blue: 251/255), // #f093fb
-                        Color(red: 245/255, green: 87/255, blue: 108/255),  // #f5576c
-                        Color(red: 79/255, green: 172/255, blue: 254/255),  // #4facfe
-                        Color(red: 0/255, green: 242/255, blue: 254/255)    // #00f2fe
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
+        ZStack {
+            // 스플래시와 같은 브랜드 남색에서 이어지게 한다(Android SmapAccent.Navy.brush 와 같은 값).
+            // 아래 절반은 흰색 — 내용이 화면보다 짧아도 흰 시트가 화면 아래 끝까지 이어 보이게.
+            VStack(spacing: 0) {
+                SMAPTheme.Navy.gradient
+                SMAPTheme.Surface.card
+            }
+            .ignoresSafeArea()
 
-                // Floating Animations
-                FloatingBackgroundView()
-
+            ScrollView {
                 VStack(spacing: 0) {
+                    logoSection
+                        .padding(.top, 40)
+                        .padding(.bottom, 32)
+
+                    // 입력 시트 — 위쪽 모서리만 둥근 흰 판(앱 공용 시트 반경)
                     VStack(spacing: 0) {
-                        // 상단 여백 (유동적)
-                        Spacer()
+                        loginFormSection
 
-                        // Card Container
-                        VStack(spacing: 0) {
-                            // 로고 영역
-                            logoSection
-                                .padding(.top, 24) // Reduced from 32
-
-                            Spacer().frame(height: 24) // Reduced from 32
-
-                            // 로그인 폼
-                            loginFormSection
-
-                            Spacer().frame(height: 16)
-
-                            // 에러 메시지
-                            if viewModel.showError, let error = viewModel.errorMessage {
-                                errorMessageView(error)
-                                Spacer().frame(height: 16)
-                            }
-
-                            // 로그인 버튼
-                            loginButton
-
-                            Spacer().frame(height: 16)
-
-                            // 비밀번호 찾기 링크
-                            forgotPasswordLink
-
-                            Spacer().frame(height: 24)
-
-                            // 구분선
-                            dividerSection
-
-                            Spacer().frame(height: 24)
-
-                            // 소셜 로그인 버튼들
-                            socialLoginSection
-
-                            // 하단 여백 (회원가입 링크 위)
-                            Spacer().frame(height: 32)
-
-                            // 회원가입 링크
-                            signUpSection
-                                .padding(.bottom, 32)
+                        if viewModel.showError, let error = viewModel.errorMessage {
+                            errorMessageView(error)
+                                .padding(.top, SMAPTheme.Spacing.md)
                         }
-                        .padding(.horizontal, 24)
-                        .background(Color.white.opacity(0.95))
-                        .cornerRadius(24)
-                        .shadow(color: Color.black.opacity(0.15), radius: 20, x: 0, y: 10)
 
-                        // 하단 safe area 여백 (유동적)
-                        Spacer()
+                        SMAPButton("로그인", isLoading: viewModel.isLoading, isDisabled: !viewModel.isInputValid) {
+                            HapticManager.shared.impact(style: .medium)
+                            hideKeyboard()
+                            loginAction()
+                        }
+                        .padding(.top, SMAPTheme.Spacing.lg)
+
+                        forgotPasswordLink
+                            .padding(.top, SMAPTheme.Spacing.sm)
+
+                        dividerSection
+                            .padding(.top, SMAPTheme.Spacing.md)
+
+                        socialLoginSection
+                            .padding(.top, SMAPTheme.Spacing.lg)
+
+                        signUpSection
+                            .padding(.top, SMAPTheme.Spacing.lg)
                     }
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, SMAPTheme.Spacing.lg)
+                    .padding(.vertical, SMAPTheme.Spacing.xl)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        UnevenRoundedRectangle(topLeadingRadius: SMAPTheme.sheetRadius, topTrailingRadius: SMAPTheme.sheetRadius)
+                            .fill(SMAPTheme.Surface.card)
+                    )
                 }
+            }
+            .scrollDismissesKeyboard(.interactively)
 
-                // 로딩 오버레이
-                if viewModel.isLoading {
-                    loadingOverlay
-                }
+            // 로딩 오버레이
+            if viewModel.isLoading {
+                loadingOverlay
             }
-            .onTapGesture {
-                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-            }
+        }
         .onChange(of: viewModel.isLoggedIn) { _, isLoggedIn in
             if isLoggedIn {
                 onLoginSuccess?()
@@ -187,72 +157,55 @@ struct LoginView: View {
             ForgotPasswordView()
         }
     }
-}
+
+    private func hideKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
 
     // MARK: - Logo Section
 
-    // MARK: - Logo Section
-
+    /// 남색 바탕 위 앱 아이콘·이름·한 줄 소개
     private var logoSection: some View {
-        VStack(spacing: -10) {
-            // 앱 아이콘
-            // 앱 아이콘 (AppNoBg)
+        VStack(spacing: 0) {
             Image("AppNoBg")
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(width: 80, height: 80) // Size adjustment if needed
+                .frame(width: 76, height: 76)
                 .accessibilityHidden(true)
 
-            VStack(spacing: 4) {
-                // 앱 이름
-                Text("도착했어")
-                    .font(.suite(size: 32, weight: .bold))
-                    .foregroundColor(SMAPTheme.Color.textPrimary)
+            Text("도착했어")
+                .font(.suite(size: 32, weight: .bold))
+                .foregroundStyle(.white)
+                .accessibilityAddTraits(.isHeader)
+                .padding(.top, SMAPTheme.Spacing.md)
 
-                // 서브텍스트
-                Text("소중한 사람들과 함께하는 위치 공유")
-                    .font(.suite(size: 14))
-                    .foregroundColor(SMAPTheme.Color.textSecondary)
-                    .multilineTextAlignment(.center)
-            }
+            Text("가족이 도착하면 먼저 알려 드려요")
+                .font(SMAPTheme.Font.body)
+                .foregroundStyle(SMAPTheme.Surface.onNavyMuted)
+                .multilineTextAlignment(.center)
+                .padding(.top, 6)
         }
-        .padding(.bottom, 20)
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Login Form Section
 
     private var loginFormSection: some View {
-        VStack(spacing: 16) {
-            // 전화번호 입력
-            HStack(spacing: 12) {
-                Image(systemName: "person.fill")
-                    .foregroundColor(isFocused ? SMAPTheme.Color.primary : SMAPTheme.Color.textSecondary)
-                    .frame(width: 20)
-
-                TextField("이메일 또는 전화번호", text: $viewModel.phoneNumber, onEditingChanged: { editing in
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        isFocused = editing
-                    }
-                })
-                .keyboardType(.emailAddress)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-            }
-            .padding(.horizontal, 16)
-            .frame(height: 56)
-            .background(SMAPTheme.Color.inputBackground)
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isFocused ? SMAPTheme.Color.primary : SMAPTheme.Color.border, lineWidth: isFocused ? 2 : 1)
+        VStack(spacing: 12) {
+            SMAPTextField(
+                "이메일",
+                text: $viewModel.phoneNumber,
+                keyboardType: .emailAddress,
+                textContentType: .username,
+                submitLabel: .next
             )
 
-            // 비밀번호 입력
-            FocusableSecureField(
-                placeholder: "비밀번호",
+            SMAPTextField(
+                "비밀번호",
                 text: $viewModel.password,
-                icon: "lock.fill",
-                showPassword: $viewModel.showPassword
+                isSecure: true,
+                textContentType: .password,
+                submitLabel: .done
             )
         }
     }
@@ -266,40 +219,14 @@ struct LoginView: View {
 
 
             Text(message)
-                .font(.suite(size: 14))
+                .font(SMAPTheme.Font.secondary)
                 .foregroundColor(SMAPTheme.Color.error)
 
             Spacer()
         }
         .padding(12)
         .background(SMAPTheme.Color.error.opacity(0.1))
-        .cornerRadius(8)
-    }
-
-    // MARK: - Login Button
-
-    private var loginButton: some View {
-        Button(action: {
-            HapticManager.shared.impact(style: .medium)
-            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-            loginAction()
-        }) {
-            HStack {
-                if viewModel.isLoading {
-                    ActivityIndicator(style: .medium, color: .white)
-                } else {
-                    Text("로그인")
-                        .font(.suite(size: 16, weight: .semibold))
-                }
-            }
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .frame(height: 52)
-            .background(viewModel.isInputValid ? SMAPTheme.Color.primary : SMAPTheme.Color.primary.opacity(0.3))
-            .cornerRadius(12)
-            .shadow(color: viewModel.isInputValid ? SMAPTheme.Color.primary.opacity(0.3) : Color.clear, radius: 4, x: 0, y: 2)
-        }
-        .disabled(!viewModel.isInputValid || viewModel.isLoading)
+        .clipShape(RoundedRectangle(cornerRadius: SMAPTheme.Radius.sm))
     }
 
     private func loginAction() {
@@ -319,9 +246,10 @@ struct LoginView: View {
             HapticManager.shared.impact(style: .light)
             showForgotPassword = true
         }) {
-            Text("비밀번호를 잊어버리셨나요?")
-                .font(.suite(size: 14))
+            Text("비밀번호를 잊으셨나요?")
+                .font(SMAPTheme.Font.secondaryMedium)
                 .foregroundColor(SMAPTheme.Color.primary)
+                .frame(minHeight: 44)
         }
     }
 
@@ -330,72 +258,71 @@ struct LoginView: View {
     private var dividerSection: some View {
         HStack {
             Rectangle()
-                .fill(SMAPTheme.Color.border)
+                .fill(SMAPTheme.Surface.divider)
                 .frame(height: 1)
 
             Text("또는")
-                .font(.suite(size: 14))
+                .font(SMAPTheme.Font.secondary)
                 .foregroundColor(SMAPTheme.Color.textSecondary)
                 .padding(.horizontal, 12)
 
             Rectangle()
-                .fill(SMAPTheme.Color.border)
+                .fill(SMAPTheme.Surface.divider)
                 .frame(height: 1)
         }
     }
 
     // MARK: - Social Login Section
 
+    /// 높이·모서리는 앱 공용 버튼(SMAPButton 52pt·12pt)과 맞춘다. Android SocialLoginSection 과 같은 규격.
     private var socialLoginSection: some View {
         VStack(spacing: 12) {
-            // Google 로그인 버튼
+            // Google — 공식 규격: 흰 바탕 + 옅은 테두리 + 컬러 G 로고
             Button(action: {
                 HapticManager.shared.impact(style: .medium)
                 viewModel.googleLogin()
             }) {
-                HStack(spacing: 12) {
-                    // Google 아이콘
+                HStack(spacing: 10) {
                     GoogleLogoView()
-                        .frame(width: 24, height: 24)
+                        .frame(width: 20, height: 20)
 
                     Text("Google로 계속하기")
-                        .font(.suite(size: 15, weight: .medium))
-                        .foregroundColor(SMAPTheme.Color.textPrimary)
+                        .font(.suite(size: 16, weight: .medium))
+                        .foregroundColor(Color(red: 0x1F/255, green: 0x1F/255, blue: 0x1F/255))
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: 48)
+                .frame(height: 52)
                 .background(Color.white)
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: SMAPTheme.Radius.md))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(SMAPTheme.Color.border, lineWidth: 1)
+                    RoundedRectangle(cornerRadius: SMAPTheme.Radius.md)
+                        .stroke(Color(red: 0xDA/255, green: 0xDC/255, blue: 0xE0/255), lineWidth: 1)
                 )
-                .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
             }
+            .disabled(viewModel.isLoading)
 
-            // Kakao 로그인 버튼 — Kakao 공식 규격(배경 #FEE500, 글자·심볼 검정 계열). Android 와 같이 Google 다음 순서.
+            // Kakao — 공식 규격: 바탕 #FEE500, 심볼 #000000, 글자 #000000 85%. Android 와 같이 Google 다음 순서.
             Button(action: {
                 HapticManager.shared.impact(style: .medium)
                 viewModel.kakaoLogin()
             }) {
-                HStack(spacing: 12) {
-                    KakaoBubbleShape()
-                        .fill(Color(red: 0x19/255, green: 0x19/255, blue: 0x19/255))
-                        .frame(width: 24, height: 24)
+                HStack(spacing: 10) {
+                    KakaoSymbolShape()
+                        .fill(Color.black)
+                        .frame(width: 20, height: 20)
                         .accessibilityHidden(true)
 
                     Text("카카오로 계속하기")
-                        .font(.suite(size: 15, weight: .medium))
-                        .foregroundColor(Color(red: 0x19/255, green: 0x19/255, blue: 0x19/255))
+                        .font(.suite(size: 16, weight: .medium))
+                        .foregroundColor(Color.black.opacity(0.85))
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: 48)
+                .frame(height: 52)
                 .background(Color(red: 0xFE/255, green: 0xE5/255, blue: 0x00/255))
-                .cornerRadius(12)
+                .clipShape(RoundedRectangle(cornerRadius: SMAPTheme.Radius.md))
             }
             .disabled(viewModel.isLoading)
 
-            // Apple 로그인 버튼 (Google 스타일과 동일하게)
             CustomAppleSignInButton(onTap: {
                 triggerAppleSignIn()
             })
@@ -439,7 +366,7 @@ struct LoginView: View {
     private var signUpSection: some View {
         HStack(spacing: 4) {
             Text("아직 회원이 아니신가요?")
-                .font(.suite(size: 14))
+                .font(SMAPTheme.Font.secondary)
                 .foregroundColor(SMAPTheme.Color.textSecondary)
 
             Button(action: {
@@ -447,8 +374,9 @@ struct LoginView: View {
                 onNavigateToRegister?(nil)
             }) {
                 Text("가입하기")
-                    .font(.suite(size: 14, weight: .semibold))
+                    .font(.suite(size: 15, weight: .bold))
                     .foregroundColor(SMAPTheme.Color.primary)
+                    .frame(minWidth: 44, minHeight: 44)
             }
         }
     }
@@ -527,18 +455,23 @@ extension Color {
 
 // MARK: - Kakao 말풍선 심볼
 
-/// Kakao 로그인 버튼용 말풍선 심볼. 외부 이미지 에셋을 추가하지 않기 위해 Shape 로 직접 그린다.
-struct KakaoBubbleShape: Shape {
+/// Kakao 로그인 버튼용 말풍선 심볼(공식 규격: 검정). 외부 이미지 에셋을 추가하지 않기 위해 Shape 로 직접 그린다.
+/// 몸통과 꼬리를 한 덩어리의 닫힌 경로로 그린다 — 예전처럼 타원과 삼각형을 따로 겹치면 감는 방향이 반대라
+/// 겹친 부분이 비어 노란 선이 보였다. Android res/drawable/ic_kakao_logo.xml 과 같은 좌표(24 기준).
+struct KakaoSymbolShape: Shape {
     func path(in rect: CGRect) -> Path {
+        let sx = rect.width / 24, sy = rect.height / 24
+        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: rect.minX + x * sx, y: rect.minY + y * sy) }
         var path = Path()
-        let w = rect.width
-        let h = rect.height
-        // 몸통: 가로로 넓은 타원 (위쪽 약 85%)
-        path.addEllipse(in: CGRect(x: rect.minX + w * 0.04, y: rect.minY + h * 0.08, width: w * 0.92, height: h * 0.74))
-        // 꼬리: 왼쪽 아래로 뻗는 작은 삼각형
-        path.move(to: CGPoint(x: rect.minX + w * 0.26, y: rect.minY + h * 0.72))
-        path.addLine(to: CGPoint(x: rect.minX + w * 0.20, y: rect.minY + h * 0.95))
-        path.addLine(to: CGPoint(x: rect.minX + w * 0.46, y: rect.minY + h * 0.80))
+        path.move(to: p(12, 3))
+        path.addCurve(to: p(1, 11), control1: p(5.9, 3), control2: p(1, 6.5))
+        path.addCurve(to: p(6.2, 17.8), control1: p(1, 13.9), control2: p(3.1, 16.4))
+        path.addLine(to: p(5.3, 21.5))
+        path.addCurve(to: p(6, 22), control1: p(5.2, 21.9), control2: p(5.7, 22.2))
+        path.addLine(to: p(10.3, 19.1))
+        path.addCurve(to: p(12.1, 19.2), control1: p(10.9, 19.2), control2: p(11.5, 19.2))
+        path.addCurve(to: p(23.1, 11.2), control1: p(18.2, 19.2), control2: p(23.1, 15.7))
+        path.addCurve(to: p(12, 3), control1: p(23.1, 6.7), control2: p(18.1, 3))
         path.closeSubpath()
         return path
     }

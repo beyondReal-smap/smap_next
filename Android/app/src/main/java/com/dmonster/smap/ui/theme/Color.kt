@@ -119,16 +119,3 @@ object SettingsColors {
     val TextBodyPrimary = Color(0xFF333333)
 }
 
-/**
- * 그라데이션 배경 색상 (로그인 화면용)
- */
-object GradientColors {
-    val LoginGradient = listOf(
-        Color(0xFF667EEA),  // #667eea
-        Color(0xFF764BA2),  // #764ba2
-        Color(0xFFF093FB),  // #f093fb
-        Color(0xFFF5576C),  // #f5576c
-        Color(0xFF4FACFE),  // #4facfe
-        Color(0xFF00F2FE)   // #00f2fe
-    )
-}

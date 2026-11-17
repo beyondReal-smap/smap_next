@@ -17,9 +17,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AlternateEmail
 import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -132,7 +130,6 @@ fun EditProfileScreen(
                     onValueChange = { name = it },
                     label = "이름",
                     placeholder = "이름을 입력하세요",
-                    leadingIcon = Icons.Outlined.Person,
                     enabled = !isNameLocked,
                     imeAction = ImeAction.Next,
                     helperText = if (isNameLocked) "등록한 이름은 바꿀 수 없어요" else null,
@@ -142,7 +139,6 @@ fun EditProfileScreen(
                     onValueChange = { nickname = it },
                     label = "닉네임",
                     placeholder = "닉네임을 입력하세요",
-                    leadingIcon = Icons.Outlined.AlternateEmail,
                     imeAction = ImeAction.Done,
                 )
 
