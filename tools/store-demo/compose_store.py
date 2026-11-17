@@ -6,7 +6,7 @@
 
 - 캡처 폴더에는 1_home 2_group 3_schedule 4_place 5_log 6_notice .png 가 있어야 한다.
 - android: 1080x1920 6장 + 대표 그래픽 1024x500
-- ios:     1320x2868(6.9인치) 6장
+- ios:     1320x2868(6.9인치) 6장 + 제품 페이지 헤더 3840x1646 + 검색 결과 3840x2560
 - 배경색은 메뉴별 강조색(홈 남색·그룹 청록·일정 주황·내장소 보라·활동 로그 장미)을 따른다.
 """
 from __future__ import annotations
@@ -120,6 +120,51 @@ def feature_graphic(home_shot: Path, log_shot: Path) -> Image.Image:
     return canvas.convert("RGB")
 
 
+def hero(shots: list[Path], w: int, h: int, title: str | None, sub: str | None) -> Image.Image:
+    """App Store 제품 페이지 헤더·검색 결과 자산. 방향별로 가운데 기준으로 잘리므로 핵심 요소를 가운데에 둔다.
+
+    shots: [왼쪽, 가운데, 오른쪽] 화면. title 이 없으면 글자 없이 휴대폰만(헤더 — 앱 이름은 스토어가 덮어 표시).
+    """
+    canvas = gradient(w, h, "#000C6E", "#2236E6")
+    # 가운데 휴대폰 뒤 은은한 빛
+    glow = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+    ImageDraw.Draw(glow).ellipse((w * 0.32, h * 0.18, w * 0.68, h * 1.15), fill=(120, 150, 255, 90))
+    canvas = Image.alpha_composite(canvas, glow.filter(ImageFilter.GaussianBlur(w * 0.04)))
+
+    top = round(h * 0.075)
+    if title:
+        d = ImageDraw.Draw(canvas)
+        tf = fit_font(d, title, "heavy", round(h * 0.062), round(w * 0.8))
+        d.text((w / 2, top), title, font=tf, fill="white", anchor="ma")
+        top += round(tf.size * 1.35)
+        if sub:
+            sf = fit_font(d, sub, "medium", round(h * 0.03), round(w * 0.8))
+            d.text((w / 2, top), sub, font=sf, fill=(255, 255, 255, 215), anchor="ma")
+            top += round(sf.size * 1.4)
+        top += round(h * 0.03)
+    else:
+        top = round(h * 0.09)
+
+    # 가운데 휴대폰이 남은 높이의 대부분을 쓰고 아래는 잘려도 된다(화면 위쪽이 핵심)
+    center_w = round((h - top) * 0.52)
+    side_w = round(center_w * 0.86)
+    gap = round(center_w * 0.18)
+    layout = [  # (화면, 폭, 가운데 x, 위쪽 y)
+        (shots[0], side_w, w / 2 - center_w / 2 - gap - side_w / 2, top + round(h * 0.07)),
+        (shots[2], side_w, w / 2 + center_w / 2 + gap + side_w / 2, top + round(h * 0.07)),
+        (shots[1], center_w, w / 2, top),
+    ]
+    for shot, pw, cx, y in layout:
+        ph = phone(Image.open(shot), pw)
+        x = round(cx - ph.width / 2)
+        shadow = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+        ImageDraw.Draw(shadow).rounded_rectangle((x, y + 40, x + ph.width, y + ph.height + 40), round(pw * 0.11),
+                                                 fill=(0, 0, 20, 120))
+        canvas = Image.alpha_composite(canvas, shadow.filter(ImageFilter.GaussianBlur(pw * 0.06)))
+        canvas.alpha_composite(ph, (x, y))
+    return canvas.convert("RGB")
+
+
 def main() -> None:
     if len(sys.argv) != 4 or sys.argv[2] not in ("android", "ios"):
         sys.exit(__doc__)
@@ -133,6 +178,11 @@ def main() -> None:
         slide(path, title, sub, colors, w, h).save(out / f"{platform}_{i:02d}_{name[2:]}.png", optimize=True)
     if platform == "android":
         feature_graphic(src / "1_home.png", src / "5_log.png").save(out / "android_feature_1024x500.png", optimize=True)
+    else:
+        trio = [src / "6_notice.png", src / "1_home.png", src / "5_log.png"]
+        hero(trio, 3840, 1646, None, None).save(out / "ios_header_3840x1646.png", optimize=True)
+        hero(trio, 3840, 2560, "도착하면 먼저 알려 드려요", "가족 위치 공유 · 도착 알림 · 이동 기록").save(
+            out / "ios_search_3840x2560.png", optimize=True)
     print(f"{platform}: {out}")
 
 
