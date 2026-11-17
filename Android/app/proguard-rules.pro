@@ -1,209 +1,47 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
+# 앱 전용 R8 규칙.
 #
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# 2026-11-17: 예전에는 앱 코드(com.dmonster.smap.**)와 androidx·compose·kotlin·firebase·okhttp 등을
+# 통째로 -keep 해서 난독화 비율이 6% 남짓이었다(Play "DEX 코드 최적화 기준점 미만" 경고, 기준 25%).
+# 각 라이브러리는 AAR 안에 자기 소비자 규칙(consumer rules)을 함께 배포하므로 여기서 다시 보존하지 않는다.
+# 여기에는 라이브러리 규칙으로 커버되지 않는 것만 남긴다.
 
 # ==========================================
-# 크래시 디버깅을 위한 스택 트레이스 보존
+# 크래시 스택 트레이스 — Play 가 AAB 에 든 mapping.txt 로 원래 이름을 복원한다
 # ==========================================
 -keepattributes SourceFile,LineNumberTable
--keepattributes *Annotation*
--keepattributes Signature
--keepattributes Exceptions
+-keepattributes *Annotation*,Signature,Exceptions,InnerClasses,EnclosingMethod
 -renamesourcefileattribute SourceFile
 
 # ==========================================
-# SMAP 앱 관련 규칙
-# ==========================================
--keep class com.dmonster.smap.** { *; }
--keepclassmembers class com.dmonster.smap.** { *; }
-
-# Data Models (Gson 직렬화/역직렬화용)
--keep class com.dmonster.smap.data.model.** { *; }
--keepclassmembers class com.dmonster.smap.data.model.** { *; }
-
-# ==========================================
-# WebView 관련 규칙
+# WebView JS 브리지(있는 경우) — 이름으로 호출되므로 보존
 # ==========================================
 -keepclassmembers class * {
     @android.webkit.JavascriptInterface <methods>;
 }
 
 # ==========================================
-# Firebase 관련 규칙
-# ==========================================
--keep class com.google.firebase.** { *; }
--keep class com.google.android.gms.** { *; }
--dontwarn com.google.firebase.**
--dontwarn com.google.android.gms.**
-
-# ==========================================
-# Naver Map SDK 규칙 (필수!)
+# Naver Map SDK — 네이티브(JNI)에서 클래스·필드를 이름으로 찾는다
 # ==========================================
 -keep class com.naver.maps.** { *; }
 -keep interface com.naver.maps.** { *; }
--keepclassmembers class com.naver.maps.** { *; }
 -dontwarn com.naver.maps.**
 
-# Naver Map 예외 클래스들
--keep class com.naver.maps.map.NaverMapSdk$* { *; }
--keep class com.naver.maps.map.NaverMapSdk$ClientUnspecifiedException { *; }
--keep class com.naver.maps.map.NaverMapSdk$UnauthorizedClientException { *; }
--keep class com.naver.maps.map.NaverMapSdk$QuotaExceededException { *; }
-
 # ==========================================
-# Kakao SDK 규칙 (필수!)
+# Kakao SDK — 내부 모델을 Gson 으로 (역)직렬화한다
 # ==========================================
 -keep class com.kakao.sdk.** { *; }
--keepclassmembers class com.kakao.sdk.** { *; }
 -dontwarn com.kakao.sdk.**
 
-# Kakao Auth
--keep class com.kakao.sdk.auth.** { *; }
--keep class com.kakao.sdk.user.** { *; }
--keep class com.kakao.sdk.common.** { *; }
+# ==========================================
+# Retrofit API 인터페이스 — 프록시로 메서드 애노테이션을 읽는다(이름은 바뀌어도 됨)
+# ==========================================
+-keep,allowobfuscation interface com.dmonster.smap.data.api.** { *; }
 
 # ==========================================
-# OkHttp 규칙
-# ==========================================
--keep class okhttp3.** { *; }
--keep interface okhttp3.** { *; }
--keepclassmembers class okhttp3.** { *; }
--dontwarn okhttp3.**
--dontwarn okio.**
-
-# ==========================================
-# Gson 규칙
-# ==========================================
--keep class com.google.gson.** { *; }
--keepclassmembers class * {
-    @com.google.gson.annotations.SerializedName <fields>;
-}
--keepclassmembers,allowobfuscation class * {
-    @com.google.gson.annotations.SerializedName <fields>;
-}
-
-# Gson TypeToken 관련
--keep class com.google.gson.reflect.TypeToken { *; }
--keep class * extends com.google.gson.reflect.TypeToken
-
-# ==========================================
-# Jetpack Compose 규칙
-# ==========================================
--keep class androidx.compose.** { *; }
--dontwarn androidx.compose.**
-
-# Compose Runtime
--keep class androidx.compose.runtime.** { *; }
--keepclassmembers class androidx.compose.runtime.** { *; }
-
-# Compose UI
--keep class androidx.compose.ui.** { *; }
-
-# ==========================================
-# AndroidX 규칙
-# ==========================================
--keep class androidx.** { *; }
--dontwarn androidx.**
-
-# Core SplashScreen
--keep class androidx.core.splashscreen.** { *; }
-
-# Lifecycle
--keep class androidx.lifecycle.** { *; }
--keepclassmembers class * implements androidx.lifecycle.LifecycleObserver {
-    <init>(...);
-}
-
-# Navigation
--keep class androidx.navigation.** { *; }
-
-# Activity
--keep class androidx.activity.** { *; }
-
-# ==========================================
-# Coil (이미지 로딩) 규칙
-# ==========================================
--keep class coil.** { *; }
--dontwarn coil.**
-
-# ==========================================
-# Kotlin 관련 규칙
-# ==========================================
--keep class kotlin.** { *; }
--keep class kotlinx.** { *; }
--dontwarn kotlin.**
--dontwarn kotlinx.**
-
-# Kotlin Coroutines
--keepclassmembernames class kotlinx.** {
-    volatile <fields>;
-}
-
-# ==========================================
-# ZXing (QR Code) 규칙
-# ==========================================
--keep class com.google.zxing.** { *; }
--dontwarn com.google.zxing.**
-
-# ==========================================
-# Enum 클래스 보존
-# ==========================================
--keepclassmembers enum * {
-    public static **[] values();
-    public static ** valueOf(java.lang.String);
-}
-
-# ==========================================
-# Parcelable 보존
-# ==========================================
--keepclassmembers class * implements android.os.Parcelable {
-    public static final ** CREATOR;
-}
-
-# ==========================================
-# Serializable 보존
-# ==========================================
--keepclassmembers class * implements java.io.Serializable {
-    static final long serialVersionUID;
-    private static final java.io.ObjectStreamField[] serialPersistentFields;
-    private void writeObject(java.io.ObjectOutputStream);
-    private void readObject(java.io.ObjectInputStream);
-    java.lang.Object writeReplace();
-    java.lang.Object readResolve();
-}
-
-# ==========================================
-# Native Methods 보존
-# ==========================================
--keepclasseswithmembernames class * {
-    native <methods>;
-}
-
-# ==========================================
-# Hilt Dependency Injection
-# ==========================================
--keep class dagger.hilt.** { *; }
--keep class javax.inject.** { *; }
--keepclassmembers class * {
-    @dagger.hilt.android.lifecycle.HiltViewModel <init>(...);
-}
-# R8 full-mode가 Hilt 생성/집계 클래스를 missing 으로 오탐(실제로는 KSP가 생성·컴파일함)하여
-# minifyReleaseWithR8 가 실패하던 문제 수정. AGP가 생성한 missing_rules.txt 권고 규칙.
--dontwarn com.dmonster.smap.SmapApplication_GeneratedInjector
--dontwarn dagger.hilt.internal.aggregatedroot.codegen.**
--dontwarn hilt_aggregated_deps.**
-
-# ==========================================
-# Kotlinx Serialization
+# Kotlinx Serialization — 앱 모델의 생성된 serializer 를 보존
+# (직렬화 이름은 컴파일 때 descriptor 에 문자열로 들어가므로 클래스·필드 이름은 바뀌어도 된다)
 # ==========================================
 -keepattributes RuntimeVisibleAnnotations,AnnotationDefault
--keepclassmembers class kotlinx.serialization.json.** { *** Companion; }
--keepclasseswithmembers class kotlinx.serialization.json.** {
-    kotlinx.serialization.KSerializer serializer(...);
-}
 -keep,includedescriptorclasses class com.dmonster.smap.**$$serializer { *; }
 -keepclassmembers class com.dmonster.smap.** {
     *** Companion;
@@ -213,6 +51,8 @@
 }
 
 # ==========================================
-# Retrofit API Interfaces
+# Hilt — R8 이 KSP 생성·집계 클래스를 missing 으로 오탐하던 문제(AGP missing_rules.txt 권고)
 # ==========================================
--keep,allowobfuscation interface com.dmonster.smap.data.api.** { *; } 
+-dontwarn com.dmonster.smap.SmapApplication_GeneratedInjector
+-dontwarn dagger.hilt.internal.aggregatedroot.codegen.**
+-dontwarn hilt_aggregated_deps.**
