@@ -22,10 +22,17 @@ func (r *LocationRepository) Create(l *model.Location) error {
 	return r.db.Create(l).Error
 }
 
-// UpdateFields는 slt_idx 행의 지정 컬럼만 UPDATE하고 영향 행 수를 반환한다(notification/update의 rowcount 분기용).
+// UpdateFields는 slt_idx 행의 지정 컬럼만 UPDATE하고 일치한 행 수를 반환한다(notification/update의 없음 분기용).
+// MariaDB의 영향 행 수는 값이 바뀐 행만 센다. 같은 초 안에 같은 값으로 다시 저장하면 0이 되므로,
+// 0일 때는 행 존재로 다시 판정한다(있는 장소가 '없음'으로 응답되지 않게).
 func (r *LocationRepository) UpdateFields(id int, fields map[string]interface{}) (int64, error) {
 	res := r.db.Model(&model.Location{}).Where("slt_idx = ?", id).Updates(fields)
-	return res.RowsAffected, res.Error
+	if res.Error != nil || res.RowsAffected > 0 {
+		return res.RowsAffected, res.Error
+	}
+	var n int64
+	err := r.db.Model(&model.Location{}).Where("slt_idx = ?", id).Count(&n).Error
+	return n, err
 }
 
 // Delete는 slt_idx 행을 하드 삭제한다(Python delete_location의 db.delete).

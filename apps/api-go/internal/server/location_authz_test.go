@@ -251,6 +251,9 @@ func (f *fakePlaceRepo) Create(l *model.Location) error {
 func (f *fakePlaceRepo) UpdateFields(id int, _ map[string]interface{}) (int64, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if _, ok := f.places[id]; !ok {
+		return 0, nil
+	}
 	f.changes = append(f.changes, fmt.Sprintf("update:%d", id))
 	return 1, nil
 }
@@ -870,6 +873,19 @@ func TestPlacesManageMatrix(t *testing.T) {
 					t.Errorf("[leader_manage=%v] %s %s: 거부됐는데 저장소가 변경됨", flag, c.name, op.name)
 				}
 			}
+		}
+	}
+}
+
+func TestPlacesUpdateMissingIs404(t *testing.T) {
+	// 앱 데모 모드의 가짜 장소(880005 등)처럼 DB에 없는 장소를 수정하면 서버 오류(500)가 아니라 404.
+	e := newLocEnv(t, defaultOpts())
+	for _, op := range []struct{ method, path, body string }{
+		{"PUT", "/locations/880005", `{"slt_title":"공덕 수학학원","slt_lat":37.5,"slt_long":127.0,"slt_enter_alarm":"N"}`},
+		{"PUT", "/locations/880005/notification", `{"slt_enter_alarm":"N"}`},
+	} {
+		if w := e.do(op.method, op.path, gMember, op.body); w.Code != 404 {
+			t.Errorf("%s %s: got %d want 404", op.method, op.path, w.Code)
 		}
 	}
 }

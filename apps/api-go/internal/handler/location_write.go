@@ -59,7 +59,7 @@ func (h *LocationHandler) Create(c *gin.Context) {
 	writeJSON(c, http.StatusOK, resp)
 }
 
-// Notification은 PUT /locations/:location_id/notification. slt_enter_alarm 필수(400)·Y/N(400). rowcount 0 → 404.
+// Notification은 PUT /locations/:location_id/notification. slt_enter_alarm 필수(400)·Y/N(400). 없는 장소 → 404.
 func (h *LocationHandler) Notification(c *gin.Context) {
 	id, ok := locationPathID(c)
 	if !ok {
@@ -92,7 +92,7 @@ func (h *LocationHandler) Notification(c *gin.Context) {
 }
 
 // Update는 PUT /locations/:location_id (dict body). 인식 필드만 UPDATE(절단 slt_title[:50]/slt_add[:100]),
-// updated_fields=body 키 순서. ⚠️ rowcount 0 → except 흡수로 500 "Update failed: 404: Location not found".
+// updated_fields=body 키 순서. 없는 장소는 404(Python은 500으로 감쌌지만, 앱이 서버 오류로 오인하지 않게 바로잡음).
 func (h *LocationHandler) Update(c *gin.Context) {
 	id, ok := locationPathID(c)
 	if !ok {
@@ -142,8 +142,7 @@ func (h *LocationHandler) Update(c *gin.Context) {
 		return
 	}
 	if !found {
-		// Python: raise HTTPException(404)가 except Exception에 잡혀 500-wrap.
-		writeJSON(c, http.StatusInternalServerError, gin.H{"detail": "Update failed: 404: Location not found"})
+		writeJSON(c, http.StatusNotFound, gin.H{"detail": "Location not found"})
 		return
 	}
 	writeJSON(c, http.StatusOK, resp)

@@ -45,7 +45,7 @@ func (s *LocationService) CreateLocation(in LocationCreateInput) (*dto.LocationC
 	}, true
 }
 
-// UpdateNotification은 Python update_location_notification을 이식한다. rowsAffected==0이면 found=false(→404).
+// UpdateNotification은 Python update_location_notification을 이식한다. 일치한 행이 없으면 found=false(→404).
 func (s *LocationService) UpdateNotification(id int, alarm string) (resp *dto.LocationNotifResponse, found, ok bool) {
 	n, err := s.repo.UpdateFields(id, map[string]interface{}{"slt_enter_alarm": alarm, "slt_udate": time.Now()})
 	if err != nil {
@@ -58,7 +58,7 @@ func (s *LocationService) UpdateNotification(id int, alarm string) (resp *dto.Lo
 }
 
 // UpdateLocation은 Python update_location을 이식한다. fields=DB 갱신 컬럼, keys=updated_fields(body 키 순서).
-// ⚠️ rowsAffected==0이면 found=false → 핸들러가 500 "Update failed: 404: Location not found"(except 흡수).
+// 일치한 행이 없으면 found=false → 핸들러가 404.
 func (s *LocationService) UpdateLocation(id int, fields map[string]interface{}, keys []string) (resp *dto.LocationUpdateResponse, found, ok bool) {
 	fields["slt_udate"] = time.Now() // 항상 추가(Python)
 	n, err := s.repo.UpdateFields(id, fields)
