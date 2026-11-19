@@ -48,7 +48,7 @@ func TestSendVerificationCodeSuccess(t *testing.T) {
 	if len(code) != 6 || store.ttls[cache.SMSCodeKey("01011112222")] != 180*time.Second {
 		t.Fatalf("코드 저장(6자리, 3분) 오류: %q", code)
 	}
-	if !strings.Contains(sender.lastMsg, code) || sender.lastSubj != "SMAP 인증번호" {
+	if !strings.Contains(sender.lastMsg, code) || sender.lastSubj != "도착했어 인증번호" {
 		t.Fatalf("발송 메시지/제목 오류")
 	}
 }
