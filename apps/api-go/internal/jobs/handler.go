@@ -134,7 +134,9 @@ func (h *Handlers) handleLocationSync(ctx context.Context, t *asynq.Task) error 
 		return nil
 	}
 
-	// Python 원본의 raw SQL 전문(바인딩 파라미터 없음). 회원별 MAX(mlt_idx)=최신 위치를 member_t에 반영.
+	// Python 원본(app/jobs/location_sync.py)의 raw SQL 전문(바인딩 파라미터 없음). 회원별 MAX(mlt_idx)=최신 위치를 member_t에 반영.
+	// 최근 1일 내 로그가 있는 회원만 대상(저장 시 member_t가 이미 갱신되므로 그 외는 갱신할 것이 없고,
+	// 범위가 없으면 매번 전 파티션 약 150만 행을 읽는다).
 	const sql = `UPDATE member_t m
 JOIN (
     SELECT mll.mt_idx, mll.mlt_lat, mll.mlt_long
@@ -142,8 +144,10 @@ JOIN (
     INNER JOIN (
         SELECT mt_idx, MAX(mlt_idx) AS max_idx
         FROM member_location_log_t
+        WHERE mlt_gps_time >= NOW() - INTERVAL 1 DAY
         GROUP BY mt_idx
     ) latest ON mll.mlt_idx = latest.max_idx AND mll.mt_idx = latest.mt_idx
+        AND mll.mlt_gps_time >= NOW() - INTERVAL 1 DAY
 ) loc ON m.mt_idx = loc.mt_idx
 SET m.mt_lat = loc.mlt_lat, m.mt_long = loc.mlt_long
 WHERE m.mt_status = 1 AND m.mt_level > 1`

@@ -17,6 +17,22 @@ func NewMemberLocationLog(db *gorm.DB) *MemberLocationLogRepository {
 	return &MemberLocationLogRepository{db: db}
 }
 
+// recentLocationWindow는 GetRecentLocationsBatch가 "최신 위치"를 찾는 gps_time 범위다.
+// 호출측(지오펜스)은 5분(gpsStaleThreshold)보다 오래된 좌표를 버리고 결과 부재와 동일하게 skip하므로
+// 판정 결과는 같다. 예외 하나: 24시간보다 오래된 캐시 배치가 신선한 행보다 늦게 적재되면, 기존은
+// MAX(mlt_idx)=옛 좌표로 skip했지만 이제 창 안의 신선한 좌표로 판정한다(실제 최신 위치 기준이라 의도된 동작).
+// 이 창이 없으면 전 파티션을 스캔한다(A/B 7회 중앙값 50ms → 3.5ms, 읽은 행 19.7만 → 754).
+const recentLocationWindow = 24 * time.Hour
+
+// nextDayYMD는 "YYYY-MM-DD"의 다음 날을 같은 형식으로 반환한다(반열린 구간 상한용).
+func nextDayYMD(ymd string) (string, error) {
+	d, err := time.ParseInLocation("2006-01-02", ymd, time.Local)
+	if err != nil {
+		return "", fmt.Errorf("invalid date %q: %w", ymd, err)
+	}
+	return d.AddDate(0, 0, 1).Format("2006-01-02"), nil
+}
+
 // GetLogByID는 mlt_idx 단건 조회. 없으면 (nil,nil).
 func (r *MemberLocationLogRepository) GetLogByID(mltIdx int) (*model.MemberLocationLog, error) {
 	var l model.MemberLocationLog
@@ -33,19 +49,70 @@ func (r *MemberLocationLogRepository) GetLogByID(mltIdx int) (*model.MemberLocat
 // CreateLog는 Python crud.create_location_log를 이식한다: 로그 INSERT + (mlt_lat/long이 nil 아니면)
 // member_t.mt_lat/mt_long/mt_udate 최신위치 갱신(부수효과). 둘을 단일 트랜잭션으로 묶는다(Python 단일 commit).
 func (r *MemberLocationLogRepository) CreateLog(l *model.MemberLocationLog, now time.Time) error {
+	fillWdate(l, now)
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(l).Error; err != nil {
 			return err
 		}
 		if l.MltLat != nil && l.MltLong != nil {
-			// member 존재 시에만 갱신(Python: member 있으면 갱신, 없으면 경고만).
-			if err := tx.Model(&model.Member{}).Where("mt_idx = ?", l.MtIdx).
-				Updates(map[string]interface{}{"mt_lat": *l.MltLat, "mt_long": *l.MltLong, "mt_udate": now}).Error; err != nil {
-				return err
-			}
+			return updateMemberLatestLocation(tx, l, now)
 		}
 		return nil
 	})
+}
+
+// CreateLogsBatch는 배치 저장(mlt_gps_data)을 단일 트랜잭션 + 다중행 INSERT로 처리한다.
+// 건별 CreateLog를 N번 부르면 N개 트랜잭션·2N개 쿼리가 나간다.
+// member_t 최신위치는 건별 처리 시의 최종 상태(배열 순서상 마지막으로 lat/long이 있는 항목)를 1회 UPDATE로 재현한다.
+// 실패 시 전체 롤백되므로, 호출측은 건별 경로로 재시도해 부분 성공 동작을 유지해야 한다.
+// gorm mysql 드라이버는 MariaDB 10.5+에서 INSERT ... RETURNING으로 받은 mlt_idx를 슬라이스 순서대로 채운다.
+func (r *MemberLocationLogRepository) CreateLogsBatch(logs []*model.MemberLocationLog, now time.Time) error {
+	if len(logs) == 0 {
+		return nil
+	}
+	var lastWithLoc *model.MemberLocationLog
+	for _, l := range logs {
+		fillWdate(l, now)
+		if l.MltLat != nil && l.MltLong != nil {
+			lastWithLoc = l
+		}
+	}
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.CreateInBatches(logs, 500).Error; err != nil {
+			return err
+		}
+		if lastWithLoc != nil {
+			return updateMemberLatestLocation(tx, lastWithLoc, now)
+		}
+		return nil
+	})
+}
+
+// GetLogsByIDs는 한 회원의 여러 mlt_idx를 1쿼리로 조회한다(배치 응답의 DB 저장값 재조회용).
+func (r *MemberLocationLogRepository) GetLogsByIDs(mtIdx int, mltIdxs []int) ([]model.MemberLocationLog, error) {
+	out := make([]model.MemberLocationLog, 0, len(mltIdxs))
+	if len(mltIdxs) == 0 {
+		return out, nil
+	}
+	err := r.db.Where("mt_idx = ? AND mlt_idx IN ?", mtIdx, mltIdxs).Find(&out).Error
+	return out, err
+}
+
+// fillWdate는 mlt_wdate(등록일시)가 비어 있으면 now로 채운다.
+// Python 모델의 default=func.now()와 같은 의미. Go 이관 후 이 값이 NULL로 저장돼
+// 걸음수 조회(mlt_wdate 필터)와 일일 로그 집계가 0건이 되는 회귀가 있었다.
+func fillWdate(l *model.MemberLocationLog, now time.Time) {
+	if l.MltWdate == nil {
+		t := now
+		l.MltWdate = &t
+	}
+}
+
+// updateMemberLatestLocation은 member_t 최신위치를 갱신한다.
+// member 존재 시에만 갱신(Python: member 있으면 갱신, 없으면 경고만).
+func updateMemberLatestLocation(tx *gorm.DB, l *model.MemberLocationLog, now time.Time) error {
+	return tx.Model(&model.Member{}).Where("mt_idx = ?", l.MtIdx).
+		Updates(map[string]interface{}{"mt_lat": *l.MltLat, "mt_long": *l.MltLong, "mt_udate": now}).Error
 }
 
 // UpdateLog는 mlt_idx 행의 지정 컬럼만 UPDATE한다(update_location_log exclude_unset). RowsAffected 반환.
@@ -82,6 +149,7 @@ func (r *MemberLocationLogRepository) GetRecentLocationsBatch(mtIdxList []int) (
 		return out, nil
 	}
 	const chunkSize = 500
+	since := time.Now().Add(-recentLocationWindow)
 	for i := 0; i < len(mtIdxList); i += chunkSize {
 		end := i + chunkSize
 		if end > len(mtIdxList) {
@@ -89,12 +157,13 @@ func (r *MemberLocationLogRepository) GetRecentLocationsBatch(mtIdxList []int) (
 		}
 		chunk := mtIdxList[i:end]
 
-		// 서브쿼리: 각 회원별 최신 mlt_idx.
+		// 서브쿼리: 각 회원별 최신 mlt_idx(최근 recentLocationWindow 내).
 		sub := r.db.Model(&model.MemberLocationLog{}).
 			Select("mt_idx, MAX(mlt_idx) AS max_idx").
-			Where("mt_idx IN ?", chunk).
+			Where("mt_idx IN ? AND mlt_gps_time >= ?", chunk, since).
 			Group("mt_idx")
 
+		// 바깥 조인에도 같은 gps_time 하한을 둬야 PK 조회가 최근 파티션으로 프루닝된다.
 		var rows []RecentLocation
 		err := r.db.Model(&model.MemberLocationLog{}).
 			Select("member_location_log_t.mt_idx, member_location_log_t.mlt_lat, "+
@@ -102,6 +171,7 @@ func (r *MemberLocationLogRepository) GetRecentLocationsBatch(mtIdxList []int) (
 				"member_location_log_t.mlt_gps_time").
 			Joins("JOIN (?) AS latest ON member_location_log_t.mlt_idx = latest.max_idx "+
 				"AND member_location_log_t.mt_idx = latest.mt_idx", sub).
+			Where("member_location_log_t.mlt_gps_time >= ?", since).
 			Scan(&rows).Error
 		if err != nil {
 			return nil, err
@@ -178,20 +248,26 @@ func (r *MemberLocationLogRepository) DailyCounts(groupID int, startStr, endStr 
 	if having {
 		havingClause = "HAVING COUNT(DISTINCT mlt_idx) > 0 "
 	}
+	endExclusive, err := nextDayYMD(endStr)
+	if err != nil {
+		return nil, nil, err
+	}
 	counts := make([]model.DailyCountRow, 0)
+	// DATE(mlt_gps_time) BETWEEN start AND end 와 동치인 반열린 구간 [start, end+1일).
+	// 컬럼을 함수로 감싸지 않아야 RANGE(to_days(mlt_gps_time)) 파티션 프루닝이 동작한다.
 	err = r.db.Raw(`SELECT mt_idx as member_idx, DATE(mlt_gps_time) as log_date, COUNT(DISTINCT mlt_idx) as count
 		FROM member_location_log_t WHERE mt_idx IN (`+intsCSV(ids)+`)
-		AND DATE(mlt_gps_time) BETWEEN ? AND ?
+		AND mlt_gps_time >= ? AND mlt_gps_time < ?
 		GROUP BY mt_idx, DATE(mlt_gps_time) `+havingClause+`ORDER BY mt_idx, log_date DESC`,
-		startStr, endStr).Scan(&counts).Error
+		startStr, endExclusive).Scan(&counts).Error
 	if err != nil {
 		return nil, nil, err
 	}
 	return members, counts, nil
 }
 
-// MemberActivity는 Python get_member_activity_by_date의 3쿼리(그룹멤버 JOIN + COUNT + MIN/MAX)를
-// 이식한다. dateStr(YYYY-MM-DD)로 DATE(mlt_gps_time)= 비교. 멤버 0명이면 빈 슬라이스.
+// MemberActivity는 Python get_member_activity_by_date(그룹멤버 JOIN + COUNT + MIN/MAX)를 이식한다.
+// COUNT와 MIN/MAX는 1쿼리로 합치고 dateStr(YYYY-MM-DD)의 [date, date+1일) 범위로 비교한다. 멤버 0명이면 빈 슬라이스.
 func (r *MemberLocationLogRepository) MemberActivity(groupID int, dateStr string) ([]model.MemberActivityRow, error) {
 	type basicRow struct {
 		MtIdx      int     `gorm:"column:mt_idx"`
@@ -219,46 +295,38 @@ func (r *MemberLocationLogRepository) MemberActivity(groupID int, dateStr string
 	for i, b := range basics {
 		ids[i] = b.MtIdx
 	}
-	idsCSV := intsCSV(ids)
-
-	type cntRow struct {
-		MtIdx    int `gorm:"column:mt_idx"`
-		LogCount int `gorm:"column:log_count"`
-	}
-	var cnts []cntRow
-	if err := r.db.Raw(`SELECT mt_idx, COUNT(*) as log_count FROM member_location_log_t
-		WHERE mt_idx IN (`+idsCSV+`) AND DATE(mlt_gps_time) = ? GROUP BY mt_idx`, dateStr).
-		Scan(&cnts).Error; err != nil {
+	nextDay, err := nextDayYMD(dateStr)
+	if err != nil {
 		return nil, err
 	}
-	cntMap := make(map[int]int, len(cnts))
-	for _, c := range cnts {
-		cntMap[c.MtIdx] = c.LogCount
-	}
 
-	type timeRow struct {
+	// Python은 COUNT와 MIN/MAX를 같은 WHERE로 2번 조회했다. 결과가 동일하므로 1쿼리로 합치고,
+	// DATE(mlt_gps_time) = ? 대신 반열린 구간 [date, date+1일)로 파티션 프루닝을 살린다.
+	type aggRow struct {
 		MtIdx        int        `gorm:"column:mt_idx"`
+		LogCount     int        `gorm:"column:log_count"`
 		FirstLogTime *time.Time `gorm:"column:first_log_time"`
 		LastLogTime  *time.Time `gorm:"column:last_log_time"`
 	}
-	var times []timeRow
-	if err := r.db.Raw(`SELECT mt_idx, MIN(mlt_gps_time) as first_log_time, MAX(mlt_gps_time) as last_log_time
-		FROM member_location_log_t WHERE mt_idx IN (`+idsCSV+`) AND DATE(mlt_gps_time) = ? GROUP BY mt_idx`, dateStr).
-		Scan(&times).Error; err != nil {
+	var aggs []aggRow
+	if err := r.db.Raw(`SELECT mt_idx, COUNT(*) as log_count,
+		MIN(mlt_gps_time) as first_log_time, MAX(mlt_gps_time) as last_log_time
+		FROM member_location_log_t WHERE mt_idx IN (`+intsCSV(ids)+`)
+		AND mlt_gps_time >= ? AND mlt_gps_time < ? GROUP BY mt_idx`, dateStr, nextDay).
+		Scan(&aggs).Error; err != nil {
 		return nil, err
 	}
-	type ft struct{ first, last *time.Time }
-	timeMap := make(map[int]ft, len(times))
-	for _, t := range times {
-		timeMap[t.MtIdx] = ft{t.FirstLogTime, t.LastLogTime}
+	aggMap := make(map[int]aggRow, len(aggs))
+	for _, a := range aggs {
+		aggMap[a.MtIdx] = a
 	}
 
 	for _, b := range basics {
-		t := timeMap[b.MtIdx]
+		a := aggMap[b.MtIdx] // 로그 없는 멤버는 zero value(0건, nil 시각) — 기존 동작과 동일
 		out = append(out, model.MemberActivityRow{
 			MtIdx: b.MtIdx, MtName: b.MtName, MtNickname: b.MtNickname,
 			MtFile1: b.MtFile1, MtGender: b.MtGender,
-			LogCount: cntMap[b.MtIdx], FirstLogTime: t.first, LastLogTime: t.last,
+			LogCount: a.LogCount, FirstLogTime: a.FirstLogTime, LastLogTime: a.LastLogTime,
 		})
 	}
 	return out, nil
@@ -368,10 +436,13 @@ const gpsDistanceSQL = `WITH RankedLogs AS (
 		) rslt
 		WHERE ROUND((rslt.distance_meters / rslt.time_diff_seconds) * 3600 / 1000, 1) BETWEEN ? AND ?`
 
-// gpsStepsSQL: 해당 날짜 마지막 걸음수. 파라미터 mt_idx, date_start, date_end. (mlt_wdate 필터에 주의)
+// gpsStepsSQL: 해당 날짜 마지막 걸음수. 파라미터 mt_idx, date_start, date_end.
+// Python 원본은 mlt_wdate(등록일시)로 필터했으나, Go 이관(2026-06-02) 이후 INSERT가 mlt_wdate를
+// 채우지 않아 그 이후 날짜는 항상 0건(걸음수 0)이었다. 정렬 키와 같은 mlt_gps_time으로 필터해
+// 과거 데이터도 조회되게 하고 파티션 프루닝 + idx_covering 역스캔을 탄다.
 const gpsStepsSQL = `SELECT mt_health_work
 		FROM member_location_log_t
-		WHERE mt_idx = ? AND mlt_wdate BETWEEN ? AND ?
+		WHERE mt_idx = ? AND mlt_gps_time BETWEEN ? AND ?
 		ORDER BY mlt_gps_time DESC LIMIT 1`
 
 // GpsDistanceAndTime은 (이동 미터, 이동 분, 걸음수)를 반환(Python get_gps_distance_and_time).

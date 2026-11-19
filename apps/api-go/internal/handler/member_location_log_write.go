@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"math"
 	"net/http"
+	"sort"
 	"strconv"
 	"time"
 
@@ -47,6 +48,9 @@ type mllBatchErr struct {
 	Index int    `json:"index"`
 	Error string `json:"error"`
 }
+
+// mllBatchRespLimit는 배치 응답 data에 담는 최대 건수(Python created[:10]).
+const mllBatchRespLimit = 10
 
 // MemberLocationLogsPost는 POST /logs/member-location-logs — body.act 기반 14종 RPC 디스패처.
 func (h *LocationLogHandler) MemberLocationLogsPost(c *gin.Context) {
@@ -334,8 +338,9 @@ func (h *LocationLogHandler) actCreateLog(c *gin.Context, body map[string]interf
 	}
 	// 배치: mlt_gps_data 배열
 	if arr, ok := body["mlt_gps_data"].([]interface{}); ok && len(arr) > 0 {
-		created := make([]dto.LocationLogDict, 0)
 		errs := make([]mllBatchErr, 0)
+		ins := make([]service.LocationLogCreateInput, 0, len(arr))
+		origIdx := make([]int, 0, len(arr)) // ins[j]의 원본 배열 인덱스(에러 index 보존용)
 		for idx, it := range arr {
 			item, _ := it.(map[string]interface{})
 			if im, has := mllAnyInt(item["mt_idx"]); tokOK && has && im != finalMt {
@@ -347,22 +352,36 @@ func (h *LocationLogHandler) actCreateLog(c *gin.Context, body map[string]interf
 				errs = append(errs, mllBatchErr{Index: idx, Error: perr})
 				continue
 			}
-			d, sok := h.svc.CreateLog(in)
-			if !sok {
-				errs = append(errs, mllBatchErr{Index: idx, Error: "create failed"})
-				continue
-			}
-			created = append(created, d)
+			ins = append(ins, in)
+			origIdx = append(origIdx, idx)
 		}
+
+		// 단일 트랜잭션 다중행 INSERT(건별 N트랜잭션·3N쿼리 → 1트랜잭션·약 3쿼리).
+		data, createdCount, inserted := h.svc.CreateLogsBatch(ins, mllBatchRespLimit)
+		if !inserted {
+			// 한 건이라도 DB가 거부하면(범위 초과 값 등) 배치 전체가 롤백된다.
+			// 기존과 같은 부분 성공 동작을 위해 건별 경로로 재시도한다(롤백됐으므로 중복 없음).
+			data, createdCount = make([]dto.LocationLogDict, 0), 0
+			for j, in := range ins {
+				d, sok := h.svc.CreateLog(in)
+				if !sok {
+					errs = append(errs, mllBatchErr{Index: origIdx[j], Error: "create failed"})
+					continue
+				}
+				createdCount++
+				if len(data) < mllBatchRespLimit {
+					data = append(data, d)
+				}
+			}
+		}
+		// 기존 응답은 원본 인덱스 오름차순으로 에러가 쌓였다(파싱 에러·저장 에러 혼재). 순서를 맞춘다.
+		sort.SliceStable(errs, func(a, b int) bool { return errs[a].Index < errs[b].Index })
+
 		res := "Y"
-		if len(created) == 0 {
+		if createdCount == 0 {
 			res = "N"
 		}
-		data := created
-		if len(data) > 10 {
-			data = data[:10]
-		}
-		writeJSON(c, http.StatusOK, mllBatchResult{Result: res, CreatedCount: len(created), Errors: errs, Data: data})
+		writeJSON(c, http.StatusOK, mllBatchResult{Result: res, CreatedCount: createdCount, Errors: errs, Data: data})
 		return
 	}
 	// 단건

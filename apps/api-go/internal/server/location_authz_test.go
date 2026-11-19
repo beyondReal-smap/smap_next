@@ -154,6 +154,25 @@ func (f *fakeLogRepo) CreateLog(l *model.MemberLocationLog, _ time.Time) error {
 	f.created = append(f.created, c)
 	return nil
 }
+func (f *fakeLogRepo) CreateLogsBatch(logs []*model.MemberLocationLog, now time.Time) error {
+	for _, l := range logs {
+		if err := f.CreateLog(l, now); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+func (f *fakeLogRepo) GetLogsByIDs(mtIdx int, ids []int) ([]model.MemberLocationLog, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := make([]model.MemberLocationLog, 0, len(ids))
+	for _, id := range ids {
+		if l, ok := f.logs[id]; ok && l.MtIdx == mtIdx {
+			out = append(out, *l)
+		}
+	}
+	return out, nil
+}
 func (f *fakeLogRepo) UpdateLog(id int, fields map[string]interface{}) (int64, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -672,6 +691,10 @@ func TestUploadBatchMismatchIs403(t *testing.T) {
 	body := `{"act":"create_location_log","mt_idx":3,"mlt_gps_data":[{"mlt_lat":1,"mlt_long":2,"mlt_gps_time":"2026-11-13T09:00:00"},{"mt_idx":1,"mlt_lat":1,"mlt_long":2,"mlt_gps_time":"2026-11-13T09:00:00"}]}`
 	if w := e.do("POST", "/logs/member-location-logs", gMember, body); w.Code != 403 {
 		t.Fatalf("배치 중 타인 명의: %d", w.Code)
+	}
+	// 403으로 거부된 배치는 앞쪽 정상 항목도 기록하지 않는다.
+	if len(e.logs.created) != 0 {
+		t.Fatalf("거부된 배치가 일부 기록됨: %+v", e.logs.created)
 	}
 }
 

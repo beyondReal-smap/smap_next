@@ -31,6 +31,12 @@ func (f *fakeLocationLogRepo) GetLogByID(mltIdx int) (*model.MemberLocationLog, 
 func (f *fakeLocationLogRepo) CreateLog(l *model.MemberLocationLog, now time.Time) error {
 	return f.err
 }
+func (f *fakeLocationLogRepo) CreateLogsBatch(logs []*model.MemberLocationLog, now time.Time) error {
+	return f.err
+}
+func (f *fakeLocationLogRepo) GetLogsByIDs(mtIdx int, mltIdxs []int) ([]model.MemberLocationLog, error) {
+	return nil, f.err
+}
 func (f *fakeLocationLogRepo) UpdateLog(mltIdx int, fields map[string]interface{}) (int64, error) {
 	return 0, f.err
 }
