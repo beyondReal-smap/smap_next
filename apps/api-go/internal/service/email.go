@@ -185,7 +185,7 @@ func (s *EmailService) apiSenderAddress() string {
 	if s.sender != "" {
 		return s.sender
 	}
-	return "admin@smap.site"
+	return "admin@aiagnt.kr"
 }
 
 // naverworksToken은 OAuth2 client_credentials로 액세스 토큰을 획득한다.

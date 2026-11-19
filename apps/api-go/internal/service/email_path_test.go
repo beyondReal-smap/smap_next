@@ -53,7 +53,7 @@ func TestEmailSMTPConfigDefaultsAndOverride(t *testing.T) {
 	if w.smtpServer != "smtp.worksmobile.com" || w.apiSenderAddress() != "s@x.test" {
 		t.Fatal("override/발신 주소")
 	}
-	if d.apiSenderAddress() != "admin@smap.site" {
+	if d.apiSenderAddress() != "admin@aiagnt.kr" {
 		t.Fatal("EMAIL_SENDER 비면 기존 고정 주소 유지")
 	}
 }

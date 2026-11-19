@@ -69,7 +69,8 @@ func cleanPhone(s string) string {
 // ForgotPassword는 Python forgot_password를 이식한다(비번찾기, 토큰 발급+저장).
 // ⚠️ 실제 SMS/이메일 발송은 sms/email 도메인 트랙 소관(미이식). Python은 발송 실패를 swallow하고
 // user 존재 시 항상 success=true를 반환하므로(응답이 발송 결과와 무관), 토큰 저장+응답만으로 byte 동등이
-// 보존된다. reset_url(https://nextstep.smap.site/r?t=<token>)은 발송 트랙 연결 시 사용한다.
+// 보존된다. reset_url(https://smap.aiagnt.kr/r?t=<token>)은 발송 트랙 연결 시 사용한다.
+// smap.site 만료로 2026-11-19 smap.aiagnt.kr 로 옮겼다. /r 페이지는 앱의 인증번호 방식 재설정으로 안내만 한다(이 토큰 API는 관리자 전용).
 func (s *AuthService) ForgotPassword(typ, contact string) dto.PwResetResponse {
 	var user *model.Member
 	var err error
@@ -97,7 +98,7 @@ func (s *AuthService) ForgotPassword(typ, contact string) dto.PwResetResponse {
 	// 발송 연결(sms/email 트랙): phone→SMS, email→이메일. 동기 호출하되 결과는 응답에 무관(Python swallow).
 	// sender 미주입(nil)이면 발송 skip — 응답은 동일(Python이 발송 실패를 흡수하는 것과 byte 동등).
 	if s.sender != nil {
-		resetURL := "https://nextstep.smap.site/r?t=" + shortToken
+		resetURL := "https://smap.aiagnt.kr/r?t=" + shortToken
 		if typ == "phone" {
 			s.sender.SendPasswordResetSMS(contact, resetURL)
 		} else {
