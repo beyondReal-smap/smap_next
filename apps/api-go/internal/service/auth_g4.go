@@ -213,17 +213,24 @@ func (s *AuthService) Login(ctx context.Context, in LoginInput, meta ClientMeta)
 	if err != nil {
 		return serverErr, nil
 	}
-	if user == nil && strings.Contains(id, "@") {
+	// mt_id 로 잡힌 행이 명시적 활성(mt_status=1)이 아니면 이메일 행도 본다.
+	// 2026-11-19: 상태값이 빈 예전 테스트 행의 mt_id 가 이메일과 같아, 같은 이메일의 활성 계정 대신
+	// 그 행으로 비밀번호를 대조해 로그인할 수 없던 문제(11-17 GetByEmail 수정과 같은 취지).
+	if strings.Contains(id, "@") && (user == nil || !hasActiveStatus(user)) {
 		rows, err := s.members.FindActiveByEmail(id)
 		if err != nil {
 			return serverErr, nil
 		}
-		if len(rows) > 1 {
-			s.log().Warn("login_ambiguous_email_account")
-			return dto.LoginHomeResponse{}, reject(http.StatusBadRequest, msgLoginAmbiguous)
-		}
-		if len(rows) == 1 {
-			user = &rows[0]
+		if picked := soleActiveStatus(rows); picked != nil {
+			user = picked
+		} else if user == nil {
+			if len(rows) > 1 {
+				s.log().Warn("login_ambiguous_email_account")
+				return dto.LoginHomeResponse{}, reject(http.StatusBadRequest, msgLoginAmbiguous)
+			}
+			if len(rows) == 1 {
+				user = &rows[0]
+			}
 		}
 	}
 	if user == nil {
@@ -746,4 +753,22 @@ func (s *AuthService) buildNewMember(in RegisterInput, mtID string, mtEmail *str
 		MtGoogleID: google, MtKakaoID: kakao, MtAppleID: apple,
 		MtBirth: birth, MtGender: in.MtGender, MtFile1: &profileImage, MtLat: &lat, MtLong: &long, MtTokenID: in.MtTokenID,
 	}, nil
+}
+
+// hasActiveStatus는 mt_status 가 명시적으로 1(활성)인지 본다. NULL 은 활성으로 확정하지 않는다.
+func hasActiveStatus(m *model.Member) bool { return m.MtStatus != nil && *m.MtStatus == 1 }
+
+// soleActiveStatus는 rows 중 mt_status=1 인 행이 정확히 하나면 그 행을, 아니면 nil 을 돌려준다.
+// 둘 이상이면 계정을 특정할 수 없으므로 고르지 않는다(호출부가 기존 모호성 규칙을 따른다).
+func soleActiveStatus(rows []model.Member) *model.Member {
+	var picked *model.Member
+	for i := range rows {
+		if hasActiveStatus(&rows[i]) {
+			if picked != nil {
+				return nil
+			}
+			picked = &rows[i]
+		}
+	}
+	return picked
 }

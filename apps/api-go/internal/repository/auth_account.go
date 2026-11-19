@@ -35,7 +35,8 @@ func (r *MemberRepository) FindActiveByEmail(email string) ([]model.Member, erro
 	err := r.db.
 		Where("LOWER(TRIM(mt_email)) = ?", strings.ToLower(strings.TrimSpace(email))).
 		Where("(mt_level IS NULL OR mt_level != 1) AND (mt_status IS NULL OR mt_status != 2) AND (mt_show IS NULL OR mt_show != 'N')").
-		Order("mt_idx").Limit(2).Find(&rows).Error
+		// 활성(mt_status=1) 행을 앞에 둬, Limit(2) 에서 활성 행이 잘리지 않게 한다(로그인의 활성 우선 선택).
+		Order("CASE WHEN mt_status = 1 THEN 0 ELSE 1 END").Order("mt_idx").Limit(2).Find(&rows).Error
 	return rows, err
 }
 
