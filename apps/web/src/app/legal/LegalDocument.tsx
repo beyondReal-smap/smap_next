@@ -17,7 +17,8 @@ export default function LegalDocument({
 }: {
   title: string;
   path: string;
-  effectiveDate: string;
+  /** 원문에 시행일이 없으면(동의서 2종) 생략 */
+  effectiveDate?: string;
   children: ReactNode;
 }) {
   return (
@@ -34,7 +35,11 @@ export default function LegalDocument({
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-6 sm:p-10 text-sm leading-relaxed">
             <h1 className="text-2xl font-bold mb-2 text-center text-gray-900">{title}</h1>
-            <p className="text-sm text-gray-500 mb-8 text-center">시행일: {effectiveDate}</p>
+            {effectiveDate ? (
+              <p className="text-sm text-gray-500 mb-8 text-center">시행일: {effectiveDate}</p>
+            ) : (
+              <div className="mb-8" />
+            )}
             <div className="space-y-6 text-gray-800 leading-7">{children}</div>
           </div>
         </div>
