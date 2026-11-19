@@ -162,7 +162,7 @@ func (f *fakeLogRepo) CreateLogsBatch(logs []*model.MemberLocationLog, now time.
 	}
 	return nil
 }
-func (f *fakeLogRepo) GetLogsByIDs(mtIdx int, ids []int) ([]model.MemberLocationLog, error) {
+func (f *fakeLogRepo) GetLogsByIDs(mtIdx int, ids []int, minTime, maxTime *time.Time) ([]model.MemberLocationLog, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	out := make([]model.MemberLocationLog, 0, len(ids))

@@ -10,37 +10,23 @@ import (
 )
 
 type fakeLocationLogRepo struct {
-	logs       []model.MemberLocationLog
-	members    []int
-	summary    []model.LocationDailySummaryRow
-	activity   []model.MemberActivityRow
-	dcMembers  []model.LocationLogMemberBasic
-	dcCounts   []model.DailyCountRow
-	stayTimes  []model.StayTimeRow
-	mapMarkers []model.MemberLocationLog
-	schedCount int
-	gpsMeters  float64
-	gpsMinutes float64
-	gpsSteps   int
-	err        error
+	logs        []model.MemberLocationLog
+	members     []int
+	summary     []model.LocationDailySummaryRow
+	activity    []model.MemberActivityRow
+	dcMembers   []model.LocationLogMemberBasic
+	dcCounts    []model.DailyCountRow
+	stayTimes   []model.StayTimeRow
+	mapMarkers  []model.MemberLocationLog
+	schedCount  int
+	gpsMeters   float64
+	gpsMinutes  float64
+	gpsSteps    int
+	lastMinTime *time.Time
+	lastMaxTime *time.Time
+	err         error
 }
 
-func (f *fakeLocationLogRepo) GetLogByID(mltIdx int) (*model.MemberLocationLog, error) {
-	return nil, f.err
-}
-func (f *fakeLocationLogRepo) CreateLog(l *model.MemberLocationLog, now time.Time) error {
-	return f.err
-}
-func (f *fakeLocationLogRepo) CreateLogsBatch(logs []*model.MemberLocationLog, now time.Time) error {
-	return f.err
-}
-func (f *fakeLocationLogRepo) GetLogsByIDs(mtIdx int, mltIdxs []int) ([]model.MemberLocationLog, error) {
-	return nil, f.err
-}
-func (f *fakeLocationLogRepo) UpdateLog(mltIdx int, fields map[string]interface{}) (int64, error) {
-	return 0, f.err
-}
-func (f *fakeLocationLogRepo) DeleteLog(mltIdx int) error { return f.err }
 func (f *fakeLocationLogRepo) GetMemberLogs(mtIdx int, start, end *time.Time, limit, offset int) ([]model.MemberLocationLog, error) {
 	return f.logs, f.err
 }
@@ -70,6 +56,55 @@ func (f *fakeLocationLogRepo) StayTimes(mtIdx int, date string, minSpeed, maxAcc
 }
 func (f *fakeLocationLogRepo) MapMarkers(mtIdx int, date string, minSpeed, maxAccuracy float64) ([]model.MemberLocationLog, error) {
 	return f.mapMarkers, f.err
+}
+func (f *fakeLocationLogRepo) GetLogByID(mltIdx int) (*model.MemberLocationLog, error) {
+	for i := range f.logs {
+		if f.logs[i].MltIdx == mltIdx {
+			return &f.logs[i], f.err
+		}
+	}
+	return nil, f.err
+}
+func (f *fakeLocationLogRepo) CreateLog(l *model.MemberLocationLog, now time.Time) error {
+	if f.err != nil {
+		return f.err
+	}
+	l.MltIdx = len(f.logs) + 1
+	l.MltWdate = &now
+	f.logs = append(f.logs, *l)
+	return nil
+}
+func (f *fakeLocationLogRepo) CreateLogsBatch(logs []*model.MemberLocationLog, now time.Time) error {
+	if f.err != nil {
+		return f.err
+	}
+	for _, l := range logs {
+		l.MltIdx = len(f.logs) + 1
+		l.MltWdate = &now
+		f.logs = append(f.logs, *l)
+	}
+	return nil
+}
+func (f *fakeLocationLogRepo) GetLogsByIDs(mtIdx int, mltIdxs []int, minTime, maxTime *time.Time) ([]model.MemberLocationLog, error) {
+	f.lastMinTime = minTime
+	f.lastMaxTime = maxTime
+	idSet := make(map[int]bool, len(mltIdxs))
+	for _, id := range mltIdxs {
+		idSet[id] = true
+	}
+	var out []model.MemberLocationLog
+	for _, l := range f.logs {
+		if l.MtIdx == mtIdx && idSet[l.MltIdx] {
+			out = append(out, l)
+		}
+	}
+	return out, f.err
+}
+func (f *fakeLocationLogRepo) UpdateLog(mltIdx int, fields map[string]interface{}) (int64, error) {
+	return 1, f.err
+}
+func (f *fakeLocationLogRepo) DeleteLog(mltIdx int) error {
+	return f.err
 }
 
 // TestDailySummaryFormat은 log_date="YYYY-MM-DD", start/end_time="YYYY-MM-DD HH:MM:SS"(공백, 초단위) 검증.
@@ -202,6 +237,24 @@ func TestLocationLogDateError(t *testing.T) {
 	}
 	if _, err := svc.DailyLogs(1, "2026-13-99", 1000, 0); err == nil {
 		t.Error("잘못된 날짜는 error 기대")
+	}
+}
+
+func TestCreateLogsBatchPassesGpsTimeBounds(t *testing.T) {
+	repo := &fakeLocationLogRepo{}
+	svc := NewLocationLog(repo)
+	t1 := time.Date(2026, 11, 19, 9, 0, 0, 0, time.Local)
+	t2 := time.Date(2026, 11, 19, 9, 5, 0, 0, time.Local)
+	lat, lng := 37.5, 127.0
+	data, created, inserted := svc.CreateLogsBatch([]LocationLogCreateInput{
+		{MtIdx: 10, MltLat: &lat, MltLong: &lng, MltGpsTime: t2},
+		{MtIdx: 10, MltLat: &lat, MltLong: &lng, MltGpsTime: t1},
+	}, 10)
+	if !inserted || created != 2 || len(data) != 2 {
+		t.Fatalf("unexpected batch result: inserted=%v created=%d len=%d", inserted, created, len(data))
+	}
+	if repo.lastMinTime == nil || !repo.lastMinTime.Equal(t1) || repo.lastMaxTime == nil || !repo.lastMaxTime.Equal(t2) {
+		t.Fatalf("파티션 프루닝 시간창 불일치: min=%v max=%v", repo.lastMinTime, repo.lastMaxTime)
 	}
 }
 

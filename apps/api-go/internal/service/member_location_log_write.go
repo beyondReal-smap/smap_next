@@ -108,11 +108,23 @@ func (s *LocationLogService) CreateLogsBatch(ins []LocationLogCreateInput, respL
 		head = head[:respLimit]
 	}
 	ids := make([]int, len(head))
+	var minT, maxT *time.Time
 	for i, l := range head {
 		ids[i] = l.MltIdx
+		if l.MltGpsTime != nil {
+			t := *l.MltGpsTime
+			if minT == nil || t.Before(*minT) {
+				v := t
+				minT = &v
+			}
+			if maxT == nil || t.After(*maxT) {
+				v := t
+				maxT = &v
+			}
+		}
 	}
 	saved := make(map[int]*model.MemberLocationLog, len(ids))
-	if rows, err := s.repo.GetLogsByIDs(ins[0].MtIdx, ids); err == nil {
+	if rows, err := s.repo.GetLogsByIDs(ins[0].MtIdx, ids, minT, maxT); err == nil {
 		for i := range rows {
 			saved[rows[i].MltIdx] = &rows[i]
 		}
@@ -128,10 +140,14 @@ func (s *LocationLogService) CreateLogsBatch(ins []LocationLogCreateInput, respL
 }
 
 // CreateLog는 act create_location_log(단건)를 이식한다. 로그 INSERT + member 최신위치 갱신(부수효과).
+// 방금 저장한 행의 mlt_gps_time을 함께 넘겨 파티션 프루닝(1파티션)으로 재조회한다.
 func (s *LocationLogService) CreateLog(in LocationLogCreateInput) (dto.LocationLogDict, bool) {
 	l := newLocationLogModel(in)
 	if err := s.repo.CreateLog(l, time.Now()); err != nil {
 		return dto.LocationLogDict{}, false
+	}
+	if rows, err := s.repo.GetLogsByIDs(l.MtIdx, []int{l.MltIdx}, l.MltGpsTime, l.MltGpsTime); err == nil && len(rows) > 0 {
+		return toLocationLogDict(&rows[0]), true
 	}
 	saved, err := s.repo.GetLogByID(l.MltIdx)
 	if err != nil || saved == nil {

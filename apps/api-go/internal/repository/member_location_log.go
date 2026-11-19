@@ -88,13 +88,22 @@ func (r *MemberLocationLogRepository) CreateLogsBatch(logs []*model.MemberLocati
 	})
 }
 
-// GetLogsByIDs는 한 회원의 여러 mlt_idx를 1쿼리로 조회한다(배치 응답의 DB 저장값 재조회용).
-func (r *MemberLocationLogRepository) GetLogsByIDs(mtIdx int, mltIdxs []int) ([]model.MemberLocationLog, error) {
+// GetLogsByIDs는 한 회원의 여러 mlt_idx를 1쿼리로 조회한다(단건·배치 응답의 DB 저장값 재조회용).
+// minTime/maxTime을 함께 넘기면 RANGE(to_days(mlt_gps_time)) 파티션 프루닝이 동작해
+// 25개 전 파티션 대신 해당 1~2개 파티션만 읽는다.
+func (r *MemberLocationLogRepository) GetLogsByIDs(mtIdx int, mltIdxs []int, minTime, maxTime *time.Time) ([]model.MemberLocationLog, error) {
 	out := make([]model.MemberLocationLog, 0, len(mltIdxs))
 	if len(mltIdxs) == 0 {
 		return out, nil
 	}
-	err := r.db.Where("mt_idx = ? AND mlt_idx IN ?", mtIdx, mltIdxs).Find(&out).Error
+	q := r.db.Where("mt_idx = ? AND mlt_idx IN ?", mtIdx, mltIdxs)
+	if minTime != nil {
+		q = q.Where("mlt_gps_time >= ?", *minTime)
+	}
+	if maxTime != nil {
+		q = q.Where("mlt_gps_time <= ?", *maxTime)
+	}
+	err := q.Find(&out).Error
 	return out, err
 }
 
@@ -405,20 +414,20 @@ func (r *MemberLocationLogRepository) ScheduleCount(mtIdx int, dateStr string) (
 	return personal.Count + groupCount, nil
 }
 
-// gpsDistanceSQL: PHP get_gps_distance 기반 CTE. 파라미터 순서
+// gpsDistanceSQL: 일일 이동 거리/시간 집계 CTE(LAG 단일 패스). 파라미터 순서
 // mt_idx, date_start, date_end, max_accuracy, min_speed(CASE), min_speed(BETWEEN), max_speed.
-const gpsDistanceSQL = `WITH RankedLogs AS (
-			SELECT mt_idx, mlt_accuacy, mlt_speed, mlt_lat, mlt_long, mlt_gps_time,
-				ROW_NUMBER() OVER (ORDER BY mlt_gps_time ASC) AS rn
+// 기존 RankedLogs 자기조인 대신 LAG() 단일 패스를 사용하고, 동일 좌표 부동소수점 오차에 의한
+// ACOS 도메인 초과(GREATEST/LEAST 클램핑)와 동일 초 중복 로그의 0나눗셈(time_diff_seconds > 0)을 방지한다.
+const gpsDistanceSQL = `WITH Diffs AS (
+			SELECT
+				mlt_lat AS lat2,
+				mlt_long AS long2,
+				LAG(mlt_lat) OVER (ORDER BY mlt_gps_time ASC, mlt_idx ASC) AS lat1,
+				LAG(mlt_long) OVER (ORDER BY mlt_gps_time ASC, mlt_idx ASC) AS long1,
+				TIMESTAMPDIFF(SECOND, LAG(mlt_gps_time) OVER (ORDER BY mlt_gps_time ASC, mlt_idx ASC), mlt_gps_time) AS time_diff_seconds
 			FROM member_location_log_t
-			WHERE 1=1 AND mt_idx = ? AND mlt_gps_time BETWEEN ? AND ?
+			WHERE mt_idx = ? AND mlt_gps_time BETWEEN ? AND ?
 				AND mlt_speed > 0 AND mlt_accuacy < ?
-		),
-		Diffs AS (
-			SELECT L1.rn, L1.mlt_lat AS lat1, L1.mlt_long AS long1, L2.mlt_lat AS lat2, L2.mlt_long AS long2,
-				L1.mlt_gps_time AS wdate1, L2.mlt_gps_time AS wdate2, L1.mlt_speed AS speed, L1.mlt_accuacy AS accuracy,
-				TIMESTAMPDIFF(SECOND, L1.mlt_gps_time, L2.mlt_gps_time) AS time_diff_seconds
-			FROM RankedLogs L1 INNER JOIN RankedLogs L2 ON L1.rn = L2.rn - 1
 		)
 		SELECT
 			SUM(CASE
@@ -430,9 +439,14 @@ const gpsDistanceSQL = `WITH RankedLogs AS (
 			END) / 60 AS moving_minute,
 			SUM(rslt.distance_meters) AS moving_meters
 		FROM (
-			SELECT rn, lat1, long1, lat2, long2, wdate1, wdate2, speed, accuracy, time_diff_seconds,
-				ROUND(6371000 * ACOS(COS(RADIANS(lat2)) * COS(RADIANS(lat1)) * COS(RADIANS(long1) - RADIANS(long2)) + SIN(RADIANS(lat1)) * SIN(RADIANS(lat2))), 1) AS distance_meters
+			SELECT
+				time_diff_seconds,
+				ROUND(6371000 * ACOS(GREATEST(-1, LEAST(1,
+					COS(RADIANS(lat2)) * COS(RADIANS(lat1)) * COS(RADIANS(long1) - RADIANS(long2)) +
+					SIN(RADIANS(lat1)) * SIN(RADIANS(lat2))
+				))), 1) AS distance_meters
 			FROM Diffs
+			WHERE lat1 IS NOT NULL AND time_diff_seconds > 0
 		) rslt
 		WHERE ROUND((rslt.distance_meters / rslt.time_diff_seconds) * 3600 / 1000, 1) BETWEEN ? AND ?`
 

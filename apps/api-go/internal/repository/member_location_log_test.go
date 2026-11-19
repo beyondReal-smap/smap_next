@@ -11,8 +11,8 @@ import (
 	"github.com/bluemusk/smap_next_go/internal/model"
 )
 
-// dryRunInsertDB는 DB에 접속하지 않고 SQL만 생성하는 gorm 세션을 만든다.
-func dryRunInsertDB(t *testing.T) *gorm.DB {
+// locLogDryRunDB는 DB에 접속하지 않고 SQL만 생성하는 gorm 세션을 만든다.
+func locLogDryRunDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	db, err := gorm.Open(mysql.New(mysql.Config{
 		DSN:                       "u:p@tcp(127.0.0.1:1)/x?parseTime=true&loc=Local",
@@ -54,7 +54,7 @@ func TestBatchInsertIsSingleMultiRowStatementWithWdate(t *testing.T) {
 
 	// CreateInBatches는 하위 세션에서 SQL을 만들어 반환 Statement에 남지 않는다.
 	// 배치 크기(500) 이하면 슬라이스 전체를 Create 1회로 처리하므로 같은 문장을 Create로 확인한다.
-	res := dryRunInsertDB(t).Create(logs)
+	res := locLogDryRunDB(t).Create(logs)
 	if res.Error != nil {
 		t.Fatalf("dry-run create: %v", res.Error)
 	}
@@ -96,5 +96,21 @@ func TestNextDayYMD(t *testing.T) {
 	}
 	if _, err := nextDayYMD("2026/11/19"); err == nil {
 		t.Fatal("잘못된 형식은 에러여야 한다")
+	}
+}
+
+func TestGetLogsByIDsAddsGpsTimeBoundsForPartitionPruning(t *testing.T) {
+	db := locLogDryRunDB(t)
+	minT := time.Date(2026, 11, 19, 10, 0, 0, 0, time.Local)
+	maxT := time.Date(2026, 11, 19, 10, 5, 0, 0, time.Local)
+
+	var out []model.MemberLocationLog
+	stmt := db.Where("mt_idx = ? AND mlt_idx IN ?", 1186, []int{10, 11}).
+		Where("mlt_gps_time >= ?", minT).
+		Where("mlt_gps_time <= ?", maxT).
+		Find(&out).Statement
+	sql := stmt.SQL.String()
+	if !strings.Contains(sql, "mlt_gps_time >= ?") || !strings.Contains(sql, "mlt_gps_time <= ?") {
+		t.Fatalf("파티션 프루닝용 mlt_gps_time 상하한이 SQL에 있어야 한다: %s", sql)
 	}
 }
