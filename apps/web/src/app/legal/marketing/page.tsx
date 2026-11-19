@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import LegalDocument from "../LegalDocument";
 
 // 원문: Notion 공개 문서 schedulemap.notion.site/7e35638d106f433f86fa95f88ba6efb1
-// (2026-11-19 이전. 앱 이름 'smap' → '도착했어' 만 바꿨다.)
+// 앱 이름 'smap' → '도착했어', 시행일 → 2026-01-08(최신 개정) 만 바꿨다.
 export const metadata: Metadata = {
   title: "마케팅 정보 수집 및 이용 동의",
   description: "도착했어의 마케팅 정보 수집 항목·이용 목적과 동의 철회 방법을 안내합니다.",
@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 export default function MarketingPage() {
   return (
-    <LegalDocument title="마케팅 정보 수집 및 이용 동의" path="/legal/marketing">
+    <LegalDocument title="마케팅 정보 수집 및 이용 동의" path="/legal/marketing" effectiveDate="2026-01-08">
       <section>
         <ol className="list-decimal pl-5 space-y-1">
           <li>

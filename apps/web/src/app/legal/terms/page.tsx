@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import LegalDocument from "../LegalDocument";
 
 // 원문: Notion 공개 문서 schedulemap.notion.site/30b32b5ad0bc4f99a39b28c0fe5f1de4
-// (2026-11-19 이전. 앱 이름 'smap' → '도착했어' 만 바꿨다.)
+// 앱 이름 'smap' → '도착했어', 시행일 → 2026-01-08(최신 개정) 만 바꿨다.
 export const metadata: Metadata = {
   title: "서비스 이용약관",
   description: "도착했어 서비스 이용에 관한 회사와 회원의 권리·의무 및 책임사항을 정한 이용약관입니다.",
@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <LegalDocument title="서비스 이용약관" path="/legal/terms" effectiveDate="2024-05-30">
+    <LegalDocument title="서비스 이용약관" path="/legal/terms" effectiveDate="2026-01-08">
       <section>
         <h3 className="text-lg font-semibold mb-3 text-blue-900">{"제1조(목적)"}</h3>
         <p>{"이 약관은 비욘드리얼 (이하 '회사' 라고 합니다)가 제공하는 제반 서비스의 이용과 관련하여 회사와 회원과의 권리, 의무 및 책임사항, 기타 필요한 사항을 규정함을 목적으로 합니다."}</p>
@@ -295,7 +295,7 @@ export default function TermsPage() {
 
       <section>
         <h3 className="text-lg font-semibold mb-3 text-blue-900">{"제1조(시행일)"}</h3>
-        <p>{"본 약관은 2024.05.30부터 시행됩니다."}</p>
+        <p>{"본 약관은 2026.01.08부터 시행됩니다."}</p>
       </section>
     </LegalDocument>
   );

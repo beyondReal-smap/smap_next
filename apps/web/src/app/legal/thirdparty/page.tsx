@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import LegalDocument from "../LegalDocument";
 
 // 원문: Notion 공개 문서 schedulemap.notion.site/3-21b302dcaba0490fbaa9430618a74f01
-// (2026-11-19 이전. 앱 이름 'smap' → '도착했어' 만 바꿨다.)
+// 앱 이름 'smap' → '도착했어', 시행일 → 2026-01-08(최신 개정) 만 바꿨다.
 export const metadata: Metadata = {
   title: "개인정보 제3자 제공 동의",
   description: "도착했어의 개인정보 제3자 제공 목적·항목·보유기간과 동의 거부 시 불이익을 안내합니다.",
@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 export default function ThirdPartyPage() {
   return (
-    <LegalDocument title="개인정보 제3자 제공 동의" path="/legal/thirdparty">
+    <LegalDocument title="개인정보 제3자 제공 동의" path="/legal/thirdparty" effectiveDate="2026-01-08">
       <section>
         <ol className="list-decimal pl-5 space-y-1">
           <li>
