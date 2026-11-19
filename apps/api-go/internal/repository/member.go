@@ -114,9 +114,14 @@ func (r *MemberRepository) ExistsByNickname(nickname string) (bool, error) {
 }
 
 // GetByEmail은 mt_email 매칭 단건(Python Member.find_by_email). 없으면 (nil, nil).
+// 같은 이메일 행이 여럿이면 활성(mt_status=1) 행을 먼저, 그 안에서는 mt_idx 오름차순으로 고른다.
+// 2026-11-17: 앱이 이메일 전용 로그인이 되면서, 예전 비활성 행(mt_idx 가 더 작음)이 먼저 잡혀
+// 활성 계정으로 로그인할 수 없던 문제(중복 이메일 5건) 수정.
 func (r *MemberRepository) GetByEmail(email string) (*model.Member, error) {
 	var m model.Member
-	err := r.db.Where("mt_email = ?", email).First(&m).Error
+	err := r.db.Where("mt_email = ?", email).
+		Order("CASE WHEN mt_status = 1 THEN 0 ELSE 1 END").
+		First(&m).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}

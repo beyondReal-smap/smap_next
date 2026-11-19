@@ -231,11 +231,11 @@ func (c *Config) CORSOrigins() []string {
 	defaults := []string{
 		"http://localhost:3000",
 		"http://localhost:8000",
-		"https://nextstep.smap.site",
+		"https://smap.aiagnt.kr",
 		"https://smap.co.kr",
 		"https://hwgi-cstmer.vercel.app",
-		"http://api3.smap.site:3000",
-		"https://api3.smap.site:3000",
+		"http://api3.aiagnt.kr:3000",
+		"https://api3.aiagnt.kr:3000",
 		"http://127.0.0.1:3000",
 	}
 	if c.corsOriginsRaw == "" {

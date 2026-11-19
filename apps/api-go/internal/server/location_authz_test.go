@@ -154,6 +154,25 @@ func (f *fakeLogRepo) CreateLog(l *model.MemberLocationLog, _ time.Time) error {
 	f.created = append(f.created, c)
 	return nil
 }
+func (f *fakeLogRepo) CreateLogsBatch(logs []*model.MemberLocationLog, now time.Time) error {
+	for _, l := range logs {
+		if err := f.CreateLog(l, now); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+func (f *fakeLogRepo) GetLogsByIDs(mtIdx int, ids []int) ([]model.MemberLocationLog, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := make([]model.MemberLocationLog, 0, len(ids))
+	for _, id := range ids {
+		if l, ok := f.logs[id]; ok && l.MtIdx == mtIdx {
+			out = append(out, *l)
+		}
+	}
+	return out, nil
+}
 func (f *fakeLogRepo) UpdateLog(id int, fields map[string]interface{}) (int64, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -232,6 +251,9 @@ func (f *fakePlaceRepo) Create(l *model.Location) error {
 func (f *fakePlaceRepo) UpdateFields(id int, _ map[string]interface{}) (int64, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if _, ok := f.places[id]; !ok {
+		return 0, nil
+	}
 	f.changes = append(f.changes, fmt.Sprintf("update:%d", id))
 	return 1, nil
 }
@@ -673,6 +695,10 @@ func TestUploadBatchMismatchIs403(t *testing.T) {
 	if w := e.do("POST", "/logs/member-location-logs", gMember, body); w.Code != 403 {
 		t.Fatalf("배치 중 타인 명의: %d", w.Code)
 	}
+	// 403으로 거부된 배치는 앞쪽 정상 항목도 기록하지 않는다.
+	if len(e.logs.created) != 0 {
+		t.Fatalf("거부된 배치가 일부 기록됨: %+v", e.logs.created)
+	}
 }
 
 func TestUploadWithoutTokenFlag(t *testing.T) {
@@ -847,6 +873,19 @@ func TestPlacesManageMatrix(t *testing.T) {
 					t.Errorf("[leader_manage=%v] %s %s: 거부됐는데 저장소가 변경됨", flag, c.name, op.name)
 				}
 			}
+		}
+	}
+}
+
+func TestPlacesUpdateMissingIs404(t *testing.T) {
+	// 앱 데모 모드의 가짜 장소(880005 등)처럼 DB에 없는 장소를 수정하면 서버 오류(500)가 아니라 404.
+	e := newLocEnv(t, defaultOpts())
+	for _, op := range []struct{ method, path, body string }{
+		{"PUT", "/locations/880005", `{"slt_title":"공덕 수학학원","slt_lat":37.5,"slt_long":127.0,"slt_enter_alarm":"N"}`},
+		{"PUT", "/locations/880005/notification", `{"slt_enter_alarm":"N"}`},
+	} {
+		if w := e.do(op.method, op.path, gMember, op.body); w.Code != 404 {
+			t.Errorf("%s %s: got %d want 404", op.method, op.path, w.Code)
 		}
 	}
 }

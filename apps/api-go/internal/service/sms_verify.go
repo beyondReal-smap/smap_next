@@ -95,8 +95,8 @@ func (s *SMSVerifyService) SendVerificationCode(ctx context.Context, phoneNumber
 		}
 	}
 	code := genCode6()
-	message := fmt.Sprintf("[SMAP] 인증번호는 %s입니다. 3분 이내에 입력해주세요.", code)
-	result := s.sms.SendSMS(phoneNumber, message, "SMAP 인증번호")
+	message := fmt.Sprintf("[도착했어] 인증번호는 %s입니다. 3분 이내에 입력해주세요.", code)
+	result := s.sms.SendSMS(phoneNumber, message, "도착했어 인증번호")
 	if !result.Success {
 		return verErr(result.Message)
 	}

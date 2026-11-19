@@ -83,7 +83,7 @@ func writeVerificationResult(c *gin.Context, r service.VerificationResult) {
 	writeJSON(c, r.Status, gin.H{"success": false, "error": r.Error, "detail": r.Error})
 }
 
-// Send는 POST /sms/send (인증 필수). SMSRequest{phone_number, message 필수, subject 기본 "SMAP"}.
+// Send는 POST /sms/send (인증 필수). SMSRequest{phone_number, message 필수, subject 기본 "도착했어"}.
 // 인증이 body 검증보다 우선(FastAPI sub-dependency 먼저 풀려 short-circuit → 무인증 시 401).
 func (h *SMSHandler) Send(c *gin.Context) {
 	if _, ok := h.requireUserID(c); !ok {
@@ -101,7 +101,7 @@ func (h *SMSHandler) Send(c *gin.Context) {
 		writeJSON(c, http.StatusUnprocessableEntity, gin.H{"detail": errs})
 		return
 	}
-	subject := "SMAP"
+	subject := "도착했어"
 	if subjectPtr != nil {
 		subject = *subjectPtr
 	}

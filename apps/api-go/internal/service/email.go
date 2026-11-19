@@ -75,7 +75,7 @@ func NewEmail(cfg EmailConfig) *EmailService {
 	}
 }
 
-const resetEmailSubject = "[SMAP] 비밀번호 재설정 링크"
+const resetEmailSubject = "[도착했어] 비밀번호 재설정 링크"
 
 // SendPasswordResetEmail은 Python send_password_reset_email을 이식한다.
 func (s *EmailService) SendPasswordResetEmail(email, resetURL string) EmailResult {
@@ -158,7 +158,7 @@ func (s *EmailService) sendNaverworks(toEmail, subject, htmlContent string) bool
 	mailURL := fmt.Sprintf("https://www.worksapis.com/v1.0/domains/%s/mail", s.nwDomain)
 	payload := map[string]interface{}{
 		"senderAddress": s.apiSenderAddress(),
-		"senderName":    "SMAP",
+		"senderName":    "도착했어",
 		"title":         subject,
 		"body":          htmlContent,
 		"recipients": []map[string]string{
@@ -185,7 +185,7 @@ func (s *EmailService) apiSenderAddress() string {
 	if s.sender != "" {
 		return s.sender
 	}
-	return "admin@smap.site"
+	return "admin@aiagnt.kr"
 }
 
 // naverworksToken은 OAuth2 client_credentials로 액세스 토큰을 획득한다.
@@ -308,7 +308,7 @@ func buildResetEmailText(resetURL string) string {
 }
 
 const resetEmailTextTemplate = `
-🚀 SMAP 비밀번호 재설정
+🚀 도착했어 비밀번호 재설정
 
 안녕하세요! 👋
 
@@ -324,10 +324,10 @@ const resetEmailTextTemplate = `
 • 링크를 다른 사람과 공유하지 마세요
 
 감사합니다.
-SMAP 팀
+도착했어 팀
 
 ---
-이 이메일은 SMAP 시스템에서 자동으로 발송되었습니다.
+이 이메일은 '도착했어' 시스템에서 자동으로 발송되었습니다.
 `
 
 const resetEmailHTMLTemplate = `<!DOCTYPE html>
@@ -335,7 +335,7 @@ const resetEmailHTMLTemplate = `<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SMAP 비밀번호 재설정</title>
+    <title>도착했어 비밀번호 재설정</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -465,7 +465,7 @@ const resetEmailHTMLTemplate = `<!DOCTYPE html>
 <body>
     <div class="container">
         <div class="header">
-            <div class="logo">🚀 SMAP</div>
+            <div class="logo">🚀 도착했어</div>
             <h1>비밀번호 재설정</h1>
             <div class="subtitle">안전한 계정 관리를 위한 링크</div>
         </div>
@@ -503,7 +503,7 @@ const resetEmailHTMLTemplate = `<!DOCTYPE html>
 
         <div class="footer">
             <p class="footer-text">
-                이 이메일은 SMAP 시스템에서 자동으로 발송되었습니다.<br>
+                이 이메일은 '도착했어' 시스템에서 자동으로 발송되었습니다.<br>
                 문의사항이 있으시면 고객센터로 연락해주세요.
             </p>
         </div>

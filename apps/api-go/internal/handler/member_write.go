@@ -307,7 +307,7 @@ func (h *MemberWriteHandler) Terms(c *gin.Context) {
 		Success: true,
 		Message: "약관 목록 조회 성공",
 		Data: []dto.MemberTermInfo{
-			{ID: "service", Title: "서비스 이용약관", Description: "SMAP 서비스 이용에 관한 약관", Version: "1.0", LastUpdated: "2024-01-01", IsRequired: true, DBField: "mt_agree1"},
+			{ID: "service", Title: "서비스 이용약관", Description: "'도착했어' 서비스 이용에 관한 약관", Version: "1.0", LastUpdated: "2024-01-01", IsRequired: true, DBField: "mt_agree1"},
 			{ID: "privacy", Title: "개인정보 처리방침", Description: "개인정보 수집 및 이용에 관한 방침", Version: "1.0", LastUpdated: "2024-01-01", IsRequired: true, DBField: "mt_agree2"},
 			{ID: "location", Title: "위치기반서비스 이용약관", Description: "위치정보 수집 및 이용에 관한 약관", Version: "1.0", LastUpdated: "2024-01-01", IsRequired: true, DBField: "mt_agree3"},
 			{ID: "third_party", Title: "개인정보 제3자 제공", Description: "개인정보 제3자 제공에 관한 동의", Version: "1.0", LastUpdated: "2024-01-01", IsRequired: false, DBField: "mt_agree4"},

@@ -25,6 +25,8 @@ type locationLogRepo interface {
 	MapMarkers(mtIdx int, date string, minSpeed, maxAccuracy float64) ([]model.MemberLocationLog, error)
 	GetLogByID(mltIdx int) (*model.MemberLocationLog, error)
 	CreateLog(l *model.MemberLocationLog, now time.Time) error
+	CreateLogsBatch(logs []*model.MemberLocationLog, now time.Time) error
+	GetLogsByIDs(mtIdx int, mltIdxs []int) ([]model.MemberLocationLog, error)
 	UpdateLog(mltIdx int, fields map[string]interface{}) (int64, error)
 	DeleteLog(mltIdx int) error
 }

@@ -15,8 +15,7 @@ func (s *LocationLogService) DailySummaryByDate(mtIdx int, date string) (dto.Loc
 	if err != nil {
 		return dto.LocationSummaryData{}, err
 	}
-	end := start.AddDate(0, 0, 1)
-	logs, err := s.repo.GetMemberLogsByExactDate(mtIdx, start, end, 10000, 0)
+	logs, err := s.repo.GetMemberLogsByExactDate(mtIdx, start, endOfDay(start), 10000, 0)
 	if err != nil {
 		return dto.LocationSummaryData{}, err
 	}
@@ -30,8 +29,7 @@ func (s *LocationLogService) DailyPathByDate(mtIdx int, date string) (dto.DailyP
 	if err != nil {
 		return dto.DailyPathData{}, err
 	}
-	end := start.AddDate(0, 0, 1)
-	logs, err := s.repo.GetMemberLogsByExactDate(mtIdx, start, end, 10000, 0)
+	logs, err := s.repo.GetMemberLogsByExactDate(mtIdx, start, endOfDay(start), 10000, 0)
 	if err != nil {
 		return dto.DailyPathData{}, err
 	}
@@ -70,15 +68,68 @@ type LocationLogCreateInput struct {
 	StayLong        *float64
 }
 
-// CreateLog는 act create_location_log(단건)를 이식한다. 로그 INSERT + member 최신위치 갱신(부수효과).
-func (s *LocationLogService) CreateLog(in LocationLogCreateInput) (dto.LocationLogDict, bool) {
+// endOfDay는 날짜의 23:59:59를 반환한다. Python get_member_location_logs_by_exact_date의
+// [date 00:00:00, date 23:59:59] 구간과 맞춘다. 상한을 다음 날 00:00:00으로 두고 <=로 비교하면
+// 다음 날 자정 정각 로그가 전날 요약/경로에 섞인다.
+func endOfDay(start time.Time) time.Time {
+	return start.AddDate(0, 0, 1).Add(-time.Second)
+}
+
+// newLocationLogModel은 검증된 입력을 저장용 모델로 변환한다(단건·배치 공용).
+func newLocationLogModel(in LocationLogCreateInput) *model.MemberLocationLog {
 	gt := in.MltGpsTime
-	l := &model.MemberLocationLog{
+	return &model.MemberLocationLog{
 		MtIdx: in.MtIdx, MltLat: in.MltLat, MltLong: in.MltLong, MltAccuacy: in.MltAccuacy,
 		MltSpeed: in.MltSpeed, MltBattery: in.MltBattery, MltFineLocation: in.MltFineLocation,
 		MltLocationChk: in.MltLocationChk, MtHealthWork: in.MtHealthWork, MltGpsTime: &gt,
 		StayLat: in.StayLat, StayLong: in.StayLong,
 	}
+}
+
+// CreateLogsBatch는 배치(mlt_gps_data) 항목을 한 번에 저장하고, 응답용으로 앞 respLimit건을
+// DB 저장값으로 재조회해 반환한다(건별 경로의 GetLogByID와 같은 값: DECIMAL/FLOAT 반올림 반영).
+// inserted=false면 아무것도 커밋되지 않았으므로 호출측이 건별 경로로 재시도해도 중복이 생기지 않는다.
+// 재조회만 실패하면(이미 커밋됨) 재시도하면 안 되므로 메모리 값으로 응답을 만든다.
+func (s *LocationLogService) CreateLogsBatch(ins []LocationLogCreateInput, respLimit int) (data []dto.LocationLogDict, created int, inserted bool) {
+	data = make([]dto.LocationLogDict, 0)
+	if len(ins) == 0 {
+		return data, 0, true
+	}
+	logs := make([]*model.MemberLocationLog, len(ins))
+	for i, in := range ins {
+		logs[i] = newLocationLogModel(in)
+	}
+	if err := s.repo.CreateLogsBatch(logs, time.Now()); err != nil {
+		return data, 0, false
+	}
+
+	head := logs
+	if len(head) > respLimit {
+		head = head[:respLimit]
+	}
+	ids := make([]int, len(head))
+	for i, l := range head {
+		ids[i] = l.MltIdx
+	}
+	saved := make(map[int]*model.MemberLocationLog, len(ids))
+	if rows, err := s.repo.GetLogsByIDs(ins[0].MtIdx, ids); err == nil {
+		for i := range rows {
+			saved[rows[i].MltIdx] = &rows[i]
+		}
+	}
+	for _, l := range head {
+		if sv, ok := saved[l.MltIdx]; ok {
+			data = append(data, toLocationLogDict(sv))
+		} else {
+			data = append(data, toLocationLogDict(l))
+		}
+	}
+	return data, len(logs), true
+}
+
+// CreateLog는 act create_location_log(단건)를 이식한다. 로그 INSERT + member 최신위치 갱신(부수효과).
+func (s *LocationLogService) CreateLog(in LocationLogCreateInput) (dto.LocationLogDict, bool) {
+	l := newLocationLogModel(in)
 	if err := s.repo.CreateLog(l, time.Now()); err != nil {
 		return dto.LocationLogDict{}, false
 	}

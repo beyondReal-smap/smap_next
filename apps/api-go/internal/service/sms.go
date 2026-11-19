@@ -110,8 +110,8 @@ func (s *SMSService) SendSMS(phoneNumber, message, subject string) SMSResult {
 
 // SendPasswordResetSMS는 Python send_password_reset_sms와 동등(비번재설정 링크 SMS).
 func (s *SMSService) SendPasswordResetSMS(phoneNumber, resetURL string) SMSResult {
-	message := fmt.Sprintf("[SMAP] 비밀번호 재설정 링크\n%s\n1분 내에 사용해주세요.", resetURL)
-	return s.SendSMS(phoneNumber, message, "SMAP 비밀번호 재설정")
+	message := fmt.Sprintf("[도착했어] 비밀번호 재설정 링크\n%s\n1분 내에 사용해주세요.", resetURL)
+	return s.SendSMS(phoneNumber, message, "도착했어 비밀번호 재설정")
 }
 
 // truncateRunes는 Python s[:n]과 동등(문자 단위 절단).
