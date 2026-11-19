@@ -3,7 +3,7 @@ import type { McpConfig } from "./config.js";
 /**
  * SMAP AI API 클라이언트.
  *
- * MCP 서버는 콘텐츠를 자체 보관하지 않고 www.smap.site의 /api/ai/* 를 읽습니다.
+ * MCP 서버는 콘텐츠를 자체 보관하지 않고 smap.aiagnt.kr의 /api/ai/* 를 읽습니다.
  * 콘텐츠 사본을 들고 있으면 웹사이트가 갱신될 때마다 MCP를 재배포해야 하고,
  * 그 사이 AI가 낡은 정보를 사실처럼 답하게 됩니다. 원본을 한 곳에 두는 편이 안전합니다.
  *

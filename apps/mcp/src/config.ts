@@ -31,7 +31,7 @@ function readInt(name: string, fallback: number): number {
 }
 
 function readBaseUrl(): string {
-  const raw = process.env.SMAP_AI_BASE_URL ?? "https://www.smap.site";
+  const raw = process.env.SMAP_AI_BASE_URL ?? "https://smap.aiagnt.kr";
   let parsed: URL;
   try {
     parsed = new URL(raw);

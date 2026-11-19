@@ -94,7 +94,7 @@ func (s *EmailService) sendNaverworks(toEmail, subject, htmlContent string) bool
 	}
 	mailURL := fmt.Sprintf("https://www.worksapis.com/v1.0/domains/%s/mail", s.nwDomain)
 	payload := map[string]interface{}{
-		"senderAddress": "admin@smap.site",
+		"senderAddress": "admin@aiagnt.kr",
 		"senderName":    "SMAP",
 		"title":         subject,
 		"body":          htmlContent,
