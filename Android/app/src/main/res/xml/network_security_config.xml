@@ -3,7 +3,7 @@
     <!-- 🔥 개발 환경에서만 cleartext 허용 (프로덕션에서는 제한적 사용) -->
     <domain-config cleartextTrafficPermitted="false">
         <!-- 운영 서버 -->
-        <domain includeSubdomains="true">nextstep.aiagnt.kr</domain>
+        <domain includeSubdomains="true">smap.aiagnt.kr</domain>
         <domain includeSubdomains="true">api3.aiagnt.kr</domain>
         <domain includeSubdomains="true">aiagnt.kr</domain>
         

@@ -58,9 +58,12 @@ class HomeViewModel: ObservableObject {
 
             if fetchedGroups.isEmpty {
                 print("⚠️ [HomeViewModel] No groups found, triggering mandatory group creation")
+                selectedGroup = nil
+                members = []
+                schedules = []
                 self.showGroupCreationModal = true
-            } else if let first = fetchedGroups.first {
-                self.selectGroup(first)
+            } else if let group = fetchedGroups.first(where: { $0.sgt_idx == selectedGroup?.sgt_idx }) ?? fetchedGroups.first {
+                self.selectGroup(group)
             }
 
             self.isLoading = false
@@ -91,6 +94,10 @@ class HomeViewModel: ObservableObject {
 
     func selectGroup(_ group: SmapGroup) {
         HapticManager.shared.selection()
+        if selectedGroup?.sgt_idx != group.sgt_idx {
+            members = []
+            schedules = []
+        }
         self.selectedGroup = group
         Task {
             await fetchGroupData(sgtIdx: group.sgt_idx)
@@ -106,15 +113,10 @@ class HomeViewModel: ObservableObject {
             let fetchedMembers = try await homeService.getGroupMembers(sgtIdx: sgtIdx)
             print("📝 [HomeViewModel] Fetched \(fetchedMembers.count) members")
 
-            self.members = fetchedMembers
-
-            // 3. 로그인한 사용자 자동 선택 (최초 진입 시)
-            if let currentUser = AuthService.shared.getUserData(),
-               let currentMember = fetchedMembers.first(where: { $0.mt_idx == currentUser.mt_idx }) {
-                print("👤 [HomeViewModel] Auto-selecting logged-in user: \(currentMember.displayName)")
-                self.selectMember(currentMember)
-            }
+            guard selectedGroup?.sgt_idx == sgtIdx else { return }
+            updateMembers(fetchedMembers)
         } catch {
+            guard selectedGroup?.sgt_idx == sgtIdx else { return }
             print("❌ [HomeViewModel] 멤버 데이터 가져오기 실패: \(error)")
             if let apiError = error as? APIError {
                 self.errorMessage = apiError.message ?? "멤버 정보를 불러오는데 실패했습니다."
@@ -127,6 +129,7 @@ class HomeViewModel: ObservableObject {
         // 2. 일정 데이터 가져오기 (선택 - 에러나도 무시)
         do {
             let fetchedSchedules = try await homeService.getGroupSchedules(sgtIdx: sgtIdx)
+            guard selectedGroup?.sgt_idx == sgtIdx else { return }
             print("📝 [HomeViewModel] Fetched \(fetchedSchedules.count) schedules")
 
             self.schedules = fetchedSchedules
@@ -299,6 +302,15 @@ class HomeViewModel: ObservableObject {
         HapticManager.shared.selection()
         for i in 0..<members.count {
             members[i].isSelected = (members[i].mt_idx == member.mt_idx)
+        }
+    }
+
+    func updateMembers(_ incoming: [SmapGroupMember]) {
+        let selectedID = members.first(where: { $0.isSelected })?.mt_idx
+        members = incoming.map { member in
+            var updated = member
+            updated.isSelected = member.mt_idx == selectedID
+            return updated
         }
     }
 

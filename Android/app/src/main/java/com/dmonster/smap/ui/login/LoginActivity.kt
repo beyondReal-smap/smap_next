@@ -17,6 +17,8 @@ import com.dmonster.smap.MainActivity
 import com.dmonster.smap.R
 import com.dmonster.smap.ui.theme.SmapTheme
 import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInStatusCodes
+import com.google.android.gms.common.api.CommonStatusCodes
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
@@ -43,6 +45,10 @@ class LoginActivity : ComponentActivity() {
     private val googleSignInLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
+        if (result.resultCode == RESULT_CANCELED && result.data == null) {
+            viewModel.setLoading(false)
+            return@registerForActivityResult
+        }
         val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
         try {
             val account = task.getResult(ApiException::class.java)
@@ -65,11 +71,13 @@ class LoginActivity : ComponentActivity() {
             }
         } catch (e: ApiException) {
             viewModel.setLoading(false)
-            Log.e(TAG, "❌ Google Sign-In 실패: 에러 코드 ${e.statusCode}", e)
+            if (e.statusCode == GoogleSignInStatusCodes.SIGN_IN_CANCELLED || e.statusCode == CommonStatusCodes.CANCELED) {
+                return@registerForActivityResult
+            }
+            Log.e(TAG, "Google 로그인 실패 (status=${e.statusCode})")
             val errorMsg = when (e.statusCode) {
-                10 -> "DEVELOPER_ERROR: SHA-1 지문이나 패키지명이 Console 설정과 일치하는지 확인하세요."
-                7 -> "NETWORK_ERROR: 네트워크 상태를 확인하세요. (에뮬레이터 재시작 권장)"
-                else -> "ApiException: ${e.message}"
+                CommonStatusCodes.NETWORK_ERROR -> "인터넷 연결을 확인한 뒤 다시 시도해 주세요."
+                else -> "Google 로그인을 완료하지 못했어요. 다시 시도하거나 이메일로 계속해 주세요."
             }
             viewModel.showErrorMessage(errorMsg)
         }
@@ -137,7 +145,7 @@ class LoginActivity : ComponentActivity() {
         val client = googleSignInClient
         if (client == null) {
             Log.e(TAG, "❌ Google Sign-In이 초기화되지 않았습니다.")
-            viewModel.showErrorMessage("Google 로그인이 설정되지 않았습니다.")
+            viewModel.showErrorMessage("Google 로그인을 완료하지 못했어요. 다시 시도하거나 이메일로 계속해 주세요.")
             return
         }
         viewModel.setLoading(true)
@@ -174,7 +182,9 @@ class LoginActivity : ComponentActivity() {
             if (error != null) {
                 Log.e(TAG, "❌ 카카오계정 로그인 실패", error)
                 viewModel.setLoading(false)
-                viewModel.showErrorMessage("카카오 로그인 실패: ${error.localizedMessage}")
+                if (error !is ClientError || error.reason != ClientErrorCause.Cancelled) {
+                    viewModel.showErrorMessage("카카오 로그인을 완료하지 못했어요. 다시 시도하거나 이메일로 계속해 주세요.")
+                }
             } else if (token != null) {
                 Log.d(TAG, "✅ 카카오계정 로그인 성공")
                 fetchKakaoUserInfo(token.accessToken)

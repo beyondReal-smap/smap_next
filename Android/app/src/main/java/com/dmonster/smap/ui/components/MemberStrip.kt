@@ -6,11 +6,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
@@ -23,6 +25,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -30,6 +34,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.dmonster.smap.data.model.SmapGroupMember
+import com.dmonster.smap.ui.theme.FamilyColors
 import com.dmonster.smap.ui.theme.SmapSpacing
 import com.dmonster.smap.ui.theme.SmapText
 
@@ -56,20 +61,32 @@ fun MemberStrip(
                 StripItem(
                     label = "전체",
                     selected = selectedMemberId == null,
+                    horizontal = true,
                     onClick = onAllClick,
                     accessibility = "전체 멤버 보기",
-                ) { selected ->
+                ) { _ ->
                     val colors = MaterialTheme.colorScheme
                     Box(
                         Modifier
-                            .size(52.dp)
-                            .then(if (selected) Modifier.border(2.5.dp, SmapBrush.accent, CircleShape) else Modifier)
-                            .padding(if (selected) 4.5.dp else 0.dp)
-                            // 선택되면 남색으로 채워 "지금 전체를 보고 있다"가 분명히 보이게 한다.
-                            .then(if (selected) Modifier.background(SmapBrush.accent, CircleShape) else Modifier.background(colors.surfaceVariant, CircleShape)),
+                            .size(40.dp)
+                            .background(colors.primaryContainer, CircleShape),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Icon(Icons.Outlined.Map, contentDescription = null, tint = if (selected) androidx.compose.ui.graphics.Color.White else colors.onSurfaceVariant)
+                        if (members.size >= 2) {
+                            Row(horizontalArrangement = Arrangement.spacedBy((-7).dp)) {
+                                members.take(2).forEach { member ->
+                                    SmapAvatar(
+                                        name = member.displayName,
+                                        imagePath = member.mtFile1,
+                                        size = 21.dp,
+                                        memberId = member.mtIdx,
+                                        modifier = Modifier.border(1.5.dp, androidx.compose.ui.graphics.Color.White, CircleShape),
+                                    )
+                                }
+                            }
+                        } else {
+                            Icon(Icons.Outlined.Map, contentDescription = null, tint = colors.primary)
+                        }
                     }
                 }
             }
@@ -80,10 +97,13 @@ fun MemberStrip(
             StripItem(
                 label = if (isMe) "나" else member.displayName,
                 selected = selected,
+                horizontal = onAllClick != null,
                 onClick = { onSelect(member) },
                 accessibility = if (isMe) "${member.displayName}, 나" else member.displayName,
             ) { sel ->
-                SmapAvatar(name = member.displayName, imagePath = member.mtFile1, size = 52.dp, selected = sel)
+                SmapAvatar(name = member.displayName, imagePath = member.mtFile1, size = if (onAllClick != null) 40.dp else 52.dp,
+                    selected = sel && onAllClick == null,
+                    memberId = if (onAllClick != null) member.mtIdx else null)
             }
         }
     }
@@ -93,11 +113,30 @@ fun MemberStrip(
 private fun StripItem(
     label: String,
     selected: Boolean,
+    horizontal: Boolean,
     onClick: () -> Unit,
     accessibility: String,
     avatar: @Composable (Boolean) -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
+    if (horizontal) {
+        val accent = LocalSmapAccent.current
+        Row(
+            Modifier.height(50.dp).clip(CircleShape)
+                .background(if (selected) accent.deep else Color.White)
+                .border(1.dp, if (selected) accent.deep else accent.deep.copy(alpha = 0.16f), CircleShape)
+                .selectable(selected = selected, onClick = onClick, role = Role.Tab)
+                .semantics(mergeDescendants = true) { contentDescription = accessibility }
+                .padding(start = 5.dp, end = 13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+        ) {
+            avatar(selected)
+            Text(label, modifier = Modifier.widthIn(max = 96.dp), style = SmapText.captionBold,
+                color = if (selected) Color.White else FamilyColors.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        return
+    }
     Column(
         Modifier
             .width(60.dp)

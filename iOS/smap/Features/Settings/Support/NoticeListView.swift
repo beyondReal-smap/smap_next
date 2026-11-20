@@ -29,7 +29,8 @@ struct NoticeListView: View {
                 SMAPEmptyState(title: "등록된 공지사항이 없어요", description: "새 소식이 생기면 여기에 알려 드릴게요.", systemImage: "bell.slash")
             } else {
                 ScrollView {
-                    SMAPSection(title: "공지 \(notices.count)") {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("공지 \(notices.count)건").font(SMAPTheme.Font.pageTitle).padding(.bottom, 12).accessibilityAddTraits(.isHeader)
                         ForEach(Array(notices.enumerated()), id: \.element.id) { index, notice in
                             if index > 0 { SMAPRowDivider() }
                             NavigationLink(destination: NoticeDetailView(notice: notice)) {
@@ -43,7 +44,7 @@ struct NoticeListView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(SMAPTheme.Surface.canvas.ignoresSafeArea())
+        .background(Color(uiColor: .systemBackground).ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar { noticeToolbar(dismiss: dismiss) }
@@ -112,7 +113,7 @@ struct NoticeDetailView: View {
                         .foregroundStyle(SMAPTheme.Surface.onSurfaceMuted)
                 }
                 Text(notice.nt_title)
-                    .font(SMAPTheme.Font.title)
+                    .font(SMAPTheme.Font.pageTitle)
                     .foregroundStyle(SMAPTheme.Surface.onSurface)
                 Rectangle()
                     .fill(SMAPTheme.Surface.divider)

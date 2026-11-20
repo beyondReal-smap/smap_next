@@ -120,7 +120,7 @@ fun EditProfileScreen(
                     .padding(SmapSpacing.lg),
                 verticalArrangement = Arrangement.spacedBy(SmapSpacing.sm)
             ) {
-                Text("프로필을 수정해 주세요", style = SmapText.title, color = colors.onSurface)
+                Text("프로필을 수정해 주세요", style = SmapText.pageTitle, color = colors.onSurface)
                 Text("닉네임은 그룹 멤버에게 보이는 이름이에요.", style = SmapText.secondary, color = colors.onSurfaceVariant)
 
                 Spacer(Modifier.height(SmapSpacing.md))

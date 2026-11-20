@@ -209,7 +209,7 @@ private fun CodeStepContent(viewModel: EmailChangeViewModel, uiState: EmailChang
 
 @Composable
 private fun StepHeader(title: String, description: String) {
-    Text(text = title, style = SmapText.title, color = MaterialTheme.colorScheme.onSurface)
+    Text(text = title, style = SmapText.pageTitle, color = MaterialTheme.colorScheme.onSurface)
     Text(text = description, style = SmapText.secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 

@@ -5,9 +5,12 @@ import com.dmonster.smap.data.model.SMAPUser
 import com.dmonster.smap.ui.theme.SmapText
 import com.dmonster.smap.ui.theme.SmapSpacing
 import com.dmonster.smap.ui.components.SmapOnNavyMuted
+import com.dmonster.smap.ui.components.SmapAccent
+import com.dmonster.smap.ui.components.SmapAccentTheme
 import com.dmonster.smap.ui.components.SmapAvatar
 import com.dmonster.smap.ui.components.HeroHeading
-import com.dmonster.smap.ui.components.SmapHeroCard
+import com.dmonster.smap.ui.components.SmapFamilyCover
+import com.dmonster.smap.R
 import com.dmonster.smap.ui.components.SmapRowDivider
 import com.dmonster.smap.ui.components.SmapRowIcon
 import com.dmonster.smap.ui.components.SmapListRow
@@ -20,6 +23,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -50,6 +54,7 @@ import com.dmonster.smap.data.GlobalEventBus
 import com.dmonster.smap.data.model.SmapNotice
 import com.dmonster.smap.ui.common.rememberSmapHaptics
 import com.dmonster.smap.ui.theme.BrandColors
+import com.dmonster.smap.ui.theme.FamilyColors
 import com.dmonster.smap.ui.theme.SuiteFont
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -58,7 +63,7 @@ fun SettingsScreen(
     onClose: () -> Unit,
     onLogout: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
-) {
+) = SmapAccentTheme(SmapAccent.Family) {
     var isAccountSettingsVisible by remember { mutableStateOf(false) }
     var selectedTermsScreen by remember { mutableStateOf<String?>(null) }
     var isUserGuideVisible by remember { mutableStateOf(false) }
@@ -92,10 +97,11 @@ fun SettingsScreen(
         }
     }
 
+    val canvas = MaterialTheme.colorScheme.surface
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(canvas)
             .navigationBarsPadding()
     ) {
         // Main Settings Content with Slide Animation
@@ -110,26 +116,22 @@ fun SettingsScreen(
                 animationSpec = tween(300)
             )
         ) {
-            // 37단계 남색 강조 — 설정 첫 화면도 다른 탭과 같은 언어로: 위에 남색 프로필 카드,
-            // 아래는 "구역 제목 + 흰 묶음" 행. 이전에는 메뉴마다 하늘·보라·분홍·주황 아이콘이라 산만했다.
             val user by viewModel.user.collectAsState()
             val haptics = rememberSmapHaptics()
             fun open(action: () -> Unit) { haptics.light(); action() }
-            Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+            Column(modifier = Modifier.fillMaxSize().background(canvas)) {
                 SmapTopBar(title = "설정", onBack = onClose)
                 Column(
                     modifier = Modifier
-                        .fillMaxSize()
+                        .align(Alignment.CenterHorizontally).widthIn(max = 600.dp).fillMaxSize()
                         .verticalScroll(rememberScrollState())
-                        .padding(horizontal = SmapSpacing.md),
+                        .padding(horizontal = 20.dp),
                     verticalArrangement = Arrangement.spacedBy(SmapSpacing.lg)
                 ) {
                     Spacer(Modifier.height(SmapSpacing.xs))
                     SettingsProfileHero(user = user, onClick = { open { isAccountSettingsVisible = true } })
 
-                    SmapSection(title = "계정 관리") {
-                        SmapListRow(title = "계정설정", leading = { SmapRowIcon(Icons.Default.Person) }, trailing = { SettingsChevron() }, onClick = { open { isAccountSettingsVisible = true } })
-                        SmapRowDivider()
+                    SmapSection(title = "멤버십") {
                         SmapListRow(
                             title = "도착했어 프리미엄",
                             leading = { SmapRowIcon(Icons.Default.WorkspacePremium, emphasized = true) },
@@ -138,7 +140,16 @@ fun SettingsScreen(
                         )
                     }
 
-                    SmapSection(title = "약관 & 정책") {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("고객 지원", style = SmapText.bodyBold, color = MaterialTheme.colorScheme.onSurface)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            SupportLink("사용 가이드", Icons.AutoMirrored.Filled.MenuBook, Modifier.weight(1f)) { open { isUserGuideVisible = true } }
+                            SupportLink("1:1 문의", Icons.Default.Email, Modifier.weight(1f)) { open { isInquiryVisible = true } }
+                            SupportLink("공지사항", Icons.Default.Campaign, Modifier.weight(1f)) { open { isNoticeListVisible = true } }
+                        }
+                    }
+
+                    SmapSection(title = "약관 및 정책") {
                         SmapListRow(title = "서비스 이용약관", leading = { SmapRowIcon(Icons.Default.Description) }, trailing = { SettingsChevron() }, onClick = { open { selectedTermsScreen = "service" } })
                         SmapRowDivider()
                         SmapListRow(title = "개인정보 처리방침", leading = { SmapRowIcon(Icons.Default.Shield) }, trailing = { SettingsChevron() }, onClick = { open { selectedTermsScreen = "privacy" } })
@@ -148,14 +159,6 @@ fun SettingsScreen(
                         SmapListRow(title = "마케팅 정보 수집 및 이용 동의", leading = { SmapRowIcon(Icons.Default.Star) }, trailing = { SettingsChevron() }, onClick = { open { selectedTermsScreen = "marketing" } })
                         SmapRowDivider()
                         SmapListRow(title = "개인정보 제3자 제공 동의", leading = { SmapRowIcon(Icons.Default.Groups) }, trailing = { SettingsChevron() }, onClick = { open { selectedTermsScreen = "thirdparty" } })
-                    }
-
-                    SmapSection(title = "고객 지원") {
-                        SmapListRow(title = "사용 가이드", leading = { SmapRowIcon(Icons.AutoMirrored.Filled.MenuBook) }, trailing = { SettingsChevron() }, onClick = { open { isUserGuideVisible = true } })
-                        SmapRowDivider()
-                        SmapListRow(title = "1:1 문의", leading = { SmapRowIcon(Icons.Default.Email) }, trailing = { SettingsChevron() }, onClick = { open { isInquiryVisible = true } })
-                        SmapRowDivider()
-                        SmapListRow(title = "공지사항", leading = { SmapRowIcon(Icons.Default.Notifications) }, trailing = { SettingsChevron() }, onClick = { open { isNoticeListVisible = true } })
                     }
 
                     Column(
@@ -377,7 +380,8 @@ fun ProfileSummaryCard(
 @Composable
 private fun SettingsProfileHero(user: SMAPUser?, onClick: () -> Unit) {
     val name = user?.mtNickname?.takeIf { it.isNotBlank() } ?: user?.mtName?.takeIf { it.isNotBlank() } ?: "회원"
-    SmapHeroCard(
+    SmapFamilyCover(
+        image = R.drawable.login_arrival_doorway,
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))
             .clickable(onClickLabel = "계정설정 열기", role = Role.Button, onClick = onClick)
@@ -391,7 +395,7 @@ private fun SettingsProfileHero(user: SMAPUser?, onClick: () -> Unit) {
             ) { SmapAvatar(name = name, imagePath = user?.mtFile1, size = 54.dp) }
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
-                HeroHeading(eyebrow = "내 계정", title = name, subtitle = user?.mtEmail?.takeIf { it.isNotBlank() })
+                HeroHeading(eyebrow = "계정설정", title = name, subtitle = user?.mtEmail?.takeIf { it.isNotBlank() })
             }
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = SmapOnNavyMuted)
         }
@@ -401,4 +405,17 @@ private fun SettingsProfileHero(user: SMAPUser?, onClick: () -> Unit) {
 @Composable
 private fun SettingsChevron() {
     Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.outline, modifier = Modifier.size(20.dp))
+}
+
+@Composable
+private fun SupportLink(title: String, icon: ImageVector, modifier: Modifier, onClick: () -> Unit) {
+    Column(
+        modifier.clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceVariant)
+            .clickable(role = Role.Button, onClick = onClick).heightIn(min = 74.dp).padding(6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(9.dp, Alignment.CenterVertically),
+    ) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+        Text(title, style = SmapText.captionBold, color = MaterialTheme.colorScheme.onSurface)
+    }
 }

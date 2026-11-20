@@ -1,5 +1,7 @@
 package com.dmonster.smap.ui.settings
 
+import com.dmonster.smap.ui.theme.SmapText
+import com.dmonster.smap.ui.components.SmapTopBar
 import androidx.activity.compose.BackHandler
 
 import androidx.compose.foundation.background
@@ -147,72 +149,18 @@ fun InquiryScreen(onBack: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(SettingsColors.PageBackground)
+            .background(MaterialTheme.colorScheme.surface)
             .imePadding()
     ) {
-        Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
-            // Header
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 20.dp)
-            ) {
-                Surface(
-                    onClick = { attemptBack() },
-                    shape = RoundedCornerShape(24.dp),
-                    color = Color.White,
-                    shadowElevation = 2.dp,
-                    modifier = Modifier.height(44.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                            contentDescription = "뒤로",
-                            tint = Color.Black,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Text(
-                            text = "뒤로",
-                            fontFamily = SuiteFont,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 17.sp,
-                            color = Color.Black
-                        )
-                    }
-                }
-            }
-
+        Column(modifier = Modifier.fillMaxSize()) {
+            SmapTopBar(title = "1:1 문의", onBack = { attemptBack() })
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp)
+                    .padding(20.dp)
             ) {
-                // Header Card
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            brush = Brush.linearGradient(
-                                colors = listOf(AccentColors.Orange, SettingsColors.SupportInquiryIcon)
-                            ),
-                            shape = RoundedCornerShape(24.dp)
-                        )
-                        .padding(24.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("1:1 문의", fontFamily = SuiteFont, fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color.White)
-                            Text("궁금한 점을 문의하세요", fontFamily = SuiteFont, fontSize = 14.sp, color = Color.White.copy(alpha = 0.8f))
-                        }
-                        Icon(Icons.Default.Email, contentDescription = null, tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.size(32.dp))
-                    }
-                }
-
+                Text("무엇을 도와드릴까요?", style = SmapText.pageTitle, color = MaterialTheme.colorScheme.onSurface)
                 Spacer(modifier = Modifier.height(24.dp))
 
                 // Category Selection
@@ -224,12 +172,12 @@ fun InquiryScreen(onBack: () -> Unit) {
                             modifier = Modifier
                                 .weight(1f)
                                 .background(
-                                    if (isSelected) AccentColors.Orange.copy(alpha = 0.1f) else Color.Gray.copy(alpha = 0.05f),
+                                    if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color.Gray.copy(alpha = 0.05f),
                                     RoundedCornerShape(12.dp)
                                 )
                                 .border(
                                     width = 2.dp,
-                                    color = if (isSelected) AccentColors.Orange else Color.Transparent,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
                                     shape = RoundedCornerShape(12.dp)
                                 )
                                 .heightIn(min = 48.dp)
@@ -242,8 +190,8 @@ fun InquiryScreen(onBack: () -> Unit) {
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Icon(item.third, contentDescription = null, modifier = Modifier.size(22.dp), tint = if (isSelected) AccentColors.Orange else Color.Gray)
-                                Text(item.second, fontFamily = SuiteFont, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = if (isSelected) AccentColors.Orange else Color.Black)
+                                Icon(item.third, contentDescription = null, modifier = Modifier.size(22.dp), tint = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray)
+                                Text(item.second, fontFamily = SuiteFont, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
                             }
                         }
                     }
@@ -260,8 +208,8 @@ fun InquiryScreen(onBack: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = Color.White,
-                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                         unfocusedBorderColor = Color.Gray.copy(alpha = 0.2f),
                         focusedBorderColor = if (isEmailValid) BrandColors.Success.copy(alpha = 0.5f) else BrandColors.Error.copy(alpha = 0.5f)
                     ),
@@ -292,8 +240,8 @@ fun InquiryScreen(onBack: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = Color.White,
-                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                         unfocusedBorderColor = Color.Gray.copy(alpha = 0.2f)
                     ),
                     keyboardOptions = KeyboardOptions(
@@ -327,8 +275,8 @@ fun InquiryScreen(onBack: () -> Unit) {
                     modifier = Modifier.fillMaxWidth().height(150.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedContainerColor = Color.White,
-                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
                         unfocusedBorderColor = Color.Gray.copy(alpha = 0.2f)
                     ),
                     keyboardOptions = KeyboardOptions(
@@ -349,7 +297,7 @@ fun InquiryScreen(onBack: () -> Unit) {
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isFormValid) AccentColors.Orange else Color.Gray.copy(alpha = 0.3f),
+                        containerColor = if (isFormValid) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.3f),
                         disabledContainerColor = Color.Gray.copy(alpha = 0.3f)
                     ),
                     enabled = isFormValid && !isSending
@@ -383,7 +331,7 @@ fun InquiryScreen(onBack: () -> Unit) {
                 }
             },
             shape = RoundedCornerShape(16.dp),
-            containerColor = Color.White
+            containerColor = MaterialTheme.colorScheme.surface
         )
     }
 
@@ -407,7 +355,7 @@ fun InquiryScreen(onBack: () -> Unit) {
                 }
             },
             shape = RoundedCornerShape(16.dp),
-            containerColor = Color.White
+            containerColor = MaterialTheme.colorScheme.surface
         )
     }
 }

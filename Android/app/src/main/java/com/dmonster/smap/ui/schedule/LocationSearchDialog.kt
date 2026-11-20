@@ -42,14 +42,14 @@ fun LocationSearchDialog(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = BrandColors.InputBackground,
+        containerColor = MaterialTheme.colorScheme.surfaceVariant,
         tonalElevation = 0.dp,
         dragHandle = { BottomSheetDefaults.DragHandle() },
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
     ) {
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = BrandColors.InputBackground,
+            color = MaterialTheme.colorScheme.surfaceVariant,
             tonalElevation = 0.dp
         ) {
             Column(
@@ -69,7 +69,7 @@ fun LocationSearchDialog(
                     fontSize = 18.sp,
                     fontFamily = SuiteFont,
                     fontWeight = FontWeight.Bold,
-                    color = Color.Black
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 IconButton(
                     onClick = onDismiss,
@@ -94,7 +94,7 @@ fun LocationSearchDialog(
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
                     leadingIcon = {
-                        Icon(Icons.Default.Search, null, tint = BrandColors.Primary)
+                        Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.primary)
                     },
                     trailingIcon = {
                         if (query.isNotEmpty()) {
@@ -106,7 +106,7 @@ fun LocationSearchDialog(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = Color.White,
                         unfocusedContainerColor = Color.White,
-                        focusedBorderColor = BrandColors.Primary.copy(alpha = 0.2f),
+                        focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
                         unfocusedBorderColor = Color.Transparent
                     ),
                     singleLine = true
@@ -133,7 +133,7 @@ fun LocationSearchDialog(
                     },
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (query.isBlank()) Color.LightGray else BrandColors.Primary
+                        containerColor = if (query.isBlank()) Color.LightGray else MaterialTheme.colorScheme.primary
                     ),
                     modifier = Modifier.height(52.dp)
                 ) {
@@ -148,7 +148,7 @@ fun LocationSearchDialog(
                 if (isLoading) {
                     CircularProgressIndicator(
                         modifier = Modifier.align(Alignment.Center),
-                        color = BrandColors.Primary
+                        color = MaterialTheme.colorScheme.primary
                     )
                 } else if (searchError != null) {
                     Text(searchError!!, modifier = Modifier.align(Alignment.Center))
@@ -167,7 +167,7 @@ fun LocationSearchDialog(
                                 imageVector = if (query.isEmpty()) Icons.Default.LocationOn else Icons.Default.Search,
                                 contentDescription = null,
                                 modifier = Modifier.padding(24.dp).size(40.dp),
-                                tint = BrandColors.Primary.copy(alpha = 0.6f)
+                                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
                             )
                         }
                         Spacer(modifier = Modifier.height(20.dp))
@@ -221,14 +221,14 @@ fun LocationSearchDialog(
                                 ) {
                                     Surface(
                                         shape = CircleShape,
-                                        color = BrandColors.Primary.copy(alpha = 0.1f),
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
                                         modifier = Modifier.size(40.dp)
                                     ) {
                                         Icon(
                                             Icons.Default.PinDrop,
                                             contentDescription = null,
                                             modifier = Modifier.padding(8.dp),
-                                            tint = BrandColors.Primary
+                                            tint = MaterialTheme.colorScheme.primary
                                         )
                                     }
 
@@ -238,7 +238,7 @@ fun LocationSearchDialog(
                                             fontFamily = SuiteFont,
                                             fontSize = 16.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = Color.Black
+                                            color = MaterialTheme.colorScheme.onSurface
                                         )
                                         Text(
                                             text = place.roadAddressName.ifBlank { place.addressName },

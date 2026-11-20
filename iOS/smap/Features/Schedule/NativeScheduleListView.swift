@@ -2,13 +2,7 @@
 // NativeScheduleListView.swift
 // smap
 //
-// 일정 탭 (Android ScheduleScreen.kt 이식, 36단계 재설계)
-//
-// 이전: "일정" 큰 제목 + 흰 달력 카드 + 남색 날짜 띠 + 흰 일정 카드(… 메뉴로 수정·삭제), 불러올 때마다 화면 전체를 덮는 스피너.
-// 지금: 지도 탭과 같은 그룹 알약 + 남색 + 버튼 → 남색 달력 카드 → "11월 16일 월요일 · N개" 구역.
-// 일정 행을 누르면 상세 시트(수정·삭제). 아래 탭 막대에 이미 "일정"이 있어 큰 제목은 뺐다.
-// 그룹 알약이 없어 다른 그룹의 일정을 볼 수 없던 것도 고친다.
-//
+// 선택한 날의 약속을 먼저 보여 주고, 월 달력에서 다른 달로 이동한다.
 
 import SwiftUI
 
@@ -16,6 +10,7 @@ struct NativeScheduleListView: View {
     @Environment(\.smapAccent) private var accent
     @StateObject private var viewModel = ScheduleViewModel()
 
+    @State private var showsMonth = false
     @State private var showingAddSchedule = false
     @State private var showingGroupPicker = false
     @State private var detailSchedule: Schedule?
@@ -36,22 +31,26 @@ struct NativeScheduleListView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: SMAPTheme.Spacing.md) {
                     topControls
-                    ScheduleMonthCalendar(
-                        currentMonth: viewModel.currentMonth,
-                        selectedDate: viewModel.selectedDate,
-                        eventDates: viewModel.datesWithEvents,
-                        onSelect: { viewModel.selectDate($0) },
-                        onPrevious: { viewModel.changeMonth(by: -1) },
-                        onNext: { viewModel.changeMonth(by: 1) },
-                        onToday: { viewModel.goToToday() }
-                    )
+                    agendaHeader
+                    if showsMonth {
+                        ScheduleMonthCalendar(
+                            currentMonth: viewModel.currentMonth, selectedDate: viewModel.selectedDate,
+                            eventDates: viewModel.datesWithEvents,
+                            onSelect: { viewModel.selectDate($0); showsMonth = false },
+                            onPrevious: { browseMonth(-1) }, onNext: { browseMonth(1) },
+                            onToday: { viewModel.goToToday(); showsMonth = false }
+                        )
+                    } else {
+                        DateStrip(items: monthDays, selected: viewModel.selectedDate) { viewModel.selectDate($0.date) }
+                            .id(Calendar.current.dateComponents([.year, .month], from: viewModel.selectedDate))
+                    }
                     daySection
                         .padding(.top, SMAPTheme.Spacing.sm)
                 }
                 .padding(.horizontal, SMAPTheme.Spacing.md)
                 .padding(.bottom, SMAPTheme.Spacing.xl)
             }
-            .background(SMAPTheme.Surface.canvas.ignoresSafeArea())
+            .background(SMAPTheme.Family.paper.ignoresSafeArea())
             .refreshable { viewModel.fetchSchedules() }
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingGroupPicker) {
@@ -160,31 +159,79 @@ struct NativeScheduleListView: View {
 
     // MARK: 고른 날 일정
 
-    private static let dayTitleFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "ko_KR")
-        f.dateFormat = "M월 d일 EEEE"
-        return f
-    }()
+    private func browseMonth(_ offset: Int) {
+        viewModel.changeMonth(by: offset)
+        if let start = Calendar.current.dateInterval(of: .month, for: viewModel.currentMonth)?.start {
+            viewModel.selectDate(start)
+        }
+    }
+
+    private var monthDays: [DateChipItem] {
+        let calendar = Calendar.current
+        guard let month = calendar.dateInterval(of: .month, for: viewModel.selectedDate),
+              let range = calendar.range(of: .day, in: .month, for: month.start) else { return [] }
+        let events = Set(viewModel.datesWithEvents.map { calendar.startOfDay(for: $0) })
+        return range.compactMap { day in
+            guard let date = calendar.date(byAdding: .day, value: day - 1, to: month.start) else { return nil }
+            return DateChipItem(date: date, dot: events.contains(date))
+        }
+    }
+
+    private var agendaHeader: some View {
+        let date = viewModel.selectedDate
+        let calendar = Calendar.current
+        return HStack(spacing: 14) {
+            Text(String(calendar.component(.day, from: date)))
+                .font(.suite(size: 46, weight: .bold)).monospacedDigit()
+                .foregroundStyle(SMAPTheme.Family.ink)
+                .frame(minWidth: 68, minHeight: 76)
+                .background(SMAPTheme.Family.highlight, in: RoundedRectangle(cornerRadius: 15))
+                .accessibilityLabel("\(calendar.component(.day, from: date))일")
+            VStack(alignment: .leading, spacing: 4) {
+                Text(verbatim: "\(calendar.component(.year, from: date))년 \(calendar.component(.month, from: date))월")
+                    .font(SMAPTheme.Font.captionBold).foregroundStyle(accent.deep)
+                Text(date.formatted(.dateTime.weekday(.wide).locale(Locale(identifier: "ko_KR"))))
+                    .font(.suite(size: 25, weight: .bold)).foregroundStyle(SMAPTheme.Family.ink)
+            }
+            Spacer(minLength: 0)
+            Button { showsMonth.toggle() } label: {
+                Label(showsMonth ? "달력 접기" : "월 달력", systemImage: "calendar")
+                    .font(SMAPTheme.Font.captionBold).foregroundStyle(accent.deep)
+                    .padding(.horizontal, 12).frame(minHeight: 44)
+                    .background(accent.container, in: Capsule())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(12).frame(maxWidth: .infinity)
+        .background(.white, in: RoundedRectangle(cornerRadius: 22))
+    }
 
     private var daySection: some View {
         let schedules = viewModel.filteredSchedules
-        let title = Self.dayTitleFormatter.string(from: viewModel.selectedDate) + (schedules.isEmpty ? "" : " · \(schedules.count)개")
+        let day = Calendar.current.isDateInToday(viewModel.selectedDate) ? "오늘의 약속" : "이날의 약속"
+        let title = schedules.isEmpty ? day : "\(day) · \(schedules.count)개"
         return SMAPSection(title: title) {
             if viewModel.isLoading && schedules.isEmpty {
                 // 그날 일정이 이미 보이면 새로 불러오는 동안에도 그대로 둔다(화면 전체를 덮던 스피너 제거).
                 ProgressView()
                     .frame(maxWidth: .infinity, minHeight: 96)
             } else if schedules.isEmpty {
-                SMAPListRow(
-                    title: "이 날은 일정이 없어요",
-                    subtitle: "새 일정을 만들면 멤버에게 알려 드려요",
-                    action: { showingAddSchedule = true },
-                    leading: { SMAPRowIcon(systemImage: "calendar.badge.plus") },
-                    trailing: {
-                        Text("추가").font(SMAPTheme.Font.captionBold).foregroundStyle(accent.base)
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "calendar.badge.plus").font(.title2).foregroundStyle(accent.deep)
+                            .frame(width: 46, height: 48).background(accent.container, in: RoundedRectangle(cornerRadius: 12))
+                        Text("아직 약속이 없는 날이에요")
+                            .font(SMAPTheme.Font.headline).foregroundStyle(SMAPTheme.Surface.onSurface)
                     }
-                )
+                    Button { showingAddSchedule = true } label: {
+                        Label("이날 약속 추가", systemImage: "plus")
+                            .font(SMAPTheme.Font.captionBold).foregroundStyle(.white)
+                            .frame(maxWidth: .infinity, minHeight: 46)
+                            .background(SMAPTheme.Family.ink, in: RoundedRectangle(cornerRadius: 13))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(SMAPTheme.Spacing.md)
             } else {
                 ForEach(Array(schedules.enumerated()), id: \.element.id) { index, schedule in
                     if index > 0 { SMAPRowDivider() }
@@ -240,7 +287,7 @@ struct ScheduleMonthCalendar: View {
     let onToday: () -> Void
 
     /// 남색 바탕 위 일요일 — 빨강을 옅게 해 남색 위에서도 읽히게 한다.
-    private static let sundayOnNavy = Color(red: 1, green: 0xB3 / 255, blue: 0xB8 / 255)
+    private static let sundayOnNavy = Color(red: 1, green: 0xEE / 255, blue: 0xDF / 255)
     private let calendar = Calendar.current
 
     var body: some View {
@@ -275,7 +322,7 @@ struct ScheduleMonthCalendar: View {
                 ForEach(Array(["일", "월", "화", "수", "목", "금", "토"].enumerated()), id: \.offset) { index, day in
                     Text(day)
                         .font(SMAPTheme.Font.captionSmall)
-                        .foregroundStyle(index == 0 ? Self.sundayOnNavy : Color.white.opacity(0.7))
+                        .foregroundStyle(index == 0 ? Self.sundayOnNavy : Color.white.opacity(0.94))
                         .frame(maxWidth: .infinity)
                 }
             }
@@ -358,7 +405,7 @@ struct ScheduleMonthCalendar: View {
                     .frame(width: 4, height: 4)
             }
             .frame(width: 40, height: 40)
-            .background(Circle().fill(isSelected ? Color.white : (isToday ? Color.white.opacity(0.18) : Color.clear)))
+            .background(Circle().fill(isSelected ? Color.white : (isToday ? Color.white.opacity(0.08) : Color.clear)))
             .contentShape(Circle())
         }
         .buttonStyle(.plain)

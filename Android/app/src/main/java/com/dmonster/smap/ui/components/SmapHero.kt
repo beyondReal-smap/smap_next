@@ -1,5 +1,6 @@
 package com.dmonster.smap.ui.components
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.size
@@ -24,6 +25,12 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.Image
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -37,13 +44,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.dmonster.smap.ui.theme.SmapSpacing
 import com.dmonster.smap.ui.theme.SmapText
-
-/*
- * 메뉴별 강조색 — 36단계 재설계가 "회색 바탕 + 흰 행"만 남아 밋밋하다는 피드백(2026-11-16)에 따라
- * 화면마다 그라데이션 시각적 중심을 하나 둔다. 처음엔 남색 하나만 썼는데 모든 메뉴가 "파랑파랑"해
- * 단조롭다는 피드백(2026-11-16)에 따라 메뉴마다 색을 나눴다(iOS SMAPAccent 와 같은 값).
- * 홈·설정 남색 / 그룹 청록 / 일정 주황 / 내장소 보라 / 활동 로그 장미.
- */
 
 /** 메뉴 강조색 한 벌 — 짙은 색 → 기준 색 → 밝은 색 그라데이션 + 옅은 바탕(아이콘 원·칩). */
 @Immutable
@@ -61,19 +61,22 @@ data class SmapAccent(val deep: Color, val base: Color, val bright: Color, val c
         val Purple = SmapAccent(Color(0xFF4C1D95), Color(0xFF6D28D9), Color(0xFF8B5CF6), Color(0xFFEEE8FD))
         val Rose = SmapAccent(Color(0xFF9F1239), Color(0xFFBE185D), Color(0xFFDB2777), Color(0xFFFBE6EF))
 
-        /** 하단 탭 순서(홈·그룹·일정·내장소·활동 로그)별 색 */
+        val Family = SmapAccent(Color(0xFF26496E), Color(0xFF345F8C), Color(0xFF416996), Color(0xFFE3EDF8))
+        val Schedule = SmapAccent(Color(0xFF2D4863), Color(0xFF365B80), Color(0xFF3C6083), Color(0xFFF9E8D9))
+        val Places = SmapAccent(Color(0xFF284B63), Color(0xFF37627B), Color(0xFF406A81), Color(0xFFE2EFF4))
+        val Activity = SmapAccent(Color(0xFF344968), Color(0xFF495E83), Color(0xFF516789), Color(0xFFE6ECF6))
+
         fun forTab(index: Int): SmapAccent = when (index) {
-            1 -> Teal
-            2 -> Orange
-            3 -> Purple
-            4 -> Rose
-            else -> Navy
+            2 -> Schedule
+            3 -> Places
+            4 -> Activity
+            else -> Family
         }
     }
 }
 
-/** 지금 메뉴의 강조색. 기본은 브랜드 남색(홈·설정). */
-val LocalSmapAccent = staticCompositionLocalOf { SmapAccent.Navy }
+/** 지금 메뉴의 강조색. 홈·설정의 가족 강조색을 기본값으로 사용한다. */
+val LocalSmapAccent = staticCompositionLocalOf { SmapAccent.Family }
 
 /**
  * [accent] 를 이 아래 화면 전체의 강조색으로 쓴다 — 요약 카드·아이콘 원·버튼(SmapBrush)뿐 아니라
@@ -82,8 +85,14 @@ val LocalSmapAccent = staticCompositionLocalOf { SmapAccent.Navy }
 @Composable
 fun SmapAccentTheme(accent: SmapAccent, content: @Composable () -> Unit) {
     val scheme = MaterialTheme.colorScheme
+    val dark = isSystemInDarkTheme()
     MaterialTheme(
-        colorScheme = scheme.copy(primary = accent.base, primaryContainer = accent.container, onPrimaryContainer = accent.deep),
+        colorScheme = scheme.copy(
+            primary = if (dark) accent.container else accent.base,
+            onPrimary = if (dark) accent.deep else Color.White,
+            primaryContainer = if (dark) accent.deep else accent.container,
+            onPrimaryContainer = if (dark) accent.container else accent.deep,
+        ),
         typography = MaterialTheme.typography,
         shapes = MaterialTheme.shapes,
     ) {
@@ -213,5 +222,21 @@ fun SmapGradientIconButton(
         contentAlignment = androidx.compose.ui.Alignment.Center,
     ) {
         androidx.compose.material3.Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+    }
+}
+
+@Composable
+fun SmapFamilyCover(
+    image: Int,
+    modifier: Modifier = Modifier,
+    minHeight: Dp = 160.dp,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Box(modifier.fillMaxWidth().heightIn(min = minHeight).clip(RoundedCornerShape(20.dp)), contentAlignment = Alignment.BottomStart) {
+        Image(painterResource(image), contentDescription = null, modifier = Modifier.matchParentSize(), contentScale = ContentScale.Crop)
+        Spacer(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.08f), Color.Black.copy(alpha = 0.8f)))))
+        CompositionLocalProvider(LocalContentColor provides Color.White) {
+            Column(Modifier.fillMaxWidth().padding(20.dp), content = content)
+        }
     }
 }

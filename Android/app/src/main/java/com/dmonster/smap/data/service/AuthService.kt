@@ -427,6 +427,8 @@ fun emailAuthError(error: Throwable): String {
     if (error is retrofit2.HttpException) {
         return when (error.code()) {
             400 -> try { org.json.JSONObject(error.response()?.errorBody()?.string().orEmpty()).optString("detail").ifBlank { "입력 정보를 확인해주세요." } } catch (_: Exception) { "입력 정보를 확인해주세요." }
+            // 이메일 인증 API 가 서버에 없을 때(미배포·경로 변경). iOS AuthService.emailAuth 와 같은 문구.
+            404 -> "지금은 이메일 인증을 사용할 수 없어요. 잠시 후 다시 시도해 주세요."
             409 -> "이미 가입된 이메일입니다."
             429 -> "요청이 많습니다. 잠시 후 다시 시도해주세요."
             502, 503 -> "일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요."

@@ -143,7 +143,7 @@ fun MonthCalendar(
                         style = SmapText.captionSmall,
                         color = when (index) {
                             0 -> CalendarSundayOnNavy
-                            else -> Color.White.copy(alpha = 0.7f)
+                            else -> Color.White.copy(alpha = 0.94f)
                         }
                     )
                 }
@@ -197,7 +197,7 @@ private fun CalendarDay(
             .background(
                 when {
                     isSelected -> Color.White
-                    isToday -> Color.White.copy(alpha = 0.18f)
+                    isToday -> Color.White.copy(alpha = 0.08f)
                     else -> Color.Transparent
                 }
             )
@@ -240,7 +240,7 @@ private fun CalendarDay(
 }
 
 /** 남색 바탕 위 일요일 — 빨강을 옅게 해 남색 위에서도 읽히게 한다. */
-private val CalendarSundayOnNavy = Color(0xFFFFB3B8)
+private val CalendarSundayOnNavy = Color(0xFFFFEEDF)
 
 // MARK: - Schedule Row
 

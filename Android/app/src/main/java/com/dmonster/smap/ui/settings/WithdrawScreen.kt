@@ -1,5 +1,8 @@
 package com.dmonster.smap.ui.settings
 
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import com.dmonster.smap.ui.components.SmapTopBar
 import androidx.activity.compose.BackHandler
 
 import androidx.compose.animation.*
@@ -89,26 +92,12 @@ fun WithdrawScreen(
 
     Scaffold(
         topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("회원탈퇴", fontFamily = SuiteFont, fontWeight = FontWeight.Bold, fontSize = 18.sp) },
-                navigationIcon = {
-                    IconButton(onClick = {
-                        if (currentStep > 1) {
-                            currentStep -= 1
-                        } else {
-                            onBack()
-                        }
-                    }) {
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "뒤로")
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.White)
-            )
+            SmapTopBar(title = "회원탈퇴", onBack = { if (currentStep > 1) currentStep -= 1 else onBack() })
         },
         bottomBar = {
             Surface(
-                color = Color.White,
-                shadowElevation = 8.dp
+                color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 0.dp
             ) {
                 Column(
                     modifier = Modifier
@@ -153,7 +142,7 @@ fun WithdrawScreen(
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (canProceed) {
-                                if (currentStep == 3) BrandColors.Error else BrandColors.Primary
+                                if (currentStep == 3) BrandColors.Error else MaterialTheme.colorScheme.primary
                             } else Color.Gray.copy(alpha = 0.3f),
                             contentColor = Color.White
                         ),
@@ -173,30 +162,25 @@ fun WithdrawScreen(
                 }
             }
         },
-        containerColor = SettingsColors.PageBackground
+        containerColor = MaterialTheme.colorScheme.surface
     ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Step Indicator
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 20.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).semantics { contentDescription = "${currentStep}/3단계" },
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 for (step in 1..3) {
-                    StepItem(
-                        step = step,
-                        currentStep = currentStep,
-                        isLast = step == 3
-                    )
+                    Spacer(Modifier.weight(1f).height(3.dp).background(
+                        if (step <= currentStep) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                        RoundedCornerShape(2.dp)
+                    ))
                 }
             }
-            
+
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -269,41 +253,6 @@ fun WithdrawScreen(
 }
 
 @Composable
-fun StepItem(step: Int, currentStep: Int, isLast: Boolean) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier
-                .size(28.dp)
-                .clip(CircleShape)
-                .background(if (step <= currentStep) BrandColors.Primary else Color.Gray.copy(alpha = 0.2f)),
-            contentAlignment = Alignment.Center
-        ) {
-            if (step < currentStep) {
-                StepIcon(Icons.Default.Check, contentSize = 12.dp, tint = Color.White)
-            } else {
-                Text(
-                    text = step.toString(),
-                    color = if (step <= currentStep) Color.White else Color.Gray,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = SuiteFont
-                )
-            }
-        }
-        
-        if (!isLast) {
-            Box(
-                modifier = Modifier
-                    .width(24.dp)
-                    .height(2.dp)
-                    .padding(horizontal = 8.dp)
-                    .background(if (step < currentStep) BrandColors.Primary else Color.Gray.copy(alpha = 0.2f))
-            )
-        }
-    }
-}
-
-@Composable
 fun StepIcon(imageVector: ImageVector, contentSize: androidx.compose.ui.unit.Dp, tint: Color) {
     androidx.compose.material3.Icon(
         imageVector = imageVector,
@@ -340,7 +289,7 @@ fun StepOneContent(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
-                color = Color.White,
+                color = MaterialTheme.colorScheme.surface,
                 shadowElevation = 1.dp
             ) {
                 Row(
@@ -385,7 +334,7 @@ fun StepOneContent(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = Color.White,
                         unfocusedContainerColor = Color.White,
-                        focusedBorderColor = BrandColors.Primary,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
                         unfocusedBorderColor = Color.Transparent
                     ),
                     keyboardOptions = KeyboardOptions(
@@ -402,14 +351,14 @@ fun StepOneContent(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
-            color = BrandColors.Primary.copy(alpha = 0.05f)
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)
         ) {
             Row(
                 modifier = Modifier.padding(16.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.Top
             ) {
-                androidx.compose.material3.Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(18.dp), tint = BrandColors.Primary)
+                androidx.compose.material3.Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("보안 강화", fontFamily = SuiteFont, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.Black)
                     Text(
@@ -460,8 +409,8 @@ fun StepTwoContent(
                         }
                     },
                     shape = RoundedCornerShape(12.dp),
-                    color = if (isSelected) BrandColors.Primary.copy(alpha = 0.05f) else Color.White,
-                    border = BorderStroke(1.dp, if (isSelected) BrandColors.Primary else Color.Transparent),
+                    color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.05f) else MaterialTheme.colorScheme.surfaceVariant,
+                    border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent),
                     shadowElevation = if (isSelected) 0.dp else 1.dp
                 ) {
                     Row(
@@ -471,7 +420,7 @@ fun StepTwoContent(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        androidx.compose.material3.Icon(reason.icon, contentDescription = null, modifier = Modifier.size(22.dp), tint = if (isSelected) BrandColors.Primary else BrandColors.TextSecondary)
+                        androidx.compose.material3.Icon(reason.icon, contentDescription = null, modifier = Modifier.size(22.dp), tint = if (isSelected) MaterialTheme.colorScheme.primary else BrandColors.TextSecondary)
                         Text(
                             text = reason.text,
                             fontFamily = SuiteFont,
@@ -480,7 +429,7 @@ fun StepTwoContent(
                             modifier = Modifier.weight(1f)
                         )
                         if (isSelected) {
-                            androidx.compose.material3.Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(22.dp), tint = BrandColors.Primary)
+                            androidx.compose.material3.Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
                         } else {
                             Box(
                                 modifier = Modifier
@@ -506,7 +455,7 @@ fun StepTwoContent(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = Color.White,
                         unfocusedContainerColor = Color.White,
-                        focusedBorderColor = BrandColors.Primary,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
                         unfocusedBorderColor = Color.Transparent
                     ),
                     textStyle = androidx.compose.ui.text.TextStyle(fontFamily = SuiteFont, fontSize = 14.sp)
@@ -585,7 +534,7 @@ fun StepThreeContent(
             androidx.compose.material3.Icon(
                 imageVector = if (agreement) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank,
                 contentDescription = null,
-                tint = if (agreement) BrandColors.Primary else Color.Gray,
+                tint = if (agreement) MaterialTheme.colorScheme.primary else Color.Gray,
                 modifier = Modifier.size(24.dp)
             )
             Text("안내사항을 모두 확인하였으며, 이에 동의합니다.", fontFamily = SuiteFont, fontSize = 14.sp)

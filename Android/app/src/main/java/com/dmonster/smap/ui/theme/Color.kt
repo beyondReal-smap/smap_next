@@ -2,6 +2,13 @@ package com.dmonster.smap.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
+object FamilyColors {
+    val Paper = Color(0xFFF4F8FC)
+    val Ink = Color(0xFF294F77)
+    val Highlight = Color(0xFFFFDBBC)
+    val Muted = Color(0xFF53677C)
+}
+
 /**
  * 브랜드 색상 정의 (iOS BrandColors / SMAPTheme 기반 동기화)
  */

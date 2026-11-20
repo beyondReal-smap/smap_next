@@ -91,6 +91,7 @@ enum SMAPTheme {
 
     enum Font {
         // 고정 크기 — 기존 레이아웃 유지가 필요한 지점(아이콘 정렬, FAB 라벨 등).
+        static let pageTitle = SwiftUI.Font.suite(size: 28, weight: .bold)
         static let title = SwiftUI.Font.suite(size: 22, weight: .bold)
         static let headline = SwiftUI.Font.suite(size: 18, weight: .bold)
         static let subheadline = SwiftUI.Font.suite(size: 16, weight: .semibold)

@@ -8,6 +8,14 @@
 import Foundation
 import SwiftUI
 import Combine
+import Observation
+
+/// 손가락을 움직일 때 지도와 경로 막대를 읽는 뷰만 갱신한다.
+@Observable
+final class ActivityLogScrubberState {
+    var value: Double = 0
+    var isDragging = false
+}
 
 @MainActor
 class ActivityLogViewModel: ObservableObject {
@@ -38,13 +46,22 @@ class ActivityLogViewModel: ObservableObject {
     // Data
     @Published var dailyCountsResponse: DailyCountsResponse?
     @Published var memberDailyCounts: [MemberDailyCount] = []
-    @Published var mapMarkers: [MapMarker] = []
-    @Published var stayTimes: [StayTime] = []
+    private(set) var overlayRevision = 0
+    private(set) var sortedMapMarkers: [MapMarker] = []
+    @Published var mapMarkers: [MapMarker] = [] {
+        didSet {
+            sortedMapMarkers = mapMarkers.filter { $0.latitude != 0 && $0.longitude != 0 }
+                .sorted { ($0.mlt_gps_time ?? "") < ($1.mlt_gps_time ?? "") }
+            overlayRevision += 1
+        }
+    }
+    @Published var stayTimes: [StayTime] = [] {
+        didSet { overlayRevision += 1 }
+    }
     @Published var locationSummary: LocationSummary?
 
     // UI States
-    @Published var sliderValue: Double = 0
-    @Published var isSliderDragging = false
+    let scrubber = ActivityLogScrubberState()
 
     // MARK: - Computed Properties
 
@@ -54,15 +71,10 @@ class ActivityLogViewModel: ObservableObject {
         return memberDailyCounts.first { $0.member_id == memberId }
     }
 
-    /// 정렬된 맵 마커 (시간순)
-    var sortedMapMarkers: [MapMarker] {
-        mapMarkers.sorted { ($0.mlt_gps_time ?? "") < ($1.mlt_gps_time ?? "") }
-    }
-
     /// 슬라이더 현재 위치의 마커
     var currentMarkerAtSlider: MapMarker? {
         guard !sortedMapMarkers.isEmpty else { return nil }
-        let index = Int(Double(sortedMapMarkers.count - 1) * sliderValue / 100.0)
+        let index = Int(Double(sortedMapMarkers.count - 1) * scrubber.value / 100.0)
         let clampedIndex = max(0, min(index, sortedMapMarkers.count - 1))
         return sortedMapMarkers[clampedIndex]
     }
@@ -190,7 +202,7 @@ class ActivityLogViewModel: ObservableObject {
 
     /// 슬라이더 값 업데이트
     func updateSliderValue(_ value: Double) {
-        sliderValue = max(0, min(100, value))
+        scrubber.value = max(0, min(100, value))
     }
 
     /// 초기 데이터 로드 (뷰 진입 시 호출)
@@ -331,7 +343,8 @@ class ActivityLogViewModel: ObservableObject {
         mapMarkers = []
         stayTimes = []
         locationSummary = nil
-        sliderValue = 0
+        scrubber.isDragging = false
+        scrubber.value = 0
 
         async let markers = capture { try await self.service.getMapMarkers(memberId: memberId, date: date) }
         async let stays = capture { try await self.service.getStayTimes(memberId: memberId, date: date) }

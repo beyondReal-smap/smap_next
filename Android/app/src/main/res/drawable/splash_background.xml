@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  windowBackground용 단색.
-  아이콘 표시는 Android 12+ 시스템 스플래시(windowSplashScreenAnimatedIcon)가 담당한다.
-  여기에 아이콘 layer를 추가하면 MainActivity의 Compose setContent 직전 수백 ms 동안
-  "작은 로고 + 흰 배경"이 사용자에게 그대로 노출되어 어색해 보이므로 사용하지 않는다.
-  (bitmap을 layer-list로 넣으면 원본 이미지 크기대로 중앙에 배치되어 고해상도 이미지가
-  화면을 가득 채우는 현상도 발생한다.)
+  Android 11 이하의 시작 화면. Android 12부터는 시스템 스플래시가 체크 핀을 표시한다.
 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/splash_background" />
+    <item
+        android:drawable="@drawable/splash_pins"
+        android:width="248dp"
+        android:height="248dp"
+        android:gravity="center" />
 </layer-list>

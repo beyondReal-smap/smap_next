@@ -50,9 +50,10 @@ class SplashActivity : ComponentActivity() {
         // 스플래시 유지 + 강제 업데이트 체크 후 다음 화면으로 이동
         lifecycleScope.launch {
             delay(SPLASH_DELAY)
+            val needsUpdate = checkForceUpdate()
             keepSplashScreen = false
 
-            if (checkForceUpdate()) {
+            if (needsUpdate) {
                 // 강제 업데이트 다이얼로그를 띄운 상태에서 멈춤. navigateNext 호출 안 함.
                 return@launch
             }

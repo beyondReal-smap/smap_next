@@ -11,6 +11,9 @@ import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
@@ -33,8 +36,8 @@ internal fun PhoneContent(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(SmapSpacing.sm)) {
         StepHeader(
-            title = "이메일을 입력해 주세요",
-            description = "이 이메일이 로그인 아이디가 됩니다.\n인증번호를 보내 본인 확인을 진행해요."
+            title = "어떤 이메일로 가입할까요?",
+            description = "로그인에 사용할 이메일로 인증번호를 보내드려요."
         )
 
         Spacer(Modifier.height(SmapSpacing.md))
@@ -63,7 +66,7 @@ internal fun VerificationContent(
     Column(verticalArrangement = Arrangement.spacedBy(SmapSpacing.sm)) {
         StepHeader(
             title = "인증번호를 입력해 주세요",
-            description = "${uiState.registerData.mtId}\n위 주소로 보낸 6자리 숫자를 입력해 주세요."
+            description = "${uiState.registerData.mtId}로 보낸 숫자 6자리를 입력해 주세요."
         )
 
         Spacer(Modifier.height(SmapSpacing.md))
@@ -106,8 +109,9 @@ internal fun VerificationContent(
 }
 
 @Composable
-private fun StepHeader(title: String, description: String) {
-    Text(text = title, style = SmapText.title, color = MaterialTheme.colorScheme.onSurface)
+internal fun StepHeader(title: String, description: String) {
+    Text(text = title, style = SmapText.title.copy(fontSize = 28.sp, lineHeight = 35.sp),
+        color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.semantics { heading() })
     Text(text = description, style = SmapText.secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 

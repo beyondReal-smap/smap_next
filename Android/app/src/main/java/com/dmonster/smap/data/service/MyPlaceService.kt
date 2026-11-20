@@ -36,7 +36,8 @@ class MyPlaceService(private val api: SmapApi) {
         lat: Double,
         lng: Double,
         memo: String? = null,
-        enterAlarm: String? = "Y"
+        enterAlarm: String? = "Y",
+        icon: String
     ): SavedLocation? {
         val body = CreateLocationRequest(
             mtIdx = memberId,
@@ -46,7 +47,8 @@ class MyPlaceService(private val api: SmapApi) {
             sltLat = lat,
             sltLong = lng,
             sltMemo = memo,
-            sltEnterAlarm = enterAlarm
+            sltEnterAlarm = enterAlarm,
+            sltIcon = icon
         )
 
         val location = api.createLocation(body)
@@ -64,7 +66,8 @@ class MyPlaceService(private val api: SmapApi) {
         lat: Double,
         lng: Double,
         memo: String? = null,
-        enterAlarm: String? = null
+        enterAlarm: String? = null,
+        icon: String?
     ): Boolean {
         val body = UpdateLocationRequest(
             sltTitle = title,
@@ -72,7 +75,8 @@ class MyPlaceService(private val api: SmapApi) {
             sltLat = lat,
             sltLong = lng,
             sltMemo = memo,
-            sltEnterAlarm = enterAlarm
+            sltEnterAlarm = enterAlarm,
+            sltIcon = icon
         )
 
         api.updateLocation(locationId, body)

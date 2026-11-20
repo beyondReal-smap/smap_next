@@ -13,9 +13,8 @@ import SwiftUI
 struct SplashView: View {
     
 
-    // Android 스플래시(values-v31/styles.xml)와 같은 모양 — 화면 전체 브랜드 남색 + 가운데 두 핀.
+    // Android 스플래시처럼 화면 전체에 브랜드 남색을 깔고 체크 핀을 가운데 표시한다.
     // LaunchScreen.storyboard 도 같은 그림이라 런치 화면 → 이 화면으로 넘어갈 때 아무것도 바뀌지 않는다.
-    // 핀 크기는 Android 스플래시에서 잰 실제 크기(핀 폭 약 75dp)에 맞춘 값이다.
     var body: some View {
         ZStack {
             // 런치 화면과 같은 색 에셋을 써야 넘어갈 때 남색이 미묘하게 바뀌지 않는다(값은 브랜드 #0113A3).
@@ -25,7 +24,7 @@ struct SplashView: View {
             Image("SplashPins")
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(width: 289, height: 289)
+                .frame(width: 248, height: 248)
                 .accessibilityHidden(true)
         }
         // 런치 화면은 "화면 전체" 가운데에 그린다. 안전 영역(위 상태바·아래 홈 표시줄 높이가 다름) 기준으로

@@ -142,7 +142,7 @@ class SmapApplication : Application() {
         
         val executor = Executors.newSingleThreadExecutor()
         executor.execute {
-            val webDomain = android.net.Uri.parse(BuildConfig.WEB_BASE_URL).host ?: "nextstep.aiagnt.kr"
+            val webDomain = android.net.Uri.parse(BuildConfig.WEB_BASE_URL).host ?: "smap.aiagnt.kr"
             val domains = listOf(
                 webDomain,
                 "smap-next.vercel.app",

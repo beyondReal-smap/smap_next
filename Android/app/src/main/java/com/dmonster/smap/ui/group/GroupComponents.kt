@@ -1,6 +1,17 @@
 package com.dmonster.smap.ui.group
 
 import androidx.compose.foundation.background
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +45,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import com.dmonster.smap.ui.theme.FamilyColors
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,10 +73,10 @@ import com.dmonster.smap.ui.components.SmapRowIcon
 import com.dmonster.smap.ui.components.SmapSection
 import com.dmonster.smap.ui.components.SmapTextField
 import com.dmonster.smap.ui.theme.SmapSpacing
+import com.dmonster.smap.ui.theme.SmapMotion
 import com.dmonster.smap.ui.theme.SmapText
 import com.dmonster.smap.ui.components.HeroStats
 import com.dmonster.smap.ui.components.HeroHeading
-import com.dmonster.smap.ui.components.SmapHeroCard
 import com.dmonster.smap.ui.components.SmapBrush
 import androidx.compose.ui.graphics.Color
 
@@ -89,33 +108,37 @@ fun GroupListContent(
     val colors = MaterialTheme.colorScheme
     // 이미 받은 목록이 있으면 다시 불러오는 동안에도 그대로 보여 준다. 탭을 다시 열 때마다 자리 표시(회색 줄)로
     // 바뀌었다가 목록이 돌아와 깜빡이는 것처럼 보였다. 자리 표시는 처음 불러올 때만.
+    var showJoin by rememberSaveable { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
     val showPlaceholder = isLoading && groups.isEmpty()
     PullToRefreshBox(isRefreshing = isRefreshing, onRefresh = onRefresh, modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .background(colors.background),
+                .background(if (isSystemInDarkTheme()) colors.background else FamilyColors.Paper),
             contentPadding = PaddingValues(start = SmapSpacing.md, end = SmapSpacing.md, top = SmapSpacing.md, bottom = SmapSpacing.xl),
             verticalArrangement = Arrangement.spacedBy(SmapSpacing.lg),
         ) {
-            item { GroupListHero(groups, groupMemberCounts, userName, currentUserIdx, showPlaceholder) }
-
             item {
-                // 새 그룹 만들기는 "내 그룹" 줄 오른쪽에 둔다. 큰 제목을 뺀 뒤 맨 위에 + 하나만 남아
-                // 빈 줄이 생겼던 것을 없애고, 목록과 그 목록에 대한 동작을 한 줄에 묶는다.
-                SmapSection(
-                    title = if (groups.isEmpty()) "내 그룹" else "내 그룹 ${groups.size}",
-                    action = {
-                        TextButton(
-                            onClick = onCreateClick,
-                            contentPadding = PaddingValues(horizontal = SmapSpacing.sm),
-                        ) {
-                            Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(SmapSpacing.xs))
-                            Text("새 그룹", style = SmapText.captionBold)
+                Column {
+                    GroupListHero(groups, groupMemberCounts, userName, currentUserIdx, showPlaceholder,
+                        showJoin, onCreateClick, {
+                            if (showJoin) focusManager.clearFocus()
+                            showJoin = !showJoin
+                        })
+                    AnimatedVisibility(
+                        visible = showJoin,
+                        enter = expandVertically(SmapMotion.enter(), expandFrom = Alignment.Top) + fadeIn(SmapMotion.enter()),
+                        exit = shrinkVertically(SmapMotion.exit(), shrinkTowards = Alignment.Top) + fadeOut(SmapMotion.exit()),
+                    ) {
+                        Box(Modifier.padding(top = SmapSpacing.lg)) {
+                            InviteJoinSection(inviteCode, onInviteCodeChange, onPasteInviteCode, onJoinGroup, isJoining)
                         }
-                    },
-                ) {
+                    }
+                }
+            }
+            item {
+                SmapSection(title = if (groups.isEmpty()) "내 그룹" else "내 그룹 · ${groups.size}") {
                     when {
                         showPlaceholder -> repeat(2) { i ->
                             if (i > 0) SmapRowDivider()
@@ -137,7 +160,12 @@ fun GroupListContent(
                             SmapListRow(
                                 title = g.sgtTitle ?: "이름 없는 그룹",
                                 subtitle = listOfNotNull("멤버 ${count}명", g.sgtMemo?.takeIf { it.isNotBlank() }).joinToString(" · "),
-                                leading = { SmapRowIcon(Icons.Outlined.Groups, emphasized = true) },
+                                leading = {
+                                    Box(Modifier.size(44.dp, 48.dp).background(FamilyColors.Highlight, RoundedCornerShape(12.dp)),
+                                        contentAlignment = Alignment.Center) {
+                                        Text(g.sgtTitle.orEmpty().take(1).ifBlank { "그" }, style = SmapText.headline, color = FamilyColors.Ink)
+                                    }
+                                },
                                 trailing = {
                                     if (mine) RoleBadge("그룹장")
                                     Chevron()
@@ -149,7 +177,6 @@ fun GroupListContent(
                 }
             }
 
-            item { InviteJoinSection(inviteCode, onInviteCodeChange, onPasteInviteCode, onJoinGroup, isJoining) }
         }
     }
 }
@@ -165,26 +192,36 @@ private fun GroupListHero(
     userName: String?,
     currentUserIdx: Int?,
     isLoading: Boolean,
+    showJoin: Boolean,
+    onCreate: () -> Unit,
+    onToggleJoin: () -> Unit,
 ) {
     val totalMembers = groups.sumOf { groupMemberCounts[it.sgtIdx] ?: it.memberCount ?: 0 }
     val owned = groups.count { currentUserIdx != null && it.mtIdx == currentUserIdx }
-    SmapHeroCard {
-        HeroHeading(
-            eyebrow = userName?.let { "안녕하세요, ${it}님" } ?: "안녕하세요",
-            title = when {
-                isLoading -> "그룹을 불러오고 있어요"
-                groups.isEmpty() -> "그룹을 만들고\n가족을 초대해 보세요"
-                else -> "${groups.size}개 그룹에서\n함께 위치를 나누고 있어요"
-            },
-        )
-        if (!isLoading && groups.isNotEmpty()) {
-            HeroStats(
-                listOf(
-                    "${groups.size}" to "내 그룹",
-                    "$totalMembers" to "전체 멤버",
-                    "$owned" to "내가 만든 그룹",
-                )
-            )
+    Column(Modifier.fillMaxWidth().background(FamilyColors.Ink, RoundedCornerShape(24.dp)).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(userName?.let { "${it}님의 그룹" } ?: "내 그룹", style = SmapText.captionBold, color = FamilyColors.Highlight)
+            Text("함께하는 사람들", style = SmapText.title.copy(fontSize = 30.sp, lineHeight = 36.sp), color = Color.White,
+                modifier = Modifier.semantics { heading() })
+            Text(when {
+                isLoading -> "그룹을 불러오는 중…"
+                groups.isEmpty() -> "첫 그룹을 만들거나 초대 코드로 참여하세요"
+                else -> "그룹 ${groups.size}개 · 그룹별 멤버 합계 ${totalMembers}명 · 내가 만든 그룹 ${owned}개"
+            }, style = SmapText.captionSmall, color = Color.White.copy(alpha = 0.85f))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Button(onClick = onCreate, modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(containerColor = FamilyColors.Highlight, contentColor = FamilyColors.Ink),
+                shape = RoundedCornerShape(13.dp)) {
+                Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("새 그룹", style = SmapText.captionBold)
+            }
+            OutlinedButton(onClick = onToggleJoin, modifier = Modifier.weight(1f),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.45f)), shape = RoundedCornerShape(13.dp)) {
+                Text(if (showJoin) "코드 입력 닫기" else "코드로 참여", color = Color.White, style = SmapText.captionBold)
+            }
         }
     }
 }
@@ -263,21 +300,24 @@ fun GroupDetailContent(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(colors.background),
+            .background(if (isSystemInDarkTheme()) colors.background else FamilyColors.Paper),
         contentPadding = PaddingValues(SmapSpacing.md),
         verticalArrangement = Arrangement.spacedBy(SmapSpacing.lg),
     ) {
         // 요약 — 화면의 시각적 중심(남색 카드). 이전 흰 카드는 아래 묶음들과 구분이 안 돼 밋밋했다.
         item {
-            SmapHeroCard {
+            Column(Modifier.fillMaxWidth().background(FamilyColors.Ink, RoundedCornerShape(24.dp)).padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        Modifier
-                            .size(52.dp)
-                            .background(Color.White.copy(alpha = 0.16f), CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) { Icon(Icons.Outlined.Groups, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp)) }
-                    Spacer(Modifier.width(14.dp))
+                    if (!isLoading && members.isNotEmpty()) {
+                        Row(horizontalArrangement = Arrangement.spacedBy((-10).dp)) {
+                            members.take(3).forEach { member ->
+                                SmapAvatar(name = member.displayName, imagePath = member.mtFile1, size = 38.dp, memberId = member.mtIdx,
+                                    modifier = Modifier.border(2.dp, FamilyColors.Ink, CircleShape))
+                            }
+                        }
+                        Spacer(Modifier.width(14.dp))
+                    }
                     Column(Modifier.weight(1f)) {
                         HeroHeading(
                             eyebrow = if (isOwner) "내가 만든 그룹" else "참여 중인 그룹",
@@ -292,27 +332,6 @@ fun GroupDetailContent(
                         "${scheduleCount}개" to "이번 주 일정",
                         "${locationCount}곳" to "등록 장소",
                     )
-                )
-            }
-        }
-
-        // 초대
-        item {
-            SmapSection(title = "초대") {
-                SmapListRow(
-                    title = group.sgtCode ?: "초대 코드 없음",
-                    subtitle = "이 코드를 받은 사람은 그룹에 참여할 수 있어요",
-                    leading = { SmapRowIcon(Icons.Outlined.PersonAdd) },
-                    trailing = if (group.sgtCode != null) {
-                        { IconButton(onClick = onCopyCode) { Icon(Icons.Outlined.ContentCopy, contentDescription = "초대 코드 복사", tint = colors.onSurfaceVariant) } }
-                    } else null,
-                )
-                SmapButton(
-                    text = "멤버 초대하기",
-                    onClick = onInviteClick,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = SmapSpacing.md, end = SmapSpacing.md, bottom = SmapSpacing.md),
                 )
             }
         }
@@ -339,7 +358,7 @@ fun GroupDetailContent(
                             title = if (m.mtIdx == currentUserIdx) "${m.displayName} (나)" else m.displayName,
                             // 역할은 오른쪽 배지로만 보여 준다(보조 줄과 배지에 "그룹장"이 두 번 나오던 문제).
                             subtitle = if (role == null && !manageable) "멤버" else null,
-                            leading = { SmapAvatar(name = m.displayName, imagePath = m.mtFile1) },
+                            leading = { SmapAvatar(name = m.displayName, imagePath = m.mtFile1, memberId = m.mtIdx) },
                             trailing = if (role != null || manageable) {
                                 {
                                     if (role != null) RoleBadge(role)
@@ -350,6 +369,27 @@ fun GroupDetailContent(
                         )
                     }
                 }
+            }
+        }
+
+        // 초대
+        item {
+            SmapSection(title = "초대") {
+                SmapListRow(
+                    title = group.sgtCode ?: "초대 코드 없음",
+                    subtitle = "이 코드를 받은 사람은 그룹에 참여할 수 있어요",
+                    leading = { SmapRowIcon(Icons.Outlined.PersonAdd) },
+                    trailing = if (group.sgtCode != null) {
+                        { IconButton(onClick = onCopyCode) { Icon(Icons.Outlined.ContentCopy, contentDescription = "초대 코드 복사", tint = colors.onSurfaceVariant) } }
+                    } else null,
+                )
+                SmapButton(
+                    text = "멤버 초대하기",
+                    onClick = onInviteClick,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = SmapSpacing.md, end = SmapSpacing.md, bottom = SmapSpacing.md),
+                )
             }
         }
 

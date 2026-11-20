@@ -17,6 +17,7 @@ struct MainTabView: View {
     @State private var transitionFrom: Int?
     @State private var transitionProgress: CGFloat = 1
     @State private var transitionToken = 0
+    @State private var visitedSchedule = false
     // 지도 탭(내장소·활동 로그)은 한 번 열면 계속 살려 둔다 — 다시 열 때마다 지도를 새로 그리며 깜빡이지 않게.
     @State private var visitedMyPlace = false
     @State private var visitedActivityLog = false
@@ -39,9 +40,9 @@ struct MainTabView: View {
                 tabPage(0, width: width) { HomeView(isActive: selectedTab == 0, onInitialLoadFinished: prewarmMapTabs) }
                 if visitedMyPlace { tabPage(3, width: width) { MyPlaceView(isActive: selectedTab == 3) } }
                 if visitedActivityLog { tabPage(4, width: width) { ActivityLogView(isActive: selectedTab == 4) } }
-                // 그룹·일정은 보일 때와 밀려 나가는 동안만 둔다(열 때마다 새로 불러오는 기존 동작 유지).
+                // 그룹은 보일 때와 밀려 나가는 동안만 둔다. 일정은 첫 조회 결과를 탭 전환 뒤에도 유지한다.
                 if selectedTab == 1 || transitionFrom == 1 { tabPage(1, width: width) { GroupListView() } }
-                if selectedTab == 2 || transitionFrom == 2 { tabPage(2, width: width) { NativeScheduleListView() } }
+                if visitedSchedule { tabPage(2, width: width) { NativeScheduleListView() } }
             }
             .frame(width: width, height: geo.size.height)
             .clipped()
@@ -131,6 +132,7 @@ struct MainTabView: View {
 
     private func switchTab(_ index: Int) {
         guard index != selectedTab, (0...4).contains(index) else { return }
+        if index == 2 { visitedSchedule = true }
         if index == 3 { visitedMyPlace = true }
         if index == 4 { visitedActivityLog = true }
         transitionToken += 1
@@ -226,7 +228,7 @@ private struct SMAPTabBar: View {
         ("내장소", "mappin.circle", "mappin.circle.fill"),
         ("활동 로그", "clock.arrow.circlepath", "clock.arrow.circlepath"),
     ]
-    private static let unselectedColor = Color(red: 0x94 / 255, green: 0xA3 / 255, blue: 0xB8 / 255)
+    private static let unselectedColor = SMAPTheme.Family.muted
 
     var body: some View {
         HStack(spacing: 0) {

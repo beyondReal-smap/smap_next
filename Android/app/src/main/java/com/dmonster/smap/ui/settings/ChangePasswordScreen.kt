@@ -136,7 +136,7 @@ fun ChangePasswordScreen(
                     return@Column
                 }
 
-                Text("새 비밀번호를 설정해 주세요", style = SmapText.title, color = colors.onSurface)
+                Text("새 비밀번호를 설정해 주세요", style = SmapText.pageTitle, color = colors.onSurface)
                 Text("영문 대·소문자, 숫자, 특수문자를 섞어 8자 이상으로 만들어 주세요.", style = SmapText.secondary, color = colors.onSurfaceVariant)
 
                 Spacer(Modifier.height(SmapSpacing.md))
@@ -225,7 +225,7 @@ private fun SocialUserNotice() {
                 .padding(18.dp),
         )
         Spacer(Modifier.height(SmapSpacing.sm))
-        Text("비밀번호를 바꿀 수 없는 계정이에요", style = SmapText.title, color = colors.onSurface)
+        Text("비밀번호를 바꿀 수 없는 계정이에요", style = SmapText.pageTitle, color = colors.onSurface)
         Text(
             "카카오·Apple·Google 계정으로 로그인했다면 그 서비스의 설정에서 비밀번호를 관리해 주세요.",
             style = SmapText.secondary,

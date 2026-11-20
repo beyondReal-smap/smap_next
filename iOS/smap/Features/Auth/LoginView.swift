@@ -63,6 +63,9 @@ extension UIFont {
 struct LoginView: View {
 
     @StateObject private var viewModel = LoginViewModel()
+    @State private var showsEmailForm = false
+    @State private var waitingForApple = false
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
 
     /// 비밀번호 찾기 시트 표시 여부
     @State private var showForgotPassword = false
@@ -78,64 +81,57 @@ struct LoginView: View {
 
     var body: some View {
         ZStack {
-            // 스플래시와 같은 브랜드 남색에서 이어지게 한다(Android SmapAccent.Navy.brush 와 같은 값).
-            // 아래 절반은 흰색 — 내용이 화면보다 짧아도 흰 시트가 화면 아래 끝까지 이어 보이게.
-            VStack(spacing: 0) {
-                SMAPTheme.Navy.gradient
-                SMAPTheme.Surface.card
-            }
-            .ignoresSafeArea()
-
-            ScrollView {
-                VStack(spacing: 0) {
-                    logoSection
-                        .padding(.top, 40)
-                        .padding(.bottom, 32)
-
-                    // 입력 시트 — 위쪽 모서리만 둥근 흰 판(앱 공용 시트 반경)
-                    VStack(spacing: 0) {
-                        loginFormSection
-
-                        if viewModel.showError, let error = viewModel.errorMessage {
-                            errorMessageView(error)
-                                .padding(.top, SMAPTheme.Spacing.md)
-                        }
-
-                        SMAPButton("로그인", isLoading: viewModel.isLoading, isDisabled: !viewModel.isInputValid) {
-                            HapticManager.shared.impact(style: .medium)
-                            hideKeyboard()
-                            loginAction()
-                        }
-                        .padding(.top, SMAPTheme.Spacing.lg)
-
-                        forgotPasswordLink
-                            .padding(.top, SMAPTheme.Spacing.sm)
-
-                        dividerSection
-                            .padding(.top, SMAPTheme.Spacing.md)
-
-                        socialLoginSection
-                            .padding(.top, SMAPTheme.Spacing.lg)
-
-                        signUpSection
-                            .padding(.top, SMAPTheme.Spacing.lg)
+            NavigationStack {
+                welcomeScreen
+                    .navigationTitle("로그인")
+                    .toolbar(.hidden, for: .navigationBar)
+                    .navigationDestination(isPresented: $showsEmailForm) {
+                        emailScreen
+                            .navigationBarTitleDisplayMode(.inline)
+                            .toolbar(.visible, for: .navigationBar)
+                            .toolbar {
+                                ToolbarItem(placement: .topBarTrailing) { signUpSection }
+                            }
                     }
-                    .padding(.horizontal, SMAPTheme.Spacing.lg)
-                    .padding(.vertical, SMAPTheme.Spacing.xl)
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        UnevenRoundedRectangle(topLeadingRadius: SMAPTheme.sheetRadius, topTrailingRadius: SMAPTheme.sheetRadius)
-                            .fill(SMAPTheme.Surface.card)
-                    )
-                }
             }
-            .scrollDismissesKeyboard(.interactively)
+            .disabled(viewModel.isLoading)
 
             // 로딩 오버레이
             if viewModel.isLoading {
                 loadingOverlay
             }
         }
+        .overlay(alignment: showsEmailForm ? .bottom : .top) {
+            if viewModel.showError, let message = viewModel.errorMessage {
+                HStack(spacing: 10) {
+                    Image(systemName: "info.circle.fill").accessibilityHidden(true)
+                    Text(message).font(SMAPTheme.Font.secondary).fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                    Button { viewModel.dismissError() } label: {
+                        Image(systemName: "xmark").font(.caption.bold()).frame(width: 44, height: 44)
+                    }
+                    .accessibilityLabel("안내 닫기")
+                }
+                .foregroundStyle(.white)
+                .padding(.leading, 14)
+                .padding(.vertical, 4)
+                .background(SMAPTheme.Surface.onSurface, in: RoundedRectangle(cornerRadius: 14))
+                .frame(maxWidth: 480)
+                .padding(.horizontal, 20)
+                .padding(.top, showsEmailForm ? 0 : 70)
+                .padding(.bottom, showsEmailForm ? 12 : 0)
+                .task(id: message) {
+                    if voiceOver {
+                        UIAccessibility.post(notification: .announcement, argument: message)
+                        return
+                    }
+                    try? await Task.sleep(for: .seconds(6))
+                    if !Task.isCancelled { viewModel.dismissError() }
+                }
+            }
+        }
+        .smapAccent(.family)
+        .onChange(of: showsEmailForm) { _, _ in viewModel.dismissError() }
         .onChange(of: viewModel.isLoggedIn) { _, isLoggedIn in
             if isLoggedIn {
                 onLoginSuccess?()
@@ -150,6 +146,7 @@ struct LoginView: View {
             // 기존 가입자 전화번호 자동 입력
             if let phone = prefilledPhone, !phone.isEmpty {
                 viewModel.phoneNumber = phone
+                showsEmailForm = true
                 print("📱 [LOGIN] 기존 가입자 전화번호 자동 입력: \(phone)")
             }
         }
@@ -162,30 +159,84 @@ struct LoginView: View {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
-    // MARK: - Logo Section
+    private var welcomeScreen: some View {
+        GeometryReader { geometry in
+            ScrollView {
+                VStack(spacing: 0) {
+                    HStack(spacing: 9) {
+                        Image("AppNoBg")
+                            .resizable()
+                            .frame(width: 30, height: 30)
+                            .accessibilityHidden(true)
+                        Text("도착했어")
+                            .font(.suite(size: 23, weight: .heavy))
+                            .tracking(-0.8)
+                            .accessibilityAddTraits(.isHeader)
+                        Spacer()
+                        signUpSection
+                    }
+                    .frame(minHeight: 48)
 
-    /// 남색 바탕 위 앱 아이콘·이름·한 줄 소개
-    private var logoSection: some View {
-        VStack(spacing: 0) {
-            Image("AppNoBg")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 76, height: 76)
-                .accessibilityHidden(true)
+                    LoginArrivalPhotos(isActive: !showsEmailForm && !waitingForApple && !viewModel.isLoading && !viewModel.showError)
+                        .frame(height: min(530, max(145, geometry.size.height - 252)))
+                        .padding(.top, 8)
 
-            Text("도착했어")
-                .font(.suite(size: 32, weight: .bold))
-                .foregroundStyle(.white)
-                .accessibilityAddTraits(.isHeader)
-                .padding(.top, SMAPTheme.Spacing.md)
+                    Button {
+                        showsEmailForm = true
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "envelope")
+                            Text("이메일로 계속하기").font(SMAPTheme.Font.bodyBold)
+                            Spacer()
+                            Image(systemName: "arrow.right")
+                        }
+                        .padding(.horizontal, 20)
+                        .frame(minHeight: 56)
+                        .foregroundStyle(.white)
+                        .background(SMAPAccent.family.deep, in: RoundedRectangle(cornerRadius: 14))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 16)
 
-            Text("가족이 도착하면 먼저 알려 드려요")
-                .font(SMAPTheme.Font.body)
-                .foregroundStyle(SMAPTheme.Surface.onNavyMuted)
-                .multilineTextAlignment(.center)
-                .padding(.top, 6)
+                    dividerSection.padding(.top, 18)
+                    socialLoginSection.padding(.top, 10)
+                }
+                .frame(maxWidth: 480)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity, minHeight: geometry.size.height)
+            }
+            .scrollIndicators(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
         }
-        .frame(maxWidth: .infinity)
+        .background(Color(uiColor: .systemBackground))
+    }
+
+    private var emailScreen: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("이메일 로그인")
+                    .font(.suite(size: 32, weight: .bold))
+                    .accessibilityAddTraits(.isHeader)
+                    .padding(.bottom, 24)
+                loginFormSection
+                SMAPButton("로그인", isLoading: viewModel.isLoading, isDisabled: !viewModel.isInputValid) {
+                    HapticManager.shared.impact(style: .medium)
+                    hideKeyboard()
+                    loginAction()
+                }
+                .padding(.top, 20)
+                forgotPasswordLink
+                    .frame(maxWidth: .infinity)
+                    .buttonStyle(.plain)
+                    .padding(.top, 8)
+            }
+            .frame(maxWidth: 440)
+            .padding(24)
+            .frame(maxWidth: .infinity)
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .scrollDismissesKeyboard(.interactively)
     }
 
     // MARK: - Login Form Section
@@ -193,40 +244,23 @@ struct LoginView: View {
     private var loginFormSection: some View {
         VStack(spacing: 12) {
             SMAPTextField(
-                "이메일",
+                "name@example.com",
                 text: $viewModel.phoneNumber,
+                label: "이메일",
                 keyboardType: .emailAddress,
                 textContentType: .username,
                 submitLabel: .next
             )
 
             SMAPTextField(
-                "비밀번호",
+                "비밀번호 입력",
                 text: $viewModel.password,
+                label: "비밀번호",
                 isSecure: true,
                 textContentType: .password,
                 submitLabel: .done
             )
         }
-    }
-
-    // MARK: - Error Message
-
-    private func errorMessageView(_ message: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.circle.fill")
-                .foregroundColor(SMAPTheme.Color.error)
-
-
-            Text(message)
-                .font(SMAPTheme.Font.secondary)
-                .foregroundColor(SMAPTheme.Color.error)
-
-            Spacer()
-        }
-        .padding(12)
-        .background(SMAPTheme.Color.error.opacity(0.1))
-        .clipShape(RoundedRectangle(cornerRadius: SMAPTheme.Radius.sm))
     }
 
     private func loginAction() {
@@ -246,9 +280,9 @@ struct LoginView: View {
             HapticManager.shared.impact(style: .light)
             showForgotPassword = true
         }) {
-            Text("비밀번호를 잊으셨나요?")
-                .font(SMAPTheme.Font.secondaryMedium)
-                .foregroundColor(SMAPTheme.Color.primary)
+            Text("비밀번호 찾기")
+                .font(SMAPTheme.Font.captionMedium)
+                .foregroundStyle(Color(uiColor: .secondaryLabel))
                 .frame(minHeight: 44)
         }
     }
@@ -258,79 +292,54 @@ struct LoginView: View {
     private var dividerSection: some View {
         HStack {
             Rectangle()
-                .fill(SMAPTheme.Surface.divider)
+                .fill(Color(uiColor: .separator).opacity(0.5))
                 .frame(height: 1)
 
-            Text("또는")
-                .font(SMAPTheme.Font.secondary)
+            Text("간편 로그인")
+                .font(SMAPTheme.Font.captionMedium)
                 .foregroundColor(SMAPTheme.Color.textSecondary)
                 .padding(.horizontal, 12)
 
             Rectangle()
-                .fill(SMAPTheme.Surface.divider)
+                .fill(Color(uiColor: .separator).opacity(0.5))
                 .frame(height: 1)
         }
     }
 
     // MARK: - Social Login Section
 
-    /// 높이·모서리는 앱 공용 버튼(SMAPButton 52pt·12pt)과 맞춘다. Android SocialLoginSection 과 같은 규격.
     private var socialLoginSection: some View {
-        VStack(spacing: 12) {
-            // Google — 공식 규격: 흰 바탕 + 옅은 테두리 + 컬러 G 로고
-            Button(action: {
+        HStack(spacing: 8) {
+            Button {
                 HapticManager.shared.impact(style: .medium)
                 viewModel.googleLogin()
-            }) {
-                HStack(spacing: 10) {
+            } label: {
+                LoginProviderLabel(name: "Google", background: .white) {
                     GoogleLogoView()
-                        .frame(width: 20, height: 20)
-
-                    Text("Google로 계속하기")
-                        .font(.suite(size: 16, weight: .medium))
-                        .foregroundColor(Color(red: 0x1F/255, green: 0x1F/255, blue: 0x1F/255))
                 }
-                .frame(maxWidth: .infinity)
-                .frame(height: 52)
-                .background(Color.white)
-                .clipShape(RoundedRectangle(cornerRadius: SMAPTheme.Radius.md))
-                .overlay(
-                    RoundedRectangle(cornerRadius: SMAPTheme.Radius.md)
-                        .stroke(Color(red: 0xDA/255, green: 0xDC/255, blue: 0xE0/255), lineWidth: 1)
-                )
             }
-            .disabled(viewModel.isLoading)
+            .accessibilityLabel("Google로 계속하기")
 
-            // Kakao — 공식 규격: 바탕 #FEE500, 심볼 #000000, 글자 #000000 85%. Android 와 같이 Google 다음 순서.
-            Button(action: {
+            Button {
                 HapticManager.shared.impact(style: .medium)
                 viewModel.kakaoLogin()
-            }) {
-                HStack(spacing: 10) {
-                    KakaoSymbolShape()
-                        .fill(Color.black)
-                        .frame(width: 20, height: 20)
-                        .accessibilityHidden(true)
-
-                    Text("카카오로 계속하기")
-                        .font(.suite(size: 16, weight: .medium))
-                        .foregroundColor(Color.black.opacity(0.85))
+            } label: {
+                LoginProviderLabel(name: "카카오", background: Color(red: 1, green: 229/255, blue: 0), brandText: .black) {
+                    KakaoSymbolShape().fill(.black)
                 }
-                .frame(maxWidth: .infinity)
-                .frame(height: 52)
-                .background(Color(red: 0xFE/255, green: 0xE5/255, blue: 0x00/255))
-                .clipShape(RoundedRectangle(cornerRadius: SMAPTheme.Radius.md))
             }
-            .disabled(viewModel.isLoading)
+            .accessibilityLabel("카카오로 계속하기")
 
-            CustomAppleSignInButton(onTap: {
-                triggerAppleSignIn()
-            })
+            CustomAppleSignInButton(onTap: triggerAppleSignIn)
         }
+        .buttonStyle(.plain)
+        .disabled(viewModel.isLoading)
     }
 
     // Apple Sign In 트리거
     private func triggerAppleSignIn() {
+        viewModel.dismissError()
+        waitingForApple = true
         let provider = ASAuthorizationAppleIDProvider()
         let request = provider.createRequest()
         request.requestedScopes = [.email, .fullName]
@@ -340,6 +349,7 @@ struct LoginView: View {
         controller.presentationContextProvider = AppleSignInCoordinator.shared
 
         AppleSignInCoordinator.shared.onCompletion = { result in
+            self.waitingForApple = false
             switch result {
             case .success(let authorization):
                 self.handleAppleLoginAction(authorization: authorization)
@@ -364,20 +374,13 @@ struct LoginView: View {
     // MARK: - Sign Up Section
 
     private var signUpSection: some View {
-        HStack(spacing: 4) {
-            Text("아직 회원이 아니신가요?")
-                .font(SMAPTheme.Font.secondary)
-                .foregroundColor(SMAPTheme.Color.textSecondary)
-
-            Button(action: {
-                print("📝 [LoginView] 가입하기 버튼 클릭 (Native Flow)")
-                onNavigateToRegister?(nil)
-            }) {
-                Text("가입하기")
-                    .font(.suite(size: 15, weight: .bold))
-                    .foregroundColor(SMAPTheme.Color.primary)
-                    .frame(minWidth: 44, minHeight: 44)
-            }
+        Button {
+            onNavigateToRegister?(nil)
+        } label: {
+            Text("회원가입")
+                .font(.suite(size: 14, weight: .bold))
+                .foregroundStyle(.primary)
+                .frame(minWidth: 44, minHeight: 44)
         }
     }
 
@@ -399,6 +402,106 @@ struct LoginView: View {
             .background(Color.black.opacity(0.7))
             .cornerRadius(16)
         }
+    }
+}
+
+private struct LoginArrivalPhotos: View {
+    let isActive: Bool
+    private let photos = ["LoginArrival", "LoginArrivalCycling", "LoginArrivalDoorway"]
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var index = 0
+    @State private var paused = false
+
+    private var playing: Bool { isActive && scenePhase == .active && !reduceMotion && !paused }
+
+    var body: some View {
+        ZStack(alignment: .bottomLeading) {
+            GeometryReader { geometry in
+                Image(photos[index])
+                    .resizable()
+                    .scaledToFill()
+                    .alignmentGuide(.trailing) { image in
+                        image.width - max(0, image.width - geometry.size.width) * (index == 2 ? 0.40 : 0.22)
+                    }
+                    .frame(width: geometry.size.width, height: geometry.size.height, alignment: .trailing)
+                    .accessibilityHidden(true)
+                    .id(index)
+                    .transition(.opacity)
+            }
+            LinearGradient(
+                stops: [.init(color: .clear, location: 0.45), .init(color: .black.opacity(0.63), location: 1)],
+                startPoint: .top, endPoint: .bottom
+            )
+            Text("가족이 도착하면,\n먼저 알려드려요.")
+                .font(.suite(size: 30, weight: .bold))
+                .tracking(-1)
+                .foregroundStyle(.white)
+                .padding(20)
+        }
+        .overlay(alignment: .topTrailing) {
+            Button {
+                if reduceMotion {
+                    index = (index + 1) % photos.count
+                } else {
+                    paused.toggle()
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Text("\(index + 1) / \(photos.count)").font(.caption.weight(.semibold)).monospacedDigit()
+                    Image(systemName: reduceMotion ? "chevron.right" : (paused ? "play.fill" : "pause.fill"))
+                        .font(.system(size: 10, weight: .bold))
+                }
+                .padding(.horizontal, 10)
+                .frame(height: 28)
+                .foregroundStyle(.white)
+                .background(.black.opacity(0.55), in: Capsule())
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(reduceMotion ? "다음 사진" : (paused ? "사진 전환 재생" : "사진 전환 일시 정지"))
+            .accessibilityValue("\(index + 1) / \(photos.count)")
+            .padding(.trailing, 12)
+            .padding(.top, 4)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .task(id: playing) {
+            guard playing else { return }
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(6))
+                guard !Task.isCancelled else { return }
+                withAnimation(.easeInOut(duration: 0.7)) { index = (index + 1) % photos.count }
+            }
+        }
+    }
+}
+
+struct LoginProviderLabel<Logo: View>: View {
+    let name: String
+    let background: Color
+    var brandText: Color? = nil
+    @ViewBuilder var logo: () -> Logo
+
+    var body: some View {
+        HStack(spacing: 7) {
+            logo()
+                .frame(width: 17, height: 17)
+                .frame(width: 26, height: 26)
+                .background(background, in: Circle())
+                .accessibilityHidden(true)
+            Text(name)
+                .font(SMAPTheme.Font.captionMedium)
+                .foregroundStyle(brandText ?? .primary)
+        }
+        .frame(maxWidth: .infinity, minHeight: 48)
+        .background(brandText == nil ? Color.clear : background, in: RoundedRectangle(cornerRadius: 12))
+        .overlay {
+            if brandText == nil {
+                RoundedRectangle(cornerRadius: 12).strokeBorder(Color(uiColor: .separator).opacity(0.6))
+            }
+        }
+        .contentShape(Rectangle())
     }
 }
 

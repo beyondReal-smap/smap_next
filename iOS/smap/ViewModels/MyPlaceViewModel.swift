@@ -227,18 +227,18 @@ class MyPlaceViewModel: ObservableObject {
         }
     }
 
-    func saveLocation(title: String, address: String, latitude: Double, longitude: Double, notifications: Bool) async -> Bool {
+    func saveLocation(title: String, address: String, latitude: Double, longitude: Double, notifications: Bool, icon: PlaceKind) async -> Bool {
         guard let memberId = selectedMember?.mt_idx else { return false }
         if selectedLocation == nil && !canAddToSelectedMember { return false }
         isSaving = true
         do {
             if let existingLocation = selectedLocation {
                 guard canManageLocation(existingLocation) else { isSaving = false; return false }
-                let request = LocationUpdateRequest(slt_title: title, slt_add: address, slt_lat: latitude, slt_long: longitude, slt_enter_alarm: notifications ? "Y" : "N")
+                let request = LocationUpdateRequest(slt_title: title, slt_add: address, slt_lat: latitude, slt_long: longitude, slt_enter_alarm: notifications ? "Y" : "N", slt_icon: icon.rawValue)
                 let success = try await myPlaceService.updateLocation(memberId: memberId, locationId: existingLocation.slt_idx, request: request)
                 if !success { throw APIError(detail: nil, message: "장소 정보 수정 내용이 서버에 반영되지 않았습니다. 다시 시도해주세요.") }
             } else {
-                let request = LocationCreateRequest(title: title, address: address, latitude: latitude, longitude: longitude, enterAlarm: notifications ? "Y" : "N")
+                let request = LocationCreateRequest(title: title, address: address, latitude: latitude, longitude: longitude, icon: icon.rawValue, enterAlarm: notifications ? "Y" : "N")
                 _ = try await myPlaceService.createLocation(memberId: memberId, request: request)
             }
 

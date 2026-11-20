@@ -4,7 +4,14 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,17 +24,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.dmonster.smap.ui.theme.SmapRadius
+import com.dmonster.smap.ui.components.SmapAccent
+import com.dmonster.smap.ui.components.SmapAccentTheme
+import com.dmonster.smap.ui.theme.SmapText
 import com.dmonster.smap.data.model.RegisterStep
-import com.dmonster.smap.ui.components.SmapBanner
-import com.dmonster.smap.ui.components.SmapBannerTone
-import com.dmonster.smap.ui.components.SmapButton
-import com.dmonster.smap.ui.components.SmapTopBar
-import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.SuiteFont
 
 /**
@@ -41,7 +45,7 @@ fun RegisterScreen(
     onBack: () -> Unit = {},
     onExistingUser: (String) -> Unit = {},
     socialData: Map<String, String>? = null
-) {
+) = SmapAccentTheme(SmapAccent.Family) {
     val uiState by viewModel.uiState.collectAsState()
 
     if (uiState.socialSessionExpired) {
@@ -61,14 +65,14 @@ fun RegisterScreen(
             onDismissRequest = { viewModel.dismissExistingUserAlert() },
             title = {
                 Text(
-                    text = "이미 가입된 전화번호",
+                    text = "이미 가입된 계정",
                     fontFamily = SuiteFont,
                     fontWeight = FontWeight.Bold
                 )
             },
             text = {
                 Text(
-                    text = "이미 가입된 전화번호입니다.\n로그인 페이지로 이동하시겠습니까?",
+                    text = "이미 가입된 계정입니다.\n로그인 페이지로 이동하시겠습니까?",
                     fontFamily = SuiteFont
                 )
             },
@@ -82,7 +86,7 @@ fun RegisterScreen(
                     Text(
                         text = "로그인으로 이동",
                         fontFamily = SuiteFont,
-                        color = BrandColors.Primary
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             },
@@ -91,7 +95,7 @@ fun RegisterScreen(
                     Text(
                         text = "취소",
                         fontFamily = SuiteFont,
-                        color = BrandColors.TextSecondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -113,33 +117,38 @@ fun RegisterScreen(
         viewModel.hideLegalDocument()
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Scaffold(
-        // 기본 배경(연분홍)이 하단 시스템 바 영역에 띠처럼 비치지 않도록 화면 표면색과 맞춘다.
-        containerColor = MaterialTheme.colorScheme.surface,
-        topBar = {
-            SmapTopBar(
-                title = uiState.currentStep.title,
-                onBack = if (uiState.currentStep != RegisterStep.COMPLETE) goBack else null,
-            )
-        }
-    ) { paddingValues ->
+    val step = uiState.currentStep
+    val (stage, stageName) = when (step) {
+        RegisterStep.TERMS -> 1 to "약관 동의"
+        RegisterStep.PHONE, RegisterStep.VERIFICATION -> 2 to "이메일 인증"
+        RegisterStep.BASIC_INFO -> 3 to "계정 정보"
+        RegisterStep.PROFILE, RegisterStep.COMPLETE -> 4 to "프로필"
+    }
+    val colors = MaterialTheme.colorScheme
+
+    Box(Modifier.fillMaxSize().background(colors.surface), contentAlignment = Alignment.TopCenter) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .background(MaterialTheme.colorScheme.surface)
+            modifier = Modifier.widthIn(max = 520.dp).fillMaxSize()
+                .statusBarsPadding().navigationBarsPadding().imePadding()
+                .padding(horizontal = 20.dp),
         ) {
-            // Progress Bar
-            if (uiState.currentStep != RegisterStep.COMPLETE) {
-                LinearProgressIndicator(
-                    progress = { uiState.currentStep.progress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(4.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.surfaceVariant
-                )
+            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (step != RegisterStep.COMPLETE) {
+                    IconButton(onClick = goBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로") }
+                }
+                Text("회원가입", style = SmapText.headline, color = colors.onSurface, modifier = Modifier.weight(1f))
+                if (step != RegisterStep.COMPLETE) {
+                    Text("$stageName  ·  $stage/4", style = SmapText.captionMedium, color = colors.onSurfaceVariant)
+                }
+            }
+            if (step != RegisterStep.COMPLETE) {
+                Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    for (index in 1..4) {
+                        Spacer(Modifier.weight(1f).height(3.dp).background(
+                            if (index <= stage) colors.primary else colors.outlineVariant, RoundedCornerShape(2.dp)
+                        ))
+                    }
+                }
             }
 
             // Content
@@ -162,53 +171,27 @@ fun RegisterScreen(
                     },
                     label = "step_transition"
                 ) { step ->
-                    if (step == RegisterStep.COMPLETE) {
-                        CompleteContent()
-                    } else {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .verticalScroll(rememberScrollState())
-                                .padding(24.dp)
-                        ) {
-                            when (step) {
-                                RegisterStep.TERMS -> TermsContent(viewModel, uiState)
-                                RegisterStep.PHONE -> PhoneContent(viewModel, uiState)
-                                RegisterStep.VERIFICATION -> VerificationContent(viewModel, uiState)
-                                RegisterStep.BASIC_INFO -> BasicInfoContent(viewModel, uiState)
-                                RegisterStep.PROFILE -> ProfileContent(viewModel, uiState)
-                                else -> {}
-                            }
+                    Column(
+                        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 22.dp)
+                    ) {
+                        when (step) {
+                            RegisterStep.TERMS -> TermsContent(viewModel, uiState)
+                            RegisterStep.PHONE -> PhoneContent(viewModel, uiState)
+                            RegisterStep.VERIFICATION -> VerificationContent(viewModel, uiState)
+                            RegisterStep.BASIC_INFO -> BasicInfoContent(viewModel, uiState)
+                            RegisterStep.PROFILE -> ProfileContent(viewModel, uiState)
+                            RegisterStep.COMPLETE -> CompleteContent()
                         }
                     }
                 }
-            }
-
-            // Error Message
-            val errorMsg = uiState.errorMessage
-            if (uiState.showError && errorMsg != null) {
-                SmapBanner(
-                    message = errorMsg,
-                    tone = SmapBannerTone.Error,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                )
-            }
-
-            // "전체 동의하기" 버튼 위에 위치 (약관 단계일 때만) — iOS 처럼 회색 상자(모서리 12)로 개별 항목과 구분
-            if (uiState.currentStep == RegisterStep.TERMS) {
-                Box(
-                    modifier = Modifier
-                        .padding(horizontal = 24.dp)
-                        .clip(RoundedCornerShape(SmapRadius.md))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(horizontal = 16.dp, vertical = 4.dp)
-                ) {
-                    TermsCheckItem(
-                        title = "전체 동의하기",
-                        isChecked = viewModel.isAllTermsAgreed,
-                        onCheckedChange = { viewModel.setAllTerms(it) },
-                        isHeader = true
-                    )
+                if (uiState.showError) {
+                    val message = uiState.errorMessage.orEmpty()
+                    Snackbar(
+                        modifier = Modifier.align(Alignment.BottomCenter),
+                        action = { TextButton(onClick = viewModel::dismissError) { Text("닫기", color = colors.inversePrimary) } },
+                    ) {
+                        Text(if (message.isBlank() || message.contains("알 수 없는 오류")) "가입을 진행할 수 없어요. 잠시 후 다시 시도해 주세요." else message)
+                    }
                 }
             }
 
@@ -223,6 +206,7 @@ fun RegisterScreen(
             }
 
             val buttonText = when (uiState.currentStep) {
+                RegisterStep.TERMS -> "동의하고 계속하기"
                 RegisterStep.PHONE -> "인증번호 받기"
                 RegisterStep.VERIFICATION -> "인증 확인"
                 RegisterStep.PROFILE -> "가입 완료"
@@ -230,8 +214,8 @@ fun RegisterScreen(
                 else -> "다음"
             }
 
-            SmapButton(
-                text = buttonText,
+            val busy = uiState.isLoading || uiState.isVerificationLoading
+            Button(
                 onClick = {
                     when (uiState.currentStep) {
                         RegisterStep.PHONE -> viewModel.sendVerificationCode()
@@ -240,12 +224,17 @@ fun RegisterScreen(
                         else -> viewModel.nextStep()
                     }
                 },
-                enabled = isEnabled,
-                isLoading = uiState.isLoading || uiState.isVerificationLoading,
-                modifier = Modifier.padding(24.dp),
-            )
-        }
-
+                enabled = isEnabled && !busy,
+                modifier = Modifier.padding(vertical = 10.dp).fillMaxWidth().heightIn(min = 54.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = SmapAccent.Family.deep, contentColor = Color.White),
+            ) {
+                if (busy) {
+                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(8.dp))
+                }
+                Text(buttonText, style = SmapText.bodyBold)
+            }
         }
 
         // Legal Document Detail Overlay with Animation
@@ -273,5 +262,20 @@ fun RegisterScreen(
                 }
             }
         }
+    }
+}
+
+
+@Composable
+internal fun RegisterPhotoHeader(image: Int, title: String, height: Dp) {
+    Box(
+        modifier = Modifier.fillMaxWidth().heightIn(min = height).clip(RoundedCornerShape(20.dp)),
+        contentAlignment = Alignment.BottomStart,
+    ) {
+        Image(painterResource(image), contentDescription = null, contentScale = ContentScale.Crop,
+            modifier = Modifier.matchParentSize())
+        Spacer(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.68f)))))
+        Text(title, color = Color.White, style = SmapText.title.copy(fontSize = 29.sp, lineHeight = 34.sp),
+            modifier = Modifier.padding(20.dp).semantics { heading() })
     }
 }

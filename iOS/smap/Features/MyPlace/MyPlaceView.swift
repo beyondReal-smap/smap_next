@@ -60,12 +60,13 @@ struct MyPlaceView: View {
                     }
                 }
 
-                SMAPMapSheet(peekHeight: MyPlaceSheet.peekHeight, isExpanded: $isSheetExpanded) {
+                SMAPMapSheet(peekHeight: MyPlaceSheet.peekHeight, isExpanded: $isSheetExpanded, maxHeightFraction: 0.72, headerSurface: SMAPTheme.Family.paper) {
                     MyPlaceSheetHeader(viewModel: viewModel, currentUserIdx: currentUserIdx) {
                         viewModel.isHeaderSearchPresented = true
                     }
-                } content: {
-                    MyPlaceSheetBody(viewModel: viewModel, currentUserIdx: currentUserIdx) { location in
+                } content: { _, toggleSheet in
+                    MyPlaceSheetBody(viewModel: viewModel, currentUserIdx: currentUserIdx, isExpanded: isSheetExpanded,
+                                    onToggle: toggleSheet) { location in
                         viewModel.selectLocationFromList(location)
                         isSheetExpanded = false
                     }
@@ -111,7 +112,8 @@ struct MyPlaceView: View {
             GroupPickerSheet(
                 groups: viewModel.groups,
                 selectedGroupId: viewModel.selectedGroup?.sgt_idx,
-                onSelect: { viewModel.selectGroup($0) }
+                onSelect: { viewModel.selectGroup($0) },
+                compact: true
             )
         }
         .sheet(isPresented: $viewModel.isLocationPanelOpen) {

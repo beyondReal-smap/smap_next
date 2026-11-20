@@ -78,8 +78,8 @@ private fun DateChip(item: DateChipItem, isSelected: Boolean, isToday: Boolean, 
     val colors = MaterialTheme.colorScheme
     val weekday = item.date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.KOREAN)
     val weekdayColor = when {
-        isSelected -> Color.White.copy(alpha = 0.8f)
-        item.date.dayOfWeek == DayOfWeek.SUNDAY -> colors.error
+        isSelected -> Color.White.copy(alpha = 0.94f)
+        item.date.dayOfWeek == DayOfWeek.SUNDAY -> if (androidx.compose.foundation.isSystemInDarkTheme()) SmapAccent.Orange.container else SmapAccent.Orange.deep
         else -> colors.onSurfaceVariant
     }
     val a11y = buildString {

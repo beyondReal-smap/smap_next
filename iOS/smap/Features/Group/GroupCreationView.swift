@@ -19,214 +19,48 @@ struct GroupCreationView: View {
     @State private var selectedTab: Int = 0 // 0 = Create, 1 = Join
     
     
-    private var pinkColor: Color { SMAPTheme.Accent.pink }
-    private var orangeColor: Color { SMAPTheme.Accent.orange }
-    
     var body: some View {
-        ZStack {
-            // Background gradient
-            LinearGradient(
-                gradient: Gradient(colors: [Color(white: 0.98), Color.white]),
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-            
-            VStack(spacing: 0) {
-                // Header Icon
-                ZStack {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                gradient: Gradient(colors: [SMAPTheme.Color.primary.opacity(0.1), pinkColor.opacity(0.1)]),
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 120, height: 120)
-                    
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                gradient: Gradient(colors: [SMAPTheme.Color.primary, pinkColor]),
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 80, height: 80)
-                        .shadow(color: SMAPTheme.Color.primary.opacity(0.3), radius: 16, x: 0, y: 8)
-                    
-                    Image(systemName: selectedTab == 0 ? "person.3.fill" : "person.badge.plus")
-                        .font(.suite(size: 32))
-                        .foregroundColor(.white)
-                }
-                .padding(.top, 40)
-                .padding(.bottom, 20)
-                
-                // Title
-                Text("그룹 시작하기")
-                    .font(.suite(size: 24, weight: .bold))
-                    .foregroundColor(.black)
-                
-                Text("새 그룹을 만들거나 초대코드로 가입하세요")
-                    .font(.suite(size: 14))
-                    .foregroundColor(.gray)
-                    .padding(.top, 8)
-                
-                // Tab Selector — 네이티브 Segmented Picker. HIG 권장 + Dynamic Type 자동 대응 + 터치 영역 보장.
-                Picker("그룹 작업 선택", selection: $selectedTab) {
-                    Text("그룹 만들기").tag(0)
-                    Text("초대코드 입력").tag(1)
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal, 24)
-                .padding(.top, 24)
-                .accessibilityLabel("그룹 작업 선택")
-                
-                // Form Card
-                VStack(spacing: 20) {
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    SMAPFamilyCover(image: "LoginArrivalDoorway", minHeight: 150) {
+                        Text("그룹 시작하기").font(SMAPTheme.Font.pageTitle)
+                    }
+                    Picker("그룹 작업 선택", selection: $selectedTab) {
+                        Text("그룹 만들기").tag(0)
+                        Text("초대코드 입력").tag(1)
+                    }
+                    .pickerStyle(.segmented)
+
                     if selectedTab == 0 {
-                        // === Create Group Form ===
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("그룹 이름")
-                                .font(.suite(size: 14, weight: .bold))
-                                .foregroundColor(.gray)
-                            
-                            FocusableTextField(
-                                placeholder: "예: 우리 가족, 회사 동료",
-                                text: $groupName,
-                                icon: "tag"
-                            )
-                            .frame(height: 56)
-                        }
-                        
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("그룹 설명 (선택)")
-                                .font(.suite(size: 14, weight: .medium))
-                                .foregroundColor(.gray)
-                            
-                            FocusableTextField(
-                                placeholder: "그룹에 대한 간단한 설명",
-                                text: $groupDescription,
-                                icon: "doc.text"
-                            )
-                            .frame(height: 56)
-                        }
+                        SMAPTextField("예: 우리 가족", text: $groupName, label: "그룹 이름")
+                        SMAPTextField("그룹에 대한 간단한 설명", text: $groupDescription, label: "그룹 설명 (선택)")
                     } else {
-                        // === Join Group Form ===
-                        // 커스텀 바인딩을 사용하여 입력을 즉시 필터링
-                        let filteredBinding = Binding<String>(
-                            get: { self.inviteCode },
-                            set: { newValue in
-                                // 대문자로 변환하고 영문 알파벳(A-Z)과 숫자(0-9)만 허용
-                                self.inviteCode = newValue.uppercased().filter { char in
-                                    char.isASCII && (char.isLetter || char.isNumber)
-                                }
-                            }
-                        )
-                        
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("초대 코드")
-                                .font(.suite(size: 14, weight: .bold))
-                                .foregroundColor(.gray)
-                            
-                            FocusableTextField(
-                                placeholder: "초대 코드를 입력하세요",
-                                text: filteredBinding,
-                                icon: "person.badge.plus",
-                                keyboardType: .asciiCapable, // 영문/숫자 키보드 강제
-                                autocapitalizationType: .allCharacters
-                            )
-                            .frame(height: 56)
-                            // FocusableTextField 내부에 전달되지 않을 수 있으므로 내부 TextField 수정 필요
-                        }
-                        
-                        Text("그룹 초대 코드를 받으셨나요?\n코드를 입력하면 해당 그룹에 가입됩니다.")
-                            .font(.suite(size: 13))
-                            .foregroundColor(.gray)
-                            .multilineTextAlignment(.center)
-                            .padding(.top, 8)
+                        SMAPTextField("초대 코드를 입력하세요", text: Binding(
+                            get: { inviteCode },
+                            set: { inviteCode = $0.uppercased().filter { $0.isASCII && ($0.isLetter || $0.isNumber) } }
+                        ), label: "초대 코드", helperText: "초대 코드는 그룹 관리자에게 받을 수 있어요.", keyboardType: .asciiCapable)
                     }
+                    if let error = errorMessage { SMAPBanner(message: error, tone: .error) }
                 }
-                .padding(24)
-                .background(Color.white)
-                .cornerRadius(20)
-                .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 4)
-                .padding(.horizontal, 24)
-                .padding(.top, 24)
-                
-                if let error = errorMessage {
-                    Text(error)
-                        .font(.suite(size: 13))
-                        .foregroundColor(SMAPTheme.Color.error)
-                        .padding(.top, 16)
-                        .padding(.horizontal, 24)
-                        .accessibilityAddTraits(.isStaticText)
-                }
-                
-                Spacer()
-                
-                // Submit Button
-                Button(action: {
-                    print("🔘 [GroupCreationView] 버튼 클릭됨 - selectedTab: \(selectedTab), inviteCode: '\(inviteCode)', groupName: '\(groupName)'")
-                    HapticManager.shared.impact(style: .medium)
-                    if selectedTab == 0 {
-                        print("🔘 [GroupCreationView] createGroup() 호출")
-                        createGroup()
-                    } else {
-                        print("🔘 [GroupCreationView] joinGroup() 호출")
-                        joinGroup()
-                    }
-                }) {
-                    HStack {
-                        if isCreating {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                .padding(.trailing, 8)
-                        }
-                        Text(selectedTab == 0 ? "그룹 만들기" : "그룹 가입하기")
-                            .font(.suite(size: 16, weight: .bold))
-                    }
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 56)
-                    .background(
-                        (selectedTab == 0 && groupName.isEmpty) || (selectedTab == 1 && inviteCode.isEmpty)
-                            ? Color.gray.opacity(0.3)
-                            : (selectedTab == 0 ? SMAPTheme.Color.primary : orangeColor)
-                    )
-                    .cornerRadius(12)
-                    .shadow(color: (selectedTab == 0 ? SMAPTheme.Color.primary : orangeColor).opacity(0.3), radius: 8, x: 0, y: 4)
-                }
-                .disabled((selectedTab == 0 && groupName.isEmpty) || (selectedTab == 1 && inviteCode.isEmpty) || isCreating)
-                .padding(.horizontal, 24)
-                
-                // Tip — 이모지 대신 SF Symbols 사용, 접근성 확보.
-                HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: "lightbulb.fill")
-                        .font(.suite(size: 14, weight: .semibold))
-                        .foregroundColor(SMAPTheme.Accent.crown)
-                        .padding(.top, 1)
-                        .accessibilityHidden(true)
-                    Text(selectedTab == 0
-                        ? "그룹을 만들면 멤버들을 초대할 수 있는 코드가 생성됩니다"
-                        : "초대 코드는 그룹 관리자에게 받을 수 있습니다")
-                        .font(.suite(size: 12))
-                        .foregroundColor(.gray)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(selectedTab == 0 ? SMAPTheme.Accent.crown.opacity(0.1) : SMAPTheme.Accent.orange.opacity(0.1))
-                .cornerRadius(12)
-                .padding(.horizontal, 24)
-                .padding(.top, 16)
-                .padding(.bottom, 32)
+                .padding(.vertical, 16)
+                .animation(.easeInOut(duration: 0.2), value: selectedTab)
             }
+            .scrollDismissesKeyboard(.interactively)
+            SMAPButton(selectedTab == 0 ? "그룹 만들기" : "그룹 가입하기", isLoading: isCreating,
+                       isDisabled: selectedTab == 0 ? groupName.isEmpty : inviteCode.isEmpty) {
+                HapticManager.shared.impact(style: .medium)
+                if selectedTab == 0 { createGroup() } else { joinGroup() }
+            }
+            .padding(.vertical, 10)
         }
+        .padding(.horizontal, 20)
+        .frame(maxWidth: 520)
+        .frame(maxWidth: .infinity)
+        .background(Color(uiColor: .systemBackground))
+        .smapAccent(.family)
     }
-    
+
     private func createGroup() {
         guard !groupName.isEmpty else { return }
         
@@ -256,7 +90,6 @@ struct GroupCreationView: View {
     }
     
     private func joinGroup() {
-        print("🔵 [GroupCreationView.joinGroup] 함수 호출됨 - inviteCode: '\(inviteCode)'")
         
         guard !inviteCode.isEmpty else {
             print("🔴 [GroupCreationView.joinGroup] 초대코드가 비어있음 - 종료")
@@ -271,9 +104,7 @@ struct GroupCreationView: View {
             do {
                 // 사용자 정보 확인
                 let currentUser = AuthService.shared.currentUser
-                print("🟡 [GroupCreationView.joinGroup] currentUser: \(String(describing: currentUser))")
                 print("🟡 [GroupCreationView.joinGroup] mt_idx: \(String(describing: currentUser?.mt_idx))")
-                print("🟡 [GroupCreationView.joinGroup] token: \(AuthService.shared.getToken()?.prefix(20) ?? "nil")...")
                 
                 print("🟡 [GroupCreationView.joinGroup] GroupService.joinGroup 호출 시작")
                 let success = try await GroupService.shared.joinGroup(inviteCode: inviteCode)

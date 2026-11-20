@@ -318,18 +318,14 @@ class HomeViewModel @Inject constructor(
             Log.d(TAG, "🚀 [API] 그룹($groupId) 멤버 및 일정 로드 시작")
             _loadFailed.value = false
 
-            when (val result = safeApiCall { homeService.getGroupMembers(groupId) }) {
+            val result = safeApiCall { homeService.getGroupMembers(groupId) }
+            if (_selectedGroup.value?.sgtIdx != groupId) return@launch
+            when (result) {
                 is ApiResult.Success -> {
                     val members = result.data
 
-                    // 현재 사용자를 기본 선택 (없으면 첫 번째 멤버)
-                    if (members.isNotEmpty() && _selectedMemberId.value == null) {
-                        val currentUserIdx = homeService.getCurrentUserIdx()
-                        val selfMember = members.find { it.mtIdx == currentUserIdx }
-                        _selectedMemberId.value = selfMember?.mtIdx ?: members.first().mtIdx
-                    }
-
-                    val currentSelectedId = _selectedMemberId.value
+                    val currentSelectedId = _selectedMemberId.value?.takeIf { id -> members.any { it.mtIdx == id } }
+                    _selectedMemberId.value = currentSelectedId
                     val membersWithSelection = members.map { member ->
                         member.copy(isSelected = member.mtIdx == currentSelectedId)
                     }
@@ -337,7 +333,9 @@ class HomeViewModel @Inject constructor(
                     Log.d(TAG, "✅ [API] ${members.size}명 멤버 로드 완료")
 
                     // 일정 목록 조회 (14일)
-                    when (val schedResult = safeApiCall { homeService.getGroupSchedules(groupId, 14) }) {
+                    val schedResult = safeApiCall { homeService.getGroupSchedules(groupId, 14) }
+                    if (_selectedGroup.value?.sgtIdx != groupId) return@launch
+                    when (schedResult) {
                         is ApiResult.Success -> {
                             _allSchedules.value = schedResult.data
                             Log.d(TAG, "✅ [API] ${schedResult.data.size}개 일정 로드 완료")
@@ -390,6 +388,9 @@ class HomeViewModel @Inject constructor(
                         selectGroup(groups.first())
                     } else {
                         _selectedGroup.value = null
+                        _selectedMemberId.value = null
+                        _members.value = emptyList()
+                        _allSchedules.value = emptyList()
                     }
 
                     Log.d(TAG, "✅ [REFRESH] 전체 데이터 새로고침 완료")
@@ -428,8 +429,12 @@ class HomeViewModel @Inject constructor(
     }
 
     fun selectGroup(group: SmapGroup) {
+        if (_selectedGroup.value?.sgtIdx != group.sgtIdx) {
+            _selectedMemberId.value = null
+            _members.value = emptyList()
+            _allSchedules.value = emptyList()
+        }
         _selectedGroup.value = group
-        _selectedMemberId.value = null // 그룹 변경 시 멤버 선택 초기화
         // 그룹 변경 시 해당 그룹의 멤버/일정 로드
         loadGroupData(group.sgtIdx)
     }

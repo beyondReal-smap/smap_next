@@ -28,8 +28,9 @@ import com.dmonster.smap.ui.home.MapLoadingOverlay
 import androidx.compose.material.icons.Icons
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import com.naver.maps.geometry.WebMercatorCoord
 import com.naver.maps.geometry.LatLng
 import com.naver.maps.map.CameraPosition
 import com.naver.maps.map.CameraUpdate
@@ -55,20 +56,7 @@ fun ActivityLogScreen(
     val selectedMember by viewModel.selectedMember.collectAsState()
     val locationLogs by viewModel.locationLogs.collectAsState()
     val locationSummary by viewModel.locationSummary.collectAsState()
-    val vmSliderValue by viewModel.sliderValue.collectAsState()
-    val vmDragging by viewModel.isSliderDragging.collectAsState()
-    var isLocalDragging by remember { mutableStateOf(false) }
-    val isSliderDragging = vmDragging || isLocalDragging
 
-    // UI Source of Truth
-    var uiSliderValue by remember { mutableFloatStateOf(0f) }
-
-    LaunchedEffect(vmSliderValue) {
-        if (!isLocalDragging) {
-            uiSliderValue = vmSliderValue.toFloat()
-        }
-    }
-    
     val isLoading by viewModel.isLoading.collectAsState()
     val isLoadingLogs by viewModel.isLoadingLogs.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
@@ -123,12 +111,6 @@ fun ActivityLogScreen(
     val allCoords = processedData.second
     val totalPoints = processedData.third
     
-    // Debug logging for slider value changes
-    LaunchedEffect(uiSliderValue) {
-        if (BuildConfig.DEBUG) android.util.Log.d("ActivityLogScreen", "Slider: value=$uiSliderValue, totalPoints=$totalPoints, isDragging=$isSliderDragging")
-    }
-
-
     // Map State
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition(
@@ -144,13 +126,13 @@ fun ActivityLogScreen(
     // 보던 위치를 그대로 둔다(이전에는 다시 그릴 때마다 출발점으로 돌아갔다).
     val cameraStartLog = mapLogs.firstOrNull { it.hasValidCoordinates }
     LaunchedEffect(cameraStartLog?.latitude, cameraStartLog?.longitude) {
+        if (totalPoints >= 2 && viewModel.isSliderDragging.value) return@LaunchedEffect
         if (mapLogs.isNotEmpty()) {
             val firstLog = cameraStartLog
             if (firstLog != null) {
                 val startPos = LatLng(firstLog.latitude, firstLog.longitude)
                 val update = CameraUpdate.toCameraPosition(CameraPosition(startPos, 15.0))
-                // 숨은 채 미리 그릴 때는 애니메이션 없이 바로 옮겨 둔다(보이지 않는 움직임에 프레임을 쓰지 않게).
-                if (isVisible) cameraPositionState.animate(update) else cameraPositionState.move(update)
+                cameraPositionState.move(update)
             }
         }
     }
@@ -173,17 +155,17 @@ fun ActivityLogScreen(
     var showGroupPicker by remember { mutableStateOf(false) }
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
-    // 경로 따라가기 — 이동 점이 2개 이상일 때만. 막대 위치의 시각과 하루의 처음·끝 시각을 함께 보여 준다.
+    // 경로 따라가기 — 막대 위치의 시각과 하루의 처음·끝 시각을 함께 보여 준다. 끌 수 있는 건 이동 점이 2개 이상일 때만.
+    // 막대 줄은 경로가 없는 날도 자리를 지킨다 — 날짜를 바꿀 때 시트 높이가 바뀌어 레이아웃이 흔들리지 않게(2026-11-20).
     val hasRoute = totalPoints >= 2
     val routeTimes = remember(validLogs) { validLogs.map { gpsHourMinute(it.mltGpsTime) } }
-    val currentRouteTime = if (hasRoute) {
-        routeTimes.getOrNull(((totalPoints - 1) * (uiSliderValue / 100f)).toInt().coerceIn(0, totalPoints - 1))
-    } else null
-    val sheetPeek = if (hasRoute) ActivityLogSheetPeekHeight + ActivityLogRouteControlHeight else ActivityLogSheetPeekHeight
+    val sheetPeek = ActivityLogSheetPeekHeight + ActivityLogRouteControlHeight
 
     Box(modifier = Modifier.fillMaxSize()) {
         SmapMapSheetScaffold(
             peekHeight = sheetPeek,
+            headerSurface = com.dmonster.smap.ui.components.SmapAccent.Activity.container,
+            maxHeightFraction = 0.76f,
             sheetState = sheetState,
             snackbarHostState = snackbarHostState,
             sheetContent = {
@@ -203,24 +185,31 @@ fun ActivityLogScreen(
                     },
                     onSelectDate = { viewModel.selectDate(it) },
                     onLockedDate = { viewModel.onLockedDateClicked(it) },
-                    routeControl = if (hasRoute) {
-                        {
+                    hasRoute = hasRoute,
+                    routeControl = {
+                        val sliderValue by viewModel.sliderValue.collectAsState()
+                        if (hasRoute) {
+                            val sampleIndex = ((totalPoints - 1) * (sliderValue / 100.0)).toInt().coerceIn(0, totalPoints - 1)
                             RouteScrubber(
-                                value = uiSliderValue,
-                                currentTime = currentRouteTime,
+                                value = sliderValue.toFloat(),
+                                currentTime = routeTimes[sampleIndex],
                                 startTime = routeTimes.firstOrNull(),
                                 endTime = routeTimes.lastOrNull(),
-                                onValueChange = { uiSliderValue = it },
-                                onDraggingChange = { dragging ->
-                                    if (isLocalDragging != dragging) {
-                                        isLocalDragging = dragging
-                                        viewModel.setSliderDragging(dragging)
-                                        if (!dragging) viewModel.setSliderValue(uiSliderValue.toDouble())
-                                    }
-                                }
+                                onValueChange = { viewModel.setSliderValue(it.toDouble()) },
+                                onDraggingChange = viewModel::setSliderDragging
+                            )
+                        } else {
+                            RouteScrubber(
+                                value = 0f,
+                                currentTime = null,
+                                startTime = null,
+                                endTime = null,
+                                onValueChange = {},
+                                onDraggingChange = viewModel::setSliderDragging,
+                                enabled = false,
                             )
                         }
-                    } else null
+                    }
                 )
             },
             overlay = {
@@ -329,97 +318,63 @@ fun ActivityLogScreen(
                         val density = context.resources.displayMetrics.density
                     
                         MapEffect(validLogs) { map ->
-                            if (totalPoints < 1) return@MapEffect
-                        
-                            // Current position marker (blue circle)
-                            val marker = com.naver.maps.map.overlay.Marker()
-                            marker.zIndex = 100
-                            marker.width = (24 * density).toInt()
-                            marker.height = (24 * density).toInt()
-                            if (allCoords.isNotEmpty()) {
-                                marker.position = allCoords.first()
+                            val projected = allCoords.map { WebMercatorCoord.valueOf(it) }
+                            val marker = com.naver.maps.map.overlay.Marker().apply {
+                                icon = OverlayImage.fromResource(R.drawable.ic_marker_current_circle)
+                                zIndex = 100
+                                width = (24 * density).toInt()
+                                height = (24 * density).toInt()
                             }
-                            marker.map = map
-                        
-                            // Info capsule marker (time + speed)
-                            val infoMarker = com.naver.maps.map.overlay.Marker()
-                            infoMarker.zIndex = 101
-                            infoMarker.anchor = android.graphics.PointF(0.5f, 1.0f) // Bottom center
-                            if (allCoords.isNotEmpty()) {
-                                infoMarker.position = allCoords.first()
+                            marker.anchor = android.graphics.PointF(0.5f, 0.5f)
+                            val infoMarker = com.naver.maps.map.overlay.Marker().apply {
+                                anchor = android.graphics.PointF(0.5f, 1f)
+                                zIndex = 101
                             }
-                            infoMarker.map = map
-                        
-                            val currentIcon = OverlayImage.fromResource(R.drawable.ic_marker_current_circle)
-                        
-                            // Capture current coords and logs for use in flow
-                            val capturedCoords = allCoords
-                            val capturedLogs = validLogs
-                            val capturedTotalPoints = totalPoints
-                        
-                            val job = launch {
-                                // 경로를 다시 그리면 이 감시가 새로 시작되며 현재 값을 한 번 바로 내보낸다.
-                                // 그때는 표시만 맞추고 카메라는 두어, 조용히 새로 받은 뒤에도 보던 위치가 유지되게 한다.
-                                var previousValue: Float? = null
-                                // Watch slider value changes
-                                snapshotFlow { uiSliderValue }
-                                    .collect { value ->
-                                        val sliderMoved = previousValue != null && previousValue != value
-                                        previousValue = value
-                                        if (!currentVisibility.value) return@collect
-                                        if (capturedTotalPoints < 1) return@collect
-                                    
-                                        val idx = ((capturedTotalPoints - 1) * (value / 100.0)).toInt()
-                                            .coerceIn(0, capturedTotalPoints - 1)
-                                    
-                                        if (idx < capturedCoords.size && idx < capturedLogs.size) {
-                                            val pos = capturedCoords[idx]
-                                            val currentLog = capturedLogs[idx]
-                                        
-                                            // Update position marker
-                                            marker.position = pos
-                                            marker.icon = currentIcon
-                                        
-                                            // Extract time from GPS time string
-                                            val timeStr = currentLog.mltGpsTime?.let { gpsTime ->
-                                                val cleanedTime = gpsTime.replace("Z", "").split(".").firstOrNull() ?: gpsTime
-                                                if (cleanedTime.length >= 16) {
-                                                    cleanedTime.substring(11, 16)
-                                                } else {
-                                                    "--:--"
-                                                }
-                                            } ?: "--:--"
-                                        
-                                            val speed = currentLog.mltSpeed ?: 0.0
-                                            val speedStr = String.format("%.1f km/h", speed)
-                                        
-                                            // Update info marker
-                                            infoMarker.position = pos
-                                            val infoBitmap = ActivityLogMarkerUtils.createCurrentPositionInfoBitmap(context, timeStr, speedStr)
-                                            infoMarker.icon = OverlayImage.fromBitmap(infoBitmap)
-                                            infoMarker.width = infoBitmap.width
-                                            infoMarker.height = infoBitmap.height
-                                        
-                                            // 슬라이더를 움직였을 때 카메라가 따라간다 (match iOS behavior)
-                                            if (sliderMoved) {
-                                                val update = CameraUpdate.scrollTo(pos)
-                                                update.animate(com.naver.maps.map.CameraAnimation.None)
-                                                map.moveCamera(update)
-                                            }
-                                        }
-                                    }
-                            }
-                        
+                            var previousValue: Double? = null
+                            var wasDragging = false
+                            var infoSampleIndex = -1
                             try {
-                                awaitCancellation()
+                                combine(viewModel.sliderValue, viewModel.isSliderDragging, ::Pair).collect { (value, dragging) ->
+                                    val progress = (totalPoints - 1) * (value / 100.0).coerceIn(0.0, 1.0)
+                                    val index = progress.toInt()
+                                    val fraction = progress - index
+                                    val position = if (fraction == 0.0) allCoords[index] else {
+                                        val a = projected[index]
+                                        val b = projected[index + 1]
+                                        WebMercatorCoord(
+                                            a.x + (b.x - a.x) * fraction,
+                                            a.y + (b.y - a.y) * fraction,
+                                        ).toLatLng()
+                                    }
+                                    marker.position = position
+                                    infoMarker.position = position
+                                    if (index != infoSampleIndex) {
+                                        val speed = String.format(java.util.Locale.US, "%.1f km/h", validLogs[index].speed * 3.6) // 서버 값은 m/s
+                                        val bitmap = ActivityLogMarkerUtils.createCurrentPositionInfoBitmap(
+                                            context, routeTimes[index] ?: "--:--", speed,
+                                        )
+                                        infoMarker.icon = OverlayImage.fromBitmap(bitmap)
+                                        infoMarker.width = bitmap.width
+                                        infoMarker.height = bitmap.height
+                                        infoSampleIndex = index
+                                    }
+                                    if (marker.map == null) {
+                                        marker.map = map
+                                        infoMarker.map = map
+                                    }
+                                    val follow = (previousValue != null && previousValue != value) || (dragging && !wasDragging)
+                                    if (currentVisibility.value && follow) {
+                                        map.moveCamera(CameraUpdate.scrollTo(position).animate(com.naver.maps.map.CameraAnimation.None))
+                                    }
+                                    previousValue = value
+                                    wasDragging = dragging
+                                }
                             } finally {
                                 marker.map = null
                                 infoMarker.map = null
-                                job.cancel()
                             }
                         }
-                    
-                        // Camera Follow Logic removed (Handled by snapshotFlow above)
+
                     }
                 }
 
@@ -430,7 +385,8 @@ fun ActivityLogScreen(
                 groups = groups,
                 selectedGroupId = selectedGroup?.sgtIdx,
                 onSelect = { viewModel.selectGroup(it) },
-                onDismiss = { showGroupPicker = false }
+                onDismiss = { showGroupPicker = false },
+                compact = true
             )
         }
 

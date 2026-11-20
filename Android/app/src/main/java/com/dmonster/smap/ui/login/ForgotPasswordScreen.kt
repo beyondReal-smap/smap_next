@@ -234,7 +234,7 @@ private fun progressOf(step: Step): Float = when (step) {
 
 @Composable
 private fun StepHeader(title: String, description: String) {
-    Text(text = title, style = SmapText.title, color = MaterialTheme.colorScheme.onSurface)
+    Text(text = title, style = SmapText.pageTitle, color = MaterialTheme.colorScheme.onSurface)
     Text(text = description, style = SmapText.secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
@@ -404,7 +404,7 @@ private fun CompleteStepContent(showEmailHint: Boolean) {
 
         Text(
             text = "비밀번호를 바꿨어요",
-            style = SmapText.title,
+            style = SmapText.pageTitle,
             color = MaterialTheme.colorScheme.onSurface,
         )
 

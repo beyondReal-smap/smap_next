@@ -9,8 +9,25 @@ import SwiftUI
 import UIKit
 import NMapsMap
 
+/// 시트에서 고른 일정 장소로 지도를 옮기라는 요청. token 이 바뀔 때만 한 번 옮긴다(같은 일정을 다시 눌러도 다시 옮김).
+struct MapFocus: Equatable {
+    let latitude: Double
+    let longitude: Double
+    let token: Int
+}
+
+extension SmapSchedule {
+    /// 지도에 찍을 수 있는 일정 장소. 좌표가 없거나 (0,0)·범위 밖이면 nil.
+    var mapCoordinate: CLLocationCoordinate2D? {
+        guard let lat = sst_location_lat, let lng = sst_location_long, lat != 0 || lng != 0 else { return nil }
+        let coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lng)
+        return CLLocationCoordinate2DIsValid(coordinate) ? coordinate : nil
+    }
+}
+
 struct NaverMapView: UIViewRepresentable {
     @Binding var members: [SmapGroupMember]
+    let groupID: Int?
     var schedules: [SmapSchedule]
     /// 지도 위 조작 줄·아래 시트에 가리는 만큼 — 선택한 멤버가 보이는 영역 가운데에 오게 한다.
     var contentInsets: UIEdgeInsets = .zero
@@ -18,6 +35,8 @@ struct NaverMapView: UIViewRepresentable {
     var fitAllToken: Int = 0
     /// 마커를 누르면 그 멤버를 고른다 — 상태는 시트 머리 줄이 보여 준다(이전의 지도 말풍선 대신).
     var onMemberTap: (SmapGroupMember) -> Void = { _ in }
+    /// 시트에서 일정을 눌렀을 때 옮겨 갈 장소
+    var focus: MapFocus?
 
     func makeUIView(context: Context) -> NMFNaverMapView {
         let view = NMFNaverMapView()
@@ -49,6 +68,7 @@ struct NaverMapView: UIViewRepresentable {
 
         let selected = members.first(where: { $0.isSelected })
         if let member = selected, let lat = member.mlt_lat, let lon = member.mlt_long {
+            context.coordinator.fittedGroupID = nil
             if context.coordinator.lastSelectedMemberID != member.mt_idx {
                 let cameraUpdate = NMFCameraUpdate(scrollTo: NMGLatLng(lat: lat, lng: lon))
                 cameraUpdate.animation = .easeIn
@@ -59,12 +79,24 @@ struct NaverMapView: UIViewRepresentable {
             context.coordinator.lastSelectedMemberID = nil
         }
 
-        if context.coordinator.lastFitAllToken != fitAllToken {
-            context.coordinator.lastFitAllToken = fitAllToken
+        if let focus, context.coordinator.lastFocusToken != focus.token {
+            context.coordinator.lastFocusToken = focus.token
+            let update = NMFCameraUpdate(scrollTo: NMGLatLng(lat: focus.latitude, lng: focus.longitude), zoomTo: 16)
+            update.animation = .easeIn
+            uiView.mapView.moveCamera(update)
+            return  // 같은 갱신에서 "전체 맞춤"이 다시 덮어쓰지 않게
+        }
+
+        if selected == nil, let groupID,
+           context.coordinator.fittedGroupID != groupID || context.coordinator.lastFitAllToken != fitAllToken {
             let points = members.compactMap { m -> NMGLatLng? in
-                guard let lat = m.mlt_lat, let lon = m.mlt_long else { return nil }
+                guard let lat = m.mlt_lat, let lon = m.mlt_long, (lat != 0 || lon != 0),
+                      CLLocationCoordinate2DIsValid(CLLocationCoordinate2D(latitude: lat, longitude: lon)) else { return nil }
                 return NMGLatLng(lat: lat, lng: lon)
             }
+            guard !points.isEmpty else { return }
+            context.coordinator.fittedGroupID = groupID
+            context.coordinator.lastFitAllToken = fitAllToken
             if points.count == 1 {
                 let update = NMFCameraUpdate(scrollTo: points[0], zoomTo: 15)
                 update.animation = .easeIn
@@ -90,7 +122,9 @@ struct NaverMapView: UIViewRepresentable {
         private static let profileImages = NSCache<NSURL, UIImage>()
         private var imageRequests: Set<URL> = []
         var lastSelectedMemberID: Int?
+        var fittedGroupID: Int?
         var lastFitAllToken = 0
+        var lastFocusToken: Int?
         var currentMapView: NMFMapView?
 
         init(_ parent: NaverMapView) {
@@ -113,7 +147,7 @@ struct NaverMapView: UIViewRepresentable {
                     marker = existing
                 } else {
                     marker = NMFMarker()
-                    marker.anchor = CGPoint(x: 0.5, y: 0.5)
+                    marker.anchor = CGPoint(x: 0.5, y: 1)
                     marker.touchHandler = { [weak self] overlay -> Bool in
                         if let marker = overlay as? NMFMarker,
                            let memberData = marker.userInfo["member"] as? SmapGroupMember {
@@ -179,136 +213,90 @@ struct NaverMapView: UIViewRepresentable {
         // MARK: - Schedule Marker Factory
 
         private func createScheduleMarkerImage(order: Int, title: String, startTime: String?, endTime: String?, status: ScheduleStatus) -> UIImage {
-            let width: CGFloat = 100
-            let height: CGFloat = 75  // 65 -> 75 (상태 원이 잘리지 않도록)
+            // 제목·시간 상자는 각자 글자 폭에 맞춘다(2026-11-20). 이전에는 그림 폭을 100 으로 고정해
+            // "집" 같은 짧은 제목도 아래 시간 범위만큼 넓은 상자로 그려졌다.
+            let orderSize: CGFloat = 16
+            let titleHeight: CGFloat = 20
+            let timeHeight: CGFloat = 16
+            let statusSize: CGFloat = 10
+
+            // 순서 숫자는 주황 — 남색 제목 상자와 한눈에 구분되게(이전에는 둘 다 남색 계열이라 숫자가 묻혔다).
+            let orderCircleBg = UIColor(SMAPAccent.orange.base)
+            let titleBg = UIColor(SMAPTheme.Family.ink)
+            let timeBg = UIColor(SMAPTheme.Family.highlight)
+
+            let statusColor: UIColor
+            switch status {
+            case .completed: statusColor = .systemGreen
+            case .ongoing: statusColor = .systemOrange
+            case .upcoming: statusColor = .systemBlue
+            case .defaultStatus: statusColor = .systemGray
+            }
+
+            let orderText = "\(order)"
+            let orderAttr: [NSAttributedString.Key: Any] = [.font: UIFont.suite(size: 11, weight: .bold), .foregroundColor: UIColor.white]
+            let displayTitle = title.count > 10 ? String(title.prefix(10)) + "…" : title
+            let titleAttr: [NSAttributedString.Key: Any] = [.font: UIFont.suite(size: 12, weight: .semibold), .foregroundColor: UIColor.white]
+            let timeText = formatTimeRange(start: startTime, end: endTime)
+            let timeAttr: [NSAttributedString.Key: Any] = [.font: UIFont.suite(size: 10), .foregroundColor: UIColor(SMAPTheme.Family.ink)]
+
+            let titleTextSize = displayTitle.size(withAttributes: titleAttr)
+            let timeTextSize = timeText.size(withAttributes: timeAttr)
+            let titleWidth = ceil(titleTextSize.width) + 16
+            let timeWidth = ceil(timeTextSize.width) + 12
+            let width = max(titleWidth, timeWidth, orderSize)
+            let titleY = orderSize + 2
+            let timeY = titleY + titleHeight + 2
+            let statusY = timeY + timeHeight + 2
+            let height = statusY + statusSize + 2  // 상태 원 테두리가 잘리지 않게 여유
 
             let renderer = UIGraphicsImageRenderer(size: CGSize(width: width, height: height))
             return renderer.image { context in
                 let ctx = context.cgContext
 
-                // Colors matching Next.js
-                let orderCircleBg = UIColor(red: 34/255, green: 197/255, blue: 94/255, alpha: 1) // 초록
-                let titleBg = UIColor(red: 79/255, green: 70/255, blue: 229/255, alpha: 1) // 인디고
-                let timeBg = UIColor(red: 236/255, green: 72/255, blue: 153/255, alpha: 1) // 핑크
-
-                let statusColor: UIColor
-                switch status {
-                case .completed: statusColor = .systemGreen
-                case .ongoing: statusColor = .systemOrange
-                case .upcoming: statusColor = .systemBlue
-                case .defaultStatus: statusColor = .systemGray
-                }
-
                 // 1. 순서 원 (상단 중앙)
-                let orderSize: CGFloat = 16
                 let orderX = (width - orderSize) / 2
-                let orderY: CGFloat = 0
                 ctx.setFillColor(orderCircleBg.cgColor)
-                ctx.fillEllipse(in: CGRect(x: orderX, y: orderY, width: orderSize, height: orderSize))
-
-                let orderText = "\(order)"
-                let orderAttr: [NSAttributedString.Key: Any] = [
-                    .font: UIFont.suite(size: 11, weight: .bold),
-                    .foregroundColor: UIColor.white
-                ]
+                ctx.fillEllipse(in: CGRect(x: orderX, y: 0, width: orderSize, height: orderSize))
                 let orderTextSize = orderText.size(withAttributes: orderAttr)
-                let orderTextRect = CGRect(
-                    x: orderX + (orderSize - orderTextSize.width) / 2,
-                    y: orderY + (orderSize - orderTextSize.height) / 2,
-                    width: orderTextSize.width,
-                    height: orderTextSize.height
-                )
-                orderText.draw(in: orderTextRect, withAttributes: orderAttr)
+                orderText.draw(at: CGPoint(x: orderX + (orderSize - orderTextSize.width) / 2, y: (orderSize - orderTextSize.height) / 2), withAttributes: orderAttr)
 
-                // 2. 제목 박스
-                let titleHeight: CGFloat = 20
-                let titleY = orderY + orderSize + 2
-                let titleRect = CGRect(x: 4, y: titleY, width: width - 8, height: titleHeight)
-
-                let titlePath = UIBezierPath(roundedRect: titleRect, cornerRadius: 6)
+                // 2. 제목 상자 — 제목 폭에 맞춤
+                let titleRect = CGRect(x: (width - titleWidth) / 2, y: titleY, width: titleWidth, height: titleHeight)
                 ctx.setFillColor(titleBg.cgColor)
-                ctx.addPath(titlePath.cgPath)
+                ctx.addPath(UIBezierPath(roundedRect: titleRect, cornerRadius: 6).cgPath)
                 ctx.fillPath()
+                displayTitle.draw(at: CGPoint(x: (width - titleTextSize.width) / 2, y: titleY + (titleHeight - titleTextSize.height) / 2), withAttributes: titleAttr)
 
-                let displayTitle = title.count > 10 ? String(title.prefix(10)) + "..." : title
-                let titleAttr: [NSAttributedString.Key: Any] = [
-                    .font: UIFont.suite(size: 12, weight: .semibold),
-                    .foregroundColor: UIColor.white
-                ]
-                let titleTextSize = displayTitle.size(withAttributes: titleAttr)
-                let titleTextRect = CGRect(
-                    x: (width - titleTextSize.width) / 2,
-                    y: titleY + (titleHeight - titleTextSize.height) / 2,
-                    width: titleTextSize.width,
-                    height: titleTextSize.height
-                )
-                displayTitle.draw(in: titleTextRect, withAttributes: titleAttr)
-
-                // 3. 시간 박스
-                let timeHeight: CGFloat = 16
-                let timeY = titleY + titleHeight + 2
-
-                let timeText = formatTimeRange(start: startTime, end: endTime)
-                let timeWidth = max(width - 16, 60)
+                // 3. 시간 상자 — 시간 글자 폭에 맞춤
                 let timeRect = CGRect(x: (width - timeWidth) / 2, y: timeY, width: timeWidth, height: timeHeight)
-
-                let timePath = UIBezierPath(roundedRect: timeRect, cornerRadius: 4)
                 ctx.setFillColor(timeBg.cgColor)
-                ctx.addPath(timePath.cgPath)
+                ctx.addPath(UIBezierPath(roundedRect: timeRect, cornerRadius: 4).cgPath)
                 ctx.fillPath()
+                timeText.draw(at: CGPoint(x: (width - timeTextSize.width) / 2, y: timeY + (timeHeight - timeTextSize.height) / 2), withAttributes: timeAttr)
 
-                let timeAttr: [NSAttributedString.Key: Any] = [
-                    .font: UIFont.suite(size: 10),
-                    .foregroundColor: UIColor.white
-                ]
-                let timeTextSize = timeText.size(withAttributes: timeAttr)
-                let timeTextRect = CGRect(
-                    x: (width - timeTextSize.width) / 2,
-                    y: timeY + (timeHeight - timeTextSize.height) / 2,
-                    width: timeTextSize.width,
-                    height: timeTextSize.height
-                )
-                timeText.draw(in: timeTextRect, withAttributes: timeAttr)
-
-                // 4. 상태 원 (하단 중앙)
-                let statusSize: CGFloat = 10
-                let statusX = (width - statusSize) / 2
-                let statusY = timeY + timeHeight + 2
-
+                // 4. 상태 원 (하단 중앙) + 흰 테두리
+                let statusRect = CGRect(x: (width - statusSize) / 2, y: statusY, width: statusSize, height: statusSize)
                 ctx.setFillColor(statusColor.cgColor)
-                ctx.fillEllipse(in: CGRect(x: statusX, y: statusY, width: statusSize, height: statusSize))
-
-                // 흰색 테두리
+                ctx.fillEllipse(in: statusRect)
                 ctx.setStrokeColor(UIColor.white.cgColor)
                 ctx.setLineWidth(1.5)
-                ctx.strokeEllipse(in: CGRect(x: statusX, y: statusY, width: statusSize, height: statusSize))
+                ctx.strokeEllipse(in: statusRect)
             }
         }
 
         private func formatTimeRange(start: String?, end: String?) -> String {
-            guard let start = start else { return "시간 없음" }
-
-            let startTime = extractTime(from: start)
-            if let end = end {
-                let endTime = extractTime(from: end)
+            guard let start, let startTime = extractTime(from: start) else { return "시간 없음" }
+            if let end, let endTime = extractTime(from: end) {
                 return "\(startTime) ~ \(endTime)"
             }
             return startTime
         }
 
-        private func extractTime(from dateStr: String) -> String {
-            // "2025-12-30T10:00:00" -> "10:00"
-            if dateStr.contains("T") {
-                let components = dateStr.components(separatedBy: "T")
-                if components.count > 1 {
-                    let timePart = components[1]
-                    let timeComponents = timePart.components(separatedBy: ":")
-                    if timeComponents.count >= 2 {
-                        return "\(timeComponents[0]):\(timeComponents[1])"
-                    }
-                }
-            }
-            return dateStr
+        /// "2026-11-20 15:30:00"·"2026-11-20T15:30:00" → "15:30". 이전에는 T 형식만 읽어 공백 형식이면 날짜 전체가 찍혔다.
+        private func extractTime(from dateStr: String) -> String? {
+            guard let range = dateStr.range(of: #"[T ](\d{2}):(\d{2})"#, options: .regularExpression) else { return nil }
+            return String(dateStr[range].dropFirst())
         }
 
         // 이미지 URL 처리 헬퍼 (Frontend imageUtils.ts 로직 반영)
@@ -322,80 +310,54 @@ struct NaverMapView: UIViewRepresentable {
 
 struct MarkerFactory {
     static func createMarkerImage(for member: SmapGroupMember, image: UIImage?) -> UIImage {
-        // Layout Constants (reduced by 30%)
-        let avatarSize: CGFloat = 28 // was 40
-        let borderWidth: CGFloat = 1.5 // was 2
-        let topPadding: CGFloat = 3 // was 4
-        let labelHeight: CGFloat = 14 // was 16
-        let labelPadding: CGFloat = 3 // was 4
-        let totalWidth: CGFloat = max(avatarSize, 60) // was 80
-        let totalHeight: CGFloat = topPadding + avatarSize + 5 + labelHeight // 여백 + 아바타 + 간격 + 라벨
+        let accent = SMAPAvatar.familyColor(for: member.mt_idx)
+        let ink = UIColor(SMAPTheme.Family.ink)
+        let name = member.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let font = UIFont.suite(size: 13, weight: .bold)
+        let textWidth = min(92, max(12, ceil((name as NSString).size(withAttributes: [.font: font]).width)))
+        let width = 4 + 30 + 6 + textWidth + 12
+        let size = CGSize(width: width, height: 48)
+        return UIGraphicsImageRenderer(size: size).image { renderer in
+            let ctx = renderer.cgContext
+            let fill = member.isSelected ? ink : UIColor.white
+            let body = UIBezierPath(roundedRect: CGRect(x: 1, y: 1, width: width - 2, height: 38), cornerRadius: 19)
+            ctx.setShadow(offset: CGSize(width: 0, height: 1), blur: 2, color: UIColor.black.withAlphaComponent(0.20).cgColor)
+            fill.setFill()
+            body.fill()
+            ctx.setShadow(offset: .zero, blur: 0, color: nil)
+            (member.isSelected ? ink : UIColor(accent.base).withAlphaComponent(0.55)).setStroke()
+            body.lineWidth = 1.5
+            body.stroke()
 
-        let renderer = UIGraphicsImageRenderer(size: CGSize(width: totalWidth, height: totalHeight))
+            let tip = UIBezierPath()
+            tip.move(to: CGPoint(x: width / 2 - 6, y: 38))
+            tip.addLine(to: CGPoint(x: width / 2, y: size.height))
+            tip.addLine(to: CGPoint(x: width / 2 + 6, y: 38))
+            tip.close()
+            ink.setFill()
+            tip.fill()
 
-        return renderer.image { context in
-            let ctx = context.cgContext
-
-            // 1. Avatar Circle (위쪽 여백 추가)
-            let avatarRect = CGRect(x: (totalWidth - avatarSize) / 2, y: topPadding, width: avatarSize, height: avatarSize)
-            let path = UIBezierPath(ovalIn: avatarRect)
-
-            // Border Color (Selected vs Normal)
-            // Android 멤버 마커와 같은 색 — 선택: 남보라 테두리·이름표, 미선택: 회색 테두리·흰 이름표 (분홍 제거)
-            let selectedColor = UIColor(red: 79/255, green: 70/255, blue: 229/255, alpha: 1.0) // #4F46E5
-            let borderColor: UIColor = member.isSelected ? selectedColor : .systemGray
-
-            // Fill Background (White)
-            UIColor.white.setFill()
-            path.fill()
-
-            // Draw Image (Clipped)
-            path.addClip()
-            if let img = image {
-                img.draw(in: avatarRect)
+            let face = CGRect(x: 5, y: 5, width: 30, height: 30)
+            ctx.saveGState()
+            UIBezierPath(ovalIn: face).addClip()
+            UIColor(accent.container).setFill()
+            ctx.fill(face)
+            if let image, image.size.width > 0, image.size.height > 0 {
+                let scale = max(face.width / image.size.width, face.height / image.size.height)
+                let w = image.size.width * scale, h = image.size.height * scale
+                image.draw(in: CGRect(x: face.midX - w / 2, y: face.midY - h / 2, width: w, height: h))
             } else {
-                // Placeholder (Gray)
-                UIColor.systemGray5.setFill()
-                path.fill()
+                let initial = (name.first.map(String.init) ?? "?") as NSString
+                let attrs: [NSAttributedString.Key: Any] = [.font: UIFont.suite(size: 15, weight: .bold), .foregroundColor: UIColor(accent.base)]
+                let letter = initial.size(withAttributes: attrs)
+                initial.draw(at: CGPoint(x: face.midX - letter.width / 2, y: face.midY - letter.height / 2), withAttributes: attrs)
             }
+            ctx.restoreGState()
 
-            // Reset Clip to draw border
-            ctx.resetClip()
-
-            // Draw Border
-            borderColor.setStroke()
-            path.lineWidth = borderWidth
-            path.stroke()
-
-            // 2. Name Label
-            let name = member.displayName
-            if !name.isEmpty {
-                let paragraphStyle = NSMutableParagraphStyle()
-                paragraphStyle.alignment = .center
-
-                let attrs: [NSAttributedString.Key: Any] = [
-                    .font: UIFont.suite(size: 10, weight: .medium),
-                    .foregroundColor: member.isSelected ? UIColor.white : UIColor.black,
-                    .paragraphStyle: paragraphStyle
-                ]
-
-                let textSize = (name as NSString).size(withAttributes: attrs)
-                let labelWidth = textSize.width + (labelPadding * 2)
-                let labelRect = CGRect(
-                    x: (totalWidth - labelWidth) / 2,
-                    y: topPadding + avatarSize + 2, // 여백 + 아바타 바로 아래
-                    width: labelWidth,
-                    height: labelHeight
-                )
-
-                // 이름표 바탕 — 선택이면 남보라, 아니면 흰색
-                let labelPath = UIBezierPath(roundedRect: labelRect, cornerRadius: 4)
-                (member.isSelected ? selectedColor : UIColor.white).setFill()
-                labelPath.fill()
-
-                // Draw Text
-                (name as NSString).draw(in: CGRect(x: labelRect.origin.x, y: labelRect.origin.y + (labelHeight - textSize.height)/2, width: labelRect.width, height: textSize.height), withAttributes: attrs)
-            }
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.lineBreakMode = .byTruncatingTail
+            let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: member.isSelected ? UIColor.white : ink, .paragraphStyle: paragraph]
+            (name as NSString).draw(in: CGRect(x: 41, y: 20 - font.lineHeight / 2, width: textWidth, height: ceil(font.lineHeight)), withAttributes: attrs)
         }
     }
 

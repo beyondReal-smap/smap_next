@@ -18,7 +18,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.SuiteFont
 
 @Composable
@@ -35,7 +34,7 @@ fun LocationPermissionDialog(
                 .fillMaxWidth()
                 .padding(horizontal = 32.dp),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White)
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(
                 modifier = Modifier.padding(24.dp),
@@ -44,7 +43,7 @@ fun LocationPermissionDialog(
                 Icon(
                     imageVector = Icons.Default.LocationOn,
                     contentDescription = null,
-                    tint = BrandColors.Primary,
+                    tint = LocalSmapAccent.current.base,
                     modifier = Modifier.size(48.dp)
                 )
                 
@@ -65,7 +64,7 @@ fun LocationPermissionDialog(
                     style = TextStyle(
                         fontSize = 14.sp,
                         fontFamily = SuiteFont,
-                        color = Color.Gray,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                         lineHeight = 20.sp,
                         lineBreak = LineBreak(
@@ -94,7 +93,7 @@ fun LocationPermissionDialog(
                         onClick = onConfirm,
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = BrandColors.Primary)
+                        colors = ButtonDefaults.buttonColors(containerColor = LocalSmapAccent.current.base)
                     ) {
                         Text("설정하기", fontFamily = SuiteFont, color = Color.White)
                     }
@@ -122,7 +121,7 @@ fun LocationDeniedOverlay(
                 .fillMaxWidth()
                 .padding(horizontal = 32.dp),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White)
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(
                 modifier = Modifier.padding(24.dp),
@@ -131,7 +130,7 @@ fun LocationDeniedOverlay(
                 Icon(
                     imageVector = Icons.Default.LocationOn,
                     contentDescription = "위치 권한",
-                    tint = Color(0xFFE74C3C),
+                    tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(48.dp)
                 )
 
@@ -152,7 +151,7 @@ fun LocationDeniedOverlay(
                     style = TextStyle(
                         fontSize = 14.sp,
                         fontFamily = SuiteFont,
-                        color = Color.Gray,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                         lineHeight = 20.sp
                     )
@@ -164,7 +163,7 @@ fun LocationDeniedOverlay(
                     onClick = onGoToSettings,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = BrandColors.Primary)
+                    colors = ButtonDefaults.buttonColors(containerColor = LocalSmapAccent.current.base)
                 ) {
                     Text("설정에서 허용하기", fontFamily = SuiteFont, color = Color.White)
                 }
@@ -175,7 +174,7 @@ fun LocationDeniedOverlay(
                     onClick = onDismiss,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("나중에 하기", fontFamily = SuiteFont, color = Color.Gray)
+                    Text("나중에 하기", fontFamily = SuiteFont, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -200,7 +199,7 @@ fun BackgroundLocationGuideDialog(
                 .fillMaxWidth()
                 .padding(horizontal = 32.dp),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White)
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(
                 modifier = Modifier.padding(24.dp),
@@ -238,7 +237,7 @@ fun BackgroundLocationGuideDialog(
                     onClick = onConfirm,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = BrandColors.Primary)
+                    colors = ButtonDefaults.buttonColors(containerColor = LocalSmapAccent.current.base)
                 ) {
                     Text("네, 알겠습니다", fontFamily = SuiteFont, color = Color.White)
                 }
@@ -249,7 +248,7 @@ fun BackgroundLocationGuideDialog(
                     onClick = onDismiss,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("나중에 하기", fontFamily = SuiteFont, color = Color.Gray)
+                    Text("나중에 하기", fontFamily = SuiteFont, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

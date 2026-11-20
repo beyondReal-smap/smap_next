@@ -25,14 +25,15 @@ struct ActivityLogView: View {
     private var currentUserIdx: Int? { AuthService.shared.getUserData()?.mt_idx }
 
     var body: some View {
-        let peek = ActivityLogSheet.peekHeight + (viewModel.sortedMapMarkers.isEmpty ? 0 : ActivityLogSheet.routeControlHeight)
+        // 경로 막대는 늘 있으므로 접힌 높이는 날짜와 상관없이 같다.
+        let peek = ActivityLogSheet.peekHeight + ActivityLogSheet.routeControlHeight
         GeometryReader { geo in
             ZStack(alignment: .top) {
-                ActivityLogMapView(
-                    mapMarkers: viewModel.mapMarkers,
+                ScrubbedActivityLogMap(
+                    scrubber: viewModel.scrubber,
+                    mapMarkers: viewModel.sortedMapMarkers,
+                    overlayRevision: viewModel.overlayRevision,
                     stayTimes: viewModel.stayTimes,
-                    sliderValue: viewModel.sliderValue,
-                    isSliderDragging: viewModel.isSliderDragging,
                     contentInsets: UIEdgeInsets(top: geo.safeAreaInsets.top + 64, left: 0, bottom: peek, right: 0)
                 )
                 .ignoresSafeArea(edges: .top)
@@ -43,12 +44,11 @@ struct ActivityLogView: View {
 
                 MapTopControls(groupName: viewModel.selectedGroup?.sgt_title, onGroupTap: { showGroupPicker = true })
 
-                SMAPMapSheet(peekHeight: peek, isExpanded: $isSheetExpanded) {
+                SMAPMapSheet(peekHeight: peek, isExpanded: $isSheetExpanded, maxHeightFraction: 0.76, headerSurface: SMAPAccent.activity.container) {
                     ActivityLogSheetHeader(viewModel: viewModel, currentUserIdx: currentUserIdx)
-                } content: {
+                } content: { _, _ in
                     ActivityLogSheetBody(viewModel: viewModel, currentUserIdx: currentUserIdx)
                 }
-                .animation(.easeOut(duration: 0.2), value: peek)
 
                 if !hasLoadedOnce {
                     MapLoadingOverlay()
@@ -76,7 +76,8 @@ struct ActivityLogView: View {
             GroupPickerSheet(
                 groups: viewModel.groups,
                 selectedGroupId: viewModel.selectedGroupId,
-                onSelect: { group in Task { await viewModel.selectGroupFromPicker(group) } }
+                onSelect: { group in Task { await viewModel.selectGroupFromPicker(group) } },
+                compact: true
             )
         }
         // 미리 만들어 둔 숨은 탭의 알림이 다른 탭 위로 뜨지 않게, 이 탭이 보일 때만 띄운다(그 전엔 보류).
@@ -97,8 +98,30 @@ struct ActivityLogView: View {
 
 // MARK: - Map View
 
+/// 경로 막대 값은 이 뷰에서만 읽는다 — 손가락이 움직일 때 지도만 다시 그리고,
+/// 부모(시트 머리줄·날짜줄·멤버줄)는 매 프레임 다시 계산하지 않는다.
+private struct ScrubbedActivityLogMap: View {
+    let scrubber: ActivityLogScrubberState
+    let mapMarkers: [MapMarker]
+    let overlayRevision: Int
+    let stayTimes: [StayTime]
+    let contentInsets: UIEdgeInsets
+
+    var body: some View {
+        ActivityLogMapView(
+            mapMarkers: mapMarkers,
+            overlayRevision: overlayRevision,
+            stayTimes: stayTimes,
+            sliderValue: scrubber.value,
+            isSliderDragging: scrubber.isDragging,
+            contentInsets: contentInsets
+        )
+    }
+}
+
 struct ActivityLogMapView: UIViewRepresentable {
     let mapMarkers: [MapMarker]
+    let overlayRevision: Int
     let stayTimes: [StayTime]
     let sliderValue: Double
     let isSliderDragging: Bool
@@ -135,109 +158,68 @@ struct ActivityLogMapView: UIViewRepresentable {
     }
     
     func updateUIView(_ mapView: NMFMapView, context: Context) {
+        updateMap(mapView, coordinator: context.coordinator)
+    }
+
+    func updateMap(_ mapView: NMFMapView, coordinator: Coordinator) {
         if mapView.contentInset != contentInsets {
             mapView.contentInset = contentInsets
         }
-        // 1. Data Processing
-        let sorted = mapMarkers.sorted { ($0.mlt_gps_time ?? "") < ($1.mlt_gps_time ?? "") }
-        
-        var validMarkers: [MapMarker] = []
-        var coords: [NMGLatLng] = []
-        for marker in sorted {
-            if marker.latitude != 0 && marker.longitude != 0 {
-                validMarkers.append(marker)
-                coords.append(NMGLatLng(lat: marker.latitude, lng: marker.longitude))
-            }
-        }
-        
-        // 2. Path Drawing (Only if data changed)
-        if context.coordinator.lastMapMarkersCount != mapMarkers.count || context.coordinator.lastMapMarkersCount == 0 {
-            context.coordinator.clearOverlays()
-            context.coordinator.lastMapMarkersCount = mapMarkers.count
-            
-            print("📍 [ActivityLogMapView] Redrawing path. Markers: \(validMarkers.count)")
-            
-            // Draw Gradient Path
+        let routeChanged = coordinator.lastOverlayRevision != overlayRevision
+        if routeChanged {
+            coordinator.clearOverlays()
+            coordinator.lastOverlayRevision = overlayRevision
+            let coords = mapMarkers.map { NMGLatLng(lat: $0.latitude, lng: $0.longitude) }
+
             if coords.count >= 2 {
-                for i in 0..<(coords.count - 1) {
-                    let start = coords[i]
-                    let end = coords[i+1]
-                    
-                    let progress = Double(i) / Double(coords.count - 1)
-                    let colorIndex = Int(progress * Double(rainbowColors.count - 1))
-                    let nextColorIndex = min(colorIndex + 1, rainbowColors.count - 1)
-                    let segmentProgress = (progress * Double(rainbowColors.count - 1)) - Double(colorIndex)
-                    
-                    let color1 = rainbowColors[colorIndex]
-                    let color2 = rainbowColors[nextColorIndex]
-                    let interpolatedColor = interpolateColor(color1: color1, color2: color2, factor: CGFloat(segmentProgress))
-                    
-                    let line = NMFPolylineOverlay([start, end])
-                    line?.color = interpolatedColor
-                    line?.width = 6
-                    line?.mapView = mapView
-                    if let line = line {
-                        context.coordinator.polylines.append(line)
+                let segments = coords.count - 1
+                // 선은 모든 꼭짓점을 유지한다. 색 구간과 장식 개수만 제한한다.
+                let lineStep = (segments + 47) / 48
+                for start in stride(from: 0, to: segments, by: lineStep) {
+                    let end = min(start + lineStep, segments)
+                    if let line = NMFPolylineOverlay(Array(coords[start...end])) {
+                        line.color = pathColor(at: start, segments: segments)
+                        line.width = 6
+                        line.capType = .round
+                        line.joinType = .round
+                        line.mapView = mapView
+                        coordinator.polylines.append(line)
                     }
                 }
-                
-                // Draw Path Dots
-                for i in 0..<coords.count {
-                    let progress = Double(i) / Double(coords.count - 1)
-                    let colorIndex = Int(progress * Double(rainbowColors.count - 1))
-                    let nextColorIndex = min(colorIndex + 1, rainbowColors.count - 1)
-                    let segmentProgress = (progress * Double(rainbowColors.count - 1)) - Double(colorIndex)
-                    
-                    let color1 = rainbowColors[colorIndex]
-                    let color2 = rainbowColors[nextColorIndex]
-                    let interpolatedColor = interpolateColor(color1: color1, color2: color2, factor: CGFloat(segmentProgress))
-                    
+
+                let dotStep = (coords.count + 39) / 40
+                for i in stride(from: 0, to: coords.count, by: dotStep) {
                     let dot = NMFMarker()
                     dot.position = coords[i]
-                    dot.iconImage = NMFOverlayImage(image: generatePathDotImage(color: interpolatedColor))
+                    dot.iconImage = NMFOverlayImage(image: generatePathDotImage(color: pathColor(at: i, segments: segments)))
                     dot.width = 8
                     dot.height = 8
                     dot.anchor = CGPoint(x: 0.5, y: 0.5)
                     dot.mapView = mapView
-                    context.coordinator.pathDotMarkers.append(dot)
+                    coordinator.pathDotMarkers.append(dot)
                 }
-                
-                // Draw Arrows
-                for i in 0..<(coords.count - 1) {
-                    if i % 3 == 0, i + 1 < coords.count {
-                        let start = coords[i]
-                        let end = coords[i+1]
-                        
-                        let dLon = (end.lng - start.lng) * .pi / 180
-                        let y = sin(dLon) * cos(end.lat * .pi / 180)
-                        let x = cos(start.lat * .pi / 180) * sin(end.lat * .pi / 180) - sin(start.lat * .pi / 180) * cos(end.lat * .pi / 180) * cos(dLon)
-                        var heading = atan2(y, x) * 180 / .pi
-                        if heading < 0 { heading += 360 }
-                        
-                        let progress = Double(i) / Double(coords.count - 1)
-                        let colorIndex = Int(progress * Double(rainbowColors.count - 1))
-                        let nextColorIndex = min(colorIndex + 1, rainbowColors.count - 1)
-                        let segmentProgress = (progress * Double(rainbowColors.count - 1)) - Double(colorIndex)
-                        
-                        let color1 = rainbowColors[colorIndex]
-                        let color2 = rainbowColors[nextColorIndex]
-                        let interpolatedColor = interpolateColor(color1: color1, color2: color2, factor: CGFloat(segmentProgress))
-                        
-                        let arrow = NMFMarker()
-                        arrow.position = NMGLatLng(lat: (start.lat + end.lat)/2, lng: (start.lng + end.lng)/2)
-                        arrow.iconImage = NMFOverlayImage(image: generateArrowImage(color: interpolatedColor))
-                        arrow.angle = heading
-                        arrow.width = 12
-                        arrow.height = 12
-                        arrow.anchor = CGPoint(x: 0.5, y: 0.5)
-                        arrow.mapView = mapView
-                        context.coordinator.arrowMarkers.append(arrow)
-                    }
+
+                let arrowStep = max(3, (segments + 15) / 16)
+                for i in stride(from: 0, to: segments, by: arrowStep) {
+                    let start = coords[i]
+                    let end = coords[i + 1]
+                    guard start.lat != end.lat || start.lng != end.lng else { continue }
+                    let arrow = NMFMarker()
+                    let a = NMGWebMercatorCoord(from: start)
+                    let b = NMGWebMercatorCoord(from: end)
+                    arrow.position = positionOnSegment(from: a, to: b, fraction: 0.5)
+                    arrow.iconImage = NMFOverlayImage(image: generateArrowImage(color: pathColor(at: i, segments: segments)))
+                    arrow.angle = atan2(b.x - a.x, b.y - a.y) * 180 / .pi
+                    arrow.width = 12
+                    arrow.height = 12
+                    arrow.anchor = CGPoint(x: 0.5, y: 0.5)
+                    arrow.mapView = mapView
+                    coordinator.arrowMarkers.append(arrow)
                 }
             }
-            
+
             // Draw Start/End Markers
-            if let first = validMarkers.first {
+            if let first = mapMarkers.first {
                 let m = NMFMarker()
                 m.position = NMGLatLng(lat: first.latitude, lng: first.longitude)
                 m.iconImage = NMFOverlayImage(image: generateStartEndMarkerImage(text: "S", color: UIColor(red: 34/255, green: 197/255, blue: 94/255, alpha: 1)))
@@ -245,20 +227,15 @@ struct ActivityLogMapView: UIViewRepresentable {
                 m.height = 24
                 m.anchor = CGPoint(x: 0.5, y: 0.5)
                 m.mapView = mapView
-                context.coordinator.markers.append(m)
+                coordinator.markers.append(m)
                 
-                // 출발점이 바뀌었을 때(날짜·멤버 변경, 첫 표시)만 카메라를 옮긴다.
-                // 이전에는 다시 그릴 때마다 출발점으로 날아가, 새로 받은 점이 붙기만 해도 보던 위치가 초기화됐다.
-                let start = NMGLatLng(lat: first.latitude, lng: first.longitude)
-                if context.coordinator.lastCameraStart.map({ $0.lat != start.lat || $0.lng != start.lng }) ?? true {
-                    context.coordinator.lastCameraStart = start
-                    let cameraUpdate = NMFCameraUpdate(scrollTo: start)
-                    cameraUpdate.animation = .fly
-                    mapView.moveCamera(cameraUpdate)
+                if coordinator.lastCameraStart?.lat != first.latitude || coordinator.lastCameraStart?.lng != first.longitude {
+                    coordinator.lastCameraStart = m.position
+                    coordinator.lastSliderCameraValue = nil
                 }
             }
             
-            if let last = validMarkers.last {
+            if let last = mapMarkers.last {
                 let m = NMFMarker()
                 m.position = NMGLatLng(lat: last.latitude, lng: last.longitude)
                 m.iconImage = NMFOverlayImage(image: generateStartEndMarkerImage(text: "E", color: UIColor(red: 239/255, green: 68/255, blue: 68/255, alpha: 1)))
@@ -266,7 +243,7 @@ struct ActivityLogMapView: UIViewRepresentable {
                 m.height = 24
                 m.anchor = CGPoint(x: 0.5, y: 0.5)
                 m.mapView = mapView
-                context.coordinator.markers.append(m)
+                coordinator.markers.append(m)
             }
             
             // Stay Markers
@@ -297,72 +274,77 @@ struct ActivityLogMapView: UIViewRepresentable {
                     m.anchor = markerResult.anchor
                     
                     m.mapView = mapView
-                    context.coordinator.stayMarkers.append(m)
+                    coordinator.stayMarkers.append(m)
                 }
             }
         }
         
-        // 3. Current Position Marker & Camera
-        if !validMarkers.isEmpty {
-            let index = Int(Double(validMarkers.count - 1) * sliderValue / 100.0)
-            let curr = validMarkers[max(0, min(index, validMarkers.count - 1))]
-            
-            context.coordinator.currentPositionMarker?.mapView = nil
-            context.coordinator.currentInfoMarker?.mapView = nil
-            
-            // Get time and speed from current log
-            let timeStr: String
-            if let gpsTime = curr.mlt_gps_time {
-                let cleanedTime = gpsTime.replacingOccurrences(of: "Z", with: "").components(separatedBy: ".").first ?? gpsTime
-                if cleanedTime.count >= 16 {
-                    let startIdx = cleanedTime.index(cleanedTime.startIndex, offsetBy: 11)
-                    let endIdx = cleanedTime.index(cleanedTime.startIndex, offsetBy: 16)
-                    timeStr = String(cleanedTime[startIdx..<endIdx])
-                } else {
-                    timeStr = "--:--"
-                }
-            } else {
-                timeStr = "--:--"
-            }
-            let speed = (curr.mlt_speed ?? 0.0) * 3.6
-            let speedStr = String(format: "%.1f km/h", speed)
-            
-            // Current Position Marker (Blue Bordered Circle)
-            let m = NMFMarker()
-            m.position = NMGLatLng(lat: curr.latitude, lng: curr.longitude)
-            m.iconImage = NMFOverlayImage(image: generateCurrentLocationMarkerImage(color: UIColor(red: 1/255, green: 19/255, blue: 163/255, alpha: 1)))
-            m.width = 24
-            m.height = 24
-            m.zIndex = 1000
-            m.mapView = mapView
-            context.coordinator.currentPositionMarker = m
-            
-            // Info Capsule Marker (Time + Speed)
-            let infoMarker = NMFMarker()
-            infoMarker.position = NMGLatLng(lat: curr.latitude, lng: curr.longitude)
-            let infoImage = generateCurrentPositionInfoImage(time: timeStr, speed: speedStr)
-            infoMarker.iconImage = NMFOverlayImage(image: infoImage)
-            infoMarker.width = CGFloat(infoImage.size.width)
-            infoMarker.height = CGFloat(infoImage.size.height)
-            infoMarker.anchor = CGPoint(x: 0.5, y: 1.0) // Bottom center anchor
-            infoMarker.zIndex = 1001
-            infoMarker.mapView = mapView
-            context.coordinator.currentInfoMarker = infoMarker
-            
-            let now = Date.timeIntervalSinceReferenceDate
-            let coordinator = context.coordinator
-            if (isSliderDragging && now - coordinator.lastSliderCameraMove >= 0.1) ||
-                (!isSliderDragging && (coordinator.wasSliderDragging || coordinator.lastSliderCameraValue != sliderValue)) {
-                let cameraUpdate = NMFCameraUpdate(scrollTo: NMGLatLng(lat: curr.latitude, lng: curr.longitude))
-                cameraUpdate.animation = .none
-                mapView.moveCamera(cameraUpdate)
-                coordinator.lastSliderCameraMove = now
-                coordinator.lastSliderCameraValue = sliderValue
-            }
-            coordinator.wasSliderDragging = isSliderDragging
+        guard !mapMarkers.isEmpty else {
+            coordinator.lastCameraStart = nil
+            coordinator.lastSliderCameraValue = nil
+            return
         }
+        let progress = Double(mapMarkers.count - 1) * sliderValue / 100
+        let index = Int(progress)
+        let sample = mapMarkers[index]
+        let start = NMGLatLng(lat: sample.latitude, lng: sample.longitude)
+        let fraction = progress - Double(index)
+        var position = start
+        if fraction > 0, index + 1 < mapMarkers.count {
+            let next = mapMarkers[index + 1]
+            let end = NMGLatLng(lat: next.latitude, lng: next.longitude)
+            position = positionOnSegment(from: NMGWebMercatorCoord(from: start), to: NMGWebMercatorCoord(from: end), fraction: fraction)
+        }
+
+        let marker = coordinator.currentPositionMarker
+        if marker.mapView == nil {
+            marker.iconImage = NMFOverlayImage(image: generateCurrentLocationMarkerImage(color: UIColor(SMAPAccent.activity.base)))
+            marker.width = 24
+            marker.height = 24
+            marker.anchor = CGPoint(x: 0.5, y: 0.5)
+            marker.zIndex = 1000
+        }
+        marker.position = position
+        if marker.mapView == nil { marker.mapView = mapView }
+
+        let info = coordinator.currentInfoMarker
+        if coordinator.infoSampleIndex != index {
+            let time = sample.mlt_gps_time.flatMap { time in
+                time.range(of: #"[T ]\d{2}:\d{2}"#, options: .regularExpression).map { String(time[$0].dropFirst()) }
+            } ?? "--:--"
+            let speed = String(format: "%.1f km/h", sample.speed * 3.6)
+            let image = generateCurrentPositionInfoImage(time: time, speed: speed)
+            info.iconImage = NMFOverlayImage(image: image)
+            info.width = image.size.width
+            info.height = image.size.height
+            info.anchor = CGPoint(x: 0.5, y: 1)
+            info.zIndex = 1001
+            coordinator.infoSampleIndex = index
+        }
+        info.position = position
+        if info.mapView == nil { info.mapView = mapView }
+
+        if coordinator.lastSliderCameraValue != sliderValue || (isSliderDragging && (!coordinator.wasSliderDragging || routeChanged)) {
+            let update = NMFCameraUpdate(scrollTo: position)
+            update.animation = .none
+            mapView.moveCamera(update)
+        }
+        coordinator.lastSliderCameraValue = sliderValue
+        coordinator.wasSliderDragging = isSliderDragging
     }
-    
+
+    private func positionOnSegment(from start: NMGWebMercatorCoord, to end: NMGWebMercatorCoord, fraction: Double) -> NMGLatLng {
+        NMGWebMercatorCoord(x: start.x + (end.x - start.x) * fraction,
+                            y: start.y + (end.y - start.y) * fraction).toLatLng()
+    }
+
+    private func pathColor(at index: Int, segments: Int) -> UIColor {
+        let progress = Double(index) / Double(segments) * Double(rainbowColors.count - 1)
+        let lower = Int(progress)
+        return interpolateColor(color1: rainbowColors[lower], color2: rainbowColors[min(lower + 1, rainbowColors.count - 1)],
+                                factor: CGFloat(progress - Double(lower)))
+    }
+
     private func interpolateColor(color1: UIColor, color2: UIColor, factor: CGFloat) -> UIColor {
         var r1: CGFloat=0, g1: CGFloat=0, b1: CGFloat=0, a1: CGFloat=0
         var r2: CGFloat=0, g2: CGFloat=0, b2: CGFloat=0, a2: CGFloat=0
@@ -505,12 +487,12 @@ struct ActivityLogMapView: UIViewRepresentable {
         var arrowMarkers: [NMFMarker] = []
         var pathDotMarkers: [NMFMarker] = []
         var polylines: [NMFPolylineOverlay] = []
-        var currentPositionMarker: NMFMarker?
-        var currentInfoMarker: NMFMarker?
-        var lastMapMarkersCount: Int = 0
+        let currentPositionMarker = NMFMarker()
+        let currentInfoMarker = NMFMarker()
+        var infoSampleIndex: Int?
+        var lastOverlayRevision: Int?
         /// 마지막으로 카메라를 맞춘 출발점 — 같은 경로에 점만 늘어난 경우(조용한 새로고침) 카메라를 되돌리지 않기 위해
         var lastCameraStart: NMGLatLng?
-        var lastSliderCameraMove: TimeInterval = 0
         /// 카메라가 마지막으로 따라간 슬라이더 값 — 위치 순번이 아니라 값으로 비교해,
         /// 조용히 새로 받아 점이 늘어 순번만 바뀐 경우엔 카메라를 옮기지 않는다
         var lastSliderCameraValue: Double?
@@ -527,11 +509,9 @@ struct ActivityLogMapView: UIViewRepresentable {
             pathDotMarkers.removeAll()
             polylines.forEach { $0.mapView = nil }
             polylines.removeAll()
-            currentPositionMarker?.mapView = nil
-            currentPositionMarker = nil
-            currentInfoMarker?.mapView = nil
-            currentInfoMarker = nil
-            lastMapMarkersCount = 0
+            currentPositionMarker.mapView = nil
+            currentInfoMarker.mapView = nil
+            infoSampleIndex = nil
         }
     }
     
@@ -552,7 +532,7 @@ struct ActivityLogMapView: UIViewRepresentable {
         let paddingV: CGFloat = 6
         let capsuleWidth = textSize.width + paddingH * 2
         let capsuleHeight = textSize.height + paddingV * 2
-        let markerBottomPadding: CGFloat = 32 // Gap between capsule and marker
+        let markerBottomPadding: CGFloat = 16 // 반지름 12pt인 위치 표시와 말풍선 사이 4pt
         
         let canvasSize = CGSize(width: capsuleWidth, height: capsuleHeight + markerBottomPadding)
         let renderer = UIGraphicsImageRenderer(size: canvasSize)
@@ -561,7 +541,7 @@ struct ActivityLogMapView: UIViewRepresentable {
             // Draw capsule background
             let capsuleRect = CGRect(x: 0, y: 0, width: capsuleWidth, height: capsuleHeight)
             let capsulePath = UIBezierPath(roundedRect: capsuleRect, cornerRadius: capsuleHeight / 2)
-            UIColor(red: 1/255, green: 19/255, blue: 163/255, alpha: 0.9).setFill()
+            UIColor(SMAPAccent.activity.deep).withAlphaComponent(0.9).setFill()
             capsulePath.fill()
             
             // Draw text

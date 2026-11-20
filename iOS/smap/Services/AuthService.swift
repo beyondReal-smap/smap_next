@@ -396,7 +396,12 @@ class AuthService: ObservableObject {
     }
 
     func emailAuth(path: String, body: [String: String]) async throws -> EmailCodeResult {
-        try await unauthenticatedPost(path: path, body: body)
+        do {
+            return try await unauthenticatedPost(path: path, body: body)
+        } catch NetworkError.notFound {
+            // 이메일 인증 API 가 서버에 없을 때(미배포·경로 변경) 공통 문구 "요청한 정보를 찾을 수 없습니다" 는 가입 화면에서 뜻이 통하지 않는다.
+            throw NetworkError.badRequest("지금은 이메일 인증을 사용할 수 없어요. 잠시 후 다시 시도해 주세요.")
+        }
     }
 
     /// 전화번호 비밀번호 찾기용 호출 (/sms/send-verification-code, /sms/verify-code, /auth/reset-password-by-phone)

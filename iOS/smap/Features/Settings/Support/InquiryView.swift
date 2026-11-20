@@ -34,30 +34,15 @@ struct InquiryView: View {
 
     var body: some View {
         ZStack {
-            SMAPTheme.Adaptive.pageBackground.ignoresSafeArea()
+            Color(uiColor: .systemBackground).ignoresSafeArea()
 
             ScrollView {
                 VStack(spacing: 24) {
-                    VStack(spacing: 12) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("1:1 문의").font(.suite(size: 20, weight: .bold)).foregroundColor(.white)
-                                Text("궁금한 점을 문의하세요").font(.suite(size: 14)).foregroundColor(.white.opacity(0.8))
-                            }
-                            Spacer()
-                            Image(systemName: "envelope.fill").font(.suite(size: 32)).foregroundColor(.white.opacity(0.3))
-                                .accessibilityHidden(true)
-                        }
-                    }
-                    .padding(24)
-                    .background(
-                        LinearGradient(
-                            gradient: Gradient(colors: [SMAPTheme.Accent.orange, SMAPTheme.Accent.pinkDeep]),
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .cornerRadius(24).padding(.horizontal)
+                    Text("무엇을 도와드릴까요?")
+                        .font(SMAPTheme.Font.pageTitle)
+                        .accessibilityAddTraits(.isHeader)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 20)
 
                     VStack(alignment: .leading, spacing: 20) {
                         VStack(alignment: .leading, spacing: 12) {
@@ -78,13 +63,13 @@ struct InquiryView: View {
                                         }
                                         .frame(maxWidth: .infinity)
                                         .padding(.vertical, 14)
-                                        .background(category == item.id ? SMAPTheme.Accent.orange.opacity(0.12) : Color.gray.opacity(0.05))
+                                        .background(category == item.id ? SMAPAccent.family.base.opacity(0.12) : Color.gray.opacity(0.05))
                                         .overlay(
                                             RoundedRectangle(cornerRadius: 12)
-                                                .stroke(category == item.id ? SMAPTheme.Accent.orange : Color.clear, lineWidth: 2)
+                                                .stroke(category == item.id ? SMAPAccent.family.base : Color.clear, lineWidth: 2)
                                         )
                                         .cornerRadius(12)
-                                        .foregroundColor(category == item.id ? SMAPTheme.Accent.orange : .primary)
+                                        .foregroundColor(category == item.id ? SMAPAccent.family.base : .primary)
                                         .contentShape(Rectangle())
                                     }
                                     .accessibilityLabel(item.name)
@@ -105,7 +90,7 @@ struct InquiryView: View {
                                 .submitLabel(.next)
                                 .onSubmit { focusedField = .subject }
                                 .padding(.horizontal, 16).frame(height: 52)
-                                .background(Color.white).cornerRadius(12)
+                                .background(Color(uiColor: .secondarySystemBackground)).cornerRadius(12)
                                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(emailValidationBorderColor, lineWidth: 1))
                                 .accessibilityLabel("답변 이메일")
                             if !email.isEmpty {
@@ -127,7 +112,7 @@ struct InquiryView: View {
                                 .submitLabel(.next)
                                 .onSubmit { focusedField = .message }
                                 .padding(.horizontal, 16).frame(height: 52)
-                                .background(Color.white).cornerRadius(12)
+                                .background(Color(uiColor: .secondarySystemBackground)).cornerRadius(12)
                                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.gray.opacity(0.2), lineWidth: 1))
                                 .accessibilityLabel("문의 제목")
                         }
@@ -146,7 +131,7 @@ struct InquiryView: View {
                                     .hideScrollBackground().background(Color.clear)
                                     .accessibilityLabel("문의 내용")
                             }
-                            .background(Color.white).cornerRadius(12)
+                            .background(Color(uiColor: .secondarySystemBackground)).cornerRadius(12)
                             .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.gray.opacity(0.2), lineWidth: 1))
                         }
 
@@ -156,14 +141,14 @@ struct InquiryView: View {
                                 else { Image(systemName: "paperplane.fill"); Text("문의 전송") }
                             }
                             .font(.suite(size: 16, weight: .bold)).foregroundColor(.white).frame(maxWidth: .infinity).padding()
-                            .background(isFormValid ? SMAPTheme.Accent.orange : Color.gray.opacity(0.3))
+                            .background(isFormValid ? SMAPAccent.family.base : Color.gray.opacity(0.3))
                             .cornerRadius(16)
                         }
                         .disabled(!isFormValid || isSending)
                         .accessibilityLabel(isSending ? "전송 중" : "문의 전송")
                         .accessibilityHint(isFormValid ? "" : "필수 항목을 모두 입력하세요")
-                    }.padding(.horizontal)
-                }.padding(.vertical)
+                    }.padding(.horizontal, 20)
+                }.padding(.vertical).frame(maxWidth: 600).frame(maxWidth: .infinity)
             }
             .scrollDismissesKeyboard(.interactively)
         }
@@ -182,7 +167,7 @@ struct InquiryView: View {
                 Spacer()
                 Button("완료") { focusedField = nil }
                     .font(.suite(size: 16, weight: .semibold))
-                    .foregroundColor(SMAPTheme.Accent.orange)
+                    .foregroundColor(SMAPAccent.family.base)
             }
         }
         .alert(isSuccess ? "전송 완료" : "오류", isPresented: $showingAlert) {

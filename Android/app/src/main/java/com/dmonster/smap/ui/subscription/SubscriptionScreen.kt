@@ -1,5 +1,7 @@
 package com.dmonster.smap.ui.subscription
 
+import com.dmonster.smap.R
+import com.dmonster.smap.ui.components.SmapFamilyCover
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
@@ -115,7 +117,7 @@ fun SubscriptionScreen(
     val colors = MaterialTheme.colorScheme
 
     Scaffold(
-        containerColor = colors.background,
+        containerColor = colors.surface,
         topBar = {
             SmapTopBar(title = "도착했어 프리미엄", onBack = onBack)
         }
@@ -129,6 +131,10 @@ fun SubscriptionScreen(
                 .padding(horizontal = SmapSpacing.screenHorizontal, vertical = SmapSpacing.md),
             verticalArrangement = Arrangement.spacedBy(SmapSpacing.md)
         ) {
+            SmapFamilyCover(image = R.drawable.login_arrival_cycling, minHeight = 154.dp) {
+                Text("도착했어 프리미엄", style = SmapText.pageTitle)
+                Text("소중한 사람들의 기록을 더 오래, 더 많이.", style = SmapText.secondary)
+            }
             when (val pState = purchaseState) {
                 is BillingPurchaseState.Success -> {
                     SmapBanner(message = pState.message, tone = SmapBannerTone.Success)
@@ -289,19 +295,6 @@ private fun NonSubscriberSection(
     onPrivacyClick: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
-
-    Column(verticalArrangement = Arrangement.spacedBy(SmapSpacing.xs)) {
-        Text(
-            text = "도착했어 프리미엄",
-            style = SmapText.title,
-            color = colors.onSurface
-        )
-        Text(
-            text = "소중한 사람들의 기록을 더 오래, 더 많이.",
-            style = SmapText.body,
-            color = colors.onSurfaceVariant
-        )
-    }
 
     BenefitListCard()
 

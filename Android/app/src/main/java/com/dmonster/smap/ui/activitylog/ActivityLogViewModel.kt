@@ -258,7 +258,10 @@ class ActivityLogViewModel @Inject constructor(
 
         activityJob?.cancel()
         activityJob = viewModelScope.launch {
-            _isLoading.value = true
+            // 화면 전체를 덮는 지도 로딩 화면은 아직 아무것도 그리지 못한 첫 로딩에만 띄운다.
+            // 날짜·멤버를 바꿀 때마다 띄우면 기록을 그리는 동안 한두 프레임 남색 화면이 비쳐 전체가 깜빡였다(2026-11-20).
+            // 그 뒤로는 보던 지도를 두고 시트의 "기록을 불러오는 중…"으로만 알린다.
+            _isLoading.value = lastLoadedAtMs == 0L
             _isLoadingLogs.value = true
             _loadFailed.value = false
             try {

@@ -176,6 +176,8 @@ fun MyPlaceScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         SmapMapSheetScaffold(
             peekHeight = MyPlaceSheetPeekHeight,
+            headerSurface = com.dmonster.smap.ui.theme.FamilyColors.Paper,
+            maxHeightFraction = 0.72f,
             sheetState = sheetState,
             snackbarHostState = snackbarHostState,
             sheetContent = {
@@ -187,6 +189,8 @@ fun MyPlaceScreen(
                     selectedLocationId = selectedLocation?.sltIdx,
                     isLoadingLocations = isLoadingLocations,
                     canAddLocation = canAddLocation,
+                    isExpanded = sheetState.currentValue == com.dmonster.smap.ui.components.SmapSheetValue.Expanded,
+                    onToggle = { scope.launch { sheetState.toggle() } },
                     canManageLocation = { viewModel.canManageLocation(it) },
                     onSelectMember = { viewModel.selectMember(it) },
                     onSelectLocation = {
@@ -354,7 +358,8 @@ fun MyPlaceScreen(
                 groups = groups,
                 selectedGroupId = selectedGroup?.sgtIdx,
                 onSelect = { viewModel.selectGroup(it) },
-                onDismiss = { showGroupPicker = false }
+                onDismiss = { showGroupPicker = false },
+                compact = true
             )
         }
 
@@ -400,8 +405,8 @@ fun MyPlaceScreen(
             onDismiss = { viewModel.hideAddDialog() },
             onSearchClick = { viewModel.showSearchScreen() },
             onMemberSelect = { viewModel.selectMember(it) },
-            onSave = { title, address, lat, lng, memo, alarm ->
-                viewModel.createLocation(title, address, lat, lng, memo, alarm)
+            onSave = { title, address, lat, lng, memo, alarm, icon ->
+                viewModel.createLocation(title, address, lat, lng, memo, alarm, icon)
             },
             onDelete = {},
             onNotificationToggle = { /* Not applicable for new items yet */ },
@@ -420,7 +425,7 @@ fun MyPlaceScreen(
                 onDismiss = { viewModel.hideEditDialog() },
                 onSearchClick = { viewModel.showSearchScreen() },
                 onMemberSelect = {},
-                onSave = { title, address, lat, lng, memo, alarm ->
+                onSave = { title, address, lat, lng, memo, alarm, icon ->
                     viewModel.updateLocation(
                         locationId = location.sltIdx,
                         title = title,
@@ -428,7 +433,8 @@ fun MyPlaceScreen(
                         lat = lat,
                         lng = lng,
                         memo = memo,
-                        enterAlarm = alarm
+                        enterAlarm = alarm,
+                        icon = icon
                     )
                 },
                 onDelete = { viewModel.showDeleteDialog(it) },

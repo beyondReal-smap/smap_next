@@ -43,6 +43,7 @@ GoogleService-Info.plist
 *.jpg
 *.png
 *.webp
+!smap/Assets.xcassets/LoginArrival*.imageset/*.jpg
 
 # Secrets
 Config/Debug.xcconfig

@@ -20,14 +20,14 @@ struct ForgotPasswordView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                SMAPTheme.Color.white.ignoresSafeArea()
+                Color(uiColor: .systemBackground).ignoresSafeArea()
 
                 VStack(spacing: 0) {
                     navigationBar
 
                     if viewModel.currentStep != .complete {
                         ProgressView(value: currentProgress, total: 1.0)
-                            .accentColor(SMAPTheme.Color.primary)
+                            .accentColor(SMAPAccent.family.base)
                             .scaleEffect(x: 1, y: 0.5, anchor: .center)
                     }
 
@@ -74,6 +74,7 @@ struct ForgotPasswordView: View {
             .onChange(of: viewModel.newPassword) { _, _ in inlineError = nil }
             .onChange(of: viewModel.confirmPassword) { _, _ in inlineError = nil }
         }
+        .smapAccent(.family)
     }
 
     // MARK: - Navigation
@@ -84,7 +85,7 @@ struct ForgotPasswordView: View {
                 Button(action: goBack) {
                     Image(systemName: "chevron.left")
                         .font(.suite(size: 20, weight: .semibold))
-                        .foregroundColor(SMAPTheme.Color.textPrimary)
+                        .foregroundColor(Color.primary)
                 }
                 .accessibilityLabel("뒤로")
             }
@@ -93,7 +94,7 @@ struct ForgotPasswordView: View {
 
             Text("비밀번호 찾기")
                 .font(SMAPTheme.Font.headline)
-                .foregroundColor(SMAPTheme.Color.textPrimary)
+                .foregroundColor(Color.primary)
 
             Spacer()
 
@@ -210,7 +211,7 @@ struct ForgotPasswordView: View {
                 } label: {
                     Text(resendWait > 0 ? "다시 받기 (\(resendWait)초)" : "인증번호 다시 받기")
                         .font(SMAPTheme.Font.secondaryMedium)
-                        .foregroundStyle(canResend ? SMAPTheme.Color.primary : SMAPTheme.Color.textSecondary)
+                        .foregroundStyle(canResend ? SMAPAccent.family.base : SMAPTheme.Color.textSecondary)
                         .frame(minHeight: 44)
                         .contentShape(Rectangle())
                 }
@@ -281,12 +282,12 @@ struct ForgotPasswordView: View {
                 Image(systemName: "checkmark.circle.fill")
                     .resizable()
                     .frame(width: 80, height: 80)
-                    .foregroundColor(SMAPTheme.Color.primary)
+                    .foregroundColor(SMAPAccent.family.base)
                     .accessibilityHidden(true)
 
                 Text("비밀번호를 바꿨어요")
-                    .font(SMAPTheme.Font.title)
-                    .foregroundStyle(SMAPTheme.Color.textPrimary)
+                    .font(SMAPTheme.Font.pageTitle)
+                    .foregroundStyle(Color.primary)
 
                 Text("새 비밀번호로 로그인해 주세요.")
                     .font(SMAPTheme.Font.secondary)
@@ -321,8 +322,8 @@ private struct StepHeader: View {
 
     var body: some View {
         Text(title)
-            .font(SMAPTheme.Font.title)
-            .foregroundStyle(SMAPTheme.Color.textPrimary)
+            .font(SMAPTheme.Font.pageTitle)
+            .foregroundStyle(Color.primary)
         Text(description)
             .font(SMAPTheme.Font.secondary)
             .foregroundStyle(SMAPTheme.Color.textSecondary)

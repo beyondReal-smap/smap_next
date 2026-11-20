@@ -1,5 +1,6 @@
 package com.dmonster.smap.ui.home
 
+import com.dmonster.smap.ui.theme.FamilyColors
 import com.dmonster.smap.BuildConfig
 import com.dmonster.smap.AppConstants
 import androidx.compose.animation.*
@@ -27,6 +28,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.naver.maps.geometry.LatLng
 import com.naver.maps.map.CameraPosition
 import com.naver.maps.map.CameraUpdate
+import com.dmonster.smap.data.model.SmapSchedule
 import com.naver.maps.map.compose.*
 import com.naver.maps.map.overlay.OverlayImage
 import kotlinx.coroutines.delay
@@ -231,7 +233,7 @@ fun HomeScreen(
     }
 
     // Effect: Move camera when member selected or group changes
-    LaunchedEffect(selectedMemberId, selectedGroup) {
+    LaunchedEffect(selectedMemberId, selectedGroup?.sgtIdx, markerPoints.isNotEmpty(), isVisible) {
         if (!isVisible) return@LaunchedEffect
         val m = selectedMemberState
         val lat = m?.mltLat
@@ -242,6 +244,8 @@ fun HomeScreen(
                 update = CameraUpdate.scrollAndZoomTo(LatLng(lat, lng), 16.0)
                     .animate(com.naver.maps.map.CameraAnimation.Fly, 1000)
             )
+        } else if (markerPoints.size == 1) {
+            cameraPositionState.move(CameraUpdate.scrollAndZoomTo(markerPoints.first(), 15.0))
         } else if (markerPoints.isNotEmpty()) {
             // 2. 멤버 미선택 → 전체 마커 fit
             val bounds = com.naver.maps.geometry.LatLngBounds.Builder()
@@ -257,12 +261,28 @@ fun HomeScreen(
     var mapMembers by remember { mutableStateOf(members) }
     var mapSchedules by remember { mutableStateOf(filteredSchedules) }
     LaunchedEffect(isVisible, members, filteredSchedules) {
-        if (isVisible) { mapMembers = members; mapSchedules = filteredSchedules }
+        // 시트 목록과 같은 시작 시각 순 — 마커 번호가 목록 순서와 같게(iOS 와 같게)
+        if (isVisible) { mapMembers = members; mapSchedules = filteredSchedules.sortedBy { it.date } }
+    }
+
+    // 시트에서 장소가 있는 일정을 누르면 그 장소로 지도를 옮기고 시트를 접어 지도를 보여 준다.
+    val focusSchedule: (SmapSchedule) -> Unit = { schedule ->
+        schedule.mapLatLng?.let { target ->
+            scope.launch { sheetState.partialExpand() }
+            scope.launch {
+                cameraPositionState.animate(
+                    update = CameraUpdate.scrollAndZoomTo(target, 16.0)
+                        .animate(com.naver.maps.map.CameraAnimation.Easing, 600)
+                )
+            }
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
         SmapMapSheetScaffold(
             peekHeight = HomeSheetPeekHeight,
+            headerSurface = FamilyColors.Paper,
+            maxHeightFraction = 0.72f,
             sheetState = sheetState,
             snackbarHostState = snackbarHostState,
             sheetContent = {
@@ -274,12 +294,19 @@ fun HomeScreen(
                     selectedDate = selectedDate,
                     schedules = filteredSchedules,
                     memberStats = { viewModel.getMemberTodayStats(it) },
+                    isExpanded = sheetState.currentValue == com.dmonster.smap.ui.components.SmapSheetValue.Expanded,
+                    expansionProgress = { sheetState.expansionProgress },
+                    onToggleSchedule = { scope.launch { sheetState.toggle() } },
                     onSelectMember = { m ->
                         viewModel.selectMember(m.mtIdx)
                         scope.launch { sheetState.partialExpand() }
                     },
-                    onShowAll = { viewModel.deselectAllMembers() },
-                    onSelectDate = { viewModel.selectDate(it) }
+                    onShowAll = {
+                        viewModel.deselectAllMembers()
+                        scope.launch { sheetState.partialExpand() }
+                    },
+                    onSelectDate = { viewModel.selectDate(it) },
+                    onSelectSchedule = focusSchedule
                 )
             },
             overlay = {
@@ -322,7 +349,7 @@ fun HomeScreen(
                         if (memberLat != null && memberLng != null) {
                             val avatar = avatarBitmap(member.mtIdx)
                             val memberMarkerBitmap = remember(member.displayName, member.isSelected, avatar) {
-                                MarkerUtils.createMemberMarkerBitmap(context, member.displayName, member.isSelected, avatar)
+                                MarkerUtils.createMemberMarkerBitmap(context, member.mtIdx, member.displayName, member.isSelected, avatar)
                             }
 
                             Marker(
@@ -331,6 +358,7 @@ fun HomeScreen(
                                 zIndex = if (member.isSelected) 2000 else 100,
                                 onClick = {
                                     viewModel.selectMember(member.mtIdx)
+                                    scope.launch { sheetState.partialExpand() }
                                     true
                                 }
                             )
@@ -344,7 +372,8 @@ fun HomeScreen(
                         val lat = schedule.sstLocationLat
                         val lng = schedule.sstLocationLong
                         if (lat != null && lng != null) {
-                            val markerBitmap = remember(schedule.sstIdx, schedule.sstTitle, index) {
+                            // 시간이나 상태(예정→진행 중→끝남)가 바뀌면 다시 그린다
+                            val markerBitmap = remember(schedule.sstIdx, schedule.sstTitle, schedule.date, schedule.sstEdate, index, schedule.status) {
                                 MarkerUtils.createScheduleMarkerBitmap(context, schedule, index)
                             }
 
@@ -366,7 +395,8 @@ fun HomeScreen(
                 selectedGroupId = selectedGroup?.sgtIdx,
                 onSelect = { viewModel.selectGroup(it) },
                 onDismiss = { showGroupPicker = false },
-                onCreateGroup = { viewModel.openGroupCreationModal() }
+                onCreateGroup = { viewModel.openGroupCreationModal() },
+                compact = true
             )
         }
 

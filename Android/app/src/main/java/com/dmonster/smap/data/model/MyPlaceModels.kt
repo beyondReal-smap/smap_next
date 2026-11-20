@@ -19,7 +19,9 @@ data class SavedLocation(
     @SerialName("slt_udate") val sltUdate: String? = null,
     @SerialName("mt_idx") val mtIdx: Int? = null,
     @SerialName("sgt_idx") val sgtIdx: Int? = null,
-    @SerialName("slt_enter_alarm") val sltEnterAlarm: String? = null
+    @SerialName("slt_enter_alarm") val sltEnterAlarm: String? = null,
+    /** 사용자가 고른 아이콘 키(PlaceKind.key). 예전 장소는 null — 이름으로 짐작한다. */
+    @SerialName("slt_icon") val sltIcon: String? = null
 ) {
     val id: Int get() = sltIdx
     val name: String get() = sltTitle ?: "이름 없음"

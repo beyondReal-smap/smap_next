@@ -62,7 +62,7 @@ class ScheduleViewModel @Inject constructor(
     val members: StateFlow<List<SmapGroupMember>> = _members.asStateFlow()
 
     // Loading States
-    private val _isLoading = MutableStateFlow(false)
+    private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     private val _isLoadingSchedules = MutableStateFlow(false)
@@ -263,6 +263,7 @@ class ScheduleViewModel @Inject constructor(
 
     // Fix #7: Await loadMembers before loadSchedules to avoid race condition
     fun selectGroup(group: SmapGroup) {
+        _isLoadingSchedules.value = true
         _selectedGroup.value = group
         _showGroupSelector.value = false
         viewModelScope.launch {

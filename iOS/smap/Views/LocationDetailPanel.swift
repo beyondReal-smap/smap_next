@@ -42,7 +42,7 @@ struct LocationDetailPanel: View {
                 }
                 .padding(20)
             }
-            .background(Color(UIColor.systemGroupedBackground))
+            .background(Color(uiColor: .systemBackground))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
@@ -55,7 +55,7 @@ struct LocationDetailPanel: View {
                         viewModel.closeLocationPanel()
                         presentationMode.wrappedValue.dismiss()
                     }
-                    .foregroundColor(SMAPTheme.Color.primary)
+                    .foregroundColor(SMAPAccent.places.base)
                 }
                 
                 if viewModel.isEditMode {
@@ -64,7 +64,7 @@ struct LocationDetailPanel: View {
                             saveLocation()
                         }
                         .font(.suite(size: 16, weight: .bold))
-                        .foregroundColor(SMAPTheme.Color.primary)
+                        .foregroundColor(SMAPAccent.places.base)
                         .disabled(viewModel.isSaving || locationName.isEmpty || locationAddress.isEmpty)
                     }
                 }
@@ -110,11 +110,7 @@ struct LocationDetailPanel: View {
             VStack(spacing: 12) {
                 ZStack {
                     Circle()
-                        .fill(LinearGradient(
-                            gradient: Gradient(colors: [SMAPTheme.Color.primary, Color.purple]),
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ))
+                        .fill(SMAPAccent.places.deep)
                         .frame(width: 72, height: 72)
                     
                     Image(systemName: "mappin.and.ellipse")
@@ -123,7 +119,7 @@ struct LocationDetailPanel: View {
                 }
                 
                 Text(location.name)
-                    .font(.suite(size: 22, weight: .bold))
+                    .font(SMAPTheme.Font.pageTitle)
                     .foregroundColor(.primary)
                 
                 Text(location.address)
@@ -141,7 +137,7 @@ struct LocationDetailPanel: View {
                 
                 HStack {
                     Image(systemName: "bell.fill")
-                        .foregroundColor(SMAPTheme.Color.primary)
+                        .foregroundColor(SMAPAccent.places.base)
                         .frame(width: 24)
                     
                     Text("도착 알림")
@@ -155,7 +151,7 @@ struct LocationDetailPanel: View {
                 }
                 .padding(16)
             }
-            .background(Color.white)
+            .background(Color(uiColor: .secondarySystemBackground))
             .cornerRadius(12)
             
             // 액션 버튼들
@@ -172,7 +168,7 @@ struct LocationDetailPanel: View {
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 50)
-                        .background(SMAPTheme.Color.primary)
+                        .background(SMAPAccent.places.base)
                         .cornerRadius(12)
                     }
                     .accessibilityLabel("편집")
@@ -217,7 +213,7 @@ struct LocationDetailPanel: View {
     private func infoRow(icon: String, title: String, value: String) -> some View {
         HStack {
             Image(systemName: icon)
-                .foregroundColor(SMAPTheme.Color.primary)
+                .foregroundColor(SMAPAccent.places.base)
                 .frame(width: 24)
             
             Text(title)
@@ -243,7 +239,7 @@ struct LocationDetailPanel: View {
             }) {
                 HStack {
                     Image(systemName: "magnifyingglass")
-                        .foregroundColor(SMAPTheme.Color.primary)
+                        .foregroundColor(SMAPAccent.places.base)
                     Text("장소 검색")
                         .font(.suite(size: 16, weight: .medium))
                         .foregroundColor(.primary)
@@ -252,7 +248,7 @@ struct LocationDetailPanel: View {
                         .foregroundColor(.secondary)
                 }
                 .padding(16)
-                .background(Color.white)
+                .background(Color(uiColor: .secondarySystemBackground))
                 .cornerRadius(12)
             }
             .accessibilityLabel("장소 검색")
@@ -266,7 +262,7 @@ struct LocationDetailPanel: View {
                 TextField("장소 이름을 입력하세요", text: $locationName)
                     .font(.suite(size: 16))
                     .padding(14)
-                    .background(Color.white)
+                    .background(Color(uiColor: .secondarySystemBackground))
                     .cornerRadius(12)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
@@ -283,7 +279,7 @@ struct LocationDetailPanel: View {
                 TextField("주소를 입력하세요", text: $locationAddress)
                     .font(.suite(size: 16))
                     .padding(14)
-                    .background(Color.white)
+                    .background(Color(uiColor: .secondarySystemBackground))
                     .cornerRadius(12)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
@@ -322,7 +318,7 @@ struct LocationDetailPanel: View {
                     .labelsHidden()
             }
             .padding(16)
-            .background(Color.white)
+            .background(Color(uiColor: .secondarySystemBackground))
             .cornerRadius(12)
             
             Spacer().frame(height: 20)

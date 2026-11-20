@@ -6,13 +6,13 @@ import org.junit.Test
 class InviteCodeParserTest {
     @Test
     fun `초대 메시지 전체를 붙여 넣으면 코드만 남는다`() {
-        val message = "[SMAP] 우리 가족 그룹에 초대합니다!\n초대 코드: 5JDZRMNVEV\n링크: https://nextstep.aiagnt.kr/group/12/join?code=5JDZRMNVEV"
+        val message = "[SMAP] 우리 가족 그룹에 초대합니다!\n초대 코드: 5JDZRMNVEV\n링크: https://smap.aiagnt.kr/group/12/join?code=5JDZRMNVEV"
         assertEquals("5JDZRMNVEV", InviteCodeParser.extract(message))
     }
 
     @Test
     fun `링크만 붙여 넣으면 code 값을 쓴다`() {
-        assertEquals("AB12CD34", InviteCodeParser.extract("https://nextstep.aiagnt.kr/group/3/join?code=ab12cd34"))
+        assertEquals("AB12CD34", InviteCodeParser.extract("https://smap.aiagnt.kr/group/3/join?code=ab12cd34"))
     }
 
     @Test

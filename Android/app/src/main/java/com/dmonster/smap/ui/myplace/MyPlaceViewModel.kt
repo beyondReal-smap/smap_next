@@ -504,7 +504,8 @@ class MyPlaceViewModel @Inject constructor(
         lat: Double,
         lng: Double,
         memo: String?,
-        enterAlarm: String = "Y"
+        enterAlarm: String = "Y",
+        icon: PlaceKind
     ) {
         val group = _selectedGroup.value ?: return
         val member = _selectedMember.value ?: return
@@ -523,7 +524,8 @@ class MyPlaceViewModel @Inject constructor(
                     lat = lat,
                     lng = lng,
                     memo = memo,
-                    enterAlarm = enterAlarm
+                    enterAlarm = enterAlarm,
+                    icon = icon.key
                 )
             }) {
                 is ApiResult.Success -> {
@@ -563,7 +565,8 @@ class MyPlaceViewModel @Inject constructor(
         lat: Double,
         lng: Double,
         memo: String?,
-        enterAlarm: String? = null
+        enterAlarm: String? = null,
+        icon: PlaceKind
     ) {
         if (title.isBlank()) return
 
@@ -577,7 +580,8 @@ class MyPlaceViewModel @Inject constructor(
                     lat = lat,
                     lng = lng,
                     memo = memo,
-                    enterAlarm = enterAlarm
+                    enterAlarm = enterAlarm,
+                    icon = icon.key
                 )
             }) {
                 is ApiResult.Success -> {
@@ -614,7 +618,8 @@ class MyPlaceViewModel @Inject constructor(
                     lat = location.latitude,
                     lng = location.longitude,
                     memo = location.memo,
-                    enterAlarm = newStatus
+                    enterAlarm = newStatus,
+                    icon = location.sltIcon // 알림만 바꾸므로 받은 값 그대로(null 이면 그대로 null)
                 )
             }) {
                 is ApiResult.Success -> {

@@ -1,5 +1,6 @@
 package com.dmonster.smap.ui.navigation
 
+import com.dmonster.smap.ui.theme.FamilyColors
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 import androidx.compose.ui.layout.layoutId
@@ -200,8 +201,8 @@ fun MainTabScreen(
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = tabColor,
                             selectedTextColor = tabColor,
-                            unselectedIconColor = Color(0xFF94A3B8),
-                            unselectedTextColor = Color(0xFF94A3B8),
+                            unselectedIconColor = FamilyColors.Muted,
+                            unselectedTextColor = FamilyColors.Muted,
                             indicatorColor = Color.Transparent
                         )
                     )

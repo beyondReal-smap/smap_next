@@ -9,11 +9,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -31,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -124,8 +128,10 @@ fun GroupPickerSheet(
     onSelect: (SmapGroup) -> Unit,
     onDismiss: () -> Unit,
     onCreateGroup: (() -> Unit)? = null,
+    compact: Boolean = false,
 ) {
     val colors = MaterialTheme.colorScheme
+    val contentHeight = minOf(320.dp, LocalConfiguration.current.screenHeightDp.dp * 0.44f)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -135,6 +141,7 @@ fun GroupPickerSheet(
             Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
+                .then(if (compact) Modifier.heightIn(max = contentHeight).verticalScroll(rememberScrollState()) else Modifier)
                 .padding(bottom = SmapSpacing.md),
         ) {
             Text(

@@ -1,16 +1,15 @@
 import SwiftUI
 
-// MARK: - 그룹 탭 (Android GroupComponents.kt 이식, 36단계 재설계)
-//
-// 이전: 머리 글자 + 남색·분홍 통계 카드 두 장 + 초대 코드 입력 + 흰 카드 목록 + 오른쪽 아래 떠 있는 + 버튼.
-// 지금: 회색 바탕 위 남색 요약 카드(인사·그룹/멤버 수) → "내 그룹 N" 구역(제목 옆 + 새 그룹) → "초대 코드로 참여" 구역.
-// 떠 있는 + 버튼은 목록 아래쪽 항목을 가리고 다른 탭과 위치가 달라 제목 옆 글자 버튼으로 옮겼다.
+// MARK: - 그룹 탭
 
 struct GroupListView: View {
     @Environment(\.smapAccent) private var accent
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var viewModel = GroupViewModel()
     @State private var inviteCode: String = ""
     @State private var showCreateModal: Bool = false
+
+    @State private var showJoin = false
 
     private var currentUserIdx: Int? { AuthService.shared.getUserData()?.mt_idx }
 
@@ -22,19 +21,28 @@ struct GroupListView: View {
                         groups: viewModel.groups,
                         userName: AuthService.shared.getUserData()?.displayName,
                         currentUserIdx: currentUserIdx,
-                        isLoading: showPlaceholder
+                        isLoading: showPlaceholder,
+                        showJoin: showJoin,
+                        onCreate: { showCreateModal = true },
+                        onToggleJoin: {
+                            let motion: Animation = showJoin ? .easeIn(duration: 0.18) : .easeOut(duration: 0.25)
+                            withAnimation(reduceMotion ? nil : motion) { showJoin.toggle() }
+                        }
                     )
-                    groupSection
-                    InviteJoinSection(inviteCode: $inviteCode, isJoining: viewModel.isJoining) {
-                        viewModel.joinGroup(inviteCode: inviteCode)
-                        inviteCode = ""
+                    if showJoin {
+                        InviteJoinSection(inviteCode: $inviteCode, isJoining: viewModel.isJoining) {
+                            viewModel.joinGroup(inviteCode: inviteCode)
+                            inviteCode = ""
+                        }
+                        .transition(.offset(y: -8).combined(with: .opacity))
                     }
+                    groupSection
                 }
                 .padding(SMAPTheme.Spacing.md)
                 .padding(.bottom, SMAPTheme.Spacing.lg)
             }
             .scrollDismissesKeyboard(.interactively)
-            .background(SMAPTheme.Surface.canvas.ignoresSafeArea())
+            .background(SMAPTheme.Family.paper.ignoresSafeArea())
             .refreshable { viewModel.fetchGroups() }
             .toolbar(.hidden, for: .navigationBar)
             .onAppear { viewModel.fetchGroups() }
@@ -58,23 +66,7 @@ struct GroupListView: View {
     private var showPlaceholder: Bool { viewModel.isLoading && viewModel.groups.isEmpty }
 
     private var groupSection: some View {
-        SMAPSection(
-            title: viewModel.groups.isEmpty ? "내 그룹" : "내 그룹 \(viewModel.groups.count)",
-            action: {
-                Button { showCreateModal = true } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "plus").font(.system(size: 14, weight: .semibold))
-                        Text("새 그룹").font(SMAPTheme.Font.captionBold)
-                    }
-                    .foregroundStyle(accent.base)
-                    .padding(.horizontal, SMAPTheme.Spacing.sm)
-                    .frame(minHeight: 44)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("새 그룹 만들기")
-            }
-        ) {
+        SMAPSection(title: viewModel.groups.isEmpty ? "내 그룹" : "내 그룹 · \(viewModel.groups.count)") {
             if showPlaceholder {
                 SkeletonRow()
                 SMAPRowDivider()
@@ -104,18 +96,26 @@ struct GroupListView: View {
     }
 }
 
-/// 그룹 목록 한 줄 — 남색 원 아이콘 · 이름 · "멤버 N명 · 메모" · (그룹장 배지) · 꺾쇠
+/// 그룹 이름과 인원, 역할을 함께 표시한다.
 private struct GroupRow: View {
     let group: SmapGroup
     let isMine: Bool
 
     var body: some View {
+        let name = group.sgt_title.flatMap { $0.isEmpty ? nil : $0 } ?? "이름 없는 그룹"
         let memo = group.sgt_memo.flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
         // NavigationLink 가 누름을 처리하므로 행 자체에는 동작을 주지 않는다.
         SMAPListRow(
-            title: group.sgt_title.flatMap { $0.isEmpty ? nil : $0 } ?? "이름 없는 그룹",
+            title: name,
             subtitle: (["멤버 \(group.member_count ?? 0)명"] + [memo].compactMap { $0 }).joined(separator: " · "),
-            leading: { SMAPRowIcon(systemImage: "person.3.fill", emphasized: true) },
+            leading: {
+                Text(String(name.prefix(1)))
+                    .font(SMAPTheme.Font.headline)
+                    .foregroundStyle(SMAPTheme.Family.ink)
+                    .frame(width: 44, height: 48)
+                    .background(SMAPTheme.Family.highlight, in: RoundedRectangle(cornerRadius: 12))
+                    .accessibilityHidden(true)
+            },
             trailing: {
                 HStack(spacing: SMAPTheme.Spacing.sm) {
                     if isMine { RoleBadge(text: "그룹장") }
@@ -127,7 +127,7 @@ private struct GroupRow: View {
     }
 }
 
-/// 그룹 탭 맨 위 남색 요약 카드 — 인사 + 그룹·멤버 수.
+/// 그룹을 만들거나 초대 코드 입력을 열 수 있는 머리 카드.
 /// 멤버 수는 그룹별 인원의 합이라 여러 그룹에 같은 사람이 있으면 겹쳐 센다("전체 멤버", Android 와 같은 기준).
 private struct GroupListHero: View {
     let groups: [SmapGroup]
@@ -135,26 +135,38 @@ private struct GroupListHero: View {
     let currentUserIdx: Int?
     let isLoading: Bool
 
-    var body: some View {
-        SMAPHeroCard {
-            SMAPHeroHeading(
-                eyebrow: userName.map { "안녕하세요, \($0)님" } ?? "안녕하세요",
-                title: title
-            )
-            if !isLoading && !groups.isEmpty {
-                SMAPHeroStats(stats: [
-                    ("\(groups.count)", "내 그룹"),
-                    ("\(groups.reduce(0) { $0 + ($1.member_count ?? 0) })", "전체 멤버"),
-                    ("\(groups.filter { currentUserIdx != nil && $0.mt_idx == currentUserIdx }.count)", "내가 만든 그룹"),
-                ])
-            }
-        }
-    }
+    let showJoin: Bool
+    let onCreate: () -> Void
+    let onToggleJoin: () -> Void
 
-    private var title: String {
-        if isLoading { return "그룹을 불러오고 있어요" }
-        if groups.isEmpty { return "그룹을 만들고\n가족을 초대해 보세요" }
-        return "\(groups.count)개 그룹에서\n함께 위치를 나누고 있어요"
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(userName.map { "\($0)님의 그룹" } ?? "내 그룹")
+                    .font(SMAPTheme.Font.captionBold).foregroundStyle(SMAPTheme.Family.highlight)
+                Text("함께하는 사람들")
+                    .font(.suite(size: 30, weight: .bold)).foregroundStyle(.white)
+                    .accessibilityAddTraits(.isHeader)
+                Text(isLoading ? "그룹을 불러오는 중…" : groups.isEmpty ? "첫 그룹을 만들거나 초대 코드로 참여하세요" :
+                     "그룹 \(groups.count)개 · 그룹별 멤버 합계 \(groups.reduce(0) { $0 + ($1.member_count ?? 0) })명 · 내가 만든 그룹 \(groups.filter { currentUserIdx != nil && $0.mt_idx == currentUserIdx }.count)개")
+                    .font(SMAPTheme.Font.captionSmall).foregroundStyle(.white.opacity(0.85))
+            }
+            HStack(spacing: 10) {
+                Button(action: onCreate) {
+                    Label("새 그룹", systemImage: "plus").frame(maxWidth: .infinity, minHeight: 46)
+                        .foregroundStyle(SMAPTheme.Family.ink)
+                        .background(SMAPTheme.Family.highlight, in: RoundedRectangle(cornerRadius: 13))
+                }
+                Button(action: onToggleJoin) {
+                    Label(showJoin ? "코드 입력 닫기" : "코드로 참여", systemImage: "envelope")
+                        .frame(maxWidth: .infinity, minHeight: 46).foregroundStyle(.white)
+                        .overlay { RoundedRectangle(cornerRadius: 13).strokeBorder(.white.opacity(0.45)) }
+                }
+            }
+            .buttonStyle(.plain).font(SMAPTheme.Font.captionBold)
+        }
+        .padding(20).frame(maxWidth: .infinity, alignment: .leading)
+        .background(SMAPTheme.Family.ink, in: RoundedRectangle(cornerRadius: 24))
     }
 }
 

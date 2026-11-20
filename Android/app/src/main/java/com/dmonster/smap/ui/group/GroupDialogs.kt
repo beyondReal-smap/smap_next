@@ -137,7 +137,7 @@ fun QRCodeDialog(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = Color.White,
+        containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
         dragHandle = null,
         contentWindowInsets = { WindowInsets(0, 0, 0, 0) }
@@ -164,7 +164,7 @@ fun QRCodeDialog(
                     fontSize = 17.sp,
                     fontFamily = SuiteFont,
                     fontWeight = FontWeight.SemiBold,
-                    color = Color.Black
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 TextButton(onClick = onDismiss) {
                     Text(
@@ -172,7 +172,7 @@ fun QRCodeDialog(
                         fontSize = 16.sp,
                         fontFamily = SuiteFont,
                         fontWeight = FontWeight.Medium,
-                        color = BrandColors.Primary
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }
@@ -185,7 +185,7 @@ fun QRCodeDialog(
                 fontSize = 22.sp,
                 fontFamily = SuiteFont,
                 fontWeight = FontWeight.Bold,
-                color = Color.Black
+                color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
@@ -202,7 +202,7 @@ fun QRCodeDialog(
             if (currentBitmap != null) {
                 Card(
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
                     modifier = Modifier.size(280.dp)
                 ) {
@@ -226,7 +226,7 @@ fun QRCodeDialog(
                         .background(Color.Gray.copy(alpha = 0.1f), RoundedCornerShape(20.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = BrandColors.Primary)
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             }
 
@@ -255,7 +255,7 @@ fun QRCodeDialog(
                     .padding(horizontal = 24.dp)
                     .height(52.dp),
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = BrandColors.Primary)
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
                 Icon(
                     imageVector = Icons.Filled.FileUpload,
@@ -283,7 +283,7 @@ private fun InstructionRow(number: String, text: String) {
         Box(
             modifier = Modifier
                 .size(24.dp)
-                .background(BrandColors.Primary, CircleShape),
+                .background(MaterialTheme.colorScheme.primary, CircleShape),
             contentAlignment = Alignment.Center
         ) {
             Text(

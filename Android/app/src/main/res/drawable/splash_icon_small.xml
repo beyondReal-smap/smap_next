@@ -1,9 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Android 12+ 스플래시 아이콘 — 앱 아이콘의 전경(두 핀)만 남색 배경 위에 그린다.
-  적응형 아이콘 전경과 스플래시 아이콘은 둘 다 "캔버스의 2/3 원 안" 규격이라 그대로 맞는다.
-  (이전: 아이콘 그림 전체를 30% 안쪽에 넣어 밝은 배경 위에 남색 사각이 동떨어져 보였다.)
+  Android 시스템 스플래시의 288dp 영역에서 체크 핀이 iOS의 248pt 이미지와 비슷하게 보이도록 맞춘다.
 -->
 <inset xmlns:android="http://schemas.android.com/apk/res/android"
     android:drawable="@drawable/splash_pins"
-    android:inset="0dp" />
+    android:inset="7%" />

@@ -12,60 +12,102 @@ import SwiftUI
 // MARK: - Terms View
 struct RegisterTermsView: View {
     @ObservedObject var viewModel: RegisterViewModel
-    
+    let allAgreed: Bool
+    let toggleAll: () -> Void
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("서비스 이용을 위해\n약관에 동의해주세요")
-                .font(.suite(size: 24, weight: .bold))
-                .foregroundColor(SMAPTheme.Color.textPrimary)
-            
-            // 한 행 = 화살표 터치 영역 44pt + 사이 4pt = 48pt(Android 와 같음). 예전엔 사이 16pt 라 60pt 로 벌어져 보였다.
-            VStack(spacing: 4) {
-                ToggleRow(title: "(필수) 서비스 이용약관", isChecked: $viewModel.registerData.mt_agree1, termsDestination: AnyView(ServiceTermsView()))
-                ToggleRow(title: "(필수) 개인정보 처리방침", isChecked: $viewModel.registerData.mt_agree2, termsDestination: AnyView(PrivacyPolicyView()))
-                ToggleRow(title: "(필수) 위치기반서비스 이용약관", isChecked: $viewModel.registerData.mt_agree3, termsDestination: AnyView(LocationTermsView()))
-                ToggleRow(title: "(선택) 개인정보 제3자 제공 동의", isChecked: $viewModel.registerData.mt_agree4, termsDestination: AnyView(ThirdPartyProvisionView()))
-                ToggleRow(title: "(선택) 마케팅 정보 수신 동의", isChecked: $viewModel.registerData.mt_agree5, termsDestination: AnyView(MarketingConsentView()))
+        VStack(alignment: .leading, spacing: 16) {
+            RegisterPhotoHeader(image: "LoginArrivalDoorway", title: "이용 약관을\n확인해 주세요", height: 176)
+            Button(action: toggleAll) {
+                HStack(spacing: 12) {
+                    Image(systemName: allAgreed ? "checkmark.circle.fill" : "circle")
+                    Text("전체 동의하기").font(.suite(size: 17, weight: .bold))
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .frame(minHeight: 54)
+                .foregroundStyle(SMAPAccent.family.deep)
+                .background(SMAPAccent.family.container, in: RoundedRectangle(cornerRadius: 14))
             }
-            .padding(.top, 4)
-            
-            Spacer()
+            .accessibilityValue(allAgreed ? "선택됨" : "선택 안 됨")
+
+            VStack(spacing: 0) {
+                ToggleRow(title: "서비스 이용약관", required: true, isChecked: $viewModel.registerData.mt_agree1, termsDestination: AnyView(ServiceTermsView()))
+                ToggleRow(title: "개인정보 처리방침", required: true, isChecked: $viewModel.registerData.mt_agree2, termsDestination: AnyView(PrivacyPolicyView()))
+                ToggleRow(title: "위치기반서비스 이용약관", required: true, isChecked: $viewModel.registerData.mt_agree3, termsDestination: AnyView(LocationTermsView()))
+                Divider().padding(.vertical, 4)
+                ToggleRow(title: "개인정보 제3자 제공 동의", required: false, isChecked: $viewModel.registerData.mt_agree4, termsDestination: AnyView(ThirdPartyProvisionView()))
+                ToggleRow(title: "마케팅 정보 수신 동의", required: false, isChecked: $viewModel.registerData.mt_agree5, termsDestination: AnyView(MarketingConsentView()))
+            }
         }
-        .padding()
     }
 }
 
 struct ToggleRow: View {
     let title: String
+    let required: Bool
     @Binding var isChecked: Bool
-    /// 약관 상세 화면. 행 오른쪽 화살표를 누르면 시트로 연다.
     let termsDestination: AnyView
     @State private var showTerms = false
-    
+
     var body: some View {
-        HStack {
-            Button(action: { isChecked.toggle() }) {
-                HStack {
+        HStack(spacing: 0) {
+            Button { isChecked.toggle() } label: {
+                HStack(spacing: 8) {
                     Image(systemName: isChecked ? "checkmark.circle.fill" : "circle")
-                        .foregroundColor(isChecked ? SMAPTheme.Color.primary : .gray)
-                    Text(title)
-                        .font(.suite(size: 16))
-                        .foregroundColor(SMAPTheme.Color.textPrimary)
+                        .foregroundStyle(isChecked ? SMAPAccent.family.base : .secondary)
+                        .font(.system(size: 19))
+                    Text(required ? "필수" : "선택")
+                        .font(.suite(size: 12, weight: .bold))
+                        .foregroundStyle(.secondary)
+                    Text(title).font(.suite(size: 15, weight: .medium))
+                        .multilineTextAlignment(.leading)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(minHeight: 48)
+                .contentShape(Rectangle())
             }
-            Spacer()
-            Button(action: { showTerms = true }) {
+            .accessibilityLabel("\(required ? "필수" : "선택") \(title)")
+            .accessibilityValue(isChecked ? "선택됨" : "선택 안 됨")
+            Button { showTerms = true } label: {
                 Image(systemName: "chevron.right")
-                    .foregroundColor(.gray)
-                    .frame(width: 44, height: 44)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 44, height: 48)
                     .contentShape(Rectangle())
             }
-            .accessibilityLabel("약관 보기")
+            .accessibilityLabel("\(title) 보기")
         }
-        // 약관 화면은 자체 "뒤로" 버튼(dismiss)을 툴바에 두므로 NavigationStack 으로 감싸 표시한다.
         .sheet(isPresented: $showTerms) {
             NavigationStack { termsDestination }
+                .presentationDragIndicator(.visible)
         }
+    }
+}
+
+private struct RegisterPhotoHeader: View {
+    let image: String
+    let title: String
+    let height: CGFloat
+
+    var body: some View {
+        Text(title)
+            .font(.suite(size: 29, weight: .bold))
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(20)
+            .frame(minHeight: height, alignment: .bottomLeading)
+            .background {
+                GeometryReader { geometry in
+                    Image(image).resizable().scaledToFill()
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .clipped()
+                        .overlay(LinearGradient(colors: [.clear, .black.opacity(0.68)], startPoint: .top, endPoint: .bottom))
+                        .accessibilityHidden(true)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 20))
+            .accessibilityAddTraits(.isHeader)
     }
 }
 
@@ -78,8 +120,8 @@ struct RegisterPhoneView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: SMAPTheme.Spacing.sm) {
             RegisterStepHeader(
-                title: "이메일을 입력해 주세요",
-                description: "이 이메일이 로그인 아이디가 됩니다.\n인증번호를 보내 본인 확인을 진행해요."
+                title: "어떤 이메일로 가입할까요?",
+                description: "로그인에 사용할 이메일로 인증번호를 보내드려요."
             )
 
             SMAPTextField(
@@ -93,7 +135,6 @@ struct RegisterPhoneView: View {
 
             Spacer()
         }
-        .padding(SMAPTheme.Spacing.lg)
     }
 }
 
@@ -110,7 +151,7 @@ struct RegisterVerificationView: View {
         VStack(alignment: .leading, spacing: SMAPTheme.Spacing.sm) {
             RegisterStepHeader(
                 title: "인증번호를 입력해 주세요",
-                description: "\(viewModel.registerData.mt_id)\n위 주소로 보낸 6자리 숫자를 입력해 주세요."
+                description: "\(viewModel.registerData.mt_id)로 보낸 숫자 6자리를 입력해 주세요."
             )
 
             SMAPTextField(
@@ -136,7 +177,7 @@ struct RegisterVerificationView: View {
                     // 대기 중에는 몇 초 뒤에 누를 수 있는지 알려 준다.
                     Text(resendWait > 0 ? "다시 받기 (\(resendWait)초)" : "인증번호 다시 받기")
                         .font(SMAPTheme.Font.secondaryMedium)
-                        .foregroundStyle(canResend ? SMAPTheme.Color.primary : SMAPTheme.Color.textSecondary)
+                        .foregroundStyle(canResend ? SMAPAccent.family.base : .secondary)
                         .frame(minHeight: 44) // 글자만 누르는 버튼이라 터치 영역을 44pt 로 보장
                         .contentShape(Rectangle())
                 }
@@ -147,7 +188,6 @@ struct RegisterVerificationView: View {
 
             Spacer()
         }
-        .padding(SMAPTheme.Spacing.lg)
     }
 
     func timeString(time: Int) -> String {
@@ -163,115 +203,43 @@ private struct RegisterStepHeader: View {
     let description: String
 
     var body: some View {
-        Text(title)
-            .font(SMAPTheme.Font.title)
-            .foregroundStyle(SMAPTheme.Color.textPrimary)
-        Text(description)
-            .font(SMAPTheme.Font.secondary)
-            .foregroundStyle(SMAPTheme.Color.textSecondary)
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.suite(size: 28, weight: .bold))
+                .tracking(-0.6)
+                .accessibilityAddTraits(.isHeader)
+            Text(description)
+                .font(SMAPTheme.Font.secondary)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
 // MARK: - Basic Info View
 struct RegisterBasicInfoView: View {
     @ObservedObject var viewModel: RegisterViewModel
-    @FocusState private var focusedField: String?
-    
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                Text("기본 정보를\n입력해주세요")
-                    .font(.suite(size: 24, weight: .bold))
-                    .foregroundColor(SMAPTheme.Color.textPrimary)
-                
-                VStack(spacing: 16) {
-                    // 이름
-                    FocusableTextField(
-                        placeholder: "이름",
-                        text: $viewModel.registerData.mt_name,
-                        icon: "person"
-                    )
-                    .frame(height: 56)
-                    
-                    // 닉네임
-                    FocusableTextField(
-                        placeholder: "닉네임",
-                        text: $viewModel.registerData.mt_nickname,
-                        icon: "tag"
-                    )
-                    .frame(height: 56)
-                    
-                    // 이메일 (선택)
-                    VStack(alignment: .leading, spacing: 4) {
-                        FocusableTextField(
-                            placeholder: "전화번호 (선택)",
-                            text: Binding(
-                                 get: { viewModel.optionalPhone },
-                                 set: { viewModel.optionalPhone = String($0.filter { $0.isNumber }.prefix(11)) }
-                             ),
-                            icon: "envelope",
-                            keyboardType: .phonePad
-                        )
-                        .frame(height: 56)
-                        
-                        // 이메일 형식 오류 표시
-                        if let email = viewModel.registerData.mt_email, !email.isEmpty, !viewModel.validateEmail(email) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "exclamationmark.circle.fill")
-                                    .font(.suite(size: 12))
-                                Text("올바른 이메일 형식을 입력해주세요")
-                                    .font(.suite(size: 12))
-                            }
-                            .foregroundColor(SMAPTheme.Color.error)
-                        }
-                    }
-                    
-                    // 비밀번호 (토글 가능) - 소셜 계정은 생략
-                    Group {
-                        VStack(alignment: .leading, spacing: 8) {
-                            FocusableSecureField(
-                                 placeholder: "비밀번호",
-                                 text: Binding(
-                                     get: { viewModel.registerData.mt_pwd ?? "" },
-                                     set: { viewModel.registerData.mt_pwd = $0 }
-                                 ),
-                                 icon: "lock",
-                                 showPassword: $viewModel.showPassword
-                            )
-                            .frame(height: 56)
-                            
-                            // 비밀번호 규칙 표시
-                            PasswordRulesView(password: viewModel.registerData.mt_pwd ?? "", viewModel: viewModel)
-                        }
-                        
-                        // 비밀번호 확인 (토글 가능)
-                        VStack(alignment: .leading, spacing: 4) {
-                            FocusableSecureField(
-                                placeholder: "비밀번호 확인",
-                                text: $viewModel.passwordConfirm,
-                                icon: "lock.shield",
-                                showPassword: $viewModel.showPasswordConfirm
-                            )
-                            .frame(height: 56)
-                            
-                            // 비밀번호 일치 여부 표시
-                            if !viewModel.passwordConfirm.isEmpty {
-                                let matches = viewModel.registerData.mt_pwd == viewModel.passwordConfirm
-                                HStack(spacing: 4) {
-                                    Image(systemName: matches ? "checkmark.circle.fill" : "xmark.circle.fill")
-                                        .font(.suite(size: 12))
-                                    Text(matches ? "비밀번호가 일치합니다" : "비밀번호가 일치하지 않습니다")
-                                        .font(.suite(size: 12))
-                                }
-                                .foregroundColor(matches ? .green : SMAPTheme.Color.error)
-                            }
-                        }
-                    }
-                }
-                
-                Spacer()
-            }
-            .padding()
+        VStack(alignment: .leading, spacing: 18) {
+            RegisterStepHeader(title: "계정 정보를 입력해 주세요", description: "닉네임은 가족에게 보이는 이름이에요.")
+            SMAPTextField("이름 입력", text: $viewModel.registerData.mt_name, label: "이름", textContentType: .name)
+            SMAPTextField("닉네임 입력", text: $viewModel.registerData.mt_nickname, label: "닉네임", textContentType: .nickname)
+            SMAPTextField("숫자만 입력", text: Binding(
+                get: { viewModel.optionalPhone },
+                set: { viewModel.optionalPhone = String($0.filter { $0.isNumber }.prefix(11)) }
+            ), label: "전화번호 (선택)", keyboardType: .phonePad, textContentType: .telephoneNumber)
+
+            Divider()
+            SMAPTextField("새 비밀번호", text: Binding(
+                get: { viewModel.registerData.mt_pwd ?? "" },
+                set: { viewModel.registerData.mt_pwd = $0 }
+            ), label: "비밀번호", isSecure: true, textContentType: .newPassword)
+            PasswordRulesView(password: viewModel.registerData.mt_pwd ?? "", viewModel: viewModel)
+            SMAPTextField("비밀번호 다시 입력", text: $viewModel.passwordConfirm, label: "비밀번호 확인",
+                          helperText: !viewModel.passwordConfirm.isEmpty && viewModel.passwordConfirm == viewModel.registerData.mt_pwd ? "비밀번호가 일치해요." : nil,
+                          errorMessage: !viewModel.passwordConfirm.isEmpty && viewModel.passwordConfirm != viewModel.registerData.mt_pwd ? "비밀번호가 일치하지 않아요." : nil,
+                          isSecure: true, textContentType: .newPassword)
         }
     }
 }
@@ -284,22 +252,11 @@ struct PasswordRulesView: View {
     var body: some View {
         let details = viewModel.passwordValidationDetails(password)
         
-        VStack(alignment: .leading, spacing: 4) {
-            Text("비밀번호 규칙")
-                .font(.suite(size: 12, weight: .medium))
-                .foregroundColor(SMAPTheme.Color.textSecondary)
-            
-            HStack(spacing: 12) {
-                PasswordRuleItem(text: "8자 이상", isValid: details.hasMinLength)
-                PasswordRuleItem(text: "영문 대소문자", isValid: details.hasLetter)
-                PasswordRuleItem(text: "숫자", isValid: details.hasNumber)
-                PasswordRuleItem(text: "특수문자", isValid: details.hasSpecialChar)
-            }
-            
-            // 조합 안내
-            Text("* 영문 대소문자, 숫자, 특수문자를 모두 포함해주세요")
-                .font(.suite(size: 11))
-                .foregroundColor(SMAPTheme.Color.textSecondary)
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 95), alignment: .leading)], alignment: .leading, spacing: 6) {
+            PasswordRuleItem(text: "8자 이상", isValid: details.hasMinLength)
+            PasswordRuleItem(text: "영문 대소문자", isValid: details.hasLetter)
+            PasswordRuleItem(text: "숫자", isValid: details.hasNumber)
+            PasswordRuleItem(text: "특수문자", isValid: details.hasSpecialChar)
         }
     }
 }
@@ -336,108 +293,33 @@ struct RegisterProfileView: View {
     @State private var provideGender: Bool = false
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("프로필 정보를\n설정해주세요")
-                .font(.suite(size: 24, weight: .bold))
-                .foregroundColor(SMAPTheme.Color.textPrimary)
-            
-            // Birth Date
+        VStack(alignment: .leading, spacing: 24) {
+            RegisterStepHeader(title: "프로필을 채워볼까요?", description: "생년월일과 성별은 선택 사항이에요. 비워 두고 가입할 수 있어요.")
             VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("생년월일")
-                        .font(.suite(size: 16, weight: .bold))
-                    Text("(선택)")
-                        .font(.suite(size: 12))
-                        .foregroundColor(SMAPTheme.Color.textSecondary)
-                    
-                    Spacer()
-                    
-                    Toggle("", isOn: $provideBirthDate)
-                        .labelsHidden()
-                        .scaleEffect(0.8)
-                }
-                
+                Toggle("생년월일", isOn: $provideBirthDate)
+                    .font(.suite(size: 17, weight: .semibold))
+                    .frame(minHeight: 48)
                 if provideBirthDate {
-                    // DatePicker (Wheel Style)
-                    DatePicker(
-                        "",
-                        selection: $birthDate,
-                        in: ...Date(),
-                        displayedComponents: .date
-                    )
-                    .datePickerStyle(.wheel)
-                    .labelsHidden()
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 150)
-                    .background(Color(white: 0.96))
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(SMAPTheme.Color.primary.opacity(0.1), lineWidth: 1)
-                    )
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-                } else {
-                    Text("생년월일을 입력하지 않습니다.")
-                        .font(.suite(size: 14))
-                        .foregroundColor(SMAPTheme.Color.textSecondary)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .background(Color(white: 0.98))
-                        .cornerRadius(12)
-                }
-                
-                // 생년월일 형식 에러 표시 (미래 날짜 등 DatePicker로 제한되지만 검증 로직 결과 표시)
-                if let birth = viewModel.registerData.mt_birth, !birth.isEmpty, !viewModel.validateBirthDate(birth) {
-                     HStack(spacing: 4) {
-                         Image(systemName: "exclamationmark.circle.fill")
-                             .font(.suite(size: 12))
-                         Text("생년월일을 확인해주세요")
-                             .font(.suite(size: 12))
-                     }
-                     .foregroundColor(SMAPTheme.Color.error)
-                }
-            }
-            .padding(.bottom, 10)
-            
-            // Gender
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("성별")
-                        .font(.suite(size: 16, weight: .bold))
-                    Text("(선택)")
-                        .font(.suite(size: 12))
-                        .foregroundColor(SMAPTheme.Color.textSecondary)
-                    
-                    Spacer()
-                    
-                    Toggle("", isOn: $provideGender)
-                        .labelsHidden()
-                        .scaleEffect(0.8)
-                }
-                
-                if provideGender {
-                    HStack(spacing: 16) {
-                        GenderButton(title: "남성", isSelected: viewModel.registerData.mt_gender == 1) {
-                            viewModel.registerData.mt_gender = 1
-                        }
-                        GenderButton(title: "여성", isSelected: viewModel.registerData.mt_gender == 2) {
-                            viewModel.registerData.mt_gender = 2
-                        }
+                    DatePicker("생년월일 선택", selection: $birthDate, in: ...Date(), displayedComponents: .date)
+                        .datePickerStyle(.compact)
+                    if let birth = viewModel.registerData.mt_birth, !birth.isEmpty, !viewModel.validateBirthDate(birth) {
+                        Text("생년월일을 확인해 주세요.").font(SMAPTheme.Font.caption).foregroundStyle(SMAPTheme.Color.error)
                     }
-                } else {
-                    Text("성별을 선택하지 않습니다.")
-                        .font(.suite(size: 14))
-                        .foregroundColor(SMAPTheme.Color.textSecondary)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .background(Color(white: 0.98))
-                        .cornerRadius(12)
+                }
+                Divider()
+                Toggle("성별", isOn: $provideGender)
+                    .font(.suite(size: 17, weight: .semibold))
+                    .frame(minHeight: 48)
+                if provideGender {
+                    HStack(spacing: 10) {
+                        GenderButton(title: "남성", isSelected: viewModel.registerData.mt_gender == 1) { viewModel.registerData.mt_gender = 1 }
+                        GenderButton(title: "여성", isSelected: viewModel.registerData.mt_gender == 2) { viewModel.registerData.mt_gender = 2 }
+                    }
                 }
             }
-            
-            Spacer()
+            .padding(16)
+            .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
         }
-        .padding()
         .onAppear {
             // 초기 로드 시 기존 데이터가 있으면 토글 활성화
             if let birth = viewModel.registerData.mt_birth, !birth.isEmpty {
@@ -488,50 +370,27 @@ struct GenderButton: View {
     
     var body: some View {
         Button(action: action) {
-            Text(title)
-                .font(.suite(size: 16, weight: .medium))
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(isSelected ? SMAPTheme.Color.primary : Color.white)
-                .foregroundColor(isSelected ? .white : SMAPTheme.Color.textPrimary)
-                .cornerRadius(12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(isSelected ? SMAPTheme.Color.primary : Color.gray.opacity(0.3), lineWidth: 1)
-                )
+            HStack {
+                if isSelected { Image(systemName: "checkmark") }
+                Text(title)
+            }
+            .font(.suite(size: 16, weight: .medium))
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .foregroundStyle(isSelected ? Color.white : .primary)
+            .background(isSelected ? SMAPAccent.family.deep : Color(uiColor: .systemBackground), in: RoundedRectangle(cornerRadius: 12))
         }
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
-
-// MARK: - Complete View
 struct RegisterCompleteView: View {
-    @ObservedObject var viewModel: RegisterViewModel
-    
     var body: some View {
-        VStack(spacing: 20) {
-            Spacer()
-            
-            Image(systemName: "checkmark.circle.fill")
-                .resizable()
-                .frame(width: 80, height: 80)
-                .foregroundColor(SMAPTheme.Color.primary)
-            
-            Text("회원가입이\n완료되었습니다!")
-                .font(.suite(size: 24, weight: .bold))
-                .multilineTextAlignment(.center)
-            
-            Text("도착했어와 함께 소중한 일상을 공유해보세요.")
-                .font(.suite(size: 16))
-                .foregroundColor(.gray)
-                .multilineTextAlignment(.center)
-            
-            Spacer()
+        VStack(alignment: .leading, spacing: 16) {
+            RegisterPhotoHeader(image: "LoginArrivalCycling", title: "가입을 마쳤어요", height: 300)
+            Text("이제 가족과 위치와 일정을 공유할 수 있어요.")
+                .font(SMAPTheme.Font.body)
+                .foregroundStyle(.secondary)
         }
-        .padding()
-        .frame(maxWidth: .infinity)
-        // ScrollView 내부에서 수직 중앙 정렬 효과를 위해 화면 높이 활용
-        .frame(height: UIScreen.main.bounds.height - 200) 
     }
 }
 
@@ -540,6 +399,7 @@ struct RegisterCompleteView: View {
 struct NativeRegisterView: View {
     @StateObject private var viewModel = RegisterViewModel()
     @Environment(\.presentationMode) var presentationMode
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     
     // Callback when registration is complete or cancelled
     var onComplete: (() -> Void)?
@@ -549,155 +409,83 @@ struct NativeRegisterView: View {
     var onExistingUser: ((String) -> Void)?
     
     var body: some View {
-        ZStack {
-            Color.white.ignoresSafeArea()
-            
-            VStack(spacing: 0) {
-                // Custom Navigation Bar
-                HStack {
-                    if viewModel.currentStep != .complete {
-                        Button(action: {
-                            if viewModel.currentStep == .terms {
-                                // 약관 페이지에서 뒤로가기 -> 로그인 페이지로 이동
-                                // presentationMode.dismiss()는 rootViewController로 설정된 경우 효과 없음
-                                // onComplete 콜백이 로그인 페이지로 이동시킴
-                                onComplete?()
-                            } else {
-                                viewModel.previousStep()
-                            }
-                        }) {
-                            Image(systemName: "chevron.left")
-                                .font(.suite(size: 20, weight: .semibold))
-                                .foregroundColor(SMAPTheme.Color.textPrimary)
-                        }
-                        .accessibilityLabel("뒤로")
-                    }
-                    
-                    Spacer()
-                    
-                    Text(viewModel.currentStep == .phone ? "이메일 인증" : viewModel.currentStep.title)
-                        .font(.suite(size: 18, weight: .bold))
-                        .foregroundColor(SMAPTheme.Color.textPrimary)
-                    
-                    Spacer()
-                    
-                    // Empty view for balance
-                    if viewModel.currentStep != .complete {
-                        Image(systemName: "chevron.left")
-                            .font(.suite(size: 20, weight: .semibold))
-                            .foregroundColor(.clear)
-                    }
-                }
-                .padding()
-                
-                // Progress Bar
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
                 if viewModel.currentStep != .complete {
-                    ProgressView(value: currentProgress, total: 1.0)
-                        .accentColor(SMAPTheme.Color.primary)
-                        .scaleEffect(x: 1, y: 0.5, anchor: .center)
+                    Button {
+                        if viewModel.currentStep == .terms { onComplete?() } else { viewModel.previousStep() }
+                    } label: {
+                        Image(systemName: "arrow.left").frame(width: 44, height: 44)
+                    }
+                    .accessibilityLabel("뒤로")
                 }
-                
-                // Content with slide animation
+                Text("회원가입").font(.suite(size: 18, weight: .bold))
+                Spacer()
+                if viewModel.currentStep != .complete {
+                    Text("\(stage.title)  ·  \(stage.index)/4").font(SMAPTheme.Font.captionMedium).foregroundStyle(.secondary)
+                }
+            }
+            .frame(minHeight: 48)
+            if viewModel.currentStep != .complete {
+                HStack(spacing: 5) {
+                    ForEach(1...4, id: \.self) { index in
+                        Capsule().fill(index <= stage.index ? SMAPAccent.family.base : Color(uiColor: .systemGray5)).frame(height: 3)
+                    }
+                }
+                .accessibilityHidden(true)
+            }
+            ZStack {
                 ScrollView {
                     Group {
                         switch viewModel.currentStep {
-                        case .terms:
-                            RegisterTermsView(viewModel: viewModel)
-                        case .phone:
-                            RegisterPhoneView(viewModel: viewModel)
-                        case .verification:
-                            RegisterVerificationView(viewModel: viewModel)
-                        case .basicInfo:
-                            RegisterBasicInfoView(viewModel: viewModel)
-                        case .profile:
-                            RegisterProfileView(viewModel: viewModel)
-                        case .complete:
-                            RegisterCompleteView(viewModel: viewModel)
+                        case .terms: RegisterTermsView(viewModel: viewModel, allAgreed: isAllTermsAgreed, toggleAll: toggleAllTerms)
+                        case .phone: RegisterPhoneView(viewModel: viewModel)
+                        case .verification: RegisterVerificationView(viewModel: viewModel)
+                        case .basicInfo: RegisterBasicInfoView(viewModel: viewModel)
+                        case .profile: RegisterProfileView(viewModel: viewModel)
+                        case .complete: RegisterCompleteView()
                         }
                     }
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .trailing),
-                        removal: .move(edge: .leading)
-                    ))
-                    .id(viewModel.currentStep) // 페이지 변경 시 애니메이션 트리거
+                    .padding(.vertical, 22)
                 }
-                .animation(.easeInOut(duration: 0.3), value: viewModel.currentStep)
-                
-                // 약관 페이지 전체 동의 버튼 (다음 버튼 바로 위)
-                if viewModel.currentStep == .terms {
-                    Button(action: {
-                        toggleAllTerms()
-                    }) {
-                        HStack {
-                            Image(systemName: isAllTermsAgreed ? "checkmark.circle.fill" : "circle")
-                                .font(.suite(size: 22))
-                                .foregroundColor(isAllTermsAgreed ? SMAPTheme.Color.primary : .gray)
-                            
-                            Text("전체 동의하기")
-                                .font(.suite(size: 16, weight: .semibold))
-                                .foregroundColor(SMAPTheme.Color.textPrimary)
-                            
-                            Spacer()
-                        }
-                        .padding(16)
-                        .background(Color(UIColor.systemGray6))
-                        .cornerRadius(12)
-                    }
-                    .padding(.horizontal)
-                }
-                
-                // Bottom Button
-                if viewModel.currentStep != .complete {
-                    Button(action: {
-                        switch viewModel.currentStep {
-                        case .phone:
-                            // 전화번호 단계: SMS 발송
-                            viewModel.sendVerificationCode()
-                        case .verification:
-                            // 인증번호 단계: 코드 확인
-                            viewModel.verifyCode()
-                        default:
-                            viewModel.nextStep()
-                        }
-                    }) {
-                        HStack(spacing: 8) {
-                            if viewModel.isVerificationLoading || viewModel.isLoading {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            }
-                            Text(nextButtonTitle)
-                                .font(.suite(size: 16, weight: .bold))
-                        }
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 52)
-                        .background(isNextButtonEnabled ? SMAPTheme.Color.primary : SMAPTheme.Color.primary.opacity(0.3))
-                        .cornerRadius(12)
-                    }
-                    .padding()
-                    .disabled(!isNextButtonEnabled || viewModel.isVerificationLoading || viewModel.isLoading)
-                } else {
-                    Button(action: {
-                        presentationMode.wrappedValue.dismiss()
-                        onComplete?()
-                    }) {
-                        Text("시작하기")
-                            .font(.suite(size: 16, weight: .bold))
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 52)
-                            .background(SMAPTheme.Color.primary)
-                            .cornerRadius(12)
-                    }
-                    .padding()
-                }
+                .id(viewModel.currentStep)
+                .scrollBounceBehavior(.basedOnSize)
+                .scrollDismissesKeyboard(.interactively)
+                .transition(.opacity)
             }
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: viewModel.currentStep)
+            Button {
+                switch viewModel.currentStep {
+                case .phone: viewModel.sendVerificationCode()
+                case .verification: viewModel.verifyCode()
+                case .complete:
+                    presentationMode.wrappedValue.dismiss()
+                    onComplete?()
+                default: viewModel.nextStep()
+                }
+            } label: {
+                HStack {
+                    if viewModel.isVerificationLoading || viewModel.isLoading { ProgressView().tint(.white) }
+                    Text(nextButtonTitle).font(.suite(size: 17, weight: .bold))
+                }
+                .frame(maxWidth: .infinity, minHeight: 54)
+                .foregroundStyle(isNextButtonEnabled ? .white : .secondary)
+                .background(isNextButtonEnabled ? SMAPAccent.family.deep : Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
+            }
+            .padding(.vertical, 10)
+            .disabled(!isNextButtonEnabled || viewModel.isVerificationLoading || viewModel.isLoading)
         }
+        .padding(.horizontal, 20)
+        .frame(maxWidth: 520)
+        .frame(maxWidth: .infinity)
+        .background(Color(uiColor: .systemBackground).ignoresSafeArea())
+        .buttonStyle(.plain)
+        .smapAccent(.family)
         .toolbar(.hidden, for: .navigationBar)
-        .alert("오류", isPresented: $viewModel.showError) {
+        .alert("가입을 진행할 수 없어요", isPresented: $viewModel.showError) {
             Button("확인", role: .cancel) {}
         } message: {
-            Text(viewModel.errorMessage ?? "알 수 없는 오류")
+            Text(viewModel.errorMessage.flatMap { !$0.isEmpty && !$0.contains("알 수 없는 오류") ? $0 : nil } ?? "잠시 후 다시 시도해 주세요.")
         }
         .alert("알림", isPresented: $viewModel.socialSessionExpired) {
             Button("확인") { onComplete?() }
@@ -710,7 +498,7 @@ struct NativeRegisterView: View {
                 onExistingUser?(viewModel.existingUserPhone)
             }
         } message: {
-            Text("이미 가입된 전화번호입니다.\n로그인 페이지로 이동합니다.")
+            Text("이미 가입된 계정입니다.\n로그인 페이지로 이동합니다.")
         }
         .onAppear {
             if let socialData = socialData {
@@ -726,20 +514,20 @@ struct NativeRegisterView: View {
     
     // MARK: - Computed Properties
     
-    var currentProgress: Double {
+    private var stage: (title: String, index: Int) {
         switch viewModel.currentStep {
-        case .terms: return 0.2
-        case .phone: return 0.4
-        case .verification: return 0.5
-        case .basicInfo: return 0.6
-        case .profile: return 0.8
-        case .complete: return 1.0
+        case .terms: return ("약관 동의", 1)
+        case .phone, .verification: return ("이메일 인증", 2)
+        case .basicInfo: return ("계정 정보", 3)
+        case .profile, .complete: return ("프로필", 4)
         }
     }
-    
+
     var nextButtonTitle: String {
         switch viewModel.currentStep {
-        case .phone: return "인증번호 발송"
+        case .terms: return "동의하고 계속하기"
+        case .complete: return "시작하기"
+        case .phone: return "인증번호 받기"
         case .verification: return "확인"
         case .profile: return "가입 완료"
         default: return "다음"

@@ -194,7 +194,7 @@ class LoginViewModel: ObservableObject {
                         self.showErrorMessage(response.message)
                     }
                 } else if let error = loginError {
-                    self.showErrorMessage("네트워크 오류: \(error.localizedDescription)")
+                    self.showErrorMessage((error as? NetworkError)?.userMessage ?? "로그인을 완료하지 못했어요. 잠시 후 다시 시도해 주세요.")
                 } else {
                     self.showErrorMessage("로그인에 실패했습니다.")
                 }
@@ -222,7 +222,7 @@ class LoginViewModel: ObservableObject {
                     if (error as NSError).code == GIDSignInError.canceled.rawValue {
                         print("ℹ️ [LoginViewModel] Google 로그인 취소됨")
                     } else {
-                        self.showErrorMessage("Google 로그인에 실패했습니다: \(error.localizedDescription)")
+                        self.showErrorMessage("Google 로그인을 완료하지 못했어요. 다시 시도하거나 이메일로 계속해 주세요.")
                     }
                     self.isLoading = false
                     return
@@ -315,11 +315,11 @@ class LoginViewModel: ObservableObject {
                             print("✅ [LoginViewModel] Google 로그인 최종 성공")
                         } else {
                             print("❌ [LoginViewModel] 로그인 성공했으나 토큰이 없음 (Data token: \(response.data?.token ?? "nil"))")
-                            self.showErrorMessage("로그인 정보가 올바르지 않습니다. (Token Missing)")
+                            self.showErrorMessage("인증 정보를 받지 못했어요. 다시 로그인해 주세요.")
                         }
                     }
                 } else if let error = loginError {
-                    self.showErrorMessage("Google 로그인/가입에 실패했습니다: \(error.localizedDescription)")
+                    self.showErrorMessage((error as? NetworkError)?.userMessage ?? "Google 로그인을 완료하지 못했어요. 다시 시도하거나 이메일로 계속해 주세요.")
                 } else if let response = loginResponse, let serverMessage = response.message ?? response.error, !serverMessage.isEmpty {
                     // success=false — 서버 안내 문구(예: 같은 이메일의 기존 계정 안내)를 그대로 보여 주고 가입 화면으로 넘기지 않는다.
                     self.showErrorMessage(serverMessage)
@@ -427,11 +427,11 @@ class LoginViewModel: ObservableObject {
                 isLoggedIn = true
                 print("✅ [LoginViewModel] Kakao 로그인 성공")
             } else {
-                showErrorMessage("로그인 정보가 올바르지 않습니다. (Token Missing)")
+                showErrorMessage("인증 정보를 받지 못했어요. 다시 로그인해 주세요.")
             }
         } catch {
             print("❌ [LoginViewModel] Kakao 로그인 오류: \(type(of: error))")
-            showErrorMessage("카카오 로그인에 실패했습니다: \(error.localizedDescription)")
+            showErrorMessage((error as? NetworkError)?.userMessage ?? "카카오 로그인을 완료하지 못했어요. 다시 시도하거나 이메일로 계속해 주세요.")
         }
     }
 
@@ -593,7 +593,7 @@ class LoginViewModel: ObservableObject {
                         }
                     }
                 } else if let error = loginError {
-                    self.showErrorMessage("Apple 로그인에 실패했습니다: \(error.localizedDescription)")
+                    self.showErrorMessage((error as? NetworkError)?.userMessage ?? "Apple 로그인을 완료하지 못했어요. 다시 시도하거나 이메일로 계속해 주세요.")
                 } else if let serverMessage = loginResponse?.message, !serverMessage.isEmpty {
                     self.showErrorMessage(serverMessage)
                 } else {
@@ -606,41 +606,27 @@ class LoginViewModel: ObservableObject {
     
     /// Apple 로그인 실패 처리
     func handleAppleLoginError(_ error: Error) {
-        if let authError = error as? ASAuthorizationError {
-            switch authError.code {
-            case .canceled:
-                print("ℹ️ [LoginViewModel] Apple 로그인 취소됨")
-            case .invalidResponse:
-                showErrorMessage("Apple 로그인 응답이 올바르지 않습니다.")
-            case .notHandled:
-                showErrorMessage("Apple 로그인 요청을 처리할 수 없습니다.")
-            case .failed:
-                showErrorMessage("Apple 로그인에 실패했습니다.")
-            case .notInteractive:
-                showErrorMessage("Apple 로그인이 중단되었습니다.")
-            case .unknown:
-                showErrorMessage("알 수 없는 오류가 발생했습니다.")
-            default:
-                showErrorMessage("Apple 로그인에 실패했습니다.")
-            }
-        } else {
-            showErrorMessage("Apple 로그인에 실패했습니다: \(error.localizedDescription)")
+        if (error as? ASAuthorizationError)?.code == .canceled {
+            dismissError()
+            return
         }
+        let failure = error as NSError
+        print("[LoginViewModel] Apple 인증 실패 (\(failure.domain), \(failure.code))")
+        showErrorMessage("Apple 로그인을 완료하지 못했어요. 다시 시도하거나 이메일로 계속해 주세요.")
     }
-    
+
     // MARK: - Error Handling
-    
-    /// 에러 메시지 표시
+
     private func showErrorMessage(_ message: String) {
-        errorMessage = message
-        showError = true
-        
-        // 3초 후 에러 메시지 숨김
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
-            self?.showError = false
+        let text = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        if text.isEmpty || text.contains("알 수 없는 오류") || text.localizedCaseInsensitiveContains("unknown error") {
+            errorMessage = "로그인을 완료하지 못했어요. 잠시 후 다시 시도해 주세요."
+        } else {
+            errorMessage = text
         }
+        showError = true
     }
-    
+
     /// 에러 메시지 숨김
     func dismissError() {
         showError = false

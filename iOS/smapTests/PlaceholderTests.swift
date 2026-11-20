@@ -1,4 +1,6 @@
 import XCTest
+import SwiftUI
+import NMapsMap
 @testable import smap
 
 final class PlaceholderTests: XCTestCase {
@@ -136,6 +138,148 @@ final class PurchaseAccountTokenTests: XCTestCase {
             XCTFail("조회 실패는 던져야 한다")
         } catch {
             XCTAssertEqual(error as? PurchaseAccountToken.TokenError, .fetchFailed)
+        }
+    }
+}
+
+@MainActor
+final class ActivityLogScrubbingTests: XCTestCase {
+    private func route(_ longitudes: [Double]) throws -> [MapMarker] {
+        try longitudes.map { longitude in
+            let data = try JSONEncoder().encode(["mlt_lat": 37.5, "mlt_long": longitude])
+            return try JSONDecoder().decode(MapMarker.self, from: data)
+        }
+    }
+
+    func testCameraAndMarkerFollowForwardAndReverseBetweenSamples() throws {
+        let map = NMFMapView(frame: CGRect(x: 0, y: 0, width: 390, height: 640))
+        let coordinator = ActivityLogMapView.Coordinator()
+        let samples = try route([127.0, 127.01])
+        for percent in [0.0, 25, 50, 100, 75, 0] {
+            ActivityLogMapView(mapMarkers: samples, overlayRevision: 1, stayTimes: [],
+                               sliderValue: percent, isSliderDragging: true)
+                .updateMap(map, coordinator: coordinator)
+            let expected = 127.0 + 0.01 * percent / 100
+            XCTAssertEqual(coordinator.currentPositionMarker.anchor, CGPoint(x: 0.5, y: 0.5))
+            XCTAssertEqual(coordinator.currentPositionMarker.position.lng, expected, accuracy: 0.000001)
+            XCTAssertEqual(coordinator.currentInfoMarker.position.lng, expected, accuracy: 0.000001)
+            XCTAssertEqual(map.cameraPosition.target.lng, expected, accuracy: 0.000001)
+        }
+    }
+
+    func testSameSizeReplacementAndEmptyRoute() throws {
+        let map = NMFMapView(frame: CGRect(x: 0, y: 0, width: 390, height: 640))
+        let coordinator = ActivityLogMapView.Coordinator()
+        for (revision, coordinates) in [[127.0, 127.01], [128.0, 128.01], []].enumerated() {
+            ActivityLogMapView(mapMarkers: try route(coordinates), overlayRevision: revision,
+                               stayTimes: [], sliderValue: 0, isSliderDragging: false)
+                .updateMap(map, coordinator: coordinator)
+            if let start = coordinates.first {
+                XCTAssertEqual(coordinator.pathDotMarkers.first?.position.lng, start)
+                XCTAssertEqual(coordinator.currentPositionMarker.position.lng, start)
+            } else {
+                XCTAssertTrue(coordinator.polylines.isEmpty)
+                XCTAssertNil(coordinator.currentPositionMarker.mapView)
+                XCTAssertNil(coordinator.currentInfoMarker.mapView)
+            }
+        }
+    }
+
+    func testRefreshWhileDraggingKeepsCameraOnMarker() throws {
+        let map = NMFMapView(frame: CGRect(x: 0, y: 0, width: 390, height: 640))
+        let coordinator = ActivityLogMapView.Coordinator()
+        for (revision, samples) in [[127.0, 127.01], [127.0, 127.01, 127.03]].enumerated() {
+            ActivityLogMapView(mapMarkers: try route(samples), overlayRevision: revision, stayTimes: [],
+                               sliderValue: 50, isSliderDragging: true)
+                .updateMap(map, coordinator: coordinator)
+        }
+        XCTAssertEqual(map.cameraPosition.target.lng, coordinator.currentPositionMarker.position.lng, accuracy: 0.000001)
+    }
+
+    func testMarkerCenterStaysOnScreenPathThroughTurnAndReverse() throws {
+        let map = NMFMapView(frame: CGRect(x: 0, y: 0, width: 390, height: 720))
+        let coordinator = ActivityLogMapView.Coordinator()
+        let data = Data(#"[{"mlt_lat":37.50,"mlt_long":127.00},{"mlt_lat":37.52,"mlt_long":127.04},{"mlt_lat":37.51,"mlt_long":127.06}]"#.utf8)
+        let samples = try JSONDecoder().decode([MapMarker].self, from: data)
+        for percent in [0.0, 25, 50, 75, 100, 25] {
+            ActivityLogMapView(mapMarkers: samples, overlayRevision: 1, stayTimes: [],
+                               sliderValue: percent, isSliderDragging: true,
+                               contentInsets: UIEdgeInsets(top: 70, left: 0, bottom: 264, right: 0))
+                .updateMap(map, coordinator: coordinator)
+            let progress = percent / 50
+            let segment = min(Int(progress), 1)
+            let fraction = CGFloat(progress - Double(segment))
+            let start = map.projection.point(from: NMGLatLng(lat: samples[segment].latitude, lng: samples[segment].longitude))
+            let end = map.projection.point(from: NMGLatLng(lat: samples[segment + 1].latitude, lng: samples[segment + 1].longitude))
+            let marker = map.projection.point(from: coordinator.currentPositionMarker.position)
+            XCTAssertEqual(marker.x, start.x + (end.x - start.x) * fraction, accuracy: 0.5)
+            XCTAssertEqual(marker.y, start.y + (end.y - start.y) * fraction, accuracy: 0.5)
+        }
+    }
+
+    func testDenseRouteRetainsEverySegmentWithBoundedOverlayCount() throws {
+        let samples = try route((0...360).map { 127 + Double($0) / 100_000 })
+        let coordinator = ActivityLogMapView.Coordinator()
+        let map = NMFMapView(frame: CGRect(x: 0, y: 0, width: 390, height: 640))
+        ActivityLogMapView(mapMarkers: samples, overlayRevision: 1, stayTimes: [],
+                           sliderValue: 50, isSliderDragging: true)
+            .updateMap(map, coordinator: coordinator)
+        XCTAssertLessThanOrEqual(coordinator.polylines.count, 48)
+        XCTAssertLessThanOrEqual(coordinator.pathDotMarkers.count, 40)
+        XCTAssertLessThanOrEqual(coordinator.arrowMarkers.count, 16)
+        XCTAssertEqual(coordinator.polylines.reduce(0) { $0 + $1.line.points.count - 1 }, samples.count - 1)
+    }
+}
+
+@MainActor
+final class HomeMapLayoutTests: XCTestCase {
+    func testFamilyOpensTogetherAndRefreshPreservesExplicitSelection() throws {
+        let data = Data(#"[{"mt_idx":1,"mt_name":"지우"},{"mt_idx":2,"mt_name":"민준"}]"#.utf8)
+        let family = try JSONDecoder().decode([SmapGroupMember].self, from: data)
+        let model = HomeViewModel()
+        model.updateMembers(family)
+        XCTAssertFalse(model.members.contains(where: { $0.isSelected }))
+        model.selectMember(family[1])
+        model.updateMembers(family.reversed())
+        XCTAssertEqual(model.members.filter { $0.isSelected }.map(\.mt_idx), [2])
+        model.updateMembers([family[0]])
+        XCTAssertFalse(model.members.contains(where: { $0.isSelected }))
+    }
+
+    /// 가운데 줄에서 흰색 알약의 오른쪽 끝을 측정한다. 화면 너비와 픽셀 너비를 1:1로 맞춘다.
+    private func whiteRightEdge(_ view: some View, width: Int) throws -> Int {
+        let renderer = ImageRenderer(content: view.frame(width: CGFloat(width), height: 48, alignment: .leading)
+            .background(Color.black))
+        renderer.scale = 1
+        let image = try XCTUnwrap(renderer.cgImage)
+        var pixels = [UInt8](repeating: 0, count: width * 48 * 4)
+        return try pixels.withUnsafeMutableBytes { bytes in
+            let context = try XCTUnwrap(CGContext(data: bytes.baseAddress, width: width, height: 48,
+                                                   bitsPerComponent: 8, bytesPerRow: width * 4,
+                                                   space: CGColorSpaceCreateDeviceRGB(),
+                                                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+            context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: 48))
+            return try XCTUnwrap((0..<width).last { x in
+                let i = (width * 24 + x) * 4
+                return bytes[i] > 245 && bytes[i + 1] > 245 && bytes[i + 2] > 245
+            })
+        }
+    }
+
+    func testGroupPillGrowsWithNameAndCapsLongNames() throws {
+        let short = try whiteRightEdge(GroupSwitcherPill(groupName: "가족", action: {}), width: 320)
+        let long = try whiteRightEdge(GroupSwitcherPill(groupName: String(repeating: "우리 가족 ", count: 8), action: {}), width: 320)
+        XCTAssertLessThan(short, long - 40)
+        XCTAssertLessThanOrEqual(long, 240)
+    }
+
+    func testShowAllHasComfortableInsetOnCompactAndWideScreens() throws {
+        var member = try JSONDecoder().decode(SmapGroupMember.self, from: Data(#"{"mt_idx":1,"mt_name":"아주 긴 이름을 쓰는 우리 가족"}"#.utf8))
+        member.isSelected = true
+        let header = HomeSheetHeader(members: [member], currentUserIdx: nil, selectedDate: Date(), onShowAll: {})
+        for width in [320, 375, 430] {
+            let edge = try whiteRightEdge(header, width: width)
+            XCTAssertEqual(Double(width - edge - 1), 24, accuracy: 1)
         }
     }
 }

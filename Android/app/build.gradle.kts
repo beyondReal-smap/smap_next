@@ -25,8 +25,8 @@ android {
         applicationId = "com.dmonster.smap"
         minSdk = 28
         targetSdk = 36
-        versionCode = 70
-        versionName = "3.3.4"
+        versionCode = 72
+        versionName = "3.3.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         resourceConfigurations += setOf("ko", "en")
@@ -35,7 +35,7 @@ android {
 
         buildConfigField("String", "API_BASE_URL", "\"https://api3.aiagnt.kr/api/v1/\"")
         buildConfigField("String", "IMAGE_BASE_URL", "\"https://api3.aiagnt.kr\"")
-        buildConfigField("String", "WEB_BASE_URL", "\"https://nextstep.aiagnt.kr\"")
+        buildConfigField("String", "WEB_BASE_URL", "\"https://smap.aiagnt.kr\"")
 
         // API keys — values loaded from local.properties (우선) or gradle.properties
         // project.findProperty 만 사용하면 local.properties 가 읽히지 않아 빈 값이 되므로

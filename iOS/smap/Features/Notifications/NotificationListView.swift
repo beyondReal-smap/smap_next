@@ -14,49 +14,36 @@ struct NotificationListView: View {
     @Environment(\.dismiss) var dismiss
     @State private var showDeleteAllConfirm = false
 
-    // 색상은 디자인 시스템에서 단일 참조 (SMAPTheme.Accent.pink)
-    private var pinkColor: Color { SMAPTheme.Accent.pink }
-
     var body: some View {
         NavigationStack {
-            ZStack {
-                // Background Gradient
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color(red: 248/255, green: 250/255, blue: 255/255),
-                        Color.white
-                    ]),
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
-
-                VStack(spacing: 0) {
-                    // Custom Header
-                    notificationHeader
-
-                    // Stats Card
-                    if !viewModel.notifications.isEmpty {
+            VStack(spacing: 0) {
+                notificationHeader
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: SMAPTheme.Spacing.sm) {
                         statsCard
-                            .padding(.horizontal, 20)
-                            .padding(.top, 16)
-                            .padding(.bottom, 8)
-                    }
+                            .padding(.bottom, SMAPTheme.Spacing.sm)
 
-                    // Content
-                    if viewModel.isLoading && viewModel.notifications.isEmpty {
-                        Spacer()
-                        loadingView
-                        Spacer()
-                    } else if viewModel.notifications.isEmpty {
-                        Spacer()
-                        emptyStateView
-                        Spacer()
-                    } else {
-                        notificationList
+                        if viewModel.isLoading && viewModel.notifications.isEmpty {
+                            SMAPLoadingView(message: nil)
+                                .frame(minHeight: 220)
+                        } else if viewModel.notifications.isEmpty {
+                            SMAPEmptyState(
+                                title: "받은 알림이 없어요",
+                                description: "가족의 위치와 그룹 활동 알림이 여기에 표시돼요.",
+                                systemImage: "bell.slash"
+                            )
+                            .frame(minHeight: 220)
+                        } else {
+                            notificationList
+                        }
                     }
+                    .frame(maxWidth: 600)
+                    .padding(20)
+                    .frame(maxWidth: .infinity)
                 }
+                .refreshable { viewModel.fetchNotifications() }
             }
+            .background(Color(uiColor: .systemBackground).ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .onAppear {
                 viewModel.fetchNotifications()
@@ -76,209 +63,78 @@ struct NotificationListView: View {
                 Text(viewModel.errorMessage ?? "")
             }
         }
+        .smapAccent(.family)
     }
 
-    // MARK: - Header
     private var notificationHeader: some View {
-        HStack(spacing: 16) {
-            // Close Button
-            Button(action: { dismiss() }) {
-                Image(systemName: "xmark")
-                    .font(.suite(size: 14, weight: .medium))
-                    .foregroundColor(.gray)
-                    .frame(width: 36, height: 36)
-                    .background(Color.gray.opacity(0.1))
-                    .clipShape(Circle())
-                    .frame(width: 44, height: 44) // 터치타깃 44pt 확보 (시각 크기 36 유지)
+        HStack(spacing: SMAPTheme.Spacing.sm) {
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 17, weight: .semibold))
+                    .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
-            .accessibilityLabel("닫기")
+            .accessibilityLabel("뒤로")
 
-            // Title
-            VStack(alignment: .leading, spacing: 2) {
-                Text("알림")
-                    .font(.suite(size: 22, weight: .bold))
-                    .foregroundColor(.black)
-                Text("최근 7일간의 알림을 확인하세요")
-                    .font(.suite(size: 12))
-                    .foregroundColor(.gray)
-            }
+            Text("알림")
+                .font(SMAPTheme.Font.headline)
+                .accessibilityAddTraits(.isHeader)
+                .frame(maxWidth: .infinity)
 
-            Spacer()
-
-            // Menu
             Menu {
                 Button(role: .destructive, action: { showDeleteAllConfirm = true }) {
                     Label("전체 삭제", systemImage: "trash")
                 }
             } label: {
                 Image(systemName: "ellipsis")
-                    .font(.suite(size: 16, weight: .medium))
-                    .foregroundColor(.gray)
-                    .frame(width: 36, height: 36)
-                    .background(Color.gray.opacity(0.1))
-                    .clipShape(Circle())
+                    .font(.system(size: 17, weight: .semibold))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
-            .accessibilityLabel("메뉴")
+            .accessibilityLabel("알림 메뉴")
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-        .background(Color.white.shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2))
+        .foregroundStyle(SMAPTheme.Surface.onSurface)
+        .padding(.horizontal, SMAPTheme.Spacing.sm)
+        .padding(.vertical, SMAPTheme.Spacing.xs)
+        .background(SMAPTheme.Surface.card)
     }
 
-    // MARK: - Stats Card
     private var statsCard: some View {
-        HStack(spacing: 16) {
-            // Total count
-            VStack(spacing: 4) {
-                Text("\(viewModel.notifications.count)")
-                    .font(.suite(size: 24, weight: .bold))
-                    .foregroundColor(SMAPTheme.Color.primary)
-                Text("전체")
-                    .font(.suite(size: 11))
-                    .foregroundColor(.gray)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(SMAPTheme.Color.primary.opacity(0.08))
-            .cornerRadius(12)
-
-            // Unread count
-            VStack(spacing: 4) {
-                Text("\(viewModel.notifications.filter { $0.plt_read_chk == .N }.count)")
-                    .font(.suite(size: 24, weight: .bold))
-                    .foregroundColor(pinkColor)
-                Text("읽지 않음")
-                    .font(.suite(size: 11))
-                    .foregroundColor(.gray)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(pinkColor.opacity(0.08))
-            .cornerRadius(12)
-
-            // Read count
-            VStack(spacing: 4) {
-                Text("\(viewModel.notifications.filter { $0.plt_read_chk == .Y }.count)")
-                    .font(.suite(size: 24, weight: .bold))
-                    .foregroundColor(.green)
-                Text("읽음")
-                    .font(.suite(size: 11))
-                    .foregroundColor(.gray)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(Color.green.opacity(0.08))
-            .cornerRadius(12)
-        }
-    }
-
-    // MARK: - Loading
-    private var loadingView: some View {
-        VStack(spacing: 16) {
-            ZStack {
-                Circle()
-                    .fill(SMAPTheme.Color.primary.opacity(0.1))
-                    .frame(width: 80, height: 80)
-
-                ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: SMAPTheme.Color.primary))
-                    .scaleEffect(1.5)
-            }
-
-            Text("알림을 불러오는 중...")
-                .font(.suite(size: 14))
-                .foregroundColor(.gray)
-        }
-    }
-
-    // MARK: - Empty State
-    private var emptyStateView: some View {
-        VStack(spacing: 20) {
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            gradient: Gradient(colors: [SMAPTheme.Color.primary.opacity(0.1), pinkColor.opacity(0.1)]),
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 120, height: 120)
-
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            gradient: Gradient(colors: [SMAPTheme.Color.primary, pinkColor]),
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 80, height: 80)
-                    .shadow(color: SMAPTheme.Color.primary.opacity(0.3), radius: 15, x: 0, y: 8)
-
-                Image(systemName: "bell.slash.fill")
-                    .font(.suite(size: 32))
-                    .foregroundColor(.white)
-            }
-
-            VStack(spacing: 8) {
-                Text("새로운 알림이 없습니다")
-                    .font(.suite(size: 18, weight: .bold))
-                    .foregroundColor(.black)
-
-                Text("위치 공유 및 그룹 활동 알림이\n여기에 표시됩니다")
-                    .font(.suite(size: 14))
-                    .foregroundColor(.gray)
-                    .multilineTextAlignment(.center)
-            }
-
-            HStack(spacing: 8) {
-                Image(systemName: "info.circle.fill")
-                    .font(.suite(size: 14))
-                    .foregroundColor(.blue.opacity(0.7))
-
-                Text("최근 7일간의 알림만 표시됩니다")
-                    .font(.suite(size: 12))
-                    .foregroundColor(.gray)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(Color.blue.opacity(0.08))
-            .cornerRadius(20)
-        }
-        .padding(.horizontal, 40)
-    }
-
-    // MARK: - Notification List
-    private var notificationList: some View {
-        ScrollView {
-            LazyVStack(spacing: 12) {
-                ForEach(viewModel.notifications) { notification in
-                    NotificationRow(notification: notification, pinkColor: pinkColor)
-                        .onAppear {
-                            if notification.plt_read_chk == .N {
-                                viewModel.markAsRead(notification)
-                            }
-                        }
-                        .onTapGesture {
-                            viewModel.markAsRead(notification)
-                        }
-                        .contextMenu {
-                            Button(role: .destructive) {
-                                viewModel.deleteNotification(notification)
-                            } label: {
-                                Label("삭제", systemImage: "trash")
-                            }
-                        }
+        let total = viewModel.notifications.count
+        let unread = viewModel.notifications.filter { $0.plt_read_chk == .N }.count
+        return SMAPFamilyCover(image: "LoginArrivalCycling", minHeight: 144) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text("최근 7일").font(SMAPTheme.Font.captionBold)
+                Text(total > 0 ? "받은 알림 \(total)건" : "가족 알림함").font(SMAPTheme.Font.pageTitle)
+                    .accessibilityAddTraits(.isHeader)
+                if total > 0 {
+                    Text("읽지 않음 \(unread)  ·  읽음 \(total - unread)").font(SMAPTheme.Font.secondaryMedium)
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 20)
         }
-        .refreshable {
-            viewModel.fetchNotifications()
+    }
+
+    @ViewBuilder
+    private var notificationList: some View {
+        ForEach(viewModel.notifications) { notification in
+            NotificationRow(notification: notification)
+                .onAppear {
+                    if notification.plt_read_chk == .N {
+                        viewModel.markAsRead(notification)
+                    }
+                }
+                .onTapGesture {
+                    viewModel.markAsRead(notification)
+                }
+                .contextMenu {
+                    Button(role: .destructive) {
+                        viewModel.deleteNotification(notification)
+                    } label: {
+                        Label("삭제", systemImage: "trash")
+                    }
+                }
         }
     }
 }

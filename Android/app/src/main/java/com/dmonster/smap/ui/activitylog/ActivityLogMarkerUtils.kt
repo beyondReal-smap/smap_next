@@ -5,6 +5,8 @@ import android.graphics.*
 import android.graphics.Color as AndroidColor
 import android.text.TextPaint
 import androidx.core.content.res.ResourcesCompat
+import androidx.compose.ui.graphics.toArgb
+import com.dmonster.smap.ui.components.SmapAccent
 import com.dmonster.smap.R
 
 /**
@@ -125,7 +127,7 @@ object ActivityLogMarkerUtils {
         val paddingV = 6f * density
         val capsuleWidth = textWidth + paddingH * 2
         val capsuleHeight = textPaint.textSize + paddingV * 2
-        val markerBottomPadding = 32f * density // Gap between capsule and marker
+        val markerBottomPadding = 16f * density // 반지름 12dp인 위치 표시와 말풍선 사이 4dp
         
         val canvasWidth = capsuleWidth
         val canvasHeight = capsuleHeight + markerBottomPadding
@@ -137,7 +139,7 @@ object ActivityLogMarkerUtils {
         
         // Draw capsule background
         val capsuleRect = RectF(0f, 0f, capsuleWidth, capsuleHeight)
-        paint.color = AndroidColor.parseColor("#E60113A3") // Brand color with 90% alpha
+        paint.color = SmapAccent.Activity.deep.copy(alpha = 0.9f).toArgb()
         canvas.drawRoundRect(capsuleRect, capsuleHeight / 2, capsuleHeight / 2, paint)
         
         // Draw text

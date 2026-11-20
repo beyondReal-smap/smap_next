@@ -1,64 +1,73 @@
 import SwiftUI
 
-// MARK: - 홈 지도 시트 (Android HomeSheet.kt 이식)
-//
-// 사이드바("멤버 조회")·떠 있는 멤버 버튼·지도 말풍선·"오늘 일정" 카드를 시트 하나로 대신한다.
-// 접힌 상태: 남색 머리 줄(선택한 멤버의 상태 또는 "멤버 N명") + 얼굴 줄.
-// 펼친 상태: 멤버 목록(위치 갱신·배터리·그날 일정 수) → 날짜 줄 → 그날 일정.
+// MARK: - 가족 홈 지도 시트
 
 enum HomeSheet {
-    /// 접힌 시트 높이: 손잡이 + 머리 줄 + 얼굴 줄
-    static let peekHeight: CGFloat = 178
+    static let peekHeight: CGFloat = 228
 }
 
-/// 머리 띠 안 — 선택한 멤버 이름·상태, 또는 멤버 수 안내
 struct HomeSheetHeader: View {
     let members: [SmapGroupMember]
     let currentUserIdx: Int?
+    let selectedDate: Date
     let onShowAll: () -> Void
 
     var body: some View {
         let selected = members.first(where: { $0.isSelected })
-        HStack(spacing: SMAPTheme.Spacing.sm) {
+        let weekday = selectedDate.formatted(.dateTime.weekday(.wide).locale(Locale(identifier: "ko_KR")))
+        HStack(spacing: 12) {
+            VStack(spacing: 0) {
+                Text("\(Calendar.current.component(.month, from: selectedDate))월")
+                    .font(.suite(size: 11, weight: .bold))
+                    .foregroundStyle(SMAPTheme.Family.ink)
+                    .frame(maxWidth: .infinity)
+                    .background(SMAPTheme.Family.highlight)
+                Text("\(Calendar.current.component(.day, from: selectedDate))")
+                    .font(.suite(size: 23, weight: .bold))
+                    .foregroundStyle(SMAPTheme.Family.ink)
+                    .monospacedDigit()
+            }
+            .frame(width: 46, height: 48)
+            .background(.white, in: RoundedRectangle(cornerRadius: 10))
+            .overlay { RoundedRectangle(cornerRadius: 10).strokeBorder(SMAPTheme.Family.ink.opacity(0.15)) }
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .accessibilityLabel(selectedDate.formatted(.dateTime.month().day().locale(Locale(identifier: "ko_KR"))))
+
             VStack(alignment: .leading, spacing: 2) {
-                if let selected {
-                    Text(selected.mt_idx == currentUserIdx ? "\(selected.displayName) (나)" : selected.displayName)
-                        .font(SMAPTheme.Font.headline)
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                        .accessibilityAddTraits(.isHeader)
-                    Text(memberStatusLine(selected) ?? "아직 위치 정보가 없어요")
-                        .font(SMAPTheme.Font.caption)
-                        .foregroundStyle(SMAPTheme.Surface.onNavyMuted)
-                        .lineLimit(1)
-                } else {
-                    Text("멤버 \(members.count)명")
-                        .font(SMAPTheme.Font.headline)
-                        .foregroundStyle(.white)
-                        .accessibilityAddTraits(.isHeader)
-                    Text("얼굴을 누르면 그 멤버 위치로 이동해요")
-                        .font(SMAPTheme.Font.caption)
-                        .foregroundStyle(SMAPTheme.Surface.onNavyMuted)
-                        .lineLimit(1)
-                }
+                Text(selected.map { $0.mt_idx == currentUserIdx ? "나의 하루" : "\($0.displayName)의 하루" } ?? "우리의 하루")
+                    .font(.suite(size: 23, weight: .bold))
+                    .foregroundStyle(SMAPTheme.Family.ink)
+                    .lineLimit(1)
+                    .accessibilityAddTraits(.isHeader)
+                Text(selected.map { memberStatusLine($0) ?? "아직 위치 정보가 없어요" }
+                     ?? (members.isEmpty ? "함께할 멤버가 아직 없어요" : "\(weekday) · 함께하는 \(members.count)명"))
+                    .font(SMAPTheme.Font.captionSmall)
+                    .foregroundStyle(SMAPTheme.Family.muted)
+                    .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if selected != nil {
                 SheetBandButton(title: "전체 보기", systemImage: "map", action: onShowAll)
+                    .smapAccent(.family)
+                    .fixedSize(horizontal: true, vertical: false)
             }
         }
-        .padding(.leading, 20)
-        .padding(.trailing, SMAPTheme.Spacing.sm)
+        .padding(.horizontal, SMAPTheme.Spacing.lg)
     }
 }
 
-/// 띠 아래 흰 영역 — 얼굴 줄(접혀도 보임) + 펼치면 보이는 목록
+/// 접힌 상태에서도 멤버 선택과 일정 미리보기가 보인다.
 struct HomeSheetBody: View {
-    @Environment(\.smapAccent) private var accent
     @ObservedObject var viewModel: HomeViewModel
+    let schedules: [SmapSchedule]
     let currentUserIdx: Int?
+    let isExpanded: Bool
+    let expansionProgress: CGFloat
+    let onToggleSchedule: () -> Void
     let onSelectMember: (SmapGroupMember) -> Void
     let onShowAll: () -> Void
+    /// 장소가 저장된 일정을 누르면 지도를 그 장소로 옮긴다
+    let onSelectSchedule: (SmapSchedule) -> Void
 
     private static let dayTitleFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -69,34 +78,84 @@ struct HomeSheetBody: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Spacer().frame(height: SMAPSheetMetrics.headerBandGap)
-            MemberStrip(
-                members: viewModel.members.map {
-                    MemberStripItem(id: $0.mt_idx, name: $0.displayName, imagePath: $0.mt_file1, isMe: $0.mt_idx == currentUserIdx)
-                },
-                selectedId: viewModel.members.first(where: { $0.isSelected })?.mt_idx,
-                onSelect: { item in
-                    if let member = viewModel.members.first(where: { $0.mt_idx == item.id }) { onSelectMember(member) }
-                },
-                onAllTap: onShowAll
-            )
-            Spacer().frame(height: SMAPTheme.Spacing.md)
+            VStack(spacing: 0) {
+                Spacer().frame(height: 6)
+                MemberStrip(
+                    members: viewModel.members.map {
+                        MemberStripItem(id: $0.mt_idx, name: $0.displayName, imagePath: $0.mt_file1, isMe: $0.mt_idx == currentUserIdx)
+                    },
+                    selectedId: viewModel.members.first(where: { $0.isSelected })?.mt_idx,
+                    onSelect: { item in
+                        if let member = viewModel.members.first(where: { $0.mt_idx == item.id }) { onSelectMember(member) }
+                    },
+                    onAllTap: onShowAll
+                )
+                .smapAccent(.family)
+                schedulePreview
+                    .padding(.horizontal, SMAPTheme.Spacing.md)
+                    .padding(.top, 10)
+                    .padding(.bottom, 14)
+            }
+            .fixedSize(horizontal: false, vertical: true)
 
             // 펼친 영역 — 회색 바탕 위 묶음들
             ScrollView {
                 VStack(alignment: .leading, spacing: SMAPTheme.Spacing.lg) {
-                    memberSection
                     scheduleSection
+                    memberSection
                 }
                 .padding(SMAPTheme.Spacing.md)
                 .padding(.bottom, SMAPTheme.Spacing.lg)
             }
             .background(SMAPTheme.Surface.canvas)
         }
+        .background(SMAPTheme.Family.paper)
+    }
+
+    private var schedulePreview: some View {
+        let featured = schedules.first { $0.status != .completed } ?? schedules.last
+        let day = Calendar.current.isDateInToday(viewModel.selectedDate) ? "오늘" : "이날"
+        return Button(action: onToggleSchedule) {
+            HStack(spacing: 12) {
+                Group {
+                    if let featured {
+                        Text(scheduleTime(featured))
+                            .font(.suite(size: 23, weight: .bold))
+                            .monospacedDigit()
+                    } else {
+                        Image(systemName: "calendar").font(.system(size: 22, weight: .medium))
+                    }
+                }
+                .foregroundStyle(SMAPTheme.Family.highlight)
+                .frame(minWidth: 66)
+                Rectangle().fill(.white.opacity(0.26)).frame(width: 1, height: 31)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(schedules.isEmpty ? "\(day)의 일정" : "\(day)의 일정 · \(schedules.count)개")
+                        .font(SMAPTheme.Font.captionSmall)
+                        .foregroundStyle(.white.opacity(0.80))
+                    Text(featured.map { $0.title.flatMap { $0.isEmpty ? nil : $0 } ?? "제목 없는 일정" } ?? "잡힌 약속이 없어요")
+                        .font(SMAPTheme.Font.subheadline)
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "chevron.up")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.white)
+                    .rotationEffect(.degrees(Double(expansionProgress) * 180))
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, 14)
+            .frame(minHeight: 64)
+            .background(SMAPTheme.Family.ink, in: RoundedRectangle(cornerRadius: 16))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("home.schedulePreview")
+        .accessibilityHint(isExpanded ? "일정 목록을 접습니다" : "일정 목록과 날짜 선택을 펼칩니다")
     }
 
     private var memberSection: some View {
-        SMAPSection(title: "멤버") {
+        SMAPSection(title: "함께하는 멤버") {
             ForEach(Array(viewModel.members.enumerated()), id: \.element.id) { index, member in
                 if index > 0 { SMAPRowDivider() }
                 let stats = viewModel.getMemberTodayStats(mtIdx: member.mt_idx)
@@ -106,7 +165,7 @@ struct HomeSheetBody: View {
                     subtitle: memberStatusLine(member) ?? "위치 정보 없음",
                     selected: member.isSelected,
                     action: { onSelectMember(member) },
-                    leading: { SMAPAvatar(name: member.displayName, imagePath: member.mt_file1) },
+                    leading: { SMAPAvatar(name: member.displayName, imagePath: member.mt_file1, memberID: member.mt_idx) },
                     trailing: {
                         if count > 0 { SMAPCountPill(text: "일정 \(count)") }
                     }
@@ -116,12 +175,20 @@ struct HomeSheetBody: View {
     }
 
     private var scheduleSection: some View {
-        VStack(alignment: .leading, spacing: SMAPTheme.Spacing.sm) {
-            Text(Self.dayTitleFormatter.string(from: viewModel.selectedDate) + " 일정")
-                .font(SMAPTheme.Font.captionBold)
-                .foregroundStyle(SMAPTheme.Surface.onSurfaceMuted)
-                .padding(.leading, 4)
-                .accessibilityAddTraits(.isHeader)
+        let isToday = Calendar.current.isDateInToday(viewModel.selectedDate)
+        return VStack(alignment: .leading, spacing: SMAPTheme.Spacing.sm) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(isToday ? "오늘의 일정" : "이날의 일정")
+                    .font(SMAPTheme.Font.headline)
+                    .foregroundStyle(SMAPTheme.Surface.onSurface)
+                Spacer()
+                Text(Self.dayTitleFormatter.string(from: viewModel.selectedDate))
+                    .font(SMAPTheme.Font.caption)
+                    .foregroundStyle(SMAPTheme.Surface.onSurfaceMuted)
+            }
+            .padding(.horizontal, 4)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
             DateStrip(
                 items: (0..<14).compactMap { Calendar.current.date(byAdding: .day, value: $0, to: Calendar.current.startOfDay(for: Date())) }
                     .map { DateChipItem(date: $0) },
@@ -132,19 +199,22 @@ struct HomeSheetBody: View {
             .padding(.bottom, 4)
 
             SMAPSection {
-                let schedules = viewModel.sheetSchedules
                 if schedules.isEmpty {
-                    SMAPListRow(title: "일정이 없어요", subtitle: "일정 탭에서 추가할 수 있어요", leading: {
+                    SMAPListRow(title: "아직 잡힌 일정이 없어요", subtitle: "일정 탭에서 함께할 약속을 추가해요", leading: {
                         SMAPRowIcon(systemImage: "calendar.badge.checkmark")
                     })
                 } else {
                     ForEach(Array(schedules.enumerated()), id: \.offset) { index, schedule in
                         if index > 0 { SMAPRowDivider() }
-                        SMAPListRow(title: schedule.title.flatMap { $0.isEmpty ? nil : $0 } ?? "제목 없음", subtitle: scheduleMemberName(schedule), leading: {
+                        // 장소가 있는 일정만 누를 수 있다 — 장소 없는 일정은 옮겨 갈 곳이 없으니 누름 표시도 하지 않는다.
+                        SMAPListRow(title: schedule.title.flatMap { $0.isEmpty ? nil : $0 } ?? "제목 없음", subtitle: scheduleMemberName(schedule),
+                                    action: schedule.mapCoordinate == nil ? nil : { onSelectSchedule(schedule) }, leading: {
                             Text(scheduleTime(schedule))
                                 .font(SMAPTheme.Font.captionBold)
-                                .foregroundStyle(accent.base)
-                                .frame(width: 52, alignment: .leading)
+                                .foregroundStyle(SMAPAccent.schedule.deep)
+                                .monospacedDigit()
+                                .frame(minWidth: 52, minHeight: 28)
+                                .background(SMAPAccent.schedule.container, in: RoundedRectangle(cornerRadius: 8))
                         })
                     }
                 }

@@ -25,18 +25,24 @@ struct HomeView: View {
     @State private var isSheetExpanded = false
     @State private var isMapLoading = true
     @State private var fitAllToken = 0
+    @State private var scheduleFocus: MapFocus?
 
     private var currentUserIdx: Int? { AuthService.shared.getUserData()?.mt_idx }
 
     var body: some View {
+        let schedules = viewModel.sheetSchedules
         GeometryReader { geo in
             ZStack(alignment: .top) {
                 NaverMapView(
                     members: $viewModel.members,
-                    schedules: viewModel.filteredSchedules,
+                    groupID: viewModel.selectedGroup?.sgt_idx,
+                    // 시트 목록과 같은 일정 — "전체"에서도 그룹 일정이 지도에 보이고, 마커 번호가 목록 순서와 같다(Android 와 같게).
+                    // 이전에는 멤버를 골라야만 일정 마커가 떠서, 목록에서 일정을 눌러 옮겨 가도 마커가 없었다.
+                    schedules: schedules,
                     contentInsets: UIEdgeInsets(top: geo.safeAreaInsets.top + 64, left: 0, bottom: HomeSheet.peekHeight, right: 0),
                     fitAllToken: fitAllToken,
-                    onMemberTap: { viewModel.selectMember($0) }
+                    onMemberTap: selectMember,
+                    focus: scheduleFocus
                 )
                 .ignoresSafeArea(edges: .top)
 
@@ -52,6 +58,7 @@ struct HomeView: View {
                         }
                         MapCircleButton(systemImage: "gearshape", accessibilityLabel: "설정") { showSettings = true }
                     }
+                    .smapAccent(.family)
                     if let message = viewModel.errorMessage {
                         VStack(spacing: 8) {
                             SMAPBanner(message: message, tone: .error)
@@ -62,14 +69,21 @@ struct HomeView: View {
                     }
                 }
 
-                SMAPMapSheet(peekHeight: HomeSheet.peekHeight, isExpanded: $isSheetExpanded) {
-                    HomeSheetHeader(members: viewModel.members, currentUserIdx: currentUserIdx, onShowAll: showAll)
-                } content: {
+                SMAPMapSheet(peekHeight: HomeSheet.peekHeight, isExpanded: $isSheetExpanded,
+                             maxHeightFraction: 0.72, headerSurface: SMAPTheme.Family.paper, keepsContentSize: true) {
+                    HomeSheetHeader(members: viewModel.members, currentUserIdx: currentUserIdx,
+                                    selectedDate: viewModel.selectedDate, onShowAll: showAll)
+                } content: { expansionProgress, toggleSheet in
                     HomeSheetBody(
                         viewModel: viewModel,
+                        schedules: schedules,
                         currentUserIdx: currentUserIdx,
-                        onSelectMember: { viewModel.selectMember($0) },
-                        onShowAll: showAll
+                        isExpanded: isSheetExpanded,
+                        expansionProgress: expansionProgress,
+                        onToggleSchedule: toggleSheet,
+                        onSelectMember: selectMember,
+                        onShowAll: showAll,
+                        onSelectSchedule: focusSchedule
                     )
                 }
 
@@ -85,7 +99,8 @@ struct HomeView: View {
                 groups: viewModel.groups,
                 selectedGroupId: viewModel.selectedGroup?.sgt_idx,
                 onSelect: { viewModel.selectGroup($0) },
-                onCreateGroup: { viewModel.showGroupCreationModal = true }
+                onCreateGroup: { viewModel.showGroupCreationModal = true },
+                compact: true
             )
         }
         .sheet(isPresented: $showNotifications, onDismiss: {
@@ -132,8 +147,21 @@ struct HomeView: View {
         .toolbar(.hidden, for: .navigationBar)
     }
 
+    private func selectMember(_ member: SmapGroupMember) {
+        viewModel.selectMember(member)
+        isSheetExpanded = false
+    }
+
+    /// 시트에서 일정을 누르면 그 일정의 장소로 지도를 옮기고 시트를 접어 지도를 보여 준다.
+    private func focusSchedule(_ schedule: SmapSchedule) {
+        guard let coordinate = schedule.mapCoordinate else { return }
+        isSheetExpanded = false
+        scheduleFocus = MapFocus(latitude: coordinate.latitude, longitude: coordinate.longitude, token: (scheduleFocus?.token ?? 0) + 1)
+    }
+
     /// 시트 "전체" — 선택을 풀고 모든 멤버가 보이게 지도를 맞춘다.
     private func showAll() {
+        isSheetExpanded = false
         viewModel.showAllMembers()
         fitAllToken += 1
     }

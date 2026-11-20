@@ -1,8 +1,11 @@
 package com.dmonster.smap.ui.components
 
 import com.dmonster.smap.ui.theme.SmapText
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.background
@@ -12,8 +15,6 @@ import androidx.compose.foundation.gestures.DragScope
 import androidx.compose.foundation.gestures.DraggableAnchors
 import androidx.compose.foundation.gestures.DraggableState
 import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.animateTo
-import androidx.compose.foundation.gestures.animateToWithDecay
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material3.Text
@@ -44,6 +45,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -95,12 +97,44 @@ class SmapMapSheetState internal constructor(
 
     val currentValue: SmapSheetValue get() = anchored.currentValue
 
-    suspend fun expand() = anchored.animateTo(SmapSheetValue.Expanded)
+    internal val expansionProgress: Float
+        get() {
+            val collapsed = anchored.anchors.positionOf(SmapSheetValue.Collapsed)
+            val expanded = anchored.anchors.positionOf(SmapSheetValue.Expanded)
+            val offset = anchored.offset
+            val travel = collapsed - expanded
+            return if (travel > 0f && offset.isFinite()) ((collapsed - offset) / travel).coerceIn(0f, 1f) else 0f
+        }
 
-    suspend fun partialExpand() = anchored.animateTo(SmapSheetValue.Collapsed)
+    suspend fun expand() = settleTo(SmapSheetValue.Expanded)
 
-    internal suspend fun toggle() =
+    suspend fun partialExpand() = settleTo(SmapSheetValue.Collapsed)
+
+    internal suspend fun toggle() {
+        if (settling) return
         if (anchored.targetValue == SmapSheetValue.Expanded) partialExpand() else expand()
+    }
+
+    /** 펼침·접힘이 움직이는 중 — 이때 들어온 손가락·목록 스크롤·두 번째 탭은 무시해 끝까지 가게 한다. */
+    private var settling = false
+
+    /**
+     * [target] 자리까지 끝까지 움직인다(2026-11-19). [MutatePriority.PreventUserInput] 으로 돌려,
+     * 움직이는 도중 시트에 손이 닿아도 끊기지 않는다(이전에는 손이 닿는 순간 멈춰 중간에 걸렸다).
+     */
+    private suspend fun settleTo(target: SmapSheetValue) {
+        settling = true
+        try {
+            anchored.anchoredDrag(target, MutatePriority.PreventUserInput) { anchors, latestTarget ->
+                val to = anchors.positionOf(latestTarget)
+                if (to.isNaN()) return@anchoredDrag
+                val from = anchored.offset.takeUnless { it.isNaN() } ?: to
+                animate(from, to, animationSpec = SheetSettleSpec) { value, _ -> dragTo(value) }
+            }
+        } finally {
+            settling = false
+        }
+    }
 
     /** 이번 끌기를 시작한 위치 — 놓을 때 방향을 정하는 기준. 끌기가 끝나면 NaN. */
     private var dragStartOffset = Float.NaN
@@ -130,9 +164,10 @@ class SmapMapSheetState internal constructor(
     /** 손을 뗀 순간 목적지를 정하고 끝까지 움직인다. [velocity] 는 아래쪽이 +(px/s). */
     internal suspend fun settle(velocity: Float) {
         val offset = anchored.offset
-        if (offset.isNaN()) return
         val start = if (dragStartOffset.isNaN()) offset else dragStartOffset
         dragStartOffset = Float.NaN
+        // 이미 끝까지 가는 중이면 그대로 둔다 — 새로 정한 목적지가 진행 중인 움직임을 뒤집지 않게.
+        if (offset.isNaN() || settling) return
         val moved = offset - start
         val target = when {
             velocity <= -flingPx -> SmapSheetValue.Expanded
@@ -141,12 +176,12 @@ class SmapMapSheetState internal constructor(
             moved >= slopPx -> SmapSheetValue.Collapsed
             else -> anchored.anchors.closestAnchor(offset) ?: anchored.currentValue
         }
-        anchored.animateToWithDecay(target, velocity)
+        settleTo(target)
     }
 
     /**
-     * 손잡이·머리 띠 등 스크롤 없는 곳을 끌 때. 끄는 동안은 [AnchoredDraggableState.anchoredDrag] 안에서 움직여
-     * 진행 중인 펼침·접힘 애니메이션을 끊고 손가락을 바로 따라간다.
+     * 손잡이·머리 띠 등 스크롤 없는 곳을 끌 때. 끄는 동안은 [AnchoredDraggableState.anchoredDrag] 안에서 손가락을 따라간다.
+     * 펼침·접힘이 움직이는 중이면 그 움직임([MutatePriority.PreventUserInput])이 이겨 이 끌기는 무시된다.
      */
     internal val draggableState = object : DraggableState {
         override fun dispatchRawDelta(delta: Float) {
@@ -173,8 +208,10 @@ class SmapMapSheetState internal constructor(
      * 목록만 스크롤하다 놓은 경우(시트는 그대로)에는 시트를 건드리지 않는다 — 목록을 세게 내려 맨 위에 닿았다고 시트가 접히지 않게.
      */
     internal val nestedScrollConnection = object : NestedScrollConnection {
+        // 시트가 움직이는 동안에는 목록의 세로 스크롤과 관성 이동을 보류한다.
         override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
             val dy = available.y
+            if (settling) return Offset(0f, dy)
             if (dy >= 0f || source != NestedScrollSource.UserInput) return Offset.Zero
             val used = anchored.dispatchRawDelta(dy)
             if (used != 0f) markDragStart()
@@ -182,13 +219,14 @@ class SmapMapSheetState internal constructor(
         }
 
         override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-            if (source != NestedScrollSource.UserInput) return Offset.Zero
+            if (settling || source != NestedScrollSource.UserInput) return Offset.Zero
             val used = anchored.dispatchRawDelta(available.y)
             if (used != 0f) markDragStart()
             return Offset(0f, used)
         }
 
         override suspend fun onPreFling(available: Velocity): Velocity {
+            if (settling) return Velocity(0f, available.y)
             if (dragStartOffset.isNaN()) return Velocity.Zero
             // 시트가 이미 끝까지 올라간 뒤 계속 위로 튕기면 그 힘은 목록 스크롤에 쓴다.
             val atTop = anchored.offset <= anchored.anchors.minAnchor()
@@ -212,6 +250,11 @@ class SmapMapSheetState internal constructor(
         val FlingVelocity = 300.dp
         /** 이만큼만 움직여도 그 방향으로 끝까지 */
         val DirectionSlop = 4.dp
+        /**
+         * 펼침·접힘 곡선 — 0.5초 동안 처음엔 손을 이어받듯 움직이다 끝에서 천천히 내려앉는다(iOS 와 같은 값).
+         * 이전 spring(stiffness 400, 약 0.3초)은 툭 올라가 가벼워 보였다.
+         */
+        val SheetSettleSpec = tween<Float>(durationMillis = 500, easing = CubicBezierEasing(0.2f, 0.75f, 0.2f, 1f))
     }
 }
 
@@ -241,6 +284,7 @@ fun SmapMapSheetScaffold(
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     overlay: @Composable BoxScope.() -> Unit = {},
     maxHeightFraction: Float = 0.55f,
+    headerSurface: Color? = null,
     map: @Composable BoxScope.() -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -300,13 +344,15 @@ fun SmapMapSheetScaffold(
                 .draggable(
                     state = sheetState.draggableState,
                     orientation = Orientation.Vertical,
-                    startDragImmediately = sheetState.anchored.isAnimationRunning,
+                    // 움직이는 중에 닿은 손가락이 시트를 붙잡지 않게 한다 — 펼침·접힘은 늘 끝까지 간다.
+                    startDragImmediately = false,
                     onDragStarted = { sheetState.onDragStarted() },
                     onDragStopped = { velocity -> sheetState.settle(velocity) },
                 ),
         ) {
             Column(Modifier.fillMaxWidth()) {
                 SheetHandle(
+                    surface = headerSurface,
                     expanded = sheetState.anchored.targetValue == SmapSheetValue.Expanded,
                     onClick = { scope.launch { sheetState.toggle() } },
                 )
@@ -340,11 +386,11 @@ fun SmapMapSheetScaffold(
  * 누르면 펼침·접힘을 바꾼다(iOS 와 같음, 화면 읽기 프로그램에서도 이 동작으로 연다).
  */
 @Composable
-private fun SheetHandle(expanded: Boolean, onClick: () -> Unit) {
+private fun SheetHandle(surface: Color?, expanded: Boolean, onClick: () -> Unit) {
     Box(
         Modifier
             .fillMaxWidth()
-            .background(SmapBrush.accentBand)
+            .then(if (surface != null) Modifier.background(surface) else Modifier.background(SmapBrush.accentBand))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -358,7 +404,7 @@ private fun SheetHandle(expanded: Boolean, onClick: () -> Unit) {
         Box(
             Modifier
                 .size(width = 36.dp, height = 4.dp)
-                .background(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.55f), RoundedCornerShape(2.dp))
+                .background(if (surface == null) Color.White.copy(alpha = 0.55f) else Color.Black.copy(alpha = 0.22f), RoundedCornerShape(2.dp))
         )
     }
 }
@@ -396,7 +442,7 @@ fun SheetBandButton(
         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 8.dp),
         colors = androidx.compose.material3.ButtonDefaults.buttonColors(
             containerColor = androidx.compose.ui.graphics.Color.White,
-            contentColor = MaterialTheme.colorScheme.primary,
+            contentColor = SmapBrush.Accent,
         ),
         modifier = modifier.height(40.dp),
     ) {

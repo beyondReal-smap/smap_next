@@ -1,32 +1,21 @@
 package com.dmonster.smap.ui.register
 
-import android.content.res.Configuration
-import android.view.ContextThemeWrapper
-import android.widget.DatePicker
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.material.icons.outlined.DateRange
-import androidx.compose.ui.semantics.Role
-import com.dmonster.smap.ui.components.SmapTextField
-import com.dmonster.smap.ui.theme.BrandColors
 import com.dmonster.smap.ui.theme.SmapText
-import com.dmonster.smap.ui.theme.SuiteFont
-import java.util.Calendar
+import java.time.LocalDate
+import java.time.ZoneOffset
+import java.time.Instant
+import com.dmonster.smap.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,105 +24,34 @@ internal fun ProfileContent(
     uiState: RegisterViewModel.RegisterUiState
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text(
-            text = "프로필 정보를 설정해 주세요",
-            style = SmapText.title,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Text(
-            text = "나중에 설정에서 바꿀 수 있어요. 건너뛰어도 됩니다.",
-            style = SmapText.secondary,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        StepHeader("프로필을 채워볼까요?", "생년월일과 성별은 선택 사항이에요. 비워 두고 가입할 수 있어요.")
 
-        // 생년월일 (DatePicker)
-        var showDatePicker by remember { mutableStateOf(false) }
-
-        // 읽기 전용 입력창 위에 투명한 클릭 영역을 덮는다.
-        // 기존에는 enabled=false 인 입력창에 clickable 을 붙여, 낭독기에 "사용 안 함"으로 읽히고
-        // 글자색을 검정으로 고정해 다크 모드에서 보이지 않았다.
-        Box {
-            SmapTextField(
-                value = uiState.registerData.mtBirth ?: "",
-                onValueChange = {},
-                label = "생년월일 (선택)",
-                placeholder = "눌러서 선택",
-                trailingContent = { Icon(Icons.Outlined.DateRange, contentDescription = null) },
-                readOnly = true,
-            )
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .clickable(
-                        onClickLabel = "생년월일 선택",
-                        role = Role.Button,
-                    ) { showDatePicker = true }
-            )
+        var showDatePicker by rememberSaveable { mutableStateOf(false) }
+        OutlinedButton(
+            onClick = { showDatePicker = true }, shape = RoundedCornerShape(14.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+        ) {
+            Text("생년월일 (선택)", style = SmapText.bodyBold, color = MaterialTheme.colorScheme.onSurface)
+            Spacer(Modifier.weight(1f))
+            Text(uiState.registerData.mtBirth ?: "날짜 선택", style = SmapText.secondary)
+            Spacer(Modifier.width(8.dp))
+            Icon(Icons.Outlined.DateRange, contentDescription = null, modifier = Modifier.size(18.dp))
         }
-
-        // Wheel Style (Spinner) DatePicker Dialog
         if (showDatePicker) {
-            val calendar = Calendar.getInstance()
-            // 기존 생년월일이 있으면 해당 날짜로 초기화
-            uiState.registerData.mtBirth?.let { birth ->
-                try {
-                    val parts = birth.split("-")
-                    if (parts.size == 3) {
-                        calendar.set(parts[0].toInt(), parts[1].toInt() - 1, parts[2].toInt())
-                    }
-                } catch (e: Exception) {}
-            }
-
-            var selectedYear = calendar.get(Calendar.YEAR)
-            var selectedMonth = calendar.get(Calendar.MONTH)
-            var selectedDay = calendar.get(Calendar.DAY_OF_MONTH)
-
-            AlertDialog(
+            val initialDate = uiState.registerData.mtBirth?.let(LocalDate::parse) ?: LocalDate.now()
+            val picker = rememberDatePickerState(initialSelectedDateMillis = initialDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
+            DatePickerDialog(
                 onDismissRequest = { showDatePicker = false },
                 confirmButton = {
-                    TextButton(
-                        onClick = {
-                            val formatted = String.format("%04d-%02d-%02d", selectedYear, selectedMonth + 1, selectedDay)
-                            viewModel.setBirthDate(formatted)
-                            showDatePicker = false
+                    TextButton(enabled = picker.selectedDateMillis != null, onClick = {
+                        picker.selectedDateMillis?.let { millis ->
+                            viewModel.setBirthDate(Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate().toString())
                         }
-                    ) {
-                        Text("확인", fontFamily = SuiteFont, color = BrandColors.Primary)
-                    }
+                        showDatePicker = false
+                    }) { Text("확인") }
                 },
-                dismissButton = {
-                    TextButton(onClick = { showDatePicker = false }) {
-                        Text("취소", fontFamily = SuiteFont, color = BrandColors.TextSecondary)
-                    }
-                },
-                text = {
-                    Box(
-                        modifier = Modifier.fillMaxWidth().height(200.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        AndroidView(
-                            factory = { context ->
-                                val locale = java.util.Locale.KOREA
-                                java.util.Locale.setDefault(locale)
-                                val config = Configuration(context.resources.configuration)
-                                config.setLocale(locale)
-                                val localizedContext = context.createConfigurationContext(config)
-
-                                DatePicker(ContextThemeWrapper(localizedContext, android.R.style.Theme_Holo_Light_Dialog)).apply {
-                                    calendarViewShown = false
-                                    spinnersShown = true
-                                    init(selectedYear, selectedMonth, selectedDay) { _, year, monthOfYear, dayOfMonth ->
-                                        selectedYear = year
-                                        selectedMonth = monthOfYear
-                                        selectedDay = dayOfMonth
-                                    }
-                                }
-                            },
-                            modifier = Modifier.wrapContentSize()
-                        )
-                    }
-                }
-            )
+                dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("취소") } },
+            ) { DatePicker(state = picker) }
         }
 
         // 성별 선택
@@ -194,33 +112,8 @@ private fun GenderButton(
 
 @Composable
 internal fun CompleteContent() {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            imageVector = Icons.Default.CheckCircle,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(80.dp)
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Text(
-            text = "가입을 환영합니다!",
-            style = SmapText.title,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-            text = "도착했어와 함께 소중한 사람들과\n위치를 공유해보세요",
-            style = SmapText.body,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        RegisterPhotoHeader(R.drawable.login_arrival_cycling, "가입을 마쳤어요", 300.dp)
+        Text("이제 가족과 위치와 일정을 공유할 수 있어요.", style = SmapText.body, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

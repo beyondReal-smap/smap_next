@@ -1,5 +1,7 @@
 package com.dmonster.smap.ui.home
 
+import com.dmonster.smap.R
+import com.dmonster.smap.ui.components.SmapFamilyCover
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -91,29 +93,8 @@ fun GroupCreationScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(SmapSpacing.md)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(72.dp)
-                        .background(colors.primary.copy(alpha = 0.08f), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = if (isCreateTab) Icons.Outlined.Groups else Icons.Outlined.PersonAdd,
-                        contentDescription = null,
-                        tint = colors.primary,
-                        modifier = Modifier.size(36.dp)
-                    )
-                }
-
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = "그룹 시작하기", style = SmapText.title, color = colors.onSurface)
-                    Spacer(Modifier.height(SmapSpacing.xs))
-                    Text(
-                        text = "가족·친구와 위치를 함께 보려면 그룹이 필요해요.",
-                        style = SmapText.secondary,
-                        color = colors.onSurfaceVariant,
-                        textAlign = TextAlign.Center
-                    )
+                SmapFamilyCover(image = R.drawable.login_arrival_doorway, minHeight = 150.dp) {
+                    Text("그룹 시작하기", style = SmapText.pageTitle)
                 }
 
                 // 만들기 / 참여 전환 — 낭독기에 "탭, 선택됨"으로 읽히도록 selectable + Role.Tab

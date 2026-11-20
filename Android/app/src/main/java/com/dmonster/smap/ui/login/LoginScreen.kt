@@ -1,52 +1,72 @@
 package com.dmonster.smap.ui.login
 
+import android.animation.ValueAnimator
 import android.app.Activity
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.border
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
+import androidx.compose.material.icons.outlined.Email
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.delay
 import com.dmonster.smap.R
 import com.dmonster.smap.ui.components.SmapAccent
+import com.dmonster.smap.ui.components.SmapAccentTheme
 import com.dmonster.smap.ui.components.SmapButton
-import com.dmonster.smap.ui.components.SmapOnNavyMuted
 import com.dmonster.smap.ui.components.SmapPasswordField
 import com.dmonster.smap.ui.components.SmapTextField
-import com.dmonster.smap.ui.theme.SmapRadius
-import com.dmonster.smap.ui.theme.SmapSize
+import com.dmonster.smap.ui.theme.SmapTextStyle
 import com.dmonster.smap.ui.theme.SmapSpacing
 import com.dmonster.smap.ui.theme.SmapText
 
 /**
- * 로그인 화면 — 위쪽 브랜드 남색(아이콘·이름) + 아래 흰 입력 시트. iOS LoginView 와 같은 구성.
+ * 로그인 화면 — 첫 화면에서 로그인 방법을 선택하고 이메일 입력으로 이동한다.
  */
 @Composable
 fun LoginScreen(
@@ -55,9 +75,11 @@ fun LoginScreen(
     onNavigateToRegister: (Map<String, String>?) -> Unit = {},
     onGoogleSignInClick: () -> Unit = {},
     onKakaoSignInClick: () -> Unit = {}
-) {
+) = SmapAccentTheme(SmapAccent.Family) {
     val uiState by viewModel.uiState.collectAsState()
     
+    var showsEmailForm by rememberSaveable { mutableStateOf(uiState.phoneNumber.isNotBlank()) }
+
     // 비밀번호 찾기 화면 표시 여부
     var showForgotPassword by remember { mutableStateOf(false) }
     
@@ -77,124 +99,116 @@ fun LoginScreen(
         }
     }
     
-    // 위쪽 남색 바탕에는 흰 상태바 아이콘, 비밀번호 찾기(밝은 화면)가 덮을 때는 어두운 아이콘.
-    // LoginActivity 의 enableEdgeToEdge() 기본값은 라이트 모드에서 어두운 아이콘이라 남색 위에서 안 보인다.
     val view = LocalView.current
+    val dark = isSystemInDarkTheme()
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = showForgotPassword
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !dark
         }
     }
 
-    val focusManager = LocalFocusManager.current
-    val surface = MaterialTheme.colorScheme.surface
+    val colors = MaterialTheme.colorScheme
+    val notices = remember { SnackbarHostState() }
+    LaunchedEffect(uiState.showError, uiState.errorMessage) {
+        val message = uiState.errorMessage
+        if (uiState.showError && message != null) {
+            notices.showSnackbar(message = message, actionLabel = "닫기", duration = SnackbarDuration.Long)
+            viewModel.dismissError()
+        }
+    }
+    val changeStep: (Boolean) -> Unit = { email ->
+        viewModel.dismissError()
+        showsEmailForm = email
+    }
+    BackHandler(enabled = showsEmailForm && !showForgotPassword) {
+        if (!uiState.isLoading) changeStep(false)
+    }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            // 스플래시와 같은 브랜드 남색에서 이어지게 한다(iOS SMAPTheme.Navy.gradient 와 같은 값).
-            .background(SmapAccent.Navy.brush)
-    ) {
-        // 내용이 화면보다 짧아도 흰 시트가 화면 아래 끝까지 이어 보이게 아래 절반을 흰색으로 깐다.
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .fillMaxHeight(0.5f)
-                .background(surface)
-        )
+    Box(modifier = Modifier.fillMaxSize().background(colors.surface)) {
+        Crossfade(
+            targetState = showsEmailForm,
+            modifier = Modifier.fillMaxSize().statusBarsPadding().imePadding().navigationBarsPadding(),
+            label = "loginStep",
+        ) { email ->
+            BoxWithConstraints(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                val viewportHeight = maxHeight
+                val scroll = rememberScrollState()
+                if (email) {
+                    Column(
+                        modifier = Modifier.widthIn(max = 488.dp).fillMaxWidth()
+                            .verticalScroll(scroll, enabled = scroll.maxValue > 0)
+                            .padding(horizontal = 24.dp, vertical = 8.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            IconButton(enabled = !uiState.isLoading, onClick = { changeStep(false) }) {
+                                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "뒤로")
+                            }
+                            TextButton(enabled = !uiState.isLoading, onClick = { onNavigateToRegister(null) }) {
+                                Text("회원가입", style = SmapText.captionBold, color = colors.onSurface)
+                            }
+                        }
+                        EmailLoginForm(uiState, viewModel, onForgotPassword = { showForgotPassword = true })
+                    }
+                } else {
+                    Column(
+                        modifier = Modifier.widthIn(max = 520.dp).fillMaxWidth()
+                            .verticalScroll(scroll, enabled = scroll.maxValue > 0)
+                            .heightIn(min = viewportHeight)
+                            .padding(horizontal = 20.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Image(painterResource(R.drawable.app_no_bg), contentDescription = null, modifier = Modifier.size(30.dp))
+                            Spacer(Modifier.width(9.dp))
+                            Text(
+                                "도착했어", style = SmapTextStyle.logoTitle.copy(fontSize = 23.sp, letterSpacing = (-0.8).sp),
+                                color = colors.onSurface, modifier = Modifier.weight(1f).semantics { heading() },
+                            )
+                            TextButton(enabled = !uiState.isLoading, onClick = { onNavigateToRegister(null) }) {
+                                Text("회원가입", style = SmapText.captionBold, color = colors.onSurface)
+                            }
+                        }
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .imePadding()
-                .verticalScroll(rememberScrollState())
-        ) {
-            LogoSection(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(top = 40.dp, bottom = 32.dp)
-            )
+                        Spacer(Modifier.height(8.dp))
+                        ArrivalPhoto(
+                            modifier = Modifier.fillMaxWidth().height((viewportHeight - 252.dp).coerceIn(145.dp, 530.dp)),
+                            isActive = !showsEmailForm && !uiState.isLoading && !uiState.showError,
+                        )
 
-            // 입력 시트 — 위쪽 모서리만 둥근 흰 판(앱 공용 시트 반경)
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(topStart = SmapRadius.sheet, topEnd = SmapRadius.sheet))
-                    .background(surface)
-                    .navigationBarsPadding()
-                    .padding(horizontal = SmapSpacing.lg, vertical = SmapSpacing.xl),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                SmapTextField(
-                    value = uiState.phoneNumber,
-                    onValueChange = viewModel::onPhoneNumberChange,
-                    label = null,
-                    placeholder = "이메일",
-                    keyboardType = KeyboardType.Email,
-                    imeAction = ImeAction.Next,
-                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
-                )
+                        Spacer(Modifier.height(16.dp))
+                        Button(
+                            onClick = { changeStep(true) }, enabled = !uiState.isLoading,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = SmapAccent.Family.deep, contentColor = Color.White),
+                            contentPadding = PaddingValues(horizontal = 20.dp),
+                        ) {
+                            Icon(Icons.Outlined.Email, contentDescription = null, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(10.dp))
+                            Text("이메일로 계속하기", style = SmapText.bodyBold, modifier = Modifier.weight(1f))
+                            Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = null, modifier = Modifier.size(20.dp))
+                        }
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                SmapPasswordField(
-                    value = uiState.password,
-                    onValueChange = viewModel::onPasswordChange,
-                    label = null,
-                    placeholder = "비밀번호",
-                    imeAction = ImeAction.Done,
-                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
-                )
-
-                if (uiState.showError && uiState.errorMessage != null) {
-                    Spacer(modifier = Modifier.height(SmapSpacing.md))
-                    ErrorMessage(message = uiState.errorMessage!!)
+                        Spacer(Modifier.height(18.dp))
+                        DividerWithText()
+                        Spacer(Modifier.height(10.dp))
+                        SocialLoginSection(onGoogleSignInClick, onKakaoSignInClick, uiState.isLoading)
+                    }
                 }
-
-                Spacer(modifier = Modifier.height(SmapSpacing.lg))
-
-                SmapButton(
-                    text = "로그인",
-                    onClick = {
-                        focusManager.clearFocus()
-                        viewModel.login()
-                    },
-                    enabled = uiState.isInputValid,
-                    isLoading = uiState.isLoading
-                )
-
-                Spacer(modifier = Modifier.height(SmapSpacing.sm))
-
-                TextButton(onClick = { showForgotPassword = true }) {
-                    Text(
-                        text = "비밀번호를 잊으셨나요?",
-                        style = SmapText.secondaryMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(SmapSpacing.md))
-
-                DividerWithText()
-
-                Spacer(modifier = Modifier.height(SmapSpacing.lg))
-
-                SocialLoginSection(
-                    onGoogleClick = onGoogleSignInClick,
-                    onKakaoClick = onKakaoSignInClick,
-                    isLoading = uiState.isLoading
-                )
-
-                Spacer(modifier = Modifier.height(SmapSpacing.lg))
-
-                SignUpSection(
-                    onClick = { onNavigateToRegister(null) }
-                )
             }
         }
+
+        val noticePosition = if (showsEmailForm) {
+            Modifier.align(Alignment.BottomCenter).navigationBarsPadding().imePadding().padding(bottom = 12.dp)
+        } else {
+            Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 70.dp)
+        }
+        SnackbarHost(notices, modifier = noticePosition.widthIn(max = 520.dp).padding(horizontal = 16.dp))
 
         // 로딩 오버레이
         if (uiState.isLoading) {
@@ -218,63 +232,127 @@ fun LoginScreen(
     }
 }
 
-/**
- * 로고 섹션 — 남색 바탕 위 앱 아이콘·이름·한 줄 소개
- */
 @Composable
-private fun LogoSection(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Image(
-            painter = painterResource(id = R.drawable.app_no_bg),
-            contentDescription = null,
-            modifier = Modifier.size(76.dp)
-        )
-        Spacer(modifier = Modifier.height(SmapSpacing.md))
+private fun ArrivalPhoto(modifier: Modifier, isActive: Boolean) {
+    val photos = remember { listOf(R.drawable.login_arrival, R.drawable.login_arrival_cycling, R.drawable.login_arrival_doorway) }
+    var index by rememberSaveable { mutableIntStateOf(0) }
+    var paused by rememberSaveable { mutableStateOf(false) }
+    val owner = LocalLifecycleOwner.current
+    val reduceMotion = !ValueAnimator.areAnimatorsEnabled()
+    val playing = isActive && LocalWindowInfo.current.isWindowFocused && !paused && !reduceMotion
+    LaunchedEffect(owner, playing) {
+        if (playing) owner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (true) {
+                delay(6_000)
+                index = (index + 1) % photos.size
+            }
+        }
+    }
+    Box(modifier = modifier.clip(RoundedCornerShape(20.dp)), contentAlignment = Alignment.BottomStart) {
+        Crossfade(
+            targetState = index, modifier = Modifier.matchParentSize(),
+            animationSpec = tween(if (reduceMotion) 0 else 700), label = "arrivalPhoto",
+        ) { slide ->
+            Image(
+                painter = painterResource(photos[slide]), contentDescription = null,
+                contentScale = ContentScale.Crop,
+                alignment = BiasAlignment(horizontalBias = if (slide == 2) 0.20f else 0.56f, verticalBias = 0f),
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        Spacer(Modifier.matchParentSize().background(
+            Brush.verticalGradient(0.45f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.63f))
+        ))
         Text(
-            text = "도착했어",
-            style = SmapText.title.copy(fontSize = 32.sp, lineHeight = 40.sp),
+            "가족이 도착하면,\n먼저 알려드려요.",
+            style = SmapTextStyle.logoTitle.copy(fontSize = 30.sp, lineHeight = 36.sp, letterSpacing = (-1).sp),
             color = Color.White,
-            modifier = Modifier.semantics { heading() }
+            modifier = Modifier.padding(20.dp),
         )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = "가족이 도착하면 먼저 알려 드려요",
-            style = SmapText.body,
-            color = SmapOnNavyMuted,
-            textAlign = TextAlign.Center
-        )
+        val control = if (reduceMotion) "다음 사진" else if (paused) "사진 전환 재생" else "사진 전환 일시 정지"
+        Row(
+            modifier = Modifier.align(Alignment.TopEnd).padding(top = 4.dp, end = 12.dp)
+                .heightIn(min = 48.dp)
+                .clickable(role = Role.Button) { if (reduceMotion) index = (index + 1) % photos.size else paused = !paused }
+                .semantics {
+                    contentDescription = control
+                    stateDescription = "${index + 1} / ${photos.size}"
+                },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(
+                modifier = Modifier.background(Color.Black.copy(alpha = 0.55f), CircleShape)
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("${index + 1} / ${photos.size}", style = SmapText.captionMedium, color = Color.White,
+                    modifier = Modifier.clearAndSetSemantics {})
+                Icon(
+                    when {
+                        reduceMotion -> Icons.AutoMirrored.Filled.KeyboardArrowRight
+                        paused -> Icons.Filled.PlayArrow
+                        else -> Icons.Filled.Pause
+                    },
+                    contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp),
+                )
+            }
+        }
     }
 }
 
-/**
- * 에러 메시지
- */
 @Composable
-private fun ErrorMessage(message: String) {
-    val error = MaterialTheme.colorScheme.error
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(color = error.copy(alpha = 0.1f), shape = RoundedCornerShape(SmapRadius.sm))
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = Icons.Default.Warning,
-            contentDescription = null,
-            tint = error,
-            modifier = Modifier.size(20.dp)
+private fun EmailLoginForm(uiState: LoginUiState, viewModel: LoginViewModel, onForgotPassword: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val focusManager = LocalFocusManager.current
+    Column(modifier = Modifier.fillMaxWidth().padding(top = 22.dp)) {
+        Text(
+            "이메일 로그인", style = SmapTextStyle.logoTitle.copy(fontSize = 32.sp), color = colors.onSurface,
+            modifier = Modifier.semantics { heading() },
         )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(text = message, style = SmapText.secondary, color = error)
+        Spacer(Modifier.height(24.dp))
+        SmapTextField(
+            value = uiState.phoneNumber,
+            onValueChange = viewModel::onPhoneNumberChange,
+            label = "이메일",
+            placeholder = "name@example.com",
+            keyboardType = KeyboardType.Email,
+            imeAction = ImeAction.Next,
+            keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        SmapPasswordField(
+            value = uiState.password,
+            onValueChange = viewModel::onPasswordChange,
+            label = "비밀번호",
+            placeholder = "비밀번호 입력",
+            imeAction = ImeAction.Done,
+            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        SmapButton(
+            text = "로그인",
+            onClick = {
+                focusManager.clearFocus()
+                viewModel.login()
+            },
+            enabled = uiState.isInputValid,
+            isLoading = uiState.isLoading
+        )
+
+        Spacer(Modifier.height(8.dp))
+        TextButton(onClick = onForgotPassword, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+            Text("비밀번호 찾기", style = SmapText.captionMedium, color = colors.onSurfaceVariant)
+        }
     }
 }
 
 /**
- * 구분선 ("또는")
+ * 간편 로그인 구분선
  */
 @Composable
 private fun DividerWithText() {
@@ -285,107 +363,46 @@ private fun DividerWithText() {
     ) {
         HorizontalDivider(modifier = Modifier.weight(1f), color = colors.outlineVariant)
         Text(
-            text = "또는",
+            text = "간편 로그인",
             modifier = Modifier.padding(horizontal = 12.dp),
-            style = SmapText.secondary,
+            style = SmapText.captionMedium,
             color = colors.onSurfaceVariant
         )
         HorizontalDivider(modifier = Modifier.weight(1f), color = colors.outlineVariant)
     }
 }
 
-/**
- * 소셜 로그인 섹션 — 높이·모서리는 앱 공용 버튼(SmapButton 52dp·12dp)과 맞춘다.
- */
 @Composable
 private fun SocialLoginSection(
     onGoogleClick: () -> Unit,
     onKakaoClick: () -> Unit,
     isLoading: Boolean
 ) {
-    val shape = RoundedCornerShape(SmapRadius.md)
-    val noElevation = ButtonDefaults.buttonElevation(0.dp, 0.dp, 0.dp, 0.dp, 0.dp)
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        // Google — 공식 규격: 흰 바탕 + 옅은 테두리 + 컬러 G 로고
-        Button(
-            onClick = onGoogleClick,
-            enabled = !isLoading,
-            modifier = Modifier.fillMaxWidth().height(SmapSize.buttonHeight),
-            shape = shape,
-            border = BorderStroke(1.dp, Color(0xFFDADCE0)),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color.White,
-                contentColor = Color(0xFF1F1F1F),
-                disabledContainerColor = Color.White,
-                disabledContentColor = Color(0xFF1F1F1F).copy(alpha = 0.38f)
-            ),
-            elevation = noElevation
-        ) {
-            Image(
-                painter = painterResource(id = R.drawable.ic_google_logo),
-                contentDescription = null,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            Text(text = "Google로 계속하기", style = SmapText.secondaryMedium.copy(fontSize = 16.sp))
-        }
-
-        // 카카오 — 공식 규격: 바탕 #FEE500, 심볼 #000000, 글자 #000000 85%
-        Button(
-            onClick = onKakaoClick,
-            enabled = !isLoading,
-            modifier = Modifier.fillMaxWidth().height(SmapSize.buttonHeight),
-            shape = shape,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = KakaoYellow,
-                contentColor = KakaoLabel,
-                disabledContainerColor = KakaoYellow.copy(alpha = 0.5f),
-                disabledContentColor = KakaoLabel
-            ),
-            elevation = noElevation
-        ) {
-            Image(
-                painter = painterResource(id = R.drawable.ic_kakao_logo),
-                contentDescription = null,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            Text(text = "카카오로 계속하기", style = SmapText.secondaryMedium.copy(fontSize = 16.sp))
-        }
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        LoginProviderButton("Google", R.drawable.ic_google_logo, Color.White, !isLoading, onGoogleClick, Modifier.weight(1f))
+        LoginProviderButton("카카오", R.drawable.ic_kakao_logo, Color(0xFFFEE500), !isLoading, onKakaoClick, Modifier.weight(1f), brandText = Color.Black)
     }
 }
 
-private val KakaoYellow = Color(0xFFFEE500)
-private val KakaoLabel = Color(0xD9000000)
-
-/**
- * 회원가입 섹션
- */
 @Composable
-private fun SignUpSection(onClick: () -> Unit) {
+private fun LoginProviderButton(
+    name: String, logo: Int, background: Color, enabled: Boolean, onClick: () -> Unit, modifier: Modifier,
+    brandText: Color? = null,
+) {
     val colors = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(12.dp)
     Row(
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
+        modifier = modifier.heightIn(min = 48.dp).clip(shape)
+            .then(if (brandText == null) Modifier.border(1.dp, colors.outline, shape) else Modifier.background(background))
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = "${name}로 계속하기" },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(7.dp, Alignment.CenterHorizontally),
     ) {
-        Text(
-            text = "아직 회원이 아니신가요?",
-            style = SmapText.secondary,
-            color = colors.onSurfaceVariant
-        )
-        Spacer(modifier = Modifier.width(4.dp))
-        Text(
-            text = "가입하기",
-            style = SmapText.captionBold.copy(fontSize = 15.sp, lineHeight = 22.sp),
-            color = colors.primary,
-            modifier = Modifier
-                .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
-                .clickable(onClick = onClick)
-                .wrapContentSize(Alignment.Center)
-        )
+        Box(Modifier.size(26.dp).background(background, CircleShape), contentAlignment = Alignment.Center) {
+            Image(painterResource(logo), contentDescription = null, modifier = Modifier.size(17.dp))
+        }
+        Text(name, style = SmapText.captionMedium, color = brandText ?: colors.onSurface, modifier = Modifier.clearAndSetSemantics {})
     }
 }
 

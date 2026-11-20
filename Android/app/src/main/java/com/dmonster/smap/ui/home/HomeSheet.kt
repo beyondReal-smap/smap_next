@@ -1,12 +1,16 @@
 package com.dmonster.smap.ui.home
 
+import com.dmonster.smap.ui.theme.FamilyColors
 import androidx.compose.material.icons.outlined.Map
 import com.dmonster.smap.ui.components.SheetBandButton
-import com.dmonster.smap.ui.components.SheetHeaderBandGap
-import com.dmonster.smap.ui.components.SheetHeaderMinHeight
-import com.dmonster.smap.ui.components.sheetHeaderBand
-import com.dmonster.smap.ui.components.SmapOnNavyMuted
+import com.dmonster.smap.ui.components.SmapAccent
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import com.dmonster.smap.ui.components.SmapAccentTheme
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,23 +22,29 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.EventAvailable
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.dmonster.smap.data.model.SmapGroupMember
 import com.dmonster.smap.data.model.SmapSchedule
+import com.dmonster.smap.data.model.ScheduleStatus
 import com.dmonster.smap.ui.components.DateChipItem
 import com.dmonster.smap.ui.components.DateStrip
 import com.dmonster.smap.ui.components.MemberStrip
@@ -51,15 +61,8 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.TimeZone
 
-/** 접힌 시트 높이: 손잡이 + 머리 줄 + 멤버 얼굴 줄 */
-val HomeSheetPeekHeight = 178.dp
+val HomeSheetPeekHeight = 228.dp
 
-/**
- * 홈 지도 시트 — 사이드바("멤버 조회")와 지도 위 말풍선을 대신한다.
- *
- * 접힌 상태: 머리 줄(선택한 멤버의 상태 또는 "멤버 N명") + 얼굴 줄.
- * 펼친 상태: 멤버 목록(위치 갱신·배터리·오늘 일정 수) → 날짜 줄 → 그날 일정.
- */
 @Composable
 fun ColumnScope.HomeSheetContent(
     members: List<SmapGroupMember>,
@@ -69,61 +72,98 @@ fun ColumnScope.HomeSheetContent(
     selectedDate: String,
     schedules: List<SmapSchedule>,
     memberStats: (Int) -> MemberStats,
+    isExpanded: Boolean,
+    expansionProgress: () -> Float,
+    onToggleSchedule: () -> Unit,
     onSelectMember: (SmapGroupMember) -> Unit,
     onShowAll: () -> Unit,
     onSelectDate: (String) -> Unit,
+    /** 장소가 저장된 일정을 누르면 지도를 그 장소로 옮긴다 */
+    onSelectSchedule: (SmapSchedule) -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
     val selected = members.firstOrNull { it.mtIdx == selectedMemberId }
+    val daySchedules = remember(schedules) { schedules.sortedBy { it.date } }
 
-    // 머리 줄
-    Row(
-        Modifier
-            .sheetHeaderBand()
-            .heightIn(min = SheetHeaderMinHeight)
-            .padding(start = SmapSpacing.screenHorizontal, end = SmapSpacing.sm),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
+    val date = remember(selectedDate) { runCatching { LocalDate.parse(selectedDate) }.getOrNull() }
+    val day = if (date == LocalDate.now()) "오늘" else "이날"
+    val featured = daySchedules.firstOrNull { it.status != ScheduleStatus.COMPLETED } ?: daySchedules.lastOrNull()
+
+    Column(Modifier.fillMaxWidth().background(FamilyColors.Paper)) {
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = SmapSpacing.lg),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (date != null) {
+                Column(
+                    Modifier.size(46.dp, 48.dp).clip(RoundedCornerShape(10.dp)).background(Color.White)
+                        .border(1.dp, FamilyColors.Ink.copy(alpha = 0.15f), RoundedCornerShape(10.dp)),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Box(Modifier.fillMaxWidth().background(FamilyColors.Highlight), contentAlignment = Alignment.Center) {
+                        Text("${date.monthValue}월", style = SmapText.captionBold.copy(fontSize = 11.sp, lineHeight = 14.sp), color = FamilyColors.Ink)
+                    }
+                    Text("${date.dayOfMonth}", style = SmapText.title, color = FamilyColors.Ink)
+                }
+            }
+            Column(Modifier.weight(1f)) {
+                val title = when {
+                    selected == null -> "우리의 하루"
+                    selected.mtIdx == currentUserIdx -> "나의 하루"
+                    else -> "${selected.displayName}의 하루"
+                }
+                Text(title, style = SmapText.title, color = FamilyColors.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.semantics { heading() })
+                val status = when {
+                    selected != null -> memberStatusLine(selected) ?: "아직 위치 정보가 없어요"
+                    members.isEmpty() -> "함께할 멤버가 아직 없어요"
+                    else -> listOfNotNull(date?.dayOfWeek?.getDisplayName(java.time.format.TextStyle.FULL, Locale.KOREAN),
+                        "함께하는 ${members.size}명").joinToString(" · ")
+                }
+                Text(status, style = SmapText.captionSmall, color = FamilyColors.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
             if (selected != null) {
-                Text(
-                    if (selected.mtIdx == currentUserIdx) "${selected.displayName} (나)" else selected.displayName,
-                    style = SmapText.headline,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.semantics { heading() },
-                )
-                Text(
-                    memberStatusLine(selected) ?: "아직 위치 정보가 없어요",
-                    style = SmapText.caption,
-                    color = SmapOnNavyMuted,
-                    maxLines = 1,
-                )
-            } else {
-                Text(
-                    "멤버 ${members.size}명",
-                    style = SmapText.headline,
-                    color = Color.White,
-                    modifier = Modifier.semantics { heading() },
-                )
-                Text("얼굴을 누르면 그 멤버 위치로 이동해요", style = SmapText.caption, color = SmapOnNavyMuted)
+                SmapAccentTheme(SmapAccent.Family) {
+                    SheetBandButton(text = "전체 보기", icon = Icons.Outlined.Map, onClick = onShowAll)
+                }
             }
         }
-        if (selected != null) {
-            SheetBandButton(text = "전체 보기", icon = Icons.Outlined.Map, onClick = onShowAll)
+        Spacer(Modifier.height(14.dp))
+        SmapAccentTheme(SmapAccent.Family) {
+            MemberStrip(
+                members = members, selectedMemberId = selectedMemberId, currentUserIdx = currentUserIdx,
+                onSelect = onSelectMember, onAllClick = onShowAll,
+            )
+        }
+        Row(
+            Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 14.dp)
+                .clip(RoundedCornerShape(16.dp)).background(FamilyColors.Ink)
+                .clickable(role = Role.Button, onClickLabel = if (isExpanded) "일정 목록 접기" else "일정 목록 펼치기", onClick = onToggleSchedule)
+                .heightIn(min = 64.dp).padding(horizontal = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(Modifier.width(66.dp), contentAlignment = Alignment.Center) {
+                if (featured != null) Text(scheduleTime(featured), style = SmapText.title, color = FamilyColors.Highlight)
+                else Icon(Icons.Outlined.EventAvailable, contentDescription = null, tint = FamilyColors.Highlight)
+            }
+            Spacer(Modifier.width(1.dp).height(31.dp).background(Color.White.copy(alpha = 0.26f)))
+            Column(Modifier.weight(1f)) {
+                Text(if (schedules.isEmpty()) "${day}의 일정" else "${day}의 일정 · ${schedules.size}개",
+                    style = SmapText.captionSmall, color = Color.White.copy(alpha = 0.8f))
+                Text(featured?.displayTitle ?: "잡힌 약속이 없어요", style = SmapText.subheadline, color = Color.White,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Icon(
+                Icons.Filled.KeyboardArrowUp,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = 180f * expansionProgress() },
+            )
         }
     }
-
-    Spacer(Modifier.height(SheetHeaderBandGap))
-    MemberStrip(
-        members = members,
-        selectedMemberId = selectedMemberId,
-        currentUserIdx = currentUserIdx,
-        onSelect = onSelectMember,
-        onAllClick = onShowAll,
-    )
-    Spacer(Modifier.height(SmapSpacing.md))
 
     // 펼친 영역 — 회색 바탕 위 묶음들
     Column(
@@ -135,7 +175,57 @@ fun ColumnScope.HomeSheetContent(
             .padding(horizontal = SmapSpacing.md, vertical = SmapSpacing.md),
         verticalArrangement = Arrangement.spacedBy(SmapSpacing.lg),
     ) {
-        SmapSection(title = "멤버") {
+        val dateItems = calendarDays.mapNotNull { (d, _) ->
+            runCatching { DateChipItem(LocalDate.parse(d)) }.getOrNull()
+        }
+        if (dateItems.isNotEmpty() && date != null) {
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp).padding(bottom = SmapSpacing.sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        if (date == LocalDate.now()) "오늘의 일정" else "이날의 일정",
+                        style = SmapText.headline,
+                        color = colors.onSurface,
+                        modifier = Modifier.semantics { heading() },
+                    )
+                    Text(
+                        date.format(DateTimeFormatter.ofPattern("M월 d일 EEEE", Locale.KOREAN)),
+                        style = SmapText.caption,
+                        color = colors.onSurfaceVariant,
+                    )
+                }
+                DateStrip(
+                    items = dateItems,
+                    selected = date,
+                    onSelect = { onSelectDate(it.date.toString()) },
+                    modifier = Modifier.padding(bottom = SmapSpacing.sm),
+                )
+                SmapSection {
+                    if (schedules.isEmpty()) {
+                        SmapListRow(
+                            title = "아직 잡힌 일정이 없어요",
+                            subtitle = "일정 탭에서 함께할 약속을 추가해요",
+                            leading = { SmapRowIcon(Icons.Outlined.EventAvailable) },
+                        )
+                    } else {
+                        daySchedules.forEachIndexed { i, s ->
+                            if (i > 0) SmapRowDivider()
+                            SmapListRow(
+                                title = s.displayTitle,
+                                subtitle = listOfNotNull(s.validMemberName, s.location?.takeIf { it.isNotBlank() }).joinToString(" · "),
+                                leading = { TimeBadge(scheduleTime(s)) },
+                                // 장소가 있는 일정만 누를 수 있다 — 장소 없는 일정은 옮겨 갈 곳이 없으니 누름 표시도 하지 않는다.
+                                onClick = if (s.mapLatLng != null) ({ onSelectSchedule(s) }) else null,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        SmapSection(title = "함께하는 멤버") {
             members.forEachIndexed { i, m ->
                 if (i > 0) SmapRowDivider()
                 val stats = memberStats(m.mtIdx)
@@ -143,54 +233,13 @@ fun ColumnScope.HomeSheetContent(
                 SmapListRow(
                     title = if (m.mtIdx == currentUserIdx) "${m.displayName} (나)" else m.displayName,
                     subtitle = memberStatusLine(m) ?: "위치 정보 없음",
-                    leading = { SmapAvatar(name = m.displayName, imagePath = m.mtFile1) },
+                    leading = { SmapAvatar(name = m.displayName, imagePath = m.mtFile1, memberId = m.mtIdx) },
                     trailing = if (todayCount > 0) {
                         { CountPill("일정 $todayCount") }
                     } else null,
                     selected = m.mtIdx == selectedMemberId,
                     onClick = { onSelectMember(m) },
                 )
-            }
-        }
-
-        val dateItems = calendarDays.mapNotNull { (d, _) ->
-            runCatching { DateChipItem(LocalDate.parse(d)) }.getOrNull()
-        }
-        val selectedLocal = runCatching { LocalDate.parse(selectedDate) }.getOrNull()
-        if (dateItems.isNotEmpty() && selectedLocal != null) {
-            Column {
-                Text(
-                    selectedLocal.format(DateTimeFormatter.ofPattern("M월 d일 EEEE", Locale.KOREAN)) + " 일정",
-                    style = SmapText.captionBold,
-                    color = colors.onSurfaceVariant,
-                    modifier = Modifier
-                        .padding(start = 4.dp, bottom = SmapSpacing.sm)
-                        .semantics { heading() },
-                )
-                DateStrip(
-                    items = dateItems,
-                    selected = selectedLocal,
-                    onSelect = { onSelectDate(it.date.toString()) },
-                    modifier = Modifier.padding(bottom = SmapSpacing.sm),
-                )
-                SmapSection {
-                    if (schedules.isEmpty()) {
-                        SmapListRow(
-                            title = "일정이 없어요",
-                            subtitle = "일정 탭에서 추가할 수 있어요",
-                            leading = { SmapRowIcon(Icons.Outlined.EventAvailable) },
-                        )
-                    } else {
-                        schedules.forEachIndexed { i, s ->
-                            if (i > 0) SmapRowDivider()
-                            SmapListRow(
-                                title = s.displayTitle,
-                                subtitle = listOfNotNull(s.validMemberName, s.location?.takeIf { it.isNotBlank() }).joinToString(" · "),
-                                leading = { TimeBadge(scheduleTime(s)) },
-                            )
-                        }
-                    }
-                }
             }
         }
         Spacer(Modifier.height(SmapSpacing.lg))
@@ -211,8 +260,12 @@ private fun CountPill(text: String) {
 
 @Composable
 private fun TimeBadge(text: String) {
-    Box(Modifier.width(52.dp), contentAlignment = Alignment.CenterStart) {
-        Text(text, style = SmapText.captionBold, color = MaterialTheme.colorScheme.primary)
+    Box(
+        Modifier.width(52.dp).heightIn(min = 28.dp)
+            .background(SmapAccent.Schedule.container, RoundedCornerShape(8.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, style = SmapText.captionBold, color = SmapAccent.Schedule.deep)
     }
 }
 
@@ -221,7 +274,8 @@ internal fun memberStatusLine(m: SmapGroupMember): String? {
     val parts = buildList {
         formatGpsTime(m.mltGpsTime)?.let { add("$it 갱신") }
         m.mltBattery?.takeIf { it >= 0 }?.let { add("배터리 $it%") }
-        m.mltSpeed?.takeIf { it >= 1.0 }?.let { add("${String.format(Locale.US, "%.0f", it)}km/h 이동 중") }
+        // 서버 값은 m/s — km/h 로 바꿔 보여 준다(iOS 와 같게)
+        m.mltSpeed?.let { it * 3.6 }?.takeIf { it >= 1.0 }?.let { add("${String.format(Locale.US, "%.0f", it)}km/h 이동 중") }
     }
     return parts.takeIf { it.isNotEmpty() }?.joinToString(" · ")
 }

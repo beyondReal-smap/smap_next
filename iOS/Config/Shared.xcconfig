@@ -1,8 +1,8 @@
 // Shared configuration for SMAP iOS app
 // API URLs
 API_BASE_URL = https:/$()/api3.aiagnt.kr/api/
-WEB_BASE_URL = https:/$()/nextstep.aiagnt.kr/
-FILE_API_URL = https:/$()/nextstep.aiagnt.kr/api/
+WEB_BASE_URL = https:/$()/smap.aiagnt.kr/
+FILE_API_URL = https:/$()/smap.aiagnt.kr/api/
 IMAGE_BASE_URL = https:/$()/api3.aiagnt.kr
 
 // App Info

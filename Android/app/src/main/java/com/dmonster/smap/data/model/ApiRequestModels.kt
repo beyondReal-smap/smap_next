@@ -126,7 +126,8 @@ data class CreateLocationRequest(
     @SerialName("slt_lat") val sltLat: Double,
     @SerialName("slt_long") val sltLong: Double,
     @SerialName("slt_memo") val sltMemo: String? = null,
-    @SerialName("slt_enter_alarm") val sltEnterAlarm: String? = "Y"
+    @SerialName("slt_enter_alarm") val sltEnterAlarm: String? = "Y",
+    @SerialName("slt_icon") val sltIcon: String? = null
 )
 
 @Serializable
@@ -136,5 +137,7 @@ data class UpdateLocationRequest(
     @SerialName("slt_lat") val sltLat: Double,
     @SerialName("slt_long") val sltLong: Double,
     @SerialName("slt_memo") val sltMemo: String? = null,
-    @SerialName("slt_enter_alarm") val sltEnterAlarm: String? = null
+    // encodeDefaults=true 라 null 도 실려 가 서버 값을 지운다 — 고친 적 없는 장소는 받은 값을 그대로 돌려보낸다.
+    @SerialName("slt_enter_alarm") val sltEnterAlarm: String? = null,
+    @SerialName("slt_icon") val sltIcon: String?
 )

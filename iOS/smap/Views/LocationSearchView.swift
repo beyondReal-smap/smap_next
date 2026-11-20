@@ -120,7 +120,7 @@ struct LocationSearchView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "magnifyingglass")
                             .font(.suite(size: 16, weight: .bold))
-                            .foregroundColor(SMAPTheme.Color.primary)
+                            .foregroundColor(SMAPAccent.places.base)
                         
                         TextField("지번, 도로명, 건물명 검색", text: $query, onCommit: performSearch)
                             .font(.suite(size: 15))
@@ -146,14 +146,14 @@ struct LocationSearchView: View {
                             .foregroundColor(.white)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
-                            .background(query.isEmpty ? Color.gray.opacity(0.3) : SMAPTheme.Color.primary)
+                            .background(query.isEmpty ? Color.gray.opacity(0.3) : SMAPAccent.places.base)
                             .cornerRadius(14)
                     }
                     .disabled(query.isEmpty || isLoading)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 16)
-                .background(Color.white)
+                .background(Color(uiColor: .systemBackground))
                 
                 Divider().opacity(0.5)
             }
@@ -187,11 +187,11 @@ struct LocationSearchView: View {
                                     HStack(spacing: 16) {
                                         ZStack {
                                             Circle()
-                                                .fill(SMAPTheme.Color.primary.opacity(0.1))
+                                                .fill(SMAPAccent.places.base.opacity(0.1))
                                                 .frame(width: 40, height: 40)
                                             Image(systemName: "mappin.and.ellipse")
                                                 .font(.suite(size: 18))
-                                                .foregroundColor(SMAPTheme.Color.primary)
+                                                .foregroundColor(SMAPAccent.places.base)
                                         }
                                         
                                         VStack(alignment: .leading, spacing: 4) {
@@ -245,7 +245,7 @@ struct LocationSearchView: View {
                 
                 Image(systemName: icon)
                     .font(.suite(size: 40))
-                    .foregroundColor(SMAPTheme.Color.primary.opacity(0.6))
+                    .foregroundColor(SMAPAccent.places.base.opacity(0.6))
             }
             
             VStack(spacing: 8) {

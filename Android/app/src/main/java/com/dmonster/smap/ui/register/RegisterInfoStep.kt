@@ -42,11 +42,7 @@ internal fun BasicInfoContent(
     val confirmMismatch = uiState.passwordConfirm.isNotEmpty() && !viewModel.isPasswordMatch
 
     Column(verticalArrangement = Arrangement.spacedBy(SmapSpacing.md)) {
-        Text(
-            text = "기본 정보를 입력해 주세요",
-            style = SmapText.title,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
+        StepHeader("계정 정보를 입력해 주세요", "닉네임은 가족에게 보이는 이름이에요.")
 
         SmapTextField(
             value = uiState.registerData.mtName,
@@ -59,7 +55,6 @@ internal fun BasicInfoContent(
             value = uiState.registerData.mtNickname,
             onValueChange = { viewModel.setNickname(it) },
             label = "닉네임",
-            helperText = "그룹 멤버에게 보이는 이름이에요.",
             imeAction = ImeAction.Next,
         )
 

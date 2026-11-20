@@ -23,6 +23,11 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.dmonster.smap.BuildConfig
 import com.dmonster.smap.ui.theme.SuiteFont
+import kotlin.math.abs
+
+private val familyColors = listOf(SmapAccent.Orange, SmapAccent.Teal, SmapAccent.Rose, SmapAccent.Purple, SmapAccent.Navy)
+
+internal fun familyColor(memberId: Int): SmapAccent = familyColors[abs(memberId % familyColors.size)]
 
 /**
  * 서버가 주는 프로필 경로(절대 URL, "/images/..", "/..", 파일명)를 이미지 URL 로 바꾼다.
@@ -49,8 +54,10 @@ fun SmapAvatar(
     modifier: Modifier = Modifier,
     size: Dp = 44.dp,
     selected: Boolean = false,
+    memberId: Int? = null,
 ) {
     val colors = MaterialTheme.colorScheme
+    val initialsColor = memberId?.let(::familyColor)
     val url = profileImageUrl(imagePath)
     val ring = if (selected) 2.5.dp else 0.dp
     Box(
@@ -59,12 +66,12 @@ fun SmapAvatar(
             .then(if (selected) Modifier.border(ring, SmapBrush.accent, CircleShape) else Modifier)
             .padding(if (selected) ring + 2.dp else 0.dp)
             .clip(CircleShape)
-            .background(colors.primaryContainer),
+            .background(initialsColor?.container ?: colors.primaryContainer),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = name.trim().take(1).ifEmpty { "?" },
-            color = colors.primary,
+            color = initialsColor?.base ?: colors.primary,
             fontFamily = SuiteFont,
             fontWeight = FontWeight.Bold,
             fontSize = (size.value * 0.38f).sp,

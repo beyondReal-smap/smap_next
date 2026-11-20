@@ -19,6 +19,8 @@ struct LocationDetailPanel: View {
     @State private var locationLatitude: Double = 37.5665
     @State private var locationLongitude: Double = 126.9780
     @State private var notificationsEnabled: Bool = true
+    /// 사용자가 직접 고른 아이콘. nil 이면 아직 안 고른 것 — 이름을 고치는 대로 짐작한 아이콘이 따라 바뀐다.
+    @State private var pickedKind: PlaceKind?
     @State private var showLocationSearch: Bool = false
     @State private var isInitialized: Bool = false
 
@@ -146,7 +148,7 @@ struct LocationDetailPanel: View {
     private func locationInfoView(location: SavedLocation) -> some View {
         VStack(alignment: .leading, spacing: SMAPTheme.Spacing.md) {
             HStack(spacing: 12) {
-                SMAPRowIcon(systemImage: "mappin.and.ellipse", emphasized: true)
+                SMAPRowIcon(systemImage: location.kind.systemImage, emphasized: true)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(location.name)
                         .font(SMAPTheme.Font.title)
@@ -206,6 +208,11 @@ struct LocationDetailPanel: View {
                     SMAPTextField("주소를 입력해 주세요", text: $locationAddress, label: "주소", submitLabel: .done) { hideKeyboard() }
                 }
                 .padding(SMAPTheme.Spacing.md)
+            }
+
+            SMAPSection(title: "아이콘") {
+                PlaceKindPicker(selected: pickedKind ?? PlaceKind(name: locationName)) { pickedKind = $0 }
+                    .padding(SMAPTheme.Spacing.md)
             }
 
             SMAPSection(title: "알림") {
@@ -271,6 +278,7 @@ struct LocationDetailPanel: View {
             locationLatitude = location.latitude
             locationLongitude = location.longitude
             notificationsEnabled = location.notifications 
+            pickedKind = location.slt_icon.flatMap(PlaceKind.init(rawValue:))
         } else {
             if let name = initialName { locationName = name }
             if let address = initialAddress { locationAddress = address }
@@ -291,7 +299,8 @@ struct LocationDetailPanel: View {
                 address: locationAddress,
                 latitude: locationLatitude,
                 longitude: locationLongitude,
-                notifications: notificationsEnabled
+                notifications: notificationsEnabled,
+                icon: pickedKind ?? PlaceKind(name: locationName)
             )
             if success {
                 HapticManager.shared.notification(type: .success)

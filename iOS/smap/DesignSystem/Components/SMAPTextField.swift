@@ -5,6 +5,7 @@ import SwiftUI
 /// 오류를 알럿이 아니라 입력창 바로 아래에 보여 어느 칸이 문제인지 알 수 있게 한다.
 /// `isSecure` 이면 보기/숨기기 토글을 함께 제공한다.
 struct SMAPTextField: View {
+    @Environment(\.smapAccent) private var accent
     let placeholder: String
     @Binding var text: String
     var label: String?
@@ -63,8 +64,8 @@ struct SMAPTextField: View {
                 .font(SMAPTheme.Font.body)
                 .textContentType(contentType)
                 // 이메일·비밀번호는 자동 대문자·자동 수정이 입력을 망가뜨린다.
-                .textInputAutocapitalization(usesPlainInput ? .never : .sentences)
-                .autocorrectionDisabled(usesPlainInput)
+                .textInputAutocapitalization(keyboardType == .asciiCapable ? .characters : (usesPlainInput ? .never : .sentences))
+                .autocorrectionDisabled(usesPlainInput || keyboardType == .asciiCapable)
                 .focused($isFocused)
                 .submitLabel(submitLabel)
                 .onSubmit { onSubmit?() }
@@ -104,6 +105,6 @@ struct SMAPTextField: View {
 
     private var borderColor: Color {
         if errorMessage != nil { return SMAPTheme.Color.error }
-        return isFocused ? SMAPTheme.Color.primary : .clear
+        return isFocused ? accent.base : .clear
     }
 }

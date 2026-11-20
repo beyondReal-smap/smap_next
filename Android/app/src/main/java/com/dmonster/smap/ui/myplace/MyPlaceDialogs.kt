@@ -46,7 +46,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -67,7 +66,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
 import com.dmonster.smap.ui.common.rememberSmapHaptics
-import com.dmonster.smap.ui.theme.BrandColors
+import com.dmonster.smap.ui.components.SmapEmptyState
+import com.dmonster.smap.ui.components.SmapTopBar
 import com.dmonster.smap.ui.theme.SuiteFont
 import coil.request.ImageRequest
 import androidx.compose.ui.platform.LocalContext
@@ -89,7 +89,7 @@ fun LocationDetailSheet(
     onDismiss: () -> Unit,
     onSearchClick: () -> Unit,
     onMemberSelect: (SmapGroupMember) -> Unit,
-    onSave: (title: String, address: String, lat: Double, lng: Double, memo: String?, enterAlarm: String) -> Unit,
+    onSave: (title: String, address: String, lat: Double, lng: Double, memo: String?, enterAlarm: String, icon: PlaceKind) -> Unit,
     onDelete: (SavedLocation) -> Unit,
     onNotificationToggle: (SavedLocation) -> Unit,
     isLoading: Boolean,
@@ -131,6 +131,9 @@ fun LocationDetailSheet(
     }
     var memo by rememberSaveable(locationKey) { mutableStateOf(location?.memo ?: pendingInfo?.third ?: "") }
     var enterAlarm by rememberSaveable(locationKey) { mutableStateOf(location?.sltEnterAlarm ?: "Y") }
+    // 사용자가 직접 고른 아이콘 키. null 이면 아직 안 고른 것 — 이름을 고치는 대로 짐작한 아이콘이 따라 바뀐다.
+    var pickedIconKey by rememberSaveable(locationKey) { mutableStateOf(location?.sltIcon?.takeIf { PlaceKind.fromKey(it) != null }) }
+    val iconKind = PlaceKind.fromKey(pickedIconKey) ?: placeKindOf(name)
 
     var showMemberSelector by rememberSaveable { mutableStateOf(false) }
     var showUnsavedChangesDialog by rememberSaveable { mutableStateOf(false) }
@@ -150,7 +153,8 @@ fun LocationDetailSheet(
                     name != (orig.name) ||
                     address != (orig.address) ||
                     (memo.ifBlank { null }) != orig.memo ||
-                    enterAlarm != orig.sltEnterAlarm
+                    enterAlarm != orig.sltEnterAlarm ||
+                    iconKind != orig.kind
                 )
             }
         }
@@ -247,7 +251,7 @@ fun LocationDetailSheet(
                                 modifier = Modifier.padding(horizontal = SmapSpacing.xs, vertical = SmapSpacing.sm),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                SmapRowIcon(Icons.Outlined.Place, emphasized = true)
+                                SmapRowIcon(loc.kind.icon, emphasized = true)
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column {
                                     Text(loc.name, style = SmapText.title, color = colors.onSurface)
@@ -343,6 +347,14 @@ fun LocationDetailSheet(
                                 }
                             }
 
+                            SmapSection(title = "아이콘") {
+                                PlaceKindPicker(
+                                    selected = iconKind,
+                                    onSelect = { pickedIconKey = it.key },
+                                    modifier = Modifier.padding(SmapSpacing.md)
+                                )
+                            }
+
                             SmapSection(title = "알림") {
                                 SmapListRow(
                                     title = "도착 알림",
@@ -388,7 +400,7 @@ fun LocationDetailSheet(
                             text = if (isNew) "장소 추가" else "저장",
                             onClick = {
                                 haptics.medium()
-                                onSave(name, address, lat, lng, memo.ifBlank { null }, enterAlarm)
+                                onSave(name, address, lat, lng, memo.ifBlank { null }, enterAlarm, iconKind)
                             },
                             enabled = canSave,
                             isLoading = isLoading,
@@ -499,152 +511,104 @@ fun LocationSearchSheet(
     ) {
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = BrandColors.InputBackground,
+            color = MaterialTheme.colorScheme.surface,
             tonalElevation = 0.dp
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // Header
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    contentAlignment = Alignment.Center
+                SmapTopBar(title = "장소 검색", onBack = {
+                    scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+                })
+                // Search Bar
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Text(
-                        text = "장소 검색",
-                        fontSize = 18.sp,
-                        fontFamily = SuiteFont,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black
-                    )
-                    IconButton(
-                        onClick = {
-                            scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
-                        },
-                        modifier = Modifier.align(Alignment.CenterEnd)
-                    ) {
-                        Icon(Icons.Default.Close, contentDescription = "닫기")
-                    }
-                }
-
-            // Search Bar
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = onQueryChange,
-                    placeholder = { Text("지번, 도로명, 건물명으로 검색", fontSize = 14.sp, color = Color.Gray.copy(alpha = 0.7f)) },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
-                    leadingIcon = { Icon(Icons.Default.Search, null, tint = BrandColors.Primary) },
-                    trailingIcon = {
-                        if (query.isNotEmpty()) {
-                            IconButton(onClick = { onQueryChange("") }) {
-                                Icon(Icons.Default.Clear, "검색어 지우기", tint = Color.Gray, modifier = Modifier.size(18.dp))
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = onQueryChange,
+                        placeholder = { Text("지번, 도로명, 건물명으로 검색", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        leadingIcon = { Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.primary) },
+                        trailingIcon = {
+                            if (query.isNotEmpty()) {
+                                IconButton(onClick = { onQueryChange("") }) {
+                                    Icon(Icons.Default.Clear, "검색어 지우기", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                                }
                             }
-                        }
-                    },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(
-                        imeAction = ImeAction.Search,
-                        keyboardType = KeyboardType.Text
-                    ),
-                    keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White,
-                        focusedBorderColor = BrandColors.Primary.copy(alpha = 0.2f),
-                        unfocusedBorderColor = Color.Transparent
+                        },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Search,
+                            keyboardType = KeyboardType.Text
+                        ),
+                        keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.surface,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                        )
                     )
-                )
-                
-                Button(
-                    onClick = onSearch,
-                    enabled = query.isNotBlank() && !isSearching,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = BrandColors.Primary),
-                    modifier = Modifier.height(52.dp)
-                ) {
-                    Text("검색", fontWeight = FontWeight.Bold, fontFamily = SuiteFont)
-                }
-            }
 
-            Text(
-                text = "검색 결과 ${results.size}건",
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-                fontSize = 13.sp,
-                color = Color.Gray,
-                fontFamily = SuiteFont
-            )
-
-            if (isSearching) {
-                Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = BrandColors.Primary)
+                    Button(
+                        onClick = onSearch,
+                        enabled = query.isNotBlank() && !isSearching,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                        modifier = Modifier.height(52.dp)
+                    ) {
+                        Text("검색", fontWeight = FontWeight.Bold, fontFamily = SuiteFont)
+                    }
                 }
-            } else if (results.isEmpty()) {
-                if (!hasSearched) {
-                    SearchEmptyState(
-                        icon = Icons.Default.Map,
-                        title = "어디를 찾으시나요?",
-                        message = "지번, 도로명 혹은 건물명을 입력하여\n원하는 장소를 검색해 보세요.",
-                        modifier = Modifier.weight(1f)
+
+                if (hasSearched && !isSearching && results.isNotEmpty()) {
+                    Text(
+                        text = "검색 결과 ${results.size}건",
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                        style = SmapText.captionBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+
+                if (isSearching) {
+                    Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    }
+                } else if (results.isEmpty()) {
+                    if (!hasSearched) {
+                        SmapEmptyState(
+                            icon = Icons.Default.Map,
+                            title = "어디를 찾으시나요?",
+                            description = "지번, 도로명 혹은 건물명을 입력하여\n원하는 장소를 검색해 보세요.",
+                            modifier = Modifier.weight(1f)
+                        )
+                    } else {
+                        SmapEmptyState(
+                            icon = Icons.Default.Search,
+                            title = "검색 결과 없음",
+                            description = "'$query' 검색 결과가 없어요.\n다른 검색어를 입력해 보세요.",
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 } else {
-                    SearchEmptyState(
-                        icon = Icons.Default.Search,
-                        title = "검색 결과 없음",
-                        message = "'$query' 검색 결과가 없어요.\n다른 검색어를 입력해 보세요.",
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth().weight(1f),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(results) { place ->
-                        SearchPlaceItem(place = place, onClick = { onSelect(place) })
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        contentPadding = PaddingValues(horizontal = 16.dp)
+                    ) {
+                        items(results) { place ->
+                            SmapListRow(
+                                title = place.placeName,
+                                subtitle = place.displayAddress,
+                                leading = { SmapRowIcon(Icons.Outlined.Place) },
+                                onClick = { onSelect(place) }
+                            )
+                            SmapRowDivider()
+                        }
                     }
                 }
             }
-        }
-    }
-}
-}
-
-@Composable
-private fun SearchPlaceItem(place: KakaoPlace, onClick: () -> Unit) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() },
-        shape = RoundedCornerShape(16.dp),
-        color = Color.White,
-        shadowElevation = 2.dp,
-        tonalElevation = 0.dp
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Box(
-                modifier = Modifier.size(40.dp).background(BrandColors.Primary.copy(alpha = 0.1f), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.LocationOn, null, tint = BrandColors.Primary, modifier = Modifier.size(20.dp))
-            }
-            
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = place.placeName, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.Black, fontFamily = SuiteFont)
-                Text(text = place.displayAddress, fontSize = 13.sp, color = Color.Gray, fontFamily = SuiteFont)
-            }
-            
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Color.LightGray, modifier = Modifier.size(16.dp))
         }
     }
 }
@@ -659,7 +623,7 @@ private fun MemberSelectorDialog(
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(24.dp),
-            color = Color.White,
+            color = MaterialTheme.colorScheme.surface,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)
         ) {
             Column(modifier = Modifier.padding(24.dp)) {
@@ -680,7 +644,7 @@ private fun MemberSelectorDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(if (isSelected) BrandColors.Primary.copy(alpha = 0.1f) else Color.Transparent)
+                                .background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color.Transparent)
                                 .heightIn(min = 48.dp)
                                 .clickable(role = Role.Button) { onSelect(member) }
                                 .semantics {
@@ -700,7 +664,7 @@ private fun MemberSelectorDialog(
                                 } else null
                             }
                             
-                            Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(Color.Gray.copy(alpha = 0.1f))) {
+                            Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f))) {
                                 if (imageUrl != null) {
                                     AsyncImage(
                                         model = ImageRequest.Builder(LocalContext.current).data(imageUrl).build(),
@@ -709,7 +673,7 @@ private fun MemberSelectorDialog(
                                         contentScale = ContentScale.Crop
                                     )
                                 } else {
-                                    Icon(Icons.Default.Person, contentDescription = null, tint = Color.Gray, modifier = Modifier.align(Alignment.Center))
+                                    Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.align(Alignment.Center))
                                 }
                             }
                             
@@ -720,12 +684,12 @@ private fun MemberSelectorDialog(
                                 fontSize = 16.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                 fontFamily = SuiteFont,
-                                color = if (isSelected) BrandColors.Primary else Color.Black
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                             )
                             
                             if (isSelected) {
                                 Spacer(modifier = Modifier.weight(1f))
-                                Icon(Icons.Default.Check, null, tint = BrandColors.Primary)
+                                Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
                             }
                         }
                     }
@@ -740,46 +704,6 @@ private fun MemberSelectorDialog(
                     Text("닫기", fontFamily = SuiteFont)
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun SearchEmptyState(icon: ImageVector, title: String, message: String, modifier: Modifier = Modifier) {
-    Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(40.dp)
-        ) {
-            Surface(
-                modifier = Modifier.size(100.dp),
-                shape = CircleShape,
-                color = Color.White,
-                shadowElevation = 2.dp
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        modifier = Modifier.size(40.dp),
-                        tint = BrandColors.Primary.copy(alpha = 0.6f)
-                    )
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            Text(text = title, fontSize = 18.sp, fontWeight = FontWeight.Bold, fontFamily = SuiteFont)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = message,
-                fontSize = 14.sp,
-                color = Color.Gray,
-                textAlign = TextAlign.Center,
-                fontFamily = SuiteFont,
-                lineHeight = 20.sp
-            )
         }
     }
 }

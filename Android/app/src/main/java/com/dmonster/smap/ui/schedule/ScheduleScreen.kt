@@ -2,6 +2,18 @@ package com.dmonster.smap.ui.schedule
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.sp
+import java.time.LocalDate
+import java.time.format.TextStyle
+import java.util.Locale
+import com.dmonster.smap.ui.components.DateChipItem
+import com.dmonster.smap.ui.components.DateStrip
+import com.dmonster.smap.ui.components.LocalSmapAccent
+import com.dmonster.smap.ui.theme.FamilyColors
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
@@ -18,9 +30,7 @@ import com.dmonster.smap.ui.components.GroupPickerSheet
 import com.dmonster.smap.ui.components.SmapGradientIconButton
 import com.dmonster.smap.ui.components.TopControlsVerticalPadding
 import com.dmonster.smap.ui.components.GroupSwitcherPill
-import com.dmonster.smap.ui.components.SmapListRow
 import com.dmonster.smap.ui.components.SmapRowDivider
-import com.dmonster.smap.ui.components.SmapRowIcon
 import com.dmonster.smap.ui.components.SmapSection
 import com.dmonster.smap.ui.theme.SmapSpacing
 import com.dmonster.smap.ui.theme.SmapText
@@ -35,6 +45,7 @@ fun ScheduleScreen(
     viewModel: ScheduleViewModel = hiltViewModel()
 ) {
     val haptics = rememberSmapHaptics()
+    var showsMonth by rememberSaveable { mutableStateOf(false) }
 
     // Collect States
     val currentMonth by viewModel.currentMonth.collectAsState()
@@ -99,7 +110,7 @@ fun ScheduleScreen(
     
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = if (androidx.compose.foundation.isSystemInDarkTheme()) MaterialTheme.colorScheme.background else FamilyColors.Paper
     ) { paddingValues ->
         PullToRefreshBox(
             isRefreshing = isRefreshing,
@@ -138,38 +149,77 @@ fun ScheduleScreen(
                 }
 
                 item {
-                    MonthCalendar(
-                        currentMonth = currentMonth,
-                        selectedDate = selectedDate,
-                        eventDates = eventDates,
-                        onDateSelect = { viewModel.selectDate(it) },
-                        onPreviousMonth = { viewModel.goToPreviousMonth() },
-                        onNextMonth = { viewModel.goToNextMonth() },
-                        onToday = { viewModel.goToToday() }
-                    )
+                    Row(
+                        Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(22.dp)).padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Box(Modifier.size(68.dp, 76.dp).background(FamilyColors.Highlight, RoundedCornerShape(15.dp)),
+                            contentAlignment = Alignment.Center) {
+                            Text("${selectedDate.dayOfMonth}", style = SmapText.title.copy(fontSize = 46.sp, lineHeight = 52.sp), color = FamilyColors.Ink)
+                        }
+                        Column(Modifier.weight(1f)) {
+                            Text("${selectedDate.year}년 ${selectedDate.monthValue}월", style = SmapText.captionBold, color = LocalSmapAccent.current.deep)
+                            Text(selectedDate.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.KOREAN),
+                                style = SmapText.title, color = FamilyColors.Ink)
+                        }
+                        FilledTonalButton(onClick = { showsMonth = !showsMonth },
+                            colors = ButtonDefaults.filledTonalButtonColors(containerColor = LocalSmapAccent.current.container,
+                                contentColor = LocalSmapAccent.current.deep), contentPadding = PaddingValues(horizontal = 12.dp)) {
+                            Text(if (showsMonth) "달력 접기" else "월 달력", style = SmapText.captionBold)
+                        }
+                    }
+                }
+                item {
+                    if (showsMonth) {
+                        MonthCalendar(
+                            currentMonth = currentMonth, selectedDate = selectedDate, eventDates = eventDates,
+                            onDateSelect = { viewModel.selectDate(it); showsMonth = false },
+                            onPreviousMonth = { viewModel.goToPreviousMonth() }, onNextMonth = { viewModel.goToNextMonth() },
+                            onToday = { viewModel.goToToday(); showsMonth = false }
+                        )
+                    } else {
+                        val days = remember(currentMonth, eventDates) {
+                            (1..currentMonth.lengthOfMonth()).map { day ->
+                                val date = currentMonth.atDay(day)
+                                DateChipItem(date, dot = date in eventDates)
+                            }
+                        }
+                        key(currentMonth) { DateStrip(days, selectedDate, onSelect = { viewModel.selectDate(it.date) }) }
+                    }
                 }
 
                 item {
                     val count = selectedDateSchedules.size
                     SmapSection(
                         modifier = Modifier.padding(top = SmapSpacing.sm),
-                        title = scheduleDateTitle(selectedDate) + if (count > 0) " · ${count}개" else ""
+                        title = (if (selectedDate == LocalDate.now()) "오늘의 약속" else "이날의 약속") + if (count > 0) " · ${count}개" else ""
                     ) {
                         when {
                             // 그날 일정이 이미 보이면 새로 불러오는 동안에도 그대로 둔다(탭을 열 때마다 스피너로 깜빡이던 것).
-                            (isLoading || isLoadingSchedules) && selectedDateSchedules.isEmpty() -> Box(
+                            (isLoading || isLoadingSchedules) && !isRefreshing && selectedDateSchedules.isEmpty() -> Box(
                                 Modifier
                                     .fillMaxWidth()
                                     .height(96.dp),
                                 contentAlignment = Alignment.Center
                             ) { CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 2.5.dp) }
-                            selectedDateSchedules.isEmpty() -> SmapListRow(
-                                title = "이 날은 일정이 없어요",
-                                subtitle = "새 일정을 만들면 멤버에게 알려 드려요",
-                                leading = { SmapRowIcon(Icons.Outlined.EventAvailable) },
-                                trailing = { Text("추가", style = SmapText.captionBold, color = MaterialTheme.colorScheme.primary) },
-                                onClick = { viewModel.showCreateDialog() }
-                            )
+                            selectedDateSchedules.isEmpty() -> Column(Modifier.fillMaxWidth().padding(SmapSpacing.md),
+                                verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Box(Modifier.size(46.dp, 48.dp).background(LocalSmapAccent.current.container, RoundedCornerShape(12.dp)),
+                                        contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Outlined.EventAvailable, contentDescription = null, tint = LocalSmapAccent.current.deep)
+                                    }
+                                    Text("아직 약속이 없는 날이에요", style = SmapText.headline, color = MaterialTheme.colorScheme.onSurface)
+                                }
+                                Button(onClick = { viewModel.showCreateDialog() }, modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(containerColor = FamilyColors.Ink, contentColor = Color.White),
+                                    shape = RoundedCornerShape(13.dp)) {
+                                    Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("이날 약속 추가", style = SmapText.captionBold)
+                                }
+                            }
                             else -> selectedDateSchedules.forEachIndexed { i, schedule ->
                                 if (i > 0) SmapRowDivider()
                                 ScheduleRow(schedule = schedule, onClick = { viewModel.showEventDetail(schedule) })

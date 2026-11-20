@@ -21,7 +21,7 @@ import java.util.Locale
  *
  * 켜는 법: adb shell am start -n com.dmonster.smap/.MainActivity --ez smap_demo true
  * 켜지면 화면이 읽는 조회(GET) 몇 가지만 assets/demo 의 가짜 응답으로 바꾼다.
- * 로그인·쓰기 요청 등 나머지는 그대로 실제 서버로 간다.
+ * 로그인·쓰기 요청 등 나머지는 그대로 실제 서버로 간다(가짜 알림의 읽음·삭제만 예외 — 성공으로 답한다).
  * 가짜 응답은 tools/store-demo/build_fixtures.py 가 만든다(iOS 와 같은 데이터).
  */
 object DemoMode {
@@ -51,15 +51,22 @@ object DemoMode {
 
     val interceptor = Interceptor { chain ->
         val request = chain.request()
-        if (!enabled || request.method != "GET") return@Interceptor chain.proceed(request)
+        if (!enabled) return@Interceptor chain.proceed(request)
 
         val encodedPath = request.url.encodedPath
         val start = encodedPath.indexOf(API_PREFIX)
         if (start < 0) return@Interceptor chain.proceed(request)
         val path = encodedPath.substring(start + API_PREFIX.length).trim('/')
 
-        val body = respond(path, request.url.queryParameter("date"))
-            ?: return@Interceptor chain.proceed(request)
+        // 데모 화면의 알림 목록은 가짜라, 전체 읽음·삭제를 운영 서버로 보내면 테스트 계정의 실제 알림이 바뀐다.
+        // 알림 쓰기는 여기서 성공으로 끝낸다(iOS DemoURLProtocol 과 같은 규칙).
+        val body = if (request.method != "GET") {
+            if (!path.startsWith("push-logs/")) return@Interceptor chain.proceed(request)
+            """{"success":true,"message":"demo"}"""
+        } else {
+            respond(path, request.url.queryParameter("date"))
+                ?: return@Interceptor chain.proceed(request)
+        }
         Log.d(TAG, "가짜 응답: $path")
         Response.Builder()
             .request(request)

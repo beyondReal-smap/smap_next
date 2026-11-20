@@ -10,84 +10,25 @@ struct QRCodeView: View {
     
     var body: some View {
         NavigationStack {
-            VStack(spacing: 24) {
-                Spacer()
-                
-                // QR Code Title
-                VStack(spacing: 8) {
-                    Text("QR 코드로 초대하기")
-                        .font(.suite(size: 24, weight: .bold))
-                        .foregroundColor(.primary)
-                    
-                    Text("QR 코드를 스캔하여 그룹에 참여하세요")
-                        .font(.suite(size: 14))
-                        .foregroundColor(.secondary)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("QR 코드로 초대하기").font(SMAPTheme.Font.pageTitle)
+                    Text("카메라로 코드를 스캔한 뒤 링크를 눌러 그룹에 참여하세요.")
+                        .font(SMAPTheme.Font.secondary).foregroundStyle(.secondary)
+                    Image(uiImage: generateQRCode(from: data))
+                        .interpolation(.none).resizable().scaledToFit()
+                        .frame(maxWidth: size)
+                        .padding(20)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 16))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 24)
+                        .background(SMAPAccent.family.container, in: RoundedRectangle(cornerRadius: 20))
+                        .accessibilityLabel("그룹 초대 QR 코드")
+                    SMAPButton("QR 코드 공유", action: shareQRCode)
                 }
-                
-                // QR Code
-                Image(uiImage: generateQRCode(from: data))
-                    .interpolation(.none)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: size, height: size)
-                    .padding(20)
-                    .background(Color.white)
-                    .cornerRadius(20)
-                    .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 5)
-                
-                // Instructions
-                VStack(spacing: 12) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "1.circle.fill")
-                            .font(.suite(size: 20))
-                            .foregroundColor(SMAPTheme.Color.primary)
-                        Text("카메라 앱을 열어주세요")
-                            .font(.suite(size: 14))
-                            .foregroundColor(.gray)
-                        Spacer()
-                    }
-                    
-                    HStack(spacing: 12) {
-                        Image(systemName: "2.circle.fill")
-                            .font(.suite(size: 20))
-                            .foregroundColor(SMAPTheme.Color.primary)
-                        Text("QR 코드를 스캔해주세요")
-                            .font(.suite(size: 14))
-                            .foregroundColor(.gray)
-                        Spacer()
-                    }
-                    
-                    HStack(spacing: 12) {
-                        Image(systemName: "3.circle.fill")
-                            .font(.suite(size: 20))
-                            .foregroundColor(SMAPTheme.Color.primary)
-                        Text("링크를 탭하여 그룹에 참여하세요")
-                            .font(.suite(size: 14))
-                            .foregroundColor(.gray)
-                        Spacer()
-                    }
-                }
-                .padding(.horizontal, 24)
-                .padding(.top, 16)
-                
-                Spacer()
-                
-                // Share Button
-                Button(action: shareQRCode) {
-                    HStack {
-                        Image(systemName: "square.and.arrow.up")
-                            .font(.suite(size: 16, weight: .semibold))
-                        Text("QR 코드 공유")
-                            .font(.suite(size: 16, weight: .semibold))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(SMAPTheme.Color.primary)
-                    .foregroundColor(.white)
-                    .cornerRadius(12)
-                }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 8)
+                .frame(maxWidth: 520)
+                .padding(20)
+                .frame(maxWidth: .infinity)
             }
             .navigationTitle("QR 코드")
             .navigationBarTitleDisplayMode(.inline)
@@ -96,7 +37,7 @@ struct QRCodeView: View {
                     Button("완료") {
                         dismiss()
                     }
-                    .foregroundColor(SMAPTheme.Color.primary)
+                    .foregroundColor(SMAPAccent.family.base)
                 }
             }
         }
@@ -137,6 +78,6 @@ struct QRCodeView: View {
 
 struct QRCodeView_Previews: PreviewProvider {
     static var previews: some View {
-        QRCodeView(data: "https://nextstep.aiagnt.kr/group/123/join", size: 250)
+        QRCodeView(data: "https://smap.aiagnt.kr/group/123/join", size: 250)
     }
 }

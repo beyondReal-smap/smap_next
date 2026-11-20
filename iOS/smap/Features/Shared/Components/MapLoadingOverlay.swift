@@ -17,8 +17,8 @@ struct MapLoadingOverlay: View {
             // 배경 (브랜드 컬러 그라데이션)
             LinearGradient(
                 gradient: Gradient(colors: [
-                    SMAPTheme.Color.primary.opacity(0.95),
-                    Color(red: 102/255, green: 126/255, blue: 234/255).opacity(0.95)
+                    SMAPAccent.family.deep.opacity(0.95),
+                    SMAPAccent.family.bright.opacity(0.95)
                 ]),
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing

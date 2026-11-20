@@ -204,7 +204,7 @@ final class AuthServiceTests: XCTestCase {
             mt_agree4: false,
             mt_agree5: false
         )
-        let response = try await service.register(request: req)
+        let response = try await service.register(request: req, verificationToken: "verified-token", phoneNumber: nil)
         XCTAssertTrue(response.success)
         XCTAssertEqual(service.getToken(), "new-user-token")
         XCTAssertEqual(service.currentUser?.mt_idx, 99)

@@ -1,8 +1,9 @@
 package com.dmonster.smap.ui.activitylog
 
-import com.dmonster.smap.ui.components.SheetHeaderBandGap
+import com.dmonster.smap.ui.theme.FamilyColors
 import com.dmonster.smap.ui.components.SheetHeaderMinHeight
 import com.dmonster.smap.ui.components.SmapBrush
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -10,8 +11,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Box
-import com.dmonster.smap.ui.components.sheetHeaderBand
-import com.dmonster.smap.ui.components.SmapOnNavyMuted
+import com.dmonster.smap.ui.components.SmapAccent
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.DirectionsWalk
+import androidx.compose.material3.Icon
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
 import androidx.compose.foundation.systemGestureExclusion
@@ -56,7 +65,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-val ActivityLogSheetPeekHeight = 180.dp
+val ActivityLogSheetPeekHeight = 190.dp
 
 /** 경로 따라가기 줄이 있을 때 접힌 시트에 더하는 높이. */
 val ActivityLogRouteControlHeight = 84.dp
@@ -81,8 +90,10 @@ fun ColumnScope.ActivityLogSheetContent(
     onSelectMember: (SmapGroupMember) -> Unit,
     onSelectDate: (LocalDate) -> Unit,
     onLockedDate: (LocalDate) -> Unit,
-    // 이동 경로가 있을 때만 머리 줄 아래에 놓는 "경로 따라가기" 줄(접힌 상태에서도 보인다).
-    routeControl: (@Composable () -> Unit)? = null,
+    /** 이동 점이 2개 이상 — 경로 따라가기 막대를 끌 수 있다. */
+    hasRoute: Boolean,
+    // 날짜 줄 아래 "경로 따라가기" 줄(접힌 상태에서도 보인다). 경로가 없는 날도 흐린 막대로 자리를 지킨다.
+    routeControl: @Composable () -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
     val today = remember(System.currentTimeMillis() / 86_400_000) { LocalDate.now() }
@@ -94,47 +105,56 @@ fun ColumnScope.ActivityLogSheetContent(
             DateChipItem(d, dot = d in activeDates, locked = SubscriptionPolicy.isActivityDateLocked(d, today, subscriptionStatus))
         }
     }
-    val name = selectedMember?.let { if (it.mtIdx == currentUserIdx) "나" else it.displayName } ?: "멤버"
     val dateText = selectedDate.format(DateTimeFormatter.ofPattern("M월 d일 (E)", Locale.KOREAN))
-
-    Row(
-        Modifier
-            .sheetHeaderBand()
-            .heightIn(min = SheetHeaderMinHeight)
-            .padding(horizontal = SmapSpacing.screenHorizontal),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                "$name · $dateText",
-                style = SmapText.headline,
-                color = Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.semantics { heading() },
-            )
-            Text(
-                when {
-                    isLoadingLogs -> "기록을 불러오는 중…"
-                    // 지도 가운데 큰 카드 대신 여기서 알린다(카드는 펼친 시트를 가렸다).
-                    !hasLogs -> "이 날은 이동 기록이 없어요 · 다른 날을 골라 보세요"
-                    summary == null -> "이동 기록이 있어요 · 아래 막대로 따라가 보세요"
-                    else -> "${summary.distanceFormatted} 이동 · ${summary.timeFormatted} · ${summary.stepsFormatted}"
-                },
-                style = SmapText.caption,
-                color = SmapOnNavyMuted,
-                maxLines = 1,
-            )
+    var choosingMember by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth().background(SmapAccent.Activity.container).padding(horizontal = SmapSpacing.screenHorizontal)) {
+        Row(Modifier.fillMaxWidth().heightIn(min = SheetHeaderMinHeight), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (selectedMember != null) {
+                SmapAvatar(name = selectedMember.displayName, imagePath = selectedMember.mtFile1, size = 48.dp, memberId = selectedMember.mtIdx)
+            } else {
+                Box(Modifier.size(48.dp).background(Color.White, CircleShape), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Outlined.DirectionsWalk, contentDescription = null, tint = SmapAccent.Activity.deep)
+                }
+            }
+            Column(Modifier.weight(1f)) {
+                Text(dateText, style = SmapText.captionBold, color = SmapAccent.Activity.deep)
+                Text(when {
+                    selectedMember == null -> "하루의 발자취"
+                    selectedMember.mtIdx == currentUserIdx -> "나의 발자취"
+                    else -> "${selectedMember.displayName}의 발자취"
+                }, style = SmapText.title, color = FamilyColors.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.semantics { heading() })
+            }
+            if (members.size > 1) {
+                Box {
+                    TextButton(onClick = { choosingMember = true }, colors = ButtonDefaults.textButtonColors(
+                        containerColor = Color.White, contentColor = SmapAccent.Activity.deep)) {
+                        Text("멤버 변경", style = SmapText.captionBold)
+                    }
+                    DropdownMenu(expanded = choosingMember, onDismissRequest = { choosingMember = false }) {
+                        members.forEach { member ->
+                            DropdownMenuItem(text = { Text(if (member.mtIdx == currentUserIdx) "${member.displayName} (나)" else member.displayName) },
+                                onClick = { choosingMember = false; onSelectMember(member) })
+                        }
+                    }
+                }
+            }
         }
+        Text(when {
+            isLoadingLogs -> "기록을 불러오는 중…"
+            !hasLogs -> "이날은 이동 기록이 없어요"
+            summary == null -> if (hasRoute) "아래 막대로 경로를 따라가 보세요" else "위치가 한 곳에 기록됐어요"
+            else -> "${summary.distanceFormatted} 이동 · ${summary.timeFormatted} · ${summary.stepsFormatted}"
+        }, style = SmapText.captionBold, color = SmapAccent.Activity.deep, modifier = Modifier.padding(top = 6.dp, bottom = 10.dp))
     }
-    if (routeControl != null) routeControl()
-    // 경로 막대가 있으면 막대 자체가 띠 아래 여백 역할을 한다.
-    Spacer(Modifier.height(if (routeControl != null) SmapSpacing.sm else SheetHeaderBandGap))
+    Spacer(Modifier.height(8.dp))
     DateStrip(
         items = dateItems,
         selected = selectedDate,
         onSelect = { if (it.locked) onLockedDate(it.date) else onSelectDate(it.date) },
     )
+    routeControl()
     Spacer(Modifier.height(SmapSpacing.md))
 
     Column(
@@ -146,21 +166,21 @@ fun ColumnScope.ActivityLogSheetContent(
             .padding(SmapSpacing.md),
         verticalArrangement = Arrangement.spacedBy(SmapSpacing.lg),
     ) {
-        SmapSection(title = "요약") {
+        if (summary != null && hasLogs) SmapSection(title = "이날의 이동") {
             Row(Modifier.fillMaxWidth().padding(vertical = SmapSpacing.md)) {
-                StatCell("이동 거리", summary?.distanceFormatted ?: "0 m", Modifier.weight(1f))
-                StatCell("이동 시간", summary?.timeFormatted ?: "0분", Modifier.weight(1f))
-                StatCell("걸음 수", summary?.stepsFormatted ?: "0", Modifier.weight(1f))
+                StatCell("이동 거리", summary.distanceFormatted, Modifier.weight(1f))
+                StatCell("이동 시간", summary.timeFormatted, Modifier.weight(1f))
+                StatCell("걸음 수", summary.stepsFormatted, Modifier.weight(1f))
             }
         }
-        SmapSection(title = "멤버") {
+        SmapSection(title = "기록을 볼 멤버") {
             members.forEachIndexed { i, m ->
                 if (i > 0) SmapRowDivider()
                 val days = activeDatesOf(activityStats[m.mtIdx].orEmpty()).count { !it.isBefore(today.minusDays(13)) }
                 SmapListRow(
                     title = if (m.mtIdx == currentUserIdx) "${m.displayName} (나)" else m.displayName,
                     subtitle = if (days > 0) "최근 2주 중 ${days}일 기록" else "최근 2주 기록 없음",
-                    leading = { SmapAvatar(name = m.displayName, imagePath = m.mtFile1) },
+                    leading = { SmapAvatar(name = m.displayName, imagePath = m.mtFile1, memberId = m.mtIdx) },
                     selected = m.mtIdx == selectedMember?.mtIdx,
                     onClick = { onSelectMember(m) },
                 )
@@ -202,6 +222,8 @@ fun RouteScrubber(
     endTime: String?,
     onValueChange: (Float) -> Unit,
     onDraggingChange: (Boolean) -> Unit,
+    /** false 면 경로가 없는 날 — 흐리게 두고 끌 수 없다(자리만 지킨다). */
+    enabled: Boolean = true,
 ) {
     val colors = MaterialTheme.colorScheme
     val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
@@ -212,6 +234,7 @@ fun RouteScrubber(
         Modifier
             .fillMaxWidth()
             .height(ActivityLogRouteControlHeight)
+            .alpha(if (enabled) 1f else 0.4f)
             // 남색 띠 바로 아래 "경로 따라가기" 글자가 띠에 붙어 보였다(대표님 피드백) — 위 여백을 12dp 두고 위에서부터 쌓는다.
             .padding(start = SmapSpacing.screenHorizontal, end = SmapSpacing.screenHorizontal, top = 12.dp),
         verticalArrangement = Arrangement.Top,
@@ -223,6 +246,7 @@ fun RouteScrubber(
         androidx.compose.material3.Slider(
             value = value,
             onValueChange = onValueChange,
+            enabled = enabled,
             valueRange = 0f..100f,
             interactionSource = interaction,
             // 기본 손잡이(가는 세로 막대 + 흰 틈)는 맨 왼쪽에 있을 때 채워진 막대가 없어 무엇인지 구분이 안 됐다.
@@ -239,7 +263,9 @@ fun RouteScrubber(
                 // 맨 처음 위치의 손잡이가 화면 왼쪽 가장자리(제스처 내비게이션의 "뒤로" 영역)에 걸려,
                 // 손잡이를 잡고 끌면 막대 대신 뒤로 가기가 실행됐다. 막대 영역만 시스템 제스처에서 뺀다.
                 .systemGestureExclusion()
-                .semantics { contentDescription = "경로 따라가기, 현재 ${currentTime ?: "알 수 없음"}" },
+                .semantics {
+                    contentDescription = if (enabled) "경로 따라가기, 현재 ${currentTime ?: "알 수 없음"}" else "경로 따라가기, 이날은 따라갈 경로가 없음"
+                },
         )
         Row {
             Text(startTime ?: "", style = SmapText.captionSmall, color = colors.onSurfaceVariant, modifier = Modifier.weight(1f))

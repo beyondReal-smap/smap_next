@@ -14,7 +14,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -31,14 +30,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
-import com.dmonster.smap.ui.components.HeroHeading
 import com.dmonster.smap.ui.components.SmapAvatar
 import com.dmonster.smap.ui.components.SmapDangerIcon
-import com.dmonster.smap.ui.components.SmapHeroCard
 import com.dmonster.smap.ui.components.SmapListRow
 import com.dmonster.smap.ui.components.SmapRowDivider
 import com.dmonster.smap.ui.components.SmapRowIcon
@@ -120,10 +116,8 @@ fun AccountSettingsScreen(
                 animationSpec = tween(300)
             )
         ) {
-            // 36단계 — 설정 첫 화면과 같은 언어로: 위에 남색 프로필 카드(사진 바꾸기), 아래 "구역 제목 + 흰 묶음" 행.
-            // 이전에는 행마다 보라·분홍·남색·주황·자주 아이콘 상자와 따로 만든 흰 "< 설정" 알약 머리였다.
             val colors = MaterialTheme.colorScheme
-            Box(modifier = Modifier.fillMaxSize().background(colors.background)) {
+            Box(modifier = Modifier.fillMaxSize().background(colors.surface)) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     SmapTopBar(title = "계정설정", onBack = onBack)
                     Column(
@@ -147,15 +141,29 @@ fun AccountSettingsScreen(
                             }
                         }
 
-                        AccountProfileHero(
-                            name = user?.displayName ?: "회원",
-                            email = user?.mtEmail?.takeIf { it.isNotBlank() },
-                            imagePath = user?.mtFile1,
-                            isUploading = isUploadingImage,
-                            onPhotoClick = { photoPickerLauncher.launch("image/*") }
-                        )
-
                         SmapSection(title = "계정 관리") {
+                            SmapListRow(
+                                title = "프로필 사진 변경",
+                                leading = {
+                                    SmapAvatar(
+                                        name = user?.displayName ?: "회원",
+                                        imagePath = user?.mtFile1,
+                                        size = 40.dp,
+                                        modifier = Modifier.clearAndSetSemantics {}
+                                    )
+                                },
+                                trailing = {
+                                    if (isUploadingImage) {
+                                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                                    } else {
+                                        RowChevron()
+                                    }
+                                },
+                                onClick = if (isUploadingImage) null else ({
+                                    photoPickerLauncher.launch("image/*")
+                                })
+                            )
+                            SmapRowDivider()
                             SmapListRow(
                                 title = "프로필 편집",
                                 leading = { SmapRowIcon(Icons.Default.Edit) },
@@ -234,7 +242,7 @@ fun AccountSettingsScreen(
                     }
                 }
 
-                // 사진 올리는 중은 카드의 사진 위에만 표시한다 — 화면 전체를 막는 것은 다른 처리(isLoading) 때만.
+                // 사진 업로드 진행 상태는 해당 행에서 표시한다.
                 if (isLoading) {
                     Box(
                         modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.1f)),
@@ -340,55 +348,6 @@ fun AccountSettingsScreen(
                 )
             }
         )
-    }
-}
-
-/**
- * 계정설정 맨 위 남색 프로필 카드 — 사진(누르면 바꾸기, 카메라 표시) · 이름 · 이메일.
- */
-@Composable
-private fun AccountProfileHero(
-    name: String,
-    email: String?,
-    imagePath: String?,
-    isUploading: Boolean,
-    onPhotoClick: () -> Unit
-) {
-    SmapHeroCard {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                contentAlignment = Alignment.BottomEnd,
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .clickable(enabled = !isUploading, onClickLabel = "프로필 사진 변경", role = Role.Button, onClick = onPhotoClick)
-                    .semantics { contentDescription = "프로필 사진 변경" }
-            ) {
-                Box(
-                    Modifier
-                        .size(70.dp)
-                        .background(Color.White.copy(alpha = 0.22f), CircleShape)
-                        .padding(3.dp)
-                ) {
-                    SmapAvatar(name = name, imagePath = imagePath, size = 64.dp)
-                    if (isUploading) {
-                        Box(
-                            Modifier.matchParentSize().clip(CircleShape).background(Color.Black.copy(alpha = 0.35f)),
-                            contentAlignment = Alignment.Center
-                        ) { CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 2.dp) }
-                    }
-                }
-                Box(
-                    Modifier.size(26.dp).background(Color.White, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.CameraAlt, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
-                }
-            }
-            Spacer(Modifier.width(16.dp))
-            Column(Modifier.weight(1f)) {
-                HeroHeading(eyebrow = "내 계정", title = name, subtitle = email ?: "이메일 미등록")
-            }
-        }
     }
 }
 

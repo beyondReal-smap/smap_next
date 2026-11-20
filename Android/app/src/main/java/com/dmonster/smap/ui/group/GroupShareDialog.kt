@@ -1,5 +1,6 @@
 package com.dmonster.smap.ui.group
 
+import com.dmonster.smap.ui.theme.SmapText
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -34,36 +35,17 @@ fun ShareGroupDialog(
                 .fillMaxWidth()
                 .wrapContentHeight(),
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White)
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
             Column(
                 modifier = Modifier.padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Icon(
-                    imageVector = Icons.Default.Share,
-                    contentDescription = null,
-                    tint = BrandColors.TextPrimary,
-                    modifier = Modifier.size(48.dp)
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = "그룹 초대하기",
-                    fontSize = 20.sp,
-                    fontFamily = SuiteFont,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Text(
-                    text = group.sgtTitle ?: "",
-                    fontSize = 14.sp,
-                    fontFamily = SuiteFont,
-                    color = Color.Gray
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text("그룹 초대", style = SmapText.captionBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(group.sgtTitle ?: "그룹", style = SmapText.pageTitle, color = MaterialTheme.colorScheme.onSurface)
+                }
+                Spacer(Modifier.height(24.dp))
 
                 // Invite Code
                 group.sgtCode?.let { code ->
@@ -71,7 +53,7 @@ fun ShareGroupDialog(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = BrandColors.InputBackground
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
                         )
                     ) {
                         Column(
@@ -92,7 +74,7 @@ fun ShareGroupDialog(
                                 fontSize = 28.sp,
                                 fontFamily = SuiteFont,
                                 fontWeight = FontWeight.Bold,
-                                color = BrandColors.Primary,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 letterSpacing = 4.sp
                             )
                         }
@@ -142,7 +124,7 @@ fun ShareGroupDialog(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = BrandColors.Success
+                        containerColor = MaterialTheme.colorScheme.primary
                     )
                 ) {
                     Icon(

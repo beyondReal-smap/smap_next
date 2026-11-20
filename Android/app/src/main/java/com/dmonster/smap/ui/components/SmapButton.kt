@@ -76,7 +76,8 @@ fun SmapButton(
                     color = when (style) {
                         SmapButtonStyle.Secondary -> colors.primary
                         SmapButtonStyle.Neutral -> colors.onSurface
-                        else -> colors.onPrimary
+                        SmapButtonStyle.Primary -> Color.White
+                        SmapButtonStyle.Destructive -> colors.onError
                     },
                 )
                 Spacer(Modifier.width(8.dp))
@@ -91,7 +92,7 @@ fun SmapButton(
     when (style) {
         SmapButtonStyle.Primary, SmapButtonStyle.Destructive -> {
             val container = if (style == SmapButtonStyle.Destructive) colors.error else colors.primary
-            val onContainer = if (style == SmapButtonStyle.Destructive) colors.onError else colors.onPrimary
+            val onContainer = if (style == SmapButtonStyle.Destructive) colors.onError else Color.White
             // 주 동작 버튼은 남색 그라데이션으로 채워 화면에서 가장 먼저 눈에 들어오게 한다(평면 남색은 밋밋했다).
             // 비활성·로딩 중에도 그라데이션을 유지한다(비활성은 위 alpha 로 흐리게).
             val gradient = style == SmapButtonStyle.Primary

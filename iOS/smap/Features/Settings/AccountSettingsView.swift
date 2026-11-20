@@ -27,8 +27,6 @@ public struct SettingMenuView: View {
 
     public var body: some View {
         NavigationStack {
-            // 36단계 — Android 설정 첫 화면과 같은 구성: 위에 남색 프로필 카드(누르면 계정설정),
-            // 아래는 "구역 제목 + 흰 묶음" 행. 이전에는 메뉴마다 남색·청록·보라·분홍·노랑·주황·빨강 아이콘이라 산만했다.
             ScrollView {
                 VStack(alignment: .leading, spacing: SMAPTheme.Spacing.lg) {
                     // 이메일 미등록 안내 — 설정 화면 상단에만 표시한다(홈·다른 탭에는 띄우지 않음).
@@ -47,13 +45,20 @@ public struct SettingMenuView: View {
                     .buttonStyle(.plain)
                     .accessibilityHint("계정설정 열기")
 
-                    SMAPSection(title: "계정 관리") {
-                        settingsLink("계정설정", icon: "person.fill") { AccountSettingsView() }
-                        SMAPRowDivider()
+                    SMAPSection(title: "멤버십") {
                         settingsLink("도착했어 프리미엄", icon: "crown.fill", emphasized: true) { PremiumView() }
                     }
 
-                    SMAPSection(title: "약관 & 정책") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("고객 지원").font(SMAPTheme.Font.subheadline).accessibilityAddTraits(.isHeader)
+                        HStack(alignment: .top, spacing: 8) {
+                            supportLink("사용 가이드", icon: "book") { UserGuideView() }
+                            supportLink("1:1 문의", icon: "envelope") { InquiryView() }
+                            supportLink("공지사항", icon: "megaphone") { NoticeListView() }
+                        }
+                    }
+
+                    SMAPSection(title: "약관 및 정책") {
                         settingsLink("서비스 이용약관", icon: "doc.text.fill") { ServiceTermsView() }
                         SMAPRowDivider()
                         settingsLink("개인정보 처리방침", icon: "shield.fill") { PrivacyPolicyView() }
@@ -63,14 +68,6 @@ public struct SettingMenuView: View {
                         settingsLink("마케팅 정보 수집 및 이용 동의", icon: "star.fill") { MarketingConsentView() }
                         SMAPRowDivider()
                         settingsLink("개인정보 제3자 제공 동의", icon: "person.2.fill") { ThirdPartyProvisionView() }
-                    }
-
-                    SMAPSection(title: "고객 지원") {
-                        settingsLink("사용 가이드", icon: "book.fill") { UserGuideView() }
-                        SMAPRowDivider()
-                        settingsLink("1:1 문의", icon: "envelope.fill") { InquiryView() }
-                        SMAPRowDivider()
-                        settingsLink("공지사항", icon: "bell.fill") { NoticeListView() }
                     }
 
                     VStack(spacing: 4) {
@@ -84,9 +81,13 @@ public struct SettingMenuView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, SMAPTheme.Spacing.lg)
                 }
-                .padding(SMAPTheme.Spacing.md)
+                .frame(maxWidth: 600)
+                .padding(20)
+                .frame(maxWidth: .infinity)
             }
-            .background(SMAPTheme.Surface.canvas.ignoresSafeArea())
+            .background(Color(uiColor: .systemBackground).ignoresSafeArea())
+            .toolbarBackground(SMAPTheme.Surface.card, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
@@ -120,6 +121,20 @@ public struct SettingMenuView: View {
                 }
             }
         }
+        .smapAccent(.family)
+    }
+
+    private func supportLink<Destination: View>(_ title: String, icon: String,
+                                                 @ViewBuilder destination: () -> Destination) -> some View {
+        NavigationLink(destination: destination()) {
+            VStack(spacing: 9) {
+                Image(systemName: icon).font(.system(size: 20, weight: .medium)).foregroundStyle(SMAPAccent.family.base)
+                Text(title).font(SMAPTheme.Font.captionBold).multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity, minHeight: 74)
+            .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
+        }
+        .buttonStyle(.plain)
     }
 
     /// 설정 메뉴 한 줄 — 아이콘 원 + 제목 + 화살표, 누르면 다음 화면.
@@ -143,12 +158,12 @@ private struct SettingsProfileHero: View {
     var body: some View {
         let nickname = user?.mt_nickname?.trimmingCharacters(in: .whitespaces)
         let name = (nickname?.isEmpty == false ? nickname : nil) ?? user?.mt_name.flatMap { $0.isEmpty ? nil : $0 } ?? "회원"
-        SMAPHeroCard {
+        SMAPFamilyCover(image: "LoginArrivalDoorway") {
             HStack(spacing: 14) {
                 SMAPAvatar(name: name, imagePath: user?.mt_file1, size: 54)
                     .padding(3)
                     .background(Color.white.opacity(0.22), in: Circle())
-                SMAPHeroHeading(eyebrow: "내 계정", title: name, subtitle: user?.mt_email)
+                SMAPHeroHeading(eyebrow: "계정설정", title: name, subtitle: user?.mt_email)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: "chevron.right")
                     .font(.system(size: 15, weight: .semibold))
@@ -233,7 +248,6 @@ struct ProfileSummaryCard: View {
 // MARK: - Account Settings View
 
 struct AccountSettingsView: View {
-    @Environment(\.smapAccent) private var accent
     @Environment(\.presentationMode) var presentationMode
     @ObservedObject var authService = AuthService.shared
 
@@ -248,13 +262,9 @@ struct AccountSettingsView: View {
     @State private var showingImageUploadError = false
     @State private var imageUploadErrorMessage = ""
 
-    // 36단계 — 설정 첫 화면과 같은 언어로: 위에 남색 프로필 카드(사진 바꾸기), 아래 "구역 제목 + 흰 묶음" 행.
-    // 이전에는 행마다 남색·분홍·주황·보라·청록 아이콘 상자, 로그아웃만 따로 떨어진 빨강 상자였다. (Android 와 같은 구성)
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SMAPTheme.Spacing.lg) {
-                profileHero
-
                 if let user = authService.currentUser {
                     accountManagementSection(user)
                     accountInfoSection(user)
@@ -338,50 +348,34 @@ struct AccountSettingsView: View {
         }
     }
 
-    // MARK: 남색 프로필 카드 — 사진(누르면 바꾸기) · 이름 · 이메일
-
-    private var profileHero: some View {
-        let user = authService.currentUser
-        let name = user?.displayName ?? "회원"
-        let email = user?.mt_email.flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
-        return SMAPHeroCard {
-            HStack(spacing: 16) {
-                Button { showingImagePicker = true } label: {
-                    ZStack(alignment: .bottomTrailing) {
-                        ZStack {
-                            if let selectedImage {
-                                Image(uiImage: selectedImage)
-                                    .resizable()
-                                    .scaledToFill()
-                            } else {
-                                SMAPAvatar(name: name, imagePath: user?.mt_file1, size: 64)
-                            }
-                            if isLoadingImage {
-                                Color.black.opacity(0.35)
-                                ProgressView().tint(.white)
-                            }
-                        }
-                        .frame(width: 64, height: 64)
-                        .clipShape(Circle())
-                        .padding(3)
-                        .background(Color.white.opacity(0.22), in: Circle())
-
-                        Image(systemName: "camera.fill")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(accent.base)
-                            .frame(width: 26, height: 26)
-                            .background(Color.white, in: Circle())
-                            .offset(x: 2, y: 2)
+    private func profilePhotoRow(_ user: SMAPUser) -> some View {
+        SMAPListRow(
+            title: "프로필 사진 변경",
+            action: { showingImagePicker = true },
+            leading: {
+                Group {
+                    if let selectedImage {
+                        Image(uiImage: selectedImage)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 40, height: 40)
+                            .clipShape(Circle())
+                    } else {
+                        SMAPAvatar(name: user.displayName, imagePath: user.mt_file1, size: 40)
                     }
                 }
-                .buttonStyle(.plain)
-                .disabled(isLoadingImage)
-                .accessibilityLabel("프로필 사진 변경")
-
-                SMAPHeroHeading(eyebrow: "내 계정", title: name, subtitle: email ?? "이메일 미등록")
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityHidden(true)
+            },
+            trailing: {
+                if isLoadingImage {
+                    ProgressView()
+                        .accessibilityLabel("프로필 사진 업로드 중")
+                } else {
+                    RowChevron()
+                }
             }
-        }
+        )
+        .disabled(isLoadingImage)
     }
 
     // MARK: 계정 관리
@@ -389,6 +383,8 @@ struct AccountSettingsView: View {
     private func accountManagementSection(_ user: SMAPUser) -> some View {
         let email = user.mt_email.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
         return SMAPSection(title: "계정 관리") {
+            profilePhotoRow(user)
+            SMAPRowDivider()
             NavigationLink(destination: EditProfileView()) {
                 SMAPListRow(title: "프로필 편집", leading: { SMAPRowIcon(systemImage: "pencil") }, trailing: { RowChevron() })
             }
@@ -949,7 +945,7 @@ struct EmailChangeView: View {
             }
             .padding(SMAPTheme.Spacing.lg)
         }
-        .background(SMAPTheme.Adaptive.pageBackground.ignoresSafeArea())
+        .background(Color(uiColor: .systemBackground).ignoresSafeArea())
         // 제목·안내 문구를 Android 이메일 변경 화면과 같게("이메일 변경"/"이메일 등록", "새 이메일을 입력해 주세요")
         .navigationTitle(viewModel.currentEmail.isEmpty ? "이메일 등록" : "이메일 변경")
         .navigationBarTitleDisplayMode(.inline)
@@ -986,7 +982,7 @@ struct EmailChangeView: View {
     private var emailStep: some View {
         Group {
             Text(viewModel.currentEmail.isEmpty ? "이메일을 입력해 주세요" : "새 이메일을 입력해 주세요")
-                .font(SMAPTheme.Font.title)
+                .font(SMAPTheme.Font.pageTitle)
                 .foregroundStyle(SMAPTheme.Color.textPrimary)
             Text(viewModel.currentEmail.isEmpty
                  ? "이메일을 등록하면 비밀번호를 잊었을 때 계정을 되찾을 수 있어요. 등록한 이메일로도 로그인할 수 있어요."
@@ -1016,7 +1012,7 @@ struct EmailChangeView: View {
         let expired = viewModel.remainingSeconds <= 0
         return Group {
             Text("인증번호를 입력해 주세요")
-                .font(SMAPTheme.Font.title)
+                .font(SMAPTheme.Font.pageTitle)
                 .foregroundStyle(SMAPTheme.Color.textPrimary)
             Text("\(viewModel.normalizedEmail)\n위 주소로 보낸 6자리 숫자를 입력해 주세요.")
                 .font(SMAPTheme.Font.secondary)
@@ -1043,7 +1039,7 @@ struct EmailChangeView: View {
                 } label: {
                     Text(viewModel.resendWaitSeconds > 0 ? "다시 받기 (\(viewModel.resendWaitSeconds)초)" : "인증번호 다시 받기")
                         .font(SMAPTheme.Font.secondaryMedium)
-                        .foregroundStyle(viewModel.canResend ? SMAPTheme.Color.primary : SMAPTheme.Color.textSecondary)
+                        .foregroundStyle(viewModel.canResend ? SMAPAccent.family.base : SMAPTheme.Color.textSecondary)
                         .frame(minHeight: 44)
                         .contentShape(Rectangle())
                 }
@@ -1062,7 +1058,7 @@ struct EmailChangeView: View {
             } label: {
                 Text("이메일 수정")
                     .font(SMAPTheme.Font.secondaryMedium)
-                    .foregroundStyle(SMAPTheme.Color.primary)
+                    .foregroundStyle(SMAPAccent.family.base)
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .contentShape(Rectangle())
             }

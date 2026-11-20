@@ -13,129 +13,48 @@ struct ShareOptionsView: View {
     
     var body: some View {
         NavigationStack {
-            List {
-                Section(header: Text("그룹 초대 방법").font(.suite(size: 13))) {
-                    // 링크 복사
-                    Button(action: copyInviteLink) {
-                        HStack {
-                            Image(systemName: "doc.on.doc")
-                                .font(.suite(size: 20))
-                                .foregroundColor(SMAPTheme.Color.primary)
-                                .frame(width: 30)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("링크 복사")
-                                    .font(.suite(size: 16))
-                                    .foregroundColor(.primary)
-                                Text("초대 링크를 복사합니다")
-                                    .font(.suite(size: 12))
-                                    .foregroundColor(.secondary)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.8)
-                            }
-                            Spacer()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    SMAPFamilyCover(image: "LoginArrivalDoorway", minHeight: 136) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("그룹 초대").font(SMAPTheme.Font.captionBold)
+                            Text(group.sgt_title ?? "그룹").font(SMAPTheme.Font.pageTitle)
                         }
-                        .contentShape(Rectangle())
                     }
-                    .buttonStyle(PlainButtonStyle())
-                    
-                    // QR 코드 보기
-                    Button(action: {
-                        showingQRCode = true
-                        isPresented = false
-                    }) {
-                        HStack {
-                            Image(systemName: "qrcode")
-                                .font(.suite(size: 20))
-                                .foregroundColor(SMAPTheme.Color.primary)
-                                .frame(width: 30)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("QR 코드 보기")
-                                    .font(.suite(size: 16))
-                                    .foregroundColor(.primary)
-                                Text("QR 코드로 쉽게 초대하세요")
-                                    .font(.suite(size: 12))
-                                    .foregroundColor(.secondary)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.8)
-                            }
-                            Spacer()
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    
-                    // 문자로 공유
-                    Button(action: shareViaSMS) {
-                        HStack {
-                            Image(systemName: "message")
-                                .font(.suite(size: 20))
-                                .foregroundColor(SMAPTheme.Color.primary)
-                                .frame(width: 30)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("문자로 공유")
-                                    .font(.suite(size: 16))
-                                    .foregroundColor(.primary)
-                                Text("문자 메시지로 초대 링크를 전송합니다")
-                                    .font(.suite(size: 12))
-                                    .foregroundColor(.secondary)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.7)
-                            }
-                            Spacer()
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    
-                    // 기본 공유
-                    Button(action: shareViaSystem) {
-                        HStack {
-                            Image(systemName: "square.and.arrow.up")
-                                .font(.suite(size: 20))
-                                .foregroundColor(SMAPTheme.Color.primary)
-                                .frame(width: 30)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("기본 공유")
-                                    .font(.suite(size: 16))
-                                    .foregroundColor(.primary)
-                                Text("다양한 앱으로 공유할 수 있습니다")
-                                    .font(.suite(size: 12))
-                                    .foregroundColor(.secondary)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.8)
-                            }
-                            Spacer()
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                }
-                
-                // 초대 코드 섹션
-                if let inviteCode = group.sgt_code, !inviteCode.isEmpty {
-                    Section(header: Text("초대 코드").font(.suite(size: 13))) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("복사하여 편한 방법으로 공유하세요.")
-                                    .font(.suite(size: 14))
-                                    .foregroundColor(.secondary)
-                                Text(inviteCode)
-                                    .font(.suite(size: 20, weight: .bold))
-                                    .foregroundColor(SMAPTheme.Color.primary)
-                            }
-                            Spacer()
-                            Button(action: copyInviteCode) {
+                    if let code = group.sgt_code, !code.isEmpty {
+                        Button(action: copyInviteCode) {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("초대 코드").font(SMAPTheme.Font.captionBold)
+                                    Text(code).font(.suite(size: 24, weight: .bold))
+                                }
+                                Spacer()
                                 Image(systemName: "doc.on.doc")
-                                    .font(.suite(size: 18))
-                                    .foregroundColor(SMAPTheme.Color.primary)
                             }
-                            .accessibilityLabel("초대 코드 복사")
+                            .padding(16)
+                            .foregroundStyle(SMAPAccent.family.deep)
+                            .background(SMAPAccent.family.container, in: RoundedRectangle(cornerRadius: 14))
                         }
-                        .padding(.vertical, 8)
+                        .accessibilityLabel("초대 코드 복사, \(code)")
+                    }
+                    VStack(spacing: 0) {
+                        shareRow("링크 복사", icon: "link", action: copyInviteLink)
+                        Divider()
+                        shareRow("QR 코드 보기", icon: "qrcode") {
+                            showingQRCode = true
+                            isPresented = false
+                        }
+                        Divider()
+                        shareRow("문자로 공유", icon: "message", action: shareViaSMS)
+                        Divider()
+                        shareRow("기본 공유", icon: "square.and.arrow.up", action: shareViaSystem)
                     }
                 }
+                .buttonStyle(.plain)
+                .frame(maxWidth: 520)
+                .padding(20)
+                .frame(maxWidth: .infinity)
             }
-            .listStyle(InsetGroupedListStyle())
             .navigationTitle("그룹 초대")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -143,7 +62,7 @@ struct ShareOptionsView: View {
                     Button("완료") {
                         isPresented = false
                     }
-                    .foregroundColor(SMAPTheme.Color.primary)
+                    .foregroundColor(SMAPAccent.family.base)
                 }
             }
         }
@@ -162,6 +81,19 @@ struct ShareOptionsView: View {
     
     // MARK: - Helper Functions
     
+    private func shareRow(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                SMAPRowIcon(systemImage: icon)
+                Text(title).font(SMAPTheme.Font.bodyBold)
+                Spacer()
+                Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+            }
+            .frame(minHeight: 56)
+            .contentShape(Rectangle())
+        }
+    }
+
     private func generateInviteLink() -> String {
         return group.inviteLink
     }
@@ -238,7 +170,7 @@ struct ShareOptionsView: View {
 
 extension SmapGroup {
     var inviteLink: String {
-        var components = URLComponents(string: "https://nextstep.aiagnt.kr/group/\(sgt_idx)/join")!
+        var components = URLComponents(string: "https://smap.aiagnt.kr/group/\(sgt_idx)/join")!
         if let code = sgt_code, !code.isEmpty { components.queryItems = [URLQueryItem(name: "code", value: code)] }
         return components.string!
     }

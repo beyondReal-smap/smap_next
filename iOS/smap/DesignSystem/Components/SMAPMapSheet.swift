@@ -18,7 +18,10 @@ enum SMAPSheetMetrics {
 }
 
 /// 시트가 자리로 가는 움직임 — 펼침·접힘과 끌다 놓은 뒤 되돌아가는 움직임이 같은 곡선을 쓴다.
-private let sheetSettleAnimation = Animation.interactiveSpring(response: 0.32, dampingFraction: 0.86)
+/// 0.5초 동안 처음엔 손을 이어받듯 움직이다 끝에서 천천히 내려앉는다(Android SheetSettleSpec 과 같은 값, 2026-11-19).
+/// 이전 interactiveSpring(response 0.32)은 툭 올라가 가벼워 보였다.
+private let sheetSettleDuration: TimeInterval = 0.5
+private let sheetSettleAnimation = Animation.timingCurve(0.2, 0.75, 0.2, 1, duration: sheetSettleDuration)
 
 /// 놓을 때 방향을 정하는 기준(Android SmapMapSheetState 와 같은 값).
 private enum SheetDragRule {
@@ -36,36 +39,51 @@ struct SMAPMapSheet<Header: View, Content: View>: View {
     let peekHeight: CGFloat
     @Binding var isExpanded: Bool
     var maxHeightFraction: CGFloat = 0.55
+    var headerSurface: Color? = nil
+    var keepsContentSize = false
     /// 손잡이에 이어지는 남색 머리 띠 안 내용 — 이 영역을 끌면 시트가 움직인다.
     @ViewBuilder var header: () -> Header
-    /// 띠 아래 흰 영역
-    @ViewBuilder var content: () -> Content
+    /// 띠 아래 영역. 현재 펼침 비율과 시트 전환 동작을 전달한다.
+    @ViewBuilder var content: (CGFloat, @escaping () -> Void) -> Content
 
-    // 손을 떼면 0 으로 돌아가는 값 — 되돌아가는 것도 애니메이션으로(이전에는 툭 튀어 버벅이는 것처럼 보였다).
-    @GestureState(resetTransaction: Transaction(animation: sheetSettleAnimation)) private var dragTranslation: CGFloat = 0
+    @GestureState private var isDragging = false
+    @State private var dragTranslation: CGFloat = 0
+    /// 펼침·접힘이 움직이는 중 — 이때 들어온 끌기·탭은 무시한다.
+    @State private var isSettling = false
+    /// 마지막으로 시작한 움직임 번호 — 앞선 움직임의 타이머가 뒤 움직임의 잠금을 풀지 않게.
+    @State private var settleGeneration = 0
 
     var body: some View {
         GeometryReader { geo in
             let maxHeight = max(peekHeight, min(geo.size.height * maxHeightFraction, geo.size.height - 76))
             let base = isExpanded ? maxHeight : peekHeight
             let height = min(max(base - dragTranslation, peekHeight), maxHeight)
+            let travel = maxHeight - peekHeight
+            let expansionProgress = travel > 0 ? (height - peekHeight) / travel : 0
 
             VStack(spacing: 0) {
                 VStack(spacing: 0) {
-                    SheetHandle()
+                    SheetHandle(color: headerSurface == nil ? .white.opacity(0.55) : .black.opacity(0.22))
                     header()
                         .frame(maxWidth: .infinity, minHeight: SMAPSheetMetrics.headerMinHeight, alignment: .leading)
                         .padding(.bottom, SMAPSheetMetrics.headerBandBottom)
                 }
-                .background(accent.band)
+                .background(headerSurface.map { AnyShapeStyle($0) } ?? AnyShapeStyle(accent.band))
                 .contentShape(Rectangle())
-                .gesture(dragGesture(maxHeight: maxHeight))
+                // 펼침·접힘이 움직이는 동안은 이 끌기를 끈다(안쪽 버튼 등은 그대로) — 손이 닿아도 끝까지 간다.
+                .gesture(dragGesture, including: isSettling ? .subviews : .all)
                 .onTapGesture { toggle() }
+                .onChange(of: isDragging) { _, dragging in
+                    if !dragging { finishCancelledDrag() }
+                }
                 .accessibilityAction(named: isExpanded ? "시트 접기" : "시트 펼치기") { toggle() }
 
-                content()
+                content(expansionProgress, toggle)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .scrollDisabled(keepsContentSize && isSettling)
             }
+            // 콘텐츠는 펼친 높이에서 배치하고 시트의 보이는 높이만 바꾼다.
+            .frame(height: keepsContentSize ? maxHeight : nil, alignment: .top)
             .frame(height: height, alignment: .top)
             .background(SMAPTheme.Surface.card)
             .clipShape(UnevenRoundedRectangle(topLeadingRadius: SMAPTheme.sheetRadius, topTrailingRadius: SMAPTheme.sheetRadius, style: .continuous))
@@ -76,38 +94,65 @@ struct SMAPMapSheet<Header: View, Content: View>: View {
     }
 
     private func toggle() {
+        guard !isSettling else { return }
         HapticManager.shared.selection()
-        isExpanded.toggle()
+        settle(expanded: !isExpanded)
     }
 
-    private func dragGesture(maxHeight: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: 6)
-            .updating($dragTranslation) { value, state, _ in state = value.translation.height }
-            .onEnded { value in
-                // 방향이 정해지면 끝까지 간다(2026-11-17). 이전에는 "예상 도착점이 절반을 넘어야" 펼쳐져서
-                // 조금 올리다 놓으면 제자리로 튕겨 돌아갔다.
-                //  1) 놓을 때 뚜렷하게 튕겼으면 그 방향  2) 아니면 움직인 방향  3) 거의 안 움직였으면 그대로
-                let moved = value.translation.height      // 아래가 +
-                let velocity = value.velocity.height      // pt/s, 아래가 +
-                let shouldExpand: Bool
-                if abs(velocity) >= SheetDragRule.flingVelocity {
-                    shouldExpand = velocity < 0
-                } else if abs(moved) >= SheetDragRule.directionSlop {
-                    shouldExpand = moved < 0
-                } else {
-                    shouldExpand = isExpanded
-                }
-                if shouldExpand != isExpanded { HapticManager.shared.selection() }
-                isExpanded = shouldExpand
-            }
+    /// [expanded] 자리까지 끝까지 움직인다. 움직이는 동안([isSettling])은 끌기·탭을 받지 않아 중간에 멈추지 않는다.
+    private func settle(expanded: Bool) {
+        isSettling = true
+        settleGeneration += 1
+        let generation = settleGeneration
+        withAnimation(sheetSettleAnimation) {
+            dragTranslation = 0
+            isExpanded = expanded
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + sheetSettleDuration) {
+            if settleGeneration == generation { isSettling = false }
+        }
+    }
+
+    /// 놓은(또는 시스템이 끌기를 가져간) 순간 방향을 정한다(2026-11-17). 이전에는 "예상 도착점이 절반을 넘어야" 펼쳐져서
+    /// 조금 올리다 놓으면 제자리로 튕겨 돌아갔다.
+    ///  1) 놓을 때 뚜렷하게 튕겼으면 그 방향  2) 아니면 움직인 방향  3) 거의 안 움직였으면 그대로
+    /// [moved]·[velocity] 는 아래가 + (pt, pt/s).
+    private func finishDrag(moved: CGFloat, velocity: CGFloat) {
+        let shouldExpand: Bool
+        if abs(velocity) >= SheetDragRule.flingVelocity {
+            shouldExpand = velocity < 0
+        } else if abs(moved) >= SheetDragRule.directionSlop {
+            shouldExpand = moved < 0
+        } else {
+            shouldExpand = isExpanded
+        }
+        if shouldExpand != isExpanded { HapticManager.shared.selection() }
+        settle(expanded: shouldExpand)
+    }
+
+    private var dragGesture: some Gesture {
+        DragGesture(minimumDistance: 6, coordinateSpace: .global)
+            .updating($isDragging) { _, state, _ in state = true }
+            .onChanged { dragTranslation = $0.translation.height }
+            .onEnded { finishDrag(moved: $0.translation.height, velocity: $0.velocity.height) }
+    }
+
+    /// 시스템이 드래그를 취소해 onEnded가 오지 않아도 마지막 드래그 위치부터 마무리한다.
+    private func finishCancelledDrag() {
+        DispatchQueue.main.async {
+            guard !isDragging, !isSettling, dragTranslation != 0 else { return }
+            finishDrag(moved: dragTranslation, velocity: 0)
+        }
     }
 }
 
 /// 손잡이 — 남색 띠 위 흰 막대. 바로 아래 머리 줄과 같은 띠로 이어져 시트 위쪽이 남색 머리로 보인다.
 private struct SheetHandle: View {
+    let color: Color
+
     var body: some View {
         Capsule()
-            .fill(Color.white.opacity(0.55))
+            .fill(color)
             .frame(width: 36, height: 4)
             .frame(maxWidth: .infinity)
             .padding(.top, 7)
@@ -152,7 +197,7 @@ struct GroupSwitcherPill: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 8) {
+            HStack(spacing: 5) {
                 Image(systemName: "person.2.fill")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(accent.base)
@@ -164,14 +209,15 @@ struct GroupSwitcherPill: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(SMAPTheme.Surface.onSurfaceMuted)
             }
-            .padding(.leading, 14)
-            .padding(.trailing, 12)
-            .frame(height: 44)
-            .frame(maxWidth: 240)
+            .padding(.horizontal, 10)
+            .frame(height: 34)
             .background(Color.white, in: Capsule())
             .shadow(color: .black.opacity(0.14), radius: 4, y: 2)
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .frame(maxWidth: 240, alignment: .leading)
         .accessibilityLabel("그룹 \(groupName ?? "선택"), 눌러서 바꾸기")
     }
 }
@@ -222,9 +268,32 @@ struct GroupPickerSheet: View {
     let selectedGroupId: Int?
     let onSelect: (SmapGroup) -> Void
     var onCreateGroup: (() -> Void)? = nil
+    var compact: Bool = false
     @Environment(\.dismiss) private var dismiss
 
+    private var detents: Set<PresentationDetent> {
+        guard compact else { return [.medium, .large] }
+        let rowCount = groups.count + (onCreateGroup == nil ? 0 : 1)
+        if rowCount <= 2 {
+            return [.height(72 + CGFloat(rowCount) * 60)]
+        }
+        return [.custom(CompactGroupPickerDetent.self)]
+    }
+
     var body: some View {
+        Group {
+            if compact {
+                groupList.presentationBackground(SMAPTheme.Surface.card)
+            } else {
+                groupList
+            }
+        }
+        .presentationDetents(detents)
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(SMAPTheme.sheetRadius)
+    }
+
+    private var groupList: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 Text("그룹")
@@ -274,8 +343,12 @@ struct GroupPickerSheet: View {
             }
             .padding(.bottom, SMAPTheme.Spacing.md)
         }
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
-        .presentationCornerRadius(SMAPTheme.sheetRadius)
+    }
+}
+
+
+private struct CompactGroupPickerDetent: CustomPresentationDetent {
+    static func height(in context: Context) -> CGFloat? {
+        min(320, context.maxDetentValue * 0.44)
     }
 }

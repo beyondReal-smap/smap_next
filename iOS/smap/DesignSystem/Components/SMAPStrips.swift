@@ -10,15 +10,23 @@ struct SMAPAvatar: View {
     let imagePath: String?
     var size: CGFloat = 44
     var selected: Bool = false
+    var memberID: Int? = nil
+
+    private static let familyColors: [SMAPAccent] = [.orange, .teal, .rose, .purple, .navy]
+
+    static func familyColor(for memberID: Int) -> SMAPAccent {
+        familyColors[abs(memberID % familyColors.count)]
+    }
 
     var body: some View {
         let ring: CGFloat = selected ? 2.5 : 0
         let inner = selected ? size - (ring + 2) * 2 : size
+        let initialsColor = memberID.map(Self.familyColor(for:)) ?? accent
         ZStack {
-            Circle().fill(accent.container)
+            Circle().fill(initialsColor.container)
             Text(String(name.trimmingCharacters(in: .whitespaces).prefix(1)).isEmpty ? "?" : String(name.trimmingCharacters(in: .whitespaces).prefix(1)))
                 .font(.suite(size: inner * 0.38 - 2, weight: .bold))
-                .foregroundStyle(accent.base)
+                .foregroundStyle(initialsColor.base)
             if let url = AuthService.getProfileImageURL(imagePath) {
                 AsyncImage(url: url, transaction: Transaction(animation: .easeOut(duration: 0.2))) { phase in
                     if case .success(let image) = phase {
@@ -63,17 +71,21 @@ struct MemberStrip: View {
                     let selected = selectedId == nil
                     stripItem(label: "전체", selected: selected, accessibility: "전체 멤버 보기", action: onAllTap) {
                         ZStack {
-                            if selected {
-                                Circle().fill(accent.gradient).padding(4.5)
-                                Circle().strokeBorder(accent.gradient, lineWidth: 2.5)
+                            Circle().fill(accent.container)
+                            if members.count >= 2 {
+                                HStack(spacing: -7) {
+                                    ForEach(members.prefix(2)) { member in
+                                        SMAPAvatar(name: member.name, imagePath: member.imagePath, size: 21, memberID: member.id)
+                                            .overlay { Circle().strokeBorder(.white, lineWidth: 1.5) }
+                                    }
+                                }
                             } else {
-                                Circle().fill(SMAPTheme.Surface.variant)
+                                Image(systemName: "map")
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundStyle(accent.base)
                             }
-                            Image(systemName: "map")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundStyle(selected ? Color.white : SMAPTheme.Surface.onSurfaceMuted)
                         }
-                        .frame(width: 52, height: 52)
+                        .frame(width: 40, height: 40)
                     }
                 }
                 ForEach(members) { member in
@@ -84,7 +96,9 @@ struct MemberStrip: View {
                         accessibility: member.isMe ? "\(member.name), 나" : member.name,
                         action: { onSelect(member) }
                     ) {
-                        SMAPAvatar(name: member.name, imagePath: member.imagePath, size: 52, selected: selected)
+                        SMAPAvatar(name: member.name, imagePath: member.imagePath, size: onAllTap == nil ? 52 : 40,
+                                   selected: onAllTap == nil && selected,
+                                   memberID: onAllTap == nil ? nil : member.id)
                     }
                 }
             }
@@ -97,14 +111,31 @@ struct MemberStrip: View {
             HapticManager.shared.selection()
             action()
         }) {
-            VStack(spacing: 6) {
-                avatar()
-                Text(label)
-                    .font(selected ? SMAPTheme.Font.captionBold : SMAPTheme.Font.caption)
-                    .foregroundStyle(selected ? accent.base : SMAPTheme.Surface.onSurfaceMuted)
-                    .lineLimit(1)
+            if onAllTap != nil {
+                HStack(spacing: 7) {
+                    avatar()
+                    Text(label)
+                        .font(SMAPTheme.Font.captionBold)
+                        .lineLimit(1)
+                        .frame(maxWidth: 96)
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+                .padding(.leading, 5)
+                .padding(.trailing, 13)
+                .frame(height: 50)
+                .foregroundStyle(selected ? Color.white : SMAPTheme.Surface.onSurface)
+                .background(selected ? accent.deep : .white, in: Capsule())
+                .overlay { Capsule().strokeBorder(accent.deep.opacity(selected ? 0 : 0.16)) }
+            } else {
+                VStack(spacing: 6) {
+                    avatar()
+                    Text(label)
+                        .font(selected ? SMAPTheme.Font.captionBold : SMAPTheme.Font.caption)
+                        .foregroundStyle(selected ? accent.base : SMAPTheme.Surface.onSurfaceMuted)
+                        .lineLimit(1)
+                }
+                .frame(width: 60)
             }
-            .frame(width: 60)
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
@@ -158,7 +189,7 @@ struct DateStrip: View {
         let isToday = calendar.isDateInToday(item.date)
         let isSunday = calendar.component(.weekday, from: item.date) == 1
         let weekday = Self.weekdayFormatter.string(from: item.date)
-        let weekdayColor: Color = isSelected ? .white.opacity(0.8) : (isSunday ? SMAPTheme.Color.error : SMAPTheme.Surface.onSurfaceMuted)
+        let weekdayColor: Color = isSelected ? .white.opacity(0.94) : (isSunday ? SMAPAccent.orange.deep : SMAPTheme.Surface.onSurfaceMuted)
         var a11y = "\(calendar.component(.month, from: item.date))월 \(calendar.component(.day, from: item.date))일 \(weekday)요일"
         if isToday { a11y += ", 오늘" }
         if item.locked { a11y += ", 구독 필요" }

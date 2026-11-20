@@ -3,10 +3,10 @@ import SwiftUI
 // MARK: - 내장소 지도 시트 (Android MyPlaceSheet.kt 이식)
 //
 // 사이드바("장소 관리")·떠 있는 멤버 버튼을 대신한다.
-// 접힌 상태: "OO의 장소 N곳" + 장소 추가 버튼 + 멤버 얼굴 줄. 펼친 상태: 장소 목록(도착 알림 켜고 끄기).
+// 접힌 시트에서 장소를 바로 열고, 펼치면 멤버 선택과 도착 알림을 관리한다.
 
 enum MyPlaceSheet {
-    static let peekHeight: CGFloat = 178
+    static let peekHeight: CGFloat = 140
 }
 
 /// 머리 띠 안 — 누구의 장소인지·몇 곳인지 + 장소 추가
@@ -17,15 +17,19 @@ struct MyPlaceSheetHeader: View {
 
     var body: some View {
         HStack(spacing: SMAPTheme.Spacing.sm) {
+            Image(systemName: "map.fill")
+                .font(.system(size: 22, weight: .semibold)).foregroundStyle(SMAPTheme.Family.ink)
+                .frame(width: 48, height: 48).background(SMAPTheme.Family.highlight, in: RoundedRectangle(cornerRadius: 14))
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(owner) 장소")
-                    .font(SMAPTheme.Font.headline)
-                    .foregroundStyle(.white)
+                    .font(.suite(size: 22, weight: .bold))
+                    .foregroundStyle(SMAPTheme.Family.ink)
                     .lineLimit(1)
                     .accessibilityAddTraits(.isHeader)
                 Text(subtitle)
                     .font(SMAPTheme.Font.caption)
-                    .foregroundStyle(SMAPTheme.Surface.onNavyMuted)
+                    .foregroundStyle(SMAPTheme.Family.ink.opacity(0.80))
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -45,33 +49,58 @@ struct MyPlaceSheetHeader: View {
     private var subtitle: String {
         if viewModel.isLoadingLocations { return "불러오는 중…" }
         if viewModel.locations.isEmpty { return "아직 등록한 장소가 없어요" }
-        return "\(viewModel.locations.count)곳 · 도착하면 알려 드려요"
+        return "저장 \(viewModel.locations.count)곳 · 도착 알림 \(viewModel.locations.filter { $0.slt_enter_alarm == "Y" }.count)곳"
     }
 }
 
-/// 띠 아래 — 멤버 얼굴 줄(접혀도 보임) + 장소 목록
+/// 장소 바로가기와 멤버별 장소 목록
 struct MyPlaceSheetBody: View {
     @Environment(\.smapAccent) private var accent
     @ObservedObject var viewModel: MyPlaceViewModel
     let currentUserIdx: Int?
+    let isExpanded: Bool
+    let onToggle: () -> Void
     let onSelectLocation: (SavedLocation) -> Void
 
     var body: some View {
         VStack(spacing: 0) {
-            Spacer().frame(height: SMAPSheetMetrics.headerBandGap)
-            MemberStrip(
-                members: viewModel.members.map {
-                    MemberStripItem(id: $0.mt_idx, name: $0.displayName, imagePath: $0.mt_file1, isMe: $0.mt_idx == currentUserIdx)
-                },
-                selectedId: viewModel.selectedMember?.mt_idx,
-                onSelect: { item in
-                    if let member = viewModel.members.first(where: { $0.mt_idx == item.id }) { viewModel.selectMember(member) }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    Button(action: onToggle) {
+                        Label(isExpanded ? "목록 접기" : "멤버·장소 보기", systemImage: "list.bullet")
+                            .font(SMAPTheme.Font.captionBold).padding(.horizontal, 14).frame(minHeight: 44)
+                            .foregroundStyle(.white).background(SMAPTheme.Family.ink, in: Capsule())
+                    }
+                    if !viewModel.isLoadingLocations {
+                        ForEach(viewModel.locations) { location in
+                            Button { onSelectLocation(location) } label: {
+                                Label(location.name, systemImage: location.kind.systemImage)
+                                    .font(SMAPTheme.Font.captionBold).lineLimit(1)
+                                    .padding(.horizontal, 14).frame(minHeight: 44)
+                                    .foregroundStyle(SMAPTheme.Family.ink).background(.white, in: Capsule())
+                                    .overlay { Capsule().strokeBorder(SMAPTheme.Family.ink.opacity(0.18)) }
+                            }
+                        }
+                    }
                 }
-            )
-            Spacer().frame(height: SMAPTheme.Spacing.md)
+                .buttonStyle(.plain)
+                .padding(.horizontal, SMAPTheme.Spacing.md)
+            }
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(SMAPTheme.Family.paper)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: SMAPTheme.Spacing.md) {
+                    MemberStrip(
+                        members: viewModel.members.map {
+                            MemberStripItem(id: $0.mt_idx, name: $0.displayName, imagePath: $0.mt_file1, isMe: $0.mt_idx == currentUserIdx)
+                        },
+                        selectedId: viewModel.selectedMember?.mt_idx,
+                        onSelect: { item in
+                            if let member = viewModel.members.first(where: { $0.mt_idx == item.id }) { viewModel.selectMember(member) }
+                        }
+                    )
                     if viewModel.isLoadingLocations {
                         ProgressView()
                             .frame(maxWidth: .infinity)
@@ -87,7 +116,7 @@ struct MyPlaceSheetBody: View {
                             )
                         }
                     } else {
-                        SMAPSection(title: "장소") {
+                        SMAPSection(title: "저장한 장소") {
                             ForEach(Array(viewModel.locations.enumerated()), id: \.element.id) { index, location in
                                 if index > 0 { SMAPRowDivider() }
                                 locationRow(location)
@@ -109,7 +138,7 @@ struct MyPlaceSheetBody: View {
             subtitle: location.address,
             selected: viewModel.selectedLocation?.slt_idx == location.slt_idx,
             action: { onSelectLocation(location) },
-            leading: { SMAPRowIcon(systemImage: "mappin.and.ellipse", emphasized: true) },
+            leading: { SMAPRowIcon(systemImage: location.kind.systemImage, emphasized: true) },
             trailing: {
                 if viewModel.canManageLocation(location) {
                     Button {

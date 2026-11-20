@@ -6,6 +6,13 @@ import SwiftUI
 // 시각적 중심을 하나 둔다. 색은 브랜드 남색 계열만 쓴다.
 
 extension SMAPTheme {
+    enum Family {
+        static let paper = SwiftUI.Color(red: 0xF4 / 255, green: 0xF8 / 255, blue: 0xFC / 255)
+        static let ink = SwiftUI.Color(red: 0x29 / 255, green: 0x4F / 255, blue: 0x77 / 255)
+        static let highlight = SwiftUI.Color(red: 0xFF / 255, green: 0xDB / 255, blue: 0xBC / 255)
+        static let muted = SwiftUI.Color(red: 0x53 / 255, green: 0x67 / 255, blue: 0x7C / 255)
+    }
+
     /// 재설계 화면 공용 색 — Android colorScheme 과 같은 값.
     enum Surface {
         static let canvas = SwiftUI.Color(red: 0xF4 / 255, green: 0xF5 / 255, blue: 0xF8 / 255)        // 회색 바탕
@@ -36,11 +43,7 @@ extension SMAPTheme {
     static let sheetRadius: CGFloat = 28
 }
 
-// MARK: - 메뉴별 강조색
-//
-// 처음엔 남색 하나만 썼는데 모든 메뉴가 "파랑파랑"해 단조롭다는 피드백(2026-11-16)에 따라 메뉴마다 색을 나눴다.
-// 홈·설정 남색 / 그룹 청록 / 일정 주황 / 내장소 보라 / 활동 로그 장미 (Android SmapAccent 와 같은 값).
-// 탭 화면에 `.smapAccent(_:)` 를 걸면 그 아래 요약 카드·아이콘 원·버튼·시트 띠가 그 색을 쓴다.
+// MARK: - 메뉴·멤버 강조색
 
 /// 메뉴 강조색 한 벌 — 짙은 색 → 기준 색 → 밝은 색 그라데이션 + 옅은 바탕(아이콘 원·칩).
 struct SMAPAccent {
@@ -64,24 +67,27 @@ struct SMAPAccent {
     static let purple = SMAPAccent(deep: rgb(0x4C1D95), base: rgb(0x6D28D9), bright: rgb(0x8B5CF6), container: rgb(0xEEE8FD))
     static let rose = SMAPAccent(deep: rgb(0x9F1239), base: rgb(0xBE185D), bright: rgb(0xDB2777), container: rgb(0xFBE6EF))
 
-    /// 하단 탭 순서(홈·그룹·일정·내장소·활동 로그)별 색
+    static let family = SMAPAccent(deep: rgb(0x26496E), base: rgb(0x345F8C), bright: rgb(0x416996), container: rgb(0xE3EDF8))
+    static let schedule = SMAPAccent(deep: rgb(0x2D4863), base: rgb(0x365B80), bright: rgb(0x3C6083), container: rgb(0xF9E8D9))
+    static let places = SMAPAccent(deep: rgb(0x284B63), base: rgb(0x37627B), bright: rgb(0x406A81), container: rgb(0xE2EFF4))
+    static let activity = SMAPAccent(deep: rgb(0x344968), base: rgb(0x495E83), bright: rgb(0x516789), container: rgb(0xE6ECF6))
+
     static func forTab(_ index: Int) -> SMAPAccent {
         switch index {
-        case 1: return .teal
-        case 2: return .orange
-        case 3: return .purple
-        case 4: return .rose
-        default: return .navy
+        case 2: return .schedule
+        case 3: return .places
+        case 4: return .activity
+        default: return .family
         }
     }
 }
 
 private struct SMAPAccentKey: EnvironmentKey {
-    static let defaultValue = SMAPAccent.navy
+    static let defaultValue = SMAPAccent.family
 }
 
 extension EnvironmentValues {
-    /// 지금 메뉴의 강조색. 기본은 브랜드 남색(홈·설정).
+    /// 지금 메뉴의 강조색. 홈·설정의 가족 강조색을 기본값으로 사용한다.
     var smapAccent: SMAPAccent {
         get { self[SMAPAccentKey.self] }
         set { self[SMAPAccentKey.self] = newValue }
@@ -220,5 +226,29 @@ struct SheetBandButton: View {
             .background(Color.white, in: Capsule())
         }
         .buttonStyle(.plain)
+    }
+}
+
+struct SMAPFamilyCover<Content: View>: View {
+    let image: String
+    var minHeight: CGFloat = 160
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        content()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(20)
+            .frame(minHeight: minHeight, alignment: .bottomLeading)
+            .background {
+                GeometryReader { geometry in
+                    Image(image).resizable().scaledToFill()
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .clipped()
+                        .overlay(LinearGradient(colors: [.black.opacity(0.08), .black.opacity(0.8)], startPoint: .top, endPoint: .bottom))
+                        .accessibilityHidden(true)
+                }
+            }
+            .foregroundStyle(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 }

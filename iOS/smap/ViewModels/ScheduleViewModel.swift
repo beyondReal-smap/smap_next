@@ -17,7 +17,7 @@ class ScheduleViewModel: ObservableObject {
     @Published var selectedDate: Date = Date()
     @Published var currentMonth: Date = Date()
     @Published var selectedMemberIds: Set<Int> = []
-    @Published var isLoading: Bool = false
+    @Published var isLoading: Bool = true
     @Published var errorMessage: String?
     @Published var userPermissions: UserPermissions?
 
@@ -94,16 +94,28 @@ class ScheduleViewModel: ObservableObject {
     }
 
     func fetchGroups() {
-        isLoading = true
+        if selectedGroup == nil { isLoading = true }
         Task {
             do {
                 let fetchedGroups = try await groupService.getCurrentUserGroups()
                 self.groups = fetchedGroups
-                if self.selectedGroup == nil, let firstGroup = fetchedGroups.first { self.selectGroup(firstGroup) }
+                if let currentGroup = fetchedGroups.first(where: { $0.sgt_idx == self.selectedGroup?.sgt_idx }) {
+                    self.selectedGroup = currentGroup
+                    return
+                }
+                if let firstGroup = fetchedGroups.first {
+                    self.selectGroup(firstGroup)
+                    return
+                }
+                self.selectedGroup = nil
+                self.schedules = []
+                self.groupMembers = []
+                self.selectedMemberIds.removeAll()
+                self.userPermissions = nil
                 self.isLoading = false
             } catch {
                 self.errorMessage = error.localizedDescription
-                self.isLoading = false
+                if self.selectedGroup == nil { self.isLoading = false }
             }
         }
     }
@@ -133,6 +145,11 @@ class ScheduleViewModel: ObservableObject {
     }
 
     func selectGroup(_ group: SmapGroup) {
+        if selectedGroup?.sgt_idx != group.sgt_idx {
+            schedules = []
+            groupMembers = []
+            userPermissions = nil
+        }
         selectedGroup = group
         selectedMemberIds.removeAll()
         fetchSchedules()

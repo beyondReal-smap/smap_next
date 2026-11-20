@@ -33,14 +33,14 @@ struct GroupDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: SMAPTheme.Spacing.lg) {
                 heroSection
-                inviteSection
                 memberSection
+                inviteSection
                 if ownerStatus != nil { manageSection }
             }
             .padding(SMAPTheme.Spacing.md)
             .padding(.bottom, SMAPTheme.Spacing.lg)
         }
-        .background(SMAPTheme.Surface.canvas.ignoresSafeArea())
+        .background(SMAPTheme.Family.paper.ignoresSafeArea())
         .navigationTitle("그룹")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
@@ -102,14 +102,16 @@ struct GroupDetailView: View {
     // MARK: 요약 — 화면의 시각적 중심(남색 카드)
 
     private var heroSection: some View {
-        SMAPHeroCard {
+        VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .center, spacing: 14) {
-                Image(systemName: "person.3.fill")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 52, height: 52)
-                    .background(Color.white.opacity(0.16), in: Circle())
-                    .accessibilityHidden(true)
+                if membersLoaded, !viewModel.groupMembers.isEmpty {
+                    HStack(spacing: -10) {
+                        ForEach(viewModel.groupMembers.prefix(3)) { member in
+                            SMAPAvatar(name: member.displayName, imagePath: member.mt_file1, size: 38, memberID: member.mt_idx)
+                                .overlay { Circle().strokeBorder(SMAPTheme.Family.ink, lineWidth: 2) }
+                        }
+                    }
+                }
                 SMAPHeroHeading(
                     eyebrow: ownerStatus == nil ? nil : (isCurrentUserOwner ? "내가 만든 그룹" : "참여 중인 그룹"),
                     title: current.sgt_title.flatMap { $0.isEmpty ? nil : $0 } ?? "이름 없는 그룹",
@@ -123,6 +125,8 @@ struct GroupDetailView: View {
                 (stats.map { "\($0.total_locations)곳" } ?? "-", "등록 장소"),
             ])
         }
+        .padding(20).frame(maxWidth: .infinity, alignment: .leading)
+        .background(SMAPTheme.Family.ink, in: RoundedRectangle(cornerRadius: 24))
     }
 
     // MARK: 초대
@@ -190,7 +194,7 @@ struct GroupDetailView: View {
             // 역할은 오른쪽 배지로만 보여 준다(보조 줄과 배지에 같은 말이 두 번 나오지 않게).
             subtitle: role == nil && !manageable ? "멤버" : nil,
             action: manageable ? { managedMember = member } : nil,
-            leading: { SMAPAvatar(name: member.displayName, imagePath: member.mt_file1) },
+            leading: { SMAPAvatar(name: member.displayName, imagePath: member.mt_file1, memberID: member.mt_idx) },
             trailing: {
                 HStack(spacing: SMAPTheme.Spacing.sm) {
                     if let role { RoleBadge(text: role) }

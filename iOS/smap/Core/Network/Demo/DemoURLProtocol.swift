@@ -7,7 +7,7 @@
 //  켜는 법: 실행 인자 `-SMAPDemo YES`
 //    (xcrun simctl launch <기기> com.dmonster.smap -SMAPDemo YES)
 //  켜지면 화면이 읽는 조회(GET) 몇 가지만 DemoFixtures 의 가짜 응답으로 바꾼다.
-//  로그인·쓰기 요청 등 나머지는 그대로 실제 서버로 간다.
+//  로그인·쓰기 요청 등 나머지는 그대로 실제 서버로 간다(가짜 알림의 읽음·삭제만 예외 — 성공으로 답한다).
 //  가짜 응답은 tools/store-demo/build_fixtures.py 가 만든다(Android 와 같은 데이터).
 //
 
@@ -68,12 +68,18 @@ final class DemoURLProtocol: URLProtocol {
 
     // MARK: - 규칙 매칭
 
+    /// 데모 화면의 알림 목록은 가짜(plt_idx 1990000 대)라, 그 읽음·삭제 요청을 운영 서버로 보내면 404 가 나
+    /// "읽음 처리에 실패했습니다" 가 뜨고, 전체 읽음·삭제는 테스트 계정의 실제 알림을 바꾼다. 알림 쓰기는 여기서 성공으로 끝낸다.
+    private static let demoWriteSuccess = #"{"success":true,"message":"demo"}"#
+
     /// 규칙에 맞으면 응답 본문, 아니면 nil(실제 서버로 보낸다).
     private static func response(for request: URLRequest) -> String? {
-        guard (request.httpMethod ?? "GET") == "GET",
-              let url = request.url,
+        guard let url = request.url,
               let range = url.path.range(of: apiPrefix) else { return nil }
         let path = url.path[range.upperBound...].trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard (request.httpMethod ?? "GET") == "GET" else {
+            return path.hasPrefix("push-logs/") ? demoWriteSuccess : nil
+        }
         let segments = path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
         let dateQuery = URLComponents(url: url, resolvingAgainstBaseURL: false)?
             .queryItems?.first(where: { $0.name == "date" })?.value

@@ -43,6 +43,7 @@ object SmapSize {
  * Text 기본값(LocalContentColor)을 따르게 해서 다크 모드에서 깨지지 않게 한다.
  */
 object SmapText {
+    val pageTitle = TextStyle(fontFamily = SuiteFont, fontWeight = FontWeight.Bold, fontSize = 28.sp, lineHeight = 35.sp, letterSpacing = (-0.5).sp)
     val title = TextStyle(fontFamily = SuiteFont, fontWeight = FontWeight.Bold, fontSize = 22.sp, lineHeight = 30.sp)
     val headline = TextStyle(fontFamily = SuiteFont, fontWeight = FontWeight.Bold, fontSize = 18.sp, lineHeight = 26.sp)
     val subheadline = TextStyle(fontFamily = SuiteFont, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, lineHeight = 24.sp)

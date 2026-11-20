@@ -107,7 +107,11 @@ class LoginViewModel @Inject constructor(
                 }
                 is ApiResult.Error -> {
                     Log.e("LoginViewModel", "❌ 로그인 실패 (${result.code})")
-                    showErrorMessage("로그인에 실패했습니다 (${result.code})")
+                    showErrorMessage(when (result.code) {
+                        401 -> "이메일과 비밀번호를 확인해 주세요."
+                        429 -> "로그인 시도가 많아요. 잠시 후 다시 시도해 주세요."
+                        else -> "로그인을 완료하지 못했어요. 잠시 후 다시 시도해 주세요."
+                    })
                 }
                 is ApiResult.NetworkError -> {
                     Log.e("LoginViewModel", "❌ 로그인 중 네트워크 오류", result.exception)
@@ -139,7 +143,7 @@ class LoginViewModel @Inject constructor(
                 }
                 is ApiResult.Error -> {
                     Log.e("LoginViewModel", "❌ Google 로그인 실패 (${result.code})")
-                    showErrorMessage("Google 로그인에 실패했습니다 (${result.code})")
+                    showErrorMessage("Google 로그인을 완료하지 못했어요. 다시 시도하거나 이메일로 계속해 주세요.")
                 }
                 is ApiResult.NetworkError -> {
                     Log.e("LoginViewModel", "❌ Google 로그인 네트워크 오류", result.exception)
@@ -178,7 +182,7 @@ class LoginViewModel @Inject constructor(
                 }
                 is ApiResult.Error -> {
                     Log.e("LoginViewModel", "❌ Kakao 로그인 실패 (${result.code})")
-                    showErrorMessage("Kakao 로그인에 실패했습니다 (${result.code})")
+                    showErrorMessage("카카오 로그인을 완료하지 못했어요. 다시 시도하거나 이메일로 계속해 주세요.")
                 }
                 is ApiResult.NetworkError -> {
                     Log.e("LoginViewModel", "❌ Kakao 로그인 네트워크 오류", result.exception)
@@ -232,8 +236,12 @@ class LoginViewModel @Inject constructor(
      * 에러 메시지 표시
      */
     fun showErrorMessage(message: String) {
+        val text = message.trim()
+        val guidance = if (text.isEmpty() || text.contains("알 수 없는 오류") || text.contains("unknown error", ignoreCase = true)) {
+            "로그인을 완료하지 못했어요. 잠시 후 다시 시도해 주세요."
+        } else text
         _uiState.value = _uiState.value.copy(
-            errorMessage = message,
+            errorMessage = guidance,
             showError = true,
             isLoading = false
         )
@@ -272,6 +280,7 @@ class LoginViewModel @Inject constructor(
      * 로딩 상태 설정 (외부용)
      */
     fun setLoading(isLoading: Boolean) {
+        if (isLoading) dismissError()
         _uiState.value = _uiState.value.copy(isLoading = isLoading)
     }
 

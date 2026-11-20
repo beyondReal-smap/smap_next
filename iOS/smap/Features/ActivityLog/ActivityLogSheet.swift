@@ -7,8 +7,8 @@ import SwiftUI
 // 펼친 상태: 요약 3칸, 멤버 목록(최근 14일 중 기록한 날 수).
 
 enum ActivityLogSheet {
-    static let peekHeight: CGFloat = 180
-    /// 경로 따라가기 줄이 있을 때 접힌 시트에 더하는 높이
+    static let peekHeight: CGFloat = 190
+    /// 경로 따라가기 줄 높이 — 경로가 없는 날도 줄을 두므로 접힌 시트는 늘 이만큼 더 높다.
     static let routeControlHeight: CGFloat = 84
 
     static func dateString(_ date: Date) -> String { DateFormatter.apiDateOnlyFormatter.string(from: date) }
@@ -19,6 +19,8 @@ struct ActivityLogSheetHeader: View {
     @ObservedObject var viewModel: ActivityLogViewModel
     let currentUserIdx: Int?
 
+    @State private var choosingMember = false
+
     private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
         f.locale = Locale(identifier: "ko_KR")
@@ -27,52 +29,63 @@ struct ActivityLogSheetHeader: View {
     }()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("\(name) · \(dateText)")
-                .font(SMAPTheme.Font.headline)
-                .foregroundStyle(.white)
-                .lineLimit(1)
-                .accessibilityAddTraits(.isHeader)
-            Text(summaryLine)
-                .font(SMAPTheme.Font.caption)
-                .foregroundStyle(SMAPTheme.Surface.onNavyMuted)
-                .lineLimit(1)
+        let member = viewModel.selectedMemberDailyCount
+        HStack(spacing: 12) {
+            if let member {
+                SMAPAvatar(name: member.displayName, imagePath: member.member_photo, size: 48, memberID: member.member_id)
+            } else {
+                Image(systemName: "figure.walk").font(.title2).foregroundStyle(SMAPAccent.activity.deep)
+                    .frame(width: 48, height: 48).background(.white, in: Circle()).accessibilityHidden(true)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(dateText).font(SMAPTheme.Font.captionBold).foregroundStyle(SMAPAccent.activity.deep)
+                Text(member.map { $0.member_id == currentUserIdx ? "나의 발자취" : "\($0.displayName)의 발자취" } ?? "하루의 발자취")
+                    .font(.suite(size: 22, weight: .bold)).foregroundStyle(SMAPTheme.Family.ink)
+                    .lineLimit(1).accessibilityAddTraits(.isHeader)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if viewModel.memberDailyCounts.count > 1 {
+                Button { choosingMember = true } label: {
+                    Text("멤버 변경").font(SMAPTheme.Font.captionBold).foregroundStyle(SMAPAccent.activity.deep)
+                        .padding(.horizontal, 12).frame(minHeight: 44).background(.white, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                    .confirmationDialog("기록을 볼 멤버", isPresented: $choosingMember, titleVisibility: .visible) {
+                        ForEach(viewModel.memberDailyCounts) { person in
+                            Button(person.member_id == currentUserIdx ? "\(person.displayName) (나)" : person.displayName) {
+                                Task { await viewModel.selectMember(person.member_id) }
+                            }
+                        }
+                        Button("취소", role: .cancel) {}
+                    }
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 20)
-    }
-
-    private var name: String {
-        guard let member = viewModel.selectedMemberDailyCount else { return "멤버" }
-        return member.member_id == currentUserIdx ? "나" : member.displayName
     }
 
     private var dateText: String {
         guard let date = DateFormatter.apiDateOnlyFormatter.date(from: viewModel.selectedDate) else { return viewModel.selectedDate }
         return Self.dateFormatter.string(from: date)
     }
-
-    private var summaryLine: String {
-        if viewModel.isMarkersLoading { return "기록을 불러오는 중…" }
-        // 지도 가운데 큰 카드 대신 여기서 알린다(카드는 펼친 시트를 가렸다).
-        if viewModel.mapMarkers.isEmpty { return "이 날은 이동 기록이 없어요 · 다른 날을 골라 보세요" }
-        guard viewModel.locationSummary != nil else { return "이동 기록이 있어요 · 아래 막대로 따라가 보세요" }
-        return "\(viewModel.formattedDistance) 이동 · \(viewModel.formattedDuration) · \(viewModel.formattedSteps)"
-    }
 }
 
-/// 띠 아래 — (경로 따라가기) + 날짜 줄(접혀도 보임) + 요약·멤버 목록
+/// 날짜를 고르면 해당 날짜의 경로 막대와 이동 요약을 확인할 수 있다.
 struct ActivityLogSheetBody: View {
     @ObservedObject var viewModel: ActivityLogViewModel
     let currentUserIdx: Int?
 
     var body: some View {
-        let hasRoute = !viewModel.sortedMapMarkers.isEmpty
+        let hasRoute = viewModel.sortedMapMarkers.count >= 2
         VStack(spacing: 0) {
-            if hasRoute {
-                RouteScrubber(viewModel: viewModel)
+            HStack(spacing: 8) {
+                Image(systemName: "point.topleft.down.to.point.bottomright.curvepath").accessibilityHidden(true)
+                Text(summaryLine).font(SMAPTheme.Font.captionBold)
             }
-            // 경로 막대가 있으면 막대 자체가 띠 아래 여백 역할을 한다.
-            Spacer().frame(height: hasRoute ? SMAPTheme.Spacing.sm : SMAPSheetMetrics.headerBandGap)
+            .foregroundStyle(SMAPAccent.activity.deep)
+            .padding(.horizontal, 20).padding(.bottom, 10)
+            .frame(maxWidth: .infinity, alignment: .leading).background(SMAPAccent.activity.container)
+            Spacer().frame(height: 8)
             DateStrip(items: dateItems, selected: selectedDate) { item in
                 if item.locked {
                     viewModel.showRetentionLock()
@@ -80,19 +93,23 @@ struct ActivityLogSheetBody: View {
                     Task { await viewModel.selectDate(ActivityLogSheet.dateString(item.date)) }
                 }
             }
+            // 경로가 없는 날(불러오는 중 포함)도 막대 자리를 지킨다 — 날짜를 바꿀 때 시트 높이가 바뀌어 레이아웃이 흔들리지 않게.
+            RouteScrubber(viewModel: viewModel, enabled: hasRoute)
             Spacer().frame(height: SMAPTheme.Spacing.md)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: SMAPTheme.Spacing.lg) {
-                    SMAPSection(title: "요약") {
-                        HStack(spacing: 0) {
-                            statCell("이동 거리", viewModel.formattedDistance)
-                            statCell("이동 시간", viewModel.formattedDuration)
-                            statCell("걸음 수", viewModel.formattedSteps)
+                    if viewModel.locationSummary != nil && !viewModel.sortedMapMarkers.isEmpty {
+                        SMAPSection(title: "이날의 이동") {
+                            HStack(spacing: 0) {
+                                statCell("이동 거리", viewModel.formattedDistance)
+                                statCell("이동 시간", viewModel.formattedDuration)
+                                statCell("걸음 수", viewModel.formattedSteps)
+                            }
+                            .padding(.vertical, SMAPTheme.Spacing.md)
                         }
-                        .padding(.vertical, SMAPTheme.Spacing.md)
                     }
-                    SMAPSection(title: "멤버") {
+                    SMAPSection(title: "기록을 볼 멤버") {
                         ForEach(Array(viewModel.memberDailyCounts.enumerated()), id: \.element.id) { index, member in
                             if index > 0 { SMAPRowDivider() }
                             let days = member.daily_counts.filter { $0.count > 0 }.count
@@ -101,7 +118,7 @@ struct ActivityLogSheetBody: View {
                                 subtitle: days > 0 ? "최근 2주 중 \(days)일 기록" : "최근 2주 기록 없음",
                                 selected: member.member_id == viewModel.selectedMemberId,
                                 action: { Task { await viewModel.selectMember(member.member_id) } },
-                                leading: { SMAPAvatar(name: member.displayName, imagePath: member.member_photo) }
+                                leading: { SMAPAvatar(name: member.displayName, imagePath: member.member_photo, memberID: member.member_id) }
                             )
                         }
                     }
@@ -111,6 +128,14 @@ struct ActivityLogSheetBody: View {
             }
             .background(SMAPTheme.Surface.canvas)
         }
+    }
+
+    private var summaryLine: String {
+        if viewModel.isMarkersLoading { return "기록을 불러오는 중…" }
+        // 지도 가운데 큰 카드 대신 여기서 알린다(카드는 펼친 시트를 가렸다).
+        if viewModel.sortedMapMarkers.isEmpty { return "이날은 이동 기록이 없어요" }
+        guard viewModel.locationSummary != nil else { return viewModel.sortedMapMarkers.count > 1 ? "이동 기록이 있어요 · 아래 막대로 따라가 보세요" : "위치가 한 곳에 기록됐어요" }
+        return "\(viewModel.formattedDistance) 이동 · \(viewModel.formattedDuration) · \(viewModel.formattedSteps)"
     }
 
     private var selectedDate: Date {
@@ -151,6 +176,8 @@ struct ActivityLogSheetBody: View {
 struct RouteScrubber: View {
     @Environment(\.smapAccent) private var accent
     @ObservedObject var viewModel: ActivityLogViewModel
+    /// 이동 점이 2개 이상일 때만 끌 수 있다. 아니면 흐리게 두고 시각은 비운다.
+    let enabled: Bool
 
     private let thumbSize: CGFloat = 22
 
@@ -161,15 +188,15 @@ struct RouteScrubber: View {
                     .font(SMAPTheme.Font.captionBold)
                     .foregroundStyle(SMAPTheme.Surface.onSurfaceMuted)
                 Spacer()
-                Text(timeText(viewModel.currentMarkerAtSlider?.mlt_gps_time) ?? "--:--")
+                Text(enabled ? timeText(viewModel.currentMarkerAtSlider?.mlt_gps_time) ?? "--:--" : "--:--")
                     .font(SMAPTheme.Font.bodyBold)
                     .foregroundStyle(accent.base)
                     .monospacedDigit()
             }
             GeometryReader { geo in
-                let size = viewModel.isSliderDragging ? thumbSize + 4 : thumbSize
+                let size = viewModel.scrubber.isDragging ? thumbSize + 4 : thumbSize
                 let usable = max(geo.size.width - thumbSize, 1)
-                let fraction = CGFloat(viewModel.sliderValue / 100)
+                let fraction = enabled ? CGFloat(viewModel.scrubber.value / 100) : 0
                 let centerX = thumbSize / 2 + usable * fraction
                 ZStack(alignment: .leading) {
                     // 연한 남색 바탕 위에 지나온 구간만 남색으로 채운다
@@ -181,6 +208,7 @@ struct RouteScrubber: View {
                         .padding(3)
                         .background(Circle().fill(Color.white))
                         .frame(width: size, height: size)
+                        .animation(.easeOut(duration: 0.12), value: viewModel.scrubber.isDragging)
                         .shadow(color: .black.opacity(0.25), radius: 3, y: 1)
                         .position(x: centerX, y: geo.size.height / 2)
                 }
@@ -189,19 +217,19 @@ struct RouteScrubber: View {
                 .gesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { value in
-                            if !viewModel.isSliderDragging { viewModel.isSliderDragging = true }
+                            if !viewModel.scrubber.isDragging { viewModel.scrubber.isDragging = true }
                             let x = min(max(value.location.x - thumbSize / 2, 0), usable)
                             viewModel.updateSliderValue(Double(x / usable) * 100)
                         }
-                        .onEnded { _ in viewModel.isSliderDragging = false }
+                        .onEnded { _ in viewModel.scrubber.isDragging = false }
                 )
-                .animation(.easeOut(duration: 0.12), value: viewModel.isSliderDragging)
             }
             .frame(height: 32)
+            .allowsHitTesting(enabled)
             HStack {
-                Text(timeText(viewModel.sortedMapMarkers.first?.mlt_gps_time) ?? "")
+                Text(enabled ? timeText(viewModel.sortedMapMarkers.first?.mlt_gps_time) ?? "" : "")
                 Spacer()
-                Text(timeText(viewModel.sortedMapMarkers.last?.mlt_gps_time) ?? "")
+                Text(enabled ? timeText(viewModel.sortedMapMarkers.last?.mlt_gps_time) ?? "" : "")
             }
             .font(SMAPTheme.Font.captionSmall)
             .foregroundStyle(SMAPTheme.Surface.onSurfaceMuted)
@@ -210,13 +238,15 @@ struct RouteScrubber: View {
         .padding(.horizontal, 20)
         .padding(.top, 12)
         .frame(height: ActivityLogSheet.routeControlHeight, alignment: .top)
+        .opacity(enabled ? 1 : 0.4)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("경로 따라가기, 현재 \(timeText(viewModel.currentMarkerAtSlider?.mlt_gps_time) ?? "알 수 없음")")
-        .accessibilityValue("\(Int(viewModel.sliderValue))%")
+        .accessibilityLabel(enabled ? "경로 따라가기, 현재 \(timeText(viewModel.currentMarkerAtSlider?.mlt_gps_time) ?? "알 수 없음")" : "경로 따라가기, 이날은 따라갈 경로가 없음")
+        .accessibilityValue("\(Int(viewModel.scrubber.value))%")
         .accessibilityAdjustableAction { direction in
+            guard enabled else { return }
             switch direction {
-            case .increment: viewModel.updateSliderValue(viewModel.sliderValue + 5)
-            case .decrement: viewModel.updateSliderValue(viewModel.sliderValue - 5)
+            case .increment: viewModel.updateSliderValue(viewModel.scrubber.value + 5)
+            case .decrement: viewModel.updateSliderValue(viewModel.scrubber.value - 5)
             @unknown default: break
             }
         }

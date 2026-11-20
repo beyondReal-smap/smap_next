@@ -97,7 +97,7 @@ fun NoticeListScreen(onBack: () -> Unit, onNoticeClick: (SmapNotice) -> Unit) {
 
     val colors = MaterialTheme.colorScheme
     Scaffold(
-        containerColor = colors.background,
+        containerColor = colors.surface,
         topBar = { SmapTopBar(title = "공지사항", onBack = onBack) }
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
@@ -114,7 +114,8 @@ fun NoticeListScreen(onBack: () -> Unit, onNoticeClick: (SmapNotice) -> Unit) {
                     contentPadding = PaddingValues(SmapSpacing.md),
                 ) {
                     item {
-                        SmapSection(title = "공지 ${notices.size}") {
+                        Column {
+                            Text("공지 ${notices.size}건", style = SmapText.pageTitle, color = colors.onSurface, modifier = Modifier.padding(bottom = 12.dp))
                             notices.forEachIndexed { index, notice ->
                                 if (index > 0) SmapRowDivider()
                                 NoticeRow(notice = notice, onClick = { onNoticeClick(notice) })
@@ -191,7 +192,7 @@ fun NoticeDetailScreen(notice: SmapNotice, onBack: () -> Unit) {
                 Text(noticeMeta(shown), style = SmapText.caption, color = colors.onSurfaceVariant)
             }
             Spacer(Modifier.height(SmapSpacing.sm))
-            Text(shown.ntTitle, style = SmapText.title, color = colors.onSurface)
+            Text(shown.ntTitle, style = SmapText.pageTitle, color = colors.onSurface)
             HorizontalDivider(modifier = Modifier.padding(vertical = SmapSpacing.lg), color = colors.outlineVariant)
             Text(
                 shown.ntContent,

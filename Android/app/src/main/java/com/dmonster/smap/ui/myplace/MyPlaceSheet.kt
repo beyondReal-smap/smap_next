@@ -1,10 +1,16 @@
 package com.dmonster.smap.ui.myplace
 
 import com.dmonster.smap.ui.components.SheetBandButton
-import com.dmonster.smap.ui.components.SheetHeaderBandGap
 import com.dmonster.smap.ui.components.SheetHeaderMinHeight
-import com.dmonster.smap.ui.components.sheetHeaderBand
-import com.dmonster.smap.ui.components.SmapOnNavyMuted
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
+import com.dmonster.smap.ui.theme.FamilyColors
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -47,11 +53,11 @@ import com.dmonster.smap.ui.components.SmapSection
 import com.dmonster.smap.ui.theme.SmapSpacing
 import com.dmonster.smap.ui.theme.SmapText
 
-val MyPlaceSheetPeekHeight = 178.dp
+val MyPlaceSheetPeekHeight = 136.dp
 
 /**
  * 내장소 지도 시트 — 사이드바("장소 관리")를 대신한다.
- * 접힌 상태: "OO의 장소 N곳" + 추가 버튼 + 멤버 얼굴 줄. 펼친 상태: 장소 목록(도착 알림 켜고 끄기).
+ * 접힌 시트에서 장소를 바로 열고, 펼치면 멤버 선택과 도착 알림을 관리한다.
  */
 @Composable
 fun ColumnScope.MyPlaceSheetContent(
@@ -63,6 +69,8 @@ fun ColumnScope.MyPlaceSheetContent(
     isLoadingLocations: Boolean,
     canAddLocation: Boolean,
     canManageLocation: (SavedLocation) -> Boolean,
+    isExpanded: Boolean,
+    onToggle: () -> Unit,
     onSelectMember: (SmapGroupMember) -> Unit,
     onSelectLocation: (SavedLocation) -> Unit,
     onToggleNotification: (SavedLocation) -> Unit,
@@ -77,16 +85,20 @@ fun ColumnScope.MyPlaceSheetContent(
 
     Row(
         Modifier
-            .sheetHeaderBand()
+            .fillMaxWidth().background(FamilyColors.Paper)
             .heightIn(min = SheetHeaderMinHeight)
             .padding(start = SmapSpacing.screenHorizontal, end = SmapSpacing.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        Box(Modifier.size(48.dp).background(FamilyColors.Highlight, RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
+            Icon(Icons.Outlined.Place, contentDescription = null, tint = FamilyColors.Ink)
+        }
+        Spacer(Modifier.width(SmapSpacing.sm))
         Column(Modifier.weight(1f)) {
             Text(
                 "$owner 장소",
-                style = SmapText.headline,
-                color = Color.White,
+                style = SmapText.title,
+                color = FamilyColors.Ink,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.semantics { heading() },
@@ -94,9 +106,9 @@ fun ColumnScope.MyPlaceSheetContent(
             Text(
                 if (isLoadingLocations) "불러오는 중…"
                 else if (locations.isEmpty()) "아직 등록한 장소가 없어요"
-                else "${locations.size}곳 · 도착하면 알려 드려요",
+                else "저장 ${locations.size}곳 · 도착 알림 ${locations.count { it.sltEnterAlarm == "Y" }}곳",
                 style = SmapText.caption,
-                color = SmapOnNavyMuted,
+                color = FamilyColors.Ink.copy(alpha = 0.8f),
             )
         }
         if (canAddLocation) {
@@ -104,14 +116,27 @@ fun ColumnScope.MyPlaceSheetContent(
         }
     }
 
-    Spacer(Modifier.height(SheetHeaderBandGap))
-    MemberStrip(
-        members = members,
-        selectedMemberId = selectedMember?.mtIdx,
-        currentUserIdx = currentUserIdx,
-        onSelect = onSelectMember,
-    )
-    Spacer(Modifier.height(SmapSpacing.md))
+    LazyRow(
+        modifier = Modifier.fillMaxWidth().background(FamilyColors.Paper),
+        contentPadding = PaddingValues(horizontal = SmapSpacing.md, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        item {
+            Button(onClick = onToggle, colors = ButtonDefaults.buttonColors(containerColor = FamilyColors.Ink, contentColor = Color.White)) {
+                Text(if (isExpanded) "목록 접기" else "멤버·장소 보기", style = SmapText.captionBold)
+            }
+        }
+        if (!isLoadingLocations) {
+            items(locations) { location ->
+                OutlinedButton(onClick = { onSelectLocation(location) }, colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White,
+                    contentColor = FamilyColors.Ink), border = androidx.compose.foundation.BorderStroke(1.dp, FamilyColors.Ink.copy(alpha = 0.18f))) {
+                    Icon(location.kind.icon, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(location.name, style = SmapText.captionBold, maxLines = 1)
+                }
+            }
+        }
+    }
 
     Column(
         Modifier
@@ -122,6 +147,12 @@ fun ColumnScope.MyPlaceSheetContent(
             .padding(SmapSpacing.md),
         verticalArrangement = Arrangement.spacedBy(SmapSpacing.md),
     ) {
+        MemberStrip(
+            members = members,
+            selectedMemberId = selectedMember?.mtIdx,
+            currentUserIdx = currentUserIdx,
+            onSelect = onSelectMember,
+        )
         when {
             isLoadingLocations -> Box(Modifier.fillMaxWidth().padding(SmapSpacing.xl), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 2.5.dp)
@@ -134,14 +165,14 @@ fun ColumnScope.MyPlaceSheetContent(
                     leading = { SmapRowIcon(Icons.Outlined.Place) },
                 )
             }
-            else -> SmapSection(title = "장소") {
+            else -> SmapSection(title = "저장한 장소") {
                 locations.forEachIndexed { i, loc ->
                     if (i > 0) SmapRowDivider()
                     val alarmOn = loc.sltEnterAlarm == "Y"
                     SmapListRow(
                         title = loc.name,
                         subtitle = loc.address,
-                        leading = { SmapRowIcon(Icons.Outlined.Place) },
+                        leading = { SmapRowIcon(loc.kind.icon) },
                         selected = loc.sltIdx == selectedLocationId,
                         trailing = if (canManageLocation(loc)) {
                             {

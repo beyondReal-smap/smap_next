@@ -27,6 +27,8 @@ struct SavedLocation: Codable, Identifiable, Equatable {
     let slt_enter_chk: String?
     let slt_wdate: String?
     let slt_udate: String?
+    /// 사용자가 고른 아이콘 키(PlaceKind.rawValue). 예전 장소는 nil — 이름으로 짐작한다.
+    let slt_icon: String?
     
     /// 알림 설정 여부
     var notifications: Bool {
@@ -64,7 +66,7 @@ struct SavedLocation: Codable, Identifiable, Equatable {
         case slt_idx, insert_mt_idx, mt_idx, sgt_idx, sgdt_idx
         case slt_title, slt_add, slt_lat, slt_long
         case slt_show, slt_enter_alarm, slt_enter_chk
-        case slt_wdate, slt_udate
+        case slt_wdate, slt_udate, slt_icon
     }
     
     init(from decoder: Decoder) throws {
@@ -100,6 +102,7 @@ struct SavedLocation: Codable, Identifiable, Equatable {
         slt_enter_chk = try container.decodeIfPresent(String.self, forKey: .slt_enter_chk)
         slt_wdate = try container.decodeIfPresent(String.self, forKey: .slt_wdate)
         slt_udate = try container.decodeIfPresent(String.self, forKey: .slt_udate)
+        slt_icon = try container.decodeIfPresent(String.self, forKey: .slt_icon)
     }
 }
 
@@ -114,12 +117,14 @@ struct LocationCreateRequest: Codable {
     let slt_show: String
     let slt_enter_alarm: String
     let slt_enter_chk: String
+    let slt_icon: String
     
     init(
         title: String,
         address: String,
         latitude: Double,
         longitude: Double,
+        icon: String,
         show: String = "Y",
         enterAlarm: String = "Y",
         enterChk: String = "N"
@@ -131,6 +136,7 @@ struct LocationCreateRequest: Codable {
         self.slt_show = show
         self.slt_enter_alarm = enterAlarm
         self.slt_enter_chk = enterChk
+        self.slt_icon = icon
     }
 }
 
@@ -144,6 +150,7 @@ struct LocationUpdateRequest: Codable {
     var slt_long: Double?
     var slt_show: String?
     var slt_enter_alarm: String?
+    var slt_icon: String?
 }
 
 // MARK: - API Response Models

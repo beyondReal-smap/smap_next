@@ -49,7 +49,7 @@ struct WithdrawView: View {
     
     var body: some View {
         ZStack {
-            Color(UIColor.systemGroupedBackground).ignoresSafeArea()
+            Color(uiColor: .systemBackground).ignoresSafeArea()
             
             VStack(spacing: 0) {
                 // Header (Navigation Bar)
@@ -90,38 +90,16 @@ struct WithdrawView: View {
                 .padding(.vertical, 12)
                 .background(Color(UIColor.systemBackground))
                 
-                // Step Indicator
-                HStack(spacing: 12) {
+                HStack(spacing: 6) {
                     ForEach(1...3, id: \.self) { step in
-                        HStack(spacing: 0) {
-                            ZStack {
-                                Circle()
-                                    .fill(step <= currentStep ? SMAPTheme.Color.primary : Color.gray.opacity(0.2))
-                                    .frame(width: 28, height: 28)
-                                
-                                if step < currentStep {
-                                    Image(systemName: "checkmark")
-                                        .font(.suite(size: 12, weight: .bold))
-                                        .foregroundColor(.white)
-                                } else {
-                                    Text("\(step)")
-                                        .font(.suite(size: 12, weight: .bold))
-                                        .foregroundColor(step <= currentStep ? .white : .gray)
-                                }
-                            }
-                            
-                            if step < 3 {
-                                Rectangle()
-                                    .fill(step < currentStep ? SMAPTheme.Color.primary : Color.gray.opacity(0.2))
-                                    .frame(width: 24, height: 2)
-                                    .padding(.leading, 8)
-                            }
-                        }
+                        Capsule().fill(step <= currentStep ? SMAPAccent.family.base : Color(uiColor: .systemGray5))
+                            .frame(height: 3)
                     }
                 }
-                .padding(.vertical, 20)
-                
-                // Content
+                .padding(.horizontal, 20)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(currentStep)/3단계")
+
                 ScrollView {
                     VStack(spacing: 24) {
                         if currentStep == 1 {
@@ -133,6 +111,7 @@ struct WithdrawView: View {
                         }
                     }
                     .padding(.horizontal, 20)
+                    .padding(.top, 20)
                     .padding(.bottom, 40)
                 }
                 
@@ -157,7 +136,7 @@ struct WithdrawView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
-                        .background(canProceed ? (currentStep == 3 ? errorRed : SMAPTheme.Color.primary) : Color.gray.opacity(0.3))
+                        .background(canProceed ? (currentStep == 3 ? errorRed : SMAPAccent.family.base) : Color.gray.opacity(0.3))
                         .foregroundColor(.white)
                         .cornerRadius(12)
                     }
@@ -245,7 +224,7 @@ struct WithdrawView: View {
                 }
                 .padding()
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.white)
+                .background(Color(uiColor: .secondarySystemBackground))
                 .cornerRadius(12)
                 .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
             } else {
@@ -270,7 +249,7 @@ struct WithdrawView: View {
                         .accessibilityLabel(showPassword ? "비밀번호 숨기기" : "비밀번호 보기")
                     }
                     .padding()
-                    .background(Color.white)
+                    .background(Color(uiColor: .secondarySystemBackground))
                     .cornerRadius(12)
                     .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
                 }
@@ -279,7 +258,7 @@ struct WithdrawView: View {
             // Info Card
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "shield.lefthalf.filled")
-                    .foregroundColor(SMAPTheme.Color.primary)
+                    .foregroundColor(SMAPAccent.family.base)
                     .font(.suite(size: 18))
                 
                 VStack(alignment: .leading, spacing: 4) {
@@ -293,7 +272,7 @@ struct WithdrawView: View {
             }
             .padding()
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(SMAPTheme.Color.primary.opacity(0.05))
+            .background(SMAPAccent.family.base.opacity(0.05))
             .cornerRadius(12)
         }
     }
@@ -330,7 +309,7 @@ struct WithdrawView: View {
                             
                             if selectedReasons.contains(reason.text) {
                                 Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(SMAPTheme.Color.primary)
+                                    .foregroundColor(SMAPAccent.family.base)
                             } else {
                                 Circle()
                                     .stroke(Color.gray.opacity(0.3), lineWidth: 1)
@@ -338,11 +317,11 @@ struct WithdrawView: View {
                             }
                         }
                         .padding()
-                        .background(selectedReasons.contains(reason.text) ? SMAPTheme.Color.primary.opacity(0.05) : Color.white)
+                        .background(selectedReasons.contains(reason.text) ? SMAPAccent.family.base.opacity(0.05) : Color(uiColor: .secondarySystemBackground))
                         .cornerRadius(12)
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
-                                .stroke(selectedReasons.contains(reason.text) ? SMAPTheme.Color.primary : Color.clear, lineWidth: 1)
+                                .stroke(selectedReasons.contains(reason.text) ? SMAPAccent.family.base : Color.clear, lineWidth: 1)
                         )
                         .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
                     }
@@ -359,7 +338,7 @@ struct WithdrawView: View {
                         .font(.suite(size: 14))
                         .frame(height: 100)
                         .padding(8)
-                        .background(Color.white)
+                        .background(Color(uiColor: .secondarySystemBackground))
                         .cornerRadius(12)
                         .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
                 }
@@ -404,7 +383,7 @@ struct WithdrawView: View {
             }
             .padding()
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.white)
+            .background(Color(uiColor: .secondarySystemBackground))
             .cornerRadius(16)
             .shadow(color: Color.black.opacity(0.03), radius: 8, x: 0, y: 4)
             
@@ -412,7 +391,7 @@ struct WithdrawView: View {
                 HStack(spacing: 12) {
                     Image(systemName: agreement ? "checkmark.square.fill" : "square")
                         .font(.suite(size: 20))
-                        .foregroundColor(agreement ? SMAPTheme.Color.primary : .gray)
+                        .foregroundColor(agreement ? SMAPAccent.family.base : .gray)
                     
                     Text("안내사항을 모두 확인하였으며, 이에 동의합니다.")
                         .font(.suite(size: 14))

@@ -1,6 +1,7 @@
 import XCTest
 @testable import smap
 
+@MainActor
 final class GroupServiceTests: XCTestCase {
     var service: GroupService!
 

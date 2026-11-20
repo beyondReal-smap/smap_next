@@ -455,7 +455,7 @@ struct PremiumView: View {
             }
             .padding(SMAPTheme.Spacing.md)
         }
-        .background(SMAPTheme.Adaptive.pageBackground.ignoresSafeArea())
+        .background(Color(uiColor: .systemBackground).ignoresSafeArea())
         .navigationTitle("도착했어 프리미엄")
         .navigationBarTitleDisplayMode(.inline)
         .manageSubscriptionsSheet(isPresented: $showManageSubscriptions)
@@ -468,13 +468,11 @@ struct PremiumView: View {
     // MARK: 구성 요소
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: SMAPTheme.Spacing.xs) {
-            Text("도착했어 프리미엄")
-                .font(SMAPTheme.Font.title)
-                .foregroundStyle(SMAPTheme.Color.textPrimary)
-            Text("소중한 사람들의 기록을 더 오래, 더 많이.")
-                .font(SMAPTheme.Font.secondary)
-                .foregroundStyle(SMAPTheme.Color.textSecondary)
+        SMAPFamilyCover(image: "LoginArrivalCycling", minHeight: 154) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text("도착했어 프리미엄").font(SMAPTheme.Font.pageTitle)
+                Text("소중한 사람들의 기록을 더 오래, 더 많이.").font(SMAPTheme.Font.secondary)
+            }
         }
     }
 
@@ -491,7 +489,7 @@ struct PremiumView: View {
     private func benefitRow(icon: String, title: String, detail: String) -> some View {
         HStack(spacing: SMAPTheme.Spacing.md) {
             Image(systemName: icon)
-                .foregroundStyle(SMAPTheme.Color.primary)
+                .foregroundStyle(SMAPAccent.family.base)
                 .frame(width: 28)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
@@ -559,7 +557,7 @@ struct PremiumView: View {
         VStack(alignment: .leading, spacing: SMAPTheme.Spacing.sm) {
             HStack(spacing: SMAPTheme.Spacing.sm) {
                 Image(systemName: "checkmark.seal.fill")
-                    .foregroundStyle(SMAPTheme.Color.primary)
+                    .foregroundStyle(SMAPAccent.family.base)
                     .accessibilityHidden(true)
                 Text("프리미엄 이용 중")
                     .font(SMAPTheme.Font.headline)
@@ -642,7 +640,7 @@ struct PremiumView: View {
     private func linkLabel(_ title: String) -> some View {
         Text(title)
             .font(SMAPTheme.Font.captionMedium)
-            .foregroundStyle(SMAPTheme.Color.primary)
+            .foregroundStyle(SMAPAccent.family.base)
             .frame(minHeight: 44)
     }
 
@@ -708,7 +706,7 @@ private struct PlanCard: View {
             HStack(spacing: SMAPTheme.Spacing.md) {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 22))
-                    .foregroundStyle(isSelected ? SMAPTheme.Color.primary : SMAPTheme.Color.textSecondary)
+                    .foregroundStyle(isSelected ? SMAPAccent.family.base : SMAPTheme.Color.textSecondary)
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -722,7 +720,7 @@ private struct PlanCard: View {
                                 .foregroundStyle(SMAPTheme.Color.white)
                                 .padding(.horizontal, SMAPTheme.Spacing.sm)
                                 .padding(.vertical, 2)
-                                .background(SMAPTheme.Color.primary)
+                                .background(SMAPAccent.family.base)
                                 .clipShape(Capsule())
                         }
                     }
@@ -750,7 +748,7 @@ private struct PlanCard: View {
             .clipShape(RoundedRectangle(cornerRadius: SMAPTheme.Radius.lg))
             .overlay(
                 RoundedRectangle(cornerRadius: SMAPTheme.Radius.lg)
-                    .stroke(isSelected ? SMAPTheme.Color.primary : SMAPTheme.Color.border,
+                    .stroke(isSelected ? SMAPAccent.family.base : SMAPTheme.Color.border,
                             lineWidth: isSelected ? 2 : 1)
             )
         }

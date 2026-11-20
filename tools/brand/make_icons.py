@@ -2,7 +2,8 @@
 """앱 아이콘 원본(app_icon_source.png) 한 장에서 두 앱의 아이콘·스플래시·로그인 로고를 모두 만든다.
 
 사용:
-  python3 -I tools/brand/make_icons.py
+  python3 -I tools/brand/make_icons.py               # 전부
+  python3 -I tools/brand/make_icons.py --icons-only  # 앱 아이콘만(스플래시·로그인 로고는 그대로)
 
 원본: OpenAI gpt-image-2.5-sunburst 로 만든 1024 정사각 아트워크(generate_icon_openai.py, 2026-11-17 채택).
      남색 그라데이션 바탕 + 반투명 유리 질감 흰 핀 + 머리 안 체크. 앱 이름 "도착했어".
@@ -29,8 +30,13 @@ SOURCE = Path(__file__).with_name("app_icon_source.png")
 IOS = ROOT / "iOS/smap/Assets.xcassets"
 RES = ROOT / "Android/app/src/main/res"
 
-# 적응형 아이콘 전경·스플래시에서 핀 높이 = 캔버스의 52% — Android 안전 영역(지름 66/108) 안.
+# 스플래시에서 핀 높이 = 캔버스의 52%.
 GLYPH_HEIGHT_IN_SAFE = 0.52
+# 앱 아이콘의 핀 크기. 원본은 핀이 아이콘 높이의 74% 라 꽉 차 보여, 85% 로 줄여 약 63% 로 둔다(2026-11-19 대표님 요청).
+ICON_GLYPH_SCALE = 0.85
+# Android 적응형 아이콘 전경의 핀 높이(108dp 캔버스 기준). 보이는 영역(72dp)으로 환산하면 0.42×108/72 ≈ 63% —
+# iOS 아이콘(ICON_GLYPH_SCALE 적용)과 같은 크기로 보이게 맞춘다. 안전 영역(지름 66dp) 안.
+ADAPTIVE_GLYPH_HEIGHT = 0.42
 
 
 def load_master() -> Image.Image:
@@ -103,6 +109,23 @@ def place(glyph: Image.Image, n: int, height_ratio: float) -> Image.Image:
     return out
 
 
+def icon_master(master: Image.Image, bg: np.ndarray, scale: float) -> Image.Image:
+    """원본 1024 아이콘에서 핀만 scale 배로 줄인다(핀 중심 고정).
+    핀을 떼어 다시 올리면 유리 질감의 밝은 기운이 옅어져, "원본 − 추정 바탕"(핀·후광·빛번짐 전부)을
+    통째로 줄여 바탕에 다시 더한다. 바탕은 매끈한 그라데이션이라 줄인 자리 둘레에 이음매가 생기지 않는다."""
+    rgb = np.asarray(master, dtype=np.float64)
+    n = rgb.shape[0]
+    ys, xs = np.nonzero(rgb[..., 0] > 110)  # extract_glyph 와 같은 핀 판정
+    cx, cy = (xs.min() + xs.max()) / 2, (ys.min() + ys.max()) / 2
+    m = round(n * scale)
+    ox, oy = round(cx - cx * scale), round(cy - cy * scale)
+    out = bg.copy()
+    for c in range(3):
+        res = Image.fromarray((rgb[..., c] - bg[..., c]).astype(np.float32), "F").resize((m, m), Image.LANCZOS)
+        out[oy:oy + m, ox:ox + m, c] += np.asarray(res, dtype=np.float64)
+    return Image.fromarray(np.clip(out, 0, 255).round().astype(np.uint8), "RGB")
+
+
 def rounded(img: Image.Image, radius_ratio: float = 0.2237) -> Image.Image:
     n = img.width
     m = Image.new("L", (n * 4, n * 4), 0)
@@ -118,11 +141,13 @@ def save(img: Image.Image, path: Path) -> None:
     print("  ", path.relative_to(ROOT), img.size)
 
 
-def main() -> None:
+def main(icons_only: bool = False) -> None:
     master = load_master()
     glyph, bg = extract_glyph(master)
     background = Image.fromarray(np.clip(bg, 0, 255).astype(np.uint8), "RGB")
     mono_src = silhouette(master)
+    # 앱 아이콘(iOS 전 크기·Android 통짜·스토어 512)과 로그인 로고(AppNoBg / app_no_bg)는 핀을 줄인 판으로 통일. 스플래시만 원본 그대로.
+    icon = icon_master(master, bg, ICON_GLYPH_SCALE)
 
     print("iOS")
     appicon = IOS / "AppIcon.appiconset"
@@ -135,28 +160,32 @@ def main() -> None:
         scale = float(item.get("scale", "1x").rstrip("x"))
         sizes[name] = round(pt * scale)
     for name, px in sorted(sizes.items()):
-        save(master if px == 1024 else master.resize((px, px), Image.LANCZOS), appicon / name)
-    for scale, px in (("2x", 578), ("3x", 867)):  # 289pt
-        save(place(glyph, px, GLYPH_HEIGHT_IN_SAFE), IOS / f"SplashPins.imageset/splash_pins@{scale}.png")
-    logo = rounded(master)
-    for name in ("app_no_bg.png", "app_no_bg 1.png", "app_no_bg 2.png"):
-        save(logo, IOS / "AppNoBg.imageset" / name)
+        save(icon if px == 1024 else icon.resize((px, px), Image.LANCZOS), appicon / name)
+    logo = rounded(icon)
+    if not icons_only:
+        for scale, px in (("2x", 578), ("3x", 867)):  # 289pt
+            save(place(glyph, px, GLYPH_HEIGHT_IN_SAFE), IOS / f"SplashPins.imageset/splash_pins@{scale}.png")
+        for name in ("app_no_bg.png", "app_no_bg 1.png", "app_no_bg 2.png"):
+            save(logo, IOS / "AppNoBg.imageset" / name)
 
     print("Android")
     legacy = {"ldpi": 36, "mdpi": 48, "hdpi": 72, "xhdpi": 96, "xxhdpi": 144, "xxxhdpi": 192}
     adaptive = {"mdpi": 108, "hdpi": 162, "xhdpi": 216, "xxhdpi": 324, "xxxhdpi": 432}
     for dpi, px in legacy.items():
-        save(master.resize((px, px), Image.LANCZOS), RES / f"mipmap-{dpi}/ic_launcher.png")
+        save(icon.resize((px, px), Image.LANCZOS), RES / f"mipmap-{dpi}/ic_launcher.png")
     for dpi, px in adaptive.items():
         save(background.resize((px, px), Image.LANCZOS), RES / f"mipmap-{dpi}/ic_launcher_adaptive_back.png")
-        fore = place(glyph, px, GLYPH_HEIGHT_IN_SAFE)
+        fore = place(glyph, px, ADAPTIVE_GLYPH_HEIGHT)
         save(fore, RES / f"mipmap-{dpi}/ic_launcher_adaptive_fore.png")
         # 테마 아이콘(단색): 모양(알파)만 쓰인다 — 불투명 실루엣(silhouette 참고)
-        save(place(mono_src, px, GLYPH_HEIGHT_IN_SAFE), RES / f"mipmap-{dpi}/ic_launcher_monochrome.png")
-    save(place(glyph, 960, GLYPH_HEIGHT_IN_SAFE), RES / "drawable-xxxhdpi/splash_pins.png")
-    save(logo, RES / "drawable/app_no_bg.png")
-    save(master.resize((512, 512), Image.LANCZOS), RES / "ic_launcher-web.png")
+        save(place(mono_src, px, ADAPTIVE_GLYPH_HEIGHT), RES / f"mipmap-{dpi}/ic_launcher_monochrome.png")
+    save(icon.resize((512, 512), Image.LANCZOS), RES / "ic_launcher-web.png")
+    if not icons_only:
+        save(place(glyph, 960, GLYPH_HEIGHT_IN_SAFE), RES / "drawable-xxxhdpi/splash_pins.png")
+        save(logo, RES / "drawable/app_no_bg.png")
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+
+    main(icons_only="--icons-only" in sys.argv[1:])

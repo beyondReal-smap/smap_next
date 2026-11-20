@@ -55,8 +55,8 @@ struct EditProfileView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: SMAPTheme.Spacing.sm) {
                 Text("프로필을 수정해 주세요")
-                    .font(SMAPTheme.Font.title)
-                    .foregroundStyle(SMAPTheme.Color.textPrimary)
+                    .font(SMAPTheme.Font.pageTitle)
+                    .foregroundStyle(.primary)
                 Text("닉네임은 그룹 멤버에게 보이는 이름이에요.")
                     .font(SMAPTheme.Font.secondary)
                     .foregroundStyle(SMAPTheme.Color.textSecondary)
@@ -87,7 +87,7 @@ struct EditProfileView: View {
             .padding(SMAPTheme.Spacing.lg)
         }
         .scrollDismissesKeyboard(.interactively)
-        .background(SMAPTheme.Adaptive.pageBackground.ignoresSafeArea())
+        .background(Color(uiColor: .systemBackground).ignoresSafeArea())
         .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
@@ -232,7 +232,7 @@ struct EditProfileView: View {
             SMAPButton("저장", isLoading: isLoading, isDisabled: !canSave) { handleSave() }
         }
         .padding(SMAPTheme.Spacing.lg)
-        .background(SMAPTheme.Adaptive.pageBackground)
+        .background(Color(uiColor: .systemBackground))
     }
 
     private var canSave: Bool {
