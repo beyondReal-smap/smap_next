@@ -133,11 +133,17 @@ actor LocationUploader {
 
         print("[LocationUploader] flush 시작 - \(pending.count)건 전송 (mtIdx: \(mtIdx))")
 
+        // 토큰을 못 읽으면(재부팅 후 첫 잠금 해제 전 등) 인증 없는 요청을 보내지 않고 대기열에 둔 채 다음 전송 때 다시 시도한다.
+        guard let token = KeychainManager.shared.getToken() else {
+            print("[LocationUploader] flush 보류 - 토큰을 읽을 수 없음 (pending: \(pending.count))")
+            return
+        }
+
         let toSend = pending
         let generation = sessionGeneration
         for location in toSend {
             guard generation == sessionGeneration else { break }
-            let success = await sendSingle(location)
+            let success = await sendSingle(location, token: token)
             guard generation == sessionGeneration else { break }
             if success {
                 pending.removeAll { $0.timestamp == location.timestamp && $0.lat == location.lat }
@@ -157,10 +163,14 @@ actor LocationUploader {
             print("[LocationUploader] heartbeat 스킵 - lastLocation stale (\(Int(Date().timeIntervalSince(updatedAt)))s old)")
             return
         }
-        let _ = await sendSingle(location)
+        guard let token = KeychainManager.shared.getToken() else {
+            print("[LocationUploader] heartbeat 보류 - 토큰을 읽을 수 없음")
+            return
+        }
+        let _ = await sendSingle(location, token: token)
     }
 
-    private func sendSingle(_ location: LocationData) async -> Bool {
+    private func sendSingle(_ location: LocationData, token: String) async -> Bool {
         let params: [String: Any] = [
             "act": "create_location_log",
             "mt_idx": mtIdx,
@@ -180,7 +190,7 @@ actor LocationUploader {
         do {
             let (_, response) = try await apiClient.requestRaw(
                 .createLocationLog(params: params),
-                token: KeychainManager.shared.getToken()
+                token: token
             )
             print("✅ [LocationUploader] 전송 성공 (status: \(response.statusCode))")
             return true

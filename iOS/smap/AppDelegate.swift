@@ -5547,6 +5547,10 @@ extension AppDelegate {
     /// 앱이 활성화될 때 호출
     @objc func appDidBecomeActive() {
         print("✨ [Active] 앱이 활성화됨")
+
+        // 예전 등급(잠금 해제 중에만 읽기)으로 저장된 토큰을 백그라운드에서도 읽히는 등급으로 전환 — 활성화 시점은 잠금이 풀려 있다.
+        // (SwiftUI @main 앱이라 applicationDidBecomeActive 는 불리지 않아 활성화 알림 처리기에 둔다)
+        KeychainManager.shared.upgradeAccessibilityIfNeeded()
         
         // 앱이 활성화될 때마다 토큰 상태 확인
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {

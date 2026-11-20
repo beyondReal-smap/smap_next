@@ -156,7 +156,7 @@ final class ActivityLogScrubbingTests: XCTestCase {
         let coordinator = ActivityLogMapView.Coordinator()
         let samples = try route([127.0, 127.01])
         for percent in [0.0, 25, 50, 100, 75, 0] {
-            ActivityLogMapView(mapMarkers: samples, overlayRevision: 1, stayTimes: [],
+            ActivityLogMapView(mapMarkers: samples, overlayRevision: 1, stayTimes: [], schedules: [],
                                sliderValue: percent, isSliderDragging: true)
                 .updateMap(map, coordinator: coordinator)
             let expected = 127.0 + 0.01 * percent / 100
@@ -172,7 +172,7 @@ final class ActivityLogScrubbingTests: XCTestCase {
         let coordinator = ActivityLogMapView.Coordinator()
         for (revision, coordinates) in [[127.0, 127.01], [128.0, 128.01], []].enumerated() {
             ActivityLogMapView(mapMarkers: try route(coordinates), overlayRevision: revision,
-                               stayTimes: [], sliderValue: 0, isSliderDragging: false)
+                               stayTimes: [], schedules: [], sliderValue: 0, isSliderDragging: false)
                 .updateMap(map, coordinator: coordinator)
             if let start = coordinates.first {
                 XCTAssertEqual(coordinator.pathDotMarkers.first?.position.lng, start)
@@ -189,7 +189,7 @@ final class ActivityLogScrubbingTests: XCTestCase {
         let map = NMFMapView(frame: CGRect(x: 0, y: 0, width: 390, height: 640))
         let coordinator = ActivityLogMapView.Coordinator()
         for (revision, samples) in [[127.0, 127.01], [127.0, 127.01, 127.03]].enumerated() {
-            ActivityLogMapView(mapMarkers: try route(samples), overlayRevision: revision, stayTimes: [],
+            ActivityLogMapView(mapMarkers: try route(samples), overlayRevision: revision, stayTimes: [], schedules: [],
                                sliderValue: 50, isSliderDragging: true)
                 .updateMap(map, coordinator: coordinator)
         }
@@ -202,7 +202,7 @@ final class ActivityLogScrubbingTests: XCTestCase {
         let data = Data(#"[{"mlt_lat":37.50,"mlt_long":127.00},{"mlt_lat":37.52,"mlt_long":127.04},{"mlt_lat":37.51,"mlt_long":127.06}]"#.utf8)
         let samples = try JSONDecoder().decode([MapMarker].self, from: data)
         for percent in [0.0, 25, 50, 75, 100, 25] {
-            ActivityLogMapView(mapMarkers: samples, overlayRevision: 1, stayTimes: [],
+            ActivityLogMapView(mapMarkers: samples, overlayRevision: 1, stayTimes: [], schedules: [],
                                sliderValue: percent, isSliderDragging: true,
                                contentInsets: UIEdgeInsets(top: 70, left: 0, bottom: 264, right: 0))
                 .updateMap(map, coordinator: coordinator)
@@ -221,7 +221,7 @@ final class ActivityLogScrubbingTests: XCTestCase {
         let samples = try route((0...360).map { 127 + Double($0) / 100_000 })
         let coordinator = ActivityLogMapView.Coordinator()
         let map = NMFMapView(frame: CGRect(x: 0, y: 0, width: 390, height: 640))
-        ActivityLogMapView(mapMarkers: samples, overlayRevision: 1, stayTimes: [],
+        ActivityLogMapView(mapMarkers: samples, overlayRevision: 1, stayTimes: [], schedules: [],
                            sliderValue: 50, isSliderDragging: true)
             .updateMap(map, coordinator: coordinator)
         XCTAssertLessThanOrEqual(coordinator.polylines.count, 48)
