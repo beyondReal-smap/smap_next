@@ -29,6 +29,7 @@ import com.naver.maps.geometry.LatLng
 import com.naver.maps.map.CameraPosition
 import com.naver.maps.map.CameraUpdate
 import com.dmonster.smap.data.model.SmapSchedule
+import com.dmonster.smap.data.model.ScheduleStatus
 import com.naver.maps.map.compose.*
 import com.naver.maps.map.overlay.OverlayImage
 import kotlinx.coroutines.delay
@@ -373,14 +374,19 @@ fun HomeScreen(
                         val lng = schedule.sstLocationLong
                         if (lat != null && lng != null) {
                             // 시간이나 상태(예정→진행 중→끝남)가 바뀌면 다시 그린다
-                            val markerBitmap = remember(schedule.sstIdx, schedule.sstTitle, schedule.date, schedule.sstEdate, index, schedule.status) {
+                            val markerBitmap = remember(schedule.sstIdx, schedule.sstTitle, schedule.date, index, schedule.status) {
                                 MarkerUtils.createScheduleMarkerBitmap(context, schedule, index)
                             }
+                            // 끝난 일정은 흐리게·아래로 — 남은 일정이 먼저 보이게
+                            val isDone = schedule.status == ScheduleStatus.COMPLETED
 
                             Marker(
                                 state = MarkerState(position = LatLng(lat, lng)),
                                 icon = OverlayImage.fromBitmap(markerBitmap),
-                                zIndex = 1000,
+                                // 좌표 = 아래 위치 점 중심
+                                anchor = androidx.compose.ui.geometry.Offset(0.5f, ScheduleMarkerLayout.ANCHOR_Y),
+                                alpha = if (isDone) 0.6f else 1f,
+                                zIndex = if (isDone) 900 else 1000,
                                 onClick = { true }
                             )
                         }

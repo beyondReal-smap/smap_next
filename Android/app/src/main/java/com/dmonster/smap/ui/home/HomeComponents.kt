@@ -434,93 +434,119 @@ object MarkerUtils {
     }
 
     /**
-     * 일정 마커 비트맵 생성 (순번 + 제목 + 시간)
-     * 제목·시간 상자는 각자 글자 폭에 맞춘다(2026-11-20) — 이전에는 짧은 제목도 최소 폭 200px 상자로 그려졌다.
-     * 순번 원은 주황 — 남색 제목 상자와 한눈에 구분되게(iOS 와 같은 색).
-     * 맨 아래 상태 점(끝남 초록·진행 중 주황·예정 파랑·그 밖 회색)이 마커 끝, 곧 일정 좌표를 가리킨다 — iOS 에만 있던 것을 맞췄다.
+     * 일정 마커 비트맵 — 한 줄 말풍선 `[번호] 15:30 제목` + 꼬리 + 위치 점(좌표 = 점 중심, [ScheduleMarkerLayout.anchorY]).
+     * 2026-11-20 바꿈: 이전엔 순번 원·제목·시간·상태 점 네 칸을 세로로 쌓아 멤버 아바타보다 두 배 가까이 높았고,
+     * 일정 몇 개만 돼도 서로·아바타와 겹쳤다. iOS createScheduleMarkerImage 와 같은 모양·치수(dp = pt).
+     * 번호 원·위치 점 색이 곧 상태(예정 주황 · 진행 중 초록 · 끝남 회색). 끝난 일정의 흐림은 Marker alpha 로.
      */
     fun createScheduleMarkerBitmap(context: Context, schedule: SmapSchedule, index: Int): Bitmap {
-        val order = index + 1
-        val rawTitle = schedule.title ?: "제목 없음"
+        val d = context.resources.displayMetrics.density
+        val L = ScheduleMarkerLayout
+        val tint = scheduleStatusTint(schedule.status)
+        val navy = FamilyColors.Ink.toArgb()
+        val suiteBold = ResourcesCompat.getFont(context, com.dmonster.smap.R.font.suite_bold)
+            ?: Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+
+        val rawTitle = schedule.title ?: "일정"
         // iOS 와 같게 10자 넘으면 줄인다 — 긴 제목이 지도를 가리지 않게
         val title = if (rawTitle.length > 10) rawTitle.take(10) + "…" else rawTitle
-        // iOS 와 같게 "시작 ~ 끝", 끝이 없으면 시작만, 시작도 없으면 "시간 없음"
-        val start = markerClock(schedule.date)
-        val end = markerClock(schedule.sstEdate)
-        val time = when {
-            start == null -> "시간 없음"
-            end == null -> start
-            else -> "$start ~ $end"
+        val time = markerClock(schedule.date)
+
+        fun textPaint(sizeDp: Float, color: Int) = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = color
+            textSize = sizeDp * d
+            typeface = suiteBold
         }
+        val orderPaint = textPaint(11f, android.graphics.Color.WHITE).apply { textAlign = Paint.Align.CENTER }
+        val timePaint = textPaint(11f, android.graphics.Color.argb(191, 255, 255, 255))  // 흰색 75%
+        val titlePaint = textPaint(12f, android.graphics.Color.WHITE)
 
-        val suiteBold = ResourcesCompat.getFont(context, com.dmonster.smap.R.font.suite_bold)
+        val titleW = titlePaint.measureText(title)
+        val timeW = time?.let { timePaint.measureText(it) } ?: 0f
+        // [안쪽 여백 4][번호 원][6][시각][5][제목][10]
+        var chipW = (L.INSET + L.ORDER_SIZE + L.GAP + L.TRAILING) * d + kotlin.math.ceil(titleW)
+        if (time != null) chipW += kotlin.math.ceil(timeW) + L.TIME_GAP * d
+        val border = L.BORDER * d
+        val chipH = L.CHIP_HEIGHT * d
+        val width = chipW + border * 2
+        val height = L.TOTAL_HEIGHT * d
 
-        val orderSize = 56f
-        val titleHeight = 70f
-        val timeHeight = 45f
-        val gap = 8f
-        val titlePadding = 28f
-        val timePadding = 20f
-        val statusSize = 35f
-        val statusStroke = 5f
-
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        val titlePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = android.graphics.Color.WHITE
-            textSize = 32f
-            typeface = suiteBold ?: Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            textAlign = Paint.Align.CENTER
-        }
-        val orderPaint = TextPaint(titlePaint).apply { textSize = 28f }
-        val timePaint = TextPaint(titlePaint).apply {
-            color = FamilyColors.Ink.toArgb()
-            textSize = 26f
-        }
-
-        val titleWidth = titlePaint.measureText(title) + titlePadding * 2
-        val timeWidth = timePaint.measureText(time) + timePadding * 2
-        val width = maxOf(titleWidth, timeWidth, orderSize)
-        val totalHeight = orderSize + gap + titleHeight + gap + timeHeight +
-            gap + statusSize + statusStroke  // 상태 점 테두리가 잘리지 않게 여유
-
-        val bitmap = Bitmap.createBitmap(kotlin.math.ceil(width).toInt(), kotlin.math.ceil(totalHeight).toInt(), Bitmap.Config.ARGB_8888)
+        val bitmap = Bitmap.createBitmap(kotlin.math.ceil(width).toInt(), kotlin.math.ceil(height).toInt(), Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         val cx = width / 2
+        val chip = RectF(border, border, border + chipW, border + chipH)
 
-        // 1. 순번 원
-        paint.color = SmapAccent.Orange.base.toArgb()
-        canvas.drawCircle(cx, orderSize / 2, orderSize / 2, paint)
-        canvas.drawText(order.toString(), cx, orderSize / 2 - (orderPaint.fontMetrics.descent + orderPaint.fontMetrics.ascent) / 2, orderPaint)
+        // 1. 꼬리 (칩 아래 가운데 → 위치 점)
+        paint.color = navy
+        canvas.drawPath(android.graphics.Path().apply {
+            moveTo(cx - L.TAIL_WIDTH * d / 2, chip.bottom - d)
+            lineTo(cx + L.TAIL_WIDTH * d / 2, chip.bottom - d)
+            lineTo(cx, chip.bottom + L.TAIL_HEIGHT * d)
+            close()
+        }, paint)
 
-        // 2. 제목 상자 — 제목 폭에 맞춤
-        paint.color = FamilyColors.Ink.toArgb()
-        val titleRect = RectF(cx - titleWidth / 2, orderSize + gap, cx + titleWidth / 2, orderSize + gap + titleHeight)
-        canvas.drawRoundRect(titleRect, 24f, 24f, paint)
-        canvas.drawText(title, cx, titleRect.centerY() - (titlePaint.fontMetrics.descent + titlePaint.fontMetrics.ascent) / 2, titlePaint)
-
-        // 3. 시간 상자 — 시간 글자 폭에 맞춤
-        paint.color = FamilyColors.Highlight.toArgb()
-        val timeRect = RectF(cx - timeWidth / 2, titleRect.bottom + gap, cx + timeWidth / 2, titleRect.bottom + gap + timeHeight)
-        canvas.drawRoundRect(timeRect, 15f, 15f, paint)
-        canvas.drawText(time, cx, timeRect.centerY() - (timePaint.fontMetrics.descent + timePaint.fontMetrics.ascent) / 2, timePaint)
-
-        // 4. 상태 점 (하단 중앙) + 흰 테두리 — 색은 iOS 시스템 색과 같은 값
-        val statusCy = totalHeight - statusStroke / 2 - statusSize / 2
-        paint.style = Paint.Style.FILL
-        paint.color = when (schedule.status) {
-            ScheduleStatus.COMPLETED -> 0xFF34C759.toInt()  // systemGreen
-            ScheduleStatus.ONGOING -> 0xFFFF9500.toInt()    // systemOrange
-            ScheduleStatus.UPCOMING -> 0xFF007AFF.toInt()   // systemBlue
-            ScheduleStatus.DEFAULT -> 0xFF8E8E93.toInt()    // systemGray
-        }
-        canvas.drawCircle(cx, statusCy, statusSize / 2, paint)
+        // 2. 칩 + 흰 테두리 — 지도 위에서 떠 보이게
+        canvas.drawRoundRect(chip, chipH / 2, chipH / 2, paint)
         paint.style = Paint.Style.STROKE
-        paint.strokeWidth = statusStroke
+        paint.strokeWidth = border
         paint.color = android.graphics.Color.WHITE
-        canvas.drawCircle(cx, statusCy, statusSize / 2, paint)
+        canvas.drawRoundRect(chip, chipH / 2, chipH / 2, paint)
+        paint.style = Paint.Style.FILL
+
+        // 3. 번호 원 — 색이 곧 상태
+        val orderR = L.ORDER_SIZE * d / 2
+        val orderCx = chip.left + L.INSET * d + orderR
+        paint.color = tint
+        canvas.drawCircle(orderCx, chip.centerY(), orderR, paint)
+        fun baseline(p: TextPaint) = chip.centerY() - (p.fontMetrics.ascent + p.fontMetrics.descent) / 2
+        canvas.drawText((index + 1).toString(), orderCx, baseline(orderPaint), orderPaint)
+
+        // 4. 시각 · 제목
+        var x = orderCx + orderR + L.GAP * d
+        if (time != null) {
+            canvas.drawText(time, x, baseline(timePaint), timePaint)
+            x += kotlin.math.ceil(timeW) + L.TIME_GAP * d
+        }
+        canvas.drawText(title, x, baseline(titlePaint), titlePaint)
+
+        // 5. 위치 점 — 이 점의 중심이 일정 좌표
+        val dotCy = L.DOT_CENTER_Y * d
+        val dotR = L.DOT_SIZE * d / 2
+        paint.color = tint
+        canvas.drawCircle(cx, dotCy, dotR, paint)
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 2 * d
+        paint.color = android.graphics.Color.WHITE
+        canvas.drawCircle(cx, dotCy, dotR, paint)
 
         return bitmap
     }
+
+    /** 번호 원·위치 점 색. 진행 중 초록은 흰 숫자가 읽히는 진한 값(#15803D, 대비 5:1). iOS scheduleStatusTint 와 같음. */
+    private fun scheduleStatusTint(status: ScheduleStatus): Int = when (status) {
+        ScheduleStatus.ONGOING -> 0xFF15803D.toInt()
+        ScheduleStatus.COMPLETED -> 0xFF6B7280.toInt()
+        ScheduleStatus.UPCOMING, ScheduleStatus.DEFAULT -> SmapAccent.Orange.base.toArgb()
+    }
+}
+
+/** 일정 마커(한 줄 말풍선) 치수 — dp. iOS `ScheduleMarkerLayout` 과 같은 값(pt). */
+internal object ScheduleMarkerLayout {
+    const val CHIP_HEIGHT = 26f
+    const val BORDER = 1.5f
+    const val INSET = 4f
+    const val ORDER_SIZE = 18f
+    const val GAP = 6f
+    const val TIME_GAP = 5f
+    const val TRAILING = 10f
+    const val TAIL_WIDTH = 10f
+    const val TAIL_HEIGHT = 6f
+    const val DOT_SIZE = 9f
+    const val DOT_CENTER_Y = BORDER + CHIP_HEIGHT + TAIL_HEIGHT + DOT_SIZE / 2
+    const val TOTAL_HEIGHT = DOT_CENTER_Y + DOT_SIZE / 2 + 1.5f  // 점 테두리 여유
+    /** 마커 기준점 = 위치 점 중심 */
+    const val ANCHOR_Y = DOT_CENTER_Y / TOTAL_HEIGHT
 }
 
 /** "2026-11-20 15:30:00"·"2026-11-20T15:30:00" → "15:30". 시각을 못 찾으면 null. */
