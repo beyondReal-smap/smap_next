@@ -28,30 +28,37 @@ struct NativeScheduleListView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
+            VStack(spacing: 0) {
+                // 그룹 선택·일정 추가 줄과 선택한 날 카드는 위에 고정 — 목록을 내려도 어느 그룹·어느 날을 보는지 늘 보이게.
                 VStack(alignment: .leading, spacing: SMAPTheme.Spacing.md) {
                     topControls
                     agendaHeader
-                    if showsMonth {
-                        ScheduleMonthCalendar(
-                            currentMonth: viewModel.currentMonth, selectedDate: viewModel.selectedDate,
-                            eventDates: viewModel.datesWithEvents,
-                            onSelect: { viewModel.selectDate($0); showsMonth = false },
-                            onPrevious: { browseMonth(-1) }, onNext: { browseMonth(1) },
-                            onToday: { viewModel.goToToday(); showsMonth = false }
-                        )
-                    } else {
-                        DateStrip(items: monthDays, selected: viewModel.selectedDate) { viewModel.selectDate($0.date) }
-                            .id(Calendar.current.dateComponents([.year, .month], from: viewModel.selectedDate))
-                    }
-                    daySection
-                        .padding(.top, SMAPTheme.Spacing.sm)
                 }
                 .padding(.horizontal, SMAPTheme.Spacing.md)
-                .padding(.bottom, SMAPTheme.Spacing.xl)
+                .padding(.bottom, SMAPTheme.Spacing.md)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: SMAPTheme.Spacing.md) {
+                        if showsMonth {
+                            ScheduleMonthCalendar(
+                                currentMonth: viewModel.currentMonth, selectedDate: viewModel.selectedDate,
+                                eventDates: viewModel.datesWithEvents,
+                                onSelect: { viewModel.selectDate($0); showsMonth = false },
+                                onPrevious: { browseMonth(-1) }, onNext: { browseMonth(1) },
+                                onToday: { viewModel.goToToday(); showsMonth = false }
+                            )
+                        } else {
+                            DateStrip(items: monthDays, selected: viewModel.selectedDate) { viewModel.selectDate($0.date) }
+                                .id(Calendar.current.dateComponents([.year, .month], from: viewModel.selectedDate))
+                        }
+                        daySection
+                            .padding(.top, SMAPTheme.Spacing.sm)
+                    }
+                    .padding(.horizontal, SMAPTheme.Spacing.md)
+                    .padding(.bottom, SMAPTheme.Spacing.xl)
+                }
+                .refreshable { viewModel.fetchSchedules() }
             }
             .background(SMAPTheme.Family.paper.ignoresSafeArea())
-            .refreshable { viewModel.fetchSchedules() }
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingGroupPicker) {
                 GroupPickerSheet(

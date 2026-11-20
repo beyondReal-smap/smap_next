@@ -112,117 +112,125 @@ fun ScheduleScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = if (androidx.compose.foundation.isSystemInDarkTheme()) MaterialTheme.colorScheme.background else FamilyColors.Paper
     ) { paddingValues ->
-        PullToRefreshBox(
-            isRefreshing = isRefreshing,
-            onRefresh = { viewModel.refresh() },
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = SmapSpacing.md, end = SmapSpacing.md, bottom = SmapSpacing.xl),
+            // 그룹 선택·일정 추가 줄과 선택한 날 카드는 위에 고정 — 목록을 내려도 어느 그룹·어느 날을 보는지 늘 보이게.
+            Column(
+                modifier = Modifier.padding(start = SmapSpacing.md, end = SmapSpacing.md, bottom = SmapSpacing.md),
                 verticalArrangement = Arrangement.spacedBy(SmapSpacing.md)
             ) {
                 // 맨 위 줄 — 그룹 전환 알약(지도 탭과 같은 모양·위치)과 일정 추가 버튼.
                 // 아래 탭 막대에 이미 "일정"이 표시돼 큰 제목은 중복이라 뺐다(대표님 요청).
-                item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = TopControlsVerticalPadding),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(Modifier.weight(1f)) {
-                            GroupSwitcherPill(
-                                groupName = selectedGroup?.sgtTitle,
-                                onClick = { viewModel.toggleGroupSelector() }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = TopControlsVerticalPadding),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(Modifier.weight(1f)) {
+                        GroupSwitcherPill(
+                            groupName = selectedGroup?.sgtTitle,
+                            onClick = { viewModel.toggleGroupSelector() }
+                        )
+                    }
+                    // 일정 추가는 이 탭의 주 동작이라 남색 그라데이션 원으로 강조한다.
+                    SmapGradientIconButton(
+                        icon = Icons.Outlined.Add,
+                        contentDescription = "일정 추가",
+                        onClick = { viewModel.showCreateDialog() }
+                    )
+                }
+
+                Row(
+                    Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(22.dp)).padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Box(Modifier.size(68.dp, 76.dp).background(FamilyColors.Highlight, RoundedCornerShape(15.dp)),
+                        contentAlignment = Alignment.Center) {
+                        Text("${selectedDate.dayOfMonth}", style = SmapText.title.copy(fontSize = 46.sp, lineHeight = 52.sp), color = FamilyColors.Ink)
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text("${selectedDate.year}년 ${selectedDate.monthValue}월", style = SmapText.captionBold, color = LocalSmapAccent.current.deep)
+                        Text(selectedDate.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.KOREAN),
+                            style = SmapText.title, color = FamilyColors.Ink)
+                    }
+                    FilledTonalButton(onClick = { showsMonth = !showsMonth },
+                        colors = ButtonDefaults.filledTonalButtonColors(containerColor = LocalSmapAccent.current.container,
+                            contentColor = LocalSmapAccent.current.deep), contentPadding = PaddingValues(horizontal = 12.dp)) {
+                        Text(if (showsMonth) "달력 접기" else "월 달력", style = SmapText.captionBold)
+                    }
+                }
+            }
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = { viewModel.refresh() },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = SmapSpacing.md, end = SmapSpacing.md, bottom = SmapSpacing.xl),
+                    verticalArrangement = Arrangement.spacedBy(SmapSpacing.md)
+                ) {
+                    item {
+                        if (showsMonth) {
+                            MonthCalendar(
+                                currentMonth = currentMonth, selectedDate = selectedDate, eventDates = eventDates,
+                                onDateSelect = { viewModel.selectDate(it); showsMonth = false },
+                                onPreviousMonth = { viewModel.goToPreviousMonth() }, onNextMonth = { viewModel.goToNextMonth() },
+                                onToday = { viewModel.goToToday(); showsMonth = false }
                             )
-                        }
-                        // 일정 추가는 이 탭의 주 동작이라 남색 그라데이션 원으로 강조한다.
-                        SmapGradientIconButton(
-                            icon = Icons.Outlined.Add,
-                            contentDescription = "일정 추가",
-                            onClick = { viewModel.showCreateDialog() }
-                        )
-                    }
-                }
-
-                item {
-                    Row(
-                        Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(22.dp)).padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        Box(Modifier.size(68.dp, 76.dp).background(FamilyColors.Highlight, RoundedCornerShape(15.dp)),
-                            contentAlignment = Alignment.Center) {
-                            Text("${selectedDate.dayOfMonth}", style = SmapText.title.copy(fontSize = 46.sp, lineHeight = 52.sp), color = FamilyColors.Ink)
-                        }
-                        Column(Modifier.weight(1f)) {
-                            Text("${selectedDate.year}년 ${selectedDate.monthValue}월", style = SmapText.captionBold, color = LocalSmapAccent.current.deep)
-                            Text(selectedDate.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.KOREAN),
-                                style = SmapText.title, color = FamilyColors.Ink)
-                        }
-                        FilledTonalButton(onClick = { showsMonth = !showsMonth },
-                            colors = ButtonDefaults.filledTonalButtonColors(containerColor = LocalSmapAccent.current.container,
-                                contentColor = LocalSmapAccent.current.deep), contentPadding = PaddingValues(horizontal = 12.dp)) {
-                            Text(if (showsMonth) "달력 접기" else "월 달력", style = SmapText.captionBold)
-                        }
-                    }
-                }
-                item {
-                    if (showsMonth) {
-                        MonthCalendar(
-                            currentMonth = currentMonth, selectedDate = selectedDate, eventDates = eventDates,
-                            onDateSelect = { viewModel.selectDate(it); showsMonth = false },
-                            onPreviousMonth = { viewModel.goToPreviousMonth() }, onNextMonth = { viewModel.goToNextMonth() },
-                            onToday = { viewModel.goToToday(); showsMonth = false }
-                        )
-                    } else {
-                        val days = remember(currentMonth, eventDates) {
-                            (1..currentMonth.lengthOfMonth()).map { day ->
-                                val date = currentMonth.atDay(day)
-                                DateChipItem(date, dot = date in eventDates)
+                        } else {
+                            val days = remember(currentMonth, eventDates) {
+                                (1..currentMonth.lengthOfMonth()).map { day ->
+                                    val date = currentMonth.atDay(day)
+                                    DateChipItem(date, dot = date in eventDates)
+                                }
                             }
+                            key(currentMonth) { DateStrip(days, selectedDate, onSelect = { viewModel.selectDate(it.date) }) }
                         }
-                        key(currentMonth) { DateStrip(days, selectedDate, onSelect = { viewModel.selectDate(it.date) }) }
                     }
-                }
 
-                item {
-                    val count = selectedDateSchedules.size
-                    SmapSection(
-                        modifier = Modifier.padding(top = SmapSpacing.sm),
-                        title = (if (selectedDate == LocalDate.now()) "오늘의 약속" else "이날의 약속") + if (count > 0) " · ${count}개" else ""
-                    ) {
-                        when {
-                            // 그날 일정이 이미 보이면 새로 불러오는 동안에도 그대로 둔다(탭을 열 때마다 스피너로 깜빡이던 것).
-                            (isLoading || isLoadingSchedules) && !isRefreshing && selectedDateSchedules.isEmpty() -> Box(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .height(96.dp),
-                                contentAlignment = Alignment.Center
-                            ) { CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 2.5.dp) }
-                            selectedDateSchedules.isEmpty() -> Column(Modifier.fillMaxWidth().padding(SmapSpacing.md),
-                                verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    Box(Modifier.size(46.dp, 48.dp).background(LocalSmapAccent.current.container, RoundedCornerShape(12.dp)),
-                                        contentAlignment = Alignment.Center) {
-                                        Icon(Icons.Outlined.EventAvailable, contentDescription = null, tint = LocalSmapAccent.current.deep)
+                    item {
+                        val count = selectedDateSchedules.size
+                        SmapSection(
+                            modifier = Modifier.padding(top = SmapSpacing.sm),
+                            title = (if (selectedDate == LocalDate.now()) "오늘의 약속" else "이날의 약속") + if (count > 0) " · ${count}개" else ""
+                        ) {
+                            when {
+                                // 그날 일정이 이미 보이면 새로 불러오는 동안에도 그대로 둔다(탭을 열 때마다 스피너로 깜빡이던 것).
+                                (isLoading || isLoadingSchedules) && !isRefreshing && selectedDateSchedules.isEmpty() -> Box(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .height(96.dp),
+                                    contentAlignment = Alignment.Center
+                                ) { CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 2.5.dp) }
+                                selectedDateSchedules.isEmpty() -> Column(Modifier.fillMaxWidth().padding(SmapSpacing.md),
+                                    verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        Box(Modifier.size(46.dp, 48.dp).background(LocalSmapAccent.current.container, RoundedCornerShape(12.dp)),
+                                            contentAlignment = Alignment.Center) {
+                                            Icon(Icons.Outlined.EventAvailable, contentDescription = null, tint = LocalSmapAccent.current.deep)
+                                        }
+                                        Text("아직 약속이 없는 날이에요", style = SmapText.headline, color = MaterialTheme.colorScheme.onSurface)
                                     }
-                                    Text("아직 약속이 없는 날이에요", style = SmapText.headline, color = MaterialTheme.colorScheme.onSurface)
+                                    Button(onClick = { viewModel.showCreateDialog() }, modifier = Modifier.fillMaxWidth(),
+                                        colors = ButtonDefaults.buttonColors(containerColor = FamilyColors.Ink, contentColor = Color.White),
+                                        shape = RoundedCornerShape(13.dp)) {
+                                        Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(4.dp))
+                                        Text("이날 약속 추가", style = SmapText.captionBold)
+                                    }
                                 }
-                                Button(onClick = { viewModel.showCreateDialog() }, modifier = Modifier.fillMaxWidth(),
-                                    colors = ButtonDefaults.buttonColors(containerColor = FamilyColors.Ink, contentColor = Color.White),
-                                    shape = RoundedCornerShape(13.dp)) {
-                                    Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(Modifier.width(4.dp))
-                                    Text("이날 약속 추가", style = SmapText.captionBold)
+                                else -> selectedDateSchedules.forEachIndexed { i, schedule ->
+                                    if (i > 0) SmapRowDivider()
+                                    ScheduleRow(schedule = schedule, onClick = { viewModel.showEventDetail(schedule) })
                                 }
-                            }
-                            else -> selectedDateSchedules.forEachIndexed { i, schedule ->
-                                if (i > 0) SmapRowDivider()
-                                ScheduleRow(schedule = schedule, onClick = { viewModel.showEventDetail(schedule) })
                             }
                         }
                     }
