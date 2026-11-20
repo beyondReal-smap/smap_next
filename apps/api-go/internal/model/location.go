@@ -21,6 +21,8 @@ type Location struct {
 	SltWdate      *time.Time `gorm:"column:slt_wdate"`
 	SltUdate      *time.Time `gorm:"column:slt_udate"`
 	SltDdate      *time.Time `gorm:"column:slt_ddate"`
+	// SltIcon은 사용자가 고른 장소 아이콘 키(home·school 등, 2026-11-20 추가). NULL이면 앱이 이름으로 짐작한다.
+	SltIcon *string `gorm:"column:slt_icon"`
 }
 
 // TableName은 GORM 기본 복수화를 막고 실제 테이블명을 고정한다.

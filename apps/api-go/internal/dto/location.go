@@ -22,4 +22,5 @@ type LocationResponse struct {
 	SltWdate        *string `json:"slt_wdate"`
 	SltUdate        *string `json:"slt_udate"`
 	SltDdate        *string `json:"slt_ddate"`
+	SltIcon         *string `json:"slt_icon"` // 사용자가 고른 아이콘 키, 없으면 null
 }

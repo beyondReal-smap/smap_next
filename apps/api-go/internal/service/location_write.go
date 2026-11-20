@@ -18,6 +18,7 @@ type LocationCreateInput struct {
 	SltShow       string
 	SltEnterAlarm string
 	SltEnterChk   string
+	SltIcon       *string // nil이면 NULL(앱이 이름으로 짐작)
 }
 
 // CreateLocation은 Python create_location을 이식한다. slt_wdate=now isoformat(micros), slt_lat/long=입력 float.
@@ -28,7 +29,7 @@ func (s *LocationService) CreateLocation(in LocationCreateInput) (*dto.LocationC
 	m := &model.Location{
 		MtIdx: &in.MtIdx, SltTitle: &in.SltTitle, SltAdd: &in.SltAdd,
 		SltLat: &lat, SltLong: &long, SltShow: &in.SltShow,
-		SltEnterAlarm: &in.SltEnterAlarm, SltEnterChk: &in.SltEnterChk, SltWdate: &now,
+		SltEnterAlarm: &in.SltEnterAlarm, SltEnterChk: &in.SltEnterChk, SltWdate: &now, SltIcon: in.SltIcon,
 	}
 	if err := s.repo.Create(m); err != nil {
 		return nil, false
@@ -40,7 +41,7 @@ func (s *LocationService) CreateLocation(in LocationCreateInput) (*dto.LocationC
 		Data: dto.LocationCreateData{
 			SltIdx: m.SltIdx, SltTitle: in.SltTitle, SltAdd: in.SltAdd, SltLat: &latF, SltLong: &longF,
 			SltShow: in.SltShow, SltEnterAlarm: in.SltEnterAlarm, SltEnterChk: in.SltEnterChk,
-			SltWdate: pyISO(now),
+			SltWdate: pyISO(now), SltIcon: in.SltIcon,
 		},
 	}, true
 }
@@ -97,7 +98,8 @@ type MemberLocationInput struct {
 	SltShow       string
 	SltEnterAlarm string
 	SltEnterChk   string
-	SgdtIdxBody   int // 그룹 없을 때 폴백(body 또는 641)
+	SltIcon       *string // nil이면 NULL(앱이 이름으로 짐작)
+	SgdtIdxBody   int     // 그룹 없을 때 폴백(body 또는 641)
 	SgtIdxBody    int
 }
 
@@ -129,6 +131,7 @@ func (s *LocationService) MemberCreateLocation(in MemberLocationInput) (resp *dt
 		InsertMtIdx: &in.MemberID, MtIdx: &in.MemberID, SgtIdx: &sgt, SgdtIdx: &sgdt,
 		SltTitle: &in.SltTitle, SltAdd: &in.SltAdd, SltLat: &lat, SltLong: &long,
 		SltShow: &in.SltShow, SltEnterAlarm: &in.SltEnterAlarm, SltEnterChk: &in.SltEnterChk, SltWdate: &now,
+		SltIcon: in.SltIcon,
 	}
 	if err := s.repo.Create(m); err != nil {
 		return nil, true, false
@@ -145,7 +148,7 @@ func (s *LocationService) MemberCreateLocation(in MemberLocationInput) (resp *dt
 			SgtIdx: saved.SgtIdx, SgdtIdx: saved.SgdtIdx, SltTitle: saved.SltTitle, SltAdd: saved.SltAdd,
 			SltLat: decStrToPyFloat(saved.SltLat), SltLong: decStrToPyFloat(saved.SltLong),
 			SltShow: saved.SltShow, SltEnterAlarm: saved.SltEnterAlarm, SltEnterChk: saved.SltEnterChk,
-			SltWdate: pyISOPtr(saved.SltWdate),
+			SltWdate: pyISOPtr(saved.SltWdate), SltIcon: saved.SltIcon,
 		},
 	}, true, true
 }

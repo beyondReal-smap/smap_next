@@ -19,6 +19,7 @@ type LocationCreateData struct {
 	SltEnterAlarm string   `json:"slt_enter_alarm"`
 	SltEnterChk   string   `json:"slt_enter_chk"`
 	SltWdate      string   `json:"slt_wdate"`
+	SltIcon       *string  `json:"slt_icon"`
 }
 
 // LocationNotifResponse는 PUT /{id}/notification 응답.
@@ -61,4 +62,5 @@ type LocationMemberCreateData struct {
 	SltEnterAlarm *string  `json:"slt_enter_alarm"`
 	SltEnterChk   *string  `json:"slt_enter_chk"`
 	SltWdate      *string  `json:"slt_wdate"`
+	SltIcon       *string  `json:"slt_icon"`
 }

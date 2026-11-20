@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"regexp"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -42,6 +43,11 @@ func (h *LocationHandler) Create(c *gin.Context) {
 	if !h.guard.ManagePlace(c, mtIdx) {
 		return
 	}
+	icon, _, iok := locIcon(body)
+	if !iok {
+		writeJSON(c, http.StatusBadRequest, gin.H{"detail": "Invalid field: slt_icon"})
+		return
+	}
 	in := service.LocationCreateInput{
 		MtIdx:    mtIdx,
 		SltTitle: truncRunes(toStr(title), 100),
@@ -50,6 +56,7 @@ func (h *LocationHandler) Create(c *gin.Context) {
 		SltShow:       locStrDefault(body, "slt_show", "Y"),
 		SltEnterAlarm: locStrDefault(body, "slt_enter_alarm", "Y"),
 		SltEnterChk:   locStrDefault(body, "slt_enter_chk", "N"),
+		SltIcon:       icon,
 	}
 	resp, sok := h.svc.CreateLocation(in)
 	if !sok {
@@ -136,6 +143,12 @@ func (h *LocationHandler) Update(c *gin.Context) {
 	if v, has := body["slt_show"]; has {
 		fields["slt_show"] = v
 	}
+	if icon, has, iok := locIcon(body); !iok {
+		writeJSON(c, http.StatusBadRequest, gin.H{"detail": "Invalid field: slt_icon"})
+		return
+	} else if has {
+		fields["slt_icon"] = icon // nil이면 NULL로 되돌린다(이름으로 짐작)
+	}
 	resp, found, sok := h.svc.UpdateLocation(id, fields, keys)
 	if !sok {
 		writeJSON(c, http.StatusInternalServerError, gin.H{"detail": "Update failed: db error"})
@@ -187,6 +200,11 @@ func (h *LocationHandler) MemberCreate(c *gin.Context) {
 		writeJSON(c, http.StatusBadRequest, gin.H{"detail": "Location address (slt_add) is required"})
 		return
 	}
+	icon, _, iok := locIcon(body)
+	if !iok {
+		writeJSON(c, http.StatusBadRequest, gin.H{"detail": "Invalid field: slt_icon"})
+		return
+	}
 	lat, long := locCoords(body)
 	in := service.MemberLocationInput{
 		MemberID: mid,
@@ -196,6 +214,7 @@ func (h *LocationHandler) MemberCreate(c *gin.Context) {
 		SltShow:       locStrDefault(body, "slt_show", "Y"),
 		SltEnterAlarm: locStrDefault(body, "slt_enter_alarm", "Y"),
 		SltEnterChk:   locStrDefault(body, "slt_enter_chk", "N"),
+		SltIcon:       icon,
 		SgdtIdxBody:   locIntDefault(body, "sgdt_idx", 641),
 		SgtIdxBody:    locIntDefault(body, "sgt_idx", 641),
 	}
@@ -212,6 +231,30 @@ func (h *LocationHandler) MemberCreate(c *gin.Context) {
 }
 
 // --- 파서/헬퍼 ---
+
+// slotIconPattern은 slt_icon 허용 형식. 종류 목록은 앱이 정하고(새 종류를 서버 배포 없이 추가할 수 있게),
+// 서버는 짧은 영문 소문자 키만 받는다. 모르는 키를 받은 옛 앱은 이름으로 짐작해 보여 준다.
+var slotIconPattern = regexp.MustCompile(`^[a-z][a-z_]{0,19}$`)
+
+// locIcon은 body의 slt_icon을 읽는다. has=키 존재, ok=false면 형식 오류(400).
+// null·빈 문자열은 "고르지 않음"(nil) — 앱이 이름으로 짐작한다.
+func locIcon(body map[string]interface{}) (icon *string, has bool, ok bool) {
+	v, has := body["slt_icon"]
+	if !has || v == nil {
+		return nil, has, true
+	}
+	s, isStr := v.(string)
+	if !isStr {
+		return nil, true, false
+	}
+	if s == "" {
+		return nil, true, true
+	}
+	if !slotIconPattern.MatchString(s) {
+		return nil, true, false
+	}
+	return &s, true, true
+}
 
 func locationPathID(c *gin.Context) (int, bool) {
 	idStr := c.Param("location_id")

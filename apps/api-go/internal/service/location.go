@@ -77,6 +77,7 @@ func toLocationResponse(l *model.Location) dto.LocationResponse {
 		SltWdate:      pyISOPtr(l.SltWdate),
 		SltUdate:      pyISOPtr(l.SltUdate),
 		SltDdate:      pyISOPtr(l.SltDdate),
+		SltIcon:       l.SltIcon,
 	}
 }
 

@@ -41,7 +41,7 @@ func TestLocationResponseJSON(t *testing.T) {
 	}})
 	res, _ := svc.GetLocation(1374)
 	b, _ := json.Marshal(res)
-	want := `{"insert_mt_idx":2523,"mt_idx":2523,"sgdt_idx":2228,"slt_title":"폴리길목","slt_add":"서울 양천구 목동 406-30","slt_lat":"37.52460739277500","slt_long":"126.87469742636608","slt_fine_location":null,"slt_location_chk":null,"slt_all_day":null,"slt_show":"Y","slt_enter_alarm":"Y","slt_enter_chk":"N","slt_idx":1374,"slt_wdate":"2026-04-06T21:38:59","slt_udate":null,"slt_ddate":null}`
+	want := `{"insert_mt_idx":2523,"mt_idx":2523,"sgdt_idx":2228,"slt_title":"폴리길목","slt_add":"서울 양천구 목동 406-30","slt_lat":"37.52460739277500","slt_long":"126.87469742636608","slt_fine_location":null,"slt_location_chk":null,"slt_all_day":null,"slt_show":"Y","slt_enter_alarm":"Y","slt_enter_chk":"N","slt_idx":1374,"slt_wdate":"2026-04-06T21:38:59","slt_udate":null,"slt_ddate":null,"slt_icon":null}`
 	if string(b) != want {
 		t.Errorf("불일치\n got: %s\nwant: %s", b, want)
 	}
