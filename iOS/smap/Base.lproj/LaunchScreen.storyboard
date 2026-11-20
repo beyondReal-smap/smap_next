@@ -40,7 +40,7 @@
     <resources>
         <image name="SplashPins" width="289" height="289"/>
         <namedColor name="SplashBackground">
-            <color red="0.0039215686274509803" green="0.074509803921568626" blue="0.63921568627450975" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+            <color red="0.14901960784313725" green="0.28627450980392155" blue="0.43137254901960786" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
         </namedColor>
     </resources>
 </document>

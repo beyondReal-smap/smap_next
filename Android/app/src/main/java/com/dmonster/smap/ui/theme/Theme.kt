@@ -14,7 +14,7 @@ private val LightColorScheme = lightColorScheme(
     // SMAP 2.0 — 브랜드 남색 하나 + 차가운 회색 계열. 화면 배경은 연회색, 묶음(카드·시트)은 흰색으로 층을 나눈다.
     primary = BrandColors.Primary,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFE8EBFB),
+    primaryContainer = Color(0xFFE3EDF8),
     onPrimaryContainer = BrandColors.Primary,
 
     secondary = BrandColors.Primary,
@@ -42,7 +42,7 @@ private val LightColorScheme = lightColorScheme(
     surfaceContainer = Color.White,
     surfaceContainerHigh = Color.White,
     surfaceContainerHighest = Color(0xFFEEF0F4),
-    secondaryContainer = Color(0xFFE8EBFB),
+    secondaryContainer = Color(0xFFE3EDF8),
     onSecondaryContainer = BrandColors.Primary,
 )
 

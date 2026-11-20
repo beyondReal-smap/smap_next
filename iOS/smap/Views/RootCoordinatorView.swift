@@ -17,7 +17,7 @@ struct SplashView: View {
     // LaunchScreen.storyboard 도 같은 그림이라 런치 화면 → 이 화면으로 넘어갈 때 아무것도 바뀌지 않는다.
     var body: some View {
         ZStack {
-            // 런치 화면과 같은 색 에셋을 써야 넘어갈 때 남색이 미묘하게 바뀌지 않는다(값은 브랜드 #0113A3).
+            // 런치 화면과 같은 색 에셋을 써야 넘어갈 때 남색이 미묘하게 바뀌지 않는다(값은 앱 남색 #26496E — 앱 아이콘 바탕과 같은 계열).
             Color("SplashBackground")
                 .ignoresSafeArea()
 

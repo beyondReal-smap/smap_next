@@ -55,7 +55,8 @@ data class SmapAccent(val deep: Color, val base: Color, val bright: Color, val c
     val band: Brush = Brush.horizontalGradient(listOf(deep, base, bright))
 
     companion object {
-        val Navy = SmapAccent(Color(0xFF000C78), Color(0xFF0113A3), Color(0xFF3D55EA), Color(0xFFE8EBFB))
+        // 2026-11-20: 파랑(#000C78→#0113A3→#3D55EA)에서 앱 남색으로(Family 와 같은 값).
+        val Navy = SmapAccent(Color(0xFF26496E), Color(0xFF345F8C), Color(0xFF416996), Color(0xFFE3EDF8))
         val Teal = SmapAccent(Color(0xFF0B4F4A), Color(0xFF0F766E), Color(0xFF0D9488), Color(0xFFE1F3F1))
         val Orange = SmapAccent(Color(0xFF9A3412), Color(0xFFC2410C), Color(0xFFEA580C), Color(0xFFFCEBDD))
         val Purple = SmapAccent(Color(0xFF4C1D95), Color(0xFF6D28D9), Color(0xFF8B5CF6), Color(0xFFEEE8FD))

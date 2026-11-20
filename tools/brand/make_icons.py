@@ -6,7 +6,9 @@
   python3 -I tools/brand/make_icons.py --icons-only  # 앱 아이콘만(스플래시·로그인 로고는 그대로)
 
 원본: OpenAI gpt-image-2.5-sunburst 로 만든 1024 정사각 아트워크(generate_icon_openai.py, 2026-11-17 채택).
-     남색 그라데이션 바탕 + 반투명 유리 질감 흰 핀 + 머리 안 체크. 앱 이름 "도착했어".
+     파란 그라데이션 바탕 + 반투명 유리 질감 흰 핀 + 머리 안 체크. 앱 이름 "도착했어".
+색: 원본 바탕은 쨍한 파랑(#0113A3→#3B5BFF)이라 앱 화면의 차분한 남색과 겉돌아(2026-11-20 대표님 요청),
+    핀을 떼어 낸 뒤 바탕을 앱 남색 그라데이션(NAVY_STOPS)으로 바꾸고 핀도 남색 위에 맞게 다시 칠한다(recolor_navy).
 
 Android 적응형 아이콘 전경·스플래시는 "바탕 없이 핀만" 필요하다. 원본에서 바탕 그라데이션을 2차 곡면으로
 추정한 뒤, 각 화소를 "흰 핀 × a + 바탕 × (1−a)" 로 풀어(언블렌딩) 투명도를 되살린다.
@@ -37,6 +39,16 @@ ICON_GLYPH_SCALE = 0.85
 # Android 적응형 아이콘 전경의 핀 높이(108dp 캔버스 기준). 보이는 영역(72dp)으로 환산하면 0.42×108/72 ≈ 63% —
 # iOS 아이콘(ICON_GLYPH_SCALE 적용)과 같은 크기로 보이게 맞춘다. 안전 영역(지름 66dp) 안.
 ADAPTIVE_GLYPH_HEIGHT = 0.42
+
+# 아이콘 바탕 남색 그라데이션 — 앱 홈 강조색(family: deep #26496E · base #345F8C · bright #416996)을 축으로,
+# 아이콘에선 깊이가 보이게 양 끝을 조금 더 벌렸다. 원본 바탕의 밝기 순서(왼쪽 아래 어둡게 → 오른쪽 위 밝게)를 그대로 따른다.
+NAVY_STOPS = ((0.0, "1D3956"), (0.5, "345F8C"), (1.0, "4F79A5"))
+# 핀 다시 칠하기 — 파란 기운을 빼고 남색 위에서 차갑게 보이는 흰색으로.
+PIN_TINT = (0.95, 0.975, 1.0)
+# 핀 밝기 끌어올림(1 이면 그대로, 작을수록 흰색 쪽)과 불투명도 곡선 지수(클수록 덜 비침).
+# 유리 질감이 반투명이라 남색 바탕이 비치면 회색으로 보여, 둘 다 흰 쪽으로 당긴다.
+PIN_LIFT = 0.55
+PIN_OPACITY_POWER = 1.8
 
 
 def load_master() -> Image.Image:
@@ -85,6 +97,33 @@ def extract_glyph(master: Image.Image) -> tuple[Image.Image, np.ndarray]:
     fg = np.clip((rgb - (1 - alpha[..., None]) * bg) / safe, 0, 255)
     rgba = np.dstack([fg, alpha * 255]).astype(np.uint8)
     return Image.fromarray(rgba, "RGBA"), bg
+
+
+def _hex(h: str) -> np.ndarray:
+    return np.array([int(h[i:i + 2], 16) for i in (0, 2, 4)], dtype=np.float64)
+
+
+def recolor_navy(glyph: Image.Image, bg: np.ndarray) -> tuple[Image.Image, Image.Image, np.ndarray]:
+    """(남색 바탕 위에 다시 올린 1024 아이콘, 다시 칠한 핀 RGBA, 남색 바탕 배열) 을 돌려준다.
+    바탕: 원본 바탕의 밝기를 0~1 로 펴서 NAVY_STOPS 그라데이션으로 옮긴다(빛의 방향은 원본 그대로).
+    핀: 밝기만 남겨 PIN_TINT 로 칠하고, 반투명도를 줄여 남색이 덜 비치게 한다. 체크 구멍은 투명이라 새 남색이 보인다."""
+    lum = bg @ np.array([0.2126, 0.7152, 0.0722])
+    t = np.clip((lum - lum.min()) / (lum.max() - lum.min()), 0.0, 1.0)
+    navy = np.empty_like(bg)
+    for (t0, c0), (t1, c1) in zip(NAVY_STOPS, NAVY_STOPS[1:]):
+        m = (t >= t0) & (t <= t1)
+        u = ((t[m] - t0) / (t1 - t0))[:, None]
+        navy[m] = _hex(c0) + (_hex(c1) - _hex(c0)) * u
+
+    g = np.asarray(glyph, dtype=np.float64)
+    alpha = 1 - (1 - g[..., 3:] / 255.0) ** PIN_OPACITY_POWER
+    light = (g[..., :3] @ np.array([0.2126, 0.7152, 0.0722]))[..., None]
+    pin = np.clip((255 - (255 - light) * PIN_LIFT) * np.array(PIN_TINT), 0, 255)
+
+    composed = pin * alpha + navy * (1 - alpha)
+    master = Image.fromarray(composed.round().astype(np.uint8), "RGB")
+    new_glyph = Image.fromarray(np.dstack([pin, alpha * 255]).round().astype(np.uint8), "RGBA")
+    return master, new_glyph, navy
 
 
 def silhouette(master: Image.Image) -> Image.Image:
@@ -142,10 +181,11 @@ def save(img: Image.Image, path: Path) -> None:
 
 
 def main(icons_only: bool = False) -> None:
-    master = load_master()
-    glyph, bg = extract_glyph(master)
+    source = load_master()
+    glyph, bg = extract_glyph(source)
+    master, glyph, bg = recolor_navy(glyph, bg)
     background = Image.fromarray(np.clip(bg, 0, 255).astype(np.uint8), "RGB")
-    mono_src = silhouette(master)
+    mono_src = silhouette(source)  # 단색 아이콘은 모양만 쓰여 원본 밝기로 잡는다
     # 앱 아이콘(iOS 전 크기·Android 통짜·스토어 512)과 로그인 로고(AppNoBg / app_no_bg)는 핀을 줄인 판으로 통일. 스플래시만 원본 그대로.
     icon = icon_master(master, bg, ICON_GLYPH_SCALE)
 

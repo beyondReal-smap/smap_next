@@ -5,7 +5,7 @@
     android:viewportHeight="24">
     <!-- Solid Blue Circle -->
     <path
-        android:fillColor="#0113A3"
+        android:fillColor="#345F8C"
         android:pathData="M12,12m-11,0a11,11 0,1 1,22 0a11,11 0,1 1,-22 0"/>
     <!-- Simple White Running Person -->
     <path

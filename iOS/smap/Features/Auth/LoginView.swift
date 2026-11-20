@@ -3,7 +3,7 @@
 // smap
 //
 // 네이티브 로그인 화면 (iOS 13+)
-// Next.js 스타일 반영: 브랜드 색상 #0113A3
+// Next.js 스타일 반영: 브랜드 색상(SMAPTheme.Color.primary, 앱 남색 #345F8C)
 //
 
 import SwiftUI

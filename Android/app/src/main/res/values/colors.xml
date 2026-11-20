@@ -1,17 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 브랜드 색상 -->
-    <color name="primary">#0113A3</color>
-    <color name="primary_dark">#001F87</color>
-    <color name="brand_primary">#0113A3</color>
+    <!-- 브랜드 색상 — 앱 남색(2026-11-20, 이전 파랑 #0113A3·#001F87). ui/theme/Color.kt BrandColors 와 같은 값 -->
+    <color name="primary">#345F8C</color>
+    <color name="primary_dark">#26496E</color>
+    <color name="brand_primary">#345F8C</color>
     <color name="background">#FEF8F9</color>
     
     <!--
-      스플래시 배경색. BrandColors.Background(#FEF8F9)와 맞추어
-      스플래시 → 메인으로 넘어가는 구간의 색 단차/깜빡임을 제거한다.
-      이전 값 #353538은 메인 화면과 톤 차이가 커서 전환이 부자연스러웠다.
+      스플래시 배경색 — 앱 남색(홈 강조색 deep #26496E). 앱 아이콘 바탕(남색 그라데이션)과 같은 계열이라
+      아이콘을 누른 뒤 스플래시로 넘어갈 때 색이 튀지 않는다(2026-11-20, 이전 값 파랑 #0113A3).
     -->
-    <color name="splash_background">#0113A3</color>
+    <color name="splash_background">#26496E</color>
     
     <!-- 카카오 로그인 -->
     <color name="kakao_yellow">#FEE500</color>

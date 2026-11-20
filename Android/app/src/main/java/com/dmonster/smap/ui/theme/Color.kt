@@ -13,9 +13,10 @@ object FamilyColors {
  * 브랜드 색상 정의 (iOS BrandColors / SMAPTheme 기반 동기화)
  */
 object BrandColors {
-    val Primary = Color(0xFF0113A3)       // #0113A3
+    // 2026-11-20: 파랑(#0113A3·#001F87)에서 앱 남색으로 — 홈 강조색(SmapAccent.Family)과 같은 값. 아이콘·스플래시와 한 톤.
+    val Primary = Color(0xFF345F8C)       // #345F8C
     val Secondary = Color(0xFF667EEA)     // #667eea
-    val PrimaryDark = Color(0xFF001F87)   // #001f87
+    val PrimaryDark = Color(0xFF26496E)   // #26496E
     val Background = Color(0xFFFEF8F9)    // #fef8f9
     val TextPrimary = Color.Black
     val TextSecondary = Color(0xFF8E8E93) // systemGray

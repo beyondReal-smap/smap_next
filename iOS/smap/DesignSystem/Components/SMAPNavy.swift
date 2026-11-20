@@ -22,16 +22,17 @@ extension SMAPTheme {
         static let divider = SwiftUI.Color(red: 0xE8 / 255, green: 0xEA / 255, blue: 0xEF / 255)
         static let onSurface = SwiftUI.Color(red: 0x11 / 255, green: 0x18 / 255, blue: 0x27 / 255)
         static let onSurfaceMuted = SwiftUI.Color(red: 0x6B / 255, green: 0x72 / 255, blue: 0x80 / 255)
-        static let primaryContainer = SwiftUI.Color(red: 0xE8 / 255, green: 0xEB / 255, blue: 0xFB / 255)
+        static let primaryContainer = SwiftUI.Color(red: 0xE3 / 255, green: 0xED / 255, blue: 0xF8 / 255)
         /// 남색 바탕 위 보조 글자
         static let onNavyMuted = SwiftUI.Color.white.opacity(0.72)
     }
 
     /// 브랜드 남색 그라데이션 — 짙은 남색 → 브랜드 → 밝은 남색.
     enum Navy {
-        static let deep = SwiftUI.Color(red: 0x00 / 255, green: 0x0C / 255, blue: 0x78 / 255)
+        // 2026-11-20: 파랑(#000C78→#0113A3→#3D55EA)에서 앱 남색으로(SMAPAccent.family 와 같은 값).
+        static let deep = SwiftUI.Color(red: 0x26 / 255, green: 0x49 / 255, blue: 0x6E / 255)
         static let base = SMAPTheme.Color.primary
-        static let bright = SwiftUI.Color(red: 0x3D / 255, green: 0x55 / 255, blue: 0xEA / 255)
+        static let bright = SwiftUI.Color(red: 0x41 / 255, green: 0x69 / 255, blue: 0x96 / 255)
 
         /// 요약 카드·강조 아이콘·선택 상태
         static let gradient = LinearGradient(colors: [deep, base, bright], startPoint: .topLeading, endPoint: .bottomTrailing)

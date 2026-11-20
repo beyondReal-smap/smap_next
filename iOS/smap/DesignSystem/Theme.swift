@@ -8,8 +8,9 @@ enum SMAPTheme {
     // MARK: - Colors
 
     enum Color {
-        static let primary = SwiftUI.Color(red: 1/255, green: 19/255, blue: 163/255)    // #0113A3
-        static let primaryDark = SwiftUI.Color(red: 0/255, green: 31/255, blue: 135/255) // #001f87
+        // 2026-11-20: 파랑(#0113A3·#001F87)에서 앱 남색으로 — 홈 강조색(family)과 같은 값. 아이콘·스플래시와 한 톤.
+        static let primary = SwiftUI.Color(red: 0x34/255, green: 0x5F/255, blue: 0x8C/255)    // #345F8C
+        static let primaryDark = SwiftUI.Color(red: 0x26/255, green: 0x49/255, blue: 0x6E/255) // #26496E
         static let background = SwiftUI.Color(red: 254/255, green: 248/255, blue: 249/255) // #fef8f9
         static let textPrimary = SwiftUI.Color.black
         static let textSecondary = SwiftUI.Color(UIColor.systemGray)
