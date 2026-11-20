@@ -10,6 +10,8 @@ struct GroupListView: View {
     @State private var showCreateModal: Bool = false
 
     @State private var showJoin = false
+    /// 상세를 바텀시트로 연 그룹 — 옆에서 밀려 들어오는 화면은 머리 줄과 요약 카드가 겹쳐 어색했다(2026-11-20).
+    @State private var openedGroup: SmapGroup?
 
     private var currentUserIdx: Int? { AuthService.shared.getUserData()?.mt_idx }
 
@@ -59,6 +61,12 @@ struct GroupListView: View {
                     viewModel.createGroup(title: title, memo: memo)
                 }
             }
+            .sheet(item: $openedGroup) { group in
+                GroupDetailView(viewModel: viewModel, group: group)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+                    .presentationBackground(SMAPTheme.Family.paper)
+            }
         }
     }
 
@@ -84,12 +92,9 @@ struct GroupListView: View {
             } else {
                 ForEach(Array(viewModel.groups.enumerated()), id: \.element.id) { index, group in
                     if index > 0 { SMAPRowDivider() }
-                    NavigationLink {
-                        GroupDetailView(viewModel: viewModel, group: group)
-                    } label: {
-                        GroupRow(group: group, isMine: currentUserIdx != nil && group.mt_idx == currentUserIdx)
+                    GroupRow(group: group, isMine: currentUserIdx != nil && group.mt_idx == currentUserIdx) {
+                        openedGroup = group
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }
@@ -100,14 +105,15 @@ struct GroupListView: View {
 private struct GroupRow: View {
     let group: SmapGroup
     let isMine: Bool
+    let action: () -> Void
 
     var body: some View {
         let name = group.sgt_title.flatMap { $0.isEmpty ? nil : $0 } ?? "이름 없는 그룹"
         let memo = group.sgt_memo.flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
-        // NavigationLink 가 누름을 처리하므로 행 자체에는 동작을 주지 않는다.
         SMAPListRow(
             title: name,
             subtitle: (["멤버 \(group.member_count ?? 0)명"] + [memo].compactMap { $0 }).joined(separator: " · "),
+            action: action,
             leading: {
                 Text(String(name.prefix(1)))
                     .font(SMAPTheme.Font.headline)

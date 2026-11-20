@@ -1,28 +1,27 @@
 package com.dmonster.smap.ui.group
 
-import com.dmonster.smap.ui.components.SmapTopBar
 import com.dmonster.smap.BuildConfig
 import android.content.Intent
-import androidx.activity.compose.BackHandler
-import androidx.compose.animation.*
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.dmonster.smap.ui.theme.SmapMotion
-import androidx.compose.ui.unit.IntOffset
+import com.dmonster.smap.ui.theme.FamilyColors
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * 그룹 화면 - 리스트/상세 뷰 전환
+ * 그룹 화면 — 목록 위에 상세를 바텀시트로 띄운다.
+ * 이전에는 상세를 옆에서 밀려 들어오는 화면 + "그룹" 머리 줄로 보여 줬는데, 남색 요약 카드와 머리 줄이 겹쳐 어색했다(2026-11-20).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,7 +33,6 @@ fun GroupScreen(
     
     // Collect States
     val currentView by viewModel.currentView.collectAsState()
-    BackHandler(enabled = currentView != GroupViewModel.ViewState.LIST) { viewModel.backToList() }
     val isLoading by viewModel.isLoading.collectAsState()
     val isMembersLoading by viewModel.isMembersLoading.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
@@ -87,87 +85,71 @@ fun GroupScreen(
         }
     }
     
+    val isDetailOpen = currentView == GroupViewModel.ViewState.DETAIL
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        // 상세 시트가 열려 있으면 알림 줄은 시트 안에 띄운다(시트는 별도 창이라 아래 화면의 알림 줄을 가린다).
+        snackbarHost = { if (!isDetailOpen) SnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            if (currentView == GroupViewModel.ViewState.DETAIL) {
-                SmapTopBar(title = "그룹", onBack = { viewModel.backToList() })
-            }
-        }
     ) { paddingValues ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            AnimatedContent(
-                targetState = currentView,
-                transitionSpec = {
-                    // 리스트↔상세 전환 — 350ms enter / 245ms exit (Material Motion 표준)
-                    val enter = SmapMotion.enter<IntOffset>(SmapMotion.ScreenTransitionMs)
-                    val exit = SmapMotion.exit<IntOffset>()
-                    val fadeEnter = SmapMotion.enter<Float>(SmapMotion.ScreenTransitionMs)
-                    val fadeExit = SmapMotion.exit<Float>()
-                    if (targetState == GroupViewModel.ViewState.DETAIL) {
-                        (slideInHorizontally(animationSpec = enter) { it } +
-                            fadeIn(animationSpec = fadeEnter)) togetherWith
-                            (slideOutHorizontally(animationSpec = exit) { -it } +
-                                fadeOut(animationSpec = fadeExit))
-                    } else {
-                        (slideInHorizontally(animationSpec = enter) { -it } +
-                            fadeIn(animationSpec = fadeEnter)) togetherWith
-                            (slideOutHorizontally(animationSpec = exit) { it } +
-                                fadeOut(animationSpec = fadeExit))
-                    }
-                },
-                label = "viewTransition"
-            ) { view ->
-                when (view) {
-                    GroupViewModel.ViewState.LIST -> {
-                        GroupListContent(
-                            groups = groups,
-                            groupMemberCounts = groupMemberCounts,
-                            userName = viewModel.currentUserName(),
-                            currentUserIdx = viewModel.currentUserIdx(),
-                            inviteCode = inviteCode,
-                            isLoading = isLoading,
-                            isJoining = isJoining,
-                            isRefreshing = isRefreshing,
-                            onGroupClick = { viewModel.selectGroup(it) },
-                            onCreateClick = { viewModel.showCreateDialog() },
-                            onInviteCodeChange = { viewModel.updateInviteCode(it) },
-                            onPasteInviteCode = { viewModel.pasteInviteCode(it) },
-                            onJoinGroup = { viewModel.joinGroupByCode() },
-                            onRefresh = { viewModel.refresh() }
-                        )
-                    }
-                    GroupViewModel.ViewState.DETAIL -> {
-                        selectedGroup?.let { group ->
-                            GroupDetailContent(
-                                group = group,
-                                members = groupMembers,
-                                memberCount = groupMemberCounts[group.sgtIdx] ?: groupMembers.size,
-                                scheduleCount = weeklyScheduleCount,
-                                locationCount = totalLocationCount,
-                                isLoading = isMembersLoading,
-                                isOwner = viewModel.isCurrentUserOwner(),
-                                currentUserIdx = viewModel.currentUserIdx(),
-                                onEditClick = { viewModel.showEditDialog() },
-                                onDeleteClick = { viewModel.showDeleteDialog() },
-                                // 삭제와 나가기는 같은 확인 대화상자를 쓰고 isLeave 로 구분한다.
-                                onLeaveClick = { viewModel.showDeleteDialog() },
-                                onInviteClick = { viewModel.showInviteBottomSheet() },
-                                onCopyCode = {
-                                    group.sgtCode?.let {
-                                        clipboardManager.setText(AnnotatedString(it))
-                                        viewModel.showSuccess("초대 코드를 복사했어요")
-                                    }
-                                },
-                                onMemberClick = { member -> viewModel.showMemberManageDialog(member) }
-                            )
-                        }
-                    }
+            GroupListContent(
+                groups = groups,
+                groupMemberCounts = groupMemberCounts,
+                userName = viewModel.currentUserName(),
+                currentUserIdx = viewModel.currentUserIdx(),
+                inviteCode = inviteCode,
+                isLoading = isLoading,
+                isJoining = isJoining,
+                isRefreshing = isRefreshing,
+                onGroupClick = { viewModel.selectGroup(it) },
+                onCreateClick = { viewModel.showCreateDialog() },
+                onInviteCodeChange = { viewModel.updateInviteCode(it) },
+                onPasteInviteCode = { viewModel.pasteInviteCode(it) },
+                onJoinGroup = { viewModel.joinGroupByCode() },
+                onRefresh = { viewModel.refresh() }
+            )
+        }
+    }
+
+    // 그룹 상세 — 끝까지 펼친 바텀시트. 아래로 끌거나 뒤로 가기로 닫으면 목록으로 돌아간다.
+    if (isDetailOpen) {
+        selectedGroup?.let { group ->
+            // 시트 바탕을 상세 내용 바탕(종이색)과 맞춰 손잡이 영역과 내용이 한 장으로 보이게.
+            val sheetColor = if (isSystemInDarkTheme()) MaterialTheme.colorScheme.background else FamilyColors.Paper
+            ModalBottomSheet(
+                onDismissRequest = { viewModel.backToList() },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                containerColor = sheetColor,
+            ) {
+                // 끝까지 채우면 상태 표시줄까지 덮어 전체 화면처럼 보인다 → 위쪽을 조금 남겨 뒤의 목록이 보이게(iOS 큰 시트와 같은 느낌).
+                Box(Modifier.fillMaxHeight(0.92f)) {
+                    GroupDetailContent(
+                        group = group,
+                        members = groupMembers,
+                        memberCount = groupMemberCounts[group.sgtIdx] ?: groupMembers.size,
+                        scheduleCount = weeklyScheduleCount,
+                        locationCount = totalLocationCount,
+                        isLoading = isMembersLoading,
+                        isOwner = viewModel.isCurrentUserOwner(),
+                        currentUserIdx = viewModel.currentUserIdx(),
+                        onEditClick = { viewModel.showEditDialog() },
+                        onDeleteClick = { viewModel.showDeleteDialog() },
+                        // 삭제와 나가기는 같은 확인 대화상자를 쓰고 isLeave 로 구분한다.
+                        onLeaveClick = { viewModel.showDeleteDialog() },
+                        onInviteClick = { viewModel.showInviteBottomSheet() },
+                        onCopyCode = {
+                            group.sgtCode?.let {
+                                clipboardManager.setText(AnnotatedString(it))
+                                viewModel.showSuccess("초대 코드를 복사했어요")
+                            }
+                        },
+                        onMemberClick = { member -> viewModel.showMemberManageDialog(member) }
+                    )
+                    SnackbarHost(snackbarHostState, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
                 }
             }
         }

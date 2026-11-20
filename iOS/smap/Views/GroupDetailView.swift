@@ -38,11 +38,11 @@ struct GroupDetailView: View {
                 if ownerStatus != nil { manageSection }
             }
             .padding(SMAPTheme.Spacing.md)
+            // 바텀시트로 띄우므로(GroupListView) 머리 줄 없이 손잡이 아래에서 바로 요약 카드가 시작한다.
+            .padding(.top, SMAPTheme.Spacing.md)
             .padding(.bottom, SMAPTheme.Spacing.lg)
         }
         .background(SMAPTheme.Family.paper.ignoresSafeArea())
-        .navigationTitle("그룹")
-        .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             viewModel.selectedGroup = group
             viewModel.fetchGroupMembers(sgtIdx: group.sgt_idx)
@@ -102,7 +102,8 @@ struct GroupDetailView: View {
     // MARK: 요약 — 화면의 시각적 중심(남색 카드)
 
     private var heroSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        // 제목 줄과 통계 칸 사이는 SMAPHeroStats 의 위 여백(16)만 둔다 — 여기서 간격을 더하면 32 로 벌어져 어색했다.
+        VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .center, spacing: 14) {
                 if membersLoaded, !viewModel.groupMembers.isEmpty {
                     HStack(spacing: -10) {

@@ -306,8 +306,8 @@ fun GroupDetailContent(
     ) {
         // 요약 — 화면의 시각적 중심(남색 카드). 이전 흰 카드는 아래 묶음들과 구분이 안 돼 밋밋했다.
         item {
-            Column(Modifier.fillMaxWidth().background(FamilyColors.Ink, RoundedCornerShape(24.dp)).padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            // 제목 줄과 통계 칸 사이는 HeroStats 의 위 여백(16dp)만 둔다 — 여기서 간격을 더하면 32dp 로 벌어져 어색했다.
+            Column(Modifier.fillMaxWidth().background(FamilyColors.Ink, RoundedCornerShape(24.dp)).padding(20.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (!isLoading && members.isNotEmpty()) {
                         Row(horizontalArrangement = Arrangement.spacedBy((-10).dp)) {
