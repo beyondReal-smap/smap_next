@@ -1204,7 +1204,7 @@ class FirebaseService:
                             <div class="footer-contact">
                                 <div class="contact-info">
                                     📞 문의사항이 있으시면 고객센터로 연락해주세요.<br>
-                                    💌 support@smap.site
+                                    💌 admin@aiagnt.kr
                                 </div>
                             </div>
                         </div>
@@ -1244,7 +1244,7 @@ class FirebaseService:
 ╠══════════════════════════════════════════════╣
 ║                                              ║
 ║  📞   문의사항                                ║
-║     고객센터: support@smap.site              ║
+║     고객센터: admin@aiagnt.kr              ║
 ║                                              ║
 ║  🔄   이 알림은 SMAP 시스템에서               ║
 ║       FCM 전송 실패 시 자동으로 발송됩니다.     ║

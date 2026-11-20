@@ -14,7 +14,7 @@ import { SITE, absoluteUrl } from "@/content/site";
 export const dynamic = "force-static";
 
 /** MCP HTTP 엔드포인트. 서버에서만 읽히므로 NEXT_PUBLIC_ 접두사를 쓰지 않습니다. */
-const MCP_HTTP_URL = process.env.MCP_HTTP_URL ?? "https://mcp.smap.site/mcp";
+const MCP_HTTP_URL = process.env.MCP_HTTP_URL ?? "https://mcp.aiagnt.kr/mcp";
 
 export function GET() {
   return Response.json(

@@ -287,7 +287,7 @@ def reverse_geocode(lat: float, lon: float) -> dict:
     """
     try:
         with httpx.Client(timeout=5.0, headers={
-            "User-Agent": "smap-app/1.0 (contact: admin@smap.site)"
+            "User-Agent": "smap-app/1.0 (contact: admin@aiagnt.kr)"
         }) as client:
             resp = client.get(
                 "https://nominatim.openstreetmap.org/reverse",

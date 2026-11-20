@@ -294,15 +294,15 @@ app.mount("/uploads", StaticFiles(directory=str(STORAGE_DIR / "uploads")), name=
 @app.get(f"{settings.API_V1_STR}/openapi.json", include_in_schema=False)
 async def get_openapi_schema(request: Request):
     """요청이 들어온 호스트 기반으로 동적 OpenAPI 스키마 반환"""
-    host = request.headers.get("host", "api3.smap.site")
+    host = request.headers.get("host", "api3.aiagnt.kr")
     forwarded_proto = request.headers.get("x-forwarded-proto", "https")
     current_server = f"{forwarded_proto}://{host}"
 
     all_servers = [
         {"url": current_server, "description": "Current server"},
-        {"url": "https://api3.smap.site", "description": "Main API (443)"},
-        {"url": "https://api3.smap.site:8000", "description": "API Port 8000"},
-        {"url": "https://api3.smap.site:3000", "description": "API Port 3000"},
+        {"url": "https://api3.aiagnt.kr", "description": "Main API (443)"},
+        {"url": "https://api3.aiagnt.kr:8000", "description": "API Port 8000"},
+        {"url": "https://api3.aiagnt.kr:3000", "description": "API Port 3000"},
     ]
 
     seen_urls: set[str] = set()
@@ -342,9 +342,9 @@ def custom_openapi():
         routes=app.routes,
     )
     openapi_schema["servers"] = [
-        {"url": "https://api3.smap.site", "description": "Main API (443)"},
-        {"url": "https://api3.smap.site:8000", "description": "API Port 8000"},
-        {"url": "https://api3.smap.site:3000", "description": "API Port 3000"},
+        {"url": "https://api3.aiagnt.kr", "description": "Main API (443)"},
+        {"url": "https://api3.aiagnt.kr:8000", "description": "API Port 8000"},
+        {"url": "https://api3.aiagnt.kr:3000", "description": "API Port 3000"},
     ]
     app.openapi_schema = openapi_schema
     return app.openapi_schema

@@ -153,12 +153,10 @@ export const PRICING = {
 export const EXTERNAL_DOCS = {
   faq: "https://schedulemap.notion.site/FAQ-8f37107b3c7c4307afd4297c7d71b5d5?pvs=4",
   help: "https://schedulemap.notion.site/SMAP-4afc9e6b71a6434cbcbf9dc4ec6f9d9d?pvs=4",
-  terms:
-    "https://schedulemap.notion.site/30b32b5ad0bc4f99a39b28c0fe5f1de4?pvs=4",
-  privacy:
-    "https://schedulemap.notion.site/2ac62e02f97b4d61945d68c2d89109e9?pvs=4",
-  locationTerms:
-    "https://schedulemap.notion.site/69cf94c6a04e471d8c3e3043f95baefb?pvs=4",
+  // 약관·개인정보 처리방침은 2026-11-19 Notion 에서 사이트 내부(/legal/*)로 옮겼다(Notion 비공개 전환).
+  terms: absoluteUrl("/legal/terms"),
+  privacy: absoluteUrl("/legal/privacy"),
+  locationTerms: absoluteUrl("/legal/location"),
 } as const;
 
 /**
