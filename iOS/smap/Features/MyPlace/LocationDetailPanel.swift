@@ -28,8 +28,12 @@ struct LocationDetailPanel: View {
     @State private var showDeleteConfirmation: Bool = false
     @State private var locationPendingDelete: SavedLocation?
 
-    // 보기 화면은 반만, 편집·등록은 크게 연다(키보드와 입력칸이 함께 보이게).
-    @State private var detent: PresentationDetent = .medium
+    // 보기 화면은 내용 높이만큼만, 편집·등록은 크게 연다(키보드와 입력칸이 함께 보이게).
+    // 2026-11-20: 보기 화면을 반 화면(.medium)으로 열었더니 내용(이름·주소·도착 알림)이 짧아 아래가 텅 비어 보였다.
+    @State private var isLarge = false
+    @State private var headerHeight: CGFloat = 0
+    @State private var contentHeight: CGFloat = 0
+    @State private var footerHeight: CGFloat = 0
 
     var body: some View {
         // 36단계 재설계와 같은 모양 — 일정 상세 시트처럼(Android LocationDetailSheet 와 같은 구성).
@@ -38,6 +42,7 @@ struct LocationDetailPanel: View {
         // 색은 내장소 탭 강조색(보라)을 환경값(smapAccent)으로 물려받는다.
         VStack(spacing: 0) {
             header
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerHeight = $0 }
             ScrollView {
                 Group {
                     if let location = viewModel.selectedLocation, !viewModel.isEditMode {
@@ -48,19 +53,21 @@ struct LocationDetailPanel: View {
                 }
                 .padding(.horizontal, SMAPTheme.Spacing.md)
                 .padding(.bottom, SMAPTheme.Spacing.md)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
             }
             .scrollDismissesKeyboard(.interactively)
             bottomButtons
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { footerHeight = $0 }
         }
         .background(SMAPTheme.Surface.canvas.ignoresSafeArea())
-        .presentationDetents([.medium, .large], selection: $detent)
+        .presentationDetents([fittedDetent, .large], selection: detentSelection)
         .presentationDragIndicator(.visible)
         .onAppear {
             setupInitialValues()
-            if viewModel.isEditMode || viewModel.selectedLocation == nil { detent = .large }
+            if viewModel.isEditMode || viewModel.selectedLocation == nil { isLarge = true }
         }
         .onChange(of: viewModel.isEditMode) { _, editing in
-            if editing { withAnimation { detent = .large } }
+            if editing { withAnimation { isLarge = true } }
         }
         .sheet(isPresented: $showLocationSearch) {
             NavigationStack {
@@ -104,6 +111,21 @@ struct LocationDetailPanel: View {
         } message: { location in
             Text("\"\(location.slt_title ?? "이 장소")\" 은(는) 삭제 후 복구할 수 없습니다.")
         }
+    }
+
+    // MARK: - 시트 높이
+
+    /// 머리 줄 + 내용 + 아래 버튼을 잰 높이. 재기 전(첫 그리기)에는 반 화면으로 둔다.
+    private var fittedDetent: PresentationDetent {
+        contentHeight > 0 ? .height(headerHeight + contentHeight + footerHeight) : .medium
+    }
+
+    /// 잰 높이가 바뀌어도 "작게/크게" 선택이 유지되게 Bool 로 들고, 표시할 때 지금 높이로 바꾼다.
+    private var detentSelection: Binding<PresentationDetent> {
+        Binding(
+            get: { isLarge ? .large : fittedDetent },
+            set: { isLarge = ($0 == .large) }
+        )
     }
 
     // MARK: - 머리 줄 [닫기] 제목

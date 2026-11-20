@@ -162,7 +162,8 @@ struct MainTabView: View {
         let isLeaving = index == transitionFrom && !isSelected
         var x: CGFloat = 0
         if let from = transitionFrom, from != selectedTab {
-            let direction: CGFloat = selectedTab > from ? 1 : -1
+            // 밀리는 방향은 탭 번호가 아니라 탭바에서의 자리 순서 — 홈이 가운데로 옮겨 가 둘이 달라졌다.
+            let direction: CGFloat = MainTabOrder.position(of: selectedTab) > MainTabOrder.position(of: from) ? 1 : -1
             if isSelected { x = direction * width * (1 - transitionProgress) }
             if isLeaving { x = -direction * width * transitionProgress }
         }
@@ -216,7 +217,15 @@ struct MainTabView: View {
 
 // MARK: - 하단 탭바
 
+/// 탭 번호(0 홈 · 1 그룹 · 2 일정 · 3 내장소 · 4 활동 로그)는 그대로 두고, 탭바에 놓는 순서만 바꾼다.
+/// 2026-11-20 홈을 가운데로 — 번호를 바꾸면 화면·강조색·방문 표시 등 번호에 기대는 곳이 모두 흔들린다(Android MainTabOrder 와 같음).
+enum MainTabOrder {
+    static let display = [1, 2, 0, 3, 4]
+    static func position(of tab: Int) -> Int { display.firstIndex(of: tab) ?? tab }
+}
+
 /// 하단 탭바 — Android 와 같은 흰 바탕 + 선택 탭은 그 메뉴의 강조색(회색 미선택), 아이콘 위 글자 아래.
+/// 홈만 가운데 위로 솟은 남색 원 버튼 — 지도 홈이 앱의 중심이라 늘 눈에 띄게(선택 여부와 무관하게 채움).
 private struct SMAPTabBar: View {
     let selected: Int
     let onSelect: (Int) -> Void
@@ -229,20 +238,28 @@ private struct SMAPTabBar: View {
         ("활동 로그", "clock.arrow.circlepath", "clock.arrow.circlepath"),
     ]
     private static let unselectedColor = SMAPTheme.Family.muted
+    private static let homeButtonSize: CGFloat = 54
 
     var body: some View {
         HStack(spacing: 0) {
-            ForEach(Array(Self.items.enumerated()), id: \.offset) { index, item in
+            ForEach(MainTabOrder.display, id: \.self) { index in
+                let item = Self.items[index]
                 let isSelected = index == selected
+                let isHome = index == 0
                 Button {
                     onSelect(index)
                 } label: {
                     VStack(spacing: 4) {
-                        Image(systemName: isSelected ? item.selectedIcon : item.icon)
-                            .font(.system(size: 20, weight: isSelected ? .semibold : .regular))
-                            .frame(height: 24)
+                        if isHome {
+                            // 자리만 차지 — 원 버튼은 탭바 위에 따로 겹쳐 그린다(글자 줄을 다른 탭과 맞추려고)
+                            Color.clear.frame(width: 24, height: 24)
+                        } else {
+                            Image(systemName: isSelected ? item.selectedIcon : item.icon)
+                                .font(.system(size: 20, weight: isSelected ? .semibold : .regular))
+                                .frame(height: 24)
+                        }
                         Text(item.title)
-                            .font(.suite(size: 11, weight: isSelected ? .medium : .regular))
+                            .font(.suite(size: 11, weight: isSelected || isHome ? .semibold : .regular))
                             .lineLimit(1)
                     }
                     .foregroundStyle(isSelected ? SMAPAccent.forTab(index).base : Self.unselectedColor)
@@ -256,10 +273,41 @@ private struct SMAPTabBar: View {
                 .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
             }
         }
+        // 홈 원 버튼은 탭 항목 버튼 밖에 따로 둔다 — 항목 안에 넣으면 탭바 위로 솟은 부분이
+        // 그 항목의 누름 영역(contentShape 사각형) 밖이라 눌리지 않는다. 홈은 가운데 칸이라 가운데 정렬.
+        .overlay(alignment: .top) {
+            // Button 이 아닌 탭 제스처 — Button 은 숨겨도 이름 없는 "버튼"으로 읽혔다. 손가락 사용자 전용, 음성 안내는 "홈 탭" 항목이 맡는다.
+            homeButton(isSelected: selected == 0)
+                .onTapGesture { onSelect(0) }
+                .offset(y: Self.homeButtonTop)
+        }
         .background {
             Color.white
                 .overlay(alignment: .top) { Rectangle().fill(SMAPTheme.Surface.divider).frame(height: 0.5) }
                 .ignoresSafeArea(edges: .bottom)
         }
+    }
+
+    /// 원 위끝 위치 — 아이콘 자리 중심(위 여백 8 + 12)보다 원 중심이 14 위에 오게.
+    private static var homeButtonTop: CGFloat { 8 + 12 - 14 - homeButtonSize / 2 }
+
+    /// 가운데 홈 원 버튼 — 탭바 위로 솟게(위치는 homeButtonTop).
+    private func homeButton(isSelected: Bool) -> some View {
+        let accent = SMAPAccent.forTab(0)
+        let size = Self.homeButtonSize
+        return Circle()
+            .fill(accent.gradient)
+            .overlay(Circle().stroke(Color.white, lineWidth: 3))
+            .overlay {
+                Image(systemName: "house.fill")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+            .frame(width: size, height: size)
+            .shadow(color: accent.deep.opacity(isSelected ? 0.35 : 0.22), radius: isSelected ? 8 : 5, y: 3)
+            .contentShape(Circle())
+            // 읽기·선택 상태는 아래 "홈 탭" 항목이 맡는다 — 집 아이콘이 "집" 버튼으로 따로 읽히지 않게 안쪽까지 숨긴다.
+            .accessibilityElement(children: .ignore)
+            .accessibilityHidden(true)
     }
 }

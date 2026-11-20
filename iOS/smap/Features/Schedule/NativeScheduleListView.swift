@@ -430,57 +430,24 @@ struct ScheduleMonthCalendar: View {
 
 /// 왼쪽 시각(시작·끝), 가운데 제목과 "누구 · 어디 · 반복", 오른쪽 상태(진행 중일 때만 남색으로 강조).
 /// 이전 카드의 … 메뉴는 없앴다 — 눌러서 여는 상세 시트에 수정·삭제가 있다.
+/// 일정 탭 한 줄 — 모양은 공용 SMAPScheduleRow(홈 시트와 같은 줄). 여기서는 일정 모델을 값으로 풀어 넘긴다.
 struct ScheduleRow: View {
-    @Environment(\.smapAccent) private var accent
     let schedule: Schedule
     let action: () -> Void
 
     var body: some View {
-        let allDay = schedule.sst_all_day == "Y"
-        let start = scheduleClock(schedule.sst_sdate)
-        let end = scheduleClock(schedule.sst_edate)
-        let subtitle = [
-            schedule.validMemberName.isEmpty ? nil : schedule.validMemberName,
-            schedule.sst_location_title.flatMap { $0.isEmpty ? nil : $0 },
-            schedule.isRecurring ? (schedule.repeatDescription ?? "반복") : nil,
-        ].compactMap { $0 }.joined(separator: " · ")
-
-        SMAPListRow(
+        SMAPScheduleRow(
+            start: scheduleClock(schedule.sst_sdate),
+            end: scheduleClock(schedule.sst_edate),
+            allDay: schedule.sst_all_day == "Y",
             title: schedule.sst_title.flatMap { $0.isEmpty ? nil : $0 } ?? "제목 없음",
-            subtitle: subtitle.isEmpty ? nil : subtitle,
-            action: action,
-            leading: {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(allDay ? "종일" : (start ?? "-"))
-                        .font(SMAPTheme.Font.bodyBold)
-                        .foregroundStyle(schedule.status == .completed ? SMAPTheme.Surface.onSurfaceMuted : accent.base)
-                    if !allDay, let end {
-                        Text(end)
-                            .font(SMAPTheme.Font.captionSmall)
-                            .foregroundStyle(SMAPTheme.Surface.onSurfaceMuted)
-                    }
-                }
-                .frame(width: 52, alignment: .leading)
-            },
-            trailing: {
-                HStack(spacing: SMAPTheme.Spacing.sm) {
-                    if schedule.isRecurring {
-                        Image(systemName: "repeat")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(SMAPTheme.Surface.onSurfaceMuted)
-                            .accessibilityLabel("반복 일정")
-                    }
-                    if schedule.status == .ongoing {
-                        // 진행 중은 지금 봐야 할 일정이라 남색으로 채워 목록에서 가장 먼저 보이게 한다.
-                        Text(schedule.status.text)
-                            .font(SMAPTheme.Font.captionBold)
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(accent.gradient, in: Capsule())
-                    }
-                }
-            }
+            member: schedule.validMemberName.isEmpty ? nil
+                : .init(name: schedule.validMemberName, photo: schedule.validMemberPhoto, id: schedule.mt_idx),
+            place: schedule.sst_location_title.flatMap { $0.isEmpty ? nil : $0 },
+            repeatText: schedule.isRecurring ? (schedule.repeatDescription ?? "반복") : nil,
+            isDone: schedule.status == .completed,
+            ongoingText: schedule.status == .ongoing ? schedule.status.text : nil,
+            action: action
         )
     }
 }

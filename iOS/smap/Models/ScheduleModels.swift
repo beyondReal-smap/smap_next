@@ -127,39 +127,12 @@ struct Schedule: Codable, Identifiable, Equatable {
     }
 
     var repeatDescription: String? {
-        if let v = sst_repeat_json_v, !v.isEmpty, v != "안함", v != "None" {
-            return v
-        }
-        guard let jsonResult = sst_repeat_json,
-              let data = jsonResult.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
-              let r1 = json["r1"] as? String else {
-            return nil
-        }
-        switch r1 {
-        case "1": return "매일"
-        case "2": return "매월"
-        case "3": return "매주"
-        case "4": return "매년"
-        default: return nil
-        }
+        ScheduleRepeat.description(json: sst_repeat_json, label: sst_repeat_json_v)
     }
 
     // Check if schedule is recurring (robust check)
     var isRecurring: Bool {
-        // Check repeat_json
-        if let json = sst_repeat_json, !json.isEmpty, json != "null" {
-            // Check if it's "None" or "안함" just in case, though usually those are in repeat_json_v
-             if json == "None" || json == "안함" { return false }
-            return true
-        }
-
-        // Check pidx (parent index for recurring instances)
-        if let pidx = sst_pidx, pidx > 0 {
-            return true
-        }
-
-        return false
+        ScheduleRepeat.isRecurring(json: sst_repeat_json, parentIdx: sst_pidx)
     }
 
     static func == (lhs: Schedule, rhs: Schedule) -> Bool {
@@ -274,5 +247,37 @@ enum ScheduleDisplayStatus {
         case .upcoming: return "예정"
         case .defaultStatus: return "-"
         }
+    }
+}
+
+/// 반복 일정 판단·문구 — 일정 탭(Schedule)과 홈(SmapSchedule) 모델이 같은 규칙을 쓰도록 한곳에 둔다.
+enum ScheduleRepeat {
+    /// "매주 화·금" 같은 서버 문구가 있으면 그대로, 없으면 반복 JSON 의 r1 로 "매일/매주/매월/매년".
+    static func description(json: String?, label: String?) -> String? {
+        if let label, !label.isEmpty, label != "안함", label != "None" {
+            return label
+        }
+        guard let json,
+              let data = json.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
+              let r1 = object["r1"] as? String else {
+            return nil
+        }
+        switch r1 {
+        case "1": return "매일"
+        case "2": return "매월"
+        case "3": return "매주"
+        case "4": return "매년"
+        default: return nil
+        }
+    }
+
+    /// 반복 JSON 이 있거나(안함·None 제외) 반복으로 생긴 일정(부모 sst_pidx > 0)이면 반복.
+    static func isRecurring(json: String?, parentIdx: Int?) -> Bool {
+        if let json, !json.isEmpty, json != "null" {
+            return json != "None" && json != "안함"
+        }
+        if let parentIdx, parentIdx > 0 { return true }
+        return false
     }
 }

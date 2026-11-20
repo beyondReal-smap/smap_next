@@ -28,6 +28,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.naver.maps.geometry.LatLng
 import com.naver.maps.map.CameraPosition
 import com.naver.maps.map.CameraUpdate
+import com.naver.maps.map.compose.PolylineOverlay
 import com.dmonster.smap.data.model.SmapSchedule
 import com.dmonster.smap.data.model.ScheduleStatus
 import com.naver.maps.map.compose.*
@@ -368,6 +369,19 @@ fun HomeScreen(
                 }
 
                 // Schedule Markers — sstIdx 로 key 고정
+                // 일정 동선 — 멤버별로 그날 일정 장소를 시각 순 점선으로 잇는다(마커 아래)
+                val routes = remember(mapSchedules) { scheduleRoutes(mapSchedules) }
+                routes.forEach { coords ->
+                    PolylineOverlay(
+                        coords = coords,
+                        width = 3.dp,
+                        color = FamilyColors.Ink.copy(alpha = 0.6f),
+                        pattern = arrayOf(8.dp, 6.dp),
+                        capType = com.naver.maps.map.compose.LineCap.Round,
+                        joinType = com.naver.maps.map.compose.LineJoin.Round,
+                    )
+                }
+
                 mapSchedules.forEachIndexed { index, schedule ->
                     key(schedule.sstIdx) {
                         val lat = schedule.sstLocationLat

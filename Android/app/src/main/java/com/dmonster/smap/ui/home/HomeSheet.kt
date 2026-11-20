@@ -50,6 +50,7 @@ import com.dmonster.smap.ui.components.DateStrip
 import com.dmonster.smap.ui.components.MemberStrip
 import com.dmonster.smap.ui.components.SmapAvatar
 import com.dmonster.smap.ui.components.SmapListRow
+import com.dmonster.smap.ui.components.SmapScheduleRow
 import com.dmonster.smap.ui.components.SmapRowDivider
 import com.dmonster.smap.ui.components.SmapRowIcon
 import com.dmonster.smap.ui.components.SmapSection
@@ -213,13 +214,27 @@ fun ColumnScope.HomeSheetContent(
                     } else {
                         daySchedules.forEachIndexed { i, s ->
                             if (i > 0) SmapRowDivider()
-                            SmapListRow(
-                                title = s.displayTitle,
-                                subtitle = listOfNotNull(s.validMemberName, s.location?.takeIf { it.isNotBlank() }).joinToString(" · "),
-                                leading = { TimeBadge(scheduleTime(s)) },
-                                // 장소가 있는 일정만 누를 수 있다 — 장소 없는 일정은 옮겨 갈 곳이 없으니 누름 표시도 하지 않는다.
-                                onClick = if (s.mapLatLng != null) ({ onSelectSchedule(s) }) else null,
-                            )
+                            // 일정 탭과 같은 줄(시각·막대 / 제목 / 멤버·반복 / 장소). 색은 일정 강조색.
+                            // 멤버는 전체 보기일 때만 — 한 멤버만 볼 때는 모두 같은 사람이다.
+                            // 그룹 일정 응답엔 멤버 이름이 없어(이전엔 모두 "나"로 보일 수 있었다) 일정 주인으로 멤버 목록에서 찾는다.
+                            val owner = if (selected == null) members.firstOrNull { it.mtIdx == (s.mtIdx ?: s.mtScheduleIdx) } else null
+                            SmapAccentTheme(SmapAccent.Schedule) {
+                                SmapScheduleRow(
+                                    start = markerClock(s.date),
+                                    end = markerClock(s.sstEdate),
+                                    allDay = s.sstAllDay == "Y",
+                                    title = s.displayTitle,
+                                    memberName = owner?.displayName,
+                                    memberPhoto = owner?.mtFile1,
+                                    memberId = owner?.mtIdx,
+                                    place = s.location?.takeIf { it.isNotBlank() },
+                                    repeatText = if (s.isRecurring) (s.repeatDescription ?: "반복") else null,
+                                    isDone = s.status == ScheduleStatus.COMPLETED,
+                                    ongoingLabel = if (s.status == ScheduleStatus.ONGOING) s.status.text else null,
+                                    // 장소가 있는 일정만 누를 수 있다 — 장소 없는 일정은 옮겨 갈 곳이 없으니 누름 표시도 하지 않는다.
+                                    onClick = if (s.mapLatLng != null) ({ onSelectSchedule(s) }) else null,
+                                )
+                            }
                         }
                     }
                 }
@@ -259,7 +274,7 @@ private fun CountPill(text: String) {
 }
 
 @Composable
-private fun TimeBadge(text: String) {
+internal fun TimeBadge(text: String) {
     Box(
         Modifier.width(52.dp).heightIn(min = 28.dp)
             .background(SmapAccent.Schedule.container, RoundedCornerShape(8.dp)),

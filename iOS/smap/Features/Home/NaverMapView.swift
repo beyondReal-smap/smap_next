@@ -118,6 +118,9 @@ struct NaverMapView: UIViewRepresentable {
         var memberMarkers: [Int: NMFMarker] = [:]
         var memberSnapshots: [Int: SmapGroupMember] = [:]
         var scheduleMarkers: [String: NMFMarker] = [:]
+        /// 일정 동선(멤버별 점선). 좌표가 그대로면 다시 그리지 않는다.
+        var scheduleRoutes: [NMFPolylineOverlay] = []
+        var scheduleRouteSignature = ""
         var scheduleSignatures: [String: String] = [:]
         private static let profileImages = NSCache<NSURL, UIImage>()
         private var imageRequests: Set<URL> = []
@@ -196,13 +199,13 @@ struct NaverMapView: UIViewRepresentable {
                 if scheduleSignatures[id] == signature { continue }
                 let marker = scheduleMarkers[id] ?? NMFMarker()
                 marker.position = NMGLatLng(lat: lat, lng: lon)
-                marker.iconImage = NMFOverlayImage(image: createScheduleMarkerImage(order: index + 1, title: schedule.title ?? "일정", startTime: schedule.date, status: schedule.status))
+                marker.iconImage = NMFOverlayImage(image: ScheduleMarkerRenderer.image(order: index + 1, title: schedule.title ?? "일정", startTime: schedule.date, tone: .init(schedule.status)))
                 marker.anchor = CGPoint(x: 0.5, y: ScheduleMarkerLayout.anchorY)
                 marker.userInfo = ["schedule": schedule]
                 // 끝난 일정은 흐리게·아래로 — 남은 일정이 먼저 보이게
-                let isDone = schedule.status == .completed
-                marker.alpha = isDone ? 0.6 : 1
-                marker.zIndex = isDone ? 900 : 1000
+                let tone = ScheduleMarkerRenderer.Tone(schedule.status)
+                marker.alpha = tone.alpha
+                marker.zIndex = tone.zIndex
                 marker.mapView = mapView
                 scheduleMarkers[id] = marker
                 scheduleSignatures[id] = signature
@@ -211,97 +214,32 @@ struct NaverMapView: UIViewRepresentable {
                 scheduleMarkers.removeValue(forKey: id)?.mapView = nil
                 scheduleSignatures.removeValue(forKey: id)
             }
+            updateScheduleRoutes(schedules, on: mapView)
+        }
+
+        // MARK: - Schedule Routes
+
+        /// 멤버마다 그날 일정 장소를 시작 시각 순으로 점선으로 잇는다 — "오늘 어디 어디 가는지"를 한눈에.
+        /// 멤버끼리 섞어 이으면 아무도 다니지 않는 길이 되므로 mt_idx 로 나눈다. `schedules` 는 이미 시각 순.
+        private func updateScheduleRoutes(_ schedules: [SmapSchedule], on mapView: NMFMapView) {
+            let routes = ScheduleRoute.routes(schedules)
+            let signature = routes.map { $0.map { "\($0.latitude),\($0.longitude)" }.joined(separator: ";") }.joined(separator: "|")
+            guard signature != scheduleRouteSignature else { return }
+            scheduleRouteSignature = signature
+            scheduleRoutes.forEach { $0.mapView = nil }
+            scheduleRoutes = routes.compactMap { coords in
+                guard let line = NMFPolylineOverlay(coords.map { NMGLatLng(lat: $0.latitude, lng: $0.longitude) }) else { return nil }
+                line.width = 3
+                line.color = UIColor(SMAPTheme.Family.ink).withAlphaComponent(0.6)
+                line.pattern = [8, 6]
+                line.capType = .round
+                line.joinType = .round
+                line.mapView = mapView
+                return line
+            }
         }
 
         // MARK: - Schedule Marker Factory
-
-        /// 일정 마커 한 장. 좌표는 아래 위치 점의 중심 — `scheduleMarkerAnchorY` 로 맞춘다.
-        /// 2026-11-20 한 줄 말풍선으로 바꿈: 이전엔 순번 원·제목·시간·상태 점 네 칸을 세로로 쌓아
-        /// 멤버 아바타보다 두 배 가까이 높았고, 일정 몇 개만 돼도 서로·아바타와 겹쳤다.
-        private func createScheduleMarkerImage(order: Int, title: String, startTime: String?, status: ScheduleStatus) -> UIImage {
-            let layout = ScheduleMarkerLayout.self
-            let tint = scheduleStatusTint(status)
-            let navy = UIColor(SMAPTheme.Family.ink)
-
-            let orderText = "\(order)"
-            let orderAttr: [NSAttributedString.Key: Any] = [.font: UIFont.suite(size: 11, weight: .bold), .foregroundColor: UIColor.white]
-            let timeText = startTime.flatMap(extractTime(from:))
-            let timeAttr: [NSAttributedString.Key: Any] = [.font: UIFont.suite(size: 11, weight: .semibold), .foregroundColor: UIColor.white.withAlphaComponent(0.75)]
-            let displayTitle = title.count > 10 ? String(title.prefix(10)) + "…" : title
-            let titleAttr: [NSAttributedString.Key: Any] = [.font: UIFont.suite(size: 12, weight: .bold), .foregroundColor: UIColor.white]
-
-            let timeSize = timeText?.size(withAttributes: timeAttr) ?? .zero
-            let titleSize = displayTitle.size(withAttributes: titleAttr)
-            // [안쪽 여백 4][번호 원][6][시각][5][제목][10]
-            var chipWidth = layout.inset + layout.orderSize + layout.gap + ceil(titleSize.width) + layout.trailing
-            if timeText != nil { chipWidth += ceil(timeSize.width) + layout.timeGap }
-            let width = chipWidth + layout.border * 2
-            let height = layout.totalHeight
-
-            let renderer = UIGraphicsImageRenderer(size: CGSize(width: width, height: height))
-            return renderer.image { context in
-                let ctx = context.cgContext
-                let chipRect = CGRect(x: layout.border, y: layout.border, width: chipWidth, height: layout.chipHeight)
-                let cx = width / 2
-
-                // 1. 꼬리 (칩 아래 가운데 → 위치 점)
-                ctx.setFillColor(navy.cgColor)
-                ctx.move(to: CGPoint(x: cx - layout.tailWidth / 2, y: chipRect.maxY - 1))
-                ctx.addLine(to: CGPoint(x: cx + layout.tailWidth / 2, y: chipRect.maxY - 1))
-                ctx.addLine(to: CGPoint(x: cx, y: chipRect.maxY + layout.tailHeight))
-                ctx.closePath()
-                ctx.fillPath()
-
-                // 2. 칩 — 흰 테두리로 지도 위에서 떠 보이게
-                let chipPath = UIBezierPath(roundedRect: chipRect, cornerRadius: layout.chipHeight / 2)
-                ctx.setFillColor(navy.cgColor)
-                ctx.addPath(chipPath.cgPath)
-                ctx.fillPath()
-                ctx.setStrokeColor(UIColor.white.cgColor)
-                ctx.setLineWidth(layout.border)
-                ctx.addPath(chipPath.cgPath)
-                ctx.strokePath()
-
-                // 3. 번호 원 — 색이 곧 상태
-                let orderRect = CGRect(x: chipRect.minX + layout.inset, y: chipRect.midY - layout.orderSize / 2, width: layout.orderSize, height: layout.orderSize)
-                ctx.setFillColor(tint.cgColor)
-                ctx.fillEllipse(in: orderRect)
-                let orderSize = orderText.size(withAttributes: orderAttr)
-                orderText.draw(at: CGPoint(x: orderRect.midX - orderSize.width / 2, y: orderRect.midY - orderSize.height / 2), withAttributes: orderAttr)
-
-                // 4. 시각 · 제목
-                var x = orderRect.maxX + layout.gap
-                if let timeText {
-                    timeText.draw(at: CGPoint(x: x, y: chipRect.midY - timeSize.height / 2), withAttributes: timeAttr)
-                    x += ceil(timeSize.width) + layout.timeGap
-                }
-                displayTitle.draw(at: CGPoint(x: x, y: chipRect.midY - titleSize.height / 2), withAttributes: titleAttr)
-
-                // 5. 위치 점 — 이 점의 중심이 일정 좌표
-                let dotRect = CGRect(x: cx - layout.dotSize / 2, y: layout.dotCenterY - layout.dotSize / 2, width: layout.dotSize, height: layout.dotSize)
-                ctx.setFillColor(tint.cgColor)
-                ctx.fillEllipse(in: dotRect)
-                ctx.setStrokeColor(UIColor.white.cgColor)
-                ctx.setLineWidth(2)
-                ctx.strokeEllipse(in: dotRect)
-            }
-        }
-
-        /// 번호 원·위치 점 색. 예정(과 상태 없음)은 주황, 진행 중은 초록, 끝난 일정은 회색(마커도 흐리게).
-        /// 초록은 흰 숫자가 읽히는 진한 값(#15803D, 대비 5:1) — 시스템 초록은 대비가 2:1 남짓이다.
-        private func scheduleStatusTint(_ status: ScheduleStatus) -> UIColor {
-            switch status {
-            case .ongoing: return UIColor(red: 0x15 / 255, green: 0x80 / 255, blue: 0x3D / 255, alpha: 1)
-            case .completed: return UIColor(red: 0x6B / 255, green: 0x72 / 255, blue: 0x80 / 255, alpha: 1)
-            case .upcoming, .defaultStatus: return UIColor(SMAPAccent.orange.base)
-            }
-        }
-
-        /// "2026-11-20 15:30:00"·"2026-11-20T15:30:00" → "15:30". 이전에는 T 형식만 읽어 공백 형식이면 날짜 전체가 찍혔다.
-        private func extractTime(from dateStr: String) -> String? {
-            guard let range = dateStr.range(of: #"[T ](\d{2}):(\d{2})"#, options: .regularExpression) else { return nil }
-            return String(dateStr[range].dropFirst())
-        }
 
         // 이미지 URL 처리 헬퍼 (Frontend imageUtils.ts 로직 반영)
         static func getSafeImageUrl(_ mtFile1: String?) -> URL? {
@@ -462,5 +400,138 @@ enum ScheduleMarkerLayout {
     static var totalHeight: CGFloat { dotCenterY + dotSize / 2 + 1.5 }  // 점 테두리 여유
     /// 마커 기준점 = 위치 점 중심
     static var anchorY: CGFloat { dotCenterY / totalHeight }
+}
+
+/// 일정 동선 계산 — Android `scheduleRoutes()` 와 같은 규칙.
+enum ScheduleRoute {
+    /// 멤버별 좌표 목록(2곳 이상인 것만). 같은 자리가 이어지면 한 번만, 멤버를 모르는 일정은 잇지 않는다.
+    static func routes(_ schedules: [SmapSchedule]) -> [[CLLocationCoordinate2D]] {
+        var order: [Int] = []
+        var byMember: [Int: [CLLocationCoordinate2D]] = [:]
+        for schedule in schedules {
+            guard let member = schedule.ownerIdx, let point = schedule.mapCoordinate else { continue }
+            if byMember[member] == nil { order.append(member) }
+            var points = byMember[member, default: []]
+            if let last = points.last, last.latitude == point.latitude, last.longitude == point.longitude { continue }
+            points.append(point)
+            byMember[member] = points
+        }
+        return order.compactMap { byMember[$0] }.filter { $0.count >= 2 }
+    }
+}
+
+/// 일정 마커 그림 — 홈 지도와 활동 로그 지도가 함께 쓴다(Android MarkerUtils.createScheduleMarkerBitmap 과 같은 모양).
+enum ScheduleMarkerRenderer {
+    /// 번호 원·위치 점 색의 단계. 홈(SmapSchedule)과 일정 API(Schedule)의 상태 종류가 달라 여기로 모은다.
+    enum Tone {
+        case upcoming, ongoing, done
+
+        init(_ status: ScheduleStatus) {
+            switch status {
+            case .ongoing: self = .ongoing
+            case .completed: self = .done
+            case .upcoming, .defaultStatus: self = .upcoming
+            }
+        }
+
+        init(_ status: ScheduleDisplayStatus) {
+            switch status {
+            case .ongoing: self = .ongoing
+            case .completed: self = .done
+            case .upcoming, .defaultStatus: self = .upcoming
+            }
+        }
+
+        /// 예정 주황, 진행 중 초록(#15803D, 흰 숫자 대비 5:1 — 시스템 초록은 2:1 남짓), 끝남 회색.
+        var tint: UIColor {
+            switch self {
+            case .ongoing: return UIColor(red: 0x15 / 255, green: 0x80 / 255, blue: 0x3D / 255, alpha: 1)
+            case .done: return UIColor(red: 0x6B / 255, green: 0x72 / 255, blue: 0x80 / 255, alpha: 1)
+            case .upcoming: return UIColor(SMAPAccent.orange.base)
+            }
+        }
+
+        /// 끝난 일정은 흐리게 — 남은 일정이 먼저 보이게
+        var alpha: CGFloat { self == .done ? 0.6 : 1 }
+        var zIndex: Int { self == .done ? 900 : 1000 }
+    }
+
+    /// 일정 마커 한 장. 좌표는 아래 위치 점의 중심 — `scheduleMarkerAnchorY` 로 맞춘다.
+    /// 2026-11-20 한 줄 말풍선으로 바꿈: 이전엔 순번 원·제목·시간·상태 점 네 칸을 세로로 쌓아
+    /// 멤버 아바타보다 두 배 가까이 높았고, 일정 몇 개만 돼도 서로·아바타와 겹쳤다.
+    static func image(order: Int, title: String, startTime: String?, tone: Tone) -> UIImage {
+        let layout = ScheduleMarkerLayout.self
+        let tint = tone.tint
+        let navy = UIColor(SMAPTheme.Family.ink)
+
+        let orderText = "\(order)"
+        let orderAttr: [NSAttributedString.Key: Any] = [.font: UIFont.suite(size: 11, weight: .bold), .foregroundColor: UIColor.white]
+        let timeText = startTime.flatMap(clock(from:))
+        let timeAttr: [NSAttributedString.Key: Any] = [.font: UIFont.suite(size: 11, weight: .semibold), .foregroundColor: UIColor.white.withAlphaComponent(0.75)]
+        let displayTitle = title.count > 10 ? String(title.prefix(10)) + "…" : title
+        let titleAttr: [NSAttributedString.Key: Any] = [.font: UIFont.suite(size: 12, weight: .bold), .foregroundColor: UIColor.white]
+
+        let timeSize = timeText?.size(withAttributes: timeAttr) ?? .zero
+        let titleSize = displayTitle.size(withAttributes: titleAttr)
+        // [안쪽 여백 4][번호 원][6][시각][5][제목][10]
+        var chipWidth = layout.inset + layout.orderSize + layout.gap + ceil(titleSize.width) + layout.trailing
+        if timeText != nil { chipWidth += ceil(timeSize.width) + layout.timeGap }
+        let width = chipWidth + layout.border * 2
+        let height = layout.totalHeight
+
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: width, height: height))
+        return renderer.image { context in
+            let ctx = context.cgContext
+            let chipRect = CGRect(x: layout.border, y: layout.border, width: chipWidth, height: layout.chipHeight)
+            let cx = width / 2
+
+            // 1. 꼬리 (칩 아래 가운데 → 위치 점)
+            ctx.setFillColor(navy.cgColor)
+            ctx.move(to: CGPoint(x: cx - layout.tailWidth / 2, y: chipRect.maxY - 1))
+            ctx.addLine(to: CGPoint(x: cx + layout.tailWidth / 2, y: chipRect.maxY - 1))
+            ctx.addLine(to: CGPoint(x: cx, y: chipRect.maxY + layout.tailHeight))
+            ctx.closePath()
+            ctx.fillPath()
+
+            // 2. 칩 — 흰 테두리로 지도 위에서 떠 보이게
+            let chipPath = UIBezierPath(roundedRect: chipRect, cornerRadius: layout.chipHeight / 2)
+            ctx.setFillColor(navy.cgColor)
+            ctx.addPath(chipPath.cgPath)
+            ctx.fillPath()
+            ctx.setStrokeColor(UIColor.white.cgColor)
+            ctx.setLineWidth(layout.border)
+            ctx.addPath(chipPath.cgPath)
+            ctx.strokePath()
+
+            // 3. 번호 원 — 색이 곧 상태
+            let orderRect = CGRect(x: chipRect.minX + layout.inset, y: chipRect.midY - layout.orderSize / 2, width: layout.orderSize, height: layout.orderSize)
+            ctx.setFillColor(tint.cgColor)
+            ctx.fillEllipse(in: orderRect)
+            let orderSize = orderText.size(withAttributes: orderAttr)
+            orderText.draw(at: CGPoint(x: orderRect.midX - orderSize.width / 2, y: orderRect.midY - orderSize.height / 2), withAttributes: orderAttr)
+
+            // 4. 시각 · 제목
+            var x = orderRect.maxX + layout.gap
+            if let timeText {
+                timeText.draw(at: CGPoint(x: x, y: chipRect.midY - timeSize.height / 2), withAttributes: timeAttr)
+                x += ceil(timeSize.width) + layout.timeGap
+            }
+            displayTitle.draw(at: CGPoint(x: x, y: chipRect.midY - titleSize.height / 2), withAttributes: titleAttr)
+
+            // 5. 위치 점 — 이 점의 중심이 일정 좌표
+            let dotRect = CGRect(x: cx - layout.dotSize / 2, y: layout.dotCenterY - layout.dotSize / 2, width: layout.dotSize, height: layout.dotSize)
+            ctx.setFillColor(tint.cgColor)
+            ctx.fillEllipse(in: dotRect)
+            ctx.setStrokeColor(UIColor.white.cgColor)
+            ctx.setLineWidth(2)
+            ctx.strokeEllipse(in: dotRect)
+        }
+    }
+
+    /// "2026-11-20 15:30:00"·"2026-11-20T15:30:00" → "15:30". 이전에는 T 형식만 읽어 공백 형식이면 날짜 전체가 찍혔다.
+    static func clock(from dateStr: String) -> String? {
+        guard let range = dateStr.range(of: #"[T ](\d{2}):(\d{2})"#, options: .regularExpression) else { return nil }
+        return String(dateStr[range].dropFirst())
+    }
 }
 

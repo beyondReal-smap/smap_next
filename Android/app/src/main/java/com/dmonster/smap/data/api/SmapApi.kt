@@ -208,6 +208,19 @@ interface SmapApi {
         @Query("days") days: Int = 14
     ): List<SmapSchedule>
 
+    /**
+     * GET /schedule/group/{groupId}/schedules — 기간 조회(지난 날짜도 된다). 활동 로그의 "그날 일정"에 쓴다.
+     * 위 /schedules/group 은 오늘부터 N일만 줘서 지난 날짜를 볼 수 없다.
+     */
+    @GET("schedule/group/{groupId}/schedules")
+    suspend fun getGroupSchedulesInRange(
+        @Path("groupId") groupId: Int,
+        @Query("current_user_id") currentUserId: String,
+        @Query("start_date") startDate: String,
+        @Query("end_date") endDate: String,
+        @Query("member_id") memberId: Int?
+    ): GroupScheduleRangeResponse
+
     /** GET /schedules/{scheduleId} */
     @GET("schedules/{scheduleId}")
     suspend fun getScheduleDetail(@Path("scheduleId") scheduleId: String): SmapSchedule

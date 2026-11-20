@@ -207,25 +207,32 @@ struct HomeSheetBody: View {
                     ForEach(Array(schedules.enumerated()), id: \.offset) { index, schedule in
                         if index > 0 { SMAPRowDivider() }
                         // 장소가 있는 일정만 누를 수 있다 — 장소 없는 일정은 옮겨 갈 곳이 없으니 누름 표시도 하지 않는다.
-                        SMAPListRow(title: schedule.title.flatMap { $0.isEmpty ? nil : $0 } ?? "제목 없음", subtitle: scheduleMemberName(schedule),
-                                    action: schedule.mapCoordinate == nil ? nil : { onSelectSchedule(schedule) }, leading: {
-                            Text(scheduleTime(schedule))
-                                .font(SMAPTheme.Font.captionBold)
-                                .foregroundStyle(SMAPAccent.schedule.deep)
-                                .monospacedDigit()
-                                .frame(minWidth: 52, minHeight: 28)
-                                .background(SMAPAccent.schedule.container, in: RoundedRectangle(cornerRadius: 8))
-                        })
+                        // 일정 탭과 같은 줄(시각·막대 / 제목 / 멤버·반복 / 장소). 색은 일정 강조색.
+                        SMAPScheduleRow(
+                            start: schedule.date.flatMap { ScheduleMarkerRenderer.clock(from: $0) },
+                            end: schedule.sst_edate.flatMap { ScheduleMarkerRenderer.clock(from: $0) },
+                            allDay: schedule.sst_all_day == "Y",
+                            title: schedule.title.flatMap { $0.isEmpty ? nil : $0 } ?? "제목 없음",
+                            member: scheduleMember(schedule),
+                            place: schedule.location.flatMap { $0.isEmpty ? nil : $0 },
+                            repeatText: schedule.isRecurring ? (schedule.repeatDescription ?? "반복") : nil,
+                            isDone: schedule.status == .completed,
+                            ongoingText: schedule.status == .ongoing ? schedule.status.text : nil,
+                            action: schedule.mapCoordinate == nil ? nil : { onSelectSchedule(schedule) }
+                        )
+                        .environment(\.smapAccent, .schedule)
                     }
                 }
             }
         }
     }
 
-    /// 그룹 전체 일정을 볼 때 누구의 일정인지
-    private func scheduleMemberName(_ schedule: SmapSchedule) -> String? {
-        guard !viewModel.members.contains(where: { $0.isSelected }), let sgdt = schedule.sgdt_idx else { return nil }
-        return viewModel.members.first(where: { $0.sgdt_idx == sgdt })?.displayName
+    /// 그룹 전체 일정을 볼 때 누구의 일정인지(한 멤버만 볼 때는 모두 같은 사람이라 뺀다).
+    /// 일정 주인(mt_idx / mt_schedule_idx)으로 찾는다 — 이전엔 sgdt_idx 로 찾았는데 그룹 일정 응답은 이 값이 비어 있어 이름이 안 나왔다.
+    private func scheduleMember(_ schedule: SmapSchedule) -> SMAPScheduleRow.Member? {
+        guard !viewModel.members.contains(where: { $0.isSelected }),
+              let owner = viewModel.members.first(where: { HomeViewModel.isSchedule(schedule, ownedBy: $0) }) else { return nil }
+        return .init(name: owner.displayName, photo: owner.mt_file1, id: owner.mt_idx)
     }
 }
 

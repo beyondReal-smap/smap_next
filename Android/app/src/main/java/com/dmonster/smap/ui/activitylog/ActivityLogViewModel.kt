@@ -14,6 +14,8 @@ import com.dmonster.smap.data.model.SubscriptionErrorCodes
 import com.dmonster.smap.data.model.SubscriptionStatusResponse
 import com.dmonster.smap.data.api.ApiResult
 import com.dmonster.smap.data.api.safeApiCall
+import com.dmonster.smap.data.model.SmapSchedule
+import com.dmonster.smap.data.service.ScheduleService
 import com.dmonster.smap.data.service.ActivityLogService
 import com.dmonster.smap.data.service.AuthService
 import com.dmonster.smap.data.service.GroupService
@@ -42,7 +44,8 @@ class ActivityLogViewModel @Inject constructor(
     private val activityLogService: ActivityLogService,
     private val groupService: GroupService,
     private val authService: AuthService,
-    private val subscriptionService: SubscriptionService
+    private val subscriptionService: SubscriptionService,
+    private val scheduleService: ScheduleService
 ) : ViewModel() {
 
     companion object {
@@ -80,6 +83,10 @@ class ActivityLogViewModel @Inject constructor(
 
     private val _locationSummary = MutableStateFlow<LocationSummary?>(null)
     val locationSummary: StateFlow<LocationSummary?> = _locationSummary.asStateFlow()
+
+    /** 고른 멤버의 그날 일정(시작 시각 순) — 지도 마커와 시트 "이날의 일정"에 쓴다. */
+    private val _daySchedules = MutableStateFlow<List<SmapSchedule>>(emptyList())
+    val daySchedules: StateFlow<List<SmapSchedule>> = _daySchedules.asStateFlow()
 
     private val _stayTimes = MutableStateFlow<List<StayTime>>(emptyList())
     val stayTimes: StateFlow<List<StayTime>> = _stayTimes.asStateFlow()
@@ -264,10 +271,13 @@ class ActivityLogViewModel @Inject constructor(
             _isLoading.value = lastLoadedAtMs == 0L
             _isLoadingLogs.value = true
             _loadFailed.value = false
+            _daySchedules.value = emptyList()
+            val groupId = _selectedGroup.value?.sgtIdx
             try {
                 val logsDeferred = async { safeApiCall { activityLogService.getLocationLogs(member.mtIdx, dateStr) } }
                 val summaryDeferred = async { safeApiCall { activityLogService.getLocationSummary(member.mtIdx, dateStr) } }
                 val stayTimesDeferred = async { safeApiCall { activityLogService.getStayTimes(member.mtIdx, dateStr) } }
+                val schedulesDeferred = async { loadDaySchedules(groupId, member.mtIdx, dateStr) }
 
                 when (val result = logsDeferred.await()) {
                     is ApiResult.Success -> {
@@ -298,6 +308,14 @@ class ActivityLogViewModel @Inject constructor(
                     is ApiResult.Success -> _stayTimes.value = result.data
                     else -> { /* error already handled above */ }
                 }
+                when (val result = schedulesDeferred.await()) {
+                    is ApiResult.Success -> _daySchedules.value = result.data
+                    else -> {
+                        Log.e(TAG, "그날 일정 조회 실패: $result")
+                        // 이동 기록 쪽 오류 안내가 먼저 있으면 덮지 않는다
+                        if (_errorMessage.value == null) _errorMessage.value = "일정을 불러오지 못했습니다"
+                    }
+                }
             } finally {
                 if (currentCoroutineContext().isActive) {
                     _isLoading.value = false
@@ -320,10 +338,12 @@ class ActivityLogViewModel @Inject constructor(
         val dateStr = _selectedDate.value.format(dateFormatter)
 
         // 날짜·멤버를 바꾸면 loadActivityData 가 이 작업을 취소한다.
+        val groupId = _selectedGroup.value?.sgtIdx
         activityJob = viewModelScope.launch {
             val logsDeferred = async { safeApiCall { activityLogService.getLocationLogs(member.mtIdx, dateStr) } }
             val summaryDeferred = async { safeApiCall { activityLogService.getLocationSummary(member.mtIdx, dateStr) } }
             val stayTimesDeferred = async { safeApiCall { activityLogService.getStayTimes(member.mtIdx, dateStr) } }
+            val schedulesDeferred = async { loadDaySchedules(groupId, member.mtIdx, dateStr) }
 
             when (val result = logsDeferred.await()) {
                 is ApiResult.Success -> {
@@ -343,8 +363,17 @@ class ActivityLogViewModel @Inject constructor(
                 is ApiResult.Success -> _stayTimes.value = result.data
                 else -> Log.w(TAG, "조용한 새로고침 실패(체류 기록): $result")
             }
+            when (val result = schedulesDeferred.await()) {
+                is ApiResult.Success -> _daySchedules.value = result.data
+                else -> Log.w(TAG, "조용한 새로고침 실패(일정): $result")
+            }
         }
     }
+
+    /** 그룹을 아직 못 정했으면 일정도 없다(그룹 단위 조회라). */
+    private suspend fun loadDaySchedules(groupId: Int?, memberId: Int, date: String): ApiResult<List<SmapSchedule>> =
+        if (groupId == null) ApiResult.Success(emptyList())
+        else safeApiCall { scheduleService.getMemberDaySchedules(groupId, memberId, date) }
 
     // MARK: - Date Navigation
 

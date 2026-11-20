@@ -34,6 +34,7 @@ struct ActivityLogView: View {
                     mapMarkers: viewModel.sortedMapMarkers,
                     overlayRevision: viewModel.overlayRevision,
                     stayTimes: viewModel.stayTimes,
+                    schedules: viewModel.daySchedules,
                     contentInsets: UIEdgeInsets(top: geo.safeAreaInsets.top + 64, left: 0, bottom: peek, right: 0)
                 )
                 .ignoresSafeArea(edges: .top)
@@ -105,6 +106,7 @@ private struct ScrubbedActivityLogMap: View {
     let mapMarkers: [MapMarker]
     let overlayRevision: Int
     let stayTimes: [StayTime]
+    let schedules: [Schedule]
     let contentInsets: UIEdgeInsets
 
     var body: some View {
@@ -112,6 +114,7 @@ private struct ScrubbedActivityLogMap: View {
             mapMarkers: mapMarkers,
             overlayRevision: overlayRevision,
             stayTimes: stayTimes,
+            schedules: schedules,
             sliderValue: scrubber.value,
             isSliderDragging: scrubber.isDragging,
             contentInsets: contentInsets
@@ -123,6 +126,8 @@ struct ActivityLogMapView: UIViewRepresentable {
     let mapMarkers: [MapMarker]
     let overlayRevision: Int
     let stayTimes: [StayTime]
+    /// 그날 일정 — 홈과 같은 한 줄 말풍선으로 찍는다(장소가 있는 것만).
+    let schedules: [Schedule]
     let sliderValue: Double
     let isSliderDragging: Bool
     /// 위 조작 줄·아래 시트에 가리는 만큼 — 경로가 보이는 영역 가운데에 오게 한다.
@@ -165,6 +170,7 @@ struct ActivityLogMapView: UIViewRepresentable {
         if mapView.contentInset != contentInsets {
             mapView.contentInset = contentInsets
         }
+        updateScheduleMarkers(mapView, coordinator: coordinator)
         let routeChanged = coordinator.lastOverlayRevision != overlayRevision
         if routeChanged {
             coordinator.clearOverlays()
@@ -487,6 +493,9 @@ struct ActivityLogMapView: UIViewRepresentable {
         var arrowMarkers: [NMFMarker] = []
         var pathDotMarkers: [NMFMarker] = []
         var polylines: [NMFPolylineOverlay] = []
+        /// 일정 마커 — 경로와 따로 관리한다(경로를 다시 그려도 일정은 그대로).
+        var scheduleMarkers: [NMFMarker] = []
+        var scheduleSignature = ""
         let currentPositionMarker = NMFMarker()
         let currentInfoMarker = NMFMarker()
         var infoSampleIndex: Int?
@@ -515,6 +524,27 @@ struct ActivityLogMapView: UIViewRepresentable {
         }
     }
     
+    /// 그날 일정 마커 — 번호는 그날 일정 순서(장소 없는 일정도 번호를 차지해 시트 목록 번호와 맞는다).
+    /// 내용이 같으면 다시 그리지 않는다.
+    private func updateScheduleMarkers(_ mapView: NMFMapView, coordinator: Coordinator) {
+        let signature = schedules.map { "\($0.sst_idx)|\($0.sst_title ?? "")|\($0.sst_sdate ?? "")|\($0.sst_location_lat ?? 0)|\($0.sst_location_long ?? 0)|\(ScheduleMarkerRenderer.Tone($0.status))" }.joined(separator: ";")
+        guard signature != coordinator.scheduleSignature else { return }
+        coordinator.scheduleSignature = signature
+        coordinator.scheduleMarkers.forEach { $0.mapView = nil }
+        coordinator.scheduleMarkers = schedules.enumerated().compactMap { index, schedule in
+            guard let lat = schedule.sst_location_lat, let lng = schedule.sst_location_long, lat != 0 || lng != 0 else { return nil }
+            let tone = ScheduleMarkerRenderer.Tone(schedule.status)
+            let marker = NMFMarker(position: NMGLatLng(lat: lat, lng: lng))
+            marker.iconImage = NMFOverlayImage(image: ScheduleMarkerRenderer.image(order: index + 1, title: schedule.sst_title ?? "일정", startTime: schedule.sst_sdate, tone: tone))
+            marker.anchor = CGPoint(x: 0.5, y: ScheduleMarkerLayout.anchorY)
+            marker.alpha = tone.alpha
+            // 경로 점·체류 마커(0)보다 위, 경로 따라가기 현재 위치(1000·1001)보다 아래 — 움직이는 위치를 가리지 않게
+            marker.zIndex = tone == .done ? 600 : 700
+            marker.mapView = mapView
+            return marker
+        }
+    }
+
     private func generateCurrentPositionInfoImage(time: String, speed: String) -> UIImage {
         let font = UIFont.suite(size: 12, weight: .bold)
         let paragraphStyle = NSMutableParagraphStyle()

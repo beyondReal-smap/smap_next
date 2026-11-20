@@ -109,6 +109,26 @@ struct ActivityLogSheetBody: View {
                             .padding(.vertical, SMAPTheme.Spacing.md)
                         }
                     }
+                    if !viewModel.daySchedules.isEmpty {
+                        // 번호는 지도 일정 마커 번호와 같다(그날 일정 순서).
+                        SMAPSection(title: "이날의 일정") {
+                            ForEach(Array(viewModel.daySchedules.enumerated()), id: \.element.id) { index, schedule in
+                                if index > 0 { SMAPRowDivider() }
+                                SMAPListRow(
+                                    title: "\(index + 1). " + (schedule.sst_title.flatMap { $0.isEmpty ? nil : $0 } ?? "제목 없음"),
+                                    subtitle: scheduleSubtitle(schedule),
+                                    leading: {
+                                        Text(schedule.sst_sdate.flatMap(ScheduleMarkerRenderer.clock(from:)) ?? "종일")
+                                            .font(SMAPTheme.Font.captionBold)
+                                            .foregroundStyle(SMAPAccent.schedule.deep)
+                                            .monospacedDigit()
+                                            .frame(minWidth: 52, minHeight: 28)
+                                            .background(SMAPAccent.schedule.container, in: RoundedRectangle(cornerRadius: 8))
+                                    }
+                                )
+                            }
+                        }
+                    }
                     SMAPSection(title: "기록을 볼 멤버") {
                         ForEach(Array(viewModel.memberDailyCounts.enumerated()), id: \.element.id) { index, member in
                             if index > 0 { SMAPRowDivider() }
@@ -128,6 +148,14 @@ struct ActivityLogSheetBody: View {
             }
             .background(SMAPTheme.Surface.canvas)
         }
+    }
+
+    /// "~ 18:00 · 공덕 수학학원" — 끝 시각과 장소 중 있는 것만
+    private func scheduleSubtitle(_ schedule: Schedule) -> String? {
+        let end = schedule.sst_edate.flatMap(ScheduleMarkerRenderer.clock(from:)).map { "~ \($0)" }
+        let place = schedule.sst_location_title.flatMap { $0.isEmpty ? nil : $0 }
+        let parts = [end, place].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
     private var summaryLine: String {

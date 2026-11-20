@@ -5,6 +5,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.background
+import com.dmonster.smap.ui.components.SmapScheduleRow
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,7 +21,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -37,7 +37,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.dmonster.smap.data.model.SmapSchedule
-import com.dmonster.smap.ui.components.SmapListRow
 import com.dmonster.smap.ui.theme.SemanticColors
 import com.dmonster.smap.ui.theme.SmapSpacing
 import com.dmonster.smap.ui.theme.SmapText
@@ -245,56 +244,27 @@ private val CalendarSundayOnNavy = Color(0xFFFFEEDF)
 // MARK: - Schedule Row
 
 /**
- * 일정 한 줄 — 왼쪽 시각(시작·끝), 가운데 제목과 "누구 · 어디", 오른쪽 상태(진행 중일 때만 강조).
- * 이전 카드에 있던 "…" 메뉴는 없앴다. 눌러서 여는 상세 시트에 수정·삭제가 있다.
+ * 일정 탭 한 줄 — 모양은 공용 [SmapScheduleRow](홈 시트와 같은 줄). 여기서는 일정 모델을 값으로 풀어 넘긴다.
+ * 눌러서 여는 상세 시트에 수정·삭제가 있다.
  */
 @Composable
 fun ScheduleRow(
     schedule: SmapSchedule,
     onClick: () -> Unit,
 ) {
-    val colors = MaterialTheme.colorScheme
     val status = getScheduleStatusUI(schedule)
-    val allDay = schedule.sstAllDay == "Y"
-    val start = timeOf(schedule.date)
-    val end = timeOf(schedule.sstEdate)
-    val subtitle = listOfNotNull(
-        schedule.validMemberName.takeIf { it.isNotBlank() },
-        schedule.location?.takeIf { it.isNotBlank() },
-        if (schedule.isRecurring) (schedule.repeatDescription ?: "반복") else null,
-    ).joinToString(" · ")
-
-    SmapListRow(
+    SmapScheduleRow(
+        start = timeOf(schedule.date),
+        end = timeOf(schedule.sstEdate),
+        allDay = schedule.sstAllDay == "Y",
         title = schedule.displayTitle,
-        subtitle = subtitle.ifBlank { null },
-        leading = {
-            Column(Modifier.width(52.dp)) {
-                Text(
-                    if (allDay) "종일" else start ?: "-",
-                    style = SmapText.bodyBold,
-                    color = if (status == ScheduleStatusUI.COMPLETED) colors.onSurfaceVariant else colors.primary
-                )
-                if (!allDay && end != null) {
-                    Text(end, style = SmapText.captionSmall, color = colors.onSurfaceVariant)
-                }
-            }
-        },
-        trailing = {
-            if (schedule.isRecurring) {
-                Icon(Icons.Outlined.Repeat, contentDescription = "반복 일정", tint = colors.onSurfaceVariant, modifier = Modifier.size(16.dp))
-            }
-            if (status == ScheduleStatusUI.ONGOING) {
-                // 진행 중은 지금 봐야 할 일정이라 남색으로 채워 목록에서 가장 먼저 보이게 한다.
-                Text(
-                    status.label,
-                    style = SmapText.captionBold,
-                    color = Color.White,
-                    modifier = Modifier
-                        .background(SmapBrush.accent, RoundedCornerShape(50))
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                )
-            }
-        },
+        memberName = schedule.validMemberName.takeIf { it.isNotBlank() },
+        memberPhoto = schedule.validMemberPhoto,
+        memberId = schedule.mtIdx,
+        place = schedule.location?.takeIf { it.isNotBlank() },
+        repeatText = if (schedule.isRecurring) (schedule.repeatDescription ?: "반복") else null,
+        isDone = status == ScheduleStatusUI.COMPLETED,
+        ongoingLabel = if (status == ScheduleStatusUI.ONGOING) status.label else null,
         onClick = onClick,
     )
 }

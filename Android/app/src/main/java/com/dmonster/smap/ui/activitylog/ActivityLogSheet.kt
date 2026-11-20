@@ -1,5 +1,8 @@
 package com.dmonster.smap.ui.activitylog
 
+import com.dmonster.smap.data.model.SmapSchedule
+import com.dmonster.smap.ui.home.TimeBadge
+import com.dmonster.smap.ui.home.markerClock
 import com.dmonster.smap.ui.theme.FamilyColors
 import com.dmonster.smap.ui.components.SheetHeaderMinHeight
 import com.dmonster.smap.ui.components.SmapBrush
@@ -86,6 +89,8 @@ fun ColumnScope.ActivityLogSheetContent(
     hasLogs: Boolean,
     isLoadingLogs: Boolean,
     activityStats: Map<Int, List<DailyCount>>,
+    /** 고른 멤버의 그날 일정(시작 시각 순) */
+    daySchedules: List<SmapSchedule>,
     subscriptionStatus: SubscriptionStatusResponse?,
     onSelectMember: (SmapGroupMember) -> Unit,
     onSelectDate: (LocalDate) -> Unit,
@@ -171,6 +176,19 @@ fun ColumnScope.ActivityLogSheetContent(
                 StatCell("이동 거리", summary.distanceFormatted, Modifier.weight(1f))
                 StatCell("이동 시간", summary.timeFormatted, Modifier.weight(1f))
                 StatCell("걸음 수", summary.stepsFormatted, Modifier.weight(1f))
+            }
+        }
+        // 번호는 지도 일정 마커 번호와 같다(그날 일정 순서). iOS "이날의 일정"과 같은 구성.
+        if (daySchedules.isNotEmpty()) SmapSection(title = "이날의 일정") {
+            daySchedules.forEachIndexed { i, s ->
+                if (i > 0) SmapRowDivider()
+                val end = markerClock(s.sstEdate)?.let { "~ $it" }
+                val place = s.location?.takeIf { it.isNotBlank() }
+                SmapListRow(
+                    title = "${i + 1}. ${s.displayTitle}",
+                    subtitle = listOfNotNull(end, place).joinToString(" · ").ifEmpty { null },
+                    leading = { TimeBadge(markerClock(s.date) ?: "종일") },
+                )
             }
         }
         SmapSection(title = "기록을 볼 멤버") {

@@ -395,13 +395,27 @@ struct SmapSchedule: Codable, Identifiable {
     let sgt_idx: Int?
     let sgdt_idx: Int?  // 그룹 멤버의 서브그룹 인덱스 (필터링 시 사용)
     let mt_idx: Int?
+    /// 그룹 일정 요약(/schedules/group/{id})은 일정 주인을 mt_idx 가 아니라 이 이름으로 준다(서버 Go dto: mt_schedule_idx = mt_idx).
+    let mt_schedule_idx: Int?
     let sst_location_lat: Double?
     let sst_location_long: Double?
     let sst_show: String? // 표시 여부 (Y/N)
-    
+    /// 장소 이름(홈 시트 일정 줄에 표시)
+    let location: String?
+    let sst_repeat_json: String?
+    let sst_repeat_json_v: String?
+    let sst_pidx: Int?
+
+    var repeatDescription: String? { ScheduleRepeat.description(json: sst_repeat_json, label: sst_repeat_json_v) }
+    var isRecurring: Bool { ScheduleRepeat.isRecurring(json: sst_repeat_json, parentIdx: sst_pidx) }
+
+    /// 일정 주인 멤버. 응답에 따라 mt_idx 또는 mt_schedule_idx 로 온다(Android filterSchedules 와 같은 규칙).
+    var ownerIdx: Int? { mt_idx ?? mt_schedule_idx }
+
     enum CodingKeys: String, CodingKey {
         case sst_idx = "id"
-        case title, date, sst_edate, sst_all_day, sst_memo, sgt_idx, sgdt_idx, mt_idx, sst_location_lat, sst_location_long, sst_show
+        case title, date, sst_edate, sst_all_day, sst_memo, sgt_idx, sgdt_idx, mt_idx, mt_schedule_idx, sst_location_lat, sst_location_long, sst_show
+        case location, sst_repeat_json, sst_repeat_json_v, sst_pidx
     }
     
     // 일정 상태 계산을 위한 헬퍼

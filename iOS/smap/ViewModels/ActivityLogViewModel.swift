@@ -59,6 +59,8 @@ class ActivityLogViewModel: ObservableObject {
         didSet { overlayRevision += 1 }
     }
     @Published var locationSummary: LocationSummary?
+    /// 고른 멤버의 그날 일정(시작 시각 순) — 지도 마커와 시트 "이날의 일정"에 쓴다.
+    @Published var daySchedules: [Schedule] = []
 
     // UI States
     let scrubber = ActivityLogScrubberState()
@@ -343,13 +345,16 @@ class ActivityLogViewModel: ObservableObject {
         mapMarkers = []
         stayTimes = []
         locationSummary = nil
+        daySchedules = []
         scrubber.isDragging = false
         scrubber.value = 0
+        let groupId = selectedGroupId
 
         async let markers = capture { try await self.service.getMapMarkers(memberId: memberId, date: date) }
         async let stays = capture { try await self.service.getStayTimes(memberId: memberId, date: date) }
         async let summary = capture { try await self.service.getLocationLogSummary(memberId: memberId, date: date) }
-        let (markerResult, stayResult, summaryResult) = await (markers, stays, summary)
+        async let schedules = capture { try await Self.fetchDaySchedules(groupId: groupId, memberId: memberId, date: date) }
+        let (markerResult, stayResult, summaryResult, scheduleResult) = await (markers, stays, summary, schedules)
         guard locationRequestID == requestID, selectedMemberId == memberId, selectedDate == date else { return }
 
         var failed: [String] = []
@@ -375,6 +380,10 @@ class ActivityLogViewModel: ObservableObject {
         case .success(let value): locationSummary = value
         case .failure(let error): note(error, "활동 요약")
         }
+        switch scheduleResult {
+        case .success(let value): daySchedules = value
+        case .failure(let error): note(error, "일정")
+        }
         if let limitMessage {
             subscriptionLimitMessage = limitMessage
         } else if !failed.isEmpty {
@@ -397,10 +406,12 @@ class ActivityLogViewModel: ObservableObject {
         let requestID = UUID()
         locationRequestID = requestID
 
+        let groupId = selectedGroupId
         async let markers = capture { try await self.service.getMapMarkers(memberId: memberId, date: date) }
         async let stays = capture { try await self.service.getStayTimes(memberId: memberId, date: date) }
         async let summary = capture { try await self.service.getLocationLogSummary(memberId: memberId, date: date) }
-        let (markerResult, stayResult, summaryResult) = await (markers, stays, summary)
+        async let schedules = capture { try await Self.fetchDaySchedules(groupId: groupId, memberId: memberId, date: date) }
+        let (markerResult, stayResult, summaryResult, scheduleResult) = await (markers, stays, summary, schedules)
         // 그사이 날짜·멤버를 바꿨거나 다른 요청이 시작됐으면 버린다.
         guard locationRequestID == requestID, selectedMemberId == memberId, selectedDate == date else { return }
 
@@ -420,6 +431,20 @@ class ActivityLogViewModel: ObservableObject {
         case .success(let value): locationSummary = value
         case .failure(let error): print("[ActivityLogViewModel] 조용한 새로고침 실패(활동 요약): \(error)")
         }
+        switch scheduleResult {
+        case .success(let value): daySchedules = value
+        case .failure(let error): print("[ActivityLogViewModel] 조용한 새로고침 실패(일정): \(error)")
+        }
+    }
+
+    /// 그 멤버의 그날 일정. 홈의 /schedules/group 은 오늘부터 14일만 주므로 지난 날짜도 되는 기간 조회를 쓴다.
+    /// 서버가 member_id 로 거르지만, 그룹 일정·반복 원본이 섞여 올 수 있어 주인·날짜·표시 여부를 한 번 더 본다.
+    private static func fetchDaySchedules(groupId: Int?, memberId: Int, date: String) async throws -> [Schedule] {
+        guard let groupId else { return [] }
+        let data = try await ScheduleService.shared.getGroupSchedules(groupId: groupId, startDate: date, endDate: date, memberId: memberId)
+        return data.schedules
+            .filter { $0.sst_show != "N" && $0.mt_idx == memberId && ($0.sst_sdate?.hasPrefix(date) ?? false) }
+            .sorted { ($0.sst_sdate ?? "") < ($1.sst_sdate ?? "") }
     }
 
     /// 특정 날짜에 해당 멤버의 활동이 있는지 확인

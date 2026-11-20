@@ -13,6 +13,15 @@ import android.view.HapticFeedbackConstants
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -159,45 +168,57 @@ fun MainTabScreen(
         bottomBar = {
             // 그룹 시작 화면(전체 화면 모달)이 떠 있을 때도 탭바를 숨긴다. 이전에는 모달 아래로 탭바가 보여
             // 눌러도 선택 표시만 바뀌고 화면은 그대로여서 고장 난 것처럼 보였다.
-            if (!showSubscriptionScreen && !showGroupCreationModal && !(selectedTabIndex == 0 && homeOverlayOpen)) CompositionLocalProvider(LocalRippleConfiguration provides null) { NavigationBar(
+            if (!showSubscriptionScreen && !showGroupCreationModal && !(selectedTabIndex == 0 && homeOverlayOpen)) CompositionLocalProvider(LocalRippleConfiguration provides null) {
+            val selectTab: (Int) -> Unit = { index ->
+                if (selectedTabIndex != index) {
+                    view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                    switchTab(index)
+                }
+            }
+            // 가운데 홈 원 버튼을 탭바 위로 솟게 겹쳐 그리려고 Box 로 감싼다(NavigationBar 는 자기 영역 밖을 잘라 낸다).
+            Box {
+            NavigationBar(
                 modifier = Modifier, // Remove fixed height to allow flexible inset-based taller height on gesture nav
                 containerColor = Color.White,
                 tonalElevation = 0.dp,
                 contentColor = BrandColors.Primary
                 // NavigationBar naturally handles NavigationBarDefaults.windowInsets
             ) {
-                tabs.forEachIndexed { index, tab ->
+                // 탭 번호는 그대로, 놓는 순서만 [그룹·일정·홈·내장소·활동 로그]
+                MainTabOrder.display.forEach { index ->
+                    val tab = tabs[index]
                     val isSelected = selectedTabIndex == index
+                    val isHome = index == 0
                     // 선택된 탭 글자·아이콘은 그 메뉴의 강조색
                     val tabColor = SmapAccent.forTab(index).base
 
                     NavigationBarItem(
                         icon = {
-                            Icon(
-                                imageVector = if (isSelected) tab.selectedIcon else tab.unselectedIcon,
-                                // 라벨 Text 가 탭 이름을 읽어주므로 아이콘은 null 로 두어
-                                // TalkBack 의 "홈 홈" 이중 읽기를 방지한다. 선택 상태는
-                                // NavigationBarItem 의 selected 시맨틱이 전달한다.
-                                contentDescription = null
-                            )
+                            if (isHome) {
+                                // 자리만 차지 — 원 버튼은 위에 겹쳐 그린다(글자 줄을 다른 탭과 맞추려고)
+                                Spacer(Modifier.size(24.dp))
+                            } else {
+                                Icon(
+                                    imageVector = if (isSelected) tab.selectedIcon else tab.unselectedIcon,
+                                    // 라벨 Text 가 탭 이름을 읽어주므로 아이콘은 null 로 두어
+                                    // TalkBack 의 "홈 홈" 이중 읽기를 방지한다. 선택 상태는
+                                    // NavigationBarItem 의 selected 시맨틱이 전달한다.
+                                    contentDescription = null
+                                )
+                            }
                         },
                         label = {
                             Text(
                                 text = tab.title,
                                 modifier = Modifier.offset(y = (-4).dp),
                                 fontFamily = SuiteFont,
-                                fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
+                                fontWeight = if (isSelected || isHome) FontWeight.SemiBold else FontWeight.Normal,
                                 fontSize = 13.sp,
                                 maxLines = 1
                             )
                         },
                         selected = isSelected,
-                        onClick = {
-                            if (selectedTabIndex != index) {
-                                view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                                switchTab(index)
-                            }
-                        },
+                        onClick = { selectTab(index) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = tabColor,
                             selectedTextColor = tabColor,
@@ -207,7 +228,14 @@ fun MainTabScreen(
                         )
                     )
                 }
-            } }
+            }
+            HomeTabButton(
+                isSelected = selectedTabIndex == 0,
+                onClick = { selectTab(0) },
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
+            }
+            }
         }
     ) { innerPadding ->
         Box(
@@ -235,7 +263,8 @@ fun MainTabScreen(
                     if (from == null || from == selectedTabIndex) {
                         placeables[selectedTabIndex]?.placeRelative(0, 0)
                     } else {
-                        val direction = if (selectedTabIndex > from) 1 else -1
+                        // 밀리는 방향은 탭 번호가 아니라 탭바에서의 자리 순서 — 홈이 가운데로 옮겨 가 둘이 달라졌다.
+                        val direction = if (MainTabOrder.positionOf(selectedTabIndex) > MainTabOrder.positionOf(from)) 1 else -1
                         val p = transitionProgress
                         placeables[from]?.placeRelative((-direction * width * p).toInt(), 0)
                         placeables[selectedTabIndex]?.placeRelative((direction * width * (1f - p)).toInt(), 0)
@@ -265,3 +294,35 @@ fun MainTabScreen(
         }
     }
 }
+
+/**
+ * 탭 번호(0 홈 · 1 그룹 · 2 일정 · 3 내장소 · 4 활동 로그)는 그대로 두고, 탭바에 놓는 순서만 바꾼다.
+ * 2026-11-20 홈을 가운데로 — 번호를 바꾸면 화면·강조색·방문 표시·뒤로 가기 등 번호에 기대는 곳이 모두 흔들린다(iOS MainTabOrder 와 같음).
+ */
+internal object MainTabOrder {
+    val display = listOf(1, 2, 0, 3, 4)
+    fun positionOf(tab: Int): Int = display.indexOf(tab).takeIf { it >= 0 } ?: tab
+}
+
+/**
+ * 가운데 홈 원 버튼 — 지도 홈이 앱의 중심이라 선택 여부와 무관하게 늘 채워 눈에 띄게, 탭바 위로 솟게 그린다.
+ * 읽기·선택 상태는 아래 "홈" 탭 항목이 맡으므로 이 버튼은 접근성 트리에서 뺀다(중복 읽기 방지).
+ */
+@Composable
+private fun HomeTabButton(isSelected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val accent = SmapAccent.forTab(0)
+    Box(
+        modifier = modifier
+            .offset(y = (-13).dp)
+            .size(54.dp)
+            .shadow(if (isSelected) 8.dp else 5.dp, CircleShape, ambientColor = accent.deep, spotColor = accent.deep)
+            .background(accent.brush, CircleShape)
+            .border(3.dp, Color.White, CircleShape)
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
+            .clearAndSetSemantics { },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(Icons.Filled.Home, contentDescription = null, tint = Color.White, modifier = Modifier.size(26.dp))
+    }
+}
+

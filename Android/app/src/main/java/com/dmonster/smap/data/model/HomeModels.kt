@@ -183,6 +183,19 @@ enum class ScheduleStatus(val text: String) {
 
 // MARK: - API Response Wrappers
 
+/** GET /schedule/group/{id}/schedules 응답 — {success, data:{schedules, groupMembers, userPermission}} 중 일정만 읽는다. */
+@Serializable
+data class GroupScheduleRangeResponse(
+    val success: Boolean,
+    val data: GroupScheduleRangeData? = null,
+    val error: String? = null,
+)
+
+@Serializable
+data class GroupScheduleRangeData(
+    val schedules: List<SmapSchedule> = emptyList(),
+)
+
 /**
  * 그룹 목록 API 응답
  */

@@ -214,7 +214,7 @@ class HomeViewModel: ObservableObject {
         dateFormatter.dateFormat = "yyyy-MM-dd"
         let selectedDateStr = dateFormatter.string(from: selectedDate)
 
-        print("🔍 [filteredSchedules] Filtering - Member: \(selectedMember.mt_name ?? "Unknown"), sgdt_idx: \(selectedMember.sgdt_idx ?? -1), selectedDate: \(selectedDateStr)")
+        print("🔍 [filteredSchedules] Filtering - Member: \(selectedMember.mt_name ?? "Unknown"), mt_idx: \(selectedMember.mt_idx), selectedDate: \(selectedDateStr)")
         print("🔍 [filteredSchedules] Total schedules available: \(schedules.count)")
 
         let filtered = schedules.filter { schedule in
@@ -223,15 +223,8 @@ class HomeViewModel: ObservableObject {
                 return false
             }
 
-            // sgdt_idx 매칭 확인 (Next.js와 동일 로직)
-            guard let scheduleSgdtIdx = schedule.sgdt_idx,
-                  let memberSgdtIdx = selectedMember.sgdt_idx else {
-                return false
-            }
-
-            // sgdt_idx로 비교 (Next.js: Number(schedule.sgdt_idx) === Number(member.sgdt_idx))
-            let sgdtMatch = scheduleSgdtIdx == memberSgdtIdx
-            if !sgdtMatch {
+            // 이 멤버의 일정인지 — 일정 주인으로 비교(Android filterSchedules 와 같은 규칙)
+            guard Self.isSchedule(schedule, ownedBy: selectedMember) else {
                 return false
             }
 
@@ -252,8 +245,8 @@ class HomeViewModel: ObservableObject {
             if let scheduleDate = scheduleDateFormatter.date(from: sDateStr) {
                 let scheduleDateStr = dateFormatter.string(from: scheduleDate)
                 let dateMatch = scheduleDateStr == selectedDateStr
-                if sgdtMatch && dateMatch {
-                    print("✅ [filteredSchedules] Match: '\(schedule.title ?? "")', sgdt_idx: \(scheduleSgdtIdx), edate: \(schedule.sst_edate ?? "nil")")
+                if dateMatch {
+                    print("✅ [filteredSchedules] Match: '\(schedule.title ?? "")', owner: \(schedule.ownerIdx ?? -1), edate: \(schedule.sst_edate ?? "nil")")
                 }
                 return dateMatch
             }
@@ -314,19 +307,27 @@ class HomeViewModel: ObservableObject {
         }
     }
 
+    /// 일정이 이 멤버 것인지 — 일정 주인(mt_idx / mt_schedule_idx)을 멤버 mt_idx 와 비교한다(Android filterSchedules 와 같은 규칙).
+    /// 2026-11-20: 이전엔 sgdt_idx 로만 비교했는데 그룹 일정 응답은 이 값이 비어 있을 수 있어, 멤버를 고르면 일정이 하나도 안 나왔다.
+    /// 주인 값이 없는 응답만 예전처럼 sgdt_idx 로 비교한다(주인을 모르는 일정을 아무 멤버에게나 보이지 않게).
+    static func isSchedule(_ schedule: SmapSchedule, ownedBy member: SmapGroupMember) -> Bool {
+        if let owner = schedule.ownerIdx { return owner == member.mt_idx }
+        guard let scheduleSgdt = schedule.sgdt_idx, let memberSgdt = member.sgdt_idx else { return false }
+        return scheduleSgdt == memberSgdt
+    }
+
     func getMemberTodayStats(mtIdx: Int) -> (completed: Int, ongoing: Int, upcoming: Int) {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
         let selectedDateStr = dateFormatter.string(from: selectedDate)
 
         // mtIdx로 멤버 찾기
-        guard let member = members.first(where: { $0.mt_idx == mtIdx }),
-              let memberSgdtIdx = member.sgdt_idx else {
-            print("⚠️ [getMemberTodayStats] Member not found or missing sgdt_idx for mtIdx: \(mtIdx)")
+        guard let member = members.first(where: { $0.mt_idx == mtIdx }) else {
+            print("⚠️ [getMemberTodayStats] Member not found for mtIdx: \(mtIdx)")
             return (0, 0, 0)
         }
 
-        print("📊 [getMemberTodayStats] Calculating stats for \(member.mt_name ?? "Unknown") (sgdt_idx: \(memberSgdtIdx)) on \(selectedDateStr)")
+        print("📊 [getMemberTodayStats] Calculating stats for \(member.mt_name ?? "Unknown") (mt_idx: \(member.mt_idx)) on \(selectedDateStr)")
 
         let todaySchedules = schedules.filter { schedule in
             // sst_show가 Y인 것만 표시
@@ -334,9 +335,8 @@ class HomeViewModel: ObservableObject {
                 return false
             }
 
-            // sgdt_idx 매칭
-            guard let scheduleSgdtIdx = schedule.sgdt_idx,
-                  scheduleSgdtIdx == memberSgdtIdx else {
+            // 이 멤버의 일정인지 — 일정 주인으로 비교
+            guard Self.isSchedule(schedule, ownedBy: member) else {
                 return false
             }
 

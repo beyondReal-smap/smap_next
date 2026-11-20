@@ -1,6 +1,10 @@
 package com.dmonster.smap.ui.activitylog
 
 
+import com.dmonster.smap.data.model.ScheduleStatus
+import com.dmonster.smap.ui.home.MarkerUtils
+import com.dmonster.smap.ui.home.ScheduleMarkerLayout
+import com.dmonster.smap.ui.home.mapLatLng
 import com.dmonster.smap.AppConstants
 import com.dmonster.smap.BuildConfig
 import androidx.compose.animation.*
@@ -67,6 +71,7 @@ fun ActivityLogScreen(
     val memberActivityStats by viewModel.memberActivityStats.collectAsState()
     val selectedDate by viewModel.selectedDate.collectAsState()
     val stayTimes by viewModel.stayTimes.collectAsState()
+    val daySchedules by viewModel.daySchedules.collectAsState()
     val subscriptionStatus by viewModel.subscriptionStatus.collectAsState()
     val retentionExceededMessage by viewModel.retentionExceededMessage.collectAsState()
 
@@ -178,6 +183,7 @@ fun ActivityLogScreen(
                     hasLogs = locationLogs.isNotEmpty(),
                     isLoadingLogs = isLoadingLogs,
                     activityStats = memberActivityStats,
+                    daySchedules = daySchedules,
                     subscriptionStatus = subscriptionStatus,
                     onSelectMember = {
                         viewModel.selectMember(it)
@@ -233,6 +239,26 @@ fun ActivityLogScreen(
                 // 위 조작 줄과 아래 접힌 시트만큼 비워 경로가 가려지지 않게 한다.
                 contentPadding = PaddingValues(top = statusBarTop + 64.dp, bottom = sheetPeek)
             ) {
+                // 그날 일정 — 홈과 같은 한 줄 말풍선. 번호는 그날 일정 순서(장소 없는 일정도 번호를 차지해 시트 목록 번호와 맞는다).
+                // 경로·시작·끝 마커(60~70)보다 위, 경로 따라가기 현재 위치(100·101)보다 아래 — 움직이는 위치를 가리지 않게.
+                val mapContext = androidx.compose.ui.platform.LocalContext.current
+                daySchedules.forEachIndexed { index, schedule ->
+                    val position = schedule.mapLatLng ?: return@forEachIndexed
+                    androidx.compose.runtime.key(schedule.sstIdx) {
+                        val bitmap = remember(schedule.sstIdx, schedule.displayTitle, schedule.date, index, schedule.status) {
+                            MarkerUtils.createScheduleMarkerBitmap(mapContext, schedule, index)
+                        }
+                        val isDone = schedule.status == ScheduleStatus.COMPLETED
+                        Marker(
+                            state = MarkerState(position = position),
+                            icon = OverlayImage.fromBitmap(bitmap),
+                            anchor = androidx.compose.ui.geometry.Offset(0.5f, ScheduleMarkerLayout.ANCHOR_Y),
+                            alpha = if (isDone) 0.6f else 1f,
+                            zIndex = if (isDone) 80 else 90,
+                        )
+                    }
+                }
+
                 // Path Overlay
                 if (totalPoints >= 2) {
                     // 1. Full Path (Always visible)

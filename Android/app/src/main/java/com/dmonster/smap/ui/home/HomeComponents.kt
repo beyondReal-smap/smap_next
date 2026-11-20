@@ -550,8 +550,25 @@ internal object ScheduleMarkerLayout {
 }
 
 /** "2026-11-20 15:30:00"·"2026-11-20T15:30:00" → "15:30". 시각을 못 찾으면 null. */
-private fun markerClock(raw: String?): String? =
+internal fun markerClock(raw: String?): String? =
     raw?.let { Regex("[T ](\\d{2}):(\\d{2})").find(it) }?.let { "${it.groupValues[1]}:${it.groupValues[2]}" }
+
+/**
+ * 일정 동선 — 멤버별 좌표 목록(2곳 이상인 것만). [schedules] 는 시작 시각 순이어야 한다.
+ * 멤버끼리 섞어 이으면 아무도 다니지 않는 길이 되므로 mtIdx 로 나눈다. 같은 자리가 이어지면 한 번만,
+ * 멤버를 모르는 일정은 잇지 않는다. iOS `ScheduleRoute.routes` 와 같은 규칙.
+ */
+internal fun scheduleRoutes(schedules: List<SmapSchedule>): List<List<LatLng>> {
+    val byMember = LinkedHashMap<Int, MutableList<LatLng>>()
+    for (schedule in schedules) {
+        // 응답에 따라 주인이 mt_idx 또는 mt_schedule_idx 로 온다(HomeViewModel.filterSchedules 와 같게)
+        val member = schedule.mtIdx ?: schedule.mtScheduleIdx ?: continue
+        val point = schedule.mapLatLng ?: continue
+        val points = byMember.getOrPut(member) { mutableListOf() }
+        if (points.lastOrNull() != point) points.add(point)
+    }
+    return byMember.values.filter { it.size >= 2 }
+}
 
 /** 지도에 찍을 수 있는 일정 장소. 좌표가 없거나 (0,0)·범위 밖이면 null. */
 internal val SmapSchedule.mapLatLng: LatLng?

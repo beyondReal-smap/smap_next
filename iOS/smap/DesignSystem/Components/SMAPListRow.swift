@@ -172,3 +172,138 @@ struct SMAPCountPill: View {
             .background(accent.container, in: Capsule())
     }
 }
+
+// MARK: - 일정 줄 (Android SmapScheduleRow 이식)
+
+/// 일정 한 줄 — 왼쪽 시각(시작·끝)과 강조색 세로 막대, 가운데 세 줄:
+/// 제목 / 멤버(얼굴·이름) + 반복 칩 / 장소(핀). 오른쪽 위는 진행 중일 때만 강조 표시.
+/// 일정 탭 목록과 홈 시트 "오늘의 일정"이 함께 쓴다 — 모델이 서로 달라(Schedule / SmapSchedule) 값으로 받는다.
+/// 2026-11-20: 이전엔 "멤버 · 장소 · 반복"을 부제 한 줄에 이어 붙여 길면 잘리고 무엇이 무엇인지 읽기 어려웠다.
+struct SMAPScheduleRow: View {
+    struct Member {
+        let name: String
+        let photo: String?
+        let id: Int?
+    }
+
+    @Environment(\.smapAccent) private var accent
+    /// "15:30" — 종일이면 무시
+    let start: String?
+    let end: String?
+    let allDay: Bool
+    let title: String
+    var member: Member? = nil
+    var place: String? = nil
+    var repeatText: String? = nil
+    var isDone: Bool = false
+    /// 값이 있으면 제목 오른쪽에 강조 배지("진행 중")
+    var ongoingText: String? = nil
+    /// nil 이면 누를 수 없는 줄(누름 표시도 없음)
+    var action: (() -> Void)? = nil
+
+    var body: some View {
+        if let action {
+            Button(action: action) { row }
+                .buttonStyle(SMAPRowButtonStyle())
+        } else {
+            row
+        }
+    }
+
+    private var row: some View {
+        HStack(alignment: .top, spacing: 12) {
+            // 시각
+            VStack(alignment: .leading, spacing: 2) {
+                Text(allDay ? "종일" : (start ?? "-"))
+                    .font(SMAPTheme.Font.bodyBold)
+                    .foregroundStyle(isDone ? SMAPTheme.Surface.onSurfaceMuted : accent.base)
+                if !allDay, let end {
+                    Text(end)
+                        .font(SMAPTheme.Font.captionSmall)
+                        .foregroundStyle(SMAPTheme.Surface.onSurfaceMuted)
+                }
+            }
+            .monospacedDigit()
+            .frame(width: 48, alignment: .leading)
+
+            // 시간 막대 — 목록이 하루 시간표처럼 읽히게. 끝난 일정은 회색.
+            RoundedRectangle(cornerRadius: 1.5)
+                .fill(isDone ? SMAPTheme.Surface.divider : accent.base)
+                .frame(width: 3)
+                .frame(maxHeight: .infinity)
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(title)
+                        .font(SMAPTheme.Font.bodyBold)
+                        .foregroundStyle(isDone ? SMAPTheme.Surface.onSurfaceMuted : SMAPTheme.Surface.onSurface)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if let ongoingText {
+                        // 진행 중은 지금 봐야 할 일정이라 강조색으로 채워 목록에서 가장 먼저 보이게 한다.
+                        Text(ongoingText)
+                            .font(SMAPTheme.Font.captionBold)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(accent.gradient, in: Capsule())
+                            .fixedSize()
+                    }
+                }
+                if member != nil || repeatText != nil {
+                    HStack(spacing: 8) {
+                        if let member {
+                            HStack(spacing: 6) {
+                                SMAPAvatar(name: member.name, imagePath: member.photo, size: 20, memberID: member.id)
+                                Text(member.name)
+                                    .font(SMAPTheme.Font.caption)
+                                    .foregroundStyle(SMAPTheme.Surface.onSurface)
+                                    .lineLimit(1)
+                            }
+                        }
+                        if let repeatText {
+                            Label(repeatText, systemImage: "repeat")
+                                .labelStyle(.titleAndIcon)
+                                .font(SMAPTheme.Font.captionSmall)
+                                .foregroundStyle(accent.deep)
+                                .lineLimit(1)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(accent.container, in: Capsule())
+                        }
+                    }
+                }
+                if let place {
+                    HStack(spacing: 4) {
+                        Image(systemName: "mappin")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text(place).lineLimit(1)
+                    }
+                    .font(SMAPTheme.Font.caption)
+                    .foregroundStyle(SMAPTheme.Surface.onSurfaceMuted)
+                }
+            }
+        }
+        .padding(.horizontal, SMAPTheme.Spacing.md)
+        .padding(.vertical, 12)
+        .frame(minHeight: 60)
+        .contentShape(Rectangle())
+        // 버튼 안쪽에서 하나로 묶어야 한 줄이 한 번만 읽힌다(바깥에 달면 버튼과 묶음이 따로 잡혔다).
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(spokenText)
+    }
+
+    /// "15:30 ~ 18:00, 수학학원, 민지, 장소 공덕 수학학원, 반복 매주, 진행 중" 처럼 한 번에 읽는다.
+    private var spokenText: String {
+        let time = allDay ? "종일" : [start, end.map { "~ \($0)" }].compactMap { $0 }.joined(separator: " ")
+        return [
+            time.isEmpty ? nil : time,
+            title,
+            member?.name,
+            place.map { "장소 \($0)" },
+            repeatText.map { "반복 \($0)" },
+            ongoingText,
+        ].compactMap { $0 }.joined(separator: ", ")
+    }
+}

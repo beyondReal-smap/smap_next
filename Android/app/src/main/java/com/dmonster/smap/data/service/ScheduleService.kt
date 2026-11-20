@@ -34,6 +34,20 @@ class ScheduleService(
     }
 
     /**
+     * 한 멤버의 그날 일정(시작 시각 순) — 활동 로그용. [date] 는 "yyyy-MM-dd".
+     * 서버가 member_id 로 거르지만 그룹 일정이 섞여 올 수 있어 주인·날짜·표시 여부를 한 번 더 본다(iOS fetchDaySchedules 와 같음).
+     */
+    suspend fun getMemberDaySchedules(groupId: Int, memberId: Int, date: String): List<SmapSchedule> {
+        val response = api.getGroupSchedulesInRange(groupId, authService.getMtIdx().toString(), date, date, memberId)
+        if (!response.success) throw IllegalStateException(response.error ?: "일정 조회 실패")
+        return response.data?.schedules.orEmpty()
+            .filter { s ->
+                s.sstShow != "N" && (s.mtIdx ?: s.mtScheduleIdx) == memberId && s.date?.startsWith(date) == true
+            }
+            .sortedBy { it.date }
+    }
+
+    /**
      * GET /schedules/group/{groupId}?days=60, then client-side filter by year/month.
      */
     suspend fun getSchedules(groupId: Int, year: Int, month: Int): List<SmapSchedule> {
